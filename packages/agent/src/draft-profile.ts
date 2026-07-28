@@ -27,6 +27,7 @@ function slugify(value: string): string {
 function titleSlugForKey(title: string): string {
   return slugify(
     title
+      .replace(/^a2a\s+/i, '')
       .replace(/^black\s*square\s+/i, '')
       .replace(/^fs\s*reborn\s+/i, '')
       .replace(/^fsreborn\s+/i, '')

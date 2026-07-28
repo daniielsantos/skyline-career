@@ -105,6 +105,7 @@ async function runWritetest(bridge: NamedPipeSimBridge): Promise<WritetestOutcom
     { name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: 40 },
     { name: 'FUEL TANK LEFT MAIN QUANTITY', unit: 'gallons', value: 35 },
     { name: 'FUEL TANK RIGHT MAIN QUANTITY', unit: 'gallons', value: 35 },
+    { name: 'FUEL TANK CENTER QUANTITY', unit: 'gallons', value: 20 },
     { name: 'FUEL TANK LEFT AUX QUANTITY', unit: 'gallons', value: 15 },
     { name: 'FUEL TANK RIGHT AUX QUANTITY', unit: 'gallons', value: 15 },
     { name: 'PAYLOAD STATION WEIGHT:1', unit: 'pounds', value: 180 },
@@ -294,8 +295,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
     printSection('2/5 Probe (capacities)');
     const totalCap = await tryRead(bridge, 'FUEL TOTAL CAPACITY', 'gallons');
+    const totalQty = await tryRead(bridge, 'FUEL TOTAL QUANTITY', 'gallons');
     const leftMainCap = await tryRead(bridge, 'FUEL TANK LEFT MAIN CAPACITY', 'gallons');
     const rightMainCap = await tryRead(bridge, 'FUEL TANK RIGHT MAIN CAPACITY', 'gallons');
+    const centerCap = await tryRead(bridge, 'FUEL TANK CENTER CAPACITY', 'gallons');
+    const centerQty = await tryRead(bridge, 'FUEL TANK CENTER QUANTITY', 'gallons');
     const leftAuxCap = await tryRead(bridge, 'FUEL TANK LEFT AUX CAPACITY', 'gallons');
     const rightAuxCap = await tryRead(bridge, 'FUEL TANK RIGHT AUX CAPACITY', 'gallons');
     const leftAuxQty = await tryRead(bridge, 'FUEL TANK LEFT AUX QUANTITY', 'gallons');
@@ -304,9 +308,10 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     printKv([
       ['fuel dens', `${roundFuel(lbPerGal, 3)} lb/gal`],
       ['FUELSYSTEM:1 cap', formatGalLbs(fs1 ?? 0, lbPerGal)],
-      ['total capacity', formatGalLbs(totalCap, lbPerGal)],
+      ['total cap/qty', `${formatGalLbs(totalCap, lbPerGal)} / ${formatGalLbs(totalQty, lbPerGal)}`],
       ['left main cap', formatGalLbs(leftMainCap, lbPerGal)],
       ['right main cap', formatGalLbs(rightMainCap, lbPerGal)],
+      ['center cap/qty', `${formatGalLbs(centerCap, lbPerGal)} / ${formatGalLbs(centerQty, lbPerGal)}`],
       [
         'left aux cap/qty',
         `${formatGalLbs(leftAuxCap, lbPerGal)} / ${formatGalLbs(leftAuxQty, lbPerGal)}`,
@@ -320,14 +325,19 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['payload stn', formatStationsLine(payloadLive.stations)],
     ]);
     const classicLikely = (fs1 ?? 0) < 5 && (leftMainCap ?? totalCap ?? 0) >= 5;
-    console.log(
-      classicLikely
-        ? '  → Likely classic tanks (FUELSYSTEM dead). Same path as Black Square.'
-        : '  → FUELSYSTEM may be live — draft will prefer it when capacity >= 5.',
-    );
+    const centerLikely = (centerCap ?? 0) >= 5;
+    if (classicLikely && centerLikely) {
+      console.log(
+        `  → Classic 3-tank layout likely (L/R main + center). total≈${roundFuel(totalCap ?? 0)} gal.`,
+      );
+    } else if (classicLikely) {
+      console.log('  → Likely classic tanks (FUELSYSTEM dead). Same path as Black Square.');
+    } else {
+      console.log('  → FUELSYSTEM may be live — draft will prefer it when capacity >= 5.');
+    }
 
     printSection('3/5 Writetest');
-    console.log('  Writing sample values (mains/aux/stations)...');
+    console.log('  Writing sample values (mains/center/aux/stations)...');
     const outcomes = await runWritetest(bridge);
     const matched = outcomes.filter((o) => o.matched);
     const failed = outcomes.filter((o) => !o.matched);
@@ -335,9 +345,14 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       console.log(`  ✓ ${o.var}  offset=${o.writeOffsetHint ?? '—'}`);
     }
     for (const o of failed) {
-      console.log(`  ✗ ${o.var}`);
+      const stuck =
+        typeof o.before === 'number' && typeof o.after === 'number' && Math.abs(o.after - o.before) < 0.05
+          ? ' (write ignored — value unchanged)'
+          : '';
+      console.log(`  ✗ ${o.var}${stuck}`);
     }
     const mainsOk = matched.some((o) => o.var.includes('LEFT MAIN')) && matched.some((o) => o.var.includes('RIGHT MAIN'));
+    const centerOk = matched.some((o) => o.var.includes('CENTER QUANTITY'));
     const auxWriteOk =
       matched.some((o) => o.var.includes('LEFT AUX')) && matched.some((o) => o.var.includes('RIGHT AUX'));
     // Many airframes accept AUX SimVar writes even with 0 capacity (ghost tanks). Only offer
@@ -345,8 +360,24 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     const auxCapacityReal =
       (leftAuxCap !== null && leftAuxCap >= 5) || (rightAuxCap !== null && rightAuxCap >= 5);
     if (!mainsOk && !(fs1 && fs1 >= 5)) {
-      console.log('  Fuel writes failed — stop and investigate (WASM may be required).');
+      console.log('  Fuel writes failed — SimConnect QUANTITY sets did not stick.');
+      console.log(
+        '  Typical on Accu-Sim / A2A: tablet owns fuel & payload; classic SimVars are read-only mirrors.',
+      );
+      console.log(
+        '  Next: identify vendor LVars/tablet API (lvar-bridge profile) — cannot promote simconnect-direct yet.',
+      );
+      if (centerLikely) {
+        console.log(
+          `  Note: CENTER tank is live (${formatGalLbs(centerCap, lbPerGal)}) — profile will need LEFT/RIGHT/CENTER when writable.`,
+        );
+      }
       return;
+    }
+    if (centerLikely && !centerOk) {
+      console.log(
+        '  Warning: CENTER has capacity but writes failed — mains ok; decide later if CENTER needs LVar path.',
+      );
     }
 
     let includeAux = false;

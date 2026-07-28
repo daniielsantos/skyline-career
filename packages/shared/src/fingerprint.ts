@@ -12,8 +12,9 @@ function semverMajor(version?: string): string {
 }
 
 /**
- * Strip trailing ATC registration / tail number so live titles like
- * "… Professional N5172C" match profile match.title without the suffix.
+ * Strip trailing ATC registration / tail number and common livery/cabin suffixes
+ * so live titles like "FSReborn Phenom 300E Manchester Interior" match a stable
+ * catalog title ("FSReborn Phenom 300E").
  */
 export function normalizeAircraftTitle(title: string): string {
   let t = title.trim().replace(/\s+/g, ' ');
@@ -21,11 +22,17 @@ export function normalizeAircraftTitle(title: string): string {
   t = t.replace(/\s+N[0-9]{1,5}[A-Z]{0,2}$/i, '');
   // Dash registrations: G-ABCD, PR-ABC, VH-ABC, C-GABC, …
   t = t.replace(/\s+[A-Z]{1,2}-[A-Z0-9]{2,5}$/i, '');
+  // Cabin packs often append "<Name> Interior" (e.g. "Manchester Interior").
+  // Only strip alphabetic name tokens (1–2 words) before Interior — never model tokens like "300E".
+  t = t.replace(/\s+(?:[A-Za-z][\w\-]*\s+){1,2}Interior$/i, '');
+  // Trailing "livery" / "paint" tokens
+  t = t.replace(/\s+(?:livery|paint|repaint)$/i, '');
   return t.trim();
 }
 
 const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\bblack\s*square\b/i, publisher: 'blacksquare' },
+  { re: /\bfs\s*reborn\b|\bfsreborn\b/i, publisher: 'fsreborn' },
   { re: /\bpmdg\b/i, publisher: 'pmdg' },
   { re: /\bfenix\b/i, publisher: 'fenix' },
   { re: /\binibuilds\b/i, publisher: 'inibuilds' },

@@ -9,17 +9,41 @@ export function cleanIcaoCode(options: {
   atcModel?: string | null;
   title?: string;
 }): string {
+  // Prefer an already-clean designator (wizard-confirmed / profile value).
+  const explicit = (options.icao ?? '').replace(/^\$\$:/, '').trim();
+  if (
+    explicit &&
+    /^[A-Z0-9]{2,6}$/i.test(explicit) &&
+    !/ATCCOM/i.test(explicit) &&
+    explicit.toUpperCase() !== 'ZZZZ'
+  ) {
+    return explicit.toUpperCase();
+  }
+
+  const title = options.title ?? '';
+  // Well-known type mappings when ATC MODEL is a vendor string.
+  if (/phenom\s*300/i.test(title) || /phenom\s*300/i.test(options.atcModel ?? '')) {
+    return 'E55P';
+  }
+
   const candidates = [options.icao, options.atcModel].filter(Boolean) as string[];
   for (const raw of candidates) {
-    const model = raw.match(/AC_MODEL[_ .\-]?([A-Z0-9]{2,6})/i);
+    const cleaned = raw.replace(/^\$\$:/, '').trim();
+    const model = cleaned.match(/AC_MODEL[_ .\-]?([A-Z0-9]{2,6})/i);
     if (model?.[1]) return model[1].toUpperCase();
-    if (/^[A-Z0-9]{2,6}$/i.test(raw) && !/ATCCOM/i.test(raw)) {
-      return raw.toUpperCase();
+    if (/^[A-Z0-9]{2,6}$/i.test(cleaned) && !/ATCCOM/i.test(cleaned)) {
+      return cleaned.toUpperCase();
     }
   }
-  const title = options.title ?? '';
   const fromTitle = title.match(/\b([A-Z]{1,2}\d{1,3}[A-Z]?)\b/i);
   return fromTitle?.[1]?.toUpperCase() ?? 'ZZZZ';
+}
+
+/** Normalize a user-entered ICAO type designator for catalog / SimBrief. */
+export function normalizeConfirmedIcao(raw: string, fallback = 'ZZZZ'): string {
+  const cleaned = raw.replace(/^\$\$:/, '').trim().toUpperCase();
+  if (/^[A-Z0-9]{2,6}$/.test(cleaned)) return cleaned;
+  return fallback;
 }
 
 export function notesFileStem(profile: AircraftProfile): string {
@@ -77,6 +101,8 @@ export async function promoteDraftProfile(options: {
   notesDir: string;
   repoRoot: string;
   identityTitle?: string;
+  /** Preferred catalog title (already stripped of livery). */
+  matchTitle?: string;
   atcModel?: string | null;
   icao?: string | null;
   discoveryNotes?: string[];
@@ -85,17 +111,22 @@ export async function promoteDraftProfile(options: {
   const profile = JSON.parse(await readFile(options.draftPath, 'utf8')) as AircraftProfile;
 
   profile.semver = '1.0.0';
-  const title = normalizeAircraftTitle(profile.match.title ?? profile.displayName ?? profile.profileId);
+  const title = normalizeAircraftTitle(
+    options.matchTitle ?? profile.match.title ?? profile.displayName ?? profile.profileId,
+  );
   profile.match.title = title;
-  profile.match.icao = cleanIcaoCode({
-    icao: options.icao ?? profile.match.icao,
-    atcModel: options.atcModel,
-    title,
-  });
+  profile.match.icao = options.icao
+    ? normalizeConfirmedIcao(options.icao, cleanIcaoCode({ icao: options.icao, atcModel: options.atcModel, title }))
+    : cleanIcaoCode({
+        icao: profile.match.icao,
+        atcModel: options.atcModel,
+        title,
+      });
   profile.displayName = `${title} (MSFS 2024)`;
   const stem = notesFileStem(profile);
   profile.notes = [
     `Homologated via wizard: ${title}.`,
+    `ICAO type designator (catalog/SimBrief): ${profile.match.icao}.`,
     ...(options.discoveryNotes ?? []),
     `See profiles/notes/${stem}.md`,
   ];
@@ -140,7 +171,7 @@ function buildNotesMarkdown(
 
 **In-sim title (example):** \`${options.identityTitle ?? profile.match.title}\`  
 **Match title:** \`${profile.match.title}\`  
-**ICAO:** \`${profile.match.icao ?? ''}\`  
+**ICAO (SimBrief type):** \`${profile.match.icao ?? ''}\`  
 **Publisher:** \`${profile.match.publisher}\`  
 **Stations:** ${profile.payload.stations.length}  
 **Profile:** \`${profile.profileKey}@${profile.semver}\`

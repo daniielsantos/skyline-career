@@ -8,6 +8,10 @@ import { cleanIcaoCode } from './promote-profile.js';
 export interface DraftOptions {
   outDir: string;
   publisher?: string;
+  /** Catalog match title (livery stripped). Defaults to normalized live title. */
+  matchTitle?: string;
+  /** Confirmed ICAO type designator (SimBrief / catalog). */
+  icao?: string;
   fuelOffset?: number;
 }
 
@@ -17,6 +21,21 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+/** Drop leading publisher words so profileKey is `fsreborn/phenom-300e`, not `fsreborn/fsreborn-…`. */
+function titleSlugForKey(title: string): string {
+  return slugify(
+    title
+      .replace(/^black\s*square\s+/i, '')
+      .replace(/^fs\s*reborn\s+/i, '')
+      .replace(/^fsreborn\s+/i, '')
+      .replace(/^pmdg\s+/i, '')
+      .replace(/^fenix\s+/i, '')
+      .replace(/^inibuilds\s+/i, '')
+      .replace(/^working\s*title\s+/i, '')
+      .replace(/^asobo\s+/i, ''),
+  );
 }
 
 /**
@@ -29,15 +48,20 @@ export async function draftProfileFromLive(
 ): Promise<{ path: string; profile: AircraftProfile }> {
   const identity = await bridge.getAircraftIdentity();
   const rawTitle = identity.title || 'Unknown Aircraft';
-  const title = normalizeAircraftTitle(rawTitle) || rawTitle;
-  const icao = cleanIcaoCode({
-    icao: identity.icao,
-    atcModel: identity.atcModel,
-    title: rawTitle,
-  });
+  const title =
+    normalizeAircraftTitle(options.matchTitle ?? rawTitle) ||
+    normalizeAircraftTitle(rawTitle) ||
+    rawTitle;
+  const icao = options.icao
+    ? cleanIcaoCode({ icao: options.icao, title })
+    : cleanIcaoCode({
+        icao: identity.icao,
+        atcModel: identity.atcModel,
+        title,
+      });
   const publisher =
     options.publisher ??
-    inferPublisher(rawTitle, process.env.MSFS_COMPAT_PUBLISHER);
+    inferPublisher(title, process.env.MSFS_COMPAT_PUBLISHER);
   const fuelOffset = options.fuelOffset ?? 0;
 
   const tanks: AircraftProfile['fuel']['tanks'] = [];
@@ -206,7 +230,7 @@ export async function draftProfileFromLive(
     },
   );
 
-  const titleSlug = slugify(title.replace(/^black\s*square\s+/i, ''));
+  const titleSlug = titleSlugForKey(title);
   const slug = slugify(`${publisher}-${titleSlug}`);
   const profile: AircraftProfile = {
     schemaVersion: '1.0.0',

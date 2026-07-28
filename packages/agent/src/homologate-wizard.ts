@@ -6,7 +6,7 @@ import { calibrateProfile } from './calibrate-profile.js';
 import { draftProfileFromLive } from './draft-profile.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { confirm, printKv, printSection, withPrompts } from './prompt.js';
-import { ensureAuxTanks, promoteDraftProfile } from './promote-profile.js';
+import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProfile } from './promote-profile.js';
 
 export interface HomologateWizardOptions {
   bridge: NamedPipeSimBridge;
@@ -179,11 +179,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     const ping = await bridge.ping();
     const identity = await bridge.getAircraftIdentity();
     const snapshot = await bridge.snapshot();
-    const title = normalizeAircraftTitle(identity.title);
+    const suggestedTitle = normalizeAircraftTitle(identity.title);
     printKv([
       ['bridge', `${ping.mode} connected=${ping.connected}`],
-      ['title', identity.title],
-      ['match title', title],
+      ['title (live)', identity.title],
+      ['match title?', suggestedTitle],
       ['atcModel', identity.atcModel],
       ['icao', identity.icao],
       ['empty lb', snapshot.vars?.['EMPTY WEIGHT']],
@@ -193,6 +193,22 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['left main', snapshot.vars?.['FUEL TANK LEFT MAIN QUANTITY']],
       ['right main', snapshot.vars?.['FUEL TANK RIGHT MAIN QUANTITY']],
     ]);
+    console.log('  Tip: strip livery/cabin names from match title (shared across paints).');
+    const matchTitle = (await ask('Catalog match title', suggestedTitle)).trim() || suggestedTitle;
+    const suggestedIcao = cleanIcaoCode({
+      icao: identity.icao,
+      atcModel: identity.atcModel,
+      title: matchTitle,
+    });
+    console.log('  Tip: ICAO type designator is required for SimBrief / OFP later — confirm carefully.');
+    if (suggestedIcao === 'ZZZZ') {
+      console.log('  Warning: could not infer ICAO from sim — enter the real type (e.g. E55P, C172).');
+    }
+    const matchIcao = normalizeConfirmedIcao(
+      (await ask('ICAO type designator (SimBrief)', suggestedIcao)).trim() || suggestedIcao,
+      suggestedIcao,
+    );
+    printKv([['catalog ICAO', matchIcao]]);
 
     printSection('2/5 Probe (capacities)');
     const totalCap = await tryRead(bridge, 'FUEL TOTAL CAPACITY', 'gallons');
@@ -260,7 +276,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     }
 
     printSection('4/5 Draft + calibrate');
-    const drafted = await draftProfileFromLive(bridge, { outDir: draftsDir });
+    const drafted = await draftProfileFromLive(bridge, {
+      outDir: draftsDir,
+      matchTitle,
+      icao: matchIcao,
+    });
     let profile = drafted.profile;
     if (includeAux) {
       const leftCapGuess =
@@ -349,8 +369,9 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       notesDir,
       repoRoot,
       identityTitle: identity.title,
+      matchTitle,
       atcModel: identity.atcModel,
-      icao: identity.icao,
+      icao: matchIcao,
       discoveryNotes,
       runSeed: await confirm(ask, 'Run db:seed (Postgres if DATABASE_URL set)', true),
     });

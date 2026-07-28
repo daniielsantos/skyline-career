@@ -12,6 +12,7 @@ coverage/
 *.tsbuildinfo
 .data/
 profiles/cache/
+artifacts/
 
 # .NET build outputs (never commit)
 **/bin/

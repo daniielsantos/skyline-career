@@ -30,6 +30,30 @@ npm run build:native
 npm run smoke
 ```
 
+### One-command local stack
+
+```powershell
+# Terminal A — catalog + SimConnect host together
+npm run start:local
+# or without MSFS:
+npm run start:local:mock
+
+# Terminal B — agent
+node packages/agent/dist/cli.js fingerprint --register
+node packages/agent/dist/cli.js resolve
+```
+
+PowerShell shortcut: `.\scripts\start-skyline.ps1` (or `-Mode mock`).
+
+### Portable zip
+
+```powershell
+npm run pack:portable
+# → artifacts/skyline-portable/ and artifacts/skyline-portable.zip
+```
+
+Unzip, `npm install`, then `.\start.ps1` or `npm run start:simconnect`.
+
 ### Catalog API (Phase 3)
 
 ```powershell
@@ -49,9 +73,8 @@ Manifest: `http://localhost:8080/v1/profiles/manifest`
 ### Real SimConnect (MSFS 2024)
 
 1. Start MSFS 2024 and load an aircraft.
-2. Terminal A: `npm run catalog:serve`
-3. Terminal B: `npm run host:simconnect`
-4. Terminal C:
+2. Terminal A: `npm run start:local`
+3. Terminal B:
 
 ```powershell
 node packages/agent/dist/cli.js fingerprint --register

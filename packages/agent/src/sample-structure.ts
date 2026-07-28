@@ -3,14 +3,15 @@ import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 
 /**
  * Classic named tanks for fingerprinting when FUELSYSTEM capacities are empty.
- * MAIN (+ CENTER) only — AUX/TIP omitted so mains-only profiles stay stable;
- * catalog title fallback covers tip-equipped airframes until those tanks are profiled.
+ * Indices must stay aligned with structureFromProfile CLASSIC_TANK_INDEX.
  */
 const CLASSIC_FINGERPRINT_SLOTS: Array<{ id: string; capacityVar: string; index: number }> = [
   { id: 'LEFT_MAIN', capacityVar: 'FUEL TANK LEFT MAIN CAPACITY', index: 1 },
   { id: 'RIGHT_MAIN', capacityVar: 'FUEL TANK RIGHT MAIN CAPACITY', index: 2 },
-  { id: 'CENTER', capacityVar: 'FUEL TANK CENTER CAPACITY', index: 3 },
-  { id: 'CENTER2', capacityVar: 'FUEL TANK CENTER2 CAPACITY', index: 4 },
+  { id: 'LEFT_AUX', capacityVar: 'FUEL TANK LEFT AUX CAPACITY', index: 3 },
+  { id: 'RIGHT_AUX', capacityVar: 'FUEL TANK RIGHT AUX CAPACITY', index: 4 },
+  { id: 'CENTER', capacityVar: 'FUEL TANK CENTER CAPACITY', index: 5 },
+  { id: 'CENTER2', capacityVar: 'FUEL TANK CENTER2 CAPACITY', index: 6 },
 ];
 
 /**

@@ -100,6 +100,16 @@ async function main() {
       );
       const profileId = prof.rows[0].id;
 
+      // Newer seed wins: deprecate other active/provisional versions of the same key.
+      await client.query(
+        `UPDATE aircraft_profiles
+         SET status = 'deprecated'
+         WHERE profile_key = $1
+           AND semver <> $2
+           AND status IN ('active', 'provisional')`,
+        [profile.profileKey, profile.semver],
+      );
+
       await client.query(
         `INSERT INTO profile_releases (profile_id, channel, rollout_pct, is_active, activated_at)
          SELECT $1, 'stable', 100, true, now()

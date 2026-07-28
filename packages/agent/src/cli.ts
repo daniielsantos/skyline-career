@@ -24,11 +24,11 @@ function usage(): never {
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
-  msfs-compat-agent apply-auto --fuel-left <n> --fuel-right <n> [--station i=lbs ...] [--catalog-url <url>] [--pipe <name>]
+  msfs-compat-agent apply-auto --fuel-left <n> --fuel-right <n> [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--station i=lbs ...] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent draft-profile [--out <dir>] [--fuel-offset <n>] [--calibrate] [--pipe <name>]
   msfs-compat-agent calibrate --profile <path.json> [--pipe <name>]
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
-  msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--pipe <name>]
+  msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -228,10 +228,18 @@ async function main(): Promise<void> {
   if (command === 'apply-auto') {
     const left = Number(getFlag(rest, '--fuel-left') ?? 'NaN');
     const right = Number(getFlag(rest, '--fuel-right') ?? 'NaN');
+    const leftAuxRaw = getFlag(rest, '--fuel-left-aux');
+    const rightAuxRaw = getFlag(rest, '--fuel-right-aux');
+    const leftAux = leftAuxRaw !== undefined ? Number(leftAuxRaw) : 0;
+    const rightAux = rightAuxRaw !== undefined ? Number(rightAuxRaw) : 0;
     const stations = getStationFlags(rest);
 
     if (!Number.isFinite(left) || !Number.isFinite(right)) {
       console.error('apply-auto requires --fuel-left and --fuel-right');
+      process.exit(1);
+    }
+    if (!Number.isFinite(leftAux) || !Number.isFinite(rightAux)) {
+      console.error('--fuel-left-aux / --fuel-right-aux must be numbers when provided');
       process.exit(1);
     }
 
@@ -259,8 +267,14 @@ async function main(): Promise<void> {
       }
 
       const before = await bridge.snapshot();
+      const tanks: Record<string, number> = { LEFT_MAIN: left, RIGHT_MAIN: right };
+      // Include AUX when the resolved profile declares those tanks (e.g. Starship Aft).
+      const tankIds = new Set(resolved.profile.fuel.tanks.map((t) => t.id));
+      if (tankIds.has('LEFT_AUX')) tanks.LEFT_AUX = leftAux;
+      if (tankIds.has('RIGHT_AUX')) tanks.RIGHT_AUX = rightAux;
+
       const plan: LoadPlanRequest = {
-        fuel: { tanks: { LEFT_MAIN: left, RIGHT_MAIN: right } },
+        fuel: { tanks },
       };
 
       if (Object.keys(stations).length > 0) {
@@ -549,6 +563,18 @@ async function main(): Promise<void> {
         const rightCap = profile.fuel.tanks.find((t) => t.id === 'RIGHT_MAIN')?.capacity ?? 40;
         const leftTarget = Math.max(5, Math.floor(leftCap * 0.8));
         const rightTarget = Math.max(5, Math.floor(rightCap * 0.8));
+        const leftAuxCap = profile.fuel.tanks.find((t) => t.id === 'LEFT_AUX')?.capacity;
+        const rightAuxCap = profile.fuel.tanks.find((t) => t.id === 'RIGHT_AUX')?.capacity;
+        const fuelTanks: Record<string, number> = {
+          LEFT_MAIN: leftTarget,
+          RIGHT_MAIN: rightTarget,
+        };
+        if (leftAuxCap !== undefined) {
+          fuelTanks.LEFT_AUX = Math.max(0, Math.floor(leftAuxCap * 0.5));
+        }
+        if (rightAuxCap !== undefined) {
+          fuelTanks.RIGHT_AUX = Math.max(0, Math.floor(rightAuxCap * 0.5));
+        }
 
         const stationTargets: Record<number, number> = {};
         for (const station of profile.payload.stations) {
@@ -560,7 +586,7 @@ async function main(): Promise<void> {
         const payloadTotal = Object.values(stationTargets).reduce((a, b) => a + b, 0);
 
         const apply = await engine.applyLoadPlan({
-          fuel: { tanks: { LEFT_MAIN: leftTarget, RIGHT_MAIN: rightTarget } },
+          fuel: { tanks: fuelTanks },
           payload: {
             stations: stationTargets,
             total: payloadTotal,
@@ -571,7 +597,7 @@ async function main(): Promise<void> {
         return {
           ping,
           identity,
-          targets: { fuel: { LEFT_MAIN: leftTarget, RIGHT_MAIN: rightTarget }, payload: stationTargets },
+          targets: { fuel: fuelTanks, payload: stationTargets },
           before,
           apply,
           after,
@@ -595,15 +621,24 @@ async function main(): Promise<void> {
     const profilePath = getFlag(rest, '--profile');
     const left = Number(getFlag(rest, '--fuel-left') ?? '20');
     const right = Number(getFlag(rest, '--fuel-right') ?? '20');
+    const leftAuxRaw = getFlag(rest, '--fuel-left-aux');
+    const rightAuxRaw = getFlag(rest, '--fuel-right-aux');
+    const leftAux = leftAuxRaw !== undefined ? Number(leftAuxRaw) : 0;
+    const rightAux = rightAuxRaw !== undefined ? Number(rightAuxRaw) : 0;
     if (!profilePath) {
       usage();
     }
 
     const profile = await loadProfile(profilePath);
+    const tanks: Record<string, number> = { LEFT_MAIN: left, RIGHT_MAIN: right };
+    const tankIds = new Set(profile.fuel.tanks.map((t) => t.id));
+    if (tankIds.has('LEFT_AUX')) tanks.LEFT_AUX = leftAux;
+    if (tankIds.has('RIGHT_AUX')) tanks.RIGHT_AUX = rightAux;
+
     const result = await withBridge(pipeName, async (bridge) => {
       const engine = new DefaultProfileEngine({ profile, bridge });
       return engine.applyLoadPlan({
-        fuel: { tanks: { LEFT_MAIN: left, RIGHT_MAIN: right } },
+        fuel: { tanks },
       });
     });
 

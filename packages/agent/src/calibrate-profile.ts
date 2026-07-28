@@ -128,7 +128,8 @@ export async function calibrateProfile(
     }
   }
 
-  // Expand CG envelope around the live CG (Asobo twins often sit near 5–10% MAC).
+  // Expand CG envelope around the live CG.
+  // Some airframes (e.g. Black Square Starship) report negative % MAC — do not clamp to 0..100.
   if (!profile.cg) {
     profile.cg = {
       readVar: 'CG PERCENT',
@@ -140,11 +141,17 @@ export async function calibrateProfile(
     name: profile.cg.readVar ?? 'CG PERCENT',
     unit: profile.cg.readUnit ?? 'Percent over 100',
   });
-  if (liveCg <= 1.5) {
+  // SimConnect "Percent over 100" is typically -1..1 (or 0..1); convert to percent points.
+  if (Math.abs(liveCg) <= 1.5) {
     liveCg *= 100;
   }
-  const minMac = Math.max(0, Math.floor(liveCg) - 15);
-  const maxMac = Math.min(100, Math.ceil(liveCg) + 20);
+  let minMac = Math.floor(liveCg) - 15;
+  let maxMac = Math.ceil(liveCg) + 20;
+  if (minMac > maxMac) {
+    const swap = minMac;
+    minMac = maxMac;
+    maxMac = swap;
+  }
   if (!profile.cg.constraints) {
     profile.cg.constraints = {};
   }

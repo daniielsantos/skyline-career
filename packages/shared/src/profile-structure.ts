@@ -5,7 +5,20 @@ import type {
 } from './types/aircraft-profile.js';
 import { computeFingerprintV2, normalizeAircraftTitle } from './fingerprint.js';
 
-function tankIndexFromVar(varName: string | undefined, fallback: number): number {
+/** Stable classic-tank indices shared with live sampleAircraftStructure. */
+const CLASSIC_TANK_INDEX: Record<string, number> = {
+  LEFT_MAIN: 1,
+  RIGHT_MAIN: 2,
+  LEFT_AUX: 3,
+  RIGHT_AUX: 4,
+  CENTER: 5,
+  CENTER2: 6,
+};
+
+function tankIndexFromVar(varName: string | undefined, tankId: string, fallback: number): number {
+  if (CLASSIC_TANK_INDEX[tankId] !== undefined) {
+    return CLASSIC_TANK_INDEX[tankId];
+  }
   if (!varName) return fallback;
   const match = varName.match(/:(\d+)\s*$/);
   if (match) {
@@ -15,7 +28,12 @@ function tankIndexFromVar(varName: string | undefined, fallback: number): number
 }
 
 /** Map classic / profile tank ids to stable structure names used in fingerprint hashing. */
-function tankStructureName(tank: { id: string; name?: string; writeVar?: string; readVar?: string }): string {
+function tankStructureName(tank: {
+  id: string;
+  name?: string;
+  writeVar?: string;
+  readVar?: string;
+}): string {
   return tank.id || tank.name || tank.writeVar || tank.readVar || 'TANK';
 }
 
@@ -26,7 +44,7 @@ function tankStructureName(tank: { id: string; name?: string; writeVar?: string;
  */
 export function structureFromProfile(profile: AircraftProfile): AircraftStructure {
   const tankSchema = profile.fuel.tanks.map((tank, i) => ({
-    index: tankIndexFromVar(tank.writeVar ?? tank.readVar, i + 1),
+    index: tankIndexFromVar(tank.writeVar ?? tank.readVar, tank.id, i + 1),
     name: tankStructureName(tank),
     capacity: tank.capacity ?? 0,
     unit: (profile.fuel.unit ?? 'gallons') as 'gallons' | 'pounds' | 'liters' | 'kilograms',

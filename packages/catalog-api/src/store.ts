@@ -17,6 +17,7 @@ import {
   fingerprintFromProfile,
   hashAndSignProfile,
   signDocument,
+  titlesMatchForCatalog,
 } from '@msfs-compat/shared';
 import type { CatalogBackend, CatalogEntry } from './types.js';
 
@@ -155,6 +156,16 @@ export class FileCatalogStore implements CatalogBackend {
     return this.index.entries.find((e) => e.fingerprint === fingerprint);
   }
 
+  findByLiveTitle(liveTitle: string): CatalogEntry | undefined {
+    const matches = this.index.entries.filter((e) => {
+      const profileTitle = e.profile.match?.title ?? e.profile.displayName ?? '';
+      return titlesMatchForCatalog(liveTitle, profileTitle);
+    });
+    if (matches.length === 0) return undefined;
+    matches.sort((a, b) => b.confidenceScore - a.confidenceScore);
+    return matches[0];
+  }
+
   findByKeySemver(profileKey: string, semver: string): CatalogEntry | undefined {
     const key = decodeURIComponent(profileKey);
     return this.index.entries.find((e) => e.profileKey === key && e.semver === semver);
@@ -181,7 +192,8 @@ export class FileCatalogStore implements CatalogBackend {
 
     void this.persistIndex();
 
-    const entry = this.findByFingerprint(fingerprint);
+    const entry =
+      this.findByFingerprint(fingerprint) ?? this.findByLiveTitle(request.identity.title);
     if (!entry) {
       return {
         fingerprint,
@@ -203,7 +215,13 @@ export class FileCatalogStore implements CatalogBackend {
   }
 
   resolveProfile(fingerprint: string, _simVersion: string, _channel = 'stable'): ProfileResolveResponse | null {
-    const entry = this.findByFingerprint(fingerprint);
+    let entry = this.findByFingerprint(fingerprint);
+    if (!entry) {
+      const seen = this.index.seen[fingerprint];
+      if (seen?.title) {
+        entry = this.findByLiveTitle(seen.title);
+      }
+    }
     if (!entry) return null;
 
     const documentUrl = `${this.publicBaseUrl}/profiles/${encodeURIComponent(entry.profileKey)}/document?semver=${encodeURIComponent(entry.semver)}`;

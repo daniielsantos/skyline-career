@@ -1,13 +1,13 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "asobo-c208b-passengers",
-  "profileKey": "asobo/c208b-passengers",
+  "profileId": "blacksquare-caravan-professional-cargo-pod",
+  "profileKey": "blacksquare/caravan-professional-cargo-pod",
   "semver": "1.0.0",
-  "displayName": "C208B Grand Caravan EX Passengers (MSFS 2024 Asobo)",
+  "displayName": "Black Square Caravan Professional Cargo Pod (MSFS 2024)",
   "match": {
-    "fingerprint": "967f61129bb4ebbe5586e1b143d43d26d3f979ec0b83cb80b405b9e442815052",
-    "title": "C208B Passengers",
-    "publisher": "asobo",
+    "fingerprint": "17289d0f7bbd5fbd2c61b6b724c56aa9bd25caa5c1739f08fb8637e825fda782",
+    "title": "Black Square Caravan Professional Cargo Pod",
+    "publisher": "blacksquare",
     "icao": "C208"
   },
   "capabilities": [
@@ -27,35 +27,35 @@
     "tanks": [
       {
         "id": "LEFT_MAIN",
-        "name": "Left Main / FUELSYSTEM:1",
+        "name": "Left Main",
         "capacity": 167.8,
-        "readVar": "FUELSYSTEM TANK QUANTITY:1",
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
-        "writeVar": "FUELSYSTEM TANK QUANTITY:1",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
         "writeUnit": "gallons"
       },
       {
         "id": "RIGHT_MAIN",
-        "name": "Right Main / FUELSYSTEM:2",
+        "name": "Right Main",
         "capacity": 167.8,
-        "readVar": "FUELSYSTEM TANK QUANTITY:2",
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
-        "writeVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "writeUnit": "gallons"
       }
     ],
     "writePlan": [
       {
         "op": "simvar_set",
-        "var": "FUELSYSTEM TANK QUANTITY:1",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN} + 0.8"
+        "valueExpr": "{LEFT_MAIN}"
       },
       {
         "op": "simvar_set",
-        "var": "FUELSYSTEM TANK QUANTITY:2",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN} + 0.8"
+        "valueExpr": "{RIGHT_MAIN}"
       },
       {
         "op": "delay",
@@ -67,13 +67,13 @@
       "pollIntervalMs": 250,
       "checks": [
         {
-          "var": "FUELSYSTEM TANK QUANTITY:1",
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
           "unit": "gallons",
           "tolerancePct": 2,
           "valueExpr": "{LEFT_MAIN}"
         },
         {
-          "var": "FUELSYSTEM TANK QUANTITY:2",
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
           "unit": "gallons",
           "tolerancePct": 2,
           "valueExpr": "{RIGHT_MAIN}"
@@ -87,72 +87,77 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 6,
         "name": "Station 6",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 7,
         "name": "Station 7",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 8,
         "name": "Station 8",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 9,
         "name": "Station 9",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 10,
         "name": "Station 10",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 11,
         "name": "Station 11",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 12,
         "name": "Station 12",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 13,
         "name": "Station 13",
-        "maxLoad": 400
+        "maxLoad": 500
       },
       {
         "index": 14,
         "name": "Station 14",
-        "maxLoad": 400
+        "maxLoad": 500
+      },
+      {
+        "index": 15,
+        "name": "Station 15",
+        "maxLoad": 500
       }
     ],
     "writePlan": [
@@ -241,6 +246,12 @@
         "valueExpr": "{station_14}"
       },
       {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:15",
+        "unit": "pounds",
+        "valueExpr": "{station_15}"
+      },
+      {
         "op": "delay",
         "ms": 400
       }
@@ -254,30 +265,6 @@
           "unit": "pounds",
           "tolerancePct": 1,
           "valueExpr": "{station_1}"
-        },
-        {
-          "var": "PAYLOAD STATION WEIGHT:2",
-          "unit": "pounds",
-          "tolerancePct": 1,
-          "valueExpr": "{station_2}"
-        },
-        {
-          "var": "PAYLOAD STATION WEIGHT:3",
-          "unit": "pounds",
-          "tolerancePct": 1,
-          "valueExpr": "{station_3}"
-        },
-        {
-          "var": "PAYLOAD STATION WEIGHT:5",
-          "unit": "pounds",
-          "tolerancePct": 1,
-          "valueExpr": "{station_5}"
-        },
-        {
-          "var": "PAYLOAD STATION WEIGHT:7",
-          "unit": "pounds",
-          "tolerancePct": 1,
-          "valueExpr": "{station_7}"
         }
       ]
     }
@@ -286,8 +273,8 @@
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
     "constraints": {
-      "minMac": 10,
-      "maxMac": 40
+      "minMac": 3,
+      "maxMac": 39
     }
   },
   "fallback": {
@@ -296,10 +283,9 @@
     ]
   },
   "notes": [
-    "Homologated from live probe/writetest on MSFS 2024: title C208B Passengers.",
-    "Fuel mains = FUELSYSTEM TANK QUANTITY:1/2 (capacity ~167.8 gal each). Tank 3 is collector/unusable — do not write.",
-    "Fuel write compensation +0.8 gal (empirical writeOffsetHint from writetest).",
-    "Payload: 14 stations, exact write/read, offset 0.",
-    "EMPTY WEIGHT=5360 lb; MAX GROSS=8807 lb; total fuel capacity ~339 gal."
+    "Homologated MSFS 2024 Black Square Caravan Professional Cargo Pod (mains only).",
+    "Fuel via FUEL TANK LEFT/RIGHT MAIN (offset 0). Do not use FUELSYSTEM.",
+    "AUX deferred; payload stations 1-15 via PAYLOAD STATION WEIGHT.",
+    "Match title without registration suffix. See profiles/notes/blacksquare-caravan-cargo-pod.md"
   ]
 }

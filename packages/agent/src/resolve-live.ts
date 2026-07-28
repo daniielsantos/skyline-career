@@ -1,5 +1,5 @@
 import type { AircraftIdentity, AircraftStructure } from '@msfs-compat/shared';
-import { computeFingerprintV2 } from '@msfs-compat/shared';
+import { computeFingerprintV2, inferPublisher } from '@msfs-compat/shared';
 import { CatalogClient } from './catalog-client.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { ProfileCache } from './profile-cache.js';
@@ -39,11 +39,15 @@ export async function resolveLiveAircraft(options: LiveResolveOptions): Promise<
     cache,
     clientId = process.env.MSFS_COMPAT_CLIENT_ID ?? 'local-dev',
     simVersion = process.env.MSFS_COMPAT_SIM_VERSION ?? '1.0.0.0',
-    publisher = process.env.MSFS_COMPAT_PUBLISHER ?? 'asobo',
+    publisher: publisherOption,
     register = true,
   } = options;
 
   const liveIdentity = await bridge.getAircraftIdentity();
+  const publisher = inferPublisher(
+    liveIdentity.title,
+    publisherOption ?? process.env.MSFS_COMPAT_PUBLISHER,
+  );
   const identity: AircraftIdentity = {
     title: liveIdentity.title,
     publisher,

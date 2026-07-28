@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import type { AircraftProfile, LoadPlanRequest } from '@msfs-compat/shared';
-import { computeFingerprintV2 } from '@msfs-compat/shared';
+import { computeFingerprintV2, inferPublisher } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { defaultCacheDir, defaultProfileDirs, loadProfilesFromDirs } from './profile-registry.js';
 import { draftProfileFromLive } from './draft-profile.js';
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
     const doRegister = rest.includes('--register');
     const result = await withBridge(pipeName, async (bridge) => {
       const live = await bridge.getAircraftIdentity();
-      const publisher = process.env.MSFS_COMPAT_PUBLISHER ?? 'asobo';
+      const publisher = inferPublisher(live.title, process.env.MSFS_COMPAT_PUBLISHER);
       const identity = {
         title: live.title,
         publisher,

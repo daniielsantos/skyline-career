@@ -5,7 +5,7 @@
   "semver": "1.0.0",
   "displayName": "Cessna 172 Skyhawk G1000 (Asobo)",
   "match": {
-    "fingerprint": "40170a3d29e636f6865f742d1dd617a1a22a4e72fee7e11c1c515f6a0794f0ba",
+    "fingerprint": "c7abca6fe13dbf1a64823b2511d3b7a4ede9ba6a6a59b86002bfb3fa4adb26df",
     "title": "C172SP G1000 Passengers",
     "publisher": "asobo",
     "icao": "C172"

@@ -5,7 +5,7 @@
   "semver": "1.0.0",
   "displayName": "C400 Corvalis (draft)",
   "match": {
-    "fingerprint": "37bbfe8aadf7af869010420ae65e5d0c52fc2d5e0250d23c64a9516b142c806d",
+    "fingerprint": "ef69c1fdd7b1f07155c156ccab8393c47b8eb707cf0d78ce03d138fe144b859d",
     "title": "C400 Corvalis",
     "publisher": "asobo",
     "icao": "C400TT"

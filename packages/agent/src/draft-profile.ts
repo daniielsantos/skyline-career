@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AircraftProfile } from '@msfs-compat/shared';
+import { inferPublisher, normalizeAircraftTitle } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 
 export interface DraftOptions {
@@ -26,9 +27,12 @@ export async function draftProfileFromLive(
   options: DraftOptions,
 ): Promise<{ path: string; profile: AircraftProfile }> {
   const identity = await bridge.getAircraftIdentity();
-  const title = identity.title || 'Unknown Aircraft';
+  const rawTitle = identity.title || 'Unknown Aircraft';
+  const title = normalizeAircraftTitle(rawTitle) || rawTitle;
   const icao = identity.icao || identity.atcModel || 'ZZZZ';
-  const publisher = options.publisher ?? 'asobo';
+  const publisher =
+    options.publisher ??
+    inferPublisher(rawTitle, process.env.MSFS_COMPAT_PUBLISHER);
   const fuelOffset = options.fuelOffset ?? 0;
 
   const tanks: AircraftProfile['fuel']['tanks'] = [];
@@ -74,6 +78,94 @@ export async function draftProfileFromLive(
     }
   }
 
+  // Black Square / classic: FUELSYSTEM often reports capacity 0 — fall back to named tanks.
+  if (tanks.length === 0) {
+    const classicSlots: Array<{ id: string; name: string; capacityVar: string; quantityVar: string }> = [
+      {
+        id: 'LEFT_MAIN',
+        name: 'Left Main',
+        capacityVar: 'FUEL TANK LEFT MAIN CAPACITY',
+        quantityVar: 'FUEL TANK LEFT MAIN QUANTITY',
+      },
+      {
+        id: 'RIGHT_MAIN',
+        name: 'Right Main',
+        capacityVar: 'FUEL TANK RIGHT MAIN CAPACITY',
+        quantityVar: 'FUEL TANK RIGHT MAIN QUANTITY',
+      },
+      {
+        id: 'CENTER',
+        name: 'Center',
+        capacityVar: 'FUEL TANK CENTER CAPACITY',
+        quantityVar: 'FUEL TANK CENTER QUANTITY',
+      },
+      {
+        id: 'CENTER2',
+        name: 'Center 2',
+        capacityVar: 'FUEL TANK CENTER2 CAPACITY',
+        quantityVar: 'FUEL TANK CENTER2 QUANTITY',
+      },
+    ];
+
+    let totalCapacity = 0;
+    try {
+      totalCapacity = await bridge.readSimVar({ name: 'FUEL TOTAL CAPACITY', unit: 'gallons' });
+    } catch {
+      totalCapacity = 0;
+    }
+
+    for (const slot of classicSlots) {
+      let capacity = 0;
+      try {
+        capacity = await bridge.readSimVar({ name: slot.capacityVar, unit: 'gallons' });
+      } catch {
+        capacity = 0;
+      }
+
+      // Some payware omit per-tank CAPACITY; split FUEL TOTAL CAPACITY across mains.
+      if (
+        (!Number.isFinite(capacity) || capacity < 5) &&
+        (slot.id === 'LEFT_MAIN' || slot.id === 'RIGHT_MAIN') &&
+        totalCapacity >= 10
+      ) {
+        capacity = totalCapacity / 2;
+      }
+
+      if (!Number.isFinite(capacity) || capacity < 5) {
+        continue;
+      }
+
+      // Confirm quantity var is readable before adding.
+      try {
+        await bridge.readSimVar({ name: slot.quantityVar, unit: 'gallons' });
+      } catch {
+        continue;
+      }
+
+      tanks.push({
+        id: slot.id,
+        name: slot.name,
+        capacity: Math.round(capacity * 10) / 10,
+        readVar: slot.quantityVar,
+        readUnit: 'gallons',
+        writeVar: slot.quantityVar,
+        writeUnit: 'gallons',
+      });
+      writePlan.push({
+        op: 'simvar_set',
+        var: slot.quantityVar,
+        unit: 'gallons',
+        valueExpr: fuelOffset > 0 ? `{${slot.id}} + ${fuelOffset}` : `{${slot.id}}`,
+      });
+      fuelChecks.push({
+        var: slot.quantityVar,
+        unit: 'gallons',
+        tolerancePct: 2.0,
+        valueExpr: `{${slot.id}}`,
+      });
+    }
+  }
+
   writePlan.push({ op: 'delay', ms: 400 });
 
   let stationCount = 8;
@@ -109,11 +201,12 @@ export async function draftProfileFromLive(
     },
   );
 
-  const slug = slugify(`${publisher}-${title}`);
+  const titleSlug = slugify(title.replace(/^black\s*square\s+/i, ''));
+  const slug = slugify(`${publisher}-${titleSlug}`);
   const profile: AircraftProfile = {
     schemaVersion: '1.0.0',
     profileId: slug,
-    profileKey: `${publisher}/${slugify(title)}`,
+    profileKey: `${publisher}/${titleSlug}`,
     semver: '0.1.0-draft',
     displayName: `${title} (draft)`,
     match: {

@@ -1,14 +1,14 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "asobo-c185f-skywagon-standard",
-  "profileKey": "asobo/c185f-skywagon-standard",
+  "profileId": "blacksquare-a36tc-bonanza-professional",
+  "profileKey": "blacksquare/a36tc-bonanza-professional",
   "semver": "1.0.0",
-  "displayName": "C185F Skywagon Standard (MSFS 2024 Asobo)",
+  "displayName": "Black Square A36TC Bonanza Professional (MSFS 2024)",
   "match": {
-    "fingerprint": "d6db544a8018d8e9b6cfeba0ce494aefc4fa4a25328ac3858269543485859d4c",
-    "title": "C185F Skywagon Standard",
-    "publisher": "asobo",
-    "icao": "C185"
+    "fingerprint": "5474abb056efbc06290549668233ba9e0e35eeb82bacc2bca8df805be8290fa8",
+    "title": "Black Square A36TC Bonanza Professional",
+    "publisher": "blacksquare",
+    "icao": "BE36"
   },
   "capabilities": [
     "simconnect"
@@ -27,35 +27,35 @@
     "tanks": [
       {
         "id": "LEFT_MAIN",
-        "name": "FUELSYSTEM:1",
-        "capacity": 32.5,
-        "readVar": "FUELSYSTEM TANK QUANTITY:1",
+        "name": "Left Main",
+        "capacity": 47,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
-        "writeVar": "FUELSYSTEM TANK QUANTITY:1",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
         "writeUnit": "gallons"
       },
       {
         "id": "RIGHT_MAIN",
-        "name": "FUELSYSTEM:2",
-        "capacity": 32.5,
-        "readVar": "FUELSYSTEM TANK QUANTITY:2",
+        "name": "Right Main",
+        "capacity": 47,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
-        "writeVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "writeUnit": "gallons"
       }
     ],
     "writePlan": [
       {
         "op": "simvar_set",
-        "var": "FUELSYSTEM TANK QUANTITY:1",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN} + 1.5"
+        "valueExpr": "{LEFT_MAIN}"
       },
       {
         "op": "simvar_set",
-        "var": "FUELSYSTEM TANK QUANTITY:2",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN} + 1.5"
+        "valueExpr": "{RIGHT_MAIN}"
       },
       {
         "op": "delay",
@@ -67,13 +67,13 @@
       "pollIntervalMs": 250,
       "checks": [
         {
-          "var": "FUELSYSTEM TANK QUANTITY:1",
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
           "unit": "gallons",
           "tolerancePct": 2,
           "valueExpr": "{LEFT_MAIN}"
         },
         {
-          "var": "FUELSYSTEM TANK QUANTITY:2",
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
           "unit": "gallons",
           "tolerancePct": 2,
           "valueExpr": "{RIGHT_MAIN}"
@@ -107,6 +107,16 @@
       {
         "index": 5,
         "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
         "maxLoad": 500
       }
     ],
@@ -142,6 +152,18 @@
         "valueExpr": "{station_5}"
       },
       {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
         "op": "delay",
         "ms": 400
       }
@@ -163,8 +185,8 @@
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
     "constraints": {
-      "minMac": 10,
-      "maxMac": 45
+      "minMac": 11,
+      "maxMac": 32
     }
   },
   "fallback": {
@@ -173,8 +195,9 @@
     ]
   },
   "notes": [
-    "Homologated MSFS 2024 Asobo C185F Skywagon Standard.",
-    "Fuel writeOffset +1.5 gal on FUELSYSTEM:1/2; capacity ~32.5 gal/side.",
-    "Payload stations 1-5 writable via PAYLOAD STATION WEIGHT."
+    "Homologated MSFS 2024 Black Square A36TC Bonanza Professional (mains only).",
+    "Fuel via FUEL TANK LEFT/RIGHT MAIN (offset 0). Do not use FUELSYSTEM.",
+    "Tip tanks deferred; payload stations 1-7 via PAYLOAD STATION WEIGHT.",
+    "Match title without registration suffix. See profiles/notes/blacksquare-a36tc-bonanza.md"
   ]
 }

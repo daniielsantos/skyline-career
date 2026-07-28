@@ -2,9 +2,21 @@ import type { AircraftStructure } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 
 /**
+ * Classic named tanks for fingerprinting when FUELSYSTEM capacities are empty.
+ * MAIN (+ CENTER) only — AUX/TIP omitted so mains-only profiles stay stable;
+ * catalog title fallback covers tip-equipped airframes until those tanks are profiled.
+ */
+const CLASSIC_FINGERPRINT_SLOTS: Array<{ id: string; capacityVar: string; index: number }> = [
+  { id: 'LEFT_MAIN', capacityVar: 'FUEL TANK LEFT MAIN CAPACITY', index: 1 },
+  { id: 'RIGHT_MAIN', capacityVar: 'FUEL TANK RIGHT MAIN CAPACITY', index: 2 },
+  { id: 'CENTER', capacityVar: 'FUEL TANK CENTER CAPACITY', index: 3 },
+  { id: 'CENTER2', capacityVar: 'FUEL TANK CENTER2 CAPACITY', index: 4 },
+];
+
+/**
  * Sample live tank/station schema for fingerprinting.
- * Weight limits are read for telemetry but left empty in structure used for hash stability
- * (same as structureFromProfile).
+ * Station maxLoad/arm are placeholders — fingerprint hash ignores them
+ * (same contract as structureFromProfile).
  */
 export async function sampleAircraftStructure(bridge: NamedPipeSimBridge): Promise<{
   structure: AircraftStructure;
@@ -29,6 +41,28 @@ export async function sampleAircraftStructure(bridge: NamedPipeSimBridge): Promi
       });
     } catch {
       // tank not present
+    }
+  }
+
+  if (tankSchema.length === 0) {
+    for (const slot of CLASSIC_FINGERPRINT_SLOTS) {
+      try {
+        const capacity = await bridge.readSimVar({
+          name: slot.capacityVar,
+          unit: 'gallons',
+        });
+        if (!Number.isFinite(capacity) || capacity < 5) {
+          continue;
+        }
+        tankSchema.push({
+          index: slot.index,
+          name: slot.id,
+          capacity,
+          unit: 'gallons',
+        });
+      } catch {
+        // slot not present
+      }
     }
   }
 

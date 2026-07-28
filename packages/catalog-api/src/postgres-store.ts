@@ -11,7 +11,7 @@ import type {
   ProfileManifest,
   ProfileResolveResponse,
 } from '@msfs-compat/shared';
-import { computeFingerprintV2, signDocument } from '@msfs-compat/shared';
+import { computeFingerprintV2, signDocument, titlesMatchForCatalog } from '@msfs-compat/shared';
 import type { CatalogBackend, CatalogEntry } from './types.js';
 
 const { Pool } = pg;
@@ -120,6 +120,68 @@ export class PostgresCatalogStore implements CatalogBackend {
     return rows[0] ?? null;
   }
 
+  private async findBestProfileByTitle(liveTitle: string): Promise<ProfileRow | null> {
+    const { rows } = await this.pool.query<ProfileRow>(
+      `SELECT af.fingerprint_v2, af.structural_hash,
+              ap.profile_key, ap.semver, ap.status, ap.confidence_score,
+              ap.capabilities, ap.document_hash, ap.signature, ap.profile_document
+       FROM aircraft_profiles ap
+       JOIN aircraft_fingerprints af ON af.id = ap.fingerprint_id
+       WHERE ap.status IN ('active', 'provisional')
+       ORDER BY CASE ap.status WHEN 'active' THEN 0 ELSE 1 END,
+                ap.confidence_score DESC`,
+    );
+    const matched = rows.filter((row) => {
+      const profileTitle =
+        row.profile_document.match?.title ?? row.profile_document.displayName ?? '';
+      return titlesMatchForCatalog(liveTitle, String(profileTitle));
+    });
+    return matched[0] ?? null;
+  }
+
+  private async resolveTitleForFingerprint(fingerprint: string): Promise<string | null> {
+    const { rows } = await this.pool.query<{ title: string }>(
+      `SELECT title FROM aircraft_fingerprints WHERE fingerprint_v2 = $1`,
+      [fingerprint],
+    );
+    return rows[0]?.title ?? null;
+  }
+
+  private toFingerprintResponse(fingerprint: string, best: ProfileRow | null): FingerprintResponse {
+    if (!best) {
+      return {
+        fingerprint,
+        known: false,
+        homologationRequired: true,
+        profileStatus: 'none',
+      };
+    }
+    const status = best.status === 'active' ? 'active' : 'provisional';
+    return {
+      fingerprint,
+      known: true,
+      homologationRequired: false,
+      profileStatus: status,
+      activeProfileKey: best.profile_key,
+      activeSemver: best.semver,
+      confidenceScore: Number(best.confidence_score),
+    };
+  }
+
+  private toResolveResponse(best: ProfileRow): ProfileResolveResponse {
+    const status = best.status === 'active' ? 'active' : 'provisional';
+    return {
+      profileKey: best.profile_key,
+      semver: best.semver,
+      status,
+      confidenceScore: Number(best.confidence_score),
+      documentUrl: `${this.publicBaseUrl}/profiles/${encodeURIComponent(best.profile_key)}/document?semver=${encodeURIComponent(best.semver)}`,
+      documentHash: best.document_hash,
+      signature: best.signature ?? '',
+      capabilities: best.capabilities ?? ['simconnect'],
+    };
+  }
+
   async registerFingerprint(request: FingerprintRequest): Promise<FingerprintResponse> {
     const { fingerprint, structuralHash } = computeFingerprintV2({
       identity: request.identity,
@@ -171,26 +233,10 @@ export class PostgresCatalogStore implements CatalogBackend {
       ],
     );
 
-    const best = await this.findBestProfile(fingerprint);
-    if (!best) {
-      return {
-        fingerprint,
-        known: false,
-        homologationRequired: true,
-        profileStatus: 'none',
-      };
-    }
-
-    const status = best.status === 'active' ? 'active' : 'provisional';
-    return {
-      fingerprint,
-      known: true,
-      homologationRequired: false,
-      profileStatus: status,
-      activeProfileKey: best.profile_key,
-      activeSemver: best.semver,
-      confidenceScore: Number(best.confidence_score),
-    };
+    const best =
+      (await this.findBestProfile(fingerprint)) ??
+      (await this.findBestProfileByTitle(request.identity.title));
+    return this.toFingerprintResponse(fingerprint, best);
   }
 
   async resolveProfile(
@@ -216,20 +262,15 @@ export class PostgresCatalogStore implements CatalogBackend {
       [fingerprint, channel],
     );
 
-    const best = released.rows[0] ?? (await this.findBestProfile(fingerprint));
+    let best: ProfileRow | null = released.rows[0] ?? (await this.findBestProfile(fingerprint));
+    if (!best) {
+      const title = await this.resolveTitleForFingerprint(fingerprint);
+      if (title) {
+        best = await this.findBestProfileByTitle(title);
+      }
+    }
     if (!best) return null;
-
-    const status = best.status === 'active' ? 'active' : 'provisional';
-    return {
-      profileKey: best.profile_key,
-      semver: best.semver,
-      status,
-      confidenceScore: Number(best.confidence_score),
-      documentUrl: `${this.publicBaseUrl}/profiles/${encodeURIComponent(best.profile_key)}/document?semver=${encodeURIComponent(best.semver)}`,
-      documentHash: best.document_hash,
-      signature: best.signature ?? '',
-      capabilities: best.capabilities ?? ['simconnect'],
-    };
+    return this.toResolveResponse(best);
   }
 
   async getManifest(channel = 'stable'): Promise<ProfileManifest> {

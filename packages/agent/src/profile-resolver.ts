@@ -1,5 +1,5 @@
 import type { AircraftProfile } from '@msfs-compat/shared';
-import { isPlaceholderFingerprint } from '@msfs-compat/shared';
+import { isPlaceholderFingerprint, normalizeAircraftTitle } from '@msfs-compat/shared';
 import type { LoadedProfile } from './profile-registry.js';
 
 export interface AircraftIdentityLike {
@@ -47,8 +47,8 @@ function scoreProfile(
     return { score: 1.0, reason: 'exact_fingerprint' };
   }
 
-  const title = norm(identity.title);
-  const profileTitle = norm(profile.match.title);
+  const title = norm(normalizeAircraftTitle(identity.title ?? ''));
+  const profileTitle = norm(normalizeAircraftTitle(profile.match.title ?? ''));
   const icao = norm(identity.icao ?? identity.atcModel);
   const profileIcao = norm(profile.match.icao);
 

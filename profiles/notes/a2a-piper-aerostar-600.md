@@ -22,10 +22,16 @@ Wing tanks total ~124 gal usable; fuselage ~41.5. Classic QUANTITY writes are ig
 
 ## Payload
 
-| Station | Write LVars | Notes |
-|---------|-------------|--------|
-| 1–6 | `CharacterNWeight` + `SeatNCharacter` | EFB seat paint needs occupancy |
-| 7 | `BaggageWeight` | max ~`BaggageMax` (tablet also shows max baggage ~240 lb on this airframe) |
+| Station | Write LVars | What / how to set |
+|---------|-------------|-------------------|
+| 1–6 | `CharacterNWeight` + `SeatNCharacter` | Seat weight (lb) + occupancy so EFB paints the seat |
+| 7 | `BaggageWeight` | Baggage (lb). Cap via `BaggageMax` / tablet max (~240 lb on this airframe) |
+
+```powershell
+# seats + baggage
+node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20 `
+  --station 1=180 --station 2=50 --station 3=25 --station 7=40
+```
 
 ## Homologation path
 

@@ -18,21 +18,7 @@ import {
   hashAndSignProfile,
   signDocument,
 } from '@msfs-compat/shared';
-
-export interface CatalogEntry {
-  fingerprint: string;
-  structuralHash: string;
-  profileKey: string;
-  semver: string;
-  status: 'active' | 'provisional';
-  confidenceScore: number;
-  capabilities: string[];
-  documentHash: string;
-  signature: string;
-  sizeBytes: number;
-  profilePath: string;
-  profile: AircraftProfile;
-}
+import type { CatalogBackend, CatalogEntry } from './types.js';
 
 export interface SeenFingerprint {
   fingerprint: string;
@@ -52,14 +38,15 @@ export interface CatalogIndex {
   seen: Record<string, SeenFingerprint>;
 }
 
-export interface CatalogStoreOptions {
+export interface FileCatalogStoreOptions {
   profilesDir: string;
   dataDir: string;
   signingKey?: string;
   publicBaseUrl?: string;
 }
 
-export class CatalogStore {
+/** File-backed catalog (default when DATABASE_URL is unset). */
+export class FileCatalogStore implements CatalogBackend {
   readonly profilesDir: string;
   readonly dataDir: string;
   readonly signingKey: string;
@@ -71,7 +58,7 @@ export class CatalogStore {
     seen: {},
   };
 
-  constructor(options: CatalogStoreOptions) {
+  constructor(options: FileCatalogStoreOptions) {
     this.profilesDir = resolve(options.profilesDir);
     this.dataDir = resolve(options.dataDir);
     this.signingKey = options.signingKey ?? process.env.CATALOG_SIGNING_KEY ?? 'dev-local-key';
@@ -124,7 +111,6 @@ export class CatalogStore {
       });
     }
 
-    // Keep previously seen fingerprints
     let seen: Record<string, SeenFingerprint> = {};
     try {
       const existing = JSON.parse(
@@ -292,3 +278,6 @@ export class CatalogStore {
     return { accepted: batch.events?.length ?? 0 };
   }
 }
+
+/** @deprecated Use FileCatalogStore */
+export { FileCatalogStore as CatalogStore };

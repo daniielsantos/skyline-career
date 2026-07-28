@@ -66,7 +66,7 @@ try {
   const doc = await docRes.json();
   if (!doc?.documentHash || !doc?.profile) throw new Error('document envelope incomplete');
 
-  console.log(`[ci-catalog] OK entries=${count} sample=${sample.profileKey}@${sample.semver}`);
+  console.log(`[ci-catalog] OK backend=${health.backend ?? 'file'} entries=${count} sample=${sample.profileKey}@${sample.semver}`);
 } catch (error) {
   exitCode = 1;
   console.error('[ci-catalog] FAILED', error instanceof Error ? error.message : error);

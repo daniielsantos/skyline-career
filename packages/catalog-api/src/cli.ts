@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CatalogStore } from './store.js';
+import { createCatalogBackend } from './backend.js';
 import { createCatalogServer } from './server.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -12,8 +12,10 @@ async function main(): Promise<void> {
   const profilesDir = process.env.PROFILES_DIR ?? resolve(repoRoot, 'profiles', 'examples');
   const dataDir = process.env.DATA_DIR ?? resolve(repoRoot, '.data', 'catalog');
   const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? `http://localhost:${port}/v1`;
+  const backend = process.env.DATABASE_URL ? 'postgres' : 'file';
 
-  const store = new CatalogStore({
+  const store = createCatalogBackend({
+    repoRoot,
     profilesDir,
     dataDir,
     publicBaseUrl,
@@ -22,8 +24,9 @@ async function main(): Promise<void> {
 
   const app = await createCatalogServer({ store });
   await app.listen({ port, host: '0.0.0.0' });
+  const entries = await store.getEntries();
   app.log.info(
-    { port, profilesDir, dataDir, entries: store.getEntries().length },
+    { port, backend, profilesDir, dataDir, entries: entries.length },
     'catalog-api listening',
   );
 }

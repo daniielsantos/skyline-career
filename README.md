@@ -101,11 +101,24 @@ npm run fingerprints:backfill
 | `packages/shared` | Fingerprint, signing, profile/API types |
 | `packages/runtime` | ProfileEngine, strategies, gating |
 | `packages/agent` | NamedPipe IPC client + CLI + catalog client/cache |
-| `packages/catalog-api` | Fastify catalog (`/v1` resolve/manifest/document) |
+| `packages/catalog-api` | Fastify catalog (`/v1` resolve/manifest/document) — file or Postgres |
 | `native/SimBridgeHost` | C# Named Pipe server + mock/SimConnect clients |
 | `profiles/` | Declarative aircraft profiles + local cache |
 | `contracts/` | OpenAPI + IPC protocol |
-| `database/` | PostgreSQL schema (not wired in Phase 3) |
+| `database/` | PostgreSQL schema + Docker Compose |
+
+## Postgres catalog (optional)
+
+Default catalog is **file-backed** (`profiles/examples`). Set `DATABASE_URL` to use Postgres.
+
+```powershell
+npm run db:up
+npm run db:migrate   # fresh DB only (applies 001_initial.sql)
+npm run db:seed
+npm run catalog:serve:pg
+```
+
+Copy `.env.example` → `.env` if you prefer env files. Agent keeps using `http://localhost:8080/v1`.
 
 ## IPC
 
@@ -119,13 +132,15 @@ Pipe default: `\\.\pipe\msfs-compat-simbridge`
 | `MSFS_COMPAT_CATALOG_URL` | `http://localhost:8080/v1` |
 | `MSFS_COMPAT_PIPE` | default pipe name |
 | `CATALOG_SIGNING_KEY` | `dev-local-key` |
+| `DATABASE_URL` | unset → file catalog; set → Postgres |
 | `PORT` / `PROFILES_DIR` / `DATA_DIR` | catalog-api listen + paths |
 
 ## CI
 
 GitHub Actions (`.github/workflows/ci.yml`):
 
-- **Ubuntu:** `npm run build`, typecheck, validate profiles, catalog API smoke
+- **Ubuntu:** build, typecheck, validate profiles, file catalog smoke
+- **Ubuntu + Postgres:** migrate, seed, catalog smoke with `DATABASE_URL`
 - **Windows:** agent smoke against Node mock-host (Named Pipes; no MSFS SDK)
 
 Local equivalent:

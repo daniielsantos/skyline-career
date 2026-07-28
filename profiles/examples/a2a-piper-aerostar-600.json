@@ -1,0 +1,216 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "a2a-piper-aerostar-600",
+  "profileKey": "a2a/piper-aerostar-600",
+  "semver": "1.0.0",
+  "displayName": "A2A Piper Aerostar 600 (MSFS 2024)",
+  "match": {
+    "fingerprint": "e885c5431e01590e366d446e44e7be0a0520c7cd1608162cfa9da0949395c0f2",
+    "title": "A2A Piper Aerostar 600",
+    "publisher": "a2a",
+    "icao": "AEST"
+  },
+  "capabilities": [
+    "simconnect",
+    "lvar"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "lvar-bridge",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left wing (Accu-Sim)",
+        "capacity": 62,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FuelLeftWingTank",
+        "writeUnit": "number"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right wing (Accu-Sim)",
+        "capacity": 62,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FuelRightWingTank",
+        "writeUnit": "number"
+      },
+      {
+        "id": "CENTER",
+        "name": "Fuselage (Accu-Sim)",
+        "capacity": 41.5,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FuelFuselageTank",
+        "writeUnit": "number"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "lvar_set",
+        "name": "FuelLeftWingTank",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "FuelRightWingTank",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "FuelFuselageTank",
+        "valueExpr": "{CENTER}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK CENTER QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{CENTER}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "lvar-bridge",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Pilot / Character1",
+        "maxLoad": 300
+      },
+      {
+        "index": 2,
+        "name": "Seat 2 / Character2",
+        "maxLoad": 300
+      },
+      {
+        "index": 3,
+        "name": "Seat 3 / Character3",
+        "maxLoad": 300
+      },
+      {
+        "index": 4,
+        "name": "Seat 4 / Character4",
+        "maxLoad": 300
+      },
+      {
+        "index": 5,
+        "name": "Seat 5 / Character5",
+        "maxLoad": 300
+      },
+      {
+        "index": 6,
+        "name": "Seat 6 / Character6",
+        "maxLoad": 300
+      },
+      {
+        "index": 7,
+        "name": "Baggage",
+        "maxLoad": 400
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "lvar_set",
+        "name": "Character1Weight",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character2Weight",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character3Weight",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character4Weight",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character5Weight",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character6Weight",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "BaggageWeight",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 2,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "constraints": {
+      "minMac": -13,
+      "maxMac": 23
+    }
+  },
+  "fallback": {
+    "chain": [
+      "lvar-bridge"
+    ]
+  },
+  "notes": [
+    "Homologated via Accu-Sim LVar bridge.",
+    "ICAO type designator (catalog/SimBrief): AEST.",
+    "Fuel LVars: FuelLeftWingTank / FuelRightWingTank / FuelFuselageTank.",
+    "Payload LVars: Character1-6Weight + BaggageWeight.",
+    "See profiles/notes/a2a-piper-aerostar-600.md"
+  ]
+}

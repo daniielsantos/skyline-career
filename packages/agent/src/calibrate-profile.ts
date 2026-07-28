@@ -63,11 +63,21 @@ export async function calibrateProfile(
     const capacity = tank.capacity !== undefined && tank.capacity > 0 ? tank.capacity : 40;
     // Stay under capacity so clamping does not inflate the offset hint.
     const probeTarget = Math.max(5, Math.floor(capacity * 0.75));
+    const useLvar = profile.fuel.strategy === 'lvar-bridge';
 
-    const before = await bridge.readSimVar({ name: writeVar, unit });
-    await bridge.writeSimVar({ name: writeVar, unit, value: probeTarget });
-    await bridge.delay(400);
-    const after = await bridge.readSimVar({ name: writeVar, unit });
+    let before: number;
+    let after: number;
+    if (useLvar) {
+      before = await bridge.readLVar(writeVar);
+      await bridge.writeLVar({ name: writeVar, value: probeTarget });
+      await bridge.delay(400);
+      after = await bridge.readLVar(writeVar);
+    } else {
+      before = await bridge.readSimVar({ name: writeVar, unit });
+      await bridge.writeSimVar({ name: writeVar, unit, value: probeTarget });
+      await bridge.delay(400);
+      after = await bridge.readSimVar({ name: writeVar, unit });
+    }
 
     const writeOffsetHint = roundOffset(probeTarget - after);
     const matchedRaw = Math.abs(after - probeTarget) <= Math.max(probeTarget * 0.05, 0.25);
@@ -75,7 +85,7 @@ export async function calibrateProfile(
     tanks.push({
       tankId: tank.id,
       writeVar,
-      unit,
+      unit: useLvar ? 'lvar' : unit,
       capacity,
       probeTarget,
       before,

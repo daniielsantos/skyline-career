@@ -2,7 +2,7 @@ import type { AircraftProfile, LoadPlanRequest } from '@msfs-compat/shared';
 import { DefaultCapabilityDetector } from './capability/default-capability-detector.js';
 import { DefaultGatingEvaluator } from './gating/default-gating-evaluator.js';
 import { StrategyRegistry } from './registry/strategy-registry.js';
-import { HybridSyncFuelStrategy, SimConnectDirectFuelStrategy } from './strategies/fuel/simconnect-fuel-strategy.js';
+import { HybridSyncFuelStrategy, LvarBridgeFuelStrategy, SimConnectDirectFuelStrategy } from './strategies/fuel/simconnect-fuel-strategy.js';
 import { StationWritebackPayloadStrategy } from './strategies/payload/station-payload-strategy.js';
 import type { ProfileEngine, SimBridge } from './types.js';
 
@@ -106,6 +106,7 @@ export function createDefaultProfileRegistry(): StrategyRegistry {
   const registry = new StrategyRegistry();
   registry.registerFuel(new SimConnectDirectFuelStrategy());
   registry.registerFuel(new HybridSyncFuelStrategy());
+  registry.registerFuel(new LvarBridgeFuelStrategy());
   registry.registerPayload(new StationWritebackPayloadStrategy());
   return registry;
 }

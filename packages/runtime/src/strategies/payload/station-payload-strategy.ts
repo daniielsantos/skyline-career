@@ -61,7 +61,11 @@ export class StationWritebackPayloadStrategy implements PayloadStrategy {
   readonly name: string = 'station-writeback';
 
   canHandle(profile: AircraftProfile): boolean {
-    return profile.payload.strategy === 'station-writeback' || profile.payload.strategy === 'simconnect-direct';
+    return (
+      profile.payload.strategy === 'station-writeback' ||
+      profile.payload.strategy === 'simconnect-direct' ||
+      profile.payload.strategy === 'lvar-bridge'
+    );
   }
 
   async detect(ctx: StrategyContext): Promise<CapabilityScore> {

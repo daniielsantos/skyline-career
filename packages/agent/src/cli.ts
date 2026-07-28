@@ -30,11 +30,11 @@ function usage(): never {
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
-  msfs-compat-agent apply-auto --fuel-left <n> --fuel-right <n> [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--station i=lbs ...] [--catalog-url <url>] [--pipe <name>]
+  msfs-compat-agent apply-auto --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--station i=lbs ...] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent draft-profile [--out <dir>] [--fuel-offset <n>] [--calibrate] [--pipe <name>]
   msfs-compat-agent calibrate --profile <path.json> [--pipe <name>]
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
-  msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
+  msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
 
@@ -250,6 +250,8 @@ async function main(): Promise<void> {
   if (command === 'apply-auto') {
     const left = Number(getFlag(rest, '--fuel-left') ?? 'NaN');
     const right = Number(getFlag(rest, '--fuel-right') ?? 'NaN');
+    const centerRaw = getFlag(rest, '--fuel-center');
+    const center = centerRaw !== undefined ? Number(centerRaw) : undefined;
     const leftAuxRaw = getFlag(rest, '--fuel-left-aux');
     const rightAuxRaw = getFlag(rest, '--fuel-right-aux');
     const leftAux = leftAuxRaw !== undefined ? Number(leftAuxRaw) : 0;
@@ -258,6 +260,10 @@ async function main(): Promise<void> {
 
     if (!Number.isFinite(left) || !Number.isFinite(right)) {
       console.error('apply-auto requires --fuel-left and --fuel-right');
+      process.exit(1);
+    }
+    if (center !== undefined && !Number.isFinite(center)) {
+      console.error('--fuel-center must be a number when provided');
       process.exit(1);
     }
     if (!Number.isFinite(leftAux) || !Number.isFinite(rightAux)) {
@@ -294,6 +300,7 @@ async function main(): Promise<void> {
       const tankIds = new Set(resolved.profile.fuel.tanks.map((t) => t.id));
       if (tankIds.has('LEFT_AUX')) tanks.LEFT_AUX = leftAux;
       if (tankIds.has('RIGHT_AUX')) tanks.RIGHT_AUX = rightAux;
+      if (tankIds.has('CENTER') && center !== undefined) tanks.CENTER = center;
 
       const plan: LoadPlanRequest = {
         fuel: { tanks },
@@ -755,6 +762,8 @@ async function main(): Promise<void> {
     const profilePath = getFlag(rest, '--profile');
     const left = Number(getFlag(rest, '--fuel-left') ?? '20');
     const right = Number(getFlag(rest, '--fuel-right') ?? '20');
+    const centerRaw = getFlag(rest, '--fuel-center');
+    const center = centerRaw !== undefined ? Number(centerRaw) : undefined;
     const leftAuxRaw = getFlag(rest, '--fuel-left-aux');
     const rightAuxRaw = getFlag(rest, '--fuel-right-aux');
     const leftAux = leftAuxRaw !== undefined ? Number(leftAuxRaw) : 0;
@@ -768,6 +777,7 @@ async function main(): Promise<void> {
     const tankIds = new Set(profile.fuel.tanks.map((t) => t.id));
     if (tankIds.has('LEFT_AUX')) tanks.LEFT_AUX = leftAux;
     if (tankIds.has('RIGHT_AUX')) tanks.RIGHT_AUX = rightAux;
+    if (tankIds.has('CENTER') && center !== undefined) tanks.CENTER = center;
 
     const result = await withBridge(pipeName, async (bridge) => {
       const engine = new DefaultProfileEngine({ profile, bridge });

@@ -4,8 +4,9 @@
 **Match title:** `A2A Piper Aerostar 600`  
 **ICAO (SimBrief type):** `AEST`  
 **Publisher:** `a2a`  
-**Stations (SimConnect count):** 20 (host snapshot may only expose 14 weights)  
-**Profile:** _(not promoted yet — needs `lvar-bridge`)_  
+**Stations (profile):** 7 (Character1–6 + Baggage via LVars)  
+**Profile:** `a2a/piper-aerostar-600@1.0.0`  
+**Fuel strategy:** `lvar-bridge`
 
 ## Why `simconnect-direct` fails
 
@@ -13,11 +14,11 @@ Accu-Sim owns fuel and payload. Classic SimVars are **read-only mirrors**:
 
 - `FUEL TANK LEFT/RIGHT MAIN QUANTITY`, `FUEL TANK CENTER QUANTITY` — readable
 - `PAYLOAD STATION WEIGHT:*` — readable
-- Writes to those SimVars are **silently ignored** (wizard writetest: value unchanged)
+- Writes to those SimVars are **silently ignored**
 
 Fuel density live: **6.0 lb/gal** (avgas).
 
-### Classic capacities (SimConnect)
+### Classic capacities (SimConnect totals)
 
 | Tank | Capacity | Notes |
 |------|----------|--------|
@@ -26,65 +27,45 @@ Fuel density live: **6.0 lb/gal** (avgas).
 | Center | 44 gal | fuselage |
 | **Total** | **177 gal** | ~174.5 usable per A2A manual |
 
+Profile uses **usable** capacities from LVars (~62 / 62 / 41.5).
+
 ## How we found the LVars
 
-Package on disk: `D:\Community2024\a2a-aircraft-aerostar600`
+Package: `D:\Community2024\a2a-aircraft-aerostar600`
 
-1. Tablet UI: `html_ui/efb_ui/efb_apps/Aerostar600App/A2ATabletApp.js`  
-   - Fuel page sets `FuelLeftWingTank` / `FuelRightWingTank` / `FuelFuselageTank` / `FuelPreset`
-   - Payload uses `Character1Weight`…`Character6Weight`, `SeatNCharacter`, `BaggageWeight`, `PayloadWeight`
-2. Panel/Accu-Sim XML under `SimObjects/Airplanes/aerostar600/common/panel/xml/` references the same `L:Fuel*Tank` names (often with `,gallons` in RPN).
+1. Tablet: `html_ui/efb_ui/efb_apps/Aerostar600App/A2ATabletApp.js` sets `FuelLeftWingTank` / `FuelRightWingTank` / `FuelFuselageTank` / `FuelPreset` and Character/Baggage weights.
+2. Panel XML under `SimObjects/Airplanes/aerostar600/common/panel/xml/` references the same `L:Fuel*Tank` names.
+3. Confirmed with `npm run probe-lvars` (read + write + SimVar mirrors).
 
-Do **not** invent names — grep the Community package + confirm with `probe-lvars`.
+## Working LVar map
 
-## Working LVar map (verified live)
+| Role | LVar | Mirror / notes |
+|------|------|----------------|
+| Left wing qty | `FuelLeftWingTank` | → `FUEL TANK LEFT MAIN QUANTITY` |
+| Right wing qty | `FuelRightWingTank` | → `FUEL TANK RIGHT MAIN QUANTITY` |
+| Fuselage qty | `FuelFuselageTank` | → `FUEL TANK CENTER QUANTITY` |
+| Wing capacity (usable) | `FuelWingTankCapacity` | ~62 gal |
+| Fuselage capacity (usable) | `FuelFuselageTankCapacity` | ~41.5 gal |
+| Pilot / pax | `Character1Weight`…`Character6Weight` | Char1 → station 1 |
+| Baggage | `BaggageWeight` | max ~400 (`BaggageMax`) |
 
-Bridge: SimConnect `L:` read/write (SU12+). Tooling: `npm run probe-lvars`.
+## Homologation
 
-| Role | LVar | Verified |
-|------|------|----------|
-| Left wing qty | `FuelLeftWingTank` | write → mirrors `FUEL TANK LEFT MAIN QUANTITY` |
-| Right wing qty | `FuelRightWingTank` | write → mirrors RIGHT MAIN |
-| Fuselage qty | `FuelFuselageTank` | write → mirrors CENTER |
-| Wing capacity (usable) | `FuelWingTankCapacity` | ~62 gal (not 66.5 total) |
-| Fuselage capacity (usable) | `FuelFuselageTankCapacity` | ~41.5 gal (not 44 total) |
-| Preset | `FuelPreset` | 0/1/2 from tablet presets |
-| Pilot / pax weights | `Character1Weight` … `Character6Weight` | Char1 write → `PAYLOAD STATION WEIGHT:1` |
-| Seat occupancy | `Seat1Character` … | 1 = occupied, etc. |
-| Baggage | `BaggageWeight` / `BaggageMax` | Max ~400 lb |
-| Totals / CG | `PayloadWeight`, `TotalWeight`, `CoG`, `CoGpct`, … | read |
+Wizard path when classic writetest fails:
 
-Example write test that stuck:
-
-```text
-✓ FuelLeftWingTank  62 → 30  (LEFT MAIN mirror 30)
-✓ FuelRightWingTank 62 → 30
-✓ FuelFuselageTank  41.5 → 20  (CENTER mirror 20)
-✓ Character1Weight  170 → 180  (station 1 = 180)
-```
-
-## Homologation status
-
-- **Cannot** finish `npm run homologate` yet: wizard gate still requires classic/FUELSYSTEM SimVar writes.
-- **Can** build an `a2a/piper-aerostar-600` profile with:
-  - `capabilities: ["simconnect", "lvar"]`
-  - `fuel.strategy: "lvar-bridge"`
-  - tanks: LEFT_MAIN / RIGHT_MAIN / CENTER → the three `Fuel*Tank` LVars
-  - payload via Character/Baggage LVars (not raw station writeback alone)
-- Next product work: extend wizard (or a one-shot promote) for Accu-Sim / `probe-lvars` → draft.
-
-## Commands
+1. Probe Accu-Sim LVars  
+2. LVar write smoke on `FuelLeftWingTank`  
+3. Draft via `draftA2aAerostarProfile` (`lvar-bridge`)  
+4. Calibrate (LVar probes, offset usually 0)  
+5. Promote → `profiles/examples/a2a-piper-aerostar-600.json`
 
 ```powershell
-# restart host after native rebuild
-npm run start:local
-
+npm run start:local   # after native rebuild
+npm run homologate    # on Aerostar — choose Accu-Sim / lvar-bridge when offered
 npm run probe-lvars
-node packages/agent/dist/cli.js probe-lvars --preset a2a-aerostar --watch 60
-node packages/agent/dist/cli.js probe-lvars --write FuelLeftWingTank=40 --write FuelFuselageTank=20
+node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20 --station 1=180
 ```
 
-## Manual / product refs
+## Homologated
 
-- A2A Accu-Sim Aerostar 600 (tablet owns load)
-- Usable fuel ~174.5 gal (42 fuselage + 66.25 each wing) per A2A docs
+- `profiles/examples/a2a-piper-aerostar-600.json`

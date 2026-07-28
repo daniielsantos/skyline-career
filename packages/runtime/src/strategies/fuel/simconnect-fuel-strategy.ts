@@ -160,3 +160,20 @@ export class HybridSyncFuelStrategy extends SimConnectDirectFuelStrategy {
     return profile.fuel.strategy === 'hybrid-sync';
   }
 }
+
+/** Accu-Sim / vendor fuel via LVar writePlan; verify still uses classic SimVar mirrors. */
+export class LvarBridgeFuelStrategy extends SimConnectDirectFuelStrategy {
+  override readonly name: string = 'lvar-bridge';
+
+  override canHandle(profile: AircraftProfile): boolean {
+    return profile.fuel.strategy === 'lvar-bridge';
+  }
+
+  override async detect(ctx: StrategyContext): Promise<CapabilityScore> {
+    return {
+      strategy: this.name,
+      score: this.canHandle(ctx.profile) ? 0.95 : 0.2,
+      reasons: ['LVar fuel writes (Accu-Sim / vendor tablet)'],
+    };
+  }
+}

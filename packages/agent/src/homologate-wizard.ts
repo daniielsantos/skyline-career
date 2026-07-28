@@ -3,10 +3,12 @@ import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import type { AircraftProfile } from '@msfs-compat/shared';
 import { normalizeAircraftTitle } from '@msfs-compat/shared';
 import { calibrateProfile } from './calibrate-profile.js';
+import { draftA2aAerostarProfile } from './draft-a2a-aerostar.js';
 import { draftProfileFromLive } from './draft-profile.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { confirm, printKv, printSection, withPrompts } from './prompt.js';
 import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProfile } from './promote-profile.js';
+import { probeLVars } from './probe-lvars.js';
 
 export interface HomologateWizardOptions {
   bridge: NamedPipeSimBridge;
@@ -191,6 +193,8 @@ async function runSmoke(
   const rightAuxCap = profile.fuel.tanks.find((t) => t.id === 'RIGHT_AUX')?.capacity;
   if (leftAuxCap !== undefined) fuelTanks.LEFT_AUX = Math.max(0, Math.floor(leftAuxCap * 0.5));
   if (rightAuxCap !== undefined) fuelTanks.RIGHT_AUX = Math.max(0, Math.floor(rightAuxCap * 0.5));
+  const centerCap = profile.fuel.tanks.find((t) => t.id === 'CENTER')?.capacity;
+  if (centerCap !== undefined) fuelTanks.CENTER = Math.max(5, Math.floor(centerCap * 0.8));
 
   const stationTargets: Record<number, number> = {};
   for (const station of profile.payload.stations) stationTargets[station.index] = 0;
@@ -211,6 +215,7 @@ async function runSmoke(
   const pick = (snap: typeof before) => ({
     LEFT_MAIN: snap.vars?.['FUEL TANK LEFT MAIN QUANTITY'],
     RIGHT_MAIN: snap.vars?.['FUEL TANK RIGHT MAIN QUANTITY'],
+    CENTER: snap.vars?.['FUEL TANK CENTER QUANTITY'],
   });
 
   const fuelOk = apply.fuel?.success === true;
@@ -364,14 +369,189 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       console.log(
         '  Typical on Accu-Sim / A2A: tablet owns fuel & payload; classic SimVars are read-only mirrors.',
       );
-      console.log(
-        '  Next: identify vendor LVars/tablet API (lvar-bridge profile) — cannot promote simconnect-direct yet.',
-      );
-      if (centerLikely) {
-        console.log(
-          `  Note: CENTER tank is live (${formatGalLbs(centerCap, lbPerGal)}) — profile will need LEFT/RIGHT/CENTER when writable.`,
-        );
+
+      console.log('  Probing Accu-Sim LVars (Fuel*Tank)…');
+      const lvarProbe = await probeLVars(bridge, [
+        'FuelLeftWingTank',
+        'FuelRightWingTank',
+        'FuelFuselageTank',
+        'Character1Weight',
+      ]);
+      const lvarReadable = lvarProbe.filter((r) => r.ok);
+      for (const r of lvarReadable) {
+        console.log(`  LVar ${r.name} = ${r.value}`);
       }
+
+      let lvarFuelOk = false;
+      if (lvarReadable.some((r) => r.name === 'FuelLeftWingTank')) {
+        try {
+          const before = await bridge.readLVar('FuelLeftWingTank');
+          const target = Math.max(5, Math.min(30, Math.floor(before * 0.5) || 20));
+          await bridge.writeLVar({ name: 'FuelLeftWingTank', value: target });
+          await bridge.delay(400);
+          const after = await bridge.readLVar('FuelLeftWingTank');
+          lvarFuelOk = Math.abs(after - target) <= Math.max(target * 0.05, 0.25);
+          console.log(
+            lvarFuelOk
+              ? `  ✓ LVar FuelLeftWingTank write ${before} → ${after} (wanted ${target})`
+              : `  ✗ LVar FuelLeftWingTank write ignored (${before} → ${after})`,
+          );
+          // restore
+          await bridge.writeLVar({ name: 'FuelLeftWingTank', value: before });
+          await bridge.delay(200);
+        } catch (error) {
+          console.log(
+            `  ✗ LVar write error: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+
+      if (!lvarFuelOk) {
+        console.log(
+          '  Next: run `npm run probe-lvars` / identify vendor LVars — cannot promote yet.',
+        );
+        if (centerLikely) {
+          console.log(
+            `  Note: CENTER tank is live (${formatGalLbs(centerCap, lbPerGal)}) — profile will need LEFT/RIGHT/CENTER when writable.`,
+          );
+        }
+        return;
+      }
+
+      if (
+        !(await confirm(
+          ask,
+          'Accu-Sim LVars writable. Continue homologation via lvar-bridge (Aerostar path)',
+          true,
+        ))
+      ) {
+        console.log('Stopped after LVar discovery.');
+        return;
+      }
+
+      printSection('4/5 Draft + calibrate (lvar-bridge)');
+      const drafted = await draftA2aAerostarProfile(bridge, {
+        outDir: draftsDir,
+        matchTitle,
+        icao: matchIcao,
+      });
+      const calibration = await calibrateProfile(bridge, drafted.path);
+      let profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
+      printKv([
+        ['draft', drafted.path],
+        ['profileKey', profile.profileKey],
+        ['strategy', profile.fuel.strategy],
+        ['tanks', profile.fuel.tanks.map((t) => t.id).join(', ')],
+        [
+          'capacities',
+          profile.fuel.tanks
+            .map((t) => `${t.id} ${formatGalLbs(t.capacity, lbPerGal)}`)
+            .join(', '),
+        ],
+        ['stations', profile.payload.stations.length],
+        ['CG envelope', `${profile.cg?.constraints?.minMac}..${profile.cg?.constraints?.maxMac}`],
+        ['fuelOffset', calibration.fuelOffsetApplied],
+      ]);
+
+      printSection('5/5 Smoke');
+      const smoke = await runSmoke(bridge, profile);
+      printKv([
+        ['fuel ok', smoke.apply.fuel?.success],
+        ['payload ok', smoke.apply.payload?.success],
+        ['cg ok', 'cg' in smoke.apply ? smoke.apply.cg?.ok : undefined],
+        [
+          'targets L/R/C',
+          `${formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.targets.CENTER, lbPerGal)}`,
+        ],
+        [
+          'before L/R/C',
+          `${formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.beforeFuel.CENTER, lbPerGal)}`,
+        ],
+        [
+          'after L/R/C',
+          `${formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.afterFuel.CENTER, lbPerGal)}`,
+        ],
+        [
+          'payload after',
+          `${formatLb(smoke.afterPayload.totalLb)} · ${formatStationsLine(smoke.afterPayload.stations)}`,
+        ],
+      ]);
+      if (!smoke.ok) {
+        console.log('  Smoke failed — fix draft manually or re-run wizard.');
+        console.log(`  Draft left at: ${drafted.path}`);
+        return;
+      }
+
+      console.log('');
+      console.log('  Check the A2A tablet / Mass & Balance UI now.');
+      if (!(await confirm(ask, 'UI looks correct (fuel/payload)', true))) {
+        console.log(`  Draft kept for manual edit: ${drafted.path}`);
+        return;
+      }
+
+      const left = Number(
+        await ask(`Test apply left wing gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
+      );
+      const right = Number(
+        await ask(`Test apply right wing gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
+      );
+      const center = Number(
+        await ask(`Test apply fuselage gal (~${roundFuel(20 * lbPerGal)} lb)`, '20'),
+      );
+      const engine = new DefaultProfileEngine({ profile, bridge });
+      const apply = await engine.applyLoadPlan({
+        fuel: { tanks: { LEFT_MAIN: left, RIGHT_MAIN: right, CENTER: center } },
+        payload: { stations: { 1: 180 }, total: 180 },
+      });
+      printKv([
+        ['apply fuel', apply.fuel?.success],
+        ['apply payload', apply.payload?.success],
+        ['apply L/R/C', `${formatPairGalLbs(left, right, lbPerGal)} / ${formatGalLbs(center, lbPerGal)}`],
+        ['apply cg', 'cg' in apply ? apply.cg?.ok : undefined],
+      ]);
+
+      if (!(await confirm(ask, 'Promote to profiles/examples @ 1.0.0 + seed catalog', true))) {
+        console.log(`  Draft kept: ${drafted.path}`);
+        return;
+      }
+
+      const discoveryNotes = [
+        'Fuel via Accu-Sim LVars FuelLeftWingTank / FuelRightWingTank / FuelFuselageTank.',
+        'Verify mirrors classic FUEL TANK LEFT/RIGHT MAIN + CENTER.',
+        'Payload via Character1-6Weight + BaggageWeight LVars.',
+        'See profiles/notes/a2a-piper-aerostar-600.md',
+        'Homologated with interactive wizard (lvar-bridge).',
+      ];
+
+      const promoted = await promoteDraftProfile({
+        draftPath: drafted.path,
+        examplesDir,
+        notesDir,
+        repoRoot,
+        identityTitle: identity.title,
+        matchTitle,
+        atcModel: identity.atcModel,
+        icao: matchIcao,
+        discoveryNotes,
+        runSeed: await confirm(ask, 'Run db:seed (Postgres if DATABASE_URL set)', true),
+      });
+
+      printSection('Done');
+      printKv([
+        ['example', promoted.examplePath],
+        ['notes', promoted.notesPath],
+        ['profileKey', promoted.profile.profileKey],
+        ['semver', promoted.profile.semver],
+        ['fingerprint', promoted.profile.match.fingerprint?.slice(0, 16) + '…'],
+        ['icao', promoted.profile.match.icao],
+        ['strategy', promoted.profile.fuel.strategy],
+      ]);
+      console.log('');
+      console.log('Next:');
+      console.log('  node packages/agent/dist/cli.js resolve');
+      console.log(
+        '  node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20',
+      );
       return;
     }
     if (centerLikely && !centerOk) {

@@ -75,6 +75,7 @@ public sealed class SimConnectClient : ISimClient
         public double FuelRight;
         public double FuelSys1;
         public double FuelSys2;
+        public double FuelCenter;
         public double Station1;
         public double Station2;
         public double Station3;
@@ -337,7 +338,10 @@ public sealed class SimConnectClient : ISimClient
         if (!IsSaneQuantity(left)) left = data.FuelLeft;
         if (!IsSaneQuantity(right)) right = data.FuelRight;
 
-        var fuelTotal = (IsSaneQuantity(left) ? left : 0) + (IsSaneQuantity(right) ? right : 0);
+        var fuelTotal =
+            (IsSaneQuantity(left) ? left : 0) +
+            (IsSaneQuantity(right) ? right : 0) +
+            (IsSaneQuantity(data.FuelCenter) ? data.FuelCenter : 0);
 
         var stations = new[]
         {
@@ -373,6 +377,7 @@ public sealed class SimConnectClient : ISimClient
 
         AddIfSane(vars, "FUEL TANK LEFT MAIN QUANTITY", data.FuelLeft);
         AddIfSane(vars, "FUEL TANK RIGHT MAIN QUANTITY", data.FuelRight);
+        AddIfSane(vars, "FUEL TANK CENTER QUANTITY", data.FuelCenter);
         AddIfSane(vars, "FUELSYSTEM TANK QUANTITY:1", data.FuelSys1);
         AddIfSane(vars, "FUELSYSTEM TANK QUANTITY:2", data.FuelSys2);
 
@@ -456,6 +461,7 @@ public sealed class SimConnectClient : ISimClient
         AddFloat(sim, Definitions.Snapshot, "FUEL TANK RIGHT MAIN QUANTITY", "gallons");
         AddFloat(sim, Definitions.Snapshot, "FUELSYSTEM TANK QUANTITY:1", "gallons");
         AddFloat(sim, Definitions.Snapshot, "FUELSYSTEM TANK QUANTITY:2", "gallons");
+        AddFloat(sim, Definitions.Snapshot, "FUEL TANK CENTER QUANTITY", "gallons");
         AddFloat(sim, Definitions.Snapshot, "PAYLOAD STATION WEIGHT:1", "pounds");
         AddFloat(sim, Definitions.Snapshot, "PAYLOAD STATION WEIGHT:2", "pounds");
         AddFloat(sim, Definitions.Snapshot, "PAYLOAD STATION WEIGHT:3", "pounds");

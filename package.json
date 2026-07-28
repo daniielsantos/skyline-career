@@ -25,6 +25,7 @@
     "start:local": "node scripts/start-skyline.mjs --mode simconnect",
     "start:local:mock": "node scripts/start-skyline.mjs --mode mock",
     "homologate": "node packages/agent/dist/cli.js homologate",
+    "probe-lvars": "node packages/agent/dist/cli.js probe-lvars --preset a2a-aerostar",
     "pack:portable": "node scripts/pack-portable.mjs",
     "smoke": "node scripts/smoke.mjs",
     "ci:catalog": "node scripts/ci-catalog.mjs",

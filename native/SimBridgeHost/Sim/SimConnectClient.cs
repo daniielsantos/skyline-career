@@ -263,20 +263,29 @@ public sealed class SimConnectClient : ISimClient
     }
 
     public Task<double> ReadLVarAsync(string name, CancellationToken ct = default)
-        => throw new SimClientException(
-            "UNSUPPORTED",
-            "LVars require a WASM bridge module. Not available in raw SimConnect.");
+        // MSFS SU12+: LVars are readable via SimConnect with an explicit "L:" prefix.
+        => ReadSimVarAsync(NormalizeLVarName(name), "number", ct);
 
     public Task WriteLVarAsync(string name, double value, CancellationToken ct = default)
-        => throw new SimClientException(
-            "UNSUPPORTED",
-            "LVars require a WASM bridge module. Not available in raw SimConnect.");
+        => WriteSimVarAsync(NormalizeLVarName(name), "number", value, ct);
 
     public Task TriggerHVarAsync(string name, CancellationToken ct = default)
         => throw new SimClientException(
             "UNSUPPORTED",
             "HVars require a WASM bridge module. Not available in raw SimConnect.");
 
+    private static string NormalizeLVarName(string name)
+    {
+        var trimmed = name?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            throw new SimClientException("INVALID_ARGUMENT", "LVar name is required");
+        }
+
+        return trimmed.StartsWith("L:", StringComparison.OrdinalIgnoreCase)
+            ? "L:" + trimmed[2..]
+            : "L:" + trimmed;
+    }
     public Task TriggerEventAsync(string eventName, uint data = 0, CancellationToken ct = default)
     {
         var sim = RequireSim();

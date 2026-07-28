@@ -15,13 +15,18 @@ import { ProfileCache } from './profile-cache.js';
 import { sampleAircraftStructure } from './sample-structure.js';
 import { resolveLiveAircraft } from './resolve-live.js';
 import { runHomologateWizard } from './homologate-wizard.js';
+import {
+  A2A_AEROSTAR_LVAR_CANDIDATES,
+  probeLVars,
+  watchLVars,
+} from './probe-lvars.js';
 
 const agentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -31,11 +36,13 @@ function usage(): never {
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
+  msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
+  probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
 `);
   process.exit(1);
 }
@@ -463,6 +470,118 @@ async function main(): Promise<void> {
     });
 
     console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === 'probe-lvars' || command === 'lvars') {
+    const preset = getFlag(rest, '--preset') ?? 'a2a-aerostar';
+    const watchRaw = getFlag(rest, '--watch');
+    const watchSec = watchRaw !== undefined ? Number(watchRaw || '60') : undefined;
+    const extraVars: string[] = [];
+    const writes: Array<{ name: string; value: number }> = [];
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === '--var' && rest[i + 1]) {
+        extraVars.push(rest[i + 1]);
+        i += 1;
+      } else if (rest[i] === '--write' && rest[i + 1]) {
+        const [name, valueRaw] = rest[i + 1].split('=');
+        const value = Number(valueRaw);
+        if (name && Number.isFinite(value)) writes.push({ name, value });
+        i += 1;
+      }
+    }
+
+    const presetNames =
+      preset === 'a2a-aerostar' || preset === 'aerostar' || preset === 'a2a'
+        ? A2A_AEROSTAR_LVAR_CANDIDATES
+        : [];
+    const names = [...presetNames, ...extraVars];
+    if (names.length === 0) {
+      console.error('No LVar names. Use --preset a2a-aerostar and/or --var Name');
+      process.exit(1);
+    }
+
+    await withBridge(pipeName, async (bridge) => {
+      const identity = await bridge.getAircraftIdentity();
+      console.log(`Aircraft: ${identity.title}`);
+      console.log(`Probing ${names.length} LVars (preset=${preset})…`);
+
+      const readings = await probeLVars(bridge, names);
+      const ok = readings.filter((r) => r.ok);
+      const failed = readings.filter((r) => !r.ok);
+      console.log('');
+      console.log('── Readable ──');
+      for (const r of ok) {
+        console.log(`  ${r.name.padEnd(32)} ${r.value}`);
+      }
+      if (ok.length === 0) console.log('  (none)');
+      console.log('');
+      console.log(`── Failed / missing (${failed.length}) ──`);
+      for (const r of failed.slice(0, 12)) {
+        console.log(`  ${r.name.padEnd(32)} ${r.error}`);
+      }
+      if (failed.length > 12) console.log(`  … +${failed.length - 12} more`);
+
+      if (writes.length > 0) {
+        console.log('');
+        console.log('── Write test ──');
+        for (const w of writes) {
+          const before = await probeLVars(bridge, [w.name]);
+          try {
+            await bridge.writeLVar({ name: w.name, value: w.value });
+            await bridge.delay(400);
+          } catch (error) {
+            console.log(
+              `  ✗ ${w.name} write error: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            continue;
+          }
+          const after = await probeLVars(bridge, [w.name]);
+          const b = before[0]?.value;
+          const a = after[0]?.value;
+          const stuck = a !== undefined && b !== undefined && Math.abs(a - b) < 0.05;
+          const matched = a !== undefined && Math.abs(a - w.value) <= Math.max(Math.abs(w.value) * 0.05, 0.25);
+          console.log(
+            `  ${matched ? '✓' : stuck ? '✗ ignored' : '~'} ${w.name}: before=${b} → after=${a} (wanted ${w.value})`,
+          );
+          // Also show classic mirrors for fuel tanks
+          if (/Fuel(Left|Right)WingTank|FuelFuselageTank/i.test(w.name)) {
+            const mirrors = [
+              'FUEL TANK LEFT MAIN QUANTITY',
+              'FUEL TANK RIGHT MAIN QUANTITY',
+              'FUEL TANK CENTER QUANTITY',
+              'FUEL TOTAL QUANTITY',
+            ];
+            for (const m of mirrors) {
+              try {
+                const v = await bridge.readSimVar({ name: m, unit: 'gallons' });
+                console.log(`      mirror ${m} = ${v}`);
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+        }
+      }
+
+      if (watchSec !== undefined && Number.isFinite(watchSec) && watchSec > 0) {
+        console.log('');
+        console.log(
+          `Watching ${Math.round(watchSec)}s — change fuel/payload on the A2A tablet now…`,
+        );
+        await watchLVars(bridge, names, {
+          durationMs: watchSec * 1000,
+          intervalMs: 750,
+          onChange: (diff) => {
+            const stamp = new Date().toISOString().slice(11, 19);
+            for (const r of diff) {
+              console.log(`  [${stamp}] ${r.name} → ${r.value}`);
+            }
+          },
+        });
+        console.log('Watch done.');
+      }
+    });
     return;
   }
 

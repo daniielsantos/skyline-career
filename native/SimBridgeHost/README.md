@@ -57,11 +57,12 @@ dotnet run --project native/SimBridgeHost -c Release -- --mode mock --pipe msfs-
 
 - `connect` / `disconnect` / `ping` / `status`
 - `readSimVar` / `writeSimVar` (FLOAT64)
+- `readLVar` / `writeLVar` via SimConnect `L:` prefix (MSFS SU12+)
 - `snapshot` (fuel, payload, CG, ground/engine/brake, sim rate)
 - `getAircraftIdentity` (TITLE, ATC MODEL/TYPE/ID)
 - `triggerEvent` (mapped client events)
 
 ## Not yet (needs WASM bridge)
 
-- `readLVar` / `writeLVar`
 - `triggerHVar`
+- Enumerating *all* LVars present in the aircraft (must probe known names)

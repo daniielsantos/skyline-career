@@ -34,6 +34,29 @@ async function tryRead(bridge: NamedPipeSimBridge, name: string, unit: string): 
   }
 }
 
+/** MSFS Jet-A default when FUEL WEIGHT PER GALLON is unavailable. */
+const FALLBACK_LB_PER_GAL = 6.7;
+
+function roundFuel(n: number, digits = 1): string {
+  const f = 10 ** digits;
+  return String(Math.round(n * f) / f);
+}
+
+/** Format gallons with pounds using live (or fallback) fuel density. */
+function formatGalLbs(gal: number | null | undefined, lbPerGal: number): string {
+  const n = typeof gal === 'number' ? gal : Number(gal);
+  if (!Number.isFinite(n)) return '—';
+  return `${roundFuel(n)} gal (${roundFuel(n * lbPerGal)} lb)`;
+}
+
+function formatPairGalLbs(
+  left: number | null | undefined,
+  right: number | null | undefined,
+  lbPerGal: number,
+): string {
+  return `${formatGalLbs(left, lbPerGal)} / ${formatGalLbs(right, lbPerGal)}`;
+}
+
 async function runWritetest(bridge: NamedPipeSimBridge): Promise<WritetestOutcome[]> {
   const tests: Array<{ name: string; unit: string; value: number }> = [
     { name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: 40 },
@@ -180,6 +203,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     const identity = await bridge.getAircraftIdentity();
     const snapshot = await bridge.snapshot();
     const suggestedTitle = normalizeAircraftTitle(identity.title);
+    const lbPerGalLive = await tryRead(bridge, 'FUEL WEIGHT PER GALLON', 'pounds');
+    const lbPerGal =
+      lbPerGalLive !== null && lbPerGalLive > 0.1 ? lbPerGalLive : FALLBACK_LB_PER_GAL;
+    const leftMainQty = snapshot.vars?.['FUEL TANK LEFT MAIN QUANTITY'];
+    const rightMainQty = snapshot.vars?.['FUEL TANK RIGHT MAIN QUANTITY'];
     printKv([
       ['bridge', `${ping.mode} connected=${ping.connected}`],
       ['title (live)', identity.title],
@@ -190,8 +218,9 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['mtow lb', snapshot.vars?.['MAX GROSS WEIGHT']],
       ['stations', snapshot.vars?.['PAYLOAD STATION COUNT']],
       ['CG %', snapshot.cgPercent?.toFixed?.(1) ?? snapshot.cgPercent],
-      ['left main', snapshot.vars?.['FUEL TANK LEFT MAIN QUANTITY']],
-      ['right main', snapshot.vars?.['FUEL TANK RIGHT MAIN QUANTITY']],
+      ['fuel dens', `${roundFuel(lbPerGal, 3)} lb/gal${lbPerGalLive == null ? ' (fallback)' : ''}`],
+      ['left main', formatGalLbs(typeof leftMainQty === 'number' ? leftMainQty : Number(leftMainQty), lbPerGal)],
+      ['right main', formatGalLbs(typeof rightMainQty === 'number' ? rightMainQty : Number(rightMainQty), lbPerGal)],
     ]);
     console.log('  Tip: strip livery/cabin names from match title (shared across paints).');
     const matchTitle = (await ask('Catalog match title', suggestedTitle)).trim() || suggestedTitle;
@@ -220,12 +249,19 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     const rightAuxQty = await tryRead(bridge, 'FUEL TANK RIGHT AUX QUANTITY', 'gallons');
     const fs1 = await tryRead(bridge, 'FUELSYSTEM TANK CAPACITY:1', 'gallons');
     printKv([
-      ['FUELSYSTEM:1 cap', fs1 ?? 0],
-      ['total capacity', totalCap],
-      ['left main cap', leftMainCap],
-      ['right main cap', rightMainCap],
-      ['left aux cap/qty', `${leftAuxCap ?? '—'} / ${leftAuxQty ?? '—'}`],
-      ['right aux cap/qty', `${rightAuxCap ?? '—'} / ${rightAuxQty ?? '—'}`],
+      ['fuel dens', `${roundFuel(lbPerGal, 3)} lb/gal`],
+      ['FUELSYSTEM:1 cap', formatGalLbs(fs1 ?? 0, lbPerGal)],
+      ['total capacity', formatGalLbs(totalCap, lbPerGal)],
+      ['left main cap', formatGalLbs(leftMainCap, lbPerGal)],
+      ['right main cap', formatGalLbs(rightMainCap, lbPerGal)],
+      [
+        'left aux cap/qty',
+        `${formatGalLbs(leftAuxCap, lbPerGal)} / ${formatGalLbs(leftAuxQty, lbPerGal)}`,
+      ],
+      [
+        'right aux cap/qty',
+        `${formatGalLbs(rightAuxCap, lbPerGal)} / ${formatGalLbs(rightAuxQty, lbPerGal)}`,
+      ],
     ]);
     const classicLikely = (fs1 ?? 0) < 5 && (leftMainCap ?? totalCap ?? 0) >= 5;
     console.log(
@@ -305,6 +341,12 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['draft', drafted.path],
       ['profileKey', profile.profileKey],
       ['tanks', profile.fuel.tanks.map((t) => t.id).join(', ')],
+      [
+        'capacities',
+        profile.fuel.tanks
+          .map((t) => `${t.id} ${formatGalLbs(t.capacity, lbPerGal)}`)
+          .join(', '),
+      ],
       ['stations', profile.payload.stations.length],
       ['CG envelope', `${profile.cg?.constraints?.minMac}..${profile.cg?.constraints?.maxMac}`],
       ['fuelOffset', calibration.fuelOffsetApplied],
@@ -316,9 +358,18 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['fuel ok', smoke.apply.fuel?.success],
       ['payload ok', smoke.apply.payload?.success],
       ['cg ok', 'cg' in smoke.apply ? smoke.apply.cg?.ok : undefined],
-      ['targets', JSON.stringify(smoke.targets)],
-      ['before L/R', `${smoke.beforeFuel.LEFT_MAIN} / ${smoke.beforeFuel.RIGHT_MAIN}`],
-      ['after L/R', `${smoke.afterFuel.LEFT_MAIN} / ${smoke.afterFuel.RIGHT_MAIN}`],
+      [
+        'targets L/R',
+        formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal),
+      ],
+      [
+        'before L/R',
+        formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal),
+      ],
+      [
+        'after L/R',
+        formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal),
+      ],
     ]);
     if (!smoke.ok) {
       console.log('  Smoke failed — fix draft manually or re-run wizard.');
@@ -333,8 +384,12 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       return;
     }
 
-    const left = Number(await ask('Test apply left main gal', '40'));
-    const right = Number(await ask('Test apply right main gal', '40'));
+    const left = Number(
+      await ask(`Test apply left main gal (~${roundFuel(40 * lbPerGal)} lb @ dens)`, '40'),
+    );
+    const right = Number(
+      await ask(`Test apply right main gal (~${roundFuel(40 * lbPerGal)} lb @ dens)`, '40'),
+    );
     const engine = new DefaultProfileEngine({ profile, bridge });
     const tanks: Record<string, number> = { LEFT_MAIN: left, RIGHT_MAIN: right };
     if (profile.fuel.tanks.some((t) => t.id === 'LEFT_AUX')) {
@@ -346,6 +401,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     const apply = await engine.applyLoadPlan({ fuel: { tanks } });
     printKv([
       ['apply fuel', apply.fuel?.success],
+      ['apply L/R', formatPairGalLbs(left, right, lbPerGal)],
       ['apply cg', 'cg' in apply ? apply.cg?.ok : undefined],
     ]);
 

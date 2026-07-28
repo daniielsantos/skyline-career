@@ -1,6 +1,9 @@
-# MSFS Compat Layer
+# MSFS Compat Layer / Skyline Career
 
-Compatibility layer for automatic fuel/payload control across MSFS aircraft.
+Compatibility layer for automatic fuel/payload control across MSFS aircraft.  
+GitHub: [daniielsantos/skyline-career](https://github.com/daniielsantos/skyline-career)
+
+[![CI](https://github.com/daniielsantos/skyline-career/actions/workflows/ci.yml/badge.svg)](https://github.com/daniielsantos/skyline-career/actions/workflows/ci.yml)
 
 ## Architecture (Phase 3)
 
@@ -94,3 +97,17 @@ Pipe default: `\\.\pipe\msfs-compat-simbridge`
 | `MSFS_COMPAT_PIPE` | default pipe name |
 | `CATALOG_SIGNING_KEY` | `dev-local-key` |
 | `PORT` / `PROFILES_DIR` / `DATA_DIR` | catalog-api listen + paths |
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`):
+
+- **Ubuntu:** `npm run build`, typecheck, validate profiles, catalog API smoke
+- **Windows:** agent smoke against Node mock-host (Named Pipes; no MSFS SDK)
+
+Local equivalent:
+
+```powershell
+npm run ci
+npm run smoke
+```

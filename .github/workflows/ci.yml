@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-validate:
+    name: Build + validate + catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Validate profiles
+        run: npm run validate:profiles
+
+      - name: Catalog API smoke
+        run: node scripts/ci-catalog.mjs
+
+  smoke-windows:
+    name: Agent smoke (Node mock / Named Pipe)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke (Node mock-host)
+        # Do not set MSFS_COMPAT_NATIVE — GitHub runners have no MSFS SDK.
+        run: npm run smoke
+        env:
+          MSFS_COMPAT_NATIVE: '0'

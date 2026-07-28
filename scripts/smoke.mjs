@@ -52,35 +52,45 @@ async function hasDotnetSdk() {
   }
 }
 
+async function startNodeMock() {
+  console.log('[smoke] starting Node mock-host (set MSFS_COMPAT_NATIVE=1 to prefer C#)...');
+  await access(mockHost);
+  return spawn(process.execPath, [mockHost, '--pipe', pipeName], {
+    cwd: root,
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+}
+
 async function startHost() {
-  const preferNative = process.env.MSFS_COMPAT_NATIVE === '1' || process.argv.includes('--native');
-  const useNative = preferNative && (await hasDotnetSdk());
+  const nativeFlag = (process.env.MSFS_COMPAT_NATIVE ?? '').trim().toLowerCase();
+  const preferNative =
+    nativeFlag === '1' || nativeFlag === 'true' || process.argv.includes('--native');
 
-  let child;
+  if (!preferNative) {
+    return startNodeMock();
+  }
 
-  if (useNative) {
+  if (!(await hasDotnetSdk())) {
+    console.warn('[smoke] .NET SDK not found — falling back to Node mock-host');
+    return startNodeMock();
+  }
+
+  try {
     console.log('[smoke] building and starting C# SimBridgeHost...');
     await run('dotnet', ['build', hostProject, '-c', 'Release'], { shell: true });
-    child = spawn(
+    return spawn(
       'dotnet',
       ['run', '--project', hostProject, '-c', 'Release', '--no-build', '--', '--mode', 'mock', '--pipe', pipeName],
       { cwd: root, stdio: 'inherit', shell: true, windowsHide: true },
     );
-  } else {
-    if (preferNative) {
-      console.warn('[smoke] .NET SDK not found — falling back to Node mock-host');
-    } else {
-      console.log('[smoke] starting Node mock-host (set MSFS_COMPAT_NATIVE=1 to prefer C#)...');
-    }
-    await access(mockHost);
-    child = spawn(process.execPath, [mockHost, '--pipe', pipeName], {
-      cwd: root,
-      stdio: 'inherit',
-      windowsHide: true,
-    });
+  } catch (error) {
+    console.warn(
+      '[smoke] native host failed — falling back to Node mock-host:',
+      error instanceof Error ? error.message : error,
+    );
+    return startNodeMock();
   }
-
-  return child;
 }
 
 console.log(`[smoke] pipe=${pipeName}`);

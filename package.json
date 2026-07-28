@@ -18,6 +18,8 @@
     "catalog:serve": "node scripts/start-local-stack.mjs",
     "catalog:start": "npm run start -w @msfs-compat/catalog-api",
     "smoke": "node scripts/smoke.mjs",
+    "ci:catalog": "node scripts/ci-catalog.mjs",
+    "ci": "npm run build && npm run typecheck && npm run validate:profiles && npm run ci:catalog",
     "resolve": "node packages/agent/dist/cli.js resolve",
     "apply-auto": "node packages/agent/dist/cli.js apply-auto"
   },

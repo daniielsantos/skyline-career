@@ -31,7 +31,7 @@ function usage(): never {
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
-  msfs-compat-agent apply-auto --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--station i=lbs ...] [--catalog-url <url>] [--pipe <name>]
+  msfs-compat-agent apply-auto --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-tip <n>] [--fuel-right-tip <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--station i=lbs ...] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent draft-profile [--out <dir>] [--fuel-offset <n>] [--calibrate] [--pipe <name>]
   msfs-compat-agent calibrate --profile <path.json> [--pipe <name>]
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
@@ -257,6 +257,10 @@ async function main(): Promise<void> {
     const rightAuxRaw = getFlag(rest, '--fuel-right-aux');
     const leftAux = leftAuxRaw !== undefined ? Number(leftAuxRaw) : 0;
     const rightAux = rightAuxRaw !== undefined ? Number(rightAuxRaw) : 0;
+    const leftTipRaw = getFlag(rest, '--fuel-left-tip');
+    const rightTipRaw = getFlag(rest, '--fuel-right-tip');
+    const leftTip = leftTipRaw !== undefined ? Number(leftTipRaw) : 0;
+    const rightTip = rightTipRaw !== undefined ? Number(rightTipRaw) : 0;
     const stations = getStationFlags(rest);
 
     if (!Number.isFinite(left) || !Number.isFinite(right)) {
@@ -269,6 +273,10 @@ async function main(): Promise<void> {
     }
     if (!Number.isFinite(leftAux) || !Number.isFinite(rightAux)) {
       console.error('--fuel-left-aux / --fuel-right-aux must be numbers when provided');
+      process.exit(1);
+    }
+    if (!Number.isFinite(leftTip) || !Number.isFinite(rightTip)) {
+      console.error('--fuel-left-tip / --fuel-right-tip must be numbers when provided');
       process.exit(1);
     }
 
@@ -301,6 +309,8 @@ async function main(): Promise<void> {
       const tankIds = new Set(resolved.profile.fuel.tanks.map((t) => t.id));
       if (tankIds.has('LEFT_AUX')) tanks.LEFT_AUX = leftAux;
       if (tankIds.has('RIGHT_AUX')) tanks.RIGHT_AUX = rightAux;
+      if (tankIds.has('LEFT_TIP')) tanks.LEFT_TIP = leftTip;
+      if (tankIds.has('RIGHT_TIP')) tanks.RIGHT_TIP = rightTip;
       if (tankIds.has('CENTER') && center !== undefined) tanks.CENTER = center;
 
       const plan: LoadPlanRequest = {
@@ -772,6 +782,14 @@ async function main(): Promise<void> {
     const tankIds = new Set(profile.fuel.tanks.map((t) => t.id));
     if (tankIds.has('LEFT_AUX')) tanks.LEFT_AUX = leftAux;
     if (tankIds.has('RIGHT_AUX')) tanks.RIGHT_AUX = rightAux;
+    if (tankIds.has('LEFT_TIP')) {
+      const leftTip = Number(getFlag(rest, '--fuel-left-tip') ?? '0');
+      tanks.LEFT_TIP = leftTip;
+    }
+    if (tankIds.has('RIGHT_TIP')) {
+      const rightTip = Number(getFlag(rest, '--fuel-right-tip') ?? '0');
+      tanks.RIGHT_TIP = rightTip;
+    }
     if (tankIds.has('CENTER') && center !== undefined) tanks.CENTER = center;
 
     const result = await withBridge(pipeName, async (bridge) => {

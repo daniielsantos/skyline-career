@@ -27,15 +27,27 @@ Accu-Sim (tablet / Mass & Balance) **owns** fuel and payload. Classic SimConnect
 |------|----------------|--------------|------------------|
 | `FuelLeftWingTank` | gallons | Left wing usable fuel on tablet | → `LEFT_MAIN`; mirrors `FUEL TANK LEFT MAIN QUANTITY` |
 | `FuelRightWingTank` | gallons | Right wing usable fuel | → `RIGHT_MAIN`; mirrors `FUEL TANK RIGHT MAIN QUANTITY` |
-| `FuelFuselageTank` | gallons | Fuselage / center tank on tablet | → `CENTER`; mirrors `FUEL TANK CENTER QUANTITY` |
+| `FuelFuselageTank` | gallons | Fuselage / center (Aerostar). **Ghost on Comanche** — LVar may read/write but `CENTER` cap=0 and classic mirror stays 0. Draft **skips** when capacity &lt; 5. | → `CENTER` only when live |
+| `FuelLeftTipTank` | gallons | Left tip tank (Comanche). | → `LEFT_TIP`; mirrors `FUEL TANK LEFT TIP QUANTITY` |
+| `FuelRightTipTank` | gallons | Right tip tank (Comanche). | → `RIGHT_TIP`; mirrors `FUEL TANK RIGHT TIP QUANTITY` |
+
+Layouts seen so far:
+
+| Airframe | Tanks |
+|----------|--------|
+| Aerostar 600 | wing L/R + fuselage (`CENTER`) |
+| PA-24-250 Comanche | wing L/R + tip L/R (`LEFT_TIP` / `RIGHT_TIP`) |
+
+Recipe lists **all** candidates; `draftProfileFromVendorRecipe` keeps only tanks with classic/usable capacity ≥ 5.
 
 ### Fuel — capacity / status (mostly read)
 
 | LVar | What it does |
 |------|----------------|
-| `FuelWingTankCapacity` | Usable capacity **per wing** (Aerostar ~62 gal). Prefer over classic CAPACITY when drafting. |
-| `FuelFuselageTankCapacity` | Usable fuselage capacity (Aerostar ~41.5 gal). |
-| `FuelTotalTanksCapacity` | Sum of usable tank capacities. |
+| `FuelWingTankCapacity` | Usable capacity **per wing** (Aerostar ~62; Comanche capacity LVar may be 0 — fall back to classic CAPACITY ~30). |
+| `FuelFuselageTankCapacity` | Usable fuselage capacity (Aerostar ~41.5; unused/0 on tip-tank airframes). |
+| `FuelTipTankCapacity` | Tip usable capacity when Accu-Sim exposes it (else classic `FUEL TANK LEFT/RIGHT TIP CAPACITY` ~15 on Comanche). |
+| `FuelTotalTanksCapacity` | Sum of usable tank capacities (Comanche ~90 = 60 wing + 30 tip). |
 | `FuelTotalPct` | Tablet “fuel % full” (can lag vs sum of bars). |
 | `FuelPreset` | Tablet preset slider (LIGHT / MEDIUM / FULL style). Writing tanks usually updates UI; writing preset alone may reshuffle quantities. |
 | `FuelEconomy` | Economy / burn-related tablet value (read; not used by Skyline apply). |
@@ -102,11 +114,13 @@ Do **not** drive apply from these; use them for sanity checks vs EFB.
 ```text
 FuelLeftWingTank   = {LEFT_MAIN}
 FuelRightWingTank  = {RIGHT_MAIN}
-FuelFuselageTank   = {CENTER}
+FuelFuselageTank   = {CENTER}          # Aerostar only when capacity ≥ 5
+FuelLeftTipTank    = {LEFT_TIP}        # Comanche tip layout
+FuelRightTipTank   = {RIGHT_TIP}
 
 CharacterNWeight   = {station_N}
 SeatNCharacter     = {station_N} / ({station_N} + 0.001)
-BaggageWeight      = {station_7}          # Aerostar baggage index
+BaggageWeight      = {station_7}          # baggage station index on drafted profiles
 ```
 
 ### Pitfalls we already hit
@@ -115,6 +129,7 @@ BaggageWeight      = {station_7}          # Aerostar baggage index
 2. Classic dump `1=180 … 9=13.7 10=13.7` → ghost stations; smoke must use **profile stations** / LVars.
 3. Verify only on `PAYLOAD STATION WEIGHT:1` does not prove seats/baggage UI — always check tablet.
 4. Baggage is **`BaggageWeight`**, not a classic `PAYLOAD STATION WEIGHT` index that matches the orange BAGGAGE box.
+5. Do not assume every Accu-Sim airframe has a fuselage tank — Comanche uses tip tanks; a readable `FuelFuselageTank` without CENTER capacity is a **ghost**.
 
 ---
 
@@ -136,10 +151,13 @@ node packages/agent/dist/cli.js probe-lvars --preset a2a-aerostar `
 node packages/agent/dist/cli.js apply-auto `
   --fuel-left 30 --fuel-right 30 --fuel-center 20 `
   --station 1=180 --station 2=50 --station 7=40
+# Comanche tips (no center):
+#   --fuel-left 24 --fuel-right 24 --fuel-left-tip 10 --fuel-right-tip 10
 ```
 
 ## Known airframes
 
 | Profile | Notes |
 |---------|--------|
-| `a2a/piper-aerostar-600` | `profiles/notes/a2a-piper-aerostar-600.md` |
+| `a2a/piper-aerostar-600` | `profiles/notes/a2a-piper-aerostar-600.md` — wing + fuselage |
+| `a2a/piper-pa-24-250-comanche` | wing + tip (`FuelLeftTipTank` / `FuelRightTipTank`) |

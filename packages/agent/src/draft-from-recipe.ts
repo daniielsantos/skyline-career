@@ -80,21 +80,32 @@ export async function draftProfileFromVendorRecipe(
   for (const hint of recipe.fuel.tanks) {
     if (!hint.writeLVar || !hint.readSimVar) continue;
 
-    let capacity = 40;
+    // Prefer usable Accu-Sim capacity LVar, then classic CAPACITY SimVar.
+    let capacity = 0;
     if (recipe.fuel.preferUsableCapacity && hint.capacityLVar) {
       capacity = await readLvarOr(bridge, hint.capacityLVar, 0);
     }
     if (capacity < 5 && hint.capacitySimVar) {
       capacity = await readSimOr(bridge, hint.capacitySimVar, 'gallons', 0);
     }
+
+    // Skip optional / ghost tanks (e.g. FuelFuselageTank exists on Comanche but CENTER cap=0
+    // and does not mirror). Never invent a fake 40 gal capacity.
     if (capacity < 5) {
-      // Still include if the write LVar is readable (qty > 0 or zeroed empty tank with known id).
       try {
         await bridge.readLVar(hint.writeLVar);
       } catch {
         continue;
       }
-      capacity = Math.max(capacity, 40);
+      // Readable LVar alone is not enough without real capacity ≥ 5.
+      continue;
+    }
+
+    // Confirm write LVar is at least readable before including.
+    try {
+      await bridge.readLVar(hint.writeLVar);
+    } catch {
+      continue;
     }
 
     tanks.push({

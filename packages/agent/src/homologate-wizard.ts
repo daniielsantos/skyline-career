@@ -67,6 +67,28 @@ function formatPairGalLbs(
   return `${formatGalLbs(left, lbPerGal)} / ${formatGalLbs(right, lbPerGal)}`;
 }
 
+/** Compact fuel line for profile tanks: `LEFT_MAIN 24 gal · RIGHT_TIP 8 gal · …` */
+function formatProfileFuelLine(
+  profile: AircraftProfile,
+  quantities: Record<string, number | undefined>,
+  lbPerGal: number,
+): string {
+  return profile.fuel.tanks
+    .map((t) => `${t.id} ${formatGalLbs(quantities[t.id], lbPerGal)}`)
+    .join(' · ');
+}
+
+function applyAutoHint(profile: AircraftProfile): string {
+  let cmd =
+    '  node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30';
+  if (profile.fuel.tanks.some((t) => t.id === 'CENTER')) cmd += ' --fuel-center 20';
+  if (profile.fuel.tanks.some((t) => t.id === 'LEFT_TIP')) cmd += ' --fuel-left-tip 10';
+  if (profile.fuel.tanks.some((t) => t.id === 'RIGHT_TIP')) cmd += ' --fuel-right-tip 10';
+  if (profile.fuel.tanks.some((t) => t.id === 'LEFT_AUX')) cmd += ' --fuel-left-aux 10';
+  if (profile.fuel.tanks.some((t) => t.id === 'RIGHT_AUX')) cmd += ' --fuel-right-aux 10';
+  return cmd;
+}
+
 function formatLb(n: number | null | undefined): string {
   const v = typeof n === 'number' ? n : Number(n);
   if (!Number.isFinite(v)) return '—';
@@ -237,18 +259,16 @@ async function runSmoke(
   apply: Awaited<ReturnType<DefaultProfileEngine['applyLoadPlan']>>;
 }> {
   const engine = new DefaultProfileEngine({ profile, bridge });
-  const leftCap = profile.fuel.tanks.find((t) => t.id === 'LEFT_MAIN')?.capacity ?? 40;
-  const rightCap = profile.fuel.tanks.find((t) => t.id === 'RIGHT_MAIN')?.capacity ?? 40;
-  const fuelTanks: Record<string, number> = {
-    LEFT_MAIN: Math.max(5, Math.floor(leftCap * 0.8)),
-    RIGHT_MAIN: Math.max(5, Math.floor(rightCap * 0.8)),
-  };
-  const leftAuxCap = profile.fuel.tanks.find((t) => t.id === 'LEFT_AUX')?.capacity;
-  const rightAuxCap = profile.fuel.tanks.find((t) => t.id === 'RIGHT_AUX')?.capacity;
-  if (leftAuxCap !== undefined) fuelTanks.LEFT_AUX = Math.max(0, Math.floor(leftAuxCap * 0.5));
-  if (rightAuxCap !== undefined) fuelTanks.RIGHT_AUX = Math.max(0, Math.floor(rightAuxCap * 0.5));
-  const centerCap = profile.fuel.tanks.find((t) => t.id === 'CENTER')?.capacity;
-  if (centerCap !== undefined) fuelTanks.CENTER = Math.max(5, Math.floor(centerCap * 0.8));
+  const fuelTanks: Record<string, number> = {};
+  for (const tank of profile.fuel.tanks) {
+    const cap = tank.capacity ?? 40;
+    // Mains/center ~80%; tips/aux ~50% so tip tanks with small caps stay visible.
+    const ratio = /TIP|AUX/i.test(tank.id) ? 0.5 : 0.8;
+    fuelTanks[tank.id] = Math.max(tank.id.includes('TIP') || tank.id.includes('AUX') ? 1 : 5, Math.floor(cap * ratio));
+  }
+  if (fuelTanks.LEFT_MAIN === undefined && profile.fuel.tanks[0]) {
+    fuelTanks[profile.fuel.tanks[0].id] = Math.max(5, Math.floor((profile.fuel.tanks[0].capacity ?? 40) * 0.8));
+  }
 
   const stationTargets = buildSmokeStationTargets(profile);
 
@@ -264,11 +284,30 @@ async function runSmoke(
   const after = await bridge.snapshot();
   const afterPayload = await readProfileStationWeights(bridge, profile, after);
 
-  const pick = (snap: typeof before) => ({
-    LEFT_MAIN: snap.vars?.['FUEL TANK LEFT MAIN QUANTITY'],
-    RIGHT_MAIN: snap.vars?.['FUEL TANK RIGHT MAIN QUANTITY'],
-    CENTER: snap.vars?.['FUEL TANK CENTER QUANTITY'],
-  });
+  const pick = async (snap: typeof before) => {
+    const out: Record<string, number | undefined> = {
+      LEFT_MAIN: snap.vars?.['FUEL TANK LEFT MAIN QUANTITY'],
+      RIGHT_MAIN: snap.vars?.['FUEL TANK RIGHT MAIN QUANTITY'],
+      CENTER: snap.vars?.['FUEL TANK CENTER QUANTITY'],
+      LEFT_TIP: snap.vars?.['FUEL TANK LEFT TIP QUANTITY'],
+      RIGHT_TIP: snap.vars?.['FUEL TANK RIGHT TIP QUANTITY'],
+      LEFT_AUX: snap.vars?.['FUEL TANK LEFT AUX QUANTITY'],
+      RIGHT_AUX: snap.vars?.['FUEL TANK RIGHT AUX QUANTITY'],
+    };
+    // Snapshot may omit tip/aux — fill from profile readVars when needed for display.
+    for (const tank of profile.fuel.tanks) {
+      if (out[tank.id] !== undefined) continue;
+      try {
+        out[tank.id] = await bridge.readSimVar({ name: tank.readVar, unit: tank.readUnit || 'gallons' });
+      } catch {
+        out[tank.id] = undefined;
+      }
+    }
+    return out;
+  };
+
+  const beforeFuel = await pick(before);
+  const afterFuel = await pick(after);
 
   const fuelOk = apply.fuel?.success === true;
   const payloadOk = apply.payload?.success === true;
@@ -277,8 +316,8 @@ async function runSmoke(
   return {
     ok: fuelOk && payloadOk && cgOk,
     targets: fuelTanks,
-    beforeFuel: pick(before),
-    afterFuel: pick(after),
+    beforeFuel,
+    afterFuel,
     beforePayload,
     afterPayload,
     payloadTargets: stationTargets,
@@ -510,29 +549,13 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
       printSection('5/5 Smoke');
       const smoke = await runSmoke(bridge, profile);
-      const hasCenter = profile.fuel.tanks.some((t) => t.id === 'CENTER');
       printKv([
         ['fuel ok', smoke.apply.fuel?.success],
         ['payload ok', smoke.apply.payload?.success],
         ['cg ok', 'cg' in smoke.apply ? smoke.apply.cg?.ok : undefined],
-        [
-          hasCenter ? 'targets L/R/C' : 'targets L/R',
-          hasCenter
-            ? `${formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.targets.CENTER, lbPerGal)}`
-            : formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal),
-        ],
-        [
-          hasCenter ? 'before L/R/C' : 'before L/R',
-          hasCenter
-            ? `${formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.beforeFuel.CENTER, lbPerGal)}`
-            : formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal),
-        ],
-        [
-          hasCenter ? 'after L/R/C' : 'after L/R',
-          hasCenter
-            ? `${formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.afterFuel.CENTER, lbPerGal)}`
-            : formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal),
-        ],
+        ['targets', formatProfileFuelLine(profile, smoke.targets, lbPerGal)],
+        ['before', formatProfileFuelLine(profile, smoke.beforeFuel, lbPerGal)],
+        ['after', formatProfileFuelLine(profile, smoke.afterFuel, lbPerGal)],
         [
           'payload after',
           `${formatLb(smoke.afterPayload.totalLb)} · ${formatStationsLine(smoke.afterPayload.stations)}`,
@@ -551,16 +574,21 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         return;
       }
 
-      const left = Number(
-        await ask(`Test apply left gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
-      );
-      const right = Number(
-        await ask(`Test apply right gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
-      );
-      const tanksApply: Record<string, number> = { LEFT_MAIN: left, RIGHT_MAIN: right };
-      if (hasCenter) {
-        tanksApply.CENTER = Number(
-          await ask(`Test apply center/fuselage gal (~${roundFuel(20 * lbPerGal)} lb)`, '20'),
+      const tanksApply: Record<string, number> = {};
+      for (const tank of profile.fuel.tanks) {
+        const def =
+          tank.id === 'LEFT_MAIN' || tank.id === 'RIGHT_MAIN'
+            ? '40'
+            : tank.id === 'CENTER'
+              ? '20'
+              : /TIP|AUX/i.test(tank.id)
+                ? '10'
+                : '20';
+        tanksApply[tank.id] = Number(
+          await ask(
+            `Test apply ${tank.name ?? tank.id} gal (~${roundFuel(Number(def) * lbPerGal)} lb)`,
+            def,
+          ),
         );
       }
       const engine = new DefaultProfileEngine({ profile, bridge });
@@ -568,15 +596,15 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         fuel: { tanks: tanksApply },
         payload: { stations: { 1: 180 }, total: 180 },
       });
+      const afterApplySnap = await bridge.snapshot();
+      const payloadNow = await readProfileStationWeights(bridge, profile, afterApplySnap);
       printKv([
         ['apply fuel', apply.fuel?.success],
-        ['apply payload', apply.payload?.success],
         [
-          'apply tanks',
-          hasCenter
-            ? `${formatPairGalLbs(left, right, lbPerGal)} / ${formatGalLbs(tanksApply.CENTER, lbPerGal)}`
-            : formatPairGalLbs(left, right, lbPerGal),
+          'apply payload',
+          `${apply.payload?.success} · ${formatLb(payloadNow.totalLb)} · ${formatStationsLine(payloadNow.stations)}`,
         ],
+        ['apply tanks', formatProfileFuelLine(profile, tanksApply, lbPerGal)],
         ['apply cg', 'cg' in apply ? apply.cg?.ok : undefined],
       ]);
 
@@ -620,11 +648,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       console.log('');
       console.log('Next:');
       console.log('  node packages/agent/dist/cli.js resolve');
-      console.log(
-        hasCenter
-          ? '  node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20'
-          : '  node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30',
-      );
+      console.log(applyAutoHint(promoted.profile));
       return;
     }
     if (centerLikely && !centerOk) {

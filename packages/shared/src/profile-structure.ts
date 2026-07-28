@@ -13,6 +13,8 @@ const CLASSIC_TANK_INDEX: Record<string, number> = {
   RIGHT_AUX: 4,
   CENTER: 5,
   CENTER2: 6,
+  LEFT_TIP: 7,
+  RIGHT_TIP: 8,
 };
 
 function tankIndexFromVar(varName: string | undefined, tankId: string, fallback: number): number {

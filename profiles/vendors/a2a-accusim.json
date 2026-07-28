@@ -3,14 +3,15 @@
   "recipeId": "a2a-accusim",
   "publisher": "a2a",
   "displayName": "A2A Accu-Sim",
-  "summary": "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy.",
+  "summary": "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy. Tank set varies (fuselage vs tip) — draft keeps only tanks with live capacity ≥ 5.",
   "detectMode": "publisher_then_probes",
   "detect": [
     { "kind": "publisher", "value": "a2a" },
     { "kind": "title_regex", "value": "\\ba2a\\b" },
     { "kind": "classic_writetest_fails" },
     { "kind": "lvar_readable", "name": "FuelLeftWingTank" },
-    { "kind": "lvar_readable", "name": "FuelFuselageTank" }
+    { "kind": "lvar_readable", "name": "FuelFuselageTank" },
+    { "kind": "lvar_readable", "name": "FuelLeftTipTank" }
   ],
   "capabilities": ["simconnect", "lvar"],
   "fuel": {
@@ -40,14 +41,33 @@
         "writeLVar": "FuelFuselageTank",
         "capacityLVar": "FuelFuselageTankCapacity",
         "capacitySimVar": "FUEL TANK CENTER CAPACITY"
+      },
+      {
+        "id": "LEFT_TIP",
+        "label": "Left tip",
+        "readSimVar": "FUEL TANK LEFT TIP QUANTITY",
+        "writeLVar": "FuelLeftTipTank",
+        "capacityLVar": "FuelTipTankCapacity",
+        "capacitySimVar": "FUEL TANK LEFT TIP CAPACITY"
+      },
+      {
+        "id": "RIGHT_TIP",
+        "label": "Right tip",
+        "readSimVar": "FUEL TANK RIGHT TIP QUANTITY",
+        "writeLVar": "FuelRightTipTank",
+        "capacityLVar": "FuelTipTankCapacity",
+        "capacitySimVar": "FUEL TANK RIGHT TIP CAPACITY"
       }
     ],
     "probeLVars": [
       "FuelLeftWingTank",
       "FuelRightWingTank",
       "FuelFuselageTank",
+      "FuelLeftTipTank",
+      "FuelRightTipTank",
       "FuelWingTankCapacity",
       "FuelFuselageTankCapacity",
+      "FuelTipTankCapacity",
       "FuelPreset",
       "Character1Weight",
       "BaggageWeight",
@@ -74,5 +94,5 @@
     "notesTemplate": "a2a-accusim"
   },
   "docs": "profiles/notes/a2a-accusim.md",
-  "knownProfileKeys": ["a2a/piper-aerostar-600"]
+  "knownProfileKeys": ["a2a/piper-aerostar-600", "a2a/piper-pa-24-250-comanche"]
 }

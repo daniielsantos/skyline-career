@@ -1,71 +1,51 @@
 # A2A Piper Aerostar 600 — discovery
 
-**In-sim title:** `A2A Piper Aerostar 600`  
+**In-sim title (example):** `A2A Piper Aerostar 600`  
 **Match title:** `A2A Piper Aerostar 600`  
 **ICAO (SimBrief type):** `AEST`  
 **Publisher:** `a2a`  
-**Stations (profile):** 7 (Character1–6 + Baggage via LVars)  
-**Profile:** `a2a/piper-aerostar-600@1.0.0`  
-**Fuel strategy:** `lvar-bridge`
+**Stations (profile):** 7 — Character1–6 + Baggage (LVars)  
+**Recipe:** `a2a-accusim`  
+**Profile:** `a2a/piper-aerostar-600@1.0.0`
 
-## Why `simconnect-direct` fails
+> Family quirks (ghost stations, `SeatNCharacter`, wizard smoke): see **`profiles/notes/a2a-accusim.md`**.
 
-Accu-Sim owns fuel and payload. Classic SimVars are **read-only mirrors**:
+## Fuel tanks
 
-- `FUEL TANK LEFT/RIGHT MAIN QUANTITY`, `FUEL TANK CENTER QUANTITY` — readable
-- `PAYLOAD STATION WEIGHT:*` — readable
-- Writes to those SimVars are **silently ignored**
+| Id | Write LVar | Capacity (usable) | Classic mirror |
+|----|------------|-------------------|----------------|
+| `LEFT_MAIN` | `FuelLeftWingTank` | ~62 gal (`FuelWingTankCapacity`) | `FUEL TANK LEFT MAIN QUANTITY` |
+| `RIGHT_MAIN` | `FuelRightWingTank` | ~62 gal | `FUEL TANK RIGHT MAIN QUANTITY` |
+| `CENTER` | `FuelFuselageTank` | ~41.5 gal (`FuelFuselageTankCapacity`) | `FUEL TANK CENTER QUANTITY` |
 
-Fuel density live: **6.0 lb/gal** (avgas).
+Wing tanks total ~124 gal usable; fuselage ~41.5. Classic QUANTITY writes are ignored (Accu-Sim).
 
-### Classic capacities (SimConnect totals)
+## Payload
 
-| Tank | Capacity | Notes |
-|------|----------|--------|
-| Left main | 66.5 gal | wing |
-| Right main | 66.5 gal | wing |
-| Center | 44 gal | fuselage |
-| **Total** | **177 gal** | ~174.5 usable per A2A manual |
+| Station | Write LVars | Notes |
+|---------|-------------|--------|
+| 1–6 | `CharacterNWeight` + `SeatNCharacter` | EFB seat paint needs occupancy |
+| 7 | `BaggageWeight` | max ~`BaggageMax` (tablet also shows max baggage ~240 lb on this airframe) |
 
-Profile uses **usable** capacities from LVars (~62 / 62 / 41.5).
+## Homologation path
 
-## How we found the LVars
-
-Package: `D:\Community2024\a2a-aircraft-aerostar600`
-
-1. Tablet: `html_ui/efb_ui/efb_apps/Aerostar600App/A2ATabletApp.js` sets `FuelLeftWingTank` / `FuelRightWingTank` / `FuelFuselageTank` / `FuelPreset` and Character/Baggage weights.
-2. Panel XML under `SimObjects/Airplanes/aerostar600/common/panel/xml/` references the same `L:Fuel*Tank` names.
-3. Confirmed with `npm run probe-lvars` (read + write + SimVar mirrors).
-
-## Working LVar map
-
-| Role | LVar | Mirror / notes |
-|------|------|----------------|
-| Left wing qty | `FuelLeftWingTank` | → `FUEL TANK LEFT MAIN QUANTITY` |
-| Right wing qty | `FuelRightWingTank` | → `FUEL TANK RIGHT MAIN QUANTITY` |
-| Fuselage qty | `FuelFuselageTank` | → `FUEL TANK CENTER QUANTITY` |
-| Wing capacity (usable) | `FuelWingTankCapacity` | ~62 gal |
-| Fuselage capacity (usable) | `FuelFuselageTankCapacity` | ~41.5 gal |
-| Pilot / pax | `Character1Weight`…`Character6Weight` | Char1 → station 1 |
-| Baggage | `BaggageWeight` | max ~400 (`BaggageMax`) |
-
-## Homologation
-
-Wizard path when classic writetest fails:
-
-1. Load `profiles/vendors` recipes; match `a2a-accusim` (publisher + LVars)  
-2. LVar write smoke from recipe (`FuelLeftWingTank`)  
-3. Draft via `draftProfileFromVendorRecipe` (`lvar-bridge`)  
-4. Calibrate (LVar probes, offset usually 0)  
-5. Promote → `profiles/examples/a2a-piper-aerostar-600.json`
+1. Classic writetest fails → recipe match `a2a-accusim`
+2. LVar write probe (e.g. `FuelLeftWingTank`)
+3. `draftProfileFromVendorRecipe` → `lvar-bridge` (+ `SeatNCharacter` soft-bool steps)
+4. Smoke / tablet check → promote
 
 ```powershell
-npm run start:local   # after native rebuild
-npm run homologate    # on Aerostar — choose a2a-accusim recipe when offered
-npm run probe-lvars
-node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20 --station 1=180
+npm run start:local
+npm run homologate
+node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20 --station 1=180 --station 2=50 --station 3=25
 ```
+
+## Package / sources
+
+- Community package (example): `a2a-aircraft-aerostar600`
+- Tablet: `html_ui/.../Aerostar600App/A2ATabletApp.js` (Fuel* / Character* / Seat*)
 
 ## Homologated
 
 - `profiles/examples/a2a-piper-aerostar-600.json`
+- Recipe: `profiles/vendors/a2a-accusim.json`

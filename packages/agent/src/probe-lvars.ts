@@ -34,6 +34,8 @@ export const A2A_AEROSTAR_LVAR_CANDIDATES: string[] = [
   'Seat2Character',
   'Seat3Character',
   'Seat4Character',
+  'Seat5Character',
+  'Seat6Character',
   'CoG',
   'CoGpct',
   'CoGmin',

@@ -143,6 +143,16 @@ export async function draftProfileFromVendorRecipe(
       name: lvar,
       valueExpr: `{station_${index}}`,
     });
+    // Accu-Sim tablet only shows a seat when occupancy is set (SeatNCharacter).
+    // Expr engine is arithmetic-only → soft bool (~0 empty, ~1 when weight > 0).
+    const seat = /^Character(\d+)Weight$/i.exec(lvar);
+    if (seat) {
+      payloadPlan.push({
+        op: 'lvar_set',
+        name: `Seat${seat[1]}Character`,
+        valueExpr: `{station_${index}} / ({station_${index}} + 0.001)`,
+      });
+    }
   }
 
   let nextIndex = (stationIndexes[stationIndexes.length - 1] ?? 0) + 1;

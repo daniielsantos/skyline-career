@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import type { AircraftProfile } from '@msfs-compat/shared';
 import { normalizeAircraftTitle } from '@msfs-compat/shared';
+import { buildSmokeStationTargets } from './smoke-targets.js';
 import { calibrateProfile } from './calibrate-profile.js';
 import { draftProfileFromVendorRecipe } from './draft-from-recipe.js';
 import { draftProfileFromLive } from './draft-profile.js';
@@ -73,11 +74,13 @@ function formatLb(n: number | null | undefined): string {
 }
 
 type StationWeight = { index: number; lb: number };
+type PayloadWeightSummary = { count: number; stations: StationWeight[]; totalLb: number };
 
+/** Discovery dump: all classic PAYLOAD STATION WEIGHT:n (may include Accu-Sim ghost stations). */
 function readStationWeights(snap: {
   vars?: Record<string, number | undefined>;
   payloadTotal?: number;
-}): { count: number; stations: StationWeight[]; totalLb: number } {
+}): PayloadWeightSummary {
   const countRaw = snap.vars?.['PAYLOAD STATION COUNT'];
   const countHint = Math.round(typeof countRaw === 'number' ? countRaw : Number(countRaw) || 0);
   const limit = Math.max(0, Math.min(16, countHint > 0 ? countHint : 14));
@@ -101,6 +104,50 @@ function readStationWeights(snap: {
     stations,
     totalLb,
   };
+}
+
+/** Map profile station index → LVar name from writePlan (`lvar_set` + `{station_N}`). */
+function stationLvarMap(profile: AircraftProfile): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const step of profile.payload.writePlan ?? []) {
+    if (step.op !== 'lvar_set' || !step.name || !step.valueExpr) continue;
+    const m = /^\{station_(\d+)\}$/.exec(step.valueExpr.trim());
+    if (m) map.set(Number(m[1]), step.name);
+  }
+  return map;
+}
+
+/**
+ * Smoke/display payload: only stations declared on the profile.
+ * Prefer LVars when the write plan uses them (Accu-Sim); else classic SimVars.
+ * Total is the sum of those stations — never TOTAL PAYLOAD WEIGHT (ghost stations).
+ */
+async function readProfileStationWeights(
+  bridge: NamedPipeSimBridge,
+  profile: AircraftProfile,
+  snap: { vars?: Record<string, number | undefined> },
+): Promise<PayloadWeightSummary> {
+  const lvars = stationLvarMap(profile);
+  const stations: StationWeight[] = [];
+
+  for (const st of profile.payload.stations) {
+    const lvar = lvars.get(st.index);
+    if (lvar) {
+      try {
+        const v = await bridge.readLVar(lvar);
+        stations.push({ index: st.index, lb: Number.isFinite(v) ? v : 0 });
+        continue;
+      } catch {
+        // fall through to classic
+      }
+    }
+    const raw = snap.vars?.[`PAYLOAD STATION WEIGHT:${st.index}`];
+    const lb = typeof raw === 'number' && Number.isFinite(raw) ? raw : Number(raw);
+    stations.push({ index: st.index, lb: Number.isFinite(lb) ? lb : 0 });
+  }
+
+  const totalLb = stations.reduce((a, s) => a + s.lb, 0);
+  return { count: stations.length, stations, totalLb };
 }
 
 /** Compact station line: `1=180 2=0 3=50 …` (zeros kept so layout is visible). */
@@ -184,8 +231,8 @@ async function runSmoke(
   targets: Record<string, number>;
   beforeFuel: Record<string, number | undefined>;
   afterFuel: Record<string, number | undefined>;
-  beforePayload: ReturnType<typeof readStationWeights>;
-  afterPayload: ReturnType<typeof readStationWeights>;
+  beforePayload: PayloadWeightSummary;
+  afterPayload: PayloadWeightSummary;
   payloadTargets: Record<number, number>;
   apply: Awaited<ReturnType<DefaultProfileEngine['applyLoadPlan']>>;
 }> {
@@ -203,13 +250,10 @@ async function runSmoke(
   const centerCap = profile.fuel.tanks.find((t) => t.id === 'CENTER')?.capacity;
   if (centerCap !== undefined) fuelTanks.CENTER = Math.max(5, Math.floor(centerCap * 0.8));
 
-  const stationTargets: Record<number, number> = {};
-  for (const station of profile.payload.stations) stationTargets[station.index] = 0;
-  if (stationTargets[1] !== undefined) stationTargets[1] = 180;
-  if (stationTargets[3] !== undefined) stationTargets[3] = 50;
-  if (stationTargets[5] !== undefined) stationTargets[5] = 25;
+  const stationTargets = buildSmokeStationTargets(profile);
 
   const before = await bridge.snapshot();
+  const beforePayload = await readProfileStationWeights(bridge, profile, before);
   const apply = await engine.applyLoadPlan({
     fuel: { tanks: fuelTanks },
     payload: {
@@ -218,6 +262,7 @@ async function runSmoke(
     },
   });
   const after = await bridge.snapshot();
+  const afterPayload = await readProfileStationWeights(bridge, profile, after);
 
   const pick = (snap: typeof before) => ({
     LEFT_MAIN: snap.vars?.['FUEL TANK LEFT MAIN QUANTITY'],
@@ -234,8 +279,8 @@ async function runSmoke(
     targets: fuelTanks,
     beforeFuel: pick(before),
     afterFuel: pick(after),
-    beforePayload: readStationWeights(before),
-    afterPayload: readStationWeights(after),
+    beforePayload,
+    afterPayload,
     payloadTargets: stationTargets,
     apply,
   };

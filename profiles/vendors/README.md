@@ -19,13 +19,18 @@ Recipes capture **how a developer's aircraft usually talk to SimConnect** — no
 
 | Id | Publisher | Pattern |
 |----|-----------|---------|
-| `a2a-accusim` | `a2a` | Classic SimVars read-only; write via Accu-Sim LVars |
+| `a2a-accusim` | `a2a` | Classic SimVars read-only; write via Accu-Sim LVars + `SeatNCharacter` |
 | `blacksquare-classic` | `blacksquare` | FUELSYSTEM dead; classic `FUEL TANK *` writable |
 | `asobo-default` | `asobo` | FUELSYSTEM or classic direct |
 
-## Next wiring (not in this sketch)
+## Wired (agent)
 
-- `loadVendorRecipes(dir)` in agent
-- Homologate wizard: on classic write fail → score recipes with `onClassicWriteFail: try-lvar-bridge` → LVar write probe → `draftProfileFromVendorRecipe` → smoke → promote
+- `loadVendorRecipes` / `scoreRecipesForLvarFallback` / `draftProfileFromVendorRecipe`
+- Homologate: classic write fail → recipe `try-lvar-bridge` → LVar probe → draft → smoke → promote
 - Classic / FUELSYSTEM paths unchanged when writetest succeeds
-- Optional `match.recipeId` on profiles for documentation only
+- Smoke lists **profile stations** only (LVars when write plan uses them)
+- Accu-Sim family notes: `profiles/notes/a2a-accusim.md`
+
+## Optional later
+
+- `match.recipeId` on profiles for documentation only

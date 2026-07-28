@@ -3,7 +3,7 @@
   "recipeId": "a2a-accusim",
   "publisher": "a2a",
   "displayName": "A2A Accu-Sim",
-  "summary": "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel* / Character* LVars.",
+  "summary": "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy.",
   "detectMode": "publisher_then_probes",
   "detect": [
     { "kind": "publisher", "value": "a2a" },
@@ -51,7 +51,10 @@
       "FuelPreset",
       "Character1Weight",
       "BaggageWeight",
-      "BaggageMax"
+      "BaggageMax",
+      "Seat1Character",
+      "Seat2Character",
+      "Seat3Character"
     ]
   },
   "payload": {
@@ -70,6 +73,6 @@
     "onClassicWriteFail": "try-lvar-bridge",
     "notesTemplate": "a2a-accusim"
   },
-  "docs": "profiles/notes/a2a-piper-aerostar-600.md",
+  "docs": "profiles/notes/a2a-accusim.md",
   "knownProfileKeys": ["a2a/piper-aerostar-600"]
 }

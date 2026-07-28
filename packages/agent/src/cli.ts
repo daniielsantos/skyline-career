@@ -15,6 +15,7 @@ import { ProfileCache } from './profile-cache.js';
 import { sampleAircraftStructure } from './sample-structure.js';
 import { resolveLiveAircraft } from './resolve-live.js';
 import { runHomologateWizard } from './homologate-wizard.js';
+import { buildSmokeStationTargets } from './smoke-targets.js';
 import {
   A2A_AEROSTAR_LVAR_CANDIDATES,
   probeLVars,
@@ -717,13 +718,7 @@ async function main(): Promise<void> {
           fuelTanks.RIGHT_AUX = Math.max(0, Math.floor(rightAuxCap * 0.5));
         }
 
-        const stationTargets: Record<number, number> = {};
-        for (const station of profile.payload.stations) {
-          stationTargets[station.index] = 0;
-        }
-        if (stationTargets[1] !== undefined) stationTargets[1] = 180;
-        if (stationTargets[3] !== undefined) stationTargets[3] = 50;
-        if (stationTargets[5] !== undefined) stationTargets[5] = 25;
+        const stationTargets = buildSmokeStationTargets(profile);
         const payloadTotal = Object.values(stationTargets).reduce((a, b) => a + b, 0);
 
         const apply = await engine.applyLoadPlan({

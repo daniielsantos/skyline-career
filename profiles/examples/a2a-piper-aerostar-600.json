@@ -28,7 +28,7 @@
     "tanks": [
       {
         "id": "LEFT_MAIN",
-        "name": "Left wing (Accu-Sim)",
+        "name": "Left wing",
         "capacity": 62,
         "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
@@ -37,7 +37,7 @@
       },
       {
         "id": "RIGHT_MAIN",
-        "name": "Right wing (Accu-Sim)",
+        "name": "Right wing",
         "capacity": 62,
         "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
@@ -46,7 +46,7 @@
       },
       {
         "id": "CENTER",
-        "name": "Fuselage (Accu-Sim)",
+        "name": "Fuselage",
         "capacity": 41.5,
         "readVar": "FUEL TANK CENTER QUANTITY",
         "readUnit": "gallons",
@@ -105,37 +105,37 @@
     "stations": [
       {
         "index": 1,
-        "name": "Pilot / Character1",
+        "name": "Character1Weight",
         "maxLoad": 300
       },
       {
         "index": 2,
-        "name": "Seat 2 / Character2",
+        "name": "Character2Weight",
         "maxLoad": 300
       },
       {
         "index": 3,
-        "name": "Seat 3 / Character3",
+        "name": "Character3Weight",
         "maxLoad": 300
       },
       {
         "index": 4,
-        "name": "Seat 4 / Character4",
+        "name": "Character4Weight",
         "maxLoad": 300
       },
       {
         "index": 5,
-        "name": "Seat 5 / Character5",
+        "name": "Character5Weight",
         "maxLoad": 300
       },
       {
         "index": 6,
-        "name": "Seat 6 / Character6",
+        "name": "Character6Weight",
         "maxLoad": 300
       },
       {
         "index": 7,
-        "name": "Baggage",
+        "name": "baggage",
         "maxLoad": 400
       }
     ],
@@ -147,8 +147,18 @@
       },
       {
         "op": "lvar_set",
+        "name": "Seat1Character",
+        "valueExpr": "{station_1} / ({station_1} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
         "name": "Character2Weight",
         "valueExpr": "{station_2}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat2Character",
+        "valueExpr": "{station_2} / ({station_2} + 0.001)"
       },
       {
         "op": "lvar_set",
@@ -157,8 +167,18 @@
       },
       {
         "op": "lvar_set",
+        "name": "Seat3Character",
+        "valueExpr": "{station_3} / ({station_3} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
         "name": "Character4Weight",
         "valueExpr": "{station_4}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat4Character",
+        "valueExpr": "{station_4} / ({station_4} + 0.001)"
       },
       {
         "op": "lvar_set",
@@ -167,8 +187,18 @@
       },
       {
         "op": "lvar_set",
+        "name": "Seat5Character",
+        "valueExpr": "{station_5} / ({station_5} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
         "name": "Character6Weight",
         "valueExpr": "{station_6}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat6Character",
+        "valueExpr": "{station_6} / ({station_6} + 0.001)"
       },
       {
         "op": "lvar_set",
@@ -207,10 +237,13 @@
     ]
   },
   "notes": [
-    "Homologated via Accu-Sim LVar bridge.",
+    "Homologated via wizard: A2A Piper Aerostar 600.",
     "ICAO type designator (catalog/SimBrief): AEST.",
-    "Fuel LVars: FuelLeftWingTank / FuelRightWingTank / FuelFuselageTank.",
-    "Payload LVars: Character1-6Weight + BaggageWeight.",
+    "Drafted from vendor recipe a2a-accusim.",
+    "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy.",
+    "Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, CENTER.",
+    "See profiles/notes/a2a-piper-aerostar-600.md",
+    "Homologated with interactive wizard (recipe lvar-bridge).",
     "See profiles/notes/a2a-piper-aerostar-600.md"
   ]
 }

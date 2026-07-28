@@ -1,14 +1,21 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import type { AircraftProfile } from '@msfs-compat/shared';
 import { normalizeAircraftTitle } from '@msfs-compat/shared';
 import { calibrateProfile } from './calibrate-profile.js';
-import { draftA2aAerostarProfile } from './draft-a2a-aerostar.js';
+import { draftProfileFromVendorRecipe } from './draft-from-recipe.js';
 import { draftProfileFromLive } from './draft-profile.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { confirm, printKv, printSection, withPrompts } from './prompt.js';
 import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProfile } from './promote-profile.js';
 import { probeLVars } from './probe-lvars.js';
+import {
+  inferPublisherFromLiveTitle,
+  loadVendorRecipes,
+  probeRecipeLvars,
+  scoreRecipesForLvarFallback,
+} from './vendor-recipes.js';
 
 export interface HomologateWizardOptions {
   bridge: NamedPipeSimBridge;
@@ -366,50 +373,32 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       (leftAuxCap !== null && leftAuxCap >= 5) || (rightAuxCap !== null && rightAuxCap >= 5);
     if (!mainsOk && !(fs1 && fs1 >= 5)) {
       console.log('  Fuel writes failed — SimConnect QUANTITY sets did not stick.');
-      console.log(
-        '  Typical on Accu-Sim / A2A: tablet owns fuel & payload; classic SimVars are read-only mirrors.',
-      );
 
-      console.log('  Probing Accu-Sim LVars (Fuel*Tank)…');
-      const lvarProbe = await probeLVars(bridge, [
-        'FuelLeftWingTank',
-        'FuelRightWingTank',
-        'FuelFuselageTank',
-        'Character1Weight',
-      ]);
-      const lvarReadable = lvarProbe.filter((r) => r.ok);
-      for (const r of lvarReadable) {
-        console.log(`  LVar ${r.name} = ${r.value}`);
+      const recipesDir = join(repoRoot, 'profiles', 'vendors');
+      const recipes = await loadVendorRecipes(recipesDir);
+      const publisherGuess = inferPublisherFromLiveTitle(identity.title);
+      console.log(`  Loading vendor recipes (${recipes.length}) — publisher guess: ${publisherGuess}`);
+
+      // Pre-probe union of try-lvar-bridge recipe LVars for scoring.
+      const probeNames = new Set<string>();
+      for (const r of recipes) {
+        if (r.wizard.onClassicWriteFail !== 'try-lvar-bridge') continue;
+        for (const n of r.fuel.probeLVars ?? []) probeNames.add(n);
+        for (const t of r.fuel.tanks) if (t.writeLVar) probeNames.add(t.writeLVar);
       }
+      const pre = await probeLVars(bridge, [...probeNames]);
+      const readableLVars = new Set(pre.filter((r) => r.ok).map((r) => r.name));
 
-      let lvarFuelOk = false;
-      if (lvarReadable.some((r) => r.name === 'FuelLeftWingTank')) {
-        try {
-          const before = await bridge.readLVar('FuelLeftWingTank');
-          const target = Math.max(5, Math.min(30, Math.floor(before * 0.5) || 20));
-          await bridge.writeLVar({ name: 'FuelLeftWingTank', value: target });
-          await bridge.delay(400);
-          const after = await bridge.readLVar('FuelLeftWingTank');
-          lvarFuelOk = Math.abs(after - target) <= Math.max(target * 0.05, 0.25);
-          console.log(
-            lvarFuelOk
-              ? `  ✓ LVar FuelLeftWingTank write ${before} → ${after} (wanted ${target})`
-              : `  ✗ LVar FuelLeftWingTank write ignored (${before} → ${after})`,
-          );
-          // restore
-          await bridge.writeLVar({ name: 'FuelLeftWingTank', value: before });
-          await bridge.delay(200);
-        } catch (error) {
-          console.log(
-            `  ✗ LVar write error: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
+      const scored = scoreRecipesForLvarFallback(recipes, {
+        title: identity.title,
+        publisher: publisherGuess,
+        classicWritetestFailed: true,
+        readableLVars,
+      });
 
-      if (!lvarFuelOk) {
-        console.log(
-          '  Next: run `npm run probe-lvars` / identify vendor LVars — cannot promote yet.',
-        );
+      if (scored.length === 0) {
+        console.log('  No vendor recipe matched for lvar-bridge fallback.');
+        console.log('  Next: run `npm run probe-lvars` / add a profiles/vendors recipe.');
         if (centerLikely) {
           console.log(
             `  Note: CENTER tank is live (${formatGalLbs(centerCap, lbPerGal)}) — profile will need LEFT/RIGHT/CENTER when writable.`,
@@ -418,19 +407,39 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         return;
       }
 
-      if (
-        !(await confirm(
-          ask,
-          'Accu-Sim LVars writable. Continue homologation via lvar-bridge (Aerostar path)',
-          true,
-        ))
-      ) {
-        console.log('Stopped after LVar discovery.');
+      const best = scored[0]!;
+      console.log(
+        `  Recipe match: ${best.recipe.recipeId} (score=${best.score}, ${best.reasons.join('+')})`,
+      );
+      console.log(`  ${best.recipe.summary}`);
+
+      const { writeProbe } = await probeRecipeLvars(bridge, best.recipe);
+      if (writeProbe) {
+        console.log(
+          writeProbe.ok
+            ? `  ✓ LVar ${writeProbe.name} write ${writeProbe.before} → ${writeProbe.after} (wanted ${writeProbe.target})`
+            : `  ✗ LVar ${writeProbe.name} write ignored (${writeProbe.before} → ${writeProbe.after})`,
+        );
+      }
+
+      if (!writeProbe?.ok) {
+        console.log('  Recipe LVar write probe failed — cannot promote via lvar-bridge yet.');
         return;
       }
 
-      printSection('4/5 Draft + calibrate (lvar-bridge)');
-      const drafted = await draftA2aAerostarProfile(bridge, {
+      if (
+        !(await confirm(
+          ask,
+          `Continue homologation via recipe ${best.recipe.recipeId} (lvar-bridge)`,
+          true,
+        ))
+      ) {
+        console.log('Stopped after recipe discovery.');
+        return;
+      }
+
+      printSection(`4/5 Draft + calibrate (${best.recipe.recipeId})`);
+      const drafted = await draftProfileFromVendorRecipe(bridge, best.recipe, {
         outDir: draftsDir,
         matchTitle,
         icao: matchIcao,
@@ -439,6 +448,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       let profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
       printKv([
         ['draft', drafted.path],
+        ['recipe', best.recipe.recipeId],
         ['profileKey', profile.profileKey],
         ['strategy', profile.fuel.strategy],
         ['tanks', profile.fuel.tanks.map((t) => t.id).join(', ')],
@@ -455,21 +465,28 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
       printSection('5/5 Smoke');
       const smoke = await runSmoke(bridge, profile);
+      const hasCenter = profile.fuel.tanks.some((t) => t.id === 'CENTER');
       printKv([
         ['fuel ok', smoke.apply.fuel?.success],
         ['payload ok', smoke.apply.payload?.success],
         ['cg ok', 'cg' in smoke.apply ? smoke.apply.cg?.ok : undefined],
         [
-          'targets L/R/C',
-          `${formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.targets.CENTER, lbPerGal)}`,
+          hasCenter ? 'targets L/R/C' : 'targets L/R',
+          hasCenter
+            ? `${formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.targets.CENTER, lbPerGal)}`
+            : formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal),
         ],
         [
-          'before L/R/C',
-          `${formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.beforeFuel.CENTER, lbPerGal)}`,
+          hasCenter ? 'before L/R/C' : 'before L/R',
+          hasCenter
+            ? `${formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.beforeFuel.CENTER, lbPerGal)}`
+            : formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal),
         ],
         [
-          'after L/R/C',
-          `${formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.afterFuel.CENTER, lbPerGal)}`,
+          hasCenter ? 'after L/R/C' : 'after L/R',
+          hasCenter
+            ? `${formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal)} / ${formatGalLbs(smoke.afterFuel.CENTER, lbPerGal)}`
+            : formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal),
         ],
         [
           'payload after',
@@ -483,30 +500,38 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       }
 
       console.log('');
-      console.log('  Check the A2A tablet / Mass & Balance UI now.');
+      console.log('  Check the vendor tablet / Mass & Balance UI now.');
       if (!(await confirm(ask, 'UI looks correct (fuel/payload)', true))) {
         console.log(`  Draft kept for manual edit: ${drafted.path}`);
         return;
       }
 
       const left = Number(
-        await ask(`Test apply left wing gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
+        await ask(`Test apply left gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
       );
       const right = Number(
-        await ask(`Test apply right wing gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
+        await ask(`Test apply right gal (~${roundFuel(40 * lbPerGal)} lb)`, '40'),
       );
-      const center = Number(
-        await ask(`Test apply fuselage gal (~${roundFuel(20 * lbPerGal)} lb)`, '20'),
-      );
+      const tanksApply: Record<string, number> = { LEFT_MAIN: left, RIGHT_MAIN: right };
+      if (hasCenter) {
+        tanksApply.CENTER = Number(
+          await ask(`Test apply center/fuselage gal (~${roundFuel(20 * lbPerGal)} lb)`, '20'),
+        );
+      }
       const engine = new DefaultProfileEngine({ profile, bridge });
       const apply = await engine.applyLoadPlan({
-        fuel: { tanks: { LEFT_MAIN: left, RIGHT_MAIN: right, CENTER: center } },
+        fuel: { tanks: tanksApply },
         payload: { stations: { 1: 180 }, total: 180 },
       });
       printKv([
         ['apply fuel', apply.fuel?.success],
         ['apply payload', apply.payload?.success],
-        ['apply L/R/C', `${formatPairGalLbs(left, right, lbPerGal)} / ${formatGalLbs(center, lbPerGal)}`],
+        [
+          'apply tanks',
+          hasCenter
+            ? `${formatPairGalLbs(left, right, lbPerGal)} / ${formatGalLbs(tanksApply.CENTER, lbPerGal)}`
+            : formatPairGalLbs(left, right, lbPerGal),
+        ],
         ['apply cg', 'cg' in apply ? apply.cg?.ok : undefined],
       ]);
 
@@ -516,12 +541,12 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       }
 
       const discoveryNotes = [
-        'Fuel via Accu-Sim LVars FuelLeftWingTank / FuelRightWingTank / FuelFuselageTank.',
-        'Verify mirrors classic FUEL TANK LEFT/RIGHT MAIN + CENTER.',
-        'Payload via Character1-6Weight + BaggageWeight LVars.',
-        'See profiles/notes/a2a-piper-aerostar-600.md',
-        'Homologated with interactive wizard (lvar-bridge).',
-      ];
+        `Drafted from vendor recipe ${best.recipe.recipeId}.`,
+        best.recipe.summary,
+        `Fuel strategy: ${profile.fuel.strategy}; tanks: ${profile.fuel.tanks.map((t) => t.id).join(', ')}.`,
+        best.recipe.docs ? `See ${best.recipe.docs}` : undefined,
+        'Homologated with interactive wizard (recipe lvar-bridge).',
+      ].filter(Boolean) as string[];
 
       const promoted = await promoteDraftProfile({
         draftPath: drafted.path,
@@ -540,6 +565,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       printKv([
         ['example', promoted.examplePath],
         ['notes', promoted.notesPath],
+        ['recipe', best.recipe.recipeId],
         ['profileKey', promoted.profile.profileKey],
         ['semver', promoted.profile.semver],
         ['fingerprint', promoted.profile.match.fingerprint?.slice(0, 16) + '…'],
@@ -550,7 +576,9 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       console.log('Next:');
       console.log('  node packages/agent/dist/cli.js resolve');
       console.log(
-        '  node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20',
+        hasCenter
+          ? '  node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20'
+          : '  node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30',
       );
       return;
     }

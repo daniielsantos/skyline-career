@@ -26,5 +26,6 @@ Recipes capture **how a developer's aircraft usually talk to SimConnect** — no
 ## Next wiring (not in this sketch)
 
 - `loadVendorRecipes(dir)` in agent
-- Homologate: on classic write fail → match recipe → draft from recipe tanks/LVars
+- Homologate wizard: on classic write fail → score recipes with `onClassicWriteFail: try-lvar-bridge` → LVar write probe → `draftProfileFromVendorRecipe` → smoke → promote
+- Classic / FUELSYSTEM paths unchanged when writetest succeeds
 - Optional `match.recipeId` on profiles for documentation only

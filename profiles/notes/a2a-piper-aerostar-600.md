@@ -53,15 +53,15 @@ Package: `D:\Community2024\a2a-aircraft-aerostar600`
 
 Wizard path when classic writetest fails:
 
-1. Probe Accu-Sim LVars  
-2. LVar write smoke on `FuelLeftWingTank`  
-3. Draft via `draftA2aAerostarProfile` (`lvar-bridge`)  
+1. Load `profiles/vendors` recipes; match `a2a-accusim` (publisher + LVars)  
+2. LVar write smoke from recipe (`FuelLeftWingTank`)  
+3. Draft via `draftProfileFromVendorRecipe` (`lvar-bridge`)  
 4. Calibrate (LVar probes, offset usually 0)  
 5. Promote → `profiles/examples/a2a-piper-aerostar-600.json`
 
 ```powershell
 npm run start:local   # after native rebuild
-npm run homologate    # on Aerostar — choose Accu-Sim / lvar-bridge when offered
+npm run homologate    # on Aerostar — choose a2a-accusim recipe when offered
 npm run probe-lvars
 node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20 --station 1=180
 ```

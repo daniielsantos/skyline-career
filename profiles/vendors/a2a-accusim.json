@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "0.1.0",
+  "recipeId": "a2a-accusim",
+  "publisher": "a2a",
+  "displayName": "A2A Accu-Sim",
+  "summary": "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel* / Character* LVars.",
+  "detectMode": "publisher_then_probes",
+  "detect": [
+    { "kind": "publisher", "value": "a2a" },
+    { "kind": "title_regex", "value": "\\ba2a\\b" },
+    { "kind": "classic_writetest_fails" },
+    { "kind": "lvar_readable", "name": "FuelLeftWingTank" },
+    { "kind": "lvar_readable", "name": "FuelFuselageTank" }
+  ],
+  "capabilities": ["simconnect", "lvar"],
+  "fuel": {
+    "strategy": "lvar-bridge",
+    "preferUsableCapacity": true,
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "label": "Left wing",
+        "readSimVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeLVar": "FuelLeftWingTank",
+        "capacityLVar": "FuelWingTankCapacity",
+        "capacitySimVar": "FUEL TANK LEFT MAIN CAPACITY"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "label": "Right wing",
+        "readSimVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeLVar": "FuelRightWingTank",
+        "capacityLVar": "FuelWingTankCapacity",
+        "capacitySimVar": "FUEL TANK RIGHT MAIN CAPACITY"
+      },
+      {
+        "id": "CENTER",
+        "label": "Fuselage",
+        "readSimVar": "FUEL TANK CENTER QUANTITY",
+        "writeLVar": "FuelFuselageTank",
+        "capacityLVar": "FuelFuselageTankCapacity",
+        "capacitySimVar": "FUEL TANK CENTER CAPACITY"
+      }
+    ],
+    "probeLVars": [
+      "FuelLeftWingTank",
+      "FuelRightWingTank",
+      "FuelFuselageTank",
+      "FuelWingTankCapacity",
+      "FuelFuselageTankCapacity",
+      "FuelPreset",
+      "Character1Weight",
+      "BaggageWeight",
+      "BaggageMax"
+    ]
+  },
+  "payload": {
+    "strategy": "lvar-bridge",
+    "stationLVars": {
+      "1": "Character1Weight",
+      "2": "Character2Weight",
+      "3": "Character3Weight",
+      "4": "Character4Weight",
+      "5": "Character5Weight",
+      "6": "Character6Weight"
+    },
+    "extras": [{ "id": "baggage", "lvar": "BaggageWeight", "maxLVar": "BaggageMax" }]
+  },
+  "wizard": {
+    "onClassicWriteFail": "try-lvar-bridge",
+    "notesTemplate": "a2a-accusim"
+  },
+  "docs": "profiles/notes/a2a-piper-aerostar-600.md",
+  "knownProfileKeys": ["a2a/piper-aerostar-600"]
+}

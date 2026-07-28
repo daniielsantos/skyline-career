@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://msfs-compat.example/schemas/vendor-recipe.schema.json",
+  "title": "VendorRecipe",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "recipeId",
+    "publisher",
+    "displayName",
+    "summary",
+    "detect",
+    "capabilities",
+    "fuel",
+    "payload",
+    "wizard"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "0.1.0" },
+    "recipeId": { "type": "string", "minLength": 3 },
+    "publisher": { "type": "string", "minLength": 2 },
+    "displayName": { "type": "string" },
+    "summary": { "type": "string" },
+    "detect": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "publisher",
+              "title_regex",
+              "simvar_capacity_lt",
+              "simvar_capacity_gte",
+              "lvar_readable",
+              "classic_writetest_fails"
+            ]
+          },
+          "value": { "type": "string" },
+          "name": { "type": "string" },
+          "unit": { "type": "string" },
+          "min": { "type": "number" },
+          "max": { "type": "number" }
+        }
+      }
+    },
+    "detectMode": {
+      "type": "string",
+      "enum": ["any", "all", "publisher_then_probes"]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["simconnect", "lvar", "hvar", "hybrid-sync"]
+      }
+    },
+    "fuel": {
+      "type": "object",
+      "required": ["strategy", "tanks"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["simconnect-direct", "lvar-bridge", "hybrid-sync", "vendor-specific"]
+        },
+        "preferUsableCapacity": { "type": "boolean" },
+        "tanks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "readSimVar": { "type": "string" },
+              "writeLVar": { "type": "string" },
+              "writeSimVar": { "type": "string" },
+              "capacityLVar": { "type": "string" },
+              "capacitySimVar": { "type": "string" }
+            }
+          }
+        },
+        "probeLVars": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["strategy"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["station-writeback", "lvar-bridge", "simconnect-direct"]
+        },
+        "stationLVars": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "extras": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "lvar"],
+            "properties": {
+              "id": { "type": "string" },
+              "lvar": { "type": "string" },
+              "maxLVar": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "wizard": {
+      "type": "object",
+      "properties": {
+        "onClassicWriteFail": {
+          "type": "string",
+          "enum": ["try-lvar-bridge", "abort", "continue-classic"]
+        },
+        "notesTemplate": { "type": "string" }
+      }
+    },
+    "docs": { "type": "string" },
+    "knownProfileKeys": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

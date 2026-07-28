@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "0.1.0",
+  "recipeId": "blacksquare-classic",
+  "publisher": "blacksquare",
+  "displayName": "Black Square classic tanks",
+  "summary": "FUELSYSTEM capacity usually 0. Writable classic FUEL TANK LEFT/RIGHT MAIN (and AUX when real capacity ≥ 5).",
+  "detectMode": "publisher_then_probes",
+  "detect": [
+    { "kind": "publisher", "value": "blacksquare" },
+    { "kind": "title_regex", "value": "black\\s*square" },
+    { "kind": "simvar_capacity_lt", "name": "FUELSYSTEM TANK CAPACITY:1", "unit": "gallons", "max": 5 },
+    { "kind": "simvar_capacity_gte", "name": "FUEL TANK LEFT MAIN CAPACITY", "unit": "gallons", "min": 5 }
+  ],
+  "capabilities": ["simconnect"],
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "preferUsableCapacity": false,
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "label": "Left main",
+        "readSimVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeSimVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "capacitySimVar": "FUEL TANK LEFT MAIN CAPACITY"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "label": "Right main",
+        "readSimVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeSimVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "capacitySimVar": "FUEL TANK RIGHT MAIN CAPACITY"
+      },
+      {
+        "id": "LEFT_AUX",
+        "label": "Left aux / aft (optional)",
+        "readSimVar": "FUEL TANK LEFT AUX QUANTITY",
+        "writeSimVar": "FUEL TANK LEFT AUX QUANTITY",
+        "capacitySimVar": "FUEL TANK LEFT AUX CAPACITY"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "label": "Right aux / aft (optional)",
+        "readSimVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "writeSimVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "capacitySimVar": "FUEL TANK RIGHT AUX CAPACITY"
+      }
+    ]
+  },
+  "payload": {
+    "strategy": "station-writeback"
+  },
+  "wizard": {
+    "onClassicWriteFail": "abort",
+    "notesTemplate": "blacksquare-classic"
+  },
+  "docs": "profiles/notes/blacksquare-starship.md",
+  "knownProfileKeys": [
+    "blacksquare/a36tc-bonanza-professional",
+    "blacksquare/caravan-professional-cargo-pod",
+    "blacksquare/starship",
+    "blacksquare/baron-58tc-professional",
+    "blacksquare/b60-duke",
+    "blacksquare/grand-duke"
+  ]
+}

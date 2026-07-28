@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "0.1.0",
+  "recipeId": "asobo-default",
+  "publisher": "asobo",
+  "displayName": "Asobo / stock-style",
+  "summary": "Prefer FUELSYSTEM when capacity ≥ 5; else classic mains. Station writeback for payload.",
+  "detectMode": "publisher_then_probes",
+  "detect": [
+    { "kind": "publisher", "value": "asobo" },
+    { "kind": "simvar_capacity_gte", "name": "FUELSYSTEM TANK CAPACITY:1", "unit": "gallons", "min": 5 }
+  ],
+  "capabilities": ["simconnect"],
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "label": "FUELSYSTEM:1 / left main",
+        "readSimVar": "FUELSYSTEM TANK QUANTITY:1",
+        "writeSimVar": "FUELSYSTEM TANK QUANTITY:1",
+        "capacitySimVar": "FUELSYSTEM TANK CAPACITY:1"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "label": "FUELSYSTEM:2 / right main",
+        "readSimVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeSimVar": "FUELSYSTEM TANK QUANTITY:2",
+        "capacitySimVar": "FUELSYSTEM TANK CAPACITY:2"
+      }
+    ]
+  },
+  "payload": {
+    "strategy": "station-writeback"
+  },
+  "wizard": {
+    "onClassicWriteFail": "continue-classic",
+    "notesTemplate": "asobo-default"
+  },
+  "knownProfileKeys": [
+    "asobo/c172-skyhawk-g1000",
+    "asobo/c172sp-g1000-passengers",
+    "asobo/cessna-c680"
+  ]
+}

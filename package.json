@@ -1,0 +1,31 @@
+{
+  "name": "msfs-compat-layer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Compatibility layer for MSFS fuel/payload control across aircraft addons",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @msfs-compat/shared && npm run build -w @msfs-compat/runtime && npm run build -w @msfs-compat/agent && npm run build -w @msfs-compat/catalog-api",
+    "build:native": "dotnet build native/SimBridgeHost/SimBridgeHost.csproj -c Release",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "validate:profiles": "node scripts/validate-profiles.mjs",
+    "fingerprints:backfill": "node scripts/backfill-fingerprints.mjs",
+    "host:mock": "node packages/agent/dist/mock-host.js",
+    "host:native": "dotnet run --project native/SimBridgeHost -c Release -- --mode mock",
+    "host:simconnect": "dotnet run --project native/SimBridgeHost -c Release -- --mode simconnect --sdk \"C:\\MSFS 2024 SDK\"",
+    "catalog:serve": "node scripts/start-local-stack.mjs",
+    "catalog:start": "npm run start -w @msfs-compat/catalog-api",
+    "smoke": "node scripts/smoke.mjs",
+    "resolve": "node packages/agent/dist/cli.js resolve",
+    "apply-auto": "node packages/agent/dist/cli.js apply-auto"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

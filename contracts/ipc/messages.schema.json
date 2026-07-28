@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://msfs-compat.example/schemas/ipc-message.schema.json",
+  "title": "SimBridgeIpcMessage",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/response" },
+    { "$ref": "#/$defs/event" }
+  ],
+  "$defs": {
+    "request": {
+      "type": "object",
+      "required": ["id", "type", "method"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "const": "request" },
+        "method": {
+          "type": "string",
+          "enum": [
+            "ping",
+            "connect",
+            "disconnect",
+            "status",
+            "readSimVar",
+            "writeSimVar",
+            "readLVar",
+            "writeLVar",
+            "triggerHVar",
+            "triggerEvent",
+            "snapshot",
+            "delay",
+            "getAircraftIdentity"
+          ]
+        },
+        "params": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "required": ["id", "type", "ok"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "response" },
+        "ok": { "type": "boolean" },
+        "result": {},
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "required": ["type", "event"],
+      "properties": {
+        "type": { "const": "event" },
+        "event": { "type": "string" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

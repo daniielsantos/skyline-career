@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://msfs-compat.example/schemas/aircraft-profile.schema.json",
+  "title": "AircraftProfile",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "profileId",
+    "profileKey",
+    "semver",
+    "match",
+    "capabilities",
+    "gating",
+    "fuel",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "profileId": {
+      "type": "string",
+      "minLength": 3
+    },
+    "profileKey": {
+      "type": "string",
+      "minLength": 3
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[\\w.]+)?$"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "match": {
+      "type": "object",
+      "required": ["fingerprint"],
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "title": { "type": "string" },
+        "publisher": { "type": "string" },
+        "icao": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "simconnect",
+          "lvar",
+          "hvar",
+          "preset",
+          "clientdata",
+          "event",
+          "hybrid-sync"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "gating": {
+      "$ref": "#/$defs/gating"
+    },
+    "fuel": {
+      "$ref": "#/$defs/fuelSection"
+    },
+    "payload": {
+      "$ref": "#/$defs/payloadSection"
+    },
+    "cg": {
+      "$ref": "#/$defs/cgSection"
+    },
+    "fallback": {
+      "type": "object",
+      "properties": {
+        "chain": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "gating": {
+      "type": "object",
+      "properties": {
+        "requireOnGround": { "type": "boolean", "default": true },
+        "requireEnginesOff": { "type": "boolean", "default": false },
+        "requireParkingBrake": { "type": "boolean", "default": false },
+        "blockWhenPaused": { "type": "boolean", "default": true },
+        "blockWhenSlew": { "type": "boolean", "default": true },
+        "minSimRate": { "type": "number", "default": 0.9 },
+        "maxSimRate": { "type": "number", "default": 1.1 }
+      },
+      "additionalProperties": false
+    },
+    "writeOp": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["op", "var", "unit", "valueExpr"],
+          "properties": {
+            "op": { "const": "simvar_set" },
+            "var": { "type": "string" },
+            "unit": { "type": "string" },
+            "valueExpr": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "name", "valueExpr"],
+          "properties": {
+            "op": { "const": "lvar_set" },
+            "name": { "type": "string" },
+            "valueExpr": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "name"],
+          "properties": {
+            "op": { "const": "hvar_trigger" },
+            "name": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "event"],
+          "properties": {
+            "op": { "const": "event" },
+            "event": { "type": "string" },
+            "data": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "ms"],
+          "properties": {
+            "op": { "const": "delay" },
+            "ms": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "verifyBlock": {
+      "type": "object",
+      "required": ["checks"],
+      "properties": {
+        "timeoutMs": { "type": "integer", "minimum": 100, "default": 3000 },
+        "pollIntervalMs": { "type": "integer", "minimum": 50, "default": 200 },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["var", "unit", "tolerancePct"],
+            "properties": {
+              "var": { "type": "string" },
+              "unit": { "type": "string" },
+              "tolerancePct": { "type": "number", "minimum": 0 },
+              "valueExpr": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "fuelSection": {
+      "type": "object",
+      "required": ["strategy", "tanks", "writePlan", "verify"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "simconnect-direct",
+            "lvar-bridge",
+            "hybrid-sync",
+            "vendor-specific"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["gallons", "pounds", "liters", "kilograms"],
+          "default": "gallons"
+        },
+        "tanks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "readVar", "readUnit"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "capacity": { "type": "number" },
+              "readVar": { "type": "string" },
+              "readUnit": { "type": "string" },
+              "writeVar": { "type": "string" },
+              "writeUnit": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "writePlan": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/writeOp" }
+        },
+        "verify": { "$ref": "#/$defs/verifyBlock" }
+      },
+      "additionalProperties": false
+    },
+    "payloadSection": {
+      "type": "object",
+      "required": ["strategy", "stations", "writePlan", "verify"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "station-writeback",
+            "simconnect-direct",
+            "lvar-bridge",
+            "vendor-specific"
+          ]
+        },
+        "stations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "maxLoad"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 0 },
+              "name": { "type": "string" },
+              "maxLoad": { "type": "number" },
+              "arm": { "type": "number" },
+              "readVar": { "type": "string" },
+              "writeVar": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "writePlan": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/writeOp" }
+        },
+        "verify": { "$ref": "#/$defs/verifyBlock" }
+      },
+      "additionalProperties": false
+    },
+    "cgSection": {
+      "type": "object",
+      "properties": {
+        "readVar": {
+          "type": "string",
+          "default": "CG PERCENT"
+        },
+        "readUnit": {
+          "type": "string",
+          "default": "Percent over 100"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "minMac": { "type": "number" },
+            "maxMac": { "type": "number" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

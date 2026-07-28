@@ -1,0 +1,624 @@
+openapi: 3.1.0
+info:
+  title: MSFS Compatibility Layer API
+  version: 0.1.0
+  description: |
+    API for aircraft fingerprinting, profile resolution, homologation telemetry,
+    and signed profile distribution.
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: http://localhost:8080/v1
+    description: Local development
+
+tags:
+  - name: Aircraft
+  - name: Profiles
+  - name: Homologation
+  - name: Telemetry
+
+paths:
+  /aircraft/fingerprint:
+    post:
+      tags: [Aircraft]
+      operationId: registerFingerprint
+      summary: Register or upsert an aircraft fingerprint
+      description: |
+        Called when the local agent detects a loaded aircraft. Returns whether
+        the aircraft is known and if homologation is required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FingerprintRequest'
+      responses:
+        '200':
+          description: Known aircraft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FingerprintResponse'
+        '202':
+          description: Unknown aircraft — homologation required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FingerprintResponse'
+
+  /profiles/resolve:
+    get:
+      tags: [Profiles]
+      operationId: resolveProfile
+      summary: Resolve the best profile for a fingerprint
+      parameters:
+        - name: fingerprint
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+        - name: simVersion
+          in: query
+          required: true
+          schema:
+            type: string
+            example: '1.37.19.0'
+        - name: channel
+          in: query
+          schema:
+            type: string
+            default: stable
+        - name: clientId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Profile resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResolveResponse'
+        '404':
+          description: No profile available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /profiles/manifest:
+    get:
+      tags: [Profiles]
+      operationId: getProfileManifest
+      summary: Fetch signed manifest for bulk profile sync
+      parameters:
+        - name: channel
+          in: query
+          schema:
+            type: string
+            default: stable
+        - name: sinceVersion
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Manifest payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileManifest'
+
+  /profiles/{profileKey}/document:
+    get:
+      tags: [Profiles]
+      operationId: getProfileDocument
+      summary: Download a specific signed profile document
+      parameters:
+        - name: profileKey
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: semver
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Profile document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileDocumentEnvelope'
+
+  /homologation/sessions:
+    post:
+      tags: [Homologation]
+      operationId: startHomologationSession
+      summary: Start a guided homologation session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomologationSessionStartRequest'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomologationSession'
+
+  /homologation/sessions/{sessionId}/complete:
+    post:
+      tags: [Homologation]
+      operationId: completeHomologationSession
+      summary: Mark homologation session complete with flight summary
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomologationSessionCompleteRequest'
+      responses:
+        '200':
+          description: Session accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomologationSessionCompleteResponse'
+
+  /telemetry/homologation:
+    post:
+      tags: [Homologation, Telemetry]
+      operationId: ingestHomologationTelemetry
+      summary: Upload homologation sample batches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomologationTelemetryBatch'
+      responses:
+        '202':
+          description: Batch accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestAck'
+
+  /telemetry/operations:
+    post:
+      tags: [Telemetry]
+      operationId: ingestOperationTelemetry
+      summary: Upload runtime operation results (setFuel, setPayload)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationTelemetryBatch'
+      responses:
+        '202':
+          description: Batch accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestAck'
+
+  /profiles/feedback:
+    post:
+      tags: [Profiles, Telemetry]
+      operationId: submitProfileFeedback
+      summary: Report profile success/failure from client runtime
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileFeedbackRequest'
+      responses:
+        '202':
+          description: Feedback accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestAck'
+
+components:
+  schemas:
+    FingerprintRequest:
+      type: object
+      required:
+        - clientId
+        - simVersion
+        - identity
+        - structure
+      properties:
+        clientId:
+          type: string
+        simVersion:
+          type: string
+        identity:
+          $ref: '#/components/schemas/AircraftIdentity'
+        structure:
+          $ref: '#/components/schemas/AircraftStructure'
+
+    AircraftIdentity:
+      type: object
+      required: [title, publisher]
+      properties:
+        title:
+          type: string
+        publisher:
+          type: string
+        atcModel:
+          type: string
+        atcType:
+          type: string
+        icao:
+          type: string
+        packageName:
+          type: string
+        packageVersion:
+          type: string
+        baseContainer:
+          type: string
+
+    AircraftStructure:
+      type: object
+      required: [tankSchema, stationSchema, weightLimits]
+      properties:
+        tankSchema:
+          type: array
+          items:
+            $ref: '#/components/schemas/TankDescriptor'
+        stationSchema:
+          type: array
+          items:
+            $ref: '#/components/schemas/StationDescriptor'
+        weightLimits:
+          $ref: '#/components/schemas/WeightLimits'
+
+    TankDescriptor:
+      type: object
+      required: [index, capacity]
+      properties:
+        index:
+          type: integer
+        name:
+          type: string
+        capacity:
+          type: number
+        unit:
+          type: string
+          enum: [gallons, pounds, liters, kilograms]
+
+    StationDescriptor:
+      type: object
+      required: [index, maxLoad]
+      properties:
+        index:
+          type: integer
+        name:
+          type: string
+        maxLoad:
+          type: number
+        arm:
+          type: number
+
+    WeightLimits:
+      type: object
+      properties:
+        emptyWeightLb:
+          type: number
+        maxGrossWeightLb:
+          type: number
+        maxZeroFuelWeightLb:
+          type: number
+
+    FingerprintResponse:
+      type: object
+      required:
+        - fingerprint
+        - known
+        - homologationRequired
+      properties:
+        fingerprint:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        known:
+          type: boolean
+        homologationRequired:
+          type: boolean
+        profileStatus:
+          type: string
+          enum: [none, provisional, active, blocked]
+        activeProfileKey:
+          type: string
+        activeSemver:
+          type: string
+        confidenceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    ProfileResolveResponse:
+      type: object
+      required:
+        - profileKey
+        - semver
+        - status
+        - documentUrl
+        - documentHash
+        - signature
+      properties:
+        profileKey:
+          type: string
+        semver:
+          type: string
+        status:
+          type: string
+          enum: [provisional, active]
+        confidenceScore:
+          type: number
+        documentUrl:
+          type: string
+          format: uri
+        documentHash:
+          type: string
+        signature:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    ProfileManifest:
+      type: object
+      required: [channel, manifestVersion, generatedAt, entries, signature]
+      properties:
+        channel:
+          type: string
+        manifestVersion:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+        entries:
+          type: array
+          items:
+            type: object
+            required: [fingerprint, profileKey, semver, documentHash, sizeBytes]
+            properties:
+              fingerprint:
+                type: string
+              profileKey:
+                type: string
+              semver:
+                type: string
+              documentHash:
+                type: string
+              sizeBytes:
+                type: integer
+              deltaFromHash:
+                type: string
+        signature:
+          type: string
+
+    ProfileDocumentEnvelope:
+      type: object
+      required: [profile, documentHash, signature]
+      properties:
+        profile:
+          type: object
+          additionalProperties: true
+        documentHash:
+          type: string
+        signature:
+          type: string
+
+    HomologationSessionStartRequest:
+      type: object
+      required: [clientId, fingerprint, simVersion]
+      properties:
+        clientId:
+          type: string
+        fingerprint:
+          type: string
+        simVersion:
+          type: string
+        userId:
+          type: string
+
+    HomologationSession:
+      type: object
+      required: [sessionId, fingerprint, checklist]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        fingerprint:
+          type: string
+        checklist:
+          type: array
+          items:
+            type: string
+
+    HomologationSessionCompleteRequest:
+      type: object
+      required: [flightSummary]
+      properties:
+        flightSummary:
+          type: object
+          required: [durationSec, tookOff, landed, enginesStarted]
+          properties:
+            durationSec:
+              type: integer
+            tookOff:
+              type: boolean
+            landed:
+              type: boolean
+            enginesStarted:
+              type: boolean
+            maxAltitudeFt:
+              type: number
+            notes:
+              type: string
+
+    HomologationSessionCompleteResponse:
+      type: object
+      required: [sessionId, status]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [submitted, rejected]
+        rejectionReason:
+          type: string
+
+    HomologationTelemetryBatch:
+      type: object
+      required: [sessionId, fingerprint, clientId, samples]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        fingerprint:
+          type: string
+        clientId:
+          type: string
+        samples:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/HomologationSample'
+
+    HomologationSample:
+      type: object
+      required: [capturedAt, phase, simState]
+      properties:
+        capturedAt:
+          type: string
+          format: date-time
+        phase:
+          type: string
+          enum: [preflight, taxi, takeoff, cruise, approach, landing, postflight]
+        simState:
+          type: object
+          additionalProperties: true
+        writeAttempts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        readback:
+          type: object
+          additionalProperties: true
+        flags:
+          type: array
+          items:
+            type: string
+
+    OperationTelemetryBatch:
+      type: object
+      required: [clientId, events]
+      properties:
+        clientId:
+          type: string
+        events:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [operation, success, timestamp]
+            properties:
+              operation:
+                type: string
+                enum: [setFuel, setPayload, setFuelAndPayload, verifyCg]
+              success:
+                type: boolean
+              timestamp:
+                type: string
+                format: date-time
+              fingerprint:
+                type: string
+              profileKey:
+                type: string
+              profileSemver:
+                type: string
+              strategyUsed:
+                type: string
+              fallbackUsed:
+                type: boolean
+              durationMs:
+                type: integer
+              errorCode:
+                type: string
+              context:
+                type: object
+                additionalProperties: true
+
+    ProfileFeedbackRequest:
+      type: object
+      required: [clientId, fingerprint, profileKey, semver, success]
+      properties:
+        clientId:
+          type: string
+        fingerprint:
+          type: string
+        profileKey:
+          type: string
+        semver:
+          type: string
+        success:
+          type: boolean
+        operation:
+          type: string
+        errorCode:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+
+    IngestAck:
+      type: object
+      required: [accepted, batchId]
+      properties:
+        accepted:
+          type: integer
+        batchId:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

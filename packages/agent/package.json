@@ -1,0 +1,26 @@
+{
+  "name": "@msfs-compat/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "msfs-compat-agent": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "smoke": "node dist/cli.js smoke --profile ../../profiles/examples/asobo-c172-skyhawk.json"
+  },
+  "dependencies": {
+    "@msfs-compat/runtime": "0.1.0",
+    "@msfs-compat/shared": "0.1.0"
+  }
+}

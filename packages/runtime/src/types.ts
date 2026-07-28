@@ -1,0 +1,108 @@
+import type {
+  AircraftProfile,
+  FuelTarget,
+  GatingRules,
+  LoadPlanRequest,
+  OperationResult,
+  PayloadTarget,
+} from '@msfs-compat/shared';
+
+export interface SimVarReadRequest {
+  name: string;
+  unit: string;
+}
+
+export interface SimVarWriteRequest {
+  name: string;
+  unit: string;
+  value: number;
+}
+
+export interface LVarWriteRequest {
+  name: string;
+  value: number;
+}
+
+export interface EventTriggerRequest {
+  event: string;
+  data?: number;
+}
+
+export interface SimSnapshot {
+  onGround: boolean;
+  enginesRunning: boolean;
+  parkingBrake: boolean;
+  paused: boolean;
+  slewActive: boolean;
+  simRate: number;
+  cgPercent?: number;
+  grossWeightLb?: number;
+  fuelTotal?: number;
+  payloadTotal?: number;
+  vars: Record<string, number>;
+}
+
+export interface SimBridge {
+  readSimVar(request: SimVarReadRequest): Promise<number>;
+  writeSimVar(request: SimVarWriteRequest): Promise<void>;
+  readLVar(name: string): Promise<number>;
+  writeLVar(request: LVarWriteRequest): Promise<void>;
+  triggerHVar(name: string): Promise<void>;
+  triggerEvent(request: EventTriggerRequest): Promise<void>;
+  snapshot(): Promise<SimSnapshot>;
+  delay(ms: number): Promise<void>;
+}
+
+export interface StrategyContext {
+  profile: AircraftProfile;
+  bridge: SimBridge;
+  snapshot: SimSnapshot;
+}
+
+export interface CapabilityScore {
+  strategy: string;
+  score: number;
+  reasons: string[];
+}
+
+export interface CapabilityDetector {
+  detect(profile: AircraftProfile, bridge: SimBridge): Promise<CapabilityScore[]>;
+}
+
+export interface VerificationResult {
+  ok: boolean;
+  failures: Array<{
+    var: string;
+    expected: number;
+    actual: number;
+    tolerancePct: number;
+  }>;
+}
+
+export interface FuelStrategy {
+  readonly name: string;
+  canHandle(profile: AircraftProfile): boolean;
+  detect(ctx: StrategyContext): Promise<CapabilityScore>;
+  setFuel(target: FuelTarget, ctx: StrategyContext): Promise<OperationResult>;
+  verify(target: FuelTarget, ctx: StrategyContext): Promise<VerificationResult>;
+}
+
+export interface PayloadStrategy {
+  readonly name: string;
+  canHandle(profile: AircraftProfile): boolean;
+  detect(ctx: StrategyContext): Promise<CapabilityScore>;
+  setPayload(target: PayloadTarget, ctx: StrategyContext): Promise<OperationResult>;
+  verify(target: PayloadTarget, ctx: StrategyContext): Promise<VerificationResult>;
+}
+
+export interface ProfileEngine {
+  applyLoadPlan(request: LoadPlanRequest): Promise<{
+    fuel?: OperationResult;
+    payload?: OperationResult;
+    cg?: VerificationResult;
+  }>;
+}
+
+export interface GatingEvaluator {
+  evaluate(rules: GatingRules, snapshot: SimSnapshot): { allowed: boolean; reason?: string };
+}

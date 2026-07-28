@@ -1,0 +1,14 @@
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\bin\Debug\net8.0\SimBridgeHost.exe
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\bin\Debug\net8.0\SimBridgeHost.deps.json
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\bin\Debug\net8.0\SimBridgeHost.runtimeconfig.json
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\bin\Debug\net8.0\SimBridgeHost.dll
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\bin\Debug\net8.0\SimBridgeHost.pdb
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\SimBridgeHost.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\SimBridgeHost.AssemblyInfoInputs.cache
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\SimBridgeHost.AssemblyInfo.cs
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\SimBridgeHost.csproj.CoreCompileInputs.cache
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\SimBridgeHost.dll
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\refint\SimBridgeHost.dll
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\SimBridgeHost.pdb
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\SimBridgeHost.genruntimeconfig.cache
+C:\Users\daniel\Documents\msfs-compat-layer\native\SimBridgeHost\obj\Debug\net8.0\ref\SimBridgeHost.dll

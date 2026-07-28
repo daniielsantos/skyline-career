@@ -10,7 +10,7 @@ export function cleanIcaoCode(options: {
   title?: string;
 }): string {
   // Prefer an already-clean designator (wizard-confirmed / profile value).
-  const explicit = (options.icao ?? '').replace(/^\$\$:/, '').trim();
+  const explicit = sanitizeIcaoToken(options.icao ?? '');
   if (
     explicit &&
     /^[A-Z0-9]{2,6}$/i.test(explicit) &&
@@ -28,7 +28,7 @@ export function cleanIcaoCode(options: {
 
   const candidates = [options.icao, options.atcModel].filter(Boolean) as string[];
   for (const raw of candidates) {
-    const cleaned = raw.replace(/^\$\$:/, '').trim();
+    const cleaned = sanitizeIcaoToken(raw);
     const model = cleaned.match(/AC_MODEL[_ .\-]?([A-Z0-9]{2,6})/i);
     if (model?.[1]) return model[1].toUpperCase();
     if (/^[A-Z0-9]{2,6}$/i.test(cleaned) && !/ATCCOM/i.test(cleaned)) {
@@ -39,9 +39,17 @@ export function cleanIcaoCode(options: {
   return fromTitle?.[1]?.toUpperCase() ?? 'ZZZZ';
 }
 
+/** Strip vendor noise from ATC/ICAO tokens (`$$:`, trailing `+`, etc.). */
+function sanitizeIcaoToken(raw: string): string {
+  return raw
+    .replace(/^\$\$:/, '')
+    .replace(/\++$/g, '')
+    .trim();
+}
+
 /** Normalize a user-entered ICAO type designator for catalog / SimBrief. */
 export function normalizeConfirmedIcao(raw: string, fallback = 'ZZZZ'): string {
-  const cleaned = raw.replace(/^\$\$:/, '').trim().toUpperCase();
+  const cleaned = sanitizeIcaoToken(raw).toUpperCase();
   if (/^[A-Z0-9]{2,6}$/.test(cleaned)) return cleaned;
   return fallback;
 }

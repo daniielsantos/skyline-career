@@ -18,15 +18,19 @@ function semverMajor(version?: string): string {
  */
 export function normalizeAircraftTitle(title: string): string {
   let t = title.trim().replace(/\s+/g, ' ');
+  // "Cessna C680: HB-SOV" — colon-separated registration
+  t = t.replace(/:\s*[A-Z0-9-]{2,10}$/i, '');
   // US N-numbers: N123, N1234, N12345, N123AB, N12AB
   t = t.replace(/\s+N[0-9]{1,5}[A-Z]{0,2}$/i, '');
-  // Dash registrations: G-ABCD, PR-ABC, VH-ABC, C-GABC, …
+  // Dash registrations: G-ABCD, PR-ABC, VH-ABC, C-GABC, HB-SOV, …
   t = t.replace(/\s+[A-Z]{1,2}-[A-Z0-9]{2,5}$/i, '');
   // Cabin packs often append "<Name> Interior" (e.g. "Manchester Interior").
   // Only strip alphabetic name tokens (1–2 words) before Interior — never model tokens like "300E".
   t = t.replace(/\s+(?:[A-Za-z][\w\-]*\s+){1,2}Interior$/i, '');
   // Trailing "livery" / "paint" tokens
   t = t.replace(/\s+(?:livery|paint|repaint)$/i, '');
+  // Leftover punctuation after registration strip ("Cessna C680:")
+  t = t.replace(/[:\-–—|/]+$/g, '');
   return t.trim();
 }
 

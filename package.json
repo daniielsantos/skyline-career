@@ -24,6 +24,7 @@
     "db:seed": "node scripts/db-seed-profiles.mjs",
     "start:local": "node scripts/start-skyline.mjs --mode simconnect",
     "start:local:mock": "node scripts/start-skyline.mjs --mode mock",
+    "homologate": "node packages/agent/dist/cli.js homologate",
     "pack:portable": "node scripts/pack-portable.mjs",
     "smoke": "node scripts/smoke.mjs",
     "ci:catalog": "node scripts/ci-catalog.mjs",

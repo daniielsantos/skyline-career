@@ -14,6 +14,7 @@ import { CatalogClient } from './catalog-client.js';
 import { ProfileCache } from './profile-cache.js';
 import { sampleAircraftStructure } from './sample-structure.js';
 import { resolveLiveAircraft } from './resolve-live.js';
+import { runHomologateWizard } from './homologate-wizard.js';
 
 const agentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(agentDir, '..', '..', '..');
@@ -29,11 +30,12 @@ function usage(): never {
   msfs-compat-agent calibrate --profile <path.json> [--pipe <name>]
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
+  msfs-compat-agent homologate [--pipe <name>]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
-  Homologation: draft-profile --calibrate → smoke → promote to profiles/examples
+  Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
 `);
   process.exit(1);
 }
@@ -129,6 +131,19 @@ async function main(): Promise<void> {
   if (command === 'ping') {
     const result = await withBridge(pipeName, (b) => b.ping());
     console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === 'homologate' || command === 'wizard') {
+    await withBridge(pipeName, async (bridge) =>
+      runHomologateWizard({
+        bridge,
+        repoRoot,
+        draftsDir: join(repoRoot, 'profiles', 'drafts'),
+        examplesDir: join(repoRoot, 'profiles', 'examples'),
+        notesDir: join(repoRoot, 'profiles', 'notes'),
+      }),
+    );
     return;
   }
 

@@ -9,7 +9,7 @@
  *   node scripts/start-skyline.mjs --catalog-only
  *   node scripts/start-skyline.mjs --no-catalog --mode mock
  */
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +37,57 @@ async function pathExists(p) {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Kill a PID and its descendants (Windows orphans `dotnet run` → SimBridgeHost). */
+function killProcessTree(pid) {
+  if (!pid) return;
+  if (process.platform === 'win32') {
+    try {
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+    } catch {
+      // already gone
+    }
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGTERM');
+  } catch {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // ignore
+    }
+  }
+}
+
+/**
+ * Reap leftover SimBridgeHost.exe from previous Ctrl+C that didn't tear down the tree.
+ * Safe: only targets this project's host binary name.
+ */
+function killStaleSimBridgeHosts() {
+  if (process.platform !== 'win32') return 0;
+  try {
+    const out = execFileSync('tasklist', ['/FI', 'IMAGENAME eq SimBridgeHost.exe', '/FO', 'CSV', '/NH'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    const lines = out
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('INFO:'));
+    if (lines.length === 0) return 0;
+    execFileSync('taskkill', ['/IM', 'SimBridgeHost.exe', '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    return lines.length;
+  } catch {
+    return 0;
   }
 }
 
@@ -83,18 +134,18 @@ function spawnLogged(label, command, args, opts = {}) {
     cwd: root,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
-    shell: opts.shell ?? false,
+    shell: false,
     env: opts.env ?? process.env,
   });
 
-  const prefix = (stream) => (chunk) => {
+  const prefix = () => (chunk) => {
     const text = String(chunk).replace(/\r?\n$/, '');
     for (const line of text.split(/\r?\n/)) {
       if (line.length) console.log(`[${label}] ${line}`);
     }
   };
-  child.stdout?.on('data', prefix('out'));
-  child.stderr?.on('data', prefix('err'));
+  child.stdout?.on('data', prefix());
+  child.stderr?.on('data', prefix());
   child.on('exit', (code, signal) => {
     console.log(`[${label}] exited code=${code} signal=${signal ?? ''}`);
   });
@@ -106,21 +157,22 @@ async function main() {
   const port = flag(args, '--port') ?? process.env.PORT ?? '8080';
   const pipeName = flag(args, '--pipe') ?? process.env.MSFS_COMPAT_PIPE ?? 'msfs-compat-simbridge';
   const mode = flag(args, '--mode') ?? process.env.MSFS_COMPAT_HOST_MODE ?? 'simconnect';
-  const sdk =
-    flag(args, '--sdk') ?? process.env.MSFS_SDK ?? 'C:\\MSFS 2024 SDK';
+  const sdk = flag(args, '--sdk') ?? process.env.MSFS_SDK ?? 'C:\\MSFS 2024 SDK';
   const catalogOnly = has(args, '--catalog-only');
   const noCatalog = has(args, '--no-catalog');
   const children = [];
+  let shuttingDown = false;
 
   const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     for (const child of children) {
-      try {
-        child.kill();
-      } catch {
-        // ignore
-      }
+      killProcessTree(child.pid);
     }
+    // Belt-and-suspenders: reap any host that escaped the tree (dotnet run orphans).
+    killStaleSimBridgeHosts();
   };
+
   process.on('SIGINT', () => {
     console.log('\n[skyline] shutting down...');
     shutdown();
@@ -130,6 +182,9 @@ async function main() {
     shutdown();
     process.exit(0);
   });
+  process.on('exit', () => {
+    shutdown();
+  });
 
   console.log('=== Skyline Career — local stack ===');
   console.log(`root: ${root}`);
@@ -137,6 +192,14 @@ async function main() {
   console.log(`host: ${catalogOnly ? 'off' : mode} (pipe=${pipeName})`);
   console.log('Ctrl+C to stop all');
   console.log('');
+
+  if (!catalogOnly && mode === 'simconnect') {
+    const n = killStaleSimBridgeHosts();
+    if (n > 0) {
+      console.log(`[skyline] cleared ${n} leftover SimBridgeHost process(es)`);
+      await sleep(500);
+    }
+  }
 
   if (!noCatalog) {
     const catalogCli = resolve(root, 'packages/catalog-api/dist/cli.js');
@@ -167,34 +230,29 @@ async function main() {
       children.push(spawnLogged('host', process.execPath, [mockHost, '--pipe', pipeName]));
     } else if (mode === 'simconnect') {
       const bundledHost = resolve(root, 'host', 'SimBridgeHost.exe');
+      const releaseHost = resolve(
+        root,
+        'native/SimBridgeHost/bin/Release/net8.0-windows/SimBridgeHost.exe',
+      );
       const project = resolve(root, 'native/SimBridgeHost/SimBridgeHost.csproj');
+      const hostArgs = ['--mode', 'simconnect', '--sdk', sdk, '--pipe', pipeName];
 
+      // Prefer a built exe over `dotnet run` — avoids rebuild file locks and orphan trees.
       if (await pathExists(bundledHost)) {
-        children.push(
-          spawnLogged('host', bundledHost, ['--mode', 'simconnect', '--sdk', sdk, '--pipe', pipeName]),
-        );
+        children.push(spawnLogged('host', bundledHost, hostArgs));
+      } else if (await pathExists(releaseHost)) {
+        children.push(spawnLogged('host', releaseHost, hostArgs));
       } else if (await pathExists(project)) {
-        children.push(
-          spawnLogged(
-            'host',
-            'dotnet',
-            [
-              'run',
-              '--project',
-              project,
-              '-c',
-              'Release',
-              '--',
-              '--mode',
-              'simconnect',
-              '--sdk',
-              sdk,
-              '--pipe',
-              pipeName,
-            ],
-            { shell: true },
-          ),
-        );
+        console.log('[skyline] building SimBridgeHost (first run)...');
+        execFileSync('dotnet', ['build', project, '-c', 'Release', '--nologo', '-v', 'q'], {
+          cwd: root,
+          stdio: 'inherit',
+          windowsHide: true,
+        });
+        if (!(await pathExists(releaseHost))) {
+          throw new Error(`Build succeeded but exe missing: ${releaseHost}`);
+        }
+        children.push(spawnLogged('host', releaseHost, hostArgs));
       } else {
         throw new Error(
           'No SimBridgeHost found (expected host/SimBridgeHost.exe or native project). Use --mode mock.',

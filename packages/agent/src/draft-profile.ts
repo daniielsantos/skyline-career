@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { AircraftProfile } from '@msfs-compat/shared';
 import { inferPublisher, normalizeAircraftTitle } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
+import { cleanIcaoCode } from './promote-profile.js';
 
 export interface DraftOptions {
   outDir: string;
@@ -29,7 +30,11 @@ export async function draftProfileFromLive(
   const identity = await bridge.getAircraftIdentity();
   const rawTitle = identity.title || 'Unknown Aircraft';
   const title = normalizeAircraftTitle(rawTitle) || rawTitle;
-  const icao = identity.icao || identity.atcModel || 'ZZZZ';
+  const icao = cleanIcaoCode({
+    icao: identity.icao,
+    atcModel: identity.atcModel,
+    title: rawTitle,
+  });
   const publisher =
     options.publisher ??
     inferPublisher(rawTitle, process.env.MSFS_COMPAT_PUBLISHER);

@@ -30,6 +30,8 @@ function titleSlugForKey(title: string): string {
       .replace(/^black\s*square\s+/i, '')
       .replace(/^fs\s*reborn\s+/i, '')
       .replace(/^fsreborn\s+/i, '')
+      .replace(/^next\s*gen\s*sim\s+/i, '')
+      .replace(/^nextgensim\s+/i, '')
       .replace(/^pmdg\s+/i, '')
       .replace(/^fenix\s+/i, '')
       .replace(/^inibuilds\s+/i, '')

@@ -1,0 +1,305 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "nextgensim-emb-110p1-bandeirante",
+  "profileKey": "nextgensim/emb-110p1-bandeirante",
+  "semver": "1.0.0",
+  "displayName": "NextGenSim EMB-110P1 Bandeirante (MSFS 2024)",
+  "match": {
+    "fingerprint": "d30c3cfeb262369dc1d7889de0ba8d6960d0c2c14d1419411fd92b6a4501dee4",
+    "title": "NextGenSim EMB-110P1 Bandeirante",
+    "publisher": "nextgensim",
+    "icao": "E110"
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "FUELSYSTEM:1",
+        "capacity": 227.19000244140625,
+        "readVar": "FUELSYSTEM TANK QUANTITY:1",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:1",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "FUELSYSTEM:2",
+        "capacity": 227.19000244140625,
+        "readVar": "FUELSYSTEM TANK QUANTITY:2",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:1",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 7.1"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:2",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 7.1"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:1",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:2",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      },
+      {
+        "index": 9,
+        "name": "Station 9",
+        "maxLoad": 500
+      },
+      {
+        "index": 10,
+        "name": "Station 10",
+        "maxLoad": 500
+      },
+      {
+        "index": 11,
+        "name": "Station 11",
+        "maxLoad": 500
+      },
+      {
+        "index": 12,
+        "name": "Station 12",
+        "maxLoad": 500
+      },
+      {
+        "index": 13,
+        "name": "Station 13",
+        "maxLoad": 500
+      },
+      {
+        "index": 14,
+        "name": "Station 14",
+        "maxLoad": 500
+      },
+      {
+        "index": 15,
+        "name": "Station 15",
+        "maxLoad": 500
+      },
+      {
+        "index": 16,
+        "name": "Station 16",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:8",
+        "unit": "pounds",
+        "valueExpr": "{station_8}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:9",
+        "unit": "pounds",
+        "valueExpr": "{station_9}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:10",
+        "unit": "pounds",
+        "valueExpr": "{station_10}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:11",
+        "unit": "pounds",
+        "valueExpr": "{station_11}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:12",
+        "unit": "pounds",
+        "valueExpr": "{station_12}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:13",
+        "unit": "pounds",
+        "valueExpr": "{station_13}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:14",
+        "unit": "pounds",
+        "valueExpr": "{station_14}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:15",
+        "unit": "pounds",
+        "valueExpr": "{station_15}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:16",
+        "unit": "pounds",
+        "valueExpr": "{station_16}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "constraints": {
+      "minMac": -4,
+      "maxMac": 32
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: NextGenSim EMB-110P1 Bandeirante.",
+    "ICAO type designator (catalog/SimBrief): E110.",
+    "Draft preferred FUELSYSTEM where capacity >= 5.",
+    "AUX deferred for v1.",
+    "Stations: 16.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/nextgensim-emb-110p1-bandeirante.md"
+  ]
+}

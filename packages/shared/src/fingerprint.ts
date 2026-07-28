@@ -33,6 +33,7 @@ export function normalizeAircraftTitle(title: string): string {
 const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\bblack\s*square\b/i, publisher: 'blacksquare' },
   { re: /\bfs\s*reborn\b|\bfsreborn\b/i, publisher: 'fsreborn' },
+  { re: /\bnext\s*gen\s*sim\b|\bnextgensim\b/i, publisher: 'nextgensim' },
   { re: /\bpmdg\b/i, publisher: 'pmdg' },
   { re: /\bfenix\b/i, publisher: 'fenix' },
   { re: /\binibuilds\b/i, publisher: 'inibuilds' },

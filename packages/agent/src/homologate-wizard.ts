@@ -57,6 +57,49 @@ function formatPairGalLbs(
   return `${formatGalLbs(left, lbPerGal)} / ${formatGalLbs(right, lbPerGal)}`;
 }
 
+function formatLb(n: number | null | undefined): string {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return `${roundFuel(v)} lb`;
+}
+
+type StationWeight = { index: number; lb: number };
+
+function readStationWeights(snap: {
+  vars?: Record<string, number | undefined>;
+  payloadTotal?: number;
+}): { count: number; stations: StationWeight[]; totalLb: number } {
+  const countRaw = snap.vars?.['PAYLOAD STATION COUNT'];
+  const countHint = Math.round(typeof countRaw === 'number' ? countRaw : Number(countRaw) || 0);
+  const limit = Math.max(0, Math.min(16, countHint > 0 ? countHint : 14));
+  const stations: StationWeight[] = [];
+  for (let i = 1; i <= limit; i++) {
+    const raw = snap.vars?.[`PAYLOAD STATION WEIGHT:${i}`];
+    if (raw === undefined || raw === null) {
+      if (countHint > 0) stations.push({ index: i, lb: 0 });
+      continue;
+    }
+    const lb = Number(raw);
+    if (!Number.isFinite(lb)) continue;
+    stations.push({ index: i, lb });
+  }
+  const summed = stations.reduce((a, s) => a + s.lb, 0);
+  const totalFromSnap = snap.payloadTotal ?? snap.vars?.['TOTAL PAYLOAD WEIGHT'];
+  const totalLb =
+    typeof totalFromSnap === 'number' && Number.isFinite(totalFromSnap) ? totalFromSnap : summed;
+  return {
+    count: countHint > 0 ? countHint : stations.length,
+    stations,
+    totalLb,
+  };
+}
+
+/** Compact station line: `1=180 2=0 3=50 …` (zeros kept so layout is visible). */
+function formatStationsLine(stations: StationWeight[]): string {
+  if (stations.length === 0) return '—';
+  return stations.map((s) => `${s.index}=${roundFuel(s.lb)}`).join(' ');
+}
+
 async function runWritetest(bridge: NamedPipeSimBridge): Promise<WritetestOutcome[]> {
   const tests: Array<{ name: string; unit: string; value: number }> = [
     { name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: 40 },
@@ -131,6 +174,9 @@ async function runSmoke(
   targets: Record<string, number>;
   beforeFuel: Record<string, number | undefined>;
   afterFuel: Record<string, number | undefined>;
+  beforePayload: ReturnType<typeof readStationWeights>;
+  afterPayload: ReturnType<typeof readStationWeights>;
+  payloadTargets: Record<number, number>;
   apply: Awaited<ReturnType<DefaultProfileEngine['applyLoadPlan']>>;
 }> {
   const engine = new DefaultProfileEngine({ profile, bridge });
@@ -175,6 +221,9 @@ async function runSmoke(
     targets: fuelTanks,
     beforeFuel: pick(before),
     afterFuel: pick(after),
+    beforePayload: readStationWeights(before),
+    afterPayload: readStationWeights(after),
+    payloadTargets: stationTargets,
     apply,
   };
 }
@@ -208,15 +257,19 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       lbPerGalLive !== null && lbPerGalLive > 0.1 ? lbPerGalLive : FALLBACK_LB_PER_GAL;
     const leftMainQty = snapshot.vars?.['FUEL TANK LEFT MAIN QUANTITY'];
     const rightMainQty = snapshot.vars?.['FUEL TANK RIGHT MAIN QUANTITY'];
+    const payloadLive = readStationWeights(snapshot);
     printKv([
       ['bridge', `${ping.mode} connected=${ping.connected}`],
       ['title (live)', identity.title],
       ['match title?', suggestedTitle],
       ['atcModel', identity.atcModel],
       ['icao', identity.icao],
-      ['empty lb', snapshot.vars?.['EMPTY WEIGHT']],
-      ['mtow lb', snapshot.vars?.['MAX GROSS WEIGHT']],
-      ['stations', snapshot.vars?.['PAYLOAD STATION COUNT']],
+      ['empty lb', formatLb(snapshot.vars?.['EMPTY WEIGHT'])],
+      ['total wt', formatLb(snapshot.vars?.['TOTAL WEIGHT'] ?? snapshot.grossWeightLb)],
+      ['mtow lb', formatLb(snapshot.vars?.['MAX GROSS WEIGHT'])],
+      ['stations', payloadLive.count],
+      ['payload tot', formatLb(payloadLive.totalLb)],
+      ['payload stn', formatStationsLine(payloadLive.stations)],
       ['CG %', snapshot.cgPercent?.toFixed?.(1) ?? snapshot.cgPercent],
       ['fuel dens', `${roundFuel(lbPerGal, 3)} lb/gal${lbPerGalLive == null ? ' (fallback)' : ''}`],
       ['left main', formatGalLbs(typeof leftMainQty === 'number' ? leftMainQty : Number(leftMainQty), lbPerGal)],
@@ -262,6 +315,9 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         'right aux cap/qty',
         `${formatGalLbs(rightAuxCap, lbPerGal)} / ${formatGalLbs(rightAuxQty, lbPerGal)}`,
       ],
+      ['stations', payloadLive.count],
+      ['payload tot', formatLb(payloadLive.totalLb)],
+      ['payload stn', formatStationsLine(payloadLive.stations)],
     ]);
     const classicLikely = (fs1 ?? 0) < 5 && (leftMainCap ?? totalCap ?? 0) >= 5;
     console.log(
@@ -369,6 +425,20 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       [
         'after L/R',
         formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal),
+      ],
+      [
+        'payload tgt',
+        `${formatLb(Object.values(smoke.payloadTargets).reduce((a, b) => a + b, 0))} · ${formatStationsLine(
+          Object.entries(smoke.payloadTargets).map(([i, lb]) => ({ index: Number(i), lb })),
+        )}`,
+      ],
+      [
+        'payload before',
+        `${formatLb(smoke.beforePayload.totalLb)} · ${formatStationsLine(smoke.beforePayload.stations)}`,
+      ],
+      [
+        'payload after',
+        `${formatLb(smoke.afterPayload.totalLb)} · ${formatStationsLine(smoke.afterPayload.stations)}`,
       ],
     ]);
     if (!smoke.ok) {

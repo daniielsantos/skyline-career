@@ -29,6 +29,11 @@
       "serviceStations": [10, 11]
     }
   },
+  "liveSources": {
+    "fuel": ["pmdg-ng3", "classic"],
+    "weights": ["pmdg-efb-lvars"],
+    "payload": ["pmdg-efb", "classic-stations"]
+  },
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1 (main deck cargo)", "role": "baggage" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2 (main deck cargo)", "role": "baggage" },

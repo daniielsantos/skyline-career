@@ -5,10 +5,12 @@ import {
   captureBaseline,
   compareOfpToLive,
   deriveCompliancePhase,
+  DISCOVERY_LIVE_SOURCES,
   enrichPayloadWithRoles,
   fuelToleranceLb,
   normalizeOfpExpectation,
   ofpFuelToLb,
+  resolveLiveSourcePrefs,
 } from './ofp-compliance.js';
 import type { LiveFuelState, OfpExpectation } from './types/ofp-compliance.js';
 
@@ -55,6 +57,36 @@ describe('ofpFuelToLb', () => {
     const lb = ofpFuelToLb({ unit: 'kg', total: 1000 });
     assert.ok(lb.total !== undefined);
     assert.ok(Math.abs(lb.total - 2204.6226218) < 0.01);
+  });
+});
+
+describe('resolveLiveSourcePrefs', () => {
+  it('uses discovery cascade when liveSources omitted', () => {
+    assert.deepEqual(resolveLiveSourcePrefs(undefined), DISCOVERY_LIVE_SOURCES);
+  });
+
+  it('keeps declared lists and fills missing keys with classic-safe defaults', () => {
+    const prefs = resolveLiveSourcePrefs({
+      fuel: ['mass-balance', 'classic'],
+      payload: ['classic-stations'],
+    });
+    assert.deepEqual(prefs.fuel, ['mass-balance', 'classic']);
+    assert.deepEqual(prefs.weights, ['classic-weights']);
+    assert.deepEqual(prefs.payload, ['classic-stations']);
+  });
+
+  it('preserves liveSources on normalize', () => {
+    const ofp = normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit: 'kg', total: 1000 },
+      liveSources: {
+        fuel: ['pmdg-ng3', 'classic'],
+        weights: ['pmdg-efb-lvars'],
+        payload: ['pmdg-efb'],
+      },
+    });
+    assert.deepEqual(ofp.liveSources?.fuel, ['pmdg-ng3', 'classic']);
+    assert.deepEqual(ofp.liveSources?.weights, ['pmdg-efb-lvars']);
   });
 });
 

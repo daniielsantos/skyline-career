@@ -28,6 +28,11 @@
       "crewStations": [1, 2]
     }
   },
+  "liveSources": {
+    "fuel": ["mass-balance", "classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Copilot", "role": "crew" },

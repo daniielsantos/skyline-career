@@ -4,6 +4,7 @@ import {
   normalizeOfpExpectation,
   type OfpExpectation,
   type OfpFuelPlan,
+  type OfpLiveSources,
   type OfpLoadSheet,
   type OfpPayloadPlan,
   type OfpStationRoleMap,
@@ -28,6 +29,7 @@ export interface OfpCliOverrides {
   ofpId?: string;
   tolerances?: Partial<OfpTolerances>;
   stationRoles?: OfpStationRoleMap;
+  liveSources?: OfpLiveSources;
 }
 
 export async function loadOfpFromFile(
@@ -37,6 +39,7 @@ export async function loadOfpFromFile(
     fuel?: OfpFuelPlan;
     loadSheet?: OfpLoadSheet;
     payload?: OfpPayloadPlan;
+    liveSources?: OfpLiveSources;
   }
 > {
   const raw = await readFile(resolve(path), 'utf8');
@@ -44,6 +47,7 @@ export async function loadOfpFromFile(
     fuel?: OfpFuelPlan;
     loadSheet?: OfpLoadSheet;
     payload?: OfpPayloadPlan;
+    liveSources?: OfpLiveSources;
   };
 }
 
@@ -52,6 +56,13 @@ export async function loadStationRolesFromFile(
 ): Promise<OfpStationRoleMap | undefined> {
   const file = await loadOfpFromFile(path);
   return file.payload?.stationRoles;
+}
+
+export async function loadLiveSourcesFromFile(
+  path: string,
+): Promise<OfpLiveSources | undefined> {
+  const file = await loadOfpFromFile(path);
+  return file.liveSources;
 }
 
 /** Apply CLI patches onto an existing expectation (e.g. after SimBrief fetch). */
@@ -128,6 +139,7 @@ export function applyOfpOverrides(
     fuel,
     loadSheet,
     payload,
+    liveSources: overrides.liveSources ?? base.liveSources,
     tolerances: {
       ...base.tolerances,
       ...(overrides.tolerances ?? {}),
@@ -209,6 +221,7 @@ export async function buildOfpExpectation(
     fuel,
     loadSheet,
     payload,
+    liveSources: overrides.liveSources ?? fromFile.liveSources,
     tolerances: {
       ...(fromFile.tolerances ?? {}),
       ...(overrides.tolerances ?? {}),

@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
-import type { OfpStationRoleMap } from '@msfs-compat/shared';
+import type { OfpLiveSources, OfpStationRoleMap } from '@msfs-compat/shared';
 
 /** On-disk OFP / roles pack with optional title matching for auto-resolve. */
 export interface OfpRolesPackFile {
@@ -19,6 +19,8 @@ export interface OfpRolesPackFile {
     total?: number;
     stationRoles?: OfpStationRoleMap;
   };
+  /** Declared live read path — reader skips undeclared vendor probes. */
+  liveSources?: OfpLiveSources;
   stationMap?: unknown[];
   tolerances?: Record<string, number>;
 }
@@ -29,6 +31,7 @@ export interface ScaffoldHeuristic {
   /** Match live aircraft title. */
   titlePattern: RegExp;
   stationRoles: OfpStationRoleMap;
+  liveSources: OfpLiveSources;
   stationMap: Array<{
     simVarIndex: number;
     cfgIndex: number;
@@ -39,6 +42,24 @@ export interface ScaffoldHeuristic {
   /** Family pack path relative to profiles/ofp (preferred over per-livery files). */
   familyPackRel?: string;
 }
+
+const PMDG_738_LIVE_SOURCES: OfpLiveSources = {
+  fuel: ['pmdg-ng3', 'classic'],
+  weights: ['pmdg-efb-lvars'],
+  payload: ['pmdg-efb', 'classic-stations'],
+};
+
+const TFDI_MD11_LIVE_SOURCES: OfpLiveSources = {
+  fuel: ['tfdi-efb', 'mass-balance'],
+  weights: ['tfdi-efb-lvars'],
+  payload: ['tfdi-efb'],
+};
+
+const TOLISS_A346_LIVE_SOURCES: OfpLiveSources = {
+  fuel: ['mass-balance', 'classic'],
+  weights: ['classic-weights'],
+  payload: ['classic-stations'],
+};
 
 /** Known families where station roles are stable across liveries/cabin options. */
 export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
@@ -54,6 +75,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       serviceStations: [10, 11],
       averagePassengerWeight: 86.18,
     },
+    liveSources: PMDG_738_LIVE_SOURCES,
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'PaxZone1', role: 'passenger' },
       { simVarIndex: 2, cfgIndex: 1, name: 'PaxZone2', role: 'passenger' },
@@ -71,6 +93,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'PMDG 737-800 PAX family (SSW TC, BW TC, …) — same station_load layout',
       'SimConnect PAYLOAD STATION WEIGHT:n is 1-based (station_load.0 → :1)',
       'After EFB Load from Simbrief, classic cargo may inflate — use L:ZFW_Lvar / L:GW_Lvar',
+      'liveSources: NG3 fuel + PMDG EFB LVars (no TFDi / mass-balance probe)',
     ],
   },
   {
@@ -86,6 +109,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       crewStations: [7, 8, 9],
       serviceStations: [10, 11],
     },
+    liveSources: PMDG_738_LIVE_SOURCES,
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'PaxZone1 (main deck cargo)', role: 'baggage' },
       { simVarIndex: 2, cfgIndex: 1, name: 'PaxZone2 (main deck cargo)', role: 'baggage' },
@@ -104,6 +128,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'SimBrief: use PMDG Boeing Converted Freighter airframe — payload is cargo, not pax',
       'Zones 1–4 are main-deck cargo despite PaxZone names in flight_model.cfg',
       'Live cargo via EFB L:ZFW_Lvar residual (classic stations may inflate)',
+      'liveSources: NG3 fuel + PMDG EFB LVars',
     ],
   },
   {
@@ -118,6 +143,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       crewStations: [1, 2, 3],
       // :14/:15 are aux tank stations — not cargo
     },
+    liveSources: TFDI_MD11_LIVE_SOURCES,
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'First Officer', role: 'crew' },
@@ -137,7 +163,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'TFDi Design MD-11F (GE/PW presets share this station layout)',
-      'Classic SimConnect stations (no PMDG EFB LVars)',
+      'liveSources: TFDi EFB LVars (kg→lb); fuel fallback mass-balance',
       'SimBrief: MD11 freighter airframe matching engines (PW4462 / GE)',
       'Host snapshot currently includes stations 1–14 (covers all cargo indices)',
     ],
@@ -153,6 +179,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       crewStations: [1, 2],
       // averagePassengerWeight: leave unset — resolve from OFP (payload−bags)/pax
     },
+    liveSources: TOLISS_A346_LIVE_SOURCES,
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'Copilot', role: 'crew' },
@@ -164,7 +191,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Aerosoft / ToLiss A346 PRO (Preset Pax) — flight_model station_load.0..6',
-      'Live: classic PAYLOAD STATION WEIGHT; fuel may use mass-balance (multi-tank)',
+      'liveSources: classic stations; fuel mass-balance then classic (no PMDG/TFDi probe)',
       'SimBrief: A346 passenger airframe',
       'Package has Pax preset only (no freighter)',
     ],
@@ -205,6 +232,7 @@ export function buildRolesPackFromHeuristic(
       unit: 'kg',
       stationRoles: heuristic.stationRoles,
     },
+    liveSources: heuristic.liveSources,
     stationMap: heuristic.stationMap,
     tolerances: {
       fuelAbsLb: 200,

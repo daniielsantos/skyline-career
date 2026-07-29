@@ -21,7 +21,7 @@ import {
   probeLVars,
   watchLVars,
 } from './probe-lvars.js';
-import { buildOfpExpectation, applyOfpOverrides, loadStationRolesFromFile } from './ofp-compliance/parse-ofp.js';
+import { buildOfpExpectation, applyOfpOverrides, loadLiveSourcesFromFile, loadStationRolesFromFile } from './ofp-compliance/parse-ofp.js';
 import { compareOnce, formatComplianceSummary } from './ofp-compliance/run-compare.js';
 import { fetchSimBriefLatestOfp } from './ofp-compliance/simbrief-fetch.js';
 import {
@@ -164,6 +164,7 @@ async function resolveOfpFromArgs(
   }
 
   const stationRoles = rolesPath ? await loadStationRolesFromFile(rolesPath) : undefined;
+  const liveSources = rolesPath ? await loadLiveSourcesFromFile(rolesPath) : undefined;
 
   if (simbriefUser || simbriefUserid) {
     console.log(
@@ -180,10 +181,10 @@ async function resolveOfpFromArgs(
     console.log(
       `  OFP: ${origin}  units=${expectation.fuel.unit}  block=${expectation.loadSheet?.blockFuel ?? '?'}  payload=${expectation.loadSheet?.payload ?? '?'}  pax=${expectation.loadSheet?.passengerCount ?? '?'}  bags=${expectation.loadSheet?.baggage ?? '?'}`,
     );
-    return applyOfpOverrides(expectation, { ...overrides, stationRoles });
+    return applyOfpOverrides(expectation, { ...overrides, stationRoles, liveSources });
   }
 
-  return buildOfpExpectation(ofpPath, { ...overrides, stationRoles });
+  return buildOfpExpectation(ofpPath, { ...overrides, stationRoles, liveSources });
 }
 
 async function loadProfile(path: string): Promise<AircraftProfile> {

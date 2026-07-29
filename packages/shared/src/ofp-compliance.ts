@@ -9,15 +9,55 @@ import type {
   LiveWeightState,
   OfpExpectation,
   OfpFuelPlan,
+  OfpLiveSources,
   OfpLoadSheet,
   OfpPayloadPlan,
   OfpStationRoleMap,
   OfpTolerances,
   OfpWeightUnit,
+  LiveFuelSource,
+  LivePayloadSourcePref,
+  LiveWeightSourcePref,
 } from './types/ofp-compliance.js';
+
+export type {
+  OfpLiveSources,
+  LiveFuelSource,
+  LivePayloadSourcePref,
+  LiveWeightSourcePref,
+};
 
 export const KG_TO_LB = 2.2046226218;
 export const DEFAULT_JET_A_LB_PER_GAL = 6.7;
+
+/** Full probe cascade when pack does not declare liveSources (new aircraft). */
+export const DISCOVERY_LIVE_SOURCES: Required<OfpLiveSources> = {
+  fuel: ['pmdg-ng3', 'classic', 'mass-balance', 'tfdi-efb'],
+  weights: ['pmdg-efb-lvars', 'tfdi-efb-lvars', 'classic-weights'],
+  payload: ['pmdg-efb', 'tfdi-efb', 'classic-stations'],
+};
+
+/**
+ * Resolve preference lists for live reads.
+ * Declared pack → only those sources (missing keys default to classic-safe).
+ * No liveSources → discovery cascade.
+ */
+export function resolveLiveSourcePrefs(
+  liveSources: OfpLiveSources | undefined,
+): Required<OfpLiveSources> {
+  if (!liveSources) {
+    return {
+      fuel: [...DISCOVERY_LIVE_SOURCES.fuel],
+      weights: [...DISCOVERY_LIVE_SOURCES.weights],
+      payload: [...DISCOVERY_LIVE_SOURCES.payload],
+    };
+  }
+  return {
+    fuel: liveSources.fuel?.length ? [...liveSources.fuel] : ['classic', 'mass-balance'],
+    weights: liveSources.weights?.length ? [...liveSources.weights] : ['classic-weights'],
+    payload: liveSources.payload?.length ? [...liveSources.payload] : ['classic-stations'],
+  };
+}
 
 export const DEFAULT_OFP_TOLERANCES: OfpTolerances = {
   fuelAbsLb: 200,
@@ -176,6 +216,7 @@ function finalizeExpectation(
     fuel,
     loadSheet,
     payload,
+    liveSources: raw.liveSources,
     tolerances: {
       ...DEFAULT_OFP_TOLERANCES,
       ...(raw.tolerances ?? {}),

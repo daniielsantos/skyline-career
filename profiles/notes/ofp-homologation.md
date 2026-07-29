@@ -62,14 +62,18 @@ Fill `stationRoles` + optional `matchTitles` / `matchTitlePattern` so auto-resol
 
 ---
 
-## 3. Live sources
+## 3. Live sources (`liveSources` on the pack)
 
-| Signal | PMDG 738 PAX | Generic fallback |
-|--------|--------------|------------------|
-| Fuel | NG3 Client Data | Classic gallons × density |
-| ZFW / GW | `L:ZFW_Lvar` / `L:GW_Lvar` | `TOTAL WEIGHT − fuel` |
-| Bags | EFB residual (ZFW − empty − pax − crew − service) | Σ baggageStations |
-| Pax | Seat stations ÷ avg weight | — |
+Homologated packs **declare** preferred live read paths. The reader only probes those sources (no PMDG/TFDi cascade on ToLiss, etc.).
+
+Omit `liveSources` only while discovering a new airframe — then the discovery cascade runs.
+
+| Signal | PMDG 738 | TFDi MD-11F | ToLiss A346 |
+|--------|----------|-------------|-------------|
+| Fuel | `pmdg-ng3` → `classic` | `tfdi-efb` → `mass-balance` | `mass-balance` → `classic` |
+| ZFW / GW | `pmdg-efb-lvars` | `tfdi-efb-lvars` | `classic-weights` |
+| Bags / payload | `pmdg-efb` → classic | `tfdi-efb` | `classic-stations` |
+| Pax | Seat stations ÷ avg weight | n/a (freighter) | Seat stations ÷ OFP avg |
 
 ---
 
@@ -91,6 +95,7 @@ Fill `stationRoles` + optional `matchTitles` / `matchTitlePattern` so auto-resol
 ## 5. Ship
 
 - [ ] Pack under `profiles/ofp/` with `matchTitles` or `matchTitlePattern`
+- [ ] `liveSources` declared (after live path is confirmed)
 - [ ] Row in table below
 - [ ] Commit
 
@@ -100,8 +105,8 @@ Fill `stationRoles` + optional `matchTitles` / `matchTitlePattern` so auto-resol
 
 | Pack | MSFS titles / pattern | Live path | Status |
 |------|----------------------|-----------|--------|
-| `pmdg-738-pax.json` | `737-800 PAX *` (SSW TC, BW TC, …) | NG3 fuel + EFB LVars + roles | **family done** |
-| `pmdg-738-bcf.json` | `737-800BCF *` (SSW / BW freighter) | EFB LVars; zones 1–6 = cargo | **family done** |
-| `tfdi-md11f.json` | `*MD-11F*` (TFDi PW/GE) | EFB `L:MD11_EFB_PAYLOAD_*` | **done** |
-| `toliss-a346.json` | `ToLiss A346 PRO *` (Pax) | Classic stations 3–7 | **in progress** |
-| `pmdg-738-ssw-tc.json` | legacy sample (prefer family pack) | same | superseded by family |
+| `pmdg-738-pax.json` | `737-800 PAX *` (SSW TC, BW TC, …) | `liveSources`: NG3 + EFB LVars | **family done** |
+| `pmdg-738-bcf.json` | `737-800BCF *` (SSW / BW freighter) | same PMDG `liveSources`; zones 1–6 cargo | **family done** |
+| `tfdi-md11f.json` | `*MD-11F*` (TFDi PW/GE) | TFDi EFB LVars (+ mass-balance fuel) | **done** |
+| `toliss-a346.json` | `ToLiss A346 PRO *` (Pax) | classic + mass-balance fuel | **done** (warn OK on EMPTY/ZFW/TOW) |
+| `pmdg-738-ssw-tc.json` | legacy sample (prefer family pack) | same PMDG `liveSources` | superseded by family |

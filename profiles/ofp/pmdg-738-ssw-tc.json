@@ -38,6 +38,11 @@
       "averagePassengerWeight": 86.18
     }
   },
+  "liveSources": {
+    "fuel": ["pmdg-ng3", "classic"],
+    "weights": ["pmdg-efb-lvars"],
+    "payload": ["pmdg-efb", "classic-stations"]
+  },
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1", "role": "passenger", "cfgFirstField": 16 },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2", "role": "passenger", "cfgFirstField": 45 },

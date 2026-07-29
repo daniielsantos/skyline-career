@@ -93,6 +93,23 @@ export interface OfpTolerances {
   maxBurnRateLbPerMin?: number;
 }
 
+export type LiveFuelSource = 'pmdg-ng3' | 'classic' | 'mass-balance' | 'tfdi-efb';
+
+export type LiveWeightSourcePref = 'classic-weights' | 'pmdg-efb-lvars' | 'tfdi-efb-lvars';
+
+export type LivePayloadSourcePref = 'classic-stations' | 'pmdg-efb' | 'tfdi-efb';
+
+/**
+ * Declared live read path for a homologated aircraft family.
+ * Arrays are preference order (first usable wins).
+ * When omitted on OfpExpectation, discovery cascade is used.
+ */
+export interface OfpLiveSources {
+  fuel?: LiveFuelSource[];
+  weights?: LiveWeightSourcePref[];
+  payload?: LivePayloadSourcePref[];
+}
+
 export interface OfpExpectation {
   source: 'manual' | 'simbrief';
   ofpId?: string;
@@ -101,10 +118,10 @@ export interface OfpExpectation {
   /** SimBrief load sheet block (weights + pax count). */
   loadSheet?: OfpLoadSheet;
   payload?: OfpPayloadPlan;
+  /** Preferred live fuel/weight/payload sources (from roles pack). */
+  liveSources?: OfpLiveSources;
   tolerances: OfpTolerances;
 }
-
-export type LiveFuelSource = 'pmdg-ng3' | 'classic' | 'mass-balance' | 'tfdi-efb';
 
 export interface LiveFuelState {
   source: LiveFuelSource;

@@ -30,6 +30,11 @@
       "crewStations": [1, 2, 3]
     }
   },
+  "liveSources": {
+    "fuel": ["tfdi-efb", "mass-balance"],
+    "weights": ["tfdi-efb-lvars"],
+    "payload": ["tfdi-efb"]
+  },
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "First Officer", "role": "crew" },

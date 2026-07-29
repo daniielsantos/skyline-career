@@ -41,6 +41,7 @@ export async function compareOnce(
     densityLbPerGal: opts.densityLbPerGal,
     stationRoles,
     roleWeightUnit,
+    liveSources: opts.ofp.liveSources,
   });
   const phase = deriveCompliancePhase(
     { onGround: live.onGround, enginesRunning: live.enginesRunning },

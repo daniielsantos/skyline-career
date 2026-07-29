@@ -2,10 +2,12 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
   applyPmdgEfbPayloadCorrection,
   enrichPayloadWithRoles,
+  resolveLiveSourcePrefs,
   toLb,
   type LiveFuelState,
   type LivePayloadState,
   type LiveWeightState,
+  type OfpLiveSources,
   type OfpStationRoleMap,
   type OfpWeightUnit,
 } from '@msfs-compat/shared';
@@ -37,7 +39,6 @@ export interface LiveLoadReading {
   weights: LiveWeightState;
   onGround: boolean;
   enginesRunning: boolean;
-  /** Raw EFB LVars when readable. */
   pmdgEfb?: {
     gwLb?: number;
     zfwLb?: number;
@@ -59,7 +60,6 @@ function saneWeight(n: number | undefined): number | undefined {
   if (n === undefined || !Number.isFinite(n) || n <= 0) {
     return undefined;
   }
-  // EFB weights are in lb; reject tiny/placeholder noise.
   if (n < 1000) {
     return undefined;
   }
@@ -139,10 +139,6 @@ export function fuelFromClassicSnapshot(
   };
 }
 
-/**
- * Fuel from mass balance: TOTAL WEIGHT − EMPTY − Σ payload stations.
- * Needed when classic L/R/C tanks under-read (e.g. TFDi MD-11 multi-tank).
- */
 export function fuelFromMassBalance(
   snapshot: SimSnapshot,
   payloadStationsTotalLb: number,
@@ -171,7 +167,6 @@ export function fuelFromMassBalance(
   };
 }
 
-/** Prefer mass-balance when classic/SDK total is clearly incomplete. */
 export function preferMassBalanceFuel(
   tankFuel: LiveFuelState,
   massBalance: LiveFuelState | undefined,
@@ -179,7 +174,6 @@ export function preferMassBalanceFuel(
   if (!massBalance) {
     return tankFuel;
   }
-  // Under-read by >8% and >500 lb → trust weight residual (widebody multi-tank).
   if (tankFuel.total < massBalance.total * 0.92 && massBalance.total - tankFuel.total > 500) {
     return massBalance;
   }
@@ -211,7 +205,7 @@ async function readPmdgEfbLvars(
 async function readTfdiMd11EfbLvars(
   bridge: NamedPipeSimBridge,
 ): Promise<{ gwLb?: number; zfwLb?: number; payloadLb?: number; fuelLb?: number }> {
-  // EFB UI shows ×1000 lb, but L:MD11_EFB_PAYLOAD_* store kilograms (despite "pounds" in efb.js).
+  // EFB UI shows ×1000 lb, but L:MD11_EFB_PAYLOAD_* store kilograms.
   const readKgAsLb = async (name: string): Promise<number | undefined> => {
     try {
       const kg = await bridge.readLVar(name);
@@ -233,9 +227,16 @@ async function readTfdiMd11EfbLvars(
   return { gwLb, zfwLb, payloadLb, fuelLb };
 }
 
+function wants(
+  prefs: string[],
+  ...sources: string[]
+): boolean {
+  return sources.some((s) => prefs.includes(s));
+}
+
 /**
- * Prefer vendor EFB / SDK when available.
- * Classic PAYLOAD STATION cargo is unreliable after SimBrief EFB load (PMDG + TFDi).
+ * Read live fuel/payload/weights using pack-declared liveSources when present.
+ * Without liveSources, uses discovery cascade (probe all known vendor paths).
  */
 export async function readLiveLoad(
   bridge: NamedPipeSimBridge,
@@ -243,74 +244,78 @@ export async function readLiveLoad(
     densityLbPerGal?: number;
     stationRoles?: OfpStationRoleMap;
     roleWeightUnit?: OfpWeightUnit;
+    liveSources?: OfpLiveSources;
   } = {},
 ): Promise<LiveLoadReading> {
+  const prefs = resolveLiveSourcePrefs(opts.liveSources);
   const density = opts.densityLbPerGal ?? DEFAULT_JET_A_LB_PER_GAL;
   const snapshot = await bridge.snapshot();
   let payload = payloadFromSnapshot(snapshot);
+  payload = enrichPayloadWithRoles(payload, opts.stationRoles, opts.roleWeightUnit ?? 'lb');
+
+  const needPmdgNg3 = wants(prefs.fuel, 'pmdg-ng3');
+  const needPmdgEfb = wants(prefs.weights, 'pmdg-efb-lvars') || wants(prefs.payload, 'pmdg-efb');
+  const needTfdiEfb =
+    wants(prefs.fuel, 'tfdi-efb') ||
+    wants(prefs.weights, 'tfdi-efb-lvars') ||
+    wants(prefs.payload, 'tfdi-efb');
+
+  let pmdgEfb: LiveLoadReading['pmdgEfb'];
+  let tfdiEfb: LiveLoadReading['tfdiEfb'];
+  if (needPmdgEfb) {
+    pmdgEfb = await readPmdgEfbLvars(bridge);
+  }
+  if (needTfdiEfb) {
+    tfdiEfb = await readTfdiMd11EfbLvars(bridge);
+  }
 
   let fuel: LiveFuelState | undefined;
-  try {
-    const sdk = await bridge.readPmdgNg3Fuel();
-    if (
-      sdk.available &&
-      sdk.layoutOk &&
-      sdk.leftLb !== undefined &&
-      sdk.rightLb !== undefined &&
-      sdk.centerLb !== undefined
-    ) {
-      const left = sdk.leftLb;
-      const right = sdk.rightLb;
-      const center = sdk.centerLb;
-      fuel = {
-        source: 'pmdg-ng3',
-        unit: 'lb',
-        left,
-        right,
-        center,
-        total: left + right + center,
-        ageMs: sdk.ageMs,
-      };
+  for (const src of prefs.fuel) {
+    if (src === 'pmdg-ng3' && needPmdgNg3) {
+      try {
+        const sdk = await bridge.readPmdgNg3Fuel();
+        if (
+          sdk.available &&
+          sdk.layoutOk &&
+          sdk.leftLb !== undefined &&
+          sdk.rightLb !== undefined &&
+          sdk.centerLb !== undefined
+        ) {
+          fuel = {
+            source: 'pmdg-ng3',
+            unit: 'lb',
+            left: sdk.leftLb,
+            right: sdk.rightLb,
+            center: sdk.centerLb,
+            total: sdk.leftLb + sdk.rightLb + sdk.centerLb,
+            ageMs: sdk.ageMs,
+          };
+          break;
+        }
+      } catch {
+        // try next preference
+      }
     }
-  } catch {
-    // Classic fallback below.
-  }
-
-  if (!fuel) {
-    fuel = fuelFromClassicSnapshot(snapshot, density);
-  }
-
-  const massBalanced = fuelFromMassBalance(snapshot, payload.total);
-  if (fuel.source !== 'pmdg-ng3') {
-    fuel = preferMassBalanceFuel(fuel, massBalanced);
-  }
-
-  payload = enrichPayloadWithRoles(payload, opts.stationRoles, opts.roleWeightUnit ?? 'lb');
-  let weights = weightsFromSnapshot(snapshot, fuel.total, payload.ofpPayloadLb ?? payload.total);
-
-  const pmdgEfb = await readPmdgEfbLvars(bridge);
-  if (pmdgEfb.zfwLb !== undefined || pmdgEfb.gwLb !== undefined) {
-    weights = {
-      ...weights,
-      source: 'pmdg-efb-lvars',
-      zfwLb: pmdgEfb.zfwLb ?? weights.zfwLb,
-      grossLb: pmdgEfb.gwLb ?? weights.grossLb,
-      landingLb: pmdgEfb.lwLb,
-    };
-    const corrected = applyPmdgEfbPayloadCorrection(payload, weights, opts.stationRoles);
-    payload = corrected.payload;
-    weights = corrected.weights;
-  }
-
-  const tfdiEfb = await readTfdiMd11EfbLvars(bridge);
-  if (
-    weights.source !== 'pmdg-efb-lvars' &&
-    (tfdiEfb.zfwLb !== undefined ||
-      tfdiEfb.gwLb !== undefined ||
-      tfdiEfb.payloadLb !== undefined ||
-      tfdiEfb.fuelLb !== undefined)
-  ) {
-    if (tfdiEfb.fuelLb !== undefined) {
+    if (src === 'classic') {
+      fuel = fuelFromClassicSnapshot(snapshot, density);
+      // May still upgrade to mass-balance if both are in prefs and classic under-reads.
+      if (prefs.fuel.includes('mass-balance')) {
+        const mb = fuelFromMassBalance(snapshot, payload.total);
+        fuel = preferMassBalanceFuel(fuel, mb);
+        if (fuel.source === 'mass-balance') {
+          break;
+        }
+      }
+      break;
+    }
+    if (src === 'mass-balance') {
+      const mb = fuelFromMassBalance(snapshot, payload.total);
+      if (mb) {
+        fuel = mb;
+        break;
+      }
+    }
+    if (src === 'tfdi-efb' && tfdiEfb?.fuelLb !== undefined) {
       fuel = {
         source: 'tfdi-efb',
         unit: 'lb',
@@ -319,24 +324,70 @@ export async function readLiveLoad(
         center: 0,
         total: tfdiEfb.fuelLb,
       };
+      break;
     }
-    weights = {
-      ...weights,
-      source: 'tfdi-efb-lvars',
-      zfwLb: tfdiEfb.zfwLb ?? weights.zfwLb,
-      grossLb: tfdiEfb.gwLb ?? weights.grossLb,
-      fuelLb: fuel.total,
-      payloadLb: tfdiEfb.payloadLb ?? weights.payloadLb,
-    };
-    if (tfdiEfb.payloadLb !== undefined) {
+  }
+  if (!fuel) {
+    fuel = fuelFromClassicSnapshot(snapshot, density);
+  }
+
+  let weights = weightsFromSnapshot(snapshot, fuel.total, payload.ofpPayloadLb ?? payload.total);
+
+  for (const src of prefs.weights) {
+    if (
+      src === 'pmdg-efb-lvars' &&
+      pmdgEfb &&
+      (pmdgEfb.zfwLb !== undefined || pmdgEfb.gwLb !== undefined)
+    ) {
+      weights = {
+        ...weights,
+        source: 'pmdg-efb-lvars',
+        zfwLb: pmdgEfb.zfwLb ?? weights.zfwLb,
+        grossLb: pmdgEfb.gwLb ?? weights.grossLb,
+        landingLb: pmdgEfb.lwLb,
+        fuelLb: fuel.total,
+      };
+      break;
+    }
+    if (
+      src === 'tfdi-efb-lvars' &&
+      tfdiEfb &&
+      (tfdiEfb.zfwLb !== undefined || tfdiEfb.gwLb !== undefined || tfdiEfb.payloadLb !== undefined)
+    ) {
+      weights = {
+        ...weights,
+        source: 'tfdi-efb-lvars',
+        zfwLb: tfdiEfb.zfwLb ?? weights.zfwLb,
+        grossLb: tfdiEfb.gwLb ?? weights.grossLb,
+        fuelLb: fuel.total,
+        payloadLb: tfdiEfb.payloadLb ?? weights.payloadLb,
+      };
+      break;
+    }
+    if (src === 'classic-weights') {
+      break;
+    }
+  }
+
+  for (const src of prefs.payload) {
+    if (src === 'pmdg-efb' && weights.source === 'pmdg-efb-lvars') {
+      const corrected = applyPmdgEfbPayloadCorrection(payload, weights, opts.stationRoles);
+      payload = corrected.payload;
+      weights = corrected.weights;
+      break;
+    }
+    if (src === 'tfdi-efb' && tfdiEfb?.payloadLb !== undefined) {
       payload = {
         ...payload,
         source: 'tfdi-efb',
         baggageLb: tfdiEfb.payloadLb,
         ofpPayloadLb: tfdiEfb.payloadLb,
-        // Freighter: no passenger stations — keep estimate undefined.
-        passengerWeightLb: payload.passengerWeightLb,
       };
+      weights = { ...weights, payloadLb: tfdiEfb.payloadLb };
+      break;
+    }
+    if (src === 'classic-stations') {
+      break;
     }
   }
 

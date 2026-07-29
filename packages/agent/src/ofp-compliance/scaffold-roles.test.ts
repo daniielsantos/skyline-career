@@ -22,3 +22,13 @@ describe('scaffold-roles PMDG 738 PAX', () => {
     assert.equal(slugFromAircraftTitle('737-800 PAX BW TC'), '737-800-pax-bw-tc');
   });
 });
+
+describe('scaffold-roles PMDG 738 BCF', () => {
+  it('matches freighter titles and maps deck as cargo', () => {
+    const h = matchHeuristic('737-800BCF SSW');
+    assert.equal(h?.id, 'pmdg-738-bcf');
+    assert.deepEqual(h?.stationRoles.passengerStations, []);
+    assert.deepEqual(h?.stationRoles.baggageStations, [1, 2, 3, 4, 5, 6]);
+    assert.equal(matchHeuristic('737-800BCF BW')?.id, 'pmdg-738-bcf');
+  });
+});

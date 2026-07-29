@@ -257,19 +257,15 @@ export function applyPmdgEfbPayloadCorrection(
 ): { payload: LivePayloadState; weights: LiveWeightState } {
   const zfw = weights.zfwLb;
   const empty = weights.emptyLb;
-  if (
-    zfw === undefined ||
-    empty === undefined ||
-    payload.passengerWeightLb === undefined ||
-    weights.source !== 'pmdg-efb-lvars'
-  ) {
+  if (zfw === undefined || empty === undefined || weights.source !== 'pmdg-efb-lvars') {
     return { payload, weights };
   }
 
+  const paxWt = payload.passengerWeightLb ?? 0;
   const crew = sumStationWeights(payload.stations, roles?.crewStations) ?? 0;
   const service = sumStationWeights(payload.stations, roles?.serviceStations) ?? 0;
-  const baggageLb = Math.max(0, zfw - empty - payload.passengerWeightLb - crew - service);
-  const ofpPayloadLb = payload.passengerWeightLb + baggageLb;
+  const baggageLb = Math.max(0, zfw - empty - paxWt - crew - service);
+  const ofpPayloadLb = paxWt + baggageLb;
 
   return {
     payload: {
@@ -505,7 +501,21 @@ function comparePayloadToOfp(
 
   // Passenger count
   if (sheet?.passengerCount !== undefined) {
-    if (live.estimatedPassengerCount === undefined) {
+    if (sheet.passengerCount === 0) {
+      // Freighter / cargo OFP — no passengerStations map required.
+      const livePax = live.estimatedPassengerCount ?? 0;
+      const paxTol = ofp.tolerances.passengerCountAbs;
+      if (livePax > paxTol) {
+        findings.push({
+          code: 'PAX_COUNT',
+          severity: 'fail',
+          message: `Passenger count: live ~${livePax} vs planned 0 (Δ=${livePax}, tol±${paxTol})`,
+          expected: 0,
+          actual: livePax,
+          delta: livePax,
+        });
+      }
+    } else if (live.estimatedPassengerCount === undefined) {
       findings.push({
         code: 'PAX_COUNT_UNMAPPED',
         severity: 'warn',

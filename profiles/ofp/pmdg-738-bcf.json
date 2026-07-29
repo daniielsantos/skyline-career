@@ -1,0 +1,53 @@
+{
+  "source": "simbrief",
+  "icao": "B738",
+  "ofpId": "pmdg-738-bcf-family",
+  "matchTitlePattern": "737-800BCF",
+  "matchTitles": [
+    "737-800BCF SSW",
+    "737-800BCF BW"
+  ],
+  "notes": [
+    "PMDG 737-800BCF freighter (SSW / BW)",
+    "SimBrief airframe: PMDG (MSFS) - Boeing Converted Freighter",
+    "cfg PaxZone1..4 are main-deck cargo on BCF — all mapped as baggageStations",
+    "Live cargo from L:ZFW_Lvar residual (no passengerStations)",
+    "compare-ofp auto-picks this pack when title matches"
+  ],
+  "fuel": {
+    "unit": "kg"
+  },
+  "loadSheet": {
+    "unit": "kg"
+  },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [1, 2, 3, 4, 5, 6],
+      "crewStations": [7, 8, 9],
+      "serviceStations": [10, 11]
+    }
+  },
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1 (main deck cargo)", "role": "baggage" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2 (main deck cargo)", "role": "baggage" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "PaxZone3 (main deck cargo)", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "PaxZone4 (main deck cargo)", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Fwd Cargo", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Aft Cargo", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Instructor", "role": "crew" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "fwd_gly", "role": "galley" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "aft_gly", "role": "galley" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

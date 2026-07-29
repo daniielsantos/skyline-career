@@ -73,6 +73,39 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'After EFB Load from Simbrief, classic cargo may inflate — use L:ZFW_Lvar / L:GW_Lvar',
     ],
   },
+  {
+    id: 'pmdg-738-bcf',
+    icao: 'B738',
+    // 737-800BCF SSW / 737-800BCF BW (no space before BCF in MSFS title)
+    titlePattern: /737-800BCF/i,
+    familyPackRel: 'pmdg-738-bcf.json',
+    stationRoles: {
+      // cfg still names PaxZone1..4 but BCF uses them as main-deck cargo.
+      passengerStations: [],
+      baggageStations: [1, 2, 3, 4, 5, 6],
+      crewStations: [7, 8, 9],
+      serviceStations: [10, 11],
+    },
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'PaxZone1 (main deck cargo)', role: 'baggage' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'PaxZone2 (main deck cargo)', role: 'baggage' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'PaxZone3 (main deck cargo)', role: 'baggage' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'PaxZone4 (main deck cargo)', role: 'baggage' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Fwd Cargo', role: 'baggage' },
+      { simVarIndex: 6, cfgIndex: 5, name: 'Aft Cargo', role: 'baggage' },
+      { simVarIndex: 7, cfgIndex: 6, name: 'Pilot', role: 'crew' },
+      { simVarIndex: 8, cfgIndex: 7, name: 'Copilot', role: 'crew' },
+      { simVarIndex: 9, cfgIndex: 8, name: 'Instructor', role: 'crew' },
+      { simVarIndex: 10, cfgIndex: 9, name: 'fwd_gly', role: 'galley' },
+      { simVarIndex: 11, cfgIndex: 10, name: 'aft_gly', role: 'galley' },
+    ],
+    notes: [
+      'PMDG 737-800BCF freighter family (SSW / BW)',
+      'SimBrief: use PMDG Boeing Converted Freighter airframe — payload is cargo, not pax',
+      'Zones 1–4 are main-deck cargo despite PaxZone names in flight_model.cfg',
+      'Live cargo via EFB L:ZFW_Lvar residual (classic stations may inflate)',
+    ],
+  },
 ];
 
 export function slugFromAircraftTitle(title: string): string {

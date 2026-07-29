@@ -203,6 +203,60 @@ describe('compareOfpToLive preflight', () => {
     assert.ok(snap.findings.some((f) => f.code === 'PAX_COUNT_UNMAPPED'));
   });
 
+  it('skips PAX_COUNT_UNMAPPED when OFP passengerCount is 0 (freighter)', () => {
+    const ofp = normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit: 'kg', total: 4927 },
+      loadSheet: {
+        unit: 'kg',
+        blockFuel: 4927,
+        payload: 15_200,
+        baggage: 15_200,
+        passengerCount: 0,
+        emptyWeight: 39_633,
+        zfw: 54_833,
+      },
+      payload: {
+        unit: 'kg',
+        total: 15_200,
+        stationRoles: {
+          passengerStations: [],
+          baggageStations: [1, 2, 3, 4, 5, 6],
+          crewStations: [7, 8, 9],
+          serviceStations: [10, 11],
+        },
+      },
+    });
+    const bagsLb = toApproxLb(15_200);
+    const emptyLb = 85_500;
+    const zfwLb = emptyLb + bagsLb + 380 + 1495;
+    const snap = compareOfpToLive({
+      ofp,
+      liveFuel: makeFuel({ total: toApproxLb(4927), source: 'classic' }),
+      livePayload: {
+        source: 'pmdg-efb',
+        unit: 'lb',
+        stations: {},
+        total: bagsLb + 2000,
+        baggageLb: bagsLb,
+        ofpPayloadLb: bagsLb,
+      },
+      liveWeights: {
+        source: 'pmdg-efb-lvars',
+        unit: 'lb',
+        emptyLb,
+        zfwLb,
+        grossLb: zfwLb + toApproxLb(4927),
+        fuelLb: toApproxLb(4927),
+      },
+      phase: 'preflight',
+    });
+    assert.ok(!snap.findings.some((f) => f.code === 'PAX_COUNT_UNMAPPED'));
+    assert.ok(!snap.findings.some((f) => f.code === 'PAX_COUNT'));
+    assert.ok(snap.findings.some((f) => f.code === 'EMPTY_WEIGHT' && f.severity === 'warn'));
+    assert.equal(snap.verdict, 'warn');
+  });
+
   it('compares payload as pax+bags when roles enrich live state', () => {
     const ofp = normalizeOfpExpectation({
       source: 'simbrief',

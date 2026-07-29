@@ -32,7 +32,7 @@ OFP sample: `profiles/ofp/pmdg-738-ssw-tc.json`. Live check: `npm run probe-payl
 | Classic `FUEL TANK * QUANTITY` write | **Ignored** (values readable; PMDG owns fuel) |
 | `FUELSYSTEM TANK *` | Dead / ignored |
 | Accu-Sim-style LVars (`FuelLeftWingTank`, `NGX_FUEL_Qty*`, …) | Read as **0** via SimConnect LVar API — not a usable write path |
-| `PAYLOAD STATION WEIGHT:*` | Often **writable** (cabin/cargo stations) |
+| `PAYLOAD STATION WEIGHT:*` | Often **writable** (cabin/cargo stations). After EFB SimBrief load, **cargo stations can be inflated** vs EFB — prefer `L:ZFW_Lvar` / `L:GW_Lvar` for compliance. |
 
 So this is **not** an A2A Accu-Sim `lvar-bridge` case.
 

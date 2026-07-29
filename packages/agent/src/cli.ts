@@ -774,15 +774,31 @@ async function main(): Promise<void> {
       const empty = snapshot.vars?.['EMPTY WEIGHT'];
       const gross = snapshot.grossWeightLb ?? snapshot.vars?.['TOTAL WEIGHT'];
       console.log(
-        `empty=${empty?.toFixed(0) ?? '?'} lb  gross=${gross?.toFixed(0) ?? '?'} lb  payloadSum=${total.toFixed(1)} lb`,
+        `empty=${empty?.toFixed(0) ?? '?'} lb  gross(classic)=${gross?.toFixed(0) ?? '?'} lb  payloadSum=${total.toFixed(1)} lb`,
       );
-      console.log('Stations (PMDG 738 SSW TC hint: 1-4 pax zones, 5-6 cargo, 7-8 crew):');
+
+      const efbNames = ['L:ZFW_Lvar', 'L:GW_Lvar', 'L:LW_Lvar'] as const;
+      const efb: Record<string, number> = {};
+      for (const name of efbNames) {
+        try {
+          efb[name] = await bridge.readLVar(name);
+        } catch {
+          // ignore
+        }
+      }
+      if (Object.keys(efb).length > 0) {
+        console.log(
+          `PMDG EFB LVars: ZFW=${efb['L:ZFW_Lvar']?.toFixed(0) ?? '?'}  GW=${efb['L:GW_Lvar']?.toFixed(0) ?? '?'}  LW=${efb['L:LW_Lvar']?.toFixed(0) ?? '?'}`,
+        );
+      }
+
+      console.log('Stations (PMDG 738 SSW TC hint: 1-4 pax, 5-6 cargo inflated vs EFB, 7-8 crew):');
       for (const s of stations) {
         const hint =
           s.index <= 4
             ? 'pax?'
             : s.index <= 6
-              ? 'cargo?'
+              ? 'cargo? (prefer EFB ZFW residual)'
               : s.index <= 8
                 ? 'crew?'
                 : s.index <= 11

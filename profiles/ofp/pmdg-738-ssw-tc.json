@@ -6,7 +6,8 @@
     "Station roles from PMDG 737-800 SSW TC flight_model.cfg station_load.*",
     "SimConnect PAYLOAD STATION WEIGHT:n is 1-based (station_load.0 → :1)",
     "PaxZone1..4 seat caps in cfg sum to 163 (16+45+55+47)",
-    "Crew (pilot/copilot) and galleys are excluded from Pass/Baggage roles"
+    "Crew (pilot/copilot/instructor) and galleys are excluded from Pass/Baggage roles",
+    "After EFB Load from Simbrief, classic cargo stations are inflated — live baggage/ZFW/GW use L:ZFW_Lvar / L:GW_Lvar"
   ],
   "fuel": {
     "unit": "kg"
@@ -32,6 +33,8 @@
     "stationRoles": {
       "passengerStations": [1, 2, 3, 4],
       "baggageStations": [5, 6],
+      "crewStations": [7, 8, 9],
+      "serviceStations": [10, 11],
       "averagePassengerWeight": 86.18
     }
   },

@@ -76,7 +76,7 @@ export function formatComplianceSummary(snap: ComplianceSnapshot): string {
   ];
   if (snap.livePayload) {
     const p = snap.livePayload;
-    let payloadLine = `  live stations sum lb: ${p.total.toFixed(1)}`;
+    let payloadLine = `  live payload[${p.source}] stations=${p.total.toFixed(1)}`;
     if (p.ofpPayloadLb !== undefined) {
       payloadLine += `  ofpPayload(pax+bags)=${p.ofpPayloadLb.toFixed(1)}`;
     }
@@ -94,7 +94,7 @@ export function formatComplianceSummary(snap: ComplianceSnapshot): string {
   if (snap.liveWeights) {
     const w = snap.liveWeights;
     lines.push(
-      `  live weights empty/ZFW/TOW lb: ${w.emptyLb?.toFixed(0) ?? '?'} / ${w.zfwLb?.toFixed(0) ?? '?'} / ${w.grossLb?.toFixed(0) ?? '?'}`,
+      `  live weights[${w.source}] empty/ZFW/TOW lb: ${w.emptyLb?.toFixed(0) ?? '?'} / ${w.zfwLb?.toFixed(0) ?? '?'} / ${w.grossLb?.toFixed(0) ?? '?'}`,
     );
   }
   for (const f of snap.findings) {

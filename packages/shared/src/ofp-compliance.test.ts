@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  applyPmdgEfbPayloadCorrection,
   captureBaseline,
   compareOfpToLive,
   deriveCompliancePhase,
@@ -269,6 +270,96 @@ describe('compareOfpToLive preflight', () => {
     });
     assert.ok(snap.findings.some((f) => f.code === 'EMPTY_WEIGHT' && f.severity === 'warn'));
     assert.equal(snap.verdict, 'warn');
+  });
+
+  it('uses PMDG EFB ZFW/GW and derived baggage (not inflated stations)', () => {
+    const zfwKg = 59_600;
+    const blockKg = 5236;
+    const bagsKg = 3892;
+    const payloadKg = 17_340;
+    const ofp = normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit: 'kg', total: blockKg },
+      loadSheet: {
+        unit: 'kg',
+        blockFuel: blockKg,
+        payload: payloadKg,
+        baggage: bagsKg,
+        passengerCount: 156,
+        emptyWeight: 42_264,
+        zfw: zfwKg,
+        tow: 64_609, // post-taxi — should not be the EFB GW target
+      },
+      payload: {
+        unit: 'kg',
+        total: payloadKg,
+        stationRoles: {
+          passengerStations: [1, 2, 3, 4],
+          baggageStations: [5, 6],
+          crewStations: [7, 8, 9],
+          serviceStations: [10, 11],
+          averagePassengerWeight: 86.18,
+        },
+      },
+    });
+    const emptyLb = 91_300;
+    const paxLb = 29_640;
+    const crewLb = 380;
+    const serviceLb = 1495;
+    const zfwLb = toApproxLb(zfwKg);
+    const bagsLb = zfwLb - emptyLb - paxLb - crewLb - serviceLb;
+    const gwLb = zfwLb + toApproxLb(blockKg);
+    const corrected = applyPmdgEfbPayloadCorrection(
+      {
+        source: 'classic-stations',
+        unit: 'lb',
+        stations: {
+          1: 7400,
+          2: 7400,
+          3: 7400,
+          4: 7440,
+          5: 5000,
+          6: 5778, // inflated classic cargo
+          7: 190,
+          8: 190,
+          10: 635,
+          11: 860,
+        },
+        total: 50_000,
+        passengerWeightLb: paxLb,
+        baggageLb: 10_778,
+        ofpPayloadLb: paxLb + 10_778,
+        estimatedPassengerCount: 156,
+      },
+      {
+        source: 'pmdg-efb-lvars',
+        unit: 'lb',
+        emptyLb,
+        zfwLb,
+        grossLb: gwLb,
+        fuelLb: toApproxLb(blockKg),
+      },
+      {
+        passengerStations: [1, 2, 3, 4],
+        baggageStations: [5, 6],
+        crewStations: [7, 8, 9],
+        serviceStations: [10, 11],
+        averagePassengerWeight: 86.18,
+      },
+    );
+    assert.ok(Math.abs((corrected.payload.baggageLb ?? 0) - bagsLb) < 2);
+    const snap = compareOfpToLive({
+      ofp,
+      liveFuel: makeFuel({ total: toApproxLb(blockKg), source: 'pmdg-ng3' }),
+      livePayload: corrected.payload,
+      liveWeights: corrected.weights,
+      phase: 'preflight',
+    });
+    assert.ok(!snap.findings.some((f) => f.code === 'BAGGAGE' && f.severity === 'fail'));
+    assert.ok(!snap.findings.some((f) => f.code === 'ZFW' && f.severity === 'fail'));
+    assert.ok(!snap.findings.some((f) => f.code === 'TOW' && f.severity === 'fail'));
+    assert.ok(snap.findings.some((f) => f.code === 'EMPTY_WEIGHT' && f.severity === 'warn'));
+    assert.equal(snap.verdict, 'warn', snap.findings.map((f) => `${f.severity}:${f.code}`).join(' | '));
   });
 });
 

@@ -51,6 +51,10 @@ export interface OfpStationRoleMap {
   passengerStations?: number[];
   /** Station indices that represent baggage / cargo. */
   baggageStations?: number[];
+  /** Pilot / crew stations (excluded from SimBrief payload). */
+  crewStations?: number[];
+  /** Galley / service stations (excluded from SimBrief payload). */
+  serviceStations?: number[];
   /**
    * Average weight per passenger (same unit as load sheet / payload plan).
    * Used to estimate live passenger count from seat station weights.
@@ -113,7 +117,7 @@ export interface LiveFuelState {
 }
 
 export interface LivePayloadState {
-  source: 'classic-stations';
+  source: 'classic-stations' | 'pmdg-efb';
   unit: 'lb';
   stations: Record<number, number>;
   /** Sum of all stations (includes crew/galley). */
@@ -131,17 +135,18 @@ export interface LivePayloadState {
   ofpPayloadLb?: number;
 }
 
-/** Gross / empty / derived ZFW from classic SimVars (always lb). */
+/** Gross / empty / derived ZFW — prefer PMDG EFB LVars when present. */
 export interface LiveWeightState {
-  source: 'classic-weights';
+  source: 'classic-weights' | 'pmdg-efb-lvars';
   unit: 'lb';
   emptyLb?: number;
   grossLb?: number;
   maxGrossLb?: number;
-  /** gross − fuel, when both known. */
+  /** Prefer L:ZFW_Lvar on PMDG; else gross − fuel. */
   zfwLb?: number;
   fuelLb?: number;
   payloadLb?: number;
+  landingLb?: number;
 }
 
 export type CompliancePhase = 'preflight' | 'locked' | 'airborne' | 'complete';
@@ -193,14 +198,14 @@ export const SIMBRIEF_LIVE_FIELD_MAP = [
   {
     simbrief: 'Payload',
     ofpPath: 'loadSheet.payload | payload.total',
-    live: 'Sum of PAYLOAD STATION WEIGHT:1..N (or TOTAL PAYLOAD WEIGHT)',
-    notes: 'Aircraft-dependent station count; PMDG often writable.',
+    live: 'PMDG: pax stations + cargo from L:ZFW_Lvar residual; else Σ stations',
+    notes: 'After PMDG EFB SimBrief load, classic cargo stations are inflated vs EFB.',
   },
   {
     simbrief: 'Baggage',
     ofpPath: 'loadSheet.baggage',
-    live: 'Sum of stations listed in payload.stationRoles.baggageStations',
-    notes: 'Requires per-aircraft role map — not a global SimVar.',
+    live: 'PMDG: ZFW − empty − pax − crew − service; else Σ baggageStations',
+    notes: 'Requires role map (crewStations + serviceStations for PMDG).',
   },
   {
     simbrief: 'Pass (passenger count)',
@@ -212,19 +217,19 @@ export const SIMBRIEF_LIVE_FIELD_MAP = [
     simbrief: 'Empty Weight',
     ofpPath: 'loadSheet.emptyWeight',
     live: 'EMPTY WEIGHT (pounds)',
-    notes: 'Should match airframe; large delta may mean wrong aircraft/OFP.',
+    notes: 'SimBrief OEW ≠ MSFS empty — advisory warn only.',
   },
   {
     simbrief: 'Estimated ZFW',
     ofpPath: 'loadSheet.zfw',
-    live: 'TOTAL WEIGHT − fuel total (or EMPTY + payload)',
-    notes: 'Derived; prefer gross−fuel when fuel source is trusted.',
+    live: 'PMDG L:ZFW_Lvar (EFB); else TOTAL WEIGHT − fuel',
+    notes: 'EFB LVar matches SimBrief after Load from Simbrief.',
   },
   {
     simbrief: 'Estimated TOW',
-    ofpPath: 'loadSheet.tow',
-    live: 'TOTAL WEIGHT (gross)',
-    notes: 'At gate ≈ ZFW + block fuel.',
+    ofpPath: 'loadSheet.tow (or zfw+block on PMDG)',
+    live: 'PMDG L:GW_Lvar; else TOTAL WEIGHT',
+    notes: 'EFB GW ≈ ZFW+block (ramp). SimBrief est_tow is usually post-taxi.',
   },
   {
     simbrief: 'Estimated LW',

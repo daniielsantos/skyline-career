@@ -1,5 +1,6 @@
 import {
   DEFAULT_JET_A_LB_PER_GAL,
+  applyPmdgEfbPayloadCorrection,
   enrichPayloadWithRoles,
   type LiveFuelState,
   type LivePayloadState,
@@ -10,16 +11,43 @@ import {
 import type { SimSnapshot } from '@msfs-compat/runtime';
 import type { NamedPipeSimBridge } from '../named-pipe-sim-bridge.js';
 
+/** PMDG EFB Weight & Balance LVars (see PMDGTablet.js wb_update_interval). */
+export const PMDG_EFB_LVARS = {
+  grossWeight: 'L:GW_Lvar',
+  grossCg: 'L:CG_GW_Lvar',
+  zfw: 'L:ZFW_Lvar',
+  zfwCg: 'L:CG_ZFW_Lvar',
+  landingWeight: 'L:LW_Lvar',
+  landingCg: 'L:CG_LW_Lvar',
+} as const;
+
 export interface LiveLoadReading {
   fuel: LiveFuelState;
   payload: LivePayloadState;
   weights: LiveWeightState;
   onGround: boolean;
   enginesRunning: boolean;
+  /** Raw EFB LVars when readable. */
+  pmdgEfb?: {
+    gwLb?: number;
+    zfwLb?: number;
+    lwLb?: number;
+  };
 }
 
 function galToLb(gal: number, densityLbPerGal: number): number {
   return Math.max(0, gal) * densityLbPerGal;
+}
+
+function saneWeight(n: number | undefined): number | undefined {
+  if (n === undefined || !Number.isFinite(n) || n <= 0) {
+    return undefined;
+  }
+  // PMDG EFB weights are in lb; reject tiny/placeholder noise.
+  if (n < 1000) {
+    return undefined;
+  }
+  return n;
 }
 
 export function payloadFromSnapshot(snapshot: SimSnapshot): LivePayloadState {
@@ -95,9 +123,27 @@ export function fuelFromClassicSnapshot(
   };
 }
 
+async function readPmdgEfbLvars(
+  bridge: NamedPipeSimBridge,
+): Promise<{ gwLb?: number; zfwLb?: number; lwLb?: number }> {
+  const read = async (name: string): Promise<number | undefined> => {
+    try {
+      return saneWeight(await bridge.readLVar(name));
+    } catch {
+      return undefined;
+    }
+  };
+  const [gwLb, zfwLb, lwLb] = await Promise.all([
+    read(PMDG_EFB_LVARS.grossWeight),
+    read(PMDG_EFB_LVARS.zfw),
+    read(PMDG_EFB_LVARS.landingWeight),
+  ]);
+  return { gwLb, zfwLb, lwLb };
+}
+
 /**
- * Prefer PMDG NG3 Client Data (lb). Fall back to classic gallons × density.
- * Applies optional station role map for baggage / pax estimate.
+ * Prefer PMDG NG3 fuel Client Data + EFB LVars (ZFW/GW) for weights/cargo.
+ * Classic PAYLOAD STATION cargo is unreliable after SimBrief EFB load.
  */
 export async function readLiveLoad(
   bridge: NamedPipeSimBridge,
@@ -143,7 +189,21 @@ export async function readLiveLoad(
   }
 
   payload = enrichPayloadWithRoles(payload, opts.stationRoles, opts.roleWeightUnit ?? 'lb');
-  const weights = weightsFromSnapshot(snapshot, fuel.total, payload.total);
+  let weights = weightsFromSnapshot(snapshot, fuel.total, payload.ofpPayloadLb ?? payload.total);
+
+  const pmdgEfb = await readPmdgEfbLvars(bridge);
+  if (pmdgEfb.zfwLb !== undefined || pmdgEfb.gwLb !== undefined) {
+    weights = {
+      ...weights,
+      source: 'pmdg-efb-lvars',
+      zfwLb: pmdgEfb.zfwLb ?? weights.zfwLb,
+      grossLb: pmdgEfb.gwLb ?? weights.grossLb,
+      landingLb: pmdgEfb.lwLb,
+    };
+    const corrected = applyPmdgEfbPayloadCorrection(payload, weights, opts.stationRoles);
+    payload = corrected.payload;
+    weights = corrected.weights;
+  }
 
   return {
     fuel,
@@ -151,5 +211,6 @@ export async function readLiveLoad(
     weights,
     onGround: snapshot.onGround,
     enginesRunning: snapshot.enginesRunning,
+    pmdgEfb,
   };
 }

@@ -69,6 +69,8 @@ function normalizePayload(plan: OfpPayloadPlan | undefined): OfpPayloadPlan | un
     ? {
         passengerStations: plan.stationRoles.passengerStations,
         baggageStations: plan.stationRoles.baggageStations,
+        crewStations: plan.stationRoles.crewStations,
+        serviceStations: plan.stationRoles.serviceStations,
         averagePassengerWeight: plan.stationRoles.averagePassengerWeight,
       }
     : undefined;
@@ -240,6 +242,46 @@ export function enrichPayloadWithRoles(
     passengerWeightLb,
     estimatedPassengerCount,
     ofpPayloadLb,
+  };
+}
+
+/**
+ * Derive cargo from PMDG EFB ZFW LVar:
+ * ZFW ≈ empty + pax + crew + service + cargo
+ * (classic PAYLOAD STATION cargo is inflated vs EFB after SimBrief load).
+ */
+export function applyPmdgEfbPayloadCorrection(
+  payload: LivePayloadState,
+  weights: LiveWeightState,
+  roles: OfpStationRoleMap | undefined,
+): { payload: LivePayloadState; weights: LiveWeightState } {
+  const zfw = weights.zfwLb;
+  const empty = weights.emptyLb;
+  if (
+    zfw === undefined ||
+    empty === undefined ||
+    payload.passengerWeightLb === undefined ||
+    weights.source !== 'pmdg-efb-lvars'
+  ) {
+    return { payload, weights };
+  }
+
+  const crew = sumStationWeights(payload.stations, roles?.crewStations) ?? 0;
+  const service = sumStationWeights(payload.stations, roles?.serviceStations) ?? 0;
+  const baggageLb = Math.max(0, zfw - empty - payload.passengerWeightLb - crew - service);
+  const ofpPayloadLb = payload.passengerWeightLb + baggageLb;
+
+  return {
+    payload: {
+      ...payload,
+      source: 'pmdg-efb',
+      baggageLb,
+      ofpPayloadLb,
+    },
+    weights: {
+      ...weights,
+      payloadLb: ofpPayloadLb,
+    },
   };
 }
 
@@ -524,49 +566,81 @@ function compareLoadSheetWeights(
     }
   }
 
-  if (sheet.tow !== undefined) {
+  const efbWeights = liveWeights?.source === 'pmdg-efb-lvars';
+
+  if (sheet.tow !== undefined || (efbWeights && sheet.zfw !== undefined)) {
+    // PMDG EFB GW ≈ SimBrief est_zfw + plan_ramp (block). SimBrief est_tow is post-taxi.
+    const blockLb =
+      sheet.blockFuel !== undefined
+        ? toLb(sheet.blockFuel, u)
+        : ofp.fuel.total !== undefined
+          ? toLb(ofp.fuel.total, ofp.fuel.unit)
+          : undefined;
+    const rampTowLb =
+      efbWeights && sheet.zfw !== undefined && blockLb !== undefined
+        ? toLb(sheet.zfw, u) + blockLb
+        : sheet.tow !== undefined
+          ? toLb(sheet.tow, u)
+          : undefined;
     if (liveWeights?.grossLb === undefined) {
       findings.push({
         code: 'TOW_UNAVAILABLE',
         severity: 'warn',
-        message: 'OFP has Estimated TOW but TOTAL WEIGHT was unavailable',
-        expected: toLb(sheet.tow, u),
+        message: efbWeights
+          ? 'OFP has TOW/ZFW but L:GW_Lvar was unavailable'
+          : 'OFP has Estimated TOW but TOTAL WEIGHT was unavailable',
+        expected: rampTowLb,
       });
-    } else {
-      pushWeightDelta(findings, 'TOW', 'Takeoff weight (gross)', toLb(sheet.tow, u), liveWeights.grossLb, tol);
+    } else if (rampTowLb !== undefined) {
+      pushWeightDelta(
+        findings,
+        'TOW',
+        efbWeights ? 'Ramp weight (EFB GW vs ZFW+block)' : 'Takeoff weight (gross)',
+        rampTowLb,
+        liveWeights.grossLb,
+        tol,
+      );
     }
   }
 
   if (sheet.zfw !== undefined) {
-    // Prefer SimBrief-like ZFW on MSFS empty basis: empty + pax + bags.
+    // PMDG EFB L:ZFW_Lvar matches SimBrief est_zfw after Load from Simbrief.
+    // Classic path: empty+pax+bags is advisory (OEW basis differs).
     const roleZfw =
+      !efbWeights &&
       liveWeights?.emptyLb !== undefined &&
       livePayload?.ofpPayloadLb !== undefined
         ? liveWeights.emptyLb + livePayload.ofpPayloadLb
         : undefined;
-    const liveZfw =
-      roleZfw ??
-      liveWeights?.zfwLb ??
-      (liveWeights?.emptyLb !== undefined && livePayload
-        ? liveWeights.emptyLb + livePayload.total
-        : undefined);
+    const liveZfw = efbWeights
+      ? liveWeights?.zfwLb
+      : (roleZfw ??
+        liveWeights?.zfwLb ??
+        (liveWeights?.emptyLb !== undefined && livePayload
+          ? liveWeights.emptyLb + livePayload.total
+          : undefined));
     if (liveZfw === undefined) {
       findings.push({
         code: 'ZFW_UNAVAILABLE',
         severity: 'warn',
-        message: 'OFP has Estimated ZFW but could not derive live ZFW',
+        message: efbWeights
+          ? 'OFP has Estimated ZFW but L:ZFW_Lvar was unavailable'
+          : 'OFP has Estimated ZFW but could not derive live ZFW',
         expected: toLb(sheet.zfw, u),
       });
     } else {
-      // Absolute ZFW mixes OFP OEW vs MSFS empty — warn. Payload slice can still fail via PAYLOAD_TOTAL.
       pushWeightDelta(
         findings,
         'ZFW',
-        roleZfw !== undefined ? 'ZFW (MSFS empty + pax + bags)' : 'Zero fuel weight',
+        efbWeights
+          ? 'Zero fuel weight (EFB L:ZFW_Lvar)'
+          : roleZfw !== undefined
+            ? 'ZFW (MSFS empty + pax + bags)'
+            : 'Zero fuel weight',
         toLb(sheet.zfw, u),
         liveZfw,
         tol,
-        'warn',
+        efbWeights ? 'fail' : 'warn',
       );
     }
   }

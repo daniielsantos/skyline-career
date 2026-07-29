@@ -48,14 +48,14 @@ Today: **fetch + compare** is live. **Generate** OFP from career params (SimBrie
 
 | SimBrief | OFP JSON | Live source | Notes |
 |----------|----------|-------------|-------|
-| **Block Fuel** | `loadSheet.blockFuel` (fills `fuel.total`) | PMDG `FUEL_Qty*` sum (lb) or classic `FUEL TANK * QUANTITY` × 6.7 | Primary fuel check at gate |
-| **Payload** | `loadSheet.payload` / `payload.total` | Σ `PAYLOAD STATION WEIGHT:n` | Aircraft-dependent station count |
-| **Baggage** | `loadSheet.baggage` | Σ stations in `payload.stationRoles.baggageStations` | **Needs per-aircraft map** |
-| **Pass** | `loadSheet.passengerCount` | Estimated: Σ `passengerStations` ÷ `averagePassengerWeight` | **No global pax-count SimVar** |
-| **Empty Weight** | `loadSheet.emptyWeight` | `EMPTY WEIGHT` | Airframe check |
-| **Estimated ZFW** | `loadSheet.zfw` | `TOTAL WEIGHT` − fuel (or empty + payload) | Derived |
-| **Estimated TOW** | `loadSheet.tow` | `TOTAL WEIGHT` (gross) | Gate ≈ ZFW + block fuel |
-| **Estimated LW** | `loadSheet.lw` | (not hard-checked in flight) | Optional later |
+| **Block Fuel** | `loadSheet.blockFuel` (fills `fuel.total`) | PMDG `FUEL_Qty*` sum (lb) or classic gallons × 6.7 | Primary fuel check at gate |
+| **Payload** | `loadSheet.payload` / `payload.total` | PMDG: pax + **EFB-derived** bags; else Σ stations | Classic cargo stations lie after EFB load |
+| **Baggage** | `loadSheet.baggage` | PMDG: `L:ZFW_Lvar − empty − pax − crew − galley` | Needs `crewStations` + `serviceStations` |
+| **Pass** | `loadSheet.passengerCount` | Estimated: Σ `passengerStations` ÷ avg weight | Seat stations still trustworthy |
+| **Empty Weight** | `loadSheet.emptyWeight` | `EMPTY WEIGHT` | Warn only (OEW ≠ MSFS empty) |
+| **Estimated ZFW** | `loadSheet.zfw` | PMDG `L:ZFW_Lvar` (EFB) | Matches SimBrief after Load from Simbrief |
+| **Estimated TOW** | `loadSheet.tow` / ZFW+block | PMDG `L:GW_Lvar` vs **ZFW+block** | `est_tow` is post-taxi; GW is ramp |
+| **Estimated LW** | `loadSheet.lw` | `L:LW_Lvar` (read, not hard-gated) | Optional later |
 | **Enroute Burn** | `loadSheet.enrouteBurn` | Fuel drop vs baseline once airborne | Informational / career scoring |
 
 Constant map also exported as `SIMBRIEF_LIVE_FIELD_MAP` from `@msfs-compat/shared`.
@@ -102,7 +102,9 @@ npm run compare-ofp -- --ofp profiles/ofp/pmdg-738-ssw-tc.json
 
 Live homologation confirmed on **737-800 PAX SSW TC**:
 
-- Stations 1–4 carry pax zone weights; 5–6 cargo; 7–8 crew (~190 lb); 10–11 galley.
-- SimBrief **Payload** must be compared to **pax+bags only** (not Σ all stations).
-- SimBrief **Empty Weight** ≠ MSFS `EMPTY WEIGHT` (91300 lb on this airframe) — compare is **warn** only.
-- Block fuel via PMDG SDK matched sample (5291 kg) when loaded.
+- Stations 1–4 carry pax zone weights; 5–6 cargo; 7–9 crew; 10–11 galley.
+- After EFB **Load from Simbrief**, stations 5–6 are **inflated** (~×1.26 vs EFB cargo). Authority is WASM/EFB: `L:ZFW_Lvar`, `L:GW_Lvar`.
+- Live baggage = `ZFW − empty − pax − crew − service` (roles include `crewStations` / `serviceStations`).
+- SimBrief **Payload** = **pax+bags only** (not Σ all stations).
+- SimBrief **Empty Weight** ≠ MSFS `EMPTY WEIGHT` (91300 lb) — **warn** only.
+- Block fuel via PMDG SDK matched when loaded; EFB ZFW/GW match SimBrief `est_zfw` / `est_zfw+plan_ramp`.

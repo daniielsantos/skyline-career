@@ -46,6 +46,18 @@ export interface SimBriefOfpJson {
     reg?: string;
     name?: string;
   };
+  origin?: {
+    icao_code?: string;
+    icao?: string;
+    iata_code?: string;
+    name?: string;
+  };
+  destination?: {
+    icao_code?: string;
+    icao?: string;
+    iata_code?: string;
+    name?: string;
+  };
   fuel?: Record<string, string | number | undefined>;
   weights?: Record<string, string | number | undefined>;
   fetch?: { userid?: string; status?: string; fetchtime?: string };
@@ -65,6 +77,13 @@ export function unitsFromSimBrief(paramsUnits: string | undefined): OfpWeightUni
     return 'lb';
   }
   return 'kg';
+}
+
+function airportIcao(
+  block: { icao_code?: string; icao?: string } | undefined,
+): string | undefined {
+  const code = (block?.icao_code ?? block?.icao)?.trim().toUpperCase();
+  return code || undefined;
 }
 
 /**
@@ -148,6 +167,8 @@ export function mapSimBriefOfpToExpectation(
     source: 'simbrief',
     ofpId,
     icao: ofp.aircraft?.icaocode,
+    originIcao: airportIcao(ofp.origin),
+    destIcao: airportIcao(ofp.destination),
     fuel: { unit, total: blockFuel },
     loadSheet,
     payload: payloadPlan,

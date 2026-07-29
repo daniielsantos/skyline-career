@@ -213,6 +213,8 @@ function finalizeExpectation(
     source: raw.source === 'simbrief' ? 'simbrief' : 'manual',
     ofpId: raw.ofpId,
     icao: raw.icao,
+    originIcao: raw.originIcao?.trim().toUpperCase() || undefined,
+    destIcao: raw.destIcao?.trim().toUpperCase() || undefined,
     fuel,
     loadSheet,
     payload,

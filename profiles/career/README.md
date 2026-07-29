@@ -13,4 +13,4 @@ npm run career -- cancel --mission <id>
 - `local-economy.json` — terminals, stocks, shipment lots (gitignored)
 - `local-missions.json` — accepted MissionIntent records (gitignored)
 
-`dispatch` opens SimBrief prefilled from the mission (orig/dest/pax=0/cargo) via the freighter roles pack.
+`dispatch` opens SimBrief prefilled from the mission (orig/dest/pax=0/cargo) via the freighter roles pack, then runs Intent→OFP checks on the fetched OFP.

@@ -4,6 +4,12 @@ import {
   type CareerEconomyWorld,
   type MarketLotView,
 } from './career-economy.js';
+import { KG_TO_LB } from './ofp-compliance.js';
+import type {
+  ComplianceFinding,
+  ComplianceVerdict,
+  OfpExpectation,
+} from './types/ofp-compliance.js';
 import type {
   AircraftClass,
   FreighterClassId,
@@ -197,4 +203,199 @@ export function formatMissionSummary(mission: MissionIntent): string {
     `${commodity.name}  ${(mission.cargoKg / 1000).toFixed(1)}t  pay=$${mission.payUsd.toLocaleString()}` +
     `${urgent}  via ${aircraft.id}  due@tick ${mission.deadlineTick}`
   );
+}
+
+export interface IntentOfpTolerances {
+  /** Absolute cargo tolerance (kg). Default 500. */
+  cargoAbsKg: number;
+  /** Relative cargo tolerance vs intent. Default 0.03. */
+  cargoPct: number;
+  /** Max allowed OFP passenger count when mission.pax is 0. Default 0. */
+  maxExtraPax: number;
+}
+
+export const DEFAULT_INTENT_OFP_TOLERANCES: IntentOfpTolerances = {
+  cargoAbsKg: 500,
+  cargoPct: 0.03,
+  maxExtraPax: 0,
+};
+
+export interface IntentOfpCheck {
+  verdict: ComplianceVerdict;
+  findings: ComplianceFinding[];
+}
+
+/** ICAO codes that count as the same airframe family for Intent→OFP. */
+const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
+  B738: ['B738', 'B38M'],
+  MD1F: ['MD1F', 'MD11'],
+  MD11: ['MD11', 'MD1F'],
+};
+
+function normalizeIcao(code: string | undefined): string | undefined {
+  const c = code?.trim().toUpperCase();
+  return c || undefined;
+}
+
+function airframesCompatible(expectedIcao: string, actualIcao: string | undefined): boolean {
+  const actual = normalizeIcao(actualIcao);
+  if (!actual) return false;
+  const expected = expectedIcao.toUpperCase();
+  if (actual === expected) return true;
+  const aliases = AIRFRAME_ICAO_ALIASES[expected] ?? [expected];
+  return aliases.includes(actual);
+}
+
+function cargoToleranceKg(intentCargoKg: number, tolerances: IntentOfpTolerances): number {
+  return Math.max(tolerances.cargoAbsKg, Math.abs(intentCargoKg) * tolerances.cargoPct);
+}
+
+/** Prefer SimBrief cargo/baggage; if freighter (pax≈0) fall back to payload. */
+export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
+  const sheet = ofp.loadSheet;
+  if (!sheet) return undefined;
+  const unit = sheet.unit ?? ofp.fuel.unit ?? 'kg';
+  const baggage = sheet.baggage;
+  const payload = sheet.payload ?? ofp.payload?.total;
+  const pax = sheet.passengerCount ?? 0;
+
+  let value: number | undefined;
+  if (baggage !== undefined) {
+    value = baggage;
+  } else if (payload !== undefined && pax <= 0) {
+    value = payload;
+  } else {
+    return undefined;
+  }
+
+  // Intent cargo is always kg.
+  return unit === 'kg' ? value : value / KG_TO_LB;
+}
+
+function worstVerdict(findings: ComplianceFinding[]): ComplianceVerdict {
+  if (findings.some((f) => f.severity === 'fail')) return 'fail';
+  if (findings.some((f) => f.severity === 'warn')) return 'warn';
+  return 'pass';
+}
+
+/**
+ * Validate MissionIntent against a fetched OFP (Slice 3).
+ * Catches SimBrief edits to orig/dest/cargo/pax/airframe after dispatch prefill.
+ */
+export function compareMissionIntentToOfp(
+  mission: MissionIntent,
+  ofp: OfpExpectation,
+  opts: { tolerances?: Partial<IntentOfpTolerances> } = {},
+): IntentOfpCheck {
+  const tolerances: IntentOfpTolerances = {
+    ...DEFAULT_INTENT_OFP_TOLERANCES,
+    ...(opts.tolerances ?? {}),
+  };
+  const findings: ComplianceFinding[] = [];
+  const aircraft = getAircraftClass(mission.aircraftClassId);
+
+  const ofpOrig = normalizeIcao(ofp.originIcao);
+  const ofpDest = normalizeIcao(ofp.destIcao);
+  const intentOrig = mission.originIcao.toUpperCase();
+  const intentDest = mission.destIcao.toUpperCase();
+
+  if (!ofpOrig) {
+    findings.push({
+      code: 'INTENT_ORIGIN_MISSING',
+      severity: 'warn',
+      message: 'OFP has no origin ICAO — cannot verify departure airport',
+    });
+  } else if (ofpOrig !== intentOrig) {
+    findings.push({
+      code: 'INTENT_ORIGIN_MISMATCH',
+      severity: 'fail',
+      message: `OFP origin ${ofpOrig} does not match mission ${intentOrig}`,
+    });
+  }
+
+  if (!ofpDest) {
+    findings.push({
+      code: 'INTENT_DEST_MISSING',
+      severity: 'warn',
+      message: 'OFP has no destination ICAO — cannot verify arrival airport',
+    });
+  } else if (ofpDest !== intentDest) {
+    findings.push({
+      code: 'INTENT_DEST_MISMATCH',
+      severity: 'fail',
+      message: `OFP destination ${ofpDest} does not match mission ${intentDest}`,
+    });
+  }
+
+  const ofpPax = ofp.loadSheet?.passengerCount;
+  if (ofpPax === undefined) {
+    findings.push({
+      code: 'INTENT_PAX_MISSING',
+      severity: 'warn',
+      message: 'OFP has no passenger count — freighter missions expect pax=0',
+    });
+  } else if (ofpPax > mission.pax + tolerances.maxExtraPax) {
+    findings.push({
+      code: 'INTENT_PAX_MISMATCH',
+      severity: 'fail',
+      message: `OFP pax=${ofpPax} but mission expects pax=${mission.pax}`,
+      expected: mission.pax,
+      actual: ofpPax,
+      delta: ofpPax - mission.pax,
+    });
+  }
+
+  const ofpCargo = ofpCargoKg(ofp);
+  if (ofpCargo === undefined) {
+    findings.push({
+      code: 'INTENT_CARGO_MISSING',
+      severity: 'warn',
+      message: 'OFP has no cargo/baggage weight — cannot verify freight load',
+    });
+  } else {
+    const tol = cargoToleranceKg(mission.cargoKg, tolerances);
+    const delta = ofpCargo - mission.cargoKg;
+    if (Math.abs(delta) > tol) {
+      findings.push({
+        code: 'INTENT_CARGO_MISMATCH',
+        severity: 'fail',
+        message: `OFP cargo ${ofpCargo.toFixed(0)} kg vs mission ${mission.cargoKg} kg (tol ±${tol.toFixed(0)} kg)`,
+        expected: mission.cargoKg,
+        actual: ofpCargo,
+        delta,
+      });
+    }
+  }
+
+  if (!ofp.icao) {
+    findings.push({
+      code: 'INTENT_AIRFRAME_MISSING',
+      severity: 'warn',
+      message: 'OFP has no aircraft ICAO — cannot verify freighter type',
+    });
+  } else if (!airframesCompatible(aircraft.simbriefIcao, ofp.icao)) {
+    findings.push({
+      code: 'INTENT_AIRFRAME_MISMATCH',
+      severity: 'fail',
+      message: `OFP airframe ${ofp.icao} is not compatible with mission class ${aircraft.id} (${aircraft.simbriefIcao})`,
+    });
+  }
+
+  if (findings.length === 0) {
+    findings.push({
+      code: 'INTENT_OFP_OK',
+      severity: 'info',
+      message: `Intent matches OFP: ${intentOrig}→${intentDest} cargo≈${mission.cargoKg} kg pax=${mission.pax}`,
+    });
+  }
+
+  return { verdict: worstVerdict(findings), findings };
+}
+
+export function formatIntentOfpCheck(check: IntentOfpCheck): string {
+  const lines = [`Intent→OFP: ${check.verdict.toUpperCase()}`];
+  for (const f of check.findings) {
+    lines.push(`  [${f.severity}] ${f.code}: ${f.message}`);
+  }
+  return lines.join('\n');
 }

@@ -59,7 +59,9 @@ import {
 import {
   acceptMission,
   cancelMission,
+  compareMissionIntentToOfp,
   createSeedEconomyWorld,
+  formatIntentOfpCheck,
   formatMissionSummary,
   listMarketLots,
   listViableMarketLots,
@@ -1556,9 +1558,14 @@ async function main(): Promise<void> {
       console.log(
         `OFP ready: ${origin}  units=${expectation.fuel.unit}  block=${expectation.loadSheet?.blockFuel ?? '?'}  payload=${expectation.loadSheet?.payload ?? '?'}  cargo intent=${mission.cargoKg} kg`,
       );
-      console.log(
-        'Note: Intent→OFP validation (Slice 3) not applied yet — compare cargo/orig/dest manually for now.',
-      );
+
+      const intentCheck = compareMissionIntentToOfp(mission, expectation);
+      console.log(formatIntentOfpCheck(intentCheck));
+      if (intentCheck.verdict === 'fail') {
+        process.exitCode = 2;
+      } else if (intentCheck.verdict === 'warn' && process.exitCode !== 2) {
+        process.exitCode = 1;
+      }
 
       if (hasFlag(subArgs, '--compare')) {
         const locked = hasFlag(subArgs, '--lock');

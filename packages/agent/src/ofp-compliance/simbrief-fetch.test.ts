@@ -16,6 +16,8 @@ describe('mapSimBriefOfpToExpectation', () => {
       {
         params: { units: 'kgs', request_id: 'abc123' },
         aircraft: { icaocode: 'B738' },
+        origin: { icao_code: 'SBGR' },
+        destination: { icao_code: 'SBGL' },
         fuel: { plan_ramp: '5236', enroute_burn: '2299' },
         weights: {
           oew: '42264',
@@ -47,6 +49,8 @@ describe('mapSimBriefOfpToExpectation', () => {
     assert.equal(ofp.loadSheet?.passengerCount, 156);
     assert.equal(ofp.loadSheet?.baggage, 3892);
     assert.equal(ofp.loadSheet?.payload, 17336);
+    assert.equal(ofp.originIcao, 'SBGR');
+    assert.equal(ofp.destIcao, 'SBGL');
     assert.ok(
       ofp.payload?.stationRoles?.averagePassengerWeight !== undefined &&
         Math.abs(ofp.payload.stationRoles.averagePassengerWeight - 86.183) < 0.01,

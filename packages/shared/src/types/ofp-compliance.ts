@@ -114,6 +114,10 @@ export interface OfpExpectation {
   source: 'manual' | 'simbrief';
   ofpId?: string;
   icao?: string;
+  /** Departure airport ICAO when known (SimBrief origin). */
+  originIcao?: string;
+  /** Arrival airport ICAO when known (SimBrief destination). */
+  destIcao?: string;
   fuel: OfpFuelPlan;
   /** SimBrief load sheet block (weights + pax count). */
   loadSheet?: OfpLoadSheet;

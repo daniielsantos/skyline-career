@@ -12,6 +12,7 @@ coverage/
 *.tsbuildinfo
 .data/
 profiles/cache/
+profiles/career/local-economy.json
 artifacts/
 
 # .NET build outputs (never commit)

@@ -44,14 +44,26 @@ import {
   writeRolesPack,
   type OfpRolesPackFile,
 } from './ofp-compliance/scaffold-roles.js';
-import { type ComplianceBaseline, type LiveFuelState } from '@msfs-compat/shared';
+import {
+  DEFAULT_CAREER_ECONOMY_PATH,
+  loadOrCreateCareerEconomy,
+  saveCareerEconomy,
+} from './ofp-compliance/career-economy-store.js';
+import {
+  listMarketLots,
+  tickEconomyN,
+  createSeedEconomyWorld,
+  type CommodityId,
+  type ComplianceBaseline,
+  type LiveFuelState,
+} from '@msfs-compat/shared';
 
 const agentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|pmdg-cdu|generate-ofp|compare-ofp|monitor-ofp|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|pmdg-cdu|generate-ofp|compare-ofp|monitor-ofp|career|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -69,6 +81,7 @@ function usage(): never {
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
+  msfs-compat-agent career init|tick|market [--save path] [--seed s] [--n ticks] [--origin ICAO] [--dest ICAO] [--commodity id] [--reset] [--json]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -81,6 +94,7 @@ Notes:
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
   generate-ofp: Dispatch Redirect with homologated SimBrief variant (pack match / live title); fuel AUTO → fetch by static_id
   compare-ofp / monitor-ofp: fetch latest SimBrief OFP; omit --roles to auto-pick pack from aircraft title
+  career: local cargo economy (terminals produce/consume → shipment lots)
 `);
   process.exit(1);
 }
@@ -1234,6 +1248,89 @@ async function main(): Promise<void> {
       );
     }
     return;
+  }
+
+  if (command === 'career') {
+    const sub = rest[0];
+    const subArgs = rest.slice(1);
+    const saveRel =
+      getFlag(subArgs, '--save') ?? join(repoRoot, DEFAULT_CAREER_ECONOMY_PATH);
+    const savePath = resolve(saveRel);
+    const asJson = hasFlag(subArgs, '--json');
+
+    if (!sub || sub === 'help' || sub === '--help') {
+      console.log(`career commands:
+  career init [--save path] [--seed s] [--reset]
+  career tick [--n 24] [--save path]
+  career market [--origin ICAO] [--dest ICAO] [--commodity electronics|perishables|machinery|general] [--save path] [--json]
+`);
+      return;
+    }
+
+    if (sub === 'init') {
+      const fresh = createSeedEconomyWorld({ seed: getFlag(subArgs, '--seed') });
+      await saveCareerEconomy(savePath, fresh);
+      console.log(
+        `Career economy initialized: ${savePath}  seed=${fresh.seed}  airports=${fresh.airports.length}  tick=${fresh.tick}`,
+      );
+      return;
+    }
+
+    if (sub === 'tick') {
+      const world = await loadOrCreateCareerEconomy(savePath, {
+        seed: getFlag(subArgs, '--seed'),
+      });
+      const n = getNumberFlag(subArgs, '--n') ?? 1;
+      const beforeLots = world.lots.filter((l) => l.status === 'available').length;
+      tickEconomyN(world, n);
+      await saveCareerEconomy(savePath, world);
+      const afterLots = world.lots.filter((l) => l.status === 'available').length;
+      console.log(
+        `tick=${world.tick} (+${n})  availableLots=${afterLots} (was ${beforeLots})  saved=${savePath}`,
+      );
+      return;
+    }
+
+    if (sub === 'market') {
+      const world = await loadOrCreateCareerEconomy(savePath, {
+        seed: getFlag(subArgs, '--seed'),
+      });
+      const commodityRaw = getFlag(subArgs, '--commodity');
+      const commodityId = commodityRaw as CommodityId | undefined;
+      if (
+        commodityId &&
+        !['electronics', 'perishables', 'machinery', 'general'].includes(commodityId)
+      ) {
+        console.error(`Unknown commodity: ${commodityRaw}`);
+        process.exit(1);
+      }
+      const market = listMarketLots(world, {
+        originIcao: getFlag(subArgs, '--origin'),
+        destIcao: getFlag(subArgs, '--dest'),
+        commodityId,
+      });
+      if (asJson) {
+        console.log(JSON.stringify({ tick: world.tick, lots: market }, null, 2));
+        return;
+      }
+      console.log(
+        `Career market tick=${world.tick}  lots=${market.length}  (${savePath})`,
+      );
+      for (const row of market.slice(0, 30)) {
+        const urgent = row.lot.urgency === 'urgent' ? ' URGENT' : '';
+        console.log(
+          `  ${row.lot.originIcao}→${row.lot.destIcao}  ${row.commodityName}  ${(row.availableKg / 1000).toFixed(1)}t  pay=$${row.lot.payUsd.toLocaleString()}${urgent}`,
+        );
+        console.log(`    ${row.lot.reason}`);
+      }
+      if (market.length > 30) {
+        console.log(`  … ${market.length - 30} more`);
+      }
+      return;
+    }
+
+    console.error(`Unknown career subcommand: ${sub}`);
+    process.exit(1);
   }
 
   if (command === 'compare-ofp') {

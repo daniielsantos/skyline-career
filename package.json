@@ -33,6 +33,7 @@
     "compare-ofp": "node packages/agent/dist/cli.js compare-ofp",
     "generate-ofp": "node packages/agent/dist/cli.js generate-ofp",
     "monitor-ofp": "node packages/agent/dist/cli.js monitor-ofp",
+    "career": "node packages/agent/dist/cli.js career",
     "test:shared": "npm run test -w @msfs-compat/shared",
     "test:agent": "npm run test -w @msfs-compat/agent",
     "pack:portable": "node scripts/pack-portable.mjs",

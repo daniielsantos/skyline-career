@@ -142,6 +142,33 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'Host snapshot currently includes stations 1–14 (covers all cargo indices)',
     ],
   },
+  {
+    id: 'toliss-a346',
+    icao: 'A346',
+    titlePattern: /ToLiss A346|A346 PRO/i,
+    familyPackRel: 'toliss-a346.json',
+    stationRoles: {
+      passengerStations: [3, 4, 5],
+      baggageStations: [6, 7],
+      crewStations: [1, 2],
+      // averagePassengerWeight: leave unset — resolve from OFP (payload−bags)/pax
+    },
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'Copilot', role: 'crew' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'Business class', role: 'passenger' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'Premium economy', role: 'passenger' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Economy class', role: 'passenger' },
+      { simVarIndex: 6, cfgIndex: 5, name: 'Forward baggage', role: 'baggage' },
+      { simVarIndex: 7, cfgIndex: 6, name: 'Rear baggage', role: 'baggage' },
+    ],
+    notes: [
+      'Aerosoft / ToLiss A346 PRO (Preset Pax) — flight_model station_load.0..6',
+      'Live: classic PAYLOAD STATION WEIGHT; fuel may use mass-balance (multi-tank)',
+      'SimBrief: A346 passenger airframe',
+      'Package has Pax preset only (no freighter)',
+    ],
+  },
 ];
 
 export function slugFromAircraftTitle(title: string): string {

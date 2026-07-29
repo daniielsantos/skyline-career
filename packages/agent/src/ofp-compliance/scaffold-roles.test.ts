@@ -43,3 +43,14 @@ describe('scaffold-roles TFDi MD-11F', () => {
     assert.deepEqual(h?.stationRoles.crewStations, [1, 2, 3]);
   });
 });
+
+describe('scaffold-roles ToLiss A346', () => {
+  it('matches Pax title and maps cabin/baggage stations', () => {
+    const h = matchHeuristic('ToLiss A346 PRO [Preset Pax]');
+    assert.equal(h?.id, 'toliss-a346');
+    assert.equal(h?.icao, 'A346');
+    assert.deepEqual(h?.stationRoles.passengerStations, [3, 4, 5]);
+    assert.deepEqual(h?.stationRoles.baggageStations, [6, 7]);
+    assert.deepEqual(h?.stationRoles.crewStations, [1, 2]);
+  });
+});

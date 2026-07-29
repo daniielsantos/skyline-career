@@ -21,13 +21,30 @@ Uses `https://www.simbrief.com/api/xml.fetcher.php?…&json=v2` (latest OFP only
 | `fuel.plan_ramp` | Block Fuel |
 | `fuel.enroute_burn` | Enroute Burn |
 | `weights.payload` | Payload |
-| `weights.bag_weight` (fallback `cargo`) | Baggage |
+| `weights.cargo` (≈ bag_count × bag_weight) | Baggage **total** |
+| `weights.bag_weight` | Average **per bag** (not used as total) |
 | `weights.pax_count` | Pass |
-| `weights.oew` | Empty Weight |
-| `weights.est_zfw` / `est_tow` / `est_ldw` | ZFW / TOW / LW |
-| `params.units` | `kgs` → kg, `lbs` → lb |
+| `weights.pax_weight` | Avg passenger weight |
 
-`--roles` supplies PMDG station map (pax zones / cargo) without using the sample weights.
+## Career loop (product)
+
+```text
+Flight type / mission params (pax, bags/cargo, …)
+        │
+        ▼
+  Generate OFP via SimBrief  ──►  block fuel + ZFW/TOW computed
+        │
+        ▼
+  User loads aircraft (EFB/FMC) to match OFP
+        │
+        ▼
+  Skyline fetch OFP + compare-ofp / monitor-ofp
+        │
+        ▼
+  pass / warn / fail  (career gate)
+```
+
+Today: **fetch + compare** is live. **Generate** OFP from career params (SimBrief dispatch API) is the next build step.
 
 | SimBrief | OFP JSON | Live source | Notes |
 |----------|----------|-------------|-------|

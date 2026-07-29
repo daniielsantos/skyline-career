@@ -64,7 +64,9 @@ export function unitsFromSimBrief(paramsUnits: string | undefined): OfpWeightUni
 
 /**
  * Map SimBrief OFP JSON (v2) → OfpExpectation.
- * Block fuel = plan_ramp; baggage prefers bag_weight then cargo.
+ * Block fuel = plan_ramp.
+ * Baggage total = `cargo` (or bag_count × bag_weight) — never bare `bag_weight`
+ * (that field is average kg/lb **per bag**).
  */
 export function mapSimBriefOfpToExpectation(
   ofp: SimBriefOfpJson,
@@ -76,14 +78,15 @@ export function mapSimBriefOfpToExpectation(
 
   const blockFuel = num(f.plan_ramp);
   const enrouteBurn = num(f.enroute_burn);
-  const passengerCount = num(w.pax_count);
-  // Load-sheet "Baggage" ≈ bag_weight; fall back to cargo if bags absent.
-  const baggage = num(w.bag_weight) ?? num(w.cargo);
+  const passengerCount = num(w.pax_count) ?? num(w.pax_count_actual);
   const payload = num(w.payload);
   const emptyWeight = num(w.oew);
   const zfw = num(w.est_zfw);
   const tow = num(w.est_tow);
   const lw = num(w.est_ldw);
+
+  const baggage = resolveSimBriefBaggageTotal(w);
+  const avgPaxFromSheet = num(w.pax_weight);
 
   const loadSheet: OfpLoadSheet = {
     unit,
@@ -103,6 +106,7 @@ export function mapSimBriefOfpToExpectation(
 
   const avgPax =
     opts.stationRoles?.averagePassengerWeight ??
+    avgPaxFromSheet ??
     (payload !== undefined &&
     baggage !== undefined &&
     passengerCount !== undefined &&
@@ -143,6 +147,27 @@ export function mapSimBriefOfpToExpectation(
     loadSheet,
     payload: payloadPlan,
   });
+}
+
+/**
+ * SimBrief `bag_weight` is per-bag; load-sheet Baggage total is `cargo`
+ * (≈ bag_count × bag_weight + freight_added).
+ */
+export function resolveSimBriefBaggageTotal(
+  w: Record<string, string | number | undefined>,
+): number | undefined {
+  const cargo = num(w.cargo);
+  const bagCount = num(w.bag_count) ?? num(w.bag_count_actual);
+  const bagWeight = num(w.bag_weight);
+  const freight = num(w.freight_added) ?? 0;
+
+  if (cargo !== undefined) {
+    return cargo;
+  }
+  if (bagCount !== undefined && bagWeight !== undefined) {
+    return bagCount * bagWeight + freight;
+  }
+  return undefined;
 }
 
 export async function fetchSimBriefLatestOfp(opts: SimBriefFetchOpts): Promise<{

@@ -22,9 +22,9 @@ export const DEFAULT_JET_A_LB_PER_GAL = 6.7;
 export const DEFAULT_OFP_TOLERANCES: OfpTolerances = {
   fuelAbsLb: 200,
   fuelPct: 0.02,
-  payloadAbsLb: 50,
-  weightAbsLb: 200,
-  passengerCountAbs: 0,
+  payloadAbsLb: 200,
+  weightAbsLb: 300,
+  passengerCountAbs: 2,
   maxFuelIncreaseLb: 0,
 };
 

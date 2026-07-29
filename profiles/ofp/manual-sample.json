@@ -24,8 +24,8 @@
     "unit": "kg",
     "total": 18114,
     "stationRoles": {
-      "passengerStations": [],
-      "baggageStations": [],
+      "passengerStations": [1, 2, 3, 4],
+      "baggageStations": [5, 6],
       "averagePassengerWeight": 84
     }
   },

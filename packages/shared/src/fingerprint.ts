@@ -27,6 +27,8 @@ export function normalizeAircraftTitle(title: string): string {
   // Cabin packs often append "<Name> Interior" (e.g. "Manchester Interior").
   // Only strip alphabetic name tokens (1–2 words) before Interior — never model tokens like "300E".
   t = t.replace(/\s+(?:[A-Za-z][\w\-]*\s+){1,2}Interior$/i, '');
+  // Trailing "Livery 1" / "- Livery 2" (common payware paint titles)
+  t = t.replace(/\s*-?\s*livery\s*\d+$/i, '');
   // Trailing "livery" / "paint" tokens
   t = t.replace(/\s+(?:livery|paint|repaint)$/i, '');
   // Leftover punctuation after registration strip ("Cessna C680:")
@@ -39,12 +41,25 @@ const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\bblack\s*square\b/i, publisher: 'blacksquare' },
   { re: /\bfs\s*reborn\b|\bfsreborn\b/i, publisher: 'fsreborn' },
   { re: /\bnext\s*gen\s*sim\b|\bnextgensim\b/i, publisher: 'nextgensim' },
+  { re: /\bflight\s*fx\b|\bflightfx\b/i, publisher: 'flightfx' },
   { re: /\bpmdg\b/i, publisher: 'pmdg' },
   { re: /\bfenix\b/i, publisher: 'fenix' },
   { re: /\binibuilds\b/i, publisher: 'inibuilds' },
   { re: /\bworking\s*title\b/i, publisher: 'workingtitle' },
   { re: /\basobo\b/i, publisher: 'asobo' },
 ];
+
+/** Known catalog publisher slugs (title hints + common MSFS vendors). */
+export const KNOWN_PUBLISHERS: readonly string[] = [
+  ...new Set([
+    ...TITLE_PUBLISHER_HINTS.map((h) => h.publisher),
+    'asobo',
+    'flightfx',
+    'hype',
+    'miltech',
+    'orbx',
+  ]),
+].sort((a, b) => a.localeCompare(b));
 
 /**
  * Infer catalog publisher slug. Explicit override wins; otherwise title hints;

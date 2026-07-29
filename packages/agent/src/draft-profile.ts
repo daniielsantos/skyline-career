@@ -13,6 +13,11 @@ export interface DraftOptions {
   /** Confirmed ICAO type designator (SimBrief / catalog). */
   icao?: string;
   fuelOffset?: number;
+  /**
+   * When set (from discoverClassicFuelTanks), only these classic tank ids are drafted
+   * on the classic fallback path (capacity already validated + writable).
+   */
+  liveTankIds?: string[];
 }
 
 function slugify(value: string): string {
@@ -37,6 +42,8 @@ function titleSlugForKey(title: string): string {
       .replace(/^fenix\s+/i, '')
       .replace(/^inibuilds\s+/i, '')
       .replace(/^working\s*title\s+/i, '')
+      .replace(/^flight\s*fx\s+/i, '')
+      .replace(/^flightfx\s+/i, '')
       .replace(/^asobo\s+/i, ''),
   );
 }
@@ -137,7 +144,36 @@ export async function draftProfileFromLive(
         capacityVar: 'FUEL TANK CENTER2 CAPACITY',
         quantityVar: 'FUEL TANK CENTER2 QUANTITY',
       },
+      {
+        id: 'LEFT_AUX',
+        name: 'Left Aux',
+        capacityVar: 'FUEL TANK LEFT AUX CAPACITY',
+        quantityVar: 'FUEL TANK LEFT AUX QUANTITY',
+      },
+      {
+        id: 'RIGHT_AUX',
+        name: 'Right Aux',
+        capacityVar: 'FUEL TANK RIGHT AUX CAPACITY',
+        quantityVar: 'FUEL TANK RIGHT AUX QUANTITY',
+      },
+      {
+        id: 'LEFT_TIP',
+        name: 'Left Tip',
+        capacityVar: 'FUEL TANK LEFT TIP CAPACITY',
+        quantityVar: 'FUEL TANK LEFT TIP QUANTITY',
+      },
+      {
+        id: 'RIGHT_TIP',
+        name: 'Right Tip',
+        capacityVar: 'FUEL TANK RIGHT TIP CAPACITY',
+        quantityVar: 'FUEL TANK RIGHT TIP QUANTITY',
+      },
     ];
+
+    const liveFilter =
+      options.liveTankIds && options.liveTankIds.length > 0
+        ? new Set(options.liveTankIds)
+        : null;
 
     let totalCapacity = 0;
     try {
@@ -147,6 +183,8 @@ export async function draftProfileFromLive(
     }
 
     for (const slot of classicSlots) {
+      if (liveFilter && !liveFilter.has(slot.id)) continue;
+
       let capacity = 0;
       try {
         capacity = await bridge.readSimVar({ name: slot.capacityVar, unit: 'gallons' });
@@ -158,7 +196,8 @@ export async function draftProfileFromLive(
       if (
         (!Number.isFinite(capacity) || capacity < 5) &&
         (slot.id === 'LEFT_MAIN' || slot.id === 'RIGHT_MAIN') &&
-        totalCapacity >= 10
+        totalCapacity >= 10 &&
+        !liveFilter
       ) {
         capacity = totalCapacity / 2;
       }

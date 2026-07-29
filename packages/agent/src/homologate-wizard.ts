@@ -2,13 +2,18 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import type { AircraftProfile } from '@msfs-compat/shared';
-import { normalizeAircraftTitle } from '@msfs-compat/shared';
+import { normalizeAircraftTitle, inferPublisher } from '@msfs-compat/shared';
 import { buildSmokeStationTargets } from './smoke-targets.js';
 import { calibrateProfile } from './calibrate-profile.js';
 import { draftProfileFromVendorRecipe } from './draft-from-recipe.js';
 import { draftProfileFromLive } from './draft-profile.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
-import { confirm, printKv, printSection, withPrompts } from './prompt.js';
+import { confirm, chooseFromList, printKv, printSection, withPrompts } from './prompt.js';
+import { listCatalogPublishers } from './catalog-publishers.js';
+import {
+  discoverClassicFuelTanks,
+  liveFuelTanks,
+} from './discover-fuel-tanks.js';
 import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProfile } from './promote-profile.js';
 import { probeLVars } from './probe-lvars.js';
 import {
@@ -57,14 +62,6 @@ function formatGalLbs(gal: number | null | undefined, lbPerGal: number): string 
   const n = typeof gal === 'number' ? gal : Number(gal);
   if (!Number.isFinite(n)) return '—';
   return `${roundFuel(n)} gal (${roundFuel(n * lbPerGal)} lb)`;
-}
-
-function formatPairGalLbs(
-  left: number | null | undefined,
-  right: number | null | undefined,
-  lbPerGal: number,
-): string {
-  return `${formatGalLbs(left, lbPerGal)} / ${formatGalLbs(right, lbPerGal)}`;
 }
 
 /** Compact fuel line for profile tanks: `LEFT_MAIN 24 gal · RIGHT_TIP 8 gal · …` */
@@ -178,14 +175,8 @@ function formatStationsLine(stations: StationWeight[]): string {
   return stations.map((s) => `${s.index}=${roundFuel(s.lb)}`).join(' ');
 }
 
-async function runWritetest(bridge: NamedPipeSimBridge): Promise<WritetestOutcome[]> {
+async function runPayloadWritetest(bridge: NamedPipeSimBridge): Promise<WritetestOutcome[]> {
   const tests: Array<{ name: string; unit: string; value: number }> = [
-    { name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: 40 },
-    { name: 'FUEL TANK LEFT MAIN QUANTITY', unit: 'gallons', value: 35 },
-    { name: 'FUEL TANK RIGHT MAIN QUANTITY', unit: 'gallons', value: 35 },
-    { name: 'FUEL TANK CENTER QUANTITY', unit: 'gallons', value: 20 },
-    { name: 'FUEL TANK LEFT AUX QUANTITY', unit: 'gallons', value: 15 },
-    { name: 'FUEL TANK RIGHT AUX QUANTITY', unit: 'gallons', value: 15 },
     { name: 'PAYLOAD STATION WEIGHT:1', unit: 'pounds', value: 180 },
     { name: 'PAYLOAD STATION WEIGHT:3', unit: 'pounds', value: 50 },
   ];
@@ -374,6 +365,18 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     ]);
     console.log('  Tip: strip livery/cabin names from match title (shared across paints).');
     const matchTitle = (await ask('Catalog match title', suggestedTitle)).trim() || suggestedTitle;
+    const suggestedPublisher = inferPublisher(
+      matchTitle,
+      process.env.MSFS_COMPAT_PUBLISHER,
+    );
+    const publishers = await listCatalogPublishers(repoRoot);
+    const matchPublisher = await chooseFromList(
+      ask,
+      'Catalog publisher (profileKey prefix)',
+      publishers,
+      { defaultValue: suggestedPublisher, otherLabel: 'other (type custom slug)' },
+    );
+    printKv([['catalog publisher', matchPublisher]]);
     const suggestedIcao = cleanIcaoCode({
       icao: identity.icao,
       atcModel: identity.atcModel,
@@ -432,9 +435,30 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       console.log('  → FUELSYSTEM may be live — draft will prefer it when capacity >= 5.');
     }
 
-    printSection('3/5 Writetest');
-    console.log('  Writing sample values (mains/center/aux/stations)...');
-    const outcomes = await runWritetest(bridge);
+    printSection('3/5 Tank discovery + writetest');
+    console.log('  Probing classic fuel slots (read capacity → write probe → restore)...');
+    const fuelProbes = await discoverClassicFuelTanks(bridge);
+    const liveTanks = liveFuelTanks(fuelProbes);
+    for (const p of fuelProbes) {
+      const capStr = p.capacity !== null ? formatGalLbs(p.capacity, lbPerGal) : 'cap?—';
+      if (p.live) {
+        console.log(`  ✓ ${p.id.padEnd(10)} ${capStr}  writable (restored)`);
+      } else if (p.writable && !p.hasCapacity) {
+        console.log(`  · ${p.id.padEnd(10)} ghost write (cap < 5) — skipped`);
+      } else if (p.hasCapacity && !p.writable) {
+        console.log(`  ✗ ${p.id.padEnd(10)} ${capStr}  write ignored`);
+      } else {
+        console.log(`  · ${p.id.padEnd(10)} inactive${p.note ? ` (${p.note})` : ''}`);
+      }
+    }
+    console.log(
+      liveTanks.length > 0
+        ? `  → Live tanks for draft: ${liveTanks.map((t) => t.id).join(', ')}`
+        : '  → No classic tanks responded (capacity≥5 + writable).',
+    );
+
+    console.log('  Payload station sample writes...');
+    const outcomes = await runPayloadWritetest(bridge);
     const matched = outcomes.filter((o) => o.matched);
     const failed = outcomes.filter((o) => !o.matched);
     for (const o of matched) {
@@ -447,15 +471,27 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
           : '';
       console.log(`  ✗ ${o.var}${stuck}`);
     }
-    const mainsOk = matched.some((o) => o.var.includes('LEFT MAIN')) && matched.some((o) => o.var.includes('RIGHT MAIN'));
-    const centerOk = matched.some((o) => o.var.includes('CENTER QUANTITY'));
-    const auxWriteOk =
-      matched.some((o) => o.var.includes('LEFT AUX')) && matched.some((o) => o.var.includes('RIGHT AUX'));
-    // Many airframes accept AUX SimVar writes even with 0 capacity (ghost tanks). Only offer
-    // inclusion when probe shows real AUX capacity (e.g. Starship Aft ~88 gal).
-    const auxCapacityReal =
-      (leftAuxCap !== null && leftAuxCap >= 5) || (rightAuxCap !== null && rightAuxCap >= 5);
-    if (!mainsOk && !(fs1 && fs1 >= 5)) {
+
+    let fsWriteOk = false;
+    try {
+      const beforeFs = await bridge.readSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons' });
+      await bridge.writeSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: 40 });
+      await bridge.delay(350);
+      const afterFs = await bridge.readSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons' });
+      fsWriteOk = Math.abs(afterFs - 40) <= Math.max(2, 40 * 0.05);
+      await bridge.writeSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: beforeFs });
+      await bridge.delay(200);
+      console.log(
+        fsWriteOk ? '  ✓ FUELSYSTEM TANK QUANTITY:1 writable' : '  ✗ FUELSYSTEM TANK QUANTITY:1 write ignored',
+      );
+    } catch {
+      console.log('  · FUELSYSTEM TANK QUANTITY:1 unreadable/unwritable');
+    }
+
+    const mainsOk =
+      liveTanks.some((t) => t.id === 'LEFT_MAIN') && liveTanks.some((t) => t.id === 'RIGHT_MAIN');
+    const centerOk = liveTanks.some((t) => t.id === 'CENTER');
+    if (!mainsOk && !(fs1 && fs1 >= 5) && !fsWriteOk) {
       console.log('  Fuel writes failed — SimConnect QUANTITY sets did not stick.');
 
       const recipesDir = join(repoRoot, 'profiles', 'vendors');
@@ -657,17 +693,14 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       );
     }
 
-    let includeAux = false;
-    if (auxWriteOk && auxCapacityReal) {
-      includeAux = await confirm(
-        ask,
-        'AUX/Aft tanks have capacity and are writable. Include them in the profile',
-        true,
-      );
-    } else if (auxWriteOk && !auxCapacityReal) {
-      console.log(
-        '  AUX SimVars accepted writes but capacity is 0 — treating as ghost tanks (not offered).',
-      );
+    // AUX/TIP already in liveTanks when capacity≥5 + writable — no separate confirm.
+    const includeAux = liveTanks.some((t) => t.id === 'LEFT_AUX' || t.id === 'RIGHT_AUX');
+    if (includeAux) {
+      console.log('  AUX tanks detected live — will be included in draft.');
+    }
+    const tipLive = liveTanks.some((t) => t.id === 'LEFT_TIP' || t.id === 'RIGHT_TIP');
+    if (tipLive) {
+      console.log('  TIP tanks detected live — will be included in draft.');
     }
 
     if (!(await confirm(ask, 'Continue to draft + calibrate', true))) {
@@ -680,23 +713,24 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       outDir: draftsDir,
       matchTitle,
       icao: matchIcao,
+      publisher: matchPublisher,
+      liveTankIds: liveTanks.map((t) => t.id),
     });
     let profile = drafted.profile;
-    if (includeAux) {
-      const leftCapGuess =
-        leftAuxCap && leftAuxCap >= 5
-          ? leftAuxCap
-          : Math.max(leftAuxQty ?? 0, 15);
-      const rightCapGuess =
-        rightAuxCap && rightAuxCap >= 5
-          ? rightAuxCap
-          : Math.max(rightAuxQty ?? 0, 15);
-      profile = await ensureAuxTanks(profile, {
-        left: leftCapGuess,
-        right: rightCapGuess,
-      });
-      await writeFile(drafted.path, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
-      console.log('  AUX tanks added to draft.');
+    // Safety net: if discovery missed AUX but probe capacities said real, still allow ensureAux.
+    if (
+      !includeAux &&
+      ((leftAuxCap !== null && leftAuxCap >= 5) || (rightAuxCap !== null && rightAuxCap >= 5))
+    ) {
+      const addAux = await confirm(ask, 'AUX capacity ≥5 but write probe failed earlier. Force-include AUX', false);
+      if (addAux) {
+        profile = await ensureAuxTanks(profile, {
+          left: leftAuxCap && leftAuxCap >= 5 ? leftAuxCap : Math.max(leftAuxQty ?? 0, 15),
+          right: rightAuxCap && rightAuxCap >= 5 ? rightAuxCap : Math.max(rightAuxQty ?? 0, 15),
+        });
+        await writeFile(drafted.path, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
+        console.log('  AUX tanks force-added to draft.');
+      }
     }
 
     const calibration = await calibrateProfile(bridge, drafted.path);
@@ -722,18 +756,9 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['fuel ok', smoke.apply.fuel?.success],
       ['payload ok', smoke.apply.payload?.success],
       ['cg ok', 'cg' in smoke.apply ? smoke.apply.cg?.ok : undefined],
-      [
-        'targets L/R',
-        formatPairGalLbs(smoke.targets.LEFT_MAIN, smoke.targets.RIGHT_MAIN, lbPerGal),
-      ],
-      [
-        'before L/R',
-        formatPairGalLbs(smoke.beforeFuel.LEFT_MAIN, smoke.beforeFuel.RIGHT_MAIN, lbPerGal),
-      ],
-      [
-        'after L/R',
-        formatPairGalLbs(smoke.afterFuel.LEFT_MAIN, smoke.afterFuel.RIGHT_MAIN, lbPerGal),
-      ],
+      ['targets', formatProfileFuelLine(profile, smoke.targets, lbPerGal)],
+      ['before', formatProfileFuelLine(profile, smoke.beforeFuel, lbPerGal)],
+      ['after', formatProfileFuelLine(profile, smoke.afterFuel, lbPerGal)],
       [
         'payload tgt',
         `${formatLb(Object.values(smoke.payloadTargets).reduce((a, b) => a + b, 0))} · ${formatStationsLine(
@@ -762,24 +787,37 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       return;
     }
 
-    const left = Number(
-      await ask(`Test apply left main gal (~${roundFuel(40 * lbPerGal)} lb @ dens)`, '40'),
-    );
-    const right = Number(
-      await ask(`Test apply right main gal (~${roundFuel(40 * lbPerGal)} lb @ dens)`, '40'),
-    );
+    const tanksApply: Record<string, number> = {};
+    for (const tank of profile.fuel.tanks) {
+      const def =
+        tank.id === 'LEFT_MAIN' || tank.id === 'RIGHT_MAIN'
+          ? '40'
+          : tank.id === 'CENTER'
+            ? '20'
+            : /TIP|AUX/i.test(tank.id)
+              ? '10'
+              : '20';
+      tanksApply[tank.id] = Number(
+        await ask(
+          `Test apply ${tank.name ?? tank.id} gal (~${roundFuel(Number(def) * lbPerGal)} lb)`,
+          def,
+        ),
+      );
+    }
     const engine = new DefaultProfileEngine({ profile, bridge });
-    const tanks: Record<string, number> = { LEFT_MAIN: left, RIGHT_MAIN: right };
-    if (profile.fuel.tanks.some((t) => t.id === 'LEFT_AUX')) {
-      tanks.LEFT_AUX = Number(await ask('Test apply left aux gal', '0'));
-    }
-    if (profile.fuel.tanks.some((t) => t.id === 'RIGHT_AUX')) {
-      tanks.RIGHT_AUX = Number(await ask('Test apply right aux gal', '0'));
-    }
-    const apply = await engine.applyLoadPlan({ fuel: { tanks } });
+    const apply = await engine.applyLoadPlan({
+      fuel: { tanks: tanksApply },
+      payload: { stations: { 1: 180 }, total: 180 },
+    });
+    const afterApplySnap = await bridge.snapshot();
+    const payloadNow = await readProfileStationWeights(bridge, profile, afterApplySnap);
     printKv([
       ['apply fuel', apply.fuel?.success],
-      ['apply L/R', formatPairGalLbs(left, right, lbPerGal)],
+      [
+        'apply payload',
+        `${apply.payload?.success} · ${formatLb(payloadNow.totalLb)} · ${formatStationsLine(payloadNow.stations)}`,
+      ],
+      ['apply tanks', formatProfileFuelLine(profile, tanksApply, lbPerGal)],
       ['apply cg', 'cg' in apply ? apply.cg?.ok : undefined],
     ]);
 
@@ -822,6 +860,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     console.log('');
     console.log('Next:');
     console.log('  node packages/agent/dist/cli.js resolve');
-    console.log('  node packages/agent/dist/cli.js apply-auto --fuel-left 20 --fuel-right 20');
+    console.log(applyAutoHint(promoted.profile));
+    return;
   });
 }

@@ -24,6 +24,13 @@ import {
 import { buildOfpExpectation, applyOfpOverrides, loadStationRolesFromFile } from './ofp-compliance/parse-ofp.js';
 import { compareOnce, formatComplianceSummary } from './ofp-compliance/run-compare.js';
 import { fetchSimBriefLatestOfp } from './ofp-compliance/simbrief-fetch.js';
+import {
+  buildRolesPackFromHeuristic,
+  matchHeuristic,
+  resolveRolesPackForTitle,
+  slugFromAircraftTitle,
+  writeRolesPack,
+} from './ofp-compliance/scaffold-roles.js';
 import { type ComplianceBaseline, type LiveFuelState } from '@msfs-compat/shared';
 
 const agentDir = dirname(fileURLToPath(import.meta.url));
@@ -31,7 +38,7 @@ const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|pmdg-cdu|compare-ofp|monitor-ofp|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|pmdg-cdu|compare-ofp|monitor-ofp|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -44,6 +51,7 @@ function usage(): never {
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
   msfs-compat-agent probe-payload-stations [--pipe <name>]
+  msfs-compat-agent scaffold-ofp-roles [--write] [--out path.json] [--pipe <name>]
   msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
@@ -55,8 +63,9 @@ Notes:
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
+  scaffold-ofp-roles: detect known family from live title and print/write roles pack
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
-  compare-ofp / monitor-ofp: fetch latest SimBrief OFP (--simbrief-user) or local --ofp JSON, then compare to live
+  compare-ofp / monitor-ofp: fetch latest SimBrief OFP; omit --roles to auto-pick pack from aircraft title
 `);
   process.exit(1);
 }
@@ -102,9 +111,12 @@ function getNumberFlag(args: string[], name: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-async function resolveOfpFromArgs(args: string[]) {
+async function resolveOfpFromArgs(
+  args: string[],
+  opts: { aircraftTitle?: string } = {},
+) {
   const ofpPath = getFlag(args, '--ofp');
-  const rolesPath = getFlag(args, '--roles') ?? ofpPath;
+  let rolesPath = getFlag(args, '--roles') ?? ofpPath;
   const simbriefUser =
     getFlag(args, '--simbrief-user') ?? process.env.SIMBRIEF_USERNAME ?? undefined;
   const simbriefUserid =
@@ -130,6 +142,26 @@ async function resolveOfpFromArgs(args: string[]) {
     icao: getFlag(args, '--icao'),
     ofpId: getFlag(args, '--ofp-id'),
   };
+
+  if (!rolesPath && opts.aircraftTitle) {
+    const ofpDir = join(repoRoot, 'profiles', 'ofp');
+    const resolved = await resolveRolesPackForTitle(opts.aircraftTitle, ofpDir);
+    if (resolved) {
+      rolesPath = resolved.path;
+      console.log(`Auto roles: ${resolved.via} ← ${opts.aircraftTitle}`);
+    } else {
+      const heuristic = matchHeuristic(opts.aircraftTitle);
+      if (heuristic) {
+        console.log(
+          `No roles pack on disk for "${opts.aircraftTitle}" (heuristic ${heuristic.id}). Run: npm run scaffold-ofp-roles -- --write`,
+        );
+      } else {
+        console.log(
+          `No roles pack matched for "${opts.aircraftTitle}" — payload/pax/bags checks may warn.`,
+        );
+      }
+    }
+  }
 
   const stationRoles = rolesPath ? await loadStationRolesFromFile(rolesPath) : undefined;
 
@@ -792,22 +824,85 @@ async function main(): Promise<void> {
         );
       }
 
-      console.log('Stations (PMDG 738 SSW TC hint: 1-4 pax, 5-6 cargo inflated vs EFB, 7-8 crew):');
+      console.log('Stations (PMDG 738 PAX hint: 1-4 pax, 5-6 cargo, 7-9 crew, 10-11 galley):');
       for (const s of stations) {
         const hint =
           s.index <= 4
             ? 'pax?'
             : s.index <= 6
               ? 'cargo? (prefer EFB ZFW residual)'
-              : s.index <= 8
+              : s.index <= 9
                 ? 'crew?'
                 : s.index <= 11
-                  ? 'galley/other?'
+                  ? 'galley?'
                   : '';
         console.log(
           `  ${String(s.index).padStart(2)}: ${s.lb.toFixed(1).padStart(10)} lb  ${hint}`,
         );
       }
+    });
+    return;
+  }
+
+  if (command === 'scaffold-ofp-roles') {
+    const doWrite = hasFlag(rest, '--write');
+    await withBridge(pipeName, async (bridge) => {
+      const identity = await bridge.getAircraftIdentity();
+      const title = identity.title;
+      console.log(`Aircraft: ${title}`);
+      const heuristic = matchHeuristic(title);
+      if (!heuristic) {
+        console.error(
+          'No known family heuristic for this title. Map stations manually (see profiles/notes/ofp-homologation.md).',
+        );
+        process.exitCode = 2;
+        return;
+      }
+
+      const ofpDir = join(repoRoot, 'profiles', 'ofp');
+      const existing = await resolveRolesPackForTitle(title, ofpDir);
+      if (existing) {
+        console.log(`Already covered: ${existing.via}`);
+        console.log(`  pack: ${existing.path}`);
+        console.log('Next: Load from Simbrief, then:');
+        console.log(`  npm run compare-ofp -- --simbrief-user YOUR_ALIAS`);
+        return;
+      }
+
+      const pack = buildRolesPackFromHeuristic(title, heuristic);
+      const defaultOut = heuristic.familyPackRel
+        ? join(ofpDir, heuristic.familyPackRel)
+        : join(ofpDir, `${slugFromAircraftTitle(title)}.json`);
+      const outPath = resolve(getFlag(rest, '--out') ?? defaultOut);
+
+      console.log(`Heuristic: ${heuristic.id} (icao ${heuristic.icao})`);
+      console.log(`Roles: pax=${heuristic.stationRoles.passengerStations?.join(',')} bags=${heuristic.stationRoles.baggageStations?.join(',')} crew=${heuristic.stationRoles.crewStations?.join(',')} service=${heuristic.stationRoles.serviceStations?.join(',')}`);
+
+      if (doWrite) {
+        // If writing family pack, merge this title into matchTitles when file exists.
+        let toWrite = pack;
+        try {
+          const prev = JSON.parse(await readFile(outPath, 'utf8')) as {
+            matchTitles?: string[];
+            payload?: { stationRoles?: unknown };
+          };
+          const titles = new Set([...(prev.matchTitles ?? []), title]);
+          toWrite = {
+            ...prev,
+            ...pack,
+            matchTitles: [...titles],
+            payload: pack.payload,
+          };
+        } catch {
+          // new file
+        }
+        await writeRolesPack(outPath, toWrite);
+        console.log(`Wrote ${outPath}`);
+      } else {
+        console.log(JSON.stringify(pack, null, 2));
+        console.log('\nDry-run only. Add --write to save the family/roles pack.');
+      }
+      console.log('Next: Load from Simbrief, then npm run compare-ofp -- --simbrief-user YOUR_ALIAS');
     });
     return;
   }
@@ -904,10 +999,11 @@ async function main(): Promise<void> {
   if (command === 'compare-ofp') {
     const locked = hasFlag(rest, '--lock');
     const asJson = hasFlag(rest, '--json');
-    const ofp = await resolveOfpFromArgs(rest);
-    const { snapshot } = await withBridge(pipeName, (bridge) =>
-      compareOnce(bridge, { ofp, locked }),
-    );
+    const { snapshot } = await withBridge(pipeName, async (bridge) => {
+      const title = (await bridge.getAircraftIdentity()).title;
+      const ofp = await resolveOfpFromArgs(rest, { aircraftTitle: title });
+      return compareOnce(bridge, { ofp, locked });
+    });
     if (asJson) {
       console.log(JSON.stringify(snapshot, null, 2));
     } else {
@@ -926,7 +1022,6 @@ async function main(): Promise<void> {
     const asJson = hasFlag(rest, '--json');
     const intervalSec = getNumberFlag(rest, '--interval') ?? 5;
     const intervalMs = Math.max(1, intervalSec) * 1000;
-    const ofp = await resolveOfpFromArgs(rest);
 
     let baseline: ComplianceBaseline | undefined;
     let previousFuel: LiveFuelState | undefined;
@@ -944,6 +1039,9 @@ async function main(): Promise<void> {
     );
 
     await withBridge(pipeName, async (bridge) => {
+      const title = (await bridge.getAircraftIdentity()).title;
+      const ofp = await resolveOfpFromArgs(rest, { aircraftTitle: title });
+
       while (!stop) {
         const nowMs = Date.now();
         const { snapshot, live, nextBaseline } = await compareOnce(bridge, {

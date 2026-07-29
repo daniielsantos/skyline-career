@@ -46,6 +46,9 @@ Flight type / mission params (pax, bags/cargo, …)
 
 Today: **fetch + compare** is live. **Generate** OFP from career params (SimBrief dispatch API) is the next build step.
 
+**Homologating a new airframe?** See [`ofp-homologation.md`](./ofp-homologation.md).  
+PMDG 737-800 PAX: `npm run scaffold-ofp-roles` then `compare-ofp` (auto roles — no `--roles` needed).
+
 | SimBrief | OFP JSON | Live source | Notes |
 |----------|----------|-------------|-------|
 | **Block Fuel** | `loadSheet.blockFuel` (fills `fuel.total`) | PMDG `FUEL_Qty*` sum (lb) or classic gallons × 6.7 | Primary fuel check at gate |

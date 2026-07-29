@@ -1,0 +1,54 @@
+{
+  "source": "simbrief",
+  "icao": "B738",
+  "ofpId": "pmdg-738-pax-family",
+  "matchTitlePattern": "737-800\\s+PAX",
+  "matchTitles": [
+    "737-800 PAX SSW TC",
+    "737-800 PAX BW TC"
+  ],
+  "notes": [
+    "Shared roles for PMDG 737-800 PAX cabin layouts (SSW TC, BW TC, …)",
+    "SimConnect PAYLOAD STATION WEIGHT:n is 1-based (station_load.0 → :1)",
+    "PaxZone1..4 / Fwd+Aft cargo / crew / galley — same indices across these titles",
+    "After EFB Load from Simbrief, classic cargo may inflate — live uses L:ZFW_Lvar / L:GW_Lvar",
+    "compare-ofp auto-picks this pack when --roles is omitted and title matches"
+  ],
+  "fuel": {
+    "unit": "kg"
+  },
+  "loadSheet": {
+    "unit": "kg"
+  },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [1, 2, 3, 4],
+      "baggageStations": [5, 6],
+      "crewStations": [7, 8, 9],
+      "serviceStations": [10, 11],
+      "averagePassengerWeight": 86.18
+    }
+  },
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1", "role": "passenger" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2", "role": "passenger" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "PaxZone3", "role": "passenger" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "PaxZone4", "role": "passenger" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Fwd Cargo", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Aft Cargo", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Instructor", "role": "crew" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "fwd_gly", "role": "galley" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "aft_gly", "role": "galley" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

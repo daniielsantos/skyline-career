@@ -96,6 +96,7 @@ describe('enrichPayloadWithRoles', () => {
     );
     assert.equal(enriched.baggageLb, 500);
     assert.equal(enriched.passengerWeightLb, 340);
+    assert.equal(enriched.ofpPayloadLb, 840);
     assert.equal(enriched.estimatedPassengerCount, 2);
   });
 });
@@ -201,49 +202,73 @@ describe('compareOfpToLive preflight', () => {
     assert.ok(snap.findings.some((f) => f.code === 'PAX_COUNT_UNMAPPED'));
   });
 
-  it('compares ZFW/TOW/empty from load sheet', () => {
+  it('compares payload as pax+bags when roles enrich live state', () => {
     const ofp = normalizeOfpExpectation({
       source: 'simbrief',
       fuel: { unit: 'kg', total: 5291 },
       loadSheet: {
         unit: 'kg',
         blockFuel: 5291,
-        emptyWeight: 42_264,
-        zfw: 60_378,
-        tow: 65_669, // empty + payload + block = 42264+18114+5291
         payload: 18_114,
+        baggage: 4066,
+        passengerCount: 163,
+      },
+      payload: {
+        unit: 'kg',
+        total: 18_114,
+        stationRoles: {
+          passengerStations: [1, 2, 3, 4],
+          baggageStations: [5, 6],
+          averagePassengerWeight: 86,
+        },
       },
     });
-    const fuelLb = toApproxLb(5291);
-    const emptyLb = toApproxLb(42_264);
     const payloadLb = toApproxLb(18_114);
-    const zfwLb = emptyLb + payloadLb;
-    const towLb = zfwLb + fuelLb;
+    const bagsLb = toApproxLb(4066);
+    const paxLb = payloadLb - bagsLb;
     const snap = compareOfpToLive({
       ofp,
-      liveFuel: makeFuel({ total: fuelLb }),
+      liveFuel: makeFuel({ total: toApproxLb(5291) }),
       livePayload: {
         source: 'classic-stations',
         unit: 'lb',
         stations: {},
-        total: payloadLb,
-      },
-      liveWeights: {
-        source: 'classic-weights',
-        unit: 'lb',
-        emptyLb,
-        grossLb: towLb,
-        zfwLb,
-        fuelLb,
-        payloadLb,
+        total: payloadLb + 2000, // crew/galley noise in full sum
+        ofpPayloadLb: payloadLb,
+        baggageLb: bagsLb,
+        passengerWeightLb: paxLb,
+        estimatedPassengerCount: 163,
       },
       phase: 'preflight',
     });
     assert.equal(
       snap.verdict,
       'pass',
-      snap.findings.map((f) => `${f.code}:${f.message}`).join(' | '),
+      snap.findings.map((f) => `${f.severity}:${f.code}`).join(' | '),
     );
+  });
+
+  it('warns on empty weight mismatch instead of fail', () => {
+    const ofp = normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit: 'lb', total: 10_000 },
+      loadSheet: { unit: 'lb', blockFuel: 10_000, emptyWeight: 93_000 },
+    });
+    const snap = compareOfpToLive({
+      ofp,
+      liveFuel: makeFuel({ total: 10_000 }),
+      liveWeights: {
+        source: 'classic-weights',
+        unit: 'lb',
+        emptyLb: 91_300,
+        grossLb: 120_000,
+        zfwLb: 110_000,
+        fuelLb: 10_000,
+      },
+      phase: 'preflight',
+    });
+    assert.ok(snap.findings.some((f) => f.code === 'EMPTY_WEIGHT' && f.severity === 'warn'));
+    assert.equal(snap.verdict, 'warn');
   });
 });
 

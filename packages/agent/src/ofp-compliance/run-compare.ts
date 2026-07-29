@@ -2,6 +2,7 @@ import {
   captureBaseline,
   compareOfpToLive,
   deriveCompliancePhase,
+  resolveAveragePassengerWeight,
   type ComplianceBaseline,
   type ComplianceSnapshot,
   type LiveFuelState,
@@ -27,10 +28,19 @@ export async function compareOnce(
   live: Awaited<ReturnType<typeof readLiveLoad>>;
   nextBaseline?: ComplianceBaseline;
 }> {
+  const baseRoles = opts.ofp.payload?.stationRoles;
+  const resolvedAvg = resolveAveragePassengerWeight(opts.ofp);
+  const stationRoles =
+    baseRoles && resolvedAvg && baseRoles.averagePassengerWeight === undefined
+      ? { ...baseRoles, averagePassengerWeight: resolvedAvg.weight }
+      : baseRoles;
+  const roleWeightUnit =
+    resolvedAvg?.unit ?? opts.ofp.payload?.unit ?? opts.ofp.loadSheet?.unit ?? 'lb';
+
   const live = await readLiveLoad(bridge, {
     densityLbPerGal: opts.densityLbPerGal,
-    stationRoles: opts.ofp.payload?.stationRoles,
-    roleWeightUnit: opts.ofp.payload?.unit ?? opts.ofp.loadSheet?.unit ?? 'lb',
+    stationRoles,
+    roleWeightUnit,
   });
   const phase = deriveCompliancePhase(
     { onGround: live.onGround, enginesRunning: live.enginesRunning },
@@ -66,9 +76,15 @@ export function formatComplianceSummary(snap: ComplianceSnapshot): string {
   ];
   if (snap.livePayload) {
     const p = snap.livePayload;
-    let payloadLine = `  live payload total lb: ${p.total.toFixed(1)}`;
+    let payloadLine = `  live stations sum lb: ${p.total.toFixed(1)}`;
+    if (p.ofpPayloadLb !== undefined) {
+      payloadLine += `  ofpPayload(pax+bags)=${p.ofpPayloadLb.toFixed(1)}`;
+    }
     if (p.baggageLb !== undefined) {
       payloadLine += `  baggage=${p.baggageLb.toFixed(1)}`;
+    }
+    if (p.passengerWeightLb !== undefined) {
+      payloadLine += `  paxWt=${p.passengerWeightLb.toFixed(1)}`;
     }
     if (p.estimatedPassengerCount !== undefined) {
       payloadLine += `  pax~${p.estimatedPassengerCount}`;

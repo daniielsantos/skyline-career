@@ -32,7 +32,7 @@
     "stationRoles": {
       "passengerStations": [1, 2, 3, 4],
       "baggageStations": [5, 6],
-      "averagePassengerWeight": 84
+      "averagePassengerWeight": 86.18
     }
   },
   "stationMap": [

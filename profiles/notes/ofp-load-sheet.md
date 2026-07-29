@@ -58,4 +58,9 @@ npm run probe-payload-stations
 npm run compare-ofp -- --ofp profiles/ofp/pmdg-738-ssw-tc.json
 ```
 
-Live homologation: load OFP pax/bags via PMDG EFB, run `probe-payload-stations`, confirm stations 1–4 ≈ pax weight and 5–6 ≈ baggage.
+Live homologation confirmed on **737-800 PAX SSW TC**:
+
+- Stations 1–4 carry pax zone weights; 5–6 cargo; 7–8 crew (~190 lb); 10–11 galley.
+- SimBrief **Payload** must be compared to **pax+bags only** (not Σ all stations).
+- SimBrief **Empty Weight** ≠ MSFS `EMPTY WEIGHT` (91300 lb on this airframe) — compare is **warn** only.
+- Block fuel via PMDG SDK matched sample (5291 kg) when loaded.

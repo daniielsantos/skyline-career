@@ -110,15 +110,29 @@ export function normalizeOfpExpectation(
   }
 
   const payload = normalizePayload(raw.payload);
+  // Fill averagePassengerWeight from load sheet when missing.
+  if (payload?.stationRoles && payload.stationRoles.averagePassengerWeight === undefined) {
+    const sheet = loadSheet;
+    if (
+      sheet?.payload !== undefined &&
+      sheet.baggage !== undefined &&
+      sheet.passengerCount !== undefined &&
+      sheet.passengerCount > 0
+    ) {
+      const paxMass = sheet.payload - sheet.baggage;
+      if (paxMass > 0) {
+        const avg = paxMass / sheet.passengerCount;
+        // Convert into payload.unit if load sheet unit differs.
+        payload.stationRoles.averagePassengerWeight =
+          sheet.unit === payload.unit ? avg : payload.unit === 'lb' ? toLb(avg, 'kg') : avg / KG_TO_LB;
+      }
+    }
+  }
   if (loadSheet?.payload !== undefined) {
     if (!payload) {
-      // Create payload plan from load sheet when caller only provided loadSheet.
       return finalizeExpectation(raw, fuel, loadSheet, {
         unit: loadSheet.unit,
-        total:
-          loadSheet.unit === 'lb'
-            ? loadSheet.payload
-            : loadSheet.payload /* keep kg; unit matches sheet */,
+        total: loadSheet.payload,
       });
     }
     if (payload.total === undefined) {
@@ -215,12 +229,43 @@ export function enrichPayloadWithRoles(
     const avgLb = toLb(roles.averagePassengerWeight, roleWeightUnit);
     estimatedPassengerCount = Math.round(passengerWeightLb / avgLb);
   }
+  /** SimBrief-style payload = pax + bags (excludes crew/galley). */
+  const ofpPayloadLb =
+    passengerWeightLb !== undefined || baggageLb !== undefined
+      ? (passengerWeightLb ?? 0) + (baggageLb ?? 0)
+      : undefined;
   return {
     ...payload,
     baggageLb,
     passengerWeightLb,
     estimatedPassengerCount,
+    ofpPayloadLb,
   };
+}
+
+/**
+ * Prefer loadSheet-derived average pax weight: (payload − baggage) / passengerCount.
+ */
+export function resolveAveragePassengerWeight(
+  ofp: OfpExpectation,
+): { weight: number; unit: OfpWeightUnit } | undefined {
+  const roles = ofp.payload?.stationRoles;
+  if (roles?.averagePassengerWeight !== undefined && roles.averagePassengerWeight > 0) {
+    return { weight: roles.averagePassengerWeight, unit: ofp.payload?.unit ?? ofp.loadSheet?.unit ?? 'lb' };
+  }
+  const sheet = ofp.loadSheet;
+  if (
+    sheet?.payload !== undefined &&
+    sheet.baggage !== undefined &&
+    sheet.passengerCount !== undefined &&
+    sheet.passengerCount > 0
+  ) {
+    const paxWeight = sheet.payload - sheet.baggage;
+    if (paxWeight > 0) {
+      return { weight: paxWeight / sheet.passengerCount, unit: sheet.unit };
+    }
+  }
+  return undefined;
 }
 
 export interface SimGatingHints {
@@ -367,12 +412,19 @@ function comparePayloadToOfp(
   }
 
   if (plannedPayloadTotalLb !== undefined) {
+    // Prefer SimBrief-style sum (pax + bags) when station roles are mapped —
+    // full station total includes crew/galley and false-fails vs OFP Payload.
+    const livePayloadForOfp = live.ofpPayloadLb ?? live.total;
+    const label =
+      live.ofpPayloadLb !== undefined
+        ? 'Payload (pax+bags)'
+        : 'Payload total (all stations)';
     pushWeightDelta(
       findings,
       'PAYLOAD_TOTAL',
-      'Payload total',
+      label,
       plannedPayloadTotalLb,
-      live.total,
+      livePayloadForOfp,
       tol,
     );
   }
@@ -459,13 +511,15 @@ function compareLoadSheetWeights(
         expected: toLb(sheet.emptyWeight, u),
       });
     } else {
+      // SimBrief OEW and MSFS empty_weight often differ by design — advisory only.
       pushWeightDelta(
         findings,
         'EMPTY_WEIGHT',
-        'Empty weight',
+        'Empty weight (OFP OEW vs MSFS; often differs)',
         toLb(sheet.emptyWeight, u),
         liveWeights.emptyLb,
         tol,
+        'warn',
       );
     }
   }
@@ -484,7 +538,14 @@ function compareLoadSheetWeights(
   }
 
   if (sheet.zfw !== undefined) {
+    // Prefer SimBrief-like ZFW on MSFS empty basis: empty + pax + bags.
+    const roleZfw =
+      liveWeights?.emptyLb !== undefined &&
+      livePayload?.ofpPayloadLb !== undefined
+        ? liveWeights.emptyLb + livePayload.ofpPayloadLb
+        : undefined;
     const liveZfw =
+      roleZfw ??
       liveWeights?.zfwLb ??
       (liveWeights?.emptyLb !== undefined && livePayload
         ? liveWeights.emptyLb + livePayload.total
@@ -493,11 +554,20 @@ function compareLoadSheetWeights(
       findings.push({
         code: 'ZFW_UNAVAILABLE',
         severity: 'warn',
-        message: 'OFP has Estimated ZFW but could not derive live ZFW (need gross−fuel or empty+payload)',
+        message: 'OFP has Estimated ZFW but could not derive live ZFW',
         expected: toLb(sheet.zfw, u),
       });
     } else {
-      pushWeightDelta(findings, 'ZFW', 'Zero fuel weight', toLb(sheet.zfw, u), liveZfw, tol);
+      // Absolute ZFW mixes OFP OEW vs MSFS empty — warn. Payload slice can still fail via PAYLOAD_TOTAL.
+      pushWeightDelta(
+        findings,
+        'ZFW',
+        roleZfw !== undefined ? 'ZFW (MSFS empty + pax + bags)' : 'Zero fuel weight',
+        toLb(sheet.zfw, u),
+        liveZfw,
+        tol,
+        'warn',
+      );
     }
   }
 

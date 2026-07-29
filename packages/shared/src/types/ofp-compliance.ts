@@ -116,6 +116,7 @@ export interface LivePayloadState {
   source: 'classic-stations';
   unit: 'lb';
   stations: Record<number, number>;
+  /** Sum of all stations (includes crew/galley). */
   total: number;
   /** Sum of baggage/cargo stations when role map provided. */
   baggageLb?: number;
@@ -123,6 +124,11 @@ export interface LivePayloadState {
   passengerWeightLb?: number;
   /** Estimated heads from passengerWeightLb / averagePassengerWeight. */
   estimatedPassengerCount?: number;
+  /**
+   * SimBrief-style payload for compare: passengerWeightLb + baggageLb
+   * (excludes crew / galley / unused stations).
+   */
+  ofpPayloadLb?: number;
 }
 
 /** Gross / empty / derived ZFW from classic SimVars (always lb). */

@@ -4,11 +4,11 @@ Applies to PMDG 737-600/700/800/900 (NG3 / NGXu) in MSFS, including titles like 
 
 ## Product path (current)
 
-Skyline **reads** PMDG fuel and **compares** it to an OFP (manual JSON today; SimBrief later). The user loads fuel/payload via **SimBrief / EFB / FMC**. Skyline does **not** write PMDG fuel.
+Skyline **reads** PMDG fuel/payload and **compares** to the latest **SimBrief OFP** (`--simbrief-user`). The user loads fuel/payload via SimBrief/EFB/FMC. Skyline does **not** write PMDG fuel.
 
 ```bash
-npm run compare-ofp -- --ofp profiles/ofp/manual-sample.json
-npm run monitor-ofp -- --ofp profiles/ofp/manual-sample.json --lock --interval 5
+npm run compare-ofp -- --simbrief-user YOUR_ALIAS --roles profiles/ofp/pmdg-738-ssw-tc.json
+npm run monitor-ofp -- --simbrief-user YOUR_ALIAS --roles profiles/ofp/pmdg-738-ssw-tc.json --lock --interval 5
 ```
 
 `compare-ofp` / `monitor-ofp` prefer `readPmdgNg3Fuel` (lb); fall back to classic gallons × 6.7. With `--lock`, preflight becomes a hard check and a baseline is captured; once airborne, fuel may only decrease and payload is frozen.

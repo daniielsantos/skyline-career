@@ -32,6 +32,7 @@
     "compare-ofp": "node packages/agent/dist/cli.js compare-ofp",
     "monitor-ofp": "node packages/agent/dist/cli.js monitor-ofp",
     "test:shared": "npm run test -w @msfs-compat/shared",
+    "test:agent": "npm run test -w @msfs-compat/agent",
     "pack:portable": "node scripts/pack-portable.mjs",
     "smoke": "node scripts/smoke.mjs",
     "ci:catalog": "node scripts/ci-catalog.mjs",

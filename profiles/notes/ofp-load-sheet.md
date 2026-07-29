@@ -1,8 +1,33 @@
 # OFP / SimBrief load sheet → live monitoring
 
-Skyline compares a planned OFP (manual JSON today; SimBrief API later) against live sim state. Write/load of fuel on PMDG is **out of scope** — the user loads via SimBrief/EFB/FMC; we only monitor.
+Skyline compares the **latest SimBrief OFP** (or a manual JSON) against live sim state. Write/load of fuel on PMDG is **out of scope** — the user loads via SimBrief/EFB/FMC; we only monitor.
 
-## SimBrief fields (your load sheet)
+## Fetch from SimBrief (preferred)
+
+```bash
+# Navigraph Alias from SimBrief Account Settings
+npm run compare-ofp -- --simbrief-user YOUR_ALIAS --roles profiles/ofp/pmdg-738-ssw-tc.json
+
+# or Pilot ID
+npm run compare-ofp -- --simbrief-userid 123456 --roles profiles/ofp/pmdg-738-ssw-tc.json
+
+# env defaults: SIMBRIEF_USERNAME / SIMBRIEF_USERID
+```
+
+Uses `https://www.simbrief.com/api/xml.fetcher.php?…&json=v2` (latest OFP only — call on user action, do not poll).
+
+| SimBrief JSON | OFP field |
+|---------------|-----------|
+| `fuel.plan_ramp` | Block Fuel |
+| `fuel.enroute_burn` | Enroute Burn |
+| `weights.payload` | Payload |
+| `weights.bag_weight` (fallback `cargo`) | Baggage |
+| `weights.pax_count` | Pass |
+| `weights.oew` | Empty Weight |
+| `weights.est_zfw` / `est_tow` / `est_ldw` | ZFW / TOW / LW |
+| `params.units` | `kgs` → kg, `lbs` → lb |
+
+`--roles` supplies PMDG station map (pax zones / cargo) without using the sample weights.
 
 | SimBrief | OFP JSON | Live source | Notes |
 |----------|----------|-------------|-------|

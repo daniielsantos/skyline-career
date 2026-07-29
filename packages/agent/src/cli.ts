@@ -21,8 +21,9 @@ import {
   probeLVars,
   watchLVars,
 } from './probe-lvars.js';
-import { buildOfpExpectation } from './ofp-compliance/parse-ofp.js';
+import { buildOfpExpectation, applyOfpOverrides, loadStationRolesFromFile } from './ofp-compliance/parse-ofp.js';
 import { compareOnce, formatComplianceSummary } from './ofp-compliance/run-compare.js';
+import { fetchSimBriefLatestOfp } from './ofp-compliance/simbrief-fetch.js';
 import { type ComplianceBaseline, type LiveFuelState } from '@msfs-compat/shared';
 
 const agentDir = dirname(fileURLToPath(import.meta.url));
@@ -44,8 +45,8 @@ function usage(): never {
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
   msfs-compat-agent probe-payload-stations [--pipe <name>]
   msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
-  msfs-compat-agent compare-ofp [--ofp path.json] [--fuel-left n] [--block-fuel n] [--payload-total n] [--baggage n] [--passengers n] [--zfw n] [--tow n] [--empty-weight n] [--station i=lb] [--lock] [--json] [--pipe <name>]
-  msfs-compat-agent monitor-ofp [--ofp path.json] [same load-sheet flags] [--interval sec] [--lock] [--json] [--pipe <name>]
+  msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
+  msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -55,7 +56,7 @@ Notes:
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
-  compare-ofp / monitor-ofp: OFP/SimBrief load sheet vs live (fuel, payload, baggage/pax if mapped, ZFW/TOW)
+  compare-ofp / monitor-ofp: fetch latest SimBrief OFP (--simbrief-user) or local --ofp JSON, then compare to live
 `);
   process.exit(1);
 }
@@ -103,9 +104,16 @@ function getNumberFlag(args: string[], name: string): number | undefined {
 
 async function resolveOfpFromArgs(args: string[]) {
   const ofpPath = getFlag(args, '--ofp');
+  const rolesPath = getFlag(args, '--roles') ?? ofpPath;
+  const simbriefUser =
+    getFlag(args, '--simbrief-user') ?? process.env.SIMBRIEF_USERNAME ?? undefined;
+  const simbriefUserid =
+    getFlag(args, '--simbrief-userid') ?? process.env.SIMBRIEF_USERID ?? undefined;
   const fuelUnitRaw = getFlag(args, '--fuel-unit');
-  const fuelUnit = fuelUnitRaw === 'kg' ? 'kg' : fuelUnitRaw === 'lb' ? 'lb' : undefined;
-  return buildOfpExpectation(ofpPath, {
+  const fuelUnit: 'lb' | 'kg' | undefined =
+    fuelUnitRaw === 'kg' ? 'kg' : fuelUnitRaw === 'lb' ? 'lb' : undefined;
+
+  const overrides = {
     fuelLeft: getNumberFlag(args, '--fuel-left'),
     fuelRight: getNumberFlag(args, '--fuel-right'),
     fuelCenter: getNumberFlag(args, '--fuel-center'),
@@ -121,7 +129,29 @@ async function resolveOfpFromArgs(args: string[]) {
     stations: getStationFlags(args),
     icao: getFlag(args, '--icao'),
     ofpId: getFlag(args, '--ofp-id'),
-  });
+  };
+
+  const stationRoles = rolesPath ? await loadStationRolesFromFile(rolesPath) : undefined;
+
+  if (simbriefUser || simbriefUserid) {
+    console.log(
+      `Fetching latest SimBrief OFP (${simbriefUserid ? `userid=${simbriefUserid}` : `user=${simbriefUser}`})…`,
+    );
+    const { expectation, raw } = await fetchSimBriefLatestOfp({
+      username: simbriefUser,
+      userid: simbriefUserid,
+      stationRoles,
+    });
+    const origin = raw.general
+      ? `${raw.aircraft?.icaocode ?? '?'} ${raw.general.icao_airline ?? ''}${raw.general.flight_number ?? ''}`.trim()
+      : expectation.ofpId ?? 'simbrief';
+    console.log(
+      `  OFP: ${origin}  units=${expectation.fuel.unit}  block=${expectation.loadSheet?.blockFuel ?? '?'}  payload=${expectation.loadSheet?.payload ?? '?'}  pax=${expectation.loadSheet?.passengerCount ?? '?'}  bags=${expectation.loadSheet?.baggage ?? '?'}`,
+    );
+    return applyOfpOverrides(expectation, { ...overrides, stationRoles });
+  }
+
+  return buildOfpExpectation(ofpPath, { ...overrides, stationRoles });
 }
 
 async function loadProfile(path: string): Promise<AircraftProfile> {

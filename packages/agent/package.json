@@ -17,6 +17,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/ofp-compliance/simbrief-fetch.test.js",
     "smoke": "node dist/cli.js smoke --profile ../../profiles/examples/asobo-c172-skyhawk.json",
     "pmdg-cdu": "node dist/cli.js pmdg-cdu"
   },

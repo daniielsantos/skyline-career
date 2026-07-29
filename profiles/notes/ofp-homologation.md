@@ -102,4 +102,5 @@ Fill `stationRoles` + optional `matchTitles` / `matchTitlePattern` so auto-resol
 |------|----------------------|-----------|--------|
 | `pmdg-738-pax.json` | `737-800 PAX *` (SSW TC, BW TC, …) | NG3 fuel + EFB LVars + roles | **family done** |
 | `pmdg-738-bcf.json` | `737-800BCF *` (SSW / BW freighter) | EFB LVars; zones 1–6 = cargo | **family done** |
+| `tfdi-md11f.json` | `*MD-11F*` (TFDi PW/GE) | EFB `L:MD11_EFB_PAYLOAD_*` | **in progress** |
 | `pmdg-738-ssw-tc.json` | legacy sample (prefer family pack) | same | superseded by family |

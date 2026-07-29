@@ -104,7 +104,7 @@ export interface OfpExpectation {
   tolerances: OfpTolerances;
 }
 
-export type LiveFuelSource = 'pmdg-ng3' | 'classic';
+export type LiveFuelSource = 'pmdg-ng3' | 'classic' | 'mass-balance' | 'tfdi-efb';
 
 export interface LiveFuelState {
   source: LiveFuelSource;
@@ -117,7 +117,7 @@ export interface LiveFuelState {
 }
 
 export interface LivePayloadState {
-  source: 'classic-stations' | 'pmdg-efb';
+  source: 'classic-stations' | 'pmdg-efb' | 'tfdi-efb';
   unit: 'lb';
   stations: Record<number, number>;
   /** Sum of all stations (includes crew/galley). */
@@ -135,14 +135,14 @@ export interface LivePayloadState {
   ofpPayloadLb?: number;
 }
 
-/** Gross / empty / derived ZFW — prefer PMDG EFB LVars when present. */
+/** Gross / empty / derived ZFW — prefer vendor EFB LVars when present. */
 export interface LiveWeightState {
-  source: 'classic-weights' | 'pmdg-efb-lvars';
+  source: 'classic-weights' | 'pmdg-efb-lvars' | 'tfdi-efb-lvars';
   unit: 'lb';
   emptyLb?: number;
   grossLb?: number;
   maxGrossLb?: number;
-  /** Prefer L:ZFW_Lvar on PMDG; else gross − fuel. */
+  /** Prefer vendor EFB ZFW LVar; else gross − fuel. */
   zfwLb?: number;
   fuelLb?: number;
   payloadLb?: number;

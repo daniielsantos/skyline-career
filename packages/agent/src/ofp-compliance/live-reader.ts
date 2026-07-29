@@ -2,6 +2,7 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
   applyPmdgEfbPayloadCorrection,
   enrichPayloadWithRoles,
+  toLb,
   type LiveFuelState,
   type LivePayloadState,
   type LiveWeightState,
@@ -21,6 +22,15 @@ export const PMDG_EFB_LVARS = {
   landingCg: 'L:CG_LW_Lvar',
 } as const;
 
+/** TFDi MD-11 EFB payload panel (efb.js setPayload → L:MD11_EFB_PAYLOAD_*). */
+export const TFDI_MD11_EFB_LVARS = {
+  grossWeight: 'L:MD11_EFB_PAYLOAD_GW',
+  zfw: 'L:MD11_EFB_PAYLOAD_ZFW',
+  payload: 'L:MD11_EFB_PAYLOAD_PAYLOAD',
+  fuel: 'L:MD11_EFB_PAYLOAD_FUEL',
+  load: 'L:MD11_EFB_PAYLOAD_LOAD',
+} as const;
+
 export interface LiveLoadReading {
   fuel: LiveFuelState;
   payload: LivePayloadState;
@@ -33,6 +43,12 @@ export interface LiveLoadReading {
     zfwLb?: number;
     lwLb?: number;
   };
+  tfdiEfb?: {
+    gwLb?: number;
+    zfwLb?: number;
+    payloadLb?: number;
+    fuelLb?: number;
+  };
 }
 
 function galToLb(gal: number, densityLbPerGal: number): number {
@@ -43,7 +59,7 @@ function saneWeight(n: number | undefined): number | undefined {
   if (n === undefined || !Number.isFinite(n) || n <= 0) {
     return undefined;
   }
-  // PMDG EFB weights are in lb; reject tiny/placeholder noise.
+  // EFB weights are in lb; reject tiny/placeholder noise.
   if (n < 1000) {
     return undefined;
   }
@@ -123,27 +139,103 @@ export function fuelFromClassicSnapshot(
   };
 }
 
+/**
+ * Fuel from mass balance: TOTAL WEIGHT − EMPTY − Σ payload stations.
+ * Needed when classic L/R/C tanks under-read (e.g. TFDi MD-11 multi-tank).
+ */
+export function fuelFromMassBalance(
+  snapshot: SimSnapshot,
+  payloadStationsTotalLb: number,
+): LiveFuelState | undefined {
+  const emptyLb = snapshot.vars?.['EMPTY WEIGHT'];
+  const grossLb = snapshot.grossWeightLb ?? snapshot.vars?.['TOTAL WEIGHT'];
+  if (
+    emptyLb === undefined ||
+    !Number.isFinite(emptyLb) ||
+    grossLb === undefined ||
+    !Number.isFinite(grossLb)
+  ) {
+    return undefined;
+  }
+  const total = Math.max(0, grossLb - emptyLb - Math.max(0, payloadStationsTotalLb));
+  if (total < 100) {
+    return undefined;
+  }
+  return {
+    source: 'mass-balance',
+    unit: 'lb',
+    left: 0,
+    right: 0,
+    center: 0,
+    total,
+  };
+}
+
+/** Prefer mass-balance when classic/SDK total is clearly incomplete. */
+export function preferMassBalanceFuel(
+  tankFuel: LiveFuelState,
+  massBalance: LiveFuelState | undefined,
+): LiveFuelState {
+  if (!massBalance) {
+    return tankFuel;
+  }
+  // Under-read by >8% and >500 lb → trust weight residual (widebody multi-tank).
+  if (tankFuel.total < massBalance.total * 0.92 && massBalance.total - tankFuel.total > 500) {
+    return massBalance;
+  }
+  return tankFuel;
+}
+
+async function readLvarWeight(
+  bridge: NamedPipeSimBridge,
+  name: string,
+): Promise<number | undefined> {
+  try {
+    return saneWeight(await bridge.readLVar(name));
+  } catch {
+    return undefined;
+  }
+}
+
 async function readPmdgEfbLvars(
   bridge: NamedPipeSimBridge,
 ): Promise<{ gwLb?: number; zfwLb?: number; lwLb?: number }> {
-  const read = async (name: string): Promise<number | undefined> => {
-    try {
-      return saneWeight(await bridge.readLVar(name));
-    } catch {
-      return undefined;
-    }
-  };
   const [gwLb, zfwLb, lwLb] = await Promise.all([
-    read(PMDG_EFB_LVARS.grossWeight),
-    read(PMDG_EFB_LVARS.zfw),
-    read(PMDG_EFB_LVARS.landingWeight),
+    readLvarWeight(bridge, PMDG_EFB_LVARS.grossWeight),
+    readLvarWeight(bridge, PMDG_EFB_LVARS.zfw),
+    readLvarWeight(bridge, PMDG_EFB_LVARS.landingWeight),
   ]);
   return { gwLb, zfwLb, lwLb };
 }
 
+async function readTfdiMd11EfbLvars(
+  bridge: NamedPipeSimBridge,
+): Promise<{ gwLb?: number; zfwLb?: number; payloadLb?: number; fuelLb?: number }> {
+  // EFB UI shows ×1000 lb, but L:MD11_EFB_PAYLOAD_* store kilograms (despite "pounds" in efb.js).
+  const readKgAsLb = async (name: string): Promise<number | undefined> => {
+    try {
+      const kg = await bridge.readLVar(name);
+      if (!Number.isFinite(kg) || kg <= 0) {
+        return undefined;
+      }
+      const lb = toLb(kg, 'kg');
+      return lb >= 1000 ? lb : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const [gwLb, zfwLb, payloadLb, fuelLb] = await Promise.all([
+    readKgAsLb(TFDI_MD11_EFB_LVARS.grossWeight),
+    readKgAsLb(TFDI_MD11_EFB_LVARS.zfw),
+    readKgAsLb(TFDI_MD11_EFB_LVARS.payload),
+    readKgAsLb(TFDI_MD11_EFB_LVARS.fuel),
+  ]);
+  return { gwLb, zfwLb, payloadLb, fuelLb };
+}
+
 /**
- * Prefer PMDG NG3 fuel Client Data + EFB LVars (ZFW/GW) for weights/cargo.
- * Classic PAYLOAD STATION cargo is unreliable after SimBrief EFB load.
+ * Prefer vendor EFB / SDK when available.
+ * Classic PAYLOAD STATION cargo is unreliable after SimBrief EFB load (PMDG + TFDi).
  */
 export async function readLiveLoad(
   bridge: NamedPipeSimBridge,
@@ -188,6 +280,11 @@ export async function readLiveLoad(
     fuel = fuelFromClassicSnapshot(snapshot, density);
   }
 
+  const massBalanced = fuelFromMassBalance(snapshot, payload.total);
+  if (fuel.source !== 'pmdg-ng3') {
+    fuel = preferMassBalanceFuel(fuel, massBalanced);
+  }
+
   payload = enrichPayloadWithRoles(payload, opts.stationRoles, opts.roleWeightUnit ?? 'lb');
   let weights = weightsFromSnapshot(snapshot, fuel.total, payload.ofpPayloadLb ?? payload.total);
 
@@ -205,6 +302,44 @@ export async function readLiveLoad(
     weights = corrected.weights;
   }
 
+  const tfdiEfb = await readTfdiMd11EfbLvars(bridge);
+  if (
+    weights.source !== 'pmdg-efb-lvars' &&
+    (tfdiEfb.zfwLb !== undefined ||
+      tfdiEfb.gwLb !== undefined ||
+      tfdiEfb.payloadLb !== undefined ||
+      tfdiEfb.fuelLb !== undefined)
+  ) {
+    if (tfdiEfb.fuelLb !== undefined) {
+      fuel = {
+        source: 'tfdi-efb',
+        unit: 'lb',
+        left: 0,
+        right: 0,
+        center: 0,
+        total: tfdiEfb.fuelLb,
+      };
+    }
+    weights = {
+      ...weights,
+      source: 'tfdi-efb-lvars',
+      zfwLb: tfdiEfb.zfwLb ?? weights.zfwLb,
+      grossLb: tfdiEfb.gwLb ?? weights.grossLb,
+      fuelLb: fuel.total,
+      payloadLb: tfdiEfb.payloadLb ?? weights.payloadLb,
+    };
+    if (tfdiEfb.payloadLb !== undefined) {
+      payload = {
+        ...payload,
+        source: 'tfdi-efb',
+        baggageLb: tfdiEfb.payloadLb,
+        ofpPayloadLb: tfdiEfb.payloadLb,
+        // Freighter: no passenger stations — keep estimate undefined.
+        passengerWeightLb: payload.passengerWeightLb,
+      };
+    }
+  }
+
   return {
     fuel,
     payload,
@@ -212,5 +347,6 @@ export async function readLiveLoad(
     onGround: snapshot.onGround,
     enginesRunning: snapshot.enginesRunning,
     pmdgEfb,
+    tfdiEfb,
   };
 }

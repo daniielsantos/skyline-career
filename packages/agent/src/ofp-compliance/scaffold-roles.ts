@@ -106,6 +106,42 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'Live cargo via EFB L:ZFW_Lvar residual (classic stations may inflate)',
     ],
   },
+  {
+    id: 'tfdi-md11f',
+    icao: 'MD11',
+    titlePattern: /MD-11F/i,
+    familyPackRel: 'tfdi-md11f.json',
+    stationRoles: {
+      passengerStations: [],
+      // Upper zones 1–4 L/R + lower forward/rear (cfg station_load.3..12 → SimVars 4..13)
+      baggageStations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      crewStations: [1, 2, 3],
+      // :14/:15 are aux tank stations — not cargo
+    },
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'First Officer', role: 'crew' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'Engineer', role: 'crew' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'Upper zone 1 L', role: 'baggage' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Upper zone 1 R', role: 'baggage' },
+      { simVarIndex: 6, cfgIndex: 5, name: 'Upper zone 2 L', role: 'baggage' },
+      { simVarIndex: 7, cfgIndex: 6, name: 'Upper zone 2 R', role: 'baggage' },
+      { simVarIndex: 8, cfgIndex: 7, name: 'Upper zone 3 L', role: 'baggage' },
+      { simVarIndex: 9, cfgIndex: 8, name: 'Upper zone 3 R', role: 'baggage' },
+      { simVarIndex: 10, cfgIndex: 9, name: 'Upper zone 4 L', role: 'baggage' },
+      { simVarIndex: 11, cfgIndex: 10, name: 'Upper zone 4 R', role: 'baggage' },
+      { simVarIndex: 12, cfgIndex: 11, name: 'Lower forward cargo', role: 'baggage' },
+      { simVarIndex: 13, cfgIndex: 12, name: 'Lower rear cargo', role: 'baggage' },
+      { simVarIndex: 14, cfgIndex: 13, name: 'Left aux tank', role: 'unused' },
+      { simVarIndex: 15, cfgIndex: 14, name: 'Right aux tank', role: 'unused' },
+    ],
+    notes: [
+      'TFDi Design MD-11F (GE/PW presets share this station layout)',
+      'Classic SimConnect stations (no PMDG EFB LVars)',
+      'SimBrief: MD11 freighter airframe matching engines (PW4462 / GE)',
+      'Host snapshot currently includes stations 1–14 (covers all cargo indices)',
+    ],
+  },
 ];
 
 export function slugFromAircraftTitle(title: string): string {

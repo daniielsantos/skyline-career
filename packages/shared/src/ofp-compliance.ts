@@ -576,10 +576,11 @@ function compareLoadSheetWeights(
     }
   }
 
-  const efbWeights = liveWeights?.source === 'pmdg-efb-lvars';
+  const efbWeights =
+    liveWeights?.source === 'pmdg-efb-lvars' || liveWeights?.source === 'tfdi-efb-lvars';
 
-  if (sheet.tow !== undefined || (efbWeights && sheet.zfw !== undefined)) {
-    // PMDG EFB GW ≈ SimBrief est_zfw + plan_ramp (block). SimBrief est_tow is post-taxi.
+  if (sheet.tow !== undefined || (sheet.zfw !== undefined && (sheet.blockFuel !== undefined || ofp.fuel.total !== undefined))) {
+    // Prefer ramp = est_zfw + block. SimBrief est_tow is often post-taxi.
     const blockLb =
       sheet.blockFuel !== undefined
         ? toLb(sheet.blockFuel, u)
@@ -587,7 +588,7 @@ function compareLoadSheetWeights(
           ? toLb(ofp.fuel.total, ofp.fuel.unit)
           : undefined;
     const rampTowLb =
-      efbWeights && sheet.zfw !== undefined && blockLb !== undefined
+      sheet.zfw !== undefined && blockLb !== undefined
         ? toLb(sheet.zfw, u) + blockLb
         : sheet.tow !== undefined
           ? toLb(sheet.tow, u)
@@ -602,13 +603,17 @@ function compareLoadSheetWeights(
         expected: rampTowLb,
       });
     } else if (rampTowLb !== undefined) {
+      // Absolute ramp/TOW mixes SimBrief OEW into ZFW+block vs MSFS gross — hard-fail only with EFB LVars.
       pushWeightDelta(
         findings,
         'TOW',
-        efbWeights ? 'Ramp weight (EFB GW vs ZFW+block)' : 'Takeoff weight (gross)',
+        sheet.zfw !== undefined && blockLb !== undefined
+          ? 'Ramp weight (gross vs ZFW+block)'
+          : 'Takeoff weight (gross)',
         rampTowLb,
         liveWeights.grossLb,
         tol,
+        efbWeights ? 'fail' : 'warn',
       );
     }
   }

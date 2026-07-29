@@ -789,12 +789,12 @@ async function main(): Promise<void> {
     await withBridge(pipeName, async (bridge) => {
       const identity = await bridge.getAircraftIdentity();
       console.log(`Aircraft: ${identity.title}`);
-      console.log('Reading PAYLOAD STATION WEIGHT:1..14 (+ empty/gross)…');
+      console.log('Reading PAYLOAD STATION WEIGHT:1..20 (+ empty/gross)…');
 
       const snapshot = await bridge.snapshot();
       const stations: Array<{ index: number; lb: number }> = [];
       let total = 0;
-      for (let i = 1; i <= 14; i++) {
+      for (let i = 1; i <= 20; i++) {
         const key = `PAYLOAD STATION WEIGHT:${i}`;
         const lb = snapshot.vars?.[key];
         if (lb !== undefined && Number.isFinite(lb)) {
@@ -813,7 +813,10 @@ async function main(): Promise<void> {
       const efb: Record<string, number> = {};
       for (const name of efbNames) {
         try {
-          efb[name] = await bridge.readLVar(name);
+          const v = await bridge.readLVar(name);
+          if (Number.isFinite(v) && v >= 1000) {
+            efb[name] = v;
+          }
         } catch {
           // ignore
         }
@@ -824,21 +827,9 @@ async function main(): Promise<void> {
         );
       }
 
-      console.log('Stations (PMDG 738 PAX hint: 1-4 pax, 5-6 cargo, 7-9 crew, 10-11 galley):');
+      console.log('Stations (host snapshot currently defines :1..14; higher may be missing):');
       for (const s of stations) {
-        const hint =
-          s.index <= 4
-            ? 'pax?'
-            : s.index <= 6
-              ? 'cargo? (prefer EFB ZFW residual)'
-              : s.index <= 9
-                ? 'crew?'
-                : s.index <= 11
-                  ? 'galley?'
-                  : '';
-        console.log(
-          `  ${String(s.index).padStart(2)}: ${s.lb.toFixed(1).padStart(10)} lb  ${hint}`,
-        );
+        console.log(`  ${String(s.index).padStart(2)}: ${s.lb.toFixed(1).padStart(10)} lb`);
       }
     });
     return;

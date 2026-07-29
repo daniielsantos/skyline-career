@@ -32,3 +32,14 @@ describe('scaffold-roles PMDG 738 BCF', () => {
     assert.equal(matchHeuristic('737-800BCF BW')?.id, 'pmdg-738-bcf');
   });
 });
+
+describe('scaffold-roles TFDi MD-11F', () => {
+  it('matches freighter title and maps upper+lower as cargo', () => {
+    const h = matchHeuristic('TFDi Design MD-11F PW4462');
+    assert.equal(h?.id, 'tfdi-md11f');
+    assert.equal(h?.icao, 'MD11');
+    assert.deepEqual(h?.stationRoles.passengerStations, []);
+    assert.deepEqual(h?.stationRoles.baggageStations, [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    assert.deepEqual(h?.stationRoles.crewStations, [1, 2, 3]);
+  });
+});

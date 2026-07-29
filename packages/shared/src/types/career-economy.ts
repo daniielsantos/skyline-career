@@ -74,3 +74,59 @@ export interface MarketLotView {
   originFillPct: number;
   destFillPct: number;
 }
+
+/** Freighter capacity classes (Slice 2) — filter market + drive SimBrief dispatch. */
+export type FreighterClassId = 'narrow_freighter' | 'wide_freighter';
+
+export interface AircraftClass {
+  id: FreighterClassId;
+  name: string;
+  /** Soft cargo weight limit used for accept clamp / market viability. */
+  maxCargoKg: number;
+  maxRangeNm: number;
+  /** Repo-relative OFP roles pack path. */
+  rolesPackRelPath: string;
+  simbriefIcao: string;
+  simbriefAirframeMatch: string;
+}
+
+export type MissionStatus =
+  | 'accepted'
+  | 'dispatched'
+  | 'in_flight'
+  | 'settled'
+  | 'cancelled'
+  | 'failed';
+
+/**
+ * What the player committed to haul — source of truth for dispatch prefill
+ * and later Intent→OFP validation.
+ */
+export interface MissionIntent {
+  id: string;
+  shipmentLotId: string;
+  commodityId: CommodityId;
+  originIcao: string;
+  destIcao: string;
+  cargoKg: number;
+  /** Freighter MVP always 0. */
+  pax: 0;
+  aircraftClassId: FreighterClassId;
+  rolesPackRelPath: string;
+  /** Economy tick by which delivery is due (from lot expiry). */
+  deadlineTick: number;
+  /** Pro-rata freight pay for this cargoKg. */
+  payUsd: number;
+  urgency: 'normal' | 'urgent';
+  reason: string;
+  status: MissionStatus;
+  acceptedAtTick: number;
+  /** Set when career dispatch opens SimBrief. */
+  staticId?: string;
+  dispatchedAtTick?: number;
+}
+
+export interface CareerMissionsState {
+  version: 1;
+  missions: MissionIntent[];
+}

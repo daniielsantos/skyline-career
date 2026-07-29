@@ -50,11 +50,24 @@ import {
   saveCareerEconomy,
 } from './ofp-compliance/career-economy-store.js';
 import {
-  listMarketLots,
-  tickEconomyN,
+  DEFAULT_CAREER_MISSIONS_PATH,
+  findMission,
+  loadOrCreateCareerMissions,
+  saveCareerMissions,
+  upsertMission,
+} from './ofp-compliance/career-missions-store.js';
+import {
+  acceptMission,
+  cancelMission,
   createSeedEconomyWorld,
+  formatMissionSummary,
+  listMarketLots,
+  listViableMarketLots,
+  parseFreighterClassId,
+  tickEconomyN,
   type CommodityId,
   type ComplianceBaseline,
+  type FreighterClassId,
   type LiveFuelState,
 } from '@msfs-compat/shared';
 
@@ -81,7 +94,7 @@ function usage(): never {
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
-  msfs-compat-agent career init|tick|market [--save path] [--seed s] [--n ticks] [--origin ICAO] [--dest ICAO] [--commodity id] [--reset] [--json]
+  msfs-compat-agent career init|tick|market|accept|missions|cancel|dispatch [--save path] [--missions path] [--lot id] [--mission id] [--kg n] [--aircraft class] [--simbrief-user ALIAS] [--n ticks] [--json]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -94,7 +107,7 @@ Notes:
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
   generate-ofp: Dispatch Redirect with homologated SimBrief variant (pack match / live title); fuel AUTO → fetch by static_id
   compare-ofp / monitor-ofp: fetch latest SimBrief OFP; omit --roles to auto-pick pack from aircraft title
-  career: local cargo economy (terminals produce/consume → shipment lots)
+  career: local cargo economy + accept/dispatch missions (SimBrief generate-ofp)
 `);
   process.exit(1);
 }
@@ -1256,13 +1269,20 @@ async function main(): Promise<void> {
     const saveRel =
       getFlag(subArgs, '--save') ?? join(repoRoot, DEFAULT_CAREER_ECONOMY_PATH);
     const savePath = resolve(saveRel);
+    const missionsRel =
+      getFlag(subArgs, '--missions') ?? join(repoRoot, DEFAULT_CAREER_MISSIONS_PATH);
+    const missionsPath = resolve(missionsRel);
     const asJson = hasFlag(subArgs, '--json');
 
     if (!sub || sub === 'help' || sub === '--help') {
       console.log(`career commands:
   career init [--save path] [--seed s] [--reset]
   career tick [--n 24] [--save path]
-  career market [--origin ICAO] [--dest ICAO] [--commodity electronics|perishables|machinery|general] [--save path] [--json]
+  career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter] [--save path] [--json]
+  career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter] [--save path] [--missions path] [--json]
+  career missions [--missions path] [--json]
+  career cancel --mission <id> [--save path] [--missions path]
+  career dispatch --mission <id> [--simbrief-user ALIAS] [--no-open] [--compare] [--missions path] [--save path]
 `);
       return;
     }
@@ -1304,27 +1324,265 @@ async function main(): Promise<void> {
         console.error(`Unknown commodity: ${commodityRaw}`);
         process.exit(1);
       }
-      const market = listMarketLots(world, {
+      const aircraftRaw = getFlag(subArgs, '--aircraft');
+      const aircraftClassId = parseFreighterClassId(aircraftRaw);
+      if (aircraftRaw && !aircraftClassId) {
+        console.error(
+          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter)`,
+        );
+        process.exit(1);
+      }
+      const filter = {
         originIcao: getFlag(subArgs, '--origin'),
         destIcao: getFlag(subArgs, '--dest'),
         commodityId,
-      });
+      };
+      const market = aircraftClassId
+        ? listViableMarketLots(world, aircraftClassId, filter)
+        : listMarketLots(world, filter);
       if (asJson) {
-        console.log(JSON.stringify({ tick: world.tick, lots: market }, null, 2));
+        console.log(
+          JSON.stringify({ tick: world.tick, aircraftClassId, lots: market }, null, 2),
+        );
         return;
       }
       console.log(
-        `Career market tick=${world.tick}  lots=${market.length}  (${savePath})`,
+        `Career market tick=${world.tick}  lots=${market.length}` +
+          (aircraftClassId ? `  aircraft=${aircraftClassId}` : '') +
+          `  (${savePath})`,
       );
       for (const row of market.slice(0, 30)) {
         const urgent = row.lot.urgency === 'urgent' ? ' URGENT' : '';
         console.log(
-          `  ${row.lot.originIcao}→${row.lot.destIcao}  ${row.commodityName}  ${(row.availableKg / 1000).toFixed(1)}t  pay=$${row.lot.payUsd.toLocaleString()}${urgent}`,
+          `  ${row.lot.id}  ${row.lot.originIcao}→${row.lot.destIcao}  ${row.commodityName}  ${(row.availableKg / 1000).toFixed(1)}t  pay=$${row.lot.payUsd.toLocaleString()}${urgent}`,
         );
         console.log(`    ${row.lot.reason}`);
       }
       if (market.length > 30) {
         console.log(`  … ${market.length - 30} more`);
+      }
+      return;
+    }
+
+    if (sub === 'accept') {
+      const lotId = getFlag(subArgs, '--lot');
+      if (!lotId) {
+        console.error('career accept requires --lot <id> (from career market)');
+        process.exit(1);
+      }
+      const aircraftRaw = getFlag(subArgs, '--aircraft') ?? 'narrow_freighter';
+      const aircraftClassId = parseFreighterClassId(aircraftRaw) as FreighterClassId | undefined;
+      if (!aircraftClassId) {
+        console.error(
+          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter)`,
+        );
+        process.exit(1);
+      }
+      const world = await loadOrCreateCareerEconomy(savePath);
+      const missions = await loadOrCreateCareerMissions(missionsPath);
+      let mission;
+      try {
+        mission = acceptMission(world, {
+          lotId,
+          cargoKg: getNumberFlag(subArgs, '--kg'),
+          aircraftClassId,
+        });
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+      upsertMission(missions, mission);
+      await saveCareerEconomy(savePath, world);
+      await saveCareerMissions(missionsPath, missions);
+      if (asJson) {
+        console.log(JSON.stringify(mission, null, 2));
+        return;
+      }
+      console.log(`Accepted: ${formatMissionSummary(mission)}`);
+      console.log(
+        `Next: npm run career -- dispatch --mission ${mission.id} --simbrief-user YOUR_ALIAS`,
+      );
+      return;
+    }
+
+    if (sub === 'missions') {
+      const missions = await loadOrCreateCareerMissions(missionsPath);
+      const active = missions.missions.filter(
+        (m) => m.status === 'accepted' || m.status === 'dispatched' || m.status === 'in_flight',
+      );
+      if (asJson) {
+        console.log(JSON.stringify({ missions: missions.missions }, null, 2));
+        return;
+      }
+      console.log(
+        `Career missions active=${active.length} total=${missions.missions.length}  (${missionsPath})`,
+      );
+      for (const m of missions.missions.slice().reverse()) {
+        console.log(`  ${formatMissionSummary(m)}`);
+      }
+      return;
+    }
+
+    if (sub === 'cancel') {
+      const missionId = getFlag(subArgs, '--mission');
+      if (!missionId) {
+        console.error('career cancel requires --mission <id>');
+        process.exit(1);
+      }
+      const world = await loadOrCreateCareerEconomy(savePath);
+      const missions = await loadOrCreateCareerMissions(missionsPath);
+      const existing = findMission(missions, missionId);
+      if (!existing) {
+        console.error(`Unknown mission: ${missionId}`);
+        process.exit(1);
+      }
+      let cancelled;
+      try {
+        cancelled = cancelMission(world, existing);
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+      upsertMission(missions, cancelled);
+      await saveCareerEconomy(savePath, world);
+      await saveCareerMissions(missionsPath, missions);
+      console.log(`Cancelled: ${formatMissionSummary(cancelled)}`);
+      return;
+    }
+
+    if (sub === 'dispatch') {
+      const missionId = getFlag(subArgs, '--mission');
+      if (!missionId) {
+        console.error('career dispatch requires --mission <id>');
+        process.exit(1);
+      }
+      const world = await loadOrCreateCareerEconomy(savePath);
+      const missions = await loadOrCreateCareerMissions(missionsPath);
+      const mission = findMission(missions, missionId);
+      if (!mission) {
+        console.error(`Unknown mission: ${missionId}`);
+        process.exit(1);
+      }
+      if (mission.status !== 'accepted' && mission.status !== 'dispatched') {
+        console.error(`Mission ${missionId} cannot dispatch (status=${mission.status})`);
+        process.exit(1);
+      }
+
+      const simbriefUser =
+        getFlag(subArgs, '--simbrief-user') ?? process.env.SIMBRIEF_USERNAME ?? undefined;
+      const simbriefUserid =
+        getFlag(subArgs, '--simbrief-userid') ?? process.env.SIMBRIEF_USERID ?? undefined;
+      if (!simbriefUser && !simbriefUserid) {
+        console.error(
+          'career dispatch requires --simbrief-user (or SIMBRIEF_USERNAME) / --simbrief-userid',
+        );
+        process.exit(1);
+      }
+
+      const rolesPath = resolve(repoRoot, mission.rolesPackRelPath);
+      const rolesPack = await loadRolesPackFile(rolesPath);
+      console.log(`Mission: ${formatMissionSummary(mission)}`);
+      console.log(`Roles pack: ${mission.rolesPackRelPath}`);
+
+      let type = getFlag(subArgs, '--type');
+      if (!type) {
+        const simbriefIcao = rolesPack.simbriefIcao ?? rolesPack.icao;
+        const match = rolesPack.simbriefAirframeMatch;
+        if (!simbriefIcao || !match) {
+          console.error(
+            'Roles pack missing simbriefIcao/simbriefAirframeMatch — pass --type <internalId>',
+          );
+          process.exit(1);
+        }
+        console.log(`Resolving SimBrief variant: icao=${simbriefIcao} match=/${match}/`);
+        const resolved = await resolveSimBriefDispatchType({
+          simbriefIcao,
+          simbriefAirframeMatch: match,
+        });
+        type = resolved.type;
+        console.log(
+          `SimBrief type=${type}  (${resolved.airframe.comments || resolved.airframe.name})`,
+        );
+      }
+
+      const staticId = mission.staticId ?? makeStaticId('career');
+      const cargoThousands = cargoWeightToThousands(mission.cargoKg);
+      const url = buildDispatchRedirectUrl({
+        type,
+        orig: mission.originIcao,
+        dest: mission.destIcao,
+        pax: 0,
+        cargo: cargoThousands,
+        units: 'KGS',
+        staticId,
+      });
+
+      mission.staticId = staticId;
+      mission.status = 'dispatched';
+      mission.dispatchedAtTick = world.tick;
+      upsertMission(missions, mission);
+      await saveCareerMissions(missionsPath, missions);
+
+      console.log(`static_id=${staticId}`);
+      console.log(`Dispatch URL:\n  ${url}`);
+      console.log(
+        `Prefill: ${mission.originIcao}→${mission.destIcao}  pax=0  cargo=${mission.cargoKg} kg (${cargoThousands} thousands)`,
+      );
+      console.log('Fuel planning left to SimBrief AUTO (not sent).');
+
+      if (!hasFlag(subArgs, '--no-open')) {
+        openDispatchInBrowser(url);
+        console.log('Opened SimBrief Dispatch in your browser.');
+      } else {
+        console.log('Skipped browser open (--no-open).');
+      }
+
+      await waitForEnter(
+        'After you click Generate on SimBrief and the OFP is ready, press Enter to fetch… ',
+      );
+
+      console.log(
+        `Fetching OFP (${simbriefUserid ? `userid=${simbriefUserid}` : `user=${simbriefUser}`}, static_id=${staticId})…`,
+      );
+      const { expectation, raw } = await fetchSimBriefLatestOfp({
+        username: simbriefUser,
+        userid: simbriefUserid,
+        staticId,
+      });
+
+      const origin = raw.general
+        ? `${raw.aircraft?.icaocode ?? type} ${raw.general.icao_airline ?? ''}${raw.general.flight_number ?? ''}`.trim()
+        : expectation.ofpId ?? 'simbrief';
+      console.log(
+        `OFP ready: ${origin}  units=${expectation.fuel.unit}  block=${expectation.loadSheet?.blockFuel ?? '?'}  payload=${expectation.loadSheet?.payload ?? '?'}  cargo intent=${mission.cargoKg} kg`,
+      );
+      console.log(
+        'Note: Intent→OFP validation (Slice 3) not applied yet — compare cargo/orig/dest manually for now.',
+      );
+
+      if (hasFlag(subArgs, '--compare')) {
+        const locked = hasFlag(subArgs, '--lock');
+        const { snapshot } = await withBridge(pipeName, async (bridge) => {
+          const ofp = applyOfpOverrides(expectation, {
+            stationRoles: rolesPack.payload?.stationRoles,
+            liveSources: rolesPack.liveSources,
+          });
+          return compareOnce(bridge, { ofp, locked });
+        });
+        if (asJson) {
+          console.log(JSON.stringify({ mission, snapshot }, null, 2));
+        } else {
+          console.log(formatComplianceSummary(snapshot));
+        }
+        if (snapshot.verdict === 'fail') {
+          process.exitCode = 2;
+        } else if (snapshot.verdict === 'warn') {
+          process.exitCode = 1;
+        }
+      } else {
+        console.log(
+          'Next: Load from SimBrief in the EFB, then: npm run compare-ofp -- --simbrief-user YOUR_ALIAS',
+        );
       }
       return;
     }

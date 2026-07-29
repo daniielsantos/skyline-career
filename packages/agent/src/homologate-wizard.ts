@@ -496,8 +496,24 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
       const recipesDir = join(repoRoot, 'profiles', 'vendors');
       const recipes = await loadVendorRecipes(recipesDir);
-      const publisherGuess = inferPublisherFromLiveTitle(identity.title);
-      console.log(`  Loading vendor recipes (${recipes.length}) — publisher guess: ${publisherGuess}`);
+      // Prefer the publisher chosen in step 1 (title often lacks "pmdg" / "flightfx").
+      const publisherForRecipes = matchPublisher || inferPublisherFromLiveTitle(identity.title);
+      console.log(
+        `  Loading vendor recipes (${recipes.length}) — publisher: ${publisherForRecipes}`,
+      );
+
+      const abortRecipe = recipes.find(
+        (r) =>
+          r.wizard.onClassicWriteFail === 'abort' &&
+          r.publisher.toLowerCase() === publisherForRecipes.toLowerCase(),
+      );
+      if (abortRecipe) {
+        console.log(`  Recipe ${abortRecipe.recipeId}: classic fuel writes not supported.`);
+        console.log(`  ${abortRecipe.summary}`);
+        if (abortRecipe.docs) console.log(`  See ${abortRecipe.docs}`);
+        console.log('  Payload stations may still be writable — fuel apply needs vendor SDK support.');
+        return;
+      }
 
       // Pre-probe union of try-lvar-bridge recipe LVars for scoring.
       const probeNames = new Set<string>();
@@ -511,7 +527,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
       const scored = scoreRecipesForLvarFallback(recipes, {
         title: identity.title,
-        publisher: publisherGuess,
+        publisher: publisherForRecipes,
         classicWritetestFailed: true,
         readableLVars,
       });

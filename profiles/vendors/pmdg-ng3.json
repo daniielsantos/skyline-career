@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "0.1.0",
+  "recipeId": "pmdg-ng3",
+  "publisher": "pmdg",
+  "displayName": "PMDG 737 NG3 / NGXu family",
+  "summary": "Fuel is owned by the PMDG SDK (Client Data PMDG_NG3_Data), not classic FUEL TANK writes and not Accu-Sim-style LVars. Payload stations often accept classic SimConnect writes. Skyline needs native Client Data support before fuel apply works.",
+  "detectMode": "publisher_then_probes",
+  "detect": [
+    { "kind": "publisher", "value": "pmdg" },
+    { "kind": "title_regex", "value": "\\b(pmdg|737-?8|b738|ng3)\\b" },
+    { "kind": "classic_writetest_fails" }
+  ],
+  "capabilities": ["simconnect"],
+  "fuel": {
+    "strategy": "vendor-specific",
+    "preferUsableCapacity": false,
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "label": "Left wing (SDK QtyLeft)",
+        "readSimVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "capacitySimVar": "FUEL TANK LEFT MAIN CAPACITY"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "label": "Right wing (SDK QtyRight)",
+        "readSimVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "capacitySimVar": "FUEL TANK RIGHT MAIN CAPACITY"
+      },
+      {
+        "id": "CENTER",
+        "label": "Center (SDK QtyCenter)",
+        "readSimVar": "FUEL TANK CENTER QUANTITY",
+        "capacitySimVar": "FUEL TANK CENTER CAPACITY"
+      }
+    ],
+    "probeLVars": []
+  },
+  "payload": {
+    "strategy": "station-writeback"
+  },
+  "wizard": {
+    "onClassicWriteFail": "abort",
+    "notesTemplate": "pmdg-ng3"
+  },
+  "docs": "profiles/notes/pmdg-ng3.md",
+  "knownProfileKeys": []
+}

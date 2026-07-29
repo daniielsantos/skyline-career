@@ -22,6 +22,7 @@ Recipes capture **how a developer's aircraft usually talk to SimConnect** — no
 | `a2a-accusim` | `a2a` | Classic SimVars read-only; write via Accu-Sim LVars + `SeatNCharacter` |
 | `blacksquare-classic` | `blacksquare` | FUELSYSTEM dead; classic `FUEL TANK *` writable |
 | `asobo-default` | `asobo` | FUELSYSTEM or classic direct |
+| `pmdg-ng3` | `pmdg` | Fuel via PMDG Client Data SDK (not LVar); classic fuel writes abort |
 
 ## Wired (agent)
 

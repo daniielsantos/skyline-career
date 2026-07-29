@@ -7,6 +7,7 @@ export type VendorRecipeId =
   | 'a2a-accusim'
   | 'blacksquare-classic'
   | 'asobo-default'
+  | 'pmdg-ng3'
   | (string & {});
 
 export type VendorDetectSignal =

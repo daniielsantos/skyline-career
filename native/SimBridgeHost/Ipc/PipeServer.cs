@@ -237,6 +237,12 @@ public sealed class PipeServer : IAsyncDisposable
                     return IpcResponse.Success(request.Id, identity);
                 }
 
+                case "readPmdgNg3Fuel":
+                {
+                    var fuel = await _sim.ReadPmdgNg3FuelAsync(ct).ConfigureAwait(false);
+                    return IpcResponse.Success(request.Id, fuel);
+                }
+
                 default:
                     return IpcResponse.Fail(request.Id, "UNSUPPORTED", $"Unknown method: {request.Method}");
             }

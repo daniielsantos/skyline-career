@@ -177,6 +177,22 @@ async function dispatch(msg: { id?: string; method?: string; params?: Record<str
         icao: 'C172',
       });
     }
+    case 'readPmdgNg3Fuel': {
+      const err = ensureConnected(id);
+      if (err) return err;
+      const mockPmdg = process.env.MSFS_COMPAT_MOCK_PMDG === '1';
+      if (!mockPmdg) {
+        return ok(id, { available: false });
+      }
+      return ok(id, {
+        available: true,
+        leftLb: 8629,
+        rightLb: 8629,
+        centerLb: 7743,
+        weightInKg: false,
+        ageMs: 0,
+      });
+    }
     default:
       return fail(id, 'UNSUPPORTED', `Unknown method: ${method}`);
   }

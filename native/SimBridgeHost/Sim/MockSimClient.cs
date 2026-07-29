@@ -2,6 +2,7 @@ namespace SimBridgeHost.Sim;
 
 using System.Collections.Concurrent;
 using SimBridgeHost.Ipc;
+using SimBridgeHost.Sim.Pmdg;
 
 /// <summary>
 /// In-memory SimConnect stand-in for local development without MSFS.
@@ -129,6 +130,31 @@ public sealed class MockSimClient : ISimClient
             AtcModel = "C172",
             AtcType = "Cessna",
             Icao = "C172"
+        });
+    }
+
+    public Task<PmdgNg3FuelDto> ReadPmdgNg3FuelAsync(CancellationToken ct = default)
+    {
+        EnsureConnected();
+        var mockPmdg = string.Equals(
+            Environment.GetEnvironmentVariable("MSFS_COMPAT_MOCK_PMDG"),
+            "1",
+            StringComparison.Ordinal);
+        if (!mockPmdg)
+        {
+            return Task.FromResult(new PmdgNg3FuelDto { Available = false });
+        }
+
+        return Task.FromResult(new PmdgNg3FuelDto
+        {
+            Available = true,
+            LayoutOk = true,
+            LayoutOffset = 0,
+            LeftLb = 8629,
+            RightLb = 8629,
+            CenterLb = 7743,
+            WeightInKg = false,
+            AgeMs = 0
         });
     }
 

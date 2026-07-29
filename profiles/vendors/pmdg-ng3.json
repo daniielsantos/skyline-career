@@ -3,7 +3,7 @@
   "recipeId": "pmdg-ng3",
   "publisher": "pmdg",
   "displayName": "PMDG 737 NG3 / NGXu family",
-  "summary": "Fuel is owned by the PMDG SDK (Client Data PMDG_NG3_Data), not classic FUEL TANK writes and not Accu-Sim-style LVars. Payload stations often accept classic SimConnect writes. Skyline needs native Client Data support before fuel apply works.",
+  "summary": "Fuel qty is readable via PMDG_NG3_Data Client Data (EnableDataBroadcast=1); classic FUEL TANK writes are ignored and Client Data is read-only. Fuel load (FMC/CDU) is fase 2. Payload stations often accept classic SimConnect writes.",
   "detectMode": "publisher_then_probes",
   "detect": [
     { "kind": "publisher", "value": "pmdg" },

@@ -512,6 +512,28 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         console.log(`  ${abortRecipe.summary}`);
         if (abortRecipe.docs) console.log(`  See ${abortRecipe.docs}`);
         console.log('  Payload stations may still be writable — fuel apply needs vendor SDK support.');
+        if (abortRecipe.recipeId === 'pmdg-ng3') {
+          try {
+            const sdk = await bridge.readPmdgNg3Fuel();
+            if (sdk.available && sdk.layoutOk) {
+              console.log(
+                `  SDK broadcast OK — fuel read works (L=${sdk.leftLb?.toFixed(0)} R=${sdk.rightLb?.toFixed(0)} C=${sdk.centerLb?.toFixed(0)} lb @ offset ${sdk.layoutOffset}); write still unsupported.`,
+              );
+            } else if (sdk.available) {
+              console.log(
+                '  SDK broadcast OK — but fuel layout not locked yet (retry with distinctive fuel load, e.g. full tanks).',
+              );
+            } else {
+              console.log(
+                '  SDK broadcast not received — set EnableDataBroadcast=1 in 737NG3_Options.ini and reload the aircraft.',
+              );
+            }
+          } catch (error) {
+            console.log(
+              `  SDK fuel probe failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
         return;
       }
 

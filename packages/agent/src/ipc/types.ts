@@ -11,7 +11,8 @@ export type IpcMethod =
   | 'triggerEvent'
   | 'snapshot'
   | 'delay'
-  | 'getAircraftIdentity';
+  | 'getAircraftIdentity'
+  | 'readPmdgNg3Fuel';
 
 export interface IpcRequest {
   id: string;

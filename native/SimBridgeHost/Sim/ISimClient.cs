@@ -1,6 +1,7 @@
 namespace SimBridgeHost.Sim;
 
 using SimBridgeHost.Ipc;
+using SimBridgeHost.Sim.Pmdg;
 
 public interface ISimClient : IAsyncDisposable
 {
@@ -18,6 +19,7 @@ public interface ISimClient : IAsyncDisposable
     Task<SimSnapshotDto> SnapshotAsync(CancellationToken ct = default);
     Task DelayAsync(int ms, CancellationToken ct = default);
     Task<AircraftIdentityDto> GetAircraftIdentityAsync(CancellationToken ct = default);
+    Task<PmdgNg3FuelDto> ReadPmdgNg3FuelAsync(CancellationToken ct = default);
 }
 
 public sealed class SimClientException : Exception

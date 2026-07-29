@@ -112,6 +112,21 @@ export class NamedPipeSimBridge implements SimBridge {
     await this.client.call('delay', { ms });
   }
 
+  async readPmdgNg3Fuel(): Promise<{
+    available: boolean;
+    leftLb?: number;
+    rightLb?: number;
+    centerLb?: number;
+    weightInKg?: boolean;
+    ageMs?: number;
+    layoutOk?: boolean;
+    layoutOffset?: number;
+    nonzeroBytes?: number;
+  }> {
+    await this.ensureOpen();
+    return this.client.call('readPmdgNg3Fuel');
+  }
+
   private async ensureOpen(): Promise<void> {
     if (!this.autoConnected) {
       await this.open();

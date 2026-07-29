@@ -8,6 +8,7 @@
     <AssemblyName>SimBridgeHost</AssemblyName>
     <LangVersion>latest</LangVersion>
     <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <MSFS_SDK Condition="'$(MSFS_SDK)' == ''">C:\MSFS 2024 SDK</MSFS_SDK>
   </PropertyGroup>
 

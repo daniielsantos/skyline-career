@@ -27,7 +27,7 @@ const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -38,12 +38,14 @@ function usage(): never {
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
+  msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
+  probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
 `);
   process.exit(1);
 }
@@ -598,6 +600,78 @@ async function main(): Promise<void> {
           },
         });
         console.log('Watch done.');
+      }
+    });
+    return;
+  }
+
+  if (command === 'probe-pmdg-fuel' || command === 'pmdg-fuel') {
+    await withBridge(pipeName, async (bridge) => {
+      const identity = await bridge.getAircraftIdentity();
+      console.log(`Aircraft: ${identity.title}`);
+      console.log('Reading PMDG_NG3_Data Client Data fuel qty…');
+
+      const sdk = await bridge.readPmdgNg3Fuel();
+      if (!sdk.available) {
+        console.log('available: false');
+        if (sdk.nonzeroBytes != null) console.log(`  nonzeroBytes: ${sdk.nonzeroBytes}`);
+        console.log(
+          'No broadcast received. Set EnableDataBroadcast=1 in 737NG3_Options.ini, reload the NG3 aircraft, then retry.',
+        );
+        return;
+      }
+
+      if (sdk.layoutOk === false) {
+        console.log(`available: true  layoutOk=false  ageMs=${sdk.ageMs ?? '?'}  nonzeroBytes=${sdk.nonzeroBytes ?? '?'}`);
+        console.log(
+          `  raw L/R/C lb: ${sdk.leftLb ?? '?'} / ${sdk.rightLb ?? '?'} / ${sdk.centerLb ?? '?'}`,
+        );
+        console.log(
+          'Broadcast received but fuel qty looks invalid. Confirm EnableDataBroadcast=1 and reload the NG3.',
+        );
+        return;
+      }
+
+      let dens = 6.7;
+      try {
+        dens = await bridge.readSimVar({ name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' });
+        if (!Number.isFinite(dens) || dens < 5 || dens > 8) dens = 6.7;
+      } catch {
+        /* default Jet-A-ish */
+      }
+
+      const toGal = (lb: number | undefined) =>
+        lb === undefined ? undefined : lb / dens;
+
+      console.log(
+        `available: true  layoutOk=true  offset=${sdk.layoutOffset ?? '?'}  ageMs=${sdk.ageMs ?? '?'}  nonzeroBytes=${sdk.nonzeroBytes ?? '?'}  weightInKgFlag=${sdk.weightInKg ?? '?'}`,
+      );
+      console.log(
+        `  LEFT   ${sdk.leftLb?.toFixed(1)} lb  (~${toGal(sdk.leftLb)?.toFixed(1)} gal)`,
+      );
+      console.log(
+        `  RIGHT  ${sdk.rightLb?.toFixed(1)} lb  (~${toGal(sdk.rightLb)?.toFixed(1)} gal)`,
+      );
+      console.log(
+        `  CENTER ${sdk.centerLb?.toFixed(1)} lb  (~${toGal(sdk.centerLb)?.toFixed(1)} gal)`,
+      );
+      console.log(`  density used: ${dens.toFixed(3)} lb/gal`);
+
+      try {
+        const mirrors = [
+          ['LEFT', 'FUEL TANK LEFT MAIN QUANTITY'],
+          ['RIGHT', 'FUEL TANK RIGHT MAIN QUANTITY'],
+          ['CENTER', 'FUEL TANK CENTER QUANTITY'],
+        ] as const;
+        console.log('Classic mirrors (gal → lb @ dens):');
+        for (const [label, name] of mirrors) {
+          const gal = await bridge.readSimVar({ name, unit: 'gallons' });
+          console.log(`  ${label.padEnd(6)} ${gal.toFixed(1)} gal  (~${(gal * dens).toFixed(1)} lb)`);
+        }
+      } catch (error) {
+        console.log(
+          `  (mirror compare skipped: ${error instanceof Error ? error.message : String(error)})`,
+        );
       }
     });
     return;

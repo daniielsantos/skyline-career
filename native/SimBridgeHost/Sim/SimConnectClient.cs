@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Microsoft.FlightSimulator.SimConnect;
 using SimBridgeHost.Ipc;
+using SimBridgeHost.Sim.Pmdg;
 
 /// <summary>
 /// Real SimConnect client for MSFS 2024 using the managed SDK wrapper.
@@ -21,6 +22,11 @@ public sealed class SimConnectClient : ISimClient
     private CancellationTokenSource? _recvCts;
     private Task? _recvLoop;
     private bool _openReceived;
+    private bool _pmdgNg3Subscribed;
+    private readonly object _pmdgFuelGate = new();
+    private byte[]? _pmdgRaw;
+    private DateTime? _pmdgFuelUtc;
+    private int _pmdgFuelOffset = -1;
 
     private enum Definitions : uint
     {
@@ -45,6 +51,22 @@ public sealed class SimConnectClient : ISimClient
     private enum Groups : uint
     {
         Default = 1,
+    }
+
+    private enum ClientDataIds : uint
+    {
+        PmdgNg3 = PmdgNg3ClientData.ClientDataId,
+    }
+
+    private enum ClientDataDefinitions : uint
+    {
+        PmdgNg3Data = PmdgNg3ClientData.DataDefinitionId,
+    }
+
+    private enum ClientDataRequests : uint
+    {
+        PmdgNg3Data = 51000,
+        PmdgNg3DataOnce = 51001,
     }
 
     private uint _nextDefId = (uint)Definitions.DynamicBase;
@@ -136,6 +158,7 @@ public sealed class SimConnectClient : ISimClient
             _sim.OnRecvQuit += OnRecvQuit;
             _sim.OnRecvException += OnRecvException;
             _sim.OnRecvSimobjectData += OnRecvSimobjectData;
+            _sim.OnRecvClientData += OnRecvClientData;
 
             RegisterFixedDefinitions(_sim);
 
@@ -178,6 +201,13 @@ public sealed class SimConnectClient : ISimClient
             }
 
             _openReceived = false;
+            _pmdgNg3Subscribed = false;
+            lock (_pmdgFuelGate)
+            {
+                _pmdgRaw = null;
+                _pmdgFuelUtc = null;
+                _pmdgFuelOffset = -1;
+            }
             _recvCts?.Dispose();
             _recvCts = null;
             _recvLoop = null;
@@ -439,6 +469,142 @@ public sealed class SimConnectClient : ISimClient
         };
     }
 
+    public async Task<PmdgNg3FuelDto> ReadPmdgNg3FuelAsync(CancellationToken ct = default)
+    {
+        var sim = RequireSim();
+
+        double expectCenterLb = 0;
+        double expectLeftLb = 0;
+        double expectRightLb = 0;
+        var dens = 6.7;
+        try
+        {
+            dens = await ReadSimVarAsync("FUEL WEIGHT PER GALLON", "pounds", ct).ConfigureAwait(false);
+            if (!IsSaneQuantity(dens) || dens < 5 || dens > 8)
+            {
+                dens = 6.7;
+            }
+
+            expectCenterLb = Math.Max(0, await ReadSimVarAsync("FUEL TANK CENTER QUANTITY", "gallons", ct).ConfigureAwait(false)) * dens;
+            expectLeftLb = Math.Max(0, await ReadSimVarAsync("FUEL TANK LEFT MAIN QUANTITY", "gallons", ct).ConfigureAwait(false)) * dens;
+            expectRightLb = Math.Max(0, await ReadSimVarAsync("FUEL TANK RIGHT MAIN QUANTITY", "gallons", ct).ConfigureAwait(false)) * dens;
+        }
+        catch
+        {
+            // optional for layout lock
+        }
+
+        TaskCompletionSource<object> tcs;
+        lock (_gate)
+        {
+            EnsurePmdgNg3Subscribed(sim);
+            tcs = NewPending((uint)ClientDataRequests.PmdgNg3DataOnce);
+            RequestPmdgNg3DataOnce(sim);
+        }
+
+        try
+        {
+            using var timeout = new CancellationTokenSource(2000);
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
+            await using var reg = linked.Token.Register(() =>
+                tcs.TrySetCanceled(linked.Token));
+            _ = await tcs.Task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _pending.TryRemove((uint)ClientDataRequests.PmdgNg3DataOnce, out _);
+        }
+        catch (SimClientException)
+        {
+            _pending.TryRemove((uint)ClientDataRequests.PmdgNg3DataOnce, out _);
+        }
+
+        lock (_pmdgFuelGate)
+        {
+            if (_pmdgRaw is null || _pmdgFuelUtc is null)
+            {
+                return new PmdgNg3FuelDto { Available = false, LayoutOk = false };
+            }
+
+            var bytes = _pmdgRaw;
+            var ageMs = (long)(DateTime.UtcNow - _pmdgFuelUtc.Value).TotalMilliseconds;
+            var nonzero = PmdgNg3ClientData.CountNonZero(bytes);
+
+            float center = 0, left = 0, right = 0;
+            var offset = _pmdgFuelOffset;
+            if (offset < 0)
+            {
+                offset = PmdgNg3ClientData.FindFuelOffset(
+                    bytes,
+                    expectCenterLb,
+                    expectLeftLb,
+                    expectRightLb,
+                    out center,
+                    out left,
+                    out right);
+                if (offset >= 0)
+                {
+                    _pmdgFuelOffset = offset;
+                    Console.WriteLine($"[simconnect] PMDG fuel locked via scan at offset {offset}");
+                }
+            }
+
+            if (offset < 0)
+            {
+                // Fall back to SDK struct offsets from the managed layout mirror.
+                offset = PmdgNg3ClientData.OffsetQtyCenter;
+                PmdgNg3ClientData.TryReadFloat(bytes, PmdgNg3ClientData.OffsetQtyCenter, out center);
+                PmdgNg3ClientData.TryReadFloat(bytes, PmdgNg3ClientData.OffsetQtyLeft, out left);
+                PmdgNg3ClientData.TryReadFloat(bytes, PmdgNg3ClientData.OffsetQtyRight, out right);
+                Console.WriteLine(
+                    $"[simconnect] PMDG raw nonzero={nonzero}/916; struct offsets C/L/R=" +
+                    $"{PmdgNg3ClientData.OffsetQtyCenter}/{PmdgNg3ClientData.OffsetQtyLeft}/{PmdgNg3ClientData.OffsetQtyRight} " +
+                    $"values={center:F1}/{left:F1}/{right:F1} expect≈{expectCenterLb:F0}/{expectLeftLb:F0}/{expectRightLb:F0}");
+            }
+            else if (_pmdgFuelOffset >= 0)
+            {
+                PmdgNg3ClientData.TryReadFloat(bytes, offset, out center);
+                PmdgNg3ClientData.TryReadFloat(bytes, offset + 4, out left);
+                PmdgNg3ClientData.TryReadFloat(bytes, offset + 8, out right);
+            }
+
+            bool? weightInKg = null;
+            if (PmdgNg3ClientData.TryReadFloat(bytes, PmdgNg3ClientData.OffsetWeightInKg, out _))
+            {
+                // WeightInKg is a bool at that offset — read as byte.
+                if (PmdgNg3ClientData.OffsetWeightInKg < bytes.Length)
+                {
+                    weightInKg = bytes[PmdgNg3ClientData.OffsetWeightInKg] != 0;
+                }
+            }
+
+            var layoutOk =
+                nonzero > 0 &&
+                left >= 0 && right >= 0 && center >= 0 &&
+                left < 100_000 && right < 100_000 && center < 100_000 &&
+                (expectLeftLb < 50 || RelClose(left, expectLeftLb) || RelClose(right, expectRightLb));
+
+            return new PmdgNg3FuelDto
+            {
+                Available = true,
+                LayoutOk = layoutOk,
+                LayoutOffset = offset,
+                LeftLb = left,
+                RightLb = right,
+                CenterLb = center,
+                WeightInKg = weightInKg,
+                AgeMs = ageMs,
+                NonzeroBytes = nonzero
+            };
+        }
+    }
+
+    private static bool RelClose(double actual, double expect)
+    {
+        var scale = Math.Max(Math.Abs(expect), 25.0);
+        return Math.Abs(actual - expect) / scale < 0.08;
+    }
+
     public async ValueTask DisposeAsync()
     {
         await DisconnectAsync().ConfigureAwait(false);
@@ -558,6 +724,99 @@ public sealed class SimConnectClient : ISimClient
         Console.WriteLine($"[simconnect] connected app={data.szApplicationName}");
     }
 
+    private void EnsurePmdgNg3Subscribed(SimConnect sim)
+    {
+        if (_pmdgNg3Subscribed)
+        {
+            return;
+        }
+
+        // Managed receive uses a blittable 916-byte RawBlob (typed PMDGNG3DataStruct
+        // does not fill reliably through RegisterStruct for non-blittable layouts).
+        sim.MapClientDataNameToID(PmdgNg3ClientData.DataAreaName, ClientDataIds.PmdgNg3);
+        sim.AddToClientDataDefinition(
+            ClientDataDefinitions.PmdgNg3Data,
+            0,
+            916,
+            0,
+            SimConnect.SIMCONNECT_UNUSED);
+        sim.RegisterStruct<SIMCONNECT_RECV_CLIENT_DATA, PmdgNg3ClientData.RawBlob>(
+            ClientDataDefinitions.PmdgNg3Data);
+        sim.RequestClientData(
+            ClientDataIds.PmdgNg3,
+            ClientDataRequests.PmdgNg3Data,
+            ClientDataDefinitions.PmdgNg3Data,
+            SIMCONNECT_CLIENT_DATA_PERIOD.SECOND,
+            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.DEFAULT,
+            0,
+            0,
+            0);
+        _pmdgNg3Subscribed = true;
+        Console.WriteLine(
+            $"[simconnect] subscribed to PMDG_NG3_Data raw 916-byte blob; " +
+            $"QtyCenter/Left/Right offsets={PmdgNg3ClientData.OffsetQtyCenter}/" +
+            $"{PmdgNg3ClientData.OffsetQtyLeft}/{PmdgNg3ClientData.OffsetQtyRight}");
+    }
+
+    private void RequestPmdgNg3DataOnce(SimConnect sim)
+    {
+        if (!_pmdgNg3Subscribed)
+        {
+            return;
+        }
+
+        sim.RequestClientData(
+            ClientDataIds.PmdgNg3,
+            ClientDataRequests.PmdgNg3DataOnce,
+            ClientDataDefinitions.PmdgNg3Data,
+            SIMCONNECT_CLIENT_DATA_PERIOD.ONCE,
+            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.DEFAULT,
+            0,
+            0,
+            0);
+    }
+
+    private void OnRecvClientData(SimConnect sender, SIMCONNECT_RECV_CLIENT_DATA data)
+    {
+        if (data.dwRequestID != (uint)ClientDataRequests.PmdgNg3Data &&
+            data.dwRequestID != (uint)ClientDataRequests.PmdgNg3DataOnce)
+        {
+            return;
+        }
+
+        try
+        {
+            if (data.dwData is null || data.dwData.Length == 0)
+            {
+                return;
+            }
+
+            if (data.dwData[0] is not PmdgNg3ClientData.RawBlob blob)
+            {
+                Console.Error.WriteLine(
+                    $"[simconnect] PMDG client data unexpected type: {data.dwData[0]?.GetType().FullName ?? "null"}");
+                return;
+            }
+
+            var bytes = PmdgNg3ClientData.ToBytes(blob);
+            lock (_pmdgFuelGate)
+            {
+                _pmdgRaw = bytes;
+                _pmdgFuelUtc = DateTime.UtcNow;
+            }
+
+            if (_pending.TryRemove(data.dwRequestID, out var tcs))
+            {
+                tcs.TrySetResult(bytes);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[simconnect] PMDG client data parse error: {ex.Message}");
+        }
+    }
+
+
     private void OnRecvQuit(SimConnect sender, SIMCONNECT_RECV data)
     {
         _openReceived = false;
@@ -568,8 +827,16 @@ public sealed class SimConnectClient : ISimClient
     private void OnRecvException(SimConnect sender, SIMCONNECT_RECV_EXCEPTION data)
     {
         // 3 = UNRECOGNIZED_ID — often harmless leftover from ClearDataDefinition.
+        // 31 = invalid data size (e.g. Client Data request larger than published area).
+        var hint = data.dwException switch
+        {
+            3 => " (UNRECOGNIZED_ID)",
+            29 => " (DUPLICATE_ID — client-data datumId collision)",
+            31 => " (OUT_OF_BOUNDS — client-data blob too large?)",
+            _ => ""
+        };
         Console.Error.WriteLine(
-            $"[simconnect] exception={data.dwException} sendId={data.dwSendID} index={data.dwIndex}");
+            $"[simconnect] exception={data.dwException}{hint} sendId={data.dwSendID} index={data.dwIndex}");
         // Intentionally do not cancel pending reads here; write-path noise was stealing verifies.
     }
 

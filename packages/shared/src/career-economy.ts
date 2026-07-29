@@ -51,6 +51,68 @@ export function getCommodity(id: CommodityId): CommodityDef {
   return COMMODITY_BY_ID[id];
 }
 
+/** Reference coordinates for career hubs (WGS84). */
+export const CAREER_HUB_COORDS: Readonly<
+  Record<string, { lat: number; lon: number; name?: string }>
+> = {
+  SBGR: { lat: -23.4356, lon: -46.4731, name: 'São Paulo/Guarulhos' },
+  SBGL: { lat: -22.8099, lon: -43.2506, name: 'Rio de Janeiro/Galeão' },
+  SBKP: { lat: -23.0074, lon: -47.1345, name: 'Campinas/Viracopos' },
+  SBBR: { lat: -15.8692, lon: -47.9208, name: 'Brasília' },
+  SBCF: { lat: -19.6244, lon: -43.9719, name: 'Belo Horizonte/Confins' },
+  SBSV: { lat: -12.9086, lon: -38.3225, name: 'Salvador' },
+  SBCT: { lat: -25.5285, lon: -49.1758, name: 'Curitiba' },
+  KMIA: { lat: 25.7959, lon: -80.287, name: 'Miami Intl' },
+  KJFK: { lat: 40.6413, lon: -73.7781, name: 'New York/JFK' },
+  KORD: { lat: 41.9742, lon: -87.9073, name: "Chicago O'Hare" },
+  KLAX: { lat: 33.9425, lon: -118.4081, name: 'Los Angeles Intl' },
+  EHAM: { lat: 52.3105, lon: 4.7683, name: 'Amsterdam Schiphol' },
+};
+
+export function resolveAirportCoords(
+  icao: string,
+  terminal?: Pick<AirportTerminal, 'lat' | 'lon'> | null,
+): { lat: number; lon: number } | undefined {
+  if (
+    terminal &&
+    Number.isFinite(terminal.lat) &&
+    Number.isFinite(terminal.lon) &&
+    !(terminal.lat === 0 && terminal.lon === 0)
+  ) {
+    return { lat: terminal.lat, lon: terminal.lon };
+  }
+  return CAREER_HUB_COORDS[icao.trim().toUpperCase()];
+}
+
+/** Great-circle distance in nautical miles. */
+export function distanceNm(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const rLat1 = toRad(a.lat);
+  const rLat2 = toRad(b.lat);
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) ** 2;
+  const earthNm = 3440.065;
+  return 2 * earthNm * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** Default radius around dest airport to accept auto-settle (nm). */
+export const DEFAULT_SETTLE_RADIUS_NM = 12;
+
+export function isNearAirport(
+  position: { lat: number; lon: number },
+  airport: { lat: number; lon: number },
+  radiusNm = DEFAULT_SETTLE_RADIUS_NM,
+): { near: boolean; distanceNm: number } {
+  const d = distanceNm(position, airport);
+  return { near: d <= radiusNm, distanceNm: d };
+}
+
 function pile(stockKg: number, capacityKg: number): StockPile {
   return {
     stockKg: clamp(stockKg, 0, capacityKg),
@@ -122,6 +184,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     icao: string;
     name: string;
     region: string;
+    lat: number;
+    lon: number;
     /** Relative production bias by commodity. */
     produce: Partial<Record<CommodityId, number>>;
     /** Relative consumption bias. */
@@ -131,6 +195,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBGR',
       name: 'São Paulo/Guarulhos',
       region: 'BR-SE',
+      lat: CAREER_HUB_COORDS.SBGR!.lat,
+      lon: CAREER_HUB_COORDS.SBGR!.lon,
       produce: { electronics: 1.4, general: 1.1, machinery: 0.9 },
       consume: { perishables: 1.2, general: 1.0 },
     },
@@ -138,6 +204,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBGL',
       name: 'Rio de Janeiro/Galeão',
       region: 'BR-SE',
+      lat: CAREER_HUB_COORDS.SBGL!.lat,
+      lon: CAREER_HUB_COORDS.SBGL!.lon,
       produce: { perishables: 1.3, general: 0.8 },
       consume: { electronics: 1.1, machinery: 1.0 },
     },
@@ -145,6 +213,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBKP',
       name: 'Campinas/Viracopos',
       region: 'BR-SE',
+      lat: CAREER_HUB_COORDS.SBKP!.lat,
+      lon: CAREER_HUB_COORDS.SBKP!.lon,
       produce: { electronics: 1.6, machinery: 1.2 },
       consume: { general: 0.9, perishables: 0.7 },
     },
@@ -152,6 +222,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBBR',
       name: 'Brasília',
       region: 'BR-CW',
+      lat: CAREER_HUB_COORDS.SBBR!.lat,
+      lon: CAREER_HUB_COORDS.SBBR!.lon,
       produce: { general: 1.0 },
       consume: { electronics: 1.0, perishables: 1.1, machinery: 0.8 },
     },
@@ -159,6 +231,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBCF',
       name: 'Belo Horizonte/Confins',
       region: 'BR-SE',
+      lat: CAREER_HUB_COORDS.SBCF!.lat,
+      lon: CAREER_HUB_COORDS.SBCF!.lon,
       produce: { machinery: 1.3, general: 1.0 },
       consume: { electronics: 0.9, perishables: 1.0 },
     },
@@ -166,6 +240,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBSV',
       name: 'Salvador',
       region: 'BR-NE',
+      lat: CAREER_HUB_COORDS.SBSV!.lat,
+      lon: CAREER_HUB_COORDS.SBSV!.lon,
       produce: { perishables: 1.5, general: 0.9 },
       consume: { electronics: 0.8, machinery: 0.7 },
     },
@@ -173,6 +249,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBCT',
       name: 'Curitiba',
       region: 'BR-S',
+      lat: CAREER_HUB_COORDS.SBCT!.lat,
+      lon: CAREER_HUB_COORDS.SBCT!.lon,
       produce: { machinery: 1.1, perishables: 1.0 },
       consume: { electronics: 0.9, general: 1.0 },
     },
@@ -180,6 +258,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'KMIA',
       name: 'Miami Intl',
       region: 'US-SE',
+      lat: CAREER_HUB_COORDS.KMIA!.lat,
+      lon: CAREER_HUB_COORDS.KMIA!.lon,
       produce: { electronics: 1.2, general: 1.3 },
       consume: { perishables: 1.4, machinery: 0.9 },
     },
@@ -187,13 +267,17 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'KJFK',
       name: 'New York/JFK',
       region: 'US-NE',
+      lat: CAREER_HUB_COORDS.KJFK!.lat,
+      lon: CAREER_HUB_COORDS.KJFK!.lon,
       produce: { general: 1.1 },
       consume: { electronics: 1.3, perishables: 1.2, machinery: 1.0 },
     },
     {
       icao: 'KORD',
-      name: 'Chicago O’Hare',
+      name: "Chicago O'Hare",
       region: 'US-MW',
+      lat: CAREER_HUB_COORDS.KORD!.lat,
+      lon: CAREER_HUB_COORDS.KORD!.lon,
       produce: { machinery: 1.5, general: 1.2 },
       consume: { electronics: 1.0, perishables: 1.0 },
     },
@@ -201,6 +285,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'KLAX',
       name: 'Los Angeles Intl',
       region: 'US-W',
+      lat: CAREER_HUB_COORDS.KLAX!.lat,
+      lon: CAREER_HUB_COORDS.KLAX!.lon,
       produce: { electronics: 1.5, perishables: 1.1 },
       consume: { machinery: 1.0, general: 1.1 },
     },
@@ -208,6 +294,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'EHAM',
       name: 'Amsterdam Schiphol',
       region: 'EU-W',
+      lat: CAREER_HUB_COORDS.EHAM!.lat,
+      lon: CAREER_HUB_COORDS.EHAM!.lon,
       produce: { general: 1.2, perishables: 1.0 },
       consume: { electronics: 1.1, machinery: 1.2 },
     },
@@ -238,6 +326,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: h.icao,
       name: h.name,
       region: h.region,
+      lat: h.lat,
+      lon: h.lon,
       level,
       inventory,
       production,

@@ -21,6 +21,10 @@ export interface AirportTerminal {
   name: string;
   /** Geographic / economic region tag for shocks later. */
   region: string;
+  /** WGS84 latitude (degrees) — used for live settle proximity. */
+  lat: number;
+  /** WGS84 longitude (degrees). */
+  lon: number;
   /**
    * Terminal development level (Transport Fever–style growth later).
    * MVP: affects capacity slightly; raised when shortages are repeatedly filled.

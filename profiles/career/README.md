@@ -18,5 +18,5 @@ npm run career -- cancel --mission <id>
 
 Loop: accept → dispatch (Intent→OFP) → load/compare → **watch** (or depart/settle) → wallet credit.
 
-`career watch` polls SimBridge: wheels-up → depart; touchdown + engines off → settle.
-Destination ICAO is not verified from the sim yet (no live airport read).
+`career watch` polls SimBridge: wheels-up → depart; touchdown + engines off **near dest** (lat/lon ≤12 nm) → settle.
+Use `--allow-any-airport` to skip the destination proximity gate; `--radius-nm N` to change it.

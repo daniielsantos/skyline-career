@@ -1,9 +1,15 @@
+import {
+  DEFAULT_SETTLE_RADIUS_NM,
+  isNearAirport,
+} from './career-economy.js';
 import type { MissionIntent, MissionStatus } from './types/career-economy.js';
 
 /** Minimal live gates used for career auto-depart / auto-settle. */
 export interface FlightGroundSample {
   onGround: boolean;
   enginesRunning: boolean;
+  /** Optional aircraft position (degrees). */
+  position?: { lat: number; lon: number };
 }
 
 export interface MissionFlightWatchState {
@@ -16,6 +22,11 @@ export interface MissionFlightWatchState {
 export type MissionFlightEvent =
   | { type: 'depart'; reason: string }
   | { type: 'settle'; reason: string }
+  | {
+      type: 'settle_blocked';
+      reason: string;
+      distanceNm?: number;
+    }
   | { type: 'none' };
 
 export interface EvaluateMissionFlightOpts {
@@ -23,12 +34,63 @@ export interface EvaluateMissionFlightOpts {
   requireEnginesOffToSettle?: boolean;
   /** Auto-depart from these statuses. */
   departFrom?: readonly MissionStatus[];
+  /** Destination airport coords for proximity gate. */
+  destCoords?: { lat: number; lon: number };
+  /** Max distance from dest to allow settle (nm). Default 12. */
+  settleRadiusNm?: number;
+  /**
+   * When true (default), require live position near dest to settle.
+   * If position is missing while required, settle is blocked.
+   */
+  requireDestProximity?: boolean;
 }
 
 const DEFAULT_DEPART_FROM: readonly MissionStatus[] = ['accepted', 'dispatched'];
 
 export function createMissionFlightWatchState(): MissionFlightWatchState {
   return { sawAirborne: false };
+}
+
+function gateSettleByDestination(
+  sample: FlightGroundSample,
+  opts: EvaluateMissionFlightOpts,
+  baseReason: string,
+): MissionFlightEvent {
+  const requireProximity = opts.requireDestProximity !== false;
+  if (!requireProximity) {
+    return { type: 'settle', reason: baseReason };
+  }
+
+  const dest = opts.destCoords;
+  if (!dest) {
+    return {
+      type: 'settle_blocked',
+      reason: `${baseReason}, but destination coords unknown — cannot verify airport`,
+    };
+  }
+
+  const pos = sample.position;
+  if (!pos) {
+    return {
+      type: 'settle_blocked',
+      reason: `${baseReason}, but aircraft position unavailable — cannot verify destination`,
+    };
+  }
+
+  const radius = opts.settleRadiusNm ?? DEFAULT_SETTLE_RADIUS_NM;
+  const { near, distanceNm } = isNearAirport(pos, dest, radius);
+  if (!near) {
+    return {
+      type: 'settle_blocked',
+      reason: `${baseReason}, but ${distanceNm.toFixed(1)} nm from dest (need ≤${radius} nm)`,
+      distanceNm,
+    };
+  }
+
+  return {
+    type: 'settle',
+    reason: `${baseReason} near dest (${distanceNm.toFixed(1)} nm)`,
+  };
 }
 
 /**
@@ -74,12 +136,11 @@ export function evaluateMissionFlightTransition(
     (!requireEnginesOff || !sample.enginesRunning)
   ) {
     return {
-      event: {
-        type: 'settle',
-        reason: requireEnginesOff
-          ? 'touchdown + engines off'
-          : 'touchdown (SIM ON GROUND true)',
-      },
+      event: gateSettleByDestination(
+        sample,
+        opts,
+        requireEnginesOff ? 'touchdown + engines off' : 'touchdown (SIM ON GROUND true)',
+      ),
       nextState,
     };
   }
@@ -91,8 +152,6 @@ export function evaluateMissionFlightTransition(
     requireEnginesOff &&
     sample.enginesRunning
   ) {
-    // Keep lastOnGround true so we don't re-fire touchdown every tick;
-    // settle when engines go cold while still on ground.
     return { event: { type: 'none' }, nextState };
   }
 
@@ -104,12 +163,8 @@ export function evaluateMissionFlightTransition(
     state.lastOnGround === true &&
     sample.enginesRunning === false
   ) {
-    // Engines shut down after landing (already on ground last tick).
     return {
-      event: {
-        type: 'settle',
-        reason: 'engines off after landing',
-      },
+      event: gateSettleByDestination(sample, opts, 'engines off after landing'),
       nextState,
     };
   }

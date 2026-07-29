@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  CAREER_HUB_COORDS,
   createMissionFlightWatchState,
+  distanceNm,
   evaluateMissionFlightTransition,
+  isNearAirport,
   pickActiveMission,
   type MissionIntent,
 } from './index.js';
@@ -27,6 +30,27 @@ function mission(status: MissionIntent['status']): MissionIntent {
   };
 }
 
+const SBBR = CAREER_HUB_COORDS.SBBR!;
+const KMIA = CAREER_HUB_COORDS.KMIA!;
+
+describe('distanceNm / isNearAirport', () => {
+  it('measures KMIA→SBBR as a long-haul distance', () => {
+    const d = distanceNm(KMIA, SBBR);
+    assert.ok(d > 2_500 && d < 4_000, `got ${d} nm`);
+  });
+
+  it('treats positions within airport radius as near', () => {
+    const near = isNearAirport(
+      { lat: SBBR.lat + 0.02, lon: SBBR.lon },
+      SBBR,
+      12,
+    );
+    assert.equal(near.near, true);
+    const far = isNearAirport(KMIA, SBBR, 12);
+    assert.equal(far.near, false);
+  });
+});
+
 describe('evaluateMissionFlightTransition', () => {
   it('does not fire on first sample (bootstrap)', () => {
     let state = createMissionFlightWatchState();
@@ -34,6 +58,7 @@ describe('evaluateMissionFlightTransition', () => {
       mission('dispatched'),
       { onGround: true, enginesRunning: true },
       state,
+      { requireDestProximity: false },
     );
     assert.equal(first.event.type, 'none');
     state = first.nextState;
@@ -42,6 +67,7 @@ describe('evaluateMissionFlightTransition', () => {
       mission('dispatched'),
       { onGround: true, enginesRunning: true },
       state,
+      { requireDestProximity: false },
     );
     assert.equal(stillGround.event.type, 'none');
   });
@@ -79,21 +105,69 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(spool.event.type, 'none');
   });
 
-  it('settles on touchdown after airborne when engines off', () => {
+  it('settles when near dest after airborne + engines off', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      { onGround: false, enginesRunning: true, position: { lat: -10, lon: -45 } },
+      state,
+      { destCoords: SBBR },
+    ).nextState;
+
+    const down = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        position: { lat: SBBR.lat, lon: SBBR.lon },
+      },
+      state,
+      { destCoords: SBBR },
+    );
+    assert.equal(down.event.type, 'settle');
+  });
+
+  it('blocks settle when landed far from destination', () => {
     let state = createMissionFlightWatchState();
     state = evaluateMissionFlightTransition(
       mission('in_flight'),
       { onGround: false, enginesRunning: true },
       state,
+      { destCoords: SBBR },
     ).nextState;
-    assert.equal(state.sawAirborne, true);
 
-    const down = evaluateMissionFlightTransition(
+    const wrongAirport = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        position: { lat: KMIA.lat, lon: KMIA.lon },
+      },
+      state,
+      { destCoords: SBBR },
+    );
+    assert.equal(wrongAirport.event.type, 'settle_blocked');
+    if (wrongAirport.event.type === 'settle_blocked') {
+      assert.ok((wrongAirport.event.distanceNm ?? 0) > 100);
+    }
+  });
+
+  it('blocks settle when position is missing', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      { onGround: false, enginesRunning: true },
+      state,
+      { destCoords: SBBR },
+    ).nextState;
+
+    const noPos = evaluateMissionFlightTransition(
       mission('in_flight'),
       { onGround: true, enginesRunning: false },
       state,
+      { destCoords: SBBR },
     );
-    assert.equal(down.event.type, 'settle');
+    assert.equal(noPos.event.type, 'settle_blocked');
   });
 
   it('waits for engines off after touchdown by default', () => {
@@ -102,40 +176,53 @@ describe('evaluateMissionFlightTransition', () => {
       mission('in_flight'),
       { onGround: false, enginesRunning: true },
       state,
+      { destCoords: SBBR },
     ).nextState;
 
     const taxi = evaluateMissionFlightTransition(
       mission('in_flight'),
-      { onGround: true, enginesRunning: true },
+      {
+        onGround: true,
+        enginesRunning: true,
+        position: { lat: SBBR.lat, lon: SBBR.lon },
+      },
       state,
+      { destCoords: SBBR },
     );
     assert.equal(taxi.event.type, 'none');
     state = taxi.nextState;
 
     const shutdown = evaluateMissionFlightTransition(
       mission('in_flight'),
-      { onGround: true, enginesRunning: false },
+      {
+        onGround: true,
+        enginesRunning: false,
+        position: { lat: SBBR.lat, lon: SBBR.lon },
+      },
       state,
+      { destCoords: SBBR },
     );
     assert.equal(shutdown.event.type, 'settle');
-    if (shutdown.event.type === 'settle') {
-      assert.match(shutdown.event.reason, /engines off/i);
-    }
   });
 
-  it('can settle on touchdown without waiting for engines when configured', () => {
+  it('can settle on touchdown without engines when near dest', () => {
     let state = createMissionFlightWatchState();
     state = evaluateMissionFlightTransition(
       mission('in_flight'),
       { onGround: false, enginesRunning: true },
       state,
+      { destCoords: SBBR },
     ).nextState;
 
     const down = evaluateMissionFlightTransition(
       mission('in_flight'),
-      { onGround: true, enginesRunning: true },
+      {
+        onGround: true,
+        enginesRunning: true,
+        position: { lat: SBBR.lat, lon: SBBR.lon },
+      },
       state,
-      { requireEnginesOffToSettle: false },
+      { requireEnginesOffToSettle: false, destCoords: SBBR },
     );
     assert.equal(down.event.type, 'settle');
   });

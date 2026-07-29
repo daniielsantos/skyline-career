@@ -18,6 +18,8 @@ describe('career-economy seed', () => {
       assert.ok(ap.inventory.perishables);
       assert.ok(ap.inventory.machinery);
       assert.ok(ap.inventory.general);
+      assert.ok(Number.isFinite(ap.lat));
+      assert.ok(Number.isFinite(ap.lon));
     }
   });
 });

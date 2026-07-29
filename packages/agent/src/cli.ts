@@ -72,6 +72,7 @@ import {
   listViableMarketLots,
   parseFreighterClassId,
   pickActiveMission,
+  resolveAirportCoords,
   settleMission,
   tickEconomyN,
   type CommodityId,
@@ -1295,7 +1296,7 @@ async function main(): Promise<void> {
   career dispatch --mission <id> [--simbrief-user ALIAS] [--no-open] [--compare] [--missions path] [--save path]
   career depart --mission <id> [--save path] [--missions path]
   career settle --mission <id> [--save path] [--missions path] [--json]
-  career watch [--mission id] [--interval 5] [--settle-on-touchdown] [--no-depart] [--no-settle] [--save path] [--missions path] [--pipe name]
+  career watch [--mission id] [--interval 5] [--settle-on-touchdown] [--allow-any-airport] [--radius-nm 12] [--no-depart] [--no-settle] [--save path] [--missions path] [--pipe name]
 `);
       return;
     }
@@ -1673,6 +1674,8 @@ async function main(): Promise<void> {
       const autoDepart = !hasFlag(subArgs, '--no-depart');
       const autoSettle = !hasFlag(subArgs, '--no-settle');
       const requireEnginesOff = !hasFlag(subArgs, '--settle-on-touchdown');
+      const requireDestProximity = !hasFlag(subArgs, '--allow-any-airport');
+      const settleRadiusNm = getNumberFlag(subArgs, '--radius-nm') ?? 12;
       const missionIdFlag = getFlag(subArgs, '--mission');
 
       let stop = false;
@@ -1705,32 +1708,51 @@ async function main(): Promise<void> {
       console.log(
         `Career watch every ${intervalSec}s (Ctrl+C to stop)` +
           `${autoDepart ? ' [auto-depart]' : ''}${autoSettle ? ' [auto-settle]' : ''}` +
-          `${requireEnginesOff ? ' [engines-off]' : ' [touchdown]'}`,
+          `${requireEnginesOff ? ' [engines-off]' : ' [touchdown]'}` +
+          `${requireDestProximity ? ` [dest≤${settleRadiusNm}nm]` : ' [any-airport]'}`,
       );
       console.log(`Watching: ${formatMissionSummary(current)}`);
-      console.log(
-        'Note: destination ICAO is not verified from the sim yet — settle fires on landing after airborne.',
-      );
 
       let watchState = createMissionFlightWatchState();
+      let lastBlockedLog = '';
 
       await withBridge(pipeName, async (bridge) => {
         while (!stop) {
           const snap = await bridge.snapshot();
+          let position: { lat: number; lon: number } | undefined;
+          try {
+            const lat = await bridge.readSimVar({ name: 'PLANE LATITUDE', unit: 'degrees' });
+            const lon = await bridge.readSimVar({ name: 'PLANE LONGITUDE', unit: 'degrees' });
+            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+              position = { lat, lon };
+            }
+          } catch {
+            position = undefined;
+          }
+
           const sample = {
             onGround: snap.onGround,
             enginesRunning: snap.enginesRunning,
+            position,
           };
 
-          // Reload mission in case another process updated it
+          const world = await loadOrCreateCareerEconomy(savePath);
           const missions = await loadOrCreateCareerMissions(missionsPath);
           current = pickActiveMission(missions.missions, current.id) ?? current;
+
+          const destTerminal = world.airports.find((a) => a.icao === current.destIcao);
+          const destCoords = resolveAirportCoords(current.destIcao, destTerminal);
 
           const { event, nextState } = evaluateMissionFlightTransition(
             current,
             sample,
             watchState,
-            { requireEnginesOffToSettle: requireEnginesOff },
+            {
+              requireEnginesOffToSettle: requireEnginesOff,
+              requireDestProximity,
+              destCoords,
+              settleRadiusNm,
+            },
           );
           watchState = nextState;
 
@@ -1739,15 +1761,22 @@ async function main(): Promise<void> {
               ? 'ground+engines'
               : 'ground'
             : 'airborne';
+          const posLabel = position
+            ? ` pos=${position.lat.toFixed(3)},${position.lon.toFixed(3)}`
+            : ' pos=?';
 
           if (event.type === 'none') {
             if (!asJson) {
               console.log(
-                `[watch] ${new Date().toISOString()}  ${phaseLabel}  mission=${current.status}  sawAirborne=${watchState.sawAirborne}`,
+                `[watch] ${new Date().toISOString()}  ${phaseLabel}${posLabel}  mission=${current.status}  sawAirborne=${watchState.sawAirborne}`,
               );
             }
+          } else if (event.type === 'settle_blocked') {
+            if (event.reason !== lastBlockedLog) {
+              console.log(`[watch] SETTLE BLOCKED: ${event.reason}`);
+              lastBlockedLog = event.reason;
+            }
           } else if (event.type === 'depart' && autoDepart) {
-            const world = await loadOrCreateCareerEconomy(savePath);
             let departed: MissionIntent;
             try {
               departed = departMission(world, current);
@@ -1764,7 +1793,6 @@ async function main(): Promise<void> {
             current = departed;
             console.log(`[watch] AUTO-DEPART (${event.reason}): ${formatMissionSummary(departed)}`);
           } else if (event.type === 'settle' && autoSettle) {
-            const world = await loadOrCreateCareerEconomy(savePath);
             let settled;
             try {
               settled = settleMission(world, current);

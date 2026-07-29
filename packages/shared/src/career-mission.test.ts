@@ -1,13 +1,15 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   acceptMission,
   cancelMission,
   compareMissionIntentToOfp,
   createSeedEconomyWorld,
+  departMission,
   getAircraftClass,
   listMarketLots,
   normalizeOfpExpectation,
+  settleMission,
   tickEconomyN,
   type MissionIntent,
 } from './index.js';
@@ -188,5 +190,81 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(check.verdict, 'warn');
     assert.ok(check.findings.some((f) => f.code === 'INTENT_ORIGIN_MISSING'));
     assert.ok(check.findings.some((f) => f.code === 'INTENT_DEST_MISSING'));
+  });
+});
+
+describe('settleMission', () => {
+  it('delivers cargo on-time and pays full freight', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-ontime' });
+    tickEconomyN(world, 24);
+    const lot = listMarketLots(world)[0]!.lot;
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_settle_1',
+    });
+    const destBefore =
+      world.airports.find((a) => a.icao === mission.destIcao)!.inventory[mission.commodityId]!
+        .stockKg;
+
+    const departed = departMission(world, { ...mission, status: 'dispatched' });
+    assert.equal(departed.status, 'in_flight');
+
+    const result = settleMission(world, departed);
+    assert.equal(result.mission.status, 'settled');
+    assert.equal(result.settlement.onTime, true);
+    assert.equal(result.settlement.penaltyUsd, 0);
+    assert.equal(result.settlement.payoutUsd, mission.payUsd);
+    assert.equal(result.walletCreditUsd, mission.payUsd);
+
+    const destAfter =
+      world.airports.find((a) => a.icao === mission.destIcao)!.inventory[mission.commodityId]!
+        .stockKg;
+    assert.ok(destAfter > destBefore);
+    assert.equal(result.settlement.destStockAfterKg, destAfter);
+  });
+
+  it('applies late penalty after deadline', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-late' });
+    tickEconomyN(world, 24);
+    const lot = listMarketLots(world)[0]!.lot;
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 4_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_late',
+    });
+    const tight: MissionIntent = {
+      ...mission,
+      status: 'dispatched',
+      deadlineTick: world.tick,
+      urgency: 'urgent',
+      payUsd: 1_000,
+    };
+    tickEconomyN(world, 3);
+    const result = settleMission(world, tight);
+    assert.equal(result.settlement.lateTicks, 3);
+    assert.equal(result.settlement.onTime, false);
+    assert.equal(result.settlement.penaltyUsd, Math.min(1_000, Math.round(1_000 * 3 * 0.12)));
+    assert.equal(result.settlement.payoutUsd, 1_000 - result.settlement.penaltyUsd);
+  });
+
+  it('settle from accepted auto-departs then closes lot portion', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-auto' });
+    tickEconomyN(world, 24);
+    const marketLot = listMarketLots(world)[0]!.lot;
+    const fullQty = marketLot.quantityKg;
+    const mission = acceptMission(world, {
+      lotId: marketLot.id,
+      cargoKg: fullQty,
+      aircraftClassId: 'wide_freighter',
+      missionId: 'msn_full',
+    });
+    assert.equal(marketLot.status, 'reserved');
+    const result = settleMission(world, mission);
+    assert.equal(result.mission.status, 'settled');
+    assert.equal(marketLot.status, 'delivered');
+    assert.equal(marketLot.quantityKg, 0);
   });
 });

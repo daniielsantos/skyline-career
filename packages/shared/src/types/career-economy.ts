@@ -124,9 +124,31 @@ export interface MissionIntent {
   /** Set when career dispatch opens SimBrief. */
   staticId?: string;
   dispatchedAtTick?: number;
+  /** Economy tick when cargo left origin (career depart). */
+  departedAtTick?: number;
+  /** Economy tick when settle ran. */
+  settledAtTick?: number;
+  /** Freight paid after late penalty. */
+  payoutUsd?: number;
+  /** Late delivery penalty deducted from payUsd. */
+  penaltyUsd?: number;
+  lateTicks?: number;
+}
+
+export interface MissionSettlement {
+  missionId: string;
+  deliveredKg: number;
+  payoutUsd: number;
+  penaltyUsd: number;
+  lateTicks: number;
+  onTime: boolean;
+  originStockAfterKg: number;
+  destStockAfterKg: number;
 }
 
 export interface CareerMissionsState {
   version: 1;
+  /** Company cash from settled freights (Slice 4). */
+  walletUsd: number;
   missions: MissionIntent[];
 }

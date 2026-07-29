@@ -258,6 +258,46 @@ function airportMap(world: CareerEconomyWorld): Map<string, AirportTerminal> {
   return new Map(world.airports.map((a) => [a.icao, a]));
 }
 
+/**
+ * Apply a freight delivery to terminal stocks.
+ * Removes up to `kg` from origin; credits full `kg` into dest (capacity-clamped).
+ * Dest credit can exceed origin draw because lot formation soft-commits surplus.
+ */
+export function applyFreightDelivery(
+  world: CareerEconomyWorld,
+  opts: {
+    commodityId: CommodityId;
+    originIcao: string;
+    destIcao: string;
+    kg: number;
+  },
+): { removedFromOriginKg: number; addedToDestKg: number; originStockKg: number; destStockKg: number } {
+  const byIcao = airportMap(world);
+  const origin = byIcao.get(opts.originIcao.toUpperCase());
+  const dest = byIcao.get(opts.destIcao.toUpperCase());
+  if (!origin) {
+    throw new Error(`Unknown origin airport: ${opts.originIcao}`);
+  }
+  if (!dest) {
+    throw new Error(`Unknown destination airport: ${opts.destIcao}`);
+  }
+
+  const qty = Math.max(0, Math.floor(opts.kg));
+  const oStock = ensurePile(origin, opts.commodityId);
+  const dStock = ensurePile(dest, opts.commodityId);
+  const removedFromOriginKg = Math.min(qty, oStock.stockKg);
+  oStock.stockKg = clamp(oStock.stockKg - removedFromOriginKg, 0, oStock.capacityKg);
+  const room = Math.max(0, dStock.capacityKg - dStock.stockKg);
+  const addedToDestKg = Math.min(qty, room);
+  dStock.stockKg = clamp(dStock.stockKg + addedToDestKg, 0, dStock.capacityKg);
+  return {
+    removedFromOriginKg,
+    addedToDestKg,
+    originStockKg: oStock.stockKg,
+    destStockKg: dStock.stockKg,
+  };
+}
+
 function applyProductionConsumption(world: CareerEconomyWorld): void {
   for (const ap of world.airports) {
     for (const c of CAREER_COMMODITIES) {

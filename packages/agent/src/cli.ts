@@ -51,6 +51,7 @@ import {
 } from './ofp-compliance/career-economy-store.js';
 import {
   DEFAULT_CAREER_MISSIONS_PATH,
+  creditWallet,
   findMission,
   loadOrCreateCareerMissions,
   saveCareerMissions,
@@ -61,11 +62,14 @@ import {
   cancelMission,
   compareMissionIntentToOfp,
   createSeedEconomyWorld,
+  departMission,
   formatIntentOfpCheck,
   formatMissionSummary,
+  formatSettlementSummary,
   listMarketLots,
   listViableMarketLots,
   parseFreighterClassId,
+  settleMission,
   tickEconomyN,
   type CommodityId,
   type ComplianceBaseline,
@@ -96,7 +100,7 @@ function usage(): never {
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
-  msfs-compat-agent career init|tick|market|accept|missions|cancel|dispatch [--save path] [--missions path] [--lot id] [--mission id] [--kg n] [--aircraft class] [--simbrief-user ALIAS] [--n ticks] [--json]
+  msfs-compat-agent career init|tick|market|accept|missions|cancel|dispatch|depart|settle [--save path] [--missions path] [--lot id] [--mission id] [--kg n] [--aircraft class] [--simbrief-user ALIAS] [--n ticks] [--json]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -1285,6 +1289,8 @@ async function main(): Promise<void> {
   career missions [--missions path] [--json]
   career cancel --mission <id> [--save path] [--missions path]
   career dispatch --mission <id> [--simbrief-user ALIAS] [--no-open] [--compare] [--missions path] [--save path]
+  career depart --mission <id> [--save path] [--missions path]
+  career settle --mission <id> [--save path] [--missions path] [--json]
 `);
       return;
     }
@@ -1413,11 +1419,11 @@ async function main(): Promise<void> {
         (m) => m.status === 'accepted' || m.status === 'dispatched' || m.status === 'in_flight',
       );
       if (asJson) {
-        console.log(JSON.stringify({ missions: missions.missions }, null, 2));
+        console.log(JSON.stringify({ walletUsd: missions.walletUsd, missions: missions.missions }, null, 2));
         return;
       }
       console.log(
-        `Career missions active=${active.length} total=${missions.missions.length}  (${missionsPath})`,
+        `Career missions active=${active.length} total=${missions.missions.length}  wallet=$${missions.walletUsd.toLocaleString()}  (${missionsPath})`,
       );
       for (const m of missions.missions.slice().reverse()) {
         console.log(`  ${formatMissionSummary(m)}`);
@@ -1588,9 +1594,71 @@ async function main(): Promise<void> {
         }
       } else {
         console.log(
-          'Next: Load from SimBrief in the EFB, then: npm run compare-ofp -- --simbrief-user YOUR_ALIAS',
+          'Next: Load from SimBrief in the EFB, then compare-ofp; after landing: npm run career -- settle --mission ' +
+            mission.id,
         );
       }
+      return;
+    }
+
+    if (sub === 'depart') {
+      const missionId = getFlag(subArgs, '--mission');
+      if (!missionId) {
+        console.error('career depart requires --mission <id>');
+        process.exit(1);
+      }
+      const world = await loadOrCreateCareerEconomy(savePath);
+      const missions = await loadOrCreateCareerMissions(missionsPath);
+      const existing = findMission(missions, missionId);
+      if (!existing) {
+        console.error(`Unknown mission: ${missionId}`);
+        process.exit(1);
+      }
+      let departed;
+      try {
+        departed = departMission(world, existing);
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+      upsertMission(missions, departed);
+      await saveCareerEconomy(savePath, world);
+      await saveCareerMissions(missionsPath, missions);
+      console.log(`Departed: ${formatMissionSummary(departed)}`);
+      console.log(`Next: after landing → npm run career -- settle --mission ${departed.id}`);
+      return;
+    }
+
+    if (sub === 'settle') {
+      const missionId = getFlag(subArgs, '--mission');
+      if (!missionId) {
+        console.error('career settle requires --mission <id>');
+        process.exit(1);
+      }
+      const world = await loadOrCreateCareerEconomy(savePath);
+      const missions = await loadOrCreateCareerMissions(missionsPath);
+      const existing = findMission(missions, missionId);
+      if (!existing) {
+        console.error(`Unknown mission: ${missionId}`);
+        process.exit(1);
+      }
+      let result;
+      try {
+        result = settleMission(world, existing);
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+      }
+      upsertMission(missions, result.mission);
+      const wallet = creditWallet(missions, result.walletCreditUsd);
+      await saveCareerEconomy(savePath, world);
+      await saveCareerMissions(missionsPath, missions);
+      if (asJson) {
+        console.log(JSON.stringify({ ...result, walletUsd: wallet }, null, 2));
+        return;
+      }
+      console.log(formatSettlementSummary(result.settlement, wallet));
+      console.log(`Mission: ${formatMissionSummary(result.mission)}`);
       return;
     }
 

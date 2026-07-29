@@ -5,7 +5,17 @@ import type { CareerMissionsState, MissionIntent } from '@msfs-compat/shared';
 export const DEFAULT_CAREER_MISSIONS_PATH = 'profiles/career/local-missions.json';
 
 export function emptyMissionsState(): CareerMissionsState {
-  return { version: 1, missions: [] };
+  return { version: 1, walletUsd: 0, missions: [] };
+}
+
+function normalizeMissionsState(parsed: CareerMissionsState): CareerMissionsState {
+  return {
+    version: 1,
+    walletUsd: typeof parsed.walletUsd === 'number' && Number.isFinite(parsed.walletUsd)
+      ? parsed.walletUsd
+      : 0,
+    missions: Array.isArray(parsed.missions) ? parsed.missions : [],
+  };
 }
 
 export async function loadCareerMissions(path: string): Promise<CareerMissionsState> {
@@ -14,7 +24,7 @@ export async function loadCareerMissions(path: string): Promise<CareerMissionsSt
   if (parsed.version !== 1 || !Array.isArray(parsed.missions)) {
     throw new Error(`Invalid career missions file: ${path}`);
   }
-  return parsed;
+  return normalizeMissionsState(parsed);
 }
 
 export async function saveCareerMissions(
@@ -23,7 +33,8 @@ export async function saveCareerMissions(
 ): Promise<void> {
   const abs = resolve(path);
   await mkdir(dirname(abs), { recursive: true });
-  await writeFile(abs, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  const normalized = normalizeMissionsState(state);
+  await writeFile(abs, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
 }
 
 export async function loadOrCreateCareerMissions(path: string): Promise<CareerMissionsState> {
@@ -50,4 +61,9 @@ export function findMission(
   missionId: string,
 ): MissionIntent | undefined {
   return state.missions.find((m) => m.id === missionId);
+}
+
+export function creditWallet(state: CareerMissionsState, amountUsd: number): number {
+  state.walletUsd = Math.round((state.walletUsd + amountUsd) * 100) / 100;
+  return state.walletUsd;
 }

@@ -1,4 +1,5 @@
 import {
+  applyFreightDelivery,
   getCommodity,
   listMarketLots,
   type CareerEconomyWorld,
@@ -14,6 +15,7 @@ import type {
   AircraftClass,
   FreighterClassId,
   MissionIntent,
+  MissionSettlement,
   ShipmentLot,
 } from './types/career-economy.js';
 
@@ -21,6 +23,7 @@ export type {
   AircraftClass,
   FreighterClassId,
   MissionIntent,
+  MissionSettlement,
   MissionStatus,
   CareerMissionsState,
 } from './types/career-economy.js';
@@ -184,6 +187,144 @@ export function cancelMission(
   return { ...mission, status: 'cancelled' };
 }
 
+/**
+ * Mark cargo airborne. Allowed from accepted or dispatched.
+ * Fully-reserved lots flip to in_transit so the market stops offering them.
+ */
+export function departMission(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+): MissionIntent {
+  if (mission.status !== 'accepted' && mission.status !== 'dispatched') {
+    throw new Error(`Cannot depart mission in status=${mission.status}`);
+  }
+  const lot = findLot(world, mission.shipmentLotId);
+  if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
+    lot.status = 'in_transit';
+  }
+  return {
+    ...mission,
+    status: 'in_flight',
+    departedAtTick: world.tick,
+  };
+}
+
+export interface SettleMissionOpts {
+  /** Override world.tick for late calculation (tests). */
+  tick?: number;
+}
+
+export interface SettleMissionResult {
+  mission: MissionIntent;
+  settlement: MissionSettlement;
+  /** Wallet delta to apply (payoutUsd). */
+  walletCreditUsd: number;
+}
+
+/** Late penalty as a fraction of pay per overdue tick. */
+function latePenaltyRate(urgency: MissionIntent['urgency']): number {
+  return urgency === 'urgent' ? 0.12 : 0.06;
+}
+
+function computeSettlementPay(
+  mission: MissionIntent,
+  settleTick: number,
+): { lateTicks: number; penaltyUsd: number; payoutUsd: number; onTime: boolean } {
+  const lateTicks = Math.max(0, settleTick - mission.deadlineTick);
+  const onTime = lateTicks === 0;
+  const rate = latePenaltyRate(mission.urgency);
+  const penaltyUsd = onTime
+    ? 0
+    : Math.min(mission.payUsd, Math.round(mission.payUsd * lateTicks * rate));
+  const payoutUsd = Math.max(0, mission.payUsd - penaltyUsd);
+  return { lateTicks, penaltyUsd, payoutUsd, onTime };
+}
+
+/**
+ * Deliver cargo into the destination terminal, shrink the lot, pay freight (minus late penalty).
+ * Accepts dispatched or in_flight (auto-departs if still dispatched).
+ */
+export function settleMission(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  opts: SettleMissionOpts = {},
+): SettleMissionResult {
+  if (
+    mission.status !== 'dispatched' &&
+    mission.status !== 'in_flight' &&
+    mission.status !== 'accepted'
+  ) {
+    throw new Error(`Cannot settle mission in status=${mission.status}`);
+  }
+
+  let working = mission;
+  if (working.status === 'accepted' || working.status === 'dispatched') {
+    working = departMission(world, working);
+  }
+
+  const settleTick = opts.tick ?? world.tick;
+  const delivery = applyFreightDelivery(world, {
+    commodityId: working.commodityId,
+    originIcao: working.originIcao,
+    destIcao: working.destIcao,
+    kg: working.cargoKg,
+  });
+
+  const lot = findLot(world, working.shipmentLotId);
+  const bookKg = working.cargoKg;
+  lot.reservedKg = Math.max(0, lot.reservedKg - bookKg);
+  lot.quantityKg = Math.max(0, lot.quantityKg - bookKg);
+  if (lot.quantityKg <= 0) {
+    lot.quantityKg = 0;
+    lot.reservedKg = 0;
+    lot.status = 'delivered';
+  } else if (lot.reservedKg <= 0) {
+    lot.reservedKg = 0;
+    lot.status = 'available';
+  } else {
+    lot.status = 'reserved';
+  }
+
+  const pay = computeSettlementPay(working, settleTick);
+  const settled: MissionIntent = {
+    ...working,
+    status: 'settled',
+    settledAtTick: settleTick,
+    payoutUsd: pay.payoutUsd,
+    penaltyUsd: pay.penaltyUsd,
+    lateTicks: pay.lateTicks,
+  };
+
+  return {
+    mission: settled,
+    walletCreditUsd: pay.payoutUsd,
+    settlement: {
+      missionId: settled.id,
+      deliveredKg: bookKg,
+      payoutUsd: pay.payoutUsd,
+      penaltyUsd: pay.penaltyUsd,
+      lateTicks: pay.lateTicks,
+      onTime: pay.onTime,
+      originStockAfterKg: delivery.originStockKg,
+      destStockAfterKg: delivery.destStockKg,
+    },
+  };
+}
+
+export function formatSettlementSummary(
+  settlement: MissionSettlement,
+  walletUsd: number,
+): string {
+  const late =
+    settlement.lateTicks > 0
+      ? ` LATE +${settlement.lateTicks} tick(s) penalty=$${settlement.penaltyUsd.toLocaleString()}`
+      : ' on-time';
+  return (
+    `Settled ${settlement.missionId}: delivered ${(settlement.deliveredKg / 1000).toFixed(1)}t` +
+    `  payout=$${settlement.payoutUsd.toLocaleString()}${late}  wallet=$${walletUsd.toLocaleString()}`
+  );
+}
+
 /** Market rows that fit under the aircraft cargo limit (at least 1 kg). */
 export function listViableMarketLots(
   world: CareerEconomyWorld,
@@ -198,10 +339,14 @@ export function formatMissionSummary(mission: MissionIntent): string {
   const commodity = getCommodity(mission.commodityId);
   const aircraft = getAircraftClass(mission.aircraftClassId);
   const urgent = mission.urgency === 'urgent' ? ' URGENT' : '';
+  const payout =
+    mission.status === 'settled' && mission.payoutUsd !== undefined
+      ? `  paid=$${mission.payoutUsd.toLocaleString()}`
+      : '';
   return (
     `${mission.id}  [${mission.status}]  ${mission.originIcao}→${mission.destIcao}  ` +
     `${commodity.name}  ${(mission.cargoKg / 1000).toFixed(1)}t  pay=$${mission.payUsd.toLocaleString()}` +
-    `${urgent}  via ${aircraft.id}  due@tick ${mission.deadlineTick}`
+    `${urgent}  via ${aircraft.id}  due@tick ${mission.deadlineTick}${payout}`
   );
 }
 

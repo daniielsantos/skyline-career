@@ -35,6 +35,8 @@
     "weights": ["tfdi-efb-lvars"],
     "payload": ["tfdi-efb"]
   },
+  "simbriefIcao": "MD1F",
+  "simbriefAirframeMatch": "TFDi Design \\(MSFS\\) - MD-11F",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "First Officer", "role": "crew" },

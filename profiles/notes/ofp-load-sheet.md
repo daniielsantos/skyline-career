@@ -1,20 +1,60 @@
 # OFP / SimBrief load sheet → live monitoring
 
-Skyline compares the **latest SimBrief OFP** (or a manual JSON) against live sim state. Write/load of fuel on PMDG is **out of scope** — the user loads via SimBrief/EFB/FMC; we only monitor.
+Skyline compares a **SimBrief OFP** (or a manual JSON) against live sim state. Write/load of fuel on PMDG is **out of scope** — the user loads via SimBrief/EFB/FMC; we only monitor.
 
-## Fetch from SimBrief (preferred)
+## Generate OFP (Dispatch Redirect)
+
+Skyline prefills SimBrief with the **correct airframe variant** (not bare `B738`), plus pax/cargo. **Fuel stays AUTO**.
+
+```bash
+# Homologated aircraft loaded in MSFS — auto pack + SimBrief Dual Class Internal ID
+npm run generate-ofp -- --orig SBGR --dest SBGL --pax 156 --simbrief-user YOUR_ALIAS
+
+# Or explicit roles pack (no sim needed for variant resolve)
+npm run generate-ofp -- --orig SBGR --dest SBGL --pax 156 --roles profiles/ofp/pmdg-738-pax.json --simbrief-user YOUR_ALIAS
+
+# Optional total manual payload (17.336 thousand kg = 17,336 kg)
+# Normally omit: SimBrief derives payload from pax + cargo.
+npm run generate-ofp -- --orig SBGR --dest SBGL --pax 156 --payload 17.336 --roles profiles/ofp/pmdg-738-pax.json --simbrief-user YOUR_ALIAS
+
+# Freighter BCF
+npm run generate-ofp -- --orig KMIA --dest SBGR --pax 0 --cargo 20 --roles profiles/ofp/pmdg-738-bcf.json --simbrief-user YOUR_ALIAS
+
+# List public variants for an ICAO
+npm run generate-ofp -- --list-airframes B738
+npm run generate-ofp -- --list-airframes MD1F
+
+# Override variant manually (Internal ID from list above)
+npm run generate-ofp -- --orig SBGR --dest SBGL --type 746599_1761165451022 --pax 156 --simbrief-user YOUR_ALIAS
+```
+
+Packs declare `simbriefIcao` + `simbriefAirframeMatch` (regex on SimBrief `airframe_comments`). At generate time we resolve the live Internal ID from `inputs.airframes.json` (IDs can change; the match string is stable).
+
+`--pax` pre-fills passengers. `--cargo` and `--payload` use SimBrief's
+thousands-of-selected-unit convention; `--cargo-weight` / `--payload-weight`
+accept absolute weight in the selected unit.
+
+| Pack | SimBrief ICAO | Variant match |
+|------|---------------|---------------|
+| `pmdg-738-pax` | B738 | PMDG Dual Class |
+| `pmdg-738-bcf` | B738 | Boeing Converted Freighter |
+| `tfdi-md11f` | MD1F | TFDi MD-11F (PW/GE from title) |
+| `toliss-a346` | A346 | Aerosoft A340-600 Pro Standard GW |
+
+## Fetch + compare (after OFP exists)
 
 ```bash
 # Navigraph Alias from SimBrief Account Settings
-npm run compare-ofp -- --simbrief-user YOUR_ALIAS --roles profiles/ofp/pmdg-738-ssw-tc.json
+npm run compare-ofp -- --simbrief-user YOUR_ALIAS
 
 # or Pilot ID
-npm run compare-ofp -- --simbrief-userid 123456 --roles profiles/ofp/pmdg-738-ssw-tc.json
+npm run compare-ofp -- --simbrief-userid 123456
 
 # env defaults: SIMBRIEF_USERNAME / SIMBRIEF_USERID
 ```
 
-Uses `https://www.simbrief.com/api/xml.fetcher.php?…&json=v2` (latest OFP only — call on user action, do not poll).
+Uses `https://www.simbrief.com/api/xml.fetcher.php?…&json=v2` (call on user action, do not poll).  
+`generate-ofp` passes `static_id` so the fetch targets the OFP you just created.
 
 | SimBrief JSON | OFP field |
 |---------------|-----------|
@@ -32,19 +72,17 @@ Uses `https://www.simbrief.com/api/xml.fetcher.php?…&json=v2` (latest OFP only
 Flight type / mission params (pax, bags/cargo, …)
         │
         ▼
-  Generate OFP via SimBrief  ──►  block fuel + ZFW/TOW computed
+  generate-ofp (Dispatch Redirect)  ──►  user Generate  ──►  fetch OFP
         │
         ▼
   User loads aircraft (EFB/FMC) to match OFP
         │
         ▼
-  Skyline fetch OFP + compare-ofp / monitor-ofp
+  compare-ofp / monitor-ofp
         │
         ▼
   pass / warn / fail  (career gate)
 ```
-
-Today: **fetch + compare** is live. **Generate** OFP from career params (SimBrief dispatch API) is the next build step.
 
 **Homologating a new airframe?** See [`ofp-homologation.md`](./ofp-homologation.md).  
 PMDG 737-800 PAX: `npm run scaffold-ofp-roles` then `compare-ofp` (auto roles — no `--roles` needed).

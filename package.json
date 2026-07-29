@@ -31,6 +31,7 @@
     "probe-payload-stations": "node packages/agent/dist/cli.js probe-payload-stations",
     "pmdg-cdu": "node packages/agent/dist/cli.js pmdg-cdu",
     "compare-ofp": "node packages/agent/dist/cli.js compare-ofp",
+    "generate-ofp": "node packages/agent/dist/cli.js generate-ofp",
     "monitor-ofp": "node packages/agent/dist/cli.js monitor-ofp",
     "test:shared": "npm run test -w @msfs-compat/shared",
     "test:agent": "npm run test -w @msfs-compat/agent",

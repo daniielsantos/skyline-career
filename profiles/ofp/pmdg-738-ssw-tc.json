@@ -43,6 +43,8 @@
     "weights": ["pmdg-efb-lvars"],
     "payload": ["pmdg-efb", "classic-stations"]
   },
+  "simbriefIcao": "B738",
+  "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Dual Class",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1", "role": "passenger", "cfgFirstField": 16 },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2", "role": "passenger", "cfgFirstField": 45 },

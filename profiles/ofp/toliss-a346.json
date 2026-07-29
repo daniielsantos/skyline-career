@@ -33,6 +33,8 @@
     "weights": ["classic-weights"],
     "payload": ["classic-stations"]
   },
+  "simbriefIcao": "A346",
+  "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Copilot", "role": "crew" },

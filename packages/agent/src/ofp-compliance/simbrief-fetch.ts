@@ -18,6 +18,11 @@ const FETCHER = 'https://www.simbrief.com/api/xml.fetcher.php';
 export interface SimBriefFetchOpts {
   username?: string;
   userid?: string;
+  /**
+   * When set, fetch the OFP tied to this Dispatch Redirect / API static_id
+   * instead of whatever happens to be the user's absolute latest flight.
+   */
+  staticId?: string;
   /** Optional station roles (e.g. from PMDG homologation). */
   stationRoles?: OfpStationRoleMap;
   /** Fetch implementation (tests). */
@@ -186,6 +191,9 @@ export async function fetchSimBriefLatestOfp(opts: SimBriefFetchOpts): Promise<{
     qs.set('userid', userid);
   } else if (username) {
     qs.set('username', username);
+  }
+  if (opts.staticId?.trim()) {
+    qs.set('static_id', opts.staticId.trim());
   }
 
   const url = `${FETCHER}?${qs.toString()}`;

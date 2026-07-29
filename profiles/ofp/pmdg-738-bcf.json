@@ -34,6 +34,8 @@
     "weights": ["pmdg-efb-lvars"],
     "payload": ["pmdg-efb", "classic-stations"]
   },
+  "simbriefIcao": "B738",
+  "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Boeing Converted Freighter",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1 (main deck cargo)", "role": "baggage" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2 (main deck cargo)", "role": "baggage" },

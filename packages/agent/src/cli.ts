@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
+import { createInterface } from 'node:readline';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -25,11 +26,23 @@ import { buildOfpExpectation, applyOfpOverrides, loadLiveSourcesFromFile, loadSt
 import { compareOnce, formatComplianceSummary } from './ofp-compliance/run-compare.js';
 import { fetchSimBriefLatestOfp } from './ofp-compliance/simbrief-fetch.js';
 import {
+  buildDispatchRedirectUrl,
+  cargoWeightToThousands,
+  makeStaticId,
+  openDispatchInBrowser,
+} from './ofp-compliance/simbrief-dispatch.js';
+import {
+  fetchSimBriefAirframesForIcao,
+  resolveSimBriefDispatchType,
+} from './ofp-compliance/simbrief-airframes.js';
+import {
   buildRolesPackFromHeuristic,
+  loadRolesPackFile,
   matchHeuristic,
   resolveRolesPackForTitle,
   slugFromAircraftTitle,
   writeRolesPack,
+  type OfpRolesPackFile,
 } from './ofp-compliance/scaffold-roles.js';
 import { type ComplianceBaseline, type LiveFuelState } from '@msfs-compat/shared';
 
@@ -38,7 +51,7 @@ const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|pmdg-cdu|compare-ofp|monitor-ofp|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|pmdg-cdu|generate-ofp|compare-ofp|monitor-ofp|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -53,6 +66,7 @@ function usage(): never {
   msfs-compat-agent probe-payload-stations [--pipe <name>]
   msfs-compat-agent scaffold-ofp-roles [--write] [--out path.json] [--pipe <name>]
   msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
+  msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
 
@@ -65,6 +79,7 @@ Notes:
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
   scaffold-ofp-roles: detect known family from live title and print/write roles pack
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
+  generate-ofp: Dispatch Redirect with homologated SimBrief variant (pack match / live title); fuel AUTO → fetch by static_id
   compare-ofp / monitor-ofp: fetch latest SimBrief OFP; omit --roles to auto-pick pack from aircraft title
 `);
   process.exit(1);
@@ -109,6 +124,17 @@ function getNumberFlag(args: string[], name: string): number | undefined {
   }
   const n = Number(raw);
   return Number.isFinite(n) ? n : undefined;
+}
+
+async function waitForEnter(prompt: string): Promise<void> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    await new Promise<void>((resolveWait) => {
+      rl.question(prompt, () => resolveWait());
+    });
+  } finally {
+    rl.close();
+  }
 }
 
 async function resolveOfpFromArgs(
@@ -985,6 +1011,228 @@ async function main(): Promise<void> {
         }
       }
     });
+    return;
+  }
+
+  if (command === 'generate-ofp') {
+    const listIcao = getFlag(rest, '--list-airframes');
+    if (listIcao) {
+      const airframes = await fetchSimBriefAirframesForIcao(listIcao);
+      if (airframes.length === 0) {
+        console.error(`No SimBrief airframes for ${listIcao.toUpperCase()}`);
+        process.exit(1);
+      }
+      console.log(`SimBrief variants for ${listIcao.toUpperCase()}:`);
+      for (const a of airframes) {
+        console.log(`  ${a.internalId}  pax=${a.passengers}  ${a.comments || a.name}`);
+      }
+      return;
+    }
+
+    const orig = getFlag(rest, '--orig');
+    const dest = getFlag(rest, '--dest');
+    if (!orig || !dest) {
+      console.error('generate-ofp requires --orig and --dest (and a SimBrief variant via --type, --roles, or live aircraft)');
+      usage();
+    }
+
+    const simbriefUser =
+      getFlag(rest, '--simbrief-user') ?? process.env.SIMBRIEF_USERNAME ?? undefined;
+    const simbriefUserid =
+      getFlag(rest, '--simbrief-userid') ?? process.env.SIMBRIEF_USERID ?? undefined;
+    if (!simbriefUser && !simbriefUserid) {
+      console.error(
+        'generate-ofp requires --simbrief-user (or SIMBRIEF_USERNAME) / --simbrief-userid to fetch after Generate',
+      );
+      process.exit(1);
+    }
+
+    let type = getFlag(rest, '--type');
+    let titleHint: string | undefined;
+    let rolesPack: OfpRolesPackFile | undefined;
+    const rolesPathFlag = getFlag(rest, '--roles');
+
+    if (rolesPathFlag) {
+      rolesPack = await loadRolesPackFile(rolesPathFlag);
+      console.log(`Roles pack: ${rolesPathFlag}`);
+    }
+
+    if (!type || !rolesPack) {
+      try {
+        await withBridge(pipeName, async (bridge) => {
+          titleHint = (await bridge.getAircraftIdentity()).title;
+          if (!rolesPack) {
+            const ofpDir = join(repoRoot, 'profiles', 'ofp');
+            const resolved = await resolveRolesPackForTitle(titleHint, ofpDir);
+            if (resolved) {
+              rolesPack = resolved.pack;
+              console.log(`Auto roles: ${resolved.via} ← ${titleHint}`);
+            } else {
+              console.log(`No roles pack matched for "${titleHint}".`);
+            }
+          } else {
+            console.log(`Live title: ${titleHint}`);
+          }
+        });
+      } catch (error) {
+        if (!type && !rolesPack?.simbriefAirframeMatch) {
+          console.error(
+            `Could not read live aircraft (${error instanceof Error ? error.message : String(error)}).`,
+          );
+          console.error(
+            'Without MSFS/SimBridge, pass a roles pack or explicit type, e.g.:',
+          );
+          console.error(
+            '  npm run generate-ofp -- --orig SBGR --dest SBGL --pax 156 --roles profiles/ofp/pmdg-738-pax.json --simbrief-user YOUR_ALIAS',
+          );
+          console.error(
+            '  npm run generate-ofp -- --orig SBGR --dest SBGL --pax 156 --type 746599_1761165451022 --simbrief-user YOUR_ALIAS',
+          );
+          console.error('Or start the sim host: npm run start:local');
+          process.exit(1);
+        }
+        console.log(
+          `Live aircraft unavailable — resolving variant from pack/flags only (${error instanceof Error ? error.message : String(error)}).`,
+        );
+      }
+    }
+
+    if (!type) {
+      const simbriefIcao = rolesPack?.simbriefIcao ?? rolesPack?.icao;
+      const match = rolesPack?.simbriefAirframeMatch;
+      if (!simbriefIcao || !match) {
+        console.error(
+          'No SimBrief variant: pass --type <internalId|ICAO>, or use a roles pack with simbriefIcao + simbriefAirframeMatch (or spawn a homologated aircraft).',
+        );
+        console.error('Tip: npm run generate-ofp -- --list-airframes B738');
+        process.exit(1);
+      }
+      console.log(`Resolving SimBrief variant: icao=${simbriefIcao} match=/${match}/`);
+      const resolved = await resolveSimBriefDispatchType({
+        simbriefIcao,
+        simbriefAirframeMatch: match,
+        titleHint,
+      });
+      type = resolved.type;
+      console.log(
+        `SimBrief type=${type}  (${resolved.airframe.comments || resolved.airframe.name}, pax=${resolved.airframe.passengers})`,
+      );
+    } else {
+      console.log(`SimBrief type=${type} (--type override)`);
+    }
+
+    const unitsRaw = (getFlag(rest, '--units') ?? 'kg').toLowerCase();
+    const units = unitsRaw === 'lb' || unitsRaw === 'lbs' ? 'LBS' : 'KGS';
+    const pax = getNumberFlag(rest, '--pax') ?? getNumberFlag(rest, '--passengers');
+    const cargoThousands = getNumberFlag(rest, '--cargo');
+    const cargoWeight = getNumberFlag(rest, '--cargo-weight');
+    const cargo =
+      cargoThousands !== undefined
+        ? cargoThousands
+        : cargoWeight !== undefined
+          ? cargoWeightToThousands(cargoWeight)
+          : undefined;
+    const payloadThousands = getNumberFlag(rest, '--payload');
+    const payloadWeight = getNumberFlag(rest, '--payload-weight');
+    const manualPayload =
+      payloadThousands !== undefined
+        ? payloadThousands
+        : payloadWeight !== undefined
+          ? cargoWeightToThousands(payloadWeight)
+          : undefined;
+
+    const staticId = getFlag(rest, '--static-id') ?? makeStaticId();
+    const url = buildDispatchRedirectUrl({
+      type,
+      orig,
+      dest,
+      pax,
+      cargo,
+      manualPayload,
+      units,
+      staticId,
+      airline: getFlag(rest, '--airline'),
+      fltnum: getFlag(rest, '--fltnum'),
+      route: getFlag(rest, '--route'),
+      altn: getFlag(rest, '--altn'),
+      reg: getFlag(rest, '--reg'),
+      callsign: getFlag(rest, '--callsign'),
+    });
+
+    console.log(`static_id=${staticId}`);
+    console.log(`Dispatch URL:\n  ${url}`);
+    if (pax === undefined && cargo === undefined) {
+      console.log(
+        'Note: pax/cargo omitted — SimBrief may AUTO-load. Freighter: pass --pax 0 --cargo <thousands>.',
+      );
+    }
+    console.log('Fuel planning left to SimBrief AUTO (not sent).');
+
+    if (!hasFlag(rest, '--no-open')) {
+      openDispatchInBrowser(url);
+      console.log('Opened SimBrief Dispatch in your browser.');
+    } else {
+      console.log('Skipped browser open (--no-open).');
+    }
+
+    await waitForEnter(
+      'After you click Generate on SimBrief and the OFP is ready, press Enter to fetch… ',
+    );
+
+    console.log(
+      `Fetching OFP (${simbriefUserid ? `userid=${simbriefUserid}` : `user=${simbriefUser}`}, static_id=${staticId})…`,
+    );
+    const { expectation, raw } = await fetchSimBriefLatestOfp({
+      username: simbriefUser,
+      userid: simbriefUserid,
+      staticId,
+    });
+
+    const origin = raw.general
+      ? `${raw.aircraft?.icaocode ?? type} ${raw.general.icao_airline ?? ''}${raw.general.flight_number ?? ''}`.trim()
+      : expectation.ofpId ?? 'simbrief';
+    console.log(
+      `OFP ready: ${origin}  units=${expectation.fuel.unit}  block=${expectation.loadSheet?.blockFuel ?? '?'}  burn=${expectation.loadSheet?.enrouteBurn ?? '?'}  payload=${expectation.loadSheet?.payload ?? '?'}  pax=${expectation.loadSheet?.passengerCount ?? '?'}  bags=${expectation.loadSheet?.baggage ?? '?'}  zfw=${expectation.loadSheet?.zfw ?? '?'}`,
+    );
+
+    if (hasFlag(rest, '--compare')) {
+      const locked = hasFlag(rest, '--lock');
+      const asJson = hasFlag(rest, '--json');
+      const { snapshot } = await withBridge(pipeName, async (bridge) => {
+        const title = (await bridge.getAircraftIdentity()).title;
+        const ofpDir = join(repoRoot, 'profiles', 'ofp');
+        const resolved = await resolveRolesPackForTitle(title, ofpDir);
+        let ofp = expectation;
+        if (resolved) {
+          console.log(`Auto roles: ${resolved.via} ← ${title}`);
+          const stationRoles = await loadStationRolesFromFile(resolved.path);
+          const liveSources = await loadLiveSourcesFromFile(resolved.path);
+          ofp = applyOfpOverrides(expectation, { stationRoles, liveSources });
+        } else if (rolesPack) {
+          ofp = applyOfpOverrides(expectation, {
+            stationRoles: rolesPack.payload?.stationRoles,
+            liveSources: rolesPack.liveSources,
+          });
+        } else {
+          console.log(`No roles pack matched for "${title}" — payload/pax/bags checks may warn.`);
+        }
+        return compareOnce(bridge, { ofp, locked });
+      });
+      if (asJson) {
+        console.log(JSON.stringify(snapshot, null, 2));
+      } else {
+        console.log(formatComplianceSummary(snapshot));
+      }
+      if (snapshot.verdict === 'fail') {
+        process.exitCode = 2;
+      } else if (snapshot.verdict === 'warn') {
+        process.exitCode = 1;
+      }
+    } else {
+      console.log(
+        'Next: Load from SimBrief in the EFB, then: npm run compare-ofp -- --simbrief-user YOUR_ALIAS',
+      );
+    }
     return;
   }
 

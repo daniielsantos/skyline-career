@@ -21,6 +21,16 @@ export interface OfpRolesPackFile {
   };
   /** Declared live read path — reader skips undeclared vendor probes. */
   liveSources?: OfpLiveSources;
+  /**
+   * ICAO key in SimBrief airframes.json (may differ from MSFS/OFP icao —
+   * e.g. freighter MD-11F uses MD1F).
+   */
+  simbriefIcao?: string;
+  /**
+   * Regex source / substring matched against SimBrief airframe_comments
+   * to pick the public variant Internal ID for dispatch `type=`.
+   */
+  simbriefAirframeMatch?: string;
   stationMap?: unknown[];
   tolerances?: Record<string, number>;
 }
@@ -32,6 +42,8 @@ export interface ScaffoldHeuristic {
   titlePattern: RegExp;
   stationRoles: OfpStationRoleMap;
   liveSources: OfpLiveSources;
+  simbriefIcao?: string;
+  simbriefAirframeMatch?: string;
   stationMap: Array<{
     simVarIndex: number;
     cfgIndex: number;
@@ -76,6 +88,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       averagePassengerWeight: 86.18,
     },
     liveSources: PMDG_738_LIVE_SOURCES,
+    simbriefIcao: 'B738',
+    simbriefAirframeMatch: 'PMDG \\(MSFS\\) - Dual Class',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'PaxZone1', role: 'passenger' },
       { simVarIndex: 2, cfgIndex: 1, name: 'PaxZone2', role: 'passenger' },
@@ -110,6 +124,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       serviceStations: [10, 11],
     },
     liveSources: PMDG_738_LIVE_SOURCES,
+    simbriefIcao: 'B738',
+    simbriefAirframeMatch: 'PMDG \\(MSFS\\) - Boeing Converted Freighter',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'PaxZone1 (main deck cargo)', role: 'baggage' },
       { simVarIndex: 2, cfgIndex: 1, name: 'PaxZone2 (main deck cargo)', role: 'baggage' },
@@ -144,6 +160,9 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       // :14/:15 are aux tank stations — not cargo
     },
     liveSources: TFDI_MD11_LIVE_SOURCES,
+    simbriefIcao: 'MD1F',
+    // Title hint (PW/GE) disambiguates among TFDi freighter variants.
+    simbriefAirframeMatch: 'TFDi Design \\(MSFS\\) - MD-11F',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'First Officer', role: 'crew' },
@@ -180,6 +199,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       // averagePassengerWeight: leave unset — resolve from OFP (payload−bags)/pax
     },
     liveSources: TOLISS_A346_LIVE_SOURCES,
+    simbriefIcao: 'A346',
+    simbriefAirframeMatch: 'Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'Copilot', role: 'crew' },
@@ -233,6 +254,8 @@ export function buildRolesPackFromHeuristic(
       stationRoles: heuristic.stationRoles,
     },
     liveSources: heuristic.liveSources,
+    simbriefIcao: heuristic.simbriefIcao,
+    simbriefAirframeMatch: heuristic.simbriefAirframeMatch,
     stationMap: heuristic.stationMap,
     tolerances: {
       fuelAbsLb: 200,

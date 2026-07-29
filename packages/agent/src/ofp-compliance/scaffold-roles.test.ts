@@ -21,6 +21,8 @@ describe('scaffold-roles PMDG 738 PAX', () => {
     assert.deepEqual(pack.payload?.stationRoles?.passengerStations, [1, 2, 3, 4]);
     assert.deepEqual(pack.liveSources?.fuel, ['pmdg-ng3', 'classic']);
     assert.deepEqual(pack.liveSources?.weights, ['pmdg-efb-lvars']);
+    assert.equal(pack.simbriefIcao, 'B738');
+    assert.match(pack.simbriefAirframeMatch ?? '', /Dual Class/);
     assert.equal(slugFromAircraftTitle('737-800 PAX BW TC'), '737-800-pax-bw-tc');
   });
 });

@@ -67,3 +67,29 @@ describe('mapSimBriefOfpToExpectation', () => {
     assert.equal(ofp.loadSheet?.baggage, 250);
   });
 });
+
+describe('fetchSimBriefLatestOfp static_id', () => {
+  it('appends static_id to fetcher query', async () => {
+    const { fetchSimBriefLatestOfp } = await import('./simbrief-fetch.js');
+    let requested = '';
+    await fetchSimBriefLatestOfp({
+      username: 'pilot',
+      staticId: 'skyline_abc',
+      fetchImpl: async (input) => {
+        requested = String(input);
+        return new Response(
+          JSON.stringify({
+            params: { units: 'kgs' },
+            fuel: { plan_ramp: '1000' },
+            weights: { payload: '5000', pax_count: '10' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      },
+    });
+    const qs = new URL(requested).searchParams;
+    assert.equal(qs.get('username'), 'pilot');
+    assert.equal(qs.get('static_id'), 'skyline_abc');
+    assert.equal(qs.get('json'), 'v2');
+  });
+});

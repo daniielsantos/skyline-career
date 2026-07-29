@@ -30,7 +30,7 @@ const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|pmdg-cdu|compare-ofp|monitor-ofp|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|pmdg-cdu|compare-ofp|monitor-ofp|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -42,6 +42,7 @@ function usage(): never {
   msfs-compat-agent homologate [--pipe <name>]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
+  msfs-compat-agent probe-payload-stations [--pipe <name>]
   msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
   msfs-compat-agent compare-ofp [--ofp path.json] [--fuel-left n] [--block-fuel n] [--payload-total n] [--baggage n] [--passengers n] [--zfw n] [--tow n] [--empty-weight n] [--station i=lb] [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--ofp path.json] [same load-sheet flags] [--interval sec] [--lock] [--json] [--pipe <name>]
@@ -52,6 +53,7 @@ Notes:
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
+  probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
   compare-ofp / monitor-ofp: OFP/SimBrief load sheet vs live (fuel, payload, baggage/pax if mapped, ZFW/TOW)
 `);
@@ -715,6 +717,49 @@ async function main(): Promise<void> {
       } catch (error) {
         console.log(
           `  (mirror compare skipped: ${error instanceof Error ? error.message : String(error)})`,
+        );
+      }
+    });
+    return;
+  }
+
+  if (command === 'probe-payload-stations' || command === 'payload-stations') {
+    await withBridge(pipeName, async (bridge) => {
+      const identity = await bridge.getAircraftIdentity();
+      console.log(`Aircraft: ${identity.title}`);
+      console.log('Reading PAYLOAD STATION WEIGHT:1..14 (+ empty/gross)…');
+
+      const snapshot = await bridge.snapshot();
+      const stations: Array<{ index: number; lb: number }> = [];
+      let total = 0;
+      for (let i = 1; i <= 14; i++) {
+        const key = `PAYLOAD STATION WEIGHT:${i}`;
+        const lb = snapshot.vars?.[key];
+        if (lb !== undefined && Number.isFinite(lb)) {
+          stations.push({ index: i, lb });
+          total += lb;
+        }
+      }
+
+      const empty = snapshot.vars?.['EMPTY WEIGHT'];
+      const gross = snapshot.grossWeightLb ?? snapshot.vars?.['TOTAL WEIGHT'];
+      console.log(
+        `empty=${empty?.toFixed(0) ?? '?'} lb  gross=${gross?.toFixed(0) ?? '?'} lb  payloadSum=${total.toFixed(1)} lb`,
+      );
+      console.log('Stations (PMDG 738 SSW TC hint: 1-4 pax zones, 5-6 cargo, 7-8 crew):');
+      for (const s of stations) {
+        const hint =
+          s.index <= 4
+            ? 'pax?'
+            : s.index <= 6
+              ? 'cargo?'
+              : s.index <= 8
+                ? 'crew?'
+                : s.index <= 11
+                  ? 'galley/other?'
+                  : '';
+        console.log(
+          `  ${String(s.index).padStart(2)}: ${s.lb.toFixed(1).padStart(10)} lb  ${hint}`,
         );
       }
     });

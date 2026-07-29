@@ -15,6 +15,16 @@ npm run monitor-ofp -- --ofp profiles/ofp/manual-sample.json --lock --interval 5
 
 Load-sheet field map (Block Fuel, Payload, Baggage, Pass, ZFW/TOW): see [`ofp-load-sheet.md`](ofp-load-sheet.md).
 
+### PMDG 738 SSW TC station roles (cfg homologation)
+
+| Stations | Name | Role |
+|----------|------|------|
+| 1–4 | PaxZone1–4 | passenger (163 seats in cfg) |
+| 5–6 | Fwd / Aft Cargo | baggage |
+| 7–8 | Pilot / Copilot | crew |
+
+OFP sample: `profiles/ofp/pmdg-738-ssw-tc.json`. Live check: `npm run probe-payload-stations` after loading pax/bags in the EFB.
+
 ## What failed in homologate
 
 | Probe | Result |

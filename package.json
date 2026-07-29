@@ -27,6 +27,7 @@
     "homologate": "node packages/agent/dist/cli.js homologate",
     "probe-lvars": "node packages/agent/dist/cli.js probe-lvars --preset a2a-aerostar",
     "probe-pmdg-fuel": "node packages/agent/dist/cli.js probe-pmdg-fuel",
+    "probe-payload-stations": "node packages/agent/dist/cli.js probe-payload-stations",
     "pmdg-cdu": "node packages/agent/dist/cli.js pmdg-cdu",
     "compare-ofp": "node packages/agent/dist/cli.js compare-ofp",
     "monitor-ofp": "node packages/agent/dist/cli.js monitor-ofp",

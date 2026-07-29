@@ -38,11 +38,24 @@ Example (illustrative — fill with real PMDG/Asobo station layout later):
 
 Without `stationRoles`, `compare-ofp` still checks block fuel / payload / ZFW / TOW / empty, and emits **warn** `BAGGAGE_UNMAPPED` / `PAX_COUNT_UNMAPPED`.
 
-## Sample matching a SimBrief KG load sheet
+## Example: PMDG 737-800 SSW TC
 
-See [`profiles/ofp/manual-sample.json`](../ofp/manual-sample.json) (Block Fuel 5291, Pass 163, Baggage 4066, Payload 18114, …).
+From `flight_model.cfg` (`station_load.N` → SimConnect `PAYLOAD STATION WEIGHT:N+1`):
+
+| SimVar | Name | Role |
+|--------|------|------|
+| 1–4 | PaxZone1–4 | **passenger** (cfg seat caps 16+45+55+47 = **163**) |
+| 5–6 | Fwd Cargo / Aft Cargo | **baggage** |
+| 7–8 | Pilot / Copilot | crew (not SimBrief Pass) |
+| 9 | Instructor | crew |
+| 10–11 | fwd_gly / aft_gly | galley |
+| 12+ | Point* | unused anchors |
+
+Sample OFP with roles: [`profiles/ofp/pmdg-738-ssw-tc.json`](../ofp/pmdg-738-ssw-tc.json)
 
 ```bash
-npm run compare-ofp -- --ofp profiles/ofp/manual-sample.json
-npm run monitor-ofp -- --ofp profiles/ofp/manual-sample.json --lock --interval 5
+npm run probe-payload-stations
+npm run compare-ofp -- --ofp profiles/ofp/pmdg-738-ssw-tc.json
 ```
+
+Live homologation: load OFP pax/bags via PMDG EFB, run `probe-payload-stations`, confirm stations 1–4 ≈ pax weight and 5–6 ≈ baggage.

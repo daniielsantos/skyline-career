@@ -1,0 +1,59 @@
+{
+  "source": "simbrief",
+  "icao": "B738",
+  "ofpId": "pmdg-738-ssw-tc-sample",
+  "notes": [
+    "Station roles from PMDG 737-800 SSW TC flight_model.cfg station_load.*",
+    "SimConnect PAYLOAD STATION WEIGHT:n is 1-based (station_load.0 → :1)",
+    "PaxZone1..4 seat caps in cfg sum to 163 (16+45+55+47)",
+    "Crew (pilot/copilot) and galleys are excluded from Pass/Baggage roles"
+  ],
+  "fuel": {
+    "unit": "kg"
+  },
+  "loadSheet": {
+    "unit": "kg",
+    "blockFuel": 5291,
+    "enrouteBurn": 2322,
+    "passengerCount": 163,
+    "baggage": 4066,
+    "payload": 18114,
+    "emptyWeight": 42264,
+    "zfw": 60378,
+    "tow": 65442,
+    "lw": 63120,
+    "maxZfw": 62732,
+    "maxTow": 79333,
+    "maxLw": 66361
+  },
+  "payload": {
+    "unit": "kg",
+    "total": 18114,
+    "stationRoles": {
+      "passengerStations": [1, 2, 3, 4],
+      "baggageStations": [5, 6],
+      "averagePassengerWeight": 84
+    }
+  },
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1", "role": "passenger", "cfgFirstField": 16 },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2", "role": "passenger", "cfgFirstField": 45 },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "PaxZone3", "role": "passenger", "cfgFirstField": 55 },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "PaxZone4", "role": "passenger", "cfgFirstField": 47 },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Fwd Cargo", "role": "baggage", "cfgFirstField": 7846 },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Aft Cargo", "role": "baggage", "cfgFirstField": 9799 },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Instructor", "role": "crew" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "fwd_gly", "role": "galley" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "aft_gly", "role": "galley" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

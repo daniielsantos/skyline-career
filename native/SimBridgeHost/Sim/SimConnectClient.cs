@@ -23,10 +23,13 @@ public sealed class SimConnectClient : ISimClient
     private Task? _recvLoop;
     private bool _openReceived;
     private bool _pmdgNg3Subscribed;
+    private bool _pmdgControlSubscribed;
     private readonly object _pmdgFuelGate = new();
+    private readonly object _pmdgControlGate = new();
     private byte[]? _pmdgRaw;
     private DateTime? _pmdgFuelUtc;
     private int _pmdgFuelOffset = -1;
+    private uint _pmdgControlEventId;
 
     private enum Definitions : uint
     {
@@ -56,17 +59,20 @@ public sealed class SimConnectClient : ISimClient
     private enum ClientDataIds : uint
     {
         PmdgNg3 = PmdgNg3ClientData.ClientDataId,
+        PmdgNg3Control = PmdgNg3ClientData.ControlClientDataId,
     }
 
     private enum ClientDataDefinitions : uint
     {
         PmdgNg3Data = PmdgNg3ClientData.DataDefinitionId,
+        PmdgNg3Control = PmdgNg3ClientData.ControlDefinitionId,
     }
 
     private enum ClientDataRequests : uint
     {
         PmdgNg3Data = 51000,
         PmdgNg3DataOnce = 51001,
+        PmdgNg3Control = 51002,
     }
 
     private uint _nextDefId = (uint)Definitions.DynamicBase;
@@ -202,11 +208,16 @@ public sealed class SimConnectClient : ISimClient
 
             _openReceived = false;
             _pmdgNg3Subscribed = false;
+            _pmdgControlSubscribed = false;
             lock (_pmdgFuelGate)
             {
                 _pmdgRaw = null;
                 _pmdgFuelUtc = null;
                 _pmdgFuelOffset = -1;
+            }
+            lock (_pmdgControlGate)
+            {
+                _pmdgControlEventId = 0;
             }
             _recvCts?.Dispose();
             _recvCts = null;
@@ -599,6 +610,138 @@ public sealed class SimConnectClient : ISimClient
         }
     }
 
+    /// <summary>
+    /// Send a PMDG NG3 control. Default path is TransmitClientEvent("#eventId") with
+    /// LEFTSINGLE then LEFTRELEASE (ConnectionTest pattern for momentary switches/CDU).
+    /// Use method=control for SetClientData on PMDG_NG3_Control.
+    /// </summary>
+    public async Task SendPmdgNg3ControlAsync(
+        uint eventId,
+        uint parameter = 0,
+        bool release = true,
+        string method = "event",
+        CancellationToken ct = default)
+    {
+        var param = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
+        var useControl = string.Equals(method, "control", StringComparison.OrdinalIgnoreCase);
+
+        if (useControl)
+        {
+            await SendPmdgControlViaClientDataAsync(eventId, param, ct).ConfigureAwait(false);
+            if (release && param != PmdgNg3Cdu.MouseLeftRelease)
+            {
+                await DelayAsync(50, ct).ConfigureAwait(false);
+                await SendPmdgControlViaClientDataAsync(eventId, PmdgNg3Cdu.MouseLeftRelease, ct)
+                    .ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        // TransmitClientEvent("#NNNNN") — preferred for CDU keys.
+        TransmitPmdgMappedEvent(eventId, param);
+        Console.WriteLine(
+            $"[simconnect] PMDG TransmitClientEvent #{eventId} Parameter=0x{param:X8}");
+
+        if (release && param != PmdgNg3Cdu.MouseLeftRelease)
+        {
+            await DelayAsync(50, ct).ConfigureAwait(false);
+            TransmitPmdgMappedEvent(eventId, PmdgNg3Cdu.MouseLeftRelease);
+            Console.WriteLine(
+                $"[simconnect] PMDG TransmitClientEvent #{eventId} Parameter=0x{PmdgNg3Cdu.MouseLeftRelease:X8} (release)");
+        }
+    }
+
+    private void TransmitPmdgMappedEvent(uint eventId, uint parameter)
+    {
+        var sim = RequireSim();
+        lock (_gate)
+        {
+            // PMDG third-party events map as "#<absoluteEventId>" (see ConnectionTest.cpp).
+            sim.MapClientEventToSimEvent(Events.Dynamic, $"#{eventId}");
+            sim.TransmitClientEvent(
+                SimConnect.SIMCONNECT_OBJECT_ID_USER,
+                Events.Dynamic,
+                parameter,
+                Groups.Default,
+                SIMCONNECT_EVENT_FLAG.GROUPID_IS_PRIORITY);
+        }
+    }
+
+    private async Task SendPmdgControlViaClientDataAsync(uint eventId, uint param, CancellationToken ct)
+    {
+        var sim = RequireSim();
+
+        lock (_gate)
+        {
+            EnsurePmdgNg3ControlReady(sim);
+        }
+
+        await WaitUntilControlEventIdleAsync(ct).ConfigureAwait(false);
+
+        var control = new PMDGNG3Control
+        {
+            EventId = eventId,
+            Parameter = param
+        };
+
+        lock (_gate)
+        {
+            sim = RequireSim();
+            EnsurePmdgNg3ControlReady(sim);
+            lock (_pmdgControlGate)
+            {
+                _pmdgControlEventId = eventId;
+            }
+
+            sim.SetClientData(
+                ClientDataIds.PmdgNg3Control,
+                ClientDataDefinitions.PmdgNg3Control,
+                SIMCONNECT_CLIENT_DATA_SET_FLAG.DEFAULT,
+                0,
+                control);
+        }
+
+        Console.WriteLine($"[simconnect] PMDG control set EventId={eventId} Parameter=0x{param:X8}");
+
+        try
+        {
+            await WaitUntilControlEventIdleAsync(ct).ConfigureAwait(false);
+        }
+        catch (SimClientException ex) when (ex.Code == "TIMEOUT")
+        {
+            Console.WriteLine("[simconnect] PMDG control ack wait timed out (Event not cleared yet)");
+        }
+    }
+
+    private async Task WaitUntilControlEventIdleAsync(CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(1000);
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            uint current;
+            lock (_pmdgControlGate)
+            {
+                current = _pmdgControlEventId;
+            }
+
+            if (current == 0)
+            {
+                return;
+            }
+
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new SimClientException(
+                    "TIMEOUT",
+                    $"Timed out waiting for PMDG_NG3_Control EventId to clear (still {current})");
+            }
+
+            await Task.Delay(20, ct).ConfigureAwait(false);
+        }
+    }
+
     private static bool RelClose(double actual, double expect)
     {
         var scale = Math.Max(Math.Abs(expect), 25.0);
@@ -758,6 +901,37 @@ public sealed class SimConnectClient : ISimClient
             $"{PmdgNg3ClientData.OffsetQtyLeft}/{PmdgNg3ClientData.OffsetQtyRight}");
     }
 
+    private void EnsurePmdgNg3ControlReady(SimConnect sim)
+    {
+        if (_pmdgControlSubscribed)
+        {
+            return;
+        }
+
+        sim.MapClientDataNameToID(PmdgNg3ClientData.ControlAreaName, ClientDataIds.PmdgNg3Control);
+        sim.AddToClientDataDefinition(
+            ClientDataDefinitions.PmdgNg3Control,
+            0,
+            PmdgNg3ClientData.ControlSize,
+            0,
+            SimConnect.SIMCONNECT_UNUSED);
+        sim.RegisterStruct<SIMCONNECT_RECV_CLIENT_DATA, PMDGNG3Control>(
+            ClientDataDefinitions.PmdgNg3Control);
+        // ON_SET + CHANGED so we see Event cleared to 0 after PMDG processes the write.
+        sim.RequestClientData(
+            ClientDataIds.PmdgNg3Control,
+            ClientDataRequests.PmdgNg3Control,
+            ClientDataDefinitions.PmdgNg3Control,
+            SIMCONNECT_CLIENT_DATA_PERIOD.ON_SET,
+            SIMCONNECT_CLIENT_DATA_REQUEST_FLAG.CHANGED,
+            0,
+            0,
+            0);
+        _pmdgControlSubscribed = true;
+        Console.WriteLine(
+            $"[simconnect] PMDG_NG3_Control ready (size={PmdgNg3ClientData.ControlSize})");
+    }
+
     private void RequestPmdgNg3DataOnce(SimConnect sim)
     {
         if (!_pmdgNg3Subscribed)
@@ -778,6 +952,36 @@ public sealed class SimConnectClient : ISimClient
 
     private void OnRecvClientData(SimConnect sender, SIMCONNECT_RECV_CLIENT_DATA data)
     {
+        if (data.dwRequestID == (uint)ClientDataRequests.PmdgNg3Control)
+        {
+            try
+            {
+                if (data.dwData is null || data.dwData.Length == 0)
+                {
+                    return;
+                }
+
+                if (data.dwData[0] is PMDGNG3Control control)
+                {
+                    lock (_pmdgControlGate)
+                    {
+                        _pmdgControlEventId = control.EventId;
+                    }
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        $"[simconnect] PMDG control unexpected type: {data.dwData[0]?.GetType().FullName ?? "null"}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[simconnect] PMDG control parse error: {ex.Message}");
+            }
+
+            return;
+        }
+
         if (data.dwRequestID != (uint)ClientDataRequests.PmdgNg3Data &&
             data.dwRequestID != (uint)ClientDataRequests.PmdgNg3DataOnce)
         {

@@ -81,8 +81,9 @@ public struct PMDGNG3CDUScreen
 /// <summary>
 /// Control area write target — set EventId and Parameter, then SimConnect.SetClientData
 /// will fire the event into the simulator. PMDG WASM zeroes EventId after processing.
+/// Pack=1 keeps sizeof == 8 like the SDK C struct.
 /// </summary>
-[StructLayout(LayoutKind.Sequential)]
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
 public struct PMDGNG3Control
 {
     public uint EventId;

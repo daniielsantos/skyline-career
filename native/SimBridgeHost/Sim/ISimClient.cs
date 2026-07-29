@@ -20,6 +20,18 @@ public interface ISimClient : IAsyncDisposable
     Task DelayAsync(int ms, CancellationToken ct = default);
     Task<AircraftIdentityDto> GetAircraftIdentityAsync(CancellationToken ct = default);
     Task<PmdgNg3FuelDto> ReadPmdgNg3FuelAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Send a PMDG NG3 control. Prefer <c>method=event</c> (TransmitClientEvent <c>#id</c>)
+    /// for CDU/momentary keys — matches ConnectionTest FD switch. <c>method=control</c>
+    /// uses <c>PMDG_NG3_Control</c> SetClientData. When <paramref name="parameter"/> is 0,
+    /// defaults to <see cref="PmdgNg3Cdu.MouseLeftSingle"/>.
+    /// </summary>
+    Task SendPmdgNg3ControlAsync(
+        uint eventId,
+        uint parameter = 0,
+        bool release = true,
+        string method = "event",
+        CancellationToken ct = default);
 }
 
 public sealed class SimClientException : Exception

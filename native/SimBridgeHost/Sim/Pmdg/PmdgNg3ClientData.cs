@@ -16,7 +16,19 @@ public static class PmdgNg3ClientData
 
     public const uint DataDefinitionId = 0x4E473734;
 
+    public const string ControlAreaName = PMDGNG3Constants.PMDG_NG3_CONTROL_NAME;
+
+    /// <summary>
+    /// Local map ids for Control — chosen not to collide with Data (0x4E473730 / 0x4E473734)
+    /// or official SDK Control constants (0x4E473333 / 0x4E473334).
+    /// </summary>
+    public const uint ControlClientDataId = 0x4E473731;
+
+    public const uint ControlDefinitionId = 0x4E473735;
+
     public static uint DataSize => (uint)Marshal.SizeOf<PMDGNG3DataStruct>();
+
+    public static uint ControlSize => (uint)Marshal.SizeOf<PMDGNG3Control>();
 
     public static int OffsetQtyCenter =>
         Marshal.OffsetOf<PMDGNG3DataStruct>(nameof(PMDGNG3DataStruct.FUEL_QtyCenter)).ToInt32();

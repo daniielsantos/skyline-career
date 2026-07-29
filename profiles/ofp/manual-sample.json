@@ -1,0 +1,40 @@
+{
+  "source": "simbrief",
+  "icao": "B738",
+  "ofpId": "load-sheet-sample",
+  "fuel": {
+    "unit": "kg"
+  },
+  "loadSheet": {
+    "unit": "kg",
+    "blockFuel": 5291,
+    "enrouteBurn": 2322,
+    "passengerCount": 163,
+    "baggage": 4066,
+    "payload": 18114,
+    "emptyWeight": 42264,
+    "zfw": 60378,
+    "tow": 65442,
+    "lw": 63120,
+    "maxZfw": 62732,
+    "maxTow": 79333,
+    "maxLw": 66361
+  },
+  "payload": {
+    "unit": "kg",
+    "total": 18114,
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [],
+      "averagePassengerWeight": 84
+    }
+  },
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

@@ -21,13 +21,16 @@ import {
   probeLVars,
   watchLVars,
 } from './probe-lvars.js';
+import { buildOfpExpectation } from './ofp-compliance/parse-ofp.js';
+import { compareOnce, formatComplianceSummary } from './ofp-compliance/run-compare.js';
+import { type ComplianceBaseline, type LiveFuelState } from '@msfs-compat/shared';
 
 const agentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|pmdg-cdu|compare-ofp|monitor-ofp|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -39,6 +42,9 @@ function usage(): never {
   msfs-compat-agent homologate [--pipe <name>]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
+  msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
+  msfs-compat-agent compare-ofp [--ofp path.json] [--fuel-left n] [--block-fuel n] [--payload-total n] [--baggage n] [--passengers n] [--zfw n] [--tow n] [--empty-weight n] [--station i=lb] [--lock] [--json] [--pipe <name>]
+  msfs-compat-agent monitor-ofp [--ofp path.json] [same load-sheet flags] [--interval sec] [--lock] [--json] [--pipe <name>]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -46,6 +52,8 @@ Notes:
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
+  pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
+  compare-ofp / monitor-ofp: OFP/SimBrief load sheet vs live (fuel, payload, baggage/pax if mapped, ZFW/TOW)
 `);
   process.exit(1);
 }
@@ -62,6 +70,10 @@ function getFlag(args: string[], name: string): string | undefined {
   return undefined;
 }
 
+function hasFlag(args: string[], name: string): boolean {
+  return args.includes(name);
+}
+
 function getStationFlags(args: string[]): Record<number, number> {
   const stations: Record<number, number> = {};
   for (let i = 0; i < args.length; i++) {
@@ -76,6 +88,38 @@ function getStationFlags(args: string[]): Record<number, number> {
     }
   }
   return stations;
+}
+
+function getNumberFlag(args: string[], name: string): number | undefined {
+  const raw = getFlag(args, name);
+  if (raw === undefined) {
+    return undefined;
+  }
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+async function resolveOfpFromArgs(args: string[]) {
+  const ofpPath = getFlag(args, '--ofp');
+  const fuelUnitRaw = getFlag(args, '--fuel-unit');
+  const fuelUnit = fuelUnitRaw === 'kg' ? 'kg' : fuelUnitRaw === 'lb' ? 'lb' : undefined;
+  return buildOfpExpectation(ofpPath, {
+    fuelLeft: getNumberFlag(args, '--fuel-left'),
+    fuelRight: getNumberFlag(args, '--fuel-right'),
+    fuelCenter: getNumberFlag(args, '--fuel-center'),
+    fuelTotal: getNumberFlag(args, '--fuel-total'),
+    fuelUnit,
+    blockFuel: getNumberFlag(args, '--block-fuel'),
+    payloadTotal: getNumberFlag(args, '--payload-total'),
+    baggage: getNumberFlag(args, '--baggage'),
+    passengerCount: getNumberFlag(args, '--passengers') ?? getNumberFlag(args, '--pax'),
+    emptyWeight: getNumberFlag(args, '--empty-weight'),
+    zfw: getNumberFlag(args, '--zfw'),
+    tow: getNumberFlag(args, '--tow'),
+    stations: getStationFlags(args),
+    icao: getFlag(args, '--icao'),
+    ofpId: getFlag(args, '--ofp-id'),
+  });
 }
 
 async function loadProfile(path: string): Promise<AircraftProfile> {
@@ -674,6 +718,171 @@ async function main(): Promise<void> {
         );
       }
     });
+    return;
+  }
+
+  if (command === 'pmdg-cdu') {
+    const key = getFlag(rest, '--key');
+    const typeText = getFlag(rest, '--type');
+    const eventRaw = getFlag(rest, '--event');
+    const release = !hasFlag(rest, '--no-release');
+    const methodRaw = getFlag(rest, '--method') ?? 'event';
+    const method = methodRaw === 'control' ? 'control' : 'event';
+    const skipFuel = hasFlag(rest, '--no-fuel');
+
+    if (!key && !typeText && eventRaw === undefined) {
+      console.error('pmdg-cdu requires --key, --type, and/or --event');
+      usage();
+    }
+
+    const keyDelayMs = 200;
+    const steps: Array<{ label: string; eventId?: number; key?: string }> = [];
+
+    if (typeText) {
+      for (const ch of typeText) {
+        if (ch >= '0' && ch <= '9') {
+          steps.push({ label: ch, key: ch });
+        } else if (ch === '.' || ch === ',') {
+          steps.push({ label: '.', key: 'DOT' });
+        } else if (ch === '/') {
+          steps.push({ label: '/', key: '/' });
+        } else if (!/\s/.test(ch)) {
+          console.error(`Unsupported CDU char in --type: '${ch}'`);
+          process.exit(1);
+        }
+      }
+    }
+
+    if (key) {
+      steps.push({ label: key, key });
+    }
+
+    if (eventRaw !== undefined) {
+      const eventId = Number(eventRaw);
+      if (!Number.isFinite(eventId) || eventId < 0) {
+        console.error(`Invalid --event: ${eventRaw}`);
+        process.exit(1);
+      }
+      steps.push({ label: `event:${eventId}`, eventId });
+    }
+
+    await withBridge(pipeName, async (bridge) => {
+      const identity = await bridge.getAircraftIdentity();
+      console.log(`Aircraft: ${identity.title}`);
+      console.log(
+        `Sending ${steps.length} PMDG CDU key(s) method=${method}${release ? ' (+release)' : ''}…`,
+      );
+
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i]!;
+        const result = await bridge.sendPmdgNg3Control({
+          ...(step.eventId !== undefined ? { eventId: step.eventId } : {}),
+          ...(step.key !== undefined ? { key: step.key } : {}),
+          release,
+          method,
+        });
+        console.log(
+          `  [${i + 1}/${steps.length}] ${step.label} → eventId=${result.eventId} parameter=0x${Number(result.parameter).toString(16)} method=${result.method ?? method}`,
+        );
+        if (i + 1 < steps.length) {
+          await bridge.delay(keyDelayMs);
+        }
+      }
+
+      if (!skipFuel) {
+        console.log('Reading PMDG fuel after CDU sequence…');
+        try {
+          const sdk = await bridge.readPmdgNg3Fuel();
+          if (!sdk.available) {
+            console.log('  fuel: available=false');
+          } else {
+            console.log(
+              `  fuel L/R/C lb: ${sdk.leftLb ?? '?'} / ${sdk.rightLb ?? '?'} / ${sdk.centerLb ?? '?'}  layoutOk=${sdk.layoutOk ?? '?'}`,
+            );
+          }
+        } catch (error) {
+          console.log(
+            `  fuel read failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    });
+    return;
+  }
+
+  if (command === 'compare-ofp') {
+    const locked = hasFlag(rest, '--lock');
+    const asJson = hasFlag(rest, '--json');
+    const ofp = await resolveOfpFromArgs(rest);
+    const { snapshot } = await withBridge(pipeName, (bridge) =>
+      compareOnce(bridge, { ofp, locked }),
+    );
+    if (asJson) {
+      console.log(JSON.stringify(snapshot, null, 2));
+    } else {
+      console.log(formatComplianceSummary(snapshot));
+    }
+    if (snapshot.verdict === 'fail') {
+      process.exitCode = 2;
+    } else if (snapshot.verdict === 'warn') {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  if (command === 'monitor-ofp') {
+    const lockedFlag = hasFlag(rest, '--lock');
+    const asJson = hasFlag(rest, '--json');
+    const intervalSec = getNumberFlag(rest, '--interval') ?? 5;
+    const intervalMs = Math.max(1, intervalSec) * 1000;
+    const ofp = await resolveOfpFromArgs(rest);
+
+    let baseline: ComplianceBaseline | undefined;
+    let previousFuel: LiveFuelState | undefined;
+    let previousAtMs: number | undefined;
+    let stop = false;
+
+    const onSignal = () => {
+      stop = true;
+    };
+    process.on('SIGINT', onSignal);
+    process.on('SIGTERM', onSignal);
+
+    console.log(
+      `Monitoring OFP vs live every ${intervalSec}s (Ctrl+C to stop)${lockedFlag ? ' [lock]' : ''}…`,
+    );
+
+    await withBridge(pipeName, async (bridge) => {
+      while (!stop) {
+        const nowMs = Date.now();
+        const { snapshot, live, nextBaseline } = await compareOnce(bridge, {
+          ofp,
+          locked: lockedFlag,
+          baseline,
+          previousFuel,
+          previousAtMs,
+        });
+
+        if (nextBaseline && !baseline) {
+          baseline = nextBaseline;
+          console.log(`[monitor] baseline captured at ${baseline.capturedAt}`);
+        }
+
+        previousFuel = live.fuel;
+        previousAtMs = nowMs;
+
+        if (asJson) {
+          console.log(JSON.stringify(snapshot));
+        } else {
+          console.log(`[${snapshot.at}] ${formatComplianceSummary(snapshot)}`);
+        }
+
+        await bridge.delay(intervalMs);
+      }
+    });
+
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
     return;
   }
 

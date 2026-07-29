@@ -127,6 +127,30 @@ export class NamedPipeSimBridge implements SimBridge {
     return this.client.call('readPmdgNg3Fuel');
   }
 
+  async sendPmdgNg3Control(opts: {
+    eventId?: number;
+    key?: string;
+    parameter?: number;
+    release?: boolean;
+    /** `event` = TransmitClientEvent (default); `control` = PMDG_NG3_Control SetClientData */
+    method?: 'event' | 'control';
+  }): Promise<{
+    ok: boolean;
+    eventId: number;
+    parameter: number;
+    release?: boolean;
+    method?: string;
+  }> {
+    await this.ensureOpen();
+    return this.client.call('sendPmdgNg3Control', {
+      ...(opts.eventId !== undefined ? { eventId: opts.eventId } : {}),
+      ...(opts.key !== undefined ? { key: opts.key } : {}),
+      ...(opts.parameter !== undefined ? { parameter: opts.parameter } : {}),
+      ...(opts.release !== undefined ? { release: opts.release } : {}),
+      ...(opts.method !== undefined ? { method: opts.method } : {}),
+    });
+  }
+
   private async ensureOpen(): Promise<void> {
     if (!this.autoConnected) {
       await this.open();

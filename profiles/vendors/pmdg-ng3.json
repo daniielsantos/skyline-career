@@ -3,7 +3,7 @@
   "recipeId": "pmdg-ng3",
   "publisher": "pmdg",
   "displayName": "PMDG 737 NG3 / NGXu family",
-  "summary": "Fuel qty is readable via PMDG_NG3_Data Client Data (EnableDataBroadcast=1); classic FUEL TANK writes are ignored and Client Data is read-only. Fuel load (FMC/CDU) is fase 2. Payload stations often accept classic SimConnect writes.",
+  "summary": "Fuel qty is readable via PMDG_NG3_Data Client Data (EnableDataBroadcast=1); classic FUEL TANK writes are ignored and Client Data is read-only. Skyline monitors OFP vs live (compare-ofp/monitor-ofp); fuel load is left to SimBrief/EFB/FMC — CDU write is out of scope. Payload stations often accept classic SimConnect writes.",
   "detectMode": "publisher_then_probes",
   "detect": [
     { "kind": "publisher", "value": "pmdg" },

@@ -4,6 +4,7 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using SimBridgeHost.Sim;
+using SimBridgeHost.Sim.Pmdg;
 
 public sealed class PipeServer : IAsyncDisposable
 {
@@ -243,6 +244,46 @@ public sealed class PipeServer : IAsyncDisposable
                     return IpcResponse.Success(request.Id, fuel);
                 }
 
+                case "sendPmdgNg3Control":
+                {
+                    uint eventId;
+                    var eventIdNum = GetNumber(request.Params, "eventId");
+                    var key = GetString(request.Params, "key");
+                    if (eventIdNum is not null)
+                    {
+                        eventId = (uint)eventIdNum.Value;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(key))
+                    {
+                        if (!PmdgNg3Cdu.TryResolveKey(key, out eventId))
+                        {
+                            throw new ArgumentException($"Unknown PMDG CDU key: {key}");
+                        }
+                    }
+                    else
+                    {
+                        throw new ArgumentException("Missing eventId or key param");
+                    }
+
+                    var parameter = (uint)(GetNumber(request.Params, "parameter") ?? 0);
+                    // Default release=true for CDU/momentary keys.
+                    var release = GetBool(request.Params, "release") ?? true;
+                    var method = GetString(request.Params, "method") ?? "event";
+
+                    await _sim.SendPmdgNg3ControlAsync(eventId, parameter, release, method, ct)
+                        .ConfigureAwait(false);
+                    var usedParameter = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
+
+                    return IpcResponse.Success(request.Id, new
+                    {
+                        ok = true,
+                        eventId,
+                        parameter = usedParameter,
+                        release,
+                        method
+                    });
+                }
+
                 default:
                     return IpcResponse.Fail(request.Id, "UNSUPPORTED", $"Unknown method: {request.Method}");
             }
@@ -313,6 +354,28 @@ public sealed class PipeServer : IAsyncDisposable
 
     private static double RequireNumber(JsonElement? map, string key)
         => GetNumber(map, key) ?? throw new ArgumentException($"Missing number param: {key}");
+
+    private static bool? GetBool(JsonElement? map, string key)
+    {
+        if (map is null || map.Value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        if (!map.Value.TryGetProperty(key, out var value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(value.GetString(), out var b) => b,
+            JsonValueKind.Number when value.TryGetDouble(out var d) => Math.Abs(d) > 0.5,
+            _ => null
+        };
+    }
 
     public async ValueTask DisposeAsync()
     {

@@ -193,6 +193,30 @@ async function dispatch(msg: { id?: string; method?: string; params?: Record<str
         ageMs: 0,
       });
     }
+    case 'sendPmdgNg3Control': {
+      const err = ensureConnected(id);
+      if (err) return err;
+      if (typeof params.eventId !== 'number' && typeof params.key !== 'string') {
+        return fail(id, 'INVALID_PARAMS', 'Missing eventId or key param');
+      }
+      const eventId = typeof params.eventId === 'number' ? params.eventId : 0;
+      const parameter =
+        typeof params.parameter === 'number' && params.parameter !== 0
+          ? params.parameter
+          : 0x20000000;
+      const method = typeof params.method === 'string' ? params.method : 'event';
+      const release = params.release === false ? false : true;
+      console.log(
+        `[mock-host] sendPmdgNg3Control method=${method} eventId=${eventId} key=${String(params.key ?? '')} parameter=0x${parameter.toString(16)} release=${release}`,
+      );
+      return ok(id, {
+        ok: true,
+        eventId,
+        parameter,
+        release,
+        method,
+      });
+    }
     default:
       return fail(id, 'UNSUPPORTED', `Unknown method: ${method}`);
   }

@@ -2,6 +2,19 @@
 
 Applies to PMDG 737-600/700/800/900 (NG3 / NGXu) in MSFS, including titles like `737-800 PAX SSW TC`.
 
+## Product path (current)
+
+Skyline **reads** PMDG fuel and **compares** it to an OFP (manual JSON today; SimBrief later). The user loads fuel/payload via **SimBrief / EFB / FMC**. Skyline does **not** write PMDG fuel.
+
+```bash
+npm run compare-ofp -- --ofp profiles/ofp/manual-sample.json
+npm run monitor-ofp -- --ofp profiles/ofp/manual-sample.json --lock --interval 5
+```
+
+`compare-ofp` / `monitor-ofp` prefer `readPmdgNg3Fuel` (lb); fall back to classic gallons × 6.7. With `--lock`, preflight becomes a hard check and a baseline is captured; once airborne, fuel may only decrease and payload is frozen.
+
+Load-sheet field map (Block Fuel, Payload, Baggage, Pass, ZFW/TOW): see [`ofp-load-sheet.md`](ofp-load-sheet.md).
+
 ## What failed in homologate
 
 | Probe | Result |
@@ -20,7 +33,7 @@ PMDG publishes a **SimConnect Client Data** SDK (not free-form LVars for fuel qt
 | Channel | Name | Role |
 |---------|------|------|
 | Data (read) | `PMDG_NG3_Data` | State including `FUEL_QtyLeft` / `QtyRight` / `QtyCenter` (**lbs**) |
-| Control (write) | `PMDG_NG3_Control` / third-party events | Cockpit-style commands (switches/MCP/CDU) — **not** “set tank = N gal” |
+| Control (write) | `PMDG_NG3_Control` / third-party events | Cockpit-style commands — **out of scope** for Skyline fuel load |
 | CDU | `PMDG_NG3_CDU_0/1` | Optional screen dump |
 
 ### Enable broadcast (`737_Options.ini`)
@@ -57,9 +70,11 @@ Expect `layoutOk: true`, `nonzeroBytes` > 0, and L/R/C lb close to classic `FUEL
 | Feature | Status |
 |---------|--------|
 | Read classic fuel mirrors (qty/cap) | Yes — useful for display / OFP checks |
-| Read SDK fuel qty via Client Data | **Yes (fase 1)** — IPC `readPmdgNg3Fuel` / `probe-pmdg-fuel` (layout auto-locked against classic mirrors) |
-| Write fuel via classic / LVar / Client Data | **No** — Client Data qty is read-only; load needs FMC/CDU automation (fase 2) |
-| Payload stations | Often yes via `station-writeback` |
+| Read SDK fuel qty via Client Data | **Yes** — IPC `readPmdgNg3Fuel` / `probe-pmdg-fuel` |
+| OFP vs live compliance | **Yes** — `compare-ofp` / `monitor-ofp` (fuel L/R/C + total, payload; burn-aware) |
+| Write fuel via classic / LVar / Client Data | **No / out of scope** — user loads via SimBrief/EFB/FMC |
+| CDU control send (`pmdg-cdu`) | **Parked / experimental** — not the product apply path |
+| Payload stations | Often yes via `station-writeback` (optional; career may only monitor) |
 | Vendor recipe | `profiles/vendors/pmdg-ng3.json` → `onClassicWriteFail: abort` |
 
 ## Homologation guidance (today)
@@ -67,8 +82,8 @@ Expect `layoutOk: true`, `nonzeroBytes` > 0, and L/R/C lb close to classic `FUEL
 1. Choose publisher **`pmdg`** in the wizard menu (title rarely contains “PMDG”).
 2. Expect tank discovery: capacity live, writes ignored → wizard stops with this recipe’s abort message **plus** SDK broadcast status (OK vs enable `EnableDataBroadcast`).
 3. Do **not** invent an Accu-Sim recipe with fake `Fuel*Tank` LVars.
-4. Optional: draft a **payload-only** profile later if product needs pax/cargo without fuel apply.
-5. Fase 2 (out of scope here): CDU/FMC key stream or other load path, then a real apply strategy — not a Client Data write of qty.
+4. Optional: draft a **payload-only** profile later if product needs pax/cargo write without fuel apply.
+5. Fuel for career: user sets OFP fuel in sim; Skyline monitors with `compare-ofp` / `monitor-ofp`.
 
 ## Title tips
 

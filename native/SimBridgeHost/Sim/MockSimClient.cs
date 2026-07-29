@@ -158,6 +158,20 @@ public sealed class MockSimClient : ISimClient
         });
     }
 
+    public Task SendPmdgNg3ControlAsync(
+        uint eventId,
+        uint parameter = 0,
+        bool release = true,
+        string method = "event",
+        CancellationToken ct = default)
+    {
+        EnsureConnected();
+        var param = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
+        Console.WriteLine(
+            $"[mock] sendPmdgNg3Control method={method} eventId={eventId} parameter={param} release={release}");
+        return Task.CompletedTask;
+    }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     private void SeedDefaults()

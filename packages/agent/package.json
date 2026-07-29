@@ -17,7 +17,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "smoke": "node dist/cli.js smoke --profile ../../profiles/examples/asobo-c172-skyhawk.json"
+    "smoke": "node dist/cli.js smoke --profile ../../profiles/examples/asobo-c172-skyhawk.json",
+    "pmdg-cdu": "node dist/cli.js pmdg-cdu"
   },
   "dependencies": {
     "@msfs-compat/runtime": "0.1.0",

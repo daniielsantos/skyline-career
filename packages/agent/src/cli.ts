@@ -61,20 +61,24 @@ import {
   acceptMission,
   cancelMission,
   compareMissionIntentToOfp,
+  createMissionFlightWatchState,
   createSeedEconomyWorld,
   departMission,
+  evaluateMissionFlightTransition,
   formatIntentOfpCheck,
   formatMissionSummary,
   formatSettlementSummary,
   listMarketLots,
   listViableMarketLots,
   parseFreighterClassId,
+  pickActiveMission,
   settleMission,
   tickEconomyN,
   type CommodityId,
   type ComplianceBaseline,
   type FreighterClassId,
   type LiveFuelState,
+  type MissionIntent,
 } from '@msfs-compat/shared';
 
 const agentDir = dirname(fileURLToPath(import.meta.url));
@@ -100,7 +104,7 @@ function usage(): never {
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
-  msfs-compat-agent career init|tick|market|accept|missions|cancel|dispatch|depart|settle [--save path] [--missions path] [--lot id] [--mission id] [--kg n] [--aircraft class] [--simbrief-user ALIAS] [--n ticks] [--json]
+  msfs-compat-agent career init|tick|market|accept|missions|cancel|dispatch|depart|settle|watch [--save path] [--missions path] [--lot id] [--mission id] [--kg n] [--aircraft class] [--simbrief-user ALIAS] [--n ticks] [--interval sec] [--json]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -1291,6 +1295,7 @@ async function main(): Promise<void> {
   career dispatch --mission <id> [--simbrief-user ALIAS] [--no-open] [--compare] [--missions path] [--save path]
   career depart --mission <id> [--save path] [--missions path]
   career settle --mission <id> [--save path] [--missions path] [--json]
+  career watch [--mission id] [--interval 5] [--settle-on-touchdown] [--no-depart] [--no-settle] [--save path] [--missions path] [--pipe name]
 `);
       return;
     }
@@ -1659,6 +1664,142 @@ async function main(): Promise<void> {
       }
       console.log(formatSettlementSummary(result.settlement, wallet));
       console.log(`Mission: ${formatMissionSummary(result.mission)}`);
+      return;
+    }
+
+    if (sub === 'watch') {
+      const intervalSec = getNumberFlag(subArgs, '--interval') ?? 5;
+      const intervalMs = Math.max(1, intervalSec) * 1000;
+      const autoDepart = !hasFlag(subArgs, '--no-depart');
+      const autoSettle = !hasFlag(subArgs, '--no-settle');
+      const requireEnginesOff = !hasFlag(subArgs, '--settle-on-touchdown');
+      const missionIdFlag = getFlag(subArgs, '--mission');
+
+      let stop = false;
+      const onSignal = () => {
+        stop = true;
+      };
+      process.on('SIGINT', onSignal);
+      process.on('SIGTERM', onSignal);
+
+      const missionsBoot = await loadOrCreateCareerMissions(missionsPath);
+      let mission = pickActiveMission(missionsBoot.missions, missionIdFlag);
+      if (!mission) {
+        console.error(
+          missionIdFlag
+            ? `Unknown mission: ${missionIdFlag}`
+            : 'No active mission (accepted/dispatched/in_flight). Accept one first.',
+        );
+        process.exit(1);
+      }
+      let current: MissionIntent = mission;
+      if (
+        current.status !== 'accepted' &&
+        current.status !== 'dispatched' &&
+        current.status !== 'in_flight'
+      ) {
+        console.error(`Mission ${current.id} is ${current.status} — nothing to watch`);
+        process.exit(1);
+      }
+
+      console.log(
+        `Career watch every ${intervalSec}s (Ctrl+C to stop)` +
+          `${autoDepart ? ' [auto-depart]' : ''}${autoSettle ? ' [auto-settle]' : ''}` +
+          `${requireEnginesOff ? ' [engines-off]' : ' [touchdown]'}`,
+      );
+      console.log(`Watching: ${formatMissionSummary(current)}`);
+      console.log(
+        'Note: destination ICAO is not verified from the sim yet — settle fires on landing after airborne.',
+      );
+
+      let watchState = createMissionFlightWatchState();
+
+      await withBridge(pipeName, async (bridge) => {
+        while (!stop) {
+          const snap = await bridge.snapshot();
+          const sample = {
+            onGround: snap.onGround,
+            enginesRunning: snap.enginesRunning,
+          };
+
+          // Reload mission in case another process updated it
+          const missions = await loadOrCreateCareerMissions(missionsPath);
+          current = pickActiveMission(missions.missions, current.id) ?? current;
+
+          const { event, nextState } = evaluateMissionFlightTransition(
+            current,
+            sample,
+            watchState,
+            { requireEnginesOffToSettle: requireEnginesOff },
+          );
+          watchState = nextState;
+
+          const phaseLabel = sample.onGround
+            ? sample.enginesRunning
+              ? 'ground+engines'
+              : 'ground'
+            : 'airborne';
+
+          if (event.type === 'none') {
+            if (!asJson) {
+              console.log(
+                `[watch] ${new Date().toISOString()}  ${phaseLabel}  mission=${current.status}  sawAirborne=${watchState.sawAirborne}`,
+              );
+            }
+          } else if (event.type === 'depart' && autoDepart) {
+            const world = await loadOrCreateCareerEconomy(savePath);
+            let departed: MissionIntent;
+            try {
+              departed = departMission(world, current);
+            } catch (error) {
+              console.error(
+                `[watch] depart failed: ${error instanceof Error ? error.message : String(error)}`,
+              );
+              await bridge.delay(intervalMs);
+              continue;
+            }
+            upsertMission(missions, departed);
+            await saveCareerEconomy(savePath, world);
+            await saveCareerMissions(missionsPath, missions);
+            current = departed;
+            console.log(`[watch] AUTO-DEPART (${event.reason}): ${formatMissionSummary(departed)}`);
+          } else if (event.type === 'settle' && autoSettle) {
+            const world = await loadOrCreateCareerEconomy(savePath);
+            let settled;
+            try {
+              settled = settleMission(world, current);
+            } catch (error) {
+              console.error(
+                `[watch] settle failed: ${error instanceof Error ? error.message : String(error)}`,
+              );
+              await bridge.delay(intervalMs);
+              continue;
+            }
+            upsertMission(missions, settled.mission);
+            const wallet = creditWallet(missions, settled.walletCreditUsd);
+            await saveCareerEconomy(savePath, world);
+            await saveCareerMissions(missionsPath, missions);
+            current = settled.mission;
+            console.log(`[watch] AUTO-SETTLE (${event.reason})`);
+            console.log(formatSettlementSummary(settled.settlement, wallet));
+            console.log(`Mission: ${formatMissionSummary(settled.mission)}`);
+            console.log('[watch] Mission settled — stopping watch.');
+            stop = true;
+            break;
+          } else if (event.type === 'depart' || event.type === 'settle') {
+            console.log(
+              `[watch] would ${event.type} (${event.reason}) but auto-${event.type} disabled`,
+            );
+          }
+
+          if (!stop) {
+            await bridge.delay(intervalMs);
+          }
+        }
+      });
+
+      process.off('SIGINT', onSignal);
+      process.off('SIGTERM', onSignal);
       return;
     }
 

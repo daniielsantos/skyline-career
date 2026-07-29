@@ -6,6 +6,7 @@ export * from './types/career-economy.js';
 export * from './ofp-compliance.js';
 export * from './career-economy.js';
 export * from './career-mission.js';
+export * from './career-flight-watch.js';
 export * from './fingerprint.js';
 export * from './profile-structure.js';
 export * from './signing.js';

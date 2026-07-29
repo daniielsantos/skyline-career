@@ -14,6 +14,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/ofp-compliance.test.js dist/career-economy.test.js dist/career-mission.test.js"
+    "test": "npm run build && node --test dist/ofp-compliance.test.js dist/career-economy.test.js dist/career-mission.test.js dist/career-flight-watch.test.js"
   }
 }

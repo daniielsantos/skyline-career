@@ -21,6 +21,26 @@ GitHub: [daniielsantos/skyline-career](https://github.com/daniielsantos/skyline-
 
 Local fallback still works without the catalog (title/ICAO match on `profiles/examples`).
 
+## Skyline Career (local freight)
+
+Prototype cargo career on Brazilian hubs: economy ticks, market lots, multi-lot flight staging, SimBrief dispatch, OFP/preflight checks, and live MSFS watch/settle.
+
+```powershell
+npm install
+npm run build
+npm run career:ui
+```
+
+- UI: http://127.0.0.1:5173
+- API: http://127.0.0.1:8787
+
+Loop: **Market** → **Prepare flight** (Staging: pick aircraft, adjust payload, add same-route lots) → **Accept & Dispatch** (SimBrief) → Confirm OFP / Preflight / Watch → wallet settle.
+
+CLI equivalent: `npm run career -- …` (see `profiles/career/README.md`).  
+UI details: `packages/career-ui/README.md`.
+
+Preflight and Watch need SimBridgeHost (`\\.\pipe\msfs-compat-simbridge`).
+
 ## Quick start
 
 ```powershell
@@ -98,12 +118,13 @@ npm run fingerprints:backfill
 
 | Path | Role |
 |------|------|
-| `packages/shared` | Fingerprint, signing, profile/API types |
+| `packages/shared` | Fingerprint, signing, profile/API types, career economy/missions |
 | `packages/runtime` | ProfileEngine, strategies, gating |
-| `packages/agent` | NamedPipe IPC client + CLI + catalog client/cache |
+| `packages/agent` | NamedPipe IPC client + CLI + catalog client/cache + `career` CLI |
+| `packages/career-ui` | Local freight board (Market / Staging / Missions / NPC fleet) |
 | `packages/catalog-api` | Fastify catalog (`/v1` resolve/manifest/document) — file or Postgres |
 | `native/SimBridgeHost` | C# Named Pipe server + mock/SimConnect clients |
-| `profiles/` | Declarative aircraft profiles + local cache |
+| `profiles/` | Aircraft profiles, OFP packs, local career saves (`profiles/career/`) |
 | `contracts/` | OpenAPI + IPC protocol |
 | `database/` | PostgreSQL schema + Docker Compose |
 

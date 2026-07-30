@@ -13,9 +13,11 @@ Opens:
 
 ## What it does
 
-- **Market** — list lots with distance/expiry (hours/days), filter by freighter class, accept contracts
+- **Market** — list lots with distance/expiry, filters/sort/pagination, freighter class filter; **Prepare flight** opens Staging
+- **Staging** — build a same-route multi-lot manifest, pick aircraft, adjust payload, then **Accept & Dispatch**
 - **Terminal** — click any ICAO to inspect stock (tonnes), surplus/shortage, and related contracts
 - **Missions** — Dispatch (SimBrief), Confirm OFP (paper), **Preflight** (OFP↔live load), **Watch**, Depart/Settle, Cancel
+- **NPC fleet** — competing freighters airborne / turnaround / idle
 - **+1 day** — optional manual advance (24h); economy also runs **1:1 with wall clock**
   (catch-up on load / while API is open)
 - **Reset Brazil** — clear the prototype save and initialize 20 airports in

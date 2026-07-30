@@ -34,7 +34,7 @@ npm run career:ui
 - UI: http://127.0.0.1:5173
 - API: http://127.0.0.1:8787
 
-Loop: **Market** → **Prepare flight** (Staging: pick aircraft, adjust payload, add same-route lots) → **Accept & Dispatch** (SimBrief) → Confirm OFP / Preflight / Watch → wallet settle.
+Loop: **Market** (all freights) → **Prepare flight** → **Staging** (pick aircraft, adjust payload, Accept & Dispatch) → Confirm OFP / Preflight / Watch / Settle → Staging empties; history stays in **Logbook**.
 
 CLI equivalent: `npm run career -- …` (see `profiles/career/README.md`).  
 UI details: `packages/career-ui/README.md`.
@@ -121,7 +121,7 @@ npm run fingerprints:backfill
 | `packages/shared` | Fingerprint, signing, profile/API types, career economy/missions |
 | `packages/runtime` | ProfileEngine, strategies, gating |
 | `packages/agent` | NamedPipe IPC client + CLI + catalog client/cache + `career` CLI |
-| `packages/career-ui` | Local freight board (Market / Staging / Missions / NPC fleet) |
+| `packages/career-ui` | Local freight board (Market / Staging / Logbook / NPC fleet) |
 | `packages/catalog-api` | Fastify catalog (`/v1` resolve/manifest/document) — file or Postgres |
 | `native/SimBridgeHost` | C# Named Pipe server + mock/SimConnect clients |
 | `profiles/` | Aircraft profiles, OFP packs, local career saves (`profiles/career/`) |

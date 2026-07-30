@@ -8,7 +8,10 @@ import {
   createSeedEconomyWorld,
   departMission,
   findOpenManifestForRoute,
+  findActivePlayerMission,
   getAircraftClass,
+  isActiveMissionStatus,
+  listActivePlayerMissions,
   listMarketLots,
   listViableMarketLots,
   MAX_MANIFEST_LOTS,
@@ -391,6 +394,67 @@ describe('acceptMission', () => {
       undefined,
     );
   });
+
+  it('isActiveMissionStatus covers accepted/dispatched/in_flight only', () => {
+    assert.equal(isActiveMissionStatus('accepted'), true);
+    assert.equal(isActiveMissionStatus('dispatched'), true);
+    assert.equal(isActiveMissionStatus('in_flight'), true);
+    assert.equal(isActiveMissionStatus('settled'), false);
+    assert.equal(isActiveMissionStatus('cancelled'), false);
+  });
+
+  it('findActivePlayerMission prefers the latest operational flight', () => {
+    const older = baseMission({
+      id: 'msn_old',
+      status: 'accepted',
+      acceptedAtTick: 10,
+      lots: [
+        {
+          shipmentLotId: 'l1',
+          commodityId: 'electronics',
+          cargoKg: 400,
+          payUsd: 100,
+          urgency: 'normal',
+          reason: 'old',
+          deadlineTick: 40,
+        },
+      ],
+    });
+    const newer = baseMission({
+      id: 'msn_new',
+      status: 'dispatched',
+      acceptedAtTick: 20,
+      lots: [
+        {
+          shipmentLotId: 'l2',
+          commodityId: 'machinery',
+          cargoKg: 500,
+          payUsd: 120,
+          urgency: 'normal',
+          reason: 'new',
+          deadlineTick: 40,
+        },
+      ],
+    });
+    const settled = baseMission({
+      id: 'msn_done',
+      status: 'settled',
+      acceptedAtTick: 30,
+      lots: [
+        {
+          shipmentLotId: 'l3',
+          commodityId: 'general',
+          cargoKg: 300,
+          payUsd: 80,
+          urgency: 'normal',
+          reason: 'done',
+          deadlineTick: 40,
+        },
+      ],
+    });
+    assert.equal(findActivePlayerMission([older, newer, settled])?.id, 'msn_new');
+    assert.equal(listActivePlayerMissions([older, newer, settled]).length, 2);
+  });
 });
 
 describe('commitStagedManifest', () => {
@@ -502,6 +566,27 @@ describe('commitStagedManifest', () => {
         }),
       /Duplicate lot/,
     );
+  });
+
+  it('rejects routes beyond the selected aircraft range', () => {
+    const world = createSeedEconomyWorld({ seed: 'staging-range' });
+    const longHaul = pushTestLot(world, {
+      id: 'lot_long',
+      originIcao: 'SBPA',
+      destIcao: 'SBRF',
+      quantityKg: 800,
+      payUsd: 200,
+    });
+    assert.throws(
+      () =>
+        commitStagedManifest(world, {
+          lines: [{ lotId: longHaul.id, cargoKg: 500 }],
+          aircraftClassId: 'light_turboprop',
+          maxCargoKg: 1_704,
+        }),
+      /max range/i,
+    );
+    assert.equal(longHaul.reservedKg, 0);
   });
 });
 
@@ -620,9 +705,11 @@ describe('settleMission', () => {
         .stockKg;
 
     const departed = departMission(world, { ...mission, status: 'dispatched' });
-    assert.equal(departed.status, 'in_flight');
+    assert.equal(departed.mission.status, 'in_flight');
+    assert.ok(departed.mission.fuelUplift);
+    assert.ok(departed.fuelDebitUsd > 0);
 
-    const result = settleMission(world, departed);
+    const result = settleMission(world, departed.mission);
     assert.equal(result.mission.status, 'settled');
     assert.equal(result.settlement.onTime, true);
     assert.equal(result.settlement.penaltyUsd, 0);
@@ -667,20 +754,28 @@ describe('settleMission', () => {
 
   it('settle from accepted auto-departs then closes lot portion', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-auto' });
-    tickEconomyN(world, 24);
-    const marketLot = listMarketLots(world)[0]!.lot;
-    const fullQty = marketLot.quantityKg;
+    const lot = pushTestLot(world, {
+      id: 'lot_settle_auto',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      commodityId: 'general',
+      quantityKg: 8_000,
+      payUsd: 2_000,
+    });
     const mission = acceptMission(world, {
-      lotId: marketLot.id,
-      cargoKg: fullQty,
+      lotId: lot.id,
+      cargoKg: 8_000,
       aircraftClassId: 'wide_freighter',
       missionId: 'msn_full',
     });
-    assert.equal(marketLot.status, 'reserved');
+    assert.equal(lot.status, 'reserved');
+    assert.equal(mission.cargoKg, 8_000);
     const result = settleMission(world, mission);
     assert.equal(result.mission.status, 'settled');
-    assert.equal(marketLot.status, 'delivered');
-    assert.equal(marketLot.quantityKg, 0);
+    assert.ok(result.fuelDebitUsd > 0);
+    assert.ok(result.mission.fuelUplift);
+    assert.equal(lot.status, 'delivered');
+    assert.equal(lot.quantityKg, 0);
   });
 
   it('settles multi-commodity manifests with per-line settlement', () => {

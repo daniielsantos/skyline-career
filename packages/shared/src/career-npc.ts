@@ -9,6 +9,7 @@ import {
   getCommodity,
   routeDistanceNm,
 } from './career-economy.js';
+import { applyNpcFuelUplift } from './career-fuel.js';
 import { getAircraftClass, reserveShipmentLot } from './career-mission.js';
 import type {
   CareerEconomyWorld,
@@ -310,6 +311,12 @@ function claimLotForNpc(
     lot.status = 'in_transit';
   }
 
+  const fuel = applyNpcFuelUplift(world, {
+    originIcao: lot.originIcao,
+    destIcao: lot.destIcao,
+    aircraftClassId: npc.aircraftClassId,
+  });
+
   const flight: NpcFlight = {
     id: `npcf-${world.tick}-${npc.id}-${lot.id.slice(0, 8)}`,
     npcId: npc.id,
@@ -325,6 +332,9 @@ function claimLotForNpc(
     departedAtMs: batchNowMs,
     arrivesAtMs: batchNowMs + flightHours * MS_PER_TICK,
     status: 'in_flight',
+    fuelUpliftKg: fuel.deliveredKg,
+    fuelCostUsd: fuel.costUsd,
+    fuelScarcity: fuel.scarcity,
   };
 
   npc.status = 'busy';

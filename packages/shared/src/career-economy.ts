@@ -84,7 +84,66 @@ export const CAREER_COMMODITIES: readonly CommodityDef[] = [
     name: 'General cargo',
     basePricePerKg: 2.2,
   },
+  {
+    id: 'fuel',
+    name: 'Jet-A fuel',
+    basePricePerKg: 0.95,
+    kind: 'fuel',
+  },
 ] as const;
+
+/** Freight-board commodities (excludes terminal fuel). */
+export const CAREER_CARGO_COMMODITIES: readonly CommodityDef[] =
+  CAREER_COMMODITIES.filter((c) => c.kind !== 'fuel');
+
+/** Major Jet-A production hubs in the Brazil career map. */
+export const FUEL_HUB_ICAOS = new Set([
+  'SBGR',
+  'SBGL',
+  'SBKP',
+  'SBCF',
+  'SBPA',
+  'SBRF',
+  'SBCT',
+  'SBSV',
+]);
+
+/** Seed or repair fuel inventory + baseline flows on a terminal. */
+export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
+  const hub = FUEL_HUB_ICAOS.has(terminal.icao);
+  const cap = hub ? 500_000 : 120_000;
+  const prod = hub ? 8_000 : 800;
+  const cons = hub ? 3_000 : 1_500;
+
+  if (!terminal.inventory.fuel) {
+    terminal.inventory.fuel = pile(Math.round(cap * 0.55), cap);
+  } else {
+    terminal.inventory.fuel.capacityKg = Math.max(
+      terminal.inventory.fuel.capacityKg,
+      cap,
+    );
+    terminal.inventory.fuel.stockKg = clamp(
+      terminal.inventory.fuel.stockKg,
+      0,
+      terminal.inventory.fuel.capacityKg,
+    );
+  }
+
+  terminal.baseProduction = { ...terminal.baseProduction, fuel: prod };
+  terminal.baseConsumption = { ...terminal.baseConsumption, fuel: cons };
+  if (terminal.production.fuel === undefined) {
+    terminal.production = { ...terminal.production, fuel: prod };
+  }
+  if (terminal.consumption.fuel === undefined) {
+    terminal.consumption = { ...terminal.consumption, fuel: cons };
+  }
+}
+
+export function ensureWorldFuelInventory(world: CareerEconomyWorld): void {
+  for (const ap of world.airports) {
+    ensureAirportFuelInventory(ap);
+  }
+}
 
 const COMMODITY_BY_ID: Record<CommodityId, CommodityDef> = Object.fromEntries(
   CAREER_COMMODITIES.map((c) => [c.id, c]),
@@ -411,6 +470,17 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     const consumption: AirportTerminal['consumption'] = {};
 
     for (const c of CAREER_COMMODITIES) {
+      if (c.id === 'fuel') {
+        const hub = FUEL_HUB_ICAOS.has(h.icao);
+        const cap = Math.round((hub ? 500_000 : 120_000) * capacityBoost);
+        const prod = Math.round((hub ? 8_000 : 800) * (0.8 + rng() * 0.4));
+        const cons = Math.round((hub ? 3_000 : 1_500) * (0.8 + rng() * 0.4));
+        production[c.id] = prod;
+        consumption[c.id] = cons;
+        const startFill = 0.45 + rng() * 0.25;
+        inventory[c.id] = pile(Math.round(cap * startFill), cap);
+        continue;
+      }
       const cap = Math.round(70_000 * capacityBoost * (0.85 + rng() * 0.3));
       const prodBias = h.produce[c.id] ?? 0.15;
       const consBias = h.consume[c.id] ?? 0.25;
@@ -575,6 +645,7 @@ export function migrateEconomyWorld(
 
   ensureNpcFleet(migrated);
   migrateNpcTimestamps(migrated, Number.isFinite(version) ? version : 0);
+  ensureWorldFuelInventory(migrated);
 
   return migrated;
 }
@@ -929,7 +1000,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     }
   };
 
-  for (const commodity of CAREER_COMMODITIES) {
+  for (const commodity of CAREER_CARGO_COMMODITIES) {
     const ranked = world.airports
       .map((ap) => {
         const stock = ensurePile(ap, commodity.id);

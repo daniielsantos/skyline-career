@@ -1,5 +1,29 @@
 export type AircraftClass = 'narrow_freighter' | 'wide_freighter' | 'light_turboprop';
 
+export type PlayerAircraft = {
+  id: string;
+  aircraftClassId: AircraftClass;
+  label: string;
+  locationIcao: string;
+  fuelKg: number;
+  fuelCapacityKg: number;
+  status: 'parked' | 'assigned';
+  assignedMissionId?: string;
+};
+
+export type FerryQuote = {
+  aircraftId: string;
+  originIcao: string;
+  destIcao: string;
+  distanceNm: number;
+  ferryFeeUsd: number;
+  fuelNeededKg: number;
+  fuelUpliftKg: number;
+  fuelCostUsd: number;
+  fuelScarcity: 'ok' | 'partial' | 'dry';
+  totalCostUsd: number;
+};
+
 export type ClockSync = {
   serverNowMs: number;
   lastBatchAtMs: number;
@@ -156,9 +180,21 @@ export type Mission = {
   deadlineTick: number;
   reason: string;
   acceptedAtTick?: number;
+  dispatchedAtTick?: number;
+  departedAtTick?: number;
+  settledAtTick?: number;
   staticId?: string;
   lots?: MissionLotLine[];
   shipmentLotId?: string;
+  fuelUplift?: {
+    originIcao: string;
+    requestedKg: number;
+    deliveredKg: number;
+    unitPriceUsd: number;
+    costUsd: number;
+    scarcity: 'ok' | 'partial' | 'dry';
+    upliftedAtTick: number;
+  };
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';
     summary: string;
@@ -195,6 +231,7 @@ export type AirportLot = {
   id: string;
   originIcao: string;
   destIcao: string;
+  commodityId: string;
   commodityName: string;
   availableKg: number;
   payUsd: number;
@@ -262,6 +299,11 @@ export function fetchState() {
       npcFleet?: number;
       npcBusy?: number;
       npcFlights?: number;
+      hubSelected?: boolean;
+      fleet?: PlayerAircraft[];
+      hubs?: string[];
+      pilotName?: string;
+      homeHubIcao?: string;
     }
   >('/api/state');
 }
@@ -277,6 +319,15 @@ export function fetchMarket(aircraft?: AircraftClass) {
       airframeLabel?: string | null;
     }
   >(`/api/market${qs}`);
+}
+
+export function fetchCargoLimit(aircraft: AircraftClass) {
+  return api<{
+    aircraftClassId: AircraftClass;
+    maxCargoKg: number;
+    maxCargoSource: string;
+    airframeLabel: string;
+  }>(`/api/cargo-limit?aircraft=${aircraft}`);
 }
 
 export function fetchNpcFleet() {
@@ -336,6 +387,7 @@ export function postAccept(opts: {
 
 export function postStagingCommit(opts: {
   aircraft: AircraftClass;
+  aircraftId?: string;
   missionId?: string;
   openDispatch?: boolean;
   lines: Array<{ lotId: string; cargoKg: number }>;
@@ -348,6 +400,7 @@ export function postStagingCommit(opts: {
     appended?: boolean;
     lineCount?: number;
     remainingKg?: number;
+    fleet?: PlayerAircraft[];
     dispatch?: {
       url: string;
       staticId: string;
@@ -356,6 +409,39 @@ export function postStagingCommit(opts: {
       opened: boolean;
     } | null;
   }>('/api/staging/commit', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postSelectHub(opts: { icao: string; pilotName: string }) {
+  return api<{
+    walletUsd: number;
+    hubSelected: boolean;
+    fleet: PlayerAircraft[];
+    hubs: string[];
+    pilotName: string;
+    homeHubIcao: string;
+  }>('/api/fleet/select-hub', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFerry(opts: {
+  aircraftId: string;
+  destIcao: string;
+  quoteOnly?: boolean;
+}) {
+  return api<{
+    quote: FerryQuote;
+    aircraft?: PlayerAircraft;
+    walletDebitUsd?: number;
+    walletUsd: number;
+    hubSelected?: boolean;
+    fleet?: PlayerAircraft[];
+    hubs?: string[];
+  }>('/api/fleet/ferry', {
     method: 'POST',
     body: JSON.stringify(opts),
   });
@@ -447,13 +533,15 @@ export type WatchStatus = {
 };
 
 export function postDepart(opts: { missionId: string; override?: boolean }) {
-  return api<{ mission: Mission; walletUsd: number; preflightOverride?: boolean }>(
-    '/api/depart',
-    {
-      method: 'POST',
-      body: JSON.stringify(opts),
-    },
-  );
+  return api<{
+    mission: Mission;
+    walletUsd: number;
+    fuelDebitUsd?: number;
+    preflightOverride?: boolean;
+  }>('/api/depart', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
 }
 
 export function postPreflight(opts: {

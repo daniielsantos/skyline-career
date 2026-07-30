@@ -1,6 +1,11 @@
 /** Skyline Career — local cargo logistics economy (Slice 1). */
 
-export type CommodityId = 'electronics' | 'perishables' | 'machinery' | 'general';
+export type CommodityId =
+  | 'electronics'
+  | 'perishables'
+  | 'machinery'
+  | 'general'
+  | 'fuel';
 
 export interface CommodityDef {
   id: CommodityId;
@@ -9,6 +14,11 @@ export interface CommodityDef {
   basePricePerKg: number;
   perishable?: boolean;
   highValue?: boolean;
+  /**
+   * `fuel` stays in terminal inventory + uplift; not formed into freight lots (MVP).
+   * Default / omitted = cargo.
+   */
+  kind?: 'cargo' | 'fuel';
 }
 
 export interface StockPile {
@@ -123,6 +133,10 @@ export interface NpcFlight {
   /** Wall-clock arrival / cargo delivery. */
   arrivesAtMs: number;
   status: 'in_flight' | 'completed';
+  /** Origin fuel taken / billed when the NPC claimed the lot. */
+  fuelUpliftKg?: number;
+  fuelCostUsd?: number;
+  fuelScarcity?: MissionFuelUplift['scarcity'];
 }
 
 export interface NpcActivityView {
@@ -265,6 +279,10 @@ export interface AircraftClass {
   rolesPackRelPath: string;
   simbriefIcao: string;
   simbriefAirframeMatch: string;
+  /** Career-economy burn estimate (not SimBrief OFP). */
+  fuelBurnKgPerNm: number;
+  /** Taxi + contingency included in uplift quote. */
+  fuelTaxiKg: number;
 }
 
 export type MissionStatus =
@@ -295,6 +313,18 @@ export interface MissionLotLine {
 
 /** Soft cap: how many market lots can share one flight. */
 export const MAX_MANIFEST_LOTS = 5;
+
+/** Jet-A purchased at origin when the flight departs. */
+export interface MissionFuelUplift {
+  originIcao: string;
+  requestedKg: number;
+  /** Kg taken from terminal stock (may be less than requested). */
+  deliveredKg: number;
+  unitPriceUsd: number;
+  costUsd: number;
+  scarcity: 'ok' | 'partial' | 'dry';
+  upliftedAtTick: number;
+}
 
 export interface MissionIntent {
   id: string;
@@ -336,6 +366,12 @@ export interface MissionIntent {
   /** Late delivery penalty deducted from payUsd. */
   penaltyUsd?: number;
   lateTicks?: number;
+  /** Origin fuel uplift charged at depart. */
+  fuelUplift?: MissionFuelUplift;
+  /** Player fleet aircraft that flies this mission. */
+  aircraftId?: string;
+  /** Trip fuel burned (estimate) applied on settle. */
+  tripFuelBurnKg?: number;
   /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';
@@ -383,8 +419,39 @@ export interface MissionSettlement {
 }
 
 export interface CareerMissionsState {
-  version: 1;
+  version: 2;
   /** Company cash from settled freights (Slice 4). */
   walletUsd: number;
   missions: MissionIntent[];
+  /** Owned freighters; empty until starter hub is selected. */
+  fleet: PlayerAircraft[];
+  /** False until the player picks the starter hub. */
+  hubSelected: boolean;
+  /** Display name from pilot signup; empty until registered. */
+  pilotName: string;
+  /** Home / starter hub ICAO; empty until registered. */
+  homeHubIcao: string;
+}
+
+/** Legacy missions save before hangar / fleet. */
+export interface CareerMissionsStateV1 {
+  version: 1;
+  walletUsd: number;
+  missions: MissionIntent[];
+}
+
+export type PlayerAircraftStatus = 'parked' | 'assigned';
+
+/** Player-owned freighter parked at a career terminal when not on a mission. */
+export interface PlayerAircraft {
+  id: string;
+  aircraftClassId: FreighterClassId;
+  label: string;
+  /** ICAO where the aircraft is parked (or last parked while assigned). */
+  locationIcao: string;
+  fuelKg: number;
+  fuelCapacityKg: number;
+  status: PlayerAircraftStatus;
+  /** Active mission id while status === 'assigned'. */
+  assignedMissionId?: string;
 }

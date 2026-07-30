@@ -4,14 +4,22 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   acceptMission,
+  assignAircraftToMission,
   CAREER_COMMODITIES,
   cancelMission,
   commitStagedManifest,
   continuousEconomyHours,
   createSeedEconomyWorld,
+  debitWalletForFuel,
   departMission,
+  emptyMissionsStateV2,
   ensureEconomyCaughtUp,
+  executeFerry,
   findOpenManifestForRoute,
+  findPlayerAircraft,
+  listActivePlayerMissions,
+  listCareerHubIcaos,
+  listParkedAt,
   getCommodity,
   listActiveEconomyEvents,
   listActiveNpcFreights,
@@ -23,15 +31,20 @@ import {
   missionRemainingCapacityKg,
   MS_PER_TICK,
   normalizeMissionIntent,
+  normalizeMissionsState,
   npcClaimForLot,
   parseFreighterClassId,
+  quoteFerry,
   routeDistanceNm,
+  selectStarterHub,
   settleMission,
   stockTrend,
   tickEconomyN,
   type CareerEconomyWorld,
+  type CareerMissionsState,
   type FreighterClassId,
   type MissionIntent,
+  type PlayerAircraft,
 } from '@msfs-compat/shared';
 import {
   buildMissionDispatch,
@@ -47,11 +60,35 @@ const repoRoot = resolve(here, '..', '..', '..');
 const economyPath = join(repoRoot, 'profiles', 'career', 'local-economy.json');
 const missionsPath = join(repoRoot, 'profiles', 'career', 'local-missions.json');
 
-type MissionsFile = {
-  version: 1;
-  walletUsd: number;
-  missions: MissionIntent[];
-};
+type MissionsFile = CareerMissionsState;
+
+async function loadMissions(): Promise<MissionsFile> {
+  const existing = await readJson<Record<string, unknown>>(missionsPath);
+  if (existing && Array.isArray(existing.missions)) {
+    const normalized = normalizeMissionsState(existing);
+    normalized.missions = normalized.missions.map((m) => normalizeMissionIntent(m));
+    if (
+      existing.version !== 2 ||
+      !Array.isArray((existing as { fleet?: unknown }).fleet)
+    ) {
+      await writeJson(missionsPath, normalized);
+    }
+    return normalized;
+  }
+  const fresh = emptyMissionsStateV2();
+  await writeJson(missionsPath, fresh);
+  return fresh;
+}
+
+function fleetPayload(missions: MissionsFile) {
+  return {
+    hubSelected: missions.hubSelected,
+    fleet: missions.fleet,
+    hubs: listCareerHubIcaos(),
+    pilotName: missions.pilotName,
+    homeHubIcao: missions.homeHubIcao,
+  };
+}
 
 async function readJson<T>(path: string): Promise<T | null> {
   try {
@@ -90,20 +127,6 @@ async function persistEconomy(world: CareerEconomyWorld): Promise<void> {
   toSave.lastBatchAtMs = world.lastBatchAtMs;
   toSave.lastSyncedAtMs = world.lastBatchAtMs;
   await writeJson(economyPath, toSave);
-}
-
-async function loadMissions(): Promise<MissionsFile> {
-  const existing = await readJson<MissionsFile>(missionsPath);
-  if (existing?.version === 1 && Array.isArray(existing.missions)) {
-    return {
-      version: 1,
-      walletUsd: typeof existing.walletUsd === 'number' ? existing.walletUsd : 0,
-      missions: existing.missions.map((m) => normalizeMissionIntent(m)),
-    };
-  }
-  const fresh: MissionsFile = { version: 1, walletUsd: 0, missions: [] };
-  await writeJson(missionsPath, fresh);
-  return fresh;
 }
 
 function send(res: import('node:http').ServerResponse, status: number, body: unknown): void {
@@ -421,6 +444,104 @@ export function createCareerApiServer(port = 8787) {
           npcFleet: world.npcs?.length ?? 0,
           npcBusy,
           npcFlights: world.npcFlights?.filter((f) => f.status === 'in_flight').length ?? 0,
+          ...fleetPayload(missions),
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/fleet') {
+        const missions = await loadMissions();
+        send(res, 200, {
+          walletUsd: missions.walletUsd,
+          ...fleetPayload(missions),
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fleet/select-hub') {
+        const body = (await readBody(req)) as { icao?: string; pilotName?: string };
+        if (!body.icao) {
+          send(res, 400, { error: 'icao required' });
+          return;
+        }
+        if (!body.pilotName || !String(body.pilotName).trim()) {
+          send(res, 400, { error: 'pilotName required' });
+          return;
+        }
+        const missions = await loadMissions();
+        try {
+          const next = selectStarterHub(missions, body.icao, {
+            pilotName: body.pilotName,
+          });
+          Object.assign(missions, next);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            ...fleetPayload(missions),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fleet/ferry') {
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          destIcao?: string;
+          quoteOnly?: boolean;
+        };
+        if (!body.aircraftId || !body.destIcao) {
+          send(res, 400, { error: 'aircraftId and destIcao required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          if (body.quoteOnly) {
+            const quote = quoteFerry(world, missions, {
+              aircraftId: body.aircraftId,
+              destIcao: body.destIcao,
+            });
+            send(res, 200, { quote, walletUsd: missions.walletUsd });
+            return;
+          }
+          const result = executeFerry(world, missions, {
+            aircraftId: body.aircraftId,
+            destIcao: body.destIcao,
+          });
+          await persistEconomy(world);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            aircraft: result.aircraft,
+            quote: result.quote,
+            walletDebitUsd: result.walletDebitUsd,
+            walletUsd: missions.walletUsd,
+            ...fleetPayload(missions),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/cargo-limit') {
+        const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
+        const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);
+        if (!aircraft) {
+          send(res, 400, { error: 'aircraft query required' });
+          return;
+        }
+        const cargoLimit = await resolveClassMaxCargoKg(aircraft);
+        send(res, 200, {
+          aircraftClassId: aircraft,
+          maxCargoKg: cargoLimit.maxCargoKg,
+          maxCargoSource: cargoLimit.source,
+          airframeLabel: cargoLimit.airframeLabel,
         });
         return;
       }
@@ -447,7 +568,7 @@ export function createCareerApiServer(port = 8787) {
           maxCargoSource: cargoLimit?.source ?? null,
           airframeLabel: cargoLimit?.airframeLabel ?? null,
           npcActivity: mapNpcActivity(world, nowMs),
-          lots: lots.slice(0, 80).map((row) => ({
+          lots: lots.slice(0, 200).map((row) => ({
             id: row.lot.id,
             originIcao: row.lot.originIcao,
             destIcao: row.lot.destIcao,
@@ -600,11 +721,7 @@ export function createCareerApiServer(port = 8787) {
         const fresh = createSeedEconomyWorld({ seed: body.seed });
         await persistEconomy(fresh);
         if (body.resetMissions) {
-          await writeJson(missionsPath, {
-            version: 1,
-            walletUsd: 0,
-            missions: [],
-          } satisfies MissionsFile);
+          await writeJson(missionsPath, emptyMissionsStateV2());
         }
         send(res, 200, { tick: fresh.tick, seed: fresh.seed, airports: fresh.airports.length });
         return;
@@ -685,13 +802,11 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'POST' && path === '/api/staging/commit') {
         const body = (await readBody(req)) as {
           aircraft?: string;
+          aircraftId?: string;
           missionId?: string;
           openDispatch?: boolean;
           lines?: Array<{ lotId?: string; cargoKg?: number }>;
         };
-        const aircraft =
-          (parseFreighterClassId(body.aircraft) as FreighterClassId | undefined) ??
-          'narrow_freighter';
         const lines = (body.lines ?? [])
           .filter((line) => line.lotId)
           .map((line) => ({
@@ -702,9 +817,35 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'lines required' });
           return;
         }
-        const cargoLimit = await resolveClassMaxCargoKg(aircraft);
         const world = await loadEconomy();
         const missions = await loadMissions();
+        if (!missions.hubSelected || missions.fleet.length === 0) {
+          send(res, 400, { error: 'Select a starter hub before staging a flight' });
+          return;
+        }
+        const firstLot = world.lots.find((lot) => lot.id === lines[0]!.lotId);
+        if (!firstLot) {
+          send(res, 404, { error: `Unknown lot ${lines[0]!.lotId}` });
+          return;
+        }
+        let playerAircraft: PlayerAircraft | undefined = body.aircraftId
+          ? findPlayerAircraft(missions, body.aircraftId)
+          : undefined;
+        if (body.aircraftId && !playerAircraft) {
+          send(res, 404, { error: `Unknown aircraft ${body.aircraftId}` });
+          return;
+        }
+        if (!playerAircraft) {
+          playerAircraft = listParkedAt(missions, firstLot.originIcao)[0];
+        }
+        if (!playerAircraft) {
+          send(res, 400, {
+            error: `No parked aircraft at ${firstLot.originIcao} — ferry one there first`,
+          });
+          return;
+        }
+        const aircraft = playerAircraft.aircraftClassId;
+        const cargoLimit = await resolveClassMaxCargoKg(aircraft);
         let intoMission =
           body.missionId
             ? missions.missions.find((m) => m.id === body.missionId)
@@ -713,26 +854,57 @@ export function createCareerApiServer(port = 8787) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
           return;
         }
-        // Soft auto-attach when exactly one open same-OD flight exists.
-        if (!intoMission && lines[0]) {
-          const firstLot = world.lots.find((lot) => lot.id === lines[0]!.lotId);
-          if (firstLot) {
-            intoMission = findOpenManifestForRoute(missions.missions, {
-              originIcao: firstLot.originIcao,
-              destIcao: firstLot.destIcao,
-              aircraftClassId: aircraft,
-            });
-          }
+        if (!intoMission) {
+          intoMission = findOpenManifestForRoute(missions.missions, {
+            originIcao: firstLot.originIcao,
+            destIcao: firstLot.destIcao,
+            aircraftClassId: aircraft,
+          });
         }
-
+        const activeMissions = listActivePlayerMissions(missions.missions);
+        if (!intoMission && activeMissions.length > 0) {
+          send(res, 400, {
+            error: `Finish or cancel active flight ${activeMissions[0]!.id} before staging another`,
+          });
+          return;
+        }
+        if (
+          intoMission &&
+          activeMissions.some((mission) => mission.id !== intoMission!.id)
+        ) {
+          send(res, 400, {
+            error: 'Another active flight is already open — finish it before adding cargo',
+          });
+          return;
+        }
         try {
+          if (intoMission?.aircraftId && intoMission.aircraftId !== playerAircraft.id) {
+            send(res, 400, {
+              error: `Mission ${intoMission.id} is assigned to another aircraft`,
+            });
+            return;
+          }
+          if (!intoMission) {
+            if (
+              playerAircraft.status !== 'parked' ||
+              playerAircraft.locationIcao !== firstLot.originIcao
+            ) {
+              send(res, 400, {
+                error: `Aircraft ${playerAircraft.id} is at ${playerAircraft.locationIcao}, not ${firstLot.originIcao}`,
+              });
+              return;
+            }
+          }
           const committed = commitStagedManifest(world, {
             lines,
             aircraftClassId: aircraft,
             maxCargoKg: cargoLimit.maxCargoKg,
             intoMission: intoMission ?? undefined,
           });
-          const mission = committed.mission;
+          let mission: MissionIntent = {
+            ...committed.mission,
+            aircraftId: playerAircraft.id,
+          };
           if (committed.appended && intoMission) {
             const idx = missions.missions.findIndex((m) => m.id === intoMission!.id);
             if (idx >= 0) missions.missions[idx] = mission;
@@ -741,6 +913,12 @@ export function createCareerApiServer(port = 8787) {
             const idx = missions.missions.findIndex((m) => m.id === mission.id);
             if (idx >= 0) missions.missions[idx] = mission;
             else missions.missions.push(mission);
+            assignAircraftToMission(
+              missions,
+              playerAircraft.id,
+              mission.id,
+              mission.originIcao,
+            );
           }
           await persistEconomy(world);
           await writeJson(missionsPath, missions);
@@ -764,6 +942,7 @@ export function createCareerApiServer(port = 8787) {
               dispatchedAtTick: world.tick,
             };
             if (idx >= 0) missions.missions[idx] = dispatched;
+            mission = dispatched;
             await writeJson(missionsPath, missions);
             openDispatchUrl(built.url);
             dispatch = {
@@ -773,20 +952,6 @@ export function createCareerApiServer(port = 8787) {
               airframeLabel: built.airframeLabel,
               opened: true,
             };
-            send(res, 200, {
-              mission: dispatched,
-              walletUsd: missions.walletUsd,
-              maxCargoKg: cargoLimit.maxCargoKg,
-              maxCargoSource: cargoLimit.source,
-              appended: committed.appended,
-              lineCount: committed.lineCount,
-              remainingKg: missionRemainingCapacityKg(
-                dispatched,
-                cargoLimit.maxCargoKg,
-              ),
-              dispatch,
-            });
-            return;
           }
 
           send(res, 200, {
@@ -797,7 +962,8 @@ export function createCareerApiServer(port = 8787) {
             appended: committed.appended,
             lineCount: committed.lineCount,
             remainingKg: missionRemainingCapacityKg(mission, cargoLimit.maxCargoKg),
-            dispatch: null,
+            dispatch: dispatch ?? null,
+            fleet: missions.fleet,
           });
         } catch (error) {
           send(res, 400, {
@@ -836,7 +1002,7 @@ export function createCareerApiServer(port = 8787) {
               reservedBefore += lot.reservedKg;
             }
           }
-          const cancelled = cancelMission(world, existing);
+          const cancelled = cancelMission(world, existing, { fleet: missions });
           let reservedAfter = 0;
           let anyReturned = false;
           for (const line of lines) {
@@ -1047,13 +1213,20 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          const departed = departMission(world, existing);
+          const departedResult = departMission(world, existing, { fleet: missions });
+          const departed = departedResult.mission;
           missions.missions[idx] = departed;
+          missions.walletUsd = debitWalletForFuel(
+            missions.walletUsd,
+            departedResult.fuelDebitUsd,
+          );
           await persistEconomy(world);
           await writeJson(missionsPath, missions);
           send(res, 200, {
             mission: departed,
             walletUsd: missions.walletUsd,
+            fuelDebitUsd: departedResult.fuelDebitUsd,
+            fleet: missions.fleet,
             preflightOverride: body.override === true,
           });
         } catch (error) {
@@ -1083,15 +1256,21 @@ export function createCareerApiServer(port = 8787) {
           if (watch.running && watch.missionId === body.missionId) {
             await watchSession.stop();
           }
-          const result = settleMission(world, missions.missions[idx]!);
+          const result = settleMission(world, missions.missions[idx]!, {
+            fleet: missions,
+          });
           missions.missions[idx] = result.mission;
-          missions.walletUsd =
-            Math.round((missions.walletUsd + result.walletCreditUsd) * 100) / 100;
+          missions.walletUsd = debitWalletForFuel(
+            Math.round((missions.walletUsd + result.walletCreditUsd) * 100) / 100,
+            result.fuelDebitUsd,
+          );
           await persistEconomy(world);
           await writeJson(missionsPath, missions);
           send(res, 200, {
             mission: result.mission,
             walletUsd: missions.walletUsd,
+            fuelDebitUsd: result.fuelDebitUsd,
+            fleet: missions.fleet,
             settlement: {
               payoutUsd: result.settlement.payoutUsd,
               penaltyUsd: result.settlement.penaltyUsd,

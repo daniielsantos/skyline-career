@@ -1,33 +1,27 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { CareerMissionsState, MissionIntent } from '@msfs-compat/shared';
-import { normalizeMissionIntent } from '@msfs-compat/shared';
+import {
+  emptyMissionsStateV2,
+  normalizeMissionIntent,
+  normalizeMissionsState,
+} from '@msfs-compat/shared';
 
 export const DEFAULT_CAREER_MISSIONS_PATH = 'profiles/career/local-missions.json';
 
 export function emptyMissionsState(): CareerMissionsState {
-  return { version: 1, walletUsd: 0, missions: [] };
-}
-
-function normalizeMissionsState(parsed: CareerMissionsState): CareerMissionsState {
-  return {
-    version: 1,
-    walletUsd: typeof parsed.walletUsd === 'number' && Number.isFinite(parsed.walletUsd)
-      ? parsed.walletUsd
-      : 0,
-    missions: Array.isArray(parsed.missions)
-      ? parsed.missions.map((m) => normalizeMissionIntent(m))
-      : [],
-  };
+  return emptyMissionsStateV2();
 }
 
 export async function loadCareerMissions(path: string): Promise<CareerMissionsState> {
   const raw = await readFile(resolve(path), 'utf8');
-  const parsed = JSON.parse(raw) as CareerMissionsState;
-  if (parsed.version !== 1 || !Array.isArray(parsed.missions)) {
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  if (!Array.isArray(parsed.missions)) {
     throw new Error(`Invalid career missions file: ${path}`);
   }
-  return normalizeMissionsState(parsed);
+  const normalized = normalizeMissionsState(parsed);
+  normalized.missions = normalized.missions.map((m) => normalizeMissionIntent(m));
+  return normalized;
 }
 
 export async function saveCareerMissions(
@@ -37,6 +31,7 @@ export async function saveCareerMissions(
   const abs = resolve(path);
   await mkdir(dirname(abs), { recursive: true });
   const normalized = normalizeMissionsState(state);
+  normalized.missions = normalized.missions.map((m) => normalizeMissionIntent(m));
   await writeFile(abs, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
 }
 

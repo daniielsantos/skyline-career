@@ -13,7 +13,7 @@ import {
 } from './career-economy.js';
 
 describe('career-economy seed', () => {
-  it('creates 20 Brazilian hubs and 4 commodities of inventory', () => {
+  it('creates 20 Brazilian hubs and 5 commodities of inventory', () => {
     const world = createSeedEconomyWorld({ seed: 'test-a' });
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
@@ -33,7 +33,9 @@ describe('career-economy seed', () => {
       assert.ok(ap.inventory.perishables);
       assert.ok(ap.inventory.machinery);
       assert.ok(ap.inventory.general);
+      assert.ok(ap.inventory.fuel);
       assert.ok(ap.baseProduction?.electronics !== undefined);
+      assert.ok(ap.baseProduction?.fuel !== undefined);
       assert.ok(Number.isFinite(ap.lat));
       assert.ok(Number.isFinite(ap.lon));
     }

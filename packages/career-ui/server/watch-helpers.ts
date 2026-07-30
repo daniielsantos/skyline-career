@@ -4,6 +4,7 @@
 
 import {
   createMissionFlightWatchState,
+  debitWalletForFuel,
   departMission,
   evaluateMissionFlightTransition,
   resolveAirportCoords,
@@ -288,17 +289,25 @@ export class CareerWatchSession {
             this.preflightDepartBlockedLogged = true;
           }
         } else {
-          current = departMission(world, current);
+          const departed = departMission(world, current, { fleet: missions });
+          current = departed.mission;
           missions.missions[idx] = current;
+          missions.walletUsd = debitWalletForFuel(
+            missions.walletUsd,
+            departed.fuelDebitUsd,
+          );
           this.missionStatus = current.status;
+          this.walletUsd = missions.walletUsd;
           await this.cb.persistEconomy(world);
           await this.cb.saveMissions(missions);
         }
       } else if (event.type === 'settle' && this.opts.autoSettle) {
-        const result = settleMission(world, current);
+        const result = settleMission(world, current, { fleet: missions });
         missions.missions[idx] = result.mission;
-        missions.walletUsd =
-          Math.round((missions.walletUsd + result.walletCreditUsd) * 100) / 100;
+        missions.walletUsd = debitWalletForFuel(
+          Math.round((missions.walletUsd + result.walletCreditUsd) * 100) / 100,
+          result.fuelDebitUsd,
+        );
         this.missionStatus = result.mission.status;
         this.walletUsd = missions.walletUsd;
         this.settlement = {

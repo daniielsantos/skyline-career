@@ -13,10 +13,12 @@ Opens:
 
 ## What it does
 
-- **Market** — list lots with distance/expiry, filters/sort/pagination, freighter class filter; **Prepare flight** opens Staging
-- **Staging** — build a same-route multi-lot manifest, pick aircraft, adjust payload, then **Accept & Dispatch**
-- **Terminal** — click any ICAO to inspect stock (tonnes), surplus/shortage, and related contracts
-- **Missions** — Dispatch (SimBrief), Confirm OFP (paper), **Preflight** (OFP↔live load), **Watch**, Depart/Settle, Cancel
+- **Market** — list lots with distance/expiry, filters/sort/pagination; **Prepare flight** opens Staging (disabled while a flight is active)
+- **Pilot** — register name + home hub on first open; profile page shows identity, wallet, fleet snapshot (XP / rank later). After Reset Brazil the market is empty until **+1 day** forms lots.
+- **Hangar** — starter Caravan parked at your hub; ferry instantly (fee + Jet-A) or relocate by settling cargo. Staging only from the aircraft's current ICAO.
+- **Staging** — always available: empty after settle/cancel, draft for multi-lot prep, or live ops (Dispatch, auto OFP confirm every 15s, Preflight, Watch, Depart/Settle, Cancel). One operational flight at a time. **Depart** buys Jet-A shortfall from the origin terminal into the aircraft tanks.
+- **Terminal** — Inventory (incl. Jet-A), Contracts, Movements tabs; click any ICAO to inspect
+- **Logbook** (Missions tab) — read-only history of settled, cancelled, and past flights
 - **NPC fleet** — competing freighters airborne / turnaround / idle
 - **+1 day** — optional manual advance (24h); economy also runs **1:1 with wall clock**
   (catch-up on load / while API is open)
@@ -26,5 +28,5 @@ Opens:
 Terminal inventory shows stock trend (rising/falling) and active regional events.
 Economy save is schema v3 (`lastBatchAtMs`, continuous NPC ops, hourly market batches).
 
-Set your SimBrief username on the Missions tab (or `SIMBRIEF_USERNAME` env for the API).
+Set your SimBrief username on the Staging ops view (or `SIMBRIEF_USERNAME` env for the API).
 **Preflight** and **Watch** need SimBridgeHost (`\\\\.\\pipe\\msfs-compat-simbridge`). Failed Preflight soft-blocks Depart / Watch auto-depart (confirm override available).

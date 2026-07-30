@@ -470,7 +470,46 @@ th {
 }
 
 .staging-capacity {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.staging-capacity em {
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.staging-empty {
+  padding: 1.25rem 0.25rem 0.5rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.staging-ops-capacity {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.staging-ops-reason {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.staging-ops-actions {
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.logbook-panel .panel-head {
+  align-items: end;
+}
+
+.logbook-list .logbook-entry {
+  grid-template-columns: 1fr;
+}
+
+.logbook-lots {
+  margin-top: 0.45rem;
 }
 
 .staging-section h3 {
@@ -805,12 +844,144 @@ th {
   color: var(--muted);
 }
 
+.hub-picker {
+  margin-bottom: 1rem;
+}
+
+.pilot-signup {
+  display: grid;
+  gap: 1rem;
+  max-width: 22rem;
+}
+
+.pilot-field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.pilot-field input,
+.pilot-field select {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+}
+
+.pilot-chip {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.pilot-chip:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.pilot-chip strong {
+  font-size: 1rem;
+}
+
+.pilot-profile-grid {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (min-width: 720px) {
+  .pilot-profile-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pilot-card-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.pilot-card {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.pilot-card h3,
+.pilot-fleet-block h3 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pilot-dl {
+  margin: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.pilot-dl > div {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.pilot-dl dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.pilot-dl dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.pilot-dl.muted dd {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.55rem;
+}
+
+.hangar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.hangar-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.hangar-ferry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.hangar-main .fill-bar {
+  margin-top: 0.45rem;
+  max-width: 16rem;
+}
+
 .airport-contracts {
   display: grid;
   gap: 1.25rem;
-  margin-top: 1.25rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--line);
 }
 
 @media (min-width: 860px) {
@@ -825,6 +996,13 @@ th {
   font-size: 1.2rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.contract-preflight {
+  margin-left: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .contract-list {
@@ -845,6 +1023,43 @@ th {
 .contract-list p {
   margin: 0.25rem 0;
   color: var(--muted);
+}
+
+.terminal-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin-bottom: 1.1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.terminal-section {
+  border: 0;
+  background: none;
+  padding: 0.2rem 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.terminal-section:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.terminal-section.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 700;
+}
+
+.terminal-section:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .terminal-tab {
@@ -1023,6 +1238,95 @@ small {
 
 .ofp-fail {
   color: var(--danger);
+}
+
+.ofp-auto-wait,
+.ofp-result-card {
+  margin: 0.85rem 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.ofp-auto-wait {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.ofp-auto-wait strong,
+.ofp-auto-wait small {
+  display: block;
+}
+
+.ofp-auto-wait small {
+  margin-top: 0.15rem;
+  color: var(--muted);
+}
+
+.poll-dot {
+  flex: 0 0 auto;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.poll-dot.checking {
+  background: var(--accent);
+  animation: poll-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes poll-pulse {
+  to {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
+.ofp-result-card {
+  border-left-width: 0.35rem;
+}
+
+.ofp-result-pass {
+  border-left-color: var(--ok);
+}
+
+.ofp-result-warn {
+  border-left-color: #8a5a12;
+}
+
+.ofp-result-fail {
+  border-left-color: var(--danger);
+}
+
+.ofp-result-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.ofp-result-pass .ofp-result-head strong {
+  color: var(--ok);
+}
+
+.ofp-result-warn .ofp-result-head strong {
+  color: #8a5a12;
+}
+
+.ofp-result-fail .ofp-result-head strong {
+  color: var(--danger);
+}
+
+.ofp-result-head span,
+.ofp-result-card > p {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ofp-result-card > p {
+  margin: 0.45rem 0 0;
 }
 
 .ofp-findings {

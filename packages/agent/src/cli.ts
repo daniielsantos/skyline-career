@@ -1522,7 +1522,7 @@ async function main(): Promise<void> {
       }
       let cancelled;
       try {
-        cancelled = cancelMission(world, existing);
+        cancelled = cancelMission(world, existing, { fleet: missions });
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -1692,7 +1692,9 @@ async function main(): Promise<void> {
       }
       let departed;
       try {
-        departed = departMission(world, existing);
+        const result = departMission(world, existing, { fleet: missions });
+        departed = result.mission;
+        creditWallet(missions, -result.fuelDebitUsd);
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -1701,6 +1703,14 @@ async function main(): Promise<void> {
       await saveCareerEconomy(savePath, world);
       await saveCareerMissions(missionsPath, missions);
       console.log(`Departed: ${formatMissionSummary(departed)}`);
+      if (departed.fuelUplift) {
+        console.log(
+          `Fuel uplift: ${(departed.fuelUplift.requestedKg / 1000).toFixed(2)} t` +
+            ` · $${departed.fuelUplift.costUsd.toLocaleString()}` +
+            ` · ${departed.fuelUplift.scarcity}` +
+            ` @ ${departed.fuelUplift.originIcao}`,
+        );
+      }
       console.log(`Next: after landing → npm run career -- settle --mission ${departed.id}`);
       return;
     }
@@ -1720,12 +1730,13 @@ async function main(): Promise<void> {
       }
       let result;
       try {
-        result = settleMission(world, existing);
+        result = settleMission(world, existing, { fleet: missions });
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
         process.exit(1);
       }
       upsertMission(missions, result.mission);
+      creditWallet(missions, -result.fuelDebitUsd);
       const wallet = creditWallet(missions, result.walletCreditUsd);
       await saveCareerEconomy(savePath, world);
       await saveCareerMissions(missionsPath, missions);
@@ -1849,7 +1860,9 @@ async function main(): Promise<void> {
           } else if (event.type === 'depart' && autoDepart) {
             let departed: MissionIntent;
             try {
-              departed = departMission(world, current);
+              const result = departMission(world, current, { fleet: missions });
+              departed = result.mission;
+              creditWallet(missions, -result.fuelDebitUsd);
             } catch (error) {
               console.error(
                 `[watch] depart failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -1865,7 +1878,7 @@ async function main(): Promise<void> {
           } else if (event.type === 'settle' && autoSettle) {
             let settled;
             try {
-              settled = settleMission(world, current);
+              settled = settleMission(world, current, { fleet: missions });
             } catch (error) {
               console.error(
                 `[watch] settle failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -1874,6 +1887,7 @@ async function main(): Promise<void> {
               continue;
             }
             upsertMission(missions, settled.mission);
+            creditWallet(missions, -settled.fuelDebitUsd);
             const wallet = creditWallet(missions, settled.walletCreditUsd);
             await saveCareerEconomy(savePath, world);
             await saveCareerMissions(missionsPath, missions);

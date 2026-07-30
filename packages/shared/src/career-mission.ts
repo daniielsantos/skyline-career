@@ -6,6 +6,11 @@ import {
   type CareerEconomyWorld,
   type MarketLotView,
 } from './career-economy.js';
+import { applyPlayerDepartFuel, relocateAircraftOnSettle, releaseAircraftOnCancel } from './career-fleet.js';
+import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
+import type {
+  CareerMissionsState,
+} from './types/career-economy.js';
 import { KG_TO_LB } from './ofp-compliance.js';
 import type {
   ComplianceFinding,
@@ -32,8 +37,17 @@ export type {
   MissionSettlementLine,
   MissionStatus,
   CareerMissionsState,
+  MissionFuelUplift,
 } from './types/career-economy.js';
 export { MAX_MANIFEST_LOTS } from './types/career-economy.js';
+export {
+  quoteFuelUplift,
+  deliverFuelUplift,
+  estimateUpliftKg,
+  debitWalletForFuel,
+  applyNpcFuelUplift,
+  type FuelUpliftQuote,
+} from './career-fuel.js';
 
 export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
   {
@@ -45,6 +59,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     rolesPackRelPath: 'profiles/ofp/pmdg-738-bcf.json',
     simbriefIcao: 'B738',
     simbriefAirframeMatch: 'PMDG \\(MSFS\\) - Boeing Converted Freighter',
+    fuelBurnKgPerNm: 5,
+    fuelTaxiKg: 400,
   },
   {
     id: 'wide_freighter',
@@ -55,6 +71,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     rolesPackRelPath: 'profiles/ofp/tfdi-md11f.json',
     simbriefIcao: 'MD1F',
     simbriefAirframeMatch: 'TFDi Design \\(MSFS\\) - MD-11F',
+    fuelBurnKgPerNm: 12,
+    fuelTaxiKg: 900,
   },
   {
     id: 'light_turboprop',
@@ -65,6 +83,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
     simbriefIcao: 'C208',
     simbriefAirframeMatch: 'Default',
+    fuelBurnKgPerNm: 0.8,
+    fuelTaxiKg: 40,
   },
 ] as const;
 
@@ -201,6 +221,35 @@ export function findOpenManifestForRoute(
         m.destIcao === opts.destIcao,
     );
   return matches.length === 1 ? matches[0] : undefined;
+}
+
+const ACTIVE_MISSION_STATUSES = new Set(['accepted', 'dispatched', 'in_flight']);
+
+export function isActiveMissionStatus(status: string): boolean {
+  return ACTIVE_MISSION_STATUSES.has(status);
+}
+
+/** Player missions that are still operational (not settled/cancelled). */
+export function listActivePlayerMissions(
+  missions: readonly MissionIntent[],
+): MissionIntent[] {
+  return missions
+    .map((m) => normalizeMissionIntent(m))
+    .filter((m) => isActiveMissionStatus(m.status));
+}
+
+/**
+ * Prefer the most recently accepted active mission when recovering UI state.
+ * With the single-active gate there should be at most one.
+ */
+export function findActivePlayerMission(
+  missions: readonly MissionIntent[],
+): MissionIntent | undefined {
+  const active = listActivePlayerMissions(missions);
+  if (active.length === 0) return undefined;
+  return active.reduce((best, mission) =>
+    (mission.acceptedAtTick ?? 0) >= (best.acceptedAtTick ?? 0) ? mission : best,
+  );
 }
 
 /**
@@ -455,6 +504,16 @@ export function commitStagedManifest(
     totalNewKg += line.cargoKg;
   }
 
+  const distanceNm = routeDistanceNm(world, originIcao!, destIcao!);
+  if (distanceNm === undefined) {
+    throw new Error(`Unknown route distance for ${originIcao}→${destIcao}`);
+  }
+  if (distanceNm > aircraft.maxRangeNm) {
+    throw new Error(
+      `Route ${originIcao}→${destIcao} is ${Math.round(distanceNm)} nm; ${aircraft.name} max range is ${aircraft.maxRangeNm} nm`,
+    );
+  }
+
   const remainingCap = into
     ? missionRemainingCapacityKg(into, maxCargoKg)
     : maxCargoKg;
@@ -505,6 +564,7 @@ export function commitStagedManifest(
 export function cancelMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
+  opts: { fleet?: CareerMissionsState } = {},
 ): MissionIntent {
   const normalized = normalizeMissionIntent(mission);
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
@@ -517,17 +577,23 @@ export function cancelMission(
       releaseShipmentReservation(world, line.shipmentLotId, line.cargoKg);
     }
   }
+  if (opts.fleet) {
+    releaseAircraftOnCancel(opts.fleet, normalized);
+  }
   return { ...normalized, status: 'cancelled' };
 }
 
 /**
  * Mark cargo airborne. Allowed from accepted or dispatched.
  * Fully-reserved lots flip to in_transit so the market stops offering them.
+ * Applies origin Jet-A uplift once (stock drain + mission.fuelUplift).
+ * When `fleet` is provided with mission.aircraftId, only the tank shortfall is purchased.
  */
 export function departMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
-): MissionIntent {
+  opts: { fleet?: CareerMissionsState } = {},
+): DepartMissionResult {
   const normalized = normalizeMissionIntent(mission);
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot depart mission in status=${normalized.status}`);
@@ -538,16 +604,50 @@ export function departMission(
       lot.status = 'in_transit';
     }
   }
-  return {
+
+  let fuelDebitUsd = 0;
+  let nextMission: MissionIntent = {
     ...normalized,
     status: 'in_flight',
     departedAtTick: world.tick,
   };
+
+  if (opts.fleet && normalized.aircraftId) {
+    const playerFuel = applyPlayerDepartFuel(world, opts.fleet, nextMission);
+    nextMission = {
+      ...playerFuel.mission,
+      status: 'in_flight',
+      departedAtTick: world.tick,
+    };
+    fuelDebitUsd = playerFuel.fuelDebitUsd;
+  } else if (!normalized.fuelUplift) {
+    const quote = quoteFuelUplift(world, {
+      originIcao: normalized.originIcao,
+      destIcao: normalized.destIcao,
+      aircraftClassId: normalized.aircraftClassId as FreighterClassId,
+    });
+    const fuelUplift = deliverFuelUplift(world, quote);
+    fuelDebitUsd = fuelUplift.costUsd;
+    nextMission = { ...nextMission, fuelUplift };
+  }
+
+  return {
+    mission: nextMission,
+    fuelDebitUsd,
+  };
+}
+
+export interface DepartMissionResult {
+  mission: MissionIntent;
+  /** Wallet debit for fuel purchased on this call (0 if already uplifted). */
+  fuelDebitUsd: number;
 }
 
 export interface SettleMissionOpts {
   /** Override world.tick for late calculation (tests). */
   tick?: number;
+  /** Player fleet — relocates aircraft and applies tank fuel on depart/settle. */
+  fleet?: CareerMissionsState;
 }
 
 export interface SettleMissionResult {
@@ -555,6 +655,8 @@ export interface SettleMissionResult {
   settlement: MissionSettlement;
   /** Wallet delta to apply (payoutUsd). */
   walletCreditUsd: number;
+  /** Fuel debit if this settle auto-departed (else 0). */
+  fuelDebitUsd: number;
 }
 
 /** Late penalty as a fraction of pay per overdue tick. */
@@ -609,8 +711,15 @@ export function settleMission(
     throw new Error(`Cannot settle mission in status=${working.status}`);
   }
 
+  let fuelDebitUsd = 0;
   if (working.status === 'accepted' || working.status === 'dispatched') {
-    working = departMission(world, working);
+    const departed = departMission(world, working, { fleet: opts.fleet });
+    working = departed.mission;
+    fuelDebitUsd = departed.fuelDebitUsd;
+  }
+
+  if (opts.fleet) {
+    relocateAircraftOnSettle(opts.fleet, working, world);
   }
 
   const settleTick = opts.tick ?? world.tick;
@@ -667,6 +776,7 @@ export function settleMission(
   return {
     mission: settled,
     walletCreditUsd: pay.payoutUsd,
+    fuelDebitUsd,
     settlement: {
       missionId: settled.id,
       deliveredKg: working.cargoKg,

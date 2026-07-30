@@ -34,6 +34,7 @@ import {
 import {
   fetchSimBriefAirframesForIcao,
   resolveSimBriefDispatchType,
+  resolveSimBriefMaxCargoKg,
 } from './ofp-compliance/simbrief-airframes.js';
 import {
   buildRolesPackFromHeuristic,
@@ -65,9 +66,11 @@ import {
   createSeedEconomyWorld,
   departMission,
   evaluateMissionFlightTransition,
+  findOpenManifestForRoute,
   formatIntentOfpCheck,
   formatMissionSummary,
   formatSettlementSummary,
+  getAircraftClass,
   listMarketLots,
   listViableMarketLots,
   parseFreighterClassId,
@@ -1351,18 +1354,40 @@ async function main(): Promise<void> {
         destIcao: getFlag(subArgs, '--dest'),
         commodityId,
       };
+      let maxCargoKg: number | undefined;
+      let maxCargoNote = '';
+      if (aircraftClassId) {
+        const aircraft = getAircraftClass(aircraftClassId);
+        try {
+          const limit = await resolveSimBriefMaxCargoKg({
+            simbriefIcao: aircraft.simbriefIcao,
+            simbriefAirframeMatch: aircraft.simbriefAirframeMatch,
+            titleHint: aircraft.name,
+          });
+          maxCargoKg = limit.maxCargoKg;
+          maxCargoNote = `  simbriefMax=${maxCargoKg}kg (${limit.source})`;
+        } catch {
+          maxCargoKg = aircraft.maxCargoKg;
+          maxCargoNote = `  classMax=${maxCargoKg}kg (simbrief unreachable)`;
+        }
+      }
       const market = aircraftClassId
-        ? listViableMarketLots(world, aircraftClassId, filter)
+        ? listViableMarketLots(world, aircraftClassId, { ...filter, maxCargoKg })
         : listMarketLots(world, filter);
       if (asJson) {
         console.log(
-          JSON.stringify({ tick: world.tick, aircraftClassId, lots: market }, null, 2),
+          JSON.stringify(
+            { tick: world.tick, aircraftClassId, maxCargoKg: maxCargoKg ?? null, lots: market },
+            null,
+            2,
+          ),
         );
         return;
       }
       console.log(
         `Career market tick=${world.tick}  lots=${market.length}` +
           (aircraftClassId ? `  aircraft=${aircraftClassId}` : '') +
+          maxCargoNote +
           `  (${savePath})`,
       );
       for (const row of market.slice(0, 30)) {
@@ -1388,18 +1413,61 @@ async function main(): Promise<void> {
       const aircraftClassId = parseFreighterClassId(aircraftRaw) as FreighterClassId | undefined;
       if (!aircraftClassId) {
         console.error(
-          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter)`,
+          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter|light_turboprop)`,
         );
         process.exit(1);
       }
       const world = await loadOrCreateCareerEconomy(savePath);
       const missions = await loadOrCreateCareerMissions(missionsPath);
+      const lot = world.lots.find((l) => l.id === lotId);
+      if (!lot) {
+        console.error(`Unknown lot: ${lotId}`);
+        process.exit(1);
+      }
+      const aircraft = getAircraftClass(aircraftClassId);
+      let maxCargoKg = aircraft.maxCargoKg;
+      try {
+        const limit = await resolveSimBriefMaxCargoKg({
+          simbriefIcao: aircraft.simbriefIcao,
+          simbriefAirframeMatch: aircraft.simbriefAirframeMatch,
+          titleHint: aircraft.name,
+        });
+        maxCargoKg = limit.maxCargoKg;
+        if (!asJson) {
+          console.log(
+            `SimBrief cargo limit: ${maxCargoKg} kg (${limit.source}) · ${limit.airframe.comments || limit.airframe.name}`,
+          );
+        }
+      } catch (error) {
+        if (!asJson) {
+          console.log(
+            `Using class cargo limit ${maxCargoKg} kg (SimBrief airframes unavailable: ${
+              error instanceof Error ? error.message : String(error)
+            })`,
+          );
+        }
+      }
+      const intoFlag = getFlag(subArgs, '--mission');
+      let intoMission = intoFlag ? findMission(missions, intoFlag) : undefined;
+      if (intoFlag && !intoMission) {
+        console.error(`Unknown mission: ${intoFlag}`);
+        process.exit(1);
+      }
+      if (!intoMission) {
+        intoMission = findOpenManifestForRoute(missions.missions, {
+          originIcao: lot.originIcao,
+          destIcao: lot.destIcao,
+          aircraftClassId,
+        });
+      }
       let mission;
       try {
         mission = acceptMission(world, {
           lotId,
           cargoKg: getNumberFlag(subArgs, '--kg'),
           aircraftClassId,
+          maxCargoKg,
+          intoMission,
         });
       } catch (error) {
         console.error(error instanceof Error ? error.message : String(error));
@@ -1412,7 +1480,9 @@ async function main(): Promise<void> {
         console.log(JSON.stringify(mission, null, 2));
         return;
       }
-      console.log(`Accepted: ${formatMissionSummary(mission)}`);
+      console.log(
+        `${intoMission ? 'Added to' : 'Accepted'}: ${formatMissionSummary(mission)}`,
+      );
       console.log(
         `Next: npm run career -- dispatch --mission ${mission.id} --simbrief-user YOUR_ALIAS`,
       );

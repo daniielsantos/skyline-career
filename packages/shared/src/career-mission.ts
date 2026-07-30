@@ -2,6 +2,7 @@ import {
   applyFreightDelivery,
   getCommodity,
   listMarketLots,
+  routeDistanceNm,
   type CareerEconomyWorld,
   type MarketLotView,
 } from './career-economy.js';
@@ -15,24 +16,31 @@ import type {
   AircraftClass,
   FreighterClassId,
   MissionIntent,
+  MissionLotLine,
   MissionSettlement,
+  MissionSettlementLine,
   ShipmentLot,
 } from './types/career-economy.js';
+import { MAX_MANIFEST_LOTS } from './types/career-economy.js';
 
 export type {
   AircraftClass,
   FreighterClassId,
   MissionIntent,
+  MissionLotLine,
   MissionSettlement,
+  MissionSettlementLine,
   MissionStatus,
   CareerMissionsState,
 } from './types/career-economy.js';
+export { MAX_MANIFEST_LOTS } from './types/career-economy.js';
 
 export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
   {
     id: 'narrow_freighter',
     name: 'Narrow freighter (B738 BCF class)',
-    maxCargoKg: 22_000,
+    /** Fallback when SimBrief airframes.json is unreachable; live limit ≈ maxcargo. */
+    maxCargoKg: 18_137,
     maxRangeNm: 2_500,
     rolesPackRelPath: 'profiles/ofp/pmdg-738-bcf.json',
     simbriefIcao: 'B738',
@@ -41,11 +49,22 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
   {
     id: 'wide_freighter',
     name: 'Wide freighter (MD-11F class)',
+    /** Fallback; live limit prefers SimBrief mzfw−oew when maxcargo is 0. */
     maxCargoKg: 90_000,
     maxRangeNm: 6_000,
     rolesPackRelPath: 'profiles/ofp/tfdi-md11f.json',
     simbriefIcao: 'MD1F',
     simbriefAirframeMatch: 'TFDi Design \\(MSFS\\) - MD-11F',
+  },
+  {
+    id: 'light_turboprop',
+    name: 'Light turboprop (C208 Caravan Cargo Pod)',
+    /** Fallback; live prefer SimBrief C208 mzfw−oew (~1704 kg). */
+    maxCargoKg: 1_704,
+    maxRangeNm: 900,
+    rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
+    simbriefIcao: 'C208',
+    simbriefAirframeMatch: 'Default',
   },
 ] as const;
 
@@ -59,9 +78,18 @@ export function getAircraftClass(id: FreighterClassId): AircraftClass {
 
 export function parseFreighterClassId(raw: string | undefined): FreighterClassId | undefined {
   if (!raw) return undefined;
-  if (raw === 'narrow_freighter' || raw === 'wide_freighter') return raw;
+  if (
+    raw === 'narrow_freighter' ||
+    raw === 'wide_freighter' ||
+    raw === 'light_turboprop'
+  ) {
+    return raw;
+  }
   if (raw === 'narrow' || raw === 'bcf' || raw === '738') return 'narrow_freighter';
   if (raw === 'wide' || raw === 'md11' || raw === 'md-11f') return 'wide_freighter';
+  if (raw === 'caravan' || raw === 'c208' || raw === 'light' || raw === 'turboprop') {
+    return 'light_turboprop';
+  }
   return undefined;
 }
 
@@ -78,6 +106,101 @@ function findLot(world: CareerEconomyWorld, lotId: string): ShipmentLot {
     throw new Error(`Unknown shipment lot: ${lotId}`);
   }
   return lot;
+}
+
+function missionLines(mission: MissionIntent): MissionLotLine[] {
+  if (Array.isArray(mission.lots) && mission.lots.length > 0) {
+    return mission.lots;
+  }
+  // Legacy single-lot saves / test fixtures without `lots`.
+  if (mission.shipmentLotId) {
+    return [
+      {
+        shipmentLotId: mission.shipmentLotId,
+        commodityId: mission.commodityId,
+        cargoKg: mission.cargoKg,
+        payUsd: mission.payUsd,
+        urgency: mission.urgency,
+        reason: mission.reason,
+        deadlineTick: mission.deadlineTick,
+      },
+    ];
+  }
+  return [];
+}
+
+/** Recompute top-level mirrors from `lots` (or legacy single-lot fields). */
+export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
+  const lots = missionLines(mission);
+  if (lots.length === 0) {
+    throw new Error(`Mission ${mission.id} has no lot lines`);
+  }
+  const cargoKg = lots.reduce((sum, line) => sum + line.cargoKg, 0);
+  const payUsd = lots.reduce((sum, line) => sum + line.payUsd, 0);
+  const deadlineTick = Math.min(...lots.map((line) => line.deadlineTick));
+  const urgency = lots.some((line) => line.urgency === 'urgent') ? 'urgent' : 'normal';
+  const primary = lots.reduce((best, line) =>
+    line.cargoKg > best.cargoKg ? line : best,
+  );
+  const reason =
+    lots.length === 1
+      ? primary.reason
+      : `${lots.length} lots · ${(cargoKg / 1000).toFixed(1)} t · primary ${getCommodity(primary.commodityId).name}`;
+  return {
+    ...mission,
+    lots,
+    shipmentLotId: lots[0]!.shipmentLotId,
+    commodityId: primary.commodityId,
+    cargoKg,
+    payUsd,
+    deadlineTick,
+    urgency,
+    reason,
+  };
+}
+
+/** Soft-migrate legacy MissionIntent / dirty saves into canonical `lots[]`. */
+export function normalizeMissionIntent(
+  raw: MissionIntent | (Omit<MissionIntent, 'lots'> & { lots?: MissionLotLine[] }),
+): MissionIntent {
+  return recomputeMissionTotals(raw as MissionIntent);
+}
+
+export function normalizeMissionsList(missions: MissionIntent[]): MissionIntent[] {
+  return missions.map((m) => normalizeMissionIntent(m));
+}
+
+/** Remaining payload capacity on an open flight (kg). */
+export function missionRemainingCapacityKg(
+  mission: MissionIntent,
+  maxCargoKg: number,
+): number {
+  const normalized = normalizeMissionIntent(mission);
+  return Math.max(0, Math.floor(maxCargoKg) - normalized.cargoKg);
+}
+
+/**
+ * Find the single open same-OD+aircraft flight to auto-append into.
+ * Returns undefined if zero or more than one match (caller creates a new flight).
+ */
+export function findOpenManifestForRoute(
+  missions: readonly MissionIntent[],
+  opts: {
+    originIcao: string;
+    destIcao: string;
+    aircraftClassId: FreighterClassId;
+  },
+): MissionIntent | undefined {
+  const matches = missions
+    .map((m) => normalizeMissionIntent(m))
+    .filter(
+      (m) =>
+        (m.status === 'accepted' || m.status === 'dispatched') &&
+        m.aircraftClassId === opts.aircraftClassId &&
+        m.originIcao === opts.originIcao &&
+        m.destIcao === opts.destIcao,
+    );
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 /**
@@ -133,32 +256,95 @@ export function acceptMission(
     lotId: string;
     cargoKg?: number;
     aircraftClassId?: FreighterClassId;
+    /** Id for a brand-new flight (ignored when appending). */
     missionId?: string;
+    /** Override class max (e.g. live SimBrief maxcargo). */
+    maxCargoKg?: number;
+    /** Append cargo onto this open flight (same OD + aircraft). */
+    intoMission?: MissionIntent;
   },
 ): MissionIntent {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
+  const maxCargoKg =
+    opts.maxCargoKg !== undefined && Number.isFinite(opts.maxCargoKg) && opts.maxCargoKg > 0
+      ? Math.floor(opts.maxCargoKg)
+      : aircraft.maxCargoKg;
   const lot = findLot(world, opts.lotId);
   const avail = lotAvailableKg(lot);
   if (avail <= 0) {
     throw new Error(`Lot ${opts.lotId} has no remaining cargo`);
   }
 
+  const into = opts.intoMission
+    ? normalizeMissionIntent(opts.intoMission)
+    : undefined;
+
+  if (into) {
+    if (into.status !== 'accepted' && into.status !== 'dispatched') {
+      throw new Error(`Cannot add cargo to mission in status=${into.status}`);
+    }
+    if (into.aircraftClassId !== aircraft.id) {
+      throw new Error(
+        `Aircraft class mismatch: flight is ${into.aircraftClassId}, accept requested ${aircraft.id}`,
+      );
+    }
+    if (into.originIcao !== lot.originIcao || into.destIcao !== lot.destIcao) {
+      throw new Error(
+        `Route mismatch: flight is ${into.originIcao}→${into.destIcao}, lot is ${lot.originIcao}→${lot.destIcao}`,
+      );
+    }
+    if (into.lots.length >= MAX_MANIFEST_LOTS) {
+      throw new Error(
+        `Manifest full (${MAX_MANIFEST_LOTS} lots) — dispatch this flight or start a new one`,
+      );
+    }
+  }
+
+  const remainingCap = into
+    ? missionRemainingCapacityKg(into, maxCargoKg)
+    : maxCargoKg;
+  if (remainingCap <= 0) {
+    throw new Error(
+      `No remaining capacity on flight ${into?.id ?? '(new)'} (max ${maxCargoKg} kg)`,
+    );
+  }
+
   const requested =
-    opts.cargoKg !== undefined ? Math.floor(opts.cargoKg) : Math.min(avail, aircraft.maxCargoKg);
-  const cargoKg = Math.min(requested, avail, aircraft.maxCargoKg);
+    opts.cargoKg !== undefined
+      ? Math.floor(opts.cargoKg)
+      : Math.min(avail, remainingCap);
+  const cargoKg = Math.min(requested, avail, remainingCap);
   if (cargoKg <= 0) {
     throw new Error(
-      `Nothing to accept: requested=${requested} avail=${avail} aircraftMax=${aircraft.maxCargoKg}`,
+      `Nothing to accept: requested=${requested} avail=${avail} remainingCap=${remainingCap}`,
     );
   }
 
   const { payUsd } = reserveShipmentLot(world, opts.lotId, cargoKg);
+  const line: MissionLotLine = {
+    shipmentLotId: lot.id,
+    commodityId: lot.commodityId,
+    cargoKg,
+    payUsd,
+    urgency: lot.urgency,
+    reason: lot.reason,
+    deadlineTick: lot.expiresAtTick,
+  };
+
+  if (into) {
+    return recomputeMissionTotals({
+      ...into,
+      lots: [...into.lots, line],
+    });
+  }
+
   const id =
     opts.missionId?.trim() ||
     `msn_${world.tick}_${lot.originIcao}_${lot.destIcao}_${Math.floor(Math.random() * 1e6)}`;
 
-  return {
+  return recomputeMissionTotals({
     id,
+    lots: [line],
     shipmentLotId: lot.id,
     commodityId: lot.commodityId,
     originIcao: lot.originIcao,
@@ -173,18 +359,165 @@ export function acceptMission(
     reason: lot.reason,
     status: 'accepted',
     acceptedAtTick: world.tick,
-  };
+  });
+}
+
+export type StagedManifestLine = {
+  lotId: string;
+  cargoKg: number;
+};
+
+/**
+ * Atomically reserve one or more staged lots onto a new or existing same-OD flight.
+ * Validates first; on mid-apply failure restores lot reservations from a snapshot.
+ */
+export function commitStagedManifest(
+  world: CareerEconomyWorld,
+  opts: {
+    lines: StagedManifestLine[];
+    aircraftClassId?: FreighterClassId;
+    maxCargoKg?: number;
+    intoMission?: MissionIntent;
+    /** Id for a brand-new flight (ignored when appending). */
+    missionId?: string;
+  },
+): { mission: MissionIntent; appended: boolean; lineCount: number } {
+  const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
+  const maxCargoKg =
+    opts.maxCargoKg !== undefined && Number.isFinite(opts.maxCargoKg) && opts.maxCargoKg > 0
+      ? Math.floor(opts.maxCargoKg)
+      : aircraft.maxCargoKg;
+
+  if (!Array.isArray(opts.lines) || opts.lines.length === 0) {
+    throw new Error('Staging requires at least one cargo line');
+  }
+  if (opts.lines.length > MAX_MANIFEST_LOTS) {
+    throw new Error(`Staging allows at most ${MAX_MANIFEST_LOTS} lots`);
+  }
+
+  const seen = new Set<string>();
+  const normalizedLines: StagedManifestLine[] = [];
+  for (const raw of opts.lines) {
+    const lotId = raw.lotId?.trim();
+    const cargoKg = Math.floor(raw.cargoKg);
+    if (!lotId) throw new Error('Each staging line needs a lotId');
+    if (seen.has(lotId)) throw new Error(`Duplicate lot in staging: ${lotId}`);
+    seen.add(lotId);
+    if (!Number.isFinite(cargoKg) || cargoKg <= 0) {
+      throw new Error(`Invalid cargoKg for ${lotId}`);
+    }
+    normalizedLines.push({ lotId, cargoKg });
+  }
+
+  const into = opts.intoMission
+    ? normalizeMissionIntent(opts.intoMission)
+    : undefined;
+  if (into) {
+    if (into.status !== 'accepted' && into.status !== 'dispatched') {
+      throw new Error(`Cannot stage onto mission in status=${into.status}`);
+    }
+    if (into.aircraftClassId !== aircraft.id) {
+      throw new Error(
+        `Aircraft class mismatch: flight is ${into.aircraftClassId}, staging requested ${aircraft.id}`,
+      );
+    }
+    if (into.lots.length + normalizedLines.length > MAX_MANIFEST_LOTS) {
+      throw new Error(
+        `Manifest would exceed ${MAX_MANIFEST_LOTS} lots (${into.lots.length} existing + ${normalizedLines.length} staged)`,
+      );
+    }
+  }
+
+  let originIcao: string | undefined;
+  let destIcao: string | undefined;
+  let totalNewKg = 0;
+  for (const line of normalizedLines) {
+    const lot = findLot(world, line.lotId);
+    const avail = lotAvailableKg(lot);
+    if (line.cargoKg > avail) {
+      throw new Error(
+        `Lot ${line.lotId} only has ${avail} kg available (requested ${line.cargoKg})`,
+      );
+    }
+    if (!originIcao) {
+      originIcao = lot.originIcao;
+      destIcao = lot.destIcao;
+    } else if (lot.originIcao !== originIcao || lot.destIcao !== destIcao) {
+      throw new Error(
+        `Staging lots must share one route (expected ${originIcao}→${destIcao}, got ${lot.originIcao}→${lot.destIcao})`,
+      );
+    }
+    if (into && (into.originIcao !== lot.originIcao || into.destIcao !== lot.destIcao)) {
+      throw new Error(
+        `Route mismatch: flight is ${into.originIcao}→${into.destIcao}, lot is ${lot.originIcao}→${lot.destIcao}`,
+      );
+    }
+    totalNewKg += line.cargoKg;
+  }
+
+  const remainingCap = into
+    ? missionRemainingCapacityKg(into, maxCargoKg)
+    : maxCargoKg;
+  if (totalNewKg > remainingCap) {
+    throw new Error(
+      `Staged cargo ${totalNewKg} kg exceeds remaining capacity ${remainingCap} kg`,
+    );
+  }
+
+  const snapshot = world.lots.map((lot) => ({
+    id: lot.id,
+    reservedKg: lot.reservedKg,
+    status: lot.status,
+  }));
+
+  try {
+    let mission: MissionIntent | undefined = into;
+    for (let i = 0; i < normalizedLines.length; i++) {
+      const line = normalizedLines[i]!;
+      mission = acceptMission(world, {
+        lotId: line.lotId,
+        cargoKg: line.cargoKg,
+        aircraftClassId: aircraft.id,
+        maxCargoKg,
+        intoMission: mission,
+        missionId: i === 0 && !into ? opts.missionId : undefined,
+      });
+    }
+    if (!mission) {
+      throw new Error('Staging commit produced no mission');
+    }
+    return {
+      mission,
+      appended: Boolean(into),
+      lineCount: normalizedLines.length,
+    };
+  } catch (error) {
+    for (const snap of snapshot) {
+      const lot = world.lots.find((candidate) => candidate.id === snap.id);
+      if (!lot) continue;
+      lot.reservedKg = snap.reservedKg;
+      lot.status = snap.status;
+    }
+    throw error;
+  }
 }
 
 export function cancelMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
 ): MissionIntent {
-  if (mission.status !== 'accepted' && mission.status !== 'dispatched') {
-    throw new Error(`Cannot cancel mission in status=${mission.status}`);
+  const normalized = normalizeMissionIntent(mission);
+  if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
+    throw new Error(`Cannot cancel mission in status=${normalized.status}`);
   }
-  releaseShipmentReservation(world, mission.shipmentLotId, mission.cargoKg);
-  return { ...mission, status: 'cancelled' };
+  // A mission can outlive its shipment lots: expired lots are pruned after
+  // 72 ticks, and a world reset can also leave legacy/orphan missions behind.
+  for (const line of normalized.lots) {
+    if (world.lots.some((lot) => lot.id === line.shipmentLotId)) {
+      releaseShipmentReservation(world, line.shipmentLotId, line.cargoKg);
+    }
+  }
+  return { ...normalized, status: 'cancelled' };
 }
 
 /**
@@ -195,15 +528,18 @@ export function departMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
 ): MissionIntent {
-  if (mission.status !== 'accepted' && mission.status !== 'dispatched') {
-    throw new Error(`Cannot depart mission in status=${mission.status}`);
+  const normalized = normalizeMissionIntent(mission);
+  if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
+    throw new Error(`Cannot depart mission in status=${normalized.status}`);
   }
-  const lot = findLot(world, mission.shipmentLotId);
-  if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
-    lot.status = 'in_transit';
+  for (const line of normalized.lots) {
+    const lot = findLot(world, line.shipmentLotId);
+    if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
+      lot.status = 'in_transit';
+    }
   }
   return {
-    ...mission,
+    ...normalized,
     status: 'in_flight',
     departedAtTick: world.tick,
   };
@@ -240,38 +576,7 @@ function computeSettlementPay(
   return { lateTicks, penaltyUsd, payoutUsd, onTime };
 }
 
-/**
- * Deliver cargo into the destination terminal, shrink the lot, pay freight (minus late penalty).
- * Accepts dispatched or in_flight (auto-departs if still dispatched).
- */
-export function settleMission(
-  world: CareerEconomyWorld,
-  mission: MissionIntent,
-  opts: SettleMissionOpts = {},
-): SettleMissionResult {
-  if (
-    mission.status !== 'dispatched' &&
-    mission.status !== 'in_flight' &&
-    mission.status !== 'accepted'
-  ) {
-    throw new Error(`Cannot settle mission in status=${mission.status}`);
-  }
-
-  let working = mission;
-  if (working.status === 'accepted' || working.status === 'dispatched') {
-    working = departMission(world, working);
-  }
-
-  const settleTick = opts.tick ?? world.tick;
-  const delivery = applyFreightDelivery(world, {
-    commodityId: working.commodityId,
-    originIcao: working.originIcao,
-    destIcao: working.destIcao,
-    kg: working.cargoKg,
-  });
-
-  const lot = findLot(world, working.shipmentLotId);
-  const bookKg = working.cargoKg;
+function shrinkDeliveredLot(lot: ShipmentLot, bookKg: number): void {
   lot.reservedKg = Math.max(0, lot.reservedKg - bookKg);
   lot.quantityKg = Math.max(0, lot.quantityKg - bookKg);
   if (lot.quantityKg <= 0) {
@@ -284,8 +589,72 @@ export function settleMission(
   } else {
     lot.status = 'reserved';
   }
+}
+
+/**
+ * Deliver cargo into the destination terminal, shrink each lot, pay freight (minus late penalty).
+ * Accepts dispatched or in_flight (auto-departs if still dispatched).
+ */
+export function settleMission(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  opts: SettleMissionOpts = {},
+): SettleMissionResult {
+  let working = normalizeMissionIntent(mission);
+  if (
+    working.status !== 'dispatched' &&
+    working.status !== 'in_flight' &&
+    working.status !== 'accepted'
+  ) {
+    throw new Error(`Cannot settle mission in status=${working.status}`);
+  }
+
+  if (working.status === 'accepted' || working.status === 'dispatched') {
+    working = departMission(world, working);
+  }
+
+  const settleTick = opts.tick ?? world.tick;
+  let lastOriginStock = 0;
+  let lastDestStock = 0;
+  const settlementLines: MissionSettlementLine[] = [];
 
   const pay = computeSettlementPay(working, settleTick);
+  // Allocate penalty across lines proportional to payUsd.
+  let penaltyLeft = pay.penaltyUsd;
+
+  for (let i = 0; i < working.lots.length; i++) {
+    const line = working.lots[i]!;
+    const delivery = applyFreightDelivery(world, {
+      commodityId: line.commodityId,
+      originIcao: working.originIcao,
+      destIcao: working.destIcao,
+      kg: line.cargoKg,
+    });
+    lastOriginStock = delivery.originStockKg;
+    lastDestStock = delivery.destStockKg;
+
+    const lot = findLot(world, line.shipmentLotId);
+    shrinkDeliveredLot(lot, line.cargoKg);
+
+    const isLast = i === working.lots.length - 1;
+    const linePenalty = isLast
+      ? penaltyLeft
+      : Math.min(
+          line.payUsd,
+          Math.round(pay.penaltyUsd * (line.payUsd / Math.max(1, working.payUsd))),
+        );
+    penaltyLeft = Math.max(0, penaltyLeft - linePenalty);
+    const linePayout = Math.max(0, line.payUsd - linePenalty);
+    settlementLines.push({
+      shipmentLotId: line.shipmentLotId,
+      commodityId: line.commodityId,
+      deliveredKg: line.cargoKg,
+      payUsd: line.payUsd,
+      penaltyUsd: linePenalty,
+      payoutUsd: linePayout,
+    });
+  }
+
   const settled: MissionIntent = {
     ...working,
     status: 'settled',
@@ -300,13 +669,14 @@ export function settleMission(
     walletCreditUsd: pay.payoutUsd,
     settlement: {
       missionId: settled.id,
-      deliveredKg: bookKg,
+      deliveredKg: working.cargoKg,
       payoutUsd: pay.payoutUsd,
       penaltyUsd: pay.penaltyUsd,
       lateTicks: pay.lateTicks,
       onTime: pay.onTime,
-      originStockAfterKg: delivery.originStockKg,
-      destStockAfterKg: delivery.destStockKg,
+      originStockAfterKg: lastOriginStock,
+      destStockAfterKg: lastDestStock,
+      lines: settlementLines,
     },
   };
 }
@@ -325,28 +695,50 @@ export function formatSettlementSummary(
   );
 }
 
-/** Market rows that fit under the aircraft cargo limit (at least 1 kg). */
+/** Market rows that have cargo and fit the aircraft class range. */
 export function listViableMarketLots(
   world: CareerEconomyWorld,
   aircraftClassId: FreighterClassId,
-  opts: { originIcao?: string; destIcao?: string; commodityId?: MarketLotView['lot']['commodityId'] } = {},
+  opts: {
+    originIcao?: string;
+    destIcao?: string;
+    commodityId?: MarketLotView['lot']['commodityId'];
+    /** Override class max (e.g. live SimBrief maxcargo). */
+    maxCargoKg?: number;
+    nowMs?: number;
+  } = {},
 ): MarketLotView[] {
   const aircraft = getAircraftClass(aircraftClassId);
-  return listMarketLots(world, opts).filter((row) => row.availableKg >= 1 && aircraft.maxCargoKg >= 1);
+  const maxCargoKg =
+    opts.maxCargoKg !== undefined && Number.isFinite(opts.maxCargoKg) && opts.maxCargoKg > 0
+      ? Math.floor(opts.maxCargoKg)
+      : aircraft.maxCargoKg;
+  return listMarketLots(world, opts).filter((row) => {
+    const distance = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
+    return (
+      row.availableKg >= 1 &&
+      maxCargoKg >= 1 &&
+      distance !== undefined &&
+      distance <= aircraft.maxRangeNm
+    );
+  });
 }
 
 export function formatMissionSummary(mission: MissionIntent): string {
-  const commodity = getCommodity(mission.commodityId);
-  const aircraft = getAircraftClass(mission.aircraftClassId);
-  const urgent = mission.urgency === 'urgent' ? ' URGENT' : '';
+  const normalized = normalizeMissionIntent(mission);
+  const commodity = getCommodity(normalized.commodityId);
+  const aircraft = getAircraftClass(normalized.aircraftClassId);
+  const urgent = normalized.urgency === 'urgent' ? ' URGENT' : '';
+  const lotsLabel =
+    normalized.lots.length > 1 ? `  ${normalized.lots.length}lots` : '';
   const payout =
-    mission.status === 'settled' && mission.payoutUsd !== undefined
-      ? `  paid=$${mission.payoutUsd.toLocaleString()}`
+    normalized.status === 'settled' && normalized.payoutUsd !== undefined
+      ? `  paid=$${normalized.payoutUsd.toLocaleString()}`
       : '';
   return (
-    `${mission.id}  [${mission.status}]  ${mission.originIcao}→${mission.destIcao}  ` +
-    `${commodity.name}  ${(mission.cargoKg / 1000).toFixed(1)}t  pay=$${mission.payUsd.toLocaleString()}` +
-    `${urgent}  via ${aircraft.id}  due@tick ${mission.deadlineTick}${payout}`
+    `${normalized.id}  [${normalized.status}]  ${normalized.originIcao}→${normalized.destIcao}  ` +
+    `${commodity.name}  ${(normalized.cargoKg / 1000).toFixed(1)}t${lotsLabel}  pay=$${normalized.payUsd.toLocaleString()}` +
+    `${urgent}  via ${aircraft.id}  due@tick ${normalized.deadlineTick}${payout}`
   );
 }
 

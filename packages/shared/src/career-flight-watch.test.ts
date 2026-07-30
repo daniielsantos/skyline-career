@@ -13,10 +13,21 @@ import {
 function mission(status: MissionIntent['status']): MissionIntent {
   return {
     id: 'msn_watch',
+    lots: [
+      {
+        shipmentLotId: 'lot_1',
+        commodityId: 'general',
+        cargoKg: 5_000,
+        payUsd: 100,
+        urgency: 'normal',
+        reason: 'test',
+        deadlineTick: 50,
+      },
+    ],
     shipmentLotId: 'lot_1',
     commodityId: 'general',
-    originIcao: 'KMIA',
-    destIcao: 'SBBR',
+    originIcao: 'SBPA',
+    destIcao: 'SBRF',
     cargoKg: 5_000,
     pax: 0,
     aircraftClassId: 'narrow_freighter',
@@ -30,23 +41,23 @@ function mission(status: MissionIntent['status']): MissionIntent {
   };
 }
 
-const SBBR = CAREER_HUB_COORDS.SBBR!;
-const KMIA = CAREER_HUB_COORDS.KMIA!;
+const SBRF = CAREER_HUB_COORDS.SBRF!;
+const SBPA = CAREER_HUB_COORDS.SBPA!;
 
 describe('distanceNm / isNearAirport', () => {
-  it('measures KMIA→SBBR as a long-haul distance', () => {
-    const d = distanceNm(KMIA, SBBR);
-    assert.ok(d > 2_500 && d < 4_000, `got ${d} nm`);
+  it('measures SBPA→SBRF as a long domestic route', () => {
+    const d = distanceNm(SBPA, SBRF);
+    assert.ok(d > 1_500 && d < 2_000, `got ${d} nm`);
   });
 
   it('treats positions within airport radius as near', () => {
     const near = isNearAirport(
-      { lat: SBBR.lat + 0.02, lon: SBBR.lon },
-      SBBR,
+      { lat: SBRF.lat + 0.02, lon: SBRF.lon },
+      SBRF,
       12,
     );
     assert.equal(near.near, true);
-    const far = isNearAirport(KMIA, SBBR, 12);
+    const far = isNearAirport(SBPA, SBRF, 12);
     assert.equal(far.near, false);
   });
 });
@@ -111,7 +122,7 @@ describe('evaluateMissionFlightTransition', () => {
       mission('in_flight'),
       { onGround: false, enginesRunning: true, position: { lat: -10, lon: -45 } },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     ).nextState;
 
     const down = evaluateMissionFlightTransition(
@@ -119,10 +130,10 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
-        position: { lat: SBBR.lat, lon: SBBR.lon },
+        position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     );
     assert.equal(down.event.type, 'settle');
   });
@@ -133,7 +144,7 @@ describe('evaluateMissionFlightTransition', () => {
       mission('in_flight'),
       { onGround: false, enginesRunning: true },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     ).nextState;
 
     const wrongAirport = evaluateMissionFlightTransition(
@@ -141,10 +152,10 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
-        position: { lat: KMIA.lat, lon: KMIA.lon },
+        position: { lat: SBPA.lat, lon: SBPA.lon },
       },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     );
     assert.equal(wrongAirport.event.type, 'settle_blocked');
     if (wrongAirport.event.type === 'settle_blocked') {
@@ -158,14 +169,14 @@ describe('evaluateMissionFlightTransition', () => {
       mission('in_flight'),
       { onGround: false, enginesRunning: true },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     ).nextState;
 
     const noPos = evaluateMissionFlightTransition(
       mission('in_flight'),
       { onGround: true, enginesRunning: false },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     );
     assert.equal(noPos.event.type, 'settle_blocked');
   });
@@ -176,7 +187,7 @@ describe('evaluateMissionFlightTransition', () => {
       mission('in_flight'),
       { onGround: false, enginesRunning: true },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     ).nextState;
 
     const taxi = evaluateMissionFlightTransition(
@@ -184,10 +195,10 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: true,
-        position: { lat: SBBR.lat, lon: SBBR.lon },
+        position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     );
     assert.equal(taxi.event.type, 'none');
     state = taxi.nextState;
@@ -197,10 +208,10 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
-        position: { lat: SBBR.lat, lon: SBBR.lon },
+        position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     );
     assert.equal(shutdown.event.type, 'settle');
   });
@@ -211,7 +222,7 @@ describe('evaluateMissionFlightTransition', () => {
       mission('in_flight'),
       { onGround: false, enginesRunning: true },
       state,
-      { destCoords: SBBR },
+      { destCoords: SBRF },
     ).nextState;
 
     const down = evaluateMissionFlightTransition(
@@ -219,10 +230,10 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: true,
-        position: { lat: SBBR.lat, lon: SBBR.lon },
+        position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { requireEnginesOffToSettle: false, destCoords: SBBR },
+      { requireEnginesOffToSettle: false, destCoords: SBRF },
     );
     assert.equal(down.event.type, 'settle');
   });

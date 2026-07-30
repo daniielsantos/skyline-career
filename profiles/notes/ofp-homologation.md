@@ -109,4 +109,5 @@ Omit `liveSources` only while discovering a new airframe — then the discovery 
 | `pmdg-738-bcf.json` | `737-800BCF *` (SSW / BW freighter) | same PMDG `liveSources`; zones 1–6 cargo | **family done** |
 | `tfdi-md11f.json` | `*MD-11F*` (TFDi PW/GE) | TFDi EFB LVars (+ mass-balance fuel) | **done** |
 | `toliss-a346.json` | `ToLiss A346 PRO *` (Pax) | classic + mass-balance fuel | **done** (warn OK on EMPTY/ZFW/TOW) |
+| `blacksquare-caravan-cargo-pod.json` | `Black Square Caravan Professional Cargo Pod *` | classic fuel + stations | **done** (gate: pass/warn EMPTY only) |
 | `pmdg-738-ssw-tc.json` | legacy sample (prefer family pack) | same PMDG `liveSources` | superseded by family |

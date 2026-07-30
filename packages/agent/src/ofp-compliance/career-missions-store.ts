@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { CareerMissionsState, MissionIntent } from '@msfs-compat/shared';
+import { normalizeMissionIntent } from '@msfs-compat/shared';
 
 export const DEFAULT_CAREER_MISSIONS_PATH = 'profiles/career/local-missions.json';
 
@@ -14,7 +15,9 @@ function normalizeMissionsState(parsed: CareerMissionsState): CareerMissionsStat
     walletUsd: typeof parsed.walletUsd === 'number' && Number.isFinite(parsed.walletUsd)
       ? parsed.walletUsd
       : 0,
-    missions: Array.isArray(parsed.missions) ? parsed.missions : [],
+    missions: Array.isArray(parsed.missions)
+      ? parsed.missions.map((m) => normalizeMissionIntent(m))
+      : [],
   };
 }
 

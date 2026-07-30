@@ -31,13 +31,39 @@ export interface AirportTerminal {
    */
   level: number;
   inventory: Partial<Record<CommodityId, StockPile>>;
-  /** Net production per tick (kg). Negative means net consumer only via consumption. */
+  /**
+   * Baseline production per tick (kg). Effective flow each tick is derived from this.
+   * Falls back to `production` on legacy saves.
+   */
+  baseProduction?: Partial<Record<CommodityId, number>>;
+  /**
+   * Baseline consumption per tick (kg).
+   * Falls back to `consumption` on legacy saves.
+   */
+  baseConsumption?: Partial<Record<CommodityId, number>>;
+  /** Last effective production applied this tick (kg) — UI display. */
   production: Partial<Record<CommodityId, number>>;
-  /** Consumption per tick (kg). */
+  /** Last effective consumption applied this tick (kg) — UI display. */
   consumption: Partial<Record<CommodityId, number>>;
 }
 
 export type ShipmentLotStatus = 'available' | 'reserved' | 'in_transit' | 'delivered' | 'expired';
+
+export type EconomyEventKind =
+  | 'harvest_boost'
+  | 'port_congestion'
+  | 'factory_outage'
+  | 'festival_demand';
+
+export interface EconomyEvent {
+  id: string;
+  kind: EconomyEventKind;
+  region: string;
+  commodityId?: CommodityId;
+  startsAtTick: number;
+  endsAtTick: number;
+  label: string;
+}
 
 export interface ShipmentLot {
   id: string;
@@ -58,12 +84,149 @@ export interface ShipmentLot {
   status: ShipmentLotStatus;
 }
 
+/** Competing AI freighter (Phase 2) — 1 mission at a time, no player wallet credit. */
+export interface NpcFreighter {
+  id: string;
+  name: string;
+  aircraftClassId: FreighterClassId;
+  homeRegion: string;
+  /** 0–1: less noise / more consistent bidding when high. */
+  reliability: number;
+  /** 0–1: prefers urgent, high-pay, expiring lots. */
+  aggressiveness: number;
+  /** Multiplier on minimum acceptable pay/kg vs commodity base. */
+  feeBias: number;
+  status: 'idle' | 'busy';
+  /** Economy tick when this freighter can bid again (legacy / debug). */
+  busyUntilTick?: number;
+  /** Wall-clock when freighter can bid again (authoritative). */
+  busyUntilMs?: number;
+  currentFlightId?: string;
+}
+
+export interface NpcFlight {
+  id: string;
+  npcId: string;
+  lotId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: CommodityId;
+  cargoKg: number;
+  /** Pro-rata freight value (not paid to player). */
+  payUsd: number;
+  aircraftClassId: FreighterClassId;
+  departedAtTick: number;
+  /** Tick when cargo delivers into dest stock (legacy / debug). */
+  arrivesAtTick: number;
+  /** Wall-clock departure (authoritative for live ETA/progress). */
+  departedAtMs: number;
+  /** Wall-clock arrival / cargo delivery. */
+  arrivesAtMs: number;
+  status: 'in_flight' | 'completed';
+}
+
+export interface NpcActivityView {
+  flight: NpcFlight;
+  npcName: string;
+  commodityName: string;
+  /** Fractional hours remaining until arrival. */
+  hoursRemaining: number;
+  /** Milliseconds remaining until arrival. */
+  etaMs: number;
+  distanceNm: number;
+  payUsd: number;
+  urgency: ShipmentLot['urgency'];
+  /** 0–100 progress along the route (wall-clock). */
+  progressPct: number;
+  /** Total planned block hours for this leg. */
+  flightHours: number;
+  homeRegion: string;
+  aircraftLabel: string;
+  phase: 'enroute' | 'arriving';
+}
+
+/** Roster row for the NPC fleet board (idle + busy). */
+export interface NpcFleetMemberView {
+  id: string;
+  name: string;
+  aircraftClassId: FreighterClassId;
+  aircraftLabel: string;
+  homeRegion: string;
+  reliability: number;
+  aggressiveness: number;
+  feeBias: number;
+  status: 'idle' | 'busy';
+  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround';
+  busyUntilTick?: number;
+  busyUntilMs?: number;
+  turnaroundHoursLeft?: number;
+  mission?: {
+    flightId: string;
+    lotId: string;
+    originIcao: string;
+    destIcao: string;
+    commodityId: CommodityId;
+    commodityName: string;
+    cargoKg: number;
+    payUsd: number;
+    distanceNm: number;
+    departedAtTick: number;
+    arrivesAtTick: number;
+    departedAtMs: number;
+    arrivesAtMs: number;
+    etaHours: number;
+    etaMs: number;
+    progressPct: number;
+    flightHours: number;
+    urgency: ShipmentLot['urgency'];
+    phase: 'enroute' | 'arriving';
+  };
+}
+
 export interface CareerEconomyWorld {
+  version: 3;
+  seed: string;
+  /** Completed hourly economy batches. */
+  tick: number;
+  /**
+   * Wall-clock when the last hourly batch completed (or was anchored).
+   * Partial hours since this instant are continuous ops / UI only.
+   */
+  lastBatchAtMs: number;
+  /**
+   * @deprecated Alias of lastBatchAtMs for one-release read/write compat.
+   */
+  lastSyncedAtMs?: number;
+  airports: AirportTerminal[];
+  lots: ShipmentLot[];
+  /** Active / recent regional shocks. */
+  events: EconomyEvent[];
+  /** Limited competing freighter pool (seeded / migrated). */
+  npcs: NpcFreighter[];
+  /** Active NPC hauls; completed flights are pruned after settle. */
+  npcFlights: NpcFlight[];
+}
+
+/** Legacy persisted shape before continuous clock / live events. */
+export interface CareerEconomyWorldV1 {
   version: 1;
   seed: string;
   tick: number;
   airports: AirportTerminal[];
   lots: ShipmentLot[];
+}
+
+/** Legacy v2 before continuous ops timestamps. */
+export interface CareerEconomyWorldV2 {
+  version: 2;
+  seed: string;
+  tick: number;
+  lastSyncedAtMs: number;
+  airports: AirportTerminal[];
+  lots: ShipmentLot[];
+  events: EconomyEvent[];
+  npcs?: NpcFreighter[];
+  npcFlights?: NpcFlight[];
 }
 
 export interface MarketLotView {
@@ -77,10 +240,20 @@ export interface MarketLotView {
   destStockKg: number;
   originFillPct: number;
   destFillPct: number;
+  /** Present when an NPC has reserved cargo on this lot. */
+  npcClaim?: {
+    npcId: string;
+    npcName: string;
+    cargoKg: number;
+    etaHours: number;
+  };
 }
 
 /** Freighter capacity classes (Slice 2) — filter market + drive SimBrief dispatch. */
-export type FreighterClassId = 'narrow_freighter' | 'wide_freighter';
+export type FreighterClassId =
+  | 'narrow_freighter'
+  | 'wide_freighter'
+  | 'light_turboprop';
 
 export interface AircraftClass {
   id: FreighterClassId;
@@ -105,22 +278,48 @@ export type MissionStatus =
 /**
  * What the player committed to haul — source of truth for dispatch prefill
  * and later Intent→OFP validation.
+ *
+ * One flight can carry multiple market lots (same origin→dest) as `lots[]`.
+ * Top-level cargo/pay/commodity/urgency/deadline are mirrors of the manifest.
  */
+export interface MissionLotLine {
+  shipmentLotId: string;
+  commodityId: CommodityId;
+  cargoKg: number;
+  /** Pro-rata freight pay for this cargoKg. */
+  payUsd: number;
+  urgency: 'normal' | 'urgent';
+  reason: string;
+  deadlineTick: number;
+}
+
+/** Soft cap: how many market lots can share one flight. */
+export const MAX_MANIFEST_LOTS = 5;
+
 export interface MissionIntent {
   id: string;
+  /** Canonical manifest (1..MAX_MANIFEST_LOTS). Always present after normalize. */
+  lots: MissionLotLine[];
+  /**
+   * Legacy mirror of lots[0].shipmentLotId — kept for older callers / saves.
+   * Prefer iterating `lots`.
+   */
   shipmentLotId: string;
+  /** Primary commodity (heaviest line). */
   commodityId: CommodityId;
   originIcao: string;
   destIcao: string;
+  /** Sum of lots[].cargoKg. */
   cargoKg: number;
   /** Freighter MVP always 0. */
   pax: 0;
   aircraftClassId: FreighterClassId;
   rolesPackRelPath: string;
-  /** Economy tick by which delivery is due (from lot expiry). */
+  /** Earliest lot deadline. */
   deadlineTick: number;
-  /** Pro-rata freight pay for this cargoKg. */
+  /** Sum of lots[].payUsd. */
   payUsd: number;
+  /** Urgent if any lot is urgent. */
   urgency: 'normal' | 'urgent';
   reason: string;
   status: MissionStatus;
@@ -137,6 +336,38 @@ export interface MissionIntent {
   /** Late delivery penalty deducted from payUsd. */
   penaltyUsd?: number;
   lateTicks?: number;
+  /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
+  lastOfpCheck?: {
+    verdict: 'pass' | 'warn' | 'fail';
+    summary: string;
+    checkedAtIso: string;
+    findings: Array<{
+      code: string;
+      severity: string;
+      message: string;
+    }>;
+  };
+  /** Last OFP↔live MSFS load check (Preflight). */
+  lastPreflightCheck?: {
+    verdict: 'pass' | 'warn' | 'fail';
+    summary: string;
+    checkedAtIso: string;
+    phase?: string;
+    findings: Array<{
+      code: string;
+      severity: string;
+      message: string;
+    }>;
+  };
+}
+
+export interface MissionSettlementLine {
+  shipmentLotId: string;
+  commodityId: CommodityId;
+  deliveredKg: number;
+  payUsd: number;
+  penaltyUsd: number;
+  payoutUsd: number;
 }
 
 export interface MissionSettlement {
@@ -148,6 +379,7 @@ export interface MissionSettlement {
   onTime: boolean;
   originStockAfterKg: number;
   destStockAfterKg: number;
+  lines?: MissionSettlementLine[];
 }
 
 export interface CareerMissionsState {

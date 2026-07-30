@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @msfs-compat/shared && npm run build -w @msfs-compat/runtime && npm run build -w @msfs-compat/agent && npm run build -w @msfs-compat/catalog-api",
+    "build": "npm run build -w @msfs-compat/shared && npm run build -w @msfs-compat/runtime && npm run build -w @msfs-compat/agent && npm run build -w @msfs-compat/catalog-api && npm run build -w @msfs-compat/career-ui",
     "build:native": "dotnet build native/SimBridgeHost/SimBridgeHost.csproj -c Release",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "validate:profiles": "node scripts/validate-profiles.mjs",
@@ -34,6 +34,7 @@
     "generate-ofp": "node packages/agent/dist/cli.js generate-ofp",
     "monitor-ofp": "node packages/agent/dist/cli.js monitor-ofp",
     "career": "node packages/agent/dist/cli.js career",
+    "career:ui": "npm run dev -w @msfs-compat/career-ui",
     "test:shared": "npm run test -w @msfs-compat/shared",
     "test:agent": "npm run test -w @msfs-compat/agent",
     "pack:portable": "node scripts/pack-portable.mjs",

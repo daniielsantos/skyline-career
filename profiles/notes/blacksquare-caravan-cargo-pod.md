@@ -33,6 +33,15 @@ Stations 1–15 writable, offset 0.
 - Classic mains only; smoke 35→134 confirmed; apply 40/40 OK
 - UI: confirm Mass & Balance follows SimVars (user reported success 2026-07-28)
 
+## Career / OFP pack (`light_turboprop`)
+
+- Roles: `profiles/ofp/blacksquare-caravan-cargo-pod.json`
+- Class id: `light_turboprop` (UI: Light TP / Caravan)
+- SimBrief: Default C208 — structural cargo ≈ **1704 kg** (`mzfw − oew`)
+- Stations (1-based): crew 1–2; baggage 3–15 (cabin seats as cargo + cabin + pods)
+- Live: classic tanks + classic stations/weights
+- Gate: spawn Caravan → Load OFP fuel/payload → `npm run compare-ofp -- --simbrief-user YOUR_ALIAS`
+
 ## When to escalate to WASM
 
 Only if Mass & Balance / EFB fuel UI does not follow classic SimVar writes.

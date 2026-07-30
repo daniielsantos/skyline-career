@@ -3,44 +3,72 @@ import { describe, it } from 'node:test';
 import {
   acceptMission,
   cancelMission,
+  commitStagedManifest,
   compareMissionIntentToOfp,
   createSeedEconomyWorld,
   departMission,
+  findOpenManifestForRoute,
   getAircraftClass,
   listMarketLots,
+  listViableMarketLots,
+  MAX_MANIFEST_LOTS,
+  normalizeMissionIntent,
   normalizeOfpExpectation,
+  routeDistanceNm,
   settleMission,
   tickEconomyN,
   type MissionIntent,
+  type ShipmentLot,
 } from './index.js';
 
+function pushTestLot(
+  world: ReturnType<typeof createSeedEconomyWorld>,
+  overrides: Partial<ShipmentLot> & Pick<ShipmentLot, 'id' | 'originIcao' | 'destIcao'>,
+): ShipmentLot {
+  const lot: ShipmentLot = {
+    commodityId: 'electronics',
+    quantityKg: 2_000,
+    reservedKg: 0,
+    createdAtTick: world.tick,
+    expiresAtTick: world.tick + 48,
+    payUsd: 500,
+    urgency: 'normal',
+    reason: 'test lot',
+    status: 'available',
+    ...overrides,
+  };
+  world.lots.push(lot);
+  return lot;
+}
+
 function baseMission(overrides: Partial<MissionIntent> = {}): MissionIntent {
-  return {
+  const base = {
     id: 'msn_intent',
     shipmentLotId: 'lot_1',
-    commodityId: 'electronics',
-    originIcao: 'KMIA',
-    destIcao: 'SBBR',
+    commodityId: 'electronics' as const,
+    originIcao: 'SBGR',
+    destIcao: 'SBRF',
     cargoKg: 8_000,
-    pax: 0,
-    aircraftClassId: 'narrow_freighter',
+    pax: 0 as const,
+    aircraftClassId: 'narrow_freighter' as const,
     rolesPackRelPath: 'profiles/ofp/pmdg-738-bcf.json',
     deadlineTick: 40,
     payUsd: 200,
-    urgency: 'urgent',
+    urgency: 'urgent' as const,
     reason: 'test',
-    status: 'dispatched',
+    status: 'dispatched' as const,
     acceptedAtTick: 24,
     ...overrides,
   };
+  return normalizeMissionIntent(base as MissionIntent);
 }
 
 function matchingOfp(overrides: Parameters<typeof normalizeOfpExpectation>[0] = {}) {
   return normalizeOfpExpectation({
     source: 'simbrief',
     icao: 'B738',
-    originIcao: 'KMIA',
-    destIcao: 'SBBR',
+    originIcao: 'SBGR',
+    destIcao: 'SBRF',
     fuel: { unit: 'kg', total: 10_000 },
     loadSheet: {
       unit: 'kg',
@@ -85,12 +113,27 @@ describe('acceptMission', () => {
     const world = createSeedEconomyWorld({ seed: 'clamp-test' });
     tickEconomyN(world, 24);
     const lot = listMarketLots(world)[0]!.lot;
+    const availableKg = lot.quantityKg - lot.reservedKg;
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: 999_999,
       aircraftClassId: 'narrow_freighter',
     });
-    assert.equal(mission.cargoKg, Math.min(lot.quantityKg, 22_000));
+    assert.equal(mission.cargoKg, Math.min(availableKg, 18_137));
+  });
+
+  it('honors maxCargoKg override from SimBrief', () => {
+    const world = createSeedEconomyWorld({ seed: 'simbrief-cap' });
+    tickEconomyN(world, 24);
+    const lot = listMarketLots(world)[0]!.lot;
+    const availableKg = lot.quantityKg - lot.reservedKg;
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 999_999,
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 18_137,
+    });
+    assert.equal(mission.cargoKg, Math.min(availableKg, 18_137));
   });
 
   it('cancel releases reservation', () => {
@@ -107,6 +150,374 @@ describe('acceptMission', () => {
     const cancelled = cancelMission(world, mission);
     assert.equal(cancelled.status, 'cancelled');
     assert.equal(lot.reservedKg, reservedAfter - 5_000);
+  });
+
+  it('cancels an orphan mission after its shipment lot was pruned', () => {
+    const world = createSeedEconomyWorld({ seed: 'cancel-orphan-test' });
+    tickEconomyN(world, 24);
+    const lot = listMarketLots(world)[0]!.lot;
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'wide_freighter',
+      missionId: 'msn_cancel_orphan',
+    });
+    world.lots = world.lots.filter((candidate) => candidate.id !== lot.id);
+
+    const cancelled = cancelMission(world, mission);
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(cancelled.shipmentLotId, lot.id);
+  });
+
+  it('appends a second same-OD lot onto an open flight', () => {
+    const world = createSeedEconomyWorld({ seed: 'manifest-append' });
+    const a = pushTestLot(world, {
+      id: 'lot_a',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      commodityId: 'electronics',
+      quantityKg: 800,
+      payUsd: 200,
+    });
+    const b = pushTestLot(world, {
+      id: 'lot_b',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      commodityId: 'perishables',
+      quantityKg: 600,
+      payUsd: 180,
+      urgency: 'urgent',
+      expiresAtTick: world.tick + 12,
+    });
+
+    const flight = acceptMission(world, {
+      lotId: a.id,
+      cargoKg: 800,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_manifest',
+    });
+    assert.equal(flight.lots.length, 1);
+
+    const appended = acceptMission(world, {
+      lotId: b.id,
+      cargoKg: 500,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      intoMission: flight,
+    });
+    assert.equal(appended.id, 'msn_manifest');
+    assert.equal(appended.lots.length, 2);
+    assert.equal(appended.cargoKg, 1_300);
+    assert.equal(appended.payUsd, appended.lots.reduce((s, l) => s + l.payUsd, 0));
+    assert.equal(appended.urgency, 'urgent');
+    assert.equal(appended.deadlineTick, b.expiresAtTick);
+    assert.equal(appended.commodityId, 'electronics');
+  });
+
+  it('rejects append for different OD, over capacity, and over lot cap', () => {
+    const world = createSeedEconomyWorld({ seed: 'manifest-reject' });
+    const a = pushTestLot(world, {
+      id: 'lot_od_a',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 1_704,
+      payUsd: 400,
+    });
+    const wrongOd = pushTestLot(world, {
+      id: 'lot_od_wrong',
+      originIcao: 'SBKP',
+      destIcao: 'SBGR',
+      quantityKg: 500,
+      payUsd: 100,
+    });
+    const extra = pushTestLot(world, {
+      id: 'lot_od_extra',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 500,
+      payUsd: 100,
+    });
+
+    const full = acceptMission(world, {
+      lotId: a.id,
+      cargoKg: 1_704,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_full',
+    });
+    assert.throws(
+      () =>
+        acceptMission(world, {
+          lotId: wrongOd.id,
+          cargoKg: 100,
+          aircraftClassId: 'light_turboprop',
+          maxCargoKg: 1_704,
+          intoMission: full,
+        }),
+      /Route mismatch/,
+    );
+    assert.throws(
+      () =>
+        acceptMission(world, {
+          lotId: extra.id,
+          cargoKg: 100,
+          aircraftClassId: 'light_turboprop',
+          maxCargoKg: 1_704,
+          intoMission: full,
+        }),
+      /No remaining capacity/,
+    );
+
+    const world2 = createSeedEconomyWorld({ seed: 'manifest-5lots' });
+    const lines: ShipmentLot[] = [];
+    for (let i = 0; i < MAX_MANIFEST_LOTS + 1; i++) {
+      lines.push(
+        pushTestLot(world2, {
+          id: `lot_cap_${i}`,
+          originIcao: 'SBKP',
+          destIcao: 'SBVT',
+          quantityKg: 100,
+          payUsd: 50,
+        }),
+      );
+    }
+    let flight = acceptMission(world2, {
+      lotId: lines[0]!.id,
+      cargoKg: 100,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_5',
+    });
+    for (let i = 1; i < MAX_MANIFEST_LOTS; i++) {
+      flight = acceptMission(world2, {
+        lotId: lines[i]!.id,
+        cargoKg: 100,
+        aircraftClassId: 'light_turboprop',
+        maxCargoKg: 1_704,
+        intoMission: flight,
+      });
+    }
+    assert.equal(flight.lots.length, MAX_MANIFEST_LOTS);
+    assert.throws(
+      () =>
+        acceptMission(world2, {
+          lotId: lines[MAX_MANIFEST_LOTS]!.id,
+          cargoKg: 100,
+          aircraftClassId: 'light_turboprop',
+          maxCargoKg: 1_704,
+          intoMission: flight,
+        }),
+      /Manifest full/,
+    );
+  });
+
+  it('normalizes legacy single-lot missions without lots[]', () => {
+    const legacy = {
+      id: 'msn_legacy',
+      shipmentLotId: 'lot_old',
+      commodityId: 'electronics' as const,
+      originIcao: 'SBGR',
+      destIcao: 'SBRF',
+      cargoKg: 8_000,
+      pax: 0 as const,
+      aircraftClassId: 'narrow_freighter' as const,
+      rolesPackRelPath: 'profiles/ofp/pmdg-738-bcf.json',
+      deadlineTick: 40,
+      payUsd: 200,
+      urgency: 'urgent' as const,
+      reason: 'legacy save',
+      status: 'accepted' as const,
+      acceptedAtTick: 24,
+    };
+    const normalized = normalizeMissionIntent(legacy);
+    assert.equal(normalized.lots.length, 1);
+    assert.equal(normalized.lots[0]!.shipmentLotId, 'lot_old');
+    assert.equal(normalized.cargoKg, 8_000);
+    assert.equal(normalized.shipmentLotId, 'lot_old');
+  });
+
+  it('findOpenManifestForRoute returns only when exactly one match', () => {
+    const a = baseMission({
+      id: 'msn_a',
+      status: 'accepted',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      aircraftClassId: 'light_turboprop',
+      lots: [
+        {
+          shipmentLotId: 'l1',
+          commodityId: 'electronics',
+          cargoKg: 400,
+          payUsd: 100,
+          urgency: 'normal',
+          reason: 'a',
+          deadlineTick: 40,
+        },
+      ],
+    });
+    const b = baseMission({
+      id: 'msn_b',
+      status: 'accepted',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      aircraftClassId: 'light_turboprop',
+      lots: [
+        {
+          shipmentLotId: 'l2',
+          commodityId: 'perishables',
+          cargoKg: 400,
+          payUsd: 100,
+          urgency: 'normal',
+          reason: 'b',
+          deadlineTick: 40,
+        },
+      ],
+    });
+    assert.equal(
+      findOpenManifestForRoute([a], {
+        originIcao: 'SBKP',
+        destIcao: 'SBVT',
+        aircraftClassId: 'light_turboprop',
+      })?.id,
+      'msn_a',
+    );
+    assert.equal(
+      findOpenManifestForRoute([a, b], {
+        originIcao: 'SBKP',
+        destIcao: 'SBVT',
+        aircraftClassId: 'light_turboprop',
+      }),
+      undefined,
+    );
+  });
+});
+
+describe('commitStagedManifest', () => {
+  it('atomically accepts multiple same-OD lots into one flight', () => {
+    const world = createSeedEconomyWorld({ seed: 'staging-commit' });
+    const a = pushTestLot(world, {
+      id: 'lot_st_a',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      commodityId: 'electronics',
+      quantityKg: 800,
+      payUsd: 200,
+    });
+    const b = pushTestLot(world, {
+      id: 'lot_st_b',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      commodityId: 'machinery',
+      quantityKg: 600,
+      payUsd: 150,
+    });
+    const { mission, appended, lineCount } = commitStagedManifest(world, {
+      lines: [
+        { lotId: a.id, cargoKg: 700 },
+        { lotId: b.id, cargoKg: 500 },
+      ],
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_staged',
+    });
+    assert.equal(appended, false);
+    assert.equal(lineCount, 2);
+    assert.equal(mission.id, 'msn_staged');
+    assert.equal(mission.lots.length, 2);
+    assert.equal(mission.cargoKg, 1_200);
+    assert.equal(a.reservedKg, 700);
+    assert.equal(b.reservedKg, 500);
+  });
+
+  it('rejects over-capacity and leaves reservations unchanged', () => {
+    const world = createSeedEconomyWorld({ seed: 'staging-reject' });
+    const a = pushTestLot(world, {
+      id: 'lot_rej_a',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 2_000,
+      payUsd: 400,
+    });
+    const b = pushTestLot(world, {
+      id: 'lot_rej_b',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 2_000,
+      payUsd: 400,
+    });
+    assert.throws(
+      () =>
+        commitStagedManifest(world, {
+          lines: [
+            { lotId: a.id, cargoKg: 1_000 },
+            { lotId: b.id, cargoKg: 1_000 },
+          ],
+          aircraftClassId: 'light_turboprop',
+          maxCargoKg: 1_704,
+        }),
+      /exceeds remaining capacity/,
+    );
+    assert.equal(a.reservedKg, 0);
+    assert.equal(b.reservedKg, 0);
+  });
+
+  it('rejects different OD and duplicate lots', () => {
+    const world = createSeedEconomyWorld({ seed: 'staging-od' });
+    const a = pushTestLot(world, {
+      id: 'lot_od1',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 500,
+      payUsd: 100,
+    });
+    const b = pushTestLot(world, {
+      id: 'lot_od2',
+      originIcao: 'SBKP',
+      destIcao: 'SBGR',
+      quantityKg: 500,
+      payUsd: 100,
+    });
+    assert.throws(
+      () =>
+        commitStagedManifest(world, {
+          lines: [
+            { lotId: a.id, cargoKg: 200 },
+            { lotId: b.id, cargoKg: 200 },
+          ],
+          aircraftClassId: 'light_turboprop',
+          maxCargoKg: 1_704,
+        }),
+      /share one route/,
+    );
+    assert.throws(
+      () =>
+        commitStagedManifest(world, {
+          lines: [
+            { lotId: a.id, cargoKg: 200 },
+            { lotId: a.id, cargoKg: 100 },
+          ],
+          aircraftClassId: 'light_turboprop',
+          maxCargoKg: 1_704,
+        }),
+      /Duplicate lot/,
+    );
+  });
+});
+
+describe('listViableMarketLots', () => {
+  it('filters routes beyond the aircraft class range', () => {
+    const world = createSeedEconomyWorld({ seed: 'range-filter' });
+    tickEconomyN(world, 24);
+    const narrow = listViableMarketLots(world, 'narrow_freighter');
+    const wide = listViableMarketLots(world, 'wide_freighter');
+
+    assert.ok(narrow.length > 0);
+    assert.ok(wide.length >= narrow.length);
+    for (const row of narrow) {
+      const distance = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
+      assert.ok(distance !== undefined && distance <= 2_500);
+    }
   });
 });
 
@@ -235,15 +646,19 @@ describe('settleMission', () => {
       aircraftClassId: 'narrow_freighter',
       missionId: 'msn_late',
     });
-    const tight: MissionIntent = {
+    const deadline = world.tick;
+    const lateMission = normalizeMissionIntent({
       ...mission,
       status: 'dispatched',
-      deadlineTick: world.tick,
-      urgency: 'urgent',
-      payUsd: 1_000,
-    };
+      lots: mission.lots.map((line) => ({
+        ...line,
+        deadlineTick: deadline,
+        urgency: 'urgent' as const,
+        payUsd: 1_000,
+      })),
+    });
     tickEconomyN(world, 3);
-    const result = settleMission(world, tight);
+    const result = settleMission(world, lateMission);
     assert.equal(result.settlement.lateTicks, 3);
     assert.equal(result.settlement.onTime, false);
     assert.equal(result.settlement.penaltyUsd, Math.min(1_000, Math.round(1_000 * 3 * 0.12)));
@@ -266,5 +681,100 @@ describe('settleMission', () => {
     assert.equal(result.mission.status, 'settled');
     assert.equal(marketLot.status, 'delivered');
     assert.equal(marketLot.quantityKg, 0);
+  });
+
+  it('settles multi-commodity manifests with per-line settlement', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-multi' });
+    const a = pushTestLot(world, {
+      id: 'lot_multi_a',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      commodityId: 'electronics',
+      quantityKg: 500,
+      payUsd: 200,
+    });
+    const b = pushTestLot(world, {
+      id: 'lot_multi_b',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      commodityId: 'machinery',
+      quantityKg: 400,
+      payUsd: 160,
+    });
+    let flight = acceptMission(world, {
+      lotId: a.id,
+      cargoKg: 500,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_multi',
+    });
+    flight = acceptMission(world, {
+      lotId: b.id,
+      cargoKg: 400,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      intoMission: flight,
+    });
+    const elecBefore =
+      world.airports.find((x) => x.icao === 'SBVT')!.inventory.electronics!.stockKg;
+    const machBefore =
+      world.airports.find((x) => x.icao === 'SBVT')!.inventory.machinery!.stockKg;
+
+    const result = settleMission(world, { ...flight, status: 'dispatched' });
+    assert.equal(result.mission.status, 'settled');
+    assert.equal(result.settlement.deliveredKg, 900);
+    assert.equal(result.settlement.lines?.length, 2);
+    assert.equal(
+      result.settlement.payoutUsd,
+      result.settlement.lines!.reduce((s, l) => s + l.payoutUsd, 0),
+    );
+    assert.ok(
+      world.airports.find((x) => x.icao === 'SBVT')!.inventory.electronics!.stockKg > elecBefore,
+    );
+    assert.ok(
+      world.airports.find((x) => x.icao === 'SBVT')!.inventory.machinery!.stockKg > machBefore,
+    );
+    assert.equal(a.status, 'delivered');
+    assert.equal(b.status, 'delivered');
+  });
+
+  it('cancel releases every line reservation', () => {
+    const world = createSeedEconomyWorld({ seed: 'cancel-multi' });
+    const a = pushTestLot(world, {
+      id: 'lot_can_a',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 500,
+      payUsd: 100,
+    });
+    const b = pushTestLot(world, {
+      id: 'lot_can_b',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 400,
+      payUsd: 80,
+    });
+    let flight = acceptMission(world, {
+      lotId: a.id,
+      cargoKg: 500,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_can',
+    });
+    flight = acceptMission(world, {
+      lotId: b.id,
+      cargoKg: 400,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      intoMission: flight,
+    });
+    assert.equal(a.reservedKg, 500);
+    assert.equal(b.reservedKg, 400);
+    const cancelled = cancelMission(world, flight);
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(a.reservedKg, 0);
+    assert.equal(b.reservedKg, 0);
+    assert.equal(a.status, 'available');
+    assert.equal(b.status, 'available');
   });
 });

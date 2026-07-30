@@ -3,6 +3,8 @@
  * Source: https://www.simbrief.com/api/inputs.airframes.json
  */
 
+import { KG_TO_LB } from '@msfs-compat/shared';
+
 const AIRFRAMES_URL = 'https://www.simbrief.com/api/inputs.airframes.json';
 
 export interface SimBriefAirframe {
@@ -12,6 +14,20 @@ export interface SimBriefAirframe {
   comments: string;
   name: string;
   passengers: number;
+  /** Soft freight cap from airframe_options.maxcargo, in kg. */
+  maxCargoKg?: number;
+  /** Operating empty weight from airframe_options.oew, in kg. */
+  oewKg?: number;
+  /** Max zero-fuel weight from airframe_options.mzfw, in kg. */
+  mzfwKg?: number;
+}
+
+interface RawAirframeOptions {
+  wgtunits?: string;
+  maxcargo?: number | string;
+  oew?: number | string;
+  mzfw?: number | string;
+  mtow?: number | string;
 }
 
 interface RawAirframe {
@@ -21,6 +37,7 @@ interface RawAirframe {
   airframe_comments?: string | false;
   airframe_name?: string;
   airframe_passengers?: number | string;
+  airframe_options?: RawAirframeOptions;
 }
 
 interface RawAircraftEntry {
@@ -28,38 +45,68 @@ interface RawAircraftEntry {
   airframes?: RawAirframe[];
 }
 
+let airframesCache:
+  | { fetchedAtMs: number; data: Record<string, RawAircraftEntry> }
+  | undefined;
+const AIRFRAMES_CACHE_TTL_MS = 60 * 60 * 1000;
+
+export async function fetchSimBriefAirframesCatalog(
+  fetchImpl: typeof fetch = fetch,
+): Promise<Record<string, RawAircraftEntry>> {
+  const now = Date.now();
+  if (
+    airframesCache &&
+    now - airframesCache.fetchedAtMs < AIRFRAMES_CACHE_TTL_MS &&
+    fetchImpl === fetch
+  ) {
+    return airframesCache.data;
+  }
+  const res = await fetchImpl(AIRFRAMES_URL, { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    throw new Error(`SimBrief airframes fetch failed HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as Record<string, RawAircraftEntry>;
+  if (fetchImpl === fetch) {
+    airframesCache = { fetchedAtMs: now, data };
+  }
+  return data;
+}
+
+/** Test helper — clear in-memory catalog cache. */
+export function clearSimBriefAirframesCache(): void {
+  airframesCache = undefined;
+}
+
 export async function fetchSimBriefAirframesForIcao(
   icao: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<SimBriefAirframe[]> {
   const code = icao.trim().toUpperCase();
-  const res = await fetchImpl(AIRFRAMES_URL, { headers: { Accept: 'application/json' } });
-  if (!res.ok) {
-    throw new Error(`SimBrief airframes fetch failed HTTP ${res.status}`);
-  }
-  const all = (await res.json()) as Record<string, RawAircraftEntry>;
+  const all = await fetchSimBriefAirframesCatalog(fetchImpl);
   const entry = all[code];
   if (!entry?.airframes?.length) {
     return [];
   }
   return entry.airframes
-    .map((a): SimBriefAirframe | undefined => {
-      const internalId = a.airframe_internal_id?.trim();
-      if (!internalId) {
-        return undefined;
-      }
-      const comments = typeof a.airframe_comments === 'string' ? a.airframe_comments : '';
-      const passengers = Number(a.airframe_passengers);
-      return {
-        internalId,
-        icao: (a.airframe_icao ?? code).toUpperCase(),
-        listType: (a.airframe_list_type ?? code).toUpperCase(),
-        comments,
-        name: a.airframe_name ?? code,
-        passengers: Number.isFinite(passengers) ? passengers : 0,
-      };
-    })
+    .map((a): SimBriefAirframe | undefined => mapRawAirframe(a, code))
     .filter((a): a is SimBriefAirframe => a !== undefined);
+}
+
+/**
+ * Prefer explicit maxcargo; when missing/zero (common on freighters),
+ * fall back to structural payload MZFW − OEW.
+ */
+export function airframeMaxCargoKg(airframe: SimBriefAirframe): number | undefined {
+  if (airframe.maxCargoKg !== undefined && airframe.maxCargoKg > 0) {
+    return Math.floor(airframe.maxCargoKg);
+  }
+  if (airframe.mzfwKg !== undefined && airframe.oewKg !== undefined) {
+    const structural = Math.floor(airframe.mzfwKg - airframe.oewKg);
+    if (structural > 0) {
+      return structural;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -130,6 +177,67 @@ export async function resolveSimBriefDispatchType(opts: {
     );
   }
   return { type: airframe.internalId, airframe };
+}
+
+/** Resolve SimBrief soft freight limit (kg) for a career freighter class match. */
+export async function resolveSimBriefMaxCargoKg(opts: {
+  simbriefIcao: string;
+  simbriefAirframeMatch: string;
+  titleHint?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ maxCargoKg: number; airframe: SimBriefAirframe; source: 'maxcargo' | 'mzfw-oew' }> {
+  const { airframe } = await resolveSimBriefDispatchType(opts);
+  const fromMax = airframe.maxCargoKg !== undefined && airframe.maxCargoKg > 0;
+  const maxCargoKg = airframeMaxCargoKg(airframe);
+  if (maxCargoKg === undefined) {
+    throw new Error(
+      `SimBrief airframe ${airframe.internalId} has no maxcargo / mzfw-oew payload limit`,
+    );
+  }
+  return {
+    maxCargoKg,
+    airframe,
+    source: fromMax ? 'maxcargo' : 'mzfw-oew',
+  };
+}
+
+function mapRawAirframe(a: RawAirframe, fallbackIcao: string): SimBriefAirframe | undefined {
+  const internalId = a.airframe_internal_id?.trim();
+  if (!internalId) {
+    return undefined;
+  }
+  const comments = typeof a.airframe_comments === 'string' ? a.airframe_comments : '';
+  const passengers = Number(a.airframe_passengers);
+  const weights = parseAirframeWeightsKg(a.airframe_options);
+  return {
+    internalId,
+    icao: (a.airframe_icao ?? fallbackIcao).toUpperCase(),
+    listType: (a.airframe_list_type ?? fallbackIcao).toUpperCase(),
+    comments,
+    name: a.airframe_name ?? fallbackIcao,
+    passengers: Number.isFinite(passengers) ? passengers : 0,
+    ...weights,
+  };
+}
+
+function parseAirframeWeightsKg(opts: RawAirframeOptions | undefined): {
+  maxCargoKg?: number;
+  oewKg?: number;
+  mzfwKg?: number;
+} {
+  if (!opts) return {};
+  const unit = (opts.wgtunits ?? 'LBS').toUpperCase();
+  const toKg = (raw: number | string | undefined): number | undefined => {
+    const n = typeof raw === 'number' ? raw : Number(String(raw ?? '').replace(/,/g, ''));
+    if (!Number.isFinite(n) || n < 0) return undefined;
+    const kg = unit === 'KGS' || unit === 'KG' ? n : n / KG_TO_LB;
+    return Math.round(kg);
+  };
+  return {
+    maxCargoKg: toKg(opts.maxcargo),
+    oewKg: toKg(opts.oew),
+    mzfwKg: toKg(opts.mzfw),
+  };
 }
 
 function compileMatch(match: string): RegExp {

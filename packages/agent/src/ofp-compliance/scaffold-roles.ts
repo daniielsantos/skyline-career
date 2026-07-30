@@ -73,6 +73,12 @@ const TOLISS_A346_LIVE_SOURCES: OfpLiveSources = {
   payload: ['classic-stations'],
 };
 
+const CLASSIC_LIGHT_LIVE_SOURCES: OfpLiveSources = {
+  fuel: ['classic'],
+  weights: ['classic-weights'],
+  payload: ['classic-stations'],
+};
+
 /** Known families where station roles are stable across liveries/cabin options. */
 export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
   {
@@ -215,6 +221,44 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'liveSources: classic stations; fuel mass-balance then classic (no PMDG/TFDi probe)',
       'SimBrief: A346 passenger airframe',
       'Package has Pax preset only (no freighter)',
+    ],
+  },
+  {
+    id: 'blacksquare-caravan-cargo-pod',
+    icao: 'C208',
+    titlePattern: /Black Square Caravan Professional Cargo Pod/i,
+    familyPackRel: 'blacksquare-caravan-cargo-pod.json',
+    stationRoles: {
+      passengerStations: [],
+      // Cabin seats + cabin cargo + belly pods — freighter career (pax=0).
+      baggageStations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      crewStations: [1, 2],
+    },
+    liveSources: CLASSIC_LIGHT_LIVE_SOURCES,
+    simbriefIcao: 'C208',
+    simbriefAirframeMatch: 'Default',
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'Copilot', role: 'crew' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'Cabin seat 03 (cargo)', role: 'baggage' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'Cabin seat 04 (cargo)', role: 'baggage' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Cabin seat 05 (cargo)', role: 'baggage' },
+      { simVarIndex: 6, cfgIndex: 5, name: 'Cabin seat 06 (cargo)', role: 'baggage' },
+      { simVarIndex: 7, cfgIndex: 6, name: 'Cabin seat 07 (cargo)', role: 'baggage' },
+      { simVarIndex: 8, cfgIndex: 7, name: 'Cabin seat 08 (cargo)', role: 'baggage' },
+      { simVarIndex: 9, cfgIndex: 8, name: 'Cabin seat 09 (cargo)', role: 'baggage' },
+      { simVarIndex: 10, cfgIndex: 9, name: 'Cabin seat 10 (cargo)', role: 'baggage' },
+      { simVarIndex: 11, cfgIndex: 10, name: 'Cargo cabin', role: 'baggage' },
+      { simVarIndex: 12, cfgIndex: 11, name: 'Cargo pod 1', role: 'baggage' },
+      { simVarIndex: 13, cfgIndex: 12, name: 'Cargo pod 2', role: 'baggage' },
+      { simVarIndex: 14, cfgIndex: 13, name: 'Cargo pod 3', role: 'baggage' },
+      { simVarIndex: 15, cfgIndex: 14, name: 'Cargo pod 4', role: 'baggage' },
+    ],
+    notes: [
+      'Black Square Caravan Professional Cargo Pod',
+      'liveSources: classic fuel tanks + classic stations/weights',
+      'SimBrief: Default C208 only (structural maxcargo ≈ mzfw−oew)',
+      'Host snapshot may expose stations 1–14; station 15 still in roles for full cfg',
     ],
   },
 ];

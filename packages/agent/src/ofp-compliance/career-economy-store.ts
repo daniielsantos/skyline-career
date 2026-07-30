@@ -3,6 +3,8 @@ import { dirname, resolve } from 'node:path';
 import {
   cloneEconomyWorld,
   createSeedEconomyWorld,
+  ensureEconomyCaughtUp,
+  migrateEconomyWorld,
   type CareerEconomyWorld,
 } from '@msfs-compat/shared';
 
@@ -10,11 +12,13 @@ export const DEFAULT_CAREER_ECONOMY_PATH = 'profiles/career/local-economy.json';
 
 export async function loadCareerEconomy(path: string): Promise<CareerEconomyWorld> {
   const raw = await readFile(resolve(path), 'utf8');
-  const parsed = JSON.parse(raw) as CareerEconomyWorld;
-  if (parsed.version !== 1 || !Array.isArray(parsed.airports)) {
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  if (!Array.isArray(parsed.airports)) {
     throw new Error(`Invalid career economy file: ${path}`);
   }
-  return parsed;
+  const world = migrateEconomyWorld(parsed);
+  const { world: caught } = ensureEconomyCaughtUp(world);
+  return caught;
 }
 
 export async function saveCareerEconomy(
@@ -23,7 +27,10 @@ export async function saveCareerEconomy(
 ): Promise<void> {
   const abs = resolve(path);
   await mkdir(dirname(abs), { recursive: true });
-  await writeFile(abs, `${JSON.stringify(world, null, 2)}\n`, 'utf8');
+  const toSave = migrateEconomyWorld(world);
+  toSave.lastBatchAtMs = world.lastBatchAtMs ?? toSave.lastBatchAtMs;
+  toSave.lastSyncedAtMs = toSave.lastBatchAtMs;
+  await writeFile(abs, `${JSON.stringify(toSave, null, 2)}\n`, 'utf8');
 }
 
 export async function loadOrCreateCareerEconomy(
@@ -32,7 +39,9 @@ export async function loadOrCreateCareerEconomy(
 ): Promise<CareerEconomyWorld> {
   if (!opts.reset) {
     try {
-      return await loadCareerEconomy(path);
+      const world = await loadCareerEconomy(path);
+      await saveCareerEconomy(path, world);
+      return world;
     } catch {
       // create fresh
     }

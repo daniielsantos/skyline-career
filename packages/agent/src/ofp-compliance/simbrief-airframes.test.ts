@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   matchSimBriefAirframe,
   resolveSimBriefDispatchType,
+  resolveSimBriefMaxCargoKg,
   type SimBriefAirframe,
 } from './simbrief-airframes.js';
 
@@ -106,5 +107,73 @@ describe('resolveSimBriefDispatchType', () => {
     });
     assert.equal(type, '746599_dual');
     assert.match(airframe.comments, /Dual Class/);
+  });
+});
+
+describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
+  it('converts maxcargo LBS to kg', async () => {
+    const { maxCargoKg, source } = await resolveSimBriefMaxCargoKg({
+      simbriefIcao: 'B738',
+      simbriefAirframeMatch: 'Converted Freighter',
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            B738: {
+              airframes: [
+                {
+                  airframe_internal_id: '746599_bcf',
+                  airframe_list_type: 'B738',
+                  airframe_icao: 'B738',
+                  airframe_comments: 'PMDG (MSFS) - Boeing Converted Freighter',
+                  airframe_name: 'B737-800BCF',
+                  airframe_passengers: 0,
+                  airframe_options: {
+                    wgtunits: 'LBS',
+                    maxcargo: 39985,
+                    oew: 87375,
+                    mzfw: 138300,
+                  },
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+    assert.equal(source, 'maxcargo');
+    assert.equal(maxCargoKg, 18137);
+  });
+
+  it('falls back to mzfw-oew when maxcargo is 0', async () => {
+    const { maxCargoKg, source } = await resolveSimBriefMaxCargoKg({
+      simbriefIcao: 'MD1F',
+      simbriefAirframeMatch: 'MD-11F PW',
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            MD1F: {
+              airframes: [
+                {
+                  airframe_internal_id: '81536_pw',
+                  airframe_list_type: 'MD1F',
+                  airframe_icao: 'MD1F',
+                  airframe_comments: 'TFDi Design (MSFS) - MD-11F PW',
+                  airframe_name: 'MD-11F',
+                  airframe_passengers: 4,
+                  airframe_options: {
+                    wgtunits: 'KGS',
+                    maxcargo: 0,
+                    oew: 112748,
+                    mzfw: 204706,
+                  },
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+    assert.equal(source, 'mzfw-oew');
+    assert.equal(maxCargoKg, 91958);
   });
 });

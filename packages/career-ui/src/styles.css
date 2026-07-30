@@ -489,6 +489,94 @@ th {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.staging-ops-head-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.settings-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.settings-panel .settings-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.settings-card {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.settings-card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.settings-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.settings-choice {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.settings-choice-btn {
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-choice-btn small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.settings-choice-btn.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, white);
+  font-weight: 600;
+}
+
+.settings-sample {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.compact-dispatch {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
 .staging-ops-reason {
   margin: 0;
   color: var(--muted);
@@ -512,12 +600,26 @@ th {
   margin-top: 0.45rem;
 }
 
-.staging-section h3 {
+.staging-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin: 0 0 0.65rem;
+}
+
+.staging-section h3,
+.staging-section-head h3 {
+  margin: 0;
   font-family: var(--font-display);
   font-size: 1rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.staging-section-head .action.compact {
+  padding: 0.28rem 0.7rem;
+  font-size: 0.78rem;
 }
 
 .staging-existing,
@@ -698,6 +800,12 @@ th {
   }
 
   .staging-head-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .staging-ops-head-actions {
     width: 100%;
     align-items: stretch;
     flex-direction: column;
@@ -1180,6 +1288,84 @@ small {
   font-size: 0.85rem;
 }
 
+.watch-status-footer {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  margin: 1.25rem 0 0;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--paper) 94%, #17202b 6%);
+  box-shadow: 0 0.35rem 1rem rgba(26, 36, 48, 0.1);
+  font-size: 0.78rem;
+}
+
+.watch-footer-primary,
+.watch-footer-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.watch-status-footer strong {
+  white-space: nowrap;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+
+.watch-connected strong {
+  color: var(--ok);
+}
+
+.watch-waiting strong {
+  color: var(--accent);
+}
+
+.watch-blocked strong {
+  color: var(--danger);
+}
+
+.watch-footer-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding-left: 0.8rem;
+  border-left: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.watch-footer-item span {
+  color: var(--muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.watch-footer-item b {
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.watch-footer-secondary {
+  justify-content: flex-end;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.watch-footer-error {
+  color: var(--danger);
+}
+
 .watch-line {
   margin: 0;
   display: flex;
@@ -1202,6 +1388,11 @@ small {
 
 .watch-dot.off {
   background: var(--muted);
+}
+
+.watch-dot.checking {
+  background: var(--accent);
+  animation: poll-pulse 1s ease-in-out infinite alternate;
 }
 
 .watch-event,
@@ -1325,6 +1516,215 @@ small {
   font-size: 0.85rem;
 }
 
+.ofp-briefing-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0.75rem 0 0;
+  border: 1px solid var(--line);
+}
+
+.ofp-briefing-grid > div {
+  min-width: 0;
+  padding: 0.65rem 0.7rem;
+  border-right: 1px solid var(--line);
+}
+
+.ofp-briefing-grid > div:last-child {
+  border-right: 0;
+}
+
+.ofp-briefing-grid dt,
+.ofp-route-strip > span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.ofp-briefing-grid dd {
+  margin: 0.28rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.ofp-route-strip {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--line);
+  background: rgba(20, 32, 48, 0.035);
+}
+
+.ofp-route-strip > span {
+  color: #8a5a12;
+}
+
+.ofp-route-strip code {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.fuel-purchase-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-left: 0.35rem solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 5%, white);
+}
+
+.fuel-purchase-head,
+.fuel-purchase-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.fuel-purchase-head strong,
+.fuel-purchase-head small {
+  display: block;
+}
+
+.fuel-purchase-head strong {
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.fuel-purchase-head small,
+.fuel-purchase-footer small {
+  margin-top: 0.15rem;
+  color: var(--muted);
+}
+
+.fuel-purchase-head > span {
+  padding: 0.15rem 0.4rem;
+  border: 1px solid currentColor;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fuel-purchase-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.fuel-purchase-grid > div {
+  padding: 0.65rem 0.7rem;
+  border-right: 1px solid var(--line);
+}
+
+.fuel-purchase-grid > div:last-child {
+  border-right: 0;
+}
+
+.fuel-purchase-grid dt {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.fuel-purchase-grid dd {
+  margin: 0.25rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.fuel-quote-error {
+  border-left-color: var(--danger);
+}
+
+.fuel-pipeline-status {
+  border-left: 0.35rem solid var(--accent);
+}
+
+.fuel-pipeline-failed {
+  border-left-color: var(--danger);
+}
+
+.fuel-pipeline-status > div {
+  flex: 1;
+}
+
+.preflight-summary-card .ofp-result-head > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.preflight-summary-card .ofp-result-head small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.preflight-load-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.preflight-load-grid > div {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.preflight-load-grid span,
+.preflight-load-grid small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.preflight-load-grid strong {
+  font-size: 1rem;
+}
+
+.preflight-load-grid b {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.6rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+}
+
+.preflight-load-ok b,
+.preflight-aircraft-state b {
+  color: var(--ok);
+}
+
+.preflight-load-fail b {
+  color: var(--danger);
+}
+
+.preflight-technical {
+  margin-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.55rem;
+}
+
+.preflight-technical summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .ofp-result-card > p {
   margin: 0.45rem 0 0;
 }
@@ -1353,6 +1753,44 @@ small {
 .ofp-findings .finding-info,
 .ofp-findings .finding-pass {
   color: var(--ok);
+}
+
+@media (max-width: 760px) {
+  .fuel-purchase-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fuel-purchase-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .watch-status-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .watch-footer-primary {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .watch-footer-secondary {
+    display: none;
+  }
+
+  .ofp-briefing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ofp-briefing-grid > div {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .preflight-load-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .npc-badge {

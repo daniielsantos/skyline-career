@@ -113,7 +113,7 @@ export function quoteFuelUplift(
   };
 }
 
-/** Drain terminal stock and build the mission uplift line. */
+/** Drain local stock; tanker supply covers any quoted shortfall at its surcharge. */
 export function deliverFuelUplift(
   world: CareerEconomyWorld,
   quote: FuelUpliftQuote,
@@ -124,15 +124,15 @@ export function deliverFuelUplift(
   }
   ensureAirportFuelInventory(ap);
   const stock = fuelPile(ap);
-  const deliveredKg = Math.min(
+  const fromTerminalKg = Math.min(
     quote.requestedKg,
     Math.max(0, Math.floor(stock.stockKg)),
   );
-  stock.stockKg = clamp(stock.stockKg - deliveredKg, 0, stock.capacityKg);
+  stock.stockKg = clamp(stock.stockKg - fromTerminalKg, 0, stock.capacityKg);
   return {
     originIcao: quote.originIcao,
     requestedKg: quote.requestedKg,
-    deliveredKg,
+    deliveredKg: quote.requestedKg,
     unitPriceUsd: quote.unitPriceUsd,
     costUsd: quote.costUsd,
     scarcity: quote.scarcity,

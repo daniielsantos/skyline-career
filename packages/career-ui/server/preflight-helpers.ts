@@ -6,7 +6,9 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  KG_TO_LB,
   ofpCargoKg,
+  ofpFuelToLb,
   type MissionIntent,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
@@ -23,6 +25,13 @@ export type PreflightCheckResult = {
   summary: string;
   checkedAtIso: string;
   phase: string;
+  loadVerification: {
+    ready: boolean;
+    fuel: { plannedLb?: number; liveLb: number; ok: boolean };
+    payload: { plannedLb?: number; liveLb?: number; ok: boolean };
+    aircraft: { onGround: boolean; enginesRunning: boolean };
+    weightNoteCount: number;
+  };
   findings: Array<{ code: string; severity: string; message: string }>;
 };
 
@@ -95,11 +104,44 @@ export async function runMissionPreflight(
       locked: false,
     });
     const checkedAtIso = new Date().toISOString();
+    const fuelFailed = snapshot.findings.some(
+      (finding) =>
+        finding.severity === 'fail' && finding.code.startsWith('FUEL_'),
+    );
+    const payloadFailed = snapshot.findings.some(
+      (finding) =>
+        finding.severity === 'fail' &&
+        /^(PAYLOAD_|BAGGAGE|PAX_|STATION_)/.test(finding.code),
+    );
+    const weightNoteCount = snapshot.findings.filter(
+      (finding) =>
+        finding.severity === 'warn' &&
+        ['EMPTY_WEIGHT', 'TOW', 'ZFW'].includes(finding.code),
+    ).length;
+    const cargoKg = ofpCargoKg(ofp);
     const check: PreflightCheckResult = {
       verdict: snapshot.verdict,
       summary: formatComplianceSummary(snapshot),
       checkedAtIso,
       phase: snapshot.phase,
+      loadVerification: {
+        ready: snapshot.verdict !== 'fail',
+        fuel: {
+          plannedLb: ofpFuelToLb(ofp.fuel).total,
+          liveLb: live.fuel.total,
+          ok: !fuelFailed,
+        },
+        payload: {
+          plannedLb: cargoKg !== undefined ? cargoKg * KG_TO_LB : undefined,
+          liveLb: live.payload?.total,
+          ok: !payloadFailed,
+        },
+        aircraft: {
+          onGround: live.onGround,
+          enginesRunning: live.enginesRunning,
+        },
+        weightNoteCount,
+      },
       findings: snapshot.findings.map((f) => ({
         code: f.code,
         severity: f.severity,
@@ -113,7 +155,7 @@ export async function runMissionPreflight(
         originIcao: ofp.originIcao,
         destIcao: ofp.destIcao,
         icao: ofp.icao,
-        cargoKg: ofpCargoKg(ofp),
+        cargoKg,
         passengerCount: ofp.loadSheet?.passengerCount,
         blockFuel: ofp.loadSheet?.blockFuel,
         ofpId: ofp.ofpId,
@@ -133,7 +175,9 @@ export async function runMissionPreflight(
     };
   } finally {
     try {
-      await bridge.close();
+      // The host owns one shared SimConnect session. Closing this short-lived
+      // pipe client must not disconnect Watch or a following operation.
+      await bridge.close({ disconnectHost: false });
     } catch {
       /* ignore */
     }

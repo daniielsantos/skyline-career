@@ -5,8 +5,10 @@
 
 import {
   compareMissionIntentToOfp,
+  estimateRouteCargoLimit,
   formatIntentOfpCheck,
   getAircraftClass,
+  KG_TO_LB,
   ofpCargoKg,
   type FreighterClassId,
   type MissionIntent,
@@ -21,17 +23,29 @@ import {
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
 } from '../../agent/src/ofp-compliance/simbrief-airframes.ts';
-import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
+import {
+  fetchSimBriefLatestOfp,
+  mapSimBriefOfpToBriefing,
+} from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 
-const cargoLimitCache = new Map<
-  FreighterClassId,
-  { maxCargoKg: number; source: string; airframeLabel: string }
->();
+export type ClassCargoLimit = {
+  maxCargoKg: number;
+  source: string;
+  airframeLabel: string;
+  oewKg?: number;
+  mtowKg?: number;
+  fuelCapacityKg?: number;
+};
+
+const cargoLimitCache = new Map<FreighterClassId, ClassCargoLimit>();
+
+/** Re-export shared estimator — class homologation fields live on AircraftClass. */
+export { estimateRouteCargoLimit };
 
 /** Live SimBrief freight cap for a career freighter class (cached). */
 export async function resolveClassMaxCargoKg(
   aircraftClassId: FreighterClassId,
-): Promise<{ maxCargoKg: number; source: string; airframeLabel: string }> {
+): Promise<ClassCargoLimit> {
   const cached = cargoLimitCache.get(aircraftClassId);
   if (cached) return cached;
   const aircraft = getAircraftClass(aircraftClassId);
@@ -45,6 +59,10 @@ export async function resolveClassMaxCargoKg(
       maxCargoKg: resolved.maxCargoKg,
       source: resolved.source,
       airframeLabel: resolved.airframe.comments || resolved.airframe.name,
+      oewKg: resolved.airframe.oewKg ?? aircraft.oewKg,
+      mtowKg: resolved.airframe.mtowKg ?? aircraft.mtowKg,
+      fuelCapacityKg:
+        resolved.airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
     };
     cargoLimitCache.set(aircraftClassId, value);
     return value;
@@ -53,18 +71,36 @@ export async function resolveClassMaxCargoKg(
       maxCargoKg: aircraft.maxCargoKg,
       source: 'class-fallback',
       airframeLabel: aircraft.name,
+      oewKg: aircraft.oewKg,
+      mtowKg: aircraft.mtowKg,
+      fuelCapacityKg: aircraft.fuelCapacityKg,
     };
     cargoLimitCache.set(aircraftClassId, value);
     return value;
   }
 }
 
-export async function buildMissionDispatch(mission: MissionIntent): Promise<{
+export type DispatchWeightSystem = 'metric' | 'imperial';
+
+const KG_TO_LB = 2.2046226218;
+
+function normalizeDispatchUnits(
+  units?: 'KGS' | 'LBS' | DispatchWeightSystem,
+): 'KGS' | 'LBS' {
+  if (units === 'LBS' || units === 'imperial') return 'LBS';
+  return 'KGS';
+}
+
+export async function buildMissionDispatch(
+  mission: MissionIntent,
+  opts: { units?: 'KGS' | 'LBS' | DispatchWeightSystem } = {},
+): Promise<{
   url: string;
   staticId: string;
   type: string;
   airframeLabel: string;
   cargoThousands: number;
+  units: 'KGS' | 'LBS';
 }> {
   const aircraft = getAircraftClass(mission.aircraftClassId);
   const resolved = await resolveSimBriefDispatchType({
@@ -72,15 +108,21 @@ export async function buildMissionDispatch(mission: MissionIntent): Promise<{
     simbriefAirframeMatch: aircraft.simbriefAirframeMatch,
     titleHint: aircraft.name,
   });
-  const staticId = mission.staticId ?? makeStaticId('career');
-  const cargoThousands = cargoWeightToThousands(mission.cargoKg);
+  const units = normalizeDispatchUnits(opts.units);
+  // A static_id identifies one dispatch revision, not the mission forever.
+  // Reusing it after payload edits lets SimBrief return the previous OFP and
+  // can produce a false PASS when the revised values happen to match.
+  const staticId = makeStaticId('career');
+  const weightInUnit =
+    units === 'LBS' ? mission.cargoKg * KG_TO_LB : mission.cargoKg;
+  const cargoThousands = cargoWeightToThousands(weightInUnit);
   const url = buildDispatchRedirectUrl({
     type: resolved.type,
     orig: mission.originIcao,
     dest: mission.destIcao,
     pax: 0,
     cargo: cargoThousands,
-    units: 'KGS',
+    units,
     staticId,
   });
   return {
@@ -89,6 +131,7 @@ export async function buildMissionDispatch(mission: MissionIntent): Promise<{
     type: resolved.type,
     airframeLabel: resolved.airframe.comments || resolved.airframe.name,
     cargoThousands,
+    units,
   };
 }
 
@@ -109,7 +152,9 @@ export async function confirmMissionOfp(
     cargoKg?: number;
     passengerCount?: number;
     blockFuel?: number;
+    blockFuelKg?: number;
     ofpId?: string;
+    briefing: ReturnType<typeof mapSimBriefOfpToBriefing>;
   };
 }> {
   if (!mission.staticId) {
@@ -123,7 +168,7 @@ export async function confirmMissionOfp(
     );
   }
 
-  const { expectation } = await fetchSimBriefLatestOfp({
+  const { expectation, raw } = await fetchSimBriefLatestOfp({
     username,
     userid,
     staticId: mission.staticId,
@@ -139,7 +184,14 @@ export async function confirmMissionOfp(
       cargoKg: ofpCargoKg(expectation),
       passengerCount: expectation.loadSheet?.passengerCount,
       blockFuel: expectation.loadSheet?.blockFuel,
+      blockFuelKg:
+        expectation.loadSheet?.blockFuel === undefined
+          ? undefined
+          : expectation.loadSheet.unit === 'lb'
+            ? expectation.loadSheet.blockFuel / KG_TO_LB
+            : expectation.loadSheet.blockFuel,
       ofpId: expectation.ofpId,
+      briefing: mapSimBriefOfpToBriefing(raw),
     },
   };
 }

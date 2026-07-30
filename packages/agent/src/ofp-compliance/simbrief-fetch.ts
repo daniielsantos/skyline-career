@@ -6,6 +6,7 @@
 
 import {
   normalizeOfpExpectation,
+  type OfpBriefingSummary,
   type OfpExpectation,
   type OfpLoadSheet,
   type OfpPayloadPlan,
@@ -40,6 +41,12 @@ export interface SimBriefOfpJson {
     icao_airline?: string;
     flight_number?: string;
     is_etops?: string;
+    route?: string;
+    route_ifps?: string;
+    route_distance?: string | number;
+    air_distance?: string | number;
+    gc_distance?: string | number;
+    initial_altitude?: string | number;
   };
   aircraft?: {
     icaocode?: string;
@@ -51,16 +58,84 @@ export interface SimBriefOfpJson {
     icao?: string;
     iata_code?: string;
     name?: string;
+    plan_rwy?: string;
   };
   destination?: {
     icao_code?: string;
     icao?: string;
     iata_code?: string;
     name?: string;
+    plan_rwy?: string;
+  };
+  alternate?:
+    | {
+        icao_code?: string;
+        icao?: string;
+      }
+    | Array<{
+        icao_code?: string;
+        icao?: string;
+      }>;
+  times?: {
+    est_block?: string;
+    sched_block?: string;
   };
   fuel?: Record<string, string | number | undefined>;
   weights?: Record<string, string | number | undefined>;
   fetch?: { userid?: string; status?: string; fetchtime?: string };
+}
+
+function compactText(value: string | undefined): string | undefined {
+  const compact = value?.trim().replace(/\s+/g, ' ');
+  return compact || undefined;
+}
+
+function airportWithRunway(
+  block:
+    | {
+        icao_code?: string;
+        icao?: string;
+        plan_rwy?: string;
+      }
+    | undefined,
+): string | undefined {
+  const icao = airportIcao(block);
+  if (!icao) return undefined;
+  const runway = compactText(block?.plan_rwy)?.toUpperCase();
+  return runway ? `${icao}/${runway}` : icao;
+}
+
+function blockTime(value: string | undefined): string | undefined {
+  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(value?.trim() ?? '');
+  if (!match) return compactText(value);
+  return `${match[1]!.padStart(2, '0')}:${match[2]}`;
+}
+
+/** Map SimBrief JSON v2 into the compact JetCard-style OFP strip. */
+export function mapSimBriefOfpToBriefing(
+  ofp: SimBriefOfpJson,
+): OfpBriefingSummary {
+  const origin = airportWithRunway(ofp.origin);
+  const destination = airportWithRunway(ofp.destination);
+  const routeBody = compactText(ofp.general?.route ?? ofp.general?.route_ifps);
+  const route = compactText(
+    [origin, routeBody, destination].filter(Boolean).join(' '),
+  );
+
+  return {
+    aircraftIcao: compactText(ofp.aircraft?.icaocode)?.toUpperCase(),
+    tailNumber: compactText(ofp.aircraft?.reg)?.toUpperCase(),
+    distanceNm:
+      num(ofp.general?.route_distance) ??
+      num(ofp.general?.air_distance) ??
+      num(ofp.general?.gc_distance),
+    blockTime: blockTime(ofp.times?.est_block ?? ofp.times?.sched_block),
+    cruiseAltitudeFt: num(ofp.general?.initial_altitude),
+    alternateIcao: airportIcao(
+      Array.isArray(ofp.alternate) ? ofp.alternate[0] : ofp.alternate,
+    ),
+    route,
+  };
 }
 
 function num(value: string | number | undefined): number | undefined {

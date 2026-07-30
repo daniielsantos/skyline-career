@@ -11,6 +11,7 @@ import {
   deliverFuelUplift,
   estimateUpliftKg,
   quoteFuelUplift,
+  type FuelUpliftQuote,
 } from './career-fuel.js';
 import type {
   CareerMissionsState,
@@ -262,23 +263,30 @@ export function relocateAircraftOnSettle(
   state: CareerMissionsState,
   mission: MissionIntent,
   world?: CareerEconomyWorld,
+  residualFuelKg?: number,
 ): PlayerAircraft | undefined {
   const aircraft = mission.aircraftId
     ? findPlayerAircraft(state, mission.aircraftId)
     : state.fleet.find((a) => a.assignedMissionId === mission.id);
   if (!aircraft) return undefined;
 
-  let appliedBurn = mission.tripFuelBurnKg;
-  if (!(typeof appliedBurn === 'number' && appliedBurn > 0) && world) {
-    const distanceNm =
-      routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
-    appliedBurn = estimateUpliftKg(aircraft.aircraftClassId, distanceNm);
-  }
-  if (typeof appliedBurn === 'number' && appliedBurn > 0) {
-    aircraft.fuelKg = Math.max(
-      0,
-      Math.min(aircraft.fuelCapacityKg, aircraft.fuelKg - appliedBurn),
+  if (typeof residualFuelKg === 'number' && Number.isFinite(residualFuelKg)) {
+    aircraft.fuelKg = Math.round(
+      Math.max(0, Math.min(aircraft.fuelCapacityKg, residualFuelKg)),
     );
+  } else {
+    let appliedBurn = mission.tripFuelBurnKg;
+    if (!(typeof appliedBurn === 'number' && appliedBurn > 0) && world) {
+      const distanceNm =
+        routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
+      appliedBurn = estimateUpliftKg(aircraft.aircraftClassId, distanceNm);
+    }
+    if (typeof appliedBurn === 'number' && appliedBurn > 0) {
+      aircraft.fuelKg = Math.max(
+        0,
+        Math.min(aircraft.fuelCapacityKg, aircraft.fuelKg - appliedBurn),
+      );
+    }
   }
 
   aircraft.locationIcao = mission.destIcao.toUpperCase();
@@ -352,6 +360,148 @@ export function applyPlayerDepartFuel(
       tripFuelBurnKg: neededKg,
     },
     fuelDebitUsd,
+    aircraft,
+  };
+}
+
+export interface PlayerMissionOfpFuelQuote {
+  aircraftId: string;
+  originIcao: string;
+  ofpId: string;
+  requiredBlockFuelKg: number;
+  currentFuelKg: number;
+  fuelCapacityKg: number;
+  shortfallKg: number;
+  authorized: boolean;
+  uplift: FuelUpliftQuote;
+}
+
+/** Quote the exact tank shortfall against a confirmed SimBrief block-fuel target. */
+export function quotePlayerMissionOfpFuel(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  mission: MissionIntent,
+  opts: { ofpId: string; requiredBlockFuelKg: number },
+): PlayerMissionOfpFuelQuote {
+  const aircraft = mission.aircraftId
+    ? findPlayerAircraft(state, mission.aircraftId)
+    : undefined;
+  if (!aircraft) {
+    throw new Error(`Mission ${mission.id} has no assigned player aircraft`);
+  }
+  if (aircraft.locationIcao.toUpperCase() !== mission.originIcao.toUpperCase()) {
+    throw new Error(
+      `Aircraft ${aircraft.label} is at ${aircraft.locationIcao}, not ${mission.originIcao}`,
+    );
+  }
+
+  const requiredBlockFuelKg = Math.max(0, Math.ceil(opts.requiredBlockFuelKg));
+  if (requiredBlockFuelKg > aircraft.fuelCapacityKg) {
+    throw new Error(
+      `OFP block fuel ${requiredBlockFuelKg} kg exceeds ${aircraft.label} capacity ${aircraft.fuelCapacityKg} kg`,
+    );
+  }
+  const currentFuelKg = Math.max(
+    0,
+    Math.min(aircraft.fuelCapacityKg, aircraft.fuelKg),
+  );
+  const shortfallKg = Math.max(0, requiredBlockFuelKg - Math.floor(currentFuelKg));
+  const priced = quoteFuelUplift(world, {
+    originIcao: mission.originIcao,
+    destIcao: mission.destIcao,
+    aircraftClassId: aircraft.aircraftClassId,
+    requestedKg: Math.max(1, shortfallKg),
+  });
+  const uplift: FuelUpliftQuote =
+    shortfallKg > 0
+      ? priced
+      : {
+          ...priced,
+          requestedKg: 0,
+          costUsd: 0,
+          scarcity: 'ok',
+        };
+
+  return {
+    aircraftId: aircraft.id,
+    originIcao: mission.originIcao.toUpperCase(),
+    ofpId: opts.ofpId,
+    requiredBlockFuelKg,
+    currentFuelKg,
+    fuelCapacityKg: aircraft.fuelCapacityKg,
+    shortfallKg,
+    authorized: mission.fuelAuthorizedOfpId === opts.ofpId,
+    uplift,
+  };
+}
+
+function mergeFuelUplifts(
+  previous: MissionFuelUplift | undefined,
+  next: MissionFuelUplift,
+): MissionFuelUplift {
+  if (!previous) return next;
+  const scarcityRank = { ok: 0, partial: 1, dry: 2 } as const;
+  return {
+    originIcao: next.originIcao,
+    requestedKg: previous.requestedKg + next.requestedKg,
+    deliveredKg: previous.deliveredKg + next.deliveredKg,
+    unitPriceUsd: next.requestedKg > 0 ? next.unitPriceUsd : previous.unitPriceUsd,
+    costUsd: previous.costUsd + next.costUsd,
+    scarcity:
+      scarcityRank[next.scarcity] > scarcityRank[previous.scarcity]
+        ? next.scarcity
+        : previous.scarcity,
+    upliftedAtTick: next.upliftedAtTick,
+  };
+}
+
+/** Purchase/record OFP fuel once; Depart sees fuelUplift and will not charge again. */
+export function purchasePlayerMissionOfpFuel(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  mission: MissionIntent,
+  opts: { ofpId: string; requiredBlockFuelKg: number },
+): {
+  mission: MissionIntent;
+  quote: PlayerMissionOfpFuelQuote;
+  fuelDebitUsd: number;
+  aircraft: PlayerAircraft;
+} {
+  const quote = quotePlayerMissionOfpFuel(world, state, mission, opts);
+  const aircraft = findPlayerAircraft(state, quote.aircraftId);
+  if (!aircraft) throw new Error(`Unknown player aircraft ${quote.aircraftId}`);
+  if (quote.authorized) {
+    return { mission, quote, fuelDebitUsd: 0, aircraft };
+  }
+
+  const purchased =
+    quote.shortfallKg > 0
+      ? deliverFuelUplift(world, quote.uplift)
+      : {
+          originIcao: quote.originIcao,
+          requestedKg: 0,
+          deliveredKg: 0,
+          unitPriceUsd: quote.uplift.unitPriceUsd,
+          costUsd: 0,
+          scarcity: 'ok' as const,
+          upliftedAtTick: world.tick,
+        };
+  aircraft.fuelKg = Math.min(
+    aircraft.fuelCapacityKg,
+    aircraft.fuelKg + purchased.deliveredKg,
+  );
+  const distanceNm =
+    routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
+  const nextMission: MissionIntent = {
+    ...mission,
+    fuelUplift: mergeFuelUplifts(mission.fuelUplift, purchased),
+    fuelAuthorizedOfpId: opts.ofpId,
+    tripFuelBurnKg: estimateUpliftKg(aircraft.aircraftClassId, distanceNm),
+  };
+  return {
+    mission: nextMission,
+    quote,
+    fuelDebitUsd: purchased.costUsd,
     aircraft,
   };
 }

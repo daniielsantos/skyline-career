@@ -79,5 +79,8 @@ describe('career fuel commodity', () => {
       estimateUpliftKg('light_turboprop', 200) * quote.unitPriceUsd * 2,
     );
     assert.equal(quote.costUsd, expected);
+    const uplift = deliverFuelUplift(world, quote);
+    assert.equal(uplift.deliveredKg, quote.requestedKg);
+    assert.equal(ap.inventory.fuel!.stockKg, 0);
   });
 });

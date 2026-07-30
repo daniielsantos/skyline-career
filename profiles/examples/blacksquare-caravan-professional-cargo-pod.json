@@ -274,7 +274,7 @@
     "readUnit": "Percent over 100",
     "constraints": {
       "minMac": 3,
-      "maxMac": 39
+      "maxMac": 40
     }
   },
   "fallback": {

@@ -61,6 +61,11 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     simbriefAirframeMatch: 'PMDG \\(MSFS\\) - Boeing Converted Freighter',
     fuelBurnKgPerNm: 5,
     fuelTaxiKg: 400,
+    fuelCapacityKg: 20_894,
+    oewKg: 42_264,
+    mtowKg: 79_333,
+    fuelRouteFactor: 1.3,
+    fuelReserveKg: 1_500,
   },
   {
     id: 'wide_freighter',
@@ -73,6 +78,11 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     simbriefAirframeMatch: 'TFDi Design \\(MSFS\\) - MD-11F',
     fuelBurnKgPerNm: 12,
     fuelTaxiKg: 900,
+    fuelCapacityKg: 117_400,
+    oewKg: 112_748,
+    mtowKg: 286_000,
+    fuelRouteFactor: 1.25,
+    fuelReserveKg: 5_000,
   },
   {
     id: 'light_turboprop',
@@ -85,6 +95,13 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     simbriefAirframeMatch: 'Default',
     fuelBurnKgPerNm: 0.8,
     fuelTaxiKg: 40,
+    /** SimBrief Default C208 maxfuel 2265 lb. */
+    fuelCapacityKg: 1_027,
+    /** Default C208 weights aligned with SimBrief OFP (SBCT→SBGL MTOW case). */
+    oewKg: 2_152,
+    mtowKg: 3_969,
+    fuelRouteFactor: 1.8,
+    fuelReserveKg: 200,
   },
 ] as const;
 
@@ -94,6 +111,61 @@ const CLASS_BY_ID: Record<FreighterClassId, AircraftClass> = Object.fromEntries(
 
 export function getAircraftClass(id: FreighterClassId): AircraftClass {
   return CLASS_BY_ID[id];
+}
+
+/**
+ * Route operational cargo cap for Staging / Dispatch prefill.
+ * Uses homologated class weights (or live SimBrief OEW/MTOW override):
+ * min(structuralMaxCargo, MTOW − OEW − takeoffFuel − margin).
+ * New aircraft homologations must fill oewKg/mtowKg/fuel* on AircraftClass.
+ */
+export function estimateRouteCargoLimit(
+  aircraftClassId: FreighterClassId,
+  distanceNm: number,
+  structuralMaxCargoKg: number,
+  weights: {
+    oewKg?: number;
+    mtowKg?: number;
+    fuelCapacityKg?: number;
+  } = {},
+): {
+  operationalMaxCargoKg: number;
+  estimatedBlockFuelKg: number;
+  fuelCapacityKg: number;
+  fuelDeficitKg: number;
+  fuelFeasible: boolean;
+  structuralMaxCargoKg: number;
+  oewKg: number;
+  mtowKg: number;
+} {
+  const aircraft = getAircraftClass(aircraftClassId);
+  const oewKg = weights.oewKg ?? aircraft.oewKg;
+  const mtowKg = weights.mtowKg ?? aircraft.mtowKg;
+  const fuelCapacityKg =
+    weights.fuelCapacityKg ?? aircraft.fuelCapacityKg;
+  const nm = Math.max(0, Number.isFinite(distanceNm) ? distanceNm : 0);
+  const structural = Math.max(0, Math.floor(structuralMaxCargoKg));
+  const estimatedBlockFuelKg = Math.round(
+    aircraft.fuelTaxiKg +
+      aircraft.fuelBurnKgPerNm * nm * aircraft.fuelRouteFactor +
+      aircraft.fuelReserveKg,
+  );
+  const takeoffFuelKg = Math.max(0, estimatedBlockFuelKg - aircraft.fuelTaxiKg);
+  const marginKg = Math.max(25, Math.round(structural * 0.02));
+  const mtowPayloadKg = Math.max(
+    0,
+    Math.floor(mtowKg - oewKg - takeoffFuelKg - marginKg),
+  );
+  return {
+    operationalMaxCargoKg: Math.min(structural, mtowPayloadKg),
+    estimatedBlockFuelKg,
+    fuelCapacityKg,
+    fuelDeficitKg: Math.max(0, estimatedBlockFuelKg - fuelCapacityKg),
+    fuelFeasible: estimatedBlockFuelKg <= fuelCapacityKg,
+    structuralMaxCargoKg: structural,
+    oewKg,
+    mtowKg,
+  };
 }
 
 export function parseFreighterClassId(raw: string | undefined): FreighterClassId | undefined {
@@ -561,6 +633,156 @@ export function commitStagedManifest(
   }
 }
 
+/**
+ * Replace an accepted/dispatched mission's cargo lines in place.
+ * Releases current reservations, reserves the new lines, keeps mission id /
+ * aircraft assignment / staticId, and clears OFP/preflight so the pilot can
+ * regenerate the plan after payload changes.
+ */
+export function replaceMissionManifest(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  opts: {
+    lines: StagedManifestLine[];
+    aircraftClassId?: FreighterClassId;
+    maxCargoKg?: number;
+  },
+): MissionIntent {
+  const normalized = normalizeMissionIntent(mission);
+  if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
+    throw new Error(`Cannot edit mission in status=${normalized.status}`);
+  }
+  if (!Array.isArray(opts.lines) || opts.lines.length === 0) {
+    throw new Error('Edited manifest requires at least one cargo line');
+  }
+  if (opts.lines.length > MAX_MANIFEST_LOTS) {
+    throw new Error(`Staging allows at most ${MAX_MANIFEST_LOTS} lots`);
+  }
+
+  const aircraft = getAircraftClass(
+    opts.aircraftClassId ?? normalized.aircraftClassId,
+  );
+  if (aircraft.id !== normalized.aircraftClassId) {
+    throw new Error(
+      `Aircraft class mismatch: flight is ${normalized.aircraftClassId}, edit requested ${aircraft.id}`,
+    );
+  }
+  const maxCargoKg =
+    opts.maxCargoKg !== undefined && Number.isFinite(opts.maxCargoKg) && opts.maxCargoKg > 0
+      ? Math.floor(opts.maxCargoKg)
+      : aircraft.maxCargoKg;
+
+  const seen = new Set<string>();
+  const normalizedLines: StagedManifestLine[] = [];
+  for (const raw of opts.lines) {
+    const lotId = raw.lotId?.trim();
+    const cargoKg = Math.floor(raw.cargoKg);
+    if (!lotId) throw new Error('Each staging line needs a lotId');
+    if (seen.has(lotId)) throw new Error(`Duplicate lot in staging: ${lotId}`);
+    seen.add(lotId);
+    if (!Number.isFinite(cargoKg) || cargoKg <= 0) {
+      throw new Error(`Invalid cargoKg for ${lotId}`);
+    }
+    normalizedLines.push({ lotId, cargoKg });
+  }
+
+  const snapshot = world.lots.map((lot) => ({
+    id: lot.id,
+    reservedKg: lot.reservedKg,
+    status: lot.status,
+  }));
+
+  try {
+    for (const line of normalized.lots) {
+      if (world.lots.some((lot) => lot.id === line.shipmentLotId)) {
+        releaseShipmentReservation(world, line.shipmentLotId, line.cargoKg);
+      }
+    }
+
+    let totalKg = 0;
+    for (const line of normalizedLines) {
+      const lot = findLot(world, line.lotId);
+      const avail = lotAvailableKg(lot);
+      if (line.cargoKg > avail) {
+        throw new Error(
+          `Lot ${line.lotId} only has ${avail} kg available (requested ${line.cargoKg})`,
+        );
+      }
+      if (
+        lot.originIcao !== normalized.originIcao ||
+        lot.destIcao !== normalized.destIcao
+      ) {
+        throw new Error(
+          `Route mismatch: flight is ${normalized.originIcao}→${normalized.destIcao}, lot is ${lot.originIcao}→${lot.destIcao}`,
+        );
+      }
+      totalKg += line.cargoKg;
+    }
+    if (totalKg > maxCargoKg) {
+      throw new Error(
+        `Edited cargo ${totalKg} kg exceeds aircraft capacity ${maxCargoKg} kg`,
+      );
+    }
+
+    const distanceNm = routeDistanceNm(
+      world,
+      normalized.originIcao,
+      normalized.destIcao,
+    );
+    if (distanceNm === undefined) {
+      throw new Error(
+        `Unknown route distance for ${normalized.originIcao}→${normalized.destIcao}`,
+      );
+    }
+    if (distanceNm > aircraft.maxRangeNm) {
+      throw new Error(
+        `Route ${normalized.originIcao}→${normalized.destIcao} is ${Math.round(distanceNm)} nm; ${aircraft.name} max range is ${aircraft.maxRangeNm} nm`,
+      );
+    }
+
+    let next: MissionIntent | undefined;
+    for (let index = 0; index < normalizedLines.length; index++) {
+      const line = normalizedLines[index]!;
+      next = acceptMission(world, {
+        lotId: line.lotId,
+        cargoKg: line.cargoKg,
+        aircraftClassId: aircraft.id,
+        maxCargoKg,
+        intoMission: next,
+        missionId: index === 0 ? normalized.id : undefined,
+      });
+    }
+    if (!next) {
+      throw new Error('Edited manifest produced no mission');
+    }
+
+    return {
+      ...normalized,
+      ...recomputeMissionTotals(next),
+      id: normalized.id,
+      aircraftId: normalized.aircraftId,
+      staticId: normalized.staticId,
+      acceptedAtTick: normalized.acceptedAtTick ?? world.tick,
+      status: 'accepted',
+      lastOfpCheck: undefined,
+      lastPreflightCheck: undefined,
+      // Purchased fuel remains in the aircraft and its expense remains in the logbook.
+      fuelUplift: normalized.fuelUplift,
+      fuelAuthorizedOfpId: undefined,
+      tripFuelBurnKg: undefined,
+      dispatchedAtTick: undefined,
+    };
+  } catch (error) {
+    for (const snap of snapshot) {
+      const lot = world.lots.find((candidate) => candidate.id === snap.id);
+      if (!lot) continue;
+      lot.reservedKg = snap.reservedKg;
+      lot.status = snap.status;
+    }
+    throw error;
+  }
+}
+
 export function cancelMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
@@ -648,6 +870,8 @@ export interface SettleMissionOpts {
   tick?: number;
   /** Player fleet — relocates aircraft and applies tank fuel on depart/settle. */
   fleet?: CareerMissionsState;
+  /** Actual fuel remaining in MSFS; falls back to estimated burn when unavailable. */
+  residualFuelKg?: number;
 }
 
 export interface SettleMissionResult {
@@ -718,8 +942,12 @@ export function settleMission(
     fuelDebitUsd = departed.fuelDebitUsd;
   }
 
+  const residualFuelKg =
+    typeof opts.residualFuelKg === 'number' && Number.isFinite(opts.residualFuelKg)
+      ? Math.max(0, Math.round(opts.residualFuelKg))
+      : undefined;
   if (opts.fleet) {
-    relocateAircraftOnSettle(opts.fleet, working, world);
+    relocateAircraftOnSettle(opts.fleet, working, world, residualFuelKg);
   }
 
   const settleTick = opts.tick ?? world.tick;
@@ -768,6 +996,7 @@ export function settleMission(
     ...working,
     status: 'settled',
     settledAtTick: settleTick,
+    settledFuelKg: residualFuelKg,
     payoutUsd: pay.payoutUsd,
     penaltyUsd: pay.penaltyUsd,
     lateTicks: pay.lateTicks,

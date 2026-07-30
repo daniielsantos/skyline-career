@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   acceptMission,
+  applyPlayerDepartFuel,
   assignAircraftToMission,
   cancelMission,
   createSeedEconomyWorld,
@@ -10,6 +11,8 @@ import {
   executeFerry,
   listParkedAt,
   normalizeMissionsState,
+  purchasePlayerMissionOfpFuel,
+  quotePlayerMissionOfpFuel,
   quoteFerry,
   releaseAircraftOnCancel,
   relocateAircraftOnSettle,
@@ -174,10 +177,15 @@ describe('career fleet hangar', () => {
       { fleet: state },
     );
     assert.ok(departed.mission.tripFuelBurnKg! > 0);
-    const settled = settleMission(world, departed.mission, { fleet: state });
+    const settled = settleMission(world, departed.mission, {
+      fleet: state,
+      residualFuelKg: 137.6,
+    });
     assert.equal(settled.mission.status, 'settled');
+    assert.equal(settled.mission.settledFuelKg, 138);
     assert.equal(state.fleet[0]!.locationIcao, 'SBKP');
     assert.equal(state.fleet[0]!.status, 'parked');
+    assert.equal(state.fleet[0]!.fuelKg, 138);
   });
 
   it('releaseAircraftOnCancel is idempotent for unknown aircraft', () => {
@@ -195,5 +203,45 @@ describe('career fleet hangar', () => {
       tripFuelBurnKg: 100,
     } as never);
     assert.equal(state.fleet[0]!.locationIcao, 'SBCF');
+  });
+
+  it('quotes and purchases only the OFP block-fuel shortfall once', () => {
+    const world = createSeedEconomyWorld({ seed: 'ofp-fuel-purchase' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const aircraft = state.fleet[0]!;
+    aircraft.fuelKg = 100;
+    const mission = {
+      id: 'msn_ofp_fuel',
+      aircraftId: aircraft.id,
+      aircraftClassId: aircraft.aircraftClassId,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'dispatched',
+    } as never;
+
+    const quote = quotePlayerMissionOfpFuel(world, state, mission, {
+      ofpId: 'ofp-1',
+      requiredBlockFuelKg: 500,
+    });
+    assert.equal(quote.currentFuelKg, 100);
+    assert.equal(quote.shortfallKg, 400);
+    assert.ok(quote.uplift.costUsd > 0);
+
+    const purchase = purchasePlayerMissionOfpFuel(world, state, mission, {
+      ofpId: 'ofp-1',
+      requiredBlockFuelKg: 500,
+    });
+    assert.equal(aircraft.fuelKg, 500);
+    assert.equal(purchase.mission.fuelAuthorizedOfpId, 'ofp-1');
+    assert.equal(purchase.mission.fuelUplift?.requestedKg, 400);
+    assert.ok(purchase.mission.tripFuelBurnKg! > 0);
+    assert.ok(purchase.fuelDebitUsd > 0);
+
+    const departFuel = applyPlayerDepartFuel(
+      world,
+      state,
+      purchase.mission,
+    );
+    assert.equal(departFuel.fuelDebitUsd, 0);
   });
 });

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { mapSimBriefOfpToExpectation, unitsFromSimBrief } from './simbrief-fetch.js';
+import {
+  mapSimBriefOfpToBriefing,
+  mapSimBriefOfpToExpectation,
+  unitsFromSimBrief,
+} from './simbrief-fetch.js';
 
 describe('unitsFromSimBrief', () => {
   it('maps kgs/lbs', () => {
@@ -69,6 +73,45 @@ describe('mapSimBriefOfpToExpectation', () => {
       },
     });
     assert.equal(ofp.loadSheet?.baggage, 250);
+  });
+});
+
+describe('mapSimBriefOfpToBriefing', () => {
+  it('maps a JetCard-style operational strip and complete route', () => {
+    const briefing = mapSimBriefOfpToBriefing({
+      general: {
+        route: ' DCT REPID   DCT VANOK DCT ',
+        route_distance: '395',
+        initial_altitude: '7000',
+      },
+      aircraft: { icaocode: 'C208', reg: 'N017SB' },
+      origin: { icao_code: 'SBCT', plan_rwy: '33' },
+      destination: { icao_code: 'SBGL', plan_rwy: '10' },
+      alternate: [{ icao_code: 'SBSJ' }],
+      times: { est_block: '02:40:43' },
+    });
+
+    assert.deepEqual(briefing, {
+      aircraftIcao: 'C208',
+      tailNumber: 'N017SB',
+      distanceNm: 395,
+      blockTime: '02:40',
+      cruiseAltitudeFt: 7000,
+      alternateIcao: 'SBSJ',
+      route: 'SBCT/33 DCT REPID DCT VANOK DCT SBGL/10',
+    });
+  });
+
+  it('falls back to air distance and scheduled block time', () => {
+    const briefing = mapSimBriefOfpToBriefing({
+      general: { route_ifps: 'DCT ABC', air_distance: 123 },
+      origin: { icao: 'KORD' },
+      destination: { icao: 'KFAR' },
+      times: { sched_block: '01:25:00' },
+    });
+    assert.equal(briefing.distanceNm, 123);
+    assert.equal(briefing.blockTime, '01:25');
+    assert.equal(briefing.route, 'KORD DCT ABC KFAR');
   });
 });
 

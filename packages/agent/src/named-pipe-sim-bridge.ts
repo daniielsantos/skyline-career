@@ -25,8 +25,12 @@ export class NamedPipeSimBridge implements SimBridge {
     this.autoConnected = true;
   }
 
-  async close(): Promise<void> {
-    if (this.client.isConnected) {
+  /**
+   * Close this IPC client. Short-lived readers can keep the host's shared
+   * SimConnect session alive so they do not interrupt Watch or the next step.
+   */
+  async close(options: { disconnectHost?: boolean } = {}): Promise<void> {
+    if (options.disconnectHost !== false && this.client.isConnected) {
       try {
         await this.client.call('disconnect');
       } catch {

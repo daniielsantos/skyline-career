@@ -7,6 +7,7 @@ import {
   compareMissionIntentToOfp,
   createSeedEconomyWorld,
   departMission,
+  estimateRouteCargoLimit,
   findOpenManifestForRoute,
   findActivePlayerMission,
   getAircraftClass,
@@ -17,12 +18,54 @@ import {
   MAX_MANIFEST_LOTS,
   normalizeMissionIntent,
   normalizeOfpExpectation,
+  replaceMissionManifest,
   routeDistanceNm,
   settleMission,
   tickEconomyN,
   type MissionIntent,
   type ShipmentLot,
 } from './index.js';
+
+describe('estimateRouteCargoLimit', () => {
+  it('limits a full Caravan by MTOW and route fuel', () => {
+    const result = estimateRouteCargoLimit(
+      'light_turboprop',
+      363,
+      1_704,
+    );
+    assert.equal(result.structuralMaxCargoKg, 1_704);
+    assert.equal(result.estimatedBlockFuelKg, 763);
+    assert.equal(result.fuelCapacityKg, 1_027);
+    assert.equal(result.fuelFeasible, true);
+    assert.equal(result.fuelDeficitKg, 0);
+    assert.equal(result.operationalMaxCargoKg, 1_060);
+    assert.ok(result.operationalMaxCargoKg < result.structuralMaxCargoKg);
+  });
+
+  it('rejects a nominal-range route when block fuel exceeds the tanks', () => {
+    const result = estimateRouteCargoLimit(
+      'light_turboprop',
+      786,
+      1_704,
+    );
+    assert.equal(result.estimatedBlockFuelKg, 1_372);
+    assert.equal(result.fuelCapacityKg, 1_027);
+    assert.equal(result.fuelFeasible, false);
+    assert.equal(result.fuelDeficitKg, 345);
+  });
+
+  it('uses live SimBrief weights when supplied', () => {
+    const result = estimateRouteCargoLimit(
+      'light_turboprop',
+      363,
+      1_704,
+      { oewKg: 2_100, mtowKg: 4_100 },
+    );
+    assert.equal(result.oewKg, 2_100);
+    assert.equal(result.mtowKg, 4_100);
+    assert.ok(result.operationalMaxCargoKg > 1_060);
+  });
+});
 
 function pushTestLot(
   world: ReturnType<typeof createSeedEconomyWorld>,
@@ -871,5 +914,104 @@ describe('settleMission', () => {
     assert.equal(b.reservedKg, 0);
     assert.equal(a.status, 'available');
     assert.equal(b.status, 'available');
+  });
+});
+
+describe('replaceMissionManifest', () => {
+  it('reduces payload, keeps mission id, and clears OFP/preflight', () => {
+    const world = createSeedEconomyWorld({ seed: 'replace-manifest' });
+    const lot = pushTestLot(world, {
+      id: 'lot_rep_1',
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      quantityKg: 1_500,
+      payUsd: 1_200,
+    });
+    let mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 1_200,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_rep_1',
+    });
+    mission = {
+      ...mission,
+      status: 'dispatched',
+      staticId: 'career_static_rep',
+      aircraftId: 'acf_caravan_1',
+      dispatchedAtTick: world.tick,
+      fuelUplift: {
+        originIcao: 'SBGR',
+        requestedKg: 100,
+        deliveredKg: 100,
+        unitPriceUsd: 1,
+        costUsd: 100,
+        scarcity: 'ok',
+        upliftedAtTick: world.tick,
+      },
+      fuelAuthorizedOfpId: 'old-ofp',
+      lastOfpCheck: {
+        verdict: 'fail',
+        summary: 'too heavy',
+        checkedAtIso: new Date().toISOString(),
+        findings: [],
+      },
+      lastPreflightCheck: {
+        verdict: 'fail',
+        summary: 'payload',
+        checkedAtIso: new Date().toISOString(),
+        findings: [],
+      },
+    };
+    assert.equal(lot.reservedKg, 1_200);
+
+    const replaced = replaceMissionManifest(world, mission, {
+      lines: [{ lotId: lot.id, cargoKg: 600 }],
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+    });
+
+    assert.equal(replaced.id, 'msn_rep_1');
+    assert.equal(replaced.status, 'accepted');
+    assert.equal(replaced.cargoKg, 600);
+    assert.equal(replaced.lots.length, 1);
+    assert.equal(replaced.lots[0]?.shipmentLotId, lot.id);
+    assert.equal(replaced.lots[0]?.cargoKg, 600);
+    assert.equal(replaced.aircraftId, 'acf_caravan_1');
+    assert.equal(replaced.staticId, 'career_static_rep');
+    assert.equal(replaced.lastOfpCheck, undefined);
+    assert.equal(replaced.lastPreflightCheck, undefined);
+    assert.equal(replaced.fuelUplift?.costUsd, 100);
+    assert.equal(replaced.fuelAuthorizedOfpId, undefined);
+    assert.equal(replaced.dispatchedAtTick, undefined);
+    assert.equal(lot.reservedKg, 600);
+    assert.equal(lot.status, 'available');
+  });
+
+  it('rolls back reservations if the new lines are invalid', () => {
+    const world = createSeedEconomyWorld({ seed: 'replace-rollback' });
+    const lot = pushTestLot(world, {
+      id: 'lot_rep_2',
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      quantityKg: 800,
+      payUsd: 400,
+    });
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 500,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_rep_2',
+    });
+    assert.throws(
+      () =>
+        replaceMissionManifest(world, mission, {
+          lines: [{ lotId: lot.id, cargoKg: 5_000 }],
+          maxCargoKg: 1_704,
+        }),
+      /available|capacity/i,
+    );
+    assert.equal(lot.reservedKg, 500);
   });
 });

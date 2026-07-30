@@ -250,6 +250,27 @@ export async function readLiveLoad(
   const prefs = resolveLiveSourcePrefs(opts.liveSources);
   const density = opts.densityLbPerGal ?? DEFAULT_JET_A_LB_PER_GAL;
   const snapshot = await bridge.snapshot();
+  // The fixed native snapshot may expose fewer stations than a homologated
+  // profile (for example Caravan cargo station 15). Hydrate every mapped role
+  // directly so OFP verification covers the full injected load.
+  const mappedStations = new Set<number>([
+    ...(opts.stationRoles?.passengerStations ?? []),
+    ...(opts.stationRoles?.baggageStations ?? []),
+    ...(opts.stationRoles?.crewStations ?? []),
+    ...(opts.stationRoles?.serviceStations ?? []),
+  ]);
+  for (const index of mappedStations) {
+    const key = `PAYLOAD STATION WEIGHT:${index}`;
+    if (snapshot.vars[key] !== undefined) continue;
+    try {
+      snapshot.vars[key] = await bridge.readSimVar({
+        name: key,
+        unit: 'pounds',
+      });
+    } catch {
+      // Keep partial snapshot; compare will surface an unavailable/mismatch finding.
+    }
+  }
   let payload = payloadFromSnapshot(snapshot);
   payload = enrichPayloadWithRoles(payload, opts.stationRoles, opts.roleWeightUnit ?? 'lb');
 

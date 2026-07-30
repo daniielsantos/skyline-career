@@ -20,6 +20,10 @@ export interface SimBriefAirframe {
   oewKg?: number;
   /** Max zero-fuel weight from airframe_options.mzfw, in kg. */
   mzfwKg?: number;
+  /** Max takeoff weight from airframe_options.mtow, in kg. */
+  mtowKg?: number;
+  /** Maximum fuel from airframe_options.maxfuel, in kg. */
+  fuelCapacityKg?: number;
 }
 
 interface RawAirframeOptions {
@@ -28,6 +32,7 @@ interface RawAirframeOptions {
   oew?: number | string;
   mzfw?: number | string;
   mtow?: number | string;
+  maxfuel?: number | string;
 }
 
 interface RawAirframe {
@@ -224,6 +229,8 @@ function parseAirframeWeightsKg(opts: RawAirframeOptions | undefined): {
   maxCargoKg?: number;
   oewKg?: number;
   mzfwKg?: number;
+  mtowKg?: number;
+  fuelCapacityKg?: number;
 } {
   if (!opts) return {};
   const unit = (opts.wgtunits ?? 'LBS').toUpperCase();
@@ -237,6 +244,8 @@ function parseAirframeWeightsKg(opts: RawAirframeOptions | undefined): {
     maxCargoKg: toKg(opts.maxcargo),
     oewKg: toKg(opts.oew),
     mzfwKg: toKg(opts.mzfw),
+    mtowKg: toKg(opts.mtow),
+    fuelCapacityKg: toKg(opts.maxfuel),
   };
 }
 

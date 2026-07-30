@@ -1,18 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchAirport,
   fetchCargoLimit,
   fetchMarket,
   fetchMissions,
   fetchNpcFleet,
+  fetchRouteLots,
   fetchState,
   fetchWatchStatus,
+  fetchSimBridgeStatus,
   postCancel,
   postConfirmOfp,
   postDepart,
   postDispatch,
+  postFuelPurchase,
+  postFuelQuote,
   postInitBrazil,
-  postPreflight,
+  postLoadOfp,
   postSettle,
   postSelectHub,
   postFerry,
@@ -25,14 +29,29 @@ import {
   type AirportMovement,
   type AirportView,
   type MarketLot,
+  type MissionFuelQuote,
   type Mission,
   type NpcActivity,
   type NpcFleetMember,
   type PlayerAircraft,
+  type SimBridgeStatus,
   type WatchStatus,
 } from './api';
+import {
+  displayToKg,
+  formatMass,
+  formatMassExact,
+  formatWeightText,
+  KG_TO_LB,
+  kgToDisplay,
+  loadWeightSystem,
+  massUnitLabel,
+  massUnitLong,
+  saveWeightSystem,
+  type WeightSystem,
+} from './weight-units';
 
-type Tab = 'market' | 'missions' | 'fleet' | 'staging' | 'hangar' | 'pilot';
+type Tab = 'market' | 'missions' | 'fleet' | 'staging' | 'hangar' | 'pilot' | 'settings';
 type TerminalSection = 'inventory' | 'contracts' | 'movements';
 type MarketSortKey = 'distance' | 'cargo' | 'load' | 'expires' | 'pay';
 type SortDirection = 'asc' | 'desc';
@@ -58,6 +77,8 @@ type StagingDraft = {
   aircraft: AircraftClass;
   aircraftId?: string;
   intoMissionId?: string;
+  /** When true, commit replaces the full manifest instead of appending. */
+  replaceManifest?: boolean;
   lines: StagingLine[];
 };
 
@@ -77,9 +98,12 @@ function defaultStagingKg(maxKg: number): number {
   return Math.min(maxKg, Math.max(Math.min(100, maxKg), half || Math.min(100, maxKg)));
 }
 
-function formatTonnes(kg: number): string {
-  return `${(kg / 1000).toFixed(1)} t`;
+function formatTonnes(kg: number, system?: WeightSystem): string {
+  return formatMass(kg, system ?? activeWeightSystem);
 }
+
+/** Updated by App so module-level formatters respect Settings. */
+let activeWeightSystem: WeightSystem = loadWeightSystem();
 
 function formatMoney(n: number): string {
   return `$${n.toLocaleString()}`;
@@ -273,6 +297,7 @@ function LotExpiry(props: {
 function NpcTakenBadge(props: {
   claim?: { npcName: string; cargoKg: number; etaHours: number; arrivesAtMs?: number } | null;
   nowMs: number;
+  weightSystem?: WeightSystem;
 }) {
   if (!props.claim) return null;
   const eta = liveEtaHours({
@@ -281,7 +306,10 @@ function NpcTakenBadge(props: {
     fallbackHours: props.claim.etaHours,
   });
   return (
-    <span className="npc-badge" title={`${formatTonnes(props.claim.cargoKg)} reserved by NPC`}>
+    <span
+      className="npc-badge"
+      title={`${formatTonnes(props.claim.cargoKg, props.weightSystem)} reserved by NPC`}
+    >
       Taken by {props.claim.npcName} · ETA {formatDuration(eta)}
     </span>
   );
@@ -320,6 +348,7 @@ function NpcActivityList(props: {
   busy?: boolean;
   empty?: string;
   nowMs: number;
+  weightSystem?: WeightSystem;
 }) {
   if (props.rows.length === 0) {
     return props.empty ? <p className="empty">{props.empty}</p> : null;
@@ -349,7 +378,8 @@ function NpcActivityList(props: {
               <span className={`phase-tag phase-${phase}`}>{phaseLabel(phase)}</span>
             </div>
             <p>
-              {row.npcName} · {row.commodityName} · {formatTonnes(row.cargoKg)} · ETA{' '}
+              {row.npcName} · {row.commodityName} ·{' '}
+              {formatTonnes(row.cargoKg, props.weightSystem)} · ETA{' '}
               {formatDuration(eta)}
             </p>
             <ProgressTrack pct={pct} label={`${row.flightHours ?? '?'}h block`} />
@@ -373,6 +403,7 @@ function MovementBoard(props: {
   empty: string;
   mode: 'arrivals' | 'departures';
   nowMs: number;
+  weightSystem?: WeightSystem;
 }) {
   return (
     <div className="movement-board">
@@ -420,7 +451,7 @@ function MovementBoard(props: {
                   )}
                 </div>
                 <p>
-                  {row.commodityName} · {formatTonnes(row.cargoKg)}
+                  {row.commodityName} · {formatTonnes(row.cargoKg, props.weightSystem)}
                   {props.mode === 'arrivals'
                     ? ` · ETA ${formatDuration(eta)}`
                     : row.phase === 'boarding'
@@ -451,6 +482,7 @@ function FleetRoster(props: {
   onOpen: (icao: string) => void;
   busy?: boolean;
   nowMs: number;
+  weightSystem?: WeightSystem;
 }) {
   if (props.fleet.length === 0) {
     return <p className="empty">No NPC fleet seeded yet — Reset Brazil or wait for migration.</p>;
@@ -536,7 +568,8 @@ function FleetRoster(props: {
                         ) : null}
                       </div>
                       <small>
-                        {mission.commodityName} · {formatTonnes(mission.cargoKg)} · ETA{' '}
+                        {mission.commodityName} ·{' '}
+                        {formatTonnes(mission.cargoKg, props.weightSystem)} · ETA{' '}
                         {formatDuration(eta)} · {formatMoney(mission.payUsd)}
                       </small>
                     </>
@@ -585,12 +618,46 @@ export function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [toastKind, setToastKind] = useState<'ok' | 'warn' | 'fail'>('ok');
   const [simbriefUser, setSimbriefUser] = useState(loadSimbriefUser);
+  const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
   const [ofpAutoStatus, setOfpAutoStatus] =
     useState<'idle' | 'waiting' | 'checking'>('idle');
+  const [loadOfpAutoStatus, setLoadOfpAutoStatus] = useState<
+    'idle' | 'waiting' | 'loading' | 'done' | 'failed'
+  >('idle');
+  const [loadOfpAutoError, setLoadOfpAutoError] = useState<string | null>(null);
+  const [loadOfpRetryToken, setLoadOfpRetryToken] = useState(0);
+  const autoLoadedOfpKeyRef = useRef<string | null>(null);
+  const [missionFuelQuote, setMissionFuelQuote] = useState<{
+    quote: MissionFuelQuote;
+    walletUsd: number;
+    walletAfterUsd: number;
+  } | null>(null);
+  const [missionFuelQuoteStatus, setMissionFuelQuoteStatus] = useState<
+    'idle' | 'loading' | 'ready' | 'error'
+  >('idle');
+  const [missionFuelQuoteError, setMissionFuelQuoteError] = useState<string | null>(
+    null,
+  );
+  const [missionFuelQuoteRetryToken, setMissionFuelQuoteRetryToken] = useState(0);
+  const [watchAutoStatus, setWatchAutoStatus] = useState<
+    'idle' | 'waiting' | 'connecting' | 'blocked'
+  >('idle');
+  const [watchAutoPaused, setWatchAutoPaused] = useState(false);
   const [maxCargoKg, setMaxCargoKg] = useState<number | null>(null);
+  const [structuralMaxCargoKg, setStructuralMaxCargoKg] =
+    useState<number | null>(null);
+  const [estimatedBlockFuelKg, setEstimatedBlockFuelKg] =
+    useState<number | null>(null);
+  const [routeFuelCapacityKg, setRouteFuelCapacityKg] =
+    useState<number | null>(null);
+  const [routeFuelDeficitKg, setRouteFuelDeficitKg] =
+    useState<number | null>(null);
+  const [routeFuelFeasible, setRouteFuelFeasible] =
+    useState<boolean | null>(null);
   const [maxCargoSource, setMaxCargoSource] = useState<string | null>(null);
   const [airframeLabel, setAirframeLabel] = useState<string | null>(null);
   const [watch, setWatch] = useState<WatchStatus | null>(null);
+  const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
   const [marketPage, setMarketPage] = useState(1);
   const [distanceMaxNm, setDistanceMaxNm] = useState('');
   const [cargoFilter, setCargoFilter] = useState('');
@@ -602,6 +669,9 @@ export function App() {
     direction: SortDirection;
   } | null>(null);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
+  const [stagingRouteLots, setStagingRouteLots] = useState<MarketLot[]>([]);
+  const [stagingRouteLotsLoading, setStagingRouteLotsLoading] = useState(false);
+  const [stagingRouteLotsError, setStagingRouteLotsError] = useState<string | null>(null);
   const [hubSelected, setHubSelected] = useState(true);
   const [fleet, setFleet] = useState<PlayerAircraft[]>([]);
   const [hubOptions, setHubOptions] = useState<string[]>([]);
@@ -651,18 +721,32 @@ export function App() {
     }
   }, [airportIcao]);
 
-  const refreshCargoLimit = useCallback(async (aircraftClass: AircraftClass) => {
-    try {
-      const limit = await fetchCargoLimit(aircraftClass);
-      setMaxCargoKg(limit.maxCargoKg);
-      setMaxCargoSource(limit.maxCargoSource);
-      setAirframeLabel(limit.airframeLabel);
-    } catch {
-      setMaxCargoKg(fallbackMaxCargoKg(aircraftClass));
-      setMaxCargoSource('class-fallback');
-      setAirframeLabel(null);
-    }
-  }, []);
+  const refreshCargoLimit = useCallback(
+    async (aircraftClass: AircraftClass, distanceNm?: number) => {
+      try {
+        const limit = await fetchCargoLimit(aircraftClass, distanceNm);
+        setStructuralMaxCargoKg(limit.maxCargoKg);
+        setMaxCargoKg(limit.operationalMaxCargoKg);
+        setEstimatedBlockFuelKg(limit.estimatedBlockFuelKg ?? null);
+        setRouteFuelCapacityKg(limit.fuelCapacityKg ?? null);
+        setRouteFuelDeficitKg(limit.fuelDeficitKg ?? null);
+        setRouteFuelFeasible(limit.fuelFeasible ?? null);
+        setMaxCargoSource(limit.maxCargoSource);
+        setAirframeLabel(limit.airframeLabel);
+      } catch {
+        const fallback = fallbackMaxCargoKg(aircraftClass);
+        setStructuralMaxCargoKg(fallback);
+        setMaxCargoKg(fallback);
+        setEstimatedBlockFuelKg(null);
+        setRouteFuelCapacityKg(null);
+        setRouteFuelDeficitKg(null);
+        setRouteFuelFeasible(null);
+        setMaxCargoSource('class-fallback');
+        setAirframeLabel(null);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     void refresh().catch((err: unknown) => {
@@ -673,12 +757,26 @@ export function App() {
   useEffect(() => {
     if (!staging) {
       setMaxCargoKg(null);
+      setStructuralMaxCargoKg(null);
+      setEstimatedBlockFuelKg(null);
+      setRouteFuelCapacityKg(null);
+      setRouteFuelDeficitKg(null);
+      setRouteFuelFeasible(null);
       setMaxCargoSource(null);
       setAirframeLabel(null);
       return;
     }
-    void refreshCargoLimit(staging.aircraft);
-  }, [staging?.aircraft, refreshCargoLimit]);
+    void refreshCargoLimit(
+      staging.aircraft,
+      stagingRouteDistanceNm(staging),
+    );
+  }, [
+    staging?.aircraft,
+    staging?.originIcao,
+    staging?.destIcao,
+    staging?.lines[0]?.lot.distanceNm,
+    refreshCargoLimit,
+  ]);
 
   // After live SimBrief cargo limit arrives, clamp staged kg to the new capacity.
   useEffect(() => {
@@ -693,6 +791,40 @@ export function App() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reclamp when capacity payload changes
   }, [maxCargoKg]);
+
+  // Self-heal manifests created by the old replacement bug while they are open.
+  useEffect(() => {
+    if (!staging?.replaceManifest) return;
+    setStaging((current) => {
+      if (!current?.replaceManifest) return current;
+      const merged = new Map<string, StagingLine>();
+      let changed = false;
+      for (const line of current.lines) {
+        if (line.cargoKg <= 0) {
+          changed = true;
+          continue;
+        }
+        const existing = merged.get(line.lot.id);
+        if (!existing) {
+          merged.set(line.lot.id, line);
+          continue;
+        }
+        changed = true;
+        merged.set(line.lot.id, {
+          lot: {
+            ...line.lot,
+            availableKg: Math.max(
+              existing.lot.availableKg,
+              line.lot.availableKg,
+            ),
+          },
+          cargoKg: existing.cargoKg + line.cargoKg,
+        });
+      }
+      const lines = [...merged.values()];
+      return changed && lines.length > 0 ? { ...current, lines } : current;
+    });
+  }, [staging?.replaceManifest, staging?.lines]);
 
   // Smooth local clock / ETA / progress between authoritative polls.
   useEffect(() => {
@@ -733,7 +865,10 @@ export function App() {
                 `Settled ${status.missionId} · paid ${formatMoney(status.settlement!.payoutUsd)}` +
                   (status.settlement!.onTime
                     ? ''
-                    : ` · late ${status.settlement!.lateTicks}h (−${formatMoney(status.settlement!.penaltyUsd)})`),
+                    : ` · late ${status.settlement!.lateTicks}h (−${formatMoney(status.settlement!.penaltyUsd)})`) +
+                  (status.settlement!.residualFuelKg !== null
+                    ? ` · fuel remaining ${formatTonnes(status.settlement!.residualFuelKg)}`
+                    : ' · fuel remaining estimated'),
               );
               if (typeof status.walletUsd === 'number') {
                 setWallet(status.walletUsd);
@@ -759,6 +894,40 @@ export function App() {
     };
   }, [watch?.running, refresh]);
 
+  // Independent SimBridge probe — does not require Watch to be running.
+  useEffect(() => {
+    let cancelled = false;
+    async function pollBridge() {
+      try {
+        const status = await fetchSimBridgeStatus();
+        if (!cancelled) setSimBridge(status);
+      } catch {
+        if (!cancelled) {
+          setSimBridge({
+            connected: false,
+            mode: null,
+            aircraftTitle: null,
+            onGround: null,
+            enginesRunning: null,
+            parkingBrake: null,
+            phase: null,
+            source: 'probe',
+            error: 'SimBridge status unavailable',
+            checkedAtIso: new Date().toISOString(),
+          });
+        }
+      }
+    }
+    void pollBridge();
+    const id = window.setInterval(() => {
+      void pollBridge();
+    }, watch?.running ? 5_000 : 8_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [watch?.running]);
+
   const continuousHours = useMemo(() => {
     const frac = Math.max(0, displayNowMs - lastBatchAtMs) / msPerTick;
     return tick + frac;
@@ -772,11 +941,48 @@ export function App() {
     }
   }, [simbriefUser]);
 
+  useEffect(() => {
+    activeWeightSystem = weightSystem;
+    saveWeightSystem(weightSystem);
+  }, [weightSystem]);
+
   const activeCount = useMemo(
     () => missions.filter((m) => isActiveMissionStatus(m.status)).length,
     [missions],
   );
   const activeMission = useMemo(() => findActiveMission(missions), [missions]);
+
+  // Staging needs the complete route inventory. The global Market payload is capped
+  // at 200 rows and may omit valid same-route lots shown by the Terminal.
+  useEffect(() => {
+    if (!staging) {
+      setStagingRouteLots([]);
+      setStagingRouteLotsLoading(false);
+      setStagingRouteLotsError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setStagingRouteLots([]);
+    setStagingRouteLotsLoading(true);
+    setStagingRouteLotsError(null);
+    void fetchRouteLots(staging.originIcao, staging.destIcao)
+      .then((result) => {
+        if (!cancelled) setStagingRouteLots(result.lots);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setStagingRouteLotsError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setStagingRouteLotsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [staging?.originIcao, staging?.destIcao, tick]);
 
   useEffect(() => {
     const username = simbriefUser.trim();
@@ -785,7 +991,8 @@ export function App() {
       !airportIcao &&
       activeMission?.status === 'dispatched' &&
       Boolean(activeMission.staticId) &&
-      !activeMission.lastOfpCheck &&
+      (!activeMission.lastOfpCheck ||
+        activeMission.lastOfpCheck.verdict === 'fail') &&
       Boolean(username);
 
     if (!eligible || !activeMission) {
@@ -808,19 +1015,28 @@ export function App() {
           simbriefUser: username,
         });
         if (cancelled) return;
-        stopped = true;
         setMissions((current) =>
           current.map((mission) =>
             mission.id === result.mission.id ? result.mission : mission,
           ),
         );
-        setToastKind(
-          result.check.verdict === 'pass' ? 'ok' : result.check.verdict,
-        );
-        setToast(
-          `OFP confirmed automatically · ${result.check.verdict.toUpperCase()}`,
-        );
-        setOfpAutoStatus('idle');
+        if (
+          result.check.verdict === 'pass' ||
+          result.check.verdict === 'warn'
+        ) {
+          stopped = true;
+          setToastKind(result.check.verdict === 'pass' ? 'ok' : 'warn');
+          setToast(
+            `OFP confirmed automatically · ${result.check.verdict.toUpperCase()}`,
+          );
+          setOfpAutoStatus('idle');
+        } else {
+          if (!activeMission.lastOfpCheck) {
+            setToastKind('fail');
+            setToast('OFP does not match yet · waiting for the updated plan');
+          }
+          setOfpAutoStatus('waiting');
+        }
       } catch {
         if (!cancelled) {
           setOfpAutoStatus('waiting');
@@ -842,23 +1058,352 @@ export function App() {
     activeMission?.id,
     activeMission?.status,
     activeMission?.staticId,
-    activeMission?.lastOfpCheck?.checkedAtIso,
+    activeMission?.lastOfpCheck?.verdict,
     airportIcao,
     simbriefUser,
     tab,
   ]);
 
+  // Compare persisted fleet fuel against confirmed OFP block fuel. A zero-cost
+  // authorization is automatic; a positive shortfall requires user purchase.
+  useEffect(() => {
+    const mission = activeMission;
+    const ofp = mission?.lastOfpCheck;
+    const eligible =
+      tab === 'staging' &&
+      !airportIcao &&
+      mission?.status === 'dispatched' &&
+      Boolean(ofp?.ofpId) &&
+      (ofp?.verdict === 'pass' || ofp?.verdict === 'warn') &&
+      typeof ofp?.plannedBlockFuelKg === 'number' &&
+      ofp.plannedBlockFuelKg > 0;
+
+    if (!eligible || !mission || !ofp?.ofpId) {
+      setMissionFuelQuote(null);
+      setMissionFuelQuoteStatus('idle');
+      setMissionFuelQuoteError(null);
+      return;
+    }
+    if (mission.fuelAuthorizedOfpId === ofp.ofpId) {
+      setMissionFuelQuote(null);
+      setMissionFuelQuoteStatus('ready');
+      setMissionFuelQuoteError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setMissionFuelQuoteStatus('loading');
+    setMissionFuelQuoteError(null);
+    void (async () => {
+      try {
+        const result = await postFuelQuote(mission.id);
+        if (cancelled) return;
+        if (result.quote.shortfallKg <= 0) {
+          await postFuelPurchase(mission.id);
+          if (cancelled) return;
+          setMissionFuelQuote(null);
+          setMissionFuelQuoteStatus('ready');
+          setToastKind('ok');
+          setToast('Persisted aircraft fuel covers the OFP · continuing automatically');
+          await refresh();
+          return;
+        }
+        setMissionFuelQuote(result);
+        setMissionFuelQuoteStatus('ready');
+      } catch (err) {
+        if (!cancelled) {
+          setMissionFuelQuote(null);
+          setMissionFuelQuoteStatus('error');
+          setMissionFuelQuoteError(
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeMission?.id,
+    activeMission?.status,
+    activeMission?.fuelAuthorizedOfpId,
+    activeMission?.lastOfpCheck?.ofpId,
+    activeMission?.lastOfpCheck?.plannedBlockFuelKg,
+    activeMission?.lastOfpCheck?.verdict,
+    airportIcao,
+    missionFuelQuoteRetryToken,
+    refresh,
+    tab,
+  ]);
+
+  // Auto-load OFP into the aircraft after confirm (pass/warn), then Preflight runs server-side.
+  useEffect(() => {
+    const username = simbriefUser.trim();
+    const ofp = activeMission?.lastOfpCheck;
+    const ofpOk = ofp?.verdict === 'pass' || ofp?.verdict === 'warn';
+    const ofpKey =
+      activeMission && ofp
+        ? `${activeMission.id}:${ofp.ofpId ?? ''}:${ofp.staticId ?? activeMission.staticId ?? ''}:${ofp.checkedAtIso}`
+        : null;
+    const fuelAuthorized =
+      Boolean(ofp?.ofpId) &&
+      activeMission?.fuelAuthorizedOfpId === ofp?.ofpId;
+    const alreadyVerified =
+      fuelAuthorized &&
+      Boolean(ofp) &&
+      Boolean(activeMission?.lastPreflightCheck?.loadVerification?.ready) &&
+      Boolean(activeMission?.lastPreflightCheck?.checkedAtIso) &&
+      Boolean(ofp?.checkedAtIso) &&
+      Date.parse(activeMission!.lastPreflightCheck!.checkedAtIso) >=
+        Date.parse(ofp!.checkedAtIso);
+    const editingManifest = Boolean(staging?.replaceManifest);
+    const eligible =
+      tab === 'staging' &&
+      !airportIcao &&
+      Boolean(activeMission) &&
+      ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
+      ofpOk &&
+      Boolean(username) &&
+      Boolean(ofpKey) &&
+      fuelAuthorized &&
+      !editingManifest &&
+      !watchAutoPaused &&
+      !alreadyVerified &&
+      autoLoadedOfpKeyRef.current !== ofpKey;
+
+    if (!eligible || !activeMission || !ofpKey) {
+      if (alreadyVerified && ofpKey) {
+        autoLoadedOfpKeyRef.current = ofpKey;
+        setLoadOfpAutoStatus('done');
+        setLoadOfpAutoError(null);
+      } else if (!ofpOk) {
+        setLoadOfpAutoStatus('idle');
+      }
+      return;
+    }
+
+    let cancelled = false;
+    let stopped = false;
+    let inFlight = false;
+    let toastedFailure = false;
+    setLoadOfpAutoStatus('waiting');
+
+    async function tryLoadOfp() {
+      if (cancelled || stopped || inFlight || !activeMission) return;
+      if (!simBridge?.connected) {
+        setLoadOfpAutoStatus('waiting');
+        return;
+      }
+      if (simBridge.onGround === false) {
+        setLoadOfpAutoStatus('waiting');
+        setLoadOfpAutoError('Waiting for aircraft on ground before loading OFP');
+        return;
+      }
+      inFlight = true;
+      setLoadOfpAutoStatus('loading');
+      setLoadOfpAutoError(null);
+      try {
+        const result = await postLoadOfp({
+          missionId: activeMission.id,
+          simbriefUser: username,
+          runPreflightAfter: true,
+        });
+        if (cancelled) return;
+        await refresh();
+        if (!result.ok) {
+          // Applying/rolling back is stateful. Never repeat automatically after
+          // an actual attempt; wait for an explicit user retry.
+          stopped = true;
+          setLoadOfpAutoStatus('failed');
+          setLoadOfpAutoError(result.error ?? 'OFP load failed');
+          if (!toastedFailure) {
+            toastedFailure = true;
+            setToastKind('fail');
+            setToast(
+              result.rolledBack
+                ? `Auto OFP load failed · ${result.error ?? 'rolled back'}`
+                : `Auto OFP load failed · ${result.error ?? 'unknown error'}`,
+            );
+          }
+          return;
+        }
+        stopped = true;
+        autoLoadedOfpKeyRef.current = ofpKey;
+        setLoadOfpAutoStatus('done');
+        setLoadOfpAutoError(null);
+        const fuelKg = result.plan.blockFuelLb / KG_TO_LB;
+        const cargoKg = result.plan.cargoLb / KG_TO_LB;
+        const pf = result.preflight?.check.verdict;
+        const preflightReady = result.preflight?.check.loadVerification?.ready;
+        setToastKind(
+          preflightReady ? 'ok' : pf === 'fail' ? 'fail' : pf === 'warn' ? 'warn' : 'ok',
+        );
+        setToast(
+          `Loaded OFP into ${result.identity.title || 'aircraft'} · ` +
+            `fuel ${formatMassExact(fuelKg, weightSystem)} · ` +
+            `cargo ${formatMassExact(cargoKg, weightSystem)}` +
+            (pf ? ` · Preflight ${preflightReady ? 'READY' : pf.toUpperCase()}` : ''),
+        );
+      } catch (err) {
+        if (!cancelled) {
+          stopped = true;
+          const message = err instanceof Error ? err.message : String(err);
+          setLoadOfpAutoStatus('failed');
+          setLoadOfpAutoError(message);
+          if (!toastedFailure) {
+            toastedFailure = true;
+            setToastKind('fail');
+            setToast(`Auto OFP load failed · ${message}`);
+          }
+        }
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    void tryLoadOfp();
+    const id = window.setInterval(() => {
+      void tryLoadOfp();
+    }, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    activeMission?.id,
+    activeMission?.status,
+    activeMission?.staticId,
+    activeMission?.lastOfpCheck?.checkedAtIso,
+    activeMission?.lastOfpCheck?.ofpId,
+    activeMission?.lastOfpCheck?.staticId,
+    activeMission?.lastOfpCheck?.verdict,
+    activeMission?.fuelAuthorizedOfpId,
+    activeMission?.lastPreflightCheck?.checkedAtIso,
+    activeMission?.lastPreflightCheck?.loadVerification?.ready,
+    airportIcao,
+    loadOfpRetryToken,
+    refresh,
+    simBridge?.connected,
+    simBridge?.onGround,
+    simbriefUser,
+    staging?.replaceManifest,
+    tab,
+    watchAutoPaused,
+    weightSystem,
+  ]);
+
+  // Auto-start Watch after Preflight pass/warn; retry while SimBridge is offline.
+  useEffect(() => {
+    const preflight = activeMission?.lastPreflightCheck;
+    const preflightOk =
+      preflight?.verdict === 'pass' || preflight?.verdict === 'warn';
+    const alreadyWatching =
+      Boolean(watch?.running) && watch?.missionId === activeMission?.id;
+    const eligible =
+      tab === 'staging' &&
+      !airportIcao &&
+      Boolean(activeMission) &&
+      ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
+      preflightOk &&
+      !alreadyWatching &&
+      !watchAutoPaused &&
+      !watch?.settlement;
+
+    if (!eligible || !activeMission) {
+      if (preflight?.verdict === 'fail' && !alreadyWatching) {
+        setWatchAutoStatus('blocked');
+      } else if (!alreadyWatching) {
+        setWatchAutoStatus('idle');
+      }
+      return;
+    }
+
+    let cancelled = false;
+    let stopped = false;
+    let inFlight = false;
+    setWatchAutoStatus('waiting');
+
+    async function tryStartWatch() {
+      if (cancelled || stopped || inFlight || !activeMission) return;
+      inFlight = true;
+      setWatchAutoStatus('connecting');
+      try {
+        const status = await postWatchStart({
+          missionId: activeMission.id,
+          intervalSec: 5,
+        });
+        if (cancelled) return;
+        stopped = true;
+        setWatch(status);
+        setWatchAutoStatus('idle');
+        setToastKind(preflight?.verdict === 'warn' ? 'warn' : 'ok');
+        setToast(
+          `Watch started · MSFS connected · auto-depart/settle near ${activeMission.destIcao}`,
+        );
+      } catch {
+        if (!cancelled) {
+          setWatchAutoStatus('waiting');
+        }
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    void tryStartWatch();
+    const id = window.setInterval(() => {
+      void tryStartWatch();
+    }, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    activeMission?.id,
+    activeMission?.status,
+    activeMission?.destIcao,
+    activeMission?.lastPreflightCheck?.checkedAtIso,
+    activeMission?.lastPreflightCheck?.verdict,
+    airportIcao,
+    tab,
+    watch?.running,
+    watch?.missionId,
+    watch?.settlement,
+    watchAutoPaused,
+  ]);
+
+  // Reset watch auto-pause when switching missions or getting a fresh preflight.
+  useEffect(() => {
+    setWatchAutoPaused(false);
+  }, [
+    activeMission?.id,
+    activeMission?.lastPreflightCheck?.checkedAtIso,
+  ]);
+
+  useEffect(() => {
+    autoLoadedOfpKeyRef.current = null;
+    setLoadOfpAutoStatus('idle');
+    setLoadOfpAutoError(null);
+  }, [activeMission?.id]);
+
   // Draft is only for pre-commit preparation; once a flight is operational, clear it.
+  // Keep the draft while editing an accepted/dispatched manifest in place.
   useEffect(() => {
     if (!activeMission || !staging) return;
     if (
       staging.intoMissionId === activeMission.id &&
-      activeMission.status === 'accepted'
+      (activeMission.status === 'accepted' ||
+        (staging.replaceManifest && activeMission.status === 'dispatched'))
     ) {
       return;
     }
     setStaging(null);
-  }, [activeMission?.id, activeMission?.status, staging?.intoMissionId]);
+  }, [
+    activeMission?.id,
+    activeMission?.status,
+    staging?.intoMissionId,
+    staging?.replaceManifest,
+  ]);
 
   async function run(
     action: () => Promise<void>,
@@ -1022,18 +1567,20 @@ export function App() {
   }
 
   function stagingUsedKg(draft: StagingDraft): number {
-    const existing = draft.intoMissionId
-      ? missions.find((m) => m.id === draft.intoMissionId)?.cargoKg ?? 0
-      : 0;
+    const existing =
+      draft.replaceManifest || !draft.intoMissionId
+        ? 0
+        : missions.find((m) => m.id === draft.intoMissionId)?.cargoKg ?? 0;
     return (
       existing + draft.lines.reduce((sum, line) => sum + line.cargoKg, 0)
     );
   }
 
   function stagingRemainingKg(draft: StagingDraft, excludeLotId?: string): number {
-    const existing = draft.intoMissionId
-      ? missions.find((m) => m.id === draft.intoMissionId)?.cargoKg ?? 0
-      : 0;
+    const existing =
+      draft.replaceManifest || !draft.intoMissionId
+        ? 0
+        : missions.find((m) => m.id === draft.intoMissionId)?.cargoKg ?? 0;
     const staged = draft.lines
       .filter((line) => line.lot.id !== excludeLotId)
       .reduce((sum, line) => sum + line.cargoKg, 0);
@@ -1065,7 +1612,7 @@ export function App() {
 
   function clampDraftToCapacity(draft: StagingDraft): StagingDraft {
     let remaining = aircraftCapKg(draft.aircraft);
-    if (draft.intoMissionId) {
+    if (draft.intoMissionId && !draft.replaceManifest) {
       const existing = missions.find((m) => m.id === draft.intoMissionId);
       remaining = Math.max(0, remaining - (existing?.cargoKg ?? 0));
     }
@@ -1165,11 +1712,119 @@ export function App() {
 
   function exitStaging() {
     if (busy) return;
+    if (staging?.replaceManifest) {
+      setStaging(null);
+      setTab('staging');
+      return;
+    }
     setTab('market');
+  }
+
+  async function enterEditManifest(mission: Mission) {
+    if (!['accepted', 'dispatched'].includes(mission.status)) {
+      setError('Only accepted or dispatched flights can edit the manifest');
+      return;
+    }
+    if (watch?.running && watch.missionId === mission.id) {
+      try {
+        const status = await postWatchStop();
+        setWatch(status);
+        setWatchAutoPaused(true);
+        setWatchAutoStatus('idle');
+      } catch {
+        /* ignore — still allow edit */
+      }
+    }
+    const missionLots = mission.lots?.length
+      ? mission.lots
+      : [
+          {
+            shipmentLotId: mission.shipmentLotId ?? '',
+            commodityId: mission.commodityId,
+            cargoKg: mission.cargoKg,
+            payUsd: mission.payUsd,
+            urgency: mission.urgency,
+            reason: mission.reason,
+            deadlineTick: mission.deadlineTick,
+          },
+        ];
+    // Repair legacy/corrupted manifests before editing: zero-weight ghost lines
+    // are discarded and duplicate shipment IDs become one independent control.
+    const editableLots = new Map<string, (typeof missionLots)[number]>();
+    for (const line of missionLots) {
+      if (!line.shipmentLotId || line.cargoKg <= 0) continue;
+      const existing = editableLots.get(line.shipmentLotId);
+      editableLots.set(
+        line.shipmentLotId,
+        existing
+          ? {
+              ...existing,
+              cargoKg: existing.cargoKg + line.cargoKg,
+              payUsd: existing.payUsd + line.payUsd,
+              urgency:
+                existing.urgency === 'urgent' || line.urgency === 'urgent'
+                  ? 'urgent'
+                  : 'normal',
+              deadlineTick: Math.min(existing.deadlineTick, line.deadlineTick),
+            }
+          : { ...line },
+      );
+    }
+    const lines: StagingLine[] = [];
+    for (const line of editableLots.values()) {
+      const market = lots.find((lot) => lot.id === line.shipmentLotId);
+      const lot: MarketLot = market
+        ? {
+            ...market,
+            availableKg: market.availableKg + line.cargoKg,
+          }
+        : {
+            id: line.shipmentLotId,
+            originIcao: mission.originIcao,
+            destIcao: mission.destIcao,
+            originName: mission.originIcao,
+            destName: mission.destIcao,
+            commodityId: line.commodityId,
+            commodityName: line.commodityId,
+            availableKg: line.cargoKg,
+            payUsd: line.payUsd,
+            urgency: line.urgency === 'urgent' ? 'urgent' : 'normal',
+            reason: line.reason,
+            expiresAtTick: line.deadlineTick,
+            ticksRemaining: Math.max(0, line.deadlineTick - tick),
+          };
+      lines.push({ lot, cargoKg: line.cargoKg });
+    }
+    if (lines.length === 0) {
+      setError('This flight has no cargo lines to edit');
+      return;
+    }
+    const draft: StagingDraft = {
+      originIcao: mission.originIcao,
+      destIcao: mission.destIcao,
+      originName:
+        lots.find((lot) => lot.originIcao === mission.originIcao)?.originName ??
+        mission.originIcao,
+      destName:
+        lots.find((lot) => lot.destIcao === mission.destIcao)?.destName ??
+        mission.destIcao,
+      aircraft: mission.aircraftClassId as AircraftClass,
+      aircraftId: mission.aircraftId,
+      intoMissionId: mission.id,
+      replaceManifest: true,
+      lines,
+    };
+    setStaging(draft);
+    setPreferredAircraft(draft.aircraft);
+    setError(null);
+    setToastKind('ok');
+    setToast('Editing manifest — adjust payload, then Save & re-dispatch');
+    setTab('staging');
   }
 
   function changeStagingAircraft(next: AircraftClass) {
     if (!staging || busy || next === staging.aircraft) return;
+    if (staging.replaceManifest || staging.aircraftId) return;
     const openFlight = openFlightForRoute(
       staging.originIcao,
       staging.destIcao,
@@ -1192,7 +1847,10 @@ export function App() {
         lines: current.lines.map((line) => {
           if (line.lot.id !== lotId) return line;
           const maxKg = lineMaxKg(current, line.lot);
-          const cargoKg = Math.max(1, Math.min(maxKg, Math.floor(rawKg) || 0));
+          const cargoKg =
+            maxKg <= 0
+              ? 0
+              : Math.max(1, Math.min(maxKg, Math.floor(rawKg) || 0));
           return { ...line, cargoKg };
         }),
       };
@@ -1206,9 +1864,14 @@ export function App() {
       if (!target) return current;
       const maxKg = lineMaxKg(current, target.lot);
       const cargoKg =
-        fraction >= 1
-          ? maxKg
-          : Math.max(1, Math.min(maxKg, Math.floor((maxKg * fraction) / 100) * 100));
+        maxKg <= 0
+          ? 0
+          : fraction >= 1
+            ? maxKg
+            : Math.max(
+                1,
+                Math.min(maxKg, Math.round(maxKg * fraction)),
+              );
       return {
         ...current,
         lines: current.lines.map((line) =>
@@ -1235,7 +1898,7 @@ export function App() {
       }
       if (current.lines.some((line) => line.lot.id === lot.id)) return current;
       const existingCount =
-        (current.intoMissionId
+        (current.intoMissionId && !current.replaceManifest
           ? missions.find((m) => m.id === current.intoMissionId)?.lots?.length ?? 0
           : 0) + current.lines.length;
       if (existingCount >= MAX_STAGING_LOTS) return current;
@@ -1256,6 +1919,8 @@ export function App() {
         aircraftId: staging.aircraftId,
         missionId: staging.intoMissionId,
         openDispatch: true,
+        replace: Boolean(staging.replaceManifest),
+        weightSystem,
         lines: staging.lines.map((line) => ({
           lotId: line.lot.id,
           cargoKg: line.cargoKg,
@@ -1263,18 +1928,24 @@ export function App() {
       });
       if (result.fleet) setFleet(result.fleet);
       setStaging(null);
+      setWatchAutoPaused(false);
       setToastKind('ok');
       const rem =
         result.remainingKg !== undefined
-          ? ` · ${Math.round(result.remainingKg).toLocaleString()} kg left`
+          ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
           : '';
       const dispatchNote = result.dispatch
         ? ` · SimBrief ${result.dispatch.airframeLabel}`
         : '';
+      const action = result.replaced
+        ? 'Updated'
+        : result.appended
+          ? 'Updated'
+          : 'Created';
       setToast(
-        `${result.appended ? 'Updated' : 'Created'} ${result.mission.id} · ${
+        `${action} ${result.mission.id} · ${
           result.lineCount ?? staging.lines.length
-        } lot(s) · ${(result.mission.cargoKg / 1000).toFixed(1)} t${rem}${dispatchNote}`,
+        } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem}${dispatchNote}`,
       );
       setTab('staging');
     });
@@ -1282,10 +1953,14 @@ export function App() {
 
   async function onDispatch(mission: Mission) {
     await run(async () => {
-      const result = await postDispatch({ missionId: mission.id, open: true });
+      const result = await postDispatch({
+        missionId: mission.id,
+        open: true,
+        weightSystem,
+      });
       setToastKind('ok');
       setToast(
-        `SimBrief opened · ${result.airframeLabel} · Generate OFP — auto-confirm runs every 15s`,
+        `SimBrief opened · ${result.airframeLabel} · ${result.units ?? 'KGS'} · Generate OFP — auto-confirm runs every 15s`,
       );
     });
   }
@@ -1300,7 +1975,7 @@ export function App() {
       setToastKind(result.warning ? 'warn' : 'ok');
       setToast(
         result.returnedToMarket
-          ? `Cancelled ${result.mission.id} · ${(result.releasedKg / 1000).toFixed(1)} t released to market`
+          ? `Cancelled ${result.mission.id} · ${formatTonnes(result.releasedKg)} released to market`
           : `Cancelled ${result.mission.id} · ${result.warning ?? 'no active lot to release'}`,
       );
       setStaging(null);
@@ -1308,29 +1983,26 @@ export function App() {
     });
   }
 
-  async function onPreflight(mission: Mission) {
-    const user = simbriefUser.trim();
-    if (!user) {
-      setError('Enter your SimBrief username above before Preflight');
-      return;
-    }
-    if (!mission.staticId) {
-      setError('Dispatch first so Preflight can fetch the OFP by static_id');
-      return;
-    }
+  function retryAutoLoadOfp() {
+    autoLoadedOfpKeyRef.current = null;
+    setLoadOfpAutoError(null);
+    setLoadOfpAutoStatus('waiting');
+    setLoadOfpRetryToken((token) => token + 1);
+  }
+
+  async function onBuyMissionFuel(mission: Mission) {
+    setMissionFuelQuoteStatus('loading');
     await run(async () => {
-      const result = await postPreflight({
-        missionId: mission.id,
-        simbriefUser: user,
-      });
-      const fuel = `fuel ${Math.round(result.live.fuelTotalLb)} lb`;
-      const payload =
-        result.live.payloadTotalLb !== undefined
-          ? ` · payload ${Math.round(result.live.payloadTotalLb)} lb`
-          : '';
-      setToastKind(result.check.verdict === 'pass' ? 'ok' : result.check.verdict);
+      const result = await postFuelPurchase(mission.id);
+      setMissionFuelQuote(null);
+      setMissionFuelQuoteStatus('ready');
+      setMissionFuelQuoteError(null);
+      setToastKind(result.quote.uplift.scarcity === 'ok' ? 'ok' : 'warn');
       setToast(
-        `Preflight ${result.check.verdict.toUpperCase()} · ${result.check.phase} · ${fuel}${payload}`,
+        `Fuel purchased · ${formatMassExact(
+          result.quote.shortfallKg,
+          weightSystem,
+        )} · −${formatMoney(result.fuelDebitUsd)} · continuing automatically`,
       );
     });
   }
@@ -1340,6 +2012,8 @@ export function App() {
       await run(async () => {
         const status = await postWatchStop();
         setWatch(status);
+        setWatchAutoPaused(true);
+        setWatchAutoStatus('idle');
         setToastKind('ok');
         setToast('Watch stopped');
       });
@@ -1354,12 +2028,14 @@ export function App() {
       allowDepartOverride = true;
     }
     await run(async () => {
+      setWatchAutoPaused(false);
       const status = await postWatchStart({
         missionId: mission.id,
         intervalSec: 5,
         allowDepartOverride,
       });
       setWatch(status);
+      setWatchAutoStatus('idle');
       setToastKind(allowDepartOverride ? 'warn' : 'ok');
       setToast(
         allowDepartOverride
@@ -1388,7 +2064,7 @@ export function App() {
             : 'ok',
       );
       const fuelNote = result.mission.fuelUplift
-        ? ` · fuel ${(result.mission.fuelUplift.requestedKg / 1000).toFixed(2)} t (−${formatMoney(result.mission.fuelUplift.costUsd)}${result.mission.fuelUplift.scarcity !== 'ok' ? ` · ${result.mission.fuelUplift.scarcity}` : ''})`
+        ? ` · fuel ${formatTonnes(result.mission.fuelUplift.requestedKg)} (−${formatMoney(result.mission.fuelUplift.costUsd)}${result.mission.fuelUplift.scarcity !== 'ok' ? ` · ${result.mission.fuelUplift.scarcity}` : ''})`
         : '';
       setToast(
         override
@@ -1413,7 +2089,10 @@ export function App() {
         `Settled ${result.mission.id} · paid ${formatMoney(result.settlement.payoutUsd)}` +
           (result.settlement.onTime
             ? ''
-            : ` · late ${result.settlement.lateTicks}h (−${formatMoney(result.settlement.penaltyUsd)})`),
+            : ` · late ${result.settlement.lateTicks}h (−${formatMoney(result.settlement.penaltyUsd)})`) +
+          (result.settlement.residualFuelKg !== null
+            ? ` · fuel remaining ${formatTonnes(result.settlement.residualFuelKg)}`
+            : ' · fuel remaining estimated'),
       );
       setStaging(null);
       setTab('staging');
@@ -1534,9 +2213,10 @@ export function App() {
     return marketSort.direction === 'asc' ? '↑' : '↓';
   }
 
-  const stagingExisting = staging?.intoMissionId
-    ? missions.find((m) => m.id === staging.intoMissionId)
-    : undefined;
+  const stagingExisting =
+    staging?.intoMissionId && !staging.replaceManifest
+      ? missions.find((m) => m.id === staging.intoMissionId)
+      : undefined;
   const stagingExistingLots = stagingExisting?.lots?.length ?? 0;
   const stagingPayUsd = staging
     ? staging.lines.reduce(
@@ -1552,6 +2232,7 @@ export function App() {
     Boolean(staging) &&
     staging!.lines.length > 0 &&
     stagingRangeOk(staging!) &&
+    routeFuelFeasible !== false &&
     staging!.lines.every((line) => {
       const maxKg = lineMaxKg(staging!, line.lot);
       return line.cargoKg > 0 && line.cargoKg <= maxKg;
@@ -1559,8 +2240,9 @@ export function App() {
     stagingExistingLots + staging!.lines.length <= MAX_STAGING_LOTS;
   const stagingDistanceNm = staging ? stagingRouteDistanceNm(staging) : undefined;
   const stagingInRange = staging ? stagingRangeOk(staging) : true;
+  const stagingFuelOk = routeFuelFeasible !== false;
   const stagingCandidates = staging
-    ? lots.filter(
+    ? stagingRouteLots.filter(
         (lot) =>
           lot.originIcao === staging.originIcao &&
           lot.destIcao === staging.destIcao &&
@@ -1749,6 +2431,14 @@ export function App() {
               ? ` (${staging.lines.length})`
               : ''}
         </button>
+        <button
+          type="button"
+          className={!showAirport && tab === 'settings' ? 'tab active' : 'tab'}
+          onClick={() => selectTab('settings')}
+          disabled={busy}
+        >
+          Settings
+        </button>
         {showAirport ? <span className="tab active terminal-tab">Terminal</span> : null}
         <div className="spacer" />
         <button
@@ -1927,7 +2617,7 @@ export function App() {
                       <div>
                         <h2>Terminal inventory</h2>
                         <p>
-                          {airportView.totalStockTonnes.toFixed(1)} t total stock ·{' '}
+                          {formatTonnes(airportView.totalStockTonnes * 1000)} total stock ·{' '}
                           {formatClock(continuousHours)}
                         </p>
                         {airportView.events && airportView.events.length > 0 ? (
@@ -1972,8 +2662,8 @@ export function App() {
                                 </small>
                               </td>
                               <td>
-                                {c.stockTonnes.toFixed(1)} t
-                                <small>of {c.capacityTonnes.toFixed(1)} t</small>
+                                {formatTonnes(c.stockTonnes * 1000)}
+                                <small>of {formatTonnes(c.capacityTonnes * 1000)}</small>
                               </td>
                               <td>
                                 <div className="fill-bar" aria-hidden="true">
@@ -1996,12 +2686,19 @@ export function App() {
                                 </span>
                               </td>
                               <td>
-                                +{(c.productionPerTickKg / 1000).toFixed(2)} t
+                                +{formatTonnes(c.productionPerTickKg)}
                                 <small>
-                                  −{(c.consumptionPerTickKg / 1000).toFixed(2)} t
+                                  −{formatTonnes(c.consumptionPerTickKg)}
                                 </small>
                               </td>
-                              <td className="pay">${c.unitPriceUsd.toFixed(2)}/kg</td>
+                              <td className="pay">
+                                $
+                                {(weightSystem === 'imperial'
+                                  ? c.unitPriceUsd / KG_TO_LB
+                                  : c.unitPriceUsd
+                                ).toFixed(2)}
+                                /{massUnitLabel(weightSystem)}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -2530,9 +3227,11 @@ export function App() {
                   <p>
                     {staging.originName} → {staging.destName} ·{' '}
                     {aircraftClassLabel(staging.aircraft)}
-                    {stagingExisting
-                      ? ` · adding to ${stagingExisting.id}`
-                      : ' · new flight'}
+                    {staging.replaceManifest
+                      ? ` · editing ${staging.intoMissionId}`
+                      : stagingExisting
+                        ? ` · adding to ${stagingExisting.id}`
+                        : ' · new flight'}
                   </p>
                 </div>
                 <div className="staging-head-actions">
@@ -2543,10 +3242,14 @@ export function App() {
                       onChange={(event) =>
                         changeStagingAircraft(event.target.value as AircraftClass)
                       }
-                      disabled={busy || Boolean(staging.aircraftId)}
+                      disabled={
+                        busy ||
+                        Boolean(staging.aircraftId) ||
+                        Boolean(staging.replaceManifest)
+                      }
                       title={
-                        staging.aircraftId
-                          ? 'Class locked to the aircraft parked at origin'
+                        staging.aircraftId || staging.replaceManifest
+                          ? 'Class locked to the assigned aircraft'
                           : undefined
                       }
                     >
@@ -2561,21 +3264,21 @@ export function App() {
                     onClick={exitStaging}
                     disabled={busy}
                   >
-                    Back to market
+                    {staging.replaceManifest ? 'Back to flight' : 'Back to market'}
                   </button>
                 </div>
               </div>
 
               <div className="cargo-capacity staging-capacity">
                 <span>
-                  Aircraft capacity
+                  Operational payload
                   <strong>{formatTonnes(aircraftCapKg(staging.aircraft))}</strong>
-                  {airframeLabel || maxCargoSource ? (
-                    <em>
-                      {airframeLabel ?? 'class'}
-                      {maxCargoSource ? ` · ${maxCargoSource}` : ''}
-                    </em>
-                  ) : null}
+                  <em>
+                    {structuralMaxCargoKg !== null
+                      ? `structural ${formatTonnes(structuralMaxCargoKg)}`
+                      : 'structural pending'}
+                    {' · MTOW/fuel estimate'}
+                  </em>
                 </span>
                 <span>
                   Route distance
@@ -2585,6 +3288,20 @@ export function App() {
                       : '—'}
                   </strong>
                   <em>max {aircraftMaxRangeNm(staging.aircraft).toLocaleString()} nm</em>
+                </span>
+                <span>
+                  Planning fuel
+                  <strong>
+                    {estimatedBlockFuelKg !== null
+                      ? formatTonnes(estimatedBlockFuelKg)
+                      : '—'}
+                  </strong>
+                  <em>
+                    {routeFuelCapacityKg !== null
+                      ? `tank max ${formatTonnes(routeFuelCapacityKg)}`
+                      : airframeLabel ?? 'homologated class'}
+                    {maxCargoSource ? ` · ${maxCargoSource}` : ''}
+                  </em>
                 </span>
                 <span>
                   Manifest total
@@ -2612,13 +3329,32 @@ export function App() {
                 </p>
               ) : null}
 
+              {!stagingFuelOk ? (
+                <p className="banner error">
+                  Estimated block fuel exceeds tank capacity
+                  {estimatedBlockFuelKg !== null &&
+                  routeFuelCapacityKg !== null
+                    ? ` (${formatTonnes(estimatedBlockFuelKg)} required > ${formatTonnes(routeFuelCapacityKg)} max`
+                    : ''}
+                  {routeFuelDeficitKg !== null && routeFuelDeficitKg > 0
+                    ? ` · deficit ${formatTonnes(routeFuelDeficitKg)}`
+                    : ''}
+                  {estimatedBlockFuelKg !== null &&
+                  routeFuelCapacityKg !== null
+                    ? ')'
+                    : ''}
+                  . Choose a shorter route or an aircraft with more range before
+                  Dispatch.
+                </p>
+              ) : null}
+
               {stagingExisting && (stagingExisting.lots?.length ?? 0) > 0 ? (
                 <div className="staging-section">
                   <h3>Already on this flight</h3>
                   <ul className="staging-existing">
                     {stagingExisting.lots!.map((line) => (
                       <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                        {(line.cargoKg / 1000).toFixed(1)} t {line.commodityId} ·{' '}
+                        {formatTonnes(line.cargoKg)} {line.commodityId} ·{' '}
                         {formatMoney(line.payUsd)}
                         {line.urgency === 'urgent' ? ' · urgent' : ''}
                       </li>
@@ -2639,6 +3375,14 @@ export function App() {
                   {staging.lines.map((line) => {
                     const maxKg = lineMaxKg(staging, line.lot);
                     const valid = line.cargoKg > 0 && line.cargoKg <= maxKg;
+                    const displayMax = Math.max(
+                      0,
+                      Math.floor(kgToDisplay(maxKg, weightSystem)),
+                    );
+                    const displayValue = Math.round(
+                      kgToDisplay(line.cargoKg, weightSystem),
+                    );
+                    const unit = massUnitLabel(weightSystem);
                     return (
                       <li key={line.lot.id} className="staging-line">
                         <div className="staging-line-head">
@@ -2675,27 +3419,33 @@ export function App() {
                             <input
                               type="number"
                               min={1}
-                              max={maxKg}
-                              step={100}
-                              value={line.cargoKg}
+                              max={Math.max(1, displayMax)}
+                              step={weightSystem === 'imperial' ? 10 : 100}
+                              value={displayValue}
                               onChange={(e) =>
-                                updateStagingLineKg(line.lot.id, Number(e.target.value))
+                                updateStagingLineKg(
+                                  line.lot.id,
+                                  displayToKg(Number(e.target.value), weightSystem),
+                                )
                               }
                               disabled={busy}
                             />
-                            <span>kg</span>
+                            <span>{unit}</span>
                           </div>
                           <input
                             type="range"
                             min={1}
-                            max={Math.max(1, maxKg)}
-                            step={100}
-                            value={Math.min(line.cargoKg, Math.max(1, maxKg))}
+                            max={Math.max(1, displayMax)}
+                            step={1}
+                            value={Math.min(displayValue, Math.max(1, displayMax))}
                             onChange={(e) =>
-                              updateStagingLineKg(line.lot.id, Number(e.target.value))
+                              updateStagingLineKg(
+                                line.lot.id,
+                                displayToKg(Number(e.target.value), weightSystem),
+                              )
                             }
-                            disabled={busy || maxKg <= 0}
-                            aria-label={`${line.lot.commodityName} load in kilograms`}
+                            disabled={busy || displayMax <= 0}
+                            aria-label={`${line.lot.commodityName} load in ${massUnitLong(weightSystem)}`}
                           />
                         </label>
                         <div className="cargo-presets">
@@ -2712,7 +3462,8 @@ export function App() {
                         </div>
                         {!valid ? (
                           <p className="cargo-dialog-error">
-                            Choose between 1 and {maxKg.toLocaleString()} kg.
+                            Choose between 1 and{' '}
+                            {formatMassExact(maxKg, weightSystem)}.
                           </p>
                         ) : null}
                       </li>
@@ -2725,6 +3476,12 @@ export function App() {
                 <h3>Same-route lots to add</h3>
                 {stagingExistingLots + staging.lines.length >= MAX_STAGING_LOTS ? (
                   <p className="empty">Manifest lot cap reached ({MAX_STAGING_LOTS}).</p>
+                ) : stagingRouteLotsLoading ? (
+                  <p className="empty">Loading all available lots on this route…</p>
+                ) : stagingRouteLotsError ? (
+                  <p className="empty">
+                    Could not load route lots: {stagingRouteLotsError}
+                  </p>
                 ) : stagingCandidates.length === 0 ? (
                   <p className="empty">No other available lots on this route.</p>
                 ) : (
@@ -2770,7 +3527,7 @@ export function App() {
                     onClick={exitStaging}
                     disabled={busy}
                   >
-                    Back to market
+                    {staging.replaceManifest ? 'Back to flight' : 'Back to market'}
                   </button>
                   <button
                     type="button"
@@ -2778,7 +3535,9 @@ export function App() {
                     disabled={busy || !stagingValid}
                     onClick={() => void onCommitStaging()}
                   >
-                    Accept &amp; Dispatch
+                    {staging.replaceManifest
+                      ? 'Save & re-dispatch'
+                      : 'Accept & Dispatch'}
                   </button>
                 </div>
               </div>
@@ -2807,18 +3566,45 @@ export function App() {
                     </span>
                   </p>
                 </div>
-                <label className="simbrief-field">
-                  SimBrief user
-                  <input
-                    type="text"
-                    value={simbriefUser}
-                    onChange={(e) => setSimbriefUser(e.target.value)}
-                    placeholder="navigraph alias"
-                    disabled={busy}
-                    autoComplete="username"
-                    spellCheck={false}
-                  />
-                </label>
+                <div className="staging-ops-head-actions">
+                  {!simbriefUser.trim() ? (
+                    <button
+                      type="button"
+                      className="action ghost compact-dispatch"
+                      onClick={() => selectTab('settings')}
+                      disabled={busy}
+                      title="Set your SimBrief username in Settings"
+                    >
+                      Set SimBrief user
+                    </button>
+                  ) : (
+                    <span className="settings-chip" title="Change in Settings">
+                      SimBrief · {simbriefUser.trim()}
+                    </span>
+                  )}
+                  {activeMission.status === 'dispatched' ? (
+                    <button
+                      type="button"
+                      className="action ghost compact-dispatch"
+                      disabled={busy}
+                      onClick={() => void onDispatch(activeMission)}
+                      title="Re-open SimBrief with the current cargo"
+                    >
+                      Re-open Dispatch
+                    </button>
+                  ) : null}
+                  {['accepted', 'dispatched'].includes(activeMission.status) ? (
+                    <button
+                      type="button"
+                      className="action ghost danger compact-dispatch"
+                      disabled={busy}
+                      title="Cancel mission and return reserved cargo to the market"
+                      onClick={() => void onCancel(activeMission)}
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="cargo-capacity staging-capacity staging-ops-capacity">
@@ -2855,121 +3641,377 @@ export function App() {
                 </span>
               </div>
 
-              <p className="staging-ops-reason">{activeMission.reason}</p>
+              <p className="staging-ops-reason">
+                {formatWeightText(activeMission.reason, weightSystem)}
+              </p>
               <p className="staging-ops-reason">
                 {activeMission.fuelUplift
-                  ? `Fuel uplift ${(activeMission.fuelUplift.requestedKg / 1000).toFixed(2)} t · ${formatMoney(activeMission.fuelUplift.costUsd)} · ${activeMission.fuelUplift.scarcity} @ ${activeMission.fuelUplift.originIcao}`
+                  ? `Fuel uplift ${formatTonnes(activeMission.fuelUplift.requestedKg)} · ${formatMoney(activeMission.fuelUplift.costUsd)} · ${activeMission.fuelUplift.scarcity} @ ${activeMission.fuelUplift.originIcao}`
                   : activeMissionFuelEstKg !== undefined
-                    ? `Est. Jet-A uplift ~${(activeMissionFuelEstKg / 1000).toFixed(2)} t at ${activeMission.originIcao} (charged on Depart)`
+                    ? `Est. Jet-A uplift ~${formatTonnes(activeMissionFuelEstKg)} at ${activeMission.originIcao} (charged on Depart)`
                     : `Jet-A uplift charged on Depart from ${activeMission.originIcao}`}
               </p>
 
-              {(activeMission.lots?.length ?? 0) > 0 ? (
+              {(activeMission.lots?.length ?? 0) > 0 ||
+              ['accepted', 'dispatched'].includes(activeMission.status) ? (
                 <div className="staging-section">
-                  <h3>Manifest</h3>
-                  <ul className="staging-existing">
-                    {activeMission.lots!.map((line) => (
-                      <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                        {(line.cargoKg / 1000).toFixed(1)} t {line.commodityId} ·{' '}
-                        {formatMoney(line.payUsd)}
-                        {line.urgency === 'urgent' ? ' · urgent' : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {activeMission.lastOfpCheck ? (
-                <section
-                  className={`ofp-result-card ofp-result-${activeMission.lastOfpCheck.verdict}`}
-                  aria-live="polite"
-                >
-                  <div className="ofp-result-head">
-                    <strong>
-                      {activeMission.lastOfpCheck.verdict === 'pass'
-                        ? 'OFP PASSED'
-                        : activeMission.lastOfpCheck.verdict === 'warn'
-                          ? 'OFP NEEDS REVIEW'
-                          : 'OFP FAILED'}
-                    </strong>
-                    <span>
-                      Checked{' '}
-                      {new Date(activeMission.lastOfpCheck.checkedAtIso).toLocaleTimeString()}
-                    </span>
+                  <div className="staging-section-head">
+                    <h3>Cargo</h3>
+                    {['accepted', 'dispatched'].includes(activeMission.status) ? (
+                      <button
+                        type="button"
+                        className="action compact"
+                        disabled={busy}
+                        title="Adjust payload or lots, then regenerate the OFP"
+                        onClick={() => void enterEditManifest(activeMission)}
+                      >
+                        Edit
+                      </button>
+                    ) : null}
                   </div>
-                  <p>{activeMission.lastOfpCheck.summary}</p>
-                  {activeMission.lastOfpCheck.findings.length > 0 ? (
-                    <ul className="ofp-findings">
-                      {activeMission.lastOfpCheck.findings.map((finding) => (
-                        <li
-                          key={`ofp-${finding.code}-${finding.message}`}
-                          className={`finding-${finding.severity}`}
-                        >
-                          [{finding.severity.toUpperCase()}] {finding.message}
+                  {(activeMission.lots?.length ?? 0) > 0 ? (
+                    <ul className="staging-existing">
+                      {activeMission.lots!.map((line) => (
+                        <li key={`${line.shipmentLotId}-${line.commodityId}`}>
+                          {formatTonnes(line.cargoKg)} {line.commodityId} ·{' '}
+                          {formatMoney(line.payUsd)}
+                          {line.urgency === 'urgent' ? ' · urgent' : ''}
                         </li>
                       ))}
                     </ul>
-                  ) : null}
-                </section>
-              ) : activeMission.status === 'dispatched' && activeMission.staticId ? (
+                  ) : (
+                    <p className="empty">No cargo lots on this flight yet.</p>
+                  )}
+                </div>
+              ) : null}
+
+              {activeMission.lastOfpCheck
+                ? (() => {
+                    const check = activeMission.lastOfpCheck;
+                    const briefing = check.briefing;
+                    const actionableFindings = check.findings.filter(
+                      (finding) => finding.severity !== 'info',
+                    );
+                    const cruise =
+                      briefing?.cruiseAltitudeFt !== undefined
+                        ? briefing.cruiseAltitudeFt >= 18_000
+                          ? `FL${String(
+                              Math.round(briefing.cruiseAltitudeFt / 100),
+                            ).padStart(3, '0')}`
+                          : `${Math.round(
+                              briefing.cruiseAltitudeFt,
+                            ).toLocaleString('en-US')} FT`
+                        : undefined;
+                    const briefingItems = [
+                      briefing?.aircraftIcao
+                        ? ['Aircraft', briefing.aircraftIcao]
+                        : null,
+                      briefing?.tailNumber
+                        ? ['Tail number', briefing.tailNumber]
+                        : null,
+                      briefing?.distanceNm !== undefined
+                        ? ['Distance', `${Math.round(briefing.distanceNm)} NM`]
+                        : null,
+                      briefing?.blockTime
+                        ? ['Block time', briefing.blockTime]
+                        : null,
+                      cruise ? ['Cruise', cruise] : null,
+                      briefing?.alternateIcao
+                        ? ['Alternate', briefing.alternateIcao]
+                        : null,
+                    ].filter(
+                      (item): item is [string, string] => item !== null,
+                    );
+
+                    return (
+                      <section
+                        className={`ofp-result-card ofp-briefing-card ofp-result-${check.verdict}`}
+                        aria-live="polite"
+                      >
+                        <div className="ofp-result-head">
+                          <strong>
+                            {check.verdict === 'pass'
+                              ? 'OFP PASSED'
+                              : check.verdict === 'warn'
+                                ? 'OFP NEEDS REVIEW'
+                                : 'OFP FAILED'}
+                          </strong>
+                          <span>
+                            Checked{' '}
+                            {new Date(check.checkedAtIso).toLocaleTimeString()}
+                          </span>
+                        </div>
+
+                        {briefingItems.length > 0 ? (
+                          <dl className="ofp-briefing-grid">
+                            {briefingItems.map(([label, value]) => (
+                              <div key={label}>
+                                <dt>{label}</dt>
+                                <dd>{value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ) : null}
+
+                        {briefing?.route ? (
+                          <div className="ofp-route-strip">
+                            <span>Route</span>
+                            <code>{briefing.route}</code>
+                          </div>
+                        ) : (
+                          <p>Re-check SimBrief to load the operational route.</p>
+                        )}
+
+                        {actionableFindings.length > 0 ? (
+                          <details className="preflight-technical">
+                            <summary>
+                              {actionableFindings.length}{' '}
+                              {actionableFindings.length === 1
+                                ? 'OFP detail'
+                                : 'OFP details'}
+                            </summary>
+                            <ul className="ofp-findings">
+                              {actionableFindings.map((finding) => (
+                                <li
+                                  key={`ofp-${finding.code}-${finding.message}`}
+                                  className={`finding-${finding.severity}`}
+                                >
+                                  [{finding.severity.toUpperCase()}]{' '}
+                                  {formatWeightText(finding.message, weightSystem)}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        ) : null}
+                      </section>
+                    );
+                  })()
+                : activeMission.status === 'dispatched' && activeMission.staticId ? (
                 <div className="ofp-auto-wait" aria-live="polite">
                   <span className={ofpAutoStatus === 'checking' ? 'poll-dot checking' : 'poll-dot'} />
                   <div>
                     <strong>
                       {!simbriefUser.trim()
-                        ? 'Enter your SimBrief user to enable automatic OFP confirmation'
+                        ? 'Set your SimBrief user in Settings to enable automatic OFP confirmation'
                         : ofpAutoStatus === 'checking'
                           ? 'Checking SimBrief for OFP…'
                           : 'Waiting for OFP'}
                     </strong>
                     {simbriefUser.trim() ? (
                       <small>Automatic check every 15 seconds while Staging is open.</small>
-                    ) : null}
+                    ) : (
+                      <small>
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => selectTab('settings')}
+                        >
+                          Open Settings
+                        </button>
+                      </small>
+                    )}
+                  </div>
+                </div>
+                ) : null}
+
+              {activeMission.status === 'dispatched' &&
+              activeMission.staticId &&
+              activeMission.lastOfpCheck?.verdict === 'fail' ? (
+                <div className="ofp-auto-wait" aria-live="polite">
+                  <span
+                    className={
+                      ofpAutoStatus === 'checking'
+                        ? 'poll-dot checking'
+                        : 'poll-dot'
+                    }
+                  />
+                  <div>
+                    <strong>
+                      {ofpAutoStatus === 'checking'
+                        ? 'Checking for an updated OFP…'
+                        : 'Waiting for the updated OFP'}
+                    </strong>
+                    <small>
+                      The previous OFP does not match. Retrying automatically
+                      every 15 seconds.
+                    </small>
                   </div>
                 </div>
               ) : null}
 
+              {activeMission.status === 'dispatched' &&
+              (activeMission.lastOfpCheck?.verdict === 'pass' ||
+                activeMission.lastOfpCheck?.verdict === 'warn') &&
+              activeMission.fuelAuthorizedOfpId !== activeMission.lastOfpCheck.ofpId ? (
+                missionFuelQuote ? (
+                  <section className="fuel-purchase-card" aria-live="polite">
+                    <div className="fuel-purchase-head">
+                      <div>
+                        <strong>FUEL PURCHASE REQUIRED</strong>
+                        <small>
+                          Persisted fuel is below the confirmed OFP block fuel.
+                        </small>
+                      </div>
+                      <span>{missionFuelQuote.quote.uplift.scarcity}</span>
+                    </div>
+                    <dl className="fuel-purchase-grid">
+                      <div>
+                        <dt>On aircraft</dt>
+                        <dd>
+                          {formatMassExact(
+                            missionFuelQuote.quote.currentFuelKg,
+                            weightSystem,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>OFP block fuel</dt>
+                        <dd>
+                          {formatMassExact(
+                            missionFuelQuote.quote.requiredBlockFuelKg,
+                            weightSystem,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>To purchase</dt>
+                        <dd>
+                          {formatMassExact(
+                            missionFuelQuote.quote.shortfallKg,
+                            weightSystem,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Total</dt>
+                        <dd>{formatMoney(missionFuelQuote.quote.uplift.costUsd)}</dd>
+                      </div>
+                    </dl>
+                    <div className="fuel-purchase-footer">
+                      <small>
+                        Wallet {formatMoney(missionFuelQuote.walletUsd)} →{' '}
+                        {formatMoney(missionFuelQuote.walletAfterUsd)}
+                        {missionFuelQuote.quote.uplift.scarcity !== 'ok'
+                          ? ' · tanker surcharge included'
+                          : ` · ${formatMoney(
+                              missionFuelQuote.quote.uplift.unitPriceUsd,
+                            )}/kg`}
+                      </small>
+                      <button
+                        type="button"
+                        className="action"
+                        disabled={busy || missionFuelQuoteStatus === 'loading'}
+                        onClick={() => void onBuyMissionFuel(activeMission)}
+                      >
+                        Buy fuel &amp; continue
+                      </button>
+                    </div>
+                  </section>
+                ) : missionFuelQuoteStatus === 'error' ? (
+                  <div className="ofp-auto-wait fuel-quote-error" aria-live="polite">
+                    <span className="poll-dot off" />
+                    <div>
+                      <strong>Could not calculate OFP fuel purchase</strong>
+                      <small>{missionFuelQuoteError}</small>
+                    </div>
+                    <button
+                      type="button"
+                      className="action ghost compact"
+                      onClick={() =>
+                        setMissionFuelQuoteRetryToken((token) => token + 1)
+                      }
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <div className="ofp-auto-wait" aria-live="polite">
+                    <span className="poll-dot checking" />
+                    <div>
+                      <strong>Checking persisted aircraft fuel…</strong>
+                      <small>Comparing the career tank with OFP block fuel.</small>
+                    </div>
+                  </div>
+                )
+              ) : null}
+
+              {activeMission.status === 'dispatched' &&
+              Boolean(activeMission.lastOfpCheck?.ofpId) &&
+              activeMission.fuelAuthorizedOfpId === activeMission.lastOfpCheck?.ofpId &&
+              !activeMission.lastPreflightCheck?.loadVerification?.ready ? (
+                <div
+                  className={`ofp-auto-wait fuel-pipeline-status ${
+                    loadOfpAutoStatus === 'failed' ? 'fuel-pipeline-failed' : ''
+                  }`}
+                  aria-live="polite"
+                >
+                  <span
+                    className={`poll-dot ${
+                      loadOfpAutoStatus === 'loading' ? 'checking' : ''
+                    }`}
+                  />
+                  <div>
+                    <strong>
+                      {loadOfpAutoStatus === 'failed'
+                        ? 'Fuel purchased · aircraft load failed'
+                        : !simBridge?.connected
+                          ? 'Fuel purchased · waiting for SimBridge'
+                          : loadOfpAutoStatus === 'loading'
+                            ? 'Loading OFP fuel and cargo into the aircraft…'
+                            : 'Fuel purchased · preparing aircraft load'}
+                    </strong>
+                    <small>
+                      {loadOfpAutoStatus === 'failed'
+                        ? loadOfpAutoError ?? 'Use Retry OFP load to try again.'
+                        : !simBridge?.connected
+                          ? 'Start the local SimBridge host with npm run start:local. Loading resumes automatically.'
+                          : 'Preflight and Watch will start automatically after loading.'}
+                    </small>
+                  </div>
+                  {loadOfpAutoStatus === 'failed' ? (
+                    <button
+                      type="button"
+                      className="action ghost compact"
+                      disabled={busy}
+                      onClick={() => retryAutoLoadOfp()}
+                    >
+                      Retry OFP load
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="mission-actions staging-ops-actions">
-                {['accepted', 'dispatched'].includes(activeMission.status) ? (
+                {activeMission.status === 'accepted' ? (
                   <button
                     type="button"
-                    className="action"
+                    className="action ghost"
                     disabled={busy}
                     onClick={() => void onDispatch(activeMission)}
+                    title="Re-open SimBrief with the current cargo without editing"
                   >
-                    {activeMission.status === 'dispatched'
-                      ? 'Re-open Dispatch'
-                      : 'Dispatch'}
+                    Dispatch
                   </button>
                 ) : null}
-                {['accepted', 'dispatched', 'in_flight'].includes(activeMission.status) ? (
-                  <button
-                    type="button"
-                    className="action"
-                    disabled={busy || !activeMission.staticId}
-                    title={
-                      !activeMission.staticId
-                        ? 'Dispatch first'
-                        : !simbriefUser.trim()
-                          ? 'Set SimBrief username above'
-                          : 'Compare SimBrief OFP to live fuel/payload in MSFS'
-                    }
-                    onClick={() => void onPreflight(activeMission)}
-                  >
-                    Preflight
-                  </button>
-                ) : null}
-                {['accepted', 'dispatched', 'in_flight'].includes(activeMission.status) ? (
+                {watch?.running && watch.missionId === activeMission.id ? (
                   <button
                     type="button"
                     className="action"
                     disabled={busy}
-                    title="Connect to MSFS and auto depart/settle from live aircraft state"
+                    title="Stop live MSFS watch"
                     onClick={() => void onWatch(activeMission)}
                   >
-                    {watch?.running && watch.missionId === activeMission.id
-                      ? 'Stop watch'
-                      : 'Watch'}
+                    Stop watch
+                  </button>
+                ) : watchAutoStatus === 'blocked' || watchAutoPaused ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={busy}
+                    title="Resume automatic Watch for depart/settle"
+                    onClick={() => void onWatch(activeMission)}
+                  >
+                    Resume Watch
                   </button>
                 ) : null}
                 {['accepted', 'dispatched'].includes(activeMission.status) ? (
@@ -2994,75 +4036,356 @@ export function App() {
                     Settle
                   </button>
                 ) : null}
-                {['accepted', 'dispatched'].includes(activeMission.status) ? (
-                  <button
-                    type="button"
-                    className="action ghost danger"
-                    disabled={busy}
-                    title="Release reserved cargo back to the market"
-                    onClick={() => void onCancel(activeMission)}
-                  >
-                    Cancel
-                  </button>
-                ) : null}
               </div>
 
-              {activeMission.lastPreflightCheck ? (
-                <ul className="ofp-findings">
-                  <li
-                    className={`ofp-verdict ofp-${activeMission.lastPreflightCheck.verdict}`}
-                  >
-                    Preflight {activeMission.lastPreflightCheck.verdict}
-                  </li>
-                  {activeMission.lastPreflightCheck.findings.map((f) => (
-                    <li
-                      key={`pre-${f.code}-${f.message}`}
-                      className={`finding-${f.severity}`}
-                    >
-                      [Live {f.severity}] {f.message}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              {activeMission.lastPreflightCheck
+                ? (() => {
+                    const check = activeMission.lastPreflightCheck;
+                    const verification = check.loadVerification;
+                    const ready = verification?.ready ?? check.verdict !== 'fail';
+                    const noteLabel =
+                      verification?.weightNoteCount &&
+                      verification.weightNoteCount === check.findings.length
+                        ? `${verification.weightNoteCount} weight ${
+                            verification.weightNoteCount === 1 ? 'note' : 'notes'
+                          }`
+                        : `${check.findings.length} technical ${
+                            check.findings.length === 1 ? 'detail' : 'details'
+                          }`;
+                    const massFromLb = (lb: number | undefined) =>
+                      lb === undefined
+                        ? 'Not available'
+                        : formatMassExact(lb / KG_TO_LB, weightSystem);
 
-              {watch?.missionId === activeMission.id &&
-              (watch.running || watch.settlement || watch.lastError) ? (
-                <div className="watch-panel" aria-live="polite">
-                  <p className="watch-line">
-                    <span className={`watch-dot ${watch.running ? 'on' : 'off'}`} />
-                    {watch.running ? 'Live watch' : 'Watch idle'}
-                    {watch.phase ? ` · ${watch.phase}` : ''}
-                    {watch.sawAirborne ? ' · saw airborne' : ''}
-                    {watch.onGround === true
-                      ? watch.enginesRunning
-                        ? ' · engines on'
-                        : ' · engines off'
-                      : watch.onGround === false
-                        ? ' · airborne'
-                        : ''}
-                  </p>
-                  {watch.lastEvent && watch.lastEvent.type !== 'none' ? (
-                    <p className="watch-event">
-                      {watch.lastEvent.type === 'settle_blocked'
-                        ? `Blocked: ${watch.lastEvent.reason}`
-                        : `${watch.lastEvent.type}: ${watch.lastEvent.reason}`}
-                    </p>
-                  ) : null}
-                  {watch.lastError ? (
-                    <p className="watch-error">{watch.lastError}</p>
-                  ) : null}
-                  {watch.settlement ? (
-                    <p className="watch-settle">
-                      Paid {formatMoney(watch.settlement.payoutUsd)}
-                      {watch.settlement.onTime
-                        ? ' on time'
-                        : ` · late ${watch.settlement.lateTicks}h (−${formatMoney(watch.settlement.penaltyUsd)})`}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+                    return (
+                      <section
+                        className={`ofp-result-card preflight-summary-card ofp-result-${
+                          ready ? 'pass' : 'fail'
+                        }`}
+                        aria-live="polite"
+                      >
+                        <div className="ofp-result-head">
+                          <div>
+                            <strong>
+                              {ready ? 'PREFLIGHT READY' : 'PREFLIGHT FAILED'}
+                            </strong>
+                            <small>
+                              {ready
+                                ? 'Fuel and cargo match the confirmed OFP.'
+                                : 'Fix the mismatched aircraft load before departure.'}
+                            </small>
+                          </div>
+                          <span>
+                            Checked {new Date(check.checkedAtIso).toLocaleTimeString()}
+                          </span>
+                        </div>
+
+                        {verification ? (
+                          <div className="preflight-load-grid">
+                            <div
+                              className={
+                                verification.fuel.ok
+                                  ? 'preflight-load-ok'
+                                  : 'preflight-load-fail'
+                              }
+                            >
+                              <span>Fuel</span>
+                              <strong>
+                                {massFromLb(verification.fuel.liveLb)}
+                              </strong>
+                              <small>
+                                OFP {massFromLb(verification.fuel.plannedLb)}
+                              </small>
+                              <b>{verification.fuel.ok ? 'MATCH' : 'MISMATCH'}</b>
+                            </div>
+                            <div
+                              className={
+                                verification.payload.ok
+                                  ? 'preflight-load-ok'
+                                  : 'preflight-load-fail'
+                              }
+                            >
+                              <span>Cargo</span>
+                              <strong>
+                                {massFromLb(verification.payload.liveLb)}
+                              </strong>
+                              <small>
+                                OFP {massFromLb(verification.payload.plannedLb)}
+                              </small>
+                              <b>{verification.payload.ok ? 'MATCH' : 'MISMATCH'}</b>
+                            </div>
+                            <div className="preflight-aircraft-state">
+                              <span>Aircraft</span>
+                              <strong>
+                                {verification.aircraft.onGround
+                                  ? 'On ground'
+                                  : 'Airborne'}
+                              </strong>
+                              <small>
+                                {verification.aircraft.enginesRunning
+                                  ? 'Engines running'
+                                  : 'Engines off'}
+                              </small>
+                              <b>
+                                {verification.aircraft.onGround &&
+                                !verification.aircraft.enginesRunning
+                                  ? 'READY'
+                                  : 'CHECK'}
+                              </b>
+                            </div>
+                          </div>
+                        ) : (
+                          <p>Run Preflight again to refresh the concise load verification.</p>
+                        )}
+
+                        {check.findings.length > 0 ? (
+                          <details className="preflight-technical">
+                            <summary>{noteLabel}</summary>
+                            <ul className="ofp-findings">
+                              {check.findings.map((finding) => (
+                                <li
+                                  key={`pre-${finding.code}-${finding.message}`}
+                                  className={`finding-${finding.severity}`}
+                                >
+                                  [{finding.severity.toUpperCase()}]{' '}
+                                  {formatWeightText(finding.message, weightSystem)}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        ) : null}
+                      </section>
+                    );
+                  })()
+                : null}
+
+              {(() => {
+                const watchingThis =
+                  watch?.missionId === activeMission.id &&
+                  (watch.running || Boolean(watch.settlement) || Boolean(watch.lastError));
+                const showWaitPanel =
+                  !watchingThis &&
+                  (watchAutoStatus === 'waiting' ||
+                    watchAutoStatus === 'connecting' ||
+                    watchAutoStatus === 'blocked' ||
+                    loadOfpAutoStatus === 'waiting' ||
+                    loadOfpAutoStatus === 'loading' ||
+                    loadOfpAutoStatus === 'failed' ||
+                    (Boolean(activeMission.lastPreflightCheck) &&
+                      activeMission.lastPreflightCheck!.verdict !== 'fail' &&
+                      !watchAutoPaused));
+                if (!watchingThis && !showWaitPanel) return null;
+
+                const watchRunning = Boolean(
+                  watch?.running && watch.missionId === activeMission.id,
+                );
+                const bridgeConnected = Boolean(
+                  watchRunning || simBridge?.connected,
+                );
+                const bridgeOnGround =
+                  watchRunning && watch?.onGround !== null && watch?.onGround !== undefined
+                    ? watch.onGround
+                    : simBridge?.onGround ?? null;
+                const bridgeEngines =
+                  watchRunning &&
+                  watch?.enginesRunning !== null &&
+                  watch?.enginesRunning !== undefined
+                    ? watch.enginesRunning
+                    : simBridge?.enginesRunning ?? null;
+                const phaseLabel = watchRunning
+                  ? watch?.phase ?? 'sampling'
+                  : watchAutoStatus === 'connecting'
+                    ? 'connecting watch'
+                    : watchAutoStatus === 'waiting'
+                      ? 'waiting to start watch'
+                      : watchAutoStatus === 'blocked'
+                        ? 'watch held'
+                        : simBridge?.phase ?? 'idle';
+                const stageDetail =
+                  bridgeOnGround === true
+                    ? bridgeEngines
+                      ? 'On ground · engines running'
+                      : 'On ground · engines off'
+                    : bridgeOnGround === false
+                      ? 'Airborne'
+                      : watchAutoStatus === 'blocked'
+                        ? 'Watch not started — Preflight failed'
+                        : bridgeConnected
+                          ? 'Sampling live aircraft…'
+                          : watchAutoStatus === 'waiting' ||
+                              watchAutoStatus === 'connecting'
+                            ? 'SimBridge not connected yet'
+                            : 'No live aircraft sample';
+
+                const statusLabel =
+                  loadOfpAutoStatus === 'loading'
+                    ? 'LOADING OFP…'
+                    : loadOfpAutoStatus === 'waiting' &&
+                        (activeMission.lastOfpCheck?.verdict === 'pass' ||
+                          activeMission.lastOfpCheck?.verdict === 'warn') &&
+                        !activeMission.lastPreflightCheck?.loadVerification?.ready
+                      ? 'WAITING TO LOAD OFP'
+                      : watchRunning
+                        ? 'MSFS CONNECTED'
+                        : watchAutoStatus === 'blocked'
+                          ? 'WATCH BLOCKED'
+                          : watchAutoStatus === 'connecting'
+                            ? 'CONNECTING…'
+                            : bridgeConnected
+                              ? 'SIMBRIDGE CONNECTED'
+                              : watchAutoPaused
+                                ? 'WATCH PAUSED'
+                                : 'WAITING FOR MSFS';
+
+                return (
+                  <footer
+                    className={`watch-status-footer ${
+                      loadOfpAutoStatus === 'failed'
+                        ? 'watch-blocked'
+                        : watchRunning
+                          ? 'watch-connected'
+                          : watchAutoStatus === 'blocked'
+                            ? 'watch-blocked'
+                            : bridgeConnected || loadOfpAutoStatus === 'loading'
+                              ? 'watch-connected'
+                              : 'watch-waiting'
+                    }`}
+                    aria-live="polite"
+                  >
+                    <div className="watch-footer-primary">
+                      <span
+                        className={`watch-dot ${
+                          loadOfpAutoStatus === 'loading' ||
+                          watchAutoStatus === 'connecting'
+                            ? 'checking'
+                            : watchRunning || bridgeConnected
+                              ? 'on'
+                              : 'off'
+                        }`}
+                      />
+                      <strong>{statusLabel}</strong>
+                      <div className="watch-footer-item">
+                        <span>Phase</span>
+                        <b>{stageDetail}</b>
+                      </div>
+                      <div className="watch-footer-item">
+                        <span>Mission</span>
+                        <b>{activeMission.status}</b>
+                      </div>
+                      {watch?.position ? (
+                        <div className="watch-footer-item">
+                          <span>Position</span>
+                          <b>
+                            {watch.position.lat.toFixed(3)}, {watch.position.lon.toFixed(3)}
+                          </b>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="watch-footer-secondary">
+                      <span>{phaseLabel}</span>
+                      {loadOfpAutoError ? (
+                        <span className="watch-footer-error">{loadOfpAutoError}</span>
+                      ) : null}
+                      {watch?.lastEvent && watch.lastEvent.type !== 'none' ? (
+                        <span>
+                          {watch.lastEvent.type === 'settle_blocked'
+                            ? `Blocked: ${watch.lastEvent.reason}`
+                            : `${watch.lastEvent.type}: ${watch.lastEvent.reason}`}
+                        </span>
+                      ) : null}
+                      {watch?.lastError ? (
+                        <span className="watch-footer-error">{watch.lastError}</span>
+                      ) : simBridge?.error &&
+                        !bridgeConnected &&
+                        watchAutoStatus !== 'blocked' ? (
+                        <span className="watch-footer-error">{simBridge.error}</span>
+                      ) : null}
+                      {watch?.settlement ? (
+                        <span>
+                          Paid {formatMoney(watch.settlement.payoutUsd)}
+                          {watch.settlement.onTime
+                            ? ' on time'
+                            : ` · late ${watch.settlement.lateTicks}h`}
+                        </span>
+                      ) : null}
+                    </div>
+                  </footer>
+                );
+              })()}
             </>
           ) : null}
+        </section>
+      ) : hubSelected && tab === 'settings' ? (
+        <section className="panel settings-panel">
+          <div className="panel-head">
+            <div>
+              <h2>Settings</h2>
+              <p>Integrations and display preferences for this browser.</p>
+            </div>
+          </div>
+          <div className="settings-grid">
+            <div className="settings-card">
+              <h3>SimBrief</h3>
+              <p className="settings-help">
+                Used for Dispatch redirect, automatic OFP confirmation, auto OFP load, and Preflight.
+                Stored only in this browser.
+              </p>
+              <label className="simbrief-field">
+                Username
+                <input
+                  type="text"
+                  value={simbriefUser}
+                  onChange={(e) => setSimbriefUser(e.target.value)}
+                  placeholder="navigraph alias"
+                  disabled={busy}
+                  autoComplete="username"
+                  spellCheck={false}
+                />
+              </label>
+            </div>
+            <div className="settings-card">
+              <h3>Weight system</h3>
+              <p className="settings-help">
+                Changes cargo, fuel, and capacity labels across the board. Dispatch also
+                sends this unit to SimBrief so the OFP matches your preference. Internal
+                mission data stays in kilograms.
+              </p>
+              <div className="settings-choice" role="radiogroup" aria-label="Weight system">
+                <button
+                  type="button"
+                  className={
+                    weightSystem === 'metric'
+                      ? 'settings-choice-btn active'
+                      : 'settings-choice-btn'
+                  }
+                  onClick={() => setWeightSystem('metric')}
+                  disabled={busy}
+                >
+                  Metric
+                  <small>tonnes / kg · SimBrief KGS</small>
+                </button>
+                <button
+                  type="button"
+                  className={
+                    weightSystem === 'imperial'
+                      ? 'settings-choice-btn active'
+                      : 'settings-choice-btn'
+                  }
+                  onClick={() => setWeightSystem('imperial')}
+                  disabled={busy}
+                >
+                  Imperial
+                  <small>klb / lb · SimBrief LBS</small>
+                </button>
+              </div>
+              <p className="settings-sample">
+                Example · Caravan structural max:{' '}
+                <strong>{formatTonnes(1_704, weightSystem)}</strong>
+                {' · '}
+                <strong>{formatMassExact(1_704, weightSystem)}</strong>
+              </p>
+            </div>
+          </div>
         </section>
       ) : hubSelected && tab === 'pilot' ? (
         <section className="panel pilot-panel">
@@ -3158,8 +4481,7 @@ export function App() {
                         <IcaoLink icao={acf.locationIcao} onOpen={openAirport} disabled={busy} />
                       </p>
                       <p className="payline">
-                        Fuel {(acf.fuelKg / 1000).toFixed(2)} /{' '}
-                        {(acf.fuelCapacityKg / 1000).toFixed(2)} t
+                        Fuel {formatTonnes(acf.fuelKg)} / {formatTonnes(acf.fuelCapacityKg)}
                       </p>
                       <div className="fill-bar" aria-hidden="true">
                         <span
@@ -3206,8 +4528,7 @@ export function App() {
                       {acf.assignedMissionId ? ` · mission ${acf.assignedMissionId}` : ''}
                     </p>
                     <p className="payline">
-                      Fuel {(acf.fuelKg / 1000).toFixed(2)} / {(acf.fuelCapacityKg / 1000).toFixed(2)}{' '}
-                      t
+                      Fuel {formatTonnes(acf.fuelKg)} / {formatTonnes(acf.fuelCapacityKg)}
                     </p>
                     <div className="fill-bar" aria-hidden="true">
                       <span
@@ -3332,7 +4653,7 @@ export function App() {
                       ) : null}
                     </div>
                     <p>
-                      {m.id} · {(m.cargoKg / 1000).toFixed(1)} t
+                      {m.id} · {formatTonnes(m.cargoKg)}
                       {(m.lots?.length ?? 1) > 1 ? ` · ${m.lots!.length} lots` : ''} ·{' '}
                       {aircraftClassLabel(m.aircraftClassId)} · deadline{' '}
                       {formatDeadline(m.deadlineTick, continuousHours)}
@@ -3355,15 +4676,23 @@ export function App() {
                         ? ` · paid ${formatMoney(m.payoutUsd)}`
                         : ''}
                       {m.fuelUplift
-                        ? ` · fuel −${formatMoney(m.fuelUplift.costUsd)} (${(m.fuelUplift.requestedKg / 1000).toFixed(2)} t)`
+                        ? ` · fuel −${formatMoney(m.fuelUplift.costUsd)} (${formatTonnes(m.fuelUplift.requestedKg)}${m.fuelUplift.scarcity !== 'ok' ? ` · ${m.fuelUplift.scarcity}` : ''})`
+                        : ''}
+                      {m.settledFuelKg !== undefined
+                        ? ` · remaining ${formatTonnes(m.settledFuelKg)}`
+                        : ''}
+                      {m.payoutUsd !== undefined
+                        ? ` · net ${formatMoney(
+                            m.payoutUsd - (m.fuelUplift?.costUsd ?? 0),
+                          )}`
                         : ''}
                     </p>
-                    <small>{m.reason}</small>
+                    <small>{formatWeightText(m.reason, weightSystem)}</small>
                     {(m.lots?.length ?? 0) > 0 ? (
                       <ul className="ofp-findings logbook-lots">
                         {m.lots!.map((line) => (
                           <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                            {(line.cargoKg / 1000).toFixed(1)} t {line.commodityId} ·{' '}
+                            {formatTonnes(line.cargoKg)} {line.commodityId} ·{' '}
                             {formatMoney(line.payUsd)}
                             {line.urgency === 'urgent' ? ' · urgent' : ''}
                           </li>
@@ -3377,7 +4706,8 @@ export function App() {
                             key={`ofp-${f.code}-${f.message}`}
                             className={`finding-${f.severity}`}
                           >
-                            [OFP {f.severity}] {f.message}
+                            [OFP {f.severity}]{' '}
+                            {formatWeightText(f.message, weightSystem)}
                           </li>
                         ))}
                       </ul>
@@ -3389,7 +4719,8 @@ export function App() {
                             key={`pre-${f.code}-${f.message}`}
                             className={`finding-${f.severity}`}
                           >
-                            [Live {f.severity}] {f.message}
+                            [Live {f.severity}]{' '}
+                            {formatWeightText(f.message, weightSystem)}
                           </li>
                         ))}
                       </ul>

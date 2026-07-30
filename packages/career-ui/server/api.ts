@@ -34,7 +34,10 @@ import {
   normalizeMissionsState,
   npcClaimForLot,
   parseFreighterClassId,
+  purchasePlayerMissionOfpFuel,
+  quotePlayerMissionOfpFuel,
   quoteFerry,
+  replaceMissionManifest,
   routeDistanceNm,
   selectStarterHub,
   settleMission,
@@ -49,11 +52,19 @@ import {
 import {
   buildMissionDispatch,
   confirmMissionOfp,
+  estimateRouteCargoLimit,
   openDispatchUrl,
   resolveClassMaxCargoKg,
 } from './dispatch-helpers.ts';
+import {
+  applyMissionOfpLoad,
+  probeSimBridgeStatus,
+} from './ofp-load-helpers.ts';
 import { preflightBlocksDepart, runMissionPreflight } from './preflight-helpers.ts';
-import { CareerWatchSession } from './watch-helpers.ts';
+import {
+  CareerWatchSession,
+  probeLiveResidualFuelKg,
+} from './watch-helpers.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
@@ -537,11 +548,29 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const cargoLimit = await resolveClassMaxCargoKg(aircraft);
+        const distanceNm = Number(url.searchParams.get('distanceNm'));
+        const routeLimit =
+          Number.isFinite(distanceNm) && distanceNm >= 0
+            ? estimateRouteCargoLimit(
+                aircraft,
+                distanceNm,
+                cargoLimit.maxCargoKg,
+                cargoLimit,
+              )
+            : undefined;
         send(res, 200, {
           aircraftClassId: aircraft,
           maxCargoKg: cargoLimit.maxCargoKg,
           maxCargoSource: cargoLimit.source,
           airframeLabel: cargoLimit.airframeLabel,
+          oewKg: cargoLimit.oewKg ?? null,
+          mtowKg: cargoLimit.mtowKg ?? null,
+          fuelCapacityKg: routeLimit?.fuelCapacityKg ?? null,
+          operationalMaxCargoKg:
+            routeLimit?.operationalMaxCargoKg ?? cargoLimit.maxCargoKg,
+          estimatedBlockFuelKg: routeLimit?.estimatedBlockFuelKg ?? null,
+          fuelDeficitKg: routeLimit?.fuelDeficitKg ?? null,
+          fuelFeasible: routeLimit?.fuelFeasible ?? null,
         });
         return;
       }
@@ -805,6 +834,9 @@ export function createCareerApiServer(port = 8787) {
           aircraftId?: string;
           missionId?: string;
           openDispatch?: boolean;
+          replace?: boolean;
+          weightSystem?: 'metric' | 'imperial';
+          units?: 'KGS' | 'LBS';
           lines?: Array<{ lotId?: string; cargoKg?: number }>;
         };
         const lines = (body.lines ?? [])
@@ -815,6 +847,11 @@ export function createCareerApiServer(port = 8787) {
           }));
         if (lines.length === 0) {
           send(res, 400, { error: 'lines required' });
+          return;
+        }
+        const replace = body.replace === true;
+        if (replace && !body.missionId) {
+          send(res, 400, { error: 'missionId required when replace=true' });
           return;
         }
         const world = await loadEconomy();
@@ -828,12 +865,23 @@ export function createCareerApiServer(port = 8787) {
           send(res, 404, { error: `Unknown lot ${lines[0]!.lotId}` });
           return;
         }
+        let intoMission =
+          body.missionId
+            ? missions.missions.find((m) => m.id === body.missionId)
+            : undefined;
+        if (body.missionId && !intoMission) {
+          send(res, 404, { error: `Unknown mission ${body.missionId}` });
+          return;
+        }
         let playerAircraft: PlayerAircraft | undefined = body.aircraftId
           ? findPlayerAircraft(missions, body.aircraftId)
           : undefined;
         if (body.aircraftId && !playerAircraft) {
           send(res, 404, { error: `Unknown aircraft ${body.aircraftId}` });
           return;
+        }
+        if (!playerAircraft && intoMission?.aircraftId) {
+          playerAircraft = findPlayerAircraft(missions, intoMission.aircraftId);
         }
         if (!playerAircraft) {
           playerAircraft = listParkedAt(missions, firstLot.originIcao)[0];
@@ -846,15 +894,26 @@ export function createCareerApiServer(port = 8787) {
         }
         const aircraft = playerAircraft.aircraftClassId;
         const cargoLimit = await resolveClassMaxCargoKg(aircraft);
-        let intoMission =
-          body.missionId
-            ? missions.missions.find((m) => m.id === body.missionId)
-            : undefined;
-        if (body.missionId && !intoMission) {
-          send(res, 404, { error: `Unknown mission ${body.missionId}` });
+        const stagingDistanceNm =
+          routeDistanceNm(world, firstLot.originIcao, firstLot.destIcao) ?? 0;
+        const routeCargoLimit = estimateRouteCargoLimit(
+          aircraft,
+          stagingDistanceNm,
+          cargoLimit.maxCargoKg,
+          cargoLimit,
+        );
+        const operationalMaxCargoKg =
+          routeCargoLimit.operationalMaxCargoKg;
+        if (!routeCargoLimit.fuelFeasible) {
+          send(res, 400, {
+            error:
+              `Estimated block fuel ${routeCargoLimit.estimatedBlockFuelKg} kg exceeds ` +
+              `${aircraft} tank capacity ${routeCargoLimit.fuelCapacityKg} kg ` +
+              `(deficit ${routeCargoLimit.fuelDeficitKg} kg)`,
+          });
           return;
         }
-        if (!intoMission) {
+        if (!intoMission && !replace) {
           intoMission = findOpenManifestForRoute(missions.missions, {
             originIcao: firstLot.originIcao,
             destIcao: firstLot.destIcao,
@@ -884,41 +943,64 @@ export function createCareerApiServer(port = 8787) {
             });
             return;
           }
-          if (!intoMission) {
-            if (
-              playerAircraft.status !== 'parked' ||
-              playerAircraft.locationIcao !== firstLot.originIcao
-            ) {
-              send(res, 400, {
-                error: `Aircraft ${playerAircraft.id} is at ${playerAircraft.locationIcao}, not ${firstLot.originIcao}`,
-              });
+          let mission: MissionIntent;
+          let appended = false;
+          let lineCount = lines.length;
+          if (replace) {
+            if (!intoMission) {
+              send(res, 400, { error: 'replace requires an existing mission' });
               return;
             }
-          }
-          const committed = commitStagedManifest(world, {
-            lines,
-            aircraftClassId: aircraft,
-            maxCargoKg: cargoLimit.maxCargoKg,
-            intoMission: intoMission ?? undefined,
-          });
-          let mission: MissionIntent = {
-            ...committed.mission,
-            aircraftId: playerAircraft.id,
-          };
-          if (committed.appended && intoMission) {
-            const idx = missions.missions.findIndex((m) => m.id === intoMission!.id);
-            if (idx >= 0) missions.missions[idx] = mission;
-            else missions.missions.push(mission);
-          } else {
+            mission = {
+              ...replaceMissionManifest(world, intoMission, {
+                lines,
+                aircraftClassId: aircraft,
+                maxCargoKg: operationalMaxCargoKg,
+              }),
+              aircraftId: playerAircraft.id,
+            };
             const idx = missions.missions.findIndex((m) => m.id === mission.id);
             if (idx >= 0) missions.missions[idx] = mission;
             else missions.missions.push(mission);
-            assignAircraftToMission(
-              missions,
-              playerAircraft.id,
-              mission.id,
-              mission.originIcao,
-            );
+          } else {
+            if (!intoMission) {
+              if (
+                playerAircraft.status !== 'parked' ||
+                playerAircraft.locationIcao !== firstLot.originIcao
+              ) {
+                send(res, 400, {
+                  error: `Aircraft ${playerAircraft.id} is at ${playerAircraft.locationIcao}, not ${firstLot.originIcao}`,
+                });
+                return;
+              }
+            }
+            const committed = commitStagedManifest(world, {
+              lines,
+              aircraftClassId: aircraft,
+              maxCargoKg: operationalMaxCargoKg,
+              intoMission: intoMission ?? undefined,
+            });
+            mission = {
+              ...committed.mission,
+              aircraftId: playerAircraft.id,
+            };
+            appended = committed.appended;
+            lineCount = committed.lineCount;
+            if (committed.appended && intoMission) {
+              const idx = missions.missions.findIndex((m) => m.id === intoMission!.id);
+              if (idx >= 0) missions.missions[idx] = mission;
+              else missions.missions.push(mission);
+            } else {
+              const idx = missions.missions.findIndex((m) => m.id === mission.id);
+              if (idx >= 0) missions.missions[idx] = mission;
+              else missions.missions.push(mission);
+              assignAircraftToMission(
+                missions,
+                playerAircraft.id,
+                mission.id,
+                mission.originIcao,
+              );
+            }
           }
           await persistEconomy(world);
           await writeJson(missionsPath, missions);
@@ -933,13 +1015,18 @@ export function createCareerApiServer(port = 8787) {
               }
             | undefined;
           if (body.openDispatch !== false) {
-            const built = await buildMissionDispatch(mission);
+            const built = await buildMissionDispatch(mission, {
+              units: body.units ?? body.weightSystem,
+            });
             const idx = missions.missions.findIndex((m) => m.id === mission.id);
             const dispatched: MissionIntent = {
               ...mission,
               staticId: built.staticId,
               status: 'dispatched',
               dispatchedAtTick: world.tick,
+              lastOfpCheck: undefined,
+              lastPreflightCheck: undefined,
+              fuelAuthorizedOfpId: undefined,
             };
             if (idx >= 0) missions.missions[idx] = dispatched;
             mission = dispatched;
@@ -957,11 +1044,18 @@ export function createCareerApiServer(port = 8787) {
           send(res, 200, {
             mission,
             walletUsd: missions.walletUsd,
-            maxCargoKg: cargoLimit.maxCargoKg,
+            maxCargoKg: operationalMaxCargoKg,
+            structuralMaxCargoKg: cargoLimit.maxCargoKg,
+            operationalMaxCargoKg,
+            estimatedBlockFuelKg: routeCargoLimit.estimatedBlockFuelKg,
             maxCargoSource: cargoLimit.source,
-            appended: committed.appended,
-            lineCount: committed.lineCount,
-            remainingKg: missionRemainingCapacityKg(mission, cargoLimit.maxCargoKg),
+            appended,
+            replaced: replace,
+            lineCount,
+            remainingKg: missionRemainingCapacityKg(
+              mission,
+              operationalMaxCargoKg,
+            ),
             dispatch: dispatch ?? null,
             fleet: missions.fleet,
           });
@@ -1042,6 +1136,8 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           missionId?: string;
           open?: boolean;
+          weightSystem?: 'metric' | 'imperial';
+          units?: 'KGS' | 'LBS';
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
@@ -1061,10 +1157,36 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
 
-        const built = await buildMissionDispatch(mission);
+        const dispatchDistanceNm =
+          routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
+        const dispatchCargoLimit = await resolveClassMaxCargoKg(
+          mission.aircraftClassId,
+        );
+        const dispatchRouteLimit = estimateRouteCargoLimit(
+          mission.aircraftClassId,
+          dispatchDistanceNm,
+          dispatchCargoLimit.maxCargoKg,
+          dispatchCargoLimit,
+        );
+        if (!dispatchRouteLimit.fuelFeasible) {
+          send(res, 400, {
+            error:
+              `Estimated block fuel ${dispatchRouteLimit.estimatedBlockFuelKg} kg exceeds ` +
+              `tank capacity ${dispatchRouteLimit.fuelCapacityKg} kg ` +
+              `(deficit ${dispatchRouteLimit.fuelDeficitKg} kg)`,
+          });
+          return;
+        }
+
+        const built = await buildMissionDispatch(mission, {
+          units: body.units ?? body.weightSystem,
+        });
         mission.staticId = built.staticId;
         mission.status = 'dispatched';
         mission.dispatchedAtTick = world.tick;
+        mission.lastOfpCheck = undefined;
+        mission.lastPreflightCheck = undefined;
+        mission.fuelAuthorizedOfpId = undefined;
         await writeJson(missionsPath, missions);
 
         const shouldOpen = body.open !== false;
@@ -1079,6 +1201,7 @@ export function createCareerApiServer(port = 8787) {
           type: built.type,
           airframeLabel: built.airframeLabel,
           cargoThousands: built.cargoThousands,
+          units: built.units,
           opened: shouldOpen,
         });
         return;
@@ -1115,6 +1238,10 @@ export function createCareerApiServer(port = 8787) {
           verdict: result.check.verdict,
           summary: result.summary,
           checkedAtIso: new Date().toISOString(),
+          ofpId: result.ofp.ofpId,
+          staticId: mission.staticId,
+          briefing: result.ofp.briefing,
+          plannedBlockFuelKg: result.ofp.blockFuelKg,
           findings: result.check.findings.map((f) => ({
             code: f.code,
             severity: f.severity,
@@ -1129,6 +1256,95 @@ export function createCareerApiServer(port = 8787) {
           summary: result.summary,
           ofp: result.ofp,
         });
+        return;
+      }
+
+      if (
+        req.method === 'POST' &&
+        (path === '/api/fuel/quote' || path === '/api/fuel/purchase')
+      ) {
+        const body = (await readBody(req)) as { missionId?: string };
+        if (!body.missionId) {
+          send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        const idx = missions.missions.findIndex((m) => m.id === body.missionId);
+        if (idx < 0) {
+          send(res, 404, { error: `Unknown mission ${body.missionId}` });
+          return;
+        }
+        const mission = missions.missions[idx]!;
+        if (mission.status !== 'dispatched') {
+          send(res, 400, {
+            error: `Fuel planning requires a dispatched mission (status=${mission.status})`,
+          });
+          return;
+        }
+        const ofp = mission.lastOfpCheck;
+        if (
+          !ofp ||
+          (ofp.verdict !== 'pass' && ofp.verdict !== 'warn') ||
+          !ofp.ofpId ||
+          !(typeof ofp.plannedBlockFuelKg === 'number' && ofp.plannedBlockFuelKg > 0)
+        ) {
+          send(res, 400, {
+            error: 'Confirm a valid OFP before planning fuel',
+          });
+          return;
+        }
+        if (ofp.staticId && ofp.staticId !== mission.staticId) {
+          send(res, 400, {
+            error: 'OFP belongs to a previous dispatch revision',
+          });
+          return;
+        }
+
+        try {
+          if (path === '/api/fuel/quote') {
+            const quote = quotePlayerMissionOfpFuel(world, missions, mission, {
+              ofpId: ofp.ofpId,
+              requiredBlockFuelKg: ofp.plannedBlockFuelKg,
+            });
+            send(res, 200, {
+              quote,
+              walletUsd: missions.walletUsd,
+              walletAfterUsd: Math.round(
+                (missions.walletUsd - quote.uplift.costUsd) * 100,
+              ) / 100,
+            });
+            return;
+          }
+
+          const purchased = purchasePlayerMissionOfpFuel(
+            world,
+            missions,
+            mission,
+            {
+              ofpId: ofp.ofpId,
+              requiredBlockFuelKg: ofp.plannedBlockFuelKg,
+            },
+          );
+          missions.missions[idx] = purchased.mission;
+          missions.walletUsd = debitWalletForFuel(
+            missions.walletUsd,
+            purchased.fuelDebitUsd,
+          );
+          await persistEconomy(world);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            mission: purchased.mission,
+            quote: purchased.quote,
+            fuelDebitUsd: purchased.fuelDebitUsd,
+            walletUsd: missions.walletUsd,
+            fleet: missions.fleet,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 
@@ -1167,6 +1383,7 @@ export function createCareerApiServer(port = 8787) {
             summary: result.check.summary,
             checkedAtIso: result.check.checkedAtIso,
             phase: result.check.phase,
+            loadVerification: result.check.loadVerification,
             findings: result.check.findings,
           };
           await writeJson(missionsPath, missions);
@@ -1251,6 +1468,13 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          let residualFuelKg: number | undefined;
+          try {
+            residualFuelKg = await probeLiveResidualFuelKg();
+          } catch {
+            // Manual/offline settle keeps the estimated-burn fallback.
+            residualFuelKg = undefined;
+          }
           // Stop live watch if it was tracking this mission.
           const watch = watchSession.getStatus();
           if (watch.running && watch.missionId === body.missionId) {
@@ -1258,6 +1482,7 @@ export function createCareerApiServer(port = 8787) {
           }
           const result = settleMission(world, missions.missions[idx]!, {
             fleet: missions,
+            residualFuelKg,
           });
           missions.missions[idx] = result.mission;
           missions.walletUsd = debitWalletForFuel(
@@ -1277,12 +1502,100 @@ export function createCareerApiServer(port = 8787) {
               lateTicks: result.settlement.lateTicks,
               onTime: result.settlement.onTime,
               deliveredKg: result.settlement.deliveredKg,
+              residualFuelKg: result.mission.settledFuelKg ?? null,
             },
           });
         } catch (error) {
           send(res, 400, {
             error: error instanceof Error ? error.message : String(error),
           });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/simbridge/status') {
+        const status = await probeSimBridgeStatus({
+          watchSession,
+          pipeName: url.searchParams.get('pipe') ?? undefined,
+        });
+        send(res, 200, status);
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/load-ofp') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          simbriefUser?: string;
+          simbriefUserid?: string;
+          pipeName?: string;
+          runPreflightAfter?: boolean;
+        };
+        if (!body.missionId) {
+          send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        const missions = await loadMissions();
+        const idx = missions.missions.findIndex((m) => m.id === body.missionId);
+        if (idx < 0) {
+          send(res, 404, { error: `Unknown mission ${body.missionId}` });
+          return;
+        }
+        const mission = missions.missions[idx]!;
+        if (
+          !mission.lastOfpCheck?.ofpId ||
+          mission.fuelAuthorizedOfpId !== mission.lastOfpCheck.ofpId
+        ) {
+          send(res, 409, {
+            error: 'Purchase or authorize OFP block fuel before loading the aircraft',
+            code: 'fuel_purchase_required',
+          });
+          return;
+        }
+        try {
+          // Avoid Named Pipe contention with the live watch session.
+          const watch = watchSession.getStatus();
+          if (watch.running && watch.missionId === body.missionId) {
+            await watchSession.stop();
+          }
+          const result = await applyMissionOfpLoad(mission, {
+            username: body.simbriefUser,
+            userid: body.simbriefUserid,
+            pipeName: body.pipeName,
+            runPreflightAfter: body.runPreflightAfter,
+          });
+          if (result.preflight) {
+            mission.lastPreflightCheck = {
+              verdict: result.preflight.check.verdict,
+              summary: result.preflight.check.summary,
+              checkedAtIso: result.preflight.check.checkedAtIso,
+              phase: result.preflight.check.phase,
+              loadVerification: result.preflight.check.loadVerification,
+              findings: result.preflight.check.findings,
+            };
+            missions.missions[idx] = mission;
+            await writeJson(missionsPath, missions);
+          }
+          if (!result.ok) {
+            const unavailable =
+              /ENOENT|pipe|connect|SimBridge|ECONNREFUSED|No writable aircraft/i.test(
+                result.error ?? '',
+              );
+            send(res, unavailable ? 503 : 400, {
+              error: result.error ?? 'OFP load failed',
+              mission,
+              ...result,
+            });
+            return;
+          }
+          send(res, 200, {
+            mission,
+            ...result,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const unavailable =
+            /ENOENT|pipe|connect|SimBridge|ECONNREFUSED/i.test(message);
+          send(res, unavailable ? 503 : 400, { error: message });
         }
         return;
       }

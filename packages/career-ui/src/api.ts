@@ -156,6 +156,16 @@ export type OfpCheckFinding = {
   message: string;
 };
 
+export type OfpBriefing = {
+  aircraftIcao?: string;
+  tailNumber?: string;
+  distanceNm?: number;
+  blockTime?: string;
+  cruiseAltitudeFt?: number;
+  alternateIcao?: string;
+  route?: string;
+};
+
 export type MissionLotLine = {
   shipmentLotId: string;
   commodityId: string;
@@ -177,12 +187,14 @@ export type Mission = {
   payoutUsd?: number;
   urgency: string;
   aircraftClassId: string;
+  aircraftId?: string;
   deadlineTick: number;
   reason: string;
   acceptedAtTick?: number;
   dispatchedAtTick?: number;
   departedAtTick?: number;
   settledAtTick?: number;
+  settledFuelKg?: number;
   staticId?: string;
   lots?: MissionLotLine[];
   shipmentLotId?: string;
@@ -195,10 +207,15 @@ export type Mission = {
     scarcity: 'ok' | 'partial' | 'dry';
     upliftedAtTick: number;
   };
+  fuelAuthorizedOfpId?: string;
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';
     summary: string;
     checkedAtIso: string;
+    ofpId?: string;
+    staticId?: string;
+    briefing?: OfpBriefing;
+    plannedBlockFuelKg?: number;
     findings: OfpCheckFinding[];
   };
   lastPreflightCheck?: {
@@ -206,6 +223,24 @@ export type Mission = {
     summary: string;
     checkedAtIso: string;
     phase?: string;
+    loadVerification?: {
+      ready: boolean;
+      fuel: {
+        plannedLb?: number;
+        liveLb: number;
+        ok: boolean;
+      };
+      payload: {
+        plannedLb?: number;
+        liveLb?: number;
+        ok: boolean;
+      };
+      aircraft: {
+        onGround: boolean;
+        enginesRunning: boolean;
+      };
+      weightNoteCount: number;
+    };
     findings: OfpCheckFinding[];
   };
 };
@@ -321,13 +356,33 @@ export function fetchMarket(aircraft?: AircraftClass) {
   >(`/api/market${qs}`);
 }
 
-export function fetchCargoLimit(aircraft: AircraftClass) {
+/** Fetch every available lot for one exact route (not the global 200-row slice). */
+export function fetchRouteLots(originIcao: string, destIcao: string) {
+  const qs = new URLSearchParams({
+    origin: originIcao.trim().toUpperCase(),
+    dest: destIcao.trim().toUpperCase(),
+  });
+  return api<ClockSync & { lots: MarketLot[] }>(`/api/market?${qs.toString()}`);
+}
+
+export function fetchCargoLimit(aircraft: AircraftClass, distanceNm?: number) {
+  const qs = new URLSearchParams({ aircraft });
+  if (distanceNm !== undefined && Number.isFinite(distanceNm)) {
+    qs.set('distanceNm', String(distanceNm));
+  }
   return api<{
     aircraftClassId: AircraftClass;
     maxCargoKg: number;
     maxCargoSource: string;
     airframeLabel: string;
-  }>(`/api/cargo-limit?aircraft=${aircraft}`);
+    oewKg?: number | null;
+    mtowKg?: number | null;
+    operationalMaxCargoKg: number;
+    estimatedBlockFuelKg?: number | null;
+    fuelCapacityKg?: number | null;
+    fuelDeficitKg?: number | null;
+    fuelFeasible?: boolean | null;
+  }>(`/api/cargo-limit?${qs.toString()}`);
 }
 
 export function fetchNpcFleet() {
@@ -376,6 +431,9 @@ export function postAccept(opts: {
     mission: Mission;
     walletUsd: number;
     maxCargoKg?: number;
+    structuralMaxCargoKg?: number;
+    operationalMaxCargoKg?: number;
+    estimatedBlockFuelKg?: number;
     maxCargoSource?: string;
     appended?: boolean;
     remainingKg?: number;
@@ -390,14 +448,20 @@ export function postStagingCommit(opts: {
   aircraftId?: string;
   missionId?: string;
   openDispatch?: boolean;
+  replace?: boolean;
+  weightSystem?: 'metric' | 'imperial';
   lines: Array<{ lotId: string; cargoKg: number }>;
 }) {
   return api<{
     mission: Mission;
     walletUsd: number;
     maxCargoKg?: number;
+    structuralMaxCargoKg?: number;
+    operationalMaxCargoKg?: number;
+    estimatedBlockFuelKg?: number;
     maxCargoSource?: string;
     appended?: boolean;
+    replaced?: boolean;
     lineCount?: number;
     remainingKg?: number;
     fleet?: PlayerAircraft[];
@@ -460,13 +524,19 @@ export function postCancel(opts: { missionId: string }) {
   });
 }
 
-export function postDispatch(opts: { missionId: string; open?: boolean }) {
+export function postDispatch(opts: {
+  missionId: string;
+  open?: boolean;
+  weightSystem?: 'metric' | 'imperial';
+}) {
   return api<{
     mission: Mission;
     url: string;
     staticId: string;
     type: string;
     airframeLabel: string;
+    cargoThousands?: number;
+    units?: 'KGS' | 'LBS';
     opened: boolean;
   }>('/api/dispatch', {
     method: 'POST',
@@ -491,10 +561,55 @@ export function postConfirmOfp(opts: {
       passengerCount?: number;
       blockFuel?: number;
       ofpId?: string;
+      briefing: OfpBriefing;
     };
   }>('/api/confirm-ofp', {
     method: 'POST',
     body: JSON.stringify(opts),
+  });
+}
+
+export type MissionFuelQuote = {
+  aircraftId: string;
+  originIcao: string;
+  ofpId: string;
+  requiredBlockFuelKg: number;
+  currentFuelKg: number;
+  fuelCapacityKg: number;
+  shortfallKg: number;
+  authorized: boolean;
+  uplift: {
+    originIcao: string;
+    requestedKg: number;
+    availableKg: number;
+    unitPriceUsd: number;
+    costUsd: number;
+    scarcity: 'ok' | 'partial' | 'dry';
+    distanceNm: number;
+  };
+};
+
+export function postFuelQuote(missionId: string) {
+  return api<{
+    quote: MissionFuelQuote;
+    walletUsd: number;
+    walletAfterUsd: number;
+  }>('/api/fuel/quote', {
+    method: 'POST',
+    body: JSON.stringify({ missionId }),
+  });
+}
+
+export function postFuelPurchase(missionId: string) {
+  return api<{
+    mission: Mission;
+    quote: MissionFuelQuote;
+    fuelDebitUsd: number;
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+  }>('/api/fuel/purchase', {
+    method: 'POST',
+    body: JSON.stringify({ missionId }),
   });
 }
 
@@ -504,6 +619,7 @@ export type MissionSettlement = {
   lateTicks: number;
   onTime: boolean;
   deliveredKg: number;
+  residualFuelKg: number | null;
 };
 
 export type WatchEvent =
@@ -557,6 +673,7 @@ export function postPreflight(opts: {
       summary: string;
       checkedAtIso: string;
       phase: string;
+      loadVerification: NonNullable<Mission['lastPreflightCheck']>['loadVerification'];
       findings: OfpCheckFinding[];
     };
     ofp: {
@@ -622,4 +739,96 @@ export function postWatchStop() {
     method: 'POST',
     body: JSON.stringify({}),
   });
+}
+
+export type SimBridgeStatus = {
+  connected: boolean;
+  mode: string | null;
+  aircraftTitle: string | null;
+  onGround: boolean | null;
+  enginesRunning: boolean | null;
+  parkingBrake: boolean | null;
+  phase: string | null;
+  source: 'watch' | 'probe';
+  error: string | null;
+  checkedAtIso: string;
+};
+
+export function fetchSimBridgeStatus() {
+  return api<SimBridgeStatus>('/api/simbridge/status');
+}
+
+export type OfpLoadResult = {
+  ok: boolean;
+  mission: Mission;
+  plan: {
+    blockFuelLb: number;
+    cargoLb: number;
+    fuelUnit: string;
+    tankCapacityTotal: number;
+    baggageCapacityLb: number;
+    preservedStations: number[];
+    baggageStations: number[];
+    plan: {
+      fuel?: { tanks?: Record<string, number> };
+      payload?: { stations?: Record<number, number>; total?: number };
+    };
+  };
+  identity: {
+    title: string;
+    publisher?: string;
+    icao?: string;
+  };
+  profileKey: string;
+  fingerprint: string;
+  rolledBack: boolean;
+  rollbackOk: boolean | null;
+  compareSummary: string | null;
+  compareVerdict: 'pass' | 'warn' | 'fail' | null;
+  preflight: {
+    check: {
+      verdict: 'pass' | 'warn' | 'fail';
+      summary: string;
+      checkedAtIso: string;
+      phase: string;
+      loadVerification: NonNullable<Mission['lastPreflightCheck']>['loadVerification'];
+      findings: OfpCheckFinding[];
+    };
+    ofp: {
+      cargoKg?: number;
+      blockFuel?: number;
+      ofpId?: string;
+    };
+    live: {
+      fuelTotalLb: number;
+      payloadTotalLb?: number;
+      onGround: boolean;
+      enginesRunning: boolean;
+    };
+  } | null;
+  error: string | null;
+};
+
+export function postLoadOfp(opts: {
+  missionId: string;
+  simbriefUser?: string;
+  simbriefUserid?: string;
+  runPreflightAfter?: boolean;
+}) {
+  return (async () => {
+    const res = await fetch('/api/load-ofp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(opts),
+    });
+    const data = (await res.json()) as OfpLoadResult & { error?: string };
+    // Soft apply failures still return a structured body with ok:false.
+    if (typeof data.ok === 'boolean') {
+      return data;
+    }
+    if (!res.ok) {
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+    return data;
+  })();
 }

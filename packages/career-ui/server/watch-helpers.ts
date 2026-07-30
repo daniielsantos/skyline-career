@@ -7,6 +7,7 @@ import {
   debitWalletForFuel,
   departMission,
   evaluateMissionFlightTransition,
+  KG_TO_LB,
   resolveAirportCoords,
   settleMission,
   type CareerEconomyWorld,
@@ -35,6 +36,7 @@ export type WatchStatusPayload = {
     lateTicks: number;
     onTime: boolean;
     deliveredKg: number;
+    residualFuelKg: number | null;
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -95,6 +97,42 @@ export async function sampleLiveFlight(
     enginesRunning: snap.enginesRunning,
     position,
   };
+}
+
+export async function readLiveResidualFuelKg(
+  bridge: NamedPipeSimBridge,
+): Promise<number> {
+  let fuelLb: number;
+  try {
+    fuelLb = await bridge.readSimVar({
+      name: 'FUEL TOTAL QUANTITY WEIGHT',
+      unit: 'pounds',
+    });
+  } catch {
+    const [quantityGal, poundsPerGal] = await Promise.all([
+      bridge.readSimVar({ name: 'FUEL TOTAL QUANTITY', unit: 'gallons' }),
+      bridge.readSimVar({ name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' }),
+    ]);
+    fuelLb = quantityGal * poundsPerGal;
+  }
+  if (!Number.isFinite(fuelLb) || fuelLb < 0) {
+    throw new Error(`Invalid live residual fuel weight: ${fuelLb}`);
+  }
+  return fuelLb / KG_TO_LB;
+}
+
+export async function probeLiveResidualFuelKg(pipeName?: string): Promise<number> {
+  const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
+  try {
+    await bridge.open('Skyline Career UI Settle Fuel Sync');
+    return await readLiveResidualFuelKg(bridge);
+  } finally {
+    try {
+      await bridge.close({ disconnectHost: false });
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export class CareerWatchSession {
@@ -302,7 +340,16 @@ export class CareerWatchSession {
           await this.cb.saveMissions(missions);
         }
       } else if (event.type === 'settle' && this.opts.autoSettle) {
-        const result = settleMission(world, current, { fleet: missions });
+        let residualFuelKg: number | undefined;
+        try {
+          residualFuelKg = await readLiveResidualFuelKg(this.bridge);
+        } catch {
+          residualFuelKg = undefined;
+        }
+        const result = settleMission(world, current, {
+          fleet: missions,
+          residualFuelKg,
+        });
         missions.missions[idx] = result.mission;
         missions.walletUsd = debitWalletForFuel(
           Math.round((missions.walletUsd + result.walletCreditUsd) * 100) / 100,
@@ -316,6 +363,7 @@ export class CareerWatchSession {
           lateTicks: result.settlement.lateTicks,
           onTime: result.settlement.onTime,
           deliveredKg: result.settlement.deliveredKg,
+          residualFuelKg: result.mission.settledFuelKg ?? null,
         };
         await this.cb.persistEconomy(world);
         await this.cb.saveMissions(missions);

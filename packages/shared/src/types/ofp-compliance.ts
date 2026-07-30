@@ -62,6 +62,17 @@ export interface OfpStationRoleMap {
   averagePassengerWeight?: number;
 }
 
+/** Compact operational briefing shown after a SimBrief OFP is confirmed. */
+export interface OfpBriefingSummary {
+  aircraftIcao?: string;
+  tailNumber?: string;
+  distanceNm?: number;
+  blockTime?: string;
+  cruiseAltitudeFt?: number;
+  alternateIcao?: string;
+  route?: string;
+}
+
 export interface OfpPayloadPlan {
   unit: OfpWeightUnit;
   stations?: Record<number, number>;

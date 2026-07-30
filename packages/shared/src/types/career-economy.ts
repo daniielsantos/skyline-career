@@ -1,5 +1,7 @@
 /** Skyline Career — local cargo logistics economy (Slice 1). */
 
+import type { OfpBriefingSummary } from './ofp-compliance.js';
+
 export type CommodityId =
   | 'electronics'
   | 'perishables'
@@ -272,7 +274,7 @@ export type FreighterClassId =
 export interface AircraftClass {
   id: FreighterClassId;
   name: string;
-  /** Soft cargo weight limit used for accept clamp / market viability. */
+  /** Soft cargo weight limit used for accept clamp / market viability (MZFW−OEW structural). */
   maxCargoKg: number;
   maxRangeNm: number;
   /** Repo-relative OFP roles pack path. */
@@ -281,8 +283,23 @@ export interface AircraftClass {
   simbriefAirframeMatch: string;
   /** Career-economy burn estimate (not SimBrief OFP). */
   fuelBurnKgPerNm: number;
-  /** Taxi + contingency included in uplift quote. */
+  /** Taxi fuel included in uplift / route estimates. */
   fuelTaxiKg: number;
+  /** Maximum usable fuel for route-feasibility planning. */
+  fuelCapacityKg: number;
+  /**
+   * Homologation weights for route operational cargo estimates (MTOW − OEW − fuel).
+   * Prefer live SimBrief airframe_options when available; these are the class fallback.
+   */
+  oewKg: number;
+  mtowKg: number;
+  /**
+   * Airway/wind multiplier on distance for block-fuel estimate before Dispatch.
+   * New aircraft homologations should calibrate this against typical SimBrief OFPs.
+   */
+  fuelRouteFactor: number;
+  /** Alternate / final reserve fuel included in route block estimate (kg). */
+  fuelReserveKg: number;
 }
 
 export type MissionStatus =
@@ -368,15 +385,27 @@ export interface MissionIntent {
   lateTicks?: number;
   /** Origin fuel uplift charged at depart. */
   fuelUplift?: MissionFuelUplift;
+  /** SimBrief OFP whose block-fuel requirement has been funded/accepted. */
+  fuelAuthorizedOfpId?: string;
   /** Player fleet aircraft that flies this mission. */
   aircraftId?: string;
   /** Trip fuel burned (estimate) applied on settle. */
   tripFuelBurnKg?: number;
+  /** Actual fuel remaining in MSFS when the mission settled. */
+  settledFuelKg?: number;
   /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';
     summary: string;
     checkedAtIso: string;
+    /** SimBrief request_id that produced this result. */
+    ofpId?: string;
+    /** Dispatch revision (static_id) validated by this result. */
+    staticId?: string;
+    /** Compact operational details from the confirmed SimBrief OFP. */
+    briefing?: OfpBriefingSummary;
+    /** SimBrief block fuel normalized to kg for career fuel accounting. */
+    plannedBlockFuelKg?: number;
     findings: Array<{
       code: string;
       severity: string;
@@ -389,6 +418,25 @@ export interface MissionIntent {
     summary: string;
     checkedAtIso: string;
     phase?: string;
+    /** Concise operational verification for the Career UI. All weights are lb. */
+    loadVerification?: {
+      ready: boolean;
+      fuel: {
+        plannedLb?: number;
+        liveLb: number;
+        ok: boolean;
+      };
+      payload: {
+        plannedLb?: number;
+        liveLb?: number;
+        ok: boolean;
+      };
+      aircraft: {
+        onGround: boolean;
+        enginesRunning: boolean;
+      };
+      weightNoteCount: number;
+    };
     findings: Array<{
       code: string;
       severity: string;

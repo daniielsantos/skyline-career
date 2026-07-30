@@ -112,7 +112,7 @@ describe('resolveSimBriefDispatchType', () => {
 
 describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
   it('converts maxcargo LBS to kg', async () => {
-    const { maxCargoKg, source } = await resolveSimBriefMaxCargoKg({
+    const { maxCargoKg, source, airframe } = await resolveSimBriefMaxCargoKg({
       simbriefIcao: 'B738',
       simbriefAirframeMatch: 'Converted Freighter',
       fetchImpl: async () =>
@@ -132,6 +132,8 @@ describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
                     maxcargo: 39985,
                     oew: 87375,
                     mzfw: 138300,
+                    mtow: 174900,
+                    maxfuel: 46063,
                   },
                 },
               ],
@@ -142,6 +144,8 @@ describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
     });
     assert.equal(source, 'maxcargo');
     assert.equal(maxCargoKg, 18137);
+    assert.equal(airframe.mtowKg, 79333);
+    assert.equal(airframe.fuelCapacityKg, 20894);
   });
 
   it('falls back to mzfw-oew when maxcargo is 0', async () => {

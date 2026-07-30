@@ -6,6 +6,8 @@ import { HybridSyncFuelStrategy, LvarBridgeFuelStrategy, SimConnectDirectFuelStr
 import { StationWritebackPayloadStrategy } from './strategies/payload/station-payload-strategy.js';
 import type { ProfileEngine, SimBridge } from './types.js';
 
+const CG_TOLERANCE_MAC_PERCENT = 1;
+
 export interface ProfileEngineOptions {
   profile: AircraftProfile;
   bridge: SimBridge;
@@ -77,6 +79,10 @@ export class DefaultProfileEngine implements ProfileEngine {
     }
 
     if (this.profile.cg?.constraints) {
+      // MSFS updates weight stations immediately, but its derived CG SimVar can
+      // lag behind. Reading it too early can reject a valid load or falsely
+      // report that a rollback failed.
+      await new Promise((resolve) => setTimeout(resolve, 750));
       let cg = await this.bridge.readSimVar({
         name: this.profile.cg.readVar ?? 'CG PERCENT',
         unit: this.profile.cg.readUnit ?? 'Percent over 100',
@@ -88,13 +94,22 @@ export class DefaultProfileEngine implements ProfileEngine {
       }
 
       const { minMac, maxMac } = this.profile.cg.constraints;
-      const ok = (minMac === undefined || cg >= minMac) && (maxMac === undefined || cg <= maxMac);
+      const ok =
+        (minMac === undefined || cg >= minMac - CG_TOLERANCE_MAC_PERCENT) &&
+        (maxMac === undefined || cg <= maxMac + CG_TOLERANCE_MAC_PERCENT);
       const expectedCg = ((minMac ?? 0) + (maxMac ?? 0)) / 2;
       results.cg = {
         ok,
         failures: ok
           ? []
-          : [{ var: 'CG PERCENT', expected: expectedCg, actual: cg, tolerancePct: 0 }],
+          : [
+              {
+                var: 'CG PERCENT',
+                expected: expectedCg,
+                actual: cg,
+                tolerancePct: CG_TOLERANCE_MAC_PERCENT,
+              },
+            ],
       };
     }
 

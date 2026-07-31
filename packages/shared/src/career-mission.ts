@@ -893,8 +893,8 @@ export function cancelMission(
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot cancel mission in status=${normalized.status}`);
   }
-  // A mission can outlive its shipment lots: expired lots are pruned after
-  // 72 ticks, and a world reset can also leave legacy/orphan missions behind.
+  // A mission can outlive its shipment lots: expired lots are pruned after a
+  // short retention window, and a world reset can leave orphan missions behind.
   for (const line of normalized.lots) {
     if (world.lots.some((lot) => lot.id === line.shipmentLotId)) {
       releaseShipmentReservation(world, line.shipmentLotId, line.cargoKg);

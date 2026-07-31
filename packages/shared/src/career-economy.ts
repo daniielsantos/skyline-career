@@ -683,6 +683,7 @@ export function migrateEconomyWorld(
   ensureNpcFleet(migrated);
   migrateNpcTimestamps(migrated, Number.isFinite(version) ? version : 0);
   ensureWorldFuelInventory(migrated);
+  pruneDeadLots(migrated);
 
   return migrated;
 }
@@ -934,6 +935,40 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
   }
 }
 
+/** Keep expired/delivered lots this many ticks after expiresAtTick, then drop. */
+export const DEAD_LOT_RETENTION_TICKS = 12;
+
+/**
+ * Drop market lots that are no longer actionable.
+ * Keeps available / reserved / in_transit always; expired & delivered only briefly.
+ * Does not touch player missions / logbook (separate file).
+ */
+export function pruneDeadLots(
+  world: CareerEconomyWorld,
+  opts: { retentionTicks?: number } = {},
+): { removed: number; kept: number } {
+  const retention = Math.max(
+    0,
+    Math.floor(opts.retentionTicks ?? DEAD_LOT_RETENTION_TICKS),
+  );
+  const keepFrom = world.tick - retention;
+  const before = world.lots.length;
+  world.lots = world.lots.filter((lot) => {
+    if (
+      lot.status === 'available' ||
+      lot.status === 'reserved' ||
+      lot.status === 'in_transit'
+    ) {
+      return true;
+    }
+    // expired | delivered — retain only a short window for debugging
+    return (
+      typeof lot.expiresAtTick === 'number' && lot.expiresAtTick >= keepFrom
+    );
+  });
+  return { removed: before - world.lots.length, kept: world.lots.length };
+}
+
 function expireLots(world: CareerEconomyWorld): void {
   for (const lot of world.lots) {
     if (lot.status !== 'available' && lot.status !== 'reserved') {
@@ -943,15 +978,7 @@ function expireLots(world: CareerEconomyWorld): void {
       lot.status = 'expired';
     }
   }
-  // Prune old terminal lots to keep saves small
-  const keepFrom = world.tick - 72;
-  world.lots = world.lots.filter(
-    (l) =>
-      l.status === 'available' ||
-      l.status === 'reserved' ||
-      l.status === 'in_transit' ||
-      l.expiresAtTick >= keepFrom,
-  );
+  pruneDeadLots(world);
 }
 
 function availableKg(lot: ShipmentLot): number {

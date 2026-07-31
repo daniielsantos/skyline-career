@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   continuousEconomyHours,
   createSeedEconomyWorld,
+  DEAD_LOT_RETENTION_TICKS,
   ensureEconomyCaughtUp,
   listMarketLots,
   localPriceMultiplier,
@@ -10,6 +11,7 @@ import {
   MS_PER_TICK,
   npcLaneSaturation,
   npcRegionBidCapacity,
+  pruneDeadLots,
   routeDistanceNm,
   tickEconomyN,
 } from './career-economy.js';
@@ -409,5 +411,124 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     world.tick = 10;
     const half = continuousEconomyHours(world, start + MS_PER_TICK / 2);
     assert.ok(Math.abs(half - 10.5) < 1e-9);
+  });
+});
+
+describe('pruneDeadLots', () => {
+  it('keeps live lots and drops expired/delivered outside the retention window', () => {
+    const world = createSeedEconomyWorld({ seed: 'prune-lots' });
+    world.tick = 100;
+    world.lots = [
+      {
+        id: 'live',
+        commodityId: 'general',
+        originIcao: 'SBGR',
+        destIcao: 'SBGL',
+        quantityKg: 1_000,
+        reservedKg: 0,
+        createdAtTick: 90,
+        expiresAtTick: 120,
+        payUsd: 100,
+        urgency: 'normal',
+        reason: 'live',
+        status: 'available',
+      },
+      {
+        id: 'transit',
+        commodityId: 'general',
+        originIcao: 'SBGR',
+        destIcao: 'SBPA',
+        quantityKg: 500,
+        reservedKg: 500,
+        createdAtTick: 10,
+        expiresAtTick: 20,
+        payUsd: 50,
+        urgency: 'normal',
+        reason: 'transit',
+        status: 'in_transit',
+      },
+      {
+        id: 'recent-expired',
+        commodityId: 'electronics',
+        originIcao: 'SBGL',
+        destIcao: 'SBRJ',
+        quantityKg: 200,
+        reservedKg: 0,
+        createdAtTick: 90,
+        expiresAtTick: world.tick - 2,
+        payUsd: 10,
+        urgency: 'normal',
+        reason: 'recent',
+        status: 'expired',
+      },
+      {
+        id: 'old-expired',
+        commodityId: 'electronics',
+        originIcao: 'SBGL',
+        destIcao: 'SBRJ',
+        quantityKg: 200,
+        reservedKg: 0,
+        createdAtTick: 1,
+        expiresAtTick: world.tick - (DEAD_LOT_RETENTION_TICKS + 5),
+        payUsd: 10,
+        urgency: 'normal',
+        reason: 'old',
+        status: 'expired',
+      },
+      {
+        id: 'old-delivered',
+        commodityId: 'machinery',
+        originIcao: 'SBPA',
+        destIcao: 'SBGR',
+        quantityKg: 800,
+        reservedKg: 0,
+        createdAtTick: 1,
+        expiresAtTick: world.tick - (DEAD_LOT_RETENTION_TICKS + 1),
+        payUsd: 20,
+        urgency: 'urgent',
+        reason: 'delivered',
+        status: 'delivered',
+      },
+    ];
+
+    const { removed, kept } = pruneDeadLots(world);
+    assert.equal(removed, 2);
+    assert.equal(kept, 3);
+    assert.deepEqual(
+      world.lots.map((l) => l.id).sort(),
+      ['live', 'recent-expired', 'transit'],
+    );
+  });
+
+  it('prunes bloated saves on migrate', () => {
+    const seeded = createSeedEconomyWorld({ seed: 'prune-migrate' });
+    seeded.tick = 200;
+    const junk = Array.from({ length: 50 }, (_, i) => ({
+      id: `junk_${i}`,
+      commodityId: 'general' as const,
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 100,
+      reservedKg: 0,
+      createdAtTick: 1,
+      expiresAtTick: 10,
+      payUsd: 1,
+      urgency: 'normal' as const,
+      reason: 'junk',
+      status: 'expired' as const,
+    }));
+    const raw = {
+      version: 3 as const,
+      seed: seeded.seed,
+      tick: seeded.tick,
+      lastBatchAtMs: seeded.lastBatchAtMs,
+      airports: seeded.airports,
+      lots: junk,
+      events: [],
+      npcs: seeded.npcs,
+      npcFlights: [],
+    };
+    const migrated = migrateEconomyWorld(raw);
+    assert.equal(migrated.lots.length, 0);
   });
 });

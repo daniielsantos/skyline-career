@@ -270,9 +270,11 @@ describe('acceptMission', () => {
       missionId: 'msn_cancel',
     });
     const reservedAfter = lot.reservedKg;
+    const bookedKg = mission.cargoKg;
     const cancelled = cancelMission(world, mission);
     assert.equal(cancelled.status, 'cancelled');
-    assert.equal(lot.reservedKg, reservedAfter - 5_000);
+    // Lot may already hold NPC reservations — only our booked kg must release.
+    assert.equal(lot.reservedKg, reservedAfter - bookedKg);
   });
 
   it('cancels an orphan mission after its shipment lot was pruned', () => {

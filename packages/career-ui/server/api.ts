@@ -173,15 +173,20 @@ async function loadEconomy(): Promise<CareerEconomyWorld> {
     const npcCountBefore = Array.isArray((existing as { npcs?: unknown[] }).npcs)
       ? (existing as { npcs: unknown[] }).npcs.length
       : 0;
+    const lotsBefore = Array.isArray((existing as { lots?: unknown[] }).lots)
+      ? (existing as { lots: unknown[] }).lots.length
+      : 0;
     const world = migrateEconomyWorld(existing);
     const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
     const version = (existing as { version?: number }).version;
     const npcCountAfter = caught.npcs?.length ?? 0;
+    const lotsAfter = caught.lots?.length ?? 0;
     if (
       advancedTicks > 0 ||
       settledFlights > 0 ||
       version !== 3 ||
-      npcCountAfter !== npcCountBefore
+      npcCountAfter !== npcCountBefore ||
+      lotsAfter !== lotsBefore
     ) {
       await writeJson(economyPath, caught);
     }

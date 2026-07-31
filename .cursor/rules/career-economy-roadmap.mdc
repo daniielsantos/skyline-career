@@ -1,5 +1,5 @@
 ---
-description: Career economy realism roadmap — NPC capacity pressure and future slices
+description: Career economy realism roadmap — NPC pressure, weather, and world-scale architecture
 globs: packages/shared/src/career-*.ts,packages/career-ui/**/*
 alwaysApply: false
 ---
@@ -8,41 +8,58 @@ alwaysApply: false
 
 Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 
-## Done — fatia 1 (NPC capacity → market)
+## Done (near-term economy loop)
 
-- `npcRegionBidCapacity(world, region, nowMs)` — fraction of home-region NPCs ready to bid.
-- Low capacity (many resting/busy) → `pushLot` pay boost `1 + (1 - capacity) * 0.22` (still capped at `base * 1.8`).
-- Low capacity → `npcBidOnMarket` scales `bidChance` by `0.45 + 0.55 * capacity` (less dispute).
+- Fatia 1: regional NPC bid capacity → pay + bidChance.
+- Fatia 2: lane saturation / soft fill shadow → urgency, lot caps, scarce pay.
+- UI chips: thin fleet / lane busy (+ weather tags).
+- Simulated regional weather (`fair|marginal|poor` per region per sim-day). No per-NPC METAR.
+- Lot prune: `pruneDeadLots` drops `expired`/`delivered` after 12 ticks (tick + migrate/load). Logbook untouched.
 
-## Done — fatia 2 (lane saturation / urgency)
+## Near-term priorities (current Brazil career)
 
-- `npcLaneAirborneKg` / `npcLaneSaturation` from `in_flight` NPC cargo on OD+commodity.
-- Soft fill shadow + lane saturation affect urgency, lot caps, and scarce pay.
+1. **Player inbound soft-shadow** — on accept/depart, count player cargo as dest inbound (same contract as NPC `in_flight`).
+2. **Polish only if needed** — NPC operational cargo ceiling; crew/maintenance costs; optional real METAR.
 
-## Done — UI chip
+Do **not** start country partitioning or Postgres until prune + inbound contract exist and Brazil still feels good.
 
-- Thin fleet / lane busy tags on market + regional chips on Market and NPC Fleet panels.
+## World-scale architecture (future — save this)
 
-## Done — regional weather index (simulated)
+### Simulation partition
 
-- `career-weather.ts`: one `fair|marginal|poor` per region per sim-day from `seed+region+day`.
-- Market: weather pay/life multipliers; poor+tight dest → urgent; NPC bidChance scaled by home-region weather.
-- UI: `BR-SE poor` chips + lot weather tags. No per-NPC METAR; cost scales with regions only.
+- Tick **domestic** work by country/region (prod/cons/stock/local lots/local NPCs).
+- Same server still shares one CPU: partition reduces work per tick and allows optional parallelism; it does not multiply cores by itself.
+- Cost must grow with **regions/countries**, never with raw airport×airport or NPC×METAR.
 
-## Next — optional real METAR (fatia B)
+### International lanes
 
-- 1–2 anchor ICAOs per region, ≤1 fetch/day, fold into the same regional index.
-- Cache + fall back to simulated. Never query inside NPC bid/claim.
+- Sparse hub↔hub OD between countries (not all-to-all).
+- International mission/flight is a **border object**: reserve at origin, track flight on the lane, settle at dest.
+- Country ticks do not fully simulate each other; they share the lane contract.
 
-## Later
+### Destination notified (preferred — esp. multiplayer)
 
-- NPC operational cargo ceiling if exploits appear.
-- Crew/maintenance cost pressure on NPC bid appetite.
-- Slot friction once the regional weather index is proven.
+- On accept/depart: publish **inbound pending** at dest (commodity, kg, ETA), any origin region/country.
+- Soft fill = stock + inbound (player + NPC). Urgency/NPC bids see help coming.
+- On settle: clear pending + apply stock.
+- Blind dest is simpler but bad for multiplayer (surprise full terminal / wasted long-haul). Prefer notified for domestic and international.
+
+### Persistence
+
+- Today: local JSON (`profiles/career/local-economy.json`, `local-missions.json`).
+- Later: SQLite (local) or Postgres (multiplayer) behind the same load/persist facade.
+- Always prune dead lots; DB without retention still explodes.
+
+## Optional later
+
+- Real METAR fold-in (fatia B) into the regional weather index.
+- NPC operational MTOW/fuel cargo clamp if exploits appear.
+- Crew/maintenance bid pressure; slot friction.
 
 ## Design rules
 
 - Prefer regional / lane-local effects over global multipliers.
-- Every slice needs a regression test that a player would notice (pay, urgency, or claim rate).
-- Do not persist new economy fields unless a slice requires them.
-- Weather/network cost must scale with **regions**, never with **NPC count**.
+- Every slice needs a player-visible regression (pay, urgency, or claim rate).
+- Do not persist new fields unless a slice requires them.
+- Weather/network cost scales with **regions**, never **NPC count**.
+- Multiplayer-facing contracts (inbound pending) should exist in single-player first.

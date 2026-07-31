@@ -2,7 +2,7 @@ import {
   ensureNpcFleet,
   listNpcActivity,
   npcClaimForLot,
-  npcLaneAirborneKg,
+  laneInboundKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
   describeLotMarketPressure,
@@ -41,6 +41,7 @@ export type {
   CommodityId,
   EconomyEvent,
   EconomyEventKind,
+  InboundPending,
   MarketLotView,
   NpcActivityView,
   NpcFleetMemberView,
@@ -59,6 +60,8 @@ export {
   listRegionMarketPressure,
   npcClaimForLot,
   npcLaneAirborneKg,
+  playerLaneInboundKg,
+  laneInboundKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
   NPC_FLEET_SIZE,
@@ -553,6 +556,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     events: [],
     npcs: seedNpcFleet({ seed, regions }),
     npcFlights: [],
+    inboundPending: [],
   };
 }
 
@@ -678,6 +682,9 @@ export function migrateEconomyWorld(
     events: Array.isArray(base.events) ? base.events : [],
     npcs: Array.isArray(base.npcs) ? base.npcs : [],
     npcFlights: Array.isArray(base.npcFlights) ? base.npcFlights : [],
+    inboundPending: Array.isArray((base as { inboundPending?: unknown }).inboundPending)
+      ? ((base as { inboundPending: CareerEconomyWorld['inboundPending'] }).inboundPending ?? [])
+      : [],
   };
 
   ensureNpcFleet(migrated);
@@ -966,6 +973,16 @@ export function pruneDeadLots(
       typeof lot.expiresAtTick === 'number' && lot.expiresAtTick >= keepFrom
     );
   });
+
+  // Drop orphan/stale player inbound so soft-fill cannot linger forever.
+  if (Array.isArray(world.inboundPending) && world.inboundPending.length > 0) {
+    world.inboundPending = world.inboundPending.filter(
+      (pending) =>
+        typeof pending.expiresAtTick === 'number' &&
+        pending.expiresAtTick >= keepFrom,
+    );
+  }
+
   return { removed: before - world.lots.length, kept: world.lots.length };
 }
 
@@ -1142,7 +1159,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
           continue;
         }
 
-        const inboundKg = npcLaneAirborneKg(
+        const inboundKg = laneInboundKg(
           world,
           null,
           dest.ap.icao,

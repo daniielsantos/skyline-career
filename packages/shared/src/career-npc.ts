@@ -192,14 +192,56 @@ export function npcLaneAirborneKg(
   return kg;
 }
 
-/** 0..1 lane saturation; 1 ≈ ≥28t airborne on that OD+commodity. */
+/**
+ * Player cargo already notified to dest (accepted / dispatched / in_flight).
+ * Pass originIcao null/undefined to sum all player inbound to dest.
+ */
+export function playerLaneInboundKg(
+  world: CareerEconomyWorld,
+  originIcao: string | null | undefined,
+  destIcao: string,
+  commodityId: CommodityId,
+): number {
+  const dest = destIcao.toUpperCase();
+  const origin =
+    typeof originIcao === 'string' && originIcao.length > 0
+      ? originIcao.toUpperCase()
+      : null;
+  let kg = 0;
+  for (const pending of world.inboundPending ?? []) {
+    if (pending.source !== 'player') continue;
+    if (pending.commodityId !== commodityId) continue;
+    if (pending.destIcao.toUpperCase() !== dest) continue;
+    if (origin && pending.originIcao.toUpperCase() !== origin) continue;
+    kg += Math.max(0, pending.cargoKg);
+  }
+  return kg;
+}
+
+/**
+ * Soft-fill / lane contract: NPC airborne + player inbound pending.
+ * Pass originIcao null/undefined to sum all inbound to dest.
+ */
+export function laneInboundKg(
+  world: CareerEconomyWorld,
+  originIcao: string | null | undefined,
+  destIcao: string,
+  commodityId: CommodityId,
+): number {
+  return (
+    npcLaneAirborneKg(world, originIcao, destIcao, commodityId) +
+    playerLaneInboundKg(world, originIcao, destIcao, commodityId)
+  );
+}
+
+/** 0..1 lane saturation; 1 ≈ ≥28t inbound (NPC + player) on that OD+commodity. */
 export function npcLaneSaturation(
   world: CareerEconomyWorld,
   originIcao: string,
   destIcao: string,
   commodityId: CommodityId,
 ): number {
-  const airborne = npcLaneAirborneKg(world, originIcao, destIcao, commodityId);
+  const airborne = laneInboundKg(world, originIcao, destIcao, commodityId);
   return Math.min(1, airborne / LANE_SATURATION_KG);
 }
 

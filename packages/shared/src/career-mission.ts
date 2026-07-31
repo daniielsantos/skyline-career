@@ -20,6 +20,7 @@ import type {
 import type {
   AircraftClass,
   FreighterClassId,
+  InboundPending,
   MissionIntent,
   MissionLotLine,
   MissionSettlement,
@@ -402,6 +403,61 @@ export function isActiveMissionStatus(status: string): boolean {
   return ACTIVE_MISSION_STATUSES.has(status);
 }
 
+/** Drop all player inbound rows for one mission. */
+export function clearPlayerInbound(
+  world: CareerEconomyWorld,
+  missionId: string,
+): void {
+  if (!Array.isArray(world.inboundPending) || world.inboundPending.length === 0) {
+    return;
+  }
+  world.inboundPending = world.inboundPending.filter(
+    (pending) => pending.missionId !== missionId,
+  );
+}
+
+/**
+ * Publish (or refresh) destination-notified inbound for an active player flight.
+ * Soft fill / lane saturation read these rows alongside NPC airborne cargo.
+ */
+export function syncPlayerInbound(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+): void {
+  const normalized = normalizeMissionIntent(mission);
+  clearPlayerInbound(world, normalized.id);
+  if (!isActiveMissionStatus(normalized.status)) {
+    return;
+  }
+  if (!Array.isArray(world.inboundPending)) {
+    world.inboundPending = [];
+  }
+  const rows: InboundPending[] = normalized.lots.map((line) => ({
+    id: `${normalized.id}:${line.shipmentLotId}`,
+    missionId: normalized.id,
+    originIcao: normalized.originIcao,
+    destIcao: normalized.destIcao,
+    commodityId: line.commodityId,
+    cargoKg: line.cargoKg,
+    expiresAtTick: line.deadlineTick,
+    source: 'player' as const,
+  }));
+  world.inboundPending.push(...rows);
+}
+
+/** Rebuild player inbound from the missions file (source of truth). */
+export function reconcilePlayerInbound(
+  world: CareerEconomyWorld,
+  missions: readonly MissionIntent[],
+): void {
+  world.inboundPending = (world.inboundPending ?? []).filter(
+    (pending) => pending.source !== 'player',
+  );
+  for (const mission of missions) {
+    syncPlayerInbound(world, mission);
+  }
+}
+
 /** Player missions that are still operational (not settled/cancelled). */
 export function listActivePlayerMissions(
   missions: readonly MissionIntent[],
@@ -554,17 +610,19 @@ export function acceptMission(
   };
 
   if (into) {
-    return recomputeMissionTotals({
+    const appended = recomputeMissionTotals({
       ...into,
       lots: [...into.lots, line],
     });
+    syncPlayerInbound(world, appended);
+    return appended;
   }
 
   const id =
     opts.missionId?.trim() ||
     `msn_${world.tick}_${lot.originIcao}_${lot.destIcao}_${Math.floor(Math.random() * 1e6)}`;
 
-  return recomputeMissionTotals({
+  const created = recomputeMissionTotals({
     id,
     lots: [line],
     shipmentLotId: lot.id,
@@ -582,6 +640,8 @@ export function acceptMission(
     status: 'accepted',
     acceptedAtTick: world.tick,
   });
+  syncPlayerInbound(world, created);
+  return created;
 }
 
 export type StagedManifestLine = {
@@ -702,8 +762,8 @@ export function commitStagedManifest(
     status: lot.status,
   }));
 
+  let mission: MissionIntent | undefined = into;
   try {
-    let mission: MissionIntent | undefined = into;
     for (let i = 0; i < normalizedLines.length; i++) {
       const line = normalizedLines[i]!;
       mission = acceptMission(world, {
@@ -729,6 +789,11 @@ export function commitStagedManifest(
       if (!lot) continue;
       lot.reservedKg = snap.reservedKg;
       lot.status = snap.status;
+    }
+    if (into) {
+      syncPlayerInbound(world, into);
+    } else if (mission) {
+      clearPlayerInbound(world, mission.id);
     }
     throw error;
   }
@@ -857,7 +922,7 @@ export function replaceMissionManifest(
       throw new Error('Edited manifest produced no mission');
     }
 
-    return {
+    const replaced: MissionIntent = {
       ...normalized,
       ...recomputeMissionTotals(next),
       id: normalized.id,
@@ -873,6 +938,8 @@ export function replaceMissionManifest(
       tripFuelBurnKg: undefined,
       dispatchedAtTick: undefined,
     };
+    syncPlayerInbound(world, replaced);
+    return replaced;
   } catch (error) {
     for (const snap of snapshot) {
       const lot = world.lots.find((candidate) => candidate.id === snap.id);
@@ -880,6 +947,7 @@ export function replaceMissionManifest(
       lot.reservedKg = snap.reservedKg;
       lot.status = snap.status;
     }
+    syncPlayerInbound(world, normalized);
     throw error;
   }
 }
@@ -903,7 +971,9 @@ export function cancelMission(
   if (opts.fleet) {
     releaseAircraftOnCancel(opts.fleet, normalized);
   }
-  return { ...normalized, status: 'cancelled' };
+  const cancelled = { ...normalized, status: 'cancelled' as const };
+  clearPlayerInbound(world, cancelled.id);
+  return cancelled;
 }
 
 /**
@@ -954,6 +1024,7 @@ export function departMission(
     nextMission = { ...nextMission, fuelUplift };
   }
 
+  syncPlayerInbound(world, nextMission);
   return {
     mission: nextMission,
     fuelDebitUsd,
@@ -1102,6 +1173,7 @@ export function settleMission(
     penaltyUsd: pay.penaltyUsd,
     lateTicks: pay.lateTicks,
   };
+  clearPlayerInbound(world, settled.id);
 
   return {
     mission: settled,

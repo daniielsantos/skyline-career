@@ -252,6 +252,76 @@ describe('tickEconomyN market formation', () => {
     );
   });
 
+  it('softens urgency when player inbound covers dest shortage', () => {
+    function prepare(withPlayerInbound: boolean): CareerEconomyWorld {
+      const world = createSeedEconomyWorld({ seed: 'player-inbound-shadow' });
+      world.lastBatchAtMs = 1_000_000;
+      world.lots = [];
+      world.npcFlights = [];
+      world.inboundPending = [];
+      world.events = [];
+      for (const npc of world.npcs) {
+        npc.status = 'idle';
+        npc.aggressiveness = 0;
+        npc.currentFlightId = undefined;
+        npc.busyUntilMs = undefined;
+        npc.restUntilMs = undefined;
+      }
+      for (const ap of world.airports) {
+        for (const id of ['electronics', 'machinery', 'general', 'perishables'] as CommodityId[]) {
+          const pile = ap.inventory[id]!;
+          pile.stockKg = pile.capacityKg * 0.5;
+        }
+      }
+      const origin = world.airports.find((a) => a.icao === 'SBGR')!;
+      const dest = world.airports.find((a) => a.icao === 'SBGL')!;
+      origin.inventory.electronics!.stockKg =
+        origin.inventory.electronics!.capacityKg * 0.75;
+      dest.inventory.electronics!.stockKg =
+        dest.inventory.electronics!.capacityKg * 0.25;
+      if (withPlayerInbound) {
+        world.inboundPending = [
+          {
+            id: 'msn_player:lot_x',
+            missionId: 'msn_player',
+            originIcao: 'SBPA',
+            destIcao: 'SBGL',
+            commodityId: 'electronics',
+            cargoKg: 25_000,
+            expiresAtTick: world.tick + 12,
+            source: 'player',
+          },
+        ];
+      }
+      return world;
+    }
+
+    const bare = prepare(false);
+    const covered = prepare(true);
+    const t0 = bare.tick;
+    tickEconomyN(bare, 1, { fromBatchAtMs: bare.lastBatchAtMs });
+    tickEconomyN(covered, 1, { fromBatchAtMs: covered.lastBatchAtMs });
+
+    const bareLots = bare.lots.filter(
+      (l) =>
+        l.createdAtTick > t0 &&
+        l.destIcao === 'SBGL' &&
+        l.commodityId === 'electronics',
+    );
+    const coveredLots = covered.lots.filter(
+      (l) =>
+        l.createdAtTick > t0 &&
+        l.destIcao === 'SBGL' &&
+        l.commodityId === 'electronics',
+    );
+    assert.ok(bareLots.some((l) => l.urgency === 'urgent'));
+    assert.ok(coveredLots.length > 0);
+    assert.ok(
+      coveredLots.every((l) => l.urgency === 'normal'),
+      'player inbound should clear urgent like NPC airborne',
+    );
+  });
+
   it('blocks new lots on a fully saturated OD lane and pays more when partially saturated', () => {
     function prepare(airborneKg: number): CareerEconomyWorld {
       const world = createSeedEconomyWorld({ seed: 'lane-sat-form' });

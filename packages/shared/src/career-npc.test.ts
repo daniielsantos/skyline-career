@@ -11,6 +11,8 @@ import {
   migrateEconomyWorld,
   NPC_FLEET_SIZE,
   npcLaneAirborneKg,
+  playerLaneInboundKg,
+  laneInboundKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
   routeDistanceNm,
@@ -431,6 +433,22 @@ describe('NPC freighter fleet', () => {
     assert.equal(npcLaneAirborneKg(world, null, 'SBGL', 'electronics'), 14_000);
     assert.equal(npcLaneAirborneKg(world, 'SBPA', 'SBGL', 'electronics'), 0);
     assert.ok(Math.abs(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics') - 0.5) < 1e-9);
+
+    world.inboundPending = [
+      {
+        id: 'msn_p:lot',
+        missionId: 'msn_p',
+        originIcao: 'SBGR',
+        destIcao: 'SBGL',
+        commodityId: 'electronics',
+        cargoKg: 7_000,
+        expiresAtTick: world.tick + 10,
+        source: 'player',
+      },
+    ];
+    assert.equal(playerLaneInboundKg(world, 'SBGR', 'SBGL', 'electronics'), 7_000);
+    assert.equal(laneInboundKg(world, 'SBGR', 'SBGL', 'electronics'), 21_000);
+    assert.ok(Math.abs(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics') - 0.75) < 1e-9);
 
     flight.cargoKg = 28_000;
     assert.equal(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics'), 1);

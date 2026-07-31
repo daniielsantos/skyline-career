@@ -230,6 +230,51 @@ describe('acceptMission', () => {
     assert.ok(mission.payUsd > 0);
     assert.equal(mission.rolesPackRelPath, 'profiles/ofp/pmdg-738-bcf.json');
     assert.equal(lot.reservedKg, before + mission.cargoKg);
+    assert.equal(
+      (world.inboundPending ?? []).find((p) => p.missionId === mission.id)?.cargoKg,
+      mission.cargoKg,
+    );
+  });
+
+  it('publishes player inbound on accept and clears on cancel/settle', () => {
+    const world = createSeedEconomyWorld({ seed: 'player-inbound-lifecycle' });
+    world.lots = [];
+    world.npcFlights = [];
+    world.inboundPending = [];
+    const lot = pushTestLot(world, {
+      id: 'lot_inbound_life',
+      originIcao: 'SBKP',
+      destIcao: 'SBGL',
+      commodityId: 'electronics',
+      quantityKg: 8_000,
+      reservedKg: 0,
+      payUsd: 40_000,
+      urgency: 'normal',
+      expiresAtTick: world.tick + 20,
+    });
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_inbound_life',
+    });
+    assert.equal(world.inboundPending?.length, 1);
+    assert.equal(world.inboundPending![0]!.destIcao, 'SBGL');
+    assert.equal(world.inboundPending![0]!.cargoKg, 5_000);
+
+    const cancelled = cancelMission(world, mission);
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(world.inboundPending?.length ?? 0, 0);
+
+    const again = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 4_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_inbound_settle',
+    });
+    assert.equal(world.inboundPending?.length, 1);
+    settleMission(world, again);
+    assert.equal(world.inboundPending?.length ?? 0, 0);
   });
 
   it('clamps cargo to aircraft max and remaining lot', () => {

@@ -40,6 +40,7 @@ import {
   purchasePlayerMissionOfpFuel,
   quotePlayerMissionOfpFuel,
   quoteFerry,
+  reconcilePlayerInbound,
   replaceMissionManifest,
   routeDistanceNm,
   selectStarterHub,
@@ -678,6 +679,12 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/market') {
         const world = await loadEconomy();
+        const missions = await loadMissions();
+        const inboundBefore = JSON.stringify(world.inboundPending ?? []);
+        reconcilePlayerInbound(world, missions.missions);
+        if (JSON.stringify(world.inboundPending ?? []) !== inboundBefore) {
+          await persistEconomy(world);
+        }
         const nowMs = Date.now();
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
         const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);

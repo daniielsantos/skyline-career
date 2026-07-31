@@ -151,6 +151,22 @@ export interface NpcFlight {
   fuelScarcity?: MissionFuelUplift['scarcity'];
 }
 
+/**
+ * Destination-notified inbound: cargo already committed toward a dest terminal.
+ * Player missions publish on accept/depart; NPCs use `npcFlights` instead.
+ */
+export interface InboundPending {
+  id: string;
+  missionId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: CommodityId;
+  cargoKg: number;
+  /** Drop after this tick + retention (usually the lot deadline). */
+  expiresAtTick: number;
+  source: 'player';
+}
+
 export interface NpcActivityView {
   flight: NpcFlight;
   npcName: string;
@@ -235,6 +251,11 @@ export interface CareerEconomyWorld {
   npcs: NpcFreighter[];
   /** Active NPC hauls; completed flights are pruned after settle. */
   npcFlights: NpcFlight[];
+  /**
+   * Player cargo notified to dest (accepted / dispatched / in_flight).
+   * Soft fill = stock + NPC airborne + these rows.
+   */
+  inboundPending?: InboundPending[];
 }
 
 /** Legacy persisted shape before continuous clock / live events. */

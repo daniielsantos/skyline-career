@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
   assertRolesPackAllowsDirectInjection,
+  normalizeAircraftTitle,
   type AircraftProfile,
   type LoadPlanRequest,
   type MissionIntent,
@@ -14,7 +15,6 @@ import {
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compliance/run-compare.ts';
-import { loadRolesPackFile } from '../../agent/src/ofp-compliance/scaffold-roles.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 import {
   OfpLoadPlanError,
@@ -33,6 +33,7 @@ import {
 } from '../../agent/src/profile-registry.ts';
 import { resolveLiveAircraft } from '../../agent/src/resolve-live.ts';
 import { runMissionPreflight, type MissionPreflightResult } from './preflight-helpers.ts';
+import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import type { CareerWatchSession } from './watch-helpers.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -263,26 +264,6 @@ export async function applyMissionOfpLoad(
 
   let ofp = expectation;
   let stationRoles = expectation.payload?.stationRoles;
-  let rolesPack: Awaited<ReturnType<typeof loadRolesPackFile>> | undefined;
-  try {
-    const rolesPath = resolve(repoRoot, mission.rolesPackRelPath);
-    rolesPack = await loadRolesPackFile(rolesPath);
-    assertRolesPackAllowsDirectInjection(rolesPack);
-    stationRoles = rolesPack.payload?.stationRoles ?? stationRoles;
-    ofp = applyOfpOverrides(expectation, {
-      stationRoles: rolesPack.payload?.stationRoles,
-      liveSources: rolesPack.liveSources,
-    });
-  } catch (rolesError) {
-    if (
-      rolesError instanceof Error &&
-      (rolesError.message.includes('loadMethod=') ||
-        rolesError.message.includes('injectCapable'))
-    ) {
-      throw rolesError;
-    }
-    // Freighter may still load if OFP already carries stationRoles.
-  }
 
   const bridge = new NamedPipeSimBridge(
     opts.pipeName ? { pipeName: opts.pipeName } : {},
@@ -338,6 +319,31 @@ export async function applyMissionOfpLoad(
     profileKey = resolved.profile.profileKey;
     profilePath = resolved.path ?? null;
     fingerprint = resolved.fingerprint;
+
+    try {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: mission.rolesPackRelPath,
+        liveTitle:
+          normalizeAircraftTitle(resolved.identity.title) ||
+          resolved.identity.title,
+      });
+      assertRolesPackAllowsDirectInjection(roles.pack);
+      stationRoles = roles.pack.payload?.stationRoles ?? stationRoles;
+      ofp = applyOfpOverrides(expectation, {
+        stationRoles: roles.pack.payload?.stationRoles,
+        liveSources: roles.pack.liveSources,
+      });
+    } catch (rolesError) {
+      if (
+        rolesError instanceof Error &&
+        (rolesError.message.includes('loadMethod=') ||
+          rolesError.message.includes('injectCapable'))
+      ) {
+        throw rolesError;
+      }
+      // Freighter may still load if OFP already carries stationRoles.
+    }
 
     const snap = await bridge.snapshot();
     beforeLive = {

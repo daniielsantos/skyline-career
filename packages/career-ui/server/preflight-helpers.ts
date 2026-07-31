@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   KG_TO_LB,
   careerPreflightReady,
+  normalizeAircraftTitle,
   ofpCargoKg,
   ofpFuelToLb,
   softenCareerPreflightVerdict,
@@ -18,10 +19,9 @@ import {
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compliance/run-compare.ts';
-import { loadRolesPackFile } from '../../agent/src/ofp-compliance/scaffold-roles.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 import { readLiveCgState } from '../../agent/src/live-cg.ts';
-
+import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
 const ofpCache = new Map<string, Promise<OfpExpectation>>();
@@ -116,23 +116,28 @@ export async function runMissionPreflight(
 
   const expectation = await loadPreflightOfp(mission, { username, userid });
 
-  let ofp = expectation;
-  try {
-    const rolesPath = resolve(repoRoot, mission.rolesPackRelPath);
-    const rolesPack = await loadRolesPackFile(rolesPath);
-    ofp = applyOfpOverrides(expectation, {
-      stationRoles: rolesPack.payload?.stationRoles,
-      liveSources: rolesPack.liveSources,
-    });
-  } catch {
-    // Freighter compare still works without roles; classic payload path.
-  }
-
   const bridge = new NamedPipeSimBridge(
     opts.pipeName ? { pipeName: opts.pipeName } : {},
   );
   try {
     await bridge.open('Skyline Career UI Preflight');
+    const identity = await bridge.getAircraftIdentity();
+    const liveTitle = normalizeAircraftTitle(identity.title ?? '');
+    let ofp = expectation;
+    try {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: mission.rolesPackRelPath,
+        liveTitle: liveTitle || identity.title,
+      });
+      ofp = applyOfpOverrides(expectation, {
+        stationRoles: roles.pack.payload?.stationRoles,
+        liveSources: roles.pack.liveSources,
+      });
+    } catch {
+      // Freighter compare still works without roles; classic payload path.
+    }
+
     const { snapshot, live } = await compareOnce(bridge, {
       ofp,
       locked: false,

@@ -985,7 +985,8 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     const urgent =
       effectiveDestFill < 0.22 ||
       commodity.perishable === true ||
-      (dest.fill < 0.28 && inboundKg < 1_000);
+      (dest.fill < 0.28 && inboundKg < 1_000) ||
+      laneSaturation >= 0.5;
     const urgencyMult = urgent ? 1.35 : 1;
     const distanceBias =
       origin.ap.region.split('-')[0] === dest.ap.region.split('-')[0] ? 1 : 1.15;

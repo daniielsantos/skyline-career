@@ -961,6 +961,10 @@ th {
   color: var(--muted);
 }
 
+.market-events {
+  margin: 0 0 0.85rem;
+}
+
 .hub-picker {
   margin-bottom: 1rem;
 }
@@ -1218,6 +1222,12 @@ small {
 .tag.idle {
   background: rgba(176, 137, 0, 0.16);
   color: #7a5f00;
+  margin-left: 0.35rem;
+}
+
+.tag.shock {
+  background: rgba(140, 60, 90, 0.14);
+  color: #7a2f4c;
   margin-left: 0.35rem;
 }
 

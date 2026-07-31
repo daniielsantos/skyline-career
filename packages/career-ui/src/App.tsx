@@ -30,6 +30,7 @@ import {
   type AirportLot,
   type AirportMovement,
   type AirportView,
+  type EconomyEvent,
   type MarketLot,
   type MissionFuelQuote,
   type Mission,
@@ -728,6 +729,7 @@ export function App() {
   const [displayNowMs, setDisplayNowMs] = useState(Date.now());
   const [wallet, setWallet] = useState(0);
   const [lots, setLots] = useState<MarketLot[]>([]);
+  const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [npcActivity, setNpcActivity] = useState<NpcActivity[]>([]);
   const [npcBusy, setNpcBusy] = useState(0);
   const [npcFleet, setNpcFleet] = useState<NpcFleetMember[]>([]);
@@ -890,6 +892,7 @@ export function App() {
     setDisplayNowMs(serverNow);
     setWallet(missionState.walletUsd);
     setLots(market.lots);
+    setMarketEvents(market.events ?? []);
     setNpcActivity(npcState.activity.length ? npcState.activity : market.npcActivity ?? []);
     setNpcBusy(npcState.busy);
     setNpcFleet(npcState.fleet);
@@ -3212,6 +3215,19 @@ export function App() {
             </p>
             <RegionPressureChips regions={regionPressure} />
           </div>
+          {marketEvents.length > 0 ? (
+            <ul className="event-list market-events">
+              {marketEvents.map((ev) => (
+                <li key={ev.id} className={`event-badge shock-${ev.kind}`}>
+                  <strong>{ev.region}</strong> · {ev.label}
+                  <small>
+                    {' '}
+                    · ends {formatClock(ev.endsAtTick)}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {activeMission ? (
             <p className="banner warn">
               Active flight {activeMission.id} ({activeMission.originIcao}→
@@ -3481,6 +3497,17 @@ export function App() {
                             Idle +{Math.round(((lot.pressure.idlePayMult || 1) - 1) * 100)}%
                           </span>
                         ) : null}
+                        {lot.pressure?.demandShock
+                          ? (lot.pressure.shockLabels ?? ['Shock']).map((label) => (
+                              <span
+                                key={`${lot.id}-${label}`}
+                                className="tag shock"
+                                title={`Regional demand shock on this lane — freight pay ×${(lot.pressure?.shockPayMult ?? 1).toFixed(2)}`}
+                              >
+                                {label}
+                              </span>
+                            ))
+                          : null}
                       </div>
                       <small>
                         {lot.originName} → {lot.destName}

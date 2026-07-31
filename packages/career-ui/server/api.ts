@@ -847,6 +847,9 @@ export function createCareerApiServer(port = 8787) {
                   weather: row.pressure.weather,
                   idleEscalated: row.pressure.idleEscalated ?? false,
                   idlePayMult: row.pressure.idlePayMult ?? 1,
+                  demandShock: row.pressure.demandShock ?? false,
+                  shockLabels: row.pressure.shockLabels ?? [],
+                  shockPayMult: row.pressure.shockPayMult ?? 1,
                 }
               : null,
             npcClaim: row.npcClaim
@@ -856,6 +859,15 @@ export function createCareerApiServer(port = 8787) {
                   etaHours: row.npcClaim.etaHours,
                 }
               : null,
+          })),
+          events: listActiveEconomyEvents(world).map((ev) => ({
+            id: ev.id,
+            kind: ev.kind,
+            region: ev.region,
+            commodityId: ev.commodityId ?? null,
+            startsAtTick: ev.startsAtTick,
+            endsAtTick: ev.endsAtTick,
+            label: ev.label,
           })),
         });
         return;

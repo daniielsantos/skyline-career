@@ -75,7 +75,8 @@ export type EconomyEventKind =
   | 'harvest_boost'
   | 'port_congestion'
   | 'factory_outage'
-  | 'festival_demand';
+  | 'festival_demand'
+  | 'labor_strike';
 
 export interface EconomyEvent {
   id: string;
@@ -323,6 +324,12 @@ export interface MarketLotView {
     idleEscalated?: boolean;
     /** Current idle pay multiplier (>= 1). */
     idlePayMult?: number;
+    /** Active regional demand shocks touching this OD. */
+    demandShock?: boolean;
+    /** Short shock labels for chips (e.g. Harvest, Festival). */
+    shockLabels?: string[];
+    /** Combined freight pay multiplier from shocks (>= 1). */
+    shockPayMult?: number;
   };
 }
 

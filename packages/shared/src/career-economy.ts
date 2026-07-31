@@ -1138,6 +1138,10 @@ function activeEvents(world: CareerEconomyWorld, tick = world.tick): EconomyEven
   return (world.events ?? []).filter((e) => e.startsAtTick <= tick && tick < e.endsAtTick);
 }
 
+function eventTouchesCommodity(ev: EconomyEvent, commodityId: CommodityId): boolean {
+  return !ev.commodityId || ev.commodityId === commodityId;
+}
+
 function eventMultiplier(
   world: CareerEconomyWorld,
   ap: AirportTerminal,
@@ -1147,13 +1151,18 @@ function eventMultiplier(
   let m = 1;
   for (const ev of activeEvents(world)) {
     if (ev.region !== ap.region) continue;
-    if (ev.commodityId && ev.commodityId !== commodityId) continue;
+    if (!eventTouchesCommodity(ev, commodityId)) continue;
     switch (ev.kind) {
       case 'harvest_boost':
         if (side === 'prod' && (!ev.commodityId || ev.commodityId === 'perishables')) m *= 1.35;
         break;
       case 'factory_outage':
-        if (side === 'prod' && (!ev.commodityId || ev.commodityId === 'electronics' || ev.commodityId === 'machinery')) {
+        if (
+          side === 'prod' &&
+          (!ev.commodityId ||
+            ev.commodityId === 'electronics' ||
+            ev.commodityId === 'machinery')
+        ) {
           m *= 0.55;
         }
         break;
@@ -1164,6 +1173,10 @@ function eventMultiplier(
       case 'festival_demand':
         if (side === 'cons') m *= 1.4;
         break;
+      case 'labor_strike':
+        if (side === 'prod') m *= 0.65;
+        if (side === 'cons') m *= 0.8;
+        break;
       default:
         break;
     }
@@ -1171,13 +1184,117 @@ function eventMultiplier(
   return m;
 }
 
+/** Short chip label for a demand-shock kind. */
+export function economyEventChipLabel(kind: EconomyEventKind): string {
+  switch (kind) {
+    case 'harvest_boost':
+      return 'Harvest';
+    case 'factory_outage':
+      return 'Outage';
+    case 'port_congestion':
+      return 'Congestion';
+    case 'festival_demand':
+      return 'Festival';
+    case 'labor_strike':
+      return 'Strike';
+    default:
+      return 'Shock';
+  }
+}
+
+export type LaneDemandShock = {
+  payMult: number;
+  forceUrgent: boolean;
+  lifeMult: number;
+  labels: string[];
+  kinds: EconomyEventKind[];
+};
+
+/**
+ * Freight-facing demand shocks for an OD lane.
+ * Events on origin or dest (matching commodity) raise pay / urgency / shorten life.
+ */
+export function laneDemandShock(
+  world: CareerEconomyWorld,
+  opts: {
+    originRegion: string;
+    destRegion: string;
+    commodityId: CommodityId;
+    tick?: number;
+  },
+): LaneDemandShock {
+  const tick = opts.tick ?? world.tick;
+  let payMult = 1;
+  let forceUrgent = false;
+  let lifeMult = 1;
+  const labels: string[] = [];
+  const kinds: EconomyEventKind[] = [];
+
+  for (const ev of activeEvents(world, tick)) {
+    if (ev.region !== opts.originRegion && ev.region !== opts.destRegion) continue;
+    if (!eventTouchesCommodity(ev, opts.commodityId)) continue;
+    const atOrigin = ev.region === opts.originRegion;
+    const atDest = ev.region === opts.destRegion;
+    kinds.push(ev.kind);
+    const chip = economyEventChipLabel(ev.kind);
+    if (!labels.includes(chip)) labels.push(chip);
+
+    switch (ev.kind) {
+      case 'harvest_boost':
+        // Origin surplus dump — slight pay bump to clear perishables.
+        if (atOrigin) payMult *= 1.08;
+        if (atDest) {
+          payMult *= 1.05;
+          lifeMult *= 0.92;
+        }
+        break;
+      case 'festival_demand':
+        if (atDest) {
+          payMult *= 1.18;
+          forceUrgent = true;
+          lifeMult *= 0.9;
+        }
+        if (atOrigin) payMult *= 1.06;
+        break;
+      case 'factory_outage':
+        if (atDest) {
+          payMult *= 1.16;
+          forceUrgent = true;
+        }
+        if (atOrigin) payMult *= 1.1;
+        break;
+      case 'port_congestion':
+        payMult *= 1.1;
+        lifeMult *= 0.88;
+        if (atDest) forceUrgent = true;
+        break;
+      case 'labor_strike':
+        payMult *= 1.14;
+        lifeMult *= 0.85;
+        forceUrgent = true;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    payMult: Math.min(1.45, payMult),
+    forceUrgent,
+    lifeMult: Math.max(0.7, lifeMult),
+    labels,
+    kinds,
+  };
+}
+
 function maybeSpawnEvents(world: CareerEconomyWorld, rng: () => number): void {
   if (!world.events) world.events = [];
   // Drop finished events older than 48h
   world.events = world.events.filter((e) => e.endsAtTick > world.tick - 48);
   const active = activeEvents(world);
-  if (active.length >= 3) return;
-  if (rng() > 0.04) return;
+  if (active.length >= 4) return;
+  // ~7%/tick → occasional overlapping regional shocks without flooding.
+  if (rng() > 0.07) return;
 
   const regions = [...new Set(world.airports.map((a) => a.region))];
   const region = regions[Math.floor(rng() * regions.length)] ?? 'BR-SE';
@@ -1186,6 +1303,7 @@ function maybeSpawnEvents(world: CareerEconomyWorld, rng: () => number): void {
     'port_congestion',
     'factory_outage',
     'festival_demand',
+    'labor_strike',
   ];
   const kind = kinds[Math.floor(rng() * kinds.length)]!;
   const duration = 12 + Math.floor(rng() * 36);
@@ -1206,6 +1324,10 @@ function maybeSpawnEvents(world: CareerEconomyWorld, rng: () => number): void {
     case 'festival_demand':
       commodityId = rng() > 0.5 ? 'general' : 'perishables';
       label = `Festival demand for ${commodityId} in ${region}`;
+      break;
+    case 'labor_strike':
+      commodityId = rng() > 0.5 ? 'general' : 'machinery';
+      label = `Labor strike slowing ${commodityId} in ${region}`;
       break;
   }
   world.events.push({
@@ -1500,10 +1622,16 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     const originWx = regionalWeatherIndex(world, origin.ap.region);
     const destWx = regionalWeatherIndex(world, dest.ap.region);
     const laneWeather = worseWeather(originWx, destWx);
+    const shock = laneDemandShock(world, {
+      originRegion: origin.ap.region,
+      destRegion: dest.ap.region,
+      commodityId: commodity.id,
+    });
     const destCap = dest.stock.capacityKg;
     const effectiveDestFill =
       destCap > 0 ? (dest.stock.stockKg + inboundKg) / destCap : dest.fill;
     const urgent =
+      shock.forceUrgent ||
       effectiveDestFill < 0.22 ||
       commodity.perishable === true ||
       (dest.fill < 0.28 && inboundKg < 1_000) ||
@@ -1531,7 +1659,8 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         capacityPayMult *
         scarcePayMult *
         weatherPayMult *
-        corridorPayMult,
+        corridorPayMult *
+        shock.payMult,
       commodity.basePricePerKg * 1.8,
     );
     const payUsd = Math.round(qty * payPerKg);
@@ -1540,9 +1669,13 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       : 18 + Math.floor(rng() * 8);
     const life = Math.max(
       4,
-      Math.round(baseLife * regionalWeatherLifeMult(laneWeather)),
+      Math.round(
+        baseLife * regionalWeatherLifeMult(laneWeather) * shock.lifeMult,
+      ),
     );
 
+    const shockNote =
+      shock.labels.length > 0 ? ` · ${shock.labels.join('/')}` : '';
     const lot: ShipmentLot = {
       id: `lot_${world.tick}_${commodity.id}_${origin.ap.icao}_${dest.ap.icao}_${Math.floor(rng() * 1e6)}`,
       commodityId: commodity.id,
@@ -1555,7 +1688,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       payUsd,
       basePayUsd: payUsd,
       urgency: urgent ? 'urgent' : 'normal',
-      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${size === 'small' ? ' · LTL' : ''}`,
+      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${size === 'small' ? ' · LTL' : ''}${shockNote}`,
       status: 'available',
     };
 
@@ -1950,6 +2083,17 @@ export function listMarketLots(
     const idlePayMult = idleLotPayMult(lot, world.tick);
     pressure.idlePayMult = idlePayMult;
     pressure.idleEscalated = idlePayMult > 1.02;
+    const originRegion =
+      byIcao.get(lot.originIcao)?.region ?? pressure.originRegion;
+    const destRegion = byIcao.get(lot.destIcao)?.region ?? '';
+    const shock = laneDemandShock(world, {
+      originRegion,
+      destRegion,
+      commodityId: lot.commodityId,
+    });
+    pressure.demandShock = shock.labels.length > 0;
+    pressure.shockLabels = shock.labels;
+    pressure.shockPayMult = shock.payMult;
 
     views.push({
       lot,

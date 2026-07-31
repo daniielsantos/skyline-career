@@ -155,6 +155,9 @@ export type LotPressure = {
   weather?: 'fair' | 'marginal' | 'poor';
   idleEscalated?: boolean;
   idlePayMult?: number;
+  demandShock?: boolean;
+  shockLabels?: string[];
+  shockPayMult?: number;
 };
 
 export type MarketLot = {
@@ -392,6 +395,7 @@ export function fetchMarket(aircraft?: AircraftClass) {
       lots: MarketLot[];
       npcActivity?: NpcActivity[];
       regionPressure?: RegionPressure[];
+      events?: EconomyEvent[];
       maxCargoKg?: number | null;
       maxCargoSource?: string | null;
       airframeLabel?: string | null;

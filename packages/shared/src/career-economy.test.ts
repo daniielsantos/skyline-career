@@ -12,7 +12,9 @@ import {
   HUB_TIER_PROFILE,
   idleLotPayMult,
   IDLE_LOT_PAY_MAX_MULT,
+  laneDemandShock,
   laneLotCaps,
+  listActiveEconomyEvents,
   listMarketLots,
   localPriceMultiplier,
   migrateEconomyWorld,
@@ -23,7 +25,13 @@ import {
   routeDistanceNm,
   tickEconomyN,
 } from './career-economy.js';
-import type { CareerEconomyWorld, CommodityId, NpcFlight, ShipmentLot } from './types/career-economy.js';
+import type {
+  CareerEconomyWorld,
+  CommodityId,
+  EconomyEvent,
+  NpcFlight,
+  ShipmentLot,
+} from './types/career-economy.js';
 
 describe('career-economy seed', () => {
   it('creates 28 Brazilian hubs across N/NE/CO/SE/S and 5 commodities of inventory', () => {
@@ -144,6 +152,72 @@ describe('cargo corridors', () => {
       ),
       'expected at least one strong-corridor lot (e.g. GRU↔Manaus class)',
     );
+  });
+});
+
+describe('demand shocks', () => {
+  it('raises lane freight pay and urgency under festival demand at dest', () => {
+    const world = createSeedEconomyWorld({ seed: 'shock-fest' });
+    const event: EconomyEvent = {
+      id: 'evt_fest',
+      kind: 'festival_demand',
+      region: 'BR-SE',
+      commodityId: 'general',
+      startsAtTick: 0,
+      endsAtTick: 48,
+      label: 'Festival demand for general in BR-SE',
+    };
+    world.events = [event];
+    const shock = laneDemandShock(world, {
+      originRegion: 'BR-S',
+      destRegion: 'BR-SE',
+      commodityId: 'general',
+    });
+    assert.ok(shock.payMult > 1.1);
+    assert.equal(shock.forceUrgent, true);
+    assert.ok(shock.labels.includes('Festival'));
+  });
+
+  it('spawns regional events over time and surfaces them on market lots', () => {
+    const world = createSeedEconomyWorld({ seed: 'shock-spawn' });
+    world.npcs = [];
+    world.npcFlights = [];
+    world.lastBatchAtMs = 1;
+    tickEconomyN(world, 120, { fromBatchAtMs: 1 });
+    const active = listActiveEconomyEvents(world);
+    assert.ok(active.length >= 1, 'expected at least one active demand shock');
+    // Inject a known dest shock so a formed lot can show the chip path.
+    const destRegion = world.airports.find((a) => a.icao === 'SBGL')?.region ?? 'BR-SE';
+    world.events.push({
+      id: 'evt_force',
+      kind: 'labor_strike',
+      region: destRegion,
+      commodityId: 'general',
+      startsAtTick: world.tick,
+      endsAtTick: world.tick + 24,
+      label: `Labor strike in ${destRegion}`,
+    });
+    const origin = world.airports.find((a) => a.icao === 'SBGR')!;
+    const dest = world.airports.find((a) => a.icao === 'SBGL')!;
+    world.lots.push({
+      id: 'lot_shock',
+      commodityId: 'general',
+      originIcao: origin.icao,
+      destIcao: dest.icao,
+      quantityKg: 4_000,
+      reservedKg: 0,
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 18,
+      payUsd: 2_000,
+      basePayUsd: 2_000,
+      urgency: 'normal',
+      reason: 'test',
+      status: 'available',
+    });
+    const row = listMarketLots(world).find((r) => r.lot.id === 'lot_shock');
+    assert.ok(row?.pressure?.demandShock);
+    assert.ok((row?.pressure?.shockPayMult ?? 1) > 1);
+    assert.ok(row?.pressure?.shockLabels?.includes('Strike'));
   });
 });
 

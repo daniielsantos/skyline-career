@@ -262,6 +262,12 @@ export type LotMarketPressure = {
   idleEscalated?: boolean;
   /** Current idle pay multiplier (>= 1). */
   idlePayMult?: number;
+  /** Active regional demand shocks touching this OD. */
+  demandShock?: boolean;
+  /** Short shock labels for chips. */
+  shockLabels?: string[];
+  /** Combined freight pay multiplier from shocks (>= 1). */
+  shockPayMult?: number;
 };
 
 export type RegionMarketPressure = {

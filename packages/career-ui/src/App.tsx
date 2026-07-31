@@ -40,6 +40,13 @@ import {
   type WatchStatus,
 } from './api';
 import {
+  pathForLocation,
+  readCareerLocation,
+  writeCareerLocation,
+  type CareerTab,
+} from './routes';
+import { useConfirm } from './ConfirmDialog';
+import {
   displayToKg,
   formatMass,
   formatMassExact,
@@ -53,7 +60,7 @@ import {
   type WeightSystem,
 } from './weight-units';
 
-type Tab = 'market' | 'missions' | 'fleet' | 'staging' | 'hangar' | 'pilot' | 'settings';
+type Tab = CareerTab;
 type TerminalSection = 'inventory' | 'contracts' | 'movements';
 type MarketSortKey = 'distance' | 'cargo' | 'load' | 'expires' | 'pay';
 type SortDirection = 'asc' | 'desc';
@@ -117,6 +124,24 @@ function aircraftClassLabel(id: string): string {
   if (id === 'light_ga') return 'Bonanza';
   if (id === 'narrow_freighter') return 'Narrow';
   return id.replace(/_/g, ' ');
+}
+
+function regionLabel(region: string): string {
+  switch (region) {
+    case 'BR-S':
+      return 'Brazil — South';
+    case 'BR-SE':
+      return 'Brazil — Southeast';
+    case 'BR-NE':
+      return 'Brazil — Northeast';
+    case 'BR-N':
+      return 'Brazil — North';
+    case 'BR-CW':
+    case 'BR-CO':
+      return 'Brazil — Central-West';
+    default:
+      return region;
+  }
 }
 
 function fallbackMaxCargoKg(aircraft: AircraftClass): number {
@@ -368,6 +393,8 @@ function phaseLabel(phase: string): string {
       return 'En route';
     case 'turnaround':
       return 'Turnaround';
+    case 'resting':
+      return 'Resting';
     case 'boarding':
       return 'Boarding';
     case 'idle':
@@ -557,12 +584,18 @@ function FleetRoster(props: {
               npc.phase === 'turnaround' && typeof npc.busyUntilMs === 'number'
                 ? Math.max(0, (npc.busyUntilMs - props.nowMs) / MS_PER_TICK_DEFAULT)
                 : npc.turnaroundHoursLeft;
+            const restLeft =
+              npc.phase === 'resting' && typeof npc.restUntilMs === 'number'
+                ? Math.max(0, (npc.restUntilMs - props.nowMs) / MS_PER_TICK_DEFAULT)
+                : npc.restHoursLeft;
             const phase =
               mission != null
                 ? livePhase(eta, mission.phase)
                 : npc.phase === 'turnaround' && (turnaroundLeft ?? 0) <= 0
                   ? 'idle'
-                  : npc.phase;
+                  : npc.phase === 'resting' && (restLeft ?? 0) <= 0
+                    ? 'idle'
+                    : npc.phase;
             return (
               <tr key={npc.id} className={`fleet-row phase-${phase}`}>
                 <td>
@@ -576,11 +609,29 @@ function FleetRoster(props: {
                   {aircraftClassLabel(npc.aircraftClassId)}
                   <small>{npc.aircraftLabel}</small>
                 </td>
-                <td>{npc.homeRegion}</td>
+                <td title={regionLabel(npc.homeRegion)}>{npc.homeRegion}</td>
                 <td>
-                  <span className={`phase-tag phase-${phase}`}>{phaseLabel(phase)}</span>
+                  <span
+                    className={`phase-tag phase-${phase}`}
+                    title={
+                      phase === 'resting'
+                        ? `Crew rest after duty day${
+                            typeof npc.dutyHoursAccum === 'number'
+                              ? ` · ${npc.dutyHoursAccum.toFixed(1)}h duty`
+                              : ''
+                          } · back in ${formatDuration(restLeft ?? 0)}`
+                        : phase === 'turnaround'
+                          ? `Ground turnaround · free in ${formatDuration(turnaroundLeft ?? 0)}`
+                          : undefined
+                    }
+                  >
+                    {phaseLabel(phase)}
+                  </span>
                   {phase === 'turnaround' && turnaroundLeft !== undefined ? (
                     <small>free in {formatDuration(turnaroundLeft)}</small>
+                  ) : null}
+                  {phase === 'resting' && restLeft !== undefined ? (
+                    <small>back in {formatDuration(restLeft)}</small>
                   ) : null}
                 </td>
                 <td>
@@ -625,8 +676,12 @@ function FleetRoster(props: {
 }
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('market');
-  const [airportIcao, setAirportIcao] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
+  const initialLocation = readCareerLocation();
+  const [tab, setTab] = useState<Tab>(initialLocation.tab);
+  const [airportIcao, setAirportIcao] = useState<string | null>(
+    initialLocation.airportIcao,
+  );
   const [airportView, setAirportView] = useState<AirportView | null>(null);
   const [terminalSection, setTerminalSection] =
     useState<TerminalSection>('inventory');
@@ -645,6 +700,7 @@ export function App() {
   const [npcSummary, setNpcSummary] = useState({
     airborne: 0,
     turnaround: 0,
+    resting: 0,
     idle: 0,
   });
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -717,6 +773,70 @@ export function App() {
   const [signupName, setSignupName] = useState('');
   const [signupHub, setSignupHub] = useState('');
 
+  useEffect(() => {
+    const loc = { tab, airportIcao };
+    const canonical = pathForLocation(loc);
+    if (window.location.pathname !== canonical) {
+      writeCareerLocation(loc, { replace: true });
+    }
+    // Mount-only canonicalize of `/` and unknown paths.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    function onPopState() {
+      const loc = readCareerLocation();
+      setTab(loc.tab);
+      if (loc.airportIcao) {
+        void (async () => {
+          try {
+            const view = await fetchAirport(loc.airportIcao!);
+            setAirportView(view);
+            setAirportIcao(loc.airportIcao);
+            setTerminalSection('inventory');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+            setAirportIcao(null);
+            setAirportView(null);
+            writeCareerLocation({ tab: loc.tab, airportIcao: null }, { replace: true });
+          }
+        })();
+      } else {
+        setAirportIcao(null);
+        setAirportView(null);
+        setTerminalSection('inventory');
+      }
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!initialLocation.airportIcao) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const view = await fetchAirport(initialLocation.airportIcao!);
+        if (!cancelled) {
+          setAirportView(view);
+          setTerminalSection('inventory');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+          setAirportIcao(null);
+          writeCareerLocation({ tab: initialLocation.tab, airportIcao: null }, {
+            replace: true,
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const refresh = useCallback(async () => {
     setError(null);
     const [state, market, missionState, npcState] = await Promise.all([
@@ -740,6 +860,7 @@ export function App() {
     setNpcSummary({
       airborne: npcState.airborne,
       turnaround: npcState.turnaround,
+      resting: npcState.resting ?? 0,
       idle: npcState.idle,
     });
     setMissions(missionState.missions.slice().reverse());
@@ -1534,6 +1655,7 @@ export function App() {
         setTerminalSection('inventory');
       }
       setAirportIcao(next);
+      writeCareerLocation({ tab, airportIcao: next });
     }, { refreshAfter: false });
   }
 
@@ -1541,11 +1663,19 @@ export function App() {
     setAirportIcao(null);
     setAirportView(null);
     setTerminalSection('inventory');
+    writeCareerLocation({ tab, airportIcao: null });
+  }
+
+  function goToTab(next: Tab, opts: { replace?: boolean } = {}) {
+    setAirportIcao(null);
+    setAirportView(null);
+    setTerminalSection('inventory');
+    setTab(next);
+    writeCareerLocation({ tab: next, airportIcao: null }, opts);
   }
 
   function selectTab(next: Tab) {
-    closeAirport();
-    setTab(next);
+    goToTab(next);
     void run(refresh, { refreshAfter: false });
   }
 
@@ -1564,9 +1694,13 @@ export function App() {
   }
 
   async function onResetBrazil() {
-    const confirmed = window.confirm(
-      'Reset the local career to the Brazil-only world? This clears the pilot profile, missions, wallet, and hangar.',
-    );
+    const confirmed = await confirm({
+      title: 'Reset Brazil world?',
+      body: 'Clears the local career save — pilot profile, missions, wallet, and hangar — then reseeds the Brazil-only economy.',
+      confirmLabel: 'Reset everything',
+      cancelLabel: 'Keep save',
+      tone: 'danger',
+    });
     if (!confirmed) return;
     await run(async () => {
       const result = await postInitBrazil();
@@ -1580,7 +1714,7 @@ export function App() {
       setHomeHubIcao('');
       setSignupName('');
       setSignupHub('');
-      setTab('pilot');
+      goToTab('pilot');
     });
   }
 
@@ -1607,7 +1741,7 @@ export function App() {
       setToast(
         `${result.pilotName} registered · Caravan parked at ${result.homeHubIcao}`,
       );
-      setTab('pilot');
+      goToTab('pilot');
     });
   }
 
@@ -1626,23 +1760,35 @@ export function App() {
 
   async function onFerry(aircraftId: string, destIcao: string) {
     if (!destIcao.trim()) return;
-    await run(async () => {
-      const quoteRes = await postFerry({
+    const dest = destIcao.trim().toUpperCase();
+    let quoteRes: Awaited<ReturnType<typeof postFerry>>;
+    try {
+      setBusy(true);
+      setError(null);
+      quoteRes = await postFerry({
         aircraftId,
-        destIcao: destIcao.trim().toUpperCase(),
+        destIcao: dest,
         quoteOnly: true,
       });
-      const q = quoteRes.quote;
-      const ok = window.confirm(
-        `Ferry ${q.originIcao} → ${q.destIcao}?\n` +
-          `${Math.round(q.distanceNm)} nm · fee ${formatMoney(q.ferryFeeUsd)}` +
-          ` · fuel ${formatMoney(q.fuelCostUsd)}` +
-          ` · total ${formatMoney(q.totalCostUsd)} (instant)`,
-      );
-      if (!ok) return;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    } finally {
+      setBusy(false);
+    }
+    const quote = quoteRes.quote;
+    const ok = await confirm({
+      title: `Ferry ${quote.originIcao} → ${quote.destIcao}?`,
+      body: `${Math.round(quote.distanceNm)} nm · fee ${formatMoney(quote.ferryFeeUsd)} · fuel ${formatMoney(quote.fuelCostUsd)} · total ${formatMoney(quote.totalCostUsd)} (instant relocation).`,
+      confirmLabel: 'Ferry now',
+      cancelLabel: 'Not now',
+      tone: 'warn',
+    });
+    if (!ok) return;
+    await run(async () => {
       const result = await postFerry({
         aircraftId,
-        destIcao: destIcao.trim().toUpperCase(),
+        destIcao: dest,
       });
       if (result.fleet) setFleet(result.fleet);
       setWallet(result.walletUsd);
@@ -1746,14 +1892,14 @@ export function App() {
   function enterStaging(lot: MarketLot) {
     if (!hubSelected) {
       setError('Create your pilot profile first (name + home hub)');
-      setTab('pilot');
+      goToTab('pilot');
       return;
     }
     if (activeMission) {
       setError(
         `Finish or cancel ${activeMission.id} in Staging before preparing another flight`,
       );
-      setTab('staging');
+      goToTab('staging');
       return;
     }
     const parkedHere = fleet.find(
@@ -1766,7 +1912,7 @@ export function App() {
           ? `Your ${parked.label} is at ${parked.locationIcao}. Ferry to ${lot.originIcao} from Hangar first.`
           : `No parked aircraft available for ${lot.originIcao}`,
       );
-      setTab('hangar');
+      goToTab('hangar');
       return;
     }
     const aircraft = parkedHere.aircraftClassId;
@@ -1797,7 +1943,7 @@ export function App() {
     setPreferredAircraft(aircraft);
     setError(null);
     closeAirport();
-    setTab('staging');
+    goToTab('staging');
   }
 
   function enterStagingFromContract(lot: AirportLot) {
@@ -1829,10 +1975,10 @@ export function App() {
     if (busy) return;
     if (staging?.replaceManifest) {
       setStaging(null);
-      setTab('staging');
+      goToTab('staging');
       return;
     }
-    setTab('market');
+    goToTab('market');
   }
 
   async function enterEditManifest(mission: Mission) {
@@ -1934,7 +2080,7 @@ export function App() {
     setError(null);
     setToastKind('ok');
     setToast('Editing manifest — adjust payload, then Save & re-dispatch');
-    setTab('staging');
+    goToTab('staging');
   }
 
   function changeStagingAircraft(next: AircraftClass) {
@@ -2062,7 +2208,7 @@ export function App() {
           result.lineCount ?? staging.lines.length
         } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem}${dispatchNote}`,
       );
-      setTab('staging');
+      goToTab('staging');
     });
   }
 
@@ -2081,20 +2227,48 @@ export function App() {
   }
 
   async function onCancel(mission: Mission) {
-    const ok = window.confirm(
-      `Cancel mission ${mission.id}?\nReleases ${mission.lots?.length ?? 1} lot reservation(s) back to the market when still active. No payout.`,
-    );
+    const ok = await confirm({
+      title: 'Cancel this flight?',
+      body: (
+        <>
+          <p>
+            <code>{mission.id}</code> · releases {mission.lots?.length ?? 1} lot
+            reservation(s) back to the market when still active.
+          </p>
+          <p>No payout.</p>
+        </>
+      ),
+      confirmLabel: 'Yes, cancel flight',
+      cancelLabel: 'Keep flying',
+      tone: 'danger',
+    });
     if (!ok) return;
     await run(async () => {
+      // Clear active flight immediately so auto-OFP / Preflight / Watch polls stop.
+      setMissions((current) =>
+        current.map((m) =>
+          m.id === mission.id ? { ...m, status: 'cancelled' } : m,
+        ),
+      );
+      setStaging(null);
+      try {
+        const stopped = await postWatchStop();
+        setWatch(stopped);
+      } catch {
+        /* watch may already be idle */
+      }
       const result = await postCancel({ missionId: mission.id });
+      setMissions((current) =>
+        current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+      );
+      setWallet(result.walletUsd);
       setToastKind(result.warning ? 'warn' : 'ok');
       setToast(
         result.returnedToMarket
           ? `Cancelled ${result.mission.id} · ${formatTonnes(result.releasedKg)} released to market`
           : `Cancelled ${result.mission.id} · ${result.warning ?? 'no active lot to release'}`,
       );
-      setStaging(null);
-      setTab('staging');
+      goToTab('staging');
     });
   }
 
@@ -2178,9 +2352,13 @@ export function App() {
       mission.lastPreflightCheck?.loadVerification?.ready ??
       mission.lastPreflightCheck?.verdict !== 'fail';
     if (mission.lastPreflightCheck && !preflightReady) {
-      const ok = window.confirm(
-        `Preflight failed for ${mission.id}.\nDepart anyway without fixing fuel/payload?`,
-      );
+      const ok = await confirm({
+        title: 'Depart with failed Preflight?',
+        body: `Preflight is not ready for ${mission.id}. Depart anyway without fixing fuel/payload?`,
+        confirmLabel: 'Depart anyway',
+        cancelLabel: 'Stay on ground',
+        tone: 'warn',
+      });
       if (!ok) return;
       override = true;
     }
@@ -2205,9 +2383,13 @@ export function App() {
   }
 
   async function onSettle(mission: Mission) {
-    const ok = window.confirm(
-      `Settle mission ${mission.id} now?\nDelivers cargo to ${mission.destIcao} and credits the wallet (no MSFS check).`,
-    );
+    const ok = await confirm({
+      title: 'Settle without MSFS?',
+      body: `Deliver cargo to ${mission.destIcao} and credit the wallet now. Skips the live SimBridge arrival check.`,
+      confirmLabel: 'Settle now',
+      cancelLabel: 'Keep flying',
+      tone: 'warn',
+    });
     if (!ok) return;
     await run(async () => {
       const result = await postSettle({ missionId: mission.id });
@@ -2225,7 +2407,7 @@ export function App() {
             : ' · fuel remaining estimated'),
       );
       setStaging(null);
-      setTab('staging');
+      goToTab('staging');
     });
   }
 
@@ -2444,7 +2626,7 @@ export function App() {
                     ? 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
                     : 'Prepare a freight from the Market, or resume after settling the last flight.'
                 : tab === 'fleet'
-                  ? 'Competing freighters — who is idle, airborne, or turning around.'
+                  ? 'Competing freighters — who is idle, airborne, turning around, or resting.'
                   : tab === 'hangar'
                     ? 'Your aircraft — always parked at a terminal; ferry or fly cargo to relocate.'
                     : tab === 'pilot'
@@ -4789,7 +4971,7 @@ export function App() {
               <h2>Competing fleet</h2>
               <p>
                 {npcBusy} busy · {npcSummary.airborne} airborne · {npcSummary.turnaround}{' '}
-                turnaround · {npcSummary.idle} idle
+                turnaround · {npcSummary.resting} resting · {npcSummary.idle} idle
                 <span className="live-dot" title="Auto-refreshes every 15s; clock ticks every second">
                   {' '}
                   · live
@@ -4948,6 +5130,7 @@ export function App() {
       <footer className="foot">
         Saves to <code>profiles/career/</code> · same engine as <code>npm run career</code>
       </footer>
+      {confirmDialog}
     </div>
   );
 }

@@ -31,6 +31,7 @@ import {
   migrateEconomyWorld,
   missionRemainingCapacityKg,
   MS_PER_TICK,
+  NPC_FLEET_SIZE,
   normalizeMissionIntent,
   normalizeMissionsState,
   npcClaimForLot,
@@ -120,13 +121,67 @@ async function writeJson(path: string, data: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
+/** Serialize mission-file read-modify-write so OFP/preflight/watch cannot clobber cancel. */
+let missionsLock: Promise<void> = Promise.resolve();
+
+function withMissionsLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = missionsLock.then(fn, fn);
+  missionsLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function isClosedMissionStatus(status: string): boolean {
+  return status === 'cancelled' || status === 'settled' || status === 'failed';
+}
+
+async function saveMissions(missions: MissionsFile): Promise<void> {
+  await writeJson(missionsPath, missions);
+}
+
+/**
+ * Reload missions under the lock, apply an update, and persist when the
+ * updater returns true. Returns false when missing/closed or updater aborts.
+ */
+async function updateOpenMission(
+  missionId: string,
+  update: (
+    missions: MissionsFile,
+    mission: MissionIntent,
+    idx: number,
+  ) => Promise<boolean> | boolean,
+): Promise<boolean> {
+  return withMissionsLock(async () => {
+    const missions = await loadMissions();
+    const idx = missions.missions.findIndex((m) => m.id === missionId);
+    if (idx < 0) return false;
+    const mission = missions.missions[idx]!;
+    if (isClosedMissionStatus(mission.status)) return false;
+    const shouldSave = await update(missions, mission, idx);
+    if (!shouldSave) return false;
+    await saveMissions(missions);
+    return true;
+  });
+}
+
 async function loadEconomy(): Promise<CareerEconomyWorld> {
   const existing = await readJson<Record<string, unknown>>(economyPath);
   if (existing && Array.isArray(existing.airports)) {
+    const npcCountBefore = Array.isArray((existing as { npcs?: unknown[] }).npcs)
+      ? (existing as { npcs: unknown[] }).npcs.length
+      : 0;
     const world = migrateEconomyWorld(existing);
     const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
     const version = (existing as { version?: number }).version;
-    if (advancedTicks > 0 || settledFlights > 0 || version !== 3) {
+    const npcCountAfter = caught.npcs?.length ?? 0;
+    if (
+      advancedTicks > 0 ||
+      settledFlights > 0 ||
+      version !== 3 ||
+      npcCountAfter !== npcCountBefore
+    ) {
       await writeJson(economyPath, caught);
     }
     return caught;
@@ -261,6 +316,10 @@ function mapNpcFleet(world: Awaited<ReturnType<typeof loadEconomy>>, nowMs = Dat
     busyUntilTick: row.busyUntilTick,
     busyUntilMs: row.busyUntilMs,
     turnaroundHoursLeft: row.turnaroundHoursLeft,
+    restUntilTick: row.restUntilTick,
+    restUntilMs: row.restUntilMs,
+    restHoursLeft: row.restHoursLeft,
+    dutyHoursAccum: row.dutyHoursAccum,
     mission: row.mission
       ? {
           flightId: row.mission.flightId,
@@ -426,9 +485,7 @@ export function createCareerApiServer(port = 8787) {
     loadEconomy,
     persistEconomy,
     loadMissions,
-    saveMissions: async (missions) => {
-      await writeJson(missionsPath, missions);
-    },
+    updateOpenMission,
   });
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`);
@@ -441,7 +498,7 @@ export function createCareerApiServer(port = 8787) {
 
     try {
       if (req.method === 'GET' && path === '/api/health') {
-        send(res, 200, { ok: true });
+        send(res, 200, { ok: true, npcFleetTarget: NPC_FLEET_SIZE });
         return;
       }
 
@@ -680,6 +737,7 @@ export function createCareerApiServer(port = 8787) {
           airborne: fleet.filter((n) => n.phase === 'enroute' || n.phase === 'arriving')
             .length,
           turnaround: fleet.filter((n) => n.phase === 'turnaround').length,
+          resting: fleet.filter((n) => n.phase === 'resting').length,
           idle: fleet.filter((n) => n.phase === 'idle').length,
           fleet,
           activity: mapNpcActivity(world, nowMs),
@@ -793,7 +851,12 @@ export function createCareerApiServer(port = 8787) {
         if (body.resetMissions) {
           await writeJson(missionsPath, emptyMissionsStateV2());
         }
-        send(res, 200, { tick: fresh.tick, seed: fresh.seed, airports: fresh.airports.length });
+        send(res, 200, {
+          tick: fresh.tick,
+          seed: fresh.seed,
+          airports: fresh.airports.length,
+          npcFleet: fresh.npcs.length,
+        });
         return;
       }
 
@@ -1114,53 +1177,74 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
-        const world = await loadEconomy();
-        const missions = await loadMissions();
-        const idx = missions.missions.findIndex((m) => m.id === body.missionId);
-        if (idx < 0) {
-          send(res, 404, { error: `Unknown mission ${body.missionId}` });
-          return;
+        // Stop live watch first so an in-flight tick cannot rewrite this mission.
+        const watch = watchSession.getStatus();
+        if (watch.running && watch.missionId === body.missionId) {
+          await watchSession.stop();
         }
-        const existing = missions.missions[idx]!;
         try {
-          const lines = existing.lots?.length
-            ? existing.lots
-            : existing.shipmentLotId
-              ? [{ shipmentLotId: existing.shipmentLotId, cargoKg: existing.cargoKg }]
-              : [];
-          let reservedBefore = 0;
-          let foundBefore = 0;
-          for (const line of lines) {
-            const lot = world.lots.find((l) => l.id === line.shipmentLotId);
-            if (lot) {
-              foundBefore += 1;
-              reservedBefore += lot.reservedKg;
+          const result = await withMissionsLock(async () => {
+            const world = await loadEconomy();
+            const missions = await loadMissions();
+            const idx = missions.missions.findIndex((m) => m.id === body.missionId);
+            if (idx < 0) return { kind: 'missing' as const };
+            const existing = missions.missions[idx]!;
+            const lines = existing.lots?.length
+              ? existing.lots
+              : existing.shipmentLotId
+                ? [
+                    {
+                      shipmentLotId: existing.shipmentLotId,
+                      cargoKg: existing.cargoKg,
+                    },
+                  ]
+                : [];
+            let reservedBefore = 0;
+            let foundBefore = 0;
+            for (const line of lines) {
+              const lot = world.lots.find((l) => l.id === line.shipmentLotId);
+              if (lot) {
+                foundBefore += 1;
+                reservedBefore += lot.reservedKg;
+              }
             }
-          }
-          const cancelled = cancelMission(world, existing, { fleet: missions });
-          let reservedAfter = 0;
-          let anyReturned = false;
-          for (const line of lines) {
-            const lot = world.lots.find((l) => l.id === line.shipmentLotId);
-            if (!lot) continue;
-            reservedAfter += lot.reservedKg;
-            if (lot.status === 'available' || lot.status === 'reserved') {
-              anyReturned = true;
+            const cancelled = cancelMission(world, existing, { fleet: missions });
+            let reservedAfter = 0;
+            let anyReturned = false;
+            for (const line of lines) {
+              const lot = world.lots.find((l) => l.id === line.shipmentLotId);
+              if (!lot) continue;
+              reservedAfter += lot.reservedKg;
+              if (lot.status === 'available' || lot.status === 'reserved') {
+                anyReturned = true;
+              }
             }
+            const releasedKg = Math.max(0, reservedBefore - reservedAfter);
+            const returnedToMarket = releasedKg > 0 && anyReturned;
+            missions.missions[idx] = cancelled;
+            await persistEconomy(world);
+            await saveMissions(missions);
+            return {
+              kind: 'ok' as const,
+              cancelled,
+              walletUsd: missions.walletUsd,
+              releasedKg,
+              returnedToMarket,
+              foundBefore,
+            };
+          });
+          if (result.kind === 'missing') {
+            send(res, 404, { error: `Unknown mission ${body.missionId}` });
+            return;
           }
-          const releasedKg = Math.max(0, reservedBefore - reservedAfter);
-          const returnedToMarket = releasedKg > 0 && anyReturned;
-          missions.missions[idx] = cancelled;
-          await persistEconomy(world);
-          await writeJson(missionsPath, missions);
           send(res, 200, {
-            mission: cancelled,
-            walletUsd: missions.walletUsd,
-            releasedKg,
-            returnedToMarket,
+            mission: result.cancelled,
+            walletUsd: result.walletUsd,
+            releasedKg: result.releasedKg,
+            returnedToMarket: result.returnedToMarket,
             warning:
-              foundBefore > 0
-                ? returnedToMarket
+              result.foundBefore > 0
+                ? result.returnedToMarket
                   ? null
                   : 'Mission cancelled, but its shipment lot was already expired'
                 : 'Mission cancelled; its shipment lot had already been pruned or reset',
@@ -1258,45 +1342,85 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
-        const missions = await loadMissions();
-        const mission = missions.missions.find((m) => m.id === body.missionId);
-        if (!mission) {
+        const probe = await loadMissions();
+        const probeMission = probe.missions.find((m) => m.id === body.missionId);
+        if (!probeMission) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
           return;
         }
-        if (mission.status !== 'dispatched' && mission.status !== 'in_flight') {
+        if (
+          probeMission.status !== 'dispatched' &&
+          probeMission.status !== 'in_flight'
+        ) {
           send(res, 400, {
-            error: `Mission ${mission.id} needs Dispatch first (status=${mission.status})`,
+            error: `Mission ${probeMission.id} needs Dispatch first (status=${probeMission.status})`,
           });
           return;
         }
 
-        const result = await confirmMissionOfp(mission, {
-          username: body.simbriefUser,
-          userid: body.simbriefUserid,
-        });
-        mission.lastOfpCheck = {
-          verdict: result.check.verdict,
-          summary: result.summary,
-          checkedAtIso: new Date().toISOString(),
-          ofpId: result.ofp.ofpId,
-          staticId: mission.staticId,
-          briefing: result.ofp.briefing,
-          plannedBlockFuelKg: result.ofp.blockFuelKg,
-          findings: result.check.findings.map((f) => ({
-            code: f.code,
-            severity: f.severity,
-            message: f.message,
-          })),
-        };
-        await writeJson(missionsPath, missions);
-
-        send(res, 200, {
-          mission,
-          check: result.check,
-          summary: result.summary,
-          ofp: result.ofp,
-        });
+        try {
+          const result = await confirmMissionOfp(probeMission, {
+            username: body.simbriefUser,
+            userid: body.simbriefUserid,
+          });
+          const ofpCheck = {
+            verdict: result.check.verdict,
+            summary: result.summary,
+            checkedAtIso: new Date().toISOString(),
+            ofpId: result.ofp.ofpId,
+            staticId: probeMission.staticId,
+            briefing: result.ofp.briefing,
+            plannedBlockFuelKg: result.ofp.blockFuelKg,
+            findings: result.check.findings.map((f) => ({
+              code: f.code,
+              severity: f.severity,
+              message: f.message,
+            })),
+          };
+          let savedMission: MissionIntent | null = null;
+          const wrote = await updateOpenMission(body.missionId, (_missions, mission) => {
+            if (
+              mission.status !== 'dispatched' &&
+              mission.status !== 'in_flight'
+            ) {
+              return false;
+            }
+            mission.lastOfpCheck = {
+              ...ofpCheck,
+              staticId: mission.staticId,
+            };
+            savedMission = mission;
+            return true;
+          });
+          if (!wrote || !savedMission) {
+            const latest = await loadMissions();
+            const current = latest.missions.find((m) => m.id === body.missionId);
+            if (!current) {
+              send(res, 404, { error: `Unknown mission ${body.missionId}` });
+              return;
+            }
+            send(res, 200, {
+              mission: current,
+              check: result.check,
+              summary: result.summary,
+              ofp: result.ofp,
+              warning: isClosedMissionStatus(current.status)
+                ? 'Mission was cancelled or closed before OFP could be saved'
+                : 'Mission status changed before OFP could be saved',
+            });
+            return;
+          }
+          send(res, 200, {
+            mission: savedMission,
+            check: result.check,
+            summary: result.summary,
+            ofp: result.ofp,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 
@@ -1400,26 +1524,25 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
-        const missions = await loadMissions();
-        const idx = missions.missions.findIndex((m) => m.id === body.missionId);
-        if (idx < 0) {
+        const probe = await loadMissions();
+        const probeMission = probe.missions.find((m) => m.id === body.missionId);
+        if (!probeMission) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
           return;
         }
-        const mission = missions.missions[idx]!;
-        if (!['accepted', 'dispatched', 'in_flight'].includes(mission.status)) {
+        if (!['accepted', 'dispatched', 'in_flight'].includes(probeMission.status)) {
           send(res, 400, {
-            error: `Mission ${mission.id} cannot preflight (status=${mission.status})`,
+            error: `Mission ${probeMission.id} cannot preflight (status=${probeMission.status})`,
           });
           return;
         }
         try {
-          const result = await runMissionPreflight(mission, {
+          const result = await runMissionPreflight(probeMission, {
             username: body.simbriefUser,
             userid: body.simbriefUserid,
             pipeName: body.pipeName,
           });
-          mission.lastPreflightCheck = {
+          const lastPreflightCheck = {
             verdict: result.check.verdict,
             summary: result.check.summary,
             checkedAtIso: result.check.checkedAtIso,
@@ -1427,9 +1550,36 @@ export function createCareerApiServer(port = 8787) {
             loadVerification: result.check.loadVerification,
             findings: result.check.findings,
           };
-          await writeJson(missionsPath, missions);
+          let savedMission: MissionIntent | null = null;
+          const wrote = await updateOpenMission(body.missionId, (_missions, mission) => {
+            if (!['accepted', 'dispatched', 'in_flight'].includes(mission.status)) {
+              return false;
+            }
+            mission.lastPreflightCheck = lastPreflightCheck;
+            savedMission = mission;
+            return true;
+          });
+          if (!wrote || !savedMission) {
+            const latest = await loadMissions();
+            const current = latest.missions.find((m) => m.id === body.missionId);
+            if (!current) {
+              send(res, 404, { error: `Unknown mission ${body.missionId}` });
+              return;
+            }
+            send(res, 200, {
+              mission: current,
+              check: result.check,
+              summary: result.summary,
+              ofp: result.ofp,
+              live: result.live,
+              warning: isClosedMissionStatus(current.status)
+                ? 'Mission was cancelled or closed before Preflight could be saved'
+                : 'Mission status changed before Preflight could be saved',
+            });
+            return;
+          }
           send(res, 200, {
-            mission,
+            mission: savedMission,
             check: result.check,
             summary: result.summary,
             ofp: result.ofp,
@@ -1615,8 +1765,9 @@ export function createCareerApiServer(port = 8787) {
             pipeName: body.pipeName,
             runPreflightAfter: body.runPreflightAfter,
           });
+          let savedMission = mission;
           if (result.preflight) {
-            mission.lastPreflightCheck = {
+            const lastPreflightCheck = {
               verdict: result.preflight.check.verdict,
               summary: result.preflight.check.summary,
               checkedAtIso: result.preflight.check.checkedAtIso,
@@ -1624,8 +1775,16 @@ export function createCareerApiServer(port = 8787) {
               loadVerification: result.preflight.check.loadVerification,
               findings: result.preflight.check.findings,
             };
-            missions.missions[idx] = mission;
-            await writeJson(missionsPath, missions);
+            const wrote = await updateOpenMission(body.missionId, (_m, open) => {
+              open.lastPreflightCheck = lastPreflightCheck;
+              savedMission = open;
+              return true;
+            });
+            if (!wrote) {
+              const latest = await loadMissions();
+              savedMission =
+                latest.missions.find((m) => m.id === body.missionId) ?? mission;
+            }
           }
           if (!result.ok) {
             const unavailable =
@@ -1634,13 +1793,13 @@ export function createCareerApiServer(port = 8787) {
               );
             send(res, unavailable ? 503 : 400, {
               error: result.error ?? 'OFP load failed',
-              mission,
+              mission: savedMission,
               ...result,
             });
             return;
           }
           send(res, 200, {
-            mission,
+            mission: savedMission,
             ...result,
           });
         } catch (error) {

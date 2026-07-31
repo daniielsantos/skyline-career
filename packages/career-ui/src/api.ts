@@ -102,11 +102,15 @@ export type NpcFleetMember = {
   reliability: number;
   aggressiveness: number;
   feeBias: number;
-  status: 'idle' | 'busy';
-  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround';
+  status: 'idle' | 'busy' | 'resting';
+  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround' | 'resting';
   busyUntilTick?: number;
   busyUntilMs?: number;
   turnaroundHoursLeft?: number;
+  restUntilTick?: number;
+  restUntilMs?: number;
+  restHoursLeft?: number;
+  dutyHoursAccum?: number;
   mission?: NpcMission | null;
 };
 
@@ -407,6 +411,7 @@ export function fetchNpcFleet() {
       busy: number;
       airborne: number;
       turnaround: number;
+      resting: number;
       idle: number;
       fleet: NpcFleetMember[];
       activity: NpcActivity[];

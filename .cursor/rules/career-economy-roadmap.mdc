@@ -1,0 +1,40 @@
+---
+description: Career economy realism roadmap — NPC capacity pressure and future slices
+globs: packages/shared/src/career-*.ts,packages/career-ui/**/*
+alwaysApply: false
+---
+
+# Career economy roadmap
+
+Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
+
+## Done — fatia 1 (NPC capacity → market)
+
+- `npcRegionBidCapacity(world, region, nowMs)` — fraction of home-region NPCs ready to bid.
+- Low capacity (many resting/busy) → `pushLot` pay boost `1 + (1 - capacity) * 0.22` (still capped at `base * 1.8`).
+- Low capacity → `npcBidOnMarket` scales `bidChance` by `0.45 + 0.55 * capacity` (less dispute).
+- Key files: `packages/shared/src/career-npc.ts`, `formLotsFromImbalances` in `career-economy.ts`.
+
+## Done — fatia 2 (lane saturation / urgency)
+
+- `npcLaneAirborneKg` / `npcLaneSaturation` from `in_flight` NPC cargo on OD+commodity.
+- Soft fill shadow: inbound kg to dest damps urgency; thin dest + almost no inbound → urgent earlier.
+- Saturation ≥ 0.5 counts as +1 toward lane lot cap; saturation ≥ 1 skips new lots on that lane.
+- Saturation ≥ 0.35 → scarce pay mult `1 + saturation * 0.12` (still under `base * 1.8`).
+
+## Next — UI chip
+
+- Market / NPC board chip: “local fleet thin → richer freight” (and optionally “lane saturated”).
+- Optional: expose capacity / saturation in career API for the chip.
+
+## Later
+
+- METAR / daily regional weather index → block time / fuel / bid bias (cached, offline-neutral).
+- Crew/maintenance cost pressure on NPC bid appetite (not just duty rest).
+- Weather / slot friction on block times.
+
+## Design rules
+
+- Prefer regional / lane-local effects over global multipliers.
+- Every slice needs a regression test that a player would notice (pay, urgency, or claim rate).
+- Do not persist new economy fields unless a slice requires them.

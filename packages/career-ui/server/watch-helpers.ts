@@ -11,6 +11,7 @@ import {
   resolveAirportCoords,
   settleMission,
   type CareerEconomyWorld,
+  type CareerMissionsState,
   type FlightGroundSample,
   type MissionFlightEvent,
   type MissionFlightWatchState,
@@ -48,16 +49,20 @@ export type WatchStatusPayload = {
 type WatchCallbacks = {
   loadEconomy: () => Promise<CareerEconomyWorld>;
   persistEconomy: (world: CareerEconomyWorld) => Promise<void>;
-  loadMissions: () => Promise<{
-    version: 1;
-    walletUsd: number;
-    missions: MissionIntent[];
-  }>;
-  saveMissions: (missions: {
-    version: 1;
-    walletUsd: number;
-    missions: MissionIntent[];
-  }) => Promise<void>;
+  loadMissions: () => Promise<CareerMissionsState>;
+  /**
+   * Reload missions under a lock, then apply. Return false to skip persist
+   * (e.g. mission already cancelled). Prevents stale watch ticks from
+   * resurrecting cancelled flights.
+   */
+  updateOpenMission: (
+    missionId: string,
+    update: (
+      missions: CareerMissionsState,
+      mission: MissionIntent,
+      idx: number,
+    ) => Promise<boolean> | boolean,
+  ) => Promise<boolean>;
 };
 
 type WatchOptions = {
@@ -327,17 +332,34 @@ export class CareerWatchSession {
             this.preflightDepartBlockedLogged = true;
           }
         } else {
-          const departed = departMission(world, current, { fleet: missions });
-          current = departed.mission;
-          missions.missions[idx] = current;
-          missions.walletUsd = debitWalletForFuel(
-            missions.walletUsd,
-            departed.fuelDebitUsd,
+          const saved = await this.cb.updateOpenMission(
+            this.missionId,
+            async (freshMissions, openMission, openIdx) => {
+              if (
+                openMission.status !== 'accepted' &&
+                openMission.status !== 'dispatched'
+              ) {
+                return false;
+              }
+              const worldFresh = await this.cb.loadEconomy();
+              const departed = departMission(worldFresh, openMission, {
+                fleet: freshMissions,
+              });
+              freshMissions.missions[openIdx] = departed.mission;
+              freshMissions.walletUsd = debitWalletForFuel(
+                freshMissions.walletUsd,
+                departed.fuelDebitUsd,
+              );
+              this.missionStatus = departed.mission.status;
+              this.walletUsd = freshMissions.walletUsd;
+              await this.cb.persistEconomy(worldFresh);
+              return true;
+            },
           );
-          this.missionStatus = current.status;
-          this.walletUsd = missions.walletUsd;
-          await this.cb.persistEconomy(world);
-          await this.cb.saveMissions(missions);
+          if (!saved) {
+            await this.stop();
+            return;
+          }
         }
       } else if (event.type === 'settle' && this.opts.autoSettle) {
         let residualFuelKg: number | undefined;
@@ -346,27 +368,46 @@ export class CareerWatchSession {
         } catch {
           residualFuelKg = undefined;
         }
-        const result = settleMission(world, current, {
-          fleet: missions,
-          residualFuelKg,
-        });
-        missions.missions[idx] = result.mission;
-        missions.walletUsd = debitWalletForFuel(
-          Math.round((missions.walletUsd + result.walletCreditUsd) * 100) / 100,
-          result.fuelDebitUsd,
+        const saved = await this.cb.updateOpenMission(
+          this.missionId,
+          async (freshMissions, openMission, openIdx) => {
+            if (
+              openMission.status !== 'accepted' &&
+              openMission.status !== 'dispatched' &&
+              openMission.status !== 'in_flight'
+            ) {
+              return false;
+            }
+            const worldFresh = await this.cb.loadEconomy();
+            const result = settleMission(worldFresh, openMission, {
+              fleet: freshMissions,
+              residualFuelKg,
+            });
+            freshMissions.missions[openIdx] = result.mission;
+            freshMissions.walletUsd = debitWalletForFuel(
+              Math.round(
+                (freshMissions.walletUsd + result.walletCreditUsd) * 100,
+              ) / 100,
+              result.fuelDebitUsd,
+            );
+            this.missionStatus = result.mission.status;
+            this.walletUsd = freshMissions.walletUsd;
+            this.settlement = {
+              payoutUsd: result.settlement.payoutUsd,
+              penaltyUsd: result.settlement.penaltyUsd,
+              lateTicks: result.settlement.lateTicks,
+              onTime: result.settlement.onTime,
+              deliveredKg: result.settlement.deliveredKg,
+              residualFuelKg: result.mission.settledFuelKg ?? null,
+            };
+            await this.cb.persistEconomy(worldFresh);
+            return true;
+          },
         );
-        this.missionStatus = result.mission.status;
-        this.walletUsd = missions.walletUsd;
-        this.settlement = {
-          payoutUsd: result.settlement.payoutUsd,
-          penaltyUsd: result.settlement.penaltyUsd,
-          lateTicks: result.settlement.lateTicks,
-          onTime: result.settlement.onTime,
-          deliveredKg: result.settlement.deliveredKg,
-          residualFuelKg: result.mission.settledFuelKg ?? null,
-        };
-        await this.cb.persistEconomy(world);
-        await this.cb.saveMissions(missions);
+        if (!saved) {
+          await this.stop();
+          return;
+        }
         await this.stop();
       }
     } catch (error) {

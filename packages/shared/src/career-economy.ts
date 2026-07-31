@@ -2,6 +2,9 @@ import {
   ensureNpcFleet,
   listNpcActivity,
   npcClaimForLot,
+  npcLaneAirborneKg,
+  npcLaneSaturation,
+  npcRegionBidCapacity,
   seedNpcFleet,
   settleNpcOpsDue,
   tickNpcFreighters,
@@ -46,6 +49,9 @@ export {
   listNpcActivity,
   listNpcFleetStatus,
   npcClaimForLot,
+  npcLaneAirborneKg,
+  npcLaneSaturation,
+  npcRegionBidCapacity,
   NPC_FLEET_SIZE,
   seedNpcFleet,
   settleNpcOpsDue,
@@ -583,6 +589,12 @@ function migrateNpcTimestamps(
     ) {
       npc.busyUntilMs = tickToWallMs(anchor, world.tick, npc.busyUntilTick);
     }
+    if (
+      (typeof npc.restUntilMs !== 'number' || !Number.isFinite(npc.restUntilMs)) &&
+      typeof npc.restUntilTick === 'number'
+    ) {
+      npc.restUntilMs = tickToWallMs(anchor, world.tick, npc.restUntilTick);
+    }
   }
 }
 
@@ -957,19 +969,38 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     key: string,
     commodity: (typeof CAREER_COMMODITIES)[number],
     origin: { ap: AirportTerminal; stock: { stockKg: number; capacityKg: number }; fill: number },
-    dest: { ap: AirportTerminal; fill: number },
+    dest: {
+      ap: AirportTerminal;
+      stock: { stockKg: number; capacityKg: number };
+      fill: number;
+    },
     qty: number,
     size: 'large' | 'small',
+    laneSaturation: number,
+    inboundKg: number,
   ): void => {
-    const urgent = dest.fill < 0.22 || commodity.perishable === true;
+    const destCap = dest.stock.capacityKg;
+    const effectiveDestFill =
+      destCap > 0 ? (dest.stock.stockKg + inboundKg) / destCap : dest.fill;
+    const urgent =
+      effectiveDestFill < 0.22 ||
+      commodity.perishable === true ||
+      (dest.fill < 0.28 && inboundKg < 1_000);
     const urgencyMult = urgent ? 1.35 : 1;
     const distanceBias =
       origin.ap.region.split('-')[0] === dest.ap.region.split('-')[0] ? 1 : 1.15;
     const destPile = ensurePile(dest.ap, commodity.id);
     const gap =
       localUnitPriceUsd(commodity.id, destPile) - localUnitPriceUsd(commodity.id, origin.stock);
+    // Low home-region NPC bid capacity → slightly richer freight for the player.
+    const batchNowMs = world.lastBatchAtMs ?? Date.now();
+    const capacity = npcRegionBidCapacity(world, origin.ap.region, batchNowMs);
+    const capacityPayMult = 1 + (1 - capacity) * 0.22;
+    // Saturated OD lane → scarce remaining slots pay a bit more.
+    const scarcePayMult =
+      laneSaturation >= 0.35 ? 1 + laneSaturation * 0.12 : 1;
     const payPerKg = Math.min(
-      gap * 0.55 * urgencyMult * distanceBias,
+      gap * 0.55 * urgencyMult * distanceBias * capacityPayMult * scarcePayMult,
       commodity.basePricePerKg * 1.8,
     );
     const payUsd = Math.round(qty * payPerKg);
@@ -1022,7 +1053,17 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
           continue;
         }
         const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
-        if ((activeCounts.get(key) ?? 0) >= MAX_LOTS_PER_LANE) {
+        const laneSat = npcLaneSaturation(
+          world,
+          origin.ap.icao,
+          dest.ap.icao,
+          commodity.id,
+        );
+        if (laneSat >= 1) {
+          continue;
+        }
+        const satPenalty = laneSat >= 0.5 ? 1 : 0;
+        if ((activeCounts.get(key) ?? 0) + satPenalty >= MAX_LOTS_PER_LANE) {
           continue;
         }
 
@@ -1030,6 +1071,13 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         if (priceGap < commodity.basePricePerKg * 0.2) {
           continue;
         }
+
+        const inboundKg = npcLaneAirborneKg(
+          world,
+          null,
+          dest.ap.icao,
+          commodity.id,
+        );
 
         const surplusKg = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
         const roomKg = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
@@ -1040,10 +1088,19 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         if (
           qty >= 4_000 &&
           (largeCounts.get(key) ?? 0) < MAX_LARGE_LOTS_PER_LANE &&
-          (activeCounts.get(key) ?? 0) < MAX_LOTS_PER_LANE
+          (activeCounts.get(key) ?? 0) + satPenalty < MAX_LOTS_PER_LANE
         ) {
           const largeQty = Math.min(qty, 28_000);
-          pushLot(key, commodity, origin, dest, largeQty, 'large');
+          pushLot(
+            key,
+            commodity,
+            origin,
+            dest,
+            largeQty,
+            'large',
+            laneSat,
+            inboundKg,
+          );
           // Refresh remaining after soft-commit for optional LTL companion.
           const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
           const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
@@ -1054,12 +1111,21 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         if (
           qty >= 400 &&
           (smallCounts.get(key) ?? 0) < MAX_SMALL_LOTS_PER_LANE &&
-          (activeCounts.get(key) ?? 0) < MAX_LOTS_PER_LANE
+          (activeCounts.get(key) ?? 0) + satPenalty < MAX_LOTS_PER_LANE
         ) {
           const smallQty = Math.min(qty, 2_000);
           // Prefer variety: 400–2000 in 100 kg steps.
           const sized = Math.max(400, Math.min(smallQty, 400 + Math.floor(rng() * 17) * 100));
-          pushLot(key, commodity, origin, dest, Math.min(smallQty, sized), 'small');
+          pushLot(
+            key,
+            commodity,
+            origin,
+            dest,
+            Math.min(smallQty, sized),
+            'small',
+            laneSat,
+            inboundKg,
+          );
         }
       }
     }
@@ -1131,8 +1197,46 @@ export function tickEconomy(
 }
 
 /**
+ * Shift absolute wall-clock stamps (batch anchor, NPC flights, busy/rest).
+ * Used so instant +N hour advances age in-progress ops instead of freezing them.
+ */
+export function shiftEconomyWallClock(
+  world: CareerEconomyWorld,
+  deltaMs: number,
+): void {
+  if (!Number.isFinite(deltaMs) || deltaMs === 0) return;
+  if (typeof world.lastBatchAtMs === 'number' && Number.isFinite(world.lastBatchAtMs)) {
+    world.lastBatchAtMs += deltaMs;
+  }
+  if (typeof world.lastSyncedAtMs === 'number' && Number.isFinite(world.lastSyncedAtMs)) {
+    world.lastSyncedAtMs += deltaMs;
+  }
+  for (const flight of world.npcFlights ?? []) {
+    if (typeof flight.departedAtMs === 'number' && Number.isFinite(flight.departedAtMs)) {
+      flight.departedAtMs += deltaMs;
+    }
+    if (typeof flight.arrivesAtMs === 'number' && Number.isFinite(flight.arrivesAtMs)) {
+      flight.arrivesAtMs += deltaMs;
+    }
+  }
+  for (const npc of world.npcs ?? []) {
+    if (typeof npc.busyUntilMs === 'number' && Number.isFinite(npc.busyUntilMs)) {
+      npc.busyUntilMs += deltaMs;
+    }
+    if (typeof npc.restUntilMs === 'number' && Number.isFinite(npc.restUntilMs)) {
+      npc.restUntilMs += deltaMs;
+    }
+  }
+}
+
+/**
  * Advance n hourly batches. When advanceWallClock is true (default for UI +1 day /
  * catch-up), shifts lastBatchAtMs and uses coherent batch wall times for NPC claims.
+ *
+ * Instant +N (no fromBatchAtMs) rewinds wall timestamps so the previous lastBatch
+ * maps to (now − N hours), then resimulates forward to now. Without that rewind,
+ * rapid +1 day clicks only bump the tick counter while NPC ETAs stay glued to
+ * Date.now() and the competing fleet board looks frozen.
  */
 export function tickEconomyN(
   world: CareerEconomyWorld,
@@ -1141,11 +1245,22 @@ export function tickEconomyN(
 ): CareerEconomyWorld {
   const steps = Math.max(0, Math.floor(n));
   const advanceWall = opts.advanceWallClock !== false;
-  // When not given an explicit anchor (UI +1 day / tests), compress batches so the
-  // final batch lands at Date.now() and live ETA/progress stay coherent.
-  const startBatch =
-    opts.fromBatchAtMs ??
-    Date.now() - steps * MS_PER_TICK;
+  const explicitStart =
+    typeof opts.fromBatchAtMs === 'number' && Number.isFinite(opts.fromBatchAtMs)
+      ? opts.fromBatchAtMs
+      : undefined;
+
+  let startBatch: number;
+  if (explicitStart !== undefined) {
+    startBatch = explicitStart;
+  } else if (advanceWall && steps > 0) {
+    const endBatch = Date.now();
+    startBatch = endBatch - steps * MS_PER_TICK;
+    const prev = world.lastBatchAtMs ?? endBatch;
+    shiftEconomyWallClock(world, startBatch - prev);
+  } else {
+    startBatch = Date.now() - steps * MS_PER_TICK;
+  }
 
   for (let i = 0; i < steps; i++) {
     const batchNowMs = startBatch + (i + 1) * MS_PER_TICK;
@@ -1157,6 +1272,8 @@ export function tickEconomyN(
     world.lastBatchAtMs = startBatch + steps * MS_PER_TICK;
     world.lastSyncedAtMs = world.lastBatchAtMs;
   }
+  // Catch-up often lands many turnarounds on the same hour — spread them for the board.
+  ensureNpcFleet(world);
   return world;
 }
 

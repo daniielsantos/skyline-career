@@ -1,0 +1,80 @@
+/** Career UI path ↔ tab / airport sync (History API, no router package). */
+
+export type CareerTab =
+  | 'market'
+  | 'missions'
+  | 'fleet'
+  | 'staging'
+  | 'hangar'
+  | 'pilot'
+  | 'settings';
+
+export type CareerLocation = {
+  tab: CareerTab;
+  airportIcao: string | null;
+};
+
+const TAB_PATH: Record<CareerTab, string> = {
+  market: '/market',
+  pilot: '/pilot',
+  hangar: '/hangar',
+  missions: '/logbook',
+  fleet: '/npc-fleet',
+  staging: '/staging',
+  settings: '/settings',
+};
+
+const PATH_TAB: Record<string, CareerTab> = {
+  '/': 'market',
+  '/market': 'market',
+  '/pilot': 'pilot',
+  '/hangar': 'hangar',
+  '/logbook': 'missions',
+  '/missions': 'missions',
+  '/npc-fleet': 'fleet',
+  '/fleet': 'fleet',
+  '/staging': 'staging',
+  '/settings': 'settings',
+};
+
+export function pathForLocation(loc: CareerLocation): string {
+  if (loc.airportIcao) {
+    return `/airport/${loc.airportIcao.toUpperCase()}`;
+  }
+  return TAB_PATH[loc.tab];
+}
+
+export function parseCareerPath(pathname: string): CareerLocation {
+  const raw = pathname.split('?')[0] ?? '/';
+  const p = (raw.replace(/\/+$/, '') || '/').toLowerCase();
+  const airport = /^\/airport\/([a-z0-9]+)$/i.exec(p);
+  if (airport) {
+    return {
+      tab: 'market',
+      airportIcao: airport[1]!.toUpperCase(),
+    };
+  }
+  const tab = PATH_TAB[p] ?? 'market';
+  return { tab, airportIcao: null };
+}
+
+export function readCareerLocation(): CareerLocation {
+  if (typeof window === 'undefined') {
+    return { tab: 'market', airportIcao: null };
+  }
+  return parseCareerPath(window.location.pathname);
+}
+
+export function writeCareerLocation(
+  loc: CareerLocation,
+  opts: { replace?: boolean } = {},
+): void {
+  if (typeof window === 'undefined') return;
+  const next = pathForLocation(loc);
+  if (window.location.pathname === next) return;
+  if (opts.replace) {
+    window.history.replaceState(loc, '', next);
+  } else {
+    window.history.pushState(loc, '', next);
+  }
+}

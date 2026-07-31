@@ -8,9 +8,12 @@ import {
   localPriceMultiplier,
   migrateEconomyWorld,
   MS_PER_TICK,
+  npcLaneSaturation,
+  npcRegionBidCapacity,
   routeDistanceNm,
   tickEconomyN,
 } from './career-economy.js';
+import type { CareerEconomyWorld, CommodityId, NpcFlight } from './types/career-economy.js';
 
 describe('career-economy seed', () => {
   it('creates 20 Brazilian hubs and 5 commodities of inventory', () => {
@@ -26,7 +29,7 @@ describe('career-economy seed', () => {
     );
     assert.equal(world.tick, 0);
     assert.equal(world.lots.length, 0);
-    assert.equal(world.npcs.length, 10);
+    assert.equal(world.npcs.length, 15);
     assert.equal(world.npcFlights.length, 0);
     for (const ap of world.airports) {
       assert.ok(ap.inventory.electronics);
@@ -111,6 +114,215 @@ describe('tickEconomyN market formation', () => {
       assert.ok(row.lot.quantityKg <= 2_000);
       assert.ok(row.lot.quantityKg >= 400);
     }
+  });
+
+  it('pays more on origin-region lots when home NPC fleet is resting', () => {
+    const region = 'BR-SE';
+
+    function warmAndFreeze(resting: boolean) {
+      const world = createSeedEconomyWorld({ seed: 'capacity-pay-boost' });
+      world.lastBatchAtMs = 1;
+      tickEconomyN(world, 36, { fromBatchAtMs: 1 });
+      const nowMs = world.lastBatchAtMs;
+      world.npcFlights = [];
+      for (const npc of world.npcs) {
+        npc.currentFlightId = undefined;
+        npc.busyUntilMs = undefined;
+        if (npc.homeRegion === region) {
+          if (resting) {
+            npc.status = 'resting';
+            npc.restUntilMs = nowMs + 48 * MS_PER_TICK;
+            npc.dutyHoursAccum = 10;
+          } else {
+            npc.status = 'idle';
+            npc.restUntilMs = undefined;
+            npc.dutyHoursAccum = 0;
+          }
+        } else {
+          npc.status = 'idle';
+          npc.restUntilMs = undefined;
+        }
+      }
+      const beforeTick = world.tick;
+      tickEconomyN(world, 1, { fromBatchAtMs: nowMs });
+      const originIcaos = new Set(
+        world.airports.filter((a) => a.region === region).map((a) => a.icao),
+      );
+      const fresh = world.lots.filter(
+        (l) =>
+          l.createdAtTick > beforeTick &&
+          originIcaos.has(l.originIcao) &&
+          l.quantityKg > 0,
+      );
+      const payPerKg =
+        fresh.length === 0
+          ? 0
+          : fresh.reduce((s, l) => s + l.payUsd / l.quantityKg, 0) / fresh.length;
+      return { fresh, payPerKg, capacity: npcRegionBidCapacity(world, region, world.lastBatchAtMs) };
+    }
+
+    const idle = warmAndFreeze(false);
+    const rest = warmAndFreeze(true);
+    assert.ok(idle.fresh.length > 0, 'expected new SE-origin lots with idle fleet');
+    assert.ok(rest.fresh.length > 0, 'expected new SE-origin lots with resting fleet');
+    assert.ok(idle.capacity > rest.capacity);
+    assert.ok(
+      rest.payPerKg > idle.payPerKg,
+      `resting pay/kg ${rest.payPerKg} should exceed idle ${idle.payPerKg}`,
+    );
+  });
+
+  it('softens urgency when NPC inbound covers dest shortage', () => {
+    function prepare(withInbound: boolean): CareerEconomyWorld {
+      const world = createSeedEconomyWorld({ seed: 'lane-urgency-shadow' });
+      world.lastBatchAtMs = 1_000_000;
+      world.lots = [];
+      world.npcFlights = [];
+      world.events = [];
+      for (const npc of world.npcs) {
+        npc.status = 'idle';
+        npc.aggressiveness = 0;
+        npc.currentFlightId = undefined;
+        npc.busyUntilMs = undefined;
+        npc.restUntilMs = undefined;
+      }
+      for (const ap of world.airports) {
+        for (const id of ['electronics', 'machinery', 'general', 'perishables'] as CommodityId[]) {
+          const pile = ap.inventory[id]!;
+          pile.stockKg = pile.capacityKg * 0.5;
+        }
+      }
+      const origin = world.airports.find((a) => a.icao === 'SBGR')!;
+      const dest = world.airports.find((a) => a.icao === 'SBGL')!;
+      origin.inventory.electronics!.stockKg =
+        origin.inventory.electronics!.capacityKg * 0.75;
+      dest.inventory.electronics!.stockKg =
+        dest.inventory.electronics!.capacityKg * 0.25;
+      if (withInbound) {
+        const flight: NpcFlight = {
+          id: 'npcf-inbound-cover',
+          npcId: world.npcs[0]!.id,
+          lotId: 'lot_inbound',
+          originIcao: 'SBPA',
+          destIcao: 'SBGL',
+          commodityId: 'electronics',
+          cargoKg: 25_000,
+          payUsd: 1,
+          aircraftClassId: 'wide_freighter',
+          departedAtTick: world.tick,
+          arrivesAtTick: world.tick + 3,
+          departedAtMs: world.lastBatchAtMs,
+          arrivesAtMs: world.lastBatchAtMs + 3 * MS_PER_TICK,
+          status: 'in_flight',
+        };
+        world.npcFlights.push(flight);
+      }
+      return world;
+    }
+
+    const bare = prepare(false);
+    const covered = prepare(true);
+    const t0 = bare.tick;
+    tickEconomyN(bare, 1, { fromBatchAtMs: bare.lastBatchAtMs });
+    tickEconomyN(covered, 1, { fromBatchAtMs: covered.lastBatchAtMs });
+
+    const bareLots = bare.lots.filter(
+      (l) =>
+        l.createdAtTick > t0 &&
+        l.destIcao === 'SBGL' &&
+        l.commodityId === 'electronics',
+    );
+    const coveredLots = covered.lots.filter(
+      (l) =>
+        l.createdAtTick > t0 &&
+        l.destIcao === 'SBGL' &&
+        l.commodityId === 'electronics',
+    );
+    assert.ok(bareLots.length > 0, 'expected electronics lots into SBGL');
+    assert.ok(
+      bareLots.some((l) => l.urgency === 'urgent'),
+      'low fill + no inbound should mark urgent',
+    );
+    assert.ok(coveredLots.length > 0, 'expected lots even with inbound cover');
+    assert.ok(
+      coveredLots.every((l) => l.urgency === 'normal'),
+      'inbound cover should clear urgent on non-perishable lots',
+    );
+  });
+
+  it('blocks new lots on a fully saturated OD lane and pays more when partially saturated', () => {
+    function prepare(airborneKg: number): CareerEconomyWorld {
+      const world = createSeedEconomyWorld({ seed: 'lane-sat-form' });
+      world.lastBatchAtMs = 2_000_000;
+      world.lots = [];
+      world.npcFlights = [];
+      world.events = [];
+      for (const npc of world.npcs) {
+        npc.status = 'idle';
+        npc.aggressiveness = 0;
+        npc.currentFlightId = undefined;
+      }
+      for (const ap of world.airports) {
+        for (const id of ['electronics', 'machinery', 'general', 'perishables'] as CommodityId[]) {
+          const pile = ap.inventory[id]!;
+          pile.stockKg = pile.capacityKg * 0.5;
+        }
+      }
+      const origin = world.airports.find((a) => a.icao === 'SBGR')!;
+      const dest = world.airports.find((a) => a.icao === 'SBGL')!;
+      origin.inventory.general!.stockKg = origin.inventory.general!.capacityKg * 0.8;
+      dest.inventory.general!.stockKg = dest.inventory.general!.capacityKg * 0.3;
+      if (airborneKg > 0) {
+        world.npcFlights.push({
+          id: 'npcf-sat',
+          npcId: world.npcs[0]!.id,
+          lotId: 'lot_sat',
+          originIcao: 'SBGR',
+          destIcao: 'SBGL',
+          commodityId: 'general',
+          cargoKg: airborneKg,
+          payUsd: 1,
+          aircraftClassId: 'wide_freighter',
+          departedAtTick: world.tick,
+          arrivesAtTick: world.tick + 2,
+          departedAtMs: world.lastBatchAtMs,
+          arrivesAtMs: world.lastBatchAtMs + 2 * MS_PER_TICK,
+          status: 'in_flight',
+        });
+      }
+      return world;
+    }
+
+    const clear = prepare(0);
+    const full = prepare(28_000);
+    const partial = prepare(14_000);
+    assert.equal(npcLaneSaturation(full, 'SBGR', 'SBGL', 'general'), 1);
+    assert.ok(npcLaneSaturation(partial, 'SBGR', 'SBGL', 'general') >= 0.35);
+
+    const t0 = clear.tick;
+    tickEconomyN(clear, 1, { fromBatchAtMs: clear.lastBatchAtMs });
+    tickEconomyN(full, 1, { fromBatchAtMs: full.lastBatchAtMs });
+    tickEconomyN(partial, 1, { fromBatchAtMs: partial.lastBatchAtMs });
+
+    const lane = (w: CareerEconomyWorld) =>
+      w.lots.filter(
+        (l) =>
+          l.createdAtTick > t0 &&
+          l.originIcao === 'SBGR' &&
+          l.destIcao === 'SBGL' &&
+          l.commodityId === 'general',
+      );
+
+    assert.ok(lane(clear).length > 0, 'unsaturated lane should form lots');
+    assert.equal(lane(full).length, 0, 'fully saturated lane should skip formation');
+    assert.ok(lane(partial).length > 0, 'partial saturation may still form');
+
+    const pay = (lots: ReturnType<typeof lane>) =>
+      lots.reduce((s, l) => s + l.payUsd / l.quantityKg, 0) / lots.length;
+    assert.ok(
+      pay(lane(partial)) > pay(lane(clear)),
+      'partial saturation should raise pay/kg vs clear lane',
+    );
   });
 });
 

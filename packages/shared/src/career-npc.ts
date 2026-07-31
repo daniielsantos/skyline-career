@@ -13,6 +13,7 @@ import { applyNpcFuelUplift } from './career-fuel.js';
 import { getAircraftClass, reserveShipmentLot } from './career-mission.js';
 import type {
   CareerEconomyWorld,
+  CommodityId,
   FreighterClassId,
   NpcActivityView,
   NpcFleetMemberView,
@@ -21,13 +22,34 @@ import type {
   ShipmentLot,
 } from './types/career-economy.js';
 
-export const NPC_FLEET_SIZE = 10;
+export const NPC_FLEET_SIZE = 15;
+
+/** Target mix: jets for heavy freight + GA for LTL / short-haul competition. */
+export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
+  aircraftClassId: FreighterClassId;
+  count: number;
+}> = [
+  { aircraftClassId: 'narrow_freighter', count: 6 },
+  { aircraftClassId: 'wide_freighter', count: 4 },
+  { aircraftClassId: 'light_turboprop', count: 3 },
+  { aircraftClassId: 'light_ga', count: 2 },
+] as const;
+
 /** Must match career-economy MS_PER_TICK (1 tick = 1 real hour). */
 const MS_PER_TICK = 3_600_000;
-const MIN_BLOCK_HOURS = 2;
+/** Minimum airborne block so ultra-short hops aren't instant. */
+const MIN_BLOCK_HOURS = 1;
 const TURNAROUND_HOURS = 1;
+/** Spread departures inside the same economy hour (wall-clock ms). */
+const DEPART_STAGGER_MS = 25 * 60 * 1000;
 /** Treat as arriving when within the last hour of the flight. */
 const ARRIVING_WINDOW_MS = MS_PER_TICK;
+/** Max flight+turnaround duty before mandatory crew rest. */
+const MAX_DUTY_HOURS = 9;
+/** A single long leg also forces rest after its turnaround. */
+const LONG_LEG_DUTY_HOURS = 6;
+const MIN_REST_HOURS = 12;
+const MAX_REST_HOURS = 16;
 const CRUISE_KT: Record<FreighterClassId, number> = {
   narrow_freighter: 430,
   wide_freighter: 480,
@@ -48,6 +70,10 @@ const NPC_NAME_POOL = [
   'Campo Verde Air',
   'Baía Cargo',
   'Andes Bridge Co',
+  'Pantanal Hop',
+  'Litoral Charter',
+  'Cerrado Air Taxi',
+  'Serra Bush Cargo',
 ] as const;
 
 function hashSeed(seed: string): number {
@@ -99,13 +125,148 @@ function npcBusyUntilMs(npc: NpcFreighter): number {
   return 0;
 }
 
+function npcRestUntilMs(npc: NpcFreighter): number {
+  if (typeof npc.restUntilMs === 'number' && Number.isFinite(npc.restUntilMs)) {
+    return npc.restUntilMs;
+  }
+  return 0;
+}
+
+/** True when the NPC could enter the bid pool at nowMs (idle / rest or turnaround done). */
+function isNpcReadyToBid(npc: NpcFreighter, nowMs: number): boolean {
+  if (npc.currentFlightId) return false;
+  if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) return false;
+  if (npc.status === 'busy' && npcBusyUntilMs(npc) > nowMs) return false;
+  return true;
+}
+
+/**
+ * Fraction of home-region NPCs ready to bid (0 = all resting/busy, 1 = all ready).
+ * Empty home region → 1 (neutral; no artificial scarcity).
+ */
+export function npcRegionBidCapacity(
+  world: CareerEconomyWorld,
+  region: string,
+  nowMs = Date.now(),
+): number {
+  const home = (world.npcs ?? []).filter((n) => n.homeRegion === region);
+  if (home.length === 0) return 1;
+  let ready = 0;
+  for (const npc of home) {
+    if (isNpcReadyToBid(npc, nowMs)) ready += 1;
+  }
+  return ready / home.length;
+}
+
+/** Wide-freighter-ish full load — saturation 1.0 at this airborne kg on a lane. */
+const LANE_SATURATION_KG = 28_000;
+
+/**
+ * kg currently in_flight on a specific origin→dest lane for a commodity.
+ * Pass originIcao null/undefined to sum all inbound to dest (soft fill shadow).
+ */
+export function npcLaneAirborneKg(
+  world: CareerEconomyWorld,
+  originIcao: string | null | undefined,
+  destIcao: string,
+  commodityId: CommodityId,
+): number {
+  const dest = destIcao.toUpperCase();
+  const origin =
+    typeof originIcao === 'string' && originIcao.length > 0
+      ? originIcao.toUpperCase()
+      : null;
+  let kg = 0;
+  for (const flight of world.npcFlights ?? []) {
+    if (flight.status !== 'in_flight') continue;
+    if (flight.commodityId !== commodityId) continue;
+    if (flight.destIcao.toUpperCase() !== dest) continue;
+    if (origin && flight.originIcao.toUpperCase() !== origin) continue;
+    kg += Math.max(0, flight.cargoKg);
+  }
+  return kg;
+}
+
+/** 0..1 lane saturation; 1 ≈ ≥28t airborne on that OD+commodity. */
+export function npcLaneSaturation(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+  commodityId: CommodityId,
+): number {
+  const airborne = npcLaneAirborneKg(world, originIcao, destIcao, commodityId);
+  return Math.min(1, airborne / LANE_SATURATION_KG);
+}
+
+function needsCrewRest(npc: NpcFreighter): boolean {
+  const duty = npc.dutyHoursAccum ?? 0;
+  const lastLeg = npc.lastLegDutyHours ?? 0;
+  return duty >= MAX_DUTY_HOURS || lastLeg >= LONG_LEG_DUTY_HOURS;
+}
+
+function estimateRestHours(dutyHours: number, rng: () => number): number {
+  const base = Math.min(MAX_REST_HOURS, Math.max(MIN_REST_HOURS, dutyHours));
+  const jittered = base * (0.9 + rng() * 0.2);
+  return Math.min(MAX_REST_HOURS, Math.max(MIN_REST_HOURS * 0.9, jittered));
+}
+
+function beginCrewRest(
+  world: CareerEconomyWorld,
+  npc: NpcFreighter,
+  nowMs: number,
+): void {
+  const duty = Math.max(npc.dutyHoursAccum ?? 0, npc.lastLegDutyHours ?? 0, MIN_REST_HOURS);
+  const rng = mulberry32(hashSeed(`${world.seed}:${npc.id}:rest:${Math.floor(nowMs / 60_000)}`));
+  const restHours = estimateRestHours(duty, rng);
+  npc.status = 'resting';
+  npc.currentFlightId = undefined;
+  npc.busyUntilTick = undefined;
+  npc.busyUntilMs = undefined;
+  npc.restUntilMs = nowMs + restHours * MS_PER_TICK;
+  npc.restUntilTick = world.tick + Math.max(1, Math.ceil(restHours));
+}
+
+function clearCrewRest(npc: NpcFreighter): void {
+  npc.status = 'idle';
+  npc.restUntilMs = undefined;
+  npc.restUntilTick = undefined;
+  npc.dutyHoursAccum = 0;
+  npc.lastLegDutyHours = undefined;
+}
+
+/** End turnaround: either start crew rest or return to idle for another leg. */
+function finishTurnaround(
+  world: CareerEconomyWorld,
+  npc: NpcFreighter,
+  nowMs: number,
+): void {
+  npc.busyUntilTick = undefined;
+  npc.busyUntilMs = undefined;
+  npc.currentFlightId = undefined;
+  if (needsCrewRest(npc)) {
+    beginCrewRest(world, npc, nowMs);
+  } else {
+    npc.status = 'idle';
+  }
+}
+
+function releaseRestIfDue(world: CareerEconomyWorld, nowMs: number): void {
+  for (const npc of world.npcs) {
+    if (npc.status !== 'resting') continue;
+    if (npcRestUntilMs(npc) > nowMs) continue;
+    clearCrewRest(npc);
+  }
+}
+
 /** Block hours in air (cargo ETA); busy time adds turnaround after arrival. */
 export function estimateNpcBlockHours(
   distanceNm: number,
   aircraftClassId: FreighterClassId,
 ): { flightHours: number; busyHours: number } {
   const cruise = CRUISE_KT[aircraftClassId] ?? 430;
-  const flightHours = Math.max(MIN_BLOCK_HOURS, Math.ceil(distanceNm / cruise));
+  const rawHours = distanceNm / Math.max(1, cruise);
+  // Tenth-hour resolution so similar routes don't all land on the same hour.
+  const flightHours = Math.max(MIN_BLOCK_HOURS, Math.round(rawHours * 10) / 10);
   return { flightHours, busyHours: flightHours + TURNAROUND_HOURS };
 }
 
@@ -124,35 +285,171 @@ export function seedNpcFleet(opts: {
     names[j] = tmp;
   }
 
+  const classOrder: FreighterClassId[] = [];
+  for (const slot of NPC_FLEET_COMPOSITION) {
+    for (let n = 0; n < slot.count; n++) {
+      classOrder.push(slot.aircraftClassId);
+    }
+  }
+
   const fleet: NpcFreighter[] = [];
-  for (let i = 0; i < NPC_FLEET_SIZE; i++) {
-    const aircraftClassId: FreighterClassId =
-      i < 6 ? 'narrow_freighter' : 'wide_freighter';
-    fleet.push({
-      id: `npc-${i + 1}`,
-      name: names[i % names.length]!,
-      aircraftClassId,
-      homeRegion: regions[i % regions.length]!,
-      reliability: 0.45 + rng() * 0.5,
-      aggressiveness: 0.2 + rng() * 0.7,
-      feeBias: 0.75 + rng() * 0.55,
-      status: 'idle',
-    });
+  for (let i = 0; i < classOrder.length; i++) {
+    fleet.push(
+      makeNpcFreighter({
+        id: `npc-${i + 1}`,
+        name: names[i % names.length]!,
+        aircraftClassId: classOrder[i]!,
+        homeRegion: regions[i % regions.length]!,
+        rng,
+      }),
+    );
   }
   return fleet;
 }
 
-/** Ensure save has a fleet; seeds when missing / empty. */
+function makeNpcFreighter(opts: {
+  id: string;
+  name: string;
+  aircraftClassId: FreighterClassId;
+  homeRegion: string;
+  rng: () => number;
+}): NpcFreighter {
+  return {
+    id: opts.id,
+    name: opts.name,
+    aircraftClassId: opts.aircraftClassId,
+    homeRegion: opts.homeRegion,
+    reliability: 0.45 + opts.rng() * 0.5,
+    aggressiveness: 0.2 + opts.rng() * 0.7,
+    feeBias: 0.75 + opts.rng() * 0.55,
+    status: 'idle',
+  };
+}
+
+/** Ensure save has a fleet; seeds when missing / empty; tops up GA slots on older saves. */
 export function ensureNpcFleet(world: CareerEconomyWorld): void {
   if (!Array.isArray(world.npcFlights)) {
     world.npcFlights = [];
   }
-  if (Array.isArray(world.npcs) && world.npcs.length > 0) {
+  const regions = world.airports.map((a) => a.region);
+  if (!Array.isArray(world.npcs) || world.npcs.length === 0) {
+    world.npcs = seedNpcFleet({ seed: world.seed, regions });
+    world.npcFlights = world.npcFlights ?? [];
     return;
   }
-  const regions = world.airports.map((a) => a.region);
-  world.npcs = seedNpcFleet({ seed: world.seed, regions });
-  world.npcFlights = world.npcFlights ?? [];
+  topUpNpcFleetComposition(world, regions);
+  backfillNpcDutyFromFlights(world);
+  desyncClusteredTurnarounds(world);
+}
+
+/**
+ * Older worlds only had Narrow/Wide. Append missing light_turboprop / light_ga
+ * NPCs without resetting jet operators already in flight.
+ */
+export function topUpNpcFleetComposition(
+  world: CareerEconomyWorld,
+  regions: string[],
+): void {
+  const regionList =
+    regions.length > 0 ? [...new Set(regions)] : ['BR-SE', 'BR-S', 'BR-NE'];
+  const rng = mulberry32(hashSeed(`${world.seed}:npc-fleet-topup`));
+  const usedNames = new Set(world.npcs.map((n) => n.name));
+  let nextIndex = world.npcs.reduce((max, n) => {
+    const m = /^npc-(\d+)$/.exec(n.id);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+
+  for (const slot of NPC_FLEET_COMPOSITION) {
+    const have = world.npcs.filter((n) => n.aircraftClassId === slot.aircraftClassId)
+      .length;
+    const missing = Math.max(0, slot.count - have);
+    for (let i = 0; i < missing; i++) {
+      nextIndex += 1;
+      const name =
+        NPC_NAME_POOL.find((n) => !usedNames.has(n)) ??
+        `${slot.aircraftClassId}-${nextIndex}`;
+      usedNames.add(name);
+      world.npcs.push(
+        makeNpcFreighter({
+          id: `npc-${nextIndex}`,
+          name,
+          aircraftClassId: slot.aircraftClassId,
+          homeRegion: regionList[(nextIndex - 1) % regionList.length]!,
+          rng,
+        }),
+      );
+    }
+  }
+}
+
+/**
+ * Legacy claims used whole-hour blocks, so several NPCs often share one busyUntilMs.
+ * Spread turnaround-only peers so the board doesn't show identical "free in Xm".
+ */
+function desyncClusteredTurnarounds(world: CareerEconomyWorld): void {
+  const BUCKET_MS = 5 * 60 * 1000;
+  const groups = new Map<number, NpcFreighter[]>();
+  for (const npc of world.npcs) {
+    if (npc.currentFlightId) continue;
+    if (npc.status !== 'busy') continue;
+    const until = npcBusyUntilMs(npc);
+    if (until <= 0) continue;
+    const key = Math.floor(until / BUCKET_MS);
+    const bucket = groups.get(key) ?? [];
+    bucket.push(npc);
+    groups.set(key, bucket);
+  }
+  for (const [, group] of groups) {
+    if (group.length < 2) continue;
+    // Anchor to the group's median busy time, then fan out.
+    const sorted = group
+      .map((n) => npcBusyUntilMs(n))
+      .sort((a, b) => a - b);
+    const anchor = sorted[Math.floor(sorted.length / 2)]!;
+    for (let i = 0; i < group.length; i++) {
+      const npc = group[i]!;
+      const rng = mulberry32(hashSeed(`${world.seed}:${npc.id}:turnaround-desync`));
+      const skewMs =
+        Math.floor((rng() - 0.5) * 40 * 60 * 1000) + i * 4 * 60 * 1000;
+      npc.busyUntilMs = anchor + skewMs;
+    }
+  }
+}
+
+/**
+ * Older in-flight / turnaround NPCs may lack duty fields (claimed before rest shipped).
+ * Reconstruct a minimum leg duty so crew-rest can still trigger.
+ */
+function backfillNpcDutyFromFlights(world: CareerEconomyWorld): void {
+  for (const npc of world.npcs) {
+    if (typeof npc.dutyHoursAccum === 'number' && Number.isFinite(npc.dutyHoursAccum)) {
+      continue;
+    }
+    const flight = world.npcFlights.find(
+      (f) => f.npcId === npc.id && f.status === 'in_flight',
+    );
+    if (flight) {
+      const blockHours = Math.max(
+        MIN_BLOCK_HOURS,
+        (flightArrivesAtMs(flight) - flightDepartedAtMs(flight)) / MS_PER_TICK,
+      );
+      const turnaroundHours = Math.max(
+        0.4,
+        (npcBusyUntilMs(npc) - flightArrivesAtMs(flight)) / MS_PER_TICK,
+      );
+      const leg = blockHours + turnaroundHours;
+      npc.lastLegDutyHours = leg;
+      npc.dutyHoursAccum = leg;
+      continue;
+    }
+    if (npc.status === 'busy') {
+      // Turnaround without a live flight record — assume at least one short leg.
+      npc.lastLegDutyHours = npc.lastLegDutyHours ?? 2.5;
+      npc.dutyHoursAccum = npc.dutyHoursAccum ?? 2.5;
+      continue;
+    }
+    npc.dutyHoursAccum = 0;
+  }
 }
 
 function findLot(world: CareerEconomyWorld, lotId: string): ShipmentLot | undefined {
@@ -201,9 +498,7 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
       npc.currentFlightId = undefined;
     }
     if (npcBusyUntilMs(npc) <= nowMs) {
-      npc.status = 'idle';
-      npc.busyUntilTick = undefined;
-      npc.busyUntilMs = undefined;
+      finishTurnaround(world, npc, nowMs);
     }
   }
 }
@@ -213,14 +508,12 @@ function releaseTurnaroundIfDue(world: CareerEconomyWorld, nowMs: number): void 
     if (npc.currentFlightId) continue;
     if (npc.status !== 'busy') continue;
     if (npcBusyUntilMs(npc) > nowMs) continue;
-    npc.status = 'idle';
-    npc.busyUntilTick = undefined;
-    npc.busyUntilMs = undefined;
+    finishTurnaround(world, npc, nowMs);
   }
 }
 
 /**
- * Settle NPC flights whose arrivesAtMs <= nowMs and free turnarounds.
+ * Settle NPC flights whose arrivesAtMs <= nowMs and free turnarounds / rest.
  * Idempotent — safe to call on every load / poll.
  */
 export function settleNpcOpsDue(
@@ -230,6 +523,7 @@ export function settleNpcOpsDue(
   ensureNpcFleet(world);
   let settledFlights = 0;
 
+  releaseRestIfDue(world, nowMs);
   releaseTurnaroundIfDue(world, nowMs);
 
   for (const flight of world.npcFlights) {
@@ -242,6 +536,7 @@ export function settleNpcOpsDue(
 
   world.npcFlights = world.npcFlights.filter((f) => f.status === 'in_flight');
   releaseTurnaroundIfDue(world, nowMs);
+  releaseRestIfDue(world, nowMs);
   return { settledFlights };
 }
 
@@ -292,6 +587,7 @@ function claimLotForNpc(
   npc: NpcFreighter,
   lot: ShipmentLot,
   batchNowMs: number,
+  rng: () => number,
 ): NpcFlight | undefined {
   const aircraft = getAircraftClass(npc.aircraftClassId);
   const avail = lotAvailableKg(lot);
@@ -299,7 +595,18 @@ function claimLotForNpc(
   if (cargoKg <= 0) return undefined;
 
   const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao) ?? 0;
-  const { flightHours, busyHours } = estimateNpcBlockHours(dist, npc.aircraftClassId);
+  const { flightHours } = estimateNpcBlockHours(dist, npc.aircraftClassId);
+  // Desync peers that claim in the same hourly batch.
+  const turnaroundHours = TURNAROUND_HOURS * (0.55 + rng() * 0.9);
+  const departSkewMs = Math.floor(rng() * DEPART_STAGGER_MS);
+  const departedAtMs = batchNowMs + departSkewMs;
+  const arrivesAtMs = departedAtMs + flightHours * MS_PER_TICK;
+  const busyUntilMs = arrivesAtMs + turnaroundHours * MS_PER_TICK;
+  const flightTickHours = Math.max(1, Math.ceil(flightHours));
+  const busyTickHours = Math.max(
+    flightTickHours + 1,
+    Math.ceil(flightHours + turnaroundHours),
+  );
 
   let reserved;
   try {
@@ -329,9 +636,9 @@ function claimLotForNpc(
     payUsd: reserved.payUsd,
     aircraftClassId: npc.aircraftClassId,
     departedAtTick: world.tick,
-    arrivesAtTick: world.tick + flightHours,
-    departedAtMs: batchNowMs,
-    arrivesAtMs: batchNowMs + flightHours * MS_PER_TICK,
+    arrivesAtTick: world.tick + flightTickHours,
+    departedAtMs,
+    arrivesAtMs,
     status: 'in_flight',
     fuelUpliftKg: fuel.deliveredKg,
     fuelCostUsd: fuel.costUsd,
@@ -339,9 +646,12 @@ function claimLotForNpc(
   };
 
   npc.status = 'busy';
-  npc.busyUntilTick = world.tick + busyHours;
-  npc.busyUntilMs = batchNowMs + busyHours * MS_PER_TICK;
+  npc.busyUntilTick = world.tick + busyTickHours;
+  npc.busyUntilMs = busyUntilMs;
   npc.currentFlightId = flight.id;
+  const legDuty = flightHours + turnaroundHours;
+  npc.lastLegDutyHours = legDuty;
+  npc.dutyHoursAccum = (npc.dutyHoursAccum ?? 0) + legDuty;
   world.npcFlights.push(flight);
   return flight;
 }
@@ -353,8 +663,16 @@ function npcBidOnMarket(
 ): void {
   const idle = world.npcs.filter((n) => {
     if (n.currentFlightId) return false;
+    if (n.status === 'resting') {
+      if (npcRestUntilMs(n) > batchNowMs) return false;
+      clearCrewRest(n);
+    }
     if (n.status === 'busy' && npcBusyUntilMs(n) > batchNowMs) return false;
-    n.status = 'idle';
+    if (n.status === 'busy') {
+      finishTurnaround(world, n, batchNowMs);
+    }
+    if (n.status === 'resting') return false;
+    if (n.status !== 'idle') return false;
     n.busyUntilTick = undefined;
     n.busyUntilMs = undefined;
     return true;
@@ -372,7 +690,9 @@ function npcBidOnMarket(
   );
 
   for (const npc of idle) {
-    const bidChance = 0.22 + npc.aggressiveness * 0.55;
+    const regionCapacity = npcRegionBidCapacity(world, npc.homeRegion, batchNowMs);
+    const bidChance =
+      (0.22 + npc.aggressiveness * 0.55) * (0.45 + 0.55 * regionCapacity);
     if (rng() > bidChance) continue;
     if (rng() > 0.55 + npc.reliability * 0.45) continue;
 
@@ -392,7 +712,7 @@ function npcBidOnMarket(
     }
 
     if (!best) continue;
-    const flight = claimLotForNpc(world, npc, best.lot, batchNowMs);
+    const flight = claimLotForNpc(world, npc, best.lot, batchNowMs, rng);
     if (flight) {
       claimedLotIds.add(best.lot.id);
     }
@@ -479,8 +799,12 @@ export function listNpcFleetStatus(
 
     let phase: NpcFleetMemberView['phase'] = 'idle';
     let turnaroundHoursLeft: number | undefined;
+    let restHoursLeft: number | undefined;
     if (flight && activity) {
       phase = activity.phase;
+    } else if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) {
+      phase = 'resting';
+      restHoursLeft = Math.max(0, (npcRestUntilMs(npc) - nowMs) / MS_PER_TICK);
     } else if (npc.status === 'busy' && npcBusyUntilMs(npc) > nowMs) {
       phase = 'turnaround';
       turnaroundHoursLeft = Math.max(0, (npcBusyUntilMs(npc) - nowMs) / MS_PER_TICK);
@@ -525,16 +849,28 @@ export function listNpcFleetStatus(
       busyUntilTick: npc.busyUntilTick,
       busyUntilMs: npc.busyUntilMs,
       turnaroundHoursLeft,
+      restUntilTick: npc.restUntilTick,
+      restUntilMs: npc.restUntilMs,
+      restHoursLeft,
+      dutyHoursAccum: npc.dutyHoursAccum,
       mission,
     };
   });
 
-  const phaseOrder = { arriving: 0, enroute: 1, turnaround: 2, idle: 3 } as const;
+  const phaseOrder = {
+    arriving: 0,
+    enroute: 1,
+    turnaround: 2,
+    resting: 3,
+    idle: 4,
+  } as const;
   rows.sort((a, b) => {
     const d = phaseOrder[a.phase] - phaseOrder[b.phase];
     if (d !== 0) return d;
-    const ae = a.mission?.etaHours ?? a.turnaroundHoursLeft ?? 99;
-    const be = b.mission?.etaHours ?? b.turnaroundHoursLeft ?? 99;
+    const ae =
+      a.mission?.etaHours ?? a.turnaroundHoursLeft ?? a.restHoursLeft ?? 99;
+    const be =
+      b.mission?.etaHours ?? b.turnaroundHoursLeft ?? b.restHoursLeft ?? 99;
     return ae - be;
   });
   return rows;

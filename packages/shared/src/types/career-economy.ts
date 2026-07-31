@@ -110,11 +110,19 @@ export interface NpcFreighter {
   aggressiveness: number;
   /** Multiplier on minimum acceptable pay/kg vs commodity base. */
   feeBias: number;
-  status: 'idle' | 'busy';
+  status: 'idle' | 'busy' | 'resting';
   /** Economy tick when this freighter can bid again (legacy / debug). */
   busyUntilTick?: number;
-  /** Wall-clock when freighter can bid again (authoritative). */
+  /** Wall-clock when freighter can bid again after turnaround (authoritative). */
   busyUntilMs?: number;
+  /** Duty hours accumulated since last crew rest (flight + turnaround). */
+  dutyHoursAccum?: number;
+  /** Duty hours from the most recent leg (for long-haul rest trigger). */
+  lastLegDutyHours?: number;
+  /** Economy tick when crew rest ends (legacy / debug). */
+  restUntilTick?: number;
+  /** Wall-clock when crew rest ends — NPC cannot bid until then. */
+  restUntilMs?: number;
   currentFlightId?: string;
 }
 
@@ -163,7 +171,7 @@ export interface NpcActivityView {
   phase: 'enroute' | 'arriving';
 }
 
-/** Roster row for the NPC fleet board (idle + busy). */
+/** Roster row for the NPC fleet board (idle + busy + resting). */
 export interface NpcFleetMemberView {
   id: string;
   name: string;
@@ -173,11 +181,15 @@ export interface NpcFleetMemberView {
   reliability: number;
   aggressiveness: number;
   feeBias: number;
-  status: 'idle' | 'busy';
-  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround';
+  status: 'idle' | 'busy' | 'resting';
+  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround' | 'resting';
   busyUntilTick?: number;
   busyUntilMs?: number;
   turnaroundHoursLeft?: number;
+  restUntilTick?: number;
+  restUntilMs?: number;
+  restHoursLeft?: number;
+  dutyHoursAccum?: number;
   mission?: {
     flightId: string;
     lotId: string;

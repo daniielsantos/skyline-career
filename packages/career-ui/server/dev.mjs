@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,16 +10,58 @@ const viteBin = join(dirname(vitePackage), 'bin', 'vite.js');
 const apiPort = Number(process.env.CAREER_UI_API_PORT ?? 8787);
 const uiPort = Number(process.env.CAREER_UI_PORT ?? 5173);
 
-async function hasHealthyApi() {
+const { NPC_FLEET_SIZE } = await import('@msfs-compat/shared');
+
+function killListenersOnPort(port) {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync('netstat -ano', { encoding: 'utf8' });
+      const pids = new Set();
+      for (const line of out.split(/\r?\n/)) {
+        if (!line.includes(`:${port}`) || !line.includes('LISTENING')) continue;
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && /^\d+$/.test(pid) && pid !== '0') pids.add(pid);
+      }
+      for (const pid of pids) {
+        try {
+          execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
+          console.log(`Stopped stale process PID ${pid} on port ${port}`);
+        } catch {
+          /* already gone */
+        }
+      }
+      return;
+    }
+    try {
+      const out = execSync(`lsof -tiTCP:${port} -sTCP:LISTEN`, {
+        encoding: 'utf8',
+      });
+      for (const pid of out.split(/\s+/).filter(Boolean)) {
+        try {
+          process.kill(Number(pid), 'SIGTERM');
+          console.log(`Stopped stale process PID ${pid} on port ${port}`);
+        } catch {
+          /* already gone */
+        }
+      }
+    } catch {
+      /* nothing listening */
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+async function apiHealth() {
   try {
     const res = await fetch(`http://127.0.0.1:${apiPort}/api/health`, {
       signal: AbortSignal.timeout(800),
     });
-    if (!res.ok) return false;
-    const body = await res.json();
-    return body?.ok === true;
+    if (!res.ok) return null;
+    return await res.json();
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -37,9 +79,24 @@ async function hasCareerUi() {
 }
 
 const kids = [];
-if (await hasHealthyApi()) {
-  console.log(`Career API already running at http://127.0.0.1:${apiPort}`);
+
+const health = await apiHealth();
+const apiIsCurrent =
+  health?.ok === true && health?.npcFleetTarget === NPC_FLEET_SIZE;
+
+if (apiIsCurrent) {
+  console.log(
+    `Career API already running at http://127.0.0.1:${apiPort} (npcFleetTarget=${NPC_FLEET_SIZE})`,
+  );
 } else {
+  if (health?.ok) {
+    console.log(
+      `Career API on :${apiPort} is stale (npcFleetTarget=${health.npcFleetTarget ?? 'missing'}, want ${NPC_FLEET_SIZE}) — restarting`,
+    );
+  }
+  killListenersOnPort(apiPort);
+  // Brief pause so Windows releases the port.
+  await new Promise((r) => setTimeout(r, 400));
   kids.push(
     spawn(process.execPath, ['--import', 'tsx', join(root, 'server', 'api.ts')], {
       cwd: root,

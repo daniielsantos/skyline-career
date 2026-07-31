@@ -32,6 +32,7 @@ Stations 1–15 writable, offset 0.
 - `profiles/examples/blacksquare-caravan-professional-cargo-pod.json`
 - Classic mains only; smoke 35→134 confirmed; apply 40/40 OK
 - UI: confirm Mass & Balance follows SimVars (user reported success 2026-07-28)
+- CG inject rebalance: Career shifts baggage stations after apply until live CG is inside FWD/AFT limits. Station `arm` is optional — run `calibrate --flight-model` to fill arms from cfg for better forward/aft ordering; without arms the loader falls back to station index order.
 
 ## Career / OFP pack (`light_turboprop`)
 

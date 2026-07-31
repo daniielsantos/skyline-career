@@ -2,6 +2,8 @@
   "source": "simbrief",
   "icao": "B738",
   "ofpId": "load-sheet-sample",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "fuel": {
     "unit": "kg"
   },

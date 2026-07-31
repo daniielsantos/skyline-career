@@ -187,6 +187,10 @@ export type Mission = {
   payoutUsd?: number;
   urgency: string;
   aircraftClassId: string;
+  /** Preferred OFP load path for this class (manual always allowed). */
+  loadMethod?: 'native-simbrief' | 'direct-injection';
+  /** True when Skyline can inject fuel/payload for this class. */
+  injectCapable?: boolean;
   aircraftId?: string;
   deadlineTick: number;
   reason: string;
@@ -238,6 +242,13 @@ export type Mission = {
       aircraft: {
         onGround: boolean;
         enginesRunning: boolean;
+      };
+      cg?: {
+        liveMac?: number;
+        minMac?: number;
+        maxMac?: number;
+        ok: boolean;
+        severity: 'info' | 'warn';
       };
       weightNoteCount: number;
     };

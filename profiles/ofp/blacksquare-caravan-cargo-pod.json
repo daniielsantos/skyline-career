@@ -2,6 +2,8 @@
   "source": "simbrief",
   "icao": "C208",
   "ofpId": "blacksquare-caravan-cargo-pod",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
   "matchTitlePattern": "Black Square Caravan Professional Cargo Pod",
   "matchTitles": [
     "Black Square Caravan Professional Cargo Pod"

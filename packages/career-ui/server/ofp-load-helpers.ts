@@ -5,7 +5,12 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
-import type { AircraftProfile, LoadPlanRequest, MissionIntent } from '@msfs-compat/shared';
+import {
+  assertRolesPackAllowsDirectInjection,
+  type AircraftProfile,
+  type LoadPlanRequest,
+  type MissionIntent,
+} from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compliance/run-compare.ts';
@@ -15,8 +20,11 @@ import {
   OfpLoadPlanError,
   buildOfpLoadPlan,
   buildRollbackPlan,
+  cgRebalanceStepLb,
+  shiftCargoForCg,
   type BuiltOfpLoadPlan,
 } from '../../agent/src/ofp-load-plan.ts';
+import { readLiveCgState } from '../../agent/src/live-cg.ts';
 import { ProfileCache } from '../../agent/src/profile-cache.ts';
 import {
   defaultCacheDir,
@@ -29,6 +37,10 @@ import type { CareerWatchSession } from './watch-helpers.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
+
+/** Stay this many %MAC inside the live envelope after inject rebalance. */
+const CG_REBALANCE_MARGIN_MAC = 1;
+const CG_REBALANCE_MAX_ITERATIONS = 8;
 
 export type SimBridgeStatusPayload = {
   connected: boolean;
@@ -251,15 +263,24 @@ export async function applyMissionOfpLoad(
 
   let ofp = expectation;
   let stationRoles = expectation.payload?.stationRoles;
+  let rolesPack: Awaited<ReturnType<typeof loadRolesPackFile>> | undefined;
   try {
     const rolesPath = resolve(repoRoot, mission.rolesPackRelPath);
-    const rolesPack = await loadRolesPackFile(rolesPath);
+    rolesPack = await loadRolesPackFile(rolesPath);
+    assertRolesPackAllowsDirectInjection(rolesPack);
     stationRoles = rolesPack.payload?.stationRoles ?? stationRoles;
     ofp = applyOfpOverrides(expectation, {
       stationRoles: rolesPack.payload?.stationRoles,
       liveSources: rolesPack.liveSources,
     });
-  } catch {
+  } catch (rolesError) {
+    if (
+      rolesError instanceof Error &&
+      (rolesError.message.includes('loadMethod=') ||
+        rolesError.message.includes('injectCapable'))
+    ) {
+      throw rolesError;
+    }
     // Freighter may still load if OFP already carries stationRoles.
   }
 
@@ -350,16 +371,170 @@ export async function applyMissionOfpLoad(
       bridge,
     });
 
-    applyResult = await engine.applyLoadPlan(built.plan);
+    // Strict CG only when envelope provenance is authoritative.
+    const envelopeSource = resolved.profile.cg?.envelopeSource;
+    const cgPolicy =
+      envelopeSource === 'cfg' ||
+      envelopeSource === 'manual' ||
+      envelopeSource === 'simvar' ||
+      envelopeSource === 'live-sweep'
+        ? 'strict'
+        : 'soft';
+
+    // Soft during rebalance so a first-pass aft CG can be corrected by shifting cargo.
+    applyResult = await engine.applyLoadPlan({
+      ...built.plan,
+      cgPolicy: 'soft',
+    });
     afterLive = {
       tanks: await readLiveTanks(bridge, resolved.profile),
       stations: await readLiveStations(bridge, resolved.profile),
     };
 
+    let softCgWarn = false;
+    let cgRebalanceMoves = 0;
+
+    if (applySucceeded({ fuel: applyResult.fuel, payload: applyResult.payload })) {
+      for (let i = 0; i < CG_REBALANCE_MAX_ITERATIONS; i++) {
+        const liveCg = await readLiveCgState(bridge, {
+          readVar: resolved.profile.cg?.readVar,
+          readUnit: resolved.profile.cg?.readUnit,
+        });
+        const minMac =
+          liveCg.minMac ?? resolved.profile.cg?.constraints?.minMac;
+        const maxMac =
+          liveCg.maxMac ?? resolved.profile.cg?.constraints?.maxMac;
+        const liveMac = liveCg.liveMac;
+        if (
+          liveMac === undefined ||
+          minMac === undefined ||
+          maxMac === undefined
+        ) {
+          break;
+        }
+        const lo = minMac + CG_REBALANCE_MARGIN_MAC;
+        const hi = maxMac - CG_REBALANCE_MARGIN_MAC;
+        if (liveMac >= lo && liveMac <= hi) {
+          applyResult = {
+            ...applyResult,
+            cg: { ok: true, failures: [] },
+          };
+          break;
+        }
+
+        const direction = liveMac > hi ? 'forward' : 'aft';
+        const excessMac =
+          liveMac > hi ? liveMac - hi : lo - liveMac;
+        const stepLb = cgRebalanceStepLb({
+          excessMac,
+          cargoLb: built.cargoLb,
+        });
+        const stations = {
+          ...(built.plan.payload?.stations ?? {}),
+        };
+        const shifted = shiftCargoForCg(
+          stations,
+          resolved.profile,
+          built.baggageStations,
+          direction,
+          stepLb,
+        );
+        if (shifted.movedLb <= 0) {
+          applyResult = {
+            ...applyResult,
+            cg: {
+              ok: false,
+              failures: [
+                {
+                  var: 'CG PERCENT',
+                  expected: (minMac + maxMac) / 2,
+                  actual: liveMac,
+                  tolerancePct: CG_REBALANCE_MARGIN_MAC,
+                },
+              ],
+            },
+          };
+          break;
+        }
+
+        const total = Object.values(shifted.stations).reduce((a, b) => a + b, 0);
+        built = {
+          ...built,
+          plan: {
+            ...built.plan,
+            payload: { stations: shifted.stations, total },
+          },
+        };
+        cgRebalanceMoves += 1;
+        const payloadApply = await engine.applyLoadPlan({
+          payload: built.plan.payload,
+          cgPolicy: 'soft',
+        });
+        applyResult = {
+          ...applyResult,
+          payload: payloadApply.payload ?? applyResult.payload,
+          cg: payloadApply.cg ?? applyResult.cg,
+        };
+        afterLive = {
+          tanks: await readLiveTanks(bridge, resolved.profile),
+          stations: await readLiveStations(bridge, resolved.profile),
+        };
+        if (payloadApply.payload && !payloadApply.payload.success) {
+          break;
+        }
+      }
+
+      // Final live CG gate after rebalance attempts.
+      const finalCg = await readLiveCgState(bridge, {
+        readVar: resolved.profile.cg?.readVar,
+        readUnit: resolved.profile.cg?.readUnit,
+      });
+      const minMac =
+        finalCg.minMac ?? resolved.profile.cg?.constraints?.minMac;
+      const maxMac =
+        finalCg.maxMac ?? resolved.profile.cg?.constraints?.maxMac;
+      const liveMac = finalCg.liveMac;
+      if (
+        liveMac !== undefined &&
+        minMac !== undefined &&
+        maxMac !== undefined
+      ) {
+        const lo = minMac + CG_REBALANCE_MARGIN_MAC;
+        const hi = maxMac - CG_REBALANCE_MARGIN_MAC;
+        const inEnvelope = liveMac >= lo && liveMac <= hi;
+        const failure = {
+          var: 'CG PERCENT',
+          expected: (minMac + maxMac) / 2,
+          actual: liveMac,
+          tolerancePct: CG_REBALANCE_MARGIN_MAC,
+        };
+        if (inEnvelope) {
+          applyResult = { ...applyResult, cg: { ok: true, failures: [] } };
+        } else if (cgPolicy === 'strict') {
+          applyResult = {
+            ...applyResult,
+            cg: { ok: false, failures: [failure] },
+          };
+        } else {
+          softCgWarn = true;
+          applyResult = {
+            ...applyResult,
+            cg: { ok: true, failures: [failure] },
+          };
+        }
+      }
+    }
+
     if (!applySucceeded(applyResult)) {
       rolledBack = true;
-      const restore = await engine.applyLoadPlan(rollbackPlan);
-      rollbackOk = applySucceeded(restore);
+      const restore = await engine.applyLoadPlan({
+        ...rollbackPlan,
+        cgPolicy: 'soft',
+      });
+      rollbackOk = applySucceeded({
+        fuel: restore.fuel,
+        payload: restore.payload,
+      });
       afterLive = {
         tanks: await readLiveTanks(bridge, resolved.profile),
         stations: await readLiveStations(bridge, resolved.profile),
@@ -397,6 +572,15 @@ export async function applyMissionOfpLoad(
         const { snapshot } = await compareOnce(bridge, { ofp, locked: false });
         compareVerdict = snapshot.verdict;
         compareSummary = formatComplianceSummary(snapshot);
+        if (cgRebalanceMoves > 0) {
+          compareSummary =
+            `${compareSummary}\n  [info] CG_REBALANCE: shifted cargo ${cgRebalanceMoves} time(s) to fit envelope`;
+        }
+        if (softCgWarn && applyResult.cg?.failures[0]) {
+          const failure = applyResult.cg.failures[0];
+          compareSummary =
+            `${compareSummary}\n  [warn] CG_SOFT: live ${failure.actual.toFixed(1)}% MAC outside provisional envelope (apply kept)`;
+        }
         if (snapshot.verdict === 'fail') {
           rolledBack = true;
           const restore = await engine.applyLoadPlan(rollbackPlan);

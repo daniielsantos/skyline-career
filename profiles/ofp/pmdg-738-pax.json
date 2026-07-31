@@ -2,6 +2,8 @@
   "source": "simbrief",
   "icao": "B738",
   "ofpId": "pmdg-738-pax-family",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "matchTitlePattern": "737-800\\s+PAX",
   "matchTitles": [
     "737-800 PAX SSW TC",

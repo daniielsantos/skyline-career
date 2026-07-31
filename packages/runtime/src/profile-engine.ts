@@ -1,12 +1,11 @@
 import type { AircraftProfile, LoadPlanRequest } from '@msfs-compat/shared';
+import { normalizeMacPercent } from '@msfs-compat/shared';
 import { DefaultCapabilityDetector } from './capability/default-capability-detector.js';
 import { DefaultGatingEvaluator } from './gating/default-gating-evaluator.js';
 import { StrategyRegistry } from './registry/strategy-registry.js';
 import { HybridSyncFuelStrategy, LvarBridgeFuelStrategy, SimConnectDirectFuelStrategy } from './strategies/fuel/simconnect-fuel-strategy.js';
 import { StationWritebackPayloadStrategy } from './strategies/payload/station-payload-strategy.js';
 import type { ProfileEngine, SimBridge } from './types.js';
-
-const CG_TOLERANCE_MAC_PERCENT = 1;
 
 export interface ProfileEngineOptions {
   profile: AircraftProfile;
@@ -87,27 +86,47 @@ export class DefaultProfileEngine implements ProfileEngine {
         name: this.profile.cg.readVar ?? 'CG PERCENT',
         unit: this.profile.cg.readUnit ?? 'Percent over 100',
       });
+      cg = normalizeMacPercent(cg);
 
-      // MSFS returns Percent-over-100 as 0.24 for 24%; normalize to MAC percent.
-      if (cg <= 1.5) {
-        cg *= 100;
+      // Prefer live envelope from CG FWD/AFT LIMIT (Mass & Balance tablet) when readable.
+      let minMac = this.profile.cg.constraints.minMac;
+      let maxMac = this.profile.cg.constraints.maxMac;
+      try {
+        const [fwdRaw, aftRaw] = await Promise.all([
+          this.bridge.readSimVar({ name: 'CG FWD LIMIT', unit: 'Percent over 100' }),
+          this.bridge.readSimVar({ name: 'CG AFT LIMIT', unit: 'Percent over 100' }),
+        ]);
+        if (Number.isFinite(fwdRaw) && Number.isFinite(aftRaw)) {
+          let fwd = normalizeMacPercent(fwdRaw);
+          let aft = normalizeMacPercent(aftRaw);
+          if (fwd > aft) [fwd, aft] = [aft, fwd];
+          minMac = fwd;
+          maxMac = aft;
+        }
+      } catch {
+        // Keep profile constraints when live limits are unavailable.
       }
 
-      const { minMac, maxMac } = this.profile.cg.constraints;
-      const ok =
-        (minMac === undefined || cg >= minMac - CG_TOLERANCE_MAC_PERCENT) &&
-        (maxMac === undefined || cg <= maxMac + CG_TOLERANCE_MAC_PERCENT);
+      const toleranceMac = Math.min(
+        1,
+        Math.max(0, this.profile.cg.toleranceMac ?? 0.5),
+      );
+      const inEnvelope =
+        (minMac === undefined || cg >= minMac - toleranceMac) &&
+        (maxMac === undefined || cg <= maxMac + toleranceMac);
+      const soft = request.cgPolicy === 'soft';
       const expectedCg = ((minMac ?? 0) + (maxMac ?? 0)) / 2;
       results.cg = {
-        ok,
-        failures: ok
+        // Soft policy reports the measurement but does not fail the apply.
+        ok: soft ? true : inEnvelope,
+        failures: inEnvelope
           ? []
           : [
               {
                 var: 'CG PERCENT',
                 expected: expectedCg,
                 actual: cg,
-                tolerancePct: CG_TOLERANCE_MAC_PERCENT,
+                tolerancePct: toleranceMac,
               },
             ],
       };

@@ -2,6 +2,8 @@
   "source": "simbrief",
   "icao": "B738",
   "ofpId": "pmdg-738-ssw-tc-sample",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "notes": [
     "Station roles from PMDG 737-800 SSW TC flight_model.cfg station_load.*",
     "SimConnect PAYLOAD STATION WEIGHT:n is 1-based (station_load.0 → :1)",

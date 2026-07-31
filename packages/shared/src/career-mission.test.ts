@@ -1,8 +1,11 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   acceptMission,
+  assertRolesPackAllowsDirectInjection,
   cancelMission,
+  careerAllowsDirectInject,
+  careerPreflightReady,
   commitStagedManifest,
   compareMissionIntentToOfp,
   createSeedEconomyWorld,
@@ -16,15 +19,81 @@ import {
   listMarketLots,
   listViableMarketLots,
   MAX_MANIFEST_LOTS,
+  missionLoadPolicy,
   normalizeMissionIntent,
   normalizeOfpExpectation,
   replaceMissionManifest,
   routeDistanceNm,
   settleMission,
+  softenCareerPreflightVerdict,
+  softenCgFindingSeverity,
   tickEconomyN,
+  withMissionLoadPolicy,
   type MissionIntent,
   type ShipmentLot,
 } from './index.js';
+
+describe('mission load method policy', () => {
+  it('marks narrow/wide as native-simbrief and Caravan as direct-injection', () => {
+    assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'narrow_freighter' }), {
+      loadMethod: 'native-simbrief',
+      injectCapable: false,
+    });
+    assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'wide_freighter' }), {
+      loadMethod: 'native-simbrief',
+      injectCapable: false,
+    });
+    assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'light_turboprop' }), {
+      loadMethod: 'direct-injection',
+      injectCapable: true,
+    });
+    assert.equal(
+      careerAllowsDirectInject(missionLoadPolicy({ aircraftClassId: 'narrow_freighter' })),
+      false,
+    );
+    assert.equal(
+      careerAllowsDirectInject(missionLoadPolicy({ aircraftClassId: 'light_turboprop' })),
+      true,
+    );
+    assert.equal(
+      withMissionLoadPolicy({ id: 'm1', aircraftClassId: 'light_turboprop' }).loadMethod,
+      'direct-injection',
+    );
+  });
+
+  it('refuses inject when roles pack is native-simbrief', () => {
+    assert.throws(
+      () =>
+        assertRolesPackAllowsDirectInjection({
+          loadMethod: 'native-simbrief',
+          injectCapable: false,
+        }),
+      /loadMethod=native-simbrief/,
+    );
+    assert.doesNotThrow(() =>
+      assertRolesPackAllowsDirectInjection({
+        loadMethod: 'direct-injection',
+        injectCapable: true,
+      }),
+    );
+  });
+
+  it('softens Preflight CG and keeps ready on fuel+payload only', () => {
+    assert.equal(softenCgFindingSeverity('CG_OUT_OF_ENVELOPE', 'fail'), 'warn');
+    assert.equal(softenCgFindingSeverity('FUEL_TOTAL', 'fail'), 'fail');
+    assert.equal(
+      careerPreflightReady({ fuelFailed: false, payloadFailed: false }),
+      true,
+    );
+    assert.equal(
+      careerPreflightReady({ fuelFailed: false, payloadFailed: true }),
+      false,
+    );
+    assert.equal(softenCareerPreflightVerdict(true, 'fail'), 'warn');
+    assert.equal(softenCareerPreflightVerdict(false, 'pass'), 'fail');
+    assert.equal(softenCareerPreflightVerdict(true, 'pass'), 'pass');
+  });
+});
 
 describe('estimateRouteCargoLimit', () => {
   it('limits a full Caravan by MTOW and route fuel', () => {

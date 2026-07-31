@@ -2,6 +2,8 @@
   "source": "simbrief",
   "icao": "B738",
   "ofpId": "pmdg-738-bcf-family",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "matchTitlePattern": "737-800BCF",
   "matchTitles": [
     "737-800BCF SSW",

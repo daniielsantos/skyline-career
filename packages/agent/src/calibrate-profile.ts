@@ -1,6 +1,13 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { AircraftProfile } from '@msfs-compat/shared';
+import {
+  normalizeMacPercent,
+  resolveCgEnvelope,
+  type AircraftProfile,
+} from '@msfs-compat/shared';
+import { sweepCgEnvelope, type CgSweepResult } from './cg-sweep.js';
+import { readFlightModelCg } from './flight-model-cg.js';
+import { readLiveCgState } from './live-cg.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 
 export interface TankCalibration {
@@ -21,9 +28,23 @@ export interface CalibrateResult {
   fuelOffsetApplied: number;
   tanks: TankCalibration[];
   tolerancePct: number;
-  cgEnvelope?: { minMac: number; maxMac: number; liveCg: number };
+  cgEnvelope?: {
+    minMac?: number;
+    maxMac?: number;
+    liveCg: number;
+    source: NonNullable<AircraftProfile['cg']>['envelopeSource'];
+    cfgPath?: string;
+    sweep?: CgSweepResult;
+  };
   updated: boolean;
   notes: string[];
+}
+
+export interface CalibrateProfileOptions {
+  flightModelPath?: string;
+  manualEnvelope?: { minMac: number; maxMac: number };
+  runCgSweep?: boolean;
+  sweepPayloadLb?: number;
 }
 
 function roundOffset(value: number): number {
@@ -47,6 +68,7 @@ function median(values: number[]): number {
 export async function calibrateProfile(
   bridge: NamedPipeSimBridge,
   profilePath: string,
+  options: CalibrateProfileOptions = {},
 ): Promise<CalibrateResult> {
   const path = resolve(profilePath);
   const profile = JSON.parse(await readFile(path, 'utf8')) as AircraftProfile;
@@ -138,8 +160,8 @@ export async function calibrateProfile(
     }
   }
 
-  // Expand CG envelope around the live CG.
-  // Some airframes (e.g. Black Square Starship) report negative % MAC — do not clamp to 0..100.
+  // Record live CG + SimVar envelope (CG FWD/AFT LIMIT — same as Mass & Balance tablet).
+  // Prefer: manual override > live SimVar limits > flight_model.cfg > stored profile.
   if (!profile.cg) {
     profile.cg = {
       readVar: 'CG PERCENT',
@@ -147,33 +169,104 @@ export async function calibrateProfile(
       constraints: {},
     };
   }
-  let liveCg = await bridge.readSimVar({
-    name: profile.cg.readVar ?? 'CG PERCENT',
-    unit: profile.cg.readUnit ?? 'Percent over 100',
+  const liveCgState = await readLiveCgState(bridge, {
+    readVar: profile.cg.readVar,
+    readUnit: profile.cg.readUnit,
   });
-  // SimConnect "Percent over 100" is typically -1..1 (or 0..1); convert to percent points.
-  if (Math.abs(liveCg) <= 1.5) {
-    liveCg *= 100;
+  let liveCg = liveCgState.liveMac;
+  if (liveCg === undefined) {
+    liveCg = normalizeMacPercent(
+      await bridge.readSimVar({
+        name: profile.cg.readVar ?? 'CG PERCENT',
+        unit: profile.cg.readUnit ?? 'Percent over 100',
+      }),
+    );
   }
-  let minMac = Math.floor(liveCg) - 15;
-  let maxMac = Math.ceil(liveCg) + 20;
-  if (minMac > maxMac) {
-    const swap = minMac;
-    minMac = maxMac;
-    maxMac = swap;
+  const cfg = options.flightModelPath
+    ? await readFlightModelCg(options.flightModelPath)
+    : undefined;
+  if (cfg) {
+    for (const station of profile.payload.stations) {
+      const arm = cfg.stationArms[station.index];
+      if (arm !== undefined && station.arm !== arm) {
+        station.arm = arm;
+        updated = true;
+      }
+    }
   }
+
+  const resolvedEnvelope = resolveCgEnvelope({
+    manual: options.manualEnvelope,
+    simvar:
+      liveCgState.minMac !== undefined && liveCgState.maxMac !== undefined
+        ? { minMac: liveCgState.minMac, maxMac: liveCgState.maxMac }
+        : undefined,
+    cfg: cfg ? { minMac: cfg.minMac, maxMac: cfg.maxMac } : undefined,
+    profile: profile.cg.constraints,
+    fallbackSource: profile.cg.envelopeSource === 'live-sweep' ? 'live-sweep' : 'calibrated-live',
+  });
+  let minMac = resolvedEnvelope.minMac;
+  let maxMac = resolvedEnvelope.maxMac;
+  let source: NonNullable<AircraftProfile['cg']>['envelopeSource'] =
+    resolvedEnvelope.source;
+
   if (!profile.cg.constraints) {
     profile.cg.constraints = {};
   }
-  if (profile.cg.constraints.minMac !== minMac || profile.cg.constraints.maxMac !== maxMac) {
+  if (
+    profile.cg.constraints.minMac !== minMac ||
+    profile.cg.constraints.maxMac !== maxMac
+  ) {
     profile.cg.constraints.minMac = minMac;
     profile.cg.constraints.maxMac = maxMac;
+    updated = true;
+  }
+  profile.cg.toleranceMac = Math.min(1, Math.max(0, profile.cg.toleranceMac ?? 0.5));
+  profile.cg.envelopeSource = source;
+  profile.cg.calibration = {
+    ...profile.cg.calibration,
+    observedMac: liveCg,
+    calibratedAtIso: new Date().toISOString(),
+    cfgPath: cfg?.path,
+    emptyWeightCgPosition: cfg?.emptyWeightCgPosition,
+  };
+
+  let sweep: CgSweepResult | undefined;
+  if (options.runCgSweep) {
+    sweep = await sweepCgEnvelope(bridge, profile, {
+      payloadLb: options.sweepPayloadLb,
+    });
+    if (!sweep.restored) {
+      throw new Error('CG sweep completed but payload restoration could not be verified');
+    }
+    profile.cg.calibration.sweep = {
+      minObservedMac: sweep.minObservedMac,
+      maxObservedMac: sweep.maxObservedMac,
+      payloadLb: sweep.payloadLb,
+      forwardStation: sweep.forwardStation,
+      aftStation: sweep.aftStation,
+      usedStationArms: sweep.usedStationArms,
+      restored: sweep.restored,
+      sampledAtIso: sweep.sampledAtIso,
+    };
+    if (source === 'calibrated-live') {
+      minMac = Math.floor(sweep.minObservedMac) - 1;
+      maxMac = Math.ceil(sweep.maxObservedMac) + 1;
+      profile.cg.constraints = { minMac, maxMac };
+      source = 'live-sweep';
+      profile.cg.envelopeSource = source;
+    }
     updated = true;
   }
 
   const noteLines = [
     `AUTO-CALIBRATED fuelOffset=${fuelOffsetApplied} (median of ${tanks.length} tank probe(s)).`,
-    `verify.tolerancePct=${tolerancePct}; cg envelope ${minMac}-${maxMac}% (live CG≈${liveCg.toFixed(1)}).`,
+    `verify.tolerancePct=${tolerancePct}; cg envelope ${minMac ?? '?'}-${maxMac ?? '?'}% source=${source} (live CG≈${liveCg.toFixed(1)}).`,
+    ...(sweep
+      ? [
+          `CG sweep ${sweep.minObservedMac.toFixed(1)}-${sweep.maxObservedMac.toFixed(1)}% with ${sweep.payloadLb} lb; restored=${sweep.restored}.`,
+        ]
+      : []),
     'Re-run smoke to confirm; then promote to profiles/examples.',
   ];
   profile.notes = [
@@ -183,7 +276,8 @@ export async function calibrateProfile(
         !n.startsWith('AUTO-CALIBRATED') &&
         !n.startsWith('AUTO-DRAFT') &&
         !n.startsWith('Draft calibrated') &&
-        !n.startsWith('verify.tolerancePct'),
+        !n.startsWith('verify.tolerancePct') &&
+        !n.startsWith('CG sweep'),
     ),
   ];
 
@@ -196,7 +290,14 @@ export async function calibrateProfile(
     fuelOffsetApplied,
     tanks,
     tolerancePct,
-    cgEnvelope: { minMac, maxMac, liveCg },
+    cgEnvelope: {
+      minMac,
+      maxMac,
+      liveCg,
+      source,
+      cfgPath: cfg?.path,
+      sweep,
+    },
     updated,
     notes: noteLines,
   };

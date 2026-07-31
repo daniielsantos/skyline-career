@@ -319,6 +319,8 @@ export async function draftProfileFromLive(
     cg: {
       readVar: 'CG PERCENT',
       readUnit: 'Percent over 100',
+      envelopeSource: 'calibrated-live',
+      toleranceMac: 0.5,
       // Wide default; calibrate --profile / draft-profile --calibrate tightens from live CG.
       constraints: { minMac: 0, maxMac: 50 },
     },

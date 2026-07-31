@@ -1659,9 +1659,23 @@ small {
   flex: 1;
 }
 
+.fuel-pipeline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
 .preflight-summary-card .ofp-result-head > div {
   display: grid;
   gap: 0.18rem;
+}
+
+.preflight-summary-card .ofp-result-head > .preflight-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 0.65rem;
 }
 
 .preflight-summary-card .ofp-result-head small {
@@ -1671,7 +1685,7 @@ small {
 
 .preflight-load-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
   gap: 0.65rem;
   margin-top: 0.75rem;
 }
@@ -1706,6 +1720,10 @@ small {
 .preflight-load-ok b,
 .preflight-aircraft-state b {
   color: var(--ok);
+}
+
+.preflight-load-warn b {
+  color: var(--warn, #b7791f);
 }
 
 .preflight-load-fail b {

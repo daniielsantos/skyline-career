@@ -7,18 +7,49 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   KG_TO_LB,
+  careerPreflightReady,
   ofpCargoKg,
   ofpFuelToLb,
+  softenCareerPreflightVerdict,
+  softenCgFindingSeverity,
   type MissionIntent,
+  type OfpExpectation,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compliance/run-compare.ts';
 import { loadRolesPackFile } from '../../agent/src/ofp-compliance/scaffold-roles.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
+import { readLiveCgState } from '../../agent/src/live-cg.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
+const ofpCache = new Map<string, Promise<OfpExpectation>>();
+
+async function loadPreflightOfp(
+  mission: MissionIntent,
+  identity: { username?: string; userid?: string },
+): Promise<OfpExpectation> {
+  const key = [
+    mission.staticId,
+    mission.lastOfpCheck?.checkedAtIso ?? '',
+    identity.username ?? '',
+    identity.userid ?? '',
+  ].join(':');
+  let cached = ofpCache.get(key);
+  if (!cached) {
+    cached = fetchSimBriefLatestOfp({
+      ...identity,
+      staticId: mission.staticId!,
+    }).then(({ expectation }) => expectation);
+    ofpCache.set(key, cached);
+    if (ofpCache.size > 20) {
+      ofpCache.delete(ofpCache.keys().next().value!);
+    }
+    cached.catch(() => ofpCache.delete(key));
+  }
+  return cached;
+}
 
 export type PreflightCheckResult = {
   verdict: 'pass' | 'warn' | 'fail';
@@ -30,6 +61,13 @@ export type PreflightCheckResult = {
     fuel: { plannedLb?: number; liveLb: number; ok: boolean };
     payload: { plannedLb?: number; liveLb?: number; ok: boolean };
     aircraft: { onGround: boolean; enginesRunning: boolean };
+    cg?: {
+      liveMac?: number;
+      minMac?: number;
+      maxMac?: number;
+      ok: boolean;
+      severity: 'info' | 'warn';
+    };
     weightNoteCount: number;
   };
   findings: Array<{ code: string; severity: string; message: string }>;
@@ -76,11 +114,7 @@ export async function runMissionPreflight(
     );
   }
 
-  const { expectation } = await fetchSimBriefLatestOfp({
-    username,
-    userid,
-    staticId: mission.staticId,
-  });
+  const expectation = await loadPreflightOfp(mission, { username, userid });
 
   let ofp = expectation;
   try {
@@ -119,34 +153,82 @@ export async function runMissionPreflight(
         ['EMPTY_WEIGHT', 'TOW', 'ZFW'].includes(finding.code),
     ).length;
     const cargoKg = ofpCargoKg(ofp);
+
+    // CG is advisory in Career preflight (OnAir-style Loaded vs Due).
+    const liveCg = await readLiveCgState(bridge);
+    const cgLiveMac = liveCg.liveMac;
+    const cgMinMac = liveCg.minMac;
+    const cgMaxMac = liveCg.maxMac;
+    const cgInEnvelope =
+      cgLiveMac === undefined ||
+      cgMinMac === undefined ||
+      cgMaxMac === undefined ||
+      (cgLiveMac >= cgMinMac - 0.5 && cgLiveMac <= cgMaxMac + 0.5);
+    // Soften CG findings: Preflight never fails on CG alone (OnAir Loaded vs Due).
+    const findings = snapshot.findings.map((f) => ({
+      code: f.code,
+      severity: softenCgFindingSeverity(f.code, f.severity),
+      message: f.message,
+    }));
+    if (cgLiveMac !== undefined) {
+      const envelopeNote =
+        cgMinMac !== undefined && cgMaxMac !== undefined
+          ? ` envelope ${cgMinMac.toFixed(0)}–${cgMaxMac.toFixed(0)}%`
+          : '';
+      findings.push({
+        code: 'CG_LIVE',
+        severity: cgInEnvelope ? 'info' : 'warn',
+        message: `Live CG ${cgLiveMac.toFixed(1)}% MAC${envelopeNote} (advisory; does not block Validate)`,
+      });
+    }
+
+    // Ready = fuel + payload OK. CG / empty-weight notes never block Depart alone.
+    const fuelOk = !fuelFailed;
+    const payloadOk = !payloadFailed;
+    const ready = careerPreflightReady({ fuelFailed, payloadFailed });
+    const careerVerdict = softenCareerPreflightVerdict(ready, snapshot.verdict);
+
     const check: PreflightCheckResult = {
-      verdict: snapshot.verdict,
-      summary: formatComplianceSummary(snapshot),
+      verdict: careerVerdict,
+      summary: formatComplianceSummary({
+        ...snapshot,
+        verdict: careerVerdict,
+        findings: findings.map((f) => ({
+          ...f,
+          severity: f.severity as 'pass' | 'warn' | 'fail' | 'info',
+        })),
+      }),
       checkedAtIso,
       phase: snapshot.phase,
       loadVerification: {
-        ready: snapshot.verdict !== 'fail',
+        ready,
         fuel: {
           plannedLb: ofpFuelToLb(ofp.fuel).total,
           liveLb: live.fuel.total,
-          ok: !fuelFailed,
+          ok: fuelOk,
         },
         payload: {
           plannedLb: cargoKg !== undefined ? cargoKg * KG_TO_LB : undefined,
-          liveLb: live.payload?.total,
-          ok: !payloadFailed,
+          liveLb: live.payload?.ofpPayloadLb ?? live.payload?.total,
+          ok: payloadOk,
         },
         aircraft: {
           onGround: live.onGround,
           enginesRunning: live.enginesRunning,
         },
+        cg:
+          cgLiveMac !== undefined
+            ? {
+                liveMac: cgLiveMac,
+                minMac: cgMinMac,
+                maxMac: cgMaxMac,
+                ok: cgInEnvelope,
+                severity: cgInEnvelope ? 'info' : 'warn',
+              }
+            : undefined,
         weightNoteCount,
       },
-      findings: snapshot.findings.map((f) => ({
-        code: f.code,
-        severity: f.severity,
-        message: f.message,
-      })),
+      findings,
     };
     return {
       check,
@@ -186,5 +268,8 @@ export async function runMissionPreflight(
 
 /** True when mission must not auto/manual depart without override. */
 export function preflightBlocksDepart(mission: MissionIntent): boolean {
+  if (!mission.lastPreflightCheck) return true;
+  const ready = mission.lastPreflightCheck?.loadVerification?.ready;
+  if (typeof ready === 'boolean') return !ready;
   return mission.lastPreflightCheck?.verdict === 'fail';
 }

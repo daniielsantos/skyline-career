@@ -1,6 +1,8 @@
 /** Skyline Career — local cargo logistics economy (Slice 1). */
 
-import type { OfpBriefingSummary } from './ofp-compliance.js';
+import type { OfpBriefingSummary, OfpLoadMethod } from './ofp-compliance.js';
+
+export type { OfpLoadMethod };
 
 export type CommodityId =
   | 'electronics'
@@ -279,6 +281,10 @@ export interface AircraftClass {
   maxRangeNm: number;
   /** Repo-relative OFP roles pack path. */
   rolesPackRelPath: string;
+  /** Preferred Career load path for this class (manual always allowed in UI). */
+  loadMethod: OfpLoadMethod;
+  /** True when a writable Skyline profile exists for direct injection. */
+  injectCapable: boolean;
   simbriefIcao: string;
   simbriefAirframeMatch: string;
   /** Career-economy burn estimate (not SimBrief OFP). */

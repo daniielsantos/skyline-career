@@ -1,6 +1,10 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
-import type { OfpLiveSources, OfpStationRoleMap } from '@msfs-compat/shared';
+import type {
+  OfpLiveSources,
+  OfpLoadMethod,
+  OfpStationRoleMap,
+} from '@msfs-compat/shared';
 
 /** On-disk OFP / roles pack with optional title matching for auto-resolve. */
 export interface OfpRolesPackFile {
@@ -12,6 +16,10 @@ export interface OfpRolesPackFile {
   matchTitles?: string[];
   /** RegExp source (no flags) tested against MSFS title. */
   matchTitlePattern?: string;
+  /** Preferred Career load path (manual always allowed in UI). */
+  loadMethod?: OfpLoadMethod;
+  /** True when a writable Skyline profile exists for direct injection. */
+  injectCapable?: boolean;
   fuel?: { unit?: string };
   loadSheet?: Record<string, unknown>;
   payload?: {
@@ -42,6 +50,8 @@ export interface ScaffoldHeuristic {
   titlePattern: RegExp;
   stationRoles: OfpStationRoleMap;
   liveSources: OfpLiveSources;
+  loadMethod?: OfpLoadMethod;
+  injectCapable?: boolean;
   simbriefIcao?: string;
   simbriefAirframeMatch?: string;
   stationMap: Array<{
@@ -94,6 +104,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       averagePassengerWeight: 86.18,
     },
     liveSources: PMDG_738_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
     simbriefIcao: 'B738',
     simbriefAirframeMatch: 'PMDG \\(MSFS\\) - Dual Class',
     stationMap: [
@@ -130,6 +142,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       serviceStations: [10, 11],
     },
     liveSources: PMDG_738_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
     simbriefIcao: 'B738',
     simbriefAirframeMatch: 'PMDG \\(MSFS\\) - Boeing Converted Freighter',
     stationMap: [
@@ -166,6 +180,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       // :14/:15 are aux tank stations — not cargo
     },
     liveSources: TFDI_MD11_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
     simbriefIcao: 'MD1F',
     // Title hint (PW/GE) disambiguates among TFDi freighter variants.
     simbriefAirframeMatch: 'TFDi Design \\(MSFS\\) - MD-11F',
@@ -205,6 +221,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       // averagePassengerWeight: leave unset — resolve from OFP (payload−bags)/pax
     },
     liveSources: TOLISS_A346_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
     simbriefIcao: 'A346',
     simbriefAirframeMatch: 'Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)',
     stationMap: [
@@ -235,6 +253,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       crewStations: [1, 2],
     },
     liveSources: CLASSIC_LIGHT_LIVE_SOURCES,
+    loadMethod: 'direct-injection',
+    injectCapable: true,
     simbriefIcao: 'C208',
     simbriefAirframeMatch: 'Default',
     stationMap: [
@@ -298,6 +318,8 @@ export function buildRolesPackFromHeuristic(
       stationRoles: heuristic.stationRoles,
     },
     liveSources: heuristic.liveSources,
+    loadMethod: heuristic.loadMethod ?? 'native-simbrief',
+    injectCapable: heuristic.injectCapable ?? false,
     simbriefIcao: heuristic.simbriefIcao,
     simbriefAirframeMatch: heuristic.simbriefAirframeMatch,
     stationMap: heuristic.stationMap,

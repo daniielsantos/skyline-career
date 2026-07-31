@@ -1,6 +1,9 @@
 /** Planned fuel from an OFP (manual JSON today; SimBrief adapter later). */
 export type OfpWeightUnit = 'lb' | 'kg';
 
+/** How Career prefers to get OFP fuel/payload into the aircraft. */
+export type OfpLoadMethod = 'native-simbrief' | 'direct-injection';
+
 /** @deprecated Use OfpWeightUnit — kept as alias for fuel tank plans. */
 export type OfpFuelUnit = OfpWeightUnit;
 

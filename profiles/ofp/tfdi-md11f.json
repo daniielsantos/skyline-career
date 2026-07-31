@@ -2,6 +2,8 @@
   "source": "simbrief",
   "icao": "MD11",
   "ofpId": "tfdi-md11f-family",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "matchTitlePattern": "MD-11F",
   "matchTitles": [
     "TFDi Design MD-11F PW4462",

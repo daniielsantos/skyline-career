@@ -96,7 +96,7 @@ function usage(): never {
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent apply-auto --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-tip <n>] [--fuel-right-tip <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--station i=lbs ...] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent draft-profile [--out <dir>] [--fuel-offset <n>] [--calibrate] [--pipe <name>]
-  msfs-compat-agent calibrate --profile <path.json> [--pipe <name>]
+  msfs-compat-agent calibrate --profile <path.json> [--flight-model <flight_model.cfg>] [--cg-min <%MAC> --cg-max <%MAC>] [--cg-sweep] [--cg-sweep-lb <n>] [--pipe <name>]
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
@@ -568,7 +568,35 @@ async function main(): Promise<void> {
     if (!profilePath) {
       usage();
     }
-    const result = await withBridge(pipeName, async (bridge) => calibrateProfile(bridge, profilePath));
+    const minRaw = getFlag(rest, '--cg-min');
+    const maxRaw = getFlag(rest, '--cg-max');
+    if ((minRaw === undefined) !== (maxRaw === undefined)) {
+      throw new Error('--cg-min and --cg-max must be provided together');
+    }
+    const minMac = minRaw === undefined ? undefined : Number(minRaw);
+    const maxMac = maxRaw === undefined ? undefined : Number(maxRaw);
+    if (
+      (minMac !== undefined && !Number.isFinite(minMac)) ||
+      (maxMac !== undefined && !Number.isFinite(maxMac))
+    ) {
+      throw new Error('--cg-min and --cg-max must be valid numbers');
+    }
+    const sweepRaw = getFlag(rest, '--cg-sweep-lb');
+    const sweepPayloadLb = sweepRaw === undefined ? undefined : Number(sweepRaw);
+    if (sweepPayloadLb !== undefined && (!Number.isFinite(sweepPayloadLb) || sweepPayloadLb <= 0)) {
+      throw new Error('--cg-sweep-lb must be a positive number');
+    }
+    const result = await withBridge(pipeName, async (bridge) =>
+      calibrateProfile(bridge, profilePath, {
+        flightModelPath: getFlag(rest, '--flight-model'),
+        manualEnvelope:
+          minMac !== undefined && maxMac !== undefined
+            ? { minMac, maxMac }
+            : undefined,
+        runCgSweep: rest.includes('--cg-sweep'),
+        sweepPayloadLb,
+      }),
+    );
     console.log(JSON.stringify(result, null, 2));
     return;
   }

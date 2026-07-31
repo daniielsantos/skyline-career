@@ -266,6 +266,108 @@ export function distributeCargoAcrossStations(
   return { stations, total, preservedStations, baggageStations, baggageCapacityLb };
 }
 
+/**
+ * Order baggage stations forward→aft.
+ * Prefer station.arm (MSFS: higher longitudinal arm = more forward); else station index.
+ */
+export function orderStationsLongitudinal(
+  profile: AircraftProfile,
+  baggageIndexes: number[],
+): { indexes: number[]; usedArms: boolean } {
+  const stations = baggageIndexes
+    .map((idx) => profile.payload.stations.find((s) => s.index === idx))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s));
+  const usedArms = stations.length > 0 && stations.every(
+    (s) => typeof s.arm === 'number' && Number.isFinite(s.arm),
+  );
+  if (usedArms) {
+    const ordered = [...stations].sort((a, b) => (b.arm as number) - (a.arm as number));
+    return { indexes: ordered.map((s) => s.index), usedArms: true };
+  }
+  return {
+    indexes: [...baggageIndexes].sort((a, b) => a - b),
+    usedArms: false,
+  };
+}
+
+export type ShiftCargoForCgResult = {
+  stations: Record<number, number>;
+  movedLb: number;
+};
+
+/**
+ * Move cargo lb toward the nose (`forward`) or tail (`aft`) among baggage stations.
+ * Preserves non-baggage weights; keeps total baggage mass constant.
+ */
+export function shiftCargoForCg(
+  stations: Record<number, number>,
+  profile: AircraftProfile,
+  baggageIndexes: number[],
+  direction: 'forward' | 'aft',
+  amountLb: number,
+): ShiftCargoForCgResult {
+  const next: Record<number, number> = { ...stations };
+  let remaining = Math.max(0, roundLb(amountLb));
+  if (remaining <= 0 || baggageIndexes.length < 2) {
+    return { stations: next, movedLb: 0 };
+  }
+
+  const { indexes: forwardFirst } = orderStationsLongitudinal(profile, baggageIndexes);
+  const maxByIndex = new Map(
+    profile.payload.stations.map((s) => [s.index, s.maxLoad] as const),
+  );
+  const baggageSet = new Set(forwardFirst);
+
+  // Sources: stations that currently hold weight on the "wrong" side.
+  // Targets: stations with spare capacity on the desired side.
+  const sources =
+    direction === 'forward' ? [...forwardFirst].reverse() : [...forwardFirst];
+  const targets =
+    direction === 'forward' ? [...forwardFirst] : [...forwardFirst].reverse();
+
+  let movedLb = 0;
+  for (const src of sources) {
+    if (remaining <= 0) break;
+    if (!baggageSet.has(src)) continue;
+    let available = next[src] ?? 0;
+    if (available <= 0) continue;
+    const srcPos = forwardFirst.indexOf(src);
+
+    for (const dst of targets) {
+      if (remaining <= 0 || available <= 0) break;
+      if (src === dst || !baggageSet.has(dst)) continue;
+      const dstPos = forwardFirst.indexOf(dst);
+      // forward: dst must be more forward than src (smaller index in forwardFirst)
+      if (direction === 'forward' && dstPos >= srcPos) continue;
+      if (direction === 'aft' && dstPos <= srcPos) continue;
+
+      const maxLoad = maxByIndex.get(dst) ?? 0;
+      const room = Math.max(0, maxLoad - (next[dst] ?? 0));
+      if (room <= 0) continue;
+
+      const move = Math.min(remaining, available, room);
+      if (move <= 0) continue;
+      next[src] = (next[src] ?? 0) - move;
+      next[dst] = (next[dst] ?? 0) + move;
+      available -= move;
+      remaining -= move;
+      movedLb += move;
+    }
+  }
+
+  return { stations: next, movedLb };
+}
+
+/** Step size for iterative CG rebalance (lb). */
+export function cgRebalanceStepLb(opts: {
+  excessMac: number;
+  cargoLb: number;
+}): number {
+  const byExcess = Math.round(Math.abs(opts.excessMac) * 80);
+  const byCargo = Math.round(opts.cargoLb * 0.08);
+  return Math.max(25, Math.min(200, byExcess, Math.max(25, byCargo)));
+}
+
 export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan {
   const { ofp, profile, stationRoles, liveStationsLb, fuelLbPerGal, cargoKgFallback } = input;
 

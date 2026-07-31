@@ -43,6 +43,9 @@ import {
   settleMission,
   stockTrend,
   tickEconomyN,
+  withMissionLoadPolicy,
+  missionLoadPolicy,
+  careerAllowsDirectInject,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type FreighterClassId,
@@ -724,7 +727,10 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/missions') {
         const missions = await loadMissions();
-        send(res, 200, missions);
+        send(res, 200, {
+          ...missions,
+          missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+        });
         return;
       }
 
@@ -1541,6 +1547,17 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const mission = missions.missions[idx]!;
+        const loadPolicy = missionLoadPolicy(mission);
+        if (!careerAllowsDirectInject(loadPolicy)) {
+          send(res, 409, {
+            error:
+              'This aircraft uses native SimBrief / EFB import — use Validate Fuel and Payload after loading in the aircraft',
+            code: 'inject_not_supported',
+            loadMethod: loadPolicy.loadMethod,
+            injectCapable: loadPolicy.injectCapable,
+          });
+          return;
+        }
         if (
           !mission.lastOfpCheck?.ofpId ||
           mission.fuelAuthorizedOfpId !== mission.lastOfpCheck.ofpId

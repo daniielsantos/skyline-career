@@ -279,11 +279,58 @@
           "type": "string",
           "default": "Percent over 100"
         },
+        "envelopeSource": {
+          "enum": ["cfg", "manual", "live-sweep", "calibrated-live"]
+        },
+        "toleranceMac": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
         "constraints": {
           "type": "object",
           "properties": {
             "minMac": { "type": "number" },
             "maxMac": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        "calibration": {
+          "type": "object",
+          "properties": {
+            "observedMac": { "type": "number" },
+            "calibratedAtIso": { "type": "string" },
+            "cfgPath": { "type": "string" },
+            "emptyWeightCgPosition": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "sweep": {
+              "type": "object",
+              "properties": {
+                "minObservedMac": { "type": "number" },
+                "maxObservedMac": { "type": "number" },
+                "payloadLb": { "type": "number", "minimum": 0 },
+                "forwardStation": { "type": "integer", "minimum": 1 },
+                "aftStation": { "type": "integer", "minimum": 1 },
+                "usedStationArms": { "type": "boolean" },
+                "restored": { "type": "boolean" },
+                "sampledAtIso": { "type": "string" }
+              },
+              "required": [
+                "minObservedMac",
+                "maxObservedMac",
+                "payloadLb",
+                "forwardStation",
+                "aftStation",
+                "usedStationArms",
+                "restored",
+                "sampledAtIso"
+              ],
+              "additionalProperties": false
+            }
           },
           "additionalProperties": false
         }

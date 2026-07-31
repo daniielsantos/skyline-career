@@ -8,7 +8,14 @@ import { calibrateProfile } from './calibrate-profile.js';
 import { draftProfileFromVendorRecipe } from './draft-from-recipe.js';
 import { draftProfileFromLive } from './draft-profile.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
-import { confirm, chooseFromList, printKv, printSection, withPrompts } from './prompt.js';
+import {
+  confirm,
+  chooseFromList,
+  printKv,
+  printSection,
+  withPrompts,
+  type AskFn,
+} from './prompt.js';
 import { listCatalogPublishers } from './catalog-publishers.js';
 import {
   discoverClassicFuelTanks,
@@ -16,6 +23,8 @@ import {
 } from './discover-fuel-tanks.js';
 import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProfile } from './promote-profile.js';
 import { probeLVars } from './probe-lvars.js';
+import { readLiveCgState } from './live-cg.js';
+import { promptFlightModelPath } from './find-flight-model.js';
 import {
   inferPublisherFromLiveTitle,
   loadVendorRecipes,
@@ -39,6 +48,78 @@ type WritetestOutcome = {
   before: number | { error: string };
   after: number | { error: string } | null;
 };
+
+async function calibrateWithCgSources(
+  ask: AskFn,
+  bridge: NamedPipeSimBridge,
+  profilePath: string,
+  aircraftTitle: string,
+) {
+  printSection('CG source + empirical validation');
+  console.log('  Prefer live CG FWD/AFT LIMIT (Mass & Balance tablet), then flight_model.cfg.');
+  const liveCg = await readLiveCgState(bridge);
+  printKv([
+    ['live CG %MAC', liveCg.liveMac?.toFixed(1)],
+    [
+      'live envelope',
+      liveCg.minMac !== undefined && liveCg.maxMac !== undefined
+        ? `${liveCg.minMac.toFixed(0)}–${liveCg.maxMac.toFixed(0)}% (SimVar)`
+        : 'unavailable',
+    ],
+  ]);
+
+  const flightModelPath = await promptFlightModelPath(ask, aircraftTitle);
+  if (flightModelPath) {
+    printKv([['flight_model.cfg', flightModelPath]]);
+  } else {
+    console.log('  Continuing without flight_model.cfg (live SimVar envelope / sweep only).');
+  }
+
+  const forwardRaw = await ask(
+    'Forward CG limit in %MAC override (blank = use live SimVar/cfg)',
+  );
+  const aftRaw = await ask(
+    'Aft CG limit in %MAC override (blank = use live SimVar/cfg)',
+  );
+  const forward = forwardRaw.trim() === '' ? undefined : Number(forwardRaw);
+  const aft = aftRaw.trim() === '' ? undefined : Number(aftRaw);
+  if (
+    (forward === undefined) !== (aft === undefined) ||
+    (forward !== undefined && (!Number.isFinite(forward) || !Number.isFinite(aft)))
+  ) {
+    throw new Error('Manual CG envelope requires valid forward and aft %MAC values');
+  }
+
+  const runCgSweep = await confirm(
+    ask,
+    'Run empirical CG station sweep now (on ground, engines off; payload is restored)',
+    false,
+  );
+  const sweepPayloadLb = runCgSweep
+    ? Number(await ask('Sweep payload (lb)', '200'))
+    : undefined;
+  if (runCgSweep && (!Number.isFinite(sweepPayloadLb) || sweepPayloadLb! <= 0)) {
+    throw new Error('Sweep payload must be a positive number');
+  }
+
+  const calibration = await calibrateProfile(bridge, profilePath, {
+    flightModelPath,
+    manualEnvelope:
+      forward !== undefined && aft !== undefined
+        ? { minMac: forward, maxMac: aft }
+        : undefined,
+    runCgSweep,
+    sweepPayloadLb,
+  });
+  if (calibration.cgEnvelope?.source === 'calibrated-live') {
+    console.log(
+      '  Warning: CG envelope remains provisional; confirm limits via SimVar/cfg/EFB before promotion.',
+    );
+  } else if (calibration.cgEnvelope?.source === 'simvar') {
+    console.log('  Using live CG FWD/AFT LIMIT from the simulator (same as tablet).');
+  }
+  return calibration;
+}
 
 async function tryRead(bridge: NamedPipeSimBridge, name: string, unit: string): Promise<number | null> {
   try {
@@ -392,6 +473,67 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     );
     printKv([['catalog ICAO', matchIcao]]);
 
+    printSection('Load method');
+    console.log('  How should Career load fuel/payload for this aircraft?');
+    console.log(
+      '    1. native-simbrief — pilot imports OFP in the addon EFB/FMC (PMDG, TFDi, ToLiss)',
+    );
+    console.log(
+      '    2. direct-injection — Skyline writes SimVars/LVars (e.g. Caravan without SimBrief import)',
+    );
+    const loadMethodRaw = (
+      await ask('Load method (1=native-simbrief, 2=direct-injection)', '1')
+    )
+      .trim()
+      .toLowerCase();
+    const loadMethod: 'native-simbrief' | 'direct-injection' =
+      loadMethodRaw === '2' ||
+      loadMethodRaw.includes('direct') ||
+      loadMethodRaw.includes('inject')
+        ? 'direct-injection'
+        : 'native-simbrief';
+    printKv([['loadMethod', loadMethod]]);
+
+    if (loadMethod === 'native-simbrief') {
+      printSection('OFP monitor path (native-simbrief)');
+      console.log('  No Skyline writable profile — skip draft / calibrate / smoke.');
+      console.log('  Checklist:');
+      console.log('    1. Scaffold roles pack: npm run scaffold-ofp-roles -- --write');
+      console.log(
+        '    2. Ensure pack has loadMethod: "native-simbrief" and injectCapable: false',
+      );
+      console.log('    3. In MSFS: EFB/FMC → Load from SimBrief / Import OFP');
+      console.log('    4. npm run compare-ofp -- --simbrief-user YOUR_ALIAS');
+      console.log('    5. Career Staging: Validate Fuel and Payload (Loaded vs Due)');
+      console.log('  Details: profiles/notes/ofp-homologation.md (track A)');
+
+      const packPathRaw = await ask(
+        'Optional: absolute/relative roles pack JSON to stamp loadMethod (blank skips)',
+      );
+      const packPath = packPathRaw.trim().replace(/^"(.*)"$/, '$1');
+      if (packPath) {
+        const abs = packPath.includes(':') || packPath.startsWith('/') || packPath.startsWith('\\')
+          ? packPath
+          : join(repoRoot, packPath);
+        const pack = JSON.parse(await readFile(abs, 'utf8')) as Record<string, unknown>;
+        pack.loadMethod = 'native-simbrief';
+        pack.injectCapable = false;
+        await writeFile(abs, `${JSON.stringify(pack, null, 2)}\n`, 'utf8');
+        console.log(`  Stamped ${abs}`);
+      }
+
+      printSection('Done');
+      console.log('  Native SimBrief path complete — validate with compare-ofp after EFB import.');
+      return;
+    }
+
+    console.log(
+      '  Continuing writable inject path — draft + calibrate + smoke required.',
+    );
+    console.log(
+      '  On promote, Career roles pack must set loadMethod: direct-injection, injectCapable: true.',
+    );
+
     printSection('2/5 Probe (capacities)');
     const totalCap = await tryRead(bridge, 'FUEL TOTAL CAPACITY', 'gallons');
     const totalQty = await tryRead(bridge, 'FUEL TOTAL QUANTITY', 'gallons');
@@ -602,7 +744,12 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         matchTitle,
         icao: matchIcao,
       });
-      const calibration = await calibrateProfile(bridge, drafted.path);
+      const calibration = await calibrateWithCgSources(
+        ask,
+        bridge,
+        drafted.path,
+        matchTitle,
+      );
       let profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
       printKv([
         ['draft', drafted.path],
@@ -618,6 +765,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         ],
         ['stations', profile.payload.stations.length],
         ['CG envelope', `${profile.cg?.constraints?.minMac}..${profile.cg?.constraints?.maxMac}`],
+        ['CG source', profile.cg?.envelopeSource],
         ['fuelOffset', calibration.fuelOffsetApplied],
       ]);
 
@@ -718,11 +866,15 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         ['fingerprint', promoted.profile.match.fingerprint?.slice(0, 16) + '…'],
         ['icao', promoted.profile.match.icao],
         ['strategy', promoted.profile.fuel.strategy],
+        ['loadMethod', 'direct-injection'],
       ]);
       console.log('');
       console.log('Next:');
       console.log('  node packages/agent/dist/cli.js resolve');
       console.log(applyAutoHint(promoted.profile));
+      console.log(
+        '  Career roles pack: loadMethod "direct-injection", injectCapable true (see ofp-homologation.md track B)',
+      );
       return;
     }
     if (centerLikely && !centerOk) {
@@ -771,7 +923,12 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       }
     }
 
-    const calibration = await calibrateProfile(bridge, drafted.path);
+    const calibration = await calibrateWithCgSources(
+      ask,
+      bridge,
+      drafted.path,
+      matchTitle,
+    );
     profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
     printKv([
       ['draft', drafted.path],
@@ -785,6 +942,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ],
       ['stations', profile.payload.stations.length],
       ['CG envelope', `${profile.cg?.constraints?.minMac}..${profile.cg?.constraints?.maxMac}`],
+      ['CG source', profile.cg?.envelopeSource],
       ['fuelOffset', calibration.fuelOffsetApplied],
     ]);
 
@@ -894,11 +1052,15 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['semver', promoted.profile.semver],
       ['fingerprint', promoted.profile.match.fingerprint?.slice(0, 16) + '…'],
       ['icao', promoted.profile.match.icao],
+      ['loadMethod', 'direct-injection'],
     ]);
     console.log('');
     console.log('Next:');
     console.log('  node packages/agent/dist/cli.js resolve');
     console.log(applyAutoHint(promoted.profile));
+    console.log(
+      '  Career roles pack: loadMethod "direct-injection", injectCapable true (see ofp-homologation.md track B)',
+    );
     return;
   });
 }

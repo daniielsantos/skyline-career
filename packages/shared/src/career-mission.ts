@@ -57,6 +57,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     maxCargoKg: 18_137,
     maxRangeNm: 2_500,
     rolesPackRelPath: 'profiles/ofp/pmdg-738-bcf.json',
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
     simbriefIcao: 'B738',
     simbriefAirframeMatch: 'PMDG \\(MSFS\\) - Boeing Converted Freighter',
     fuelBurnKgPerNm: 5,
@@ -74,6 +76,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     maxCargoKg: 90_000,
     maxRangeNm: 6_000,
     rolesPackRelPath: 'profiles/ofp/tfdi-md11f.json',
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
     simbriefIcao: 'MD1F',
     simbriefAirframeMatch: 'TFDi Design \\(MSFS\\) - MD-11F',
     fuelBurnKgPerNm: 12,
@@ -91,6 +95,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     maxCargoKg: 1_704,
     maxRangeNm: 900,
     rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
+    loadMethod: 'direct-injection',
+    injectCapable: true,
     simbriefIcao: 'C208',
     simbriefAirframeMatch: 'Default',
     fuelBurnKgPerNm: 0.8,
@@ -111,6 +117,74 @@ const CLASS_BY_ID: Record<FreighterClassId, AircraftClass> = Object.fromEntries(
 
 export function getAircraftClass(id: FreighterClassId): AircraftClass {
   return CLASS_BY_ID[id];
+}
+
+/** Preferred load path for a mission's aircraft class (manual always allowed in UI). */
+export function missionLoadPolicy(mission: {
+  aircraftClassId: FreighterClassId | string;
+}): {
+  loadMethod: AircraftClass['loadMethod'];
+  injectCapable: boolean;
+} {
+  const aircraft = getAircraftClass(mission.aircraftClassId as FreighterClassId);
+  return {
+    loadMethod: aircraft.loadMethod,
+    injectCapable: aircraft.injectCapable,
+  };
+}
+
+export function withMissionLoadPolicy<T extends { aircraftClassId: FreighterClassId | string }>(
+  mission: T,
+): T & { loadMethod: AircraftClass['loadMethod']; injectCapable: boolean } {
+  return { ...mission, ...missionLoadPolicy(mission) };
+}
+
+/** Server/API gate: only direct-injection + injectCapable may call load-ofp apply. */
+export function careerAllowsDirectInject(policy: {
+  loadMethod?: string;
+  injectCapable?: boolean;
+}): boolean {
+  return policy.loadMethod === 'direct-injection' && policy.injectCapable === true;
+}
+
+/** Roles-pack gate used by ofp-load before writing SimVars. */
+export function assertRolesPackAllowsDirectInjection(pack: {
+  loadMethod?: string;
+  injectCapable?: boolean;
+}): void {
+  if (pack.loadMethod && pack.loadMethod !== 'direct-injection') {
+    throw new Error(
+      `Roles pack loadMethod=${pack.loadMethod} — direct injection is not allowed for this aircraft`,
+    );
+  }
+  if (pack.injectCapable === false) {
+    throw new Error(
+      'Roles pack is not injectCapable — use native SimBrief/EFB import + Validate',
+    );
+  }
+}
+
+/** Career Preflight Loaded vs Due: fuel+payload only; CG never blocks alone. */
+export function careerPreflightReady(opts: {
+  fuelFailed: boolean;
+  payloadFailed: boolean;
+}): boolean {
+  return !opts.fuelFailed && !opts.payloadFailed;
+}
+
+export function softenCareerPreflightVerdict(
+  ready: boolean,
+  snapshotVerdict: 'pass' | 'warn' | 'fail',
+): 'pass' | 'warn' | 'fail' {
+  if (!ready) return 'fail';
+  if (snapshotVerdict === 'fail') return 'warn';
+  return snapshotVerdict;
+}
+
+export function softenCgFindingSeverity(code: string, severity: string): string {
+  const isCg = code.startsWith('CG_') || code.includes('CG');
+  if (isCg && severity === 'fail') return 'warn';
+  return severity;
 }
 
 /**

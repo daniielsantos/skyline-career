@@ -2,6 +2,8 @@
   "source": "simbrief",
   "icao": "A346",
   "ofpId": "toliss-a346-family",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "matchTitlePattern": "ToLiss A346|A346 PRO",
   "matchTitles": [
     "ToLiss A346 PRO [Preset Pax]"

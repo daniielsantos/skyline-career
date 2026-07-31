@@ -23,6 +23,8 @@ describe('scaffold-roles PMDG 738 PAX', () => {
     assert.deepEqual(pack.liveSources?.weights, ['pmdg-efb-lvars']);
     assert.equal(pack.simbriefIcao, 'B738');
     assert.match(pack.simbriefAirframeMatch ?? '', /Dual Class/);
+    assert.equal(pack.loadMethod, 'native-simbrief');
+    assert.equal(pack.injectCapable, false);
     assert.equal(slugFromAircraftTitle('737-800 PAX BW TC'), '737-800-pax-bw-tc');
   });
 });
@@ -48,6 +50,25 @@ describe('scaffold-roles TFDi MD-11F', () => {
     assert.deepEqual(h?.stationRoles.crewStations, [1, 2, 3]);
     assert.deepEqual(h?.liveSources.fuel, ['tfdi-efb', 'mass-balance']);
     assert.deepEqual(h?.liveSources.payload, ['tfdi-efb']);
+    assert.equal(h?.loadMethod, 'native-simbrief');
+    assert.equal(h?.injectCapable, false);
+  });
+});
+
+describe('scaffold-roles Black Square Caravan', () => {
+  it('declares direct-injection for Career autoset', () => {
+    const h = matchHeuristic(
+      'Black Square Caravan Professional Cargo Pod N208BS',
+    );
+    assert.equal(h?.id, 'blacksquare-caravan-cargo-pod');
+    assert.equal(h?.loadMethod, 'direct-injection');
+    assert.equal(h?.injectCapable, true);
+    const pack = buildRolesPackFromHeuristic(
+      'Black Square Caravan Professional Cargo Pod N208BS',
+      h!,
+    );
+    assert.equal(pack.loadMethod, 'direct-injection');
+    assert.equal(pack.injectCapable, true);
   });
 });
 

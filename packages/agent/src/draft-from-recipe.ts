@@ -240,6 +240,8 @@ export async function draftProfileFromVendorRecipe(
     cg: {
       readVar: 'CG PERCENT',
       readUnit: 'Percent over 100',
+      envelopeSource: 'calibrated-live',
+      toleranceMac: 0.5,
       constraints: { minMac: 0, maxMac: 50 },
     },
     fallback: { chain: ['lvar-bridge'] },

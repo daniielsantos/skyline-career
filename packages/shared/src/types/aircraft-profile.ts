@@ -143,9 +143,29 @@ export interface PayloadSection {
 export interface CgSection {
   readVar?: string;
   readUnit?: string;
+  /** Provenance of the operational envelope stored in constraints. */
+  envelopeSource?: 'cfg' | 'manual' | 'simvar' | 'live-sweep' | 'calibrated-live';
+  /** Read/settling tolerance in percentage points of MAC. */
+  toleranceMac?: number;
   constraints?: {
     minMac?: number;
     maxMac?: number;
+  };
+  calibration?: {
+    observedMac?: number;
+    calibratedAtIso?: string;
+    cfgPath?: string;
+    emptyWeightCgPosition?: [number, number, number];
+    sweep?: {
+      minObservedMac: number;
+      maxObservedMac: number;
+      payloadLb: number;
+      forwardStation: number;
+      aftStation: number;
+      usedStationArms: boolean;
+      restored: boolean;
+      sampledAtIso: string;
+    };
   };
 }
 
@@ -185,6 +205,12 @@ export interface PayloadTarget {
 export interface LoadPlanRequest {
   fuel?: FuelTarget;
   payload?: PayloadTarget;
+  /**
+   * How CG envelope failures affect apply success.
+   * - strict: CG out of envelope fails the apply (default)
+   * - soft: CG is reported but does not fail the apply
+   */
+  cgPolicy?: 'strict' | 'soft';
 }
 
 export interface OperationResult {

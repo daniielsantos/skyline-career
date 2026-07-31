@@ -24,6 +24,7 @@ import type {
   CommodityId,
   EconomyEvent,
   EconomyEventKind,
+  HubTier,
   MarketLotView,
   NpcActivityView,
   NpcFlight,
@@ -41,6 +42,7 @@ export type {
   CommodityId,
   EconomyEvent,
   EconomyEventKind,
+  HubTier,
   InboundPending,
   MarketLotView,
   NpcActivityView,
@@ -90,11 +92,94 @@ export type { RegionalWeather, RegionWeatherView } from './career-weather.js';
 export const MS_PER_TICK = 3_600_000;
 /** Cap catch-up per load so a long offline stretch stays responsive. */
 export const MAX_CATCH_UP_TICKS = 24 * 14;
-/** Max concurrent active lots on the same commodity+route (large + small). */
-export const MAX_LOTS_PER_LANE = 4;
-/** Soft caps within a lane so light aircraft see bookable slices. */
-export const MAX_LARGE_LOTS_PER_LANE = 2;
+/** Max concurrent active lots on the same commodity+route (large + small). Fallback for major↔major. */
+export const MAX_LOTS_PER_LANE = 5;
+/** Soft caps within a lane so light aircraft see bookable slices. Fallback for major↔major. */
+export const MAX_LARGE_LOTS_PER_LANE = 3;
 export const MAX_SMALL_LOTS_PER_LANE = 2;
+
+/**
+ * Static cargo-role profile per hub tier.
+ * Calibrated offline from BR cargo roles (~2024): GRU/VCP dominate tonnage;
+ * GIG remains a national gateway; regionals mid-network; spokes are LTL/feeders.
+ */
+export const HUB_TIER_PROFILE: Record<
+  HubTier,
+  {
+    capacityMult: number;
+    flowMult: number;
+    maxLots: number;
+    maxLarge: number;
+    maxSmall: number;
+  }
+> = {
+  major: {
+    capacityMult: 2.6,
+    flowMult: 2.2,
+    maxLots: 5,
+    maxLarge: 3,
+    maxSmall: 2,
+  },
+  regional: {
+    capacityMult: 1.0,
+    flowMult: 1.0,
+    maxLots: 3,
+    maxLarge: 2,
+    maxSmall: 1,
+  },
+  spoke: {
+    capacityMult: 0.45,
+    flowMult: 0.55,
+    maxLots: 2,
+    maxLarge: 1,
+    maxSmall: 2,
+  },
+};
+
+/** Curated ICAO → tier map for the Brazil career seed (not fetched at runtime). */
+export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
+  SBGR: 'major',
+  SBKP: 'major',
+  SBGL: 'major',
+  SBCF: 'regional',
+  SBCT: 'regional',
+  SBPA: 'regional',
+  SBSV: 'regional',
+  SBRF: 'regional',
+  SBFZ: 'regional',
+  SBVT: 'regional',
+  SBRP: 'spoke',
+  SBFL: 'spoke',
+  SBNF: 'spoke',
+  SBLO: 'spoke',
+  SBJV: 'spoke',
+  SBSG: 'spoke',
+  SBAR: 'spoke',
+  SBMO: 'spoke',
+  SBJP: 'spoke',
+  SBPS: 'spoke',
+};
+
+export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
+  if (airport.hubTier === 'major' || airport.hubTier === 'regional' || airport.hubTier === 'spoke') {
+    return airport.hubTier;
+  }
+  return HUB_TIER_BY_ICAO[airport.icao.toUpperCase()] ?? 'spoke';
+}
+
+export function laneLotCaps(
+  originTier: HubTier,
+  destTier: HubTier,
+): { maxLots: number; maxLarge: number; maxSmall: number } {
+  const origin = HUB_TIER_PROFILE[originTier];
+  const dest = HUB_TIER_PROFILE[destTier];
+  return {
+    maxLots: Math.min(origin.maxLots, dest.maxLots),
+    maxLarge: Math.min(origin.maxLarge, dest.maxLarge),
+    maxSmall: Math.min(origin.maxSmall, dest.maxSmall),
+  };
+}
+
 export const CAREER_COMMODITIES: readonly CommodityDef[] = [
   {
     id: 'electronics',
@@ -176,6 +261,47 @@ export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
 export function ensureWorldFuelInventory(world: CareerEconomyWorld): void {
   for (const ap of world.airports) {
     ensureAirportFuelInventory(ap);
+  }
+}
+
+/**
+ * Stamp curated hubTier on legacy airports. First time only: rescale cargo
+ * warehouses/flows toward the tier profile so flat ~70t seeds become majors vs spokes.
+ */
+export function ensureAirportHubTier(terminal: AirportTerminal): void {
+  const tier = HUB_TIER_BY_ICAO[terminal.icao.toUpperCase()] ?? 'spoke';
+  const alreadyStamped =
+    terminal.hubTier === 'major' ||
+    terminal.hubTier === 'regional' ||
+    terminal.hubTier === 'spoke';
+  if (alreadyStamped) {
+    // Keep map as source of truth if ICAO map was updated.
+    terminal.hubTier = HUB_TIER_BY_ICAO[terminal.icao.toUpperCase()] ?? terminal.hubTier;
+    return;
+  }
+
+  const profile = HUB_TIER_PROFILE[tier];
+  terminal.hubTier = tier;
+  if (!terminal.baseProduction) terminal.baseProduction = { ...(terminal.production ?? {}) };
+  if (!terminal.baseConsumption) terminal.baseConsumption = { ...(terminal.consumption ?? {}) };
+
+  for (const c of CAREER_CARGO_COMMODITIES) {
+    const stock = terminal.inventory[c.id];
+    if (stock && stock.capacityKg > 0) {
+      const fill = stock.stockKg / stock.capacityKg;
+      stock.capacityKg = Math.max(1_000, Math.round(stock.capacityKg * profile.capacityMult));
+      stock.stockKg = clamp(Math.round(stock.capacityKg * fill), 0, stock.capacityKg);
+    }
+    const baseProd = terminal.baseProduction[c.id] ?? terminal.production[c.id] ?? 0;
+    const baseCons = terminal.baseConsumption[c.id] ?? terminal.consumption[c.id] ?? 0;
+    terminal.baseProduction[c.id] = Math.round(baseProd * profile.flowMult);
+    terminal.baseConsumption[c.id] = Math.round(baseCons * profile.flowMult);
+  }
+}
+
+export function ensureWorldHubTiers(world: CareerEconomyWorld): void {
+  for (const ap of world.airports) {
+    ensureAirportHubTier(ap);
   }
 }
 
@@ -345,6 +471,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     icao: string;
     name: string;
     region: string;
+    hubTier: HubTier;
     /** Relative production bias by commodity. */
     produce: Partial<Record<CommodityId, number>>;
     /** Relative consumption bias. */
@@ -354,6 +481,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBGR',
       name: 'São Paulo/Guarulhos',
       region: 'BR-SE',
+      hubTier: 'major',
       produce: { electronics: 1.4, general: 1.1, machinery: 0.9 },
       consume: { perishables: 1.2, general: 1.0 },
     },
@@ -361,6 +489,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBGL',
       name: 'Rio de Janeiro/Galeão',
       region: 'BR-SE',
+      hubTier: 'major',
       produce: { perishables: 1.3, general: 0.8 },
       consume: { electronics: 1.1, machinery: 1.0 },
     },
@@ -368,6 +497,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBKP',
       name: 'Campinas/Viracopos',
       region: 'BR-SE',
+      hubTier: 'major',
       produce: { electronics: 1.6, machinery: 1.2 },
       consume: { general: 0.9, perishables: 0.7 },
     },
@@ -375,6 +505,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBCF',
       name: 'Belo Horizonte/Confins',
       region: 'BR-SE',
+      hubTier: 'regional',
       produce: { machinery: 1.3, general: 1.0 },
       consume: { electronics: 0.9, perishables: 1.0 },
     },
@@ -382,6 +513,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBVT',
       name: 'Vitória',
       region: 'BR-SE',
+      hubTier: 'regional',
       produce: { general: 1.2, machinery: 0.8 },
       consume: { electronics: 0.9, perishables: 1.0 },
     },
@@ -389,6 +521,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBRP',
       name: 'Ribeirão Preto',
       region: 'BR-SE',
+      hubTier: 'spoke',
       produce: { machinery: 1.0, perishables: 1.2 },
       consume: { electronics: 0.9, general: 0.8 },
     },
@@ -396,6 +529,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBCT',
       name: 'Curitiba',
       region: 'BR-S',
+      hubTier: 'regional',
       produce: { machinery: 1.1, perishables: 1.0 },
       consume: { electronics: 0.9, general: 1.0 },
     },
@@ -403,6 +537,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBPA',
       name: 'Porto Alegre',
       region: 'BR-S',
+      hubTier: 'regional',
       produce: { machinery: 1.2, general: 1.1 },
       consume: { electronics: 1.0, perishables: 1.1 },
     },
@@ -410,6 +545,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBFL',
       name: 'Florianópolis',
       region: 'BR-S',
+      hubTier: 'spoke',
       produce: { electronics: 0.8, perishables: 1.1 },
       consume: { machinery: 0.9, general: 1.0 },
     },
@@ -417,6 +553,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBNF',
       name: 'Navegantes',
       region: 'BR-S',
+      hubTier: 'spoke',
       produce: { general: 1.3, machinery: 1.0 },
       consume: { electronics: 0.9, perishables: 0.8 },
     },
@@ -424,6 +561,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBLO',
       name: 'Londrina',
       region: 'BR-S',
+      hubTier: 'spoke',
       produce: { perishables: 1.4, machinery: 0.8 },
       consume: { electronics: 0.9, general: 0.9 },
     },
@@ -431,6 +569,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBJV',
       name: 'Joinville',
       region: 'BR-S',
+      hubTier: 'spoke',
       produce: { machinery: 1.3, general: 0.9 },
       consume: { electronics: 0.8, perishables: 0.9 },
     },
@@ -438,6 +577,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBSV',
       name: 'Salvador',
       region: 'BR-NE',
+      hubTier: 'regional',
       produce: { perishables: 1.5, general: 0.9 },
       consume: { electronics: 0.8, machinery: 0.7 },
     },
@@ -445,6 +585,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBRF',
       name: 'Recife',
       region: 'BR-NE',
+      hubTier: 'regional',
       produce: { general: 1.2, perishables: 1.0 },
       consume: { electronics: 1.1, machinery: 0.9 },
     },
@@ -452,6 +593,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBFZ',
       name: 'Fortaleza',
       region: 'BR-NE',
+      hubTier: 'regional',
       produce: { perishables: 1.3, general: 1.0 },
       consume: { electronics: 1.0, machinery: 0.8 },
     },
@@ -459,6 +601,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBSG',
       name: 'Natal/São Gonçalo',
       region: 'BR-NE',
+      hubTier: 'spoke',
       produce: { perishables: 1.2, general: 0.8 },
       consume: { electronics: 0.9, machinery: 0.8 },
     },
@@ -466,6 +609,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBAR',
       name: 'Aracaju',
       region: 'BR-NE',
+      hubTier: 'spoke',
       produce: { perishables: 1.2, general: 0.9 },
       consume: { electronics: 0.8, machinery: 0.9 },
     },
@@ -473,6 +617,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBMO',
       name: 'Maceió',
       region: 'BR-NE',
+      hubTier: 'spoke',
       produce: { perishables: 1.3, general: 0.8 },
       consume: { electronics: 0.9, machinery: 0.8 },
     },
@@ -480,6 +625,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBJP',
       name: 'João Pessoa',
       region: 'BR-NE',
+      hubTier: 'spoke',
       produce: { perishables: 1.1, general: 0.9 },
       consume: { electronics: 0.8, machinery: 0.8 },
     },
@@ -487,6 +633,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: 'SBPS',
       name: 'Porto Seguro',
       region: 'BR-NE',
+      hubTier: 'spoke',
       produce: { perishables: 1.1, general: 0.7 },
       consume: { electronics: 0.8, machinery: 0.7 },
     },
@@ -498,6 +645,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       throw new Error(`Missing coordinates for seeded airport ${h.icao}`);
     }
     const level = 1;
+    const tier = h.hubTier;
+    const tierProfile = HUB_TIER_PROFILE[tier];
     const capacityBoost = 1 + (level - 1) * 0.15;
     const inventory: AirportTerminal['inventory'] = {};
     const production: AirportTerminal['production'] = {};
@@ -515,12 +664,18 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
         inventory[c.id] = pile(Math.round(cap * startFill), cap);
         continue;
       }
-      const cap = Math.round(70_000 * capacityBoost * (0.85 + rng() * 0.3));
+      const cap = Math.round(
+        70_000 * capacityBoost * tierProfile.capacityMult * (0.85 + rng() * 0.3),
+      );
       const prodBias = h.produce[c.id] ?? 0.15;
       const consBias = h.consume[c.id] ?? 0.25;
-      // kg / tick — asymmetric by design
-      const prod = Math.round(2_200 * prodBias * (0.8 + rng() * 0.4));
-      const cons = Math.round(2_000 * consBias * (0.8 + rng() * 0.4));
+      // kg / tick — asymmetric by design, scaled by hub tier
+      const prod = Math.round(
+        2_200 * prodBias * tierProfile.flowMult * (0.8 + rng() * 0.4),
+      );
+      const cons = Math.round(
+        2_000 * consBias * tierProfile.flowMult * (0.8 + rng() * 0.4),
+      );
       production[c.id] = prod;
       consumption[c.id] = cons;
       // Start near mid stock with mild noise
@@ -532,6 +687,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       icao: h.icao,
       name: h.name,
       region: h.region,
+      hubTier: tier,
       lat: coords.lat,
       lon: coords.lon,
       level,
@@ -690,6 +846,7 @@ export function migrateEconomyWorld(
   ensureNpcFleet(migrated);
   migrateNpcTimestamps(migrated, Number.isFinite(version) ? version : 0);
   ensureWorldFuelInventory(migrated);
+  ensureWorldHubTiers(migrated);
   pruneDeadLots(migrated);
 
   return migrated;
@@ -1016,6 +1173,7 @@ function laneKey(commodityId: CommodityId, origin: string, dest: string): string
 /**
  * Form shipment lots from surplus→shortage pairs.
  * Only creates a lot when value of moving cargo is clearly positive.
+ * Origins/dests are ranked by absolute kg (not fill %), so majors dominate the board.
  */
 function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): void {
   const activeCounts = new Map<string, number>();
@@ -1037,7 +1195,11 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
   const pushLot = (
     key: string,
     commodity: (typeof CAREER_COMMODITIES)[number],
-    origin: { ap: AirportTerminal; stock: { stockKg: number; capacityKg: number }; fill: number },
+    origin: {
+      ap: AirportTerminal;
+      stock: { stockKg: number; capacityKg: number };
+      fill: number;
+    },
     dest: {
       ap: AirportTerminal;
       stock: { stockKg: number; capacityKg: number };
@@ -1119,20 +1281,29 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
   };
 
   for (const commodity of CAREER_CARGO_COMMODITIES) {
-    const ranked = world.airports
-      .map((ap) => {
-        const stock = ensurePile(ap, commodity.id);
-        return {
-          ap,
-          stock,
-          fill: fillPct(stock),
-          price: localUnitPriceUsd(commodity.id, stock),
-        };
-      })
-      .sort((a, b) => a.fill - b.fill);
+    const ranked = world.airports.map((ap) => {
+      const stock = ensurePile(ap, commodity.id);
+      const fill = fillPct(stock);
+      return {
+        ap,
+        stock,
+        fill,
+        price: localUnitPriceUsd(commodity.id, stock),
+        surplusKg: Math.max(0, stock.stockKg - stock.capacityKg * 0.48),
+        roomKg: Math.max(0, stock.capacityKg * 0.58 - stock.stockKg),
+        tier: hubTierOf(ap),
+      };
+    });
 
-    const destinations = ranked.filter((r) => r.fill <= 0.45).slice(0, 8);
-    const origins = ranked.filter((r) => r.fill >= 0.55).slice(-8).reverse();
+    // Absolute kg — majors with bigger warehouses surface first.
+    const destinations = ranked
+      .filter((r) => r.fill <= 0.45 && r.roomKg >= 400)
+      .sort((a, b) => b.roomKg - a.roomKg)
+      .slice(0, 10);
+    const origins = ranked
+      .filter((r) => r.fill >= 0.55 && r.surplusKg >= 400)
+      .sort((a, b) => b.surplusKg - a.surplusKg)
+      .slice(0, 10);
 
     for (const origin of origins) {
       for (const dest of destinations) {
@@ -1140,6 +1311,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
           continue;
         }
         const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
+        const caps = laneLotCaps(origin.tier, dest.tier);
         const laneSat = npcLaneSaturation(
           world,
           origin.ap.icao,
@@ -1150,7 +1322,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
           continue;
         }
         const satPenalty = laneSat >= 0.5 ? 1 : 0;
-        if ((activeCounts.get(key) ?? 0) + satPenalty >= MAX_LOTS_PER_LANE) {
+        if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) {
           continue;
         }
 
@@ -1171,11 +1343,12 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         let qty = Math.min(surplusKg, roomKg);
         qty = Math.floor(qty / 100) * 100;
 
-        // Large lot for narrow/wide freighters.
+        // Large lot for narrow/wide freighters (spoke lanes often cap at 1).
         if (
           qty >= 4_000 &&
-          (largeCounts.get(key) ?? 0) < MAX_LARGE_LOTS_PER_LANE &&
-          (activeCounts.get(key) ?? 0) + satPenalty < MAX_LOTS_PER_LANE
+          caps.maxLarge > 0 &&
+          (largeCounts.get(key) ?? 0) < caps.maxLarge &&
+          (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
         ) {
           const largeQty = Math.min(qty, 28_000);
           pushLot(
@@ -1197,8 +1370,9 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         // Small LTL lots for light turboprop / partial fills.
         if (
           qty >= 400 &&
-          (smallCounts.get(key) ?? 0) < MAX_SMALL_LOTS_PER_LANE &&
-          (activeCounts.get(key) ?? 0) + satPenalty < MAX_LOTS_PER_LANE
+          caps.maxSmall > 0 &&
+          (smallCounts.get(key) ?? 0) < caps.maxSmall &&
+          (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
         ) {
           const smallQty = Math.min(qty, 2_000);
           // Prefer variety: 400–2000 in 100 kg steps.

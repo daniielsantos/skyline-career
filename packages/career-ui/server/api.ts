@@ -22,6 +22,7 @@ import {
   listCareerHubIcaos,
   listParkedAt,
   getCommodity,
+  hubTierOf,
   listActiveEconomyEvents,
   listActiveNpcFreights,
   listMarketLots,
@@ -238,6 +239,9 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     const lotsBefore = Array.isArray((existing as { lots?: unknown[] }).lots)
       ? (existing as { lots: unknown[] }).lots.length
       : 0;
+    const missingHubTiers = (existing as { airports: Array<{ hubTier?: string }> }).airports.some(
+      (ap) => !ap.hubTier,
+    );
     const world = migrateEconomyWorld(existing);
     const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
     const version = (existing as { version?: number }).version;
@@ -248,7 +252,8 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
       settledFlights > 0 ||
       version !== 3 ||
       npcCountAfter !== npcCountBefore ||
-      lotsAfter !== lotsBefore
+      lotsAfter !== lotsBefore ||
+      missingHubTiers
     ) {
       await writeJson(economyPath, caught);
     }
@@ -934,6 +939,7 @@ export function createCareerApiServer(port = 8787) {
             name: airport.name,
             region: airport.region,
             level: airport.level,
+            hubTier: hubTierOf(airport),
             lat: airport.lat,
             lon: airport.lon,
           },

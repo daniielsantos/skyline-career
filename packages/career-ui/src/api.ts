@@ -339,6 +339,7 @@ export type AirportView = ClockSync & {
     level: number;
     lat?: number;
     lon?: number;
+    hubTier?: 'major' | 'regional' | 'spoke';
   };
   events?: EconomyEvent[];
   totalStockKg: number;

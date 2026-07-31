@@ -5,6 +5,9 @@ import {
   createSeedEconomyWorld,
   DEAD_LOT_RETENTION_TICKS,
   ensureEconomyCaughtUp,
+  hubTierOf,
+  HUB_TIER_PROFILE,
+  laneLotCaps,
   listMarketLots,
   localPriceMultiplier,
   migrateEconomyWorld,
@@ -43,7 +46,31 @@ describe('career-economy seed', () => {
       assert.ok(ap.baseProduction?.fuel !== undefined);
       assert.ok(Number.isFinite(ap.lat));
       assert.ok(Number.isFinite(ap.lon));
+      assert.ok(ap.hubTier === 'major' || ap.hubTier === 'regional' || ap.hubTier === 'spoke');
     }
+  });
+
+  it('scales major cargo hubs larger than spokes', () => {
+    const world = createSeedEconomyWorld({ seed: 'tier-scale' });
+    const gru = world.airports.find((a) => a.icao === 'SBGR')!;
+    const ps = world.airports.find((a) => a.icao === 'SBPS')!;
+    assert.equal(hubTierOf(gru), 'major');
+    assert.equal(hubTierOf(ps), 'spoke');
+    assert.ok(
+      (gru.inventory.general?.capacityKg ?? 0) >
+        (ps.inventory.general?.capacityKg ?? 0) * 3,
+      'GRU warehouse should dwarf Porto Seguro',
+    );
+    assert.deepEqual(laneLotCaps('major', 'major'), {
+      maxLots: HUB_TIER_PROFILE.major.maxLots,
+      maxLarge: HUB_TIER_PROFILE.major.maxLarge,
+      maxSmall: HUB_TIER_PROFILE.major.maxSmall,
+    });
+    assert.deepEqual(laneLotCaps('spoke', 'spoke'), {
+      maxLots: 2,
+      maxLarge: 1,
+      maxSmall: 2,
+    });
   });
 });
 
@@ -83,6 +110,28 @@ describe('tickEconomyN market formation', () => {
         `${row.lot.reason} originFill=${row.originFillPct} destFill=${row.destFillPct}`,
       );
     }
+  });
+
+  it('concentrates market activity on major hubs over spokes', () => {
+    const world = createSeedEconomyWorld({ seed: 'tier-market' });
+    tickEconomyN(world, 48);
+    const mentions: Record<string, number> = {};
+    for (const row of listMarketLots(world)) {
+      mentions[row.lot.originIcao] = (mentions[row.lot.originIcao] ?? 0) + 1;
+      mentions[row.lot.destIcao] = (mentions[row.lot.destIcao] ?? 0) + 1;
+    }
+    const majorAvg =
+      ['SBGR', 'SBKP', 'SBGL']
+        .map((icao) => mentions[icao] ?? 0)
+        .reduce((a, b) => a + b, 0) / 3;
+    const spokeAvg =
+      ['SBPS', 'SBAR', 'SBJP', 'SBMO']
+        .map((icao) => mentions[icao] ?? 0)
+        .reduce((a, b) => a + b, 0) / 4;
+    assert.ok(
+      majorAvg > spokeAvg * 1.4,
+      `majors should dominate board (majorAvg=${majorAvg}, spokeAvg=${spokeAvg})`,
+    );
   });
 
   it('keeps lots stable across identical seeds', () => {

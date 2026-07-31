@@ -16,11 +16,12 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Simulated regional weather (`fair|marginal|poor` per region per sim-day). No per-NPC METAR.
 - Lot prune: `pruneDeadLots` drops `expired`/`delivered` after 12 ticks (tick + migrate/load). Logbook untouched.
 - Player inbound soft-shadow: accept/depart publishes `inboundPending`; soft fill / lane sat = NPC + player.
+- Hub tiers (`major`/`regional`/`spoke`): curated offline from BR cargo roles; capacity/flow scale + lane lot caps; formLots ranks by absolute kg.
 
 ## Near-term priorities (current Brazil career)
 
 1. **Polish only if needed** — NPC operational cargo ceiling; crew/maintenance costs; optional real METAR.
-2. Play-test Brazil market after inbound + prune; only then consider country partition / Postgres.
+2. Play-test Brazil market after hub tiers; only then consider country partition / Postgres.
 
 Do **not** start country partitioning or Postgres until Brazil still feels good after prune + inbound.
 

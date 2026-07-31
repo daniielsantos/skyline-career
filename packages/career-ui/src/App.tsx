@@ -2658,7 +2658,7 @@ export function App() {
           </h1>
           <p className="lede">
             {showAirport
-              ? `${airportView.airport.name} · ${airportView.airport.region} · level ${airportView.airport.level}`
+              ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'} · level ${airportView.airport.level}`
               : showStaging
                 ? stagingMode === 'active'
                   ? 'Dispatch, confirm OFP, preflight, and watch the active flight.'

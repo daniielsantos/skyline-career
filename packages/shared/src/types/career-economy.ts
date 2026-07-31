@@ -35,6 +35,11 @@ export interface AirportTerminal {
   name: string;
   /** Geographic / economic region tag for shocks later. */
   region: string;
+  /**
+   * Static cargo-role tier (calibrated offline from ANAC/concession tonnage).
+   * Drives warehouse scale and how many lots a lane may form.
+   */
+  hubTier?: HubTier;
   /** WGS84 latitude (degrees) — used for live settle proximity. */
   lat: number;
   /** WGS84 longitude (degrees). */
@@ -60,6 +65,9 @@ export interface AirportTerminal {
   /** Last effective consumption applied this tick (kg) — UI display. */
   consumption: Partial<Record<CommodityId, number>>;
 }
+
+/** Cargo-network role for Brazil career hubs (not live API — curated snapshot). */
+export type HubTier = 'major' | 'regional' | 'spoke';
 
 export type ShipmentLotStatus = 'available' | 'reserved' | 'in_transit' | 'delivered' | 'expired';
 

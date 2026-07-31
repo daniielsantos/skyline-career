@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   createSeedEconomyWorld,
+  describeLotMarketPressure,
   ensureNpcFleet,
   estimateNpcBlockHours,
   listActiveNpcFreights,
   listNpcFleetStatus,
+  listRegionMarketPressure,
   migrateEconomyWorld,
   NPC_FLEET_SIZE,
   npcLaneAirborneKg,
@@ -350,6 +352,55 @@ describe('NPC freighter fleet', () => {
     assert.equal(npcRegionBidCapacity(world, region, nowMs), 0);
 
     assert.equal(npcRegionBidCapacity(world, 'NO-SUCH-REGION', nowMs), 1);
+  });
+
+  it('describes thin-fleet and lane-busy pressure for UI chips', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-pressure-chips' });
+    const nowMs = world.lastBatchAtMs;
+    const region = world.npcs[0]!.homeRegion;
+    for (const npc of world.npcs.filter((n) => n.homeRegion === region)) {
+      npc.status = 'resting';
+      npc.restUntilMs = nowMs + 12 * 3_600_000;
+      npc.currentFlightId = undefined;
+    }
+    const origin =
+      world.airports.find((a) => a.region === region)?.icao ?? 'SBGR';
+    const dest =
+      world.airports.find((a) => a.icao !== origin)?.icao ?? 'SBGL';
+
+    const thin = describeLotMarketPressure(
+      world,
+      { originIcao: origin, destIcao: dest, commodityId: 'general' },
+      nowMs,
+    );
+    assert.equal(thin.thinFleet, true);
+    assert.equal(thin.laneBusy, false);
+
+    world.npcFlights.push({
+      id: 'npcf-busy-lane',
+      npcId: world.npcs[0]!.id,
+      lotId: 'lot_busy',
+      originIcao: origin,
+      destIcao: dest,
+      commodityId: 'general',
+      cargoKg: 14_000,
+      payUsd: 1,
+      aircraftClassId: 'narrow_freighter',
+      departedAtTick: world.tick,
+      arrivesAtTick: world.tick + 2,
+      departedAtMs: nowMs,
+      arrivesAtMs: nowMs + 2 * 3_600_000,
+      status: 'in_flight',
+    });
+    const busy = describeLotMarketPressure(
+      world,
+      { originIcao: origin, destIcao: dest, commodityId: 'general' },
+      nowMs,
+    );
+    assert.equal(busy.laneBusy, true);
+
+    const regions = listRegionMarketPressure(world, nowMs);
+    assert.ok(regions.some((r) => r.region === region && r.thinFleet));
   });
 
   it('measures lane airborne kg and saturation from in_flight NPC cargo', () => {

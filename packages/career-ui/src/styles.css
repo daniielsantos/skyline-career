@@ -1197,6 +1197,29 @@ small {
   font-weight: 700;
 }
 
+.tag.pressure {
+  background: rgba(46, 125, 110, 0.14);
+  color: #1f6b5c;
+  margin-left: 0.35rem;
+}
+
+.tag.saturated {
+  background: rgba(90, 100, 140, 0.14);
+  color: #3d4668;
+  margin-left: 0.35rem;
+}
+
+.pressure-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.pressure-chips .tag {
+  margin-left: 0;
+}
+
 .pay {
   font-family: var(--font-display);
   font-size: 1.25rem;

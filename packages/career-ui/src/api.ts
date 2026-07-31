@@ -136,6 +136,23 @@ export type AirportMovement = {
   distanceNm?: number;
 };
 
+export type RegionPressure = {
+  region: string;
+  capacity: number;
+  thinFleet: boolean;
+  ready: number;
+  total: number;
+  resting: number;
+};
+
+export type LotPressure = {
+  originRegion: string;
+  originRegionCapacity: number;
+  laneSaturation: number;
+  thinFleet: boolean;
+  laneBusy: boolean;
+};
+
 export type MarketLot = {
   id: string;
   originIcao: string;
@@ -155,6 +172,7 @@ export type MarketLot = {
   expiresAtTick: number;
   ticksRemaining?: number;
   perishable?: boolean;
+  pressure?: LotPressure | null;
   npcClaim?: NpcClaim | null;
 };
 
@@ -368,6 +386,7 @@ export function fetchMarket(aircraft?: AircraftClass) {
     ClockSync & {
       lots: MarketLot[];
       npcActivity?: NpcActivity[];
+      regionPressure?: RegionPressure[];
       maxCargoKg?: number | null;
       maxCargoSource?: string | null;
       airframeLabel?: string | null;
@@ -413,6 +432,7 @@ export function fetchNpcFleet() {
       turnaround: number;
       resting: number;
       idle: number;
+      regionPressure?: RegionPressure[];
       fleet: NpcFleetMember[];
       activity: NpcActivity[];
     }

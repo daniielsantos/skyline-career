@@ -198,6 +198,83 @@ export function npcLaneSaturation(
   return Math.min(1, airborne / LANE_SATURATION_KG);
 }
 
+/** Capacity below this → UI "thin fleet" / richer freight chip. */
+export const THIN_FLEET_CAPACITY = 0.45;
+/** Saturation at/above this → UI "lane busy" chip (matches scarce-pay threshold). */
+export const LANE_BUSY_SATURATION = 0.35;
+
+export type LotMarketPressure = {
+  originRegion: string;
+  originRegionCapacity: number;
+  laneSaturation: number;
+  thinFleet: boolean;
+  laneBusy: boolean;
+};
+
+export type RegionMarketPressure = {
+  region: string;
+  capacity: number;
+  thinFleet: boolean;
+  ready: number;
+  total: number;
+  resting: number;
+};
+
+/** Player-facing pressure signals for one market lot (origin region + OD lane). */
+export function describeLotMarketPressure(
+  world: CareerEconomyWorld,
+  lot: Pick<ShipmentLot, 'originIcao' | 'destIcao' | 'commodityId'>,
+  nowMs = Date.now(),
+): LotMarketPressure {
+  const originRegion =
+    airportRegion(world, lot.originIcao) ??
+    world.airports.find((a) => a.icao === lot.originIcao.toUpperCase())?.region ??
+    '';
+  const originRegionCapacity = originRegion
+    ? npcRegionBidCapacity(world, originRegion, nowMs)
+    : 1;
+  const laneSaturation = npcLaneSaturation(
+    world,
+    lot.originIcao,
+    lot.destIcao,
+    lot.commodityId,
+  );
+  return {
+    originRegion,
+    originRegionCapacity,
+    laneSaturation,
+    thinFleet: originRegionCapacity < THIN_FLEET_CAPACITY,
+    laneBusy: laneSaturation >= LANE_BUSY_SATURATION,
+  };
+}
+
+/** Per-home-region fleet readiness for the competing-fleet board. */
+export function listRegionMarketPressure(
+  world: CareerEconomyWorld,
+  nowMs = Date.now(),
+): RegionMarketPressure[] {
+  ensureNpcFleet(world);
+  const regions = [...new Set((world.npcs ?? []).map((n) => n.homeRegion))].sort();
+  return regions.map((region) => {
+    const home = world.npcs.filter((n) => n.homeRegion === region);
+    let ready = 0;
+    let resting = 0;
+    for (const npc of home) {
+      if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) resting += 1;
+      if (isNpcReadyToBid(npc, nowMs)) ready += 1;
+    }
+    const capacity = home.length === 0 ? 1 : ready / home.length;
+    return {
+      region,
+      capacity,
+      thinFleet: capacity < THIN_FLEET_CAPACITY,
+      ready,
+      total: home.length,
+      resting,
+    };
+  });
+}
+
 function needsCrewRest(npc: NpcFreighter): boolean {
   const duty = npc.dutyHoursAccum ?? 0;
   const lastLeg = npc.lastLegDutyHours ?? 0;

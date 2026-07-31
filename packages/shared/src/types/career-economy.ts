@@ -277,6 +277,14 @@ export interface MarketLotView {
     cargoKg: number;
     etaHours: number;
   };
+  /** Fatia 1–2 signals for market UI chips. */
+  pressure?: {
+    originRegion: string;
+    originRegionCapacity: number;
+    laneSaturation: number;
+    thinFleet: boolean;
+    laneBusy: boolean;
+  };
 }
 
 /** Freighter capacity classes (Slice 2) — filter market + drive SimBrief dispatch. */

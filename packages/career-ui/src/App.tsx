@@ -36,6 +36,7 @@ import {
   type NpcActivity,
   type NpcFleetMember,
   type PlayerAircraft,
+  type RegionPressure,
   type SimBridgeStatus,
   type WatchStatus,
 } from './api';
@@ -142,6 +143,27 @@ function regionLabel(region: string): string {
     default:
       return region;
   }
+}
+
+function RegionPressureChips(props: {
+  regions: RegionPressure[];
+  className?: string;
+}) {
+  const thin = props.regions.filter((r) => r.thinFleet);
+  if (thin.length === 0) return null;
+  return (
+    <div className={props.className ?? 'pressure-chips'}>
+      {thin.map((r) => (
+        <span
+          key={r.region}
+          className="tag pressure"
+          title={`${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting — thinner local fleet tends to raise outbound freights`}
+        >
+          {r.region} thin fleet
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function fallbackMaxCargoKg(aircraft: AircraftClass): number {
@@ -703,6 +725,7 @@ export function App() {
     resting: 0,
     idle: 0,
   });
+  const [regionPressure, setRegionPressure] = useState<RegionPressure[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -863,6 +886,11 @@ export function App() {
       resting: npcState.resting ?? 0,
       idle: npcState.idle,
     });
+    setRegionPressure(
+      npcState.regionPressure?.length
+        ? npcState.regionPressure
+        : market.regionPressure ?? [],
+    );
     setMissions(missionState.missions.slice().reverse());
     setHubSelected(Boolean(state.hubSelected) && (state.fleet?.length ?? 0) > 0);
     setFleet(state.fleet ?? []);
@@ -3154,6 +3182,7 @@ export function App() {
                 ? ` · aircraft at ${fleet.find((a) => a.status === 'parked')!.locationIcao}`
                 : ''}
             </p>
+            <RegionPressureChips regions={regionPressure} />
           </div>
           {activeMission ? (
             <p className="banner warn">
@@ -3380,6 +3409,22 @@ export function App() {
                         <span className="arrow">→</span>
                         <IcaoLink icao={lot.destIcao} onOpen={openAirport} disabled={busy} />
                         {lot.urgency === 'urgent' ? <span className="tag">Urgent</span> : null}
+                        {lot.pressure?.thinFleet ? (
+                          <span
+                            className="tag pressure"
+                            title={`${regionLabel(lot.pressure.originRegion || 'region')}: local competing fleet is thin — freights from this origin tend to pay more`}
+                          >
+                            Thin fleet
+                          </span>
+                        ) : null}
+                        {lot.pressure?.laneBusy ? (
+                          <span
+                            className="tag saturated"
+                            title={`NPC cargo already airborne on this lane (${Math.round((lot.pressure.laneSaturation || 0) * 100)}% saturated) — remaining slots are scarcer`}
+                          >
+                            Lane busy
+                          </span>
+                        ) : null}
                       </div>
                       <small>
                         {lot.originName} → {lot.destName}
@@ -4977,6 +5022,7 @@ export function App() {
                   · live
                 </span>
               </p>
+              <RegionPressureChips regions={regionPressure} />
             </div>
           </div>
           <FleetRoster

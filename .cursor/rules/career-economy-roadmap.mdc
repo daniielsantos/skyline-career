@@ -21,16 +21,24 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Soft fill shadow: inbound kg to dest damps urgency; thin dest + almost no inbound → urgent earlier.
 - Saturation ≥ 0.5 counts as +1 toward lane lot cap; saturation ≥ 1 skips new lots on that lane.
 - Saturation ≥ 0.35 → scarce pay mult `1 + saturation * 0.12` (still under `base * 1.8`).
+- Saturation ≥ 0.5 on formed lots → mark urgent.
 
-## Next — UI chip
+## Done — UI chip
 
-- Market / NPC board chip: “local fleet thin → richer freight” (and optionally “lane saturated”).
-- Optional: expose capacity / saturation in career API for the chip.
+- `describeLotMarketPressure` / `listRegionMarketPressure` exposed on `/api/market` and `/api/npc`.
+- Market rows: **Thin fleet** / **Lane busy** tags with tooltips.
+- Market + Competing fleet panel headers: regional thin-fleet chips.
+
+## Next — METAR regional (1×/day)
+
+- Sample METAR for hubs → regional fair/marginal/poor index.
+- Effects: block time / fuel bias / NPC bidChance; cache + offline-neutral fallback.
+- UI: show weather index next to region chips when present.
 
 ## Later
 
-- METAR / daily regional weather index → block time / fuel / bid bias (cached, offline-neutral).
-- Crew/maintenance cost pressure on NPC bid appetite (not just duty rest).
+- NPC operational cargo ceiling (route fuel/MTOW) if exploits appear.
+- Crew/maintenance cost pressure on NPC bid appetite.
 - Weather / slot friction on block times.
 
 ## Design rules

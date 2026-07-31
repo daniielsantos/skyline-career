@@ -5,6 +5,7 @@ import {
   npcLaneAirborneKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
+  describeLotMarketPressure,
   seedNpcFleet,
   settleNpcOpsDue,
   tickNpcFreighters,
@@ -44,19 +45,25 @@ export type {
 } from './types/career-economy.js';
 
 export {
+  describeLotMarketPressure,
   ensureNpcFleet,
   estimateNpcBlockHours,
   listNpcActivity,
   listNpcFleetStatus,
+  listRegionMarketPressure,
   npcClaimForLot,
   npcLaneAirborneKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
   NPC_FLEET_SIZE,
+  LANE_BUSY_SATURATION,
+  THIN_FLEET_CAPACITY,
   seedNpcFleet,
   settleNpcOpsDue,
   tickNpcFreighters,
 } from './career-npc.js';
+
+export type { LotMarketPressure, RegionMarketPressure } from './career-npc.js';
 
 /** 1 economy tick = 1 real hour. */
 export const MS_PER_TICK = 3_600_000;
@@ -1315,6 +1322,7 @@ export function listMarketLots(
     const dStock = dest ? ensurePile(dest, lot.commodityId) : pile(0, 1);
     const commodity = getCommodity(lot.commodityId);
     const claim = npcClaimForLot(world, lot.id, nowMs);
+    const pressure = describeLotMarketPressure(world, lot, nowMs);
 
     views.push({
       lot,
@@ -1335,6 +1343,7 @@ export function listMarketLots(
             etaHours: claim.etaHours,
           }
         : undefined,
+      pressure,
     });
   }
 

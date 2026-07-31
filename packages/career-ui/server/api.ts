@@ -26,6 +26,7 @@ import {
   listActiveNpcFreights,
   listMarketLots,
   listNpcFleetStatus,
+  listRegionMarketPressure,
   listViableMarketLots,
   localUnitPriceUsd,
   migrateEconomyWorld,
@@ -692,6 +693,14 @@ export function createCareerApiServer(port = 8787) {
           maxCargoSource: cargoLimit?.source ?? null,
           airframeLabel: cargoLimit?.airframeLabel ?? null,
           npcActivity: mapNpcActivity(world, nowMs),
+          regionPressure: listRegionMarketPressure(world, nowMs).map((r) => ({
+            region: r.region,
+            capacity: r.capacity,
+            thinFleet: r.thinFleet,
+            ready: r.ready,
+            total: r.total,
+            resting: r.resting,
+          })),
           lots: lots.slice(0, 200).map((row) => ({
             id: row.lot.id,
             originIcao: row.lot.originIcao,
@@ -714,6 +723,15 @@ export function createCareerApiServer(port = 8787) {
             expiresAtTick: row.lot.expiresAtTick,
             ticksRemaining: Math.max(0, row.lot.expiresAtTick - world.tick),
             perishable: Boolean(getCommodity(row.lot.commodityId).perishable),
+            pressure: row.pressure
+              ? {
+                  originRegion: row.pressure.originRegion,
+                  originRegionCapacity: row.pressure.originRegionCapacity,
+                  laneSaturation: row.pressure.laneSaturation,
+                  thinFleet: row.pressure.thinFleet,
+                  laneBusy: row.pressure.laneBusy,
+                }
+              : null,
             npcClaim: row.npcClaim
               ? {
                   npcName: row.npcClaim.npcName,
@@ -739,6 +757,14 @@ export function createCareerApiServer(port = 8787) {
           turnaround: fleet.filter((n) => n.phase === 'turnaround').length,
           resting: fleet.filter((n) => n.phase === 'resting').length,
           idle: fleet.filter((n) => n.phase === 'idle').length,
+          regionPressure: listRegionMarketPressure(world, nowMs).map((r) => ({
+            region: r.region,
+            capacity: r.capacity,
+            thinFleet: r.thinFleet,
+            ready: r.ready,
+            total: r.total,
+            resting: r.resting,
+          })),
           fleet,
           activity: mapNpcActivity(world, nowMs),
         });

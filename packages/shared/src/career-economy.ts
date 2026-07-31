@@ -10,6 +10,12 @@ import {
   settleNpcOpsDue,
   tickNpcFreighters,
 } from './career-npc.js';
+import {
+  regionalWeatherIndex,
+  regionalWeatherLifeMult,
+  regionalWeatherPayMult,
+  worseWeather,
+} from './career-weather.js';
 import type {
   AirportTerminal,
   CareerEconomyWorld,
@@ -64,6 +70,18 @@ export {
 } from './career-npc.js';
 
 export type { LotMarketPressure, RegionMarketPressure } from './career-npc.js';
+
+export {
+  economyDayIndex,
+  listRegionalWeather,
+  regionalWeatherBidMult,
+  regionalWeatherIndex,
+  regionalWeatherLifeMult,
+  regionalWeatherPayMult,
+  worseWeather,
+} from './career-weather.js';
+
+export type { RegionalWeather, RegionWeatherView } from './career-weather.js';
 
 /** 1 economy tick = 1 real hour. */
 export const MS_PER_TICK = 3_600_000;
@@ -986,6 +1004,9 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     laneSaturation: number,
     inboundKg: number,
   ): void => {
+    const originWx = regionalWeatherIndex(world, origin.ap.region);
+    const destWx = regionalWeatherIndex(world, dest.ap.region);
+    const laneWeather = worseWeather(originWx, destWx);
     const destCap = dest.stock.capacityKg;
     const effectiveDestFill =
       destCap > 0 ? (dest.stock.stockKg + inboundKg) / destCap : dest.fill;
@@ -993,7 +1014,8 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       effectiveDestFill < 0.22 ||
       commodity.perishable === true ||
       (dest.fill < 0.28 && inboundKg < 1_000) ||
-      laneSaturation >= 0.5;
+      laneSaturation >= 0.5 ||
+      (laneWeather === 'poor' && dest.fill < 0.35);
     const urgencyMult = urgent ? 1.35 : 1;
     const distanceBias =
       origin.ap.region.split('-')[0] === dest.ap.region.split('-')[0] ? 1 : 1.15;
@@ -1007,12 +1029,25 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     // Saturated OD lane → scarce remaining slots pay a bit more.
     const scarcePayMult =
       laneSaturation >= 0.35 ? 1 + laneSaturation * 0.12 : 1;
+    const weatherPayMult = regionalWeatherPayMult(laneWeather);
     const payPerKg = Math.min(
-      gap * 0.55 * urgencyMult * distanceBias * capacityPayMult * scarcePayMult,
+      gap *
+        0.55 *
+        urgencyMult *
+        distanceBias *
+        capacityPayMult *
+        scarcePayMult *
+        weatherPayMult,
       commodity.basePricePerKg * 1.8,
     );
     const payUsd = Math.round(qty * payPerKg);
-    const life = commodity.perishable ? 8 + Math.floor(rng() * 4) : 18 + Math.floor(rng() * 8);
+    const baseLife = commodity.perishable
+      ? 8 + Math.floor(rng() * 4)
+      : 18 + Math.floor(rng() * 8);
+    const life = Math.max(
+      4,
+      Math.round(baseLife * regionalWeatherLifeMult(laneWeather)),
+    );
 
     const lot: ShipmentLot = {
       id: `lot_${world.tick}_${commodity.id}_${origin.ap.icao}_${dest.ap.icao}_${Math.floor(rng() * 1e6)}`,

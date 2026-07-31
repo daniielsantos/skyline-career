@@ -11,6 +11,11 @@ import {
 } from './career-economy.js';
 import { applyNpcFuelUplift } from './career-fuel.js';
 import { getAircraftClass, reserveShipmentLot } from './career-mission.js';
+import {
+  regionalWeatherBidMult,
+  regionalWeatherIndex,
+  type RegionalWeather,
+} from './career-weather.js';
 import type {
   CareerEconomyWorld,
   CommodityId,
@@ -209,6 +214,8 @@ export type LotMarketPressure = {
   laneSaturation: number;
   thinFleet: boolean;
   laneBusy: boolean;
+  /** Worse of origin/dest regional weather for this lane. */
+  weather: RegionalWeather;
 };
 
 export type RegionMarketPressure = {
@@ -218,6 +225,7 @@ export type RegionMarketPressure = {
   ready: number;
   total: number;
   resting: number;
+  weather: RegionalWeather;
 };
 
 /** Player-facing pressure signals for one market lot (origin region + OD lane). */
@@ -230,6 +238,7 @@ export function describeLotMarketPressure(
     airportRegion(world, lot.originIcao) ??
     world.airports.find((a) => a.icao === lot.originIcao.toUpperCase())?.region ??
     '';
+  const destRegion = airportRegion(world, lot.destIcao) ?? '';
   const originRegionCapacity = originRegion
     ? npcRegionBidCapacity(world, originRegion, nowMs)
     : 1;
@@ -239,12 +248,23 @@ export function describeLotMarketPressure(
     lot.destIcao,
     lot.commodityId,
   );
+  const originWx = originRegion
+    ? regionalWeatherIndex(world, originRegion)
+    : 'fair';
+  const destWx = destRegion ? regionalWeatherIndex(world, destRegion) : 'fair';
+  const weather =
+    originWx === 'poor' || destWx === 'poor'
+      ? 'poor'
+      : originWx === 'marginal' || destWx === 'marginal'
+        ? 'marginal'
+        : 'fair';
   return {
     originRegion,
     originRegionCapacity,
     laneSaturation,
     thinFleet: originRegionCapacity < THIN_FLEET_CAPACITY,
     laneBusy: laneSaturation >= LANE_BUSY_SATURATION,
+    weather,
   };
 }
 
@@ -271,6 +291,7 @@ export function listRegionMarketPressure(
       ready,
       total: home.length,
       resting,
+      weather: regionalWeatherIndex(world, region),
     };
   });
 }
@@ -768,8 +789,11 @@ function npcBidOnMarket(
 
   for (const npc of idle) {
     const regionCapacity = npcRegionBidCapacity(world, npc.homeRegion, batchNowMs);
+    const wx = regionalWeatherIndex(world, npc.homeRegion);
     const bidChance =
-      (0.22 + npc.aggressiveness * 0.55) * (0.45 + 0.55 * regionCapacity);
+      (0.22 + npc.aggressiveness * 0.55) *
+      (0.45 + 0.55 * regionCapacity) *
+      regionalWeatherBidMult(wx);
     if (rng() > bidChance) continue;
     if (rng() > 0.55 + npc.reliability * 0.45) continue;
 

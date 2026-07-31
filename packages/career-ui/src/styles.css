@@ -1209,6 +1209,20 @@ small {
   margin-left: 0.35rem;
 }
 
+.tag.weather {
+  margin-left: 0.35rem;
+}
+
+.tag.weather.marginal {
+  background: rgba(160, 120, 40, 0.14);
+  color: #7a5a18;
+}
+
+.tag.weather.poor {
+  background: rgba(120, 70, 90, 0.14);
+  color: #6b3a52;
+}
+
 .pressure-chips {
   display: flex;
   flex-wrap: wrap;

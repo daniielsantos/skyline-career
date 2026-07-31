@@ -700,6 +700,7 @@ export function createCareerApiServer(port = 8787) {
             ready: r.ready,
             total: r.total,
             resting: r.resting,
+            weather: r.weather,
           })),
           lots: lots.slice(0, 200).map((row) => ({
             id: row.lot.id,
@@ -730,6 +731,7 @@ export function createCareerApiServer(port = 8787) {
                   laneSaturation: row.pressure.laneSaturation,
                   thinFleet: row.pressure.thinFleet,
                   laneBusy: row.pressure.laneBusy,
+                  weather: row.pressure.weather,
                 }
               : null,
             npcClaim: row.npcClaim
@@ -764,6 +766,7 @@ export function createCareerApiServer(port = 8787) {
             ready: r.ready,
             total: r.total,
             resting: r.resting,
+            weather: r.weather,
           })),
           fleet,
           activity: mapNpcActivity(world, nowMs),

@@ -143,6 +143,7 @@ export type RegionPressure = {
   ready: number;
   total: number;
   resting: number;
+  weather?: 'fair' | 'marginal' | 'poor';
 };
 
 export type LotPressure = {
@@ -151,6 +152,7 @@ export type LotPressure = {
   laneSaturation: number;
   thinFleet: boolean;
   laneBusy: boolean;
+  weather?: 'fair' | 'marginal' | 'poor';
 };
 
 export type MarketLot = {

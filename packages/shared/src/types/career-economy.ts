@@ -284,6 +284,7 @@ export interface MarketLotView {
     laneSaturation: number;
     thinFleet: boolean;
     laneBusy: boolean;
+    weather?: 'fair' | 'marginal' | 'poor';
   };
 }
 

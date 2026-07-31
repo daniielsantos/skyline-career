@@ -13,36 +13,36 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - `npcRegionBidCapacity(world, region, nowMs)` — fraction of home-region NPCs ready to bid.
 - Low capacity (many resting/busy) → `pushLot` pay boost `1 + (1 - capacity) * 0.22` (still capped at `base * 1.8`).
 - Low capacity → `npcBidOnMarket` scales `bidChance` by `0.45 + 0.55 * capacity` (less dispute).
-- Key files: `packages/shared/src/career-npc.ts`, `formLotsFromImbalances` in `career-economy.ts`.
 
 ## Done — fatia 2 (lane saturation / urgency)
 
 - `npcLaneAirborneKg` / `npcLaneSaturation` from `in_flight` NPC cargo on OD+commodity.
-- Soft fill shadow: inbound kg to dest damps urgency; thin dest + almost no inbound → urgent earlier.
-- Saturation ≥ 0.5 counts as +1 toward lane lot cap; saturation ≥ 1 skips new lots on that lane.
-- Saturation ≥ 0.35 → scarce pay mult `1 + saturation * 0.12` (still under `base * 1.8`).
-- Saturation ≥ 0.5 on formed lots → mark urgent.
+- Soft fill shadow + lane saturation affect urgency, lot caps, and scarce pay.
 
 ## Done — UI chip
 
-- `describeLotMarketPressure` / `listRegionMarketPressure` exposed on `/api/market` and `/api/npc`.
-- Market rows: **Thin fleet** / **Lane busy** tags with tooltips.
-- Market + Competing fleet panel headers: regional thin-fleet chips.
+- Thin fleet / lane busy tags on market + regional chips on Market and NPC Fleet panels.
 
-## Next — METAR regional (1×/day)
+## Done — regional weather index (simulated)
 
-- Sample METAR for hubs → regional fair/marginal/poor index.
-- Effects: block time / fuel bias / NPC bidChance; cache + offline-neutral fallback.
-- UI: show weather index next to region chips when present.
+- `career-weather.ts`: one `fair|marginal|poor` per region per sim-day from `seed+region+day`.
+- Market: weather pay/life multipliers; poor+tight dest → urgent; NPC bidChance scaled by home-region weather.
+- UI: `BR-SE poor` chips + lot weather tags. No per-NPC METAR; cost scales with regions only.
+
+## Next — optional real METAR (fatia B)
+
+- 1–2 anchor ICAOs per region, ≤1 fetch/day, fold into the same regional index.
+- Cache + fall back to simulated. Never query inside NPC bid/claim.
 
 ## Later
 
-- NPC operational cargo ceiling (route fuel/MTOW) if exploits appear.
+- NPC operational cargo ceiling if exploits appear.
 - Crew/maintenance cost pressure on NPC bid appetite.
-- Weather / slot friction on block times.
+- Slot friction once the regional weather index is proven.
 
 ## Design rules
 
 - Prefer regional / lane-local effects over global multipliers.
 - Every slice needs a regression test that a player would notice (pay, urgency, or claim rate).
 - Do not persist new economy fields unless a slice requires them.
+- Weather/network cost must scale with **regions**, never with **NPC count**.

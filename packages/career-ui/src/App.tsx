@@ -150,16 +150,28 @@ function RegionPressureChips(props: {
   className?: string;
 }) {
   const thin = props.regions.filter((r) => r.thinFleet);
-  if (thin.length === 0) return null;
+  const wx = props.regions.filter(
+    (r) => r.weather === 'marginal' || r.weather === 'poor',
+  );
+  if (thin.length === 0 && wx.length === 0) return null;
   return (
     <div className={props.className ?? 'pressure-chips'}>
       {thin.map((r) => (
         <span
-          key={r.region}
+          key={`thin-${r.region}`}
           className="tag pressure"
           title={`${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting — thinner local fleet tends to raise outbound freights`}
         >
           {r.region} thin fleet
+        </span>
+      ))}
+      {wx.map((r) => (
+        <span
+          key={`wx-${r.region}`}
+          className={`tag weather ${r.weather}`}
+          title={`${regionLabel(r.region)}: simulated ${r.weather} weather today — freights pay more / expire sooner; local NPCs bid less`}
+        >
+          {r.region} {r.weather}
         </span>
       ))}
     </div>
@@ -3423,6 +3435,15 @@ export function App() {
                             title={`NPC cargo already airborne on this lane (${Math.round((lot.pressure.laneSaturation || 0) * 100)}% saturated) — remaining slots are scarcer`}
                           >
                             Lane busy
+                          </span>
+                        ) : null}
+                        {lot.pressure?.weather === 'marginal' ||
+                        lot.pressure?.weather === 'poor' ? (
+                          <span
+                            className={`tag weather ${lot.pressure.weather}`}
+                            title={`Simulated ${lot.pressure.weather} weather on this lane — richer / shorter-lived freights`}
+                          >
+                            {lot.pressure.weather}
                           </span>
                         ) : null}
                       </div>

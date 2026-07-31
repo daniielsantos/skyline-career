@@ -5,6 +5,7 @@ export * from './types/ofp-compliance.js';
 export * from './types/career-economy.js';
 export * from './ofp-compliance.js';
 export * from './career-economy.js';
+export * from './career-weather.js';
 export * from './career-fuel.js';
 export * from './career-fleet.js';
 export * from './career-mission.js';

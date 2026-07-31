@@ -375,6 +375,7 @@ describe('NPC freighter fleet', () => {
     );
     assert.equal(thin.thinFleet, true);
     assert.equal(thin.laneBusy, false);
+    assert.ok(['fair', 'marginal', 'poor'].includes(thin.weather));
 
     world.npcFlights.push({
       id: 'npcf-busy-lane',
@@ -400,7 +401,7 @@ describe('NPC freighter fleet', () => {
     assert.equal(busy.laneBusy, true);
 
     const regions = listRegionMarketPressure(world, nowMs);
-    assert.ok(regions.some((r) => r.region === region && r.thinFleet));
+    assert.ok(regions.some((r) => r.region === region && r.thinFleet && r.weather));
   });
 
   it('measures lane airborne kg and saturation from in_flight NPC cargo', () => {

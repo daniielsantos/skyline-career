@@ -1,4 +1,8 @@
-export type AircraftClass = 'narrow_freighter' | 'wide_freighter' | 'light_turboprop';
+export type AircraftClass =
+  | 'narrow_freighter'
+  | 'wide_freighter'
+  | 'light_turboprop'
+  | 'light_ga';
 
 export type PlayerAircraft = {
   id: string;
@@ -498,6 +502,23 @@ export function postSelectHub(opts: { icao: string; pilotName: string }) {
     pilotName: string;
     homeHubIcao: string;
   }>('/api/fleet/select-hub', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAcquireAircraft(opts: {
+  aircraftClassId: AircraftClass;
+  locationIcao?: string;
+}) {
+  return api<{
+    walletUsd: number;
+    hubSelected: boolean;
+    fleet: PlayerAircraft[];
+    hubs: string[];
+    pilotName: string;
+    homeHubIcao: string;
+  }>('/api/fleet/acquire', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

@@ -271,7 +271,8 @@ export interface MarketLotView {
 export type FreighterClassId =
   | 'narrow_freighter'
   | 'wide_freighter'
-  | 'light_turboprop';
+  | 'light_turboprop'
+  | 'light_ga';
 
 export interface AircraftClass {
   id: FreighterClassId;

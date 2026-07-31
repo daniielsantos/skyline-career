@@ -34,7 +34,7 @@ import {
 } from './index.js';
 
 describe('mission load method policy', () => {
-  it('marks narrow/wide as native-simbrief and Caravan as direct-injection', () => {
+  it('marks narrow/wide as native-simbrief and Caravan/Bonanza as direct-injection', () => {
     assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'narrow_freighter' }), {
       loadMethod: 'native-simbrief',
       injectCapable: false,
@@ -47,12 +47,20 @@ describe('mission load method policy', () => {
       loadMethod: 'direct-injection',
       injectCapable: true,
     });
+    assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'light_ga' }), {
+      loadMethod: 'direct-injection',
+      injectCapable: true,
+    });
     assert.equal(
       careerAllowsDirectInject(missionLoadPolicy({ aircraftClassId: 'narrow_freighter' })),
       false,
     );
     assert.equal(
       careerAllowsDirectInject(missionLoadPolicy({ aircraftClassId: 'light_turboprop' })),
+      true,
+    );
+    assert.equal(
+      careerAllowsDirectInject(missionLoadPolicy({ aircraftClassId: 'light_ga' })),
       true,
     );
     assert.equal(

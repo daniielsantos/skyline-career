@@ -1365,8 +1365,8 @@ async function main(): Promise<void> {
       console.log(`career commands:
   career init [--save path] [--seed s] [--reset]
   career tick [--n 24] [--save path]
-  career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter] [--save path] [--json]
-  career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter] [--save path] [--missions path] [--json]
+  career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter|light_turboprop|light_ga] [--save path] [--json]
+  career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter|light_turboprop|light_ga] [--save path] [--missions path] [--json]
   career missions [--missions path] [--json]
   career cancel --mission <id> [--save path] [--missions path]
   career dispatch --mission <id> [--simbrief-user ALIAS] [--no-open] [--compare] [--missions path] [--save path]
@@ -1486,7 +1486,7 @@ async function main(): Promise<void> {
       const aircraftClassId = parseFreighterClassId(aircraftRaw) as FreighterClassId | undefined;
       if (!aircraftClassId) {
         console.error(
-          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter|light_turboprop)`,
+          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter|light_turboprop|light_ga)`,
         );
         process.exit(1);
       }

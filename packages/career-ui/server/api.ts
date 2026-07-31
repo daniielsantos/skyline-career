@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   acceptMission,
   assignAircraftToMission,
+  acquireCompanyAircraft,
   CAREER_COMMODITIES,
   cancelMission,
   commitStagedManifest,
@@ -352,7 +353,9 @@ function mapAirportMovements(
         ? 480
         : m.aircraftClassId === 'light_turboprop'
           ? 185
-          : 430;
+          : m.aircraftClassId === 'light_ga'
+            ? 170
+            : 430;
     const flightHours = Math.max(2, Math.ceil(dist / cruise));
     const departedAt = m.departedAtTick ?? m.dispatchedAtTick ?? m.acceptedAtTick;
     let etaHours = flightHours;
@@ -486,6 +489,38 @@ export function createCareerApiServer(port = 8787) {
         try {
           const next = selectStarterHub(missions, body.icao, {
             pilotName: body.pilotName,
+          });
+          Object.assign(missions, next);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            ...fleetPayload(missions),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fleet/acquire') {
+        const body = (await readBody(req)) as {
+          aircraftClassId?: string;
+          locationIcao?: string;
+        };
+        const aircraftClassId = parseFreighterClassId(body.aircraftClassId ?? undefined);
+        if (!aircraftClassId) {
+          send(res, 400, {
+            error:
+              'aircraftClassId required (narrow_freighter|wide_freighter|light_turboprop|light_ga)',
+          });
+          return;
+        }
+        const missions = await loadMissions();
+        try {
+          const next = acquireCompanyAircraft(missions, aircraftClassId, {
+            locationIcao: body.locationIcao,
           });
           Object.assign(missions, next);
           await writeJson(missionsPath, missions);

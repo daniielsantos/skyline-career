@@ -109,6 +109,29 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelRouteFactor: 1.8,
     fuelReserveKg: 200,
   },
+  {
+    id: 'light_ga',
+    name: 'Light GA (BE36 Bonanza Professional)',
+    /**
+     * Fallback structural payload for BE36 family (A36 / A36TC / B36TP).
+     * B36TP cfg: MTOW 4050 lb − OEW 2355 lb ≈ 769 kg useful; ~450 kg after typical fuel.
+     */
+    maxCargoKg: 450,
+    maxRangeNm: 800,
+    rolesPackRelPath: 'profiles/ofp/blacksquare-bonanza-professional.json',
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    simbriefIcao: 'BE36',
+    simbriefAirframeMatch: 'Default',
+    fuelBurnKgPerNm: 0.35,
+    fuelTaxiKg: 20,
+    /** B36TP mains 62+62 gal Jet-A ≈ 380 kg usable planning capacity. */
+    fuelCapacityKg: 380,
+    oewKg: 1_068,
+    mtowKg: 1_837,
+    fuelRouteFactor: 1.8,
+    fuelReserveKg: 80,
+  },
 ] as const;
 
 const CLASS_BY_ID: Record<FreighterClassId, AircraftClass> = Object.fromEntries(
@@ -247,7 +270,8 @@ export function parseFreighterClassId(raw: string | undefined): FreighterClassId
   if (
     raw === 'narrow_freighter' ||
     raw === 'wide_freighter' ||
-    raw === 'light_turboprop'
+    raw === 'light_turboprop' ||
+    raw === 'light_ga'
   ) {
     return raw;
   }
@@ -255,6 +279,9 @@ export function parseFreighterClassId(raw: string | undefined): FreighterClassId
   if (raw === 'wide' || raw === 'md11' || raw === 'md-11f') return 'wide_freighter';
   if (raw === 'caravan' || raw === 'c208' || raw === 'light' || raw === 'turboprop') {
     return 'light_turboprop';
+  }
+  if (raw === 'bonanza' || raw === 'be36' || raw === 'ga' || raw === 'a36' || raw === 'b36tp') {
+    return 'light_ga';
   }
   return undefined;
 }

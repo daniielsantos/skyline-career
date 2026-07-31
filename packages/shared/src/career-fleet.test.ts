@@ -17,6 +17,7 @@ import {
   releaseAircraftOnCancel,
   relocateAircraftOnSettle,
   selectStarterHub,
+  acquireCompanyAircraft,
   settleMission,
 } from './index.js';
 
@@ -37,6 +38,20 @@ describe('career fleet hangar', () => {
     assert.equal(state.fleet[0]!.locationIcao, 'SBGR');
     assert.equal(state.fleet[0]!.status, 'parked');
     assert.ok(state.fleet[0]!.fuelKg > 0);
+  });
+
+  it('acquireCompanyAircraft parks a Bonanza light_ga at the home hub', () => {
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    state = acquireCompanyAircraft(state, 'light_ga');
+    assert.equal(state.fleet.length, 2);
+    const bonanza = state.fleet.find((a) => a.aircraftClassId === 'light_ga');
+    assert.ok(bonanza);
+    assert.equal(bonanza!.locationIcao, 'SBGR');
+    assert.equal(bonanza!.status, 'parked');
+    assert.equal(bonanza!.label, 'Company Bonanza');
+    // Idempotent per class.
+    const again = acquireCompanyAircraft(state, 'light_ga');
+    assert.equal(again.fleet.length, 2);
   });
 
   it('selectStarterHub rejects empty pilot name and second register', () => {

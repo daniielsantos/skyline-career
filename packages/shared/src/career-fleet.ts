@@ -25,6 +25,7 @@ import type {
 /** Usable Jet-A capacity by class (career estimate, not MSFS tanks). */
 export const PLAYER_FUEL_CAPACITY_KG: Record<FreighterClassId, number> = {
   light_turboprop: 1_010,
+  light_ga: 380,
   narrow_freighter: 20_894,
   wide_freighter: 117_450,
 };
@@ -32,6 +33,7 @@ export const PLAYER_FUEL_CAPACITY_KG: Record<FreighterClassId, number> = {
 /** Keep in sync with CAREER_AIRCRAFT_CLASSES.maxRangeNm. */
 const MAX_RANGE_NM: Record<FreighterClassId, number> = {
   light_turboprop: 900,
+  light_ga: 800,
   narrow_freighter: 2_500,
   wide_freighter: 6_000,
 };
@@ -41,6 +43,7 @@ export const FERRY_FEE_USD_PER_NM = 2.5;
 
 const FERRY_CLASS_MULT: Record<FreighterClassId, number> = {
   light_turboprop: 1,
+  light_ga: 0.85,
   narrow_freighter: 2.2,
   wide_freighter: 4,
 };
@@ -117,6 +120,7 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
   const aircraftClassId = raw.aircraftClassId;
   if (
     aircraftClassId !== 'light_turboprop' &&
+    aircraftClassId !== 'light_ga' &&
     aircraftClassId !== 'narrow_freighter' &&
     aircraftClassId !== 'wide_freighter'
   ) {
@@ -150,8 +154,16 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
 
 function defaultLabel(aircraftClassId: FreighterClassId): string {
   if (aircraftClassId === 'light_turboprop') return 'Company Caravan';
+  if (aircraftClassId === 'light_ga') return 'Company Bonanza';
   if (aircraftClassId === 'narrow_freighter') return 'Company Narrow';
   return 'Company Wide';
+}
+
+function defaultAircraftId(aircraftClassId: FreighterClassId): string {
+  if (aircraftClassId === 'light_turboprop') return 'acf_caravan_1';
+  if (aircraftClassId === 'light_ga') return 'acf_bonanza_1';
+  if (aircraftClassId === 'narrow_freighter') return 'acf_narrow_1';
+  return 'acf_wide_1';
 }
 
 export function findPlayerAircraft(
@@ -210,6 +222,51 @@ export function selectStarterHub(
     homeHubIcao: hub,
     hubSelected: true,
     fleet: [starter],
+  };
+}
+
+/**
+ * Park an additional company aircraft at home hub (or a chosen ICAO).
+ * One airframe per class for now — acquiring again is a no-op that returns the existing one.
+ */
+export function acquireCompanyAircraft(
+  state: CareerMissionsState,
+  aircraftClassId: FreighterClassId,
+  opts?: { locationIcao?: string },
+): CareerMissionsState {
+  if (!state.hubSelected || state.fleet.length === 0) {
+    throw new Error('Select a starter hub before acquiring another aircraft');
+  }
+  const existing = state.fleet.find((a) => a.aircraftClassId === aircraftClassId);
+  if (existing) {
+    return state;
+  }
+  const hub = (
+    opts?.locationIcao ??
+    state.homeHubIcao ??
+    state.fleet.find((a) => a.status === 'parked')?.locationIcao ??
+    state.fleet[0]?.locationIcao ??
+    ''
+  )
+    .trim()
+    .toUpperCase();
+  if (!hub || !CAREER_HUB_COORDS[hub]) {
+    throw new Error(`Unknown career hub: ${hub || '(empty)'}`);
+  }
+  const capacity = PLAYER_FUEL_CAPACITY_KG[aircraftClassId];
+  const next: PlayerAircraft = {
+    id: defaultAircraftId(aircraftClassId),
+    aircraftClassId,
+    label: defaultLabel(aircraftClassId),
+    locationIcao: hub,
+    fuelKg: Math.round(capacity * 0.45),
+    fuelCapacityKg: capacity,
+    status: 'parked',
+  };
+  return {
+    ...state,
+    version: 2,
+    fleet: [...state.fleet, next],
   };
 }
 

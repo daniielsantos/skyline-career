@@ -20,6 +20,7 @@ import {
   postPreflight,
   postSettle,
   postSelectHub,
+  postAcquireAircraft,
   postFerry,
   postStagingCommit,
   postTick,
@@ -113,6 +114,7 @@ function formatMoney(n: number): string {
 function aircraftClassLabel(id: string): string {
   if (id === 'wide_freighter') return 'Wide';
   if (id === 'light_turboprop') return 'Caravan';
+  if (id === 'light_ga') return 'Bonanza';
   if (id === 'narrow_freighter') return 'Narrow';
   return id.replace(/_/g, ' ');
 }
@@ -120,19 +122,34 @@ function aircraftClassLabel(id: string): string {
 function fallbackMaxCargoKg(aircraft: AircraftClass): number {
   if (aircraft === 'wide_freighter') return 90_000;
   if (aircraft === 'light_turboprop') return 1_704;
+  if (aircraft === 'light_ga') return 450;
   return 18_137;
 }
 
 function aircraftMaxRangeNm(aircraft: AircraftClass): number {
   if (aircraft === 'wide_freighter') return 6_000;
   if (aircraft === 'light_turboprop') return 900;
+  if (aircraft === 'light_ga') return 800;
   return 2_500;
 }
 
 function estimateFuelUpliftKg(aircraft: AircraftClass, distanceNm: number): number {
-  const taxi = aircraft === 'wide_freighter' ? 900 : aircraft === 'light_turboprop' ? 40 : 400;
+  const taxi =
+    aircraft === 'wide_freighter'
+      ? 900
+      : aircraft === 'light_turboprop'
+        ? 40
+        : aircraft === 'light_ga'
+          ? 20
+          : 400;
   const burn =
-    aircraft === 'wide_freighter' ? 12 : aircraft === 'light_turboprop' ? 0.8 : 5;
+    aircraft === 'wide_freighter'
+      ? 12
+      : aircraft === 'light_turboprop'
+        ? 0.8
+        : aircraft === 'light_ga'
+          ? 0.35
+          : 5;
   return Math.max(taxi, Math.round(taxi + burn * Math.max(0, distanceNm)));
 }
 
@@ -154,7 +171,8 @@ function preferredLoadMethod(
   if (mission.loadMethod === 'native-simbrief' || mission.loadMethod === 'direct-injection') {
     return mission.loadMethod;
   }
-  return mission.aircraftClassId === 'light_turboprop'
+  return mission.aircraftClassId === 'light_turboprop' ||
+    mission.aircraftClassId === 'light_ga'
     ? 'direct-injection'
     : 'native-simbrief';
 }
@@ -1590,6 +1608,19 @@ export function App() {
         `${result.pilotName} registered · Caravan parked at ${result.homeHubIcao}`,
       );
       setTab('pilot');
+    });
+  }
+
+  async function onAcquireBonanza() {
+    await run(async () => {
+      const result = await postAcquireAircraft({
+        aircraftClassId: 'light_ga',
+        locationIcao: homeHubIcao || undefined,
+      });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setToastKind('ok');
+      setToast('Company Bonanza parked at hangar');
     });
   }
 
@@ -3355,6 +3386,7 @@ export function App() {
                       <option value="narrow_freighter">Narrow (B738 BCF)</option>
                       <option value="wide_freighter">Wide (MD-11F)</option>
                       <option value="light_turboprop">Light TP (C208 Caravan)</option>
+                      <option value="light_ga">Light GA (BE36 Bonanza)</option>
                     </select>
                   </label>
                   <button
@@ -4676,6 +4708,16 @@ export function App() {
                 for a fee + Jet-A.
               </p>
             </div>
+            {!fleet.some((a) => a.aircraftClassId === 'light_ga') ? (
+              <button
+                type="button"
+                className="accept"
+                onClick={() => void onAcquireBonanza()}
+                disabled={busy}
+              >
+                Add Bonanza
+              </button>
+            ) : null}
           </div>
           {fleet.length === 0 ? (
             <p className="empty">No aircraft yet — pick a starter hub.</p>

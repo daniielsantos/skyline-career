@@ -19,6 +19,7 @@ const FUEL_PLAN: Record<
   narrow_freighter: { fuelBurnKgPerNm: 5, fuelTaxiKg: 400 },
   wide_freighter: { fuelBurnKgPerNm: 12, fuelTaxiKg: 900 },
   light_turboprop: { fuelBurnKgPerNm: 0.8, fuelTaxiKg: 40 },
+  light_ga: { fuelBurnKgPerNm: 0.35, fuelTaxiKg: 20 },
 };
 
 const PARTIAL_SURCHARGE = 1.25;

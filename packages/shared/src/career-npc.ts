@@ -32,6 +32,7 @@ const CRUISE_KT: Record<FreighterClassId, number> = {
   narrow_freighter: 430,
   wide_freighter: 480,
   light_turboprop: 185,
+  light_ga: 170,
 };
 
 const NPC_NAME_POOL = [

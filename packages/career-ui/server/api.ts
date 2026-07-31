@@ -93,6 +93,12 @@ async function loadMissions(): Promise<MissionsFile> {
     }
     return normalized;
   }
+  if (existing) {
+    // Readable JSON without missions[]: refuse rather than wipe pilot/wallet/logbook.
+    throw new Error(
+      `Save at ${missionsPath} has no missions[]; refusing to overwrite it with an empty career`,
+    );
+  }
   const fresh = emptyMissionsStateV2();
   await writeJson(missionsPath, fresh);
   return fresh;
@@ -108,19 +114,62 @@ function fleetPayload(missions: MissionsFile) {
   };
 }
 
+/**
+ * Returns null only when the save does not exist yet.
+ * An existing-but-unreadable save throws: callers must never treat a transient
+ * read failure as "no save" and reseed over the player's world.
+ */
 async function readJson<T>(path: string): Promise<T | null> {
+  let raw: string;
   try {
-    const raw = await readFile(path, 'utf8');
+    raw = await readFile(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+  try {
     return JSON.parse(raw) as T;
-  } catch {
-    return null;
+  } catch (error) {
+    const { copyFile } = await import('node:fs/promises');
+    const quarantine = `${path}.corrupt-${Date.now()}`;
+    await copyFile(path, quarantine).catch(() => undefined);
+    throw new Error(
+      `Save at ${path} is unreadable; kept a copy at ${quarantine}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 }
 
+/**
+ * Write via temp file + rename so a concurrent reader always sees either the
+ * previous or the next save, never a half-written one.
+ */
 async function writeJson(path: string, data: unknown): Promise<void> {
-  const { mkdir, writeFile } = await import('node:fs/promises');
+  const { mkdir, writeFile, rename, rm } = await import('node:fs/promises');
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  try {
+    // Windows can briefly deny the replace while an indexer/AV holds the file.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await rename(tmp, path);
+        return;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (attempt >= 4 || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) {
+          throw error;
+        }
+        await new Promise((done) => setTimeout(done, 25 * (attempt + 1)));
+      }
+    }
+  } catch (error) {
+    await rm(tmp, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 /** Serialize mission-file read-modify-write so OFP/preflight/watch cannot clobber cancel. */
@@ -168,7 +217,19 @@ async function updateOpenMission(
   });
 }
 
-async function loadEconomy(): Promise<CareerEconomyWorld> {
+/** Serialize economy read-modify-write so +1 day, catch-up and settles cannot clobber each other. */
+let economyLock: Promise<void> = Promise.resolve();
+
+function withEconomyLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = economyLock.then(fn, fn);
+  economyLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
   const existing = await readJson<Record<string, unknown>>(economyPath);
   if (existing && Array.isArray(existing.airports)) {
     const npcCountBefore = Array.isArray((existing as { npcs?: unknown[] }).npcs)
@@ -193,17 +254,46 @@ async function loadEconomy(): Promise<CareerEconomyWorld> {
     }
     return caught;
   }
+  if (existing) {
+    // Readable JSON that is not a world: refuse rather than reseed over it.
+    throw new Error(
+      `Save at ${economyPath} has no airports[]; refusing to overwrite it with a fresh world`,
+    );
+  }
   const fresh = createSeedEconomyWorld();
   await writeJson(economyPath, fresh);
   return fresh;
 }
 
-async function persistEconomy(world: CareerEconomyWorld): Promise<void> {
+async function persistEconomyUnlocked(world: CareerEconomyWorld): Promise<void> {
   // Do NOT stomp lastBatchAtMs — fractional hour + continuous ops depend on it.
   const toSave = migrateEconomyWorld(world);
   toSave.lastBatchAtMs = world.lastBatchAtMs;
   toSave.lastSyncedAtMs = world.lastBatchAtMs;
   await writeJson(economyPath, toSave);
+}
+
+function loadEconomy(): Promise<CareerEconomyWorld> {
+  return withEconomyLock(loadEconomyUnlocked);
+}
+
+function persistEconomy(world: CareerEconomyWorld): Promise<void> {
+  return withEconomyLock(() => persistEconomyUnlocked(world));
+}
+
+/**
+ * Load, mutate and persist the economy inside one lock so a slow handler cannot
+ * write back a world that another request already advanced.
+ */
+async function withEconomyWrite<T>(
+  fn: (world: CareerEconomyWorld) => Promise<T> | T,
+): Promise<T> {
+  return withEconomyLock(async () => {
+    const world = await loadEconomyUnlocked();
+    const result = await fn(world);
+    await persistEconomyUnlocked(world);
+    return result;
+  });
 }
 
 function send(res: import('node:http').ServerResponse, status: number, body: unknown): void {
@@ -678,13 +768,16 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/market') {
-        const world = await loadEconomy();
         const missions = await loadMissions();
-        const inboundBefore = JSON.stringify(world.inboundPending ?? []);
-        reconcilePlayerInbound(world, missions.missions);
-        if (JSON.stringify(world.inboundPending ?? []) !== inboundBefore) {
-          await persistEconomy(world);
-        }
+        const world = await withEconomyLock(async () => {
+          const w = await loadEconomyUnlocked();
+          const before = JSON.stringify(w.inboundPending ?? []);
+          reconcilePlayerInbound(w, missions.missions);
+          if (JSON.stringify(w.inboundPending ?? []) !== before) {
+            await persistEconomyUnlocked(w);
+          }
+          return w;
+        });
         const nowMs = Date.now();
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
         const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);
@@ -870,10 +963,11 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'POST' && path === '/api/tick') {
         const body = (await readBody(req)) as { n?: number };
-        const world = await loadEconomy();
         const n = Math.max(1, Math.min(168, Math.floor(body.n ?? 24)));
-        tickEconomyN(world, n);
-        await persistEconomy(world);
+        const world = await withEconomyWrite((w) => {
+          tickEconomyN(w, n);
+          return w;
+        });
         const nowMs = Date.now();
         send(res, 200, {
           ...clockPayload(world, nowMs),
@@ -1916,8 +2010,7 @@ export function createCareerApiServer(port = 8787) {
           catchUpTimer = setInterval(() => {
             void (async () => {
               try {
-                const world = await loadEconomy();
-                await persistEconomy(world);
+                await withEconomyWrite(() => undefined);
               } catch {
                 /* ignore background catch-up errors */
               }

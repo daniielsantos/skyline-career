@@ -153,6 +153,8 @@ export type LotPressure = {
   thinFleet: boolean;
   laneBusy: boolean;
   weather?: 'fair' | 'marginal' | 'poor';
+  idleEscalated?: boolean;
+  idlePayMult?: number;
 };
 
 export type MarketLot = {

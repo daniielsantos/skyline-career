@@ -1376,6 +1376,71 @@ function expireLots(world: CareerEconomyWorld): void {
   pruneDeadLots(world);
 }
 
+/**
+ * Grace fraction of lot life before idle pay starts rising.
+ * After that, pay ramps linearly to IDLE_LOT_PAY_MAX_MULT at expiry.
+ */
+export const IDLE_LOT_ESCALATION_START = 0.25;
+/** Max pay multiplier vs formation base for a fully aged available lot. */
+export const IDLE_LOT_PAY_MAX_MULT = 1.4;
+/** Life progress at which a lingering lot flips to urgent. */
+export const IDLE_LOT_URGENT_PROGRESS = 0.55;
+
+/** Life progress of a lot at `tick` (0 at create, 1 at expiry). */
+export function idleLotLifeProgress(
+  lot: Pick<ShipmentLot, 'createdAtTick' | 'expiresAtTick'>,
+  tick: number,
+): number {
+  const life = Math.max(1, lot.expiresAtTick - lot.createdAtTick);
+  const age = Math.max(0, tick - lot.createdAtTick);
+  return Math.min(1, age / life);
+}
+
+/**
+ * Idle freight multiplier from formation base (≥ 1).
+ * No boost for the first IDLE_LOT_ESCALATION_START of life, then ramps to max.
+ */
+export function idleLotPayMult(
+  lot: Pick<ShipmentLot, 'createdAtTick' | 'expiresAtTick'>,
+  tick: number,
+): number {
+  const progress = idleLotLifeProgress(lot, tick);
+  if (progress <= IDLE_LOT_ESCALATION_START) return 1;
+  const t =
+    (progress - IDLE_LOT_ESCALATION_START) / (1 - IDLE_LOT_ESCALATION_START);
+  return 1 + (IDLE_LOT_PAY_MAX_MULT - 1) * t;
+}
+
+/**
+ * Raise pay on lingering available lots from stamped basePayUsd.
+ * Also flips urgency late in life so the board shows the pressure.
+ */
+export function escalateIdleLots(world: CareerEconomyWorld): {
+  escalated: number;
+  markedUrgent: number;
+} {
+  let escalated = 0;
+  let markedUrgent = 0;
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+    if (typeof lot.basePayUsd !== 'number' || !Number.isFinite(lot.basePayUsd)) {
+      lot.basePayUsd = lot.payUsd;
+    }
+    const mult = idleLotPayMult(lot, world.tick);
+    const nextPay = Math.max(1, Math.round(lot.basePayUsd * mult));
+    if (mult > 1 && nextPay !== lot.payUsd) escalated += 1;
+    lot.payUsd = nextPay;
+    if (
+      lot.urgency === 'normal' &&
+      idleLotLifeProgress(lot, world.tick) >= IDLE_LOT_URGENT_PROGRESS
+    ) {
+      lot.urgency = 'urgent';
+      markedUrgent += 1;
+    }
+  }
+  return { escalated, markedUrgent };
+}
+
 function availableKg(lot: ShipmentLot): number {
   if (lot.status !== 'available' && lot.status !== 'reserved') {
     return 0;
@@ -1488,6 +1553,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       createdAtTick: world.tick,
       expiresAtTick: world.tick + life,
       payUsd,
+      basePayUsd: payUsd,
       urgency: urgent ? 'urgent' : 'normal',
       reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${size === 'small' ? ' · LTL' : ''}`,
       status: 'available',
@@ -1729,6 +1795,7 @@ export function tickEconomy(
 
   applyProductionConsumption(world, rng);
   expireLots(world);
+  escalateIdleLots(world);
   maybeSpawnEvents(world, rng);
   formLotsFromImbalances(world, rng);
   tickNpcFreighters(world, rng, { batchNowMs });
@@ -1880,6 +1947,9 @@ export function listMarketLots(
     const commodity = getCommodity(lot.commodityId);
     const claim = npcClaimForLot(world, lot.id, nowMs);
     const pressure = describeLotMarketPressure(world, lot, nowMs);
+    const idlePayMult = idleLotPayMult(lot, world.tick);
+    pressure.idlePayMult = idlePayMult;
+    pressure.idleEscalated = idlePayMult > 1.02;
 
     views.push({
       lot,

@@ -371,7 +371,8 @@ th {
   border-top: 0;
 }
 
-.filter-row select {
+.filter-row select,
+.filter-row .route-filter {
   width: 100%;
   min-width: 6.5rem;
   padding: 0.38rem 0.45rem;
@@ -383,6 +384,11 @@ th {
   font-size: 0.76rem;
   letter-spacing: normal;
   text-transform: none;
+}
+
+.filter-row .route-filter {
+  min-width: 8rem;
+  box-sizing: border-box;
 }
 
 .clear-filters {
@@ -1206,6 +1212,12 @@ small {
 .tag.saturated {
   background: rgba(90, 100, 140, 0.14);
   color: #3d4668;
+  margin-left: 0.35rem;
+}
+
+.tag.idle {
+  background: rgba(176, 137, 0, 0.16);
+  color: #7a5f00;
   margin-left: 0.35rem;
 }
 

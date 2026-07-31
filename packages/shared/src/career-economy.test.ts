@@ -7,8 +7,11 @@ import {
   DEAD_LOT_RETENTION_TICKS,
   ensureCareerHubCoverage,
   ensureEconomyCaughtUp,
+  escalateIdleLots,
   hubTierOf,
   HUB_TIER_PROFILE,
+  idleLotPayMult,
+  IDLE_LOT_PAY_MAX_MULT,
   laneLotCaps,
   listMarketLots,
   localPriceMultiplier,
@@ -20,7 +23,7 @@ import {
   routeDistanceNm,
   tickEconomyN,
 } from './career-economy.js';
-import type { CareerEconomyWorld, CommodityId, NpcFlight } from './types/career-economy.js';
+import type { CareerEconomyWorld, CommodityId, NpcFlight, ShipmentLot } from './types/career-economy.js';
 
 describe('career-economy seed', () => {
   it('creates 28 Brazilian hubs across N/NE/CO/SE/S and 5 commodities of inventory', () => {
@@ -141,6 +144,64 @@ describe('cargo corridors', () => {
       ),
       'expected at least one strong-corridor lot (e.g. GRU↔Manaus class)',
     );
+  });
+});
+
+describe('idle lot escalation', () => {
+  function makeIdleLot(overrides: Partial<ShipmentLot> = {}): ShipmentLot {
+    return {
+      id: 'lot_idle',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 5_000,
+      reservedKg: 0,
+      createdAtTick: 0,
+      expiresAtTick: 20,
+      payUsd: 1_000,
+      basePayUsd: 1_000,
+      urgency: 'normal',
+      reason: 'test idle lot',
+      status: 'available',
+      ...overrides,
+    };
+  }
+
+  it('holds formation pay for the first quarter of lot life', () => {
+    const lot = makeIdleLot();
+    assert.equal(idleLotPayMult(lot, 0), 1);
+    assert.equal(idleLotPayMult(lot, 5), 1);
+  });
+
+  it('ramps pay toward the max multiplier by expiry', () => {
+    const lot = makeIdleLot();
+    assert.ok(idleLotPayMult(lot, 12) > 1);
+    assert.equal(idleLotPayMult(lot, 20), IDLE_LOT_PAY_MAX_MULT);
+    const world = createSeedEconomyWorld({ seed: 'idle-ramp' });
+    world.npcs = [];
+    world.npcFlights = [];
+    world.lots = [makeIdleLot()];
+    world.tick = 20;
+    escalateIdleLots(world);
+    assert.equal(world.lots[0]!.payUsd, Math.round(1_000 * IDLE_LOT_PAY_MAX_MULT));
+    assert.equal(world.lots[0]!.urgency, 'urgent');
+  });
+
+  it('stamps basePayUsd on legacy lots and escalates from it on ticks', () => {
+    const world = createSeedEconomyWorld({ seed: 'idle-legacy' });
+    world.npcs = [];
+    world.npcFlights = [];
+    world.lots = [makeIdleLot({ basePayUsd: undefined, payUsd: 800 })];
+    world.tick = 0;
+    world.lastBatchAtMs = 1;
+    tickEconomyN(world, 12, { fromBatchAtMs: 1 });
+    const lot = world.lots.find((l) => l.id === 'lot_idle');
+    assert.ok(lot);
+    assert.equal(lot.basePayUsd, 800);
+    assert.ok(lot.payUsd > 800, `expected escalated pay, got ${lot.payUsd}`);
+    const row = listMarketLots(world).find((r) => r.lot.id === 'lot_idle');
+    assert.ok(row?.pressure?.idleEscalated);
+    assert.ok((row?.pressure?.idlePayMult ?? 1) > 1);
   });
 });
 

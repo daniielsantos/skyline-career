@@ -786,6 +786,7 @@ export function App() {
   const [watch, setWatch] = useState<WatchStatus | null>(null);
   const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
   const [marketPage, setMarketPage] = useState(1);
+  const [routeFilter, setRouteFilter] = useState('');
   const [distanceMaxNm, setDistanceMaxNm] = useState('');
   const [cargoFilter, setCargoFilter] = useState('');
   const [loadMaxKg, setLoadMaxKg] = useState('');
@@ -2463,7 +2464,19 @@ export function App() {
     const maxLoad = Number(loadMaxKg);
     const maxExpiry = Number(expiresWithinHours);
     const minPay = Number(minimumPayUsd);
+    const routeTokens = routeFilter
+      .trim()
+      .toLowerCase()
+      .split(/[\s,/>\-→]+/)
+      .filter(Boolean);
     return lots.filter((lot) => {
+      if (routeTokens.length > 0) {
+        const blob =
+          `${lot.originIcao} ${lot.destIcao} ${lot.originName ?? ''} ${lot.destName ?? ''}`.toLowerCase();
+        if (!routeTokens.every((token) => blob.includes(token))) {
+          return false;
+        }
+      }
       if (
         distanceMaxNm &&
         (lot.distanceNm === undefined || lot.distanceNm > maxDistance)
@@ -2489,6 +2502,7 @@ export function App() {
     loadMaxKg,
     lots,
     minimumPayUsd,
+    routeFilter,
   ]);
   const marketPageCount = Math.max(
     1,
@@ -2530,7 +2544,8 @@ export function App() {
     safeMarketPage * MARKET_PAGE_SIZE,
   );
   const hasMarketFilters = Boolean(
-    distanceMaxNm ||
+    routeFilter.trim() ||
+      distanceMaxNm ||
       cargoFilter ||
       loadMaxKg ||
       expiresWithinHours ||
@@ -2543,6 +2558,7 @@ export function App() {
   }
 
   function clearMarketFilters() {
+    setRouteFilter('');
     setDistanceMaxNm('');
     setCargoFilter('');
     setLoadMaxKg('');
@@ -3320,17 +3336,16 @@ export function App() {
                 </tr>
                 <tr className="filter-row">
                   <th>
-                    {hasMarketFilters ? (
-                      <button
-                        type="button"
-                        className="clear-filters"
-                        onClick={clearMarketFilters}
-                      >
-                        Clear
-                      </button>
-                    ) : (
-                      <span>Filters</span>
-                    )}
+                    <input
+                      type="search"
+                      className="route-filter"
+                      aria-label="Filter route by ICAO or city"
+                      placeholder="ICAO / city"
+                      value={routeFilter}
+                      onChange={(e) =>
+                        updateMarketFilter(setRouteFilter, e.target.value)
+                      }
+                    />
                   </th>
                   <th>
                     <select
@@ -3409,7 +3424,19 @@ export function App() {
                       <option value="25000">≥ $25,000</option>
                     </select>
                   </th>
-                  <th />
+                  <th>
+                    {hasMarketFilters ? (
+                      <button
+                        type="button"
+                        className="clear-filters"
+                        onClick={clearMarketFilters}
+                      >
+                        Clear
+                      </button>
+                    ) : (
+                      <span className="muted">Filters</span>
+                    )}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -3444,6 +3471,14 @@ export function App() {
                             title={`Simulated ${lot.pressure.weather} weather on this lane — richer / shorter-lived freights`}
                           >
                             {lot.pressure.weather}
+                          </span>
+                        ) : null}
+                        {lot.pressure?.idleEscalated ? (
+                          <span
+                            className="tag idle"
+                            title={`Freight has sat on the board — pay is up ${Math.round(((lot.pressure.idlePayMult || 1) - 1) * 100)}% vs formation`}
+                          >
+                            Idle +{Math.round(((lot.pressure.idlePayMult || 1) - 1) * 100)}%
                           </span>
                         ) : null}
                       </div>

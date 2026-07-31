@@ -258,6 +258,10 @@ export type LotMarketPressure = {
   laneBusy: boolean;
   /** Worse of origin/dest regional weather for this lane. */
   weather: RegionalWeather;
+  /** True when idle age has raised freight above formation pay. */
+  idleEscalated?: boolean;
+  /** Current idle pay multiplier (>= 1). */
+  idlePayMult?: number;
 };
 
 export type RegionMarketPressure = {

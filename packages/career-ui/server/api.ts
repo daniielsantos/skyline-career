@@ -845,6 +845,8 @@ export function createCareerApiServer(port = 8787) {
                   thinFleet: row.pressure.thinFleet,
                   laneBusy: row.pressure.laneBusy,
                   weather: row.pressure.weather,
+                  idleEscalated: row.pressure.idleEscalated ?? false,
+                  idlePayMult: row.pressure.idlePayMult ?? 1,
                 }
               : null,
             npcClaim: row.npcClaim

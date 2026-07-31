@@ -98,8 +98,13 @@ export interface ShipmentLot {
   createdAtTick: number;
   /** Soft expiry; perishables expire sooner. */
   expiresAtTick: number;
-  /** Freight pay USD for the full lot (before urgency multipliers already baked in). */
+  /** Freight pay USD for the full lot (idle escalation may raise this). */
   payUsd: number;
+  /**
+   * Pay at formation. Idle escalation multiplies from this so re-ticks stay
+   * deterministic. Missing on legacy lots — first escalate stamps current pay.
+   */
+  basePayUsd?: number;
   urgency: 'normal' | 'urgent';
   /** Short economic reason (surplus → shortage). */
   reason: string;
@@ -314,6 +319,10 @@ export interface MarketLotView {
     thinFleet: boolean;
     laneBusy: boolean;
     weather?: 'fair' | 'marginal' | 'poor';
+    /** True when idle age has raised freight above formation pay. */
+    idleEscalated?: boolean;
+    /** Current idle pay multiplier (>= 1). */
+    idlePayMult?: number;
   };
 }
 

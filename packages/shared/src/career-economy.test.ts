@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   continuousEconomyHours,
+  corridorWeight,
   createSeedEconomyWorld,
   DEAD_LOT_RETENTION_TICKS,
+  ensureCareerHubCoverage,
   ensureEconomyCaughtUp,
   hubTierOf,
   HUB_TIER_PROFILE,
@@ -21,20 +23,20 @@ import {
 import type { CareerEconomyWorld, CommodityId, NpcFlight } from './types/career-economy.js';
 
 describe('career-economy seed', () => {
-  it('creates 20 Brazilian hubs and 5 commodities of inventory', () => {
+  it('creates 28 Brazilian hubs across N/NE/CO/SE/S and 5 commodities of inventory', () => {
     const world = createSeedEconomyWorld({ seed: 'test-a' });
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 20);
+    assert.equal(world.airports.length, 28);
     assert.ok(world.airports.every((airport) => airport.icao.startsWith('SB')));
     assert.deepEqual(
       new Set(world.airports.map((airport) => airport.region)),
-      new Set(['BR-S', 'BR-SE', 'BR-NE']),
+      new Set(['BR-S', 'BR-SE', 'BR-NE', 'BR-N', 'BR-CO']),
     );
     assert.equal(world.tick, 0);
     assert.equal(world.lots.length, 0);
-    assert.equal(world.npcs.length, 15);
+    assert.equal(world.npcs.length, 17);
     assert.equal(world.npcFlights.length, 0);
     for (const ap of world.airports) {
       assert.ok(ap.inventory.electronics);
@@ -53,8 +55,10 @@ describe('career-economy seed', () => {
   it('scales major cargo hubs larger than spokes', () => {
     const world = createSeedEconomyWorld({ seed: 'tier-scale' });
     const gru = world.airports.find((a) => a.icao === 'SBGR')!;
+    const manaus = world.airports.find((a) => a.icao === 'SBEG')!;
     const ps = world.airports.find((a) => a.icao === 'SBPS')!;
     assert.equal(hubTierOf(gru), 'major');
+    assert.equal(hubTierOf(manaus), 'major');
     assert.equal(hubTierOf(ps), 'spoke');
     assert.ok(
       (gru.inventory.general?.capacityKg ?? 0) >
@@ -90,6 +94,53 @@ describe('routeDistanceNm', () => {
     const distance = routeDistanceNm(world, 'SBGR', 'SBGL');
     assert.ok(distance !== undefined);
     assert.ok(distance > 150 && distance < 250, `got ${distance} nm`);
+  });
+
+  it('resolves long-haul GRU–Manaus distance', () => {
+    const world = createSeedEconomyWorld({ seed: 'distance-manaus' });
+    const distance = routeDistanceNm(world, 'SBGR', 'SBEG');
+    assert.ok(distance !== undefined);
+    assert.ok(distance > 1_200 && distance < 1_600, `got ${distance} nm`);
+  });
+});
+
+describe('cargo corridors', () => {
+  it('weights historic GRU↔Manaus as a strong domestic axis', () => {
+    assert.ok(corridorWeight('SBGR', 'SBEG') >= 2.2);
+    assert.equal(corridorWeight('SBGR', 'SBEG'), corridorWeight('SBEG', 'SBGR'));
+    assert.equal(corridorWeight('SBGR', 'SBPS'), 1);
+  });
+
+  it('biases lot formation toward curated corridor ODs', () => {
+    const world = createSeedEconomyWorld({ seed: 'corridor-market' });
+    // Count formation shape without NPC skim (competitors prefer corridor pay).
+    world.npcs = [];
+    world.npcFlights = [];
+    tickEconomyN(world, 48);
+    let onCorridor = 0;
+    let offCorridor = 0;
+    for (const lot of world.lots) {
+      if (lot.status === 'expired' || lot.status === 'delivered') continue;
+      if (corridorWeight(lot.originIcao, lot.destIcao) > 1) {
+        onCorridor += 1;
+      } else {
+        offCorridor += 1;
+      }
+    }
+    assert.ok(onCorridor + offCorridor > 0, 'expected formed lots');
+    assert.ok(
+      onCorridor > offCorridor,
+      `expected corridor-heavy formation (on=${onCorridor}, off=${offCorridor})`,
+    );
+    assert.ok(
+      world.lots.some(
+        (lot) =>
+          lot.status !== 'expired' &&
+          lot.status !== 'delivered' &&
+          corridorWeight(lot.originIcao, lot.destIcao) >= 2,
+      ),
+      'expected at least one strong-corridor lot (e.g. GRU↔Manaus class)',
+    );
   });
 });
 
@@ -194,6 +245,8 @@ describe('tickEconomyN market formation', () => {
           npc.restUntilMs = undefined;
         }
       }
+      // Free lane caps so the probe tick can form comparable SE-origin lots.
+      world.lots = world.lots.filter((l) => l.status !== 'available');
       const beforeTick = world.tick;
       tickEconomyN(world, 1, { fromBatchAtMs: nowMs });
       const originIcaos = new Set(
@@ -448,6 +501,30 @@ describe('tickEconomyN market formation', () => {
 });
 
 describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
+  it('adds missing BR-N / BR-CO hubs to a truncated legacy airport list', () => {
+    const full = createSeedEconomyWorld({ seed: 'hub-coverage' });
+    const truncated = {
+      version: 3 as const,
+      seed: 'hub-coverage',
+      tick: 5,
+      lastBatchAtMs: full.lastBatchAtMs,
+      airports: full.airports.filter(
+        (a) => a.region === 'BR-SE' || a.region === 'BR-S' || a.region === 'BR-NE',
+      ),
+      lots: [],
+      events: [],
+      npcs: full.npcs,
+      npcFlights: [],
+    };
+    assert.equal(truncated.airports.length, 20);
+    const migrated = migrateEconomyWorld(truncated);
+    assert.equal(migrated.airports.length, 28);
+    assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
+    const again = createSeedEconomyWorld({ seed: 'hub-coverage-idem' });
+    assert.equal(ensureCareerHubCoverage(again), false);
+  });
+
   it('migrates v1 without retroactive catch-up', () => {
     const v1 = {
       version: 1 as const,

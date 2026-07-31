@@ -39,7 +39,7 @@ export function economyDayIndex(tick: number): number {
 
 /**
  * Deterministic regional weather for a sim-day.
- * Mild seasonal bias: NE more often fair in "summer" wave, S/SE slightly worse in winter wave.
+ * Mild seasonal bias: NE/N more often fair; S/SE slightly worse in winter wave; CO in between.
  */
 export function regionalWeatherIndex(
   world: Pick<CareerEconomyWorld, 'seed' | 'tick'>,
@@ -53,12 +53,17 @@ export function regionalWeatherIndex(
   const season = Math.sin((2 * Math.PI * (tick / 24)) / 365);
   let fairCut = 0.55;
   let poorCut = 0.88;
-  if (region === 'BR-NE') {
+  if (region === 'BR-NE' || region === 'BR-N') {
+    // Tropical / equatorial: more often fair; mild wet-season wave.
     fairCut += season * 0.08;
     poorCut += season * 0.04;
   } else if (region === 'BR-S' || region === 'BR-SE') {
     fairCut -= season * 0.06;
     poorCut -= season * 0.05;
+  } else if (region === 'BR-CO') {
+    // Center-West: dry winters / wet summers — between SE and NE.
+    fairCut += season * 0.04;
+    poorCut -= season * 0.03;
   }
   fairCut = Math.min(0.72, Math.max(0.4, fairCut));
   poorCut = Math.min(0.95, Math.max(fairCut + 0.12, poorCut));

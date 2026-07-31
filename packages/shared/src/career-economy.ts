@@ -141,6 +141,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   SBGR: 'major',
   SBKP: 'major',
   SBGL: 'major',
+  SBEG: 'major',
   SBCF: 'regional',
   SBCT: 'regional',
   SBPA: 'regional',
@@ -148,6 +149,9 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   SBRF: 'regional',
   SBFZ: 'regional',
   SBVT: 'regional',
+  SBBR: 'regional',
+  SBBE: 'regional',
+  SBGO: 'regional',
   SBRP: 'spoke',
   SBFL: 'spoke',
   SBNF: 'spoke',
@@ -158,6 +162,10 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   SBMO: 'spoke',
   SBJP: 'spoke',
   SBPS: 'spoke',
+  SBCY: 'spoke',
+  SBCG: 'spoke',
+  SBPV: 'spoke',
+  SBMQ: 'spoke',
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -178,6 +186,122 @@ export function laneLotCaps(
     maxLarge: Math.min(origin.maxLarge, dest.maxLarge),
     maxSmall: Math.min(origin.maxSmall, dest.maxSmall),
   };
+}
+
+/**
+ * Curated domestic cargo corridors on the Brazil career map (bidirectional).
+ * Weights > 1 favor formation + a mild pay bump. Calibrated offline from
+ * domestic TECA/hub roles: GRU/VCP/Manaus anchors, BSB redistributor, spoke feeders.
+ */
+export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
+  a: string;
+  b: string;
+  weight: number;
+}> = [
+  // SE trunk
+  { a: 'SBGR', b: 'SBGL', weight: 2.2 },
+  { a: 'SBGR', b: 'SBKP', weight: 1.8 },
+  { a: 'SBKP', b: 'SBGL', weight: 1.6 },
+  { a: 'SBGR', b: 'SBCF', weight: 1.7 },
+  { a: 'SBKP', b: 'SBCF', weight: 1.5 },
+  // Historic domestic cargo: SE ↔ Manaus
+  { a: 'SBGR', b: 'SBEG', weight: 2.4 },
+  { a: 'SBKP', b: 'SBEG', weight: 2.0 },
+  { a: 'SBGL', b: 'SBEG', weight: 1.7 },
+  // Brasília redistributor
+  { a: 'SBGR', b: 'SBBR', weight: 1.9 },
+  { a: 'SBKP', b: 'SBBR', weight: 1.7 },
+  { a: 'SBGL', b: 'SBBR', weight: 1.5 },
+  { a: 'SBBR', b: 'SBEG', weight: 1.6 },
+  { a: 'SBBR', b: 'SBRF', weight: 1.5 },
+  { a: 'SBBR', b: 'SBPA', weight: 1.4 },
+  { a: 'SBBR', b: 'SBGO', weight: 1.7 },
+  { a: 'SBBR', b: 'SBCY', weight: 1.4 },
+  { a: 'SBBR', b: 'SBCG', weight: 1.3 },
+  // SE → South
+  { a: 'SBGR', b: 'SBPA', weight: 2.0 },
+  { a: 'SBGR', b: 'SBCT', weight: 1.8 },
+  { a: 'SBKP', b: 'SBPA', weight: 1.7 },
+  { a: 'SBKP', b: 'SBCT', weight: 1.6 },
+  { a: 'SBGL', b: 'SBPA', weight: 1.4 },
+  // SE → NE
+  { a: 'SBGR', b: 'SBRF', weight: 2.1 },
+  { a: 'SBGR', b: 'SBFZ', weight: 1.9 },
+  { a: 'SBGR', b: 'SBSV', weight: 1.8 },
+  { a: 'SBKP', b: 'SBRF', weight: 1.7 },
+  { a: 'SBKP', b: 'SBFZ', weight: 1.5 },
+  { a: 'SBGL', b: 'SBRF', weight: 1.5 },
+  // North internal + Belém links
+  { a: 'SBEG', b: 'SBBE', weight: 1.6 },
+  { a: 'SBEG', b: 'SBPV', weight: 1.4 },
+  { a: 'SBEG', b: 'SBMQ', weight: 1.3 },
+  { a: 'SBBE', b: 'SBGR', weight: 1.6 },
+  { a: 'SBBE', b: 'SBRF', weight: 1.4 },
+  // Center-West feeders
+  { a: 'SBGO', b: 'SBGR', weight: 1.6 },
+  { a: 'SBGO', b: 'SBKP', weight: 1.4 },
+  { a: 'SBCY', b: 'SBGR', weight: 1.4 },
+  { a: 'SBCG', b: 'SBGR', weight: 1.4 },
+  { a: 'SBCG', b: 'SBPA', weight: 1.3 },
+  // South / NE regional trunks
+  { a: 'SBPA', b: 'SBCT', weight: 1.5 },
+  { a: 'SBCT', b: 'SBFL', weight: 1.4 },
+  { a: 'SBPA', b: 'SBNF', weight: 1.3 },
+  { a: 'SBRF', b: 'SBFZ', weight: 1.5 },
+  { a: 'SBRF', b: 'SBSV', weight: 1.5 },
+  { a: 'SBSV', b: 'SBFZ', weight: 1.3 },
+  // Spoke feeders (SE/S/NE)
+  { a: 'SBVT', b: 'SBGR', weight: 1.5 },
+  { a: 'SBVT', b: 'SBGL', weight: 1.4 },
+  { a: 'SBRP', b: 'SBKP', weight: 1.5 },
+  { a: 'SBRP', b: 'SBGR', weight: 1.4 },
+  { a: 'SBLO', b: 'SBCT', weight: 1.4 },
+  { a: 'SBLO', b: 'SBKP', weight: 1.3 },
+  { a: 'SBJV', b: 'SBCT', weight: 1.4 },
+  { a: 'SBFL', b: 'SBPA', weight: 1.3 },
+  { a: 'SBPS', b: 'SBSV', weight: 1.4 },
+  { a: 'SBAR', b: 'SBSV', weight: 1.3 },
+  { a: 'SBMO', b: 'SBRF', weight: 1.4 },
+  { a: 'SBJP', b: 'SBRF', weight: 1.4 },
+  { a: 'SBSG', b: 'SBRF', weight: 1.3 },
+  { a: 'SBSG', b: 'SBFZ', weight: 1.3 },
+];
+
+const CORRIDOR_WEIGHT_BY_OD: ReadonlyMap<string, number> = (() => {
+  const map = new Map<string, number>();
+  for (const { a, b, weight } of CAREER_CARGO_CORRIDORS) {
+    const left = a.toUpperCase();
+    const right = b.toUpperCase();
+    map.set(`${left}:${right}`, weight);
+    map.set(`${right}:${left}`, weight);
+  }
+  return map;
+})();
+
+const CORRIDOR_PARTNERS_BY_ICAO: ReadonlyMap<string, readonly string[]> = (() => {
+  const map = new Map<string, string[]>();
+  for (const { a, b } of CAREER_CARGO_CORRIDORS) {
+    const left = a.toUpperCase();
+    const right = b.toUpperCase();
+    if (!map.has(left)) map.set(left, []);
+    if (!map.has(right)) map.set(right, []);
+    map.get(left)!.push(right);
+    map.get(right)!.push(left);
+  }
+  return map;
+})();
+
+/** 1 = off-corridor; >1 = curated domestic cargo axis. */
+export function corridorWeight(originIcao: string, destIcao: string): number {
+  return (
+    CORRIDOR_WEIGHT_BY_OD.get(
+      `${originIcao.toUpperCase()}:${destIcao.toUpperCase()}`,
+    ) ?? 1
+  );
+}
+
+export function corridorPartners(icao: string): readonly string[] {
+  return CORRIDOR_PARTNERS_BY_ICAO.get(icao.toUpperCase()) ?? [];
 }
 
 export const CAREER_COMMODITIES: readonly CommodityDef[] = [
@@ -225,6 +349,8 @@ export const FUEL_HUB_ICAOS = new Set([
   'SBRF',
   'SBCT',
   'SBSV',
+  'SBEG',
+  'SBBR',
 ]);
 
 /** Seed or repair fuel inventory + baseline flows on a terminal. */
@@ -337,6 +463,16 @@ export const CAREER_HUB_COORDS: Readonly<
   SBMO: { lat: -9.5108, lon: -35.7917, name: 'Maceió' },
   SBJP: { lat: -7.1484, lon: -34.9507, name: 'João Pessoa' },
   SBPS: { lat: -16.4386, lon: -39.0809, name: 'Porto Seguro' },
+  // North
+  SBEG: { lat: -3.0386, lon: -60.0497, name: 'Manaus' },
+  SBBE: { lat: -1.3792, lon: -48.4761, name: 'Belém' },
+  SBPV: { lat: -8.7093, lon: -63.9023, name: 'Porto Velho' },
+  SBMQ: { lat: 0.0506, lon: -51.0722, name: 'Macapá' },
+  // Center-West
+  SBBR: { lat: -15.8692, lon: -47.9208, name: 'Brasília' },
+  SBGO: { lat: -16.632, lon: -49.2207, name: 'Goiânia' },
+  SBCY: { lat: -15.6529, lon: -56.1167, name: 'Cuiabá' },
+  SBCG: { lat: -20.4687, lon: -54.6725, name: 'Campo Grande' },
 };
 
 export function resolveAirportCoords(
@@ -460,7 +596,7 @@ function ensurePile(
 }
 
 /**
- * Seed a Brazil-first cargo world: South, Southeast and Northeast hubs,
+ * Seed a Brazil-wide cargo world: N / NE / CO / SE / S hubs,
  * with asymmetric production/consumption so ticks create explainable lanes.
  */
 export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEconomyWorld {
@@ -637,6 +773,72 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       produce: { perishables: 1.1, general: 0.7 },
       consume: { electronics: 0.8, machinery: 0.7 },
     },
+    // North — Manaus is the domestic cargo anchor
+    {
+      icao: 'SBEG',
+      name: 'Manaus',
+      region: 'BR-N',
+      hubTier: 'major',
+      produce: { electronics: 1.9, machinery: 1.1, general: 0.9 },
+      consume: { perishables: 1.3, general: 1.1 },
+    },
+    {
+      icao: 'SBBE',
+      name: 'Belém',
+      region: 'BR-N',
+      hubTier: 'regional',
+      produce: { perishables: 1.4, general: 1.1 },
+      consume: { electronics: 0.9, machinery: 0.8 },
+    },
+    {
+      icao: 'SBPV',
+      name: 'Porto Velho',
+      region: 'BR-N',
+      hubTier: 'spoke',
+      produce: { general: 1.1, perishables: 1.0 },
+      consume: { electronics: 0.8, machinery: 0.9 },
+    },
+    {
+      icao: 'SBMQ',
+      name: 'Macapá',
+      region: 'BR-N',
+      hubTier: 'spoke',
+      produce: { perishables: 1.1, general: 0.9 },
+      consume: { electronics: 0.8, machinery: 0.7 },
+    },
+    // Center-West — Brasília redistributes
+    {
+      icao: 'SBBR',
+      name: 'Brasília',
+      region: 'BR-CO',
+      hubTier: 'regional',
+      produce: { general: 1.2, electronics: 0.9 },
+      consume: { perishables: 1.2, machinery: 1.0, electronics: 1.0 },
+    },
+    {
+      icao: 'SBGO',
+      name: 'Goiânia',
+      region: 'BR-CO',
+      hubTier: 'regional',
+      produce: { perishables: 1.3, machinery: 1.0 },
+      consume: { electronics: 0.9, general: 1.0 },
+    },
+    {
+      icao: 'SBCY',
+      name: 'Cuiabá',
+      region: 'BR-CO',
+      hubTier: 'spoke',
+      produce: { perishables: 1.4, general: 1.0 },
+      consume: { electronics: 0.8, machinery: 0.9 },
+    },
+    {
+      icao: 'SBCG',
+      name: 'Campo Grande',
+      region: 'BR-CO',
+      hubTier: 'spoke',
+      produce: { perishables: 1.2, machinery: 0.9 },
+      consume: { electronics: 0.8, general: 0.9 },
+    },
   ];
 
   const airports: AirportTerminal[] = hubs.map((h) => {
@@ -784,6 +986,24 @@ function migrateNpcTimestamps(
 }
 
 /**
+ * Merge airports present in the current Brazil seed that are missing from a
+ * legacy save (e.g. BR-N / BR-CO expansion). Returns true when any hub was added.
+ */
+export function ensureCareerHubCoverage(world: CareerEconomyWorld): boolean {
+  const have = new Set(world.airports.map((a) => a.icao.toUpperCase()));
+  const fresh = createSeedEconomyWorld({ seed: world.seed });
+  let added = false;
+  for (const ap of fresh.airports) {
+    const icao = ap.icao.toUpperCase();
+    if (have.has(icao)) continue;
+    world.airports.push(JSON.parse(JSON.stringify(ap)) as AirportTerminal);
+    have.add(icao);
+    added = true;
+  }
+  return added;
+}
+
+/**
  * Migrate legacy saves into the hybrid live-economy schema (v3).
  * Does not catch up wall-clock time — caller should set/keep lastBatchAtMs.
  */
@@ -843,6 +1063,7 @@ export function migrateEconomyWorld(
       : [],
   };
 
+  ensureCareerHubCoverage(migrated);
   ensureNpcFleet(migrated);
   migrateNpcTimestamps(migrated, Number.isFinite(version) ? version : 0);
   ensureWorldFuelInventory(migrated);
@@ -1209,6 +1430,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     size: 'large' | 'small',
     laneSaturation: number,
     inboundKg: number,
+    corridorW: number,
   ): void => {
     const originWx = regionalWeatherIndex(world, origin.ap.region);
     const destWx = regionalWeatherIndex(world, dest.ap.region);
@@ -1223,8 +1445,8 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       laneSaturation >= 0.5 ||
       (laneWeather === 'poor' && dest.fill < 0.35);
     const urgencyMult = urgent ? 1.35 : 1;
-    const distanceBias =
-      origin.ap.region.split('-')[0] === dest.ap.region.split('-')[0] ? 1 : 1.15;
+    const distanceBias = origin.ap.region === dest.ap.region ? 1 : 1.12;
+    const corridorPayMult = 1 + Math.max(0, corridorW - 1) * 0.1;
     const destPile = ensurePile(dest.ap, commodity.id);
     const gap =
       localUnitPriceUsd(commodity.id, destPile) - localUnitPriceUsd(commodity.id, origin.stock);
@@ -1243,7 +1465,8 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         distanceBias *
         capacityPayMult *
         scarcePayMult *
-        weatherPayMult,
+        weatherPayMult *
+        corridorPayMult,
       commodity.basePricePerKg * 1.8,
     );
     const payUsd = Math.round(qty * payPerKg);
@@ -1299,19 +1522,97 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     const destinations = ranked
       .filter((r) => r.fill <= 0.45 && r.roomKg >= 400)
       .sort((a, b) => b.roomKg - a.roomKg)
-      .slice(0, 10);
+      .slice(0, 12);
     const origins = ranked
       .filter((r) => r.fill >= 0.55 && r.surplusKg >= 400)
       .sort((a, b) => b.surplusKg - a.surplusKg)
-      .slice(0, 10);
+      .slice(0, 12);
+
+    // Ensure curated corridor partners stay eligible even when outside the top-12.
+    const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
+    const mergeUnique = (
+      list: typeof destinations,
+      candidate: (typeof ranked)[number] | undefined,
+    ) => {
+      if (!candidate) return;
+      if (list.some((r) => r.ap.icao === candidate.ap.icao)) return;
+      list.push(candidate);
+    };
+    for (const origin of [...origins]) {
+      for (const partner of corridorPartners(origin.ap.icao)) {
+        const row = byIcao.get(partner);
+        if (row && row.fill <= 0.45 && row.roomKg >= 400) {
+          mergeUnique(destinations, row);
+        }
+      }
+    }
+    for (const dest of [...destinations]) {
+      for (const partner of corridorPartners(dest.ap.icao)) {
+        const row = byIcao.get(partner);
+        if (row && row.fill >= 0.55 && row.surplusKg >= 400) {
+          mergeUnique(origins, row);
+        }
+      }
+    }
+
+    const laneOpen = (
+      o: (typeof ranked)[number],
+      d: (typeof ranked)[number],
+      weight: number,
+    ): boolean => {
+      let caps = laneLotCaps(o.tier, d.tier);
+      if (weight >= 1.8) {
+        caps = {
+          maxLots: caps.maxLots + 1,
+          maxLarge: caps.maxLarge + 1,
+          maxSmall: caps.maxSmall,
+        };
+      }
+      const key = laneKey(commodity.id, o.ap.icao, d.ap.icao);
+      const laneSat = npcLaneSaturation(world, o.ap.icao, d.ap.icao, commodity.id);
+      if (laneSat >= 1) return false;
+      const satPenalty = laneSat >= 0.5 ? 1 : 0;
+      return (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots;
+    };
+
+    const originHasOpenCorridor = (o: (typeof ranked)[number]): boolean => {
+      for (const partnerIcao of corridorPartners(o.ap.icao)) {
+        const partner = byIcao.get(partnerIcao);
+        if (!partner || partner.fill > 0.45 || partner.roomKg < 400) continue;
+        const w = corridorWeight(o.ap.icao, partner.ap.icao);
+        if (laneOpen(o, partner, w)) return true;
+      }
+      return false;
+    };
 
     for (const origin of origins) {
-      for (const dest of destinations) {
+      const orderedDests = [...destinations].sort((a, b) => {
+        const wa = corridorWeight(origin.ap.icao, a.ap.icao);
+        const wb = corridorWeight(origin.ap.icao, b.ap.icao);
+        return wb - wa;
+      });
+      for (const dest of orderedDests) {
         if (origin.ap.icao === dest.ap.icao) {
           continue;
         }
+        const cw = corridorWeight(origin.ap.icao, dest.ap.icao);
+        // Curated corridors first. Off-table pairs only as rare spoke↔spoke fillers
+        // once this origin's corridor lanes are full (or have no qualifying partner).
+        if (cw <= 1) {
+          const spokeFiller =
+            origin.tier === 'spoke' && dest.tier === 'spoke';
+          if (!spokeFiller) continue;
+          if (originHasOpenCorridor(origin) || rng() > 0.2) continue;
+        }
         const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
-        const caps = laneLotCaps(origin.tier, dest.tier);
+        let caps = laneLotCaps(origin.tier, dest.tier);
+        if (cw >= 1.8) {
+          caps = {
+            maxLots: caps.maxLots + 1,
+            maxLarge: caps.maxLarge + 1,
+            maxSmall: caps.maxSmall,
+          };
+        }
         const laneSat = npcLaneSaturation(
           world,
           origin.ap.icao,
@@ -1327,7 +1628,8 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         }
 
         const priceGap = dest.price - origin.price;
-        if (priceGap < commodity.basePricePerKg * 0.2) {
+        const minGapMult = cw >= 1.5 ? 0.15 : 0.22;
+        if (priceGap < commodity.basePricePerKg * minGapMult) {
           continue;
         }
 
@@ -1360,6 +1662,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
             'large',
             laneSat,
             inboundKg,
+            cw,
           );
           // Refresh remaining after soft-commit for optional LTL companion.
           const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
@@ -1386,6 +1689,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
             'small',
             laneSat,
             inboundKg,
+            cw,
           );
         }
       }

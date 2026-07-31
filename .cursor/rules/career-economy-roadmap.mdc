@@ -17,13 +17,15 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Lot prune: `pruneDeadLots` drops `expired`/`delivered` after 12 ticks (tick + migrate/load). Logbook untouched.
 - Player inbound soft-shadow: accept/depart publishes `inboundPending`; soft fill / lane sat = NPC + player.
 - Hub tiers (`major`/`regional`/`spoke`): curated offline from BR cargo roles; capacity/flow scale + lane lot caps; formLots ranks by absolute kg.
+- Brazil map: 28 hubs across BR-N / BR-NE / BR-CO / BR-SE / BR-S (Manaus major, Brasília redistributor).
+- Cargo corridors: curated OD weights bias `formLots` formation + mild pay; legacy saves gain missing hubs via `ensureCareerHubCoverage`.
 
 ## Near-term priorities (current Brazil career)
 
 1. **Polish only if needed** — NPC operational cargo ceiling; crew/maintenance costs; optional real METAR.
-2. Play-test Brazil market after hub tiers; only then consider country partition / Postgres.
+2. Play-test national Brazil market (corridors + hub tiers); only then consider country partition / Postgres.
 
-Do **not** start country partitioning or Postgres until Brazil still feels good after prune + inbound.
+Do **not** start country partitioning or Postgres until Brazil still feels good after prune + inbound + national map.
 
 ## World-scale architecture (future — save this)
 

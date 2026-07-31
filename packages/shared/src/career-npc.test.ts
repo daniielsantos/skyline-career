@@ -32,8 +32,8 @@ describe('NPC freighter fleet', () => {
     const bonanza = world.npcs.filter((n) => n.aircraftClassId === 'light_ga');
     assert.equal(narrow.length, 6);
     assert.equal(wide.length, 4);
-    assert.equal(caravan.length, 3);
-    assert.equal(bonanza.length, 2);
+    assert.equal(caravan.length, 4);
+    assert.equal(bonanza.length, 3);
     assert.ok(world.npcs.every((n) => n.status === 'idle'));
     assert.ok(world.npcs.every((n) => n.reliability > 0 && n.aggressiveness > 0));
   });
@@ -62,11 +62,11 @@ describe('NPC freighter fleet', () => {
     });
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_turboprop').length,
-      3,
+      4,
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_ga').length,
-      2,
+      3,
     );
     assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
   });

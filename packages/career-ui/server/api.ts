@@ -239,6 +239,7 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     const lotsBefore = Array.isArray((existing as { lots?: unknown[] }).lots)
       ? (existing as { lots: unknown[] }).lots.length
       : 0;
+    const airportsBefore = (existing as { airports: unknown[] }).airports.length;
     const missingHubTiers = (existing as { airports: Array<{ hubTier?: string }> }).airports.some(
       (ap) => !ap.hubTier,
     );
@@ -247,12 +248,14 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     const version = (existing as { version?: number }).version;
     const npcCountAfter = caught.npcs?.length ?? 0;
     const lotsAfter = caught.lots?.length ?? 0;
+    const airportsAfter = caught.airports?.length ?? 0;
     if (
       advancedTicks > 0 ||
       settledFlights > 0 ||
       version !== 3 ||
       npcCountAfter !== npcCountBefore ||
       lotsAfter !== lotsBefore ||
+      airportsAfter !== airportsBefore ||
       missingHubTiers
     ) {
       await writeJson(economyPath, caught);

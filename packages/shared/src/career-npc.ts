@@ -27,7 +27,7 @@ import type {
   ShipmentLot,
 } from './types/career-economy.js';
 
-export const NPC_FLEET_SIZE = 15;
+export const NPC_FLEET_SIZE = 17;
 
 /** Target mix: jets for heavy freight + GA for LTL / short-haul competition. */
 export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
@@ -36,8 +36,8 @@ export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
 }> = [
   { aircraftClassId: 'narrow_freighter', count: 6 },
   { aircraftClassId: 'wide_freighter', count: 4 },
-  { aircraftClassId: 'light_turboprop', count: 3 },
-  { aircraftClassId: 'light_ga', count: 2 },
+  { aircraftClassId: 'light_turboprop', count: 4 },
+  { aircraftClassId: 'light_ga', count: 3 },
 ] as const;
 
 /** Must match career-economy MS_PER_TICK (1 tick = 1 real hour). */
@@ -416,7 +416,9 @@ export function seedNpcFleet(opts: {
 }): NpcFreighter[] {
   const rng = mulberry32(hashSeed(`${opts.seed}:npc-fleet`));
   const regions =
-    opts.regions.length > 0 ? [...new Set(opts.regions)] : ['BR-SE', 'BR-S', 'BR-NE'];
+    opts.regions.length > 0
+      ? [...new Set(opts.regions)]
+      : ['BR-SE', 'BR-S', 'BR-NE', 'BR-N', 'BR-CO'];
   const names = [...NPC_NAME_POOL];
   for (let i = names.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -491,7 +493,9 @@ export function topUpNpcFleetComposition(
   regions: string[],
 ): void {
   const regionList =
-    regions.length > 0 ? [...new Set(regions)] : ['BR-SE', 'BR-S', 'BR-NE'];
+    regions.length > 0
+      ? [...new Set(regions)]
+      : ['BR-SE', 'BR-S', 'BR-NE', 'BR-N', 'BR-CO'];
   const rng = mulberry32(hashSeed(`${world.seed}:npc-fleet-topup`));
   const usedNames = new Set(world.npcs.map((n) => n.name));
   let nextIndex = world.npcs.reduce((max, n) => {

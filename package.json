@@ -28,6 +28,7 @@
     "probe-lvars": "node packages/agent/dist/cli.js probe-lvars --preset a2a-aerostar",
     "probe-pmdg-fuel": "node packages/agent/dist/cli.js probe-pmdg-fuel",
     "scaffold-ofp-roles": "node packages/agent/dist/cli.js scaffold-ofp-roles",
+    "draft-ofp-roles": "node packages/agent/dist/cli.js draft-ofp-roles",
     "probe-payload-stations": "node packages/agent/dist/cli.js probe-payload-stations",
     "pmdg-cdu": "node packages/agent/dist/cli.js pmdg-cdu",
     "compare-ofp": "node packages/agent/dist/cli.js compare-ofp",

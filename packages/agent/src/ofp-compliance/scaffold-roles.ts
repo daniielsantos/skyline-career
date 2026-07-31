@@ -281,6 +281,38 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'Host snapshot may expose stations 1–14; station 15 still in roles for full cfg',
     ],
   },
+  {
+    id: 'blacksquare-bonanza-professional',
+    icao: 'BE36',
+    titlePattern: /Black Square (A36(?:TC)?|B36TP) Bonanza Professional/i,
+    familyPackRel: 'blacksquare-bonanza-professional.json',
+    stationRoles: {
+      passengerStations: [],
+      // Front/rear pax + aft baggage — career cargo (pax=0).
+      baggageStations: [3, 4, 5, 6, 7],
+      crewStations: [1, 2],
+    },
+    liveSources: CLASSIC_LIGHT_LIVE_SOURCES,
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    simbriefIcao: 'BE36',
+    simbriefAirframeMatch: 'Default',
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'Pilot', role: 'crew' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'Copilot', role: 'crew' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'Front pax left (cargo)', role: 'baggage' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'Front pax right (cargo)', role: 'baggage' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Rear pax left (cargo)', role: 'baggage' },
+      { simVarIndex: 6, cfgIndex: 5, name: 'Rear pax right (cargo)', role: 'baggage' },
+      { simVarIndex: 7, cfgIndex: 6, name: 'Baggage', role: 'baggage' },
+    ],
+    notes: [
+      'Black Square Bonanza Professional family (A36 / A36TC / B36TP)',
+      'Same 7-station layout; fuel capacities differ per variant profile',
+      'liveSources: classic fuel tanks + classic stations/weights',
+      'SimBrief: Default BE36',
+    ],
+  },
 ];
 
 export function slugFromAircraftTitle(title: string): string {

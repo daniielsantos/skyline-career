@@ -39,6 +39,14 @@ Homologation wizard (`homologate`) after choosing load method 2:
 4. Promote example profile; set pack `injectCapable: true`
 5. Career Staging auto-injects only when pack is direct-injection + injectCapable
 
+On promote, the wizard offers to **write/merge** `profiles/ofp/*.json` automatically (or run offline):
+
+```powershell
+npm run draft-ofp-roles -- --profile profiles/examples/YOUR.json --write
+```
+
+Known families (Bonanza, Caravan, …) merge into a shared family pack via `matchTitles`.
+
 Strict CG rollback on inject applies for trusted envelopes; `calibrated-live` is soft.
 
 ---

@@ -46,6 +46,11 @@ import {
   type OfpRolesPackFile,
 } from './ofp-compliance/scaffold-roles.js';
 import {
+  buildRolesPackFromProfile,
+  rolesPackPathForProfile,
+  upsertRolesPackFromProfile,
+} from './ofp-compliance/draft-roles-pack.js';
+import {
   DEFAULT_CAREER_ECONOMY_PATH,
   loadOrCreateCareerEconomy,
   saveCareerEconomy,
@@ -90,7 +95,7 @@ const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|pmdg-cdu|generate-ofp|compare-ofp|monitor-ofp|career|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|draft-ofp-roles|pmdg-cdu|generate-ofp|compare-ofp|monitor-ofp|career|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -104,6 +109,7 @@ function usage(): never {
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
   msfs-compat-agent probe-payload-stations [--pipe <name>]
   msfs-compat-agent scaffold-ofp-roles [--write] [--out path.json] [--pipe <name>]
+  msfs-compat-agent draft-ofp-roles --profile path.json [--write] [--keep-passengers]
   msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
@@ -118,6 +124,7 @@ Notes:
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
   scaffold-ofp-roles: detect known family from live title and print/write roles pack
+  draft-ofp-roles: build/merge roles pack from a homologated profiles/examples JSON (no sim)
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
   generate-ofp: Dispatch Redirect with homologated SimBrief variant (pack match / live title); fuel AUTO → fetch by static_id
   compare-ofp / monitor-ofp: fetch latest SimBrief OFP; omit --roles to auto-pick pack from aircraft title
@@ -928,6 +935,44 @@ async function main(): Promise<void> {
         console.log(`  ${String(s.index).padStart(2)}: ${s.lb.toFixed(1).padStart(10)} lb`);
       }
     });
+    return;
+  }
+
+  if (command === 'draft-ofp-roles') {
+    const profilePath = getFlag(rest, '--profile');
+    if (!profilePath) {
+      console.error('draft-ofp-roles requires --profile path.json');
+      usage();
+    }
+    const doWrite = hasFlag(rest, '--write');
+    const cabinAsBaggage = !hasFlag(rest, '--keep-passengers');
+    const profile = JSON.parse(
+      await readFile(resolve(profilePath), 'utf8'),
+    ) as AircraftProfile;
+    const ofpDir = join(repoRoot, 'profiles', 'ofp');
+    if (!doWrite) {
+      const pack = buildRolesPackFromProfile(profile, {
+        loadMethod: 'direct-injection',
+        injectCapable: true,
+        cabinAsBaggage,
+      });
+      const target = rolesPackPathForProfile(profile, ofpDir);
+      console.log(`Would write ${target.path} (via ${target.via})`);
+      console.log(JSON.stringify(pack, null, 2));
+      console.log('\nDry-run only. Add --write to save.');
+      return;
+    }
+    const result = await upsertRolesPackFromProfile(profile, ofpDir, {
+      loadMethod: 'direct-injection',
+      injectCapable: true,
+      cabinAsBaggage,
+    });
+    console.log(
+      `${result.created ? 'Wrote' : 'Updated'} ${result.path} (${result.via})`,
+    );
+    console.log(
+      `matchTitles: ${(result.pack.matchTitles ?? []).join(' | ')}`,
+    );
     return;
   }
 

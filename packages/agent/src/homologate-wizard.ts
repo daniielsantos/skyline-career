@@ -31,6 +31,7 @@ import {
   probeRecipeLvars,
   scoreRecipesForLvarFallback,
 } from './vendor-recipes.js';
+import { upsertRolesPackFromProfile } from './ofp-compliance/draft-roles-pack.js';
 
 export interface HomologateWizardOptions {
   bridge: NamedPipeSimBridge;
@@ -119,6 +120,47 @@ async function calibrateWithCgSources(
     console.log('  Using live CG FWD/AFT LIMIT from the simulator (same as tablet).');
   }
   return calibration;
+}
+
+async function writeCareerRolesPackAfterPromote(
+  ask: AskFn,
+  repoRoot: string,
+  profile: AircraftProfile,
+): Promise<void> {
+  printSection('Career OFP roles pack');
+  const cabinAsBaggage = await confirm(
+    ask,
+    'Map cabin seats as baggage for Career cargo inject (recommended)',
+    true,
+  );
+  if (
+    !(await confirm(
+      ask,
+      'Write / merge profiles/ofp roles pack now (direct-injection)',
+      true,
+    ))
+  ) {
+    console.log(
+      '  Skipped roles pack — run: npm run agent -- draft-ofp-roles --profile PATH --write',
+    );
+    return;
+  }
+  const ofpDir = join(repoRoot, 'profiles', 'ofp');
+  const result = await upsertRolesPackFromProfile(profile, ofpDir, {
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    cabinAsBaggage,
+  });
+  printKv([
+    ['roles pack', result.path],
+    ['via', result.via],
+    [result.created ? 'created' : 'updated', 'yes'],
+    ['matchTitles', (result.pack.matchTitles ?? []).join(' | ')],
+    [
+      'roles',
+      `crew=${result.pack.payload?.stationRoles?.crewStations?.join(',') ?? '—'} bags=${result.pack.payload?.stationRoles?.baggageStations?.join(',') ?? '—'}`,
+    ],
+  ]);
 }
 
 async function tryRead(bridge: NamedPipeSimBridge, name: string, unit: string): Promise<number | null> {
@@ -531,7 +573,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       '  Continuing writable inject path — draft + calibrate + smoke required.',
     );
     console.log(
-      '  On promote, Career roles pack must set loadMethod: direct-injection, injectCapable: true.',
+      '  On promote, wizard writes/merges the Career roles pack (direct-injection + injectCapable).',
     );
 
     printSection('2/5 Probe (capacities)');
@@ -868,13 +910,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         ['strategy', promoted.profile.fuel.strategy],
         ['loadMethod', 'direct-injection'],
       ]);
+      await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile);
       console.log('');
       console.log('Next:');
       console.log('  node packages/agent/dist/cli.js resolve');
       console.log(applyAutoHint(promoted.profile));
-      console.log(
-        '  Career roles pack: loadMethod "direct-injection", injectCapable true (see ofp-homologation.md track B)',
-      );
       return;
     }
     if (centerLikely && !centerOk) {
@@ -1054,13 +1094,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['icao', promoted.profile.match.icao],
       ['loadMethod', 'direct-injection'],
     ]);
+    await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile);
     console.log('');
     console.log('Next:');
     console.log('  node packages/agent/dist/cli.js resolve');
     console.log(applyAutoHint(promoted.profile));
-    console.log(
-      '  Career roles pack: loadMethod "direct-injection", injectCapable true (see ofp-homologation.md track B)',
-    );
     return;
   });
 }

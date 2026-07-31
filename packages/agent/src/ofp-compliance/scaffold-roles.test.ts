@@ -72,6 +72,28 @@ describe('scaffold-roles Black Square Caravan', () => {
   });
 });
 
+describe('scaffold-roles Black Square Bonanza', () => {
+  it('matches A36 / A36TC / B36TP as one direct-injection family', () => {
+    assert.equal(
+      matchHeuristic('Black Square A36 Bonanza Professional')?.id,
+      'blacksquare-bonanza-professional',
+    );
+    assert.equal(
+      matchHeuristic('Black Square A36TC Bonanza Professional N5172C')?.id,
+      'blacksquare-bonanza-professional',
+    );
+    assert.equal(
+      matchHeuristic('Black Square B36TP Bonanza Professional')?.id,
+      'blacksquare-bonanza-professional',
+    );
+    const h = matchHeuristic('Black Square B36TP Bonanza Professional')!;
+    assert.equal(h.loadMethod, 'direct-injection');
+    assert.equal(h.injectCapable, true);
+    assert.deepEqual(h.stationRoles.crewStations, [1, 2]);
+    assert.deepEqual(h.stationRoles.baggageStations, [3, 4, 5, 6, 7]);
+  });
+});
+
 describe('scaffold-roles ToLiss A346', () => {
   it('matches Pax title and maps cabin/baggage stations', () => {
     const h = matchHeuristic('ToLiss A346 PRO [Preset Pax]');

@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/ofp-compliance/simbrief-fetch.test.js dist/ofp-compliance/simbrief-dispatch.test.js dist/ofp-compliance/simbrief-airframes.test.js dist/ofp-compliance/scaffold-roles.test.js dist/ofp-load-plan.test.js dist/flight-model-cg.test.js dist/find-flight-model.test.js",
+    "test": "npm run build && node --test dist/ofp-compliance/simbrief-fetch.test.js dist/ofp-compliance/simbrief-dispatch.test.js dist/ofp-compliance/simbrief-airframes.test.js dist/ofp-compliance/scaffold-roles.test.js dist/ofp-compliance/draft-roles-pack.test.js dist/ofp-load-plan.test.js dist/flight-model-cg.test.js dist/find-flight-model.test.js",
     "smoke": "node dist/cli.js smoke --profile ../../profiles/examples/asobo-c172-skyhawk.json",
     "pmdg-cdu": "node dist/cli.js pmdg-cdu"
   },

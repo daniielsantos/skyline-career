@@ -19,7 +19,10 @@ import {
 import { listCatalogPublishers } from './catalog-publishers.js';
 import {
   discoverClassicFuelTanks,
+  isFuelWriteAccepted,
   liveFuelTanks,
+  readAfterWriteSettles,
+  writeTolerance,
 } from './discover-fuel-tanks.js';
 import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProfile } from './promote-profile.js';
 import { probeLVars } from './probe-lvars.js';
@@ -186,6 +189,13 @@ async function writeCareerRolesPackAfterPromote(
     ],
     ['Aircraft Market', `${registered.label} (${registered.aircraftClassId})`],
   ]);
+}
+
+/** Default gallons offered in the post-smoke "Test apply" prompts. */
+function defaultTestApplyGallons(tankId: string): string {
+  if (tankId === 'LEFT_MAIN' || tankId === 'RIGHT_MAIN') return '20';
+  // Tip / aux / FUELSYSTEM:3+ (TANK_3…) and center — keep the test load light.
+  return '10';
 }
 
 async function tryRead(bridge: NamedPipeSimBridge, name: string, unit: string): Promise<number | null> {
@@ -513,8 +523,10 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     ]);
     console.log('  Tip: strip livery/cabin names from match title (shared across paints).');
     const matchTitle = (await ask('Catalog match title', suggestedTitle)).trim() || suggestedTitle;
+    // Match titles are often stripped of the vendor prefix (e.g. "BN2 Islander - …");
+    // also probe the live title / ATC model so Black Box / PMDG-style branding still wins.
     const suggestedPublisher = inferPublisher(
-      matchTitle,
+      [identity.title, matchTitle, identity.atcModel].filter(Boolean).join(' '),
       process.env.MSFS_COMPAT_PUBLISHER,
     );
     const publishers = await listCatalogPublishers(repoRoot);
@@ -671,20 +683,38 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     for (const p of fuelProbes) {
       const capStr = p.capacity !== null ? formatGalLbs(p.capacity, lbPerGal) : 'cap?—';
       if (p.live) {
-        console.log(`  ✓ ${p.id.padEnd(10)} ${capStr}  writable (restored)`);
+        const residual =
+          p.after !== null && p.target !== null
+            ? Math.abs(p.after - p.target)
+            : 0;
+        const residualNote =
+          residual > writeTolerance(p.target ?? 0)
+            ? ` (offset residual ${residual.toFixed(1)} gal — calibrate will measure)`
+            : '';
+        console.log(`  ✓ ${p.id.padEnd(10)} ${capStr}  writable (restored)${residualNote}`);
       } else if (p.writable && !p.hasCapacity) {
         console.log(`  · ${p.id.padEnd(10)} ghost write (cap < 5) — skipped`);
+      } else if (p.hasCapacity && p.changed) {
+        console.log(
+          `  ~ ${p.id.padEnd(10)} ${capStr}  partial write — ${p.note ?? 'did not reach target'}`,
+        );
       } else if (p.hasCapacity && !p.writable) {
         console.log(`  ✗ ${p.id.padEnd(10)} ${capStr}  write ignored`);
       } else {
         console.log(`  · ${p.id.padEnd(10)} inactive${p.note ? ` (${p.note})` : ''}`);
       }
     }
+    const partialTanks = fuelProbes.filter((p) => p.hasCapacity && !p.writable && p.changed);
     console.log(
       liveTanks.length > 0
         ? `  → Live tanks for draft: ${liveTanks.map((t) => t.id).join(', ')}`
         : '  → No classic tanks responded (capacity≥5 + writable).',
     );
+    if (partialTanks.length > 0) {
+      console.log(
+        `  → ${partialTanks.map((t) => t.id).join(', ')} moved but settled off target — vendor fuel system may rebalance after the write.`,
+      );
+    }
 
     console.log('  Payload station sample writes...');
     const outcomes = await runPayloadWritetest(bridge);
@@ -705,14 +735,20 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     try {
       const beforeFs = await bridge.readSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons' });
       await bridge.writeSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: 40 });
-      await bridge.delay(350);
-      const afterFs = await bridge.readSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons' });
-      fsWriteOk = Math.abs(afterFs - 40) <= Math.max(2, 40 * 0.05);
+      const afterFs =
+        (await readAfterWriteSettles(bridge, 'FUELSYSTEM TANK QUANTITY:1', 40)) ?? beforeFs;
+      fsWriteOk = isFuelWriteAccepted(beforeFs, afterFs, 40);
       await bridge.writeSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons', value: beforeFs });
       await bridge.delay(200);
-      console.log(
-        fsWriteOk ? '  ✓ FUELSYSTEM TANK QUANTITY:1 writable' : '  ✗ FUELSYSTEM TANK QUANTITY:1 write ignored',
-      );
+      if (fsWriteOk) {
+        console.log('  ✓ FUELSYSTEM TANK QUANTITY:1 writable');
+      } else if (Math.abs(afterFs - beforeFs) > 0.05) {
+        console.log(
+          `  ~ FUELSYSTEM TANK QUANTITY:1 partial write — moved ${beforeFs.toFixed(1)} → ${afterFs.toFixed(1)} gal (wanted 40)`,
+        );
+      } else {
+        console.log('  ✗ FUELSYSTEM TANK QUANTITY:1 write ignored');
+      }
     } catch {
       console.log('  · FUELSYSTEM TANK QUANTITY:1 unreadable/unwritable');
     }
@@ -885,14 +921,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
       const tanksApply: Record<string, number> = {};
       for (const tank of profile.fuel.tanks) {
-        const def =
-          tank.id === 'LEFT_MAIN' || tank.id === 'RIGHT_MAIN'
-            ? '40'
-            : tank.id === 'CENTER'
-              ? '20'
-              : /TIP|AUX/i.test(tank.id)
-                ? '10'
-                : '20';
+        const def = defaultTestApplyGallons(tank.id);
         tanksApply[tank.id] = Number(
           await ask(
             `Test apply ${tank.name ?? tank.id} gal (~${roundFuel(Number(def) * lbPerGal)} lb)`,
@@ -1070,14 +1099,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
     const tanksApply: Record<string, number> = {};
     for (const tank of profile.fuel.tanks) {
-      const def =
-        tank.id === 'LEFT_MAIN' || tank.id === 'RIGHT_MAIN'
-          ? '40'
-          : tank.id === 'CENTER'
-            ? '20'
-            : /TIP|AUX/i.test(tank.id)
-              ? '10'
-              : '20';
+      const def = defaultTestApplyGallons(tank.id);
       tanksApply[tank.id] = Number(
         await ask(
           `Test apply ${tank.name ?? tank.id} gal (~${roundFuel(Number(def) * lbPerGal)} lb)`,

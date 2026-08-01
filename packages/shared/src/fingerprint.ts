@@ -38,6 +38,10 @@ export function normalizeAircraftTitle(title: string): string {
 
 const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\ba2a\b/i, publisher: 'a2a' },
+  { re: /\bblack\s*box(?:\s*simulation)?\b/i, publisher: 'blackbox' },
+  // Black Box Simulation BN-2 — live titles are often just "BN2 Islander - …"
+  // without the publisher prefix.
+  { re: /\bbn-?2\b.*\bislander\b|\bislander\b.*\bbn-?2\b|\bbn2\s+islander\b/i, publisher: 'blackbox' },
   { re: /\bblack\s*square\b/i, publisher: 'blacksquare' },
   { re: /\bfs\s*reborn\b|\bfsreborn\b/i, publisher: 'fsreborn' },
   { re: /\bnext\s*gen\s*sim\b|\bnextgensim\b/i, publisher: 'nextgensim' },

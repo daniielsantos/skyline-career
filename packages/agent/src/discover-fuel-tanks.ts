@@ -89,6 +89,79 @@ async function readGal(
   }
 }
 
+export function writeTolerance(target: number): number {
+  return Math.max(Math.abs(target) * 0.05, 0.25);
+}
+
+/**
+ * Residual band for unusable-fuel / vendor clamps. Calibrate later turns this
+ * into fuelOffset (often ~0.8–3.5 gal); discovery should still treat the tank
+ * as writable when the write mostly closes the gap.
+ */
+export function fuelWriteOffsetBand(target: number): number {
+  return Math.max(4, Math.abs(target) * 0.15);
+}
+
+/**
+ * True when the quantity stuck on/near the target, including near-misses that
+ * look like a fuelOffset residual (AUX 8.2→9, FUELSYSTEM 36.5→40). Weak
+ * mirror slots that only crawl a little (MAIN 15.3→18.5 wanted 22) stay false.
+ */
+export function isFuelWriteAccepted(
+  before: number,
+  after: number,
+  target: number,
+): boolean {
+  const residual = Math.abs(after - target);
+  if (residual <= writeTolerance(target)) return true;
+
+  const needed = Math.abs(target - before);
+  if (needed < 0.05) return false;
+
+  const moved = Math.abs(after - before);
+  const closedGap = Math.abs(after - target) < Math.abs(before - target) - 0.05;
+  const progress = moved / needed;
+  return closedGap && progress >= 0.5 && residual <= fuelWriteOffsetBand(target);
+}
+
+/**
+ * Poll a quantity after a write instead of sampling once. Vendor fuel systems
+ * (Black Box, Black Square) ramp the tank toward the target over a second or
+ * more, so a single fast read reports a real write as "ignored".
+ */
+export async function readAfterWriteSettles(
+  bridge: NamedPipeSimBridge,
+  name: string,
+  target: number,
+  opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
+): Promise<number | null> {
+  const timeoutMs = opts.timeoutMs ?? 2500;
+  const pollIntervalMs = opts.pollIntervalMs ?? 250;
+  const tolerance = writeTolerance(target);
+  const offsetBand = fuelWriteOffsetBand(target);
+  const deadline = Date.now() + timeoutMs;
+  let latest: number | null = null;
+  let stableSamples = 0;
+
+  while (Date.now() < deadline) {
+    await bridge.delay(pollIntervalMs);
+    const sample = await readGal(bridge, name);
+    if (sample === null) break;
+    const residual = Math.abs(sample - target);
+    if (residual <= tolerance) return sample;
+    // Near-miss inside the offset band — good enough for discovery; calibrate
+    // will measure the exact fuelOffset later.
+    if (residual <= offsetBand && latest !== null && Math.abs(sample - latest) < 0.05) {
+      return sample;
+    }
+    // Give up early once the value stops moving between polls.
+    stableSamples = latest !== null && Math.abs(sample - latest) < 0.05 ? stableSamples + 1 : 0;
+    latest = sample;
+    if (stableSamples >= 2) break;
+  }
+  return latest;
+}
+
 /**
  * Probe every classic fuel slot: read capacity, write a safe test quantity, restore.
  * Ghost tanks (write sticks but capacity ~0) are flagged but not `live`.
@@ -136,11 +209,10 @@ export async function discoverClassicFuelTanks(
 
     try {
       await bridge.writeSimVar({ name: slot.quantityVar, unit: 'gallons', value: target });
-      await bridge.delay(350);
-      after = await readGal(bridge, slot.quantityVar);
+      after = await readAfterWriteSettles(bridge, slot.quantityVar, target);
       if (after !== null) {
         changed = Math.abs(after - before) > 0.05;
-        writable = Math.abs(after - target) <= Math.max(target * 0.05, 0.25);
+        writable = isFuelWriteAccepted(before, after, target);
       }
       // Restore original quantity.
       await bridge.writeSimVar({ name: slot.quantityVar, unit: 'gallons', value: before });
@@ -152,6 +224,10 @@ export async function discoverClassicFuelTanks(
 
     if (writable && !hasCapacity) {
       note = note ?? 'ghost write (capacity < 5)';
+    } else if (!writable && changed) {
+      note =
+        note ??
+        `moved ${before.toFixed(1)} → ${after?.toFixed(1) ?? '?'} gal (wanted ${target})`;
     }
 
     results.push({

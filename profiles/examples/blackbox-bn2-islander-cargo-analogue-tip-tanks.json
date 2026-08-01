@@ -1,14 +1,14 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "asobo-c208b-cargo",
-  "profileKey": "asobo/c208b-cargo",
+  "profileId": "blackbox-bn2-islander-cargo-analogue-tip-tanks",
+  "profileKey": "blackbox/bn2-islander-cargo-analogue-tip-tanks",
   "semver": "1.0.0",
-  "displayName": "C208B Cargo (MSFS 2024)",
+  "displayName": "BN2 Islander - Cargo / Analogue / Tip Tanks (MSFS 2024)",
   "match": {
-    "fingerprint": "110531dd34e944c37e07407ec7aeb658769d8e4c620a6164203d860bdbf1685f",
-    "title": "C208B Cargo",
-    "publisher": "asobo",
-    "icao": "C208"
+    "fingerprint": "4bab0caca03efbdd9deab7c1fd418818a7a87f4e8f5f7fa555c4e47bf1515a57",
+    "title": "BN2 Islander - Cargo / Analogue / Tip Tanks",
+    "publisher": "blackbox",
+    "icao": "BN2P"
   },
   "capabilities": [
     "simconnect"
@@ -28,7 +28,7 @@
       {
         "id": "LEFT_MAIN",
         "name": "FUELSYSTEM:1",
-        "capacity": 167.8000030517578,
+        "capacity": 65,
         "readVar": "FUELSYSTEM TANK QUANTITY:1",
         "readUnit": "gallons",
         "writeVar": "FUELSYSTEM TANK QUANTITY:1",
@@ -37,10 +37,28 @@
       {
         "id": "RIGHT_MAIN",
         "name": "FUELSYSTEM:2",
-        "capacity": 167.8000030517578,
+        "capacity": 65,
         "readVar": "FUELSYSTEM TANK QUANTITY:2",
         "readUnit": "gallons",
         "writeVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "TANK_3",
+        "name": "FUELSYSTEM:3",
+        "capacity": 27.5,
+        "readVar": "FUELSYSTEM TANK QUANTITY:3",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:3",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "TANK_4",
+        "name": "FUELSYSTEM:4",
+        "capacity": 27.5,
+        "readVar": "FUELSYSTEM TANK QUANTITY:4",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:4",
         "writeUnit": "gallons"
       }
     ],
@@ -49,13 +67,25 @@
         "op": "simvar_set",
         "var": "FUELSYSTEM TANK QUANTITY:1",
         "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN} + 0.8"
+        "valueExpr": "{LEFT_MAIN} + 2.2"
       },
       {
         "op": "simvar_set",
         "var": "FUELSYSTEM TANK QUANTITY:2",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN} + 0.8"
+        "valueExpr": "{RIGHT_MAIN} + 2.2"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:3",
+        "unit": "gallons",
+        "valueExpr": "{TANK_3} + 2.2"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:4",
+        "unit": "gallons",
+        "valueExpr": "{TANK_4} + 2.2"
       },
       {
         "op": "delay",
@@ -69,14 +99,26 @@
         {
           "var": "FUELSYSTEM TANK QUANTITY:1",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 8,
           "valueExpr": "{LEFT_MAIN}"
         },
         {
           "var": "FUELSYSTEM TANK QUANTITY:2",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 8,
           "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:3",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{TANK_3}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:4",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{TANK_4}"
         }
       ]
     }
@@ -102,46 +144,6 @@
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500
-      },
-      {
-        "index": 5,
-        "name": "Station 5",
-        "maxLoad": 500
-      },
-      {
-        "index": 6,
-        "name": "Station 6",
-        "maxLoad": 500
-      },
-      {
-        "index": 7,
-        "name": "Station 7",
-        "maxLoad": 500
-      },
-      {
-        "index": 8,
-        "name": "Station 8",
-        "maxLoad": 500
-      },
-      {
-        "index": 9,
-        "name": "Station 9",
-        "maxLoad": 500
-      },
-      {
-        "index": 10,
-        "name": "Station 10",
-        "maxLoad": 500
-      },
-      {
-        "index": 11,
-        "name": "Station 11",
-        "maxLoad": 500
-      },
-      {
-        "index": 12,
-        "name": "Station 12",
         "maxLoad": 500
       }
     ],
@@ -171,54 +173,6 @@
         "valueExpr": "{station_4}"
       },
       {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:5",
-        "unit": "pounds",
-        "valueExpr": "{station_5}"
-      },
-      {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:6",
-        "unit": "pounds",
-        "valueExpr": "{station_6}"
-      },
-      {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:7",
-        "unit": "pounds",
-        "valueExpr": "{station_7}"
-      },
-      {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:8",
-        "unit": "pounds",
-        "valueExpr": "{station_8}"
-      },
-      {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:9",
-        "unit": "pounds",
-        "valueExpr": "{station_9}"
-      },
-      {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:10",
-        "unit": "pounds",
-        "valueExpr": "{station_10}"
-      },
-      {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:11",
-        "unit": "pounds",
-        "valueExpr": "{station_11}"
-      },
-      {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:12",
-        "unit": "pounds",
-        "valueExpr": "{station_12}"
-      },
-      {
         "op": "delay",
         "ms": 400
       }
@@ -242,12 +196,23 @@
     "envelopeSource": "simvar",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 11,
-      "maxMac": 40
+      "minMac": 17,
+      "maxMac": 26.400000000000002
     },
     "calibration": {
-      "observedMac": 20.208406448364258,
-      "calibratedAtIso": "2026-07-31T03:44:13.764Z"
+      "observedMac": 24.052199721336365,
+      "calibratedAtIso": "2026-08-01T16:43:58.554Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\blackboxsimulation-bn2islander24\\SimObjects\\Airplanes\\BBS_BN2_Piston\\presets\\bbs\\f_cargo_steam_tiptank\\config\\flight_model.cfg",
+      "sweep": {
+        "minObservedMac": 24.475616216659546,
+        "maxObservedMac": 32.38403797149658,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 4,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-08-01T16:44:02.974Z"
+      }
     }
   },
   "fallback": {
@@ -256,13 +221,12 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: C208B Cargo.",
-    "ICAO type designator (catalog/SimBrief): C208.",
+    "Homologated via wizard: BN2 Islander - Cargo / Analogue / Tip Tanks.",
+    "ICAO type designator (catalog/SimBrief): BN2P.",
     "Draft preferred FUELSYSTEM where capacity >= 5.",
     "AUX deferred for v1.",
-    "Stations: 12.",
+    "Stations: 4.",
     "Homologated with interactive wizard.",
-    "Station arms intentionally absent: the Asobo C208B ships in StreamedPackages with no readable flight_model.cfg, so CG comes from the live SimVar envelope only.",
-    "See profiles/notes/asobo-c208b-cargo.md"
+    "See profiles/notes/blackbox-bn2-islander-cargo-analogue-tip-tanks.md"
   ]
 }

@@ -8,6 +8,22 @@
     "simbriefAirframeMatch": "Default"
   },
   {
+    "typeId": "blackbox-bn2-islander-cargo-analogue-tip-tanks",
+    "aircraftClassId": "light_ga",
+    "label": "BN2 Islander - Cargo / Analogue / Tip Tanks",
+    "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-analogue-tip-tanks.json",
+    "simbriefIcao": "BN2P",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "blackbox-bn2-islander-cargo-garmin-tip-tanks",
+    "aircraftClassId": "light_ga",
+    "label": "BN2 Islander - Cargo / Garmin / Tip Tanks",
+    "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-garmin-tip-tanks.json",
+    "simbriefIcao": "BN2P",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
     "typeId": "asobo-c172sp-cargo",
     "aircraftClassId": "light_ga",
     "label": "Cessna 172SP Cargo",

@@ -1,0 +1,91 @@
+---
+description: Checklist obrigatório ao expandir aeroportos/regiões do career map
+globs: packages/shared/src/career-*.ts,packages/career-ui/src/App.tsx,.cursor/rules/career-economy-roadmap.mdc
+alwaysApply: false
+---
+
+# Career map expansion playbook
+
+Use this whenever adding airports, regions, or a **new country/territory**. Do **not** invent ad-hoc one-offs.
+
+## New country / territory (required first)
+
+Country id is **derived** from region prefix (`XX-YY` → `XX` via `countryIdFromRegion`). There is no separate country registry — if airports use `AR-*` regions, `listWorldCountryIds` returns `AR` automatically.
+
+Before touching individual ICAOs, decide:
+
+1. **ISO-ish code** — 2-letter prefix for all regions (`AR`, `PT`, `CA`, …). Never reuse `BR`/`US` for another country.
+2. **Region set** — 2–6 `XX-YY` codes (e.g. `AR-N`, `AR-C`, `AR-P`). Keep the set curated.
+3. **Minimum viable slice** for that country:
+   - ≥1 `major` hub + a few regionals/spokes (prefer ~6–12 hubs, not every real ICAO)
+   - ≥1 entry in `FUEL_HUB_ICAOS` **inside** the country (fuel trucks are domestic-region; no local producer ⇒ dry spokes)
+   - Domestic `CAREER_CARGO_CORRIDORS` only among that country’s ICAOs
+   - Sparse `CAREER_INTERNATIONAL_LANES` to existing countries (gateways only — not all-to-all)
+4. **`REGION_NEIGHBORS`** — connect the new `XX-YY` regions to each other (same-country road graph). Do not link across countries here.
+5. **`homeCountryId`** — seed default stays `BR` until hub pick. After `selectStarterHub`, it follows the hub’s country (`KMIA` → `US`). Adding a country does not change existing players until they (re)select a hub there; legacy saves sync on economy load via `syncHomeCountryFromHub`.
+6. **Fleets** — bump `NPC_FLEET_SIZE` so `npcs.length ≥` total distinct regions worldwide; scale fuel trucks with new regions/fuel hubs.
+7. **UI** — `regionLabel` for every new `XX-YY` (include country name in the label).
+8. **Tests** — `listWorldCountryIds` includes the new code; domestic OD stays inside country; intl OD only via seeded lanes; coverage migrate adds the new hubs.
+
+Partition invariants (do not break):
+
+- Domestic lot formation loops **per country** (`listWorldCountryIds`).
+- Cross-country freight **only** when an `internationalLanes` entry matches the OD.
+- Fuel trucks prefer same-country neighbors via `REGION_NEIGHBORS`.
+
+Then run the airport checklist below for every hub in the new territory.
+
+## Already automated (legacy saves)
+
+On `migrateEconomyWorld` / load, these run — **after** the seed constants are updated:
+
+| Helper | Effect |
+|---|---|
+| `ensureCareerHubCoverage` | Copies missing seed airports into the save |
+| `ensureInternationalLanes` | Merges curated intl ODs by id/OD |
+| `ensureWorldFuelInventory` | Cap/prod/cons Jet-A from `FUEL_HUB_ICAOS` (promotes spoke→hub) |
+| `ensureNpcFleet` + `ensureNpcRegionCoverage` | Tops up composition; ≥1 home NPC per region |
+| `ensureFuelTruckFleet` | Tops up truck composition across airport regions |
+| `ensureHomeCountryId` | Stamps partition home |
+
+**You still must update the seed constants below.** Coverage cannot invent coords, tiers, fuel hubs, corridors, or region neighbors.
+
+## Manual checklist (required)
+
+Edit in this order in [`career-economy.ts`](packages/shared/src/career-economy.ts) unless noted:
+
+1. **`CAREER_HUB_COORDS`** — lat/lon/name for every new ICAO.
+2. **`HUB_TIER_BY_ICAO`** — `major` / `regional` / `spoke`.
+3. **Seed hubs array** inside `createSeedEconomyWorld` — region (`XX-YY`), tier, produce/consume biases.
+4. **`FUEL_HUB_ICAOS`** — only Jet-A **producers**. Target ~1 fuel hub per 2–3 airports in that country. Majors that are not listed seed as draining spokes.
+5. **`CAREER_CARGO_CORRIDORS`** — domestic trunks + feeders (bidirectional weights).
+6. **`CAREER_INTERNATIONAL_LANES`** — sparse cross-country ODs only (not all-to-all).
+7. **New region?** → [`career-fuel-logistics.ts`](packages/shared/src/career-fuel-logistics.ts) `REGION_NEIGHBORS` graph (same-country road haul preference).
+8. **Region count vs fleets**
+   - `NPC_FLEET_SIZE` ≥ distinct regions (else `ensureNpcRegionCoverage` no-ops). Scale composition; extend `NPC_NAME_POOL` if needed.
+   - Scale `FUEL_TRUCK_FLEET_SIZE` / composition when regions or fuel hubs grow; extend truck name pool.
+9. **UI** — [`App.tsx`](packages/career-ui/src/App.tsx) `regionLabel` for every new `XX-YY`.
+10. **Tests** — update airport/region/NPC/truck/fuel-hub counts; coverage migrate test; one assert that new regions have airports (+ fuel hub if claimed).
+11. **Roadmap** — one line in `.cursor/rules/career-economy-roadmap.mdc` Done list.
+
+## Design rules
+
+- Prefer **curated** hubs over dumping every real-world ICAO.
+- Domestic lots stay same-country; intl only via `internationalLanes`.
+- Player `homeCountryId` follows the chosen starter hub’s region country (not a fixed world constant).
+- Fuel trucks are hub→spoke only; without local `FUEL_HUB_ICAOS`, distant majors starve.
+- A new country must be fuel- and corridor-self-contained before intl lanes matter.
+- Keep tick cost growing with **regions/hubs**, not airport×airport.
+
+## Quick smoke
+
+```text
+createSeedEconomyWorld → airport count / regions
+listWorldCountryIds includes new country code
+every new region has ≥1 airport; country has ≥1 FUEL_HUB_ICAOS member
+domestic corridors only within country; intl lanes sparse to existing gateways
+FUEL_HUB_ICAOS.has(each intended producer)
+npcs.length === NPC_FLEET_SIZE; every region has ≥1 home NPC
+fuelTrucks.length === FUEL_TRUCK_FLEET_SIZE
+ensureCareerHubCoverage(brOnlySave) adds the new ICAOs
+```

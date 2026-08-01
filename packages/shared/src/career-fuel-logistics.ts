@@ -17,15 +17,15 @@ import type {
 /** Keep in sync with career-economy MS_PER_TICK (avoid circular TDZ). */
 const MS_PER_TICK = 3_600_000;
 
-export const FUEL_TRUCK_FLEET_SIZE = 12;
+export const FUEL_TRUCK_FLEET_SIZE = 20;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 4 },
-  { truckClassId: 'semi_tanker', count: 6 },
-  { truckClassId: 'btrain_tanker', count: 2 },
+  { truckClassId: 'rigid_tanker', count: 6 },
+  { truckClassId: 'semi_tanker', count: 10 },
+  { truckClassId: 'btrain_tanker', count: 4 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -71,6 +71,13 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'BR-CO': ['BR-N', 'BR-NE', 'BR-SE', 'BR-S'],
   'BR-SE': ['BR-NE', 'BR-CO', 'BR-S'],
   'BR-S': ['BR-SE', 'BR-CO'],
+  // US continental road-neighbor graph (no BR↔US road hauls preferred).
+  'US-NE': ['US-SE', 'US-MW'],
+  'US-SE': ['US-NE', 'US-MW', 'US-SC'],
+  'US-MW': ['US-NE', 'US-SE', 'US-SC', 'US-MT'],
+  'US-SC': ['US-SE', 'US-MW', 'US-MT', 'US-W'],
+  'US-MT': ['US-MW', 'US-SC', 'US-W'],
+  'US-W': ['US-MT', 'US-SC'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -86,6 +93,14 @@ const TRUCK_NAME_POOL = [
   'Nordeste Abastece',
   'Pantanal Fuel Co',
   'Serra Tank Line',
+  'Gulf Coast Tankers',
+  'Midwest Jet Haul',
+  'Empire Fuel Line',
+  'Sunbelt Abastece',
+  'Rockies Tank Run',
+  'Pacific Pipe Road',
+  'Great Lakes Fuel',
+  'Lone Star Tankers',
 ] as const;
 
 function hashSeed(seed: string): number {

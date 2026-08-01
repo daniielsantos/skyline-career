@@ -32,6 +32,13 @@ import {
   regionalWeatherPayMult,
   worseWeather,
 } from './career-weather.js';
+import {
+  activeLaneKg,
+  countryIdFromRegion,
+  ensureHomeCountryId,
+  isDomesticOd,
+  listWorldCountryIds,
+} from './career-partition.js';
 import type {
   AirportTerminal,
   CareerEconomyWorld,
@@ -43,10 +50,12 @@ import type {
   FuelHaul,
   FuelTruck,
   HubTier,
+  InternationalLane,
   MarketLotView,
   NpcActivityView,
   NpcFlight,
   NpcFreighter,
+  PartitionTickResult,
   ShipmentLot,
   StockPile,
 } from './types/career-economy.js';
@@ -66,14 +75,28 @@ export type {
   FuelTruckClassId,
   HubTier,
   InboundPending,
+  InternationalLane,
   MarketLotView,
   NpcActivityView,
   NpcFleetMemberView,
   NpcFlight,
   NpcFreighter,
+  PartitionTickResult,
   ShipmentLot,
   StockPile,
 } from './types/career-economy.js';
+
+export {
+  activeLaneKg,
+  countryIdFromRegion,
+  ensureHomeCountryId,
+  findInternationalLane,
+  inferHomeCountryId,
+  isDomesticOd,
+  isInternationalOdAllowed,
+  laneMatchesOd,
+  listWorldCountryIds,
+} from './career-partition.js';
 
 export {
   clampHubLevel,
@@ -237,6 +260,31 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   SBCG: 'spoke',
   SBPV: 'spoke',
   SBMQ: 'spoke',
+  // US continental map
+  KMIA: 'major',
+  KATL: 'major',
+  KJFK: 'major',
+  KORD: 'major',
+  KIAH: 'major',
+  KDFW: 'major',
+  KDEN: 'major',
+  KLAX: 'major',
+  KSEA: 'major',
+  KBOS: 'regional',
+  KEWR: 'regional',
+  KCLT: 'regional',
+  KDTW: 'regional',
+  KMSP: 'regional',
+  KMEM: 'regional',
+  KPHX: 'regional',
+  KSFO: 'regional',
+  KPHL: 'spoke',
+  KMCO: 'spoke',
+  KFLL: 'spoke',
+  KCVG: 'spoke',
+  KAUS: 'spoke',
+  KSLC: 'spoke',
+  KSAN: 'spoke',
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -338,7 +386,172 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   { a: 'SBJP', b: 'SBRF', weight: 1.4 },
   { a: 'SBSG', b: 'SBRF', weight: 1.3 },
   { a: 'SBSG', b: 'SBFZ', weight: 1.3 },
+  // US domestic trunks + feeders
+  { a: 'KMIA', b: 'KJFK', weight: 1.8 },
+  { a: 'KMIA', b: 'KIAH', weight: 1.7 },
+  { a: 'KJFK', b: 'KIAH', weight: 1.5 },
+  { a: 'KORD', b: 'KJFK', weight: 2.2 },
+  { a: 'KATL', b: 'KMIA', weight: 2.0 },
+  { a: 'KATL', b: 'KORD', weight: 2.1 },
+  { a: 'KDFW', b: 'KIAH', weight: 2.0 },
+  { a: 'KDFW', b: 'KORD', weight: 1.9 },
+  { a: 'KLAX', b: 'KSEA', weight: 2.0 },
+  { a: 'KLAX', b: 'KDEN', weight: 1.9 },
+  { a: 'KDEN', b: 'KORD', weight: 2.0 },
+  { a: 'KSEA', b: 'KORD', weight: 1.7 },
+  { a: 'KATL', b: 'KJFK', weight: 1.8 },
+  { a: 'KLAX', b: 'KDFW', weight: 1.8 },
+  { a: 'KMEM', b: 'KATL', weight: 1.6 },
+  { a: 'KMEM', b: 'KORD', weight: 1.5 },
+  { a: 'KMEM', b: 'KDFW', weight: 1.7 },
+  { a: 'KMEM', b: 'KIAH', weight: 1.6 },
+  // US regional feeders
+  { a: 'KBOS', b: 'KJFK', weight: 1.7 },
+  { a: 'KBOS', b: 'KORD', weight: 1.5 },
+  { a: 'KEWR', b: 'KJFK', weight: 1.8 },
+  { a: 'KEWR', b: 'KORD', weight: 1.6 },
+  { a: 'KPHL', b: 'KJFK', weight: 1.5 },
+  { a: 'KCLT', b: 'KATL', weight: 1.7 },
+  { a: 'KCLT', b: 'KJFK', weight: 1.5 },
+  { a: 'KMCO', b: 'KMIA', weight: 1.6 },
+  { a: 'KFLL', b: 'KMIA', weight: 1.7 },
+  { a: 'KDTW', b: 'KORD', weight: 1.6 },
+  { a: 'KDTW', b: 'KATL', weight: 1.4 },
+  { a: 'KMSP', b: 'KORD', weight: 1.6 },
+  { a: 'KMSP', b: 'KDEN', weight: 1.5 },
+  { a: 'KCVG', b: 'KORD', weight: 1.4 },
+  { a: 'KAUS', b: 'KDFW', weight: 1.5 },
+  { a: 'KAUS', b: 'KIAH', weight: 1.4 },
+  { a: 'KPHX', b: 'KDEN', weight: 1.5 },
+  { a: 'KPHX', b: 'KLAX', weight: 1.6 },
+  { a: 'KSLC', b: 'KDEN', weight: 1.5 },
+  { a: 'KSFO', b: 'KLAX', weight: 1.8 },
+  { a: 'KSFO', b: 'KSEA', weight: 1.6 },
+  { a: 'KSAN', b: 'KLAX', weight: 1.6 },
 ];
+
+/** Default corridor weight when an international lane has no domestic corridor entry. */
+export const INTERNATIONAL_CORRIDOR_WEIGHT = 2.0;
+/** Pay distance bias for cross-country lots (domestic cross-region is 1.12). */
+export const INTERNATIONAL_DISTANCE_BIAS = 1.55;
+/** Extra lot lifetime for long-haul international freights. */
+export const INTERNATIONAL_LIFE_MULT = 1.35;
+/** Emergency domestic release valve for non-major warehouses pinned near capacity. */
+const DOMESTIC_OVERFLOW_ORIGIN_FILL = 0.9;
+const DOMESTIC_OVERFLOW_DEST_FILL = 0.35;
+const DOMESTIC_OVERFLOW_CORRIDOR_WEIGHT = 1.1;
+
+/**
+ * Sparse BR↔US hub lanes (stored directed; matching is bidirectional).
+ * Soft capacityKgPerDay caps active freight on the OD.
+ */
+export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
+  {
+    id: 'lane_sbgr_kmia',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBGR',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 90_000,
+  },
+  {
+    id: 'lane_sbkp_kmia',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBKP',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 70_000,
+  },
+  {
+    id: 'lane_sbgl_kmia',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBGL',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_sbgr_kjfk',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBGR',
+    destIcao: 'KJFK',
+    capacityKgPerDay: 60_000,
+  },
+  {
+    id: 'lane_sbeg_kmia',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBEG',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_sbgr_kiah',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBGR',
+    destIcao: 'KIAH',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_sbgl_kiah',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBGL',
+    destIcao: 'KIAH',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_sbgr_katl',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBGR',
+    destIcao: 'KATL',
+    capacityKgPerDay: 65_000,
+  },
+  {
+    id: 'lane_sbgr_kord',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBGR',
+    destIcao: 'KORD',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_sbeg_kmem',
+    originCountryId: 'BR',
+    destCountryId: 'US',
+    originIcao: 'SBEG',
+    destIcao: 'KMEM',
+    capacityKgPerDay: 35_000,
+  },
+];
+
+/** Merge curated international lanes into a world (idempotent by id / OD). */
+export function ensureInternationalLanes(world: CareerEconomyWorld): boolean {
+  const existing = world.internationalLanes ?? [];
+  const byId = new Map(existing.map((l) => [l.id, l]));
+  const byOd = new Set(
+    existing.map(
+      (l) =>
+        `${l.originIcao.toUpperCase()}:${l.destIcao.toUpperCase()}`,
+    ),
+  );
+  let added = false;
+  for (const lane of CAREER_INTERNATIONAL_LANES) {
+    if (byId.has(lane.id)) continue;
+    const od = `${lane.originIcao.toUpperCase()}:${lane.destIcao.toUpperCase()}`;
+    const odRev = `${lane.destIcao.toUpperCase()}:${lane.originIcao.toUpperCase()}`;
+    if (byOd.has(od) || byOd.has(odRev)) continue;
+    existing.push({ ...lane });
+    byId.set(lane.id, lane);
+    byOd.add(od);
+    added = true;
+  }
+  world.internationalLanes = existing;
+  return added;
+}
 
 const CORRIDOR_WEIGHT_BY_OD: ReadonlyMap<string, number> = (() => {
   const map = new Map<string, number>();
@@ -419,7 +632,7 @@ export const CAREER_COMMODITIES: readonly CommodityDef[] = [
 export const CAREER_CARGO_COMMODITIES: readonly CommodityDef[] =
   CAREER_COMMODITIES.filter((c) => c.kind !== 'fuel' && c.kind !== 'mro');
 
-/** Major Jet-A production hubs in the Brazil career map. */
+/** Major Jet-A production hubs (BR + US career anchors). */
 export const FUEL_HUB_ICAOS = new Set([
   'SBGR',
   'SBGL',
@@ -431,14 +644,28 @@ export const FUEL_HUB_ICAOS = new Set([
   'SBSV',
   'SBEG',
   'SBBR',
+  // US continental Jet-A producers (~1 per 2–3 airports).
+  'KMIA',
+  'KATL',
+  'KJFK',
+  'KORD',
+  'KIAH',
+  'KDFW',
+  'KDEN',
+  'KLAX',
+  'KSEA',
 ]);
 
 /** Seed or repair fuel inventory + baseline flows on a terminal. */
 export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
-  const hub = FUEL_HUB_ICAOS.has(terminal.icao);
+  const icao = terminal.icao.trim().toUpperCase();
+  const hub = FUEL_HUB_ICAOS.has(icao);
   const cap = hub ? 500_000 : 120_000;
   const prod = hub ? 8_000 : 800;
   const cons = hub ? 3_000 : 1_500;
+  const existingCap = terminal.inventory.fuel?.capacityKg ?? 0;
+  /** Spoke→hub promotion (e.g. US majors added to FUEL_HUB_ICAOS). */
+  const upgradingToHub = hub && existingCap > 0 && existingCap < cap;
 
   if (!terminal.inventory.fuel) {
     terminal.inventory.fuel = pile(Math.round(cap * 0.55), cap);
@@ -456,10 +683,10 @@ export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
 
   terminal.baseProduction = { ...terminal.baseProduction, fuel: prod };
   terminal.baseConsumption = { ...terminal.baseConsumption, fuel: cons };
-  if (terminal.production.fuel === undefined) {
+  if (terminal.production.fuel === undefined || upgradingToHub) {
     terminal.production = { ...terminal.production, fuel: prod };
   }
-  if (terminal.consumption.fuel === undefined) {
+  if (terminal.consumption.fuel === undefined || upgradingToHub) {
     terminal.consumption = { ...terminal.consumption, fuel: cons };
   }
 }
@@ -593,6 +820,31 @@ export const CAREER_HUB_COORDS: Readonly<
   SBGO: { lat: -16.632, lon: -49.2207, name: 'Goiânia' },
   SBCY: { lat: -15.6529, lon: -56.1167, name: 'Cuiabá' },
   SBCG: { lat: -20.4687, lon: -54.6725, name: 'Campo Grande' },
+  // US continental map
+  KMIA: { lat: 25.7959, lon: -80.287, name: 'Miami International' },
+  KATL: { lat: 33.6407, lon: -84.4277, name: 'Atlanta/Hartsfield' },
+  KCLT: { lat: 35.214, lon: -80.9431, name: 'Charlotte/Douglas' },
+  KMCO: { lat: 28.4294, lon: -81.309, name: 'Orlando International' },
+  KFLL: { lat: 26.0726, lon: -80.1527, name: 'Fort Lauderdale' },
+  KJFK: { lat: 40.6398, lon: -73.7789, name: 'New York/JFK' },
+  KBOS: { lat: 42.3656, lon: -71.0096, name: 'Boston/Logan' },
+  KEWR: { lat: 40.6895, lon: -74.1745, name: 'Newark Liberty' },
+  KPHL: { lat: 39.8719, lon: -75.2411, name: 'Philadelphia' },
+  KORD: { lat: 41.9742, lon: -87.9073, name: "Chicago/O'Hare" },
+  KDTW: { lat: 42.2162, lon: -83.3554, name: 'Detroit Metro' },
+  KMSP: { lat: 44.8848, lon: -93.2223, name: 'Minneapolis/St Paul' },
+  KCVG: { lat: 39.0488, lon: -84.6678, name: 'Cincinnati/Northern Kentucky' },
+  KIAH: { lat: 29.9844, lon: -95.3414, name: 'Houston/Intercontinental' },
+  KDFW: { lat: 32.8998, lon: -97.0403, name: 'Dallas/Fort Worth' },
+  KMEM: { lat: 35.0424, lon: -89.9767, name: 'Memphis' },
+  KAUS: { lat: 30.1945, lon: -97.6699, name: 'Austin-Bergstrom' },
+  KDEN: { lat: 39.8561, lon: -104.6737, name: 'Denver International' },
+  KPHX: { lat: 33.4342, lon: -112.0116, name: 'Phoenix Sky Harbor' },
+  KSLC: { lat: 40.7899, lon: -111.9791, name: 'Salt Lake City' },
+  KLAX: { lat: 33.9416, lon: -118.4085, name: 'Los Angeles International' },
+  KSEA: { lat: 47.4502, lon: -122.3088, name: 'Seattle/Tacoma' },
+  KSFO: { lat: 37.6213, lon: -122.379, name: 'San Francisco' },
+  KSAN: { lat: 32.7336, lon: -117.1897, name: 'San Diego' },
 };
 
 export function resolveAirportCoords(
@@ -716,7 +968,7 @@ function ensurePile(
 }
 
 /**
- * Seed a Brazil-wide cargo world: N / NE / CO / SE / S hubs,
+ * Seed the career cargo world: Brazil domestic hubs + sparse US anchors,
  * with asymmetric production/consumption so ticks create explainable lanes.
  */
 export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEconomyWorld {
@@ -959,6 +1211,199 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       produce: { perishables: 1.2, machinery: 0.9 },
       consume: { electronics: 0.8, general: 0.9 },
     },
+    // US continental — 6 regions + sparse intl lanes to BR
+    {
+      icao: 'KMIA',
+      name: 'Miami International',
+      region: 'US-SE',
+      hubTier: 'major',
+      produce: { electronics: 1.5, perishables: 1.3, general: 1.0 },
+      consume: { machinery: 1.1, general: 1.0 },
+    },
+    {
+      icao: 'KATL',
+      name: 'Atlanta/Hartsfield',
+      region: 'US-SE',
+      hubTier: 'major',
+      produce: { general: 1.5, electronics: 1.2, machinery: 1.0 },
+      consume: { perishables: 1.1, general: 1.0 },
+    },
+    {
+      icao: 'KCLT',
+      name: 'Charlotte/Douglas',
+      region: 'US-SE',
+      hubTier: 'regional',
+      produce: { general: 1.2, machinery: 0.9 },
+      consume: { electronics: 1.0, perishables: 0.9 },
+    },
+    {
+      icao: 'KMCO',
+      name: 'Orlando International',
+      region: 'US-SE',
+      hubTier: 'spoke',
+      produce: { perishables: 1.2, general: 0.9 },
+      consume: { electronics: 1.0, machinery: 0.8 },
+    },
+    {
+      icao: 'KFLL',
+      name: 'Fort Lauderdale',
+      region: 'US-SE',
+      hubTier: 'spoke',
+      produce: { perishables: 1.1, general: 0.9 },
+      consume: { electronics: 1.0, machinery: 0.8 },
+    },
+    {
+      icao: 'KJFK',
+      name: 'New York/JFK',
+      region: 'US-NE',
+      hubTier: 'major',
+      produce: { electronics: 1.4, general: 1.2 },
+      consume: { perishables: 1.2, machinery: 1.0 },
+    },
+    {
+      icao: 'KBOS',
+      name: 'Boston/Logan',
+      region: 'US-NE',
+      hubTier: 'regional',
+      produce: { electronics: 1.3, general: 1.0 },
+      consume: { perishables: 1.1, machinery: 0.9 },
+    },
+    {
+      icao: 'KEWR',
+      name: 'Newark Liberty',
+      region: 'US-NE',
+      hubTier: 'regional',
+      produce: { general: 1.3, machinery: 1.1 },
+      consume: { electronics: 1.0, perishables: 1.0 },
+    },
+    {
+      icao: 'KPHL',
+      name: 'Philadelphia',
+      region: 'US-NE',
+      hubTier: 'spoke',
+      produce: { general: 1.1, perishables: 0.9 },
+      consume: { electronics: 0.9, machinery: 0.9 },
+    },
+    {
+      icao: 'KORD',
+      name: "Chicago/O'Hare",
+      region: 'US-MW',
+      hubTier: 'major',
+      produce: { machinery: 1.5, general: 1.3, electronics: 1.1 },
+      consume: { perishables: 1.1, general: 1.0 },
+    },
+    {
+      icao: 'KDTW',
+      name: 'Detroit Metro',
+      region: 'US-MW',
+      hubTier: 'regional',
+      produce: { machinery: 1.4, general: 1.0 },
+      consume: { electronics: 1.0, perishables: 0.9 },
+    },
+    {
+      icao: 'KMSP',
+      name: 'Minneapolis/St Paul',
+      region: 'US-MW',
+      hubTier: 'regional',
+      produce: { perishables: 1.3, general: 1.1 },
+      consume: { electronics: 0.9, machinery: 1.0 },
+    },
+    {
+      icao: 'KCVG',
+      name: 'Cincinnati/Northern Kentucky',
+      region: 'US-MW',
+      hubTier: 'spoke',
+      produce: { general: 1.2, machinery: 0.9 },
+      consume: { electronics: 0.9, perishables: 0.9 },
+    },
+    {
+      icao: 'KIAH',
+      name: 'Houston/Intercontinental',
+      region: 'US-SC',
+      hubTier: 'major',
+      produce: { machinery: 1.5, general: 1.1 },
+      consume: { electronics: 1.0, perishables: 0.9 },
+    },
+    {
+      icao: 'KDFW',
+      name: 'Dallas/Fort Worth',
+      region: 'US-SC',
+      hubTier: 'major',
+      produce: { electronics: 1.3, general: 1.4, machinery: 1.1 },
+      consume: { perishables: 1.0, general: 1.0 },
+    },
+    {
+      icao: 'KMEM',
+      name: 'Memphis',
+      region: 'US-SC',
+      hubTier: 'regional',
+      produce: { general: 1.6, electronics: 1.1 },
+      consume: { machinery: 0.9, perishables: 0.9 },
+    },
+    {
+      icao: 'KAUS',
+      name: 'Austin-Bergstrom',
+      region: 'US-SC',
+      hubTier: 'spoke',
+      produce: { electronics: 1.2, general: 0.9 },
+      consume: { perishables: 0.9, machinery: 0.8 },
+    },
+    {
+      icao: 'KDEN',
+      name: 'Denver International',
+      region: 'US-MT',
+      hubTier: 'major',
+      produce: { general: 1.3, machinery: 1.1, electronics: 1.0 },
+      consume: { perishables: 1.0, general: 1.0 },
+    },
+    {
+      icao: 'KPHX',
+      name: 'Phoenix Sky Harbor',
+      region: 'US-MT',
+      hubTier: 'regional',
+      produce: { electronics: 1.1, general: 1.2 },
+      consume: { perishables: 1.0, machinery: 0.9 },
+    },
+    {
+      icao: 'KSLC',
+      name: 'Salt Lake City',
+      region: 'US-MT',
+      hubTier: 'spoke',
+      produce: { general: 1.1, perishables: 0.9 },
+      consume: { electronics: 0.9, machinery: 0.8 },
+    },
+    {
+      icao: 'KLAX',
+      name: 'Los Angeles International',
+      region: 'US-W',
+      hubTier: 'major',
+      produce: { electronics: 1.6, general: 1.3, perishables: 1.1 },
+      consume: { machinery: 1.0, general: 1.0 },
+    },
+    {
+      icao: 'KSEA',
+      name: 'Seattle/Tacoma',
+      region: 'US-W',
+      hubTier: 'major',
+      produce: { electronics: 1.5, machinery: 1.2, general: 1.0 },
+      consume: { perishables: 1.0, general: 1.0 },
+    },
+    {
+      icao: 'KSFO',
+      name: 'San Francisco',
+      region: 'US-W',
+      hubTier: 'regional',
+      produce: { electronics: 1.4, general: 1.1 },
+      consume: { perishables: 1.1, machinery: 0.9 },
+    },
+    {
+      icao: 'KSAN',
+      name: 'San Diego',
+      region: 'US-W',
+      hubTier: 'spoke',
+      produce: { electronics: 1.1, general: 0.9 },
+      consume: { perishables: 1.0, machinery: 0.8 },
+    },
   ];
 
   const airports: AirportTerminal[] = hubs.map((h) => {
@@ -1048,6 +1493,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     tick: 0,
     lastBatchAtMs: now,
     lastSyncedAtMs: now,
+    homeCountryId: 'BR',
     airports,
     lots: [],
     events: [],
@@ -1056,8 +1502,11 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     inboundPending: [],
     fuelTrucks: seedFuelTruckFleet({ seed, regions }),
     fuelHauls: [],
+    internationalLanes: CAREER_INTERNATIONAL_LANES.map((l) => ({ ...l })),
   };
   ensureWorldHubLevels(world);
+  ensureHomeCountryId(world);
+  ensureInternationalLanes(world);
   return world;
 }
 
@@ -1129,8 +1578,8 @@ function migrateNpcTimestamps(
 }
 
 /**
- * Merge airports present in the current Brazil seed that are missing from a
- * legacy save (e.g. BR-N / BR-CO expansion). Returns true when any hub was added.
+ * Merge airports present in the current seed that are missing from a legacy
+ * save (e.g. BR-N / BR-CO / US anchors). Returns true when any hub was added.
  */
 export function ensureCareerHubCoverage(world: CareerEconomyWorld): boolean {
   const have = new Set(world.airports.map((a) => a.icao.toUpperCase()));
@@ -1143,6 +1592,7 @@ export function ensureCareerHubCoverage(world: CareerEconomyWorld): boolean {
     have.add(icao);
     added = true;
   }
+  if (ensureInternationalLanes(world)) added = true;
   return added;
 }
 
@@ -1192,12 +1642,18 @@ export function migrateEconomyWorld(
     lastBatchAtMs = nowMs;
   }
 
+  const homeCountryRaw = (base as { homeCountryId?: unknown }).homeCountryId;
+  const lanesRaw = (base as { internationalLanes?: unknown }).internationalLanes;
   const migrated: CareerEconomyWorld = {
     version: 3,
     seed,
     tick: typeof base.tick === 'number' ? base.tick : 0,
     lastBatchAtMs,
     lastSyncedAtMs: lastBatchAtMs,
+    homeCountryId:
+      typeof homeCountryRaw === 'string' && homeCountryRaw.trim()
+        ? homeCountryRaw.trim().toUpperCase()
+        : undefined,
     airports: base.airports,
     lots: Array.isArray(base.lots) ? base.lots : [],
     events: Array.isArray(base.events) ? base.events : [],
@@ -1208,9 +1664,13 @@ export function migrateEconomyWorld(
       : [],
     fuelTrucks: Array.isArray(base.fuelTrucks) ? base.fuelTrucks : [],
     fuelHauls: Array.isArray(base.fuelHauls) ? base.fuelHauls : [],
+    internationalLanes: Array.isArray(lanesRaw)
+      ? (lanesRaw as InternationalLane[])
+      : [],
   };
 
   ensureCareerHubCoverage(migrated);
+  ensureInternationalLanes(migrated);
   ensureNpcFleet(migrated);
   migrateNpcTimestamps(migrated, Number.isFinite(version) ? version : 0);
   ensureWorldFuelInventory(migrated);
@@ -1218,6 +1678,7 @@ export function migrateEconomyWorld(
   ensureWorldHubTiers(migrated);
   ensureFuelTruckFleet(migrated);
   ensureWorldHubLevels(migrated);
+  ensureHomeCountryId(migrated);
   pruneDeadLots(migrated);
 
   return migrated;
@@ -1246,6 +1707,8 @@ export function ensureEconomyCaughtUp(
   w.npcFlights = migrated.npcFlights;
   w.fuelTrucks = migrated.fuelTrucks;
   w.fuelHauls = migrated.fuelHauls;
+  w.homeCountryId = migrated.homeCountryId;
+  w.internationalLanes = migrated.internationalLanes;
 
   // Mid-hour continuous ops first (arrivals between batches).
   let settledFlights = settleNpcOpsDue(w, nowMs).settledFlights;
@@ -1575,8 +2038,9 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
       const baseProd = baseProdOf(ap, c.id);
       const baseCons = baseConsOf(ap, c.id);
 
-      // Production slows as warehouse fills; consumption slows when nearly empty.
-      const prodSaturation = fill >= 0.7 ? 1 - ((fill - 0.7) / 0.3) * 0.55 : 1;
+      // Production nearly stops at a full warehouse instead of creating a
+      // permanent 100%-fill pressure source.
+      const prodSaturation = fill >= 0.7 ? 1 - ((fill - 0.7) / 0.3) * 0.95 : 1;
       const consStarvation = fill <= 0.15 ? Math.max(0.15, fill / 0.15) : 1;
       const season = seasonalFactor(c.id, world.tick);
       const noise = 0.88 + rng() * 0.24;
@@ -1743,12 +2207,26 @@ function laneKey(commodityId: CommodityId, origin: string, dest: string): string
   return `${commodityId}:${origin}:${dest}`;
 }
 
+type RankedAirport = {
+  ap: AirportTerminal;
+  stock: StockPile;
+  fill: number;
+  price: number;
+  surplusKg: number;
+  roomKg: number;
+  tier: HubTier;
+};
+
 /**
  * Form shipment lots from surplus→shortage pairs.
- * Only creates a lot when value of moving cargo is clearly positive.
- * Origins/dests are ranked by absolute kg (not fill %), so majors dominate the board.
+ * Domestic passes are per country; cross-country only via internationalLanes.
  */
-function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): void {
+function formLotsFromImbalances(
+  world: CareerEconomyWorld,
+  rng: () => number,
+): PartitionTickResult[] {
+  ensureInternationalLanes(world);
+
   const activeCounts = new Map<string, number>();
   const largeCounts = new Map<string, number>();
   const smallCounts = new Map<string, number>();
@@ -1765,25 +2243,31 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     }
   }
 
+  const formedByPartition = new Map<string, number>();
+  const bumpFormed = (partitionId: string, n = 1) => {
+    formedByPartition.set(partitionId, (formedByPartition.get(partitionId) ?? 0) + n);
+  };
+
   const pushLot = (
     key: string,
     commodity: (typeof CAREER_COMMODITIES)[number],
-    origin: {
-      ap: AirportTerminal;
-      stock: { stockKg: number; capacityKg: number };
-      fill: number;
-    },
-    dest: {
-      ap: AirportTerminal;
-      stock: { stockKg: number; capacityKg: number };
-      fill: number;
-    },
+    origin: RankedAirport,
+    dest: RankedAirport,
     qty: number,
     size: 'large' | 'small',
     laneSaturation: number,
     inboundKg: number,
     corridorW: number,
-  ): void => {
+    opts: { international: boolean; partitionId: string; capacityKgPerDay?: number },
+  ): boolean => {
+    if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
+      const activeKg = activeLaneKg(world, origin.ap.icao, dest.ap.icao);
+      if (activeKg + qty > opts.capacityKgPerDay) {
+        return false;
+      }
+    }
+
+    const international = opts.international;
     const originWx = regionalWeatherIndex(world, origin.ap.region);
     const destWx = regionalWeatherIndex(world, dest.ap.region);
     const laneWeather = worseWeather(originWx, destWx);
@@ -1803,16 +2287,18 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       laneSaturation >= 0.5 ||
       (laneWeather === 'poor' && dest.fill < 0.35);
     const urgencyMult = urgent ? 1.35 : 1;
-    const distanceBias = origin.ap.region === dest.ap.region ? 1 : 1.12;
+    const distanceBias = international
+      ? INTERNATIONAL_DISTANCE_BIAS
+      : origin.ap.region === dest.ap.region
+        ? 1
+        : 1.12;
     const corridorPayMult = 1 + Math.max(0, corridorW - 1) * 0.1;
     const destPile = ensurePile(dest.ap, commodity.id);
     const gap =
       localUnitPriceUsd(commodity.id, destPile) - localUnitPriceUsd(commodity.id, origin.stock);
-    // Low home-region NPC bid capacity → slightly richer freight for the player.
     const batchNowMs = world.lastBatchAtMs ?? Date.now();
     const capacity = npcRegionBidCapacity(world, origin.ap.region, batchNowMs);
     const capacityPayMult = 1 + (1 - capacity) * 0.22;
-    // Saturated OD lane → scarce remaining slots pay a bit more.
     const scarcePayMult =
       laneSaturation >= 0.35 ? 1 + laneSaturation * 0.12 : 1;
     const weatherPayMult = regionalWeatherPayMult(laneWeather);
@@ -1828,7 +2314,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         corridorPayMult *
         shock.payMult *
         originLevelPay,
-      commodity.basePricePerKg * 1.8,
+      commodity.basePricePerKg * (international ? 2.1 : 1.8),
     );
     const payUsd = Math.round(qty * payPerKg);
     const baseLife = commodity.perishable
@@ -1837,7 +2323,10 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     const life = Math.max(
       4,
       Math.round(
-        baseLife * regionalWeatherLifeMult(laneWeather) * shock.lifeMult,
+        baseLife *
+          regionalWeatherLifeMult(laneWeather) *
+          shock.lifeMult *
+          (international ? INTERNATIONAL_LIFE_MULT : 1),
       ),
     );
 
@@ -1855,7 +2344,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       payUsd,
       basePayUsd: payUsd,
       urgency: urgent ? 'urgent' : 'normal',
-      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${size === 'small' ? ' · LTL' : ''}${shockNote}`,
+      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${size === 'small' ? ' · LTL' : ''}${international ? ' · intl' : ''}${shockNote}`,
       status: 'available',
     };
 
@@ -1868,10 +2357,123 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     } else {
       smallCounts.set(key, (smallCounts.get(key) ?? 0) + 1);
     }
+    bumpFormed(opts.partitionId);
+    return true;
   };
 
-  for (const commodity of CAREER_CARGO_COMMODITIES) {
-    const ranked = world.airports.map((ap) => {
+  const tryFormPair = (
+    commodity: (typeof CAREER_CARGO_COMMODITIES)[number],
+    origin: RankedAirport,
+    dest: RankedAirport,
+    cw: number,
+    opts: {
+      international: boolean;
+      partitionId: string;
+      capacityKgPerDay?: number;
+      allowSpokeFiller: boolean;
+      originHasOpenCorridor: boolean;
+    },
+  ): void => {
+    if (origin.ap.icao === dest.ap.icao) return;
+    if (!opts.international && !isDomesticOd(origin.ap.region, dest.ap.region)) {
+      return;
+    }
+    if (cw <= 1) {
+      if (!opts.allowSpokeFiller) return;
+      const spokeFiller = origin.tier === 'spoke' && dest.tier === 'spoke';
+      if (!spokeFiller) return;
+      if (opts.originHasOpenCorridor || rng() > 0.2) return;
+    }
+    const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
+    let caps = laneLotCaps(origin.tier, dest.tier, {
+      originLevel: origin.ap.level,
+      destLevel: dest.ap.level,
+    });
+    if (cw >= 1.8) {
+      caps = {
+        maxLots: caps.maxLots + 1,
+        maxLarge: caps.maxLarge + 1,
+        maxSmall: caps.maxSmall,
+      };
+    }
+    const laneSat = npcLaneSaturation(
+      world,
+      origin.ap.icao,
+      dest.ap.icao,
+      commodity.id,
+    );
+    if (laneSat >= 1) return;
+    const satPenalty = laneSat >= 0.5 ? 1 : 0;
+    if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) return;
+
+    const priceGap = dest.price - origin.price;
+    const minGapMult = opts.international ? 0.12 : cw >= 1.5 ? 0.15 : 0.22;
+    if (priceGap < commodity.basePricePerKg * minGapMult) return;
+
+    if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
+      if (activeLaneKg(world, origin.ap.icao, dest.ap.icao) >= opts.capacityKgPerDay) {
+        return;
+      }
+    }
+
+    const inboundKg = laneInboundKg(world, null, dest.ap.icao, commodity.id);
+    const surplusKg = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
+    const roomKg = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
+    let qty = Math.min(surplusKg, roomKg);
+    qty = Math.floor(qty / 100) * 100;
+
+    if (
+      qty >= 4_000 &&
+      caps.maxLarge > 0 &&
+      (largeCounts.get(key) ?? 0) < caps.maxLarge &&
+      (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
+    ) {
+      const largeQty = Math.min(qty, 28_000);
+      pushLot(
+        key,
+        commodity,
+        origin,
+        dest,
+        largeQty,
+        'large',
+        laneSat,
+        inboundKg,
+        cw,
+        opts,
+      );
+      const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
+      const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
+      qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
+    }
+
+    if (
+      qty >= 400 &&
+      caps.maxSmall > 0 &&
+      (smallCounts.get(key) ?? 0) < caps.maxSmall &&
+      (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
+    ) {
+      const smallQty = Math.min(qty, 2_000);
+      const sized = Math.max(400, Math.min(smallQty, 400 + Math.floor(rng() * 17) * 100));
+      pushLot(
+        key,
+        commodity,
+        origin,
+        dest,
+        Math.min(smallQty, sized),
+        'small',
+        laneSat,
+        inboundKg,
+        cw,
+        opts,
+      );
+    }
+  };
+
+  const rankAirports = (
+    airports: AirportTerminal[],
+    commodity: (typeof CAREER_CARGO_COMMODITIES)[number],
+  ): RankedAirport[] =>
+    airports.map((ap) => {
       const stock = ensurePile(ap, commodity.id);
       const fill = fillPct(stock);
       return {
@@ -1885,189 +2487,190 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       };
     });
 
-    // Absolute kg — majors with bigger warehouses surface first.
-    const destinations = ranked
-      .filter((r) => r.fill <= 0.45 && r.roomKg >= 400)
-      .sort((a, b) => b.roomKg - a.roomKg)
-      .slice(0, 12);
-    const origins = ranked
-      .filter((r) => r.fill >= 0.55 && r.surplusKg >= 400)
-      .sort((a, b) => b.surplusKg - a.surplusKg)
-      .slice(0, 12);
+  // --- Domestic: one pass per country present in the world ---
+  for (const countryId of listWorldCountryIds(world)) {
+    const countryAirports = world.airports.filter(
+      (ap) => countryIdFromRegion(ap.region) === countryId,
+    );
+    for (const commodity of CAREER_CARGO_COMMODITIES) {
+      const ranked = rankAirports(countryAirports, commodity);
+      const destinations = ranked
+        .filter((r) => r.fill <= 0.45 && r.roomKg >= 400)
+        .sort((a, b) => b.roomKg - a.roomKg)
+        .slice(0, 12);
+      const origins = ranked
+        .filter((r) => r.fill >= 0.55 && r.surplusKg >= 400)
+        .sort((a, b) => b.surplusKg - a.surplusKg)
+        .slice(0, 12);
 
-    // Ensure curated corridor partners stay eligible even when outside the top-12.
-    const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
-    const mergeUnique = (
-      list: typeof destinations,
-      candidate: (typeof ranked)[number] | undefined,
-    ) => {
-      if (!candidate) return;
-      if (list.some((r) => r.ap.icao === candidate.ap.icao)) return;
-      list.push(candidate);
-    };
-    for (const origin of [...origins]) {
-      for (const partner of corridorPartners(origin.ap.icao)) {
-        const row = byIcao.get(partner);
-        if (row && row.fill <= 0.45 && row.roomKg >= 400) {
-          mergeUnique(destinations, row);
-        }
-      }
-    }
-    for (const dest of [...destinations]) {
-      for (const partner of corridorPartners(dest.ap.icao)) {
-        const row = byIcao.get(partner);
-        if (row && row.fill >= 0.55 && row.surplusKg >= 400) {
+      const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
+      const mergeUnique = (
+        list: RankedAirport[],
+        candidate: RankedAirport | undefined,
+      ) => {
+        if (!candidate) return;
+        if (list.some((r) => r.ap.icao === candidate.ap.icao)) return;
+        list.push(candidate);
+      };
+      // Absolute-kg ranking favors majors. Keep critically full regionals and
+      // spokes eligible for the overflow valve even when they miss the top 12.
+      for (const row of ranked) {
+        if (
+          row.tier !== 'major' &&
+          row.fill >= DOMESTIC_OVERFLOW_ORIGIN_FILL &&
+          row.surplusKg >= 400
+        ) {
           mergeUnique(origins, row);
         }
       }
-    }
-
-    const laneOpen = (
-      o: (typeof ranked)[number],
-      d: (typeof ranked)[number],
-      weight: number,
-    ): boolean => {
-      let caps = laneLotCaps(o.tier, d.tier, {
-        originLevel: o.ap.level,
-        destLevel: d.ap.level,
-      });
-      if (weight >= 1.8) {
-        caps = {
-          maxLots: caps.maxLots + 1,
-          maxLarge: caps.maxLarge + 1,
-          maxSmall: caps.maxSmall,
-        };
-      }
-      const key = laneKey(commodity.id, o.ap.icao, d.ap.icao);
-      const laneSat = npcLaneSaturation(world, o.ap.icao, d.ap.icao, commodity.id);
-      if (laneSat >= 1) return false;
-      const satPenalty = laneSat >= 0.5 ? 1 : 0;
-      return (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots;
-    };
-
-    const originHasOpenCorridor = (o: (typeof ranked)[number]): boolean => {
-      for (const partnerIcao of corridorPartners(o.ap.icao)) {
-        const partner = byIcao.get(partnerIcao);
-        if (!partner || partner.fill > 0.45 || partner.roomKg < 400) continue;
-        const w = corridorWeight(o.ap.icao, partner.ap.icao);
-        if (laneOpen(o, partner, w)) return true;
-      }
-      return false;
-    };
-
-    for (const origin of origins) {
-      const orderedDests = [...destinations].sort((a, b) => {
-        const wa = corridorWeight(origin.ap.icao, a.ap.icao);
-        const wb = corridorWeight(origin.ap.icao, b.ap.icao);
-        return wb - wa;
-      });
-      for (const dest of orderedDests) {
-        if (origin.ap.icao === dest.ap.icao) {
-          continue;
+      for (const origin of [...origins]) {
+        for (const partner of corridorPartners(origin.ap.icao)) {
+          const row = byIcao.get(partner);
+          if (row && row.fill <= 0.45 && row.roomKg >= 400) {
+            mergeUnique(destinations, row);
+          }
         }
-        const cw = corridorWeight(origin.ap.icao, dest.ap.icao);
-        // Curated corridors first. Off-table pairs only as rare spoke↔spoke fillers
-        // once this origin's corridor lanes are full (or have no qualifying partner).
-        if (cw <= 1) {
-          const spokeFiller =
-            origin.tier === 'spoke' && dest.tier === 'spoke';
-          if (!spokeFiller) continue;
-          if (originHasOpenCorridor(origin) || rng() > 0.2) continue;
+      }
+      for (const dest of [...destinations]) {
+        for (const partner of corridorPartners(dest.ap.icao)) {
+          const row = byIcao.get(partner);
+          if (row && row.fill >= 0.55 && row.surplusKg >= 400) {
+            mergeUnique(origins, row);
+          }
         }
-        const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
-        let caps = laneLotCaps(origin.tier, dest.tier, {
-          originLevel: origin.ap.level,
-          destLevel: dest.ap.level,
+      }
+
+      const laneOpen = (o: RankedAirport, d: RankedAirport, weight: number): boolean => {
+        let caps = laneLotCaps(o.tier, d.tier, {
+          originLevel: o.ap.level,
+          destLevel: d.ap.level,
         });
-        if (cw >= 1.8) {
+        if (weight >= 1.8) {
           caps = {
             maxLots: caps.maxLots + 1,
             maxLarge: caps.maxLarge + 1,
             maxSmall: caps.maxSmall,
           };
         }
-        const laneSat = npcLaneSaturation(
-          world,
-          origin.ap.icao,
-          dest.ap.icao,
-          commodity.id,
-        );
-        if (laneSat >= 1) {
-          continue;
-        }
+        const key = laneKey(commodity.id, o.ap.icao, d.ap.icao);
+        const laneSat = npcLaneSaturation(world, o.ap.icao, d.ap.icao, commodity.id);
+        if (laneSat >= 1) return false;
         const satPenalty = laneSat >= 0.5 ? 1 : 0;
-        if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) {
-          continue;
+        return (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots;
+      };
+
+      const originHasOpenCorridor = (o: RankedAirport): boolean => {
+        for (const partnerIcao of corridorPartners(o.ap.icao)) {
+          const partner = byIcao.get(partnerIcao);
+          if (!partner || partner.fill > 0.45 || partner.roomKg < 400) continue;
+          if (countryIdFromRegion(partner.ap.region) !== countryId) continue;
+          const w = corridorWeight(o.ap.icao, partner.ap.icao);
+          if (laneOpen(o, partner, w)) return true;
+        }
+        return false;
+      };
+
+      for (const origin of origins) {
+        const hasOpenCorridor = originHasOpenCorridor(origin);
+        const orderedDests = [...destinations].sort((a, b) => {
+          const wa = corridorWeight(origin.ap.icao, a.ap.icao);
+          const wb = corridorWeight(origin.ap.icao, b.ap.icao);
+          return wb - wa;
+        });
+        for (const dest of orderedDests) {
+          tryFormPair(commodity, origin, dest, corridorWeight(origin.ap.icao, dest.ap.icao), {
+            international: false,
+            partitionId: countryId,
+            allowSpokeFiller: true,
+            originHasOpenCorridor: hasOpenCorridor,
+          });
         }
 
-        const priceGap = dest.price - origin.price;
-        const minGapMult = cw >= 1.5 ? 0.15 : 0.22;
-        if (priceGap < commodity.basePricePerKg * minGapMult) {
-          continue;
-        }
-
-        const inboundKg = laneInboundKg(
-          world,
-          null,
-          dest.ap.icao,
-          commodity.id,
-        );
-
-        const surplusKg = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
-        const roomKg = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
-        let qty = Math.min(surplusKg, roomKg);
-        qty = Math.floor(qty / 100) * 100;
-
-        // Large lot for narrow/wide freighters (spoke lanes often cap at 1).
+        // If a non-major warehouse remains critically full and every curated
+        // gateway is blocked, release at most one low-priority domestic OD per
+        // commodity/tick. It still requires a deep shortage, price gap, range,
+        // and normal lane caps; curated corridors continue to win first.
         if (
-          qty >= 4_000 &&
-          caps.maxLarge > 0 &&
-          (largeCounts.get(key) ?? 0) < caps.maxLarge &&
-          (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
+          origin.tier !== 'major' &&
+          origin.fill >= DOMESTIC_OVERFLOW_ORIGIN_FILL &&
+          !hasOpenCorridor
         ) {
-          const largeQty = Math.min(qty, 28_000);
-          pushLot(
-            key,
-            commodity,
-            origin,
-            dest,
-            largeQty,
-            'large',
-            laneSat,
-            inboundKg,
-            cw,
+          const overflowDest = destinations.find(
+            (dest) =>
+              dest.ap.icao !== origin.ap.icao &&
+              dest.fill <= DOMESTIC_OVERFLOW_DEST_FILL &&
+              corridorWeight(origin.ap.icao, dest.ap.icao) === 1 &&
+              laneOpen(origin, dest, DOMESTIC_OVERFLOW_CORRIDOR_WEIGHT),
           );
-          // Refresh remaining after soft-commit for optional LTL companion.
-          const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
-          const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
-          qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
-        }
-
-        // Small LTL lots for light turboprop / partial fills.
-        if (
-          qty >= 400 &&
-          caps.maxSmall > 0 &&
-          (smallCounts.get(key) ?? 0) < caps.maxSmall &&
-          (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
-        ) {
-          const smallQty = Math.min(qty, 2_000);
-          // Prefer variety: 400–2000 in 100 kg steps.
-          const sized = Math.max(400, Math.min(smallQty, 400 + Math.floor(rng() * 17) * 100));
-          pushLot(
-            key,
-            commodity,
-            origin,
-            dest,
-            Math.min(smallQty, sized),
-            'small',
-            laneSat,
-            inboundKg,
-            cw,
-          );
+          if (overflowDest) {
+            tryFormPair(
+              commodity,
+              origin,
+              overflowDest,
+              DOMESTIC_OVERFLOW_CORRIDOR_WEIGHT,
+              {
+                international: false,
+                partitionId: countryId,
+                allowSpokeFiller: false,
+                originHasOpenCorridor: false,
+              },
+            );
+          }
         }
       }
     }
   }
+
+  // --- International: only curated sparse lanes (both directions) ---
+  const byIcaoAll = new Map(world.airports.map((ap) => [ap.icao.toUpperCase(), ap]));
+  for (const commodity of CAREER_CARGO_COMMODITIES) {
+    const rankedAll = rankAirports(world.airports, commodity);
+    const rankedByIcao = new Map(rankedAll.map((r) => [r.ap.icao.toUpperCase(), r]));
+    for (const lane of world.internationalLanes ?? []) {
+      const pairs: Array<[string, string]> = [
+        [lane.originIcao, lane.destIcao],
+        [lane.destIcao, lane.originIcao],
+      ];
+      for (const [oIcao, dIcao] of pairs) {
+        if (!byIcaoAll.has(oIcao.toUpperCase()) || !byIcaoAll.has(dIcao.toUpperCase())) {
+          continue;
+        }
+        const origin = rankedByIcao.get(oIcao.toUpperCase());
+        const dest = rankedByIcao.get(dIcao.toUpperCase());
+        if (!origin || !dest) continue;
+        if (origin.fill < 0.55 || origin.surplusKg < 400) continue;
+        if (dest.fill > 0.45 || dest.roomKg < 400) continue;
+        const cw = Math.max(
+          corridorWeight(origin.ap.icao, dest.ap.icao),
+          INTERNATIONAL_CORRIDOR_WEIGHT,
+        );
+        tryFormPair(commodity, origin, dest, cw, {
+          international: true,
+          partitionId: 'INTL',
+          capacityKgPerDay: lane.capacityKgPerDay,
+          allowSpokeFiller: false,
+          originHasOpenCorridor: false,
+        });
+      }
+    }
+  }
+
+  const results: PartitionTickResult[] = [];
+  for (const countryId of listWorldCountryIds(world)) {
+    results.push({
+      countryId,
+      ticksAdvanced: 1,
+      lotsFormed: formedByPartition.get(countryId) ?? 0,
+      npcSettled: 0,
+    });
+  }
+  results.push({
+    countryId: 'INTL',
+    ticksAdvanced: 1,
+    lotsFormed: formedByPartition.get('INTL') ?? 0,
+    npcSettled: 0,
+  });
+  return results;
 }
 
 /** Advance the local economy by one hourly batch. Mutates and returns the world. */
@@ -2092,11 +2695,15 @@ export function tickEconomy(
     world.npcFlights = migrated.npcFlights;
     world.fuelTrucks = migrated.fuelTrucks;
     world.fuelHauls = migrated.fuelHauls;
+    world.homeCountryId = migrated.homeCountryId;
+    world.internationalLanes = migrated.internationalLanes;
   }
 
   ensureNpcFleet(world);
   ensureFuelTruckFleet(world);
   ensureWorldHubLevels(world);
+  ensureInternationalLanes(world);
+  ensureHomeCountryId(world);
 
   world.tick += 1;
   const batchNowMs =
@@ -2292,6 +2899,7 @@ export function listMarketLots(
     pressure.demandShock = shock.labels.length > 0;
     pressure.shockLabels = shock.labels;
     pressure.shockPayMult = shock.payMult;
+    pressure.international = !isDomesticOd(originRegion, destRegion);
 
     views.push({
       lot,

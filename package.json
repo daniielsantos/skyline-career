@@ -46,7 +46,7 @@
     "apply-auto": "node packages/agent/dist/cli.js apply-auto"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

@@ -22,6 +22,60 @@ describe('career fuel commodity', () => {
     assert.ok((world.airports.find((a) => a.icao === 'SBGR')!.inventory.fuel!.capacityKg) >= 400_000);
   });
 
+  it('treats US majors as Jet-A production hubs (not draining spokes)', () => {
+    const world = createSeedEconomyWorld({ seed: 'fuel-us-hubs' });
+    const usFuelHubs = [
+      'KMIA',
+      'KATL',
+      'KJFK',
+      'KORD',
+      'KIAH',
+      'KDFW',
+      'KDEN',
+      'KLAX',
+      'KSEA',
+    ];
+    for (const icao of usFuelHubs) {
+      const ap = world.airports.find((a) => a.icao === icao)!;
+      assert.ok(ap, `${icao} missing`);
+      assert.ok(
+        (ap.inventory.fuel?.capacityKg ?? 0) >= 400_000,
+        `${icao} should have hub fuel capacity`,
+      );
+      assert.ok(
+        (ap.baseProduction?.fuel ?? 0) > (ap.baseConsumption?.fuel ?? 0),
+        `${icao} should net-produce Jet-A`,
+      );
+    }
+    // Spoke in a fuel-hub region stays a consumer spoke.
+    const fll = world.airports.find((a) => a.icao === 'KFLL')!;
+    assert.ok((fll.inventory.fuel?.capacityKg ?? 0) < 200_000);
+    assert.ok((fll.baseConsumption?.fuel ?? 0) > (fll.baseProduction?.fuel ?? 0));
+  });
+
+  it('promotes legacy US majors from spoke fuel rates on migrate', () => {
+    const world = createSeedEconomyWorld({ seed: 'fuel-us-promote' });
+    const miami = world.airports.find((a) => a.icao === 'KMIA')!;
+    // Simulate pre-fix spoke seed still sitting on a save.
+    miami.inventory.fuel = {
+      stockKg: 1_100,
+      capacityKg: 120_000,
+    };
+    miami.baseProduction = { ...miami.baseProduction, fuel: 800 };
+    miami.baseConsumption = { ...miami.baseConsumption, fuel: 1_500 };
+    miami.production = { ...miami.production, fuel: 800 };
+    miami.consumption = { ...miami.consumption, fuel: 1_500 };
+
+    const migrated = migrateEconomyWorld(world);
+    ensureWorldFuelInventory(migrated);
+    const fixed = migrated.airports.find((a) => a.icao === 'KMIA')!;
+    assert.ok((fixed.inventory.fuel?.capacityKg ?? 0) >= 400_000);
+    assert.equal(fixed.baseProduction?.fuel, 8_000);
+    assert.equal(fixed.baseConsumption?.fuel, 3_000);
+    assert.equal(fixed.production.fuel, 8_000);
+    assert.equal(fixed.consumption.fuel, 3_000);
+  });
+
   it('migrates legacy airports without fuel piles', () => {
     const seeded = createSeedEconomyWorld({ seed: 'fuel-migrate' });
     for (const ap of seeded.airports) {

@@ -1,39 +1,46 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { CareerMissionsState, MissionIntent } from '@msfs-compat/shared';
 import {
-  emptyMissionsStateV2,
-  normalizeMissionIntent,
-  normalizeMissionsState,
   applyWalletDelta,
+  emptyMissionsStateV2,
+  openCareerStore,
+  type CareerStore,
 } from '@msfs-compat/shared';
 
 export const DEFAULT_CAREER_MISSIONS_PATH = 'profiles/career/local-missions.json';
+
+function careerDirFromMissionsPath(path: string): string {
+  const abs = resolve(path);
+  return abs.replace(/[\\/][^\\/]+$/, '');
+}
+
+async function storeForPath(path: string): Promise<CareerStore> {
+  return openCareerStore({ careerDir: careerDirFromMissionsPath(path) });
+}
 
 export function emptyMissionsState(): CareerMissionsState {
   return emptyMissionsStateV2();
 }
 
 export async function loadCareerMissions(path: string): Promise<CareerMissionsState> {
-  const raw = await readFile(resolve(path), 'utf8');
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
-  if (!Array.isArray(parsed.missions)) {
-    throw new Error(`Invalid career missions file: ${path}`);
+  const store = await storeForPath(path);
+  try {
+    return await store.loadMissions();
+  } finally {
+    store.close();
   }
-  const normalized = normalizeMissionsState(parsed);
-  normalized.missions = normalized.missions.map((m) => normalizeMissionIntent(m));
-  return normalized;
 }
 
 export async function saveCareerMissions(
   path: string,
   state: CareerMissionsState,
 ): Promise<void> {
-  const abs = resolve(path);
-  await mkdir(dirname(abs), { recursive: true });
-  const normalized = normalizeMissionsState(state);
-  normalized.missions = normalized.missions.map((m) => normalizeMissionIntent(m));
-  await writeFile(abs, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+  const store = await storeForPath(path);
+  try {
+    await store.saveMissions(state);
+  } finally {
+    store.close();
+  }
 }
 
 export async function loadOrCreateCareerMissions(path: string): Promise<CareerMissionsState> {

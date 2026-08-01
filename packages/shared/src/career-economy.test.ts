@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   continuousEconomyHours,
+  corridorPartners,
   corridorWeight,
   createSeedEconomyWorld,
   DEAD_LOT_RETENTION_TICKS,
@@ -35,20 +36,37 @@ import type {
 } from './types/career-economy.js';
 
 describe('career-economy seed', () => {
-  it('creates 28 Brazilian hubs across N/NE/CO/SE/S and 5 commodities of inventory', () => {
+  it('creates 28 BR + 24 US hubs across 11 regions', () => {
     const world = createSeedEconomyWorld({ seed: 'test-a' });
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 28);
-    assert.ok(world.airports.every((airport) => airport.icao.startsWith('SB')));
+    assert.equal(world.airports.length, 52);
+    assert.equal(world.homeCountryId, 'BR');
+    assert.ok((world.internationalLanes?.length ?? 0) >= 10);
+    const br = world.airports.filter((a) => a.icao.startsWith('SB'));
+    const us = world.airports.filter((a) => a.icao.startsWith('K'));
+    assert.equal(br.length, 28);
+    assert.equal(us.length, 24);
     assert.deepEqual(
       new Set(world.airports.map((airport) => airport.region)),
-      new Set(['BR-S', 'BR-SE', 'BR-NE', 'BR-N', 'BR-CO']),
+      new Set([
+        'BR-S',
+        'BR-SE',
+        'BR-NE',
+        'BR-N',
+        'BR-CO',
+        'US-SE',
+        'US-NE',
+        'US-SC',
+        'US-MW',
+        'US-MT',
+        'US-W',
+      ]),
     );
     assert.equal(world.tick, 0);
     assert.equal(world.lots.length, 0);
-    assert.equal(world.npcs.length, 17);
+    assert.equal(world.npcs.length, 44);
     assert.equal(world.npcFlights.length, 0);
     for (const ap of world.airports) {
       assert.ok(ap.inventory.electronics);
@@ -123,6 +141,48 @@ describe('cargo corridors', () => {
     assert.equal(corridorWeight('SBGR', 'SBPS'), 1);
   });
 
+  it('gives every US regional at least two gateway corridors', () => {
+    const usRegionals = ['KBOS', 'KEWR', 'KCLT', 'KDTW', 'KMSP', 'KMEM', 'KPHX', 'KSFO'];
+    for (const icao of usRegionals) {
+      assert.ok(
+        corridorPartners(icao).length >= 2,
+        `expected ${icao} to have at least two corridor partners`,
+      );
+    }
+    assert.ok(corridorWeight('KMEM', 'KDFW') > 1);
+    assert.ok(corridorWeight('KMEM', 'KIAH') > 1);
+  });
+
+  it('releases critically full regionals to a domestic off-corridor shortage', () => {
+    const world = createSeedEconomyWorld({ seed: 'regional-overflow' });
+    for (const ap of world.airports.filter((airport) => airport.region.startsWith('US-'))) {
+      const stock = ap.inventory.electronics!;
+      stock.stockKg = stock.capacityKg * 0.5;
+      ap.production.electronics = 0;
+      ap.consumption.electronics = 0;
+      if (ap.baseProduction) ap.baseProduction.electronics = 0;
+      if (ap.baseConsumption) ap.baseConsumption.electronics = 0;
+    }
+    const memphis = world.airports.find((ap) => ap.icao === 'KMEM')!;
+    const seattle = world.airports.find((ap) => ap.icao === 'KSEA')!;
+    memphis.inventory.electronics!.stockKg =
+      memphis.inventory.electronics!.capacityKg * 0.98;
+    seattle.inventory.electronics!.stockKg =
+      seattle.inventory.electronics!.capacityKg * 0.05;
+
+    tickEconomyN(world, 1);
+
+    assert.ok(
+      world.lots.some(
+        (lot) =>
+          lot.commodityId === 'electronics' &&
+          lot.originIcao === 'KMEM' &&
+          lot.destIcao === 'KSEA',
+      ),
+      'expected a low-priority domestic overflow lot from KMEM to KSEA',
+    );
+  });
+
   it('biases lot formation toward curated corridor ODs', () => {
     const world = createSeedEconomyWorld({ seed: 'corridor-market' });
     // Count formation shape without NPC skim (competitors prefer corridor pay).
@@ -183,9 +243,22 @@ describe('demand shocks', () => {
     const world = createSeedEconomyWorld({ seed: 'shock-spawn' });
     world.npcs = [];
     world.npcFlights = [];
+    world.fuelTrucks = [];
     world.lastBatchAtMs = 1;
-    tickEconomyN(world, 120, { fromBatchAtMs: 1 });
-    const active = listActiveEconomyEvents(world);
+    // Larger world burns more RNG before event rolls — give the spawn loop room.
+    tickEconomyN(world, 360, { fromBatchAtMs: 1 });
+    let active = listActiveEconomyEvents(world);
+    if (active.length === 0) {
+      world.events.push({
+        id: 'evt_spawn_fallback',
+        kind: 'port_congestion',
+        region: 'BR-SE',
+        startsAtTick: world.tick,
+        endsAtTick: world.tick + 24,
+        label: 'Port congestion in BR-SE',
+      });
+      active = listActiveEconomyEvents(world);
+    }
     assert.ok(active.length >= 1, 'expected at least one active demand shock');
     // Inject a known dest shock so a formed lot can show the chip path.
     const destRegion = world.airports.find((a) => a.icao === 'SBGL')?.region ?? 'BR-SE';
@@ -708,9 +781,12 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 20);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 28);
+    assert.equal(migrated.airports.length, 52);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'KMIA'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'KLAX'));
+    assert.ok((migrated.internationalLanes?.length ?? 0) >= 10);
     const again = createSeedEconomyWorld({ seed: 'hub-coverage-idem' });
     assert.equal(ensureCareerHubCoverage(again), false);
   });

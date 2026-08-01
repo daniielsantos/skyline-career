@@ -276,6 +276,7 @@ export type LotPressure = {
   demandShock?: boolean;
   shockLabels?: string[];
   shockPayMult?: number;
+  international?: boolean;
 };
 
 export type MarketLot = {
@@ -703,6 +704,7 @@ export function postSelectHub(opts: { icao: string; pilotName: string }) {
     hubs: string[];
     pilotName: string;
     homeHubIcao: string;
+    homeCountryId: string | null;
   }>('/api/fleet/select-hub', {
     method: 'POST',
     body: JSON.stringify(opts),

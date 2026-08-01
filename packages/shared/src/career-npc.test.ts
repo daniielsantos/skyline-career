@@ -33,10 +33,10 @@ describe('NPC freighter fleet', () => {
     const wide = world.npcs.filter((n) => n.aircraftClassId === 'wide_freighter');
     const caravan = world.npcs.filter((n) => n.aircraftClassId === 'light_turboprop');
     const bonanza = world.npcs.filter((n) => n.aircraftClassId === 'light_ga');
-    assert.equal(narrow.length, 6);
-    assert.equal(wide.length, 4);
-    assert.equal(caravan.length, 4);
-    assert.equal(bonanza.length, 3);
+    assert.equal(narrow.length, 16);
+    assert.equal(wide.length, 10);
+    assert.equal(caravan.length, 10);
+    assert.equal(bonanza.length, 8);
     assert.ok(world.npcs.every((n) => n.status === 'idle'));
     assert.ok(world.npcs.every((n) => n.reliability > 0 && n.aggressiveness > 0));
   });
@@ -50,7 +50,7 @@ describe('NPC freighter fleet', () => {
           n.aircraftClassId === 'wide_freighter',
       )
       .map((n) => ({ ...n }));
-    assert.equal(jetOnly.length, 10);
+    assert.equal(jetOnly.length, 26);
     const migrated = migrateEconomyWorld({
       version: 3,
       seed: world.seed,
@@ -65,11 +65,11 @@ describe('NPC freighter fleet', () => {
     });
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_turboprop').length,
-      4,
+      10,
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_ga').length,
-      3,
+      8,
     );
     assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
   });
@@ -490,7 +490,9 @@ describe('NPC freighter fleet', () => {
     const npc = world.npcs.find((n) => n.aircraftClassId === 'narrow_freighter')!;
     const icao = 'SBGR';
     npc.locationIcao = icao;
-    npc.hoursSinceMx = NPC_MX_INTERVAL_HOURS.narrow_freighter + 10;
+    // Interval stretches with reliability — clear the bar for any operator.
+    npc.reliability = 0.45;
+    npc.hoursSinceMx = NPC_MX_INTERVAL_HOURS.narrow_freighter * 2;
     npc.dutyHoursAccum = 0;
     npc.lastLegDutyHours = 0;
     npc.status = 'busy';

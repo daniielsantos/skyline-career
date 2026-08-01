@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -17,7 +17,6 @@ import {
   createSeedEconomyWorld,
   departMission,
   emptyMissionsStateV2,
-  ensureEconomyCaughtUp,
   executeFerry,
   findOpenManifestForRoute,
   findPlayerAircraft,
@@ -40,13 +39,10 @@ import {
   listRegionMarketPressure,
   listViableMarketLots,
   localUnitPriceUsd,
-  migrateEconomyWorld,
   regionFuelThin,
   missionRemainingCapacityKg,
   MS_PER_TICK,
   NPC_FLEET_SIZE,
-  normalizeMissionIntent,
-  normalizeMissionsState,
   npcClaimForLot,
   parseFreighterClassId,
   purchaseAircraftListing,
@@ -68,6 +64,9 @@ import {
   applyWalletDelta,
   summarizeCareerLedger,
   LEDGER_KIND_LABEL,
+  openCareerStore,
+  listWorldCountryIds,
+  syncHomeCountryFromHub,
   stockTrend,
   tickEconomyN,
   withMissionLoadPolicy,
@@ -76,6 +75,7 @@ import {
   economyDayIndex,
   type CareerEconomyWorld,
   type CareerMissionsState,
+  type CareerStore,
   type FreighterClassId,
   type MissionIntent,
   type PlayerAircraft,
@@ -116,35 +116,15 @@ export async function serverSourceStamp(dir: string = here): Promise<number> {
 }
 
 const bootSourceStamp = await serverSourceStamp();
-const economyPath = join(repoRoot, 'profiles', 'career', 'local-economy.json');
-const missionsPath = join(repoRoot, 'profiles', 'career', 'local-missions.json');
+const careerDir = join(repoRoot, 'profiles', 'career');
+const store: CareerStore = await openCareerStore({ careerDir });
 /** Row cap for the market board — filters must run server-side to survive it. */
 const MARKET_LOT_LIMIT = 200;
 
 type MissionsFile = CareerMissionsState;
 
 async function loadMissions(): Promise<MissionsFile> {
-  const existing = await readJson<Record<string, unknown>>(missionsPath);
-  if (existing && Array.isArray(existing.missions)) {
-    const normalized = normalizeMissionsState(existing);
-    normalized.missions = normalized.missions.map((m) => normalizeMissionIntent(m));
-    if (
-      existing.version !== 2 ||
-      !Array.isArray((existing as { fleet?: unknown }).fleet)
-    ) {
-      await writeJson(missionsPath, normalized);
-    }
-    return normalized;
-  }
-  if (existing) {
-    // Readable JSON without missions[]: refuse rather than wipe pilot/wallet/logbook.
-    throw new Error(
-      `Save at ${missionsPath} has no missions[]; refusing to overwrite it with an empty career`,
-    );
-  }
-  const fresh = emptyMissionsStateV2();
-  await writeJson(missionsPath, fresh);
-  return fresh;
+  return store.loadMissions();
 }
 
 function withParkingRates(
@@ -171,64 +151,6 @@ function fleetPayload(
   };
 }
 
-/**
- * Returns null only when the save does not exist yet.
- * An existing-but-unreadable save throws: callers must never treat a transient
- * read failure as "no save" and reseed over the player's world.
- */
-async function readJson<T>(path: string): Promise<T | null> {
-  let raw: string;
-  try {
-    raw = await readFile(path, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
-  try {
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    const { copyFile } = await import('node:fs/promises');
-    const quarantine = `${path}.corrupt-${Date.now()}`;
-    await copyFile(path, quarantine).catch(() => undefined);
-    throw new Error(
-      `Save at ${path} is unreadable; kept a copy at ${quarantine}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
-}
-
-/**
- * Write via temp file + rename so a concurrent reader always sees either the
- * previous or the next save, never a half-written one.
- */
-async function writeJson(path: string, data: unknown): Promise<void> {
-  const { mkdir, writeFile, rename, rm } = await import('node:fs/promises');
-  await mkdir(dirname(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
-  try {
-    // Windows can briefly deny the replace while an indexer/AV holds the file.
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await rename(tmp, path);
-        return;
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code;
-        if (attempt >= 4 || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) {
-          throw error;
-        }
-        await new Promise((done) => setTimeout(done, 25 * (attempt + 1)));
-      }
-    }
-  } catch (error) {
-    await rm(tmp, { force: true }).catch(() => undefined);
-    throw error;
-  }
-}
-
 /** Serialize mission-file read-modify-write so OFP/preflight/watch cannot clobber cancel. */
 let missionsLock: Promise<void> = Promise.resolve();
 
@@ -246,7 +168,7 @@ function isClosedMissionStatus(status: string): boolean {
 }
 
 async function saveMissions(missions: MissionsFile): Promise<void> {
-  await writeJson(missionsPath, missions);
+  await store.saveMissions(missions);
 }
 
 /**
@@ -287,99 +209,31 @@ function withEconomyLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
-  const existing = await readJson<Record<string, unknown>>(economyPath);
-  if (existing && Array.isArray(existing.airports)) {
-    const npcCountBefore = Array.isArray((existing as { npcs?: unknown[] }).npcs)
-      ? (existing as { npcs: unknown[] }).npcs.length
-      : 0;
-    const trucksBefore = Array.isArray((existing as { fuelTrucks?: unknown[] }).fuelTrucks)
-      ? (existing as { fuelTrucks: unknown[] }).fuelTrucks.length
-      : 0;
-    const hubLevelSigBefore = Array.isArray(
-      (existing as { airports?: Array<{ level?: number; levelXp?: number; levelCurveVersion?: number }> })
-        .airports,
-    )
-      ? (existing as { airports: Array<{ level?: number; levelXp?: number; levelCurveVersion?: number }> })
-          .airports.map(
-            (ap) =>
-              `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`,
-          )
-          .join('|')
-      : '';
-    const lotsBefore = Array.isArray((existing as { lots?: unknown[] }).lots)
-      ? (existing as { lots: unknown[] }).lots.length
-      : 0;
-    const airportsBefore = (existing as { airports: unknown[] }).airports.length;
-    // Snapshot before migrate: it mutates the same npc objects in place.
-    const npcRegionsBefore = Array.isArray(
-      (existing as { npcs?: Array<{ homeRegion?: string }> }).npcs,
-    )
-      ? (existing as { npcs: Array<{ homeRegion?: string }> }).npcs
-          .map((npc) => npc.homeRegion ?? '')
-          .join('|')
-      : '';
-    const missingHubTiers = (existing as { airports: Array<{ hubTier?: string }> }).airports.some(
-      (ap) => !ap.hubTier,
-    );
-    const world = migrateEconomyWorld(existing);
-    const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
-    const version = (existing as { version?: number }).version;
-    const npcCountAfter = caught.npcs?.length ?? 0;
-    const trucksAfter = caught.fuelTrucks?.length ?? 0;
-    const hubLevelSigAfter = (caught.airports ?? [])
-      .map(
-        (ap) =>
-          `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`,
-      )
-      .join('|');
-    const lotsAfter = caught.lots?.length ?? 0;
-    const airportsAfter = caught.airports?.length ?? 0;
-    const npcRegionsAfter = (caught.npcs ?? [])
-      .map((npc) => npc.homeRegion ?? '')
-      .join('|');
-    if (
-      advancedTicks > 0 ||
-      settledFlights > 0 ||
-      version !== 3 ||
-      npcCountAfter !== npcCountBefore ||
-      trucksAfter !== trucksBefore ||
-      lotsAfter !== lotsBefore ||
-      airportsAfter !== airportsBefore ||
-      npcRegionsAfter !== npcRegionsBefore ||
-      hubLevelSigAfter !== hubLevelSigBefore ||
-      missingHubTiers
-    ) {
-      await writeJson(economyPath, caught);
-    }
-    if (advancedTicks > 0) {
-      const missions = await loadMissions();
-      settleAircraftMarketOps(missions, caught.tick, caught);
-      settleHangarParkingFees(missions, caught, {
-        fromTick: caught.tick - advancedTicks,
-        toTick: caught.tick,
-      });
-      listAircraftMarket(missions, caught);
-      await writeJson(missionsPath, missions);
-    }
-    return caught;
+  const { world: caught, advancedTicks, dirty } = await store.loadEconomy();
+  const missions = await loadMissions();
+  let needsSave = dirty;
+  // Home partition follows the player's chosen hub (KMIA → US), including legacy saves.
+  if (syncHomeCountryFromHub(caught, missions.homeHubIcao)) {
+    needsSave = true;
   }
-  if (existing) {
-    // Readable JSON that is not a world: refuse rather than reseed over it.
-    throw new Error(
-      `Save at ${economyPath} has no airports[]; refusing to overwrite it with a fresh world`,
-    );
+  if (needsSave) {
+    await store.saveEconomy(caught);
   }
-  const fresh = createSeedEconomyWorld();
-  await writeJson(economyPath, fresh);
-  return fresh;
+  if (advancedTicks > 0) {
+    settleAircraftMarketOps(missions, caught.tick, caught);
+    settleHangarParkingFees(missions, caught, {
+      fromTick: caught.tick - advancedTicks,
+      toTick: caught.tick,
+    });
+    listAircraftMarket(missions, caught);
+    await saveMissions(missions);
+  }
+  return caught;
 }
 
 async function persistEconomyUnlocked(world: CareerEconomyWorld): Promise<void> {
   // Do NOT stomp lastBatchAtMs — fractional hour + continuous ops depend on it.
-  const toSave = migrateEconomyWorld(world);
-  toSave.lastBatchAtMs = world.lastBatchAtMs;
-  toSave.lastSyncedAtMs = world.lastBatchAtMs;
-  await writeJson(economyPath, toSave);
+  await store.saveEconomy(world);
 }
 
 function loadEconomy(): Promise<CareerEconomyWorld> {
@@ -732,10 +586,15 @@ export function createCareerApiServer(port = 8787) {
 
     try {
       if (req.method === 'GET' && path === '/api/health') {
+        const world = await loadEconomy();
         send(res, 200, {
           ok: true,
           npcFleetTarget: NPC_FLEET_SIZE,
           sourceStamp: bootSourceStamp,
+          store: store.kind,
+          homeCountryId: world.homeCountryId ?? null,
+          countries: listWorldCountryIds(world),
+          internationalLaneCount: world.internationalLanes?.length ?? 0,
         });
         return;
       }
@@ -758,6 +617,10 @@ export function createCareerApiServer(port = 8787) {
           npcFlights: world.npcFlights?.filter((f) => f.status === 'in_flight').length ?? 0,
           ...fleetPayload(missions, world),
           cashflow: summarizeCareerLedger(missions, world.tick),
+          homeCountryId: world.homeCountryId ?? null,
+          countries: listWorldCountryIds(world),
+          internationalLaneCount: world.internationalLanes?.length ?? 0,
+          store: store.kind,
         });
         return;
       }
@@ -769,6 +632,8 @@ export function createCareerApiServer(port = 8787) {
           walletUsd: missions.walletUsd,
           ...fleetPayload(missions, world),
           cashflow: summarizeCareerLedger(missions, world.tick),
+          homeCountryId: world.homeCountryId ?? null,
+          store: store.kind,
         });
         return;
       }
@@ -776,12 +641,15 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/cashflow') {
         const world = await loadEconomy();
         const missions = await loadMissions();
+        const cashflow = await store.summarizeCashflow(world.tick);
         send(res, 200, {
           walletUsd: missions.walletUsd,
           tick: world.tick,
           dayIndex: economyDayIndex(world.tick),
+          homeCountryId: world.homeCountryId ?? null,
+          store: store.kind,
           labels: LEDGER_KIND_LABEL,
-          ...summarizeCareerLedger(missions, world.tick),
+          ...cashflow,
         });
         return;
       }
@@ -796,17 +664,22 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'pilotName required' });
           return;
         }
-        const missions = await loadMissions();
         try {
-          const next = selectStarterHub(missions, body.icao, {
-            pilotName: body.pilotName,
+          const result = await withEconomyWrite(async (world) => {
+            const missions = await loadMissions();
+            const next = selectStarterHub(missions, body.icao!, {
+              pilotName: body.pilotName!,
+            });
+            Object.assign(missions, next);
+            syncHomeCountryFromHub(world, missions.homeHubIcao);
+            await saveMissions(missions);
+            return {
+              walletUsd: missions.walletUsd,
+              homeCountryId: world.homeCountryId ?? null,
+              ...fleetPayload(missions, world),
+            };
           });
-          Object.assign(missions, next);
-          await writeJson(missionsPath, missions);
-          send(res, 200, {
-            walletUsd: missions.walletUsd,
-            ...fleetPayload(missions),
-          });
+          send(res, 200, result);
         } catch (error) {
           send(res, 400, {
             error: error instanceof Error ? error.message : String(error),
@@ -820,7 +693,7 @@ export function createCareerApiServer(port = 8787) {
         const missions = await loadMissions();
         settleAircraftMarketOps(missions, world.tick, world);
         const listings = listAircraftMarket(missions, world);
-        await writeJson(missionsPath, missions);
+        await saveMissions(missions);
         const nowMs = Date.now();
         send(res, 200, {
           ...clockPayload(world, nowMs),
@@ -844,7 +717,7 @@ export function createCareerApiServer(port = 8787) {
         try {
           settleAircraftMarketOps(missions, world.tick);
           const result = purchaseAircraftListing(missions, world, body.listingId);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
@@ -871,7 +744,7 @@ export function createCareerApiServer(port = 8787) {
         try {
           settleAircraftMarketOps(missions, world.tick);
           const result = signAircraftLease(missions, world, body.listingId);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
@@ -897,7 +770,7 @@ export function createCareerApiServer(port = 8787) {
         const missions = await loadMissions();
         try {
           const result = sellPlayerAircraft(missions, body.aircraftId, world.tick);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             creditUsd: result.creditUsd,
@@ -933,7 +806,7 @@ export function createCareerApiServer(port = 8787) {
             world.tick,
             { termMonths: term },
           );
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             listing: result.listing,
@@ -958,7 +831,7 @@ export function createCareerApiServer(port = 8787) {
         const missions = await loadMissions();
         try {
           unlistAircraftForLease(missions, body.aircraftId);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             fleet: withParkingRates(missions.fleet),
@@ -987,7 +860,7 @@ export function createCareerApiServer(port = 8787) {
             world,
           );
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
@@ -1026,7 +899,7 @@ export function createCareerApiServer(port = 8787) {
             },
           );
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
@@ -1052,7 +925,7 @@ export function createCareerApiServer(port = 8787) {
         try {
           const world = await loadEconomy();
           const result = buyOutAircraftLease(missions, body.aircraftId, world.tick);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
@@ -1092,7 +965,7 @@ export function createCareerApiServer(port = 8787) {
             destIcao: body.destIcao,
           });
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             aircraft: result.aircraft,
             quote: result.quote,
@@ -1193,6 +1066,9 @@ export function createCareerApiServer(port = 8787) {
           })),
           totalLots: lots.length,
           lotLimit: MARKET_LOT_LIMIT,
+          countries: listWorldCountryIds(world),
+          internationalLaneCount: world.internationalLanes?.length ?? 0,
+          homeCountryId: world.homeCountryId ?? null,
           lots: lots.slice(0, MARKET_LOT_LIMIT).map((row) => ({
             id: row.lot.id,
             originIcao: row.lot.originIcao,
@@ -1228,6 +1104,7 @@ export function createCareerApiServer(port = 8787) {
                   demandShock: row.pressure.demandShock ?? false,
                   shockLabels: row.pressure.shockLabels ?? [],
                   shockPayMult: row.pressure.shockPayMult ?? 1,
+                  international: row.pressure.international ?? false,
                 }
               : null,
             npcClaim: row.npcClaim
@@ -1401,7 +1278,7 @@ export function createCareerApiServer(port = 8787) {
           toTick: world.tick,
         });
         listAircraftMarket(missions, world);
-        await writeJson(missionsPath, missions);
+        await saveMissions(missions);
         const nowMs = Date.now();
         send(res, 200, {
           ...clockPayload(world, nowMs),
@@ -1426,7 +1303,7 @@ export function createCareerApiServer(port = 8787) {
         const fresh = createSeedEconomyWorld({ seed: body.seed });
         await persistEconomy(fresh);
         if (body.resetMissions) {
-          await writeJson(missionsPath, emptyMissionsStateV2());
+          await saveMissions(emptyMissionsStateV2());
         }
         send(res, 200, {
           tick: fresh.tick,
@@ -1492,7 +1369,7 @@ export function createCareerApiServer(port = 8787) {
             missions.missions.push(mission);
           }
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             mission,
             walletUsd: missions.walletUsd,
@@ -1684,7 +1561,7 @@ export function createCareerApiServer(port = 8787) {
             }
           }
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
 
           let dispatch:
             | {
@@ -1711,7 +1588,7 @@ export function createCareerApiServer(port = 8787) {
             };
             if (idx >= 0) missions.missions[idx] = dispatched;
             mission = dispatched;
-            await writeJson(missionsPath, missions);
+            await saveMissions(missions);
             openDispatchUrl(built.url);
             dispatch = {
               url: built.url,
@@ -1889,7 +1766,7 @@ export function createCareerApiServer(port = 8787) {
         mission.lastOfpCheck = undefined;
         mission.lastPreflightCheck = undefined;
         mission.fuelAuthorizedOfpId = undefined;
-        await writeJson(missionsPath, missions);
+        await saveMissions(missions);
 
         const shouldOpen = body.open !== false;
         if (shouldOpen) {
@@ -2080,7 +1957,7 @@ export function createCareerApiServer(port = 8787) {
             });
           }
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             mission: purchased.mission,
             quote: purchased.quote,
@@ -2218,7 +2095,7 @@ export function createCareerApiServer(port = 8787) {
             });
           }
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             mission: departed,
             walletUsd: missions.walletUsd,
@@ -2286,7 +2163,7 @@ export function createCareerApiServer(port = 8787) {
             });
           }
           await persistEconomy(world);
-          await writeJson(missionsPath, missions);
+          await saveMissions(missions);
           send(res, 200, {
             mission: result.mission,
             walletUsd: missions.walletUsd,

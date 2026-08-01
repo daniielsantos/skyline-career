@@ -21,18 +21,26 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Cargo corridors: curated OD weights bias `formLots` formation + mild pay; legacy saves gain missing hubs via `ensureCareerHubCoverage`.
 - Idle-lot escalation: available lots raise pay from `basePayUsd` after 25% of life (cap +40%); flip urgent late; Market shows Idle +N% chip.
 - Demand shocks: regional events (harvest/outage/congestion/festival/strike) affect prod/cons + freight pay/urgency/life; Market banner + lot chips.
-- Fuel road logistics: background tanker fleet (12 trucks, ≤32 t) redistributes Jet-A hub→spoke; Terminal Fuel logistics block.
+- Fuel road logistics: background tanker fleet (20 trucks, ≤32 t) redistributes Jet-A hub→spoke; Terminal Fuel logistics block. US has 9 Jet-A production hubs (KMIA/KATL/KJFK/KORD/KIAH/KDFW/KDEN/KLAX/KSEA).
 - Hub level 1→5: sticky XP from traffic (lots/settles/fuel/trucks); real capacity/flow/lane/pay/NPC-bid impact; soft quiet penalty without demotion.
 - Aircraft market: Skyline-priced new/used/lease board with class caps/scarcity, abstract NPC demand (0–2/day), sell→relist, list spare for lease / leased_out income; free acquire removed (starter Caravan only).
 - Aircraft wear/MX: AF+eng condition %, wear per block hour, workshop inspection gate + optional repair (MSRP-calibrated); no annual/TBO yet.
+- Hangar parking fees: daily debit for parked/maintenance airframes (class × hub tier); assigned/leased_out/listed exempt.
+- Company cashflow ledger: signed wallet movements + Hangar Cashflow (week / month / all-time).
+- **Embedded SQLite persistence** via Node `node:sqlite` (`DatabaseSync`) behind `openCareerStore` (`profiles/career/skyline.sqlite`); one-shot JSON migrate; ledger table materialized. Tick still in-memory.
+- **Partition contract:** `homeCountryId` / `countryIdFromRegion` (`BR-SE` → `BR`); domestic lot formation per country.
+- **US continental medium map:** 6 regions (NE/SE/MW/SC/MT/W), 24 US hubs, sparse BR↔US intl lanes, NPC fleet 44, fuel trucks 20; resilient regional corridors (≥2 gateways per US regional), critical-full domestic overflow valve, and near-full production throttle; Market `intl` chip; health/market expose `countries` + `internationalLaneCount`.
+- **Lots table (schema v2):** `lots` dual-written with `economy_json` on `saveEconomy`; hydrate overlay on load when table non-empty; real meta upgrade 1→2. Tick/missions still in-memory.
+- **Map expansion playbook:** `.cursor/rules/career-map-expansion.mdc` — checklist when adding airports/regions (seed constants + auto coverage on migrate).
 
 ## Near-term priorities (current Brazil career)
 
 1. Polish only if needed — NPC operational cargo ceiling; optional real METAR.
+2. Strip lots from economy blob once dual-write is proven; optional indexed market SQL reads.
 
-Do **not** start country partitioning or Postgres until Brazil still feels good after prune + inbound + national map + market dynamics.
+Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 
-## World-scale architecture (future — save this)
+## World-scale architecture (future)
 
 ### Simulation partition
 
@@ -44,19 +52,19 @@ Do **not** start country partitioning or Postgres until Brazil still feels good 
 
 - Sparse hub↔hub OD between countries (not all-to-all).
 - International mission/flight is a **border object**: reserve at origin, track flight on the lane, settle at dest.
-- Country ticks do not fully simulate each other; they share the lane contract.
+- Country ticks do not fully simulate each other; they share the lane contract (`InternationalLane` stub exists).
 
 ### Destination notified (preferred — esp. multiplayer)
 
 - On accept/depart: publish **inbound pending** at dest (commodity, kg, ETA), any origin region/country.
 - Soft fill = stock + inbound (player + NPC). Urgency/NPC bids see help coming.
 - On settle: clear pending + apply stock.
-- Blind dest is simpler but bad for multiplayer (surprise full terminal / wasted long-haul). Prefer notified for domestic and international.
+- Already live for domestic BR; reuse for international.
 
 ### Persistence
 
-- Today: local JSON (`profiles/career/local-economy.json`, `local-missions.json`).
-- Later: SQLite (local) or Postgres (multiplayer) behind the same load/persist facade.
+- **Now:** SQLite embedded (`skyline.sqlite`) via `CareerStore` facade; JSON import one-shot; ledger + lots dual-written (blobs still carry copies).
+- **Later:** Postgres (multiplayer) behind the same facade; strip hot arrays from blobs.
 - Always prune dead lots; DB without retention still explodes.
 
 ## Optional later

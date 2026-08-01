@@ -32,17 +32,18 @@ import type {
   ShipmentLot,
 } from './types/career-economy.js';
 
-export const NPC_FLEET_SIZE = 17;
+/** About four operators per mapped region; enough capacity for a 52-hub world. */
+export const NPC_FLEET_SIZE = 44;
 
 /** Target mix: jets for heavy freight + GA for LTL / short-haul competition. */
 export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
   aircraftClassId: FreighterClassId;
   count: number;
 }> = [
-  { aircraftClassId: 'narrow_freighter', count: 6 },
-  { aircraftClassId: 'wide_freighter', count: 4 },
-  { aircraftClassId: 'light_turboprop', count: 4 },
-  { aircraftClassId: 'light_ga', count: 3 },
+  { aircraftClassId: 'narrow_freighter', count: 16 },
+  { aircraftClassId: 'wide_freighter', count: 10 },
+  { aircraftClassId: 'light_turboprop', count: 10 },
+  { aircraftClassId: 'light_ga', count: 8 },
 ] as const;
 
 /** Must match career-economy MS_PER_TICK (1 tick = 1 real hour). */
@@ -111,6 +112,34 @@ const NPC_NAME_POOL = [
   'Litoral Charter',
   'Cerrado Air Taxi',
   'Serra Bush Cargo',
+  'Prairie Wing Cargo',
+  'Gulfstream Freight',
+  'Great Lakes Lift',
+  'Sunbelt Haulers',
+  'Cascade Air Cargo',
+  'Desert West Freight',
+  'Empire State Haul',
+  'Heartland Freighters',
+  'Pacific Rim Cargo',
+  'Lone Star Airlink',
+  'Appalachian Lift',
+  'Bayou Charter Co',
+  'Blue Ridge Freight',
+  'Hudson Valley Cargo',
+  'New England Airlift',
+  'Midwest Cargo Link',
+  'Mississippi Valley Air',
+  'Rocky Mountain Freight',
+  'Golden Gate Cargo',
+  'Puget Sound Airlift',
+  'Southern Cross Freight',
+  'Rio Grande Logistics',
+  'Ozark Cargo Lines',
+  'Great Plains Air',
+  'Coastal Bridge Cargo',
+  'Frontier Freightways',
+  'Metro Air Logistics',
+  'Continental Cargo Co',
 ] as const;
 
 function hashSeed(seed: string): number {
@@ -308,6 +337,8 @@ export type LotMarketPressure = {
   shockLabels?: string[];
   /** Combined freight pay multiplier from shocks (>= 1). */
   shockPayMult?: number;
+  /** True when origin/dest countries differ. */
+  international?: boolean;
 };
 
 export type RegionMarketPressure = {

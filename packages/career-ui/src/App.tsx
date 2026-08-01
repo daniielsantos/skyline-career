@@ -149,6 +149,27 @@ function formatMoney(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
+/** `BR-SE` → `BR`, `US-SC` → `US`. Bare two-letter codes pass through. */
+function countryIdFromRegion(region: string): string {
+  const raw = region.trim().toUpperCase();
+  if (!raw) return '';
+  const dash = raw.indexOf('-');
+  if (dash > 0) return raw.slice(0, dash);
+  if (/^[A-Z]{2}$/.test(raw)) return raw;
+  return raw.slice(0, 2);
+}
+
+function countryLabel(countryId: string): string {
+  switch (countryId) {
+    case 'BR':
+      return 'Brazil';
+    case 'US':
+      return 'USA';
+    default:
+      return countryId;
+  }
+}
+
 function regionLabel(region: string): string {
   switch (region) {
     case 'BR-S':
@@ -162,6 +183,18 @@ function regionLabel(region: string): string {
     case 'BR-CW':
     case 'BR-CO':
       return 'Brazil — Central-West';
+    case 'US-SE':
+      return 'USA — Southeast';
+    case 'US-NE':
+      return 'USA — Northeast';
+    case 'US-SC':
+      return 'USA — South-Central';
+    case 'US-MW':
+      return 'USA — Midwest';
+    case 'US-MT':
+      return 'USA — Mountain';
+    case 'US-W':
+      return 'USA — West Coast';
     default:
       return region;
   }
@@ -781,6 +814,7 @@ function FleetRoster(props: {
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [phaseFilter, setPhaseFilter] = useState<FleetPhaseFilter>('');
+  const [countryFilter, setCountryFilter] = useState('');
 
   const enriched = useMemo(
     () =>
@@ -791,6 +825,15 @@ function FleetRoster(props: {
     [props.fleet, props.nowMs],
   );
 
+  const countryOptions = useMemo(() => {
+    const ids = new Set<string>();
+    for (const npc of props.fleet) {
+      const id = countryIdFromRegion(npc.homeRegion);
+      if (id) ids.add(id);
+    }
+    return [...ids].sort();
+  }, [props.fleet]);
+
   const filtered = useMemo(() => {
     const tokens = query
       .trim()
@@ -799,6 +842,12 @@ function FleetRoster(props: {
       .filter(Boolean);
     return enriched.filter(({ npc, phase, mission }) => {
       if (phaseFilter && phase !== phaseFilter) return false;
+      if (
+        countryFilter &&
+        countryIdFromRegion(npc.homeRegion) !== countryFilter
+      ) {
+        return false;
+      }
       if (tokens.length === 0) return true;
       const hay = [
         npc.name,
@@ -806,6 +855,8 @@ function FleetRoster(props: {
         aircraftClassLabel(npc.aircraftClassId),
         npc.homeRegion,
         regionLabel(npc.homeRegion),
+        countryIdFromRegion(npc.homeRegion),
+        countryLabel(countryIdFromRegion(npc.homeRegion)),
         npc.locationIcao ?? '',
         mission?.originIcao ?? '',
         mission?.destIcao ?? '',
@@ -816,7 +867,7 @@ function FleetRoster(props: {
         .toLowerCase();
       return tokens.every((token) => hay.includes(token));
     });
-  }, [enriched, phaseFilter, query]);
+  }, [enriched, phaseFilter, countryFilter, query]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / FLEET_PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -831,17 +882,18 @@ function FleetRoster(props: {
 
   useEffect(() => {
     setPage(1);
-  }, [query, phaseFilter, props.fleet.length]);
+  }, [query, phaseFilter, countryFilter, props.fleet.length]);
 
   if (props.fleet.length === 0) {
     return (
       <p className="empty">
-        No rival freighters seeded yet — Reset Brazil or wait for migration.
+        No rival freighters seeded yet — Reset world or wait for migration.
       </p>
     );
   }
 
-  const hasFilters = query.trim() !== '' || phaseFilter !== '';
+  const hasFilters =
+    query.trim() !== '' || phaseFilter !== '' || countryFilter !== '';
 
   return (
     <>
@@ -868,7 +920,20 @@ function FleetRoster(props: {
                 />
               </th>
               <th />
-              <th />
+              <th>
+                <select
+                  value={countryFilter}
+                  onChange={(e) => setCountryFilter(e.target.value)}
+                  aria-label="Filter by home country"
+                >
+                  <option value="">All countries</option>
+                  {countryOptions.map((id) => (
+                    <option key={id} value={id}>
+                      {countryLabel(id)} ({id})
+                    </option>
+                  ))}
+                </select>
+              </th>
               <th>
                 <select
                   value={phaseFilter}
@@ -895,6 +960,7 @@ function FleetRoster(props: {
                     onClick={() => {
                       setQuery('');
                       setPhaseFilter('');
+                      setCountryFilter('');
                     }}
                   >
                     Clear
@@ -1434,9 +1500,9 @@ export function App() {
     return () => window.clearInterval(id);
   }, [serverOffsetMs]);
 
-  // Live board: soft-refresh while watching fleet or a terminal.
+  // Live board: soft-refresh on market, rivals, or an open terminal.
   useEffect(() => {
-    if (tab !== 'fleet' && !airportIcao) return;
+    if (tab !== 'fleet' && tab !== 'market' && !airportIcao) return;
     const id = window.setInterval(() => {
       void refresh().catch(() => {
         /* ignore background refresh errors */
@@ -2161,10 +2227,10 @@ export function App() {
     });
   }
 
-  async function onResetBrazil() {
+  async function onResetWorld() {
     const confirmed = await confirm({
-      title: 'Reset Brazil world?',
-      body: 'Clears the local career save — pilot profile, missions, wallet, and hangar — then reseeds the Brazil-only economy.',
+      title: 'Reset career world?',
+      body: 'Clears the local career save — pilot profile, missions, wallet, and hangar — then reseeds the full economy (Brazil + US hubs and international lanes).',
       confirmLabel: 'Reset everything',
       cancelLabel: 'Keep save',
       tone: 'danger',
@@ -2173,7 +2239,7 @@ export function App() {
     await run(async () => {
       const result = await postInitBrazil();
       setToastKind('ok');
-      setToast(`Brazil world initialized · ${result.airports} airports`);
+      setToast(`Career world initialized · ${result.airports} airports`);
       closeAirport();
       setStaging(null);
       setFleet([]);
@@ -3577,11 +3643,11 @@ export function App() {
             <button
               type="button"
               className="action ghost"
-              onClick={() => void onResetBrazil()}
+              onClick={() => void onResetWorld()}
               disabled={busy}
-              title="Clear the prototype save and initialize the Brazil-only world"
+              title="Clear the prototype save and reseed the full career world (BR + US)"
             >
-              Reset Brazil
+              Reset world
             </button>
           </div>
         </header>
@@ -4260,6 +4326,11 @@ export function App() {
                         <span className="arrow">→</span>
                         <IcaoLink icao={lot.destIcao} onOpen={openAirport} disabled={busy} />
                         {lot.urgency === 'urgent' ? <span className="tag">Urgent</span> : null}
+                        {lot.pressure?.international ? (
+                          <span className="tag" title="International lane freight">
+                            intl
+                          </span>
+                        ) : null}
                       </div>
                       <small>
                         {lot.originName} → {lot.destName}

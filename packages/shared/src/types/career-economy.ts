@@ -339,6 +339,13 @@ export interface CareerEconomyWorld {
    * @deprecated Alias of lastBatchAtMs for one-release read/write compat.
    */
   lastSyncedAtMs?: number;
+  /**
+   * Player home domestic partition (ISO-ish country code).
+   * Follows the chosen starter hub's region (`KMIA` / `US-SE` → `US`).
+   * Seed default is `BR` until hub selection; missing values fall back to
+   * majority airport country via `inferHomeCountryId`.
+   */
+  homeCountryId?: string;
   airports: AirportTerminal[];
   lots: ShipmentLot[];
   /** Active / recent regional shocks. */
@@ -356,6 +363,33 @@ export interface CareerEconomyWorld {
   fuelTrucks?: FuelTruck[];
   /** Active / recently completed fuel road hauls. */
   fuelHauls?: FuelHaul[];
+  /**
+   * Sparse hub↔hub international OD overlay (bidirectional match).
+   * Domestic lot formation never crosses countries except via these lanes.
+   */
+  internationalLanes?: InternationalLane[];
+}
+
+/**
+ * Sparse hub↔hub OD between countries.
+ * Country partitions share this contract instead of fully simulating each other.
+ */
+export interface InternationalLane {
+  id: string;
+  originCountryId: string;
+  destCountryId: string;
+  originIcao: string;
+  destIcao: string;
+  /** Soft capacity hint for international freight (kg / day). */
+  capacityKgPerDay?: number;
+}
+
+/** Per-partition stats from a domestic or international lot-formation pass. */
+export interface PartitionTickResult {
+  countryId: string;
+  ticksAdvanced: number;
+  lotsFormed: number;
+  npcSettled: number;
 }
 
 /** Legacy persisted shape before continuous clock / live events. */
@@ -416,6 +450,8 @@ export interface MarketLotView {
     shockLabels?: string[];
     /** Combined freight pay multiplier from shocks (>= 1). */
     shockPayMult?: number;
+    /** True when origin/dest countries differ (international lane). */
+    international?: boolean;
   };
 }
 

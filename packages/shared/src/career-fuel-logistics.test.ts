@@ -15,7 +15,7 @@ import {
 } from './career-economy.js';
 
 describe('fuel truck logistics', () => {
-  it('seeds 12 trucks with realistic class caps (≤ 32 t)', () => {
+  it('seeds tanker fleet with realistic class caps (≤ 32 t)', () => {
     const world = createSeedEconomyWorld({ seed: 'fuel-trucks-seed' });
     assert.equal(world.fuelTrucks?.length, FUEL_TRUCK_FLEET_SIZE);
     assert.equal(world.fuelHauls?.length, 0);
@@ -27,15 +27,15 @@ describe('fuel truck logistics', () => {
     );
     assert.equal(
       world.fuelTrucks!.filter((t) => t.truckClassId === 'rigid_tanker').length,
-      4,
-    );
-    assert.equal(
-      world.fuelTrucks!.filter((t) => t.truckClassId === 'semi_tanker').length,
       6,
     );
     assert.equal(
+      world.fuelTrucks!.filter((t) => t.truckClassId === 'semi_tanker').length,
+      10,
+    );
+    assert.equal(
       world.fuelTrucks!.filter((t) => t.truckClassId === 'btrain_tanker').length,
-      2,
+      4,
     );
   });
 

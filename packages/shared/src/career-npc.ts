@@ -24,6 +24,11 @@ import {
 } from './career-hub-level.js';
 import { getAircraftClass, reserveShipmentLot } from './career-mission.js';
 import {
+  npcAirframeLabel,
+  npcMaxCargoKg,
+  pickNpcAirframe,
+} from './career-npc-airframes.js';
+import {
   regionalWeatherBidMult,
   regionalWeatherIndex,
   type RegionalWeather,
@@ -38,6 +43,16 @@ import type {
   NpcFreighter,
   ShipmentLot,
 } from './types/career-economy.js';
+
+export {
+  NPC_AIRFRAME_VARIANTS,
+  findNpcAirframe,
+  listNpcAirframesForClass,
+  npcAirframeLabel,
+  npcMaxCargoKg,
+  pickNpcAirframe,
+  type NpcAirframeVariant,
+} from './career-npc-airframes.js';
 
 /** About four operators per mapped region; enough capacity for a 52-hub world. */
 export const NPC_FLEET_SIZE = 44;
@@ -652,10 +667,13 @@ function makeNpcFreighter(opts: {
   rng: () => number;
 }): NpcFreighter {
   const interval = NPC_MX_INTERVAL_HOURS[opts.aircraftClassId];
+  const airframe = pickNpcAirframe(opts.aircraftClassId, opts.rng);
   return {
     id: opts.id,
     name: opts.name,
     aircraftClassId: opts.aircraftClassId,
+    airframeTypeId: airframe?.typeId,
+    maxCargoKg: airframe?.maxCargoKg,
     homeRegion: opts.homeRegion,
     reliability: 0.45 + opts.rng() * 0.5,
     aggressiveness: 0.2 + opts.rng() * 0.7,
@@ -664,6 +682,30 @@ function makeNpcFreighter(opts: {
     // Desync shop calendars so the fleet does not all hit MX together.
     hoursSinceMx: Math.round(opts.rng() * interval * 0.55),
   };
+}
+
+/**
+ * Assign abstract airframe variants to NPCs that predate the FSLTL catalog.
+ * Does not rewrite an existing typeId.
+ */
+export function ensureNpcAirframes(
+  world: CareerEconomyWorld,
+  seed = world.seed,
+): number {
+  let assigned = 0;
+  for (let i = 0; i < world.npcs.length; i++) {
+    const npc = world.npcs[i]!;
+    if (npc.airframeTypeId) continue;
+    const rng = mulberry32(hashSeed(`${seed}:npc-airframe:${npc.id}`));
+    const airframe = pickNpcAirframe(npc.aircraftClassId, rng);
+    if (!airframe) continue;
+    npc.airframeTypeId = airframe.typeId;
+    if (airframe.maxCargoKg !== undefined) {
+      npc.maxCargoKg = airframe.maxCargoKg;
+    }
+    assigned += 1;
+  }
+  return assigned;
 }
 
 /** Ensure save has a fleet; seeds when missing / empty; tops up GA slots on older saves. */
@@ -679,6 +721,7 @@ export function ensureNpcFleet(world: CareerEconomyWorld): void {
   }
   topUpNpcFleetComposition(world, regions);
   ensureNpcRegionCoverage(world, regions);
+  ensureNpcAirframes(world);
   backfillNpcDutyFromFlights(world);
   desyncClusteredTurnarounds(world);
 }
@@ -955,6 +998,7 @@ function scoreLotForNpc(
   rng: () => number,
 ): number | null {
   const aircraft = getAircraftClass(npc.aircraftClassId);
+  const maxCargoKg = npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
   if (avail < 500) return null;
 
@@ -966,8 +1010,8 @@ function scoreLotForNpc(
   const minPay = commodity.basePricePerKg * 0.35 * npc.feeBias;
   if (payPerKg < minPay) return null;
 
-  const cargoKg = Math.min(avail, aircraft.maxCargoKg);
-  const fillRatio = cargoKg / aircraft.maxCargoKg;
+  const cargoKg = Math.min(avail, maxCargoKg);
+  const fillRatio = cargoKg / maxCargoKg;
   const payScore = Math.min(2.2, payPerKg / commodity.basePricePerKg);
   const urgencyScore =
     lot.urgency === 'urgent' ? 0.55 * npc.aggressiveness : 0.12 * npc.aggressiveness;
@@ -997,9 +1041,9 @@ function claimLotForNpc(
   batchNowMs: number,
   rng: () => number,
 ): NpcFlight | undefined {
-  const aircraft = getAircraftClass(npc.aircraftClassId);
+  const maxCargoKg = npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
-  const cargoKg = Math.min(avail, aircraft.maxCargoKg);
+  const cargoKg = Math.min(avail, maxCargoKg);
   if (cargoKg <= 0) return undefined;
 
   const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao) ?? 0;
@@ -1171,7 +1215,6 @@ export function listNpcActivity(
     const etaMs = Math.max(0, arrives - nowMs);
     const hoursRemaining = msToHours(etaMs);
     const progressPct = Math.min(100, Math.round((flownMs / durationMs) * 100));
-    const aircraft = getAircraftClass(flight.aircraftClassId);
 
     views.push({
       flight,
@@ -1185,7 +1228,7 @@ export function listNpcActivity(
       progressPct,
       flightHours,
       homeRegion: npc?.homeRegion ?? '',
-      aircraftLabel: aircraft.name,
+      aircraftLabel: npc ? npcAirframeLabel(npc) : getAircraftClass(flight.aircraftClassId).name,
       phase: etaMs <= ARRIVING_WINDOW_MS ? 'arriving' : 'enroute',
     });
   }
@@ -1210,7 +1253,6 @@ export function listNpcFleetStatus(
   );
 
   const rows: NpcFleetMemberView[] = world.npcs.map((npc) => {
-    const aircraft = getAircraftClass(npc.aircraftClassId);
     const flight = flightsByNpc.get(npc.id);
     const activity = flight ? activityByFlight.get(flight.id) : undefined;
 
@@ -1260,7 +1302,8 @@ export function listNpcFleetStatus(
       id: npc.id,
       name: npc.name,
       aircraftClassId: npc.aircraftClassId,
-      aircraftLabel: aircraft.name,
+      aircraftLabel: npcAirframeLabel(npc),
+      airframeTypeId: npc.airframeTypeId,
       homeRegion: npc.homeRegion,
       reliability: npc.reliability,
       aggressiveness: npc.aggressiveness,

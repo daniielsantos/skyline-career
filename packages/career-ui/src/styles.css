@@ -1511,6 +1511,28 @@ th {
   background: var(--accent);
 }
 
+.terminal-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: help;
+}
+
+.terminal-level-bar {
+  display: inline-block;
+  width: 3rem;
+  height: 0.22rem;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.terminal-level-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
 .hub-level-perks {
   display: block;
   color: var(--muted);

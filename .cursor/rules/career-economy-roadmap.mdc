@@ -33,6 +33,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Lots table (schema v2):** `lots` dual-written with `economy_json` on `saveEconomy`; hydrate overlay on load when table non-empty; real meta upgrade 1→2. Tick/missions still in-memory.
 - **Map expansion playbook:** `.cursor/rules/career-map-expansion.mdc` — checklist when adding airports/regions (seed constants + auto coverage on migrate).
 - **15-min economy ticks:** `MS_PER_TICK = 900_000`, `TICKS_PER_DAY = 96`; physics (flight/rest/MX/fuel) uses `MS_PER_HOUR`; per-tick flows ÷4 and tick lifetimes ×4 so a career day stays ~24h wall-clock. Old saves need Reset world (no tick-scale migrate).
+- **NPC airframe variants:** curated ICAO types from FSLTL traffic `flight_model.cfg` scrape (A321F, MD11F, 208B, …) — label + optional cargo ceiling only; not player OFP flight models. Legacy fleets backfill via `ensureNpcAirframes`.
 
 ## Near-term priorities (current Brazil career)
 

@@ -190,6 +190,7 @@ export type NpcFleetMember = {
   name: string;
   aircraftClassId: string;
   aircraftLabel: string;
+  airframeTypeId?: string;
   homeRegion: string;
   reliability: number;
   aggressiveness: number;

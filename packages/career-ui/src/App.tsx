@@ -861,6 +861,7 @@ function FleetRoster(props: {
       const hay = [
         npc.name,
         npc.aircraftLabel,
+        npc.airframeTypeId,
         aircraftClassLabel(npc.aircraftClassId),
         npc.homeRegion,
         regionLabel(npc.homeRegion),
@@ -1120,6 +1121,11 @@ export function App() {
   const [airportView, setAirportView] = useState<AirportView | null>(null);
   const [terminalSection, setTerminalSection] =
     useState<TerminalSection>('inventory');
+  /** When Hangar was opened to ferry for a contract, Back restores this terminal. */
+  const [airportReturn, setAirportReturn] = useState<{
+    icao: string;
+    section: TerminalSection;
+  } | null>(null);
   const [preferredAircraft, setPreferredAircraft] =
     useState<AircraftClass>('narrow_freighter');
   const [tick, setTick] = useState(0);
@@ -2188,6 +2194,7 @@ export function App() {
     setAirportIcao(null);
     setAirportView(null);
     setTerminalSection('inventory');
+    setAirportReturn(null);
     writeCareerLocation({ tab, airportIcao: null });
   }
 
@@ -2200,9 +2207,24 @@ export function App() {
   }
 
   function selectTab(next: Tab) {
+    setAirportReturn(null);
     setSidebarOpen(false);
     goToTab(next);
     void run(refresh, { refreshAfter: false });
+  }
+
+  async function returnToAirport() {
+    if (!airportReturn) return;
+    const { icao, section } = airportReturn;
+    setAirportReturn(null);
+    setSidebarOpen(false);
+    await run(async () => {
+      const view = await fetchAirport(icao);
+      setAirportView(view);
+      setAirportIcao(icao);
+      setTerminalSection(section);
+      writeCareerLocation({ tab, airportIcao: icao });
+    }, { refreshAfter: false });
   }
 
   function onRefresh() {
@@ -2619,6 +2641,12 @@ export function App() {
           ? `Your ${parked.label} is at ${parked.locationIcao}. Ferry to ${lot.originIcao} from Hangar first.`
           : `No parked aircraft available for ${lot.originIcao}`,
       );
+      setAirportReturn({
+        icao: lot.originIcao,
+        section:
+          airportIcao === lot.originIcao ? terminalSection : 'contracts',
+      });
+      setFerryDest(lot.originIcao);
       goToTab('hangar');
       return;
     }
@@ -2650,6 +2678,7 @@ export function App() {
     setStaging(draft);
     setPreferredAircraft(aircraft);
     setError(null);
+    setAirportReturn(null);
     closeAirport();
     goToTab('staging');
   }
@@ -3309,6 +3338,7 @@ export function App() {
     : [];
 
   const showAirport = airportIcao !== null && airportView !== null;
+  const showBack = showAirport || airportReturn !== null;
   const showStaging = tab === 'staging';
   const stagingMode: 'empty' | 'draft' | 'active' | 'debrief' = staging
     ? 'draft'
@@ -3390,7 +3420,7 @@ export function App() {
                   ? 'Settings'
                   : 'Freights';
   const pageLede = showAirport
-    ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'} · level ${airportView.airport.level}`
+    ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'}`
     : showStaging
       ? stagingMode === 'active'
         ? 'Guided preflight — flight plan, fuel, load, then fly and settle.'
@@ -3434,14 +3464,23 @@ export function App() {
         <nav className="sidebar-nav" aria-label="Board sections">
           <button
             type="button"
-            className={`tab tab-back${showAirport ? '' : ' is-placeholder'}`}
+            className={`tab tab-back${showBack ? '' : ' is-placeholder'}`}
             onClick={() => {
+              if (airportReturn && !showAirport) {
+                void returnToAirport();
+                return;
+              }
               setSidebarOpen(false);
               selectTab(tab);
             }}
-            disabled={busy || !showAirport}
-            aria-hidden={!showAirport}
-            tabIndex={showAirport ? undefined : -1}
+            disabled={busy || !showBack}
+            aria-hidden={!showBack}
+            tabIndex={showBack ? undefined : -1}
+            title={
+              airportReturn && !showAirport
+                ? `Back to ${airportReturn.icao}`
+                : undefined
+            }
           >
             ← Back
           </button>
@@ -3602,7 +3641,47 @@ export function App() {
               Menu
             </button>
             <h1>{pageTitle}</h1>
-            <p className="lede">{pageLede}</p>
+            <p className="lede">
+              {pageLede}
+              {showAirport ? (
+                <>
+                  {' · '}
+                  <span
+                    className="terminal-level"
+                    title={
+                      airportView.hubLevel
+                        ? [
+                            airportView.hubLevel.xpForNext != null
+                              ? `${airportView.hubLevel.progressPct}% to terminal level ${airportView.hubLevel.level + 1}`
+                              : 'Max terminal level',
+                            `Cap ×${airportView.hubLevel.capacityMult.toFixed(2)} · Flow ×${airportView.hubLevel.flowMult.toFixed(2)}`,
+                            airportView.hubLevel.laneBonus > 0
+                              ? `+${airportView.hubLevel.laneBonus} lane lots`
+                              : null,
+                            airportView.hubLevel.originPayMult > 1
+                              ? `origin pay ×${airportView.hubLevel.originPayMult.toFixed(2)}`
+                              : null,
+                            airportView.hubLevel.quiet ? 'quiet terminal' : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')
+                        : undefined
+                    }
+                  >
+                    terminal level {airportView.airport.level}
+                    {airportView.hubLevel ? (
+                      <span className="terminal-level-bar" aria-hidden="true">
+                        <span
+                          style={{
+                            width: `${Math.min(100, airportView.hubLevel.progressPct)}%`,
+                          }}
+                        />
+                      </span>
+                    ) : null}
+                  </span>
+                </>
+              ) : null}
+            </p>
           </div>
           <div className="topbar-metrics">
             {parkedIcao ? (
@@ -3841,35 +3920,6 @@ export function App() {
                           {formatTonnes(airportView.totalStockTonnes * 1000)} total stock ·{' '}
                           {formatClock(continuousHours)}
                         </p>
-                        {airportView.hubLevel ? (
-                          <div className="hub-level-block">
-                            <p className="hub-level-line">
-                              Level {airportView.hubLevel.level}
-                              {airportView.hubLevel.xpForNext != null
-                                ? ` · ${airportView.hubLevel.progressPct}% to ${airportView.hubLevel.level + 1}`
-                                : ' · max'}
-                              {airportView.hubLevel.quiet ? ' · quiet' : ''}
-                            </p>
-                            <div className="hub-level-bar" aria-hidden="true">
-                              <span
-                                style={{
-                                  width: `${Math.min(100, airportView.hubLevel.progressPct)}%`,
-                                }}
-                              />
-                            </div>
-                            <small className="hub-level-perks">
-                              Cap ×{airportView.hubLevel.capacityMult.toFixed(2)}
-                              {' · '}
-                              Flow ×{airportView.hubLevel.flowMult.toFixed(2)}
-                              {airportView.hubLevel.laneBonus > 0
-                                ? ` · +${airportView.hubLevel.laneBonus} lane lots`
-                                : ''}
-                              {airportView.hubLevel.originPayMult > 1
-                                ? ` · origin pay ×${airportView.hubLevel.originPayMult.toFixed(2)}`
-                                : ''}
-                            </small>
-                          </div>
-                        ) : null}
                         {airportView.events && airportView.events.length > 0 ? (
                           <ul className="event-list">
                             {airportView.events.map((ev) => (

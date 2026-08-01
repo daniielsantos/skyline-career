@@ -4,6 +4,7 @@ import {
   createSeedEconomyWorld,
   describeLotMarketPressure,
   drainNpcMroParts,
+  ensureNpcAirframes,
   ensureNpcFleet,
   estimateNpcBlockHours,
   listActiveNpcFreights,
@@ -15,6 +16,7 @@ import {
   NPC_MX_INTERVAL_HOURS,
   NPC_MX_PARTS_KG,
   npcLaneAirborneKg,
+  npcMaxCargoKg,
   playerLaneInboundKg,
   laneInboundKg,
   npcLaneSaturation,
@@ -23,6 +25,7 @@ import {
   settleNpcOpsDue,
   tickEconomyN,
 } from './career-economy.js';
+import { getAircraftClass } from './career-mission.js';
 import type { NpcFlight } from './types/career-economy.js';
 
 describe('NPC freighter fleet', () => {
@@ -40,6 +43,31 @@ describe('NPC freighter fleet', () => {
     assert.equal(bonanza.length, 8);
     assert.ok(world.npcs.every((n) => n.status === 'idle'));
     assert.ok(world.npcs.every((n) => n.reliability > 0 && n.aggressiveness > 0));
+  });
+
+  it('assigns abstract airframe variants (FSLTL-derived) on seed', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-airframes' });
+    assert.ok(world.npcs.every((n) => Boolean(n.airframeTypeId)));
+    const types = new Set(world.npcs.map((n) => n.airframeTypeId));
+    assert.ok(types.size >= 8, `expected variety, got ${[...types].join(',')}`);
+    const withCargoCap = world.npcs.filter(
+      (n) => typeof n.maxCargoKg === 'number' && n.maxCargoKg > 0,
+    );
+    assert.ok(withCargoCap.length >= 4);
+    for (const npc of withCargoCap) {
+      assert.ok(npcMaxCargoKg(npc) <= getAircraftClass(npc.aircraftClassId).maxCargoKg);
+    }
+  });
+
+  it('backfills airframes on legacy NPCs missing typeId', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-airframe-backfill' });
+    for (const npc of world.npcs) {
+      delete npc.airframeTypeId;
+      delete npc.maxCargoKg;
+    }
+    const assigned = ensureNpcAirframes(world);
+    assert.equal(assigned, world.npcs.length);
+    assert.ok(world.npcs.every((n) => Boolean(n.airframeTypeId)));
   });
 
   it('tops up legacy jet-only fleets with GA NPCs', () => {

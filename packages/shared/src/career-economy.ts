@@ -151,30 +151,41 @@ export {
 export {
   describeLotMarketPressure,
   drainNpcMroParts,
+  ensureNpcAirframes,
   ensureNpcFleet,
   ensureNpcRegionCoverage,
   estimateNpcBlockHours,
+  findNpcAirframe,
+  listNpcAirframesForClass,
   listNpcActivity,
   listNpcFleetStatus,
   listRegionMarketPressure,
+  npcAirframeLabel,
   npcClaimForLot,
   npcLaneAirborneKg,
+  npcMaxCargoKg,
   playerLaneInboundKg,
   laneInboundKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
+  NPC_AIRFRAME_VARIANTS,
   NPC_FLEET_SIZE,
   NPC_MX_INTERVAL_HOURS,
   NPC_MX_PARTS_KG,
   NPC_MX_SHOP_HOURS,
   LANE_BUSY_SATURATION,
   THIN_FLEET_CAPACITY,
+  pickNpcAirframe,
   seedNpcFleet,
   settleNpcOpsDue,
   tickNpcFreighters,
 } from './career-npc.js';
 
-export type { LotMarketPressure, RegionMarketPressure } from './career-npc.js';
+export type {
+  LotMarketPressure,
+  NpcAirframeVariant,
+  RegionMarketPressure,
+} from './career-npc.js';
 
 export {
   economyDayIndex,

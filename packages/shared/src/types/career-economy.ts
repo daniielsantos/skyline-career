@@ -132,6 +132,13 @@ export interface NpcFreighter {
   id: string;
   name: string;
   aircraftClassId: FreighterClassId;
+  /**
+   * Optional ICAO-ish airframe variant (A321F, 208B, …) from the abstract
+   * NPC catalog — display + optional cargo ceiling. Not a player flight_model.
+   */
+  airframeTypeId?: string;
+  /** Optional cargo ceiling (kg); clamped to class max when bidding. */
+  maxCargoKg?: number;
   homeRegion: string;
   /** 0–1: less noise / more consistent bidding when high. */
   reliability: number;
@@ -238,6 +245,8 @@ export interface NpcFleetMemberView {
   name: string;
   aircraftClassId: FreighterClassId;
   aircraftLabel: string;
+  /** ICAO-ish variant when assigned (A321F, …). */
+  airframeTypeId?: string;
   homeRegion: string;
   reliability: number;
   aggressiveness: number;

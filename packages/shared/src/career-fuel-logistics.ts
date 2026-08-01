@@ -3,6 +3,12 @@
  * fuel hubs to shortage spokes. Not a player trucking career.
  */
 
+import {
+  hoursToMs,
+  MS_PER_HOUR,
+  MS_PER_TICK,
+  msToHours,
+} from './career-clock.js';
 import { FUEL_HUB_ICAOS, routeDistanceNm } from './career-economy.js';
 import { recordFuelTruckDeliveryActivity } from './career-hub-level.js';
 import type {
@@ -13,9 +19,6 @@ import type {
   FuelTruck,
   FuelTruckClassId,
 } from './types/career-economy.js';
-
-/** Keep in sync with career-economy MS_PER_TICK (avoid circular TDZ). */
-const MS_PER_TICK = 3_600_000;
 
 export const FUEL_TRUCK_FLEET_SIZE = 20;
 
@@ -62,7 +65,8 @@ const MAX_INBOUND_HAULS = 2;
 const TURNAROUND_MIN_H = 3;
 const TURNAROUND_MAX_H = 5;
 /** Keep completed hauls briefly for Terminal “last delivery”. */
-const COMPLETED_HAUL_RETENTION_MS = 12 * MS_PER_TICK;
+const COMPLETED_HAUL_RETENTION_MS = 12 * MS_PER_HOUR;
+/** Last economy batch of the haul counts as "arriving". */
 const ARRIVING_WINDOW_MS = MS_PER_TICK;
 
 const REGION_NEIGHBORS: Record<string, readonly string[]> = {
@@ -297,7 +301,7 @@ export function settleFuelHaulsDue(
         (hashSeed(`${haul.id}:tt`) % 1000) / 1000 * (TURNAROUND_MAX_H - TURNAROUND_MIN_H);
       truck.status = 'turnaround';
       truck.currentHaulId = undefined;
-      truck.busyUntilMs = nowMs + turnH * MS_PER_TICK;
+      truck.busyUntilMs = nowMs + hoursToMs(turnH);
     }
   }
 
@@ -464,7 +468,7 @@ export function dispatchFuelTrucks(
     const hours = estimateFuelHaulHours(world, pick.origin.icao, pick.dest.icao);
     const staggerMs = Math.floor(rng() * 20 * 60 * 1000);
     const departedAtMs = batchNowMs + staggerMs;
-    const arrivesAtMs = departedAtMs + hours * MS_PER_TICK;
+    const arrivesAtMs = departedAtMs + hoursToMs(hours);
     const haul: FuelHaul = {
       id: `fuelh-${world.tick}-${truck.id}-${pick.dest.icao}`,
       truckId: truck.id,
@@ -553,7 +557,7 @@ export function listFuelHaulViews(
         departedAtMs: h.departedAtMs,
         arrivesAtMs: h.arrivesAtMs,
         etaMs,
-        etaHours: Math.round((etaMs / MS_PER_TICK) * 10) / 10,
+        etaHours: Math.round(msToHours(etaMs) * 10) / 10,
         progressPct: Math.min(100, Math.round((flown / duration) * 100)),
         status: h.status,
         phase: haulPhase(h, nowMs),

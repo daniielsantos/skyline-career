@@ -86,7 +86,7 @@ describe('hangar parking fees', () => {
     );
     const result = settleHangarParkingFees(state, world, {
       fromTick: 0,
-      toTick: 48,
+      toTick: 192, // 2 career days at 96 ticks/day
     });
 
     assert.equal(result.daysCharged, 2);
@@ -113,7 +113,7 @@ describe('hangar parking fees', () => {
 
     const result = settleHangarParkingFees(state, world, {
       fromTick: 0,
-      toTick: 24,
+      toTick: 96, // 1 career day
     });
 
     assert.ok(result.requestedUsd > 50);

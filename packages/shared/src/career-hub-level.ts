@@ -109,11 +109,12 @@ export const HUB_ACTIVITY = {
   fuelTruckDelivery: 3,
 } as const;
 
-/** Hard cap so a busy formation hour cannot dump a whole level alone. */
-export const HUB_LEVEL_XP_PER_TICK_CAP = 6;
+/** Hard cap so a busy formation hour cannot dump a whole level alone (~6/hour ÷ 4). */
+export const HUB_LEVEL_XP_PER_TICK_CAP = 1.5;
 
 /** Recent-activity soft health (neglect does not drop level). */
-const ACTIVITY_DECAY_PER_TICK = 0.985;
+/** Per 15-min tick; ≈ 0.985 per wall-hour (0.985^(1/4)). */
+const ACTIVITY_DECAY_PER_TICK = 0.99622;
 const ACTIVITY_SCORE_CAP = 100;
 const QUIET_ACTIVITY_SCORE = 8;
 const QUIET_FLOW_MULT = 0.92;

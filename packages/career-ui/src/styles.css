@@ -120,6 +120,16 @@ body {
   cursor: not-allowed;
 }
 
+/* Keep Back slot height so Freights+ don't jump when leaving a terminal. */
+.sidebar-nav .tab.tab-back.is-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sidebar-nav .tab.tab-back.is-placeholder:disabled {
+  opacity: 1;
+}
+
 .sidebar-active-card {
   margin: 0 0.15rem;
   padding: 0.75rem;

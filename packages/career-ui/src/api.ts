@@ -615,7 +615,8 @@ export function fetchMissions() {
   return api<{ walletUsd: number; missions: Mission[] }>('/api/missions');
 }
 
-export function postTick(n = 24) {
+/** Advance economy batches; default one career day (96 × 15-min ticks). */
+export function postTick(n = 96) {
   return api<{
     tick: number;
     availableLots: number;

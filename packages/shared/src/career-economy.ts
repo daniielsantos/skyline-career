@@ -33,6 +33,12 @@ import {
   worseWeather,
 } from './career-weather.js';
 import {
+  hoursToMs,
+  MAX_CATCH_UP_TICKS,
+  MS_PER_TICK,
+  TICKS_PER_DAY,
+} from './career-clock.js';
+import {
   activeLaneKg,
   countryIdFromRegion,
   ensureHomeCountryId,
@@ -182,10 +188,17 @@ export {
 
 export type { RegionalWeather, RegionWeatherView } from './career-weather.js';
 
-/** 1 economy tick = 1 real hour. */
-export const MS_PER_TICK = 3_600_000;
-/** Cap catch-up per load so a long offline stretch stays responsive. */
-export const MAX_CATCH_UP_TICKS = 24 * 14;
+export {
+  hoursToMs,
+  hoursToTicks,
+  MAX_CATCH_UP_TICKS,
+  msToHours,
+  MS_PER_HOUR,
+  MS_PER_TICK,
+  TICKS_PER_DAY,
+  TICKS_PER_HOUR,
+} from './career-clock.js';
+
 /** Max concurrent active lots on the same commodity+route (large + small). Fallback for major↔major. */
 export const MAX_LOTS_PER_LANE = 5;
 /** Soft caps within a lane so light aircraft see bookable slices. Fallback for major↔major. */
@@ -661,8 +674,9 @@ export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
   const icao = terminal.icao.trim().toUpperCase();
   const hub = FUEL_HUB_ICAOS.has(icao);
   const cap = hub ? 500_000 : 120_000;
-  const prod = hub ? 8_000 : 800;
-  const cons = hub ? 3_000 : 1_500;
+  // kg / 15-min tick (legacy hourly rates ÷ 4)
+  const prod = hub ? 2_000 : 200;
+  const cons = hub ? 750 : 375;
   const existingCap = terminal.inventory.fuel?.capacityKg ?? 0;
   /** Spoke→hub promotion (e.g. US majors added to FUEL_HUB_ICAOS). */
   const upgradingToHub = hub && existingCap > 0 && existingCap < cap;
@@ -702,10 +716,11 @@ export function ensureAirportMroInventory(terminal: AirportTerminal): void {
   const tier = hubTierOf(terminal);
   const cap =
     tier === 'major' ? 80_000 : tier === 'regional' ? 35_000 : 12_000;
+  // kg / 15-min tick (legacy hourly rates ÷ 4)
   const prod =
-    tier === 'major' ? 900 : tier === 'regional' ? 280 : 40;
+    tier === 'major' ? 225 : tier === 'regional' ? 70 : 10;
   const cons =
-    tier === 'major' ? 420 : tier === 'regional' ? 220 : 90;
+    tier === 'major' ? 105 : tier === 'regional' ? 55 : 22;
 
   if (!terminal.inventory.mro_parts) {
     terminal.inventory.mro_parts = pile(Math.round(cap * 0.5), cap);
@@ -1423,8 +1438,9 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       if (c.id === 'fuel') {
         const hub = FUEL_HUB_ICAOS.has(h.icao);
         const cap = Math.round((hub ? 500_000 : 120_000) * capacityBoost);
-        const prod = Math.round((hub ? 8_000 : 800) * (0.8 + rng() * 0.4));
-        const cons = Math.round((hub ? 3_000 : 1_500) * (0.8 + rng() * 0.4));
+        // kg / 15-min tick (legacy hourly rates ÷ 4)
+        const prod = Math.round((hub ? 2_000 : 200) * (0.8 + rng() * 0.4));
+        const cons = Math.round((hub ? 750 : 375) * (0.8 + rng() * 0.4));
         production[c.id] = prod;
         consumption[c.id] = cons;
         const startFill = 0.45 + rng() * 0.25;
@@ -1438,11 +1454,11 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
             capacityBoost,
         );
         const prod = Math.round(
-          (tier === 'major' ? 900 : tier === 'regional' ? 280 : 40) *
+          (tier === 'major' ? 225 : tier === 'regional' ? 70 : 10) *
             (0.85 + rng() * 0.3),
         );
         const cons = Math.round(
-          (tier === 'major' ? 420 : tier === 'regional' ? 220 : 90) *
+          (tier === 'major' ? 105 : tier === 'regional' ? 55 : 22) *
             (0.85 + rng() * 0.3),
         );
         production[c.id] = prod;
@@ -1455,12 +1471,12 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       );
       const prodBias = h.produce[c.id] ?? 0.15;
       const consBias = h.consume[c.id] ?? 0.25;
-      // kg / tick — asymmetric by design, scaled by hub tier
+      // kg / 15-min tick — asymmetric by design, scaled by hub tier
       const prod = Math.round(
-        2_200 * prodBias * tierProfile.flowMult * (0.8 + rng() * 0.4),
+        550 * prodBias * tierProfile.flowMult * (0.8 + rng() * 0.4),
       );
       const cons = Math.round(
-        2_000 * consBias * tierProfile.flowMult * (0.8 + rng() * 0.4),
+        500 * consBias * tierProfile.flowMult * (0.8 + rng() * 0.4),
       );
       production[c.id] = prod;
       consumption[c.id] = cons;
@@ -1510,7 +1526,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   return world;
 }
 
-/** Continuous economy hours = completed batches + fractional hour since last batch. */
+/** Continuous economy ticks = completed batches + fractional batch since lastBatchAtMs. */
 export function continuousEconomyHours(
   world: CareerEconomyWorld,
   nowMs = Date.now(),
@@ -1557,7 +1573,7 @@ function migrateNpcTimestamps(
       if (typeof flight.arrivesAtTick === 'number') {
         flight.arrivesAtMs = tickToWallMs(anchor, world.tick, flight.arrivesAtTick);
       } else if (typeof flight.arrivesAtMs !== 'number') {
-        flight.arrivesAtMs = flight.departedAtMs + 2 * MS_PER_TICK;
+        flight.arrivesAtMs = flight.departedAtMs + hoursToMs(2);
       }
     }
   }
@@ -1738,9 +1754,9 @@ function baseConsOf(ap: AirportTerminal, commodityId: CommodityId): number {
   return ap.baseConsumption?.[commodityId] ?? ap.consumption[commodityId] ?? 0;
 }
 
-/** Day-of-year style season from tick (1 tick = 1h). */
+/** Day-of-year style season from tick (96 ticks ≈ 1 day). */
 function seasonalFactor(commodityId: CommodityId, tick: number): number {
-  const day = Math.floor(tick / 24) % 365;
+  const day = Math.floor(tick / TICKS_PER_DAY) % 365;
   const wave = Math.sin((2 * Math.PI * day) / 365);
   if (commodityId === 'perishables') {
     return 1 + wave * 0.18;
@@ -1906,12 +1922,14 @@ export function laneDemandShock(
 
 function maybeSpawnEvents(world: CareerEconomyWorld, rng: () => number): void {
   if (!world.events) world.events = [];
-  // Drop finished events older than 48h
-  world.events = world.events.filter((e) => e.endsAtTick > world.tick - 48);
+  // Drop finished events older than ~48 wall-hours (192 × 15-min ticks).
+  world.events = world.events.filter(
+    (e) => e.endsAtTick > world.tick - TICKS_PER_DAY * 2,
+  );
   const active = activeEvents(world);
   if (active.length >= 4) return;
-  // ~7%/tick → occasional overlapping regional shocks without flooding.
-  if (rng() > 0.07) return;
+  // ~1.75%/15-min tick ≈ ~7%/hour — occasional overlapping shocks.
+  if (rng() > 0.0175) return;
 
   const regions = [...new Set(world.airports.map((a) => a.region))];
   const region = regions[Math.floor(rng() * regions.length)] ?? 'BR-SE';
@@ -1923,7 +1941,7 @@ function maybeSpawnEvents(world: CareerEconomyWorld, rng: () => number): void {
     'labor_strike',
   ];
   const kind = kinds[Math.floor(rng() * kinds.length)]!;
-  const duration = 12 + Math.floor(rng() * 36);
+  const duration = 48 + Math.floor(rng() * 144);
   let commodityId: CommodityId | undefined;
   let label = '';
   switch (kind) {
@@ -1964,8 +1982,9 @@ export function stockTrend(
   consumptionKg: number,
 ): 'rising' | 'falling' | 'stable' {
   const net = productionKg - consumptionKg;
-  if (net > 80) return 'rising';
-  if (net < -80) return 'falling';
+  // Per 15-min tick thresholds (legacy ±80 kg/hour ÷ 4).
+  if (net > 20) return 'rising';
+  if (net < -20) return 'falling';
   return 'stable';
 }
 
@@ -2071,8 +2090,8 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
   }
 }
 
-/** Keep expired/delivered lots this many ticks after expiresAtTick, then drop. */
-export const DEAD_LOT_RETENTION_TICKS = 12;
+/** Keep expired/delivered lots this many ticks after expiresAtTick, then drop (~12h). */
+export const DEAD_LOT_RETENTION_TICKS = 48;
 
 /**
  * Drop market lots that are no longer actionable.
@@ -2317,11 +2336,12 @@ function formLotsFromImbalances(
       commodity.basePricePerKg * (international ? 2.1 : 1.8),
     );
     const payUsd = Math.round(qty * payPerKg);
+    // Lot life in 15-min ticks (legacy hour lives × 4).
     const baseLife = commodity.perishable
-      ? 8 + Math.floor(rng() * 4)
-      : 18 + Math.floor(rng() * 8);
+      ? 32 + Math.floor(rng() * 16)
+      : 72 + Math.floor(rng() * 32);
     const life = Math.max(
-      4,
+      16,
       Math.round(
         baseLife *
           regionalWeatherLifeMult(laneWeather) *
@@ -2758,11 +2778,11 @@ export function shiftEconomyWallClock(
 }
 
 /**
- * Advance n hourly batches. When advanceWallClock is true (default for UI +1 day /
+ * Advance n 15-minute batches. When advanceWallClock is true (default for UI +1 day /
  * catch-up), shifts lastBatchAtMs and uses coherent batch wall times for NPC claims.
  *
  * Instant +N (no fromBatchAtMs) rewinds wall timestamps so the previous lastBatch
- * maps to (now − N hours), then resimulates forward to now. Without that rewind,
+ * maps to (now − N batches), then resimulates forward to now. Without that rewind,
  * rapid +1 day clicks only bump the tick counter while NPC ETAs stay glued to
  * Date.now() and the competing fleet board looks frozen.
  */

@@ -3,6 +3,7 @@
  * One fair|marginal|poor value per region per sim-day — scales with regions, never NPCs.
  */
 
+import { TICKS_PER_DAY } from './career-clock.js';
 import type { CareerEconomyWorld } from './types/career-economy.js';
 
 export type RegionalWeather = 'fair' | 'marginal' | 'poor';
@@ -10,7 +11,7 @@ export type RegionalWeather = 'fair' | 'marginal' | 'poor';
 export type RegionWeatherView = {
   region: string;
   weather: RegionalWeather;
-  /** Sim-day index = floor(tick / 24). */
+  /** Sim-day index = floor(tick / TICKS_PER_DAY). */
   day: number;
 };
 
@@ -34,7 +35,7 @@ function mulberry32(seed: number): () => number {
 }
 
 export function economyDayIndex(tick: number): number {
-  return Math.max(0, Math.floor(tick / 24));
+  return Math.max(0, Math.floor(tick / TICKS_PER_DAY));
 }
 
 /**
@@ -49,8 +50,8 @@ export function regionalWeatherIndex(
   const day = economyDayIndex(tick);
   const rng = mulberry32(hashSeed(`${world.seed}:wx:${region}:${day}`));
   const roll = rng();
-  // day-of-year style wave from tick (1 tick = 1h).
-  const season = Math.sin((2 * Math.PI * (tick / 24)) / 365);
+  // day-of-year style wave from tick (96 ticks ≈ 1 day).
+  const season = Math.sin((2 * Math.PI * (tick / TICKS_PER_DAY)) / 365);
   let fairCut = 0.55;
   let poorCut = 0.88;
   if (region === 'BR-NE' || region === 'BR-N') {

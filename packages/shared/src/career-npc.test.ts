@@ -10,6 +10,7 @@ import {
   listNpcFleetStatus,
   listRegionMarketPressure,
   migrateEconomyWorld,
+  hoursToTicks,
   NPC_FLEET_SIZE,
   NPC_MX_INTERVAL_HOURS,
   NPC_MX_PARTS_KG,
@@ -174,7 +175,7 @@ describe('NPC freighter fleet', () => {
     );
     assert.equal(
       sample.flight.arrivesAtTick - sample.flight.departedAtTick,
-      Math.max(1, Math.ceil(flightHours)),
+      hoursToTicks(flightHours),
     );
     const npc = world.npcs.find((n) => n.id === sample.flight.npcId)!;
     assert.equal(npc.status, 'busy');

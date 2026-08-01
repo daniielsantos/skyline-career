@@ -20,6 +20,7 @@ import {
   localPriceMultiplier,
   marketQueryTokens,
   migrateEconomyWorld,
+  MS_PER_HOUR,
   MS_PER_TICK,
   npcLaneSaturation,
   npcRegionBidCapacity,
@@ -496,7 +497,7 @@ describe('tickEconomyN market formation', () => {
         if (npc.homeRegion === region) {
           if (resting) {
             npc.status = 'resting';
-            npc.restUntilMs = nowMs + 48 * MS_PER_TICK;
+            npc.restUntilMs = nowMs + 48 * MS_PER_HOUR;
             npc.dutyHoursAccum = 10;
           } else {
             npc.status = 'idle';
@@ -579,7 +580,7 @@ describe('tickEconomyN market formation', () => {
           departedAtTick: world.tick,
           arrivesAtTick: world.tick + 3,
           departedAtMs: world.lastBatchAtMs,
-          arrivesAtMs: world.lastBatchAtMs + 3 * MS_PER_TICK,
+          arrivesAtMs: world.lastBatchAtMs + 3 * MS_PER_HOUR,
           status: 'in_flight',
         };
         world.npcFlights.push(flight);
@@ -723,7 +724,7 @@ describe('tickEconomyN market formation', () => {
           departedAtTick: world.tick,
           arrivesAtTick: world.tick + 2,
           departedAtMs: world.lastBatchAtMs,
-          arrivesAtMs: world.lastBatchAtMs + 2 * MS_PER_TICK,
+          arrivesAtMs: world.lastBatchAtMs + 2 * MS_PER_HOUR,
           status: 'in_flight',
         });
       }
@@ -849,19 +850,20 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     const start = 1_700_000_000_000;
     world.lastBatchAtMs = start;
     world.tick = 0;
-    const threeHoursPlus = start + 3 * MS_PER_TICK + 1_800_000; // +3h 30m
+    // +3h 20m → 13 × 15-min batches + 5m remainder
+    const threeHoursPlus = start + 3 * MS_PER_HOUR + 20 * 60 * 1000;
     const { advancedTicks } = ensureEconomyCaughtUp(world, threeHoursPlus);
-    assert.equal(advancedTicks, 3);
-    assert.equal(world.tick, 3);
-    assert.equal(world.lastBatchAtMs, threeHoursPlus - 1_800_000);
+    assert.equal(advancedTicks, 13);
+    assert.equal(world.tick, 13);
+    assert.equal(world.lastBatchAtMs, threeHoursPlus - 5 * 60 * 1000);
   });
 
-  it('returns 0 when less than one hour elapsed', () => {
+  it('returns 0 when less than one batch elapsed', () => {
     const world = createSeedEconomyWorld({ seed: 'partial' });
     const start = 1_700_000_000_000;
     world.lastBatchAtMs = start;
     const before = world.tick;
-    const { advancedTicks } = ensureEconomyCaughtUp(world, start + 59 * 60 * 1000);
+    const { advancedTicks } = ensureEconomyCaughtUp(world, start + 14 * 60 * 1000);
     assert.equal(advancedTicks, 0);
     assert.equal(world.tick, before);
   });

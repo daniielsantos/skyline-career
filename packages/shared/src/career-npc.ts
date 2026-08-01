@@ -1,9 +1,16 @@
 /**
  * Phase 2 — limited NPC freighter fleet competing for market lots.
  * Same capacity/range rules as the player; no wallet credit on settle.
- * Flight timing is wall-clock (ms); hourly batches only decide new bids.
+ * Flight timing is wall-clock (ms); 15-min batches only decide new bids.
  */
 
+import {
+  hoursToMs,
+  hoursToTicks,
+  MS_PER_TICK,
+  msToHours,
+  TICKS_PER_HOUR,
+} from './career-clock.js';
 import {
   applyFreightDelivery,
   ensureAirportMroInventory,
@@ -46,8 +53,6 @@ export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
   { aircraftClassId: 'light_ga', count: 8 },
 ] as const;
 
-/** Must match career-economy MS_PER_TICK (1 tick = 1 real hour). */
-const MS_PER_TICK = 3_600_000;
 /** Minimum airborne block so ultra-short hops aren't instant. */
 const MIN_BLOCK_HOURS = 1;
 const TURNAROUND_HOURS = 1;
@@ -78,9 +83,9 @@ export const NPC_MX_PARTS_KG: Record<FreighterClassId, number> = {
   narrow_freighter: 200,
   wide_freighter: 400,
 };
-/** Spread departures inside the same economy hour (wall-clock ms). */
+/** Spread departures inside the same economy batch (wall-clock ms). */
 const DEPART_STAGGER_MS = 25 * 60 * 1000;
-/** Treat as arriving when within the last hour of the flight. */
+/** Last economy batch of the leg counts as "arriving". */
 const ARRIVING_WINDOW_MS = MS_PER_TICK;
 /** Max flight+turnaround duty before mandatory crew rest. */
 const MAX_DUTY_HOURS = 9;
@@ -448,8 +453,8 @@ function beginCrewRest(
   npc.currentFlightId = undefined;
   npc.busyUntilTick = undefined;
   npc.busyUntilMs = undefined;
-  npc.restUntilMs = nowMs + restHours * MS_PER_TICK;
-  npc.restUntilTick = world.tick + Math.max(1, Math.ceil(restHours));
+  npc.restUntilMs = nowMs + hoursToMs(restHours);
+  npc.restUntilTick = world.tick + hoursToTicks(restHours);
 }
 
 function clearCrewRest(npc: NpcFreighter): void {
@@ -532,8 +537,8 @@ function beginShopMx(
   npc.busyUntilMs = undefined;
   npc.restUntilMs = undefined;
   npc.restUntilTick = undefined;
-  npc.mxUntilMs = nowMs + shopHours * MS_PER_TICK;
-  npc.mxUntilTick = world.tick + Math.max(1, Math.ceil(shopHours));
+  npc.mxUntilMs = nowMs + hoursToMs(shopHours);
+  npc.mxUntilTick = world.tick + hoursToTicks(shopHours);
   npc.hoursSinceMx = 0;
 }
 
@@ -826,11 +831,11 @@ function backfillNpcDutyFromFlights(world: CareerEconomyWorld): void {
     if (flight) {
       const blockHours = Math.max(
         MIN_BLOCK_HOURS,
-        (flightArrivesAtMs(flight) - flightDepartedAtMs(flight)) / MS_PER_TICK,
+        msToHours(flightArrivesAtMs(flight) - flightDepartedAtMs(flight)),
       );
       const turnaroundHours = Math.max(
         0.4,
-        (npcBusyUntilMs(npc) - flightArrivesAtMs(flight)) / MS_PER_TICK,
+        msToHours(npcBusyUntilMs(npc) - flightArrivesAtMs(flight)),
       );
       const leg = blockHours + turnaroundHours;
       npc.lastLegDutyHours = leg;
@@ -892,7 +897,7 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
     npc.locationIcao = flight.destIcao;
     const blockHours = Math.max(
       MIN_BLOCK_HOURS,
-      (flightArrivesAtMs(flight) - flightDepartedAtMs(flight)) / MS_PER_TICK,
+      msToHours(flightArrivesAtMs(flight) - flightDepartedAtMs(flight)),
     );
     npc.hoursSinceMx = (npc.hoursSinceMx ?? 0) + blockHours;
     if (npc.currentFlightId === flight.id) {
@@ -1003,12 +1008,12 @@ function claimLotForNpc(
   const turnaroundHours = TURNAROUND_HOURS * (0.55 + rng() * 0.9);
   const departSkewMs = Math.floor(rng() * DEPART_STAGGER_MS);
   const departedAtMs = batchNowMs + departSkewMs;
-  const arrivesAtMs = departedAtMs + flightHours * MS_PER_TICK;
-  const busyUntilMs = arrivesAtMs + turnaroundHours * MS_PER_TICK;
-  const flightTickHours = Math.max(1, Math.ceil(flightHours));
+  const arrivesAtMs = departedAtMs + hoursToMs(flightHours);
+  const busyUntilMs = arrivesAtMs + hoursToMs(turnaroundHours);
+  const flightTickHours = hoursToTicks(flightHours);
   const busyTickHours = Math.max(
-    flightTickHours + 1,
-    Math.ceil(flightHours + turnaroundHours),
+    flightTickHours + TICKS_PER_HOUR,
+    hoursToTicks(flightHours + turnaroundHours),
   );
 
   let reserved;
@@ -1161,10 +1166,10 @@ export function listNpcActivity(
     const departed = flightDepartedAtMs(flight);
     const arrives = flightArrivesAtMs(flight);
     const durationMs = Math.max(1, arrives - departed);
-    const flightHours = durationMs / MS_PER_TICK;
+    const flightHours = msToHours(durationMs);
     const flownMs = Math.min(durationMs, Math.max(0, nowMs - departed));
     const etaMs = Math.max(0, arrives - nowMs);
-    const hoursRemaining = etaMs / MS_PER_TICK;
+    const hoursRemaining = msToHours(etaMs);
     const progressPct = Math.min(100, Math.round((flownMs / durationMs) * 100));
     const aircraft = getAircraftClass(flight.aircraftClassId);
 
@@ -1217,13 +1222,13 @@ export function listNpcFleetStatus(
       phase = activity.phase;
     } else if (npc.status === 'maintenance' && npcMxUntilMs(npc) > nowMs) {
       phase = 'maintenance';
-      mxHoursLeft = Math.max(0, (npcMxUntilMs(npc) - nowMs) / MS_PER_TICK);
+      mxHoursLeft = Math.max(0, msToHours(npcMxUntilMs(npc) - nowMs));
     } else if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) {
       phase = 'resting';
-      restHoursLeft = Math.max(0, (npcRestUntilMs(npc) - nowMs) / MS_PER_TICK);
+      restHoursLeft = Math.max(0, msToHours(npcRestUntilMs(npc) - nowMs));
     } else if (npc.status === 'busy' && npcBusyUntilMs(npc) > nowMs) {
       phase = 'turnaround';
-      turnaroundHoursLeft = Math.max(0, (npcBusyUntilMs(npc) - nowMs) / MS_PER_TICK);
+      turnaroundHoursLeft = Math.max(0, msToHours(npcBusyUntilMs(npc) - nowMs));
     }
 
     const mission =
@@ -1329,7 +1334,7 @@ export function npcClaimForLot(
     npcId: flight.npcId,
     npcName: npc?.name ?? flight.npcId,
     cargoKg: flight.cargoKg,
-    etaHours: etaMs / MS_PER_TICK,
+    etaHours: msToHours(etaMs),
     etaMs,
     arrivesAtMs: arrives,
   };

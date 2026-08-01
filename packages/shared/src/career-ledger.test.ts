@@ -8,6 +8,7 @@ import {
   summarizeLedgerEntries,
 } from './career-ledger.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
+import { TICKS_PER_DAY } from './career-clock.js';
 
 describe('career ledger', () => {
   it('records signed wallet deltas and summarizes income vs expense', () => {
@@ -43,17 +44,25 @@ describe('career ledger', () => {
   it('windows by economy day for week/month', () => {
     const state = emptyMissionsStateV2();
     applyWalletDelta(state, { amountUsd: 100, kind: 'freight_payout', atTick: 0 });
-    applyWalletDelta(state, { amountUsd: 200, kind: 'freight_payout', atTick: 24 * 10 });
-    applyWalletDelta(state, { amountUsd: -50, kind: 'ferry', atTick: 24 * 12 });
+    applyWalletDelta(state, {
+      amountUsd: 200,
+      kind: 'freight_payout',
+      atTick: TICKS_PER_DAY * 10,
+    });
+    applyWalletDelta(state, {
+      amountUsd: -50,
+      kind: 'ferry',
+      atTick: TICKS_PER_DAY * 12,
+    });
 
     const week = summarizeLedgerEntries(
-      ledgerEntriesInWindow(state.ledger ?? [], 24 * 12, 7),
+      ledgerEntriesInWindow(state.ledger ?? [], TICKS_PER_DAY * 12, 7),
     );
     assert.equal(week.incomeUsd, 200);
     assert.equal(week.expenseUsd, 50);
     assert.equal(week.netUsd, 150);
 
-    const month = summarizeCareerLedger(state, 24 * 12).month;
+    const month = summarizeCareerLedger(state, TICKS_PER_DAY * 12).month;
     assert.equal(month.incomeUsd, 300);
     assert.equal(month.expenseUsd, 50);
   });

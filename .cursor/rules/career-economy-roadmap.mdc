@@ -14,7 +14,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Fatia 2: lane saturation / soft fill shadow → urgency, lot caps, scarce pay.
 - UI chips: thin fleet / lane busy (+ weather tags).
 - Simulated regional weather (`fair|marginal|poor` per region per sim-day). No per-NPC METAR.
-- Lot prune: `pruneDeadLots` drops `expired`/`delivered` after 12 ticks (tick + migrate/load). Logbook untouched.
+- Lot prune: `pruneDeadLots` drops `expired`/`delivered` after 48 ticks (~12h at 15-min batches; tick + migrate/load). Logbook untouched.
 - Player inbound soft-shadow: accept/depart publishes `inboundPending`; soft fill / lane sat = NPC + player.
 - Hub tiers (`major`/`regional`/`spoke`): curated offline from BR cargo roles; capacity/flow scale + lane lot caps; formLots ranks by absolute kg.
 - Brazil map: 28 hubs across BR-N / BR-NE / BR-CO / BR-SE / BR-S (Manaus major, Brasília redistributor).
@@ -32,6 +32,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **US continental medium map:** 6 regions (NE/SE/MW/SC/MT/W), 24 US hubs, sparse BR↔US intl lanes, NPC fleet 44, fuel trucks 20; resilient regional corridors (≥2 gateways per US regional), critical-full domestic overflow valve, and near-full production throttle; Market `intl` chip; health/market expose `countries` + `internationalLaneCount`.
 - **Lots table (schema v2):** `lots` dual-written with `economy_json` on `saveEconomy`; hydrate overlay on load when table non-empty; real meta upgrade 1→2. Tick/missions still in-memory.
 - **Map expansion playbook:** `.cursor/rules/career-map-expansion.mdc` — checklist when adding airports/regions (seed constants + auto coverage on migrate).
+- **15-min economy ticks:** `MS_PER_TICK = 900_000`, `TICKS_PER_DAY = 96`; physics (flight/rest/MX/fuel) uses `MS_PER_HOUR`; per-tick flows ÷4 and tick lifetimes ×4 so a career day stays ~24h wall-clock. Old saves need Reset world (no tick-scale migrate).
 
 ## Near-term priorities (current Brazil career)
 

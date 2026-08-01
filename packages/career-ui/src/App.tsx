@@ -99,10 +99,12 @@ const MARKET_PAGE_SIZE = 10;
 const FLEET_PAGE_SIZE = 10;
 const MAX_STAGING_LOTS = 5;
 const SIMBRIEF_USER_KEY = 'skyline.simbriefUser';
-/** Career economy: 1 tick = 1 simulated hour. */
-const HOURS_PER_TICK = 1;
+/** Career economy: 1 tick = 15 wall-clock minutes. */
+const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
-const MS_PER_TICK_DEFAULT = 3_600_000;
+const TICKS_PER_DAY = 96;
+const MS_PER_HOUR = 3_600_000;
+const MS_PER_TICK_DEFAULT = 900_000;
 
 type StagingLine = {
   lot: MarketLot;
@@ -472,9 +474,9 @@ function missionInjectCapable(mission: Mission): boolean {
   return preferredLoadMethod(mission) === 'direct-injection';
 }
 
-/** Format a duration; shows minutes when under 2 hours. */
+/** Format a wall-clock duration in hours; shows minutes when under 2 hours. */
 function formatDuration(hours: number): string {
-  const totalMinutes = Math.max(0, Math.round(Math.abs(hours) * 60 * HOURS_PER_TICK));
+  const totalMinutes = Math.max(0, Math.round(Math.abs(hours) * 60));
   if (totalMinutes < 120) {
     const h = Math.floor(totalMinutes / 60);
     const m = totalMinutes % 60;
@@ -490,9 +492,12 @@ function formatDuration(hours: number): string {
   return rem === 0 ? `${days}d` : `${days}d ${rem}h`;
 }
 
-/** Continuous clock from fractional economy hours: Day 1 · 14:37 */
-function formatClock(continuousHours: number): string {
-  const totalMinutes = Math.max(0, Math.floor(continuousHours * 60));
+/** Continuous clock from fractional economy ticks: Day 1 · 14:37 */
+function formatClock(continuousTicks: number): string {
+  const totalMinutes = Math.max(
+    0,
+    Math.floor(continuousTicks * HOURS_PER_TICK * 60),
+  );
   const day = Math.floor(totalMinutes / (HOURS_PER_DAY * 60)) + 1;
   const rem = totalMinutes % (HOURS_PER_DAY * 60);
   const hour = Math.floor(rem / 60);
@@ -511,21 +516,24 @@ function formatExpiry(opts: {
   if (opts.currentTick >= opts.expiresAtTick) {
     return 'Expired';
   }
-  // Soft continuous remaining within the current hour.
+  // Soft continuous remaining within the current 15-min batch.
   const frac = opts.continuousHours - opts.currentTick;
-  const continuousRemaining = Math.max(0, remaining - Math.min(1, Math.max(0, frac)));
-  return `Expires in ${formatDuration(continuousRemaining)}`;
+  const continuousRemainingTicks = Math.max(
+    0,
+    remaining - Math.min(1, Math.max(0, frac)),
+  );
+  return `Expires in ${formatDuration(continuousRemainingTicks * HOURS_PER_TICK)}`;
 }
 
 function formatDeadline(deadlineTick: number, continuousHours: number): string {
-  const delta = deadlineTick - continuousHours;
-  if (delta < 0) {
-    return `Overdue by ${formatDuration(Math.abs(delta))} · was ${formatClock(deadlineTick)}`;
+  const deltaTicks = deadlineTick - continuousHours;
+  if (deltaTicks < 0) {
+    return `Overdue by ${formatDuration(Math.abs(deltaTicks) * HOURS_PER_TICK)} · was ${formatClock(deadlineTick)}`;
   }
-  if (delta < 1 / 60) {
+  if (deltaTicks * HOURS_PER_TICK < 1 / 60) {
     return `Due now (${formatClock(deadlineTick)})`;
   }
-  return `Due in ${formatDuration(delta)} · ${formatClock(deadlineTick)}`;
+  return `Due in ${formatDuration(deltaTicks * HOURS_PER_TICK)} · ${formatClock(deadlineTick)}`;
 }
 
 function liveProgress(opts: {
@@ -552,7 +560,7 @@ function liveEtaHours(opts: {
   fallbackHours?: number;
 }): number {
   if (typeof opts.arrivesAtMs === 'number') {
-    return Math.max(0, (opts.arrivesAtMs - opts.nowMs) / MS_PER_TICK_DEFAULT);
+    return Math.max(0, (opts.arrivesAtMs - opts.nowMs) / MS_PER_HOUR);
   }
   return opts.fallbackHours ?? 0;
 }
@@ -561,7 +569,8 @@ function livePhase(
   etaHours: number,
   fallback?: string,
 ): 'enroute' | 'arriving' | string {
-  if (etaHours <= 1) return 'arriving';
+  // Match server arriving window: last economy batch (~15 min).
+  if (etaHours <= HOURS_PER_TICK) return 'arriving';
   if (fallback === 'boarding' || fallback === 'turnaround' || fallback === 'idle') {
     return fallback;
   }
@@ -781,15 +790,15 @@ function resolveNpcLiveState(npc: NpcFleetMember, nowMs: number) {
     : 0;
   const turnaroundLeft =
     npc.phase === 'turnaround' && typeof npc.busyUntilMs === 'number'
-      ? Math.max(0, (npc.busyUntilMs - nowMs) / MS_PER_TICK_DEFAULT)
+      ? Math.max(0, (npc.busyUntilMs - nowMs) / MS_PER_HOUR)
       : npc.turnaroundHoursLeft;
   const restLeft =
     npc.phase === 'resting' && typeof npc.restUntilMs === 'number'
-      ? Math.max(0, (npc.restUntilMs - nowMs) / MS_PER_TICK_DEFAULT)
+      ? Math.max(0, (npc.restUntilMs - nowMs) / MS_PER_HOUR)
       : npc.restHoursLeft;
   const mxLeft =
     npc.phase === 'maintenance' && typeof npc.mxUntilMs === 'number'
-      ? Math.max(0, (npc.mxUntilMs - nowMs) / MS_PER_TICK_DEFAULT)
+      ? Math.max(0, (npc.mxUntilMs - nowMs) / MS_PER_HOUR)
       : npc.mxHoursLeft;
   const phase =
     mission != null
@@ -2202,7 +2211,7 @@ export function App() {
 
   async function onTick() {
     await run(async () => {
-      const result = await postTick(24);
+      const result = await postTick(TICKS_PER_DAY);
       if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
       const leaseNote =
         (result.leasePaidUsd ?? 0) > 0
@@ -2222,7 +2231,7 @@ export function App() {
               : '';
       setToastKind(hangarShortfall > 0 ? 'warn' : 'ok');
       setToast(
-        `Time advanced ${formatDuration(24)} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}`,
+        `Time advanced ${formatDuration(HOURS_PER_DAY)} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}`,
       );
     });
   }
@@ -3423,19 +3432,19 @@ export function App() {
           SKY<span>LINE</span>
         </p>
         <nav className="sidebar-nav" aria-label="Board sections">
-          {showAirport ? (
-            <button
-              type="button"
-              className="tab"
-              onClick={() => {
-                setSidebarOpen(false);
-                selectTab(tab);
-              }}
-              disabled={busy}
-            >
-              ← Back
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className={`tab tab-back${showAirport ? '' : ' is-placeholder'}`}
+            onClick={() => {
+              setSidebarOpen(false);
+              selectTab(tab);
+            }}
+            disabled={busy || !showAirport}
+            aria-hidden={!showAirport}
+            tabIndex={showAirport ? undefined : -1}
+          >
+            ← Back
+          </button>
           <button
             type="button"
             className={!showAirport && tab === 'market' ? 'tab active' : 'tab'}

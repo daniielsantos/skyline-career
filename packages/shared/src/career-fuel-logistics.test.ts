@@ -132,7 +132,8 @@ describe('fuel truck logistics', () => {
       }
     }
 
-    tickEconomyN(world, 36, { advanceWallClock: true });
+    // ~36 wall-hours at 15-min batches
+    tickEconomyN(world, 36 * 4, { advanceWallClock: true });
     const fill =
       spoke.inventory.fuel!.stockKg / spoke.inventory.fuel!.capacityKg;
     assert.ok(

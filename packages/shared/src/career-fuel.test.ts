@@ -70,10 +70,10 @@ describe('career fuel commodity', () => {
     ensureWorldFuelInventory(migrated);
     const fixed = migrated.airports.find((a) => a.icao === 'KMIA')!;
     assert.ok((fixed.inventory.fuel?.capacityKg ?? 0) >= 400_000);
-    assert.equal(fixed.baseProduction?.fuel, 8_000);
-    assert.equal(fixed.baseConsumption?.fuel, 3_000);
-    assert.equal(fixed.production.fuel, 8_000);
-    assert.equal(fixed.consumption.fuel, 3_000);
+    assert.equal(fixed.baseProduction?.fuel, 2_000);
+    assert.equal(fixed.baseConsumption?.fuel, 750);
+    assert.equal(fixed.production.fuel, 2_000);
+    assert.equal(fixed.consumption.fuel, 750);
   });
 
   it('migrates legacy airports without fuel piles', () => {

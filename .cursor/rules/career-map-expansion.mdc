@@ -8,6 +8,8 @@ alwaysApply: false
 
 Use this whenever adding airports, regions, or a **new country/territory**. Do **not** invent ad-hoc one-offs.
 
+Clock: `1 tick = 15 min` wall-clock (`TICKS_PER_DAY = 96`). Physics durations stay in real hours via `MS_PER_HOUR`.
+
 ## New country / territory (required first)
 
 Country id is **derived** from region prefix (`XX-YY` → `XX` via `countryIdFromRegion`). There is no separate country registry — if airports use `AR-*` regions, `listWorldCountryIds` returns `AR` automatically.

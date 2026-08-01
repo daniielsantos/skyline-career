@@ -62,13 +62,24 @@ export type WatchStatusPayload = {
 };
 
 type WatchCallbacks = {
-  loadEconomy: () => Promise<CareerEconomyWorld>;
-  persistEconomy: (world: CareerEconomyWorld) => Promise<void>;
-  loadMissions: () => Promise<CareerMissionsState>;
+  /** Consistent world+missions snapshot (may run economy catch-up). */
+  withCareerRead: <T>(
+    fn: (
+      world: CareerEconomyWorld,
+      missions: CareerMissionsState,
+    ) => Promise<T> | T,
+  ) => Promise<T>;
+  /** Atomic load → mutate → persist for economy + missions. */
+  withCareerWrite: <T>(
+    fn: (
+      world: CareerEconomyWorld,
+      missions: CareerMissionsState,
+    ) => Promise<T> | T,
+  ) => Promise<T>;
   /**
-   * Reload missions under a lock, then apply. Return false to skip persist
-   * (e.g. mission already cancelled). Prevents stale watch ticks from
-   * resurrecting cancelled flights.
+   * Reload missions under the career lock, then apply. Return false to skip
+   * persist (e.g. mission already cancelled). Missions-only — do not nest
+   * withCareerRead/Write (same non-reentrant lock).
    */
   updateOpenMission: (
     missionId: string,
@@ -336,17 +347,20 @@ export class CareerWatchSession {
       this.lastSample = sample;
       this.lastError = null;
 
-      const world = await this.cb.loadEconomy();
-      const missions = await this.cb.loadMissions();
-      const idx = missions.missions.findIndex((m) => m.id === this.missionId);
-      if (idx < 0) {
+      const snap = await this.cb.withCareerRead((world, missions) => {
+        const idx = missions.missions.findIndex((m) => m.id === this.missionId);
+        if (idx < 0) return null;
+        const current = missions.missions[idx]!;
+        return { world, missions, idx, current };
+      });
+      if (!snap) {
         this.lastError = `Unknown mission ${this.missionId}`;
         await this.stop();
         return;
       }
-      let current = missions.missions[idx]!;
+      const { world, current } = snap;
       this.missionStatus = current.status;
-      this.walletUsd = missions.walletUsd;
+      this.walletUsd = snap.missions.walletUsd;
 
       if (current.status === 'settled' || current.status === 'cancelled' || current.status === 'failed') {
         await this.stop();
@@ -422,44 +436,44 @@ export class CareerWatchSession {
             this.preflightDepartBlockedLogged = true;
           }
         } else {
-          const saved = await this.cb.updateOpenMission(
-            this.missionId,
-            async (freshMissions, openMission, openIdx) => {
-              if (
-                openMission.status !== 'accepted' &&
-                openMission.status !== 'dispatched'
-              ) {
-                return false;
-              }
-              const worldFresh = await this.cb.loadEconomy();
-              const departed = departMission(worldFresh, openMission, {
-                fleet: freshMissions,
-                nowMs: nextState.airborneAtMs ?? nowMs,
-                distanceNm,
-                expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
+          const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
+            const openIdx = freshMissions.missions.findIndex(
+              (m) => m.id === this.missionId,
+            );
+            if (openIdx < 0) return false;
+            const openMission = freshMissions.missions[openIdx]!;
+            if (
+              openMission.status !== 'accepted' &&
+              openMission.status !== 'dispatched'
+            ) {
+              return false;
+            }
+            const departed = departMission(worldFresh, openMission, {
+              fleet: freshMissions,
+              nowMs: nextState.airborneAtMs ?? nowMs,
+              distanceNm,
+              expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
+            });
+            freshMissions.missions[openIdx] = departed.mission;
+            if (departed.fuelDebitUsd > 0) {
+              applyWalletDelta(freshMissions, {
+                amountUsd: -departed.fuelDebitUsd,
+                kind: 'fuel',
+                atTick: worldFresh.tick,
+                missionId: departed.mission.id,
+                icao: departed.mission.originIcao,
+                note: `${departed.mission.originIcao}→${departed.mission.destIcao}`,
               });
-              freshMissions.missions[openIdx] = departed.mission;
-              if (departed.fuelDebitUsd > 0) {
-                applyWalletDelta(freshMissions, {
-                  amountUsd: -departed.fuelDebitUsd,
-                  kind: 'fuel',
-                  atTick: worldFresh.tick,
-                  missionId: departed.mission.id,
-                  icao: departed.mission.originIcao,
-                  note: `${departed.mission.originIcao}→${departed.mission.destIcao}`,
-                });
-              }
-              this.missionStatus = departed.mission.status;
-              this.walletUsd = freshMissions.walletUsd;
-              this.watchState = {
-                ...this.watchState,
-                airborneAtMs: departed.mission.airborneAtMs,
-                expectedRouteMs: departed.mission.expectedRouteMs,
-              };
-              await this.cb.persistEconomy(worldFresh);
-              return true;
-            },
-          );
+            }
+            this.missionStatus = departed.mission.status;
+            this.walletUsd = freshMissions.walletUsd;
+            this.watchState = {
+              ...this.watchState,
+              airborneAtMs: departed.mission.airborneAtMs,
+              expectedRouteMs: departed.mission.expectedRouteMs,
+            };
+            return true;
+          });
           if (!saved) {
             await this.stop();
             return;
@@ -472,56 +486,56 @@ export class CareerWatchSession {
         } catch {
           residualFuelKg = undefined;
         }
-        const saved = await this.cb.updateOpenMission(
-          this.missionId,
-          async (freshMissions, openMission, openIdx) => {
-            if (
-              openMission.status !== 'accepted' &&
-              openMission.status !== 'dispatched' &&
-              openMission.status !== 'in_flight'
-            ) {
-              return false;
-            }
-            const worldFresh = await this.cb.loadEconomy();
-            const result = settleMission(worldFresh, openMission, {
-              fleet: freshMissions,
-              residualFuelKg,
+        const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
+          const openIdx = freshMissions.missions.findIndex(
+            (m) => m.id === this.missionId,
+          );
+          if (openIdx < 0) return false;
+          const openMission = freshMissions.missions[openIdx]!;
+          if (
+            openMission.status !== 'accepted' &&
+            openMission.status !== 'dispatched' &&
+            openMission.status !== 'in_flight'
+          ) {
+            return false;
+          }
+          const result = settleMission(worldFresh, openMission, {
+            fleet: freshMissions,
+            residualFuelKg,
+          });
+          freshMissions.missions[openIdx] = result.mission;
+          if (result.walletCreditUsd > 0) {
+            applyWalletDelta(freshMissions, {
+              amountUsd: result.walletCreditUsd,
+              kind: 'freight_payout',
+              atTick: worldFresh.tick,
+              missionId: result.mission.id,
+              icao: result.mission.destIcao,
+              note: `${result.mission.originIcao}→${result.mission.destIcao}`,
             });
-            freshMissions.missions[openIdx] = result.mission;
-            if (result.walletCreditUsd > 0) {
-              applyWalletDelta(freshMissions, {
-                amountUsd: result.walletCreditUsd,
-                kind: 'freight_payout',
-                atTick: worldFresh.tick,
-                missionId: result.mission.id,
-                icao: result.mission.destIcao,
-                note: `${result.mission.originIcao}→${result.mission.destIcao}`,
-              });
-            }
-            if (result.fuelDebitUsd > 0) {
-              applyWalletDelta(freshMissions, {
-                amountUsd: -result.fuelDebitUsd,
-                kind: 'fuel',
-                atTick: worldFresh.tick,
-                missionId: result.mission.id,
-                icao: result.mission.destIcao,
-                note: 'settlement fuel',
-              });
-            }
-            this.missionStatus = result.mission.status;
-            this.walletUsd = freshMissions.walletUsd;
-            this.settlement = {
-              payoutUsd: result.settlement.payoutUsd,
-              penaltyUsd: result.settlement.penaltyUsd,
-              lateTicks: result.settlement.lateTicks,
-              onTime: result.settlement.onTime,
-              deliveredKg: result.settlement.deliveredKg,
-              residualFuelKg: result.mission.settledFuelKg ?? null,
-            };
-            await this.cb.persistEconomy(worldFresh);
-            return true;
-          },
-        );
+          }
+          if (result.fuelDebitUsd > 0) {
+            applyWalletDelta(freshMissions, {
+              amountUsd: -result.fuelDebitUsd,
+              kind: 'fuel',
+              atTick: worldFresh.tick,
+              missionId: result.mission.id,
+              icao: result.mission.destIcao,
+              note: 'settlement fuel',
+            });
+          }
+          this.missionStatus = result.mission.status;
+          this.walletUsd = freshMissions.walletUsd;
+          this.settlement = {
+            payoutUsd: result.settlement.payoutUsd,
+            penaltyUsd: result.settlement.penaltyUsd,
+            lateTicks: result.settlement.lateTicks,
+            onTime: result.settlement.onTime,
+            deliveredKg: result.settlement.deliveredKg,
+            residualFuelKg: result.mission.settledFuelKg ?? null,
+          };
+          return true;
+        });
         if (!saved) {
           await this.stop();
           return;

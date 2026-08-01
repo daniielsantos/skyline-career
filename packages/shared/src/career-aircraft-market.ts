@@ -18,6 +18,7 @@ import {
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
 } from './career-aircraft-pricing.js';
+import { TICKS_PER_DAY } from './career-clock.js';
 import { applyWalletDelta } from './career-ledger.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
@@ -56,9 +57,9 @@ const CLASS_ORDER: FreighterClassId[] = [
   'wide_freighter',
 ];
 
-const TICKS_PER_MONTH = 24 * 30;
-const LISTING_LIFE_TICKS = 24 * 5;
-const PLAYER_LISTING_LIFE_TICKS = 24 * 7;
+const TICKS_PER_MONTH = TICKS_PER_DAY * 30;
+const LISTING_LIFE_TICKS = TICKS_PER_DAY * 5;
+const PLAYER_LISTING_LIFE_TICKS = TICKS_PER_DAY * 7;
 /** Soft target; hard class caps (≤7 low wallet, ≤9 high) may stop earlier. */
 const TARGET_LISTINGS_MIN = 5;
 const TARGET_LISTINGS_MAX = 10;

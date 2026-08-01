@@ -1,0 +1,89 @@
+{
+  "source": "simbrief",
+  "icao": "BN2P",
+  "ofpId": "blackbox-bn2-islander-cargo-tip-tanks",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "BN2 Islander - Cargo / Analogue / Tip Tanks",
+    "BN2 Islander - Cargo / Garmin / Tip Tanks"
+  ],
+  "matchTitlePattern": "BN2 Islander - Cargo / (?:Analogue|Garmin) / Tip Tanks",
+  "notes": [
+    "Black Box BN-2 Islander Cargo tip-tank family (Analogue + Garmin)",
+    "Same 4-station cargo layout; panel (steam vs G3000) does not change stations",
+    "One Skyline Market SKU; either glass variant matches the purchased airframe",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct",
+    "SimBrief: Default BN2P",
+    "Homologated profiles: blackbox/bn2-islander-cargo-analogue-tip-tanks@1.0.0, blackbox/bn2-islander-cargo-garmin-tip-tanks@1.0.0"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "BN2P",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Station 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Station 2",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Station 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Station 4",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

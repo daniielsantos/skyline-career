@@ -68,7 +68,9 @@ export function structureFromProfile(profile: AircraftProfile): AircraftStructur
 }
 
 export function identityFromProfile(profile: AircraftProfile): AircraftIdentity {
-  const rawTitle = profile.match.title ?? profile.displayName ?? profile.profileId;
+  const liveTitle = profile.match.liveTitles?.find((t) => t.trim().length > 0);
+  const rawTitle =
+    liveTitle ?? profile.match.title ?? profile.displayName ?? profile.profileId;
   return {
     title: normalizeAircraftTitle(rawTitle),
     publisher: profile.match.publisher ?? 'asobo',

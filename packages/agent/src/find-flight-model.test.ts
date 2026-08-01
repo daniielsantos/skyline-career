@@ -32,6 +32,8 @@ describe('titleSearchTokens / scorePathAgainstTokens', () => {
     const tokens = titleSearchTokens('Black Square Bonanza A36');
     assert.ok(tokens.includes('bksq'));
     assert.ok(tokens.includes('bonanza'));
+    assert.ok(!tokens.includes('black'), 'bare "black" must not match blackbox packages');
+    assert.ok(!tokens.includes('square'));
 
     const pro = scorePathAgainstTokens('bksq-aircraft-bonanzapro', tokens);
     const tc = scorePathAgainstTokens('bksq-aircraft-bonanzatc', tokens);
@@ -65,6 +67,30 @@ describe('titleSearchTokens / scorePathAgainstTokens', () => {
       tokens,
     );
     assert.ok(g3000 > steam);
+  });
+
+  it('maps Duke titles to piston/stock folders and prefers B60 over Grand Duke', () => {
+    const tokens = titleSearchTokens('Black Square B60 Duke');
+    assert.ok(tokens.includes('bksq'));
+    assert.ok(tokens.includes('duke'));
+    assert.ok(tokens.includes('stockduke'));
+    assert.ok(tokens.includes('pistonduke'));
+    assert.ok(!tokens.includes('black'));
+
+    const stock = scorePathAgainstTokens(
+      'bksq-aircraft-pistonduke/SimObjects/Airplanes/bksq-aircraft-stockduke',
+      tokens,
+    );
+    const grand = scorePathAgainstTokens(
+      'bksq-aircraft-pistonduke/SimObjects/Airplanes/bksq-aircraft-grandduke',
+      tokens,
+    );
+    const blackbox = scorePathAgainstTokens(
+      'blackboxsimulation-bn2islander24',
+      tokens,
+    );
+    assert.ok(stock > grand);
+    assert.equal(blackbox, 0);
   });
 });
 
@@ -234,5 +260,70 @@ describe('findFlightModelCandidates', () => {
     assert.equal(found.some((c) => c.path.includes('a346')), false);
     assert.ok(found[0]!.path.includes('f_cargo_steam_tiptank'));
     assert.match(found[0]!.airplaneFolder, /BBS_BN2_Piston.*f_cargo_steam_tiptank/);
+  });
+
+  it('filters Black Square Duke away from Black Box and sibling BKSQ airframes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'msfs-fm-duke-'));
+    async function writePlane(
+      pkg: string,
+      airplane: string,
+      body = '[WEIGHT_AND_BALANCE]\nCG_forward_limit = 0.25\n',
+    ) {
+      const dir = join(
+        root,
+        'Community2024',
+        pkg,
+        'SimObjects',
+        'Airplanes',
+        airplane,
+      );
+      await mkdir(dir, { recursive: true });
+      const cfg = join(dir, 'flight_model.cfg');
+      await writeFile(cfg, body, 'utf8');
+      return cfg;
+    }
+
+    await writePlane('bksq-aircraft-pistonduke', 'bksq-aircraft-stockduke');
+    await writePlane('bksq-aircraft-pistonduke', 'bksq-aircraft-grandduke');
+    await writePlane('bksq-aircraft-baronpro', 'bksq-aircraft-baronpro');
+    await writePlane('bksq-aircraft-bonanzapro', 'bksq-aircraft-bonanzapro');
+    const islander = join(
+      root,
+      'Community2024',
+      'blackboxsimulation-bn2islander24',
+      'SimObjects',
+      'Airplanes',
+      'BBS_BN2_Piston',
+      'attachments',
+      'bbs',
+      'part_interior_cargo',
+      'config',
+    );
+    await mkdir(islander, { recursive: true });
+    await writeFile(
+      join(islander, 'flight_model.cfg'),
+      '[WEIGHT_AND_BALANCE]\nmax_gross_weight = 6600\n',
+      'utf8',
+    );
+
+    const found = await findFlightModelCandidates(
+      root,
+      'Black Square B60 Duke',
+      { publisher: 'blacksquare' },
+    );
+    assert.ok(found.length >= 1);
+    assert.ok(found.every((c) => c.packageName.startsWith('bksq-')));
+    assert.ok(
+      found.every(
+        (c) =>
+          c.airplaneFolder.includes('duke') || c.packageName.includes('duke'),
+      ),
+    );
+    assert.equal(found.some((c) => c.path.includes('blackbox')), false);
+    assert.equal(
+      found.some((c) => c.path.includes('baron') || c.path.includes('bonanza')),
+      false,
+    );
+    assert.ok(found[0]!.path.includes('stockduke'));
   });
 });

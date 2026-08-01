@@ -119,16 +119,27 @@ export async function calibrateProfile(
 
   const offsets = tanks.map((t) => t.writeOffsetHint).filter((o) => Number.isFinite(o));
   const fuelOffsetApplied = roundOffset(median(offsets));
+  const offsetByTankId = new Map(
+    tanks.map((t) => [t.tankId, roundOffset(t.writeOffsetHint)] as const),
+  );
 
-  // Residual after offset → tolerance floor 2%, bump if probe still noisy.
+  // Tolerance: cover quantization noise and small aux tanks (1–2 gal is a large %).
   let maxResidualPct = 2;
   for (const t of tanks) {
-    const compensated = t.probeTarget; // we measured raw write; residual vs target is |hint|
-    const residual = Math.abs(t.writeOffsetHint - fuelOffsetApplied);
-    const pct = compensated > 0 ? (residual / compensated) * 100 : 0;
-    maxResidualPct = Math.max(maxResidualPct, Math.ceil(pct + 1));
+    const applied = offsetByTankId.get(t.tankId) ?? 0;
+    const abs = Math.abs(t.writeOffsetHint - applied);
+    if (t.capacity > 0) {
+      maxResidualPct = Math.max(
+        maxResidualPct,
+        Math.ceil((Math.max(abs, 0.5) / t.capacity) * 100) + 1,
+      );
+    }
   }
-  const tolerancePct = Math.min(8, maxResidualPct);
+  const minCap = Math.min(...tanks.map((t) => t.capacity).filter((c) => c > 0), Infinity);
+  if (Number.isFinite(minCap) && minCap < 30) {
+    maxResidualPct = Math.max(maxResidualPct, 8);
+  }
+  const tolerancePct = Math.min(12, maxResidualPct);
 
   let updated = false;
   const tankByVar = new Map(
@@ -141,11 +152,12 @@ export async function calibrateProfile(
     if (step.op !== 'simvar_set' || !step.var) continue;
     const tank = tankByVar.get(step.var);
     if (!tank) continue;
+    const tankOffset = offsetByTankId.get(tank.id) ?? fuelOffsetApplied;
     const nextExpr =
-      fuelOffsetApplied > 0
-        ? `{${tank.id}} + ${fuelOffsetApplied}`
-        : fuelOffsetApplied < 0
-          ? `{${tank.id}} - ${Math.abs(fuelOffsetApplied)}`
+      tankOffset > 0
+        ? `{${tank.id}} + ${tankOffset}`
+        : tankOffset < 0
+          ? `{${tank.id}} - ${Math.abs(tankOffset)}`
           : `{${tank.id}}`;
     if (step.valueExpr !== nextExpr) {
       step.valueExpr = nextExpr;
@@ -160,6 +172,23 @@ export async function calibrateProfile(
     }
   }
 
+  // Restore probe writes so smoke starts from a coherent quantity (best-effort).
+  for (const t of tanks) {
+    try {
+      if (profile.fuel.strategy === 'lvar-bridge') {
+        await bridge.writeLVar({ name: t.writeVar, value: t.before });
+      } else {
+        await bridge.writeSimVar({
+          name: t.writeVar,
+          unit: t.unit === 'lvar' ? 'gallons' : t.unit,
+          value: t.before,
+        });
+      }
+    } catch {
+      /* ignore restore failures */
+    }
+  }
+  await bridge.delay(400);
   // Record live CG + SimVar envelope (CG FWD/AFT LIMIT — same as Mass & Balance tablet).
   // Prefer: manual override > live SimVar limits > flight_model.cfg > stored profile.
   if (!profile.cg) {
@@ -260,7 +289,9 @@ export async function calibrateProfile(
   }
 
   const noteLines = [
-    `AUTO-CALIBRATED fuelOffset=${fuelOffsetApplied} (median of ${tanks.length} tank probe(s)).`,
+    `AUTO-CALIBRATED fuelOffset median=${fuelOffsetApplied} (per-tank: ${tanks
+      .map((t) => `${t.tankId}=${offsetByTankId.get(t.tankId) ?? 0}`)
+      .join(', ')}).`,
     `verify.tolerancePct=${tolerancePct}; cg envelope ${minMac ?? '?'}-${maxMac ?? '?'}% source=${source} (live CG≈${liveCg.toFixed(1)}).`,
     ...(sweep
       ? [

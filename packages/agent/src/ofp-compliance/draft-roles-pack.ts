@@ -24,6 +24,13 @@ export type DraftRolesPackOptions = {
   /** Regex / substring for SimBrief airframe_comments. Default "Default". */
   simbriefAirframeMatch?: string;
   unit?: 'lb' | 'kg';
+  /**
+   * Join an existing Market family: merge matchTitles into this pack under ofpDir
+   * and stamp ofpId / label notes from the family SKU.
+   */
+  familyPackRel?: string;
+  familyOfpId?: string;
+  marketLabel?: string;
 };
 
 const CREW_RE = /\b(pilot|co-?pilot|crew|captain|instructor|fo)\b/i;
@@ -178,7 +185,14 @@ function escapeRegExp(value: string): string {
 export function rolesPackPathForProfile(
   profile: AircraftProfile,
   ofpDir: string,
-): { path: string; via: 'family' | 'profile' } {
+  opts: Pick<DraftRolesPackOptions, 'familyPackRel'> = {},
+): { path: string; via: 'family' | 'profile' | 'family-join' } {
+  if (opts.familyPackRel?.trim()) {
+    return {
+      path: join(ofpDir, opts.familyPackRel.trim().replace(/^.*\//, '')),
+      via: 'family-join',
+    };
+  }
   const title =
     profile.match.title?.trim() || profile.displayName || profile.profileId;
   const heuristic = matchHeuristic(title);
@@ -197,7 +211,7 @@ export async function upsertRolesPackFromProfile(
   ofpDir: string,
   opts: DraftRolesPackOptions = {},
 ): Promise<{ path: string; pack: OfpRolesPackFile; created: boolean; via: string }> {
-  const target = rolesPackPathForProfile(profile, ofpDir);
+  const target = rolesPackPathForProfile(profile, ofpDir, opts);
   const title =
     profile.match.title?.trim() || profile.displayName || profile.profileId;
   const heuristic = matchHeuristic(title);
@@ -232,6 +246,21 @@ export async function upsertRolesPackFromProfile(
     };
   }
 
+  if (opts.familyOfpId?.trim()) {
+    pack = {
+      ...pack,
+      ofpId: opts.familyOfpId.trim(),
+      notes: [
+        ...(pack.notes ?? []),
+        opts.marketLabel
+          ? `Joined Market family: ${opts.marketLabel} (${opts.familyOfpId.trim()})`
+          : `Joined Market family ofpId=${opts.familyOfpId.trim()}`,
+        `Homologated profile: ${profile.profileKey}@${profile.semver}`,
+        `Title: ${title}`,
+      ],
+    };
+  }
+
   let created = true;
   try {
     const prev = JSON.parse(await readFile(resolve(target.path), 'utf8')) as OfpRolesPackFile;
@@ -239,26 +268,42 @@ export async function upsertRolesPackFromProfile(
     const titles = [
       ...new Set([...(prev.matchTitles ?? []), ...(pack.matchTitles ?? [])]),
     ];
+    // Keep the family's ofpId / station map when joining an existing pack.
     pack = {
       ...prev,
       ...pack,
+      ofpId: opts.familyOfpId?.trim() || prev.ofpId || pack.ofpId,
       matchTitles: titles,
       notes: [...new Set([...(prev.notes ?? []), ...(pack.notes ?? [])])],
-      payload: pack.payload,
-      stationMap: pack.stationMap,
-      liveSources: pack.liveSources,
-      loadMethod: pack.loadMethod,
-      injectCapable: pack.injectCapable,
+      payload: pack.payload ?? prev.payload,
+      stationMap:
+        target.via === 'family-join' && (prev.stationMap?.length ?? 0) > 0
+          ? prev.stationMap
+          : pack.stationMap,
+      liveSources: pack.liveSources ?? prev.liveSources,
+      loadMethod: pack.loadMethod ?? prev.loadMethod,
+      injectCapable: pack.injectCapable ?? prev.injectCapable,
+      matchTitlePattern: prev.matchTitlePattern ?? pack.matchTitlePattern,
     };
   } catch {
     // new file
   }
 
   await writeRolesPack(target.path, pack);
+  const via =
+    target.via === 'family-join'
+      ? `family-join (${opts.familyOfpId ?? basename(target.path)})`
+      : target.via === 'family'
+        ? `family (${heuristic?.id})`
+        : 'profile pack';
   return {
     path: target.path,
     pack,
     created,
-    via: target.via === 'family' ? `family (${heuristic?.id})` : 'profile pack',
+    via,
   };
+}
+
+function basename(path: string): string {
+  return path.replace(/\\/g, '/').split('/').pop() ?? path;
 }

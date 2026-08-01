@@ -1,17 +1,17 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "blacksquare-grand-duke",
-  "profileKey": "blacksquare/grand-duke",
+  "profileId": "blacksquare-turbine-duke",
+  "profileKey": "blacksquare/turbine-duke",
   "semver": "1.0.0",
-  "displayName": "Black Square Grand Duke (MSFS 2024)",
+  "displayName": "Black Square Turbine Duke (MSFS 2024)",
   "match": {
-    "fingerprint": "2c84a6bd28656cdc1d6a7393c944653bfd05695b5a7745ce117bc7a3ab67bb8e",
-    "title": "Black Square Grand Duke",
+    "fingerprint": "30b8705be59e722b39694e30e77759432aa698f981e72feca4f6b4cdc07edd1c",
+    "title": "Black Square Turbine Duke",
     "publisher": "blacksquare",
     "icao": "BE60",
     "liveTitles": [
-      "Black Square Grand Duke",
-      "Black Square Grand Duke N18VK"
+      "Black Square Turbine Duke",
+      "Black Square Turbine Duke N6060X"
     ]
   },
   "capabilities": [
@@ -32,7 +32,7 @@
       {
         "id": "LEFT_MAIN",
         "name": "Left Main",
-        "capacity": 118.5,
+        "capacity": 138.4,
         "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
@@ -41,7 +41,7 @@
       {
         "id": "RIGHT_MAIN",
         "name": "Right Main",
-        "capacity": 118.5,
+        "capacity": 132.5,
         "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
@@ -214,23 +214,23 @@
       "maxMac": 40
     },
     "calibration": {
-      "observedMac": 25.488513708114624,
-      "calibratedAtIso": "2026-08-01T20:05:53.670Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-pistonduke\\SimObjects\\Airplanes\\bksq-aircraft-grandduke\\flight_model.cfg",
+      "observedMac": 25.79684555530548,
+      "calibratedAtIso": "2026-08-01T20:03:59.279Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-turbineduke\\SimObjects\\Airplanes\\bksq-aircraft-turbineduke\\flight_model.cfg",
       "emptyWeightCgPosition": [
         0,
         0,
         0
       ],
       "sweep": {
-        "minObservedMac": 25.175878405570984,
-        "maxObservedMac": 33.625537157058716,
+        "minObservedMac": 25.485512614250183,
+        "maxObservedMac": 33.13896656036377,
         "payloadLb": 200,
         "forwardStation": 1,
         "aftStation": 8,
         "usedStationArms": true,
         "restored": true,
-        "sampledAtIso": "2026-08-01T20:05:58.855Z"
+        "sampledAtIso": "2026-08-01T20:04:04.447Z"
       }
     }
   },
@@ -240,12 +240,12 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: Black Square Grand Duke.",
+    "Homologated via wizard: Black Square Turbine Duke.",
     "ICAO type designator (catalog/SimBrief): BE60.",
     "Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.",
     "AUX deferred for v1.",
     "Stations: 8.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/blacksquare-grand-duke.md"
+    "See profiles/notes/blacksquare-turbine-duke.md"
   ]
 }

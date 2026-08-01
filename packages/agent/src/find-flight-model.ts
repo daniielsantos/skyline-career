@@ -96,6 +96,71 @@ export async function resolveInstalledPackagesPath(
   return undefined;
 }
 
+/**
+ * Community package-folder prefixes keyed by catalog publisher slug.
+ * Used to avoid scanning rival vendors (e.g. blackbox when homologating blacksquare).
+ */
+export const PUBLISHER_PACKAGE_PREFIXES: Readonly<Record<string, readonly string[]>> = {
+  blacksquare: ['bksq-', 'blacksquare'],
+  blackbox: ['blackbox', 'bbs_'],
+  a2a: ['a2a-'],
+  pmdg: ['pmdg-'],
+  fenix: ['fnx-', 'fenix'],
+  inibuilds: ['inibuilds-'],
+  nextgensim: ['nextgensim-', 'ngs-'],
+  flightfx: ['flightfx-', 'ffx-'],
+  workingtitle: ['workingtitle-', 'wt-'],
+  orbx: ['orbx-'],
+  hype: ['hype-', 'hypeperformance'],
+  miltech: ['miltech'],
+  fsreborn: ['fsreborn'],
+  carenado: ['carenado'],
+  tfdi: ['tfdidesign-', 'tfdi'],
+  asobo: ['asobo-'],
+  aerosoft: ['aerosoft-'],
+};
+
+/** Tokens that only identify a vendor — not enough to keep an airplane folder. */
+const VENDOR_ONLY_TOKENS = new Set([
+  'bksq',
+  'blacksquare',
+  'blackbox',
+  'blackboxsimulation',
+  'bbs',
+  'a2a',
+  'pmdg',
+  'fenix',
+  'carenado',
+  'asobo',
+  'inibuilds',
+  'nextgensim',
+  'flightfx',
+  'workingtitle',
+  'orbx',
+  'hype',
+  'miltech',
+  'fsreborn',
+  'tfdi',
+  'aerosoft',
+  'microsoft',
+]);
+
+export function packageMatchesPublisher(
+  packageName: string,
+  publisher: string | undefined,
+): boolean {
+  if (!publisher || publisher === 'other') return true;
+  const hints = PUBLISHER_PACKAGE_PREFIXES[publisher.toLowerCase()];
+  if (!hints?.length) return true;
+  const hay = packageName.toLowerCase();
+  return hints.some((h) => hay.includes(h.toLowerCase()));
+}
+
+/** Model/airframe tokens (excludes vendor shorthand) — used to drop sibling airframes. */
+export function modelSearchTokens(tokens: string[]): string[] {
+  return tokens.filter((t) => !VENDOR_ONLY_TOKENS.has(t));
+}
+
 /** Tokens used to rank package / airplane folder names against the live title. */
 export function titleSearchTokens(title: string): string[] {
   const normalized = title
@@ -125,6 +190,10 @@ export function titleSearchTokens(title: string): string[] {
   }
   if (tokens.includes('bonanza')) tokens.push('bonanzapro', 'bonanza');
   if (tokens.includes('caravan')) tokens.push('caravanpro', 'caravan');
+  if (tokens.includes('baron')) tokens.push('baronpro', 'baron');
+  if (tokens.includes('duke')) {
+    tokens.push('pistonduke', 'stockduke', 'grandduke', 'turbineduke');
+  }
   if (tokens.includes('islander') || tokens.includes('bn2') || tokens.includes('bn')) {
     tokens.push('islander', 'bn2', 'bn2islander', 'bbs_bn2', 'bbs-bn2');
   }
@@ -139,7 +208,20 @@ export function titleSearchTokens(title: string): string[] {
   if (tokens.includes('tip') && tokens.includes('tanks')) {
     tokens.push('tiptank', 'tiptanks');
   }
-  return [...new Set(tokens)];
+
+  // Drop ambiguous fragments that collide across vendors once shorthand exists.
+  // "black" alone matches both bksq-* and blackboxsimulation-*.
+  const drop = new Set<string>();
+  if (tokens.includes('bksq') || tokens.includes('blacksquare')) {
+    drop.add('black');
+    drop.add('square');
+  }
+  if (tokens.includes('blackbox') || tokens.includes('bbs')) {
+    drop.add('black');
+    drop.add('box');
+  }
+
+  return [...new Set(tokens.filter((t) => !drop.has(t)))];
 }
 
 export function scorePathAgainstTokens(pathOrName: string, tokens: string[]): number {
@@ -152,6 +234,14 @@ export function scorePathAgainstTokens(pathOrName: string, tokens: string[]): nu
   if (!tokens.some((t) => t.includes('turbo') || t.includes('turbine'))) {
     if (/turbo|turbine|tc\b/.test(hay)) score -= 4;
   }
+  // B60 Duke (stock/piston) vs Grand Duke — title usually names one variant.
+  const titleHasGrand = tokens.includes('grand');
+  const wantsB60 = tokens.includes('b60');
+  if (wantsB60 && !titleHasGrand) {
+    if (/stockduke|pistonduke/.test(hay)) score += 5;
+    if (/grandduke/.test(hay)) score -= 3;
+  }
+  if (titleHasGrand && /grandduke/.test(hay)) score += 5;
   // Prefer the concrete preset/common cfg over an empty airplane-root stub.
   if (/\/presets\//i.test(hay)) score += 2;
   if (/\/common\/config\//i.test(hay)) score += 1;
@@ -247,6 +337,7 @@ async function collectFlightModelsUnderPackage(
 
   const packageName = basename(packageDir);
   const packageScore = scorePathAgainstTokens(packageName, tokens);
+  const modelTokens = modelSearchTokens(tokens);
   const out: FlightModelCandidate[] = [];
   for (const airplaneDir of await listImmediateDirs(airplanesRoot)) {
     const airplaneFolder = basename(airplaneDir);
@@ -254,6 +345,13 @@ async function collectFlightModelsUnderPackage(
     // Skip airplanes that share no title tokens with the package or folder —
     // avoids dumping unrelated Community packages when the search falls back.
     if (packageScore <= 0 && airplaneScore <= 0) continue;
+
+    // Vendor-only hits (e.g. bksq on Baron while searching Duke) are not enough.
+    if (modelTokens.length > 0) {
+      const modelPkg = scorePathAgainstTokens(packageName, modelTokens);
+      const modelPlane = scorePathAgainstTokens(airplaneFolder, modelTokens);
+      if (modelPkg <= 0 && modelPlane <= 0) continue;
+    }
 
     for (const cfg of await listFlightModelCfgPaths(airplaneDir)) {
       const score =
@@ -272,17 +370,25 @@ async function collectFlightModelsUnderPackage(
   return out;
 }
 
+export type FindFlightModelOptions = {
+  minScore?: number;
+  maxPackagesToScan?: number;
+  /** Catalog publisher slug (e.g. blacksquare) — restricts package folders when possible. */
+  publisher?: string;
+};
+
 /**
  * Search Community/Official package trees for flight_model.cfg ranked by aircraft title.
  */
 export async function findFlightModelCandidates(
   packagesRoot: string,
   aircraftTitle: string,
-  opts: { minScore?: number; maxPackagesToScan?: number } = {},
+  opts: FindFlightModelOptions = {},
 ): Promise<FlightModelCandidate[]> {
   const tokens = titleSearchTokens(aircraftTitle);
   const minScore = opts.minScore ?? 1;
   const maxPackagesToScan = opts.maxPackagesToScan ?? 40;
+  const publisher = opts.publisher?.trim().toLowerCase() || undefined;
   const found: FlightModelCandidate[] = [];
 
   for (const rootName of PACKAGE_ROOT_NAMES) {
@@ -293,13 +399,20 @@ export async function findFlightModelCandidates(
       .map((dir) => ({
         dir,
         score: scorePathAgainstTokens(basename(dir), tokens),
+        vendorOk: packageMatchesPublisher(basename(dir), publisher),
       }))
       .sort((a, b) => b.score - a.score);
 
+    const vendorHits = publisher
+      ? ranked.filter((r) => r.vendorOk)
+      : ranked;
+    // Prefer publisher-scoped packages when any exist; otherwise fall back.
+    const pool = vendorHits.length > 0 ? vendorHits : ranked;
+
     const toScan = [
-      ...ranked.filter((r) => r.score >= minScore),
+      ...pool.filter((r) => r.score >= minScore),
       // If nothing matched tokens, still scan a capped set so empty Community isn't silent forever.
-      ...(ranked.every((r) => r.score < minScore) ? ranked.slice(0, 8) : []),
+      ...(pool.every((r) => r.score < minScore) ? pool.slice(0, 8) : []),
     ].slice(0, maxPackagesToScan);
 
     const seen = new Set<string>();
@@ -484,6 +597,7 @@ export async function groupFlightModelCandidatesByContent(
 export async function promptFlightModelPath(
   ask: AskFn,
   aircraftTitle: string,
+  opts: { publisher?: string } = {},
 ): Promise<string | undefined> {
   console.log('  Searching MSFS Community/Official for flight_model.cfg…');
   const resolved = await resolveInstalledPackagesPath();
@@ -495,9 +609,14 @@ export async function promptFlightModelPath(
   }
 
   printInstalled(resolved);
+  const searchOpts: FindFlightModelOptions = { publisher: opts.publisher };
+  if (opts.publisher) {
+    console.log(`  Filtering packages for publisher: ${opts.publisher}`);
+  }
   let candidates = await findFlightModelCandidates(
     resolved.packagesRoot,
     aircraftTitle,
+    searchOpts,
   );
 
   if (candidates.length === 0) {
@@ -508,6 +627,7 @@ export async function promptFlightModelPath(
       candidates = await findFlightModelCandidates(
         resolved.packagesRoot,
         `${aircraftTitle} ${keyword}`,
+        searchOpts,
       );
     }
   }

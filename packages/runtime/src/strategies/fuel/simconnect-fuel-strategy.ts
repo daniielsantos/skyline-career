@@ -76,7 +76,8 @@ async function runVerification(
         ? evaluateExpr(check.valueExpr, vars)
         : vars[check.var] ?? 0;
       const actual = await ctx.bridge.readSimVar({ name: check.var, unit: check.unit });
-      const tolerance = Math.max(expected * (check.tolerancePct / 100), 0.01);
+      // Absolute floor: 1.5 gal covers typical MSFS unusable/offset residual on light GA.
+      const tolerance = Math.max(expected * (check.tolerancePct / 100), 1.5, 0.01);
 
       if (Math.abs(actual - expected) > tolerance) {
         failures.push({

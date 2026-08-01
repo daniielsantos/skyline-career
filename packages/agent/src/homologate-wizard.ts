@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
-import type { AircraftProfile } from '@msfs-compat/shared';
+import type { AircraftProfile, CareerPlayerAirframe } from '@msfs-compat/shared';
 import { normalizeAircraftTitle, inferPublisher } from '@msfs-compat/shared';
 import { buildSmokeStationTargets } from './smoke-targets.js';
 import { calibrateProfile } from './calibrate-profile.js';
@@ -35,12 +35,21 @@ import {
   scoreRecipesForLvarFallback,
 } from './vendor-recipes.js';
 import { upsertRolesPackFromProfile } from './ofp-compliance/draft-roles-pack.js';
-import type { OfpRolesPackFile } from './ofp-compliance/scaffold-roles.js';
+import {
+  loadRolesPackFile,
+  matchHeuristic,
+  type OfpRolesPackFile,
+} from './ofp-compliance/scaffold-roles.js';
 import {
   CAREER_CLASS_CHOICES,
   inferCareerClassFromIcao,
   registerCareerPlayerAirframe,
 } from './career-player-airframe-catalog.js';
+import {
+  findMarketFamilyCandidates,
+  stationLayoutFromProfile,
+  type MarketFamilyCandidate,
+} from './career-family-merge.js';
 
 export interface HomologateWizardOptions {
   bridge: NamedPipeSimBridge;
@@ -64,6 +73,7 @@ async function calibrateWithCgSources(
   bridge: NamedPipeSimBridge,
   profilePath: string,
   aircraftTitle: string,
+  publisher?: string,
 ) {
   printSection('CG source + empirical validation');
   console.log('  Prefer live CG FWD/AFT LIMIT (Mass & Balance tablet), then flight_model.cfg.');
@@ -78,7 +88,9 @@ async function calibrateWithCgSources(
     ],
   ]);
 
-  const flightModelPath = await promptFlightModelPath(ask, aircraftTitle);
+  const flightModelPath = await promptFlightModelPath(ask, aircraftTitle, {
+    publisher,
+  });
   if (flightModelPath) {
     printKv([['flight_model.cfg', flightModelPath]]);
   } else {
@@ -131,6 +143,84 @@ async function calibrateWithCgSources(
   return calibration;
 }
 
+async function loadMarketCatalogRows(
+  repoRoot: string,
+): Promise<CareerPlayerAirframe[]> {
+  const path = join(
+    repoRoot,
+    'packages',
+    'shared',
+    'src',
+    'data',
+    'career-player-airframes.json',
+  );
+  try {
+    return JSON.parse(await readFile(path, 'utf8')) as CareerPlayerAirframe[];
+  } catch {
+    return [];
+  }
+}
+
+async function promptJoinMarketFamily(
+  ask: AskFn,
+  repoRoot: string,
+  profile: AircraftProfile,
+  aircraftClassId: CareerPlayerAirframe['aircraftClassId'],
+  cabinAsBaggage: boolean,
+): Promise<MarketFamilyCandidate | undefined> {
+  const title = profile.match.title?.trim() || profile.displayName || profile.profileId;
+  if (matchHeuristic(title)?.familyPackRel) {
+    // Built-in family heuristic already routes the pack merge.
+    return undefined;
+  }
+  const icao = (
+    profile.match.icao ??
+    ''
+  ).trim();
+  const catalog = await loadMarketCatalogRows(repoRoot);
+  const packsByRelPath = new Map<string, OfpRolesPackFile>();
+  for (const row of catalog) {
+    if (packsByRelPath.has(row.rolesPackRelPath)) continue;
+    try {
+      packsByRelPath.set(
+        row.rolesPackRelPath,
+        await loadRolesPackFile(join(repoRoot, row.rolesPackRelPath)),
+      );
+    } catch {
+      /* pack missing on disk */
+    }
+  }
+  const candidates = findMarketFamilyCandidates({
+    icao,
+    aircraftClassId,
+    profileLayout: stationLayoutFromProfile(profile, { cabinAsBaggage }),
+    matchTitle: title,
+    catalog,
+    packsByRelPath,
+  });
+  if (candidates.length === 0) return undefined;
+
+  const best = candidates[0]!;
+  const stationNote =
+    best.compatibility === 'different-stations'
+      ? 'same ICAO/class but different station map — would share Market SKU with separate OFP pack'
+      : 'same ICAO/class and compatible stations — would merge into one OFP pack';
+  console.log(
+    `  Existing Market SKU: ${best.label} (${best.typeId}, ${best.simbriefIcao})`,
+  );
+  console.log(`  → ${stationNote}`);
+  if (
+    await confirm(
+      ask,
+      `Join existing family "${best.label}"`,
+      best.compatibility !== 'different-stations',
+    )
+  ) {
+    return best;
+  }
+  return undefined;
+}
+
 async function writeCareerRolesPackAfterPromote(
   ask: AskFn,
   repoRoot: string,
@@ -155,13 +245,8 @@ async function writeCareerRolesPackAfterPromote(
     return;
   }
   const ofpDir = join(repoRoot, 'profiles', 'ofp');
-  const result = await upsertRolesPackFromProfile(profile, ofpDir, {
-    loadMethod: 'direct-injection',
-    injectCapable: true,
-    cabinAsBaggage,
-  });
   const inferredClass = inferCareerClassFromIcao(
-    result.pack.simbriefIcao ?? result.pack.icao ?? profile.match.icao ?? '',
+    profile.match.icao ?? '',
   );
   const aircraftClassId = await chooseFromList(
     ask,
@@ -169,14 +254,39 @@ async function writeCareerRolesPackAfterPromote(
     CAREER_CLASS_CHOICES.map((choice) => choice.value),
     { defaultValue: inferredClass },
   );
+  const classId =
+    CAREER_CLASS_CHOICES.find((choice) => choice.value === aircraftClassId)
+      ?.value ?? inferredClass;
+
+  const family = await promptJoinMarketFamily(
+    ask,
+    repoRoot,
+    profile,
+    classId,
+    cabinAsBaggage,
+  );
+  const mergePack =
+    family != null && family.compatibility !== 'different-stations';
+
+  const result = await upsertRolesPackFromProfile(profile, ofpDir, {
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    cabinAsBaggage,
+    ...(mergePack
+      ? {
+          familyPackRel: basename(family.rolesPackRelPath),
+          familyOfpId: family.typeId,
+          marketLabel: family.label,
+        }
+      : {}),
+  });
   const registered = await registerCareerPlayerAirframe({
     repoRoot,
     rolesPackPath: result.path,
     pack: result.pack,
-    aircraftClassId:
-      CAREER_CLASS_CHOICES.find((choice) => choice.value === aircraftClassId)
-        ?.value ?? inferredClass,
+    aircraftClassId: classId,
     title: profile.match.title ?? profile.displayName,
+    ...(family ? { typeId: family.typeId } : {}),
   });
   printKv([
     ['roles pack', result.path],
@@ -188,6 +298,9 @@ async function writeCareerRolesPackAfterPromote(
       `crew=${result.pack.payload?.stationRoles?.crewStations?.join(',') ?? '—'} bags=${result.pack.payload?.stationRoles?.baggageStations?.join(',') ?? '—'}`,
     ],
     ['Aircraft Market', `${registered.label} (${registered.aircraftClassId})`],
+    ...(family
+      ? [['family', `${family.label} (${family.compatibility})`] as [string, string]]
+      : []),
   ]);
 }
 
@@ -411,12 +524,17 @@ async function runSmoke(
   const fuelTanks: Record<string, number> = {};
   for (const tank of profile.fuel.tanks) {
     const cap = tank.capacity ?? 40;
-    // Mains/center ~80%; tips/aux ~50% so tip tanks with small caps stay visible.
-    const ratio = /TIP|AUX/i.test(tank.id) ? 0.5 : 0.8;
-    fuelTanks[tank.id] = Math.max(tank.id.includes('TIP') || tank.id.includes('AUX') ? 1 : 5, Math.floor(cap * ratio));
+    // Aux/tip often have a high unusable floor (Baron G58 AUX stuck ~8.5 of 14).
+    // Target high on the usable band so smoke does not aim below what the sim will hold.
+    const ratio = /TIP|AUX/i.test(tank.id) ? 0.85 : 0.8;
+    const minGal = /TIP|AUX/i.test(tank.id) ? Math.min(10, Math.floor(cap * 0.6)) : 5;
+    fuelTanks[tank.id] = Math.max(minGal, Math.floor(cap * ratio));
   }
   if (fuelTanks.LEFT_MAIN === undefined && profile.fuel.tanks[0]) {
-    fuelTanks[profile.fuel.tanks[0].id] = Math.max(5, Math.floor((profile.fuel.tanks[0].capacity ?? 40) * 0.8));
+    fuelTanks[profile.fuel.tanks[0].id] = Math.max(
+      5,
+      Math.floor((profile.fuel.tanks[0].capacity ?? 40) * 0.8),
+    );
   }
 
   const stationTargets = buildSmokeStationTargets(profile);
@@ -461,6 +579,23 @@ async function runSmoke(
   const fuelOk = apply.fuel?.success === true;
   const payloadOk = apply.payload?.success === true;
   const cgOk = !('cg' in apply) || apply.cg === undefined || apply.cg.ok !== false;
+
+  if (!fuelOk) {
+    console.log('  Fuel verify detail (target → after):');
+    for (const tank of profile.fuel.tanks) {
+      const want = fuelTanks[tank.id];
+      const got = afterFuel[tank.id];
+      if (want === undefined) continue;
+      const delta =
+        got !== undefined ? ` Δ=${(got - want).toFixed(1)}` : '';
+      console.log(
+        `    ${tank.id}: want ${want} after ${got ?? '—'} gal${delta}`,
+      );
+    }
+    if (apply.fuel?.errorCode) {
+      console.log(`  fuel errorCode     ${apply.fuel.errorCode}`);
+    }
+  }
 
   return {
     ok: fuelOk && payloadOk && cgOk,
@@ -673,7 +808,9 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     } else if (classicLikely) {
       console.log('  → Likely classic tanks (FUELSYSTEM dead). Same path as Black Square.');
     } else {
-      console.log('  → FUELSYSTEM may be live — draft will prefer it when capacity >= 5.');
+      console.log(
+        '  → FUELSYSTEM capacity live — draft prefers classic slots if writetest proves them.',
+      );
     }
 
     printSection('3/5 Tank discovery + writetest');
@@ -872,6 +1009,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         bridge,
         drafted.path,
         matchTitle,
+        matchPublisher,
       );
       let profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
       printKv([
@@ -1042,6 +1180,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       bridge,
       drafted.path,
       matchTitle,
+      matchPublisher,
     );
     profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
     printKv([
@@ -1130,9 +1269,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     }
 
     const discoveryNotes = [
-      classicLikely
-        ? 'Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.'
-        : 'Draft preferred FUELSYSTEM where capacity >= 5.',
+      liveTanks.length > 0
+        ? `Fuel via classic FUEL TANK * from writetest (${liveTanks.map((t) => t.id).join(', ')}).`
+        : classicLikely
+          ? 'Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.'
+          : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).',
       includeAux ? 'AUX/Aft tanks included.' : 'AUX deferred for v1.',
       `Stations: ${profile.payload.stations.length}.`,
       'Homologated with interactive wizard.',

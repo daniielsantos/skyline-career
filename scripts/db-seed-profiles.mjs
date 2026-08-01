@@ -130,6 +130,26 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('[db-seed] FAILED', err instanceof Error ? err.message || String(err) : err);
+  const detail =
+    err && typeof err === 'object' && Array.isArray(err.errors) && err.errors[0]
+      ? `${err.errors[0].code ?? ''}: ${err.errors[0].message ?? err.message}`
+      : err instanceof Error
+        ? err.message || String(err)
+        : err;
+  console.error('[db-seed] FAILED', detail);
+  if (
+    (typeof detail === 'string' && detail.includes('ECONNREFUSED')) ||
+    err?.code === 'ECONNREFUSED'
+  ) {
+    console.error(
+      '[db-seed] Postgres is not reachable (default localhost:5432).',
+    );
+    console.error(
+      '[db-seed] Start it with: npm run db:up && npm run db:migrate',
+    );
+    console.error(
+      '[db-seed] Homologation/promote still succeeded — seed is optional for local file catalog.',
+    );
+  }
   process.exit(1);
 });

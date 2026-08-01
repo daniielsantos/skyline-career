@@ -8,7 +8,11 @@
     "fingerprint": "8eecddc5370ccd68cf96d0b1ea8a2d9328f96de4debc52f89c36f47af7be7038",
     "title": "Black Square Baron 58TC Professional",
     "publisher": "blacksquare",
-    "icao": "BE58"
+    "icao": "BE58",
+    "liveTitles": [
+      "Black Square Baron 58TC Professional",
+      "Black Square Baron 58TC Professional N585RS"
+    ]
   },
   "capabilities": [
     "simconnect"
@@ -87,42 +91,50 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 5.5
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 0.6
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 0.6
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.3
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.3
       },
       {
         "index": 6,
         "name": "Station 6",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -5.7
       },
       {
         "index": 7,
         "name": "Station 7",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -5.7
       },
       {
         "index": 8,
         "name": "Station 8",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -7.8
       }
     ],
     "writePlan": [
@@ -195,9 +207,31 @@
   "cg": {
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
     "constraints": {
-      "minMac": -2,
-      "maxMac": 34
+      "minMac": 10,
+      "maxMac": 28.000000000000004
+    },
+    "calibration": {
+      "observedMac": 13.563832640647888,
+      "calibratedAtIso": "2026-08-01T20:27:37.997Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-baronpro\\SimObjects\\Airplanes\\bksq-aircraft-baronproturbo\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        0.33,
+        0,
+        0
+      ],
+      "sweep": {
+        "minObservedMac": 13.003979623317719,
+        "maxObservedMac": 22.48266190290451,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 8,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-01T20:27:43.198Z"
+      }
     }
   },
   "fallback": {
@@ -206,10 +240,12 @@
     ]
   },
   "notes": [
-    "Homologated MSFS 2024 Black Square Baron 58TC Professional (mains only).",
-    "Fuel via FUEL TANK LEFT/RIGHT MAIN (offset 0). Do not use FUELSYSTEM.",
-    "AUX writable in writetest but qty was 0 at probe — deferred; total capacity ~202 gal.",
-    "Match title without registration. ICAO BE58 (ATC model token stripped).",
-    "See profiles/notes/blacksquare-baron-58tc.md"
+    "Homologated via wizard: Black Square Baron 58TC Professional.",
+    "ICAO type designator (catalog/SimBrief): BE58.",
+    "Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.",
+    "AUX deferred for v1.",
+    "Stations: 8.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/blacksquare-baron-58tc-professional.md"
   ]
 }

@@ -2,7 +2,7 @@
 
 **In-sim title (example):** `Black Square Grand Duke N18VK`  
 **Match title:** `Black Square Grand Duke`  
-**ICAO:** `BE60`  
+**ICAO (SimBrief type):** `BE60`  
 **Publisher:** `blacksquare`  
 **Stations:** 8  
 **Profile:** `blacksquare/grand-duke@1.0.0`

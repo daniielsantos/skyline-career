@@ -8,7 +8,11 @@
     "fingerprint": "c062903eaabf0257929da435d5bf55f3de3bce61f1fae5c4d367f7e97b49ba1c",
     "title": "Black Square B60 Duke",
     "publisher": "blacksquare",
-    "icao": "BE60"
+    "icao": "BE60",
+    "liveTitles": [
+      "Black Square B60 Duke",
+      "Black Square B60 Duke N43DH"
+    ]
   },
   "capabilities": [
     "simconnect"
@@ -87,42 +91,50 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 5.25
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 0.5
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 0.5
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.65
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.65
       },
       {
         "index": 6,
         "name": "Station 6",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -7
       },
       {
         "index": 7,
         "name": "Station 7",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -7
       },
       {
         "index": 8,
         "name": "Station 8",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -8.25
       }
     ],
     "writePlan": [
@@ -195,9 +207,31 @@
   "cg": {
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 10,
-      "maxMac": 46
+      "minMac": 25,
+      "maxMac": 40
+    },
+    "calibration": {
+      "observedMac": 25.374814867973328,
+      "calibratedAtIso": "2026-08-01T19:58:34.728Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-pistonduke\\SimObjects\\Airplanes\\bksq-aircraft-stockduke\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        0,
+        0,
+        0
+      ],
+      "sweep": {
+        "minObservedMac": 25.044909119606018,
+        "maxObservedMac": 33.83134603500366,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 8,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-01T19:58:39.965Z"
+      }
     }
   },
   "fallback": {
@@ -207,6 +241,7 @@
   },
   "notes": [
     "Homologated via wizard: Black Square B60 Duke.",
+    "ICAO type designator (catalog/SimBrief): BE60.",
     "Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.",
     "AUX deferred for v1.",
     "Stations: 8.",

@@ -1,16 +1,16 @@
 {
   "source": "simbrief",
-  "icao": "BN2P",
-  "ofpId": "blackbox-bn2-islander-cargo-garmin-tip-tanks",
+  "icao": "B350",
+  "ofpId": "asobo-beechcraft-king-air-350i",
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "BN2 Islander - Cargo / Garmin / Tip Tanks"
+    "Beechcraft King Air 350i"
   ],
-  "matchTitlePattern": "BN2 Islander - Cargo / Garmin / Tip Tanks",
+  "matchTitlePattern": "Beechcraft King Air 350i",
   "notes": [
-    "BN2 Islander - Cargo / Garmin / Tip Tanks — auto roles pack from homologated profile",
-    "Profile: blackbox/bn2-islander-cargo-garmin-tip-tanks@1.0.0",
+    "Beechcraft King Air 350i — auto roles pack from homologated profile",
+    "Profile: asobo/beechcraft-king-air-350i@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct"
@@ -29,8 +29,7 @@
         2
       ],
       "baggageStations": [
-        3,
-        4
+        3
       ],
       "passengerStations": []
     }
@@ -46,7 +45,7 @@
       "classic-stations"
     ]
   },
-  "simbriefIcao": "BN2P",
+  "simbriefIcao": "B350",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
     {
@@ -65,12 +64,6 @@
       "simVarIndex": 3,
       "cfgIndex": 2,
       "name": "Station 3",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 4,
-      "cfgIndex": 3,
-      "name": "Station 4",
       "role": "baggage"
     }
   ],

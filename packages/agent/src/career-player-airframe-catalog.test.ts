@@ -13,6 +13,7 @@ import type { OfpRolesPackFile } from './ofp-compliance/scaffold-roles.js';
 describe('career player airframe registration', () => {
   it('infers current economic classes', () => {
     assert.equal(inferCareerClassFromIcao('C172'), 'light_ga');
+    assert.equal(inferCareerClassFromIcao('BE60'), 'light_ga');
     assert.equal(inferCareerClassFromIcao('C208'), 'light_turboprop');
     assert.equal(inferCareerClassFromIcao('B738'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD1F'), 'wide_freighter');

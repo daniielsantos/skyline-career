@@ -123,6 +123,16 @@ export async function promoteDraftProfile(options: {
     options.matchTitle ?? profile.match.title ?? profile.displayName ?? profile.profileId,
   );
   profile.match.title = title;
+  const liveTitle = options.identityTitle?.trim();
+  if (liveTitle) {
+    const normalizedLive = normalizeAircraftTitle(liveTitle);
+    const aliases = new Set([
+      ...(profile.match.liveTitles ?? []).map((t) => normalizeAircraftTitle(t)),
+      normalizedLive,
+      liveTitle,
+    ]);
+    profile.match.liveTitles = [...aliases].filter(Boolean);
+  }
   profile.match.icao = options.icao
     ? normalizeConfirmedIcao(options.icao, cleanIcaoCode({ icao: options.icao, atcModel: options.atcModel, title }))
     : cleanIcaoCode({

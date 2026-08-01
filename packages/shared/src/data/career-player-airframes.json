@@ -1,5 +1,17 @@
 [
   {
+    "typeId": "blacksquare-baron-58-professional",
+    "aircraftClassId": "light_ga",
+    "label": "Beechcraft Baron BE58",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-baron-58-professional.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/asobo-beech-baron-g58.json",
+      "profiles/ofp/blacksquare-baron-58-professional.json"
+    ],
+    "simbriefIcao": "BE58",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
     "typeId": "blacksquare-bonanza-professional",
     "aircraftClassId": "light_ga",
     "label": "Beechcraft Bonanza BE36",
@@ -8,18 +20,18 @@
     "simbriefAirframeMatch": "Default"
   },
   {
-    "typeId": "blackbox-bn2-islander-cargo-analogue-tip-tanks",
+    "typeId": "blacksquare-b60-duke",
     "aircraftClassId": "light_ga",
-    "label": "BN2 Islander - Cargo / Analogue / Tip Tanks",
-    "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-analogue-tip-tanks.json",
-    "simbriefIcao": "BN2P",
+    "label": "Beechcraft Duke BE60",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-b60-duke.json",
+    "simbriefIcao": "BE60",
     "simbriefAirframeMatch": "Default"
   },
   {
-    "typeId": "blackbox-bn2-islander-cargo-garmin-tip-tanks",
+    "typeId": "blackbox-bn2-islander-cargo-tip-tanks",
     "aircraftClassId": "light_ga",
-    "label": "BN2 Islander - Cargo / Garmin / Tip Tanks",
-    "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-garmin-tip-tanks.json",
+    "label": "BN2 Islander Cargo",
+    "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json",
     "simbriefIcao": "BN2P",
     "simbriefAirframeMatch": "Default"
   },
@@ -32,11 +44,27 @@
     "simbriefAirframeMatch": "Default"
   },
   {
+    "typeId": "asobo-cessna-c152",
+    "aircraftClassId": "light_ga",
+    "label": "Cessna C152",
+    "rolesPackRelPath": "profiles/ofp/asobo-cessna-c152.json",
+    "simbriefIcao": "C152",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
     "typeId": "blacksquare-commander-114",
     "aircraftClassId": "light_ga",
     "label": "Rockwell Commander 114",
     "rolesPackRelPath": "profiles/ofp/blacksquare-commander-114.json",
     "simbriefIcao": "AC11",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "asobo-beechcraft-king-air-350i",
+    "aircraftClassId": "light_turboprop",
+    "label": "Beechcraft King Air 350i",
+    "rolesPackRelPath": "profiles/ofp/asobo-beechcraft-king-air-350i.json",
+    "simbriefIcao": "B350",
     "simbriefAirframeMatch": "Default"
   },
   {
@@ -49,6 +77,14 @@
       "profiles/ofp/blacksquare-caravan-cargo-pod.json"
     ],
     "simbriefIcao": "C208",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "carenado-saab-340-cargo",
+    "aircraftClassId": "light_turboprop",
+    "label": "Saab 340 Cargo",
+    "rolesPackRelPath": "profiles/ofp/carenado-saab-340-cargo.json",
+    "simbriefIcao": "SF34",
     "simbriefAirframeMatch": "Default"
   },
   {
@@ -74,7 +110,8 @@
     "label": "Airbus A340-600",
     "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
     "simbriefIcao": "A346",
-    "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)"
+    "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
+    "enabled": false
   },
   {
     "typeId": "tfdi-md11f-family",

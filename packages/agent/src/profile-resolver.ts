@@ -1,5 +1,9 @@
 import type { AircraftProfile } from '@msfs-compat/shared';
-import { isPlaceholderFingerprint, normalizeAircraftTitle } from '@msfs-compat/shared';
+import {
+  isPlaceholderFingerprint,
+  normalizeAircraftTitle,
+  titlesMatchForCatalog,
+} from '@msfs-compat/shared';
 import type { LoadedProfile } from './profile-registry.js';
 
 export interface AircraftIdentityLike {
@@ -30,6 +34,14 @@ function norm(value: string | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+function profileTitles(profile: AircraftProfile): string[] {
+  const titles = [
+    profile.match.title,
+    ...(profile.match.liveTitles ?? []),
+  ].filter((t): t is string => Boolean(t?.trim()));
+  return [...new Set(titles.map((t) => normalizeAircraftTitle(t)))];
+}
+
 function scoreProfile(
   identity: AircraftIdentityLike,
   profile: AircraftProfile,
@@ -47,22 +59,26 @@ function scoreProfile(
     return { score: 1.0, reason: 'exact_fingerprint' };
   }
 
-  const title = norm(normalizeAircraftTitle(identity.title ?? ''));
-  const profileTitle = norm(normalizeAircraftTitle(profile.match.title ?? ''));
+  const title = normalizeAircraftTitle(identity.title ?? '');
+  const titles = profileTitles(profile);
   const icao = norm(identity.icao ?? identity.atcModel);
   const profileIcao = norm(profile.match.icao);
 
-  if (title && profileTitle && title === profileTitle) {
-    return { score: 1.0, reason: 'exact_title' };
-  }
-
-  if (title && profileTitle && (title.includes(profileTitle) || profileTitle.includes(title))) {
-    return { score: 0.85, reason: 'partial_title' };
+  for (const profileTitle of titles) {
+    if (title && profileTitle && titlesMatchForCatalog(title, profileTitle)) {
+      const exact = norm(title) === norm(profileTitle);
+      return {
+        score: exact ? 1.0 : 0.9,
+        reason: exact ? 'exact_title' : 'title_alias',
+      };
+    }
   }
 
   if (icao && profileIcao && icao === profileIcao) {
-    const titleTokens = title.split(/[\s\-_]+/).filter(Boolean);
-    const profileTokens = profileTitle.split(/[\s\-_]+/).filter(Boolean);
+    const titleTokens = norm(title).split(/[\s\-_]+/).filter(Boolean);
+    const profileTokens = titles
+      .flatMap((t) => norm(t).split(/[\s\-_]+/))
+      .filter(Boolean);
     const shared = titleTokens.some((t) => profileTokens.includes(t) || profileIcao.includes(t));
     return {
       score: shared ? 0.75 : 0.55,

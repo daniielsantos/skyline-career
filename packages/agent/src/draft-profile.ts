@@ -78,46 +78,54 @@ export async function draftProfileFromLive(
   const writePlan: AircraftProfile['fuel']['writePlan'] = [];
   const fuelChecks: AircraftProfile['fuel']['verify']['checks'] = [];
 
-  for (let i = 1; i <= 8; i++) {
-    try {
-      const capacity = await bridge.readSimVar({
-        name: `FUELSYSTEM TANK CAPACITY:${i}`,
-        unit: 'gallons',
-      });
-      // Skip empty slots and tiny collector tanks (< 5 gal capacity).
-      if (!Number.isFinite(capacity) || capacity < 5) {
-        continue;
-      }
+  // When discovery already proved classic slots writable, prefer those over
+  // FUELSYSTEM. Asobo G58 etc. report FUELSYSTEM capacity but AUX indexes
+  // often ignore writes while classic LEFT/RIGHT AUX work.
+  const preferClassicFromDiscovery =
+    Array.isArray(options.liveTankIds) && options.liveTankIds.length > 0;
 
-      const id = i === 1 ? 'LEFT_MAIN' : i === 2 ? 'RIGHT_MAIN' : `TANK_${i}`;
-      const varName = `FUELSYSTEM TANK QUANTITY:${i}`;
-      tanks.push({
-        id,
-        name: `FUELSYSTEM:${i}`,
-        capacity,
-        readVar: varName,
-        readUnit: 'gallons',
-        writeVar: varName,
-        writeUnit: 'gallons',
-      });
-      writePlan.push({
-        op: 'simvar_set',
-        var: varName,
-        unit: 'gallons',
-        valueExpr: fuelOffset > 0 ? `{${id}} + ${fuelOffset}` : `{${id}}`,
-      });
-      fuelChecks.push({
-        var: varName,
-        unit: 'gallons',
-        tolerancePct: 2.0,
-        valueExpr: `{${id}}`,
-      });
-    } catch {
-      // tank index not present
+  if (!preferClassicFromDiscovery) {
+    for (let i = 1; i <= 8; i++) {
+      try {
+        const capacity = await bridge.readSimVar({
+          name: `FUELSYSTEM TANK CAPACITY:${i}`,
+          unit: 'gallons',
+        });
+        // Skip empty slots and tiny collector tanks (< 5 gal capacity).
+        if (!Number.isFinite(capacity) || capacity < 5) {
+          continue;
+        }
+
+        const id = i === 1 ? 'LEFT_MAIN' : i === 2 ? 'RIGHT_MAIN' : `TANK_${i}`;
+        const varName = `FUELSYSTEM TANK QUANTITY:${i}`;
+        tanks.push({
+          id,
+          name: `FUELSYSTEM:${i}`,
+          capacity,
+          readVar: varName,
+          readUnit: 'gallons',
+          writeVar: varName,
+          writeUnit: 'gallons',
+        });
+        writePlan.push({
+          op: 'simvar_set',
+          var: varName,
+          unit: 'gallons',
+          valueExpr: fuelOffset > 0 ? `{${id}} + ${fuelOffset}` : `{${id}}`,
+        });
+        fuelChecks.push({
+          var: varName,
+          unit: 'gallons',
+          tolerancePct: 2.0,
+          valueExpr: `{${id}}`,
+        });
+      } catch {
+        // tank index not present
+      }
     }
   }
 
-  // Black Square / classic: FUELSYSTEM often reports capacity 0 — fall back to named tanks.
+  // Classic named tanks: FUELSYSTEM dead, or discovery already validated slots.
   if (tanks.length === 0) {
     const classicSlots: Array<{ id: string; name: string; capacityVar: string; quantityVar: string }> = [
       {
@@ -237,7 +245,8 @@ export async function draftProfileFromLive(
     }
   }
 
-  writePlan.push({ op: 'delay', ms: 400 });
+  // Vendor fuel systems often ramp for ~0.5–1.5s after SimVar write.
+  writePlan.push({ op: 'delay', ms: 1000 });
 
   let stationCount = 8;
   try {
@@ -301,7 +310,7 @@ export async function draftProfileFromLive(
       tanks,
       writePlan,
       verify: {
-        timeoutMs: 6000,
+        timeoutMs: 8000,
         pollIntervalMs: 250,
         checks: fuelChecks,
       },
@@ -329,6 +338,9 @@ export async function draftProfileFromLive(
       'AUTO-DRAFT from live aircraft. Prefer: draft-profile --calibrate (or calibrate --profile).',
       'Move to profiles/examples after smoke succeeds; bump semver and remove -draft.',
       `Detected tanks=${tanks.length}, stations=${stationCount}, fuelOffset=${fuelOffset}`,
+      preferClassicFromDiscovery
+        ? `Fuel via classic slots from discovery writetest: ${options.liveTankIds!.join(', ')}.`
+        : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest filter).',
     ],
   };
 

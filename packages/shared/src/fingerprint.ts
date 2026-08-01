@@ -31,6 +31,8 @@ export function normalizeAircraftTitle(title: string): string {
   t = t.replace(/\s*-?\s*livery\s*\d+$/i, '');
   // Trailing "livery" / "paint" tokens
   t = t.replace(/\s+(?:livery|paint|repaint)$/i, '');
+  // Payload / config state suffixes (Carenado Saab "340 Cargo - Loaded", etc.)
+  t = t.replace(/\s*-?\s*(?:loaded|unloaded|empty)\s*$/i, '');
   // Leftover punctuation after registration strip ("Cessna C680:")
   t = t.replace(/[:\-–—|/]+$/g, '');
   return t.trim();
@@ -43,6 +45,9 @@ const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   // without the publisher prefix.
   { re: /\bbn-?2\b.*\bislander\b|\bislander\b.*\bbn-?2\b|\bbn2\s+islander\b/i, publisher: 'blackbox' },
   { re: /\bblack\s*square\b/i, publisher: 'blacksquare' },
+  { re: /\bcarenado\b/i, publisher: 'carenado' },
+  // Default / Marketplace Saab 340 — live titles are often just "340 Cargo - …".
+  { re: /\bsaab\s*340\b|\b340\s+cargo\b|\bs340b?\b/i, publisher: 'carenado' },
   { re: /\bfs\s*reborn\b|\bfsreborn\b/i, publisher: 'fsreborn' },
   { re: /\bnext\s*gen\s*sim\b|\bnextgensim\b/i, publisher: 'nextgensim' },
   { re: /\bflight\s*fx\b|\bflightfx\b/i, publisher: 'flightfx' },
@@ -58,6 +63,7 @@ export const KNOWN_PUBLISHERS: readonly string[] = [
   ...new Set([
     ...TITLE_PUBLISHER_HINTS.map((h) => h.publisher),
     'asobo',
+    'carenado',
     'flightfx',
     'hype',
     'miltech',
@@ -159,5 +165,19 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
   const live = normalize(normalizeAircraftTitle(liveTitle));
   const profile = normalize(normalizeAircraftTitle(profileTitle));
   if (!live || !profile) return false;
-  return live === profile || live.includes(profile) || profile.includes(live);
+  if (live === profile || live.includes(profile) || profile.includes(live)) return true;
+
+  // Token overlap: "340 Cargo" vs "Saab 340 Cargo" share enough identity tokens.
+  const stop = new Set(['the', 'and', 'for', 'msfs', 'aircraft', 'airplane', 'default']);
+  const tokens = (s: string) =>
+    s
+      .split(/[\s\-_+/]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2 && !stop.has(t));
+  const liveTokens = tokens(live);
+  const profileTokens = new Set(tokens(profile));
+  const shared = liveTokens.filter((t) => profileTokens.has(t));
+  // Prefer numeric model tokens (340, 208, 737) — one shared model id + one word is enough.
+  const sharedModel = shared.some((t) => /^\d{2,4}[a-z]?$/i.test(t));
+  return sharedModel ? shared.length >= 2 : shared.length >= 3;
 }

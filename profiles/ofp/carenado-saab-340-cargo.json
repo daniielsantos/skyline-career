@@ -1,16 +1,16 @@
 {
   "source": "simbrief",
-  "icao": "BN2P",
-  "ofpId": "blackbox-bn2-islander-cargo-analogue-tip-tanks",
+  "icao": "SF34",
+  "ofpId": "carenado-saab-340-cargo",
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "BN2 Islander - Cargo / Analogue / Tip Tanks"
+    "Saab 340 Cargo"
   ],
-  "matchTitlePattern": "BN2 Islander - Cargo / Analogue / Tip Tanks",
+  "matchTitlePattern": "Saab 340 Cargo",
   "notes": [
-    "BN2 Islander - Cargo / Analogue / Tip Tanks — auto roles pack from homologated profile",
-    "Profile: blackbox/bn2-islander-cargo-analogue-tip-tanks@1.0.0",
+    "Saab 340 Cargo — auto roles pack from homologated profile",
+    "Profile: carenado/saab-340-cargo@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct"
@@ -28,10 +28,7 @@
         1,
         2
       ],
-      "baggageStations": [
-        3,
-        4
-      ],
+      "baggageStations": [],
       "passengerStations": []
     }
   },
@@ -46,7 +43,7 @@
       "classic-stations"
     ]
   },
-  "simbriefIcao": "BN2P",
+  "simbriefIcao": "SF34",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
     {
@@ -60,18 +57,6 @@
       "cfgIndex": 1,
       "name": "Station 2",
       "role": "crew"
-    },
-    {
-      "simVarIndex": 3,
-      "cfgIndex": 2,
-      "name": "Station 3",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 4,
-      "cfgIndex": 3,
-      "name": "Station 4",
-      "role": "baggage"
     }
   ],
   "tolerances": {

@@ -210,6 +210,64 @@ describe('upsertRolesPackFromProfile Commander 114 family', () => {
   });
 });
 
+describe('upsertRolesPackFromProfile BN2 Islander Cargo family', () => {
+  it('merges Analogue and Garmin tip-tank into blackbox-bn2-islander-cargo-tip-tanks.json', async () => {
+    assert.equal(
+      matchHeuristic('BN2 Islander - Cargo / Analogue / Tip Tanks')?.id,
+      'blackbox-bn2-islander-cargo-tip-tanks',
+    );
+    assert.equal(
+      matchHeuristic('BN2 Islander - Cargo / Garmin / Tip Tanks')?.id,
+      'blackbox-bn2-islander-cargo-tip-tanks',
+    );
+    const dir = await mkdtemp(join(tmpdir(), 'ofp-bn2-'));
+    const analogue = minimalProfile({
+      profileId: 'blackbox-bn2-islander-cargo-analogue-tip-tanks',
+      profileKey: 'blackbox/bn2-islander-cargo-analogue-tip-tanks',
+      match: {
+        title: 'BN2 Islander - Cargo / Analogue / Tip Tanks',
+        publisher: 'blackbox',
+        icao: 'BN2P',
+      },
+      stations: [1, 2, 3, 4].map((index) => ({
+        index,
+        name: `Station ${index}`,
+        maxLoad: 500,
+      })),
+    });
+    const first = await upsertRolesPackFromProfile(analogue, dir, {
+      loadMethod: 'direct-injection',
+      cabinAsBaggage: true,
+    });
+    assert.match(first.path, /blackbox-bn2-islander-cargo-tip-tanks\.json$/);
+    assert.equal(first.created, true);
+
+    const garmin = minimalProfile({
+      profileId: 'blackbox-bn2-islander-cargo-garmin-tip-tanks',
+      profileKey: 'blackbox/bn2-islander-cargo-garmin-tip-tanks',
+      match: {
+        title: 'BN2 Islander - Cargo / Garmin / Tip Tanks',
+        publisher: 'blackbox',
+        icao: 'BN2P',
+      },
+      stations: analogue.payload.stations,
+    });
+    const second = await upsertRolesPackFromProfile(garmin, dir, {
+      loadMethod: 'direct-injection',
+    });
+    assert.equal(second.created, false);
+    assert.deepEqual(
+      [...(second.pack.matchTitles ?? [])].sort(),
+      [
+        'BN2 Islander - Cargo / Analogue / Tip Tanks',
+        'BN2 Islander - Cargo / Garmin / Tip Tanks',
+      ].sort(),
+    );
+    assert.equal(second.pack.injectCapable, true);
+    assert.equal(second.pack.ofpId, 'blackbox-bn2-islander-cargo-tip-tanks');
+  });
+});
+
 describe('upsertRolesPackFromProfile C172SP Cargo family', () => {
   it('merges Classic and G1000 into asobo-c172sp-cargo.json', async () => {
     assert.equal(

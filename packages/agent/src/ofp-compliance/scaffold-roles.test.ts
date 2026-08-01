@@ -85,6 +85,23 @@ describe('scaffold-roles Asobo C208B Cargo', () => {
   });
 });
 
+describe('scaffold-roles Black Box BN-2 Islander Cargo', () => {
+  it('matches Analogue and Garmin tip-tank as one Market family', () => {
+    assert.equal(
+      matchHeuristic('BN2 Islander - Cargo / Analogue / Tip Tanks')?.id,
+      'blackbox-bn2-islander-cargo-tip-tanks',
+    );
+    assert.equal(
+      matchHeuristic('BN2 Islander - Cargo / Garmin / Tip Tanks')?.id,
+      'blackbox-bn2-islander-cargo-tip-tanks',
+    );
+    const h = matchHeuristic('BN2 Islander - Cargo / Garmin / Tip Tanks')!;
+    assert.equal(h.marketLabel, 'BN2 Islander Cargo');
+    assert.equal(h.familyPackRel, 'blackbox-bn2-islander-cargo-tip-tanks.json');
+    assert.equal(h.loadMethod, 'direct-injection');
+  });
+});
+
 describe('scaffold-roles Black Square Commander 114', () => {
   it('matches NA and TC as one Market family', () => {
     assert.equal(
@@ -120,6 +137,30 @@ describe('scaffold-roles Black Square Bonanza', () => {
     assert.equal(h.injectCapable, true);
     assert.deepEqual(h.stationRoles.crewStations, [1, 2]);
     assert.deepEqual(h.stationRoles.baggageStations, [3, 4, 5, 6, 7]);
+  });
+});
+
+describe('scaffold-roles Black Square Duke', () => {
+  it('matches B60 / Turbine / Grand as one direct-injection family', () => {
+    assert.equal(
+      matchHeuristic('Black Square B60 Duke')?.id,
+      'blacksquare-b60-duke',
+    );
+    assert.equal(
+      matchHeuristic('Black Square Turbine Duke N6060X')?.id,
+      'blacksquare-b60-duke',
+    );
+    assert.equal(
+      matchHeuristic('Black Square Grand Duke')?.id,
+      'blacksquare-b60-duke',
+    );
+    const h = matchHeuristic('Black Square B60 Duke')!;
+    assert.equal(h.loadMethod, 'direct-injection');
+    assert.equal(h.injectCapable, true);
+    assert.equal(h.marketLabel, 'Beechcraft Duke BE60');
+    // Station 1 is forward baggage — crew is 2–3, not 1–2.
+    assert.deepEqual(h.stationRoles.crewStations, [2, 3]);
+    assert.deepEqual(h.stationRoles.baggageStations, [1, 4, 5, 6, 7, 8]);
   });
 });
 

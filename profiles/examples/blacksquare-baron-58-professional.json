@@ -1,17 +1,17 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "blacksquare-grand-duke",
-  "profileKey": "blacksquare/grand-duke",
+  "profileId": "blacksquare-baron-58-professional",
+  "profileKey": "blacksquare/baron-58-professional",
   "semver": "1.0.0",
-  "displayName": "Black Square Grand Duke (MSFS 2024)",
+  "displayName": "Black Square Baron 58 Professional (MSFS 2024)",
   "match": {
-    "fingerprint": "2c84a6bd28656cdc1d6a7393c944653bfd05695b5a7745ce117bc7a3ab67bb8e",
-    "title": "Black Square Grand Duke",
+    "fingerprint": "79d5e5b432733cb68b9dcc3d167f25d23e41e9a08062001bb878ea335472ac42",
+    "title": "Black Square Baron 58 Professional",
     "publisher": "blacksquare",
-    "icao": "BE60",
+    "icao": "BE58",
     "liveTitles": [
-      "Black Square Grand Duke",
-      "Black Square Grand Duke N18VK"
+      "Black Square Baron 58 Professional",
+      "Black Square Baron 58 Professional N972HJ"
     ]
   },
   "capabilities": [
@@ -32,7 +32,7 @@
       {
         "id": "LEFT_MAIN",
         "name": "Left Main",
-        "capacity": 118.5,
+        "capacity": 86,
         "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
@@ -41,7 +41,7 @@
       {
         "id": "RIGHT_MAIN",
         "name": "Right Main",
-        "capacity": 118.5,
+        "capacity": 86,
         "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
@@ -92,49 +92,49 @@
         "index": 1,
         "name": "Station 1",
         "maxLoad": 500,
-        "arm": 5.25
+        "arm": 5.5
       },
       {
         "index": 2,
         "name": "Station 2",
         "maxLoad": 500,
-        "arm": 0.5
+        "arm": 0.6
       },
       {
         "index": 3,
         "name": "Station 3",
         "maxLoad": 500,
-        "arm": 0.5
+        "arm": 0.6
       },
       {
         "index": 4,
         "name": "Station 4",
         "maxLoad": 500,
-        "arm": -2.65
+        "arm": -2.3
       },
       {
         "index": 5,
         "name": "Station 5",
         "maxLoad": 500,
-        "arm": -2.65
+        "arm": -2.3
       },
       {
         "index": 6,
         "name": "Station 6",
         "maxLoad": 500,
-        "arm": -7
+        "arm": -5.7
       },
       {
         "index": 7,
         "name": "Station 7",
         "maxLoad": 500,
-        "arm": -7
+        "arm": -5.7
       },
       {
         "index": 8,
         "name": "Station 8",
         "maxLoad": 500,
-        "arm": -8.25
+        "arm": -7.8
       }
     ],
     "writePlan": [
@@ -210,27 +210,27 @@
     "envelopeSource": "simvar",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 25,
-      "maxMac": 40
+      "minMac": 10,
+      "maxMac": 28.000000000000004
     },
     "calibration": {
-      "observedMac": 25.488513708114624,
-      "calibratedAtIso": "2026-08-01T20:05:53.670Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-pistonduke\\SimObjects\\Airplanes\\bksq-aircraft-grandduke\\flight_model.cfg",
+      "observedMac": 12.729594111442566,
+      "calibratedAtIso": "2026-08-01T20:23:14.668Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-baronpro\\SimObjects\\Airplanes\\bksq-aircraft-baronpro\\flight_model.cfg",
       "emptyWeightCgPosition": [
-        0,
+        0.33,
         0,
         0
       ],
       "sweep": {
-        "minObservedMac": 25.175878405570984,
-        "maxObservedMac": 33.625537157058716,
+        "minObservedMac": 12.337033450603485,
+        "maxObservedMac": 23.67064356803894,
         "payloadLb": 200,
         "forwardStation": 1,
         "aftStation": 8,
         "usedStationArms": true,
         "restored": true,
-        "sampledAtIso": "2026-08-01T20:05:58.855Z"
+        "sampledAtIso": "2026-08-01T20:23:19.832Z"
       }
     }
   },
@@ -240,12 +240,12 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: Black Square Grand Duke.",
-    "ICAO type designator (catalog/SimBrief): BE60.",
+    "Homologated via wizard: Black Square Baron 58 Professional.",
+    "ICAO type designator (catalog/SimBrief): BE58.",
     "Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.",
     "AUX deferred for v1.",
     "Stations: 8.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/blacksquare-grand-duke.md"
+    "See profiles/notes/blacksquare-baron-58-professional.md"
   ]
 }

@@ -178,6 +178,11 @@ export interface AircraftProfile {
   match: {
     fingerprint: string;
     title?: string;
+    /**
+     * In-sim title(s) observed during homologation. Fingerprint is derived from
+     * the first entry when present so cleaned catalog titles still resolve.
+     */
+    liveTitles?: string[];
     publisher?: string;
     icao?: string;
   };

@@ -1,17 +1,16 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "blacksquare-grand-duke",
-  "profileKey": "blacksquare/grand-duke",
+  "profileId": "asobo-beech-baron-g58",
+  "profileKey": "asobo/beech-baron-g58",
   "semver": "1.0.0",
-  "displayName": "Black Square Grand Duke (MSFS 2024)",
+  "displayName": "Beech Baron G58 (MSFS 2024)",
   "match": {
-    "fingerprint": "2c84a6bd28656cdc1d6a7393c944653bfd05695b5a7745ce117bc7a3ab67bb8e",
-    "title": "Black Square Grand Duke",
-    "publisher": "blacksquare",
-    "icao": "BE60",
+    "fingerprint": "5ee3ca0eef12d57f07921e3ffd6bbc159af95a53101fa8e23cc63da6b12eff50",
+    "title": "Beech Baron G58",
+    "publisher": "asobo",
+    "icao": "BE58",
     "liveTitles": [
-      "Black Square Grand Duke",
-      "Black Square Grand Duke N18VK"
+      "Beech Baron G58"
     ]
   },
   "capabilities": [
@@ -32,7 +31,7 @@
       {
         "id": "LEFT_MAIN",
         "name": "Left Main",
-        "capacity": 118.5,
+        "capacity": 86,
         "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
@@ -41,10 +40,28 @@
       {
         "id": "RIGHT_MAIN",
         "name": "Right Main",
-        "capacity": 118.5,
+        "capacity": 86,
         "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 14,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT AUX QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 14,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT AUX QUANTITY",
         "writeUnit": "gallons"
       }
     ],
@@ -53,34 +70,58 @@
         "op": "simvar_set",
         "var": "FUEL TANK LEFT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN}"
+        "valueExpr": "{LEFT_MAIN} + 3"
       },
       {
         "op": "simvar_set",
         "var": "FUEL TANK RIGHT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN}"
+        "valueExpr": "{RIGHT_MAIN} + 3"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX}"
       },
       {
         "op": "delay",
-        "ms": 400
+        "ms": 1000
       }
     ],
     "verify": {
-      "timeoutMs": 6000,
+      "timeoutMs": 8000,
       "pollIntervalMs": 250,
       "checks": [
         {
           "var": "FUEL TANK LEFT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 8,
           "valueExpr": "{LEFT_MAIN}"
         },
         {
           "var": "FUEL TANK RIGHT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 8,
           "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK LEFT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_AUX}"
+        },
+        {
+          "var": "FUEL TANK RIGHT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_AUX}"
         }
       ]
     }
@@ -91,50 +132,37 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 500,
-        "arm": 5.25
+        "maxLoad": 500
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 500,
-        "arm": 0.5
+        "maxLoad": 500
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 500,
-        "arm": 0.5
+        "maxLoad": 500
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500,
-        "arm": -2.65
+        "maxLoad": 500
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 500,
-        "arm": -2.65
+        "maxLoad": 500
       },
       {
         "index": 6,
         "name": "Station 6",
-        "maxLoad": 500,
-        "arm": -7
+        "maxLoad": 500
       },
       {
         "index": 7,
         "name": "Station 7",
-        "maxLoad": 500,
-        "arm": -7
-      },
-      {
-        "index": 8,
-        "name": "Station 8",
-        "maxLoad": 500,
-        "arm": -8.25
+        "maxLoad": 500
       }
     ],
     "writePlan": [
@@ -181,12 +209,6 @@
         "valueExpr": "{station_7}"
       },
       {
-        "op": "simvar_set",
-        "var": "PAYLOAD STATION WEIGHT:8",
-        "unit": "pounds",
-        "valueExpr": "{station_8}"
-      },
-      {
         "op": "delay",
         "ms": 400
       }
@@ -210,28 +232,12 @@
     "envelopeSource": "simvar",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 25,
-      "maxMac": 40
+      "minMac": 10,
+      "maxMac": 30
     },
     "calibration": {
-      "observedMac": 25.488513708114624,
-      "calibratedAtIso": "2026-08-01T20:05:53.670Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-pistonduke\\SimObjects\\Airplanes\\bksq-aircraft-grandduke\\flight_model.cfg",
-      "emptyWeightCgPosition": [
-        0,
-        0,
-        0
-      ],
-      "sweep": {
-        "minObservedMac": 25.175878405570984,
-        "maxObservedMac": 33.625537157058716,
-        "payloadLb": 200,
-        "forwardStation": 1,
-        "aftStation": 8,
-        "usedStationArms": true,
-        "restored": true,
-        "sampledAtIso": "2026-08-01T20:05:58.855Z"
-      }
+      "observedMac": 16.217902302742004,
+      "calibratedAtIso": "2026-08-01T20:47:06.769Z"
     }
   },
   "fallback": {
@@ -240,12 +246,12 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: Black Square Grand Duke.",
-    "ICAO type designator (catalog/SimBrief): BE60.",
-    "Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.",
-    "AUX deferred for v1.",
-    "Stations: 8.",
+    "Homologated via wizard: Beech Baron G58.",
+    "ICAO type designator (catalog/SimBrief): BE58.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX).",
+    "AUX/Aft tanks included.",
+    "Stations: 7.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/blacksquare-grand-duke.md"
+    "See profiles/notes/asobo-beech-baron-g58.md"
   ]
 }

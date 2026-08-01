@@ -9,6 +9,10 @@ import {
 import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './career-aircraft-market.js';
 import { applyPlayerDepartFuel, relocateAircraftOnSettle, releaseAircraftOnCancel } from './career-fleet.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
+import {
+  evaluateMinAirborneElapsed,
+  resolveExpectedRouteMs,
+} from './career-flight-watch.js';
 import type {
   CareerMissionsState,
 } from './types/career-economy.js';
@@ -986,7 +990,15 @@ export function cancelMission(
 export function departMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
-  opts: { fleet?: CareerMissionsState } = {},
+  opts: {
+    fleet?: CareerMissionsState;
+    /** Wall-clock now for airborne stamp. */
+    nowMs?: number;
+    /** Route distance override for expected airborne duration. */
+    distanceNm?: number;
+    /** Precomputed expected route duration (ms). */
+    expectedRouteMs?: number;
+  } = {},
 ): DepartMissionResult {
   const normalized = normalizeMissionIntent(mission);
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
@@ -999,11 +1011,32 @@ export function departMission(
     }
   }
 
+  const nowMs = opts.nowMs ?? Date.now();
+  const distanceNm =
+    opts.distanceNm ??
+    routeDistanceNm(world, normalized.originIcao, normalized.destIcao);
+  const expectedRouteMs =
+    opts.expectedRouteMs ??
+    resolveExpectedRouteMs(normalized, {
+      distanceNm,
+      fallbackHours: estimateMissionBlockHours(
+        world,
+        normalized.originIcao,
+        normalized.destIcao,
+        normalized.aircraftClassId as FreighterClassId,
+      ),
+    });
+  const airborneStamp = {
+    airborneAtMs: normalized.airborneAtMs ?? nowMs,
+    expectedRouteMs: normalized.expectedRouteMs ?? expectedRouteMs,
+  };
+
   let fuelDebitUsd = 0;
   let nextMission: MissionIntent = {
     ...normalized,
     status: 'in_flight',
     departedAtTick: world.tick,
+    ...airborneStamp,
   };
 
   if (opts.fleet && normalized.aircraftId) {
@@ -1012,6 +1045,7 @@ export function departMission(
       ...playerFuel.mission,
       status: 'in_flight',
       departedAtTick: world.tick,
+      ...airborneStamp,
     };
     fuelDebitUsd = playerFuel.fuelDebitUsd;
   } else if (!normalized.fuelUplift) {
@@ -1045,6 +1079,13 @@ export interface SettleMissionOpts {
   fleet?: CareerMissionsState;
   /** Actual fuel remaining in MSFS; falls back to estimated burn when unavailable. */
   residualFuelKg?: number;
+  /** Wall-clock now for minimum airborne duration gate. */
+  nowMs?: number;
+  /**
+   * When true, skip the 70% airborne-duration gate (tests only).
+   * Live Watch / UI settle keep the gate on.
+   */
+  skipMinAirborneGate?: boolean;
 }
 
 export interface SettleMissionResult {
@@ -1108,11 +1149,39 @@ export function settleMission(
     throw new Error(`Cannot settle mission in status=${working.status}`);
   }
 
+  const priorAirborneAtMs = working.airborneAtMs;
+  const priorExpectedRouteMs = working.expectedRouteMs;
+
   let fuelDebitUsd = 0;
   if (working.status === 'accepted' || working.status === 'dispatched') {
-    const departed = departMission(world, working, { fleet: opts.fleet });
+    const departed = departMission(world, working, {
+      fleet: opts.fleet,
+      nowMs: opts.nowMs,
+    });
     working = departed.mission;
     fuelDebitUsd = departed.fuelDebitUsd;
+  }
+
+  // Enforce min airborne only when the flight already left the ground earlier.
+  // Same-call auto-depart+settle (offline Advanced) is not a live flight.
+  if (
+    !opts.skipMinAirborneGate &&
+    typeof priorAirborneAtMs === 'number' &&
+    Number.isFinite(priorAirborneAtMs) &&
+    typeof priorExpectedRouteMs === 'number' &&
+    Number.isFinite(priorExpectedRouteMs) &&
+    priorExpectedRouteMs > 0
+  ) {
+    const check = evaluateMinAirborneElapsed({
+      airborneAtMs: priorAirborneAtMs,
+      expectedRouteMs: priorExpectedRouteMs,
+      nowMs: opts.nowMs ?? Date.now(),
+    });
+    if (!check.ok) {
+      throw new Error(
+        `Cannot settle yet — ${check.message}. Keep flying until at least 70% of the planned route time has elapsed.`,
+      );
+    }
   }
 
   const residualFuelKg =

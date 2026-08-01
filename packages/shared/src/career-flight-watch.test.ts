@@ -6,7 +6,9 @@ import {
   distanceNm,
   evaluateMissionFlightTransition,
   isNearAirport,
+  parseBlockTimeToMs,
   pickActiveMission,
+  resolveExpectedRouteMs,
   type MissionIntent,
 } from './index.js';
 
@@ -117,13 +119,13 @@ describe('evaluateMissionFlightTransition', () => {
   });
 
   it('settles when near dest after airborne + engines off', () => {
-    let state = createMissionFlightWatchState();
-    state = evaluateMissionFlightTransition(
-      mission('in_flight'),
-      { onGround: false, enginesRunning: true, position: { lat: -10, lon: -45 } },
-      state,
-      { destCoords: SBRF },
-    ).nextState;
+    const plannedMs = 3_600_000;
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: Date.now() - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
 
     const down = evaluateMissionFlightTransition(
       mission('in_flight'),
@@ -133,19 +135,19 @@ describe('evaluateMissionFlightTransition', () => {
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { destCoords: SBRF },
+      { destCoords: SBRF, nowMs: Date.now() },
     );
     assert.equal(down.event.type, 'settle');
   });
 
   it('blocks settle when landed far from destination', () => {
-    let state = createMissionFlightWatchState();
-    state = evaluateMissionFlightTransition(
-      mission('in_flight'),
-      { onGround: false, enginesRunning: true },
-      state,
-      { destCoords: SBRF },
-    ).nextState;
+    const plannedMs = 3_600_000;
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: Date.now() - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
 
     const wrongAirport = evaluateMissionFlightTransition(
       mission('in_flight'),
@@ -155,7 +157,7 @@ describe('evaluateMissionFlightTransition', () => {
         position: { lat: SBPA.lat, lon: SBPA.lon },
       },
       state,
-      { destCoords: SBRF },
+      { destCoords: SBRF, nowMs: Date.now() },
     );
     assert.equal(wrongAirport.event.type, 'settle_blocked');
     if (wrongAirport.event.type === 'settle_blocked') {
@@ -164,31 +166,32 @@ describe('evaluateMissionFlightTransition', () => {
   });
 
   it('blocks settle when position is missing', () => {
-    let state = createMissionFlightWatchState();
-    state = evaluateMissionFlightTransition(
-      mission('in_flight'),
-      { onGround: false, enginesRunning: true },
-      state,
-      { destCoords: SBRF },
-    ).nextState;
+    const plannedMs = 3_600_000;
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: Date.now() - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
 
     const noPos = evaluateMissionFlightTransition(
       mission('in_flight'),
       { onGround: true, enginesRunning: false },
       state,
-      { destCoords: SBRF },
+      { destCoords: SBRF, nowMs: Date.now() },
     );
     assert.equal(noPos.event.type, 'settle_blocked');
   });
 
   it('waits for engines off after touchdown by default', () => {
-    let state = createMissionFlightWatchState();
-    state = evaluateMissionFlightTransition(
-      mission('in_flight'),
-      { onGround: false, enginesRunning: true },
-      state,
-      { destCoords: SBRF },
-    ).nextState;
+    const plannedMs = 3_600_000;
+    const nowMs = Date.now();
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: nowMs - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
 
     const taxi = evaluateMissionFlightTransition(
       mission('in_flight'),
@@ -198,7 +201,7 @@ describe('evaluateMissionFlightTransition', () => {
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { destCoords: SBRF },
+      { destCoords: SBRF, nowMs },
     );
     assert.equal(taxi.event.type, 'none');
     state = taxi.nextState;
@@ -211,19 +214,20 @@ describe('evaluateMissionFlightTransition', () => {
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { destCoords: SBRF },
+      { destCoords: SBRF, nowMs },
     );
     assert.equal(shutdown.event.type, 'settle');
   });
 
   it('can settle on touchdown without engines when near dest', () => {
-    let state = createMissionFlightWatchState();
-    state = evaluateMissionFlightTransition(
-      mission('in_flight'),
-      { onGround: false, enginesRunning: true },
-      state,
-      { destCoords: SBRF },
-    ).nextState;
+    const plannedMs = 3_600_000;
+    const nowMs = Date.now();
+    const state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: nowMs - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
 
     const down = evaluateMissionFlightTransition(
       mission('in_flight'),
@@ -233,9 +237,79 @@ describe('evaluateMissionFlightTransition', () => {
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
-      { requireEnginesOffToSettle: false, destCoords: SBRF },
+      { requireEnginesOffToSettle: false, destCoords: SBRF, nowMs },
     );
     assert.equal(down.event.type, 'settle');
+  });
+
+  it('stamps airborne clock on wheels-up and blocks early settle', () => {
+    const plannedMs = 60 * 60_000;
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: true },
+      state,
+      { expectedRouteMs: plannedMs, nowMs: 1_000_000 },
+    ).nextState;
+
+    const up = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: false, enginesRunning: true },
+      state,
+      { expectedRouteMs: plannedMs, nowMs: 1_000_000 },
+    );
+    assert.equal(up.event.type, 'depart');
+    assert.equal(up.nextState.airborneAtMs, 1_000_000);
+    assert.equal(up.nextState.expectedRouteMs, plannedMs);
+    state = up.nextState;
+
+    const early = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      {
+        destCoords: SBRF,
+        expectedRouteMs: plannedMs,
+        nowMs: 1_000_000 + 30 * 60_000,
+      },
+    );
+    assert.equal(early.event.type, 'settle_blocked');
+    if (early.event.type === 'settle_blocked') {
+      assert.match(early.event.reason, /70%/);
+    }
+
+    const lateEnough = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      {
+        destCoords: SBRF,
+        expectedRouteMs: plannedMs,
+        nowMs: 1_000_000 + 42 * 60_000,
+      },
+    );
+    assert.equal(lateEnough.event.type, 'settle');
+  });
+
+  it('uses OFP block time when resolving expected route ms', () => {
+    assert.equal(parseBlockTimeToMs('1:30'), 90 * 60_000);
+    const msn = mission('dispatched');
+    msn.lastOfpCheck = {
+      verdict: 'pass',
+      summary: 'ok',
+      checkedAtIso: new Date().toISOString(),
+      findings: [],
+      briefing: { blockTime: '2:00', distanceNm: 800 },
+    };
+    assert.equal(resolveExpectedRouteMs(msn), 2 * 3_600_000);
   });
 });
 

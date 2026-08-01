@@ -198,6 +198,7 @@ describe('career fleet hangar', () => {
     const settled = settleMission(world, departed.mission, {
       fleet: state,
       residualFuelKg: 137.6,
+      skipMinAirborneGate: true,
     });
     assert.equal(settled.mission.status, 'settled');
     assert.equal(settled.mission.settledFuelKg, 138);

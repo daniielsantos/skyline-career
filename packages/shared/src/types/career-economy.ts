@@ -535,6 +535,13 @@ export interface MissionIntent {
   dispatchedAtTick?: number;
   /** Economy tick when cargo left origin (career depart). */
   departedAtTick?: number;
+  /**
+   * Wall-clock when the aircraft left the ground (Watch / depart).
+   * Used to enforce a minimum airborne fraction of planned route time.
+   */
+  airborneAtMs?: number;
+  /** Planned route duration (ms) stamped at airborne — OFP block or distance estimate. */
+  expectedRouteMs?: number;
   /** Economy tick when settle ran. */
   settledAtTick?: number;
   /** Freight paid after late penalty. */

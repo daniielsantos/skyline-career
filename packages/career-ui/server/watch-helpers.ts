@@ -6,9 +6,13 @@ import {
   createMissionFlightWatchState,
   debitWalletForFuel,
   departMission,
+  estimateMissionBlockHours,
+  evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
   KG_TO_LB,
   resolveAirportCoords,
+  resolveExpectedRouteMs,
+  routeDistanceNm,
   settleMission,
   type CareerEconomyWorld,
   type CareerMissionsState,
@@ -18,6 +22,15 @@ import {
   type MissionIntent,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+
+export type WatchFlightTimePayload = {
+  airborneAtMs: number;
+  expectedRouteMs: number;
+  requiredMs: number;
+  elapsedMs: number;
+  ratio: number;
+  met: boolean;
+};
 
 export type WatchStatusPayload = {
   running: boolean;
@@ -44,6 +57,8 @@ export type WatchStatusPayload = {
   autoSettle: boolean;
   intervalSec: number;
   allowDepartOverride: boolean;
+  /** Live airborne progress vs planned route (anti time-compression). */
+  flightTime: WatchFlightTimePayload | null;
 };
 
 type WatchCallbacks = {
@@ -179,6 +194,31 @@ export class CareerWatchSession {
   constructor(private readonly cb: WatchCallbacks) {}
 
   getStatus(): WatchStatusPayload {
+    const nowMs = Date.now();
+    const airborneAtMs = this.watchState.airborneAtMs;
+    const expectedRouteMs = this.watchState.expectedRouteMs;
+    let flightTime: WatchFlightTimePayload | null = null;
+    if (
+      typeof airborneAtMs === 'number' &&
+      Number.isFinite(airborneAtMs) &&
+      typeof expectedRouteMs === 'number' &&
+      Number.isFinite(expectedRouteMs) &&
+      expectedRouteMs > 0
+    ) {
+      const check = evaluateMinAirborneElapsed({
+        airborneAtMs,
+        expectedRouteMs,
+        nowMs,
+      });
+      flightTime = {
+        airborneAtMs,
+        expectedRouteMs,
+        requiredMs: check.requiredMs,
+        elapsedMs: check.elapsedMs,
+        ratio: check.elapsedMs / expectedRouteMs,
+        met: check.ok,
+      };
+    }
     return {
       running: this.running,
       missionId: this.missionId,
@@ -197,6 +237,7 @@ export class CareerWatchSession {
       autoSettle: this.opts.autoSettle,
       intervalSec: this.opts.intervalSec,
       allowDepartOverride: this.opts.allowDepartOverride,
+      flightTime,
     };
   }
 
@@ -216,7 +257,6 @@ export class CareerWatchSession {
       pipeName: opts.pipeName,
     };
     this.missionId = opts.missionId;
-    this.watchState = createMissionFlightWatchState();
     this.lastSample = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
@@ -236,6 +276,15 @@ export class CareerWatchSession {
     }
     this.missionStatus = mission.status;
     this.walletUsd = missions.walletUsd;
+    this.watchState = createMissionFlightWatchState({
+      sawAirborne: mission.status === 'in_flight',
+      airborneAtMs: mission.airborneAtMs,
+      expectedRouteMs:
+        mission.expectedRouteMs ??
+        (mission.status === 'in_flight'
+          ? resolveExpectedRouteMs(mission)
+          : undefined),
+    });
 
     const bridge = new NamedPipeSimBridge(
       opts.pipeName ? { pipeName: opts.pipeName } : {},
@@ -306,6 +355,21 @@ export class CareerWatchSession {
 
       const destTerminal = world.airports.find((a) => a.icao === current.destIcao);
       const destCoords = resolveAirportCoords(current.destIcao, destTerminal);
+      const distanceNm = routeDistanceNm(
+        world,
+        current.originIcao,
+        current.destIcao,
+      );
+      const fallbackHours = estimateMissionBlockHours(
+        world,
+        current.originIcao,
+        current.destIcao,
+        current.aircraftClassId,
+      );
+      const expectedRouteMs =
+        current.expectedRouteMs ??
+        resolveExpectedRouteMs(current, { distanceNm, fallbackHours });
+      const nowMs = Date.now();
       const { event, nextState } = evaluateMissionFlightTransition(
         current,
         sample,
@@ -315,11 +379,37 @@ export class CareerWatchSession {
           requireDestProximity: this.opts.requireDestProximity,
           destCoords,
           settleRadiusNm: this.opts.settleRadiusNm,
+          nowMs,
+          expectedRouteMs,
+          distanceNm,
+          fallbackHours,
         },
       );
       this.watchState = nextState;
       this.lastEvent = event;
       this.lastEventAtIso = new Date().toISOString();
+
+      // Persist airborne clock if Watch first saw wheels-up on an already in-flight mission.
+      if (
+        current.status === 'in_flight' &&
+        nextState.airborneAtMs !== undefined &&
+        (current.airborneAtMs !== nextState.airborneAtMs ||
+          current.expectedRouteMs !== nextState.expectedRouteMs)
+      ) {
+        await this.cb.updateOpenMission(
+          this.missionId,
+          async (freshMissions, openMission, openIdx) => {
+            if (openMission.status !== 'in_flight') return false;
+            freshMissions.missions[openIdx] = {
+              ...openMission,
+              airborneAtMs: openMission.airborneAtMs ?? nextState.airborneAtMs,
+              expectedRouteMs:
+                openMission.expectedRouteMs ?? nextState.expectedRouteMs,
+            };
+            return true;
+          },
+        );
+      }
 
       if (event.type === 'depart' && this.opts.autoDepart) {
         if (
@@ -344,6 +434,9 @@ export class CareerWatchSession {
               const worldFresh = await this.cb.loadEconomy();
               const departed = departMission(worldFresh, openMission, {
                 fleet: freshMissions,
+                nowMs: nextState.airborneAtMs ?? nowMs,
+                distanceNm,
+                expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
               });
               freshMissions.missions[openIdx] = departed.mission;
               freshMissions.walletUsd = debitWalletForFuel(
@@ -352,6 +445,11 @@ export class CareerWatchSession {
               );
               this.missionStatus = departed.mission.status;
               this.walletUsd = freshMissions.walletUsd;
+              this.watchState = {
+                ...this.watchState,
+                airborneAtMs: departed.mission.airborneAtMs,
+                expectedRouteMs: departed.mission.expectedRouteMs,
+              };
               await this.cb.persistEconomy(worldFresh);
               return true;
             },

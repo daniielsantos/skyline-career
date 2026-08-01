@@ -303,6 +303,8 @@ export type Mission = {
   acceptedAtTick?: number;
   dispatchedAtTick?: number;
   departedAtTick?: number;
+  airborneAtMs?: number;
+  expectedRouteMs?: number;
   settledAtTick?: number;
   settledFuelKg?: number;
   staticId?: string;
@@ -938,6 +940,14 @@ export type WatchStatus = {
   autoSettle: boolean;
   intervalSec: number;
   allowDepartOverride?: boolean;
+  flightTime?: {
+    airborneAtMs: number;
+    expectedRouteMs: number;
+    requiredMs: number;
+    elapsedMs: number;
+    ratio: number;
+    met: boolean;
+  } | null;
 };
 
 export function postDepart(opts: { missionId: string; override?: boolean }) {

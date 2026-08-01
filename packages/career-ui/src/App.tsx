@@ -78,6 +78,14 @@ import {
   saveWeightSystem,
   type WeightSystem,
 } from './weight-units';
+import {
+  buildFlightDebrief,
+  deriveDispatchStep,
+  dispatchStepStatusLine,
+  resolveLoadPath,
+  type FlightDebrief,
+} from './dispatch-flow';
+import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
 
 type Tab = CareerTab;
 type TerminalSection = 'inventory' | 'contracts' | 'movements';
@@ -397,26 +405,6 @@ function aircraftMaxRangeNm(aircraft: AircraftClass): number {
   if (aircraft === 'light_turboprop') return 900;
   if (aircraft === 'light_ga') return 800;
   return 2_500;
-}
-
-function estimateFuelUpliftKg(aircraft: AircraftClass, distanceNm: number): number {
-  const taxi =
-    aircraft === 'wide_freighter'
-      ? 900
-      : aircraft === 'light_turboprop'
-        ? 40
-        : aircraft === 'light_ga'
-          ? 20
-          : 400;
-  const burn =
-    aircraft === 'wide_freighter'
-      ? 12
-      : aircraft === 'light_turboprop'
-        ? 0.8
-        : aircraft === 'light_ga'
-          ? 0.35
-          : 5;
-  return Math.max(taxi, Math.round(taxi + burn * Math.max(0, distanceNm)));
 }
 
 function isActiveMissionStatus(status: string): boolean {
@@ -1123,6 +1111,8 @@ export function App() {
     'idle' | 'waiting' | 'connecting' | 'blocked'
   >('idle');
   const [watchAutoPaused, setWatchAutoPaused] = useState(false);
+  const [flightDebrief, setFlightDebrief] = useState<FlightDebrief | null>(null);
+  const activeMissionRef = useRef<Mission | undefined>(undefined);
   const [maxCargoKg, setMaxCargoKg] = useState<number | null>(null);
   const [structuralMaxCargoKg, setStructuralMaxCargoKg] =
     useState<number | null>(null);
@@ -1463,20 +1453,26 @@ export function App() {
             Boolean(status.settlement) &&
             Boolean(status.missionId);
           if (justSettled && status.settlement && status.missionId) {
+            const settledMission = activeMissionRef.current;
+            const debrief =
+              settledMission && settledMission.id === status.missionId
+                ? buildFlightDebrief({
+                    mission: settledMission,
+                    settlement: status.settlement,
+                  })
+                : null;
             queueMicrotask(() => {
-              setToastKind('ok');
+              if (debrief) setFlightDebrief(debrief);
+              setToastKind(status.settlement!.onTime ? 'ok' : 'warn');
               setToast(
-                `Settled ${status.missionId} · paid ${formatMoney(status.settlement!.payoutUsd)}` +
-                  (status.settlement!.onTime
-                    ? ''
-                    : ` · late ${status.settlement!.lateTicks}h (−${formatMoney(status.settlement!.penaltyUsd)})`) +
-                  (status.settlement!.residualFuelKg !== null
-                    ? ` · fuel remaining ${formatTonnes(status.settlement!.residualFuelKg)}`
-                    : ' · fuel remaining estimated'),
+                `Flight settled · net ${formatMoney(
+                  debrief?.netUsd ?? status.settlement!.payoutUsd,
+                )}`,
               );
               if (typeof status.walletUsd === 'number') {
                 setWallet(status.walletUsd);
               }
+              goToTab('staging');
               void refresh().catch(() => {
                 /* ignore */
               });
@@ -1555,6 +1551,7 @@ export function App() {
     [missions],
   );
   const activeMission = useMemo(() => findActiveMission(missions), [missions]);
+  activeMissionRef.current = activeMission;
 
   // Dispatch needs the complete route inventory. The global Freights payload is capped
   // at 200 rows and may omit valid same-route lots shown by the Terminal.
@@ -2558,6 +2555,7 @@ export function App() {
         cargoKg: maxKg > 0 ? defaultStagingKg(maxKg) : 0,
       },
     ];
+    setFlightDebrief(null);
     setStaging(draft);
     setPreferredAircraft(aircraft);
     setError(null);
@@ -2869,6 +2867,7 @@ export function App() {
           m.id === mission.id ? { ...m, status: 'cancelled' } : m,
         ),
       );
+      setFlightDebrief(null);
       setStaging(null);
       try {
         const stopped = await postWatchStop();
@@ -3015,16 +3014,13 @@ export function App() {
       setWatch((prev) =>
         prev?.missionId === mission.id ? { ...prev, running: false } : prev,
       );
+      const debrief = buildFlightDebrief({
+        mission: result.mission.fuelUplift ? result.mission : mission,
+        settlement: result.settlement,
+      });
+      setFlightDebrief(debrief);
       setToastKind(result.settlement.onTime ? 'ok' : 'warn');
-      setToast(
-        `Settled ${result.mission.id} · paid ${formatMoney(result.settlement.payoutUsd)}` +
-          (result.settlement.onTime
-            ? ''
-            : ` · late ${result.settlement.lateTicks}h (−${formatMoney(result.settlement.penaltyUsd)})`) +
-          (result.settlement.residualFuelKg !== null
-            ? ` · fuel remaining ${formatTonnes(result.settlement.residualFuelKg)}`
-            : ' · fuel remaining estimated'),
-      );
+      setToast(`Flight settled · net ${formatMoney(debrief.netUsd)}`);
       setStaging(null);
       goToTab('staging');
     });
@@ -3223,11 +3219,37 @@ export function App() {
 
   const showAirport = airportIcao !== null && airportView !== null;
   const showStaging = tab === 'staging';
-  const stagingMode: 'empty' | 'draft' | 'active' = staging
+  const stagingMode: 'empty' | 'draft' | 'active' | 'debrief' = staging
     ? 'draft'
     : activeMission
       ? 'active'
-      : 'empty';
+      : flightDebrief
+        ? 'debrief'
+        : 'empty';
+  const dispatchStep = deriveDispatchStep({
+    hasDraft: Boolean(staging),
+    hasDebrief: stagingMode === 'debrief',
+    mission: activeMission,
+  });
+  const activeLoadPath = activeMission
+    ? resolveLoadPath(activeMission, preferManualLoad)
+    : 'manual';
+  const dispatchStatusText = dispatchStepStatusLine({
+    step: dispatchStep,
+    mission: activeMission,
+    simbriefUser,
+    ofpAutoStatus,
+    missionFuelQuoteStatus,
+    missionFuelQuoteError,
+    loadOfpAutoStatus,
+    loadOfpAutoError,
+    loadPath: activeLoadPath,
+    simBridgeConnected: Boolean(simBridge?.connected),
+    watchRunning: Boolean(
+      watch?.running && watch.missionId === activeMission?.id,
+    ),
+    watchAutoStatus,
+  });
   const terminalMovementCount = showAirport
     ? (airportView.arrivals?.length ?? 0) + (airportView.departures?.length ?? 0)
     : 0;
@@ -3259,21 +3281,6 @@ export function App() {
     return () => clearTimeout(timer);
   }, [toastState, toastKind]);
 
-  const activeMissionDistanceNm = activeMission
-    ? lots.find(
-        (lot) =>
-          lot.originIcao === activeMission.originIcao &&
-          lot.destIcao === activeMission.destIcao,
-      )?.distanceNm
-    : undefined;
-  const activeMissionFuelEstKg =
-    activeMission && !activeMission.fuelUplift
-      ? estimateFuelUpliftKg(
-          activeMission.aircraftClassId as AircraftClass,
-          activeMissionDistanceNm ?? 0,
-        )
-      : undefined;
-
   const pageTitle = showAirport
     ? airportView.airport.icao
     : showStaging
@@ -3295,10 +3302,12 @@ export function App() {
     ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'} · level ${airportView.airport.level}`
     : showStaging
       ? stagingMode === 'active'
-        ? 'Confirm OFP, preflight, and watch the active flight.'
+        ? 'Guided preflight — flight plan, fuel, load, then fly and settle.'
         : stagingMode === 'draft'
           ? 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
-          : 'Prepare a freight from Freights, or resume after settling the last flight.'
+          : stagingMode === 'debrief'
+            ? 'Flight complete — review payout, fuel cost, and net.'
+            : 'Prepare a freight from Freights, or resume after settling the last flight.'
       : tab === 'fleet'
         ? 'Competing freighters — idle, airborne, turnaround, shop MX, or crew rest.'
         : tab === 'aircraft'
@@ -3921,7 +3930,7 @@ export function App() {
                                           : `Prepare ${lot.originIcao} → ${lot.destIcao}`
                                     }
                                   >
-                                    {activeMission ? 'Flight busy' : 'Prepare Preflight'}
+                                    {activeMission ? 'Flight busy' : 'Prepare flight'}
                                   </button>
                                 </div>
                                 <p>
@@ -4345,7 +4354,105 @@ export function App() {
         </section>
       ) : hubSelected && showStaging ? (
         <section className="panel staging-panel">
-          {stagingMode === 'empty' ? (
+          {stagingMode === 'debrief' && flightDebrief ? (
+            <>
+              <DispatchStepper current="debrief" />
+              <p className="dispatch-step-status" role="status">
+                {dispatchStatusText}
+              </p>
+              <div className="panel-head missions-head">
+                <div>
+                  <h2>
+                    {flightDebrief.originIcao} → {flightDebrief.destIcao}
+                  </h2>
+                  <p>
+                    {flightDebrief.missionId} ·{' '}
+                    {flightDebrief.onTime
+                      ? 'On time'
+                      : `Late ${flightDebrief.lateTicks}h`}
+                  </p>
+                </div>
+              </div>
+              <section className="debrief-card" aria-live="polite">
+                <div className="debrief-card-head">
+                  <strong>FLIGHT DEBRIEF</strong>
+                  <span className={flightDebrief.onTime ? 'debrief-ok' : 'debrief-late'}>
+                    {flightDebrief.onTime ? 'On time' : 'Late'}
+                  </span>
+                </div>
+                <dl className="debrief-grid">
+                  <div>
+                    <dt>Contract</dt>
+                    <dd>{formatMoney(flightDebrief.contractPayUsd)}</dd>
+                  </div>
+                  <div>
+                    <dt>Payout</dt>
+                    <dd>{formatMoney(flightDebrief.payoutUsd)}</dd>
+                  </div>
+                  <div>
+                    <dt>Late penalty</dt>
+                    <dd>
+                      {flightDebrief.penaltyUsd > 0
+                        ? `−${formatMoney(flightDebrief.penaltyUsd)}`
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Fuel cost</dt>
+                    <dd>
+                      {flightDebrief.fuelCostUsd > 0
+                        ? `−${formatMoney(flightDebrief.fuelCostUsd)}`
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Fuel remaining</dt>
+                    <dd>
+                      {flightDebrief.residualFuelKg !== null
+                        ? formatTonnes(flightDebrief.residualFuelKg)
+                        : 'estimated'}
+                    </dd>
+                  </div>
+                  <div className="debrief-net">
+                    <dt>Net</dt>
+                    <dd>{formatMoney(flightDebrief.netUsd)}</dd>
+                  </div>
+                </dl>
+                <div className="debrief-actions">
+                  <button
+                    type="button"
+                    className="accept"
+                    disabled={busy}
+                    onClick={() => {
+                      setFlightDebrief(null);
+                      selectTab('market');
+                    }}
+                  >
+                    Back to Freights
+                  </button>
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setFlightDebrief(null);
+                      selectTab('missions');
+                    }}
+                  >
+                    Open Logbook
+                  </button>
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={busy}
+                    onClick={() => setFlightDebrief(null)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </section>
+            </>
+          ) : stagingMode === 'empty' ? (
             <>
               <div className="panel-head missions-head">
                 <div>
@@ -4384,6 +4491,10 @@ export function App() {
             </>
           ) : stagingMode === 'draft' && staging ? (
             <>
+              <DispatchStepper current="manifest" />
+              <p className="dispatch-step-status" role="status">
+                {dispatchStatusText}
+              </p>
               <div className="panel-head missions-head">
                 <div>
                   <h2>
@@ -4709,843 +4820,47 @@ export function App() {
               </div>
             </>
           ) : activeMission ? (
-            <>
-              <div className="panel-head missions-head">
-                <div>
-                  <h2>
-                    <IcaoLink
-                      icao={activeMission.originIcao}
-                      onOpen={openAirport}
-                      disabled={busy}
-                    />{' '}
-                    →{' '}
-                    <IcaoLink
-                      icao={activeMission.destIcao}
-                      onOpen={openAirport}
-                      disabled={busy}
-                    />
-                  </h2>
-                  <p>
-                    {activeMission.id} · {aircraftClassLabel(activeMission.aircraftClassId)} ·{' '}
-                    <span className={`status status-${activeMission.status}`}>
-                      {activeMission.status}
-                    </span>
-                  </p>
-                </div>
-                <div className="staging-ops-head-actions">
-                  {!simbriefUser.trim() ? (
-                    <button
-                      type="button"
-                      className="action ghost compact-dispatch"
-                      onClick={() => selectTab('settings')}
-                      disabled={busy}
-                      title="Set your SimBrief username in Settings"
-                    >
-                      Set SimBrief user
-                    </button>
-                  ) : (
-                    <span className="settings-chip" title="Change in Settings">
-                      SimBrief · {simbriefUser.trim()}
-                    </span>
-                  )}
-                  {activeMission.status === 'dispatched' ? (
-                    <button
-                      type="button"
-                      className="action ghost compact-dispatch"
-                      disabled={busy}
-                      onClick={() => void onDispatch(activeMission)}
-                      title="Re-open SimBrief with the current cargo"
-                    >
-                      Re-open Dispatch
-                    </button>
-                  ) : null}
-                  {['accepted', 'dispatched'].includes(activeMission.status) ? (
-                    <button
-                      type="button"
-                      className="action ghost danger compact-dispatch"
-                      disabled={busy}
-                      title="Cancel mission and return reserved cargo to the market"
-                      onClick={() => void onCancel(activeMission)}
-                    >
-                      Cancel
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="cargo-capacity staging-capacity staging-ops-capacity">
-                <span>
-                  Cargo
-                  <strong>{formatTonnes(activeMission.cargoKg)}</strong>
-                  <em>
-                    {(activeMission.lots?.length ?? 1) > 1
-                      ? `${activeMission.lots!.length} lots`
-                      : '1 lot'}
-                  </em>
-                </span>
-                <span>
-                  Contract
-                  <strong>{formatMoney(activeMission.payUsd)}</strong>
-                </span>
-                <span>
-                  Deadline
-                  <strong>
-                    {formatDeadline(activeMission.deadlineTick, continuousHours)}
-                  </strong>
-                </span>
-                <span>
-                  Capacity left
-                  <strong>
-                    {formatTonnes(
-                      Math.max(
-                        0,
-                        fallbackMaxCargoKg(activeMission.aircraftClassId as AircraftClass) -
-                          activeMission.cargoKg,
-                      ),
-                    )}
-                  </strong>
-                </span>
-              </div>
-
-              <p className="staging-ops-reason">
-                {formatWeightText(activeMission.reason, weightSystem)}
-              </p>
-              <p className="staging-ops-reason">
-                {activeMission.fuelUplift
-                  ? `Fuel uplift ${formatTonnes(activeMission.fuelUplift.requestedKg)} · ${formatMoney(activeMission.fuelUplift.costUsd)} · ${activeMission.fuelUplift.scarcity} @ ${activeMission.fuelUplift.originIcao}`
-                  : activeMissionFuelEstKg !== undefined
-                    ? `Est. Jet-A uplift ~${formatTonnes(activeMissionFuelEstKg)} at ${activeMission.originIcao} (charged on Depart)`
-                    : `Jet-A uplift charged on Depart from ${activeMission.originIcao}`}
-              </p>
-
-              {(activeMission.lots?.length ?? 0) > 0 ||
-              ['accepted', 'dispatched'].includes(activeMission.status) ? (
-                <div className="staging-section">
-                  <div className="staging-section-head">
-                    <h3>Cargo</h3>
-                    {['accepted', 'dispatched'].includes(activeMission.status) ? (
-                      <button
-                        type="button"
-                        className="action compact"
-                        disabled={busy}
-                        title="Adjust payload or lots, then regenerate the OFP"
-                        onClick={() => void enterEditManifest(activeMission)}
-                      >
-                        Edit
-                      </button>
-                    ) : null}
-                  </div>
-                  {(activeMission.lots?.length ?? 0) > 0 ? (
-                    <ul className="staging-existing">
-                      {activeMission.lots!.map((line) => (
-                        <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                          {formatTonnes(line.cargoKg)} {line.commodityId} ·{' '}
-                          {formatMoney(line.payUsd)}
-                          {line.urgency === 'urgent' ? ' · urgent' : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="empty">No cargo lots on this flight yet.</p>
-                  )}
-                </div>
-              ) : null}
-
-              {activeMission.lastOfpCheck
-                ? (() => {
-                    const check = activeMission.lastOfpCheck;
-                    const briefing = check.briefing;
-                    const actionableFindings = check.findings.filter(
-                      (finding) => finding.severity !== 'info',
-                    );
-                    const cruise =
-                      briefing?.cruiseAltitudeFt !== undefined
-                        ? briefing.cruiseAltitudeFt >= 18_000
-                          ? `FL${String(
-                              Math.round(briefing.cruiseAltitudeFt / 100),
-                            ).padStart(3, '0')}`
-                          : `${Math.round(
-                              briefing.cruiseAltitudeFt,
-                            ).toLocaleString('en-US')} FT`
-                        : undefined;
-                    const briefingItems = [
-                      briefing?.aircraftIcao
-                        ? ['Aircraft', briefing.aircraftIcao]
-                        : null,
-                      briefing?.tailNumber
-                        ? ['Tail number', briefing.tailNumber]
-                        : null,
-                      briefing?.distanceNm !== undefined
-                        ? ['Distance', `${Math.round(briefing.distanceNm)} NM`]
-                        : null,
-                      briefing?.blockTime
-                        ? ['Block time', briefing.blockTime]
-                        : null,
-                      cruise ? ['Cruise', cruise] : null,
-                      briefing?.alternateIcao
-                        ? ['Alternate', briefing.alternateIcao]
-                        : null,
-                    ].filter(
-                      (item): item is [string, string] => item !== null,
-                    );
-
-                    return (
-                      <section
-                        className={`ofp-result-card ofp-briefing-card ofp-result-${check.verdict}`}
-                        aria-live="polite"
-                      >
-                        <div className="ofp-result-head">
-                          <strong>
-                            {check.verdict === 'pass'
-                              ? 'OFP PASSED'
-                              : check.verdict === 'warn'
-                                ? 'OFP NEEDS REVIEW'
-                                : 'OFP FAILED'}
-                          </strong>
-                          <span>
-                            Checked{' '}
-                            {new Date(check.checkedAtIso).toLocaleTimeString()}
-                          </span>
-                        </div>
-
-                        {briefingItems.length > 0 ? (
-                          <dl className="ofp-briefing-grid">
-                            {briefingItems.map(([label, value]) => (
-                              <div key={label}>
-                                <dt>{label}</dt>
-                                <dd>{value}</dd>
-                              </div>
-                            ))}
-                          </dl>
-                        ) : null}
-
-                        {briefing?.route ? (
-                          <div className="ofp-route-strip">
-                            <span>Route</span>
-                            <code>{briefing.route}</code>
-                          </div>
-                        ) : (
-                          <p>Re-check SimBrief to load the operational route.</p>
-                        )}
-
-                        {actionableFindings.length > 0 ? (
-                          <details className="preflight-technical">
-                            <summary>
-                              {actionableFindings.length}{' '}
-                              {actionableFindings.length === 1
-                                ? 'OFP detail'
-                                : 'OFP details'}
-                            </summary>
-                            <ul className="ofp-findings">
-                              {actionableFindings.map((finding) => (
-                                <li
-                                  key={`ofp-${finding.code}-${finding.message}`}
-                                  className={`finding-${finding.severity}`}
-                                >
-                                  [{finding.severity.toUpperCase()}]{' '}
-                                  {formatWeightText(finding.message, weightSystem)}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        ) : null}
-                      </section>
-                    );
-                  })()
-                : activeMission.status === 'dispatched' && activeMission.staticId ? (
-                <div className="ofp-auto-wait" aria-live="polite">
-                  <span className={ofpAutoStatus === 'checking' ? 'poll-dot checking' : 'poll-dot'} />
-                  <div>
-                    <strong>
-                      {!simbriefUser.trim()
-                        ? 'Set your SimBrief user in Settings to enable automatic OFP confirmation'
-                        : ofpAutoStatus === 'checking'
-                          ? 'Checking SimBrief for OFP…'
-                          : 'Waiting for OFP'}
-                    </strong>
-                    {simbriefUser.trim() ? (
-                      <small>Automatic check every 15 seconds while Dispatch is open.</small>
-                    ) : (
-                      <small>
-                        <button
-                          type="button"
-                          className="linkish"
-                          onClick={() => selectTab('settings')}
-                        >
-                          Open Settings
-                        </button>
-                      </small>
-                    )}
-                  </div>
-                </div>
-                ) : null}
-
-              {activeMission.status === 'dispatched' &&
-              activeMission.staticId &&
-              activeMission.lastOfpCheck?.verdict === 'fail' ? (
-                <div className="ofp-auto-wait" aria-live="polite">
-                  <span
-                    className={
-                      ofpAutoStatus === 'checking'
-                        ? 'poll-dot checking'
-                        : 'poll-dot'
-                    }
-                  />
-                  <div>
-                    <strong>
-                      {ofpAutoStatus === 'checking'
-                        ? 'Checking for an updated OFP…'
-                        : 'Waiting for the updated OFP'}
-                    </strong>
-                    <small>
-                      The previous OFP does not match. Retrying automatically
-                      every 15 seconds.
-                    </small>
-                  </div>
-                </div>
-              ) : null}
-
-              {activeMission.status === 'dispatched' &&
-              (activeMission.lastOfpCheck?.verdict === 'pass' ||
-                activeMission.lastOfpCheck?.verdict === 'warn') &&
-              activeMission.fuelAuthorizedOfpId !== activeMission.lastOfpCheck.ofpId ? (
-                missionFuelQuote ? (
-                  <section className="fuel-purchase-card" aria-live="polite">
-                    <div className="fuel-purchase-head">
-                      <div>
-                        <strong>FUEL PURCHASE REQUIRED</strong>
-                        <small>
-                          Persisted fuel is below the confirmed OFP block fuel.
-                        </small>
-                      </div>
-                      <span>{missionFuelQuote.quote.uplift.scarcity}</span>
-                    </div>
-                    <dl className="fuel-purchase-grid">
-                      <div>
-                        <dt>On aircraft</dt>
-                        <dd>
-                          {formatMassExact(
-                            missionFuelQuote.quote.currentFuelKg,
-                            weightSystem,
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>OFP block fuel</dt>
-                        <dd>
-                          {formatMassExact(
-                            missionFuelQuote.quote.requiredBlockFuelKg,
-                            weightSystem,
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>To purchase</dt>
-                        <dd>
-                          {formatMassExact(
-                            missionFuelQuote.quote.shortfallKg,
-                            weightSystem,
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Total</dt>
-                        <dd>{formatMoney(missionFuelQuote.quote.uplift.costUsd)}</dd>
-                      </div>
-                    </dl>
-                    <div className="fuel-purchase-footer">
-                      <small>
-                        Wallet {formatMoney(missionFuelQuote.walletUsd)} →{' '}
-                        {formatMoney(missionFuelQuote.walletAfterUsd)}
-                        {missionFuelQuote.quote.uplift.scarcity !== 'ok'
-                          ? ' · tanker surcharge included'
-                          : ` · ${formatMoney(
-                              missionFuelQuote.quote.uplift.unitPriceUsd,
-                            )}/kg`}
-                      </small>
-                      <button
-                        type="button"
-                        className="action"
-                        disabled={busy || missionFuelQuoteStatus === 'loading'}
-                        onClick={() => void onBuyMissionFuel(activeMission)}
-                      >
-                        Buy fuel &amp; continue
-                      </button>
-                    </div>
-                  </section>
-                ) : missionFuelQuoteStatus === 'error' ? (
-                  <div className="ofp-auto-wait fuel-quote-error" aria-live="polite">
-                    <span className="poll-dot off" />
-                    <div>
-                      <strong>Could not calculate OFP fuel purchase</strong>
-                      <small>{missionFuelQuoteError}</small>
-                    </div>
-                    <button
-                      type="button"
-                      className="action ghost compact"
-                      onClick={() =>
-                        setMissionFuelQuoteRetryToken((token) => token + 1)
-                      }
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : (
-                  <div className="ofp-auto-wait" aria-live="polite">
-                    <span className="poll-dot checking" />
-                    <div>
-                      <strong>Checking persisted aircraft fuel…</strong>
-                      <small>Comparing the career tank with OFP block fuel.</small>
-                    </div>
-                  </div>
-                )
-              ) : null}
-
-              {activeMission.status === 'dispatched' &&
-              Boolean(activeMission.lastOfpCheck?.ofpId) &&
-              activeMission.fuelAuthorizedOfpId ===
-                activeMission.lastOfpCheck?.ofpId &&
-              !activeMission.lastPreflightCheck?.loadVerification?.ready
-                ? (() => {
-                    const method = preferredLoadMethod(activeMission);
-                    const inject =
-                      method === 'direct-injection' &&
-                      missionInjectCapable(activeMission) &&
-                      !preferManualLoad;
-                    const title = inject
-                      ? loadOfpAutoStatus === 'failed'
-                        ? 'Fuel purchased · aircraft load failed'
-                        : !simBridge?.connected
-                          ? 'Fuel purchased · waiting for SimBridge'
-                          : loadOfpAutoStatus === 'loading'
-                            ? 'Loading OFP fuel and cargo into the aircraft…'
-                            : 'Fuel purchased · preparing Skyline inject'
-                      : preferManualLoad || method === 'native-simbrief'
-                        ? method === 'native-simbrief' && !preferManualLoad
-                          ? 'Import OFP in the aircraft EFB'
-                          : 'Load manually, then Validate'
-                        : 'Load fuel and payload';
-                    const detail = inject
-                      ? loadOfpAutoStatus === 'failed'
-                        ? loadOfpAutoError ??
-                          'Retry inject, or continue manually; live validation stays active.'
-                        : !simBridge?.connected
-                          ? 'Start the local SimBridge host with npm run start:local. Loading resumes automatically.'
-                          : 'Loaded vs Due updates live after inject. CG is advisory on Preflight.'
-                      : method === 'native-simbrief' && !preferManualLoad
-                        ? 'Use Import SimBrief / Load OFP on the aircraft EFB or FMC. Loaded vs Due updates automatically.'
-                        : 'Set fuel and payload in Mass & Balance / EFB. Loaded vs Due updates automatically.';
-                    return (
-                      <div
-                        className={`ofp-auto-wait fuel-pipeline-status ${
-                          loadOfpAutoStatus === 'failed' ? 'fuel-pipeline-failed' : ''
-                        }`}
-                        aria-live="polite"
-                      >
-                        <span
-                          className={`poll-dot ${
-                            inject && loadOfpAutoStatus === 'loading'
-                              ? 'checking'
-                              : ''
-                          }`}
-                        />
-                        <div>
-                          <strong>{title}</strong>
-                          <small>
-                            Preferred method:{' '}
-                            {method === 'direct-injection'
-                              ? 'Skyline inject'
-                              : 'Native SimBrief EFB'}
-                            {preferManualLoad ? ' · manual override' : ''}
-                            <br />
-                            {detail}
-                          </small>
-                        </div>
-                        <div className="fuel-pipeline-actions">
-                          {inject && loadOfpAutoStatus === 'failed' ? (
-                            <button
-                              type="button"
-                              className="action ghost compact"
-                              disabled={busy}
-                              onClick={() => retryAutoLoadOfp()}
-                            >
-                              Retry inject
-                            </button>
-                          ) : null}
-                          {inject ? (
-                            <button
-                              type="button"
-                              className="action ghost compact"
-                              disabled={busy}
-                              onClick={() => continueManuallyLoad()}
-                            >
-                              Continue manually
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })()
-                : null}
-
-              <div className="mission-actions staging-ops-actions">
-                {activeMission.status === 'accepted' ? (
-                  <button
-                    type="button"
-                    className="action ghost"
-                    disabled={busy}
-                    onClick={() => void onDispatch(activeMission)}
-                    title="Re-open SimBrief with the current cargo without editing"
-                  >
-                    Dispatch
-                  </button>
-                ) : null}
-                {['accepted', 'dispatched'].includes(activeMission.status) ? (
-                  <button
-                    type="button"
-                    className="action ghost"
-                    disabled={busy}
-                    title="Mark cargo airborne without MSFS"
-                    onClick={() => void onDepart(activeMission)}
-                  >
-                    Depart
-                  </button>
-                ) : null}
-                {['accepted', 'dispatched', 'in_flight'].includes(activeMission.status) ? (
-                  <button
-                    type="button"
-                    className="action ghost"
-                    disabled={busy}
-                    title="Deliver cargo and credit wallet without MSFS"
-                    onClick={() => void onSettle(activeMission)}
-                  >
-                    Settle
-                  </button>
-                ) : null}
-              </div>
-
-              {activeMission.lastPreflightCheck
-                ? (() => {
-                    const check = activeMission.lastPreflightCheck;
-                    const verification = check.loadVerification;
-                    const ready = verification?.ready ?? check.verdict !== 'fail';
-                    const canInjectPayload =
-                      preferredLoadMethod(activeMission) === 'direct-injection' &&
-                      missionInjectCapable(activeMission);
-                    const noteLabel =
-                      verification?.weightNoteCount &&
-                      verification.weightNoteCount === check.findings.length
-                        ? `${verification.weightNoteCount} weight ${
-                            verification.weightNoteCount === 1 ? 'note' : 'notes'
-                          }`
-                        : `${check.findings.length} technical ${
-                            check.findings.length === 1 ? 'detail' : 'details'
-                          }`;
-                    const massFromLb = (lb: number | undefined) =>
-                      lb === undefined
-                        ? 'Not available'
-                        : formatMassExact(lb / KG_TO_LB, weightSystem);
-
-                    return (
-                      <section
-                        className={`ofp-result-card preflight-summary-card ofp-result-${
-                          ready ? 'pass' : 'fail'
-                        }`}
-                        aria-live="polite"
-                      >
-                        <div className="ofp-result-head">
-                          <div>
-                            <strong>
-                              {ready ? 'PREFLIGHT READY' : 'PREFLIGHT FAILED'}
-                            </strong>
-                            <small>
-                              {ready
-                                ? 'Fuel and cargo match the confirmed OFP.'
-                                : 'Fix the mismatched aircraft load before departure.'}
-                            </small>
-                          </div>
-                          <div className="preflight-head-actions">
-                            <span>
-                              Checked {new Date(check.checkedAtIso).toLocaleTimeString()}
-                            </span>
-                            {canInjectPayload ? (
-                              <button
-                                type="button"
-                                className="action compact"
-                                disabled={
-                                  busy ||
-                                  !simBridge?.connected ||
-                                  verification?.aircraft.onGround === false
-                                }
-                                onClick={() =>
-                                  void onLoadFuelAndPayload(activeMission)
-                                }
-                                title="Load OFP fuel and payload into the aircraft"
-                              >
-                                Load Fuel &amp; Payload
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {verification ? (
-                          <div className="preflight-load-grid">
-                            <div
-                              className={
-                                verification.fuel.ok
-                                  ? 'preflight-load-ok'
-                                  : 'preflight-load-fail'
-                              }
-                            >
-                              <span>Fuel</span>
-                              <strong>
-                                Sim {massFromLb(verification.fuel.liveLb)}
-                              </strong>
-                              <small>
-                                Due {massFromLb(verification.fuel.plannedLb)}
-                              </small>
-                              <b>{verification.fuel.ok ? '✓' : '✗'}</b>
-                            </div>
-                            <div
-                              className={
-                                verification.payload.ok
-                                  ? 'preflight-load-ok'
-                                  : 'preflight-load-fail'
-                              }
-                            >
-                              <span>Payload</span>
-                              <strong>
-                                Sim {massFromLb(verification.payload.liveLb)}
-                              </strong>
-                              <small>
-                                Due {massFromLb(verification.payload.plannedLb)}
-                              </small>
-                              <b>{verification.payload.ok ? '✓' : '✗'}</b>
-                            </div>
-                            {verification.cg ? (
-                              <div
-                                className={
-                                  verification.cg.ok
-                                    ? 'preflight-load-ok'
-                                    : 'preflight-load-warn'
-                                }
-                              >
-                                <span>CG</span>
-                                <strong>
-                                  {verification.cg.liveMac !== undefined
-                                    ? `${verification.cg.liveMac.toFixed(1)}% MAC`
-                                    : 'n/a'}
-                                </strong>
-                                <small>
-                                  {verification.cg.minMac !== undefined &&
-                                  verification.cg.maxMac !== undefined
-                                    ? `envelope ${verification.cg.minMac}–${verification.cg.maxMac}`
-                                    : 'advisory only'}
-                                </small>
-                                <b>
-                                  {verification.cg.severity === 'warn' ? '⚠' : 'ℹ'}
-                                </b>
-                              </div>
-                            ) : null}
-                            <div className="preflight-aircraft-state">
-                              <span>Aircraft</span>
-                              <strong>
-                                {verification.aircraft.onGround
-                                  ? 'On ground'
-                                  : 'Airborne'}
-                              </strong>
-                              <small>
-                                {verification.aircraft.enginesRunning
-                                  ? 'Engines running'
-                                  : 'Engines off'}
-                              </small>
-                              <b>
-                                {verification.aircraft.onGround &&
-                                !verification.aircraft.enginesRunning
-                                  ? 'READY'
-                                  : 'CHECK'}
-                              </b>
-                            </div>
-                          </div>
-                        ) : (
-                          <p>Waiting for live Loaded vs Due data…</p>
-                        )}
-
-                        {check.findings.length > 0 ? (
-                          <details className="preflight-technical">
-                            <summary>{noteLabel}</summary>
-                            <ul className="ofp-findings">
-                              {check.findings.map((finding) => (
-                                <li
-                                  key={`pre-${finding.code}-${finding.message}`}
-                                  className={`finding-${finding.severity}`}
-                                >
-                                  [{finding.severity.toUpperCase()}]{' '}
-                                  {formatWeightText(finding.message, weightSystem)}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        ) : null}
-                      </section>
-                    );
-                  })()
-                : null}
-
-              {(() => {
-                const watchingThis =
-                  watch?.missionId === activeMission.id &&
-                  (watch.running || Boolean(watch.settlement) || Boolean(watch.lastError));
-                const showWaitPanel =
-                  !watchingThis &&
-                  (watchAutoStatus === 'waiting' ||
-                    watchAutoStatus === 'connecting' ||
-                    watchAutoStatus === 'blocked' ||
-                    loadOfpAutoStatus === 'waiting' ||
-                    loadOfpAutoStatus === 'loading' ||
-                    loadOfpAutoStatus === 'failed' ||
-                    (Boolean(activeMission.lastPreflightCheck) &&
-                      activeMission.lastPreflightCheck!.verdict !== 'fail' &&
-                      !watchAutoPaused));
-                if (!watchingThis && !showWaitPanel) return null;
-
-                const watchRunning = Boolean(
-                  watch?.running && watch.missionId === activeMission.id,
-                );
-                const bridgeConnected = Boolean(
-                  watchRunning || simBridge?.connected,
-                );
-                const bridgeOnGround =
-                  watchRunning && watch?.onGround !== null && watch?.onGround !== undefined
-                    ? watch.onGround
-                    : simBridge?.onGround ?? null;
-                const bridgeEngines =
-                  watchRunning &&
-                  watch?.enginesRunning !== null &&
-                  watch?.enginesRunning !== undefined
-                    ? watch.enginesRunning
-                    : simBridge?.enginesRunning ?? null;
-                const phaseLabel = watchRunning
-                  ? watch?.phase ?? 'sampling'
-                  : watchAutoStatus === 'connecting'
-                    ? 'connecting watch'
-                    : watchAutoStatus === 'waiting'
-                      ? 'waiting to start watch'
-                      : watchAutoStatus === 'blocked'
-                        ? 'watch held'
-                        : simBridge?.phase ?? 'idle';
-                const stageDetail =
-                  bridgeOnGround === true
-                    ? bridgeEngines
-                      ? 'On ground · engines running'
-                      : 'On ground · engines off'
-                    : bridgeOnGround === false
-                      ? 'Airborne'
-                      : watchAutoStatus === 'blocked'
-                        ? 'Watch not started — Preflight failed'
-                        : bridgeConnected
-                          ? 'Sampling live aircraft…'
-                          : watchAutoStatus === 'waiting' ||
-                              watchAutoStatus === 'connecting'
-                            ? 'SimBridge not connected yet'
-                            : 'No live aircraft sample';
-
-                const statusLabel =
-                  loadOfpAutoStatus === 'loading'
-                    ? 'LOADING OFP…'
-                    : loadOfpAutoStatus === 'waiting' &&
-                        (activeMission.lastOfpCheck?.verdict === 'pass' ||
-                          activeMission.lastOfpCheck?.verdict === 'warn') &&
-                        !activeMission.lastPreflightCheck?.loadVerification?.ready
-                      ? 'WAITING TO LOAD OFP'
-                      : watchRunning
-                        ? 'MSFS CONNECTED'
-                        : watchAutoStatus === 'blocked'
-                          ? 'WATCH BLOCKED'
-                          : watchAutoStatus === 'connecting'
-                            ? 'CONNECTING…'
-                            : bridgeConnected
-                              ? 'SIMBRIDGE CONNECTED'
-                              : watchAutoPaused
-                                ? 'WATCH PAUSED'
-                                : 'WAITING FOR MSFS';
-
-                return (
-                  <footer
-                    className={`watch-status-footer ${
-                      loadOfpAutoStatus === 'failed'
-                        ? 'watch-blocked'
-                        : watchRunning
-                          ? 'watch-connected'
-                          : watchAutoStatus === 'blocked'
-                            ? 'watch-blocked'
-                            : bridgeConnected || loadOfpAutoStatus === 'loading'
-                              ? 'watch-connected'
-                              : 'watch-waiting'
-                    }`}
-                    aria-live="polite"
-                  >
-                    <div className="watch-footer-primary">
-                      <span
-                        className={`watch-dot ${
-                          loadOfpAutoStatus === 'loading' ||
-                          watchAutoStatus === 'connecting'
-                            ? 'checking'
-                            : watchRunning || bridgeConnected
-                              ? 'on'
-                              : 'off'
-                        }`}
-                      />
-                      <strong>{statusLabel}</strong>
-                      <div className="watch-footer-item">
-                        <span>Phase</span>
-                        <b>{stageDetail}</b>
-                      </div>
-                      <div className="watch-footer-item">
-                        <span>Mission</span>
-                        <b>{activeMission.status}</b>
-                      </div>
-                      {watch?.position ? (
-                        <div className="watch-footer-item">
-                          <span>Position</span>
-                          <b>
-                            {watch.position.lat.toFixed(3)}, {watch.position.lon.toFixed(3)}
-                          </b>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="watch-footer-secondary">
-                      <span>{phaseLabel}</span>
-                      {loadOfpAutoError ? (
-                        <span className="watch-footer-error">{loadOfpAutoError}</span>
-                      ) : null}
-                      {watch?.lastEvent && watch.lastEvent.type !== 'none' ? (
-                        <span>
-                          {watch.lastEvent.type === 'settle_blocked'
-                            ? `Blocked: ${watch.lastEvent.reason}`
-                            : `${watch.lastEvent.type}: ${watch.lastEvent.reason}`}
-                        </span>
-                      ) : null}
-                      {watch?.lastError ? (
-                        <span className="watch-footer-error">{watch.lastError}</span>
-                      ) : simBridge?.error &&
-                        !bridgeConnected &&
-                        watchAutoStatus !== 'blocked' ? (
-                        <span className="watch-footer-error">{simBridge.error}</span>
-                      ) : null}
-                      {watch?.settlement ? (
-                        <span>
-                          Paid {formatMoney(watch.settlement.payoutUsd)}
-                          {watch.settlement.onTime
-                            ? ' on time'
-                            : ` · late ${watch.settlement.lateTicks}h`}
-                        </span>
-                      ) : null}
-                    </div>
-                  </footer>
-                );
-              })()}
-            </>
+            <DispatchActivePanel
+              mission={activeMission}
+              step={dispatchStep}
+              statusText={dispatchStatusText}
+              loadPath={activeLoadPath}
+              busy={busy}
+              weightSystem={weightSystem}
+              simbriefUser={simbriefUser}
+              continuousHours={continuousHours}
+              formatMoney={formatMoney}
+              formatTonnes={formatTonnes}
+              formatDeadline={formatDeadline}
+              aircraftClassLabel={aircraftClassLabel}
+              fallbackMaxCargoKg={(cls) =>
+                fallbackMaxCargoKg(cls as AircraftClass)
+              }
+              ofpAutoStatus={ofpAutoStatus}
+              missionFuelQuote={missionFuelQuote}
+              missionFuelQuoteStatus={missionFuelQuoteStatus}
+              missionFuelQuoteError={missionFuelQuoteError}
+              loadOfpAutoStatus={loadOfpAutoStatus}
+              loadOfpAutoError={loadOfpAutoError}
+              simBridge={simBridge}
+              watch={watch}
+              watchAutoStatus={watchAutoStatus}
+              watchAutoPaused={watchAutoPaused}
+              onOpenAirport={openAirport}
+              onSelectSettings={() => selectTab('settings')}
+              onDispatch={(m) => void onDispatch(m)}
+              onCancel={(m) => void onCancel(m)}
+              onEditManifest={(m) => void enterEditManifest(m)}
+              onBuyFuel={(m) => void onBuyMissionFuel(m)}
+              onRetryFuelQuote={() =>
+                setMissionFuelQuoteRetryToken((token) => token + 1)
+              }
+              onLoadFuelAndPayload={(m) => void onLoadFuelAndPayload(m)}
+              onRetryInject={() => retryAutoLoadOfp()}
+              onContinueManually={() => continueManuallyLoad()}
+              onDepart={(m) => void onDepart(m)}
+              onSettle={(m) => void onSettle(m)}
+            />
           ) : null}
         </section>
       ) : hubSelected && tab === 'settings' ? (

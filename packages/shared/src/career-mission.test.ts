@@ -876,7 +876,9 @@ describe('settleMission', () => {
     assert.ok(departed.mission.fuelUplift);
     assert.ok(departed.fuelDebitUsd > 0);
 
-    const result = settleMission(world, departed.mission);
+    const result = settleMission(world, departed.mission, {
+      skipMinAirborneGate: true,
+    });
     assert.equal(result.mission.status, 'settled');
     assert.equal(result.settlement.onTime, true);
     assert.equal(result.settlement.penaltyUsd, 0);

@@ -1,0 +1,587 @@
+/**
+ * Background Jet-A road logistics: small tanker fleet redistributes fuel from
+ * fuel hubs to shortage spokes. Not a player trucking career.
+ */
+
+import { FUEL_HUB_ICAOS, routeDistanceNm } from './career-economy.js';
+import { recordFuelTruckDeliveryActivity } from './career-hub-level.js';
+import type {
+  AirportTerminal,
+  CareerEconomyWorld,
+  FuelHaul,
+  FuelHaulView,
+  FuelTruck,
+  FuelTruckClassId,
+} from './types/career-economy.js';
+
+/** Keep in sync with career-economy MS_PER_TICK (avoid circular TDZ). */
+const MS_PER_TICK = 3_600_000;
+
+export const FUEL_TRUCK_FLEET_SIZE = 12;
+
+export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
+  truckClassId: FuelTruckClassId;
+  count: number;
+}> = [
+  { truckClassId: 'rigid_tanker', count: 4 },
+  { truckClassId: 'semi_tanker', count: 6 },
+  { truckClassId: 'btrain_tanker', count: 2 },
+] as const;
+
+/** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
+export const FUEL_TRUCK_CAPACITY_KG: Record<FuelTruckClassId, number> = {
+  rigid_tanker: 12_000,
+  semi_tanker: 24_000,
+  btrain_tanker: 32_000,
+};
+
+export const FUEL_TRUCK_LABEL: Record<FuelTruckClassId, string> = {
+  rigid_tanker: 'Rigid tanker',
+  semi_tanker: 'Semi tanker',
+  btrain_tanker: 'B-train tanker',
+};
+
+/** Road distance ≈ air great-circle × this factor. */
+const ROAD_DISTANCE_FACTOR = 1.35;
+/** Effective average speed including stops (km/h). */
+const ROAD_SPEED_KMH = 55;
+/** Fixed load + unload hours per haul. */
+const LOAD_UNLOAD_HOURS = 2;
+/** Min cargo to bother dispatching (kg). */
+const MIN_HAUL_KG = 4_000;
+/** Dest fill below this is a dispatch candidate. */
+const DEST_SHORTAGE_FILL = 0.28;
+/** Hub must stay above this fill after dispatch (reserve). */
+const HUB_RESERVE_FILL = 0.25;
+/** Hub must start above this fill to dispatch. */
+const HUB_SURPLUS_FILL = 0.4;
+/** Single delivery aims toward this dest fill, not a full tank. */
+const DEST_TARGET_FILL = 0.55;
+/** Max concurrent enroute hauls into one airport. */
+const MAX_INBOUND_HAULS = 2;
+const TURNAROUND_MIN_H = 3;
+const TURNAROUND_MAX_H = 5;
+/** Keep completed hauls briefly for Terminal “last delivery”. */
+const COMPLETED_HAUL_RETENTION_MS = 12 * MS_PER_TICK;
+const ARRIVING_WINDOW_MS = MS_PER_TICK;
+
+const REGION_NEIGHBORS: Record<string, readonly string[]> = {
+  'BR-N': ['BR-NE', 'BR-CO'],
+  'BR-NE': ['BR-N', 'BR-SE', 'BR-CO'],
+  'BR-CO': ['BR-N', 'BR-NE', 'BR-SE', 'BR-S'],
+  'BR-SE': ['BR-NE', 'BR-CO', 'BR-S'],
+  'BR-S': ['BR-SE', 'BR-CO'],
+};
+
+const TRUCK_NAME_POOL = [
+  'BR Distribuidora 1',
+  'BR Distribuidora 2',
+  'BR Distribuidora 3',
+  'Posto Norte Log',
+  'Amazônia Fuel Run',
+  'Cerrado Tankers',
+  'Sul Combustíveis',
+  'Litoral Jet-A',
+  'Planalto Pipe & Truck',
+  'Nordeste Abastece',
+  'Pantanal Fuel Co',
+  'Serra Tank Line',
+] as const;
+
+function hashSeed(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let t = seed >>> 0;
+  return () => {
+    t += 0x6d2b79f5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function fuelPile(ap: AirportTerminal): { stockKg: number; capacityKg: number } {
+  const fuel = ap.inventory.fuel;
+  if (!fuel || !(fuel.capacityKg > 0)) {
+    return { stockKg: 0, capacityKg: 0 };
+  }
+  return fuel;
+}
+
+function fillOf(ap: AirportTerminal): number {
+  const pile = fuelPile(ap);
+  if (!(pile.capacityKg > 0)) return 0;
+  return clamp(pile.stockKg / pile.capacityKg, 0, 1);
+}
+
+function regionsReachable(from: string): Set<string> {
+  const out = new Set<string>([from]);
+  for (const n of REGION_NEIGHBORS[from] ?? []) out.add(n);
+  return out;
+}
+
+export function getFuelTruckCapacityKg(truckClassId: FuelTruckClassId): number {
+  return FUEL_TRUCK_CAPACITY_KG[truckClassId];
+}
+
+/** Road hours for an OD pair (distance + load/unload). */
+export function estimateFuelHaulHours(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+): number {
+  const airNm = routeDistanceNm(world, originIcao, destIcao) ?? 0;
+  const roadNm = airNm * ROAD_DISTANCE_FACTOR;
+  const driveH = (roadNm * 1.852) / ROAD_SPEED_KMH;
+  return Math.max(2, Math.round((driveH + LOAD_UNLOAD_HOURS) * 10) / 10);
+}
+
+function makeTruck(opts: {
+  id: string;
+  name: string;
+  truckClassId: FuelTruckClassId;
+  homeRegion: string;
+}): FuelTruck {
+  return {
+    id: opts.id,
+    name: opts.name,
+    truckClassId: opts.truckClassId,
+    homeRegion: opts.homeRegion,
+    status: 'idle',
+  };
+}
+
+export function seedFuelTruckFleet(opts: {
+  seed: string;
+  regions: string[];
+}): FuelTruck[] {
+  const regionList =
+    opts.regions.length > 0
+      ? [...new Set(opts.regions)]
+      : ['BR-SE', 'BR-S', 'BR-NE', 'BR-N', 'BR-CO'];
+  const rng = mulberry32(hashSeed(`${opts.seed}:fuel-trucks`));
+  const trucks: FuelTruck[] = [];
+  let index = 0;
+  const names = [...TRUCK_NAME_POOL];
+  // Mild shuffle for variety across seeds.
+  for (let i = names.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [names[i], names[j]] = [names[j]!, names[i]!];
+  }
+  for (const slot of FUEL_TRUCK_COMPOSITION) {
+    for (let i = 0; i < slot.count; i++) {
+      index += 1;
+      trucks.push(
+        makeTruck({
+          id: `truck-${index}`,
+          name: names[index - 1] ?? `${slot.truckClassId}-${index}`,
+          truckClassId: slot.truckClassId,
+          homeRegion: regionList[(index - 1) % regionList.length]!,
+        }),
+      );
+    }
+  }
+  return trucks;
+}
+
+function topUpFuelTruckFleet(world: CareerEconomyWorld, regions: string[]): void {
+  const regionList =
+    regions.length > 0
+      ? [...new Set(regions)]
+      : ['BR-SE', 'BR-S', 'BR-NE', 'BR-N', 'BR-CO'];
+  const usedNames = new Set(world.fuelTrucks!.map((t) => t.name));
+  let nextIndex = world.fuelTrucks!.reduce((max, t) => {
+    const m = /^truck-(\d+)$/.exec(t.id);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+
+  for (const slot of FUEL_TRUCK_COMPOSITION) {
+    const have = world.fuelTrucks!.filter((t) => t.truckClassId === slot.truckClassId)
+      .length;
+    const missing = Math.max(0, slot.count - have);
+    for (let i = 0; i < missing; i++) {
+      nextIndex += 1;
+      const name =
+        TRUCK_NAME_POOL.find((n) => !usedNames.has(n)) ??
+        `${slot.truckClassId}-${nextIndex}`;
+      usedNames.add(name);
+      world.fuelTrucks!.push(
+        makeTruck({
+          id: `truck-${nextIndex}`,
+          name,
+          truckClassId: slot.truckClassId,
+          homeRegion: regionList[(nextIndex - 1) % regionList.length]!,
+        }),
+      );
+    }
+  }
+}
+
+/** Ensure save has a fuel-truck fleet; seeds / tops up composition. */
+export function ensureFuelTruckFleet(world: CareerEconomyWorld): void {
+  if (!Array.isArray(world.fuelHauls)) {
+    world.fuelHauls = [];
+  }
+  const regions = world.airports.map((a) => a.region);
+  if (!Array.isArray(world.fuelTrucks) || world.fuelTrucks.length === 0) {
+    world.fuelTrucks = seedFuelTruckFleet({ seed: world.seed, regions });
+    return;
+  }
+  topUpFuelTruckFleet(world, regions);
+}
+
+function creditDestFuel(world: CareerEconomyWorld, destIcao: string, kg: number): number {
+  const dest = world.airports.find((a) => a.icao === destIcao.toUpperCase());
+  if (!dest || !(kg > 0)) return 0;
+  const pile = dest.inventory.fuel;
+  if (!pile) return 0;
+  const before = pile.stockKg;
+  pile.stockKg = clamp(pile.stockKg + kg, 0, pile.capacityKg);
+  return pile.stockKg - before;
+}
+
+function debitHubFuel(world: CareerEconomyWorld, originIcao: string, kg: number): number {
+  const origin = world.airports.find((a) => a.icao === originIcao.toUpperCase());
+  if (!origin || !(kg > 0)) return 0;
+  const pile = origin.inventory.fuel;
+  if (!pile) return 0;
+  const take = Math.min(kg, Math.max(0, pile.stockKg));
+  pile.stockKg = Math.max(0, pile.stockKg - take);
+  return take;
+}
+
+/** Settle due hauls at wall-clock nowMs (mid-hour + batch). */
+export function settleFuelHaulsDue(
+  world: CareerEconomyWorld,
+  nowMs: number,
+): { settledHauls: number } {
+  ensureFuelTruckFleet(world);
+  let settledHauls = 0;
+  for (const haul of world.fuelHauls!) {
+    if (haul.status !== 'enroute') continue;
+    if (nowMs < haul.arrivesAtMs) continue;
+    creditDestFuel(world, haul.destIcao, haul.cargoKg);
+    haul.status = 'completed';
+    settledHauls += 1;
+    recordFuelTruckDeliveryActivity(world, haul.destIcao);
+    const truck = world.fuelTrucks!.find((t) => t.id === haul.truckId);
+    if (truck) {
+      const turnH =
+        TURNAROUND_MIN_H +
+        (hashSeed(`${haul.id}:tt`) % 1000) / 1000 * (TURNAROUND_MAX_H - TURNAROUND_MIN_H);
+      truck.status = 'turnaround';
+      truck.currentHaulId = undefined;
+      truck.busyUntilMs = nowMs + turnH * MS_PER_TICK;
+    }
+  }
+
+  // Free trucks whose turnaround ended.
+  for (const truck of world.fuelTrucks!) {
+    if (truck.status !== 'turnaround') continue;
+    const until = truck.busyUntilMs ?? 0;
+    if (until <= nowMs) {
+      truck.status = 'idle';
+      truck.busyUntilMs = undefined;
+      truck.currentHaulId = undefined;
+    }
+  }
+
+  // Prune old completed hauls.
+  const keepFrom = nowMs - COMPLETED_HAUL_RETENTION_MS;
+  world.fuelHauls = world.fuelHauls!.filter(
+    (h) => h.status === 'enroute' || h.arrivesAtMs >= keepFrom,
+  );
+
+  return { settledHauls };
+}
+
+type DispatchCandidate = {
+  origin: AirportTerminal;
+  dest: AirportTerminal;
+  roadNm: number;
+  cargoKg: number;
+};
+
+function buildDispatchCandidate(
+  world: CareerEconomyWorld,
+  truck: FuelTruck,
+  origin: AirportTerminal,
+  dest: AirportTerminal,
+): DispatchCandidate | undefined {
+  if (FUEL_HUB_ICAOS.has(dest.icao)) return undefined;
+  if (!FUEL_HUB_ICAOS.has(origin.icao)) return undefined;
+
+  const destFill = fillOf(dest);
+  if (destFill >= DEST_SHORTAGE_FILL) return undefined;
+
+  const originFill = fillOf(origin);
+  if (originFill < HUB_SURPLUS_FILL) return undefined;
+
+  const oPile = fuelPile(origin);
+  const dPile = fuelPile(dest);
+  if (!(oPile.capacityKg > 0) || !(dPile.capacityKg > 0)) return undefined;
+
+  const hubReserveKg = Math.round(oPile.capacityKg * HUB_RESERVE_FILL);
+  const availableFromHub = Math.max(0, oPile.stockKg - hubReserveKg);
+  if (availableFromHub < MIN_HAUL_KG) return undefined;
+
+  const destTargetKg = Math.round(dPile.capacityKg * DEST_TARGET_FILL);
+  const roomToTarget = Math.max(0, destTargetKg - dPile.stockKg);
+  if (roomToTarget < MIN_HAUL_KG) return undefined;
+
+  const cap = getFuelTruckCapacityKg(truck.truckClassId);
+  const cargoKg = Math.min(cap, availableFromHub, roomToTarget);
+  if (cargoKg < MIN_HAUL_KG) return undefined;
+
+  // Prefer same / neighbor region to truck home, then any reachable hub→dest.
+  const destRegions = regionsReachable(truck.homeRegion);
+  if (!destRegions.has(dest.region) && !destRegions.has(origin.region)) {
+    // Still allow if home region has no local shortage — handled by caller ordering.
+  }
+
+  const airNm = routeDistanceNm(world, origin.icao, dest.icao);
+  if (airNm === undefined || airNm <= 0) return undefined;
+
+  return {
+    origin,
+    dest,
+    roadNm: airNm * ROAD_DISTANCE_FACTOR,
+    cargoKg,
+  };
+}
+
+function inboundEnrouteCount(world: CareerEconomyWorld, destIcao: string): number {
+  const code = destIcao.toUpperCase();
+  return (world.fuelHauls ?? []).filter(
+    (h) => h.status === 'enroute' && h.destIcao === code,
+  ).length;
+}
+
+function pickBestCandidate(
+  world: CareerEconomyWorld,
+  truck: FuelTruck,
+): DispatchCandidate | undefined {
+  const hubs = world.airports.filter((a) => FUEL_HUB_ICAOS.has(a.icao));
+  const spokes = world.airports
+    .filter((a) => !FUEL_HUB_ICAOS.has(a.icao) && fillOf(a) < DEST_SHORTAGE_FILL)
+    .filter((a) => inboundEnrouteCount(world, a.icao) < MAX_INBOUND_HAULS)
+    .sort((a, b) => fillOf(a) - fillOf(b));
+
+  if (hubs.length === 0 || spokes.length === 0) return undefined;
+
+  const homeReach = regionsReachable(truck.homeRegion);
+  const rankedSpokes = [
+    ...spokes.filter((s) => homeReach.has(s.region)),
+    ...spokes.filter((s) => !homeReach.has(s.region)),
+  ];
+
+  let best: DispatchCandidate | undefined;
+  for (const dest of rankedSpokes.slice(0, 8)) {
+    const destReach = regionsReachable(dest.region);
+    const localHubs = hubs.filter(
+      (h) => h.region === dest.region || destReach.has(h.region),
+    );
+    const hubPool = localHubs.length > 0 ? localHubs : hubs;
+    for (const origin of hubPool) {
+      const cand = buildDispatchCandidate(world, truck, origin, dest);
+      if (!cand) continue;
+      if (!best || cand.roadNm < best.roadNm - 1e-6) {
+        best = cand;
+      } else if (
+        best &&
+        Math.abs(cand.roadNm - best.roadNm) < 1e-6 &&
+        fillOf(cand.dest) < fillOf(best.dest)
+      ) {
+        best = cand;
+      }
+    }
+    // Prefer serving home-region shortages first: if we found a home-region haul, stop.
+    if (best && homeReach.has(best.dest.region)) break;
+  }
+  return best;
+}
+
+export function dispatchFuelTrucks(
+  world: CareerEconomyWorld,
+  opts: { batchNowMs: number; rng: () => number },
+): { dispatched: number } {
+  ensureFuelTruckFleet(world);
+  const { batchNowMs, rng } = opts;
+  let dispatched = 0;
+
+  const idle = world.fuelTrucks!.filter((t) => {
+    if (t.currentHaulId) return false;
+    if (t.status === 'enroute') return false;
+    if (t.status === 'turnaround' && (t.busyUntilMs ?? 0) > batchNowMs) return false;
+    return true;
+  });
+
+  // Mild shuffle so the same truck id does not always win.
+  for (let i = idle.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [idle[i], idle[j]] = [idle[j]!, idle[i]!];
+  }
+
+  for (const truck of idle) {
+    truck.status = 'idle';
+    truck.busyUntilMs = undefined;
+    const pick = pickBestCandidate(world, truck);
+    if (!pick) continue;
+
+    const taken = debitHubFuel(world, pick.origin.icao, pick.cargoKg);
+    if (taken < MIN_HAUL_KG) {
+      // Roll back partial — shouldn't happen with pre-check, but stay safe.
+      if (taken > 0) creditDestFuel(world, pick.origin.icao, taken);
+      continue;
+    }
+
+    const hours = estimateFuelHaulHours(world, pick.origin.icao, pick.dest.icao);
+    const staggerMs = Math.floor(rng() * 20 * 60 * 1000);
+    const departedAtMs = batchNowMs + staggerMs;
+    const arrivesAtMs = departedAtMs + hours * MS_PER_TICK;
+    const haul: FuelHaul = {
+      id: `fuelh-${world.tick}-${truck.id}-${pick.dest.icao}`,
+      truckId: truck.id,
+      originIcao: pick.origin.icao,
+      destIcao: pick.dest.icao,
+      commodityId: 'fuel',
+      cargoKg: taken,
+      departedAtMs,
+      arrivesAtMs,
+      status: 'enroute',
+    };
+    world.fuelHauls!.push(haul);
+    truck.status = 'enroute';
+    truck.currentHaulId = haul.id;
+    truck.busyUntilMs = arrivesAtMs;
+    dispatched += 1;
+  }
+
+  return { dispatched };
+}
+
+/** Settle due hauls then dispatch idle trucks for this economy batch. */
+export function tickFuelLogistics(
+  world: CareerEconomyWorld,
+  rng: () => number,
+  opts: { batchNowMs: number },
+): { settledHauls: number; dispatched: number } {
+  const settled = settleFuelHaulsDue(world, opts.batchNowMs);
+  const dispatched = dispatchFuelTrucks(world, {
+    batchNowMs: opts.batchNowMs,
+    rng,
+  });
+  return { settledHauls: settled.settledHauls, dispatched: dispatched.dispatched };
+}
+
+export function shiftFuelLogisticsWallClock(
+  world: CareerEconomyWorld,
+  deltaMs: number,
+): void {
+  if (!Number.isFinite(deltaMs) || deltaMs === 0) return;
+  for (const haul of world.fuelHauls ?? []) {
+    if (typeof haul.departedAtMs === 'number') haul.departedAtMs += deltaMs;
+    if (typeof haul.arrivesAtMs === 'number') haul.arrivesAtMs += deltaMs;
+  }
+  for (const truck of world.fuelTrucks ?? []) {
+    if (typeof truck.busyUntilMs === 'number') truck.busyUntilMs += deltaMs;
+  }
+}
+
+function haulPhase(haul: FuelHaul, nowMs: number): FuelHaulView['phase'] {
+  if (haul.status === 'completed' || nowMs >= haul.arrivesAtMs) return 'delivered';
+  if (haul.arrivesAtMs - nowMs <= ARRIVING_WINDOW_MS) return 'arriving';
+  return 'enroute';
+}
+
+export function listFuelHaulViews(
+  world: CareerEconomyWorld,
+  opts: { destIcao?: string; originIcao?: string; nowMs?: number } = {},
+): FuelHaulView[] {
+  ensureFuelTruckFleet(world);
+  const nowMs = opts.nowMs ?? Date.now();
+  const dest = opts.destIcao?.toUpperCase();
+  const origin = opts.originIcao?.toUpperCase();
+  const byTruck = new Map(world.fuelTrucks!.map((t) => [t.id, t]));
+
+  return world
+    .fuelHauls!.filter((h) => {
+      if (dest && h.destIcao !== dest) return false;
+      if (origin && h.originIcao !== origin) return false;
+      return true;
+    })
+    .map((h) => {
+      const truck = byTruck.get(h.truckId);
+      const duration = Math.max(1, h.arrivesAtMs - h.departedAtMs);
+      const flown = Math.min(duration, Math.max(0, nowMs - h.departedAtMs));
+      const etaMs = Math.max(0, h.arrivesAtMs - nowMs);
+      return {
+        id: h.id,
+        truckId: h.truckId,
+        truckName: truck?.name ?? h.truckId,
+        truckClassId: truck?.truckClassId ?? 'semi_tanker',
+        truckLabel: FUEL_TRUCK_LABEL[truck?.truckClassId ?? 'semi_tanker'],
+        originIcao: h.originIcao,
+        destIcao: h.destIcao,
+        cargoKg: h.cargoKg,
+        departedAtMs: h.departedAtMs,
+        arrivesAtMs: h.arrivesAtMs,
+        etaMs,
+        etaHours: Math.round((etaMs / MS_PER_TICK) * 10) / 10,
+        progressPct: Math.min(100, Math.round((flown / duration) * 100)),
+        status: h.status,
+        phase: haulPhase(h, nowMs),
+      };
+    })
+    .sort((a, b) => a.arrivesAtMs - b.arrivesAtMs);
+}
+
+/** Enroute hauls into this airport (for Terminal). */
+export function listAirportFuelInbound(
+  world: CareerEconomyWorld,
+  icao: string,
+  nowMs = Date.now(),
+): FuelHaulView[] {
+  return listFuelHaulViews(world, { destIcao: icao, nowMs }).filter(
+    (h) => h.status === 'enroute' && h.phase !== 'delivered',
+  );
+}
+
+export function countFuelHaulsEnroute(world: CareerEconomyWorld): number {
+  return (world.fuelHauls ?? []).filter((h) => h.status === 'enroute').length;
+}
+
+/**
+ * Region is "fuel thin" when average non-hub fill is low and no inbound haul
+ * is headed to any airport in that region.
+ */
+export function regionFuelThin(
+  world: CareerEconomyWorld,
+  region: string,
+  nowMs = Date.now(),
+): boolean {
+  const airports = world.airports.filter(
+    (a) => a.region === region && !FUEL_HUB_ICAOS.has(a.icao),
+  );
+  if (airports.length === 0) return false;
+  const avg =
+    airports.reduce((s, a) => s + fillOf(a), 0) / Math.max(1, airports.length);
+  if (avg >= 0.2) return false;
+  const inbound = listFuelHaulViews(world, { nowMs }).some(
+    (h) =>
+      h.status === 'enroute' &&
+      world.airports.some((a) => a.icao === h.destIcao && a.region === region),
+  );
+  return !inbound;
+}

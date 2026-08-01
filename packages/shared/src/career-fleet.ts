@@ -13,6 +13,7 @@ import {
   quoteFuelUplift,
   type FuelUpliftQuote,
 } from './career-fuel.js';
+import { ensureAircraftConditionPcts } from './career-aircraft-maintenance.js';
 import type {
   CareerMissionsState,
   CareerMissionsStateV1,
@@ -64,6 +65,9 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     hubSelected: false,
     pilotName: '',
     homeHubIcao: '',
+    aircraftMarket: [],
+    aircraftMarketDay: undefined,
+    aircraftMarketDemandDay: undefined,
   };
 }
 
@@ -104,6 +108,19 @@ export function normalizeMissionsState(
   if (hubSelected && !homeHubIcao && fleet[0]) {
     homeHubIcao = fleet[0].locationIcao;
   }
+  const aircraftMarket = Array.isArray(
+    (raw as CareerMissionsState).aircraftMarket,
+  )
+    ? (raw as CareerMissionsState).aircraftMarket
+    : [];
+  const aircraftMarketDay =
+    typeof (raw as CareerMissionsState).aircraftMarketDay === 'number'
+      ? (raw as CareerMissionsState).aircraftMarketDay
+      : undefined;
+  const aircraftMarketDemandDay =
+    typeof (raw as CareerMissionsState).aircraftMarketDemandDay === 'number'
+      ? (raw as CareerMissionsState).aircraftMarketDemandDay
+      : undefined;
   return {
     version: 2,
     walletUsd,
@@ -112,6 +129,9 @@ export function normalizeMissionsState(
     hubSelected,
     pilotName,
     homeHubIcao,
+    aircraftMarket,
+    aircraftMarketDay,
+    aircraftMarketDemandDay,
   };
 }
 
@@ -137,19 +157,131 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
       typeof raw.fuelKg === 'number' && Number.isFinite(raw.fuelKg) ? raw.fuelKg : 0,
     ),
   );
-  return {
+  const status =
+    raw.status === 'assigned'
+      ? 'assigned'
+      : raw.status === 'maintenance'
+        ? 'maintenance'
+        : raw.status === 'listed'
+          ? 'listed'
+          : raw.status === 'leased_out'
+            ? 'leased_out'
+            : 'parked';
+  const ownership =
+    raw.ownership === 'leased' || raw.ownership === 'owned'
+      ? raw.ownership
+      : 'owned';
+  const condition =
+    raw.condition === 'excellent' ||
+    raw.condition === 'good' ||
+    raw.condition === 'fair' ||
+    raw.condition === 'tired'
+      ? raw.condition
+      : 'good';
+  const normalized: PlayerAircraft = {
     id: raw.id,
     aircraftClassId,
     label: typeof raw.label === 'string' && raw.label.trim() ? raw.label : defaultLabel(aircraftClassId),
     locationIcao: String(raw.locationIcao).trim().toUpperCase(),
     fuelKg,
     fuelCapacityKg: capacity,
-    status: raw.status === 'assigned' ? 'assigned' : 'parked',
+    status,
     assignedMissionId:
-      raw.status === 'assigned' && typeof raw.assignedMissionId === 'string'
+      status === 'assigned' && typeof raw.assignedMissionId === 'string'
         ? raw.assignedMissionId
         : undefined,
+    ownership,
+    condition,
+    hoursAirframe:
+      typeof raw.hoursAirframe === 'number' && Number.isFinite(raw.hoursAirframe)
+        ? Math.max(0, raw.hoursAirframe)
+        : 0,
+    hoursEngine:
+      typeof raw.hoursEngine === 'number' && Number.isFinite(raw.hoursEngine)
+        ? Math.max(0, raw.hoursEngine)
+        : 0,
+    maintenanceDueAtHours:
+      typeof raw.maintenanceDueAtHours === 'number' &&
+      Number.isFinite(raw.maintenanceDueAtHours)
+        ? raw.maintenanceDueAtHours
+        : undefined,
+    lease:
+      raw.lease &&
+      typeof raw.lease.monthlyUsd === 'number' &&
+      typeof raw.lease.nextDueTick === 'number' &&
+      typeof raw.lease.termEndsTick === 'number'
+        ? {
+            monthlyUsd: raw.lease.monthlyUsd,
+            nextDueTick: raw.lease.nextDueTick,
+            termEndsTick: raw.lease.termEndsTick,
+            buyoutUsd:
+              typeof raw.lease.buyoutUsd === 'number'
+                ? raw.lease.buyoutUsd
+                : undefined,
+            listingId:
+              typeof raw.lease.listingId === 'string'
+                ? raw.lease.listingId
+                : undefined,
+          }
+        : undefined,
+    leaseOverdue: Boolean(raw.leaseOverdue),
+    listedListingId:
+      status === 'listed' && typeof raw.listedListingId === 'string'
+        ? raw.listedListingId
+        : undefined,
+    leaseOut:
+      raw.leaseOut &&
+      typeof raw.leaseOut.monthlyUsd === 'number' &&
+      typeof raw.leaseOut.termEndsTick === 'number' &&
+      typeof raw.leaseOut.nextDueTick === 'number' &&
+      typeof raw.leaseOut.depositUsd === 'number'
+        ? {
+            monthlyUsd: raw.leaseOut.monthlyUsd,
+            nextDueTick: raw.leaseOut.nextDueTick,
+            termEndsTick: raw.leaseOut.termEndsTick,
+            depositUsd: raw.leaseOut.depositUsd,
+            listingId:
+              typeof raw.leaseOut.listingId === 'string'
+                ? raw.leaseOut.listingId
+                : undefined,
+            lesseeNpcId:
+              typeof raw.leaseOut.lesseeNpcId === 'string'
+                ? raw.leaseOut.lesseeNpcId
+                : undefined,
+            lesseeName:
+              typeof raw.leaseOut.lesseeName === 'string'
+                ? raw.leaseOut.lesseeName
+                : undefined,
+            startedAtTick:
+              typeof raw.leaseOut.startedAtTick === 'number'
+                ? raw.leaseOut.startedAtTick
+                : raw.leaseOut.nextDueTick - 24 * 30,
+            lastWearTick:
+              typeof raw.leaseOut.lastWearTick === 'number'
+                ? raw.leaseOut.lastWearTick
+                : typeof raw.leaseOut.startedAtTick === 'number'
+                  ? raw.leaseOut.startedAtTick
+                  : raw.leaseOut.nextDueTick - 24 * 30,
+          }
+        : undefined,
+    airframeConditionPct:
+      typeof raw.airframeConditionPct === 'number' &&
+      Number.isFinite(raw.airframeConditionPct)
+        ? raw.airframeConditionPct
+        : undefined,
+    engineConditionPct:
+      typeof raw.engineConditionPct === 'number' &&
+      Number.isFinite(raw.engineConditionPct)
+        ? raw.engineConditionPct
+        : undefined,
+    hoursSinceInspection:
+      typeof raw.hoursSinceInspection === 'number' &&
+      Number.isFinite(raw.hoursSinceInspection)
+        ? Math.max(0, raw.hoursSinceInspection)
+        : undefined,
   };
+  ensureAircraftConditionPcts(normalized);
+  return normalized;
 }
 
 function defaultLabel(aircraftClassId: FreighterClassId): string {
@@ -157,13 +289,6 @@ function defaultLabel(aircraftClassId: FreighterClassId): string {
   if (aircraftClassId === 'light_ga') return 'Company Bonanza';
   if (aircraftClassId === 'narrow_freighter') return 'Company Narrow';
   return 'Company Wide';
-}
-
-function defaultAircraftId(aircraftClassId: FreighterClassId): string {
-  if (aircraftClassId === 'light_turboprop') return 'acf_caravan_1';
-  if (aircraftClassId === 'light_ga') return 'acf_bonanza_1';
-  if (aircraftClassId === 'narrow_freighter') return 'acf_narrow_1';
-  return 'acf_wide_1';
 }
 
 export function findPlayerAircraft(
@@ -214,7 +339,16 @@ export function selectStarterHub(
     fuelKg: Math.round(capacity * 0.45),
     fuelCapacityKg: capacity,
     status: 'parked',
+    ownership: 'owned',
+    condition: 'good',
+    hoursAirframe: 40,
+    hoursEngine: 35,
+    airframeConditionPct: 88,
+    engineConditionPct: 92,
+    hoursSinceInspection: 40,
+    maintenanceDueAtHours: 100,
   };
+  ensureAircraftConditionPcts(starter);
   return {
     ...state,
     version: 2,
@@ -226,48 +360,17 @@ export function selectStarterHub(
 }
 
 /**
- * Park an additional company aircraft at home hub (or a chosen ICAO).
- * One airframe per class for now — acquiring again is a no-op that returns the existing one.
+ * @deprecated Free acquire removed — use the Aircraft Market
+ * (`purchaseAircraftListing` / `signAircraftLease`).
  */
 export function acquireCompanyAircraft(
-  state: CareerMissionsState,
-  aircraftClassId: FreighterClassId,
-  opts?: { locationIcao?: string },
+  _state: CareerMissionsState,
+  _aircraftClassId: FreighterClassId,
+  _opts?: { locationIcao?: string },
 ): CareerMissionsState {
-  if (!state.hubSelected || state.fleet.length === 0) {
-    throw new Error('Select a starter hub before acquiring another aircraft');
-  }
-  const existing = state.fleet.find((a) => a.aircraftClassId === aircraftClassId);
-  if (existing) {
-    return state;
-  }
-  const hub = (
-    opts?.locationIcao ??
-    state.homeHubIcao ??
-    state.fleet.find((a) => a.status === 'parked')?.locationIcao ??
-    state.fleet[0]?.locationIcao ??
-    ''
-  )
-    .trim()
-    .toUpperCase();
-  if (!hub || !CAREER_HUB_COORDS[hub]) {
-    throw new Error(`Unknown career hub: ${hub || '(empty)'}`);
-  }
-  const capacity = PLAYER_FUEL_CAPACITY_KG[aircraftClassId];
-  const next: PlayerAircraft = {
-    id: defaultAircraftId(aircraftClassId),
-    aircraftClassId,
-    label: defaultLabel(aircraftClassId),
-    locationIcao: hub,
-    fuelKg: Math.round(capacity * 0.45),
-    fuelCapacityKg: capacity,
-    status: 'parked',
-  };
-  return {
-    ...state,
-    version: 2,
-    fleet: [...state.fleet, next],
-  };
+  throw new Error(
+    'Free aircraft acquire is disabled — buy or lease from the Aircraft Market',
+  );
 }
 
 export function assertAircraftAtOrigin(
@@ -295,6 +398,24 @@ export function assignAircraftToMission(
 ): PlayerAircraft {
   const aircraft = findPlayerAircraft(state, aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  if (aircraft.status === 'maintenance') {
+    throw new Error(
+      `Aircraft ${aircraft.id} is in maintenance — clear the shop visit first`,
+    );
+  }
+  if (aircraft.status === 'listed') {
+    throw new Error(
+      `Aircraft ${aircraft.id} is listed on the Aircraft Market — unlist first`,
+    );
+  }
+  if (aircraft.status === 'leased_out') {
+    throw new Error(
+      `Aircraft ${aircraft.id} is leased out to the market`,
+    );
+  }
+  if (aircraft.leaseOverdue) {
+    throw new Error(`Aircraft ${aircraft.id} has an overdue lease payment`);
+  }
   assertAircraftAtOrigin(aircraft, originIcao);
   aircraft.status = 'assigned';
   aircraft.assignedMissionId = missionId;
@@ -347,8 +468,21 @@ export function relocateAircraftOnSettle(
   }
 
   aircraft.locationIcao = mission.destIcao.toUpperCase();
-  aircraft.status = 'parked';
   aircraft.assignedMissionId = undefined;
+  const due =
+    aircraft.maintenanceDueAtHours ??
+    (aircraft.aircraftClassId === 'light_ga'
+      ? 80
+      : aircraft.aircraftClassId === 'light_turboprop'
+        ? 100
+        : aircraft.aircraftClassId === 'narrow_freighter'
+          ? 160
+          : 200);
+  if ((aircraft.hoursAirframe ?? 0) >= due) {
+    aircraft.status = 'maintenance';
+  } else {
+    aircraft.status = 'parked';
+  }
   return aircraft;
 }
 

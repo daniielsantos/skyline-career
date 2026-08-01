@@ -20,17 +20,27 @@ import {
   postPreflight,
   postSettle,
   postSelectHub,
-  postAcquireAircraft,
+  fetchAircraftMarket,
+  postAircraftBuy,
+  postAircraftLease,
+  postAircraftSell,
+  postAircraftListLease,
+  postAircraftUnlist,
+  postAircraftMaintenance,
+  postAircraftRepair,
+  postAircraftBuyout,
   postFerry,
   postStagingCommit,
   postTick,
   postWatchStart,
   postWatchStop,
   type AircraftClass,
+  type AircraftListing,
   type AirportLot,
   type AirportMovement,
   type AirportView,
   type EconomyEvent,
+  type FuelHaulView,
   type MarketLot,
   type MissionFuelQuote,
   type Mission,
@@ -48,6 +58,13 @@ import {
   type CareerTab,
 } from './routes';
 import { useConfirm } from './ConfirmDialog';
+import {
+  AIRCRAFT_CLASS_FILTERS,
+  HangarAircraftCard,
+  MarketListingCard,
+  aircraftClassLabel,
+  aircraftModelLabel,
+} from './AircraftCards';
 import {
   displayToKg,
   formatMass,
@@ -120,14 +137,6 @@ function formatMoney(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
-function aircraftClassLabel(id: string): string {
-  if (id === 'wide_freighter') return 'Wide';
-  if (id === 'light_turboprop') return 'Caravan';
-  if (id === 'light_ga') return 'Bonanza';
-  if (id === 'narrow_freighter') return 'Narrow';
-  return id.replace(/_/g, ' ');
-}
-
 function regionLabel(region: string): string {
   switch (region) {
     case 'BR-S':
@@ -161,7 +170,7 @@ function RegionPressureChips(props: {
         <span
           key={`thin-${r.region}`}
           className="tag pressure"
-          title={`${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting — thinner local fleet tends to raise outbound freights`}
+          title={`${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting · ${r.maintenance ?? 0} in MX — thinner local fleet tends to raise outbound freights`}
         >
           {r.region} thin fleet
         </span>
@@ -177,6 +186,202 @@ function RegionPressureChips(props: {
       ))}
     </div>
   );
+}
+
+/** Compact text line for Market head (no colored pill rainbow). */
+function MarketSignalsLine(props: { regions: RegionPressure[] }) {
+  const tokens: { key: string; text: string; title: string }[] = [];
+  for (const r of props.regions) {
+    if (r.thinFleet) {
+      tokens.push({
+        key: `thin-${r.region}`,
+        text: `${r.region} thin`,
+        title: `${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting · ${r.maintenance ?? 0} in MX — thinner local fleet tends to raise outbound freights`,
+      });
+    }
+    if (r.weather === 'marginal' || r.weather === 'poor') {
+      tokens.push({
+        key: `wx-${r.region}`,
+        text: `${r.region} ${r.weather}`,
+        title: `${regionLabel(r.region)}: simulated ${r.weather} weather today — freights pay more / expire sooner; local NPCs bid less`,
+      });
+    }
+    if (r.fuelThin) {
+      tokens.push({
+        key: `fuel-${r.region}`,
+        text: `${r.region} fuel thin`,
+        title: `${regionLabel(r.region)}: non-hub Jet-A is low and no road tanker is inbound — expect higher uplift prices until trucks catch up`,
+      });
+    }
+  }
+  if (tokens.length === 0) return null;
+  return (
+    <p className="market-signals">
+      <span className="market-signals-label">Signals</span>
+      {tokens.map((t) => (
+        <span key={t.key} className="market-signals-token" title={t.title}>
+          {' '}
+          · {t.text}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function FuelLogisticsBlock(props: {
+  inbound: FuelHaulView[];
+  recent: FuelHaulView[];
+  weightSystem: WeightSystem;
+  onOpen: (icao: string) => void;
+  busy: boolean;
+}) {
+  const { inbound, recent, weightSystem, onOpen, busy } = props;
+  if (inbound.length === 0 && recent.length === 0) return null;
+  return (
+    <div className="fuel-logistics">
+      <h3>Fuel logistics</h3>
+      <p className="fuel-logistics-note">
+        Background road tankers redistributing Jet-A from fuel hubs
+      </p>
+      {inbound.length > 0 ? (
+        <ul className="fuel-haul-list">
+          {inbound.map((h) => (
+            <li key={h.id}>
+              <strong>{h.truckLabel.replace(' tanker', '')}</strong>
+              {' · '}
+              <IcaoLink icao={h.originIcao} onOpen={onOpen} disabled={busy} />
+              <span className="arrow"> → </span>
+              <IcaoLink icao={h.destIcao} onOpen={onOpen} disabled={busy} />
+              {' · '}
+              {formatTonnes(h.cargoKg, weightSystem)}
+              {' · '}
+              {h.phase === 'arriving'
+                ? 'arriving'
+                : `ETA ${formatDuration(h.etaHours)}`}
+              <small>
+                {' '}
+                · {h.truckName} · {h.progressPct}%
+              </small>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="fuel-logistics-empty">No tanker inbound right now.</p>
+      )}
+      {recent.length > 0 ? (
+        <ul className="fuel-haul-list fuel-haul-recent">
+          {recent.map((h) => (
+            <li key={`r-${h.id}`}>
+              <span className="tag">Delivered</span>{' '}
+              {formatTonnes(h.cargoKg, weightSystem)} from{' '}
+              <IcaoLink icao={h.originIcao} onOpen={onOpen} disabled={busy} />
+              <small> · {h.truckName}</small>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function eventChipLabel(kind: string): string {
+  switch (kind) {
+    case 'harvest_boost':
+      return 'Harvest';
+    case 'factory_outage':
+      return 'Outage';
+    case 'port_congestion':
+      return 'Congestion';
+    case 'festival_demand':
+      return 'Festival';
+    case 'labor_strike':
+      return 'Strike';
+    default:
+      return 'Shock';
+  }
+}
+
+function MarketEventsSummary(props: {
+  events: EconomyEvent[];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { events, expanded, onToggle } = props;
+  if (events.length === 0) return null;
+  const preview = events
+    .slice(0, 3)
+    .map((ev) => `${eventChipLabel(ev.kind)} ${ev.region}`);
+  const extra = events.length > 3 ? ` · +${events.length - 3}` : '';
+  return (
+    <div className="market-events-summary">
+      <button
+        type="button"
+        className="market-events-toggle"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        {events.length} regional shock{events.length === 1 ? '' : 's'}
+        {preview.length > 0 ? ` · ${preview.join(' · ')}${extra}` : ''}
+        <span className="muted"> · {expanded ? 'Hide' : 'Show'}</span>
+      </button>
+      {expanded ? (
+        <ul className="event-list market-events">
+          {events.map((ev) => (
+            <li key={ev.id} className={`event-badge shock-${ev.kind}`}>
+              <strong>{ev.region}</strong> · {ev.label}
+              <small> · ends {formatClock(ev.endsAtTick)}</small>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/** Secondary lot signals as one muted line (not a pill stack). */
+function lotPressureMeta(lot: MarketLot): { text: string; title: string } | null {
+  const tokens: string[] = [];
+  const titles: string[] = [];
+  const p = lot.pressure;
+  if (p?.idleEscalated) {
+    const pct = Math.round(((p.idlePayMult || 1) - 1) * 100);
+    tokens.push(`Idle +${pct}%`);
+    titles.push(`Freight has sat on the board — pay is up ${pct}% vs formation`);
+  }
+  if (p?.weather === 'marginal' || p?.weather === 'poor') {
+    tokens.push(p.weather);
+    titles.push(
+      `Simulated ${p.weather} weather on this lane — richer / shorter-lived freights`,
+    );
+  }
+  if (p?.laneBusy) {
+    tokens.push('Lane busy');
+    titles.push(
+      `NPC cargo already airborne on this lane (${Math.round((p.laneSaturation || 0) * 100)}% saturated) — remaining slots are scarcer`,
+    );
+  }
+  if (p?.thinFleet) {
+    tokens.push('Thin fleet');
+    titles.push(
+      `${regionLabel(p.originRegion || 'region')}: local competing fleet is thin — freights from this origin tend to pay more`,
+    );
+  }
+  if (p?.demandShock) {
+    for (const label of p.shockLabels ?? ['Shock']) {
+      tokens.push(label);
+    }
+    titles.push(
+      `Regional demand shock on this lane — freight pay ×${(p.shockPayMult ?? 1).toFixed(2)}`,
+    );
+  }
+  if (tokens.length === 0) return null;
+  return { text: tokens.join(' · '), title: titles.join(' · ') };
+}
+
+function idleUptickPct(lot: MarketLot): number | null {
+  if (!lot.pressure?.idleEscalated) return null;
+  const pct = Math.round(((lot.pressure.idlePayMult || 1) - 1) * 100);
+  return pct > 0 ? pct : null;
 }
 
 function fallbackMaxCargoKg(aircraft: AircraftClass): number {
@@ -279,12 +484,12 @@ function formatExpiry(opts: {
   const remaining =
     opts.ticksRemaining ?? Math.max(0, opts.expiresAtTick - opts.currentTick);
   if (opts.currentTick >= opts.expiresAtTick) {
-    return `Expired (${formatClock(opts.expiresAtTick)})`;
+    return 'Expired';
   }
   // Soft continuous remaining within the current hour.
   const frac = opts.continuousHours - opts.currentTick;
   const continuousRemaining = Math.max(0, remaining - Math.min(1, Math.max(0, frac)));
-  return `Expires in ${formatDuration(continuousRemaining)} · ${formatClock(opts.expiresAtTick)}`;
+  return `Expires in ${formatDuration(continuousRemaining)}`;
 }
 
 function formatDeadline(deadlineTick: number, continuousHours: number): string {
@@ -430,6 +635,8 @@ function phaseLabel(phase: string): string {
       return 'Turnaround';
     case 'resting':
       return 'Resting';
+    case 'maintenance':
+      return 'Maintenance';
     case 'boarding':
       return 'Boarding';
     case 'idle':
@@ -623,6 +830,10 @@ function FleetRoster(props: {
               npc.phase === 'resting' && typeof npc.restUntilMs === 'number'
                 ? Math.max(0, (npc.restUntilMs - props.nowMs) / MS_PER_TICK_DEFAULT)
                 : npc.restHoursLeft;
+            const mxLeft =
+              npc.phase === 'maintenance' && typeof npc.mxUntilMs === 'number'
+                ? Math.max(0, (npc.mxUntilMs - props.nowMs) / MS_PER_TICK_DEFAULT)
+                : npc.mxHoursLeft;
             const phase =
               mission != null
                 ? livePhase(eta, mission.phase)
@@ -630,7 +841,9 @@ function FleetRoster(props: {
                   ? 'idle'
                   : npc.phase === 'resting' && (restLeft ?? 0) <= 0
                     ? 'idle'
-                    : npc.phase;
+                    : npc.phase === 'maintenance' && (mxLeft ?? 0) <= 0
+                      ? 'idle'
+                      : npc.phase;
             return (
               <tr key={npc.id} className={`fleet-row phase-${phase}`}>
                 <td>
@@ -655,9 +868,13 @@ function FleetRoster(props: {
                               ? ` · ${npc.dutyHoursAccum.toFixed(1)}h duty`
                               : ''
                           } · back in ${formatDuration(restLeft ?? 0)}`
-                        : phase === 'turnaround'
-                          ? `Ground turnaround · free in ${formatDuration(turnaroundLeft ?? 0)}`
-                          : undefined
+                        : phase === 'maintenance'
+                          ? `Shop visit${
+                              npc.locationIcao ? ` at ${npc.locationIcao}` : ''
+                            } · draws local aircraft parts · free in ${formatDuration(mxLeft ?? 0)}`
+                          : phase === 'turnaround'
+                            ? `Ground turnaround · free in ${formatDuration(turnaroundLeft ?? 0)}`
+                            : undefined
                     }
                   >
                     {phaseLabel(phase)}
@@ -667,6 +884,12 @@ function FleetRoster(props: {
                   ) : null}
                   {phase === 'resting' && restLeft !== undefined ? (
                     <small>back in {formatDuration(restLeft)}</small>
+                  ) : null}
+                  {phase === 'maintenance' && mxLeft !== undefined ? (
+                    <small>
+                      {npc.locationIcao ? `${npc.locationIcao} · ` : ''}
+                      free in {formatDuration(mxLeft)}
+                    </small>
                   ) : null}
                 </td>
                 <td>
@@ -729,7 +952,11 @@ export function App() {
   const [displayNowMs, setDisplayNowMs] = useState(Date.now());
   const [wallet, setWallet] = useState(0);
   const [lots, setLots] = useState<MarketLot[]>([]);
+  const [marketTotalLots, setMarketTotalLots] = useState(0);
+  /** Kept in a ref so `refresh` stays stable while the board filter changes. */
+  const marketQueryRef = useRef('');
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
+  const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
   const [npcActivity, setNpcActivity] = useState<NpcActivity[]>([]);
   const [npcBusy, setNpcBusy] = useState(0);
   const [npcFleet, setNpcFleet] = useState<NpcFleetMember[]>([]);
@@ -737,6 +964,7 @@ export function App() {
     airborne: 0,
     turnaround: 0,
     resting: 0,
+    maintenance: 0,
     idle: 0,
   });
   const [regionPressure, setRegionPressure] = useState<RegionPressure[]>([]);
@@ -810,6 +1038,22 @@ export function App() {
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupHub, setSignupHub] = useState('');
+  const [aircraftListings, setAircraftListings] = useState<AircraftListing[]>([]);
+  const [aircraftCatalog, setAircraftCatalog] = useState<
+    Array<{
+      id: AircraftClass;
+      name: string;
+      msrpUsd: number;
+      leaseMonthlyUsd: number;
+      maxCargoKg: number;
+      maxRangeNm: number;
+    }>
+  >([]);
+  const [aircraftMarketDay, setAircraftMarketDay] = useState(0);
+  const [aircraftMarketClass, setAircraftMarketClass] = useState<
+    '' | AircraftClass
+  >('');
+  const [aircraftMarketQuery, setAircraftMarketQuery] = useState('');
 
   useEffect(() => {
     const loc = { tab, airportIcao };
@@ -877,11 +1121,12 @@ export function App() {
 
   const refresh = useCallback(async () => {
     setError(null);
-    const [state, market, missionState, npcState] = await Promise.all([
+    const [state, market, missionState, npcState, acMarket] = await Promise.all([
       fetchState(),
-      fetchMarket(),
+      fetchMarket(undefined, { query: marketQueryRef.current }),
       fetchMissions(),
       fetchNpcFleet(),
+      fetchAircraftMarket().catch(() => null),
     ]);
     const clientNow = Date.now();
     const serverNow = state.serverNowMs ?? clientNow;
@@ -892,6 +1137,7 @@ export function App() {
     setDisplayNowMs(serverNow);
     setWallet(missionState.walletUsd);
     setLots(market.lots);
+    setMarketTotalLots(market.totalLots ?? market.lots.length);
     setMarketEvents(market.events ?? []);
     setNpcActivity(npcState.activity.length ? npcState.activity : market.npcActivity ?? []);
     setNpcBusy(npcState.busy);
@@ -900,6 +1146,7 @@ export function App() {
       airborne: npcState.airborne,
       turnaround: npcState.turnaround,
       resting: npcState.resting ?? 0,
+      maintenance: npcState.maintenance ?? 0,
       idle: npcState.idle,
     });
     setRegionPressure(
@@ -913,6 +1160,13 @@ export function App() {
     setHubOptions(state.hubs ?? []);
     setPilotName(state.pilotName ?? '');
     setHomeHubIcao(state.homeHubIcao ?? '');
+    if (acMarket) {
+      setAircraftListings(acMarket.listings);
+      setAircraftCatalog(acMarket.catalog);
+      setAircraftMarketDay(acMarket.dayIndex);
+      setWallet(acMarket.walletUsd);
+      if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
+    }
     if (!(state.hubSelected && (state.fleet?.length ?? 0) > 0)) {
       setSignupHub((prev) => prev || state.hubs?.[0] || 'SBGR');
     }
@@ -954,6 +1208,31 @@ export function App() {
       setError(err instanceof Error ? err.message : String(err));
     });
   }, [refresh]);
+
+  // The board is capped server-side, so the route search has to run there too —
+  // otherwise ICAOs outside the first page of lots look empty.
+  useEffect(() => {
+    const query = routeFilter.trim();
+    if (query === marketQueryRef.current) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void fetchMarket(undefined, { query })
+        .then((market) => {
+          if (cancelled) return;
+          marketQueryRef.current = query;
+          setLots(market.lots);
+          setMarketTotalLots(market.totalLots ?? market.lots.length);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setError(err instanceof Error ? err.message : String(err));
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [routeFilter]);
 
   useEffect(() => {
     if (!staging) {
@@ -1730,9 +2009,16 @@ export function App() {
   async function onTick() {
     await run(async () => {
       const result = await postTick(24);
+      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      const leaseNote =
+        (result.leasePaidUsd ?? 0) > 0
+          ? ` · lease ${formatMoney(result.leasePaidUsd!)}`
+          : (result.leaseRepossessed?.length ?? 0) > 0
+            ? ` · ${result.leaseRepossessed!.length} lease repossessed`
+            : '';
       setToastKind('ok');
       setToast(
-        `Time advanced ${formatDuration(24)} → ${formatClock(result.tick)} · ${result.availableLots} lots`,
+        `Time advanced ${formatDuration(24)} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}`,
       );
     });
   }
@@ -1789,16 +2075,180 @@ export function App() {
     });
   }
 
-  async function onAcquireBonanza() {
+  async function refreshAircraftMarket() {
+    const acMarket = await fetchAircraftMarket();
+    setAircraftListings(acMarket.listings);
+    setAircraftCatalog(acMarket.catalog);
+    setAircraftMarketDay(acMarket.dayIndex);
+    setWallet(acMarket.walletUsd);
+    if (acMarket.fleet) setFleet(acMarket.fleet);
+    return acMarket;
+  }
+
+  async function onBuyAircraft(listingId: string) {
     await run(async () => {
-      const result = await postAcquireAircraft({
-        aircraftClassId: 'light_ga',
-        locationIcao: homeHubIcao || undefined,
+      const result = await postAircraftBuy({ listingId });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setAircraftListings(result.listings);
+      setToastKind('ok');
+      setToast(
+        `Purchased ${result.aircraft.label} for ${formatMoney(result.debitUsd)} · parked at ${result.aircraft.locationIcao}`,
+      );
+      goToTab('hangar');
+    });
+  }
+
+  async function onLeaseAircraft(listingId: string) {
+    await run(async () => {
+      const result = await postAircraftLease({ listingId });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setAircraftListings(result.listings);
+      setToastKind('ok');
+      setToast(
+        `Lease signed · ${result.aircraft.label} · deposit ${formatMoney(result.debitUsd)}`,
+      );
+      goToTab('hangar');
+    });
+  }
+
+  async function onSellAircraft(aircraftId: string) {
+    const acf = fleet.find((a) => a.id === aircraftId);
+    if (!acf) return;
+    const ok = await confirm({
+      title: `Sell ${acf.label}?`,
+      body: 'Dealer buy-back pays about 70% of fair value. The airframe is relisted on the Aircraft Market for others.',
+      confirmLabel: 'Sell to market',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postAircraftSell({ aircraftId });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      if (result.listings) setAircraftListings(result.listings);
+      setToastKind('ok');
+      setToast(
+        `Sold for ${formatMoney(result.creditUsd)} · listed at ${result.listing.basedIcao}`,
+      );
+    });
+  }
+
+  async function onListForLease(aircraftId: string) {
+    const acf = fleet.find((a) => a.id === aircraftId);
+    if (!acf) return;
+    const ok = await confirm({
+      title: `List ${acf.label} for lease?`,
+      body: 'Needs two owned aircraft. This airframe leaves dispatch until an NPC leases it or you unlist.',
+      confirmLabel: 'List for lease',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postAircraftListLease({ aircraftId, termMonths: 12 });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setAircraftListings(result.listings);
+      setToastKind('ok');
+      setToast(`Listed for lease at ${result.listing.basedIcao}`);
+    });
+  }
+
+  async function onUnlistAircraft(aircraftId: string) {
+    await run(async () => {
+      const result = await postAircraftUnlist({ aircraftId });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setAircraftListings(result.listings);
+      setToastKind('ok');
+      setToast('Lease listing removed');
+    });
+  }
+
+  async function onClearMaintenance(aircraftId: string) {
+    const acf = fleet.find((a) => a.id === aircraftId);
+    if (!acf) return;
+    const ok = await confirm({
+      title: `Workshop inspection on ${acf.label}?`,
+      body: `Pays the scheduled inspection at ${acf.locationIcao} using local aircraft parts + shop labor. Does not restore condition % — use Repair for that. Thin/dry parts raise the labor bill.`,
+      confirmLabel: 'Pay inspection',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postAircraftMaintenance({ aircraftId });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setToastKind(result.needsRepair ? 'warn' : 'ok');
+      const mroNote =
+        result.mro?.scarcity === 'dry'
+          ? ' · dry parts (labor premium)'
+          : result.mro?.scarcity === 'partial'
+            ? ' · partial parts'
+            : result.mro
+              ? ` · ${Math.round(result.mro.fromTerminalKg)} kg parts`
+              : '';
+      setToast(
+        result.needsRepair
+          ? `Inspection paid · ${formatMoney(result.debitUsd)}${mroNote} — repair condition before dispatch`
+          : `Inspection cleared · ${formatMoney(result.debitUsd)}${mroNote}`,
+      );
+    });
+  }
+
+  async function onRepairAircraft(aircraftId: string) {
+    const acf = fleet.find((a) => a.id === aircraftId);
+    if (!acf) return;
+    const afNeed = Math.max(0, Math.ceil(100 - (acf.airframeConditionPct ?? 100)));
+    const engNeed = Math.max(0, Math.ceil(100 - (acf.engineConditionPct ?? 100)));
+    const afPts = Math.min(10, afNeed);
+    const engPts = Math.min(10, engNeed);
+    if (afPts === 0 && engPts === 0) {
+      setToastKind('ok');
+      setToast('Condition already at 100%');
+      return;
+    }
+    const ok = await confirm({
+      title: `Repair ${acf.label}?`,
+      body: `Restores up to ${afPts} airframe pts and ${engPts} engine pts at ${acf.locationIcao} (capped at 10 per click). Draws terminal aircraft parts; dry stock still works at a labor premium.`,
+      confirmLabel: 'Repair',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postAircraftRepair({
+        aircraftId,
+        airframePts: afPts || undefined,
+        enginePts: engPts || undefined,
       });
       setFleet(result.fleet);
       setWallet(result.walletUsd);
+      setToastKind(result.mro?.scarcity === 'ok' ? 'ok' : 'warn');
+      const mroNote =
+        result.mro?.scarcity === 'dry'
+          ? ' · dry parts (labor premium)'
+          : result.mro?.scarcity === 'partial'
+            ? ' · partial parts'
+            : result.mro
+              ? ` · ${Math.round(result.mro.fromTerminalKg)} kg parts`
+              : '';
+      setToast(`Repaired · ${formatMoney(result.debitUsd)}${mroNote}`);
+    });
+  }
+
+  async function onBuyoutLease(aircraftId: string) {
+    const acf = fleet.find((a) => a.id === aircraftId);
+    if (!acf?.lease) return;
+    const buyout = acf.lease.buyoutUsd ?? 0;
+    const ok = await confirm({
+      title: `Buy out lease on ${acf.label}?`,
+      body: `Pays ${formatMoney(buyout)} and converts the airframe to owned.`,
+      confirmLabel: 'Buy out',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postAircraftBuyout({ aircraftId });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
       setToastKind('ok');
-      setToast('Company Bonanza parked at hangar');
+      setToast(`Lease bought out · ${formatMoney(result.debitUsd)}`);
     });
   }
 
@@ -2462,6 +2912,30 @@ export function App() {
       ).sort((a, b) => a[1].localeCompare(b[1])),
     [lots],
   );
+  const catalogByClass = useMemo(
+    () => new Map(aircraftCatalog.map((c) => [c.id, c])),
+    [aircraftCatalog],
+  );
+  const filteredAircraftListings = useMemo(() => {
+    const q = aircraftMarketQuery.trim().toLowerCase();
+    return aircraftListings.filter((listing) => {
+      if (aircraftMarketClass && listing.aircraftClassId !== aircraftMarketClass) {
+        return false;
+      }
+      if (!q) return true;
+      const blob =
+        `${listing.label} ${aircraftModelLabel(listing.aircraftClassId)} ${listing.basedIcao} ${listing.kind} ${listing.condition}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }, [aircraftListings, aircraftMarketClass, aircraftMarketQuery]);
+  const ownedFleetCount = useMemo(
+    () => fleet.filter((a) => (a.ownership ?? 'owned') === 'owned').length,
+    [fleet],
+  );
+  const hasListedAircraft = useMemo(
+    () => fleet.some((a) => a.status === 'listed'),
+    [fleet],
+  );
   const filteredLots = useMemo(() => {
     const maxDistance = Number(distanceMaxNm);
     const maxLoad = Number(loadMaxKg);
@@ -2667,13 +3141,15 @@ export function App() {
                     : 'Staging'
                 : tab === 'fleet'
                   ? 'NPC fleet'
-                  : tab === 'hangar'
-                    ? 'Hangar'
-                    : tab === 'pilot'
-                      ? 'Pilot'
-                      : tab === 'missions'
-                        ? 'Logbook'
-                        : 'Freight board'}
+                  : tab === 'aircraft'
+                    ? 'Aircraft market'
+                    : tab === 'hangar'
+                      ? 'Hangar'
+                      : tab === 'pilot'
+                        ? 'Pilot'
+                        : tab === 'missions'
+                          ? 'Logbook'
+                          : 'Freight board'}
           </h1>
           <p className="lede">
             {showAirport
@@ -2685,16 +3161,18 @@ export function App() {
                     ? 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
                     : 'Prepare a freight from the Market, or resume after settling the last flight.'
                 : tab === 'fleet'
-                  ? 'Competing freighters — who is idle, airborne, turning around, or resting.'
-                  : tab === 'hangar'
-                    ? 'Your aircraft — always parked at a terminal; ferry or fly cargo to relocate.'
-                    : tab === 'pilot'
-                      ? hubSelected
-                        ? 'Company identity, fleet snapshot, and progression.'
-                        : 'Register your name and home hub to start the career.'
-                      : tab === 'missions'
-                        ? 'Historical flights — settled, cancelled, and past operations.'
-                        : 'Local cargo economy — prepare a flight, dispatch in SimBrief, watch it settle.'}
+                  ? 'Competing freighters — idle, airborne, turnaround, shop MX, or crew rest.'
+                  : tab === 'aircraft'
+                    ? 'New, used, and lease airframes priced to Skyline freights — not real-world MSRP.'
+                    : tab === 'hangar'
+                      ? 'Your aircraft — ownership, condition, ferry, and maintenance.'
+                      : tab === 'pilot'
+                        ? hubSelected
+                          ? 'Company identity, fleet snapshot, and progression.'
+                          : 'Register your name and home hub to start the career.'
+                        : tab === 'missions'
+                          ? 'Historical flights — settled, cancelled, and past operations.'
+                          : 'Local cargo economy — prepare a flight, dispatch in SimBrief, watch it settle.'}
           </p>
         </div>
         <div className="metrics">
@@ -2756,6 +3234,18 @@ export function App() {
         >
           Pilot
           {hubSelected && homeHubIcao ? ` · ${homeHubIcao}` : ''}
+        </button>
+        <button
+          type="button"
+          className={!showAirport && tab === 'aircraft' ? 'tab active' : 'tab'}
+          onClick={() => {
+            selectTab('aircraft');
+            void refreshAircraftMarket().catch(() => undefined);
+          }}
+          disabled={busy}
+        >
+          Aircraft
+          {aircraftListings.length ? ` · ${aircraftListings.length}` : ''}
         </button>
         <button
           type="button"
@@ -2991,6 +3481,35 @@ export function App() {
                           {formatTonnes(airportView.totalStockTonnes * 1000)} total stock ·{' '}
                           {formatClock(continuousHours)}
                         </p>
+                        {airportView.hubLevel ? (
+                          <div className="hub-level-block">
+                            <p className="hub-level-line">
+                              Level {airportView.hubLevel.level}
+                              {airportView.hubLevel.xpForNext != null
+                                ? ` · ${airportView.hubLevel.progressPct}% to ${airportView.hubLevel.level + 1}`
+                                : ' · max'}
+                              {airportView.hubLevel.quiet ? ' · quiet' : ''}
+                            </p>
+                            <div className="hub-level-bar" aria-hidden="true">
+                              <span
+                                style={{
+                                  width: `${Math.min(100, airportView.hubLevel.progressPct)}%`,
+                                }}
+                              />
+                            </div>
+                            <small className="hub-level-perks">
+                              Cap ×{airportView.hubLevel.capacityMult.toFixed(2)}
+                              {' · '}
+                              Flow ×{airportView.hubLevel.flowMult.toFixed(2)}
+                              {airportView.hubLevel.laneBonus > 0
+                                ? ` · +${airportView.hubLevel.laneBonus} lane lots`
+                                : ''}
+                              {airportView.hubLevel.originPayMult > 1
+                                ? ` · origin pay ×${airportView.hubLevel.originPayMult.toFixed(2)}`
+                                : ''}
+                            </small>
+                          </div>
+                        ) : null}
                         {airportView.events && airportView.events.length > 0 ? (
                           <ul className="event-list">
                             {airportView.events.map((ev) => (
@@ -3025,11 +3544,15 @@ export function App() {
                               <td>
                                 <strong>{c.name}</strong>
                                 <small>
-                                  {c.perishable
-                                    ? 'Perishable'
-                                    : c.highValue
-                                      ? 'High value'
-                                      : 'Standard'}
+                                  {c.kind === 'fuel'
+                                    ? 'Jet-A (shop)'
+                                    : c.kind === 'mro'
+                                      ? 'MRO shop stock'
+                                      : c.perishable
+                                        ? 'Perishable'
+                                        : c.highValue
+                                          ? 'High value'
+                                          : 'Standard'}
                                 </small>
                               </td>
                               <td>
@@ -3075,6 +3598,13 @@ export function App() {
                         </tbody>
                       </table>
                     </div>
+                    <FuelLogisticsBlock
+                      inbound={airportView.fuelInbound ?? []}
+                      recent={airportView.fuelRecent ?? []}
+                      weightSystem={weightSystem}
+                      onOpen={openAirport}
+                      busy={busy}
+                    />
                   </>
                 ) : null}
 
@@ -3205,7 +3735,9 @@ export function App() {
           <div className="panel-head">
             <h2>Available freights</h2>
             <p>
-              {lots.length} lots
+              {marketTotalLots > lots.length
+                ? `${lots.length} of ${marketTotalLots} lots`
+                : `${lots.length} lots`}
               {npcActivity.length > 0
                 ? ` · ${npcActivity.length} NPC airborne`
                 : ''}
@@ -3213,21 +3745,13 @@ export function App() {
                 ? ` · aircraft at ${fleet.find((a) => a.status === 'parked')!.locationIcao}`
                 : ''}
             </p>
-            <RegionPressureChips regions={regionPressure} />
+            <MarketSignalsLine regions={regionPressure} />
           </div>
-          {marketEvents.length > 0 ? (
-            <ul className="event-list market-events">
-              {marketEvents.map((ev) => (
-                <li key={ev.id} className={`event-badge shock-${ev.kind}`}>
-                  <strong>{ev.region}</strong> · {ev.label}
-                  <small>
-                    {' '}
-                    · ends {formatClock(ev.endsAtTick)}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <MarketEventsSummary
+            events={marketEvents}
+            expanded={marketEventsExpanded}
+            onToggle={() => setMarketEventsExpanded((v) => !v)}
+          />
           {activeMission ? (
             <p className="banner warn">
               Active flight {activeMission.id} ({activeMission.originIcao}→
@@ -3456,7 +3980,10 @@ export function App() {
                 </tr>
               </thead>
               <tbody>
-                {pagedLots.map((lot) => (
+                {pagedLots.map((lot) => {
+                  const meta = lotPressureMeta(lot);
+                  const idlePct = idleUptickPct(lot);
+                  return (
                   <tr key={lot.id}>
                     <td>
                       <div className="route">
@@ -3464,54 +3991,15 @@ export function App() {
                         <span className="arrow">→</span>
                         <IcaoLink icao={lot.destIcao} onOpen={openAirport} disabled={busy} />
                         {lot.urgency === 'urgent' ? <span className="tag">Urgent</span> : null}
-                        {lot.pressure?.thinFleet ? (
-                          <span
-                            className="tag pressure"
-                            title={`${regionLabel(lot.pressure.originRegion || 'region')}: local competing fleet is thin — freights from this origin tend to pay more`}
-                          >
-                            Thin fleet
-                          </span>
-                        ) : null}
-                        {lot.pressure?.laneBusy ? (
-                          <span
-                            className="tag saturated"
-                            title={`NPC cargo already airborne on this lane (${Math.round((lot.pressure.laneSaturation || 0) * 100)}% saturated) — remaining slots are scarcer`}
-                          >
-                            Lane busy
-                          </span>
-                        ) : null}
-                        {lot.pressure?.weather === 'marginal' ||
-                        lot.pressure?.weather === 'poor' ? (
-                          <span
-                            className={`tag weather ${lot.pressure.weather}`}
-                            title={`Simulated ${lot.pressure.weather} weather on this lane — richer / shorter-lived freights`}
-                          >
-                            {lot.pressure.weather}
-                          </span>
-                        ) : null}
-                        {lot.pressure?.idleEscalated ? (
-                          <span
-                            className="tag idle"
-                            title={`Freight has sat on the board — pay is up ${Math.round(((lot.pressure.idlePayMult || 1) - 1) * 100)}% vs formation`}
-                          >
-                            Idle +{Math.round(((lot.pressure.idlePayMult || 1) - 1) * 100)}%
-                          </span>
-                        ) : null}
-                        {lot.pressure?.demandShock
-                          ? (lot.pressure.shockLabels ?? ['Shock']).map((label) => (
-                              <span
-                                key={`${lot.id}-${label}`}
-                                className="tag shock"
-                                title={`Regional demand shock on this lane — freight pay ×${(lot.pressure?.shockPayMult ?? 1).toFixed(2)}`}
-                              >
-                                {label}
-                              </span>
-                            ))
-                          : null}
                       </div>
                       <small>
                         {lot.originName} → {lot.destName}
                       </small>
+                      {meta ? (
+                        <small className="lot-meta" title={meta.title}>
+                          {meta.text}
+                        </small>
+                      ) : null}
                       <NpcTakenBadge claim={lot.npcClaim} nowMs={displayNowMs} />
                     </td>
                     <td className="distance">
@@ -3528,7 +4016,17 @@ export function App() {
                       <LotExpiry lot={lot} tick={tick} continuousHours={continuousHours} />
                       {lot.perishable ? <small>Perishable</small> : null}
                     </td>
-                    <td className="pay">{formatMoney(lot.payUsd)}</td>
+                    <td className="pay">
+                      {formatMoney(lot.payUsd)}
+                      {idlePct !== null ? (
+                        <span
+                          className="idle-uptick"
+                          title={`Freight has sat on the board — pay is up ${idlePct}% vs formation`}
+                        >
+                          ↑{idlePct}%
+                        </span>
+                      ) : null}
+                    </td>
                     <td>
                       <button
                         type="button"
@@ -3555,7 +4053,8 @@ export function App() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {filteredLots.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="empty">
@@ -4989,6 +5488,9 @@ export function App() {
                         <IcaoLink icao={acf.locationIcao} onOpen={openAirport} disabled={busy} />
                       </p>
                       <p className="payline">
+                        {(acf.ownership ?? 'owned') === 'leased' ? 'Leased' : 'Owned'}
+                        {acf.condition ? ` · ${acf.condition}` : ''}
+                        {' · '}
                         Fuel {formatTonnes(acf.fuelKg)} / {formatTonnes(acf.fuelCapacityKg)}
                       </p>
                       <div className="fill-bar" aria-hidden="true">
@@ -5008,86 +5510,138 @@ export function App() {
             )}
           </div>
         </section>
+      ) : hubSelected && tab === 'aircraft' ? (
+        <section className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>Aircraft market</h2>
+              <p>
+                Day {aircraftMarketDay || '—'} · {aircraftListings.length} listings · wallet{' '}
+                {formatMoney(wallet)}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="action ghost"
+              onClick={() =>
+                void run(async () => {
+                  await refreshAircraftMarket();
+                })
+              }
+              disabled={busy}
+            >
+              Refresh board
+            </button>
+          </div>
+          {aircraftCatalog.length > 0 ? (
+            <p className="aircraft-market-msrp">
+              MSRP guide:{' '}
+              {aircraftCatalog
+                .map((c) => `${c.name} ${formatMoney(c.msrpUsd)}`)
+                .join(' · ')}
+            </p>
+          ) : null}
+          <div className="aircraft-market-toolbar">
+            <input
+              type="search"
+              className="aircraft-market-search"
+              placeholder="Search name or ICAO…"
+              aria-label="Search aircraft listings"
+              value={aircraftMarketQuery}
+              onChange={(e) => setAircraftMarketQuery(e.target.value)}
+            />
+            <div className="aircraft-class-chips" role="group" aria-label="Aircraft class filter">
+              {AIRCRAFT_CLASS_FILTERS.map((chip) => (
+                <button
+                  key={chip.id || 'all'}
+                  type="button"
+                  className={aircraftMarketClass === chip.id ? 'active' : undefined}
+                  onClick={() => setAircraftMarketClass(chip.id)}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {aircraftListings.length === 0 ? (
+            <p className="empty">No airframes listed today — advance a day or refresh.</p>
+          ) : filteredAircraftListings.length === 0 ? (
+            <p className="empty">No listings match this filter.</p>
+          ) : (
+            <>
+              <p className="aircraft-card-count">
+                Showing {filteredAircraftListings.length}
+                {filteredAircraftListings.length !== aircraftListings.length
+                  ? ` of ${aircraftListings.length}`
+                  : ''}{' '}
+                aircraft
+              </p>
+              <div className="aircraft-card-grid">
+                {filteredAircraftListings.map((listing) => (
+                  <MarketListingCard
+                    key={listing.id}
+                    listing={listing}
+                    catalog={catalogByClass.get(listing.aircraftClassId)}
+                    wallet={wallet}
+                    busy={busy}
+                    formatMoney={formatMoney}
+                    formatMass={formatTonnes}
+                    onOpenAirport={openAirport}
+                    onBuy={(id) => void onBuyAircraft(id)}
+                    onLease={(id) => void onLeaseAircraft(id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
       ) : hubSelected && tab === 'hangar' ? (
         <section className="panel hangar-panel">
           <div className="panel-head">
             <div>
               <h2>Company hangar</h2>
               <p>
-                Aircraft must be at the mission origin to prepare cargo. Instant ferry moves them
-                for a fee + Jet-A.
+                Aircraft must be at the mission origin to prepare cargo. Buy or lease from the
+                Aircraft market; ferry relocates instantly for a fee + Jet-A.
               </p>
             </div>
-            {!fleet.some((a) => a.aircraftClassId === 'light_ga') ? (
-              <button
-                type="button"
-                className="accept"
-                onClick={() => void onAcquireBonanza()}
-                disabled={busy}
-              >
-                Add Bonanza
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="accept"
+              onClick={() => {
+                selectTab('aircraft');
+                void refreshAircraftMarket().catch(() => undefined);
+              }}
+              disabled={busy}
+            >
+              Aircraft market
+            </button>
           </div>
           {fleet.length === 0 ? (
             <p className="empty">No aircraft yet — pick a starter hub.</p>
           ) : (
             <ul className="hangar-list">
               {fleet.map((acf) => (
-                <li key={acf.id} className="hangar-card">
-                  <div className="hangar-main">
-                    <div className="route">
-                      <strong>{acf.label}</strong>
-                      <span className={`status status-${acf.status}`}>{acf.status}</span>
-                    </div>
-                    <p>
-                      {aircraftClassLabel(acf.aircraftClassId)} · at{' '}
-                      <IcaoLink icao={acf.locationIcao} onOpen={openAirport} disabled={busy} />
-                      {acf.assignedMissionId ? ` · mission ${acf.assignedMissionId}` : ''}
-                    </p>
-                    <p className="payline">
-                      Fuel {formatTonnes(acf.fuelKg)} / {formatTonnes(acf.fuelCapacityKg)}
-                    </p>
-                    <div className="fill-bar" aria-hidden="true">
-                      <span
-                        style={{
-                          width: `${Math.min(100, (acf.fuelKg / Math.max(1, acf.fuelCapacityKg)) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  {acf.status === 'parked' ? (
-                    <div className="hangar-ferry">
-                      <label className="staging-aircraft">
-                        Ferry to
-                        <select
-                          value={ferryDest}
-                          onChange={(e) => setFerryDest(e.target.value)}
-                          disabled={busy}
-                        >
-                          <option value="">Select hub…</option>
-                          {hubOptions
-                            .filter((h) => h !== acf.locationIcao)
-                            .map((h) => (
-                              <option key={h} value={h}>
-                                {h}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        className="accept"
-                        disabled={busy || !ferryDest}
-                        onClick={() => void onFerry(acf.id, ferryDest)}
-                      >
-                        Ferry now
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="empty">Assigned — finish or cancel the flight in Staging.</p>
-                  )}
-                </li>
+                <HangarAircraftCard
+                  key={acf.id}
+                  aircraft={acf}
+                  busy={busy}
+                  hubOptions={hubOptions}
+                  ferryDest={ferryDest}
+                  ownedCount={ownedFleetCount}
+                  hasListed={hasListedAircraft}
+                  formatMoney={formatMoney}
+                  formatMass={formatTonnes}
+                  onOpenAirport={openAirport}
+                  onFerryDestChange={setFerryDest}
+                  onClearMaintenance={(id) => void onClearMaintenance(id)}
+                  onRepair={(id) => void onRepairAircraft(id)}
+                  onUnlist={(id) => void onUnlistAircraft(id)}
+                  onBuyout={(id) => void onBuyoutLease(id)}
+                  onListForLease={(id) => void onListForLease(id)}
+                  onSell={(id) => void onSellAircraft(id)}
+                  onFerry={(id, dest) => void onFerry(id, dest)}
+                />
               ))}
             </ul>
           )}
@@ -5099,7 +5653,8 @@ export function App() {
               <h2>Competing fleet</h2>
               <p>
                 {npcBusy} busy · {npcSummary.airborne} airborne · {npcSummary.turnaround}{' '}
-                turnaround · {npcSummary.resting} resting · {npcSummary.idle} idle
+                turnaround · {npcSummary.maintenance} MX · {npcSummary.resting} resting ·{' '}
+                {npcSummary.idle} idle
                 <span className="live-dot" title="Auto-refreshes every 15s; clock ticks every second">
                   {' '}
                   · live

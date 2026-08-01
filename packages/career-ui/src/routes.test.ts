@@ -8,6 +8,7 @@ describe('career UI routes', () => {
     assert.equal(pathForLocation({ tab: 'pilot', airportIcao: null }), '/pilot');
     assert.equal(pathForLocation({ tab: 'missions', airportIcao: null }), '/logbook');
     assert.equal(pathForLocation({ tab: 'fleet', airportIcao: null }), '/npc-fleet');
+    assert.equal(pathForLocation({ tab: 'aircraft', airportIcao: null }), '/aircraft');
     assert.equal(
       pathForLocation({ tab: 'market', airportIcao: 'sbgl' }),
       '/airport/SBGL',
@@ -25,6 +26,10 @@ describe('career UI routes', () => {
     });
     assert.deepEqual(parseCareerPath('/fleet'), {
       tab: 'fleet',
+      airportIcao: null,
+    });
+    assert.deepEqual(parseCareerPath('/aircraft'), {
+      tab: 'aircraft',
       airportIcao: null,
     });
     assert.deepEqual(parseCareerPath('/airport/sbct'), {

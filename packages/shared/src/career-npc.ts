@@ -6,10 +6,15 @@
 
 import {
   applyFreightDelivery,
+  ensureAirportMroInventory,
   getCommodity,
   routeDistanceNm,
 } from './career-economy.js';
 import { applyNpcFuelUplift } from './career-fuel.js';
+import {
+  hubLevelNpcBidMult,
+  regionAverageHubLevel,
+} from './career-hub-level.js';
 import { getAircraftClass, reserveShipmentLot } from './career-mission.js';
 import {
   regionalWeatherBidMult,
@@ -45,6 +50,33 @@ const MS_PER_TICK = 3_600_000;
 /** Minimum airborne block so ultra-short hops aren't instant. */
 const MIN_BLOCK_HOURS = 1;
 const TURNAROUND_HOURS = 1;
+
+/**
+ * Abstract shop interval (block hours) — aligned with player inspection gates,
+ * slightly stretched so the board isn't permanently half-MX.
+ */
+export const NPC_MX_INTERVAL_HOURS: Record<FreighterClassId, number> = {
+  light_ga: 90,
+  light_turboprop: 110,
+  narrow_freighter: 180,
+  wide_freighter: 220,
+};
+
+/** Ground shop dwell once MX is due. */
+export const NPC_MX_SHOP_HOURS: Record<FreighterClassId, number> = {
+  light_ga: 2,
+  light_turboprop: 2.5,
+  narrow_freighter: 4,
+  wide_freighter: 5.5,
+};
+
+/** Parts drawn from terminal MRO stock per shop visit (not freight). */
+export const NPC_MX_PARTS_KG: Record<FreighterClassId, number> = {
+  light_ga: 40,
+  light_turboprop: 60,
+  narrow_freighter: 200,
+  wide_freighter: 400,
+};
 /** Spread departures inside the same economy hour (wall-clock ms). */
 const DEPART_STAGGER_MS = 25 * 60 * 1000;
 /** Treat as arriving when within the last hour of the flight. */
@@ -137,9 +169,17 @@ function npcRestUntilMs(npc: NpcFreighter): number {
   return 0;
 }
 
+function npcMxUntilMs(npc: NpcFreighter): number {
+  if (typeof npc.mxUntilMs === 'number' && Number.isFinite(npc.mxUntilMs)) {
+    return npc.mxUntilMs;
+  }
+  return 0;
+}
+
 /** True when the NPC could enter the bid pool at nowMs (idle / rest or turnaround done). */
 function isNpcReadyToBid(npc: NpcFreighter, nowMs: number): boolean {
   if (npc.currentFlightId) return false;
+  if (npc.status === 'maintenance' && npcMxUntilMs(npc) > nowMs) return false;
   if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) return false;
   if (npc.status === 'busy' && npcBusyUntilMs(npc) > nowMs) return false;
   return true;
@@ -277,6 +317,8 @@ export type RegionMarketPressure = {
   ready: number;
   total: number;
   resting: number;
+  /** Abstract shop visits (MRO) — also off the bid pool. */
+  maintenance: number;
   weather: RegionalWeather;
 };
 
@@ -331,8 +373,10 @@ export function listRegionMarketPressure(
     const home = world.npcs.filter((n) => n.homeRegion === region);
     let ready = 0;
     let resting = 0;
+    let maintenance = 0;
     for (const npc of home) {
       if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) resting += 1;
+      if (npc.status === 'maintenance' && npcMxUntilMs(npc) > nowMs) maintenance += 1;
       if (isNpcReadyToBid(npc, nowMs)) ready += 1;
     }
     const capacity = home.length === 0 ? 1 : ready / home.length;
@@ -343,6 +387,7 @@ export function listRegionMarketPressure(
       ready,
       total: home.length,
       resting,
+      maintenance,
       weather: regionalWeatherIndex(world, region),
     };
   });
@@ -384,7 +429,107 @@ function clearCrewRest(npc: NpcFreighter): void {
   npc.lastLegDutyHours = undefined;
 }
 
-/** End turnaround: either start crew rest or return to idle for another leg. */
+function mxIntervalHours(npc: NpcFreighter): number {
+  const base = NPC_MX_INTERVAL_HOURS[npc.aircraftClassId];
+  // Reliable operators stretch intervals a bit (better planned MX).
+  return base * (0.9 + npc.reliability * 0.25);
+}
+
+function needsShopMx(npc: NpcFreighter): boolean {
+  return (npc.hoursSinceMx ?? 0) >= mxIntervalHours(npc);
+}
+
+function pickNpcMxIcao(world: CareerEconomyWorld, npc: NpcFreighter): string {
+  if (npc.locationIcao) {
+    const known = world.airports.find(
+      (a) => a.icao === npc.locationIcao!.toUpperCase(),
+    );
+    if (known) return known.icao;
+  }
+  const home = world.airports.find((a) => a.region === npc.homeRegion);
+  if (home) return home.icao;
+  return world.airports[0]?.icao ?? 'SBGR';
+}
+
+/**
+ * Drain terminal MRO parts for an NPC shop visit.
+ * Dry stock still grounds the aircraft longer (parts ferry delay) but takes 0 kg.
+ */
+export function drainNpcMroParts(
+  world: CareerEconomyWorld,
+  icao: string,
+  requestedKg: number,
+): { takenKg: number; scarcity: 'ok' | 'partial' | 'dry' } {
+  const ap = world.airports.find((a) => a.icao === icao.toUpperCase());
+  if (!ap) {
+    return { takenKg: 0, scarcity: 'dry' };
+  }
+  ensureAirportMroInventory(ap);
+  const stock = ap.inventory.mro_parts;
+  if (!stock) {
+    return { takenKg: 0, scarcity: 'dry' };
+  }
+  const want = Math.max(0, Math.round(requestedKg));
+  const available = Math.max(0, Math.floor(stock.stockKg));
+  const takenKg = Math.min(want, available);
+  stock.stockKg = Math.max(0, stock.stockKg - takenKg);
+  if (want > 0 && takenKg === 0) return { takenKg: 0, scarcity: 'dry' };
+  if (takenKg < want) return { takenKg, scarcity: 'partial' };
+  return { takenKg, scarcity: 'ok' };
+}
+
+function beginShopMx(
+  world: CareerEconomyWorld,
+  npc: NpcFreighter,
+  nowMs: number,
+): void {
+  const icao = pickNpcMxIcao(world, npc);
+  npc.locationIcao = icao;
+  const rng = mulberry32(
+    hashSeed(`${world.seed}:${npc.id}:mx:${Math.floor(nowMs / 60_000)}`),
+  );
+  const requested = NPC_MX_PARTS_KG[npc.aircraftClassId];
+  const { scarcity } = drainNpcMroParts(world, icao, requested);
+  let shopHours =
+    NPC_MX_SHOP_HOURS[npc.aircraftClassId] * (0.85 + rng() * 0.3);
+  if (scarcity === 'dry') shopHours *= 1.6;
+  else if (scarcity === 'partial') shopHours *= 1.25;
+
+  npc.status = 'maintenance';
+  npc.currentFlightId = undefined;
+  npc.busyUntilTick = undefined;
+  npc.busyUntilMs = undefined;
+  npc.restUntilMs = undefined;
+  npc.restUntilTick = undefined;
+  npc.mxUntilMs = nowMs + shopHours * MS_PER_TICK;
+  npc.mxUntilTick = world.tick + Math.max(1, Math.ceil(shopHours));
+  npc.hoursSinceMx = 0;
+}
+
+/** End shop visit; may cascade into crew rest if duty is still high. */
+function finishShopMx(
+  world: CareerEconomyWorld,
+  npc: NpcFreighter,
+  nowMs: number,
+): void {
+  npc.mxUntilMs = undefined;
+  npc.mxUntilTick = undefined;
+  if (needsCrewRest(npc)) {
+    beginCrewRest(world, npc, nowMs);
+  } else {
+    npc.status = 'idle';
+  }
+}
+
+function releaseMxIfDue(world: CareerEconomyWorld, nowMs: number): void {
+  for (const npc of world.npcs) {
+    if (npc.status !== 'maintenance') continue;
+    if (npcMxUntilMs(npc) > nowMs) continue;
+    finishShopMx(world, npc, nowMs);
+  }
+}
+
+/** End turnaround: shop MX if due, else crew rest, else idle. */
 function finishTurnaround(
   world: CareerEconomyWorld,
   npc: NpcFreighter,
@@ -393,6 +538,10 @@ function finishTurnaround(
   npc.busyUntilTick = undefined;
   npc.busyUntilMs = undefined;
   npc.currentFlightId = undefined;
+  if (needsShopMx(npc)) {
+    beginShopMx(world, npc, nowMs);
+    return;
+  }
   if (needsCrewRest(npc)) {
     beginCrewRest(world, npc, nowMs);
   } else {
@@ -466,6 +615,7 @@ function makeNpcFreighter(opts: {
   homeRegion: string;
   rng: () => number;
 }): NpcFreighter {
+  const interval = NPC_MX_INTERVAL_HOURS[opts.aircraftClassId];
   return {
     id: opts.id,
     name: opts.name,
@@ -475,6 +625,8 @@ function makeNpcFreighter(opts: {
     aggressiveness: 0.2 + opts.rng() * 0.7,
     feeBias: 0.75 + opts.rng() * 0.55,
     status: 'idle',
+    // Desync shop calendars so the fleet does not all hit MX together.
+    hoursSinceMx: Math.round(opts.rng() * interval * 0.55),
   };
 }
 
@@ -490,8 +642,66 @@ export function ensureNpcFleet(world: CareerEconomyWorld): void {
     return;
   }
   topUpNpcFleetComposition(world, regions);
+  ensureNpcRegionCoverage(world, regions);
   backfillNpcDutyFromFlights(world);
   desyncClusteredTurnarounds(world);
+}
+
+/**
+ * Give every mapped region at least one home operator.
+ * Map expansions (BR-N / BR-CO) otherwise leave new regions with an empty local
+ * fleet forever, which keeps their lanes permanently "thin fleet".
+ * Reassigns from the most crowded region and never touches an NPC in flight.
+ */
+export function ensureNpcRegionCoverage(
+  world: CareerEconomyWorld,
+  regions: string[],
+): number {
+  const regionList = [...new Set(regions)].filter((r) => Boolean(r));
+  if (regionList.length === 0 || world.npcs.length < regionList.length) {
+    return 0;
+  }
+
+  const byRegion = new Map<string, NpcFreighter[]>();
+  for (const region of regionList) {
+    byRegion.set(region, []);
+  }
+  for (const npc of world.npcs) {
+    const bucket = byRegion.get(npc.homeRegion);
+    if (bucket) bucket.push(npc);
+  }
+
+  let moved = 0;
+  for (const region of regionList) {
+    if ((byRegion.get(region) ?? []).length > 0) continue;
+
+    let donorRegion: string | undefined;
+    let donorCount = 1;
+    for (const [candidate, members] of byRegion) {
+      if (members.length > donorCount) {
+        donorRegion = candidate;
+        donorCount = members.length;
+      }
+    }
+    if (!donorRegion) break;
+
+    const donors = byRegion.get(donorRegion)!;
+    // Stable pick: idle-first, then lowest id, so migrations stay deterministic.
+    const ordered = [...donors].sort((a, b) => {
+      const aFree = a.currentFlightId ? 1 : 0;
+      const bFree = b.currentFlightId ? 1 : 0;
+      if (aFree !== bFree) return aFree - bFree;
+      return a.id.localeCompare(b.id);
+    });
+    const pick = ordered.find((npc) => !npc.currentFlightId);
+    if (!pick) break;
+
+    pick.homeRegion = region;
+    donors.splice(donors.indexOf(pick), 1);
+    byRegion.get(region)!.push(pick);
+    moved += 1;
+  }
+  return moved;
 }
 
 /**
@@ -648,6 +858,12 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
   flight.status = 'completed';
   const npc = world.npcs.find((n) => n.id === flight.npcId);
   if (npc) {
+    npc.locationIcao = flight.destIcao;
+    const blockHours = Math.max(
+      MIN_BLOCK_HOURS,
+      (flightArrivesAtMs(flight) - flightDepartedAtMs(flight)) / MS_PER_TICK,
+    );
+    npc.hoursSinceMx = (npc.hoursSinceMx ?? 0) + blockHours;
     if (npc.currentFlightId === flight.id) {
       npc.currentFlightId = undefined;
     }
@@ -677,6 +893,7 @@ export function settleNpcOpsDue(
   ensureNpcFleet(world);
   let settledFlights = 0;
 
+  releaseMxIfDue(world, nowMs);
   releaseRestIfDue(world, nowMs);
   releaseTurnaroundIfDue(world, nowMs);
 
@@ -690,6 +907,7 @@ export function settleNpcOpsDue(
 
   world.npcFlights = world.npcFlights.filter((f) => f.status === 'in_flight');
   releaseTurnaroundIfDue(world, nowMs);
+  releaseMxIfDue(world, nowMs);
   releaseRestIfDue(world, nowMs);
   return { settledFlights };
 }
@@ -817,6 +1035,10 @@ function npcBidOnMarket(
 ): void {
   const idle = world.npcs.filter((n) => {
     if (n.currentFlightId) return false;
+    if (n.status === 'maintenance') {
+      if (npcMxUntilMs(n) > batchNowMs) return false;
+      finishShopMx(world, n, batchNowMs);
+    }
     if (n.status === 'resting') {
       if (npcRestUntilMs(n) > batchNowMs) return false;
       clearCrewRest(n);
@@ -825,7 +1047,7 @@ function npcBidOnMarket(
     if (n.status === 'busy') {
       finishTurnaround(world, n, batchNowMs);
     }
-    if (n.status === 'resting') return false;
+    if (n.status === 'resting' || n.status === 'maintenance') return false;
     if (n.status !== 'idle') return false;
     n.busyUntilTick = undefined;
     n.busyUntilMs = undefined;
@@ -846,10 +1068,12 @@ function npcBidOnMarket(
   for (const npc of idle) {
     const regionCapacity = npcRegionBidCapacity(world, npc.homeRegion, batchNowMs);
     const wx = regionalWeatherIndex(world, npc.homeRegion);
+    const levelBid = hubLevelNpcBidMult(regionAverageHubLevel(world, npc.homeRegion));
     const bidChance =
       (0.22 + npc.aggressiveness * 0.55) *
       (0.45 + 0.55 * regionCapacity) *
-      regionalWeatherBidMult(wx);
+      regionalWeatherBidMult(wx) *
+      levelBid;
     if (rng() > bidChance) continue;
     if (rng() > 0.55 + npc.reliability * 0.45) continue;
 
@@ -957,8 +1181,12 @@ export function listNpcFleetStatus(
     let phase: NpcFleetMemberView['phase'] = 'idle';
     let turnaroundHoursLeft: number | undefined;
     let restHoursLeft: number | undefined;
+    let mxHoursLeft: number | undefined;
     if (flight && activity) {
       phase = activity.phase;
+    } else if (npc.status === 'maintenance' && npcMxUntilMs(npc) > nowMs) {
+      phase = 'maintenance';
+      mxHoursLeft = Math.max(0, (npcMxUntilMs(npc) - nowMs) / MS_PER_TICK);
     } else if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) {
       phase = 'resting';
       restHoursLeft = Math.max(0, (npcRestUntilMs(npc) - nowMs) / MS_PER_TICK);
@@ -1009,6 +1237,11 @@ export function listNpcFleetStatus(
       restUntilTick: npc.restUntilTick,
       restUntilMs: npc.restUntilMs,
       restHoursLeft,
+      mxUntilTick: npc.mxUntilTick,
+      mxUntilMs: npc.mxUntilMs,
+      mxHoursLeft,
+      locationIcao: npc.locationIcao,
+      hoursSinceMx: npc.hoursSinceMx,
       dutyHoursAccum: npc.dutyHoursAccum,
       mission,
     };
@@ -1018,16 +1251,25 @@ export function listNpcFleetStatus(
     arriving: 0,
     enroute: 1,
     turnaround: 2,
-    resting: 3,
-    idle: 4,
+    maintenance: 3,
+    resting: 4,
+    idle: 5,
   } as const;
   rows.sort((a, b) => {
     const d = phaseOrder[a.phase] - phaseOrder[b.phase];
     if (d !== 0) return d;
     const ae =
-      a.mission?.etaHours ?? a.turnaroundHoursLeft ?? a.restHoursLeft ?? 99;
+      a.mission?.etaHours ??
+      a.turnaroundHoursLeft ??
+      a.mxHoursLeft ??
+      a.restHoursLeft ??
+      99;
     const be =
-      b.mission?.etaHours ?? b.turnaroundHoursLeft ?? b.restHoursLeft ?? 99;
+      b.mission?.etaHours ??
+      b.turnaroundHoursLeft ??
+      b.mxHoursLeft ??
+      b.restHoursLeft ??
+      99;
     return ae - be;
   });
   return rows;

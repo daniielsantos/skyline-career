@@ -4,6 +4,7 @@ import {
   localUnitPriceUsd,
   routeDistanceNm,
 } from './career-economy.js';
+import { recordFuelUpliftActivity } from './career-hub-level.js';
 import type {
   CareerEconomyWorld,
   FreighterClassId,
@@ -130,6 +131,7 @@ export function deliverFuelUplift(
     Math.max(0, Math.floor(stock.stockKg)),
   );
   stock.stockKg = clamp(stock.stockKg - fromTerminalKg, 0, stock.capacityKg);
+  recordFuelUpliftActivity(world, quote.originIcao, fromTerminalKg);
   return {
     originIcao: quote.originIcao,
     requestedKg: quote.requestedKg,

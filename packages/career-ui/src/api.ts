@@ -11,8 +11,55 @@ export type PlayerAircraft = {
   locationIcao: string;
   fuelKg: number;
   fuelCapacityKg: number;
-  status: 'parked' | 'assigned';
+  status: 'parked' | 'assigned' | 'maintenance' | 'listed' | 'leased_out';
   assignedMissionId?: string;
+  ownership?: 'owned' | 'leased';
+  condition?: 'excellent' | 'good' | 'fair' | 'tired';
+  hoursAirframe?: number;
+  hoursEngine?: number;
+  maintenanceDueAtHours?: number;
+  airframeConditionPct?: number;
+  engineConditionPct?: number;
+  hoursSinceInspection?: number;
+  leaseOverdue?: boolean;
+  lease?: {
+    monthlyUsd: number;
+    nextDueTick: number;
+    termEndsTick: number;
+    buyoutUsd?: number;
+  };
+  listedListingId?: string;
+  leaseOut?: {
+    monthlyUsd: number;
+    nextDueTick: number;
+    termEndsTick: number;
+    depositUsd: number;
+    listingId?: string;
+    lesseeNpcId?: string;
+    lesseeName?: string;
+    startedAtTick?: number;
+    lastWearTick?: number;
+  };
+};
+
+export type AircraftListing = {
+  id: string;
+  kind: 'new' | 'used' | 'lease';
+  aircraftClassId: AircraftClass;
+  label: string;
+  basedIcao: string;
+  askingUsd: number;
+  leaseMonthlyUsd?: number;
+  leaseTermMonths?: number;
+  condition: 'excellent' | 'good' | 'fair' | 'tired';
+  hoursAirframe: number;
+  hoursEngine: number;
+  airframeConditionPct?: number;
+  engineConditionPct?: number;
+  expiresAtTick: number;
+  status: string;
+  source?: 'generated' | 'player_sale' | 'player_lease';
+  sellerAircraftId?: string;
 };
 
 export type FerryQuote = {
@@ -102,14 +149,19 @@ export type NpcFleetMember = {
   reliability: number;
   aggressiveness: number;
   feeBias: number;
-  status: 'idle' | 'busy' | 'resting';
-  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround' | 'resting';
+  status: 'idle' | 'busy' | 'resting' | 'maintenance';
+  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround' | 'resting' | 'maintenance';
   busyUntilTick?: number;
   busyUntilMs?: number;
   turnaroundHoursLeft?: number;
   restUntilTick?: number;
   restUntilMs?: number;
   restHoursLeft?: number;
+  mxUntilTick?: number;
+  mxUntilMs?: number;
+  mxHoursLeft?: number;
+  locationIcao?: string;
+  hoursSinceMx?: number;
   dutyHoursAccum?: number;
   mission?: NpcMission | null;
 };
@@ -143,7 +195,28 @@ export type RegionPressure = {
   ready: number;
   total: number;
   resting: number;
+  maintenance?: number;
   weather?: 'fair' | 'marginal' | 'poor';
+  /** Non-hub Jet-A average is low and no truck haul is inbound. */
+  fuelThin?: boolean;
+};
+
+export type FuelHaulView = {
+  id: string;
+  truckId: string;
+  truckName: string;
+  truckClassId: string;
+  truckLabel: string;
+  originIcao: string;
+  destIcao: string;
+  cargoKg: number;
+  departedAtMs: number;
+  arrivesAtMs: number;
+  etaMs: number;
+  etaHours: number;
+  progressPct: number;
+  status: 'enroute' | 'completed';
+  phase: 'enroute' | 'arriving' | 'delivered';
 };
 
 export type LotPressure = {
@@ -292,6 +365,7 @@ export type Mission = {
 export type AirportCommodity = {
   commodityId: string;
   name: string;
+  kind?: 'cargo' | 'fuel' | 'mro';
   perishable: boolean;
   highValue: boolean;
   stockKg: number;
@@ -346,6 +420,18 @@ export type AirportView = ClockSync & {
     lon?: number;
     hubTier?: 'major' | 'regional' | 'spoke';
   };
+  hubLevel?: {
+    level: number;
+    xp: number;
+    xpIntoLevel: number;
+    xpForNext: number | null;
+    progressPct: number;
+    capacityMult: number;
+    flowMult: number;
+    laneBonus: number;
+    originPayMult: number;
+    quiet: boolean;
+  };
   events?: EconomyEvent[];
   totalStockKg: number;
   totalStockTonnes: number;
@@ -355,6 +441,9 @@ export type AirportView = ClockSync & {
   arrivals?: AirportMovement[];
   departures?: AirportMovement[];
   npcActivity?: NpcActivity[];
+  fuelInbound?: FuelHaulView[];
+  fuelRecent?: FuelHaulView[];
+  fuelHaulsEnroute?: number;
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -388,11 +477,20 @@ export function fetchState() {
   >('/api/state');
 }
 
-export function fetchMarket(aircraft?: AircraftClass) {
-  const qs = aircraft ? `?aircraft=${aircraft}` : '';
+export function fetchMarket(
+  aircraft?: AircraftClass,
+  opts: { query?: string } = {},
+) {
+  const params = new URLSearchParams();
+  if (aircraft) params.set('aircraft', aircraft);
+  const query = opts.query?.trim();
+  if (query) params.set('q', query);
+  const qs = params.toString();
   return api<
     ClockSync & {
       lots: MarketLot[];
+      totalLots?: number;
+      lotLimit?: number;
       npcActivity?: NpcActivity[];
       regionPressure?: RegionPressure[];
       events?: EconomyEvent[];
@@ -400,7 +498,7 @@ export function fetchMarket(aircraft?: AircraftClass) {
       maxCargoSource?: string | null;
       airframeLabel?: string | null;
     }
-  >(`/api/market${qs}`);
+  >(`/api/market${qs ? `?${qs}` : ''}`);
 }
 
 /** Fetch every available lot for one exact route (not the global 200-row slice). */
@@ -440,6 +538,7 @@ export function fetchNpcFleet() {
       airborne: number;
       turnaround: number;
       resting: number;
+      maintenance?: number;
       idle: number;
       regionPressure?: RegionPressure[];
       fleet: NpcFleetMember[];
@@ -457,7 +556,13 @@ export function fetchMissions() {
 }
 
 export function postTick(n = 24) {
-  return api<{ tick: number; availableLots: number }>('/api/tick', {
+  return api<{
+    tick: number;
+    availableLots: number;
+    leasePaidUsd?: number;
+    leaseRepossessed?: string[];
+    walletUsd?: number;
+  }>('/api/tick', {
     method: 'POST',
     body: JSON.stringify({ n }),
   });
@@ -541,18 +646,139 @@ export function postSelectHub(opts: { icao: string; pilotName: string }) {
   });
 }
 
-export function postAcquireAircraft(opts: {
-  aircraftClassId: AircraftClass;
-  locationIcao?: string;
+export function fetchAircraftMarket() {
+  return api<
+    ClockSync & {
+      walletUsd: number;
+      dayIndex: number;
+      listings: AircraftListing[];
+      catalog: Array<{
+        id: AircraftClass;
+        name: string;
+        msrpUsd: number;
+        leaseMonthlyUsd: number;
+        maxCargoKg: number;
+        maxRangeNm: number;
+      }>;
+      fleet: PlayerAircraft[];
+    }
+  >('/api/aircraft-market');
+}
+
+export function postAircraftBuy(opts: { listingId: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    aircraft: PlayerAircraft;
+    fleet: PlayerAircraft[];
+    listings: AircraftListing[];
+  }>('/api/aircraft-market/buy', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftLease(opts: { listingId: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    aircraft: PlayerAircraft;
+    fleet: PlayerAircraft[];
+    listings: AircraftListing[];
+  }>('/api/aircraft-market/lease', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftSell(opts: { aircraftId: string }) {
+  return api<{
+    walletUsd: number;
+    creditUsd: number;
+    listing: AircraftListing;
+    fleet: PlayerAircraft[];
+    listings: AircraftListing[];
+  }>('/api/aircraft-market/sell', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftListLease(opts: {
+  aircraftId: string;
+  termMonths?: 12 | 24;
 }) {
   return api<{
     walletUsd: number;
-    hubSelected: boolean;
+    listing: AircraftListing;
     fleet: PlayerAircraft[];
-    hubs: string[];
-    pilotName: string;
-    homeHubIcao: string;
-  }>('/api/fleet/acquire', {
+    listings: AircraftListing[];
+  }>('/api/aircraft-market/list-lease', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftUnlist(opts: { aircraftId: string }) {
+  return api<{
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+    listings: AircraftListing[];
+  }>('/api/aircraft-market/unlist', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export type MroPartsQuote = {
+  icao: string;
+  requestedKg: number;
+  fromTerminalKg: number;
+  shortfallKg: number;
+  unitPriceUsd: number;
+  partsCostUsd: number;
+  laborSurcharge: number;
+  scarcity: 'ok' | 'partial' | 'dry';
+  stockKg: number;
+  capacityKg: number;
+};
+
+export function postAircraftMaintenance(opts: { aircraftId: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    needsRepair?: boolean;
+    mro?: MroPartsQuote;
+    fleet: PlayerAircraft[];
+  }>('/api/aircraft-market/maintenance', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftRepair(opts: {
+  aircraftId: string;
+  airframePts?: number;
+  enginePts?: number;
+}) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    aircraft: PlayerAircraft;
+    mro?: MroPartsQuote;
+    fleet: PlayerAircraft[];
+  }>('/api/aircraft-market/repair', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftBuyout(opts: { aircraftId: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    fleet: PlayerAircraft[];
+  }>('/api/aircraft-market/buyout', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

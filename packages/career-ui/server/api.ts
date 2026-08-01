@@ -5,9 +5,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   acceptMission,
   assignAircraftToMission,
-  acquireCompanyAircraft,
+  buyOutAircraftLease,
   CAREER_COMMODITIES,
   cancelMission,
+  clearAircraftMaintenanceWithParts,
+  repairAircraftConditionWithParts,
+  hoursUntilInspection,
+  inspectionCostUsd,
   commitStagedManifest,
   continuousEconomyHours,
   createSeedEconomyWorld,
@@ -19,18 +23,26 @@ import {
   findOpenManifestForRoute,
   findPlayerAircraft,
   listActivePlayerMissions,
+  listAircraftClassCatalog,
+  listAircraftMarket,
   listCareerHubIcaos,
   listParkedAt,
   getCommodity,
   hubTierOf,
+  countFuelHaulsEnroute,
+  hubLevelProfile,
+  hubLevelXpProgress,
   listActiveEconomyEvents,
   listActiveNpcFreights,
+  listAirportFuelInbound,
+  listFuelHaulViews,
   listMarketLots,
   listNpcFleetStatus,
   listRegionMarketPressure,
   listViableMarketLots,
   localUnitPriceUsd,
   migrateEconomyWorld,
+  regionFuelThin,
   missionRemainingCapacityKg,
   MS_PER_TICK,
   NPC_FLEET_SIZE,
@@ -38,6 +50,7 @@ import {
   normalizeMissionsState,
   npcClaimForLot,
   parseFreighterClassId,
+  purchaseAircraftListing,
   purchasePlayerMissionOfpFuel,
   quotePlayerMissionOfpFuel,
   quoteFerry,
@@ -45,12 +58,18 @@ import {
   replaceMissionManifest,
   routeDistanceNm,
   selectStarterHub,
+  listAircraftForLease,
+  unlistAircraftForLease,
+  sellPlayerAircraft,
+  settleAircraftMarketOps,
   settleMission,
+  signAircraftLease,
   stockTrend,
   tickEconomyN,
   withMissionLoadPolicy,
   missionLoadPolicy,
   careerAllowsDirectInject,
+  economyDayIndex,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type FreighterClassId,
@@ -78,6 +97,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
 const economyPath = join(repoRoot, 'profiles', 'career', 'local-economy.json');
 const missionsPath = join(repoRoot, 'profiles', 'career', 'local-missions.json');
+/** Row cap for the market board — filters must run server-side to survive it. */
+const MARKET_LOT_LIMIT = 200;
 
 type MissionsFile = CareerMissionsState;
 
@@ -236,10 +257,32 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     const npcCountBefore = Array.isArray((existing as { npcs?: unknown[] }).npcs)
       ? (existing as { npcs: unknown[] }).npcs.length
       : 0;
+    const trucksBefore = Array.isArray((existing as { fuelTrucks?: unknown[] }).fuelTrucks)
+      ? (existing as { fuelTrucks: unknown[] }).fuelTrucks.length
+      : 0;
+    const hubLevelSigBefore = Array.isArray(
+      (existing as { airports?: Array<{ level?: number; levelXp?: number; levelCurveVersion?: number }> })
+        .airports,
+    )
+      ? (existing as { airports: Array<{ level?: number; levelXp?: number; levelCurveVersion?: number }> })
+          .airports.map(
+            (ap) =>
+              `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`,
+          )
+          .join('|')
+      : '';
     const lotsBefore = Array.isArray((existing as { lots?: unknown[] }).lots)
       ? (existing as { lots: unknown[] }).lots.length
       : 0;
     const airportsBefore = (existing as { airports: unknown[] }).airports.length;
+    // Snapshot before migrate: it mutates the same npc objects in place.
+    const npcRegionsBefore = Array.isArray(
+      (existing as { npcs?: Array<{ homeRegion?: string }> }).npcs,
+    )
+      ? (existing as { npcs: Array<{ homeRegion?: string }> }).npcs
+          .map((npc) => npc.homeRegion ?? '')
+          .join('|')
+      : '';
     const missingHubTiers = (existing as { airports: Array<{ hubTier?: string }> }).airports.some(
       (ap) => !ap.hubTier,
     );
@@ -247,18 +290,37 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
     const version = (existing as { version?: number }).version;
     const npcCountAfter = caught.npcs?.length ?? 0;
+    const trucksAfter = caught.fuelTrucks?.length ?? 0;
+    const hubLevelSigAfter = (caught.airports ?? [])
+      .map(
+        (ap) =>
+          `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`,
+      )
+      .join('|');
     const lotsAfter = caught.lots?.length ?? 0;
     const airportsAfter = caught.airports?.length ?? 0;
+    const npcRegionsAfter = (caught.npcs ?? [])
+      .map((npc) => npc.homeRegion ?? '')
+      .join('|');
     if (
       advancedTicks > 0 ||
       settledFlights > 0 ||
       version !== 3 ||
       npcCountAfter !== npcCountBefore ||
+      trucksAfter !== trucksBefore ||
       lotsAfter !== lotsBefore ||
       airportsAfter !== airportsBefore ||
+      npcRegionsAfter !== npcRegionsBefore ||
+      hubLevelSigAfter !== hubLevelSigBefore ||
       missingHubTiers
     ) {
       await writeJson(economyPath, caught);
+    }
+    if (advancedTicks > 0) {
+      const missions = await loadMissions();
+      settleAircraftMarketOps(missions, caught.tick, caught);
+      listAircraftMarket(missions, caught);
+      await writeJson(missionsPath, missions);
     }
     return caught;
   }
@@ -333,6 +395,29 @@ function clockPayload(world: CareerEconomyWorld, nowMs = Date.now()) {
     tick: world.tick,
     continuousHours: continuousEconomyHours(world, nowMs),
     msPerTick: MS_PER_TICK,
+    fuelHaulsEnroute: countFuelHaulsEnroute(world),
+  };
+}
+
+function mapFuelHaulView(
+  row: ReturnType<typeof listFuelHaulViews>[number],
+) {
+  return {
+    id: row.id,
+    truckId: row.truckId,
+    truckName: row.truckName,
+    truckClassId: row.truckClassId,
+    truckLabel: row.truckLabel,
+    originIcao: row.originIcao,
+    destIcao: row.destIcao,
+    cargoKg: row.cargoKg,
+    departedAtMs: row.departedAtMs,
+    arrivesAtMs: row.arrivesAtMs,
+    etaMs: row.etaMs,
+    etaHours: row.etaHours,
+    progressPct: row.progressPct,
+    status: row.status,
+    phase: row.phase,
   };
 }
 
@@ -424,6 +509,11 @@ function mapNpcFleet(world: Awaited<ReturnType<typeof loadEconomy>>, nowMs = Dat
     restUntilTick: row.restUntilTick,
     restUntilMs: row.restUntilMs,
     restHoursLeft: row.restHoursLeft,
+    mxUntilTick: row.mxUntilTick,
+    mxUntilMs: row.mxUntilMs,
+    mxHoursLeft: row.mxHoursLeft,
+    locationIcao: row.locationIcao,
+    hoursSinceMx: row.hoursSinceMx,
     dutyHoursAccum: row.dutyHoursAccum,
     mission: row.mission
       ? {
@@ -666,29 +756,247 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
-      if (req.method === 'POST' && path === '/api/fleet/acquire') {
-        const body = (await readBody(req)) as {
-          aircraftClassId?: string;
-          locationIcao?: string;
-        };
-        const aircraftClassId = parseFreighterClassId(body.aircraftClassId ?? undefined);
-        if (!aircraftClassId) {
-          send(res, 400, {
-            error:
-              'aircraftClassId required (narrow_freighter|wide_freighter|light_turboprop|light_ga)',
+      if (req.method === 'GET' && path === '/api/aircraft-market') {
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        settleAircraftMarketOps(missions, world.tick, world);
+        const listings = listAircraftMarket(missions, world);
+        await writeJson(missionsPath, missions);
+        const nowMs = Date.now();
+        send(res, 200, {
+          ...clockPayload(world, nowMs),
+          walletUsd: missions.walletUsd,
+          dayIndex: economyDayIndex(world.tick),
+          listings,
+          catalog: listAircraftClassCatalog(),
+          fleet: missions.fleet,
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/buy') {
+        const body = (await readBody(req)) as { listingId?: string };
+        if (!body.listingId) {
+          send(res, 400, { error: 'listingId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          settleAircraftMarketOps(missions, world.tick);
+          const result = purchaseAircraftListing(missions, world, body.listingId);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            debitUsd: result.debitUsd,
+            aircraft: result.aircraft,
+            fleet: missions.fleet,
+            listings: listAircraftMarket(missions, world),
           });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/lease') {
+        const body = (await readBody(req)) as { listingId?: string };
+        if (!body.listingId) {
+          send(res, 400, { error: 'listingId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          settleAircraftMarketOps(missions, world.tick);
+          const result = signAircraftLease(missions, world, body.listingId);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            debitUsd: result.debitUsd,
+            aircraft: result.aircraft,
+            fleet: missions.fleet,
+            listings: listAircraftMarket(missions, world),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/sell') {
+        const body = (await readBody(req)) as { aircraftId?: string };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          const result = sellPlayerAircraft(missions, body.aircraftId, world.tick);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            creditUsd: result.creditUsd,
+            listing: result.listing,
+            fleet: missions.fleet,
+            listings: listAircraftMarket(missions, world),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/list-lease') {
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          termMonths?: number;
+        };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          const term =
+            body.termMonths === 24 ? (24 as const) : (12 as const);
+          const result = listAircraftForLease(
+            missions,
+            body.aircraftId,
+            world.tick,
+            { termMonths: term },
+          );
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            listing: result.listing,
+            fleet: missions.fleet,
+            listings: listAircraftMarket(missions, world),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/unlist') {
+        const body = (await readBody(req)) as { aircraftId?: string };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          unlistAircraftForLease(missions, body.aircraftId);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            fleet: missions.fleet,
+            listings: listAircraftMarket(missions, world),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/maintenance') {
+        const body = (await readBody(req)) as { aircraftId?: string };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          const result = clearAircraftMaintenanceWithParts(
+            missions,
+            body.aircraftId,
+            world,
+          );
+          await persistEconomy(world);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            debitUsd: result.debitUsd,
+            needsRepair: result.needsRepair,
+            mro: result.mro,
+            fleet: missions.fleet,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/repair') {
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          airframePts?: number;
+          enginePts?: number;
+        };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        try {
+          const result = repairAircraftConditionWithParts(
+            missions,
+            body.aircraftId,
+            world,
+            {
+              airframePts: body.airframePts,
+              enginePts: body.enginePts,
+            },
+          );
+          await persistEconomy(world);
+          await writeJson(missionsPath, missions);
+          send(res, 200, {
+            walletUsd: missions.walletUsd,
+            debitUsd: result.debitUsd,
+            aircraft: result.aircraft,
+            mro: result.mro,
+            fleet: missions.fleet,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/buyout') {
+        const body = (await readBody(req)) as { aircraftId?: string };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
           return;
         }
         const missions = await loadMissions();
         try {
-          const next = acquireCompanyAircraft(missions, aircraftClassId, {
-            locationIcao: body.locationIcao,
-          });
-          Object.assign(missions, next);
+          const result = buyOutAircraftLease(missions, body.aircraftId);
           await writeJson(missionsPath, missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
-            ...fleetPayload(missions),
+            debitUsd: result.debitUsd,
+            fleet: missions.fleet,
           });
         } catch (error) {
           send(res, 400, {
@@ -791,7 +1099,13 @@ export function createCareerApiServer(port = 8787) {
         const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);
         const origin = url.searchParams.get('origin') ?? undefined;
         const dest = url.searchParams.get('dest') ?? undefined;
-        const filter = { originIcao: origin ?? undefined, destIcao: dest ?? undefined, nowMs };
+        const query = url.searchParams.get('q') ?? undefined;
+        const filter = {
+          originIcao: origin ?? undefined,
+          destIcao: dest ?? undefined,
+          query: query ?? undefined,
+          nowMs,
+        };
         const cargoLimit = aircraft ? await resolveClassMaxCargoKg(aircraft) : undefined;
         const lots = aircraft
           ? listViableMarketLots(world, aircraft, {
@@ -813,9 +1127,13 @@ export function createCareerApiServer(port = 8787) {
             ready: r.ready,
             total: r.total,
             resting: r.resting,
+            maintenance: r.maintenance,
             weather: r.weather,
+            fuelThin: regionFuelThin(world, r.region, nowMs),
           })),
-          lots: lots.slice(0, 200).map((row) => ({
+          totalLots: lots.length,
+          lotLimit: MARKET_LOT_LIMIT,
+          lots: lots.slice(0, MARKET_LOT_LIMIT).map((row) => ({
             id: row.lot.id,
             originIcao: row.lot.originIcao,
             destIcao: row.lot.destIcao,
@@ -885,6 +1203,7 @@ export function createCareerApiServer(port = 8787) {
             .length,
           turnaround: fleet.filter((n) => n.phase === 'turnaround').length,
           resting: fleet.filter((n) => n.phase === 'resting').length,
+          maintenance: fleet.filter((n) => n.phase === 'maintenance').length,
           idle: fleet.filter((n) => n.phase === 'idle').length,
           regionPressure: listRegionMarketPressure(world, nowMs).map((r) => ({
             region: r.region,
@@ -893,7 +1212,9 @@ export function createCareerApiServer(port = 8787) {
             ready: r.ready,
             total: r.total,
             resting: r.resting,
+            maintenance: r.maintenance,
             weather: r.weather,
+            fuelThin: regionFuelThin(world, r.region, nowMs),
           })),
           fleet,
           activity: mapNpcActivity(world, nowMs),
@@ -921,6 +1242,7 @@ export function createCareerApiServer(port = 8787) {
           return {
             commodityId: c.id,
             name: c.name,
+            kind: c.kind ?? 'cargo',
             perishable: Boolean(c.perishable),
             highValue: Boolean(c.highValue),
             stockKg: pile.stockKg,
@@ -948,6 +1270,13 @@ export function createCareerApiServer(port = 8787) {
           .map((lot) => mapLotSummary(world, lot, nowMs));
 
         const movements = mapAirportMovements(world, icao, missions.missions, nowMs);
+        const fuelInbound = listAirportFuelInbound(world, icao, nowMs).map(mapFuelHaulView);
+        const fuelRecent = listFuelHaulViews(world, { destIcao: icao, nowMs })
+          .filter((h) => h.status === 'completed' || h.phase === 'delivered')
+          .slice(-3)
+          .map(mapFuelHaulView);
+        const levelInfo = hubLevelXpProgress(airport);
+        const levelProfile = hubLevelProfile(levelInfo.level);
 
         send(res, 200, {
           ...clockPayload(world, nowMs),
@@ -955,10 +1284,22 @@ export function createCareerApiServer(port = 8787) {
             icao: airport.icao,
             name: airport.name,
             region: airport.region,
-            level: airport.level,
+            level: levelInfo.level,
             hubTier: hubTierOf(airport),
             lat: airport.lat,
             lon: airport.lon,
+          },
+          hubLevel: {
+            level: levelInfo.level,
+            xp: levelInfo.xp,
+            xpIntoLevel: levelInfo.xpIntoLevel,
+            xpForNext: levelInfo.xpForNext,
+            progressPct: levelInfo.progressPct,
+            capacityMult: levelProfile.capacityMult,
+            flowMult: levelProfile.flowMult,
+            laneBonus: levelProfile.laneBonus,
+            originPayMult: levelProfile.originPayMult,
+            quiet: (airport.activityScore ?? 40) < 8,
           },
           events: listActiveEconomyEvents(world, { icao }),
           totalStockKg,
@@ -971,6 +1312,8 @@ export function createCareerApiServer(port = 8787) {
           npcActivity: mapNpcActivity(world, nowMs).filter(
             (f) => f.originIcao === icao || f.destIcao === icao,
           ),
+          fuelInbound,
+          fuelRecent,
         });
         return;
       }
@@ -991,10 +1334,18 @@ export function createCareerApiServer(port = 8787) {
           tickEconomyN(w, n);
           return w;
         });
+        const missions = await loadMissions();
+        const leaseOps = settleAircraftMarketOps(missions, world.tick, world);
+        listAircraftMarket(missions, world);
+        await writeJson(missionsPath, missions);
         const nowMs = Date.now();
         send(res, 200, {
           ...clockPayload(world, nowMs),
           availableLots: world.lots.filter((l) => l.status === 'available').length,
+          leasePaidUsd: leaseOps.paidUsd,
+          leaseRepossessed: leaseOps.repossessed,
+          leaseOutEarnedUsd: leaseOps.leaseOutEarnedUsd,
+          walletUsd: missions.walletUsd,
         });
         return;
       }

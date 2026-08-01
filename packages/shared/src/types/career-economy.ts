@@ -9,7 +9,8 @@ export type CommodityId =
   | 'perishables'
   | 'machinery'
   | 'general'
-  | 'fuel';
+  | 'fuel'
+  | 'mro_parts';
 
 export interface CommodityDef {
   id: CommodityId;
@@ -19,10 +20,10 @@ export interface CommodityDef {
   perishable?: boolean;
   highValue?: boolean;
   /**
-   * `fuel` stays in terminal inventory + uplift; not formed into freight lots (MVP).
+   * `fuel` / `mro` stay in terminal inventory; not formed into freight lots.
    * Default / omitted = cargo.
    */
-  kind?: 'cargo' | 'fuel';
+  kind?: 'cargo' | 'fuel' | 'mro';
 }
 
 export interface StockPile {
@@ -45,10 +46,24 @@ export interface AirportTerminal {
   /** WGS84 longitude (degrees). */
   lon: number;
   /**
-   * Terminal development level (Transport Fever–style growth later).
-   * MVP: affects capacity slightly; raised when shortages are repeatedly filled.
+   * Terminal development level 1–5 (sticky). Raised by traffic XP, not by
+   * idle stock alone. Distinct from static hubTier.
    */
   level: number;
+  /** Cumulative activity points toward / past current level. */
+  levelXp?: number;
+  /**
+   * Balance-curve generation for hub XP thresholds.
+   * Bumped when thresholds/XP rates are retuned so inflated levels can resync.
+   */
+  levelCurveVersion?: number;
+  /** XP granted during the current economy tick (cap spam from lot formation). */
+  levelXpTick?: number;
+  levelXpTickAt?: number;
+  /** Decaying recent-activity score for soft neglect (does not drop level). */
+  activityScore?: number;
+  /** Last tick that recorded hub activity. */
+  lastActivityTick?: number;
   inventory: Partial<Record<CommodityId, StockPile>>;
   /**
    * Baseline production per tick (kg). Effective flow each tick is derived from this.
@@ -124,7 +139,7 @@ export interface NpcFreighter {
   aggressiveness: number;
   /** Multiplier on minimum acceptable pay/kg vs commodity base. */
   feeBias: number;
-  status: 'idle' | 'busy' | 'resting';
+  status: 'idle' | 'busy' | 'resting' | 'maintenance';
   /** Economy tick when this freighter can bid again (legacy / debug). */
   busyUntilTick?: number;
   /** Wall-clock when freighter can bid again after turnaround (authoritative). */
@@ -137,6 +152,22 @@ export interface NpcFreighter {
   restUntilTick?: number;
   /** Wall-clock when crew rest ends — NPC cannot bid until then. */
   restUntilMs?: number;
+  /**
+   * Block hours since last abstract shop visit (inspection-scale).
+   * When past class interval, NPC enters maintenance after turnaround.
+   */
+  hoursSinceMx?: number;
+  /** Last known terminal (set on arrival); MRO parts drawn here. */
+  locationIcao?: string;
+  /** Wall-clock when shop visit ends. */
+  mxUntilMs?: number;
+  /** Economy tick when shop visit ends (legacy / debug). */
+  mxUntilTick?: number;
+  /**
+   * Player airframe currently wet-leased to this operator (lease-out from hangar).
+   * Cleared when the term ends.
+   */
+  leasedPlayerAircraftId?: string;
   currentFlightId?: string;
 }
 
@@ -211,14 +242,19 @@ export interface NpcFleetMemberView {
   reliability: number;
   aggressiveness: number;
   feeBias: number;
-  status: 'idle' | 'busy' | 'resting';
-  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround' | 'resting';
+  status: 'idle' | 'busy' | 'resting' | 'maintenance';
+  phase: 'idle' | 'enroute' | 'arriving' | 'turnaround' | 'resting' | 'maintenance';
   busyUntilTick?: number;
   busyUntilMs?: number;
   turnaroundHoursLeft?: number;
   restUntilTick?: number;
   restUntilMs?: number;
   restHoursLeft?: number;
+  mxUntilTick?: number;
+  mxUntilMs?: number;
+  mxHoursLeft?: number;
+  locationIcao?: string;
+  hoursSinceMx?: number;
   dutyHoursAccum?: number;
   mission?: {
     flightId: string;
@@ -241,6 +277,52 @@ export interface NpcFleetMemberView {
     urgency: ShipmentLot['urgency'];
     phase: 'enroute' | 'arriving';
   };
+}
+
+/** Background Jet-A road tanker (not a player career vehicle). */
+export type FuelTruckClassId = 'rigid_tanker' | 'semi_tanker' | 'btrain_tanker';
+
+export interface FuelTruck {
+  id: string;
+  name: string;
+  truckClassId: FuelTruckClassId;
+  homeRegion: string;
+  status: 'idle' | 'enroute' | 'turnaround';
+  currentHaulId?: string;
+  /** Wall-clock when turnaround ends / truck becomes idle again. */
+  busyUntilMs?: number;
+}
+
+/** One hub→spoke Jet-A road delivery. */
+export interface FuelHaul {
+  id: string;
+  truckId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: 'fuel';
+  cargoKg: number;
+  departedAtMs: number;
+  arrivesAtMs: number;
+  status: 'enroute' | 'completed';
+}
+
+/** Compact Terminal / API row for an inbound (or recent) fuel truck. */
+export interface FuelHaulView {
+  id: string;
+  truckId: string;
+  truckName: string;
+  truckClassId: FuelTruckClassId;
+  truckLabel: string;
+  originIcao: string;
+  destIcao: string;
+  cargoKg: number;
+  departedAtMs: number;
+  arrivesAtMs: number;
+  etaMs: number;
+  etaHours: number;
+  progressPct: number;
+  status: FuelHaul['status'];
+  phase: 'enroute' | 'arriving' | 'delivered';
 }
 
 export interface CareerEconomyWorld {
@@ -270,6 +352,10 @@ export interface CareerEconomyWorld {
    * Soft fill = stock + NPC airborne + these rows.
    */
   inboundPending?: InboundPending[];
+  /** Background Jet-A road tankers (seeded / migrated). */
+  fuelTrucks?: FuelTruck[];
+  /** Active / recently completed fuel road hauls. */
+  fuelHauls?: FuelHaul[];
 }
 
 /** Legacy persisted shape before continuous clock / live events. */
@@ -539,6 +625,62 @@ export interface MissionSettlement {
   lines?: MissionSettlementLine[];
 }
 
+export type AircraftListingKind = 'new' | 'used' | 'lease';
+export type AirframeCondition = 'excellent' | 'good' | 'fair' | 'tired';
+export type AircraftListingStatus = 'available' | 'reserved' | 'sold' | 'expired';
+export type AircraftListingSource = 'generated' | 'player_sale' | 'player_lease';
+
+/** Board listing on the Skyline aircraft market. */
+export interface AircraftListing {
+  id: string;
+  kind: AircraftListingKind;
+  aircraftClassId: FreighterClassId;
+  label: string;
+  basedIcao: string;
+  /** Purchase price, or lease down-payment. */
+  askingUsd: number;
+  leaseMonthlyUsd?: number;
+  leaseTermMonths?: number;
+  condition: AirframeCondition;
+  hoursAirframe: number;
+  hoursEngine: number;
+  /** Optional 0–100 wear stats (market / hangar). */
+  airframeConditionPct?: number;
+  engineConditionPct?: number;
+  expiresAtTick: number;
+  status: AircraftListingStatus;
+  /** Origin of the listing; omit/legacy treated as generated. */
+  source?: AircraftListingSource;
+  /** Fleet id when source is player_sale or player_lease. */
+  sellerAircraftId?: string;
+}
+
+export interface AircraftLeaseContract {
+  monthlyUsd: number;
+  /** Economy tick when the next monthly debit is due. */
+  nextDueTick: number;
+  /** Economy tick when the lease term ends. */
+  termEndsTick: number;
+  buyoutUsd?: number;
+  listingId?: string;
+}
+
+/** Income side when an NPC/market leases a player-listed airframe. */
+export interface AircraftLeaseOutContract {
+  monthlyUsd: number;
+  nextDueTick: number;
+  termEndsTick: number;
+  depositUsd: number;
+  listingId?: string;
+  /** Named competing freighter operating the airframe (when bound). */
+  lesseeNpcId?: string;
+  lesseeName?: string;
+  /** Economy tick when the lease-out started (wear baseline). */
+  startedAtTick: number;
+  /** Economy tick through which utilization wear was last applied. */
+  lastWearTick: number;
+}
+
 export interface CareerMissionsState {
   version: 2;
   /** Company cash from settled freights (Slice 4). */
@@ -552,6 +694,12 @@ export interface CareerMissionsState {
   pilotName: string;
   /** Home / starter hub ICAO; empty until registered. */
   homeHubIcao: string;
+  /** Active aircraft-market board (refreshed by economy day). */
+  aircraftMarket?: AircraftListing[];
+  /** Economy day index when aircraftMarket was last regenerated. */
+  aircraftMarketDay?: number;
+  /** Economy day when abstract NPC demand last ran. */
+  aircraftMarketDemandDay?: number;
 }
 
 /** Legacy missions save before hangar / fleet. */
@@ -561,9 +709,15 @@ export interface CareerMissionsStateV1 {
   missions: MissionIntent[];
 }
 
-export type PlayerAircraftStatus = 'parked' | 'assigned';
+export type PlayerAircraftStatus =
+  | 'parked'
+  | 'assigned'
+  | 'maintenance'
+  | 'listed'
+  | 'leased_out';
+export type AircraftOwnership = 'owned' | 'leased';
 
-/** Player-owned freighter parked at a career terminal when not on a mission. */
+/** Player freighter parked at a career terminal when not on a mission. */
 export interface PlayerAircraft {
   id: string;
   aircraftClassId: FreighterClassId;
@@ -575,4 +729,23 @@ export interface PlayerAircraft {
   status: PlayerAircraftStatus;
   /** Active mission id while status === 'assigned'. */
   assignedMissionId?: string;
+  ownership?: AircraftOwnership;
+  condition?: AirframeCondition;
+  hoursAirframe?: number;
+  hoursEngine?: number;
+  /** Soft inspection threshold (absolute airframe hours); derived from hoursSinceInspection. */
+  maintenanceDueAtHours?: number;
+  /** Airframe condition 0–100. */
+  airframeConditionPct?: number;
+  /** Engine condition 0–100. */
+  engineConditionPct?: number;
+  /** Flight hours since last workshop inspection. */
+  hoursSinceInspection?: number;
+  lease?: AircraftLeaseContract;
+  /** Set when lease payment is overdue — blocks dispatch until paid/caught up. */
+  leaseOverdue?: boolean;
+  /** Active board listing when status === 'listed'. */
+  listedListingId?: string;
+  /** Active when status === 'leased_out' (NPC/market holds the airframe). */
+  leaseOut?: AircraftLeaseOutContract;
 }

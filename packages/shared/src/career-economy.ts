@@ -1,4 +1,20 @@
 import {
+  ensureWorldHubLevels,
+  hubLevelHealthMult,
+  hubLevelLaneBonus,
+  hubLevelOriginPayMult,
+  recordFreightSettleActivity,
+  recordLotFormationActivity,
+  tickHubLevels,
+} from './career-hub-level.js';
+import {
+  ensureFuelTruckFleet,
+  seedFuelTruckFleet,
+  settleFuelHaulsDue,
+  shiftFuelLogisticsWallClock,
+  tickFuelLogistics,
+} from './career-fuel-logistics.js';
+import {
   ensureNpcFleet,
   listNpcActivity,
   npcClaimForLot,
@@ -24,6 +40,8 @@ import type {
   CommodityId,
   EconomyEvent,
   EconomyEventKind,
+  FuelHaul,
+  FuelTruck,
   HubTier,
   MarketLotView,
   NpcActivityView,
@@ -42,6 +60,10 @@ export type {
   CommodityId,
   EconomyEvent,
   EconomyEventKind,
+  FuelHaul,
+  FuelHaulView,
+  FuelTruck,
+  FuelTruckClassId,
   HubTier,
   InboundPending,
   MarketLotView,
@@ -54,8 +76,54 @@ export type {
 } from './types/career-economy.js';
 
 export {
+  clampHubLevel,
+  ensureAirportHubLevel,
+  ensureWorldHubLevels,
+  HUB_ACTIVITY,
+  HUB_LEVEL_CURVE_VERSION,
+  HUB_LEVEL_MAX,
+  HUB_LEVEL_MIN,
+  HUB_LEVEL_PROFILE,
+  HUB_LEVEL_XP_PER_TICK_CAP,
+  HUB_LEVEL_XP_TO_REACH,
+  hubLevelFromXp,
+  hubLevelHealthMult,
+  hubLevelLaneBonus,
+  hubLevelNpcBidMult,
+  hubLevelOriginPayMult,
+  hubLevelProfile,
+  hubLevelXpProgress,
+  recordFreightSettleActivity,
+  recordFuelTruckDeliveryActivity,
+  recordFuelUpliftActivity,
+  recordHubActivity,
+  recordLotFormationActivity,
+  regionAverageHubLevel,
+  tickHubLevels,
+} from './career-hub-level.js';
+
+export {
+  countFuelHaulsEnroute,
+  ensureFuelTruckFleet,
+  estimateFuelHaulHours,
+  FUEL_TRUCK_CAPACITY_KG,
+  FUEL_TRUCK_COMPOSITION,
+  FUEL_TRUCK_FLEET_SIZE,
+  FUEL_TRUCK_LABEL,
+  getFuelTruckCapacityKg,
+  listAirportFuelInbound,
+  listFuelHaulViews,
+  regionFuelThin,
+  seedFuelTruckFleet,
+  settleFuelHaulsDue,
+  tickFuelLogistics,
+} from './career-fuel-logistics.js';
+
+export {
   describeLotMarketPressure,
+  drainNpcMroParts,
   ensureNpcFleet,
+  ensureNpcRegionCoverage,
   estimateNpcBlockHours,
   listNpcActivity,
   listNpcFleetStatus,
@@ -67,6 +135,9 @@ export {
   npcLaneSaturation,
   npcRegionBidCapacity,
   NPC_FLEET_SIZE,
+  NPC_MX_INTERVAL_HOURS,
+  NPC_MX_PARTS_KG,
+  NPC_MX_SHOP_HOURS,
   LANE_BUSY_SATURATION,
   THIN_FLEET_CAPACITY,
   seedNpcFleet,
@@ -178,13 +249,15 @@ export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): H
 export function laneLotCaps(
   originTier: HubTier,
   destTier: HubTier,
+  opts: { originLevel?: number; destLevel?: number } = {},
 ): { maxLots: number; maxLarge: number; maxSmall: number } {
   const origin = HUB_TIER_PROFILE[originTier];
   const dest = HUB_TIER_PROFILE[destTier];
+  const bonus = hubLevelLaneBonus(opts.originLevel ?? 1, opts.destLevel ?? 1);
   return {
-    maxLots: Math.min(origin.maxLots, dest.maxLots),
-    maxLarge: Math.min(origin.maxLarge, dest.maxLarge),
-    maxSmall: Math.min(origin.maxSmall, dest.maxSmall),
+    maxLots: Math.min(origin.maxLots, dest.maxLots) + bonus,
+    maxLarge: Math.min(origin.maxLarge, dest.maxLarge) + Math.min(1, bonus),
+    maxSmall: Math.min(origin.maxSmall, dest.maxSmall) + Math.max(0, bonus - 1),
   };
 }
 
@@ -333,11 +406,18 @@ export const CAREER_COMMODITIES: readonly CommodityDef[] = [
     basePricePerKg: 0.95,
     kind: 'fuel',
   },
+  {
+    id: 'mro_parts',
+    name: 'Aircraft parts (MRO)',
+    basePricePerKg: 12,
+    highValue: true,
+    kind: 'mro',
+  },
 ] as const;
 
-/** Freight-board commodities (excludes terminal fuel). */
+/** Freight-board commodities (excludes terminal fuel + MRO parts). */
 export const CAREER_CARGO_COMMODITIES: readonly CommodityDef[] =
-  CAREER_COMMODITIES.filter((c) => c.kind !== 'fuel');
+  CAREER_COMMODITIES.filter((c) => c.kind !== 'fuel' && c.kind !== 'mro');
 
 /** Major Jet-A production hubs in the Brazil career map. */
 export const FUEL_HUB_ICAOS = new Set([
@@ -387,6 +467,46 @@ export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
 export function ensureWorldFuelInventory(world: CareerEconomyWorld): void {
   for (const ap of world.airports) {
     ensureAirportFuelInventory(ap);
+  }
+}
+
+/** Seed or repair aircraft-parts (MRO) inventory + baseline flows on a terminal. */
+export function ensureAirportMroInventory(terminal: AirportTerminal): void {
+  const tier = hubTierOf(terminal);
+  const cap =
+    tier === 'major' ? 80_000 : tier === 'regional' ? 35_000 : 12_000;
+  const prod =
+    tier === 'major' ? 900 : tier === 'regional' ? 280 : 40;
+  const cons =
+    tier === 'major' ? 420 : tier === 'regional' ? 220 : 90;
+
+  if (!terminal.inventory.mro_parts) {
+    terminal.inventory.mro_parts = pile(Math.round(cap * 0.5), cap);
+  } else {
+    terminal.inventory.mro_parts.capacityKg = Math.max(
+      terminal.inventory.mro_parts.capacityKg,
+      cap,
+    );
+    terminal.inventory.mro_parts.stockKg = clamp(
+      terminal.inventory.mro_parts.stockKg,
+      0,
+      terminal.inventory.mro_parts.capacityKg,
+    );
+  }
+
+  terminal.baseProduction = { ...terminal.baseProduction, mro_parts: prod };
+  terminal.baseConsumption = { ...terminal.baseConsumption, mro_parts: cons };
+  if (terminal.production.mro_parts === undefined) {
+    terminal.production = { ...terminal.production, mro_parts: prod };
+  }
+  if (terminal.consumption.mro_parts === undefined) {
+    terminal.consumption = { ...terminal.consumption, mro_parts: cons };
+  }
+}
+
+export function ensureWorldMroInventory(world: CareerEconomyWorld): void {
+  for (const ap of world.airports) {
+    ensureAirportMroInventory(ap);
   }
 }
 
@@ -866,6 +986,25 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
         inventory[c.id] = pile(Math.round(cap * startFill), cap);
         continue;
       }
+      if (c.id === 'mro_parts') {
+        const tier = h.hubTier;
+        const cap = Math.round(
+          (tier === 'major' ? 80_000 : tier === 'regional' ? 35_000 : 12_000) *
+            capacityBoost,
+        );
+        const prod = Math.round(
+          (tier === 'major' ? 900 : tier === 'regional' ? 280 : 40) *
+            (0.85 + rng() * 0.3),
+        );
+        const cons = Math.round(
+          (tier === 'major' ? 420 : tier === 'regional' ? 220 : 90) *
+            (0.85 + rng() * 0.3),
+        );
+        production[c.id] = prod;
+        consumption[c.id] = cons;
+        inventory[c.id] = pile(Math.round(cap * (0.4 + rng() * 0.25)), cap);
+        continue;
+      }
       const cap = Math.round(
         70_000 * capacityBoost * tierProfile.capacityMult * (0.85 + rng() * 0.3),
       );
@@ -903,7 +1042,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
 
   const now = Date.now();
   const regions = airports.map((a) => a.region);
-  return {
+  const world: CareerEconomyWorld = {
     version: 3,
     seed,
     tick: 0,
@@ -915,7 +1054,11 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     npcs: seedNpcFleet({ seed, regions }),
     npcFlights: [],
     inboundPending: [],
+    fuelTrucks: seedFuelTruckFleet({ seed, regions }),
+    fuelHauls: [],
   };
+  ensureWorldHubLevels(world);
+  return world;
 }
 
 /** Continuous economy hours = completed batches + fractional hour since last batch. */
@@ -1023,6 +1166,8 @@ export function migrateEconomyWorld(
     events?: EconomyEvent[];
     npcs?: NpcFreighter[];
     npcFlights?: NpcFlight[];
+    fuelTrucks?: FuelTruck[];
+    fuelHauls?: FuelHaul[];
   };
   if (!Array.isArray(base.airports)) {
     throw new Error('Invalid career economy: missing airports');
@@ -1061,13 +1206,18 @@ export function migrateEconomyWorld(
     inboundPending: Array.isArray((base as { inboundPending?: unknown }).inboundPending)
       ? ((base as { inboundPending: CareerEconomyWorld['inboundPending'] }).inboundPending ?? [])
       : [],
+    fuelTrucks: Array.isArray(base.fuelTrucks) ? base.fuelTrucks : [],
+    fuelHauls: Array.isArray(base.fuelHauls) ? base.fuelHauls : [],
   };
 
   ensureCareerHubCoverage(migrated);
   ensureNpcFleet(migrated);
   migrateNpcTimestamps(migrated, Number.isFinite(version) ? version : 0);
   ensureWorldFuelInventory(migrated);
+  ensureWorldMroInventory(migrated);
   ensureWorldHubTiers(migrated);
+  ensureFuelTruckFleet(migrated);
+  ensureWorldHubLevels(migrated);
   pruneDeadLots(migrated);
 
   return migrated;
@@ -1094,9 +1244,12 @@ export function ensureEconomyCaughtUp(
   w.events = migrated.events ?? [];
   w.npcs = migrated.npcs;
   w.npcFlights = migrated.npcFlights;
+  w.fuelTrucks = migrated.fuelTrucks;
+  w.fuelHauls = migrated.fuelHauls;
 
   // Mid-hour continuous ops first (arrivals between batches).
   let settledFlights = settleNpcOpsDue(w, nowMs).settledFlights;
+  settledFlights += settleFuelHaulsDue(w, nowMs).settledHauls;
 
   const last = w.lastBatchAtMs;
   const elapsed = Math.max(0, nowMs - last);
@@ -1110,6 +1263,7 @@ export function ensureEconomyCaughtUp(
   w.lastSyncedAtMs = w.lastBatchAtMs;
 
   settledFlights += settleNpcOpsDue(w, nowMs).settledFlights;
+  settledFlights += settleFuelHaulsDue(w, nowMs).settledHauls;
   return { advancedTicks: hours, settledFlights, world: w };
 }
 
@@ -1399,6 +1553,9 @@ export function applyFreightDelivery(
   const room = Math.max(0, dStock.capacityKg - dStock.stockKg);
   const addedToDestKg = Math.min(qty, room);
   dStock.stockKg = clamp(dStock.stockKg + addedToDestKg, 0, dStock.capacityKg);
+  if (addedToDestKg > 0 || removedFromOriginKg > 0) {
+    recordFreightSettleActivity(world, opts.originIcao, opts.destIcao);
+  }
   return {
     removedFromOriginKg,
     addedToDestKg,
@@ -1426,13 +1583,21 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
       const evProd = eventMultiplier(world, ap, c.id, 'prod');
       const evCons = eventMultiplier(world, ap, c.id, 'cons');
 
+      const health = hubLevelHealthMult(ap);
       const prod = Math.max(
         0,
-        Math.round(baseProd * prodSaturation * season * evProd * noise),
+        Math.round(baseProd * prodSaturation * season * evProd * noise * health),
       );
       const cons = Math.max(
         0,
-        Math.round(baseCons * consStarvation * season * evCons * (0.9 + rng() * 0.2)),
+        Math.round(
+          baseCons *
+            consStarvation *
+            season *
+            evCons *
+            (0.9 + rng() * 0.2) *
+            health,
+        ),
       );
 
       ap.production[c.id] = prod;
@@ -1651,6 +1816,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
     const scarcePayMult =
       laneSaturation >= 0.35 ? 1 + laneSaturation * 0.12 : 1;
     const weatherPayMult = regionalWeatherPayMult(laneWeather);
+    const originLevelPay = hubLevelOriginPayMult(origin.ap.level ?? 1);
     const payPerKg = Math.min(
       gap *
         0.55 *
@@ -1660,7 +1826,8 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
         scarcePayMult *
         weatherPayMult *
         corridorPayMult *
-        shock.payMult,
+        shock.payMult *
+        originLevelPay,
       commodity.basePricePerKg * 1.8,
     );
     const payUsd = Math.round(qty * payPerKg);
@@ -1694,6 +1861,7 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
 
     origin.stock.stockKg = clamp(origin.stock.stockKg - qty * 0.25, 0, origin.stock.capacityKg);
     world.lots.push(lot);
+    recordLotFormationActivity(world, origin.ap.icao, dest.ap.icao);
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
     if (size === 'large') {
       largeCounts.set(key, (largeCounts.get(key) ?? 0) + 1);
@@ -1759,7 +1927,10 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
       d: (typeof ranked)[number],
       weight: number,
     ): boolean => {
-      let caps = laneLotCaps(o.tier, d.tier);
+      let caps = laneLotCaps(o.tier, d.tier, {
+        originLevel: o.ap.level,
+        destLevel: d.ap.level,
+      });
       if (weight >= 1.8) {
         caps = {
           maxLots: caps.maxLots + 1,
@@ -1804,7 +1975,10 @@ function formLotsFromImbalances(world: CareerEconomyWorld, rng: () => number): v
           if (originHasOpenCorridor(origin) || rng() > 0.2) continue;
         }
         const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
-        let caps = laneLotCaps(origin.tier, dest.tier);
+        let caps = laneLotCaps(origin.tier, dest.tier, {
+          originLevel: origin.ap.level,
+          destLevel: dest.ap.level,
+        });
         if (cw >= 1.8) {
           caps = {
             maxLots: caps.maxLots + 1,
@@ -1916,9 +2090,13 @@ export function tickEconomy(
     world.lots = migrated.lots;
     world.npcs = migrated.npcs;
     world.npcFlights = migrated.npcFlights;
+    world.fuelTrucks = migrated.fuelTrucks;
+    world.fuelHauls = migrated.fuelHauls;
   }
 
   ensureNpcFleet(world);
+  ensureFuelTruckFleet(world);
+  ensureWorldHubLevels(world);
 
   world.tick += 1;
   const batchNowMs =
@@ -1927,36 +2105,13 @@ export function tickEconomy(
   const rng = mulberry32(hashSeed(`${opts.rngSeed ?? world.seed}:t${world.tick}`));
 
   applyProductionConsumption(world, rng);
+  tickFuelLogistics(world, rng, { batchNowMs });
   expireLots(world);
   escalateIdleLots(world);
   maybeSpawnEvents(world, rng);
   formLotsFromImbalances(world, rng);
   tickNpcFreighters(world, rng, { batchNowMs });
-
-  // Mild TF-like growth: terminals that stay well-supplied bump level slowly
-  for (const ap of world.airports) {
-    let ok = 0;
-    let n = 0;
-    for (const c of CAREER_COMMODITIES) {
-      const s = ap.inventory[c.id];
-      if (!s) continue;
-      n += 1;
-      if (fillPct(s) > 0.35 && fillPct(s) < 0.85) {
-        ok += 1;
-      }
-    }
-    if (n > 0 && ok / n >= 0.75 && world.tick % 12 === 0 && ap.level < 5) {
-      ap.level += 1;
-      if (!ap.baseProduction) ap.baseProduction = { ...(ap.production ?? {}) };
-      if (!ap.baseConsumption) ap.baseConsumption = { ...(ap.consumption ?? {}) };
-      for (const c of CAREER_COMMODITIES) {
-        const s = ensurePile(ap, c.id);
-        s.capacityKg = Math.round(s.capacityKg * 1.05);
-        ap.baseProduction[c.id] = Math.round(baseProdOf(ap, c.id) * 1.03);
-        ap.baseConsumption[c.id] = Math.round(baseConsOf(ap, c.id) * 1.03);
-      }
-    }
-  }
+  tickHubLevels(world);
 
   return world;
 }
@@ -1992,6 +2147,7 @@ export function shiftEconomyWallClock(
       npc.restUntilMs += deltaMs;
     }
   }
+  shiftFuelLogisticsWallClock(world, deltaMs);
 }
 
 /**
@@ -2030,6 +2186,7 @@ export function tickEconomyN(
   for (let i = 0; i < steps; i++) {
     const batchNowMs = startBatch + (i + 1) * MS_PER_TICK;
     settleNpcOpsDue(world, batchNowMs);
+    settleFuelHaulsDue(world, batchNowMs);
     tickEconomy(world, { batchNowMs });
   }
 
@@ -2039,7 +2196,33 @@ export function tickEconomyN(
   }
   // Catch-up often lands many turnarounds on the same hour — spread them for the board.
   ensureNpcFleet(world);
+  ensureFuelTruckFleet(world);
   return world;
+}
+
+/** Split a free-text route search ("SBAR", "SBAR SBGR", "SBAR→SBGR") into tokens. */
+export function marketQueryTokens(query: string): string[] {
+  return query
+    .trim()
+    .toLowerCase()
+    .split(/[\s,/>\-→]+/)
+    .filter(Boolean);
+}
+
+/** Every token must appear in the ICAO/city blob, matching the market board input. */
+export function marketLotMatchesQuery(
+  tokens: string[],
+  fields: {
+    originIcao: string;
+    destIcao: string;
+    originName?: string;
+    destName?: string;
+  },
+): boolean {
+  if (tokens.length === 0) return true;
+  const blob =
+    `${fields.originIcao} ${fields.destIcao} ${fields.originName ?? ''} ${fields.destName ?? ''}`.toLowerCase();
+  return tokens.every((token) => blob.includes(token));
 }
 
 export function listMarketLots(
@@ -2048,12 +2231,15 @@ export function listMarketLots(
     originIcao?: string;
     destIcao?: string;
     commodityId?: CommodityId;
+    /** Free-text ICAO/city search applied before any caller-side row cap. */
+    query?: string;
     nowMs?: number;
   } = {},
 ): MarketLotView[] {
   const byIcao = airportMap(world);
   const views: MarketLotView[] = [];
   const nowMs = opts.nowMs ?? Date.now();
+  const queryTokens = marketQueryTokens(opts.query ?? '');
 
   for (const lot of world.lots) {
     if (lot.status !== 'available' && lot.status !== 'reserved') {
@@ -2075,6 +2261,18 @@ export function listMarketLots(
 
     const origin = byIcao.get(lot.originIcao);
     const dest = byIcao.get(lot.destIcao);
+    const originName = origin?.name ?? lot.originIcao;
+    const destName = dest?.name ?? lot.destIcao;
+    if (
+      !marketLotMatchesQuery(queryTokens, {
+        originIcao: lot.originIcao,
+        destIcao: lot.destIcao,
+        originName,
+        destName,
+      })
+    ) {
+      continue;
+    }
     const oStock = origin ? ensurePile(origin, lot.commodityId) : pile(0, 1);
     const dStock = dest ? ensurePile(dest, lot.commodityId) : pile(0, 1);
     const commodity = getCommodity(lot.commodityId);
@@ -2097,8 +2295,8 @@ export function listMarketLots(
 
     views.push({
       lot,
-      originName: origin?.name ?? lot.originIcao,
-      destName: dest?.name ?? lot.destIcao,
+      originName,
+      destName,
       commodityName: commodity.name,
       availableKg: avail,
       payPerKgUsd: lot.payUsd / lot.quantityKg,

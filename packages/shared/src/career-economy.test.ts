@@ -17,6 +17,7 @@ import {
   listActiveEconomyEvents,
   listMarketLots,
   localPriceMultiplier,
+  marketQueryTokens,
   migrateEconomyWorld,
   MS_PER_TICK,
   npcLaneSaturation,
@@ -218,6 +219,60 @@ describe('demand shocks', () => {
     assert.ok(row?.pressure?.demandShock);
     assert.ok((row?.pressure?.shockPayMult ?? 1) > 1);
     assert.ok(row?.pressure?.shockLabels?.includes('Strike'));
+  });
+});
+
+describe('market board search', () => {
+  function warmBoard(seed: string) {
+    const world = createSeedEconomyWorld({ seed });
+    tickEconomyN(world, 48);
+    return world;
+  }
+
+  it('matches ICAO or city across the whole board, not just the first rows', () => {
+    const world = warmBoard('market-search');
+    const all = listMarketLots(world);
+    assert.ok(all.length > 0);
+    // Pick a hub that only shows up at the tail, where a row cap would hide it.
+    const target = all[all.length - 1].lot.originIcao;
+    const expected = all.filter(
+      (row) => row.lot.originIcao === target || row.lot.destIcao === target,
+    );
+    const filtered = listMarketLots(world, { query: target.toLowerCase() });
+    assert.ok(filtered.length > 0);
+    assert.equal(filtered.length, expected.length);
+    assert.ok(
+      filtered.every(
+        (row) => row.lot.originIcao === target || row.lot.destIcao === target,
+      ),
+    );
+    const city = expected[0].originName;
+    assert.ok(listMarketLots(world, { query: city }).length > 0);
+  });
+
+  it('requires every token and ignores blank queries', () => {
+    const world = warmBoard('market-search-tokens');
+    const all = listMarketLots(world);
+    const lane = all[0].lot;
+    const pair = listMarketLots(world, {
+      query: `${lane.originIcao}→${lane.destIcao}`,
+    });
+    assert.ok(pair.length > 0);
+    assert.ok(
+      pair.every(
+        (row) =>
+          [row.lot.originIcao, row.lot.destIcao].sort().join() ===
+          [lane.originIcao, lane.destIcao].sort().join(),
+      ),
+    );
+    assert.equal(listMarketLots(world, { query: '   ' }).length, all.length);
+    assert.equal(listMarketLots(world, { query: 'ZZZZ' }).length, 0);
+  });
+
+  it('tokenizes the separators the board input accepts', () => {
+    assert.deepEqual(marketQueryTokens('SBAR→SBGR'), ['sbar', 'sbgr']);
+    assert.deepEqual(marketQueryTokens(' sbar , sbgr '), ['sbar', 'sbgr']);
+    assert.deepEqual(marketQueryTokens('  '), []);
   });
 });
 

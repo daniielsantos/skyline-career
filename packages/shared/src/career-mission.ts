@@ -6,6 +6,7 @@ import {
   type CareerEconomyWorld,
   type MarketLotView,
 } from './career-economy.js';
+import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './career-aircraft-market.js';
 import { applyPlayerDepartFuel, relocateAircraftOnSettle, releaseAircraftOnCancel } from './career-fleet.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
 import type {
@@ -1119,7 +1120,21 @@ export function settleMission(
       ? Math.max(0, Math.round(opts.residualFuelKg))
       : undefined;
   if (opts.fleet) {
-    relocateAircraftOnSettle(opts.fleet, working, world, residualFuelKg);
+    const aircraft = relocateAircraftOnSettle(
+      opts.fleet,
+      working,
+      world,
+      residualFuelKg,
+    );
+    if (aircraft) {
+      const blockHours = estimateMissionBlockHours(
+        world,
+        working.originIcao,
+        working.destIcao,
+        aircraft.aircraftClassId,
+      );
+      applyAircraftHoursAfterMission(aircraft, blockHours);
+    }
   }
 
   const settleTick = opts.tick ?? world.tick;
@@ -1215,6 +1230,8 @@ export function listViableMarketLots(
     originIcao?: string;
     destIcao?: string;
     commodityId?: MarketLotView['lot']['commodityId'];
+    /** Free-text ICAO/city search applied before any caller-side row cap. */
+    query?: string;
     /** Override class max (e.g. live SimBrief maxcargo). */
     maxCargoKg?: number;
     nowMs?: number;

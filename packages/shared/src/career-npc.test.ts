@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   createSeedEconomyWorld,
   describeLotMarketPressure,
+  drainNpcMroParts,
   ensureNpcFleet,
   estimateNpcBlockHours,
   listActiveNpcFreights,
@@ -10,6 +11,8 @@ import {
   listRegionMarketPressure,
   migrateEconomyWorld,
   NPC_FLEET_SIZE,
+  NPC_MX_INTERVAL_HOURS,
+  NPC_MX_PARTS_KG,
   npcLaneAirborneKg,
   playerLaneInboundKg,
   laneInboundKg,
@@ -86,6 +89,34 @@ describe('NPC freighter fleet', () => {
     assert.equal(migrated.version, 3);
     assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
     assert.ok(Array.isArray(migrated.npcFlights));
+  });
+
+  it('gives map-expansion regions a home operator on legacy saves', () => {
+    const seeded = createSeedEconomyWorld({ seed: 'legacy-regions' });
+    const legacyRegions = ['BR-SE', 'BR-S', 'BR-NE'];
+    const raw = {
+      version: 3 as const,
+      seed: 'legacy-regions',
+      tick: 40,
+      lastSyncedAtMs: Date.now(),
+      airports: seeded.airports.filter((ap) => legacyRegions.includes(ap.region)),
+      lots: [],
+      events: [],
+      npcs: seeded.npcs.slice(0, 15).map((npc, i) => ({
+        ...npc,
+        homeRegion: legacyRegions[i % legacyRegions.length]!,
+      })),
+      npcFlights: [],
+    };
+    const migrated = migrateEconomyWorld(raw);
+    const regions = new Set(migrated.airports.map((ap) => ap.region));
+    for (const region of regions) {
+      assert.ok(
+        migrated.npcs.some((npc) => npc.homeRegion === region),
+        `expected at least one NPC based in ${region}`,
+      );
+    }
+    assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
   });
 
   it('estimates busy time ≥ flight block hours', () => {
@@ -452,5 +483,83 @@ describe('NPC freighter fleet', () => {
 
     flight.cargoKg = 28_000;
     assert.equal(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics'), 1);
+  });
+
+  it('enters shop MX after enough block hours and drains terminal parts', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-mx-drain' });
+    const npc = world.npcs.find((n) => n.aircraftClassId === 'narrow_freighter')!;
+    const icao = 'SBGR';
+    npc.locationIcao = icao;
+    npc.hoursSinceMx = NPC_MX_INTERVAL_HOURS.narrow_freighter + 10;
+    npc.dutyHoursAccum = 0;
+    npc.lastLegDutyHours = 0;
+    npc.status = 'busy';
+    npc.busyUntilMs = world.lastBatchAtMs - 1_000;
+    npc.currentFlightId = undefined;
+
+    const before = world.airports.find((a) => a.icao === icao)!.inventory.mro_parts!
+      .stockKg;
+    const nowMs = world.lastBatchAtMs;
+    settleNpcOpsDue(world, nowMs);
+
+    assert.equal(npc.status, 'maintenance');
+    assert.ok((npc.mxUntilMs ?? 0) > nowMs);
+    assert.equal(npc.hoursSinceMx, 0);
+    const after = world.airports.find((a) => a.icao === icao)!.inventory.mro_parts!
+      .stockKg;
+    assert.equal(after, before - NPC_MX_PARTS_KG.narrow_freighter);
+
+    const roster = listNpcFleetStatus(world, nowMs);
+    const row = roster.find((r) => r.id === npc.id)!;
+    assert.equal(row.phase, 'maintenance');
+    assert.equal(row.locationIcao, icao);
+  });
+
+  it('dry MRO stock still grounds NPC longer without draining', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-mx-dry' });
+    const npc = world.npcs.find((n) => n.aircraftClassId === 'light_turboprop')!;
+    const icao = 'SBPS';
+    npc.locationIcao = icao;
+    npc.hoursSinceMx = NPC_MX_INTERVAL_HOURS.light_turboprop * 2;
+    npc.dutyHoursAccum = 0;
+    npc.lastLegDutyHours = 0;
+    npc.status = 'busy';
+    npc.busyUntilMs = world.lastBatchAtMs - 1_000;
+
+    const ap = world.airports.find((a) => a.icao === icao)!;
+    ap.inventory.mro_parts!.stockKg = 0;
+    const nowMs = world.lastBatchAtMs;
+    settleNpcOpsDue(world, nowMs);
+
+    assert.equal(npc.status, 'maintenance');
+    assert.equal(ap.inventory.mro_parts!.stockKg, 0);
+    const shopMs = (npc.mxUntilMs ?? 0) - nowMs;
+    // Dry surcharge (×1.6) pushes dwell above the non-dry maximum (~2.5×1.15h).
+    assert.ok(shopMs > 2.5 * 1.15 * 3_600_000);
+  });
+
+  it('returns to idle when shop MX completes', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-mx-done' });
+    const npc = world.npcs[0]!;
+    npc.status = 'maintenance';
+    npc.mxUntilMs = world.lastBatchAtMs - 1_000;
+    npc.dutyHoursAccum = 0;
+    npc.lastLegDutyHours = 0;
+    settleNpcOpsDue(world, world.lastBatchAtMs);
+    assert.equal(npc.status, 'idle');
+    assert.equal(npc.mxUntilMs, undefined);
+  });
+
+  it('drainNpcMroParts reports scarcity correctly', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-mx-helper' });
+    const ap = world.airports.find((a) => a.icao === 'SBGL')!;
+    ap.inventory.mro_parts!.stockKg = 50;
+    const partial = drainNpcMroParts(world, 'SBGL', 200);
+    assert.equal(partial.scarcity, 'partial');
+    assert.equal(partial.takenKg, 50);
+    ap.inventory.mro_parts!.stockKg = 0;
+    const dry = drainNpcMroParts(world, 'SBGL', 100);
+    assert.equal(dry.scarcity, 'dry');
+    assert.equal(dry.takenKg, 0);
   });
 });

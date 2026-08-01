@@ -21,12 +21,14 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Cargo corridors: curated OD weights bias `formLots` formation + mild pay; legacy saves gain missing hubs via `ensureCareerHubCoverage`.
 - Idle-lot escalation: available lots raise pay from `basePayUsd` after 25% of life (cap +40%); flip urgent late; Market shows Idle +N% chip.
 - Demand shocks: regional events (harvest/outage/congestion/festival/strike) affect prod/cons + freight pay/urgency/life; Market banner + lot chips.
+- Fuel road logistics: background tanker fleet (12 trucks, ≤32 t) redistributes Jet-A hub→spoke; Terminal Fuel logistics block.
+- Hub level 1→5: sticky XP from traffic (lots/settles/fuel/trucks); real capacity/flow/lane/pay/NPC-bid impact; soft quiet penalty without demotion.
+- Aircraft market: Skyline-priced new/used/lease board with class caps/scarcity, abstract NPC demand (0–2/day), sell→relist, list spare for lease / leased_out income; free acquire removed (starter Caravan only).
+- Aircraft wear/MX: AF+eng condition %, wear per block hour, workshop inspection gate + optional repair (MSRP-calibrated); no annual/TBO yet.
 
 ## Near-term priorities (current Brazil career)
 
-1. Hub level dinâmico (1→5) with real capacity/flow impact.
-2. Then aircraft market / leasing / maintenance.
-3. Polish only if needed — NPC operational cargo ceiling; optional real METAR.
+1. Polish only if needed — NPC operational cargo ceiling; optional real METAR.
 
 Do **not** start country partitioning or Postgres until Brazil still feels good after prune + inbound + national map + market dynamics.
 

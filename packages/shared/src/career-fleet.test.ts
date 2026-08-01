@@ -18,6 +18,8 @@ import {
   relocateAircraftOnSettle,
   selectStarterHub,
   acquireCompanyAircraft,
+  listAircraftMarket,
+  purchaseAircraftListing,
   settleMission,
 } from './index.js';
 
@@ -40,18 +42,19 @@ describe('career fleet hangar', () => {
     assert.ok(state.fleet[0]!.fuelKg > 0);
   });
 
-  it('acquireCompanyAircraft parks a Bonanza light_ga at the home hub', () => {
+  it('free acquire is disabled — Aircraft Market purchase parks light_ga', () => {
+    const world = createSeedEconomyWorld({ seed: 'fleet-buy-ga' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
-    state = acquireCompanyAircraft(state, 'light_ga');
-    assert.equal(state.fleet.length, 2);
-    const bonanza = state.fleet.find((a) => a.aircraftClassId === 'light_ga');
-    assert.ok(bonanza);
-    assert.equal(bonanza!.locationIcao, 'SBGR');
-    assert.equal(bonanza!.status, 'parked');
-    assert.equal(bonanza!.label, 'Company Bonanza');
-    // Idempotent per class.
-    const again = acquireCompanyAircraft(state, 'light_ga');
-    assert.equal(again.fleet.length, 2);
+    assert.throws(() => acquireCompanyAircraft(state, 'light_ga'), /Aircraft Market/i);
+    const listing = listAircraftMarket(state, world).find(
+      (l) => l.kind !== 'lease' && l.aircraftClassId === 'light_ga',
+    );
+    assert.ok(listing);
+    state.walletUsd = listing!.askingUsd;
+    const { aircraft } = purchaseAircraftListing(state, world, listing!.id);
+    assert.equal(aircraft.aircraftClassId, 'light_ga');
+    assert.equal(aircraft.status, 'parked');
+    assert.ok(state.fleet.some((a) => a.id === aircraft.id));
   });
 
   it('selectStarterHub rejects empty pilot name and second register', () => {

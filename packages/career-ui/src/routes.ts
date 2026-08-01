@@ -2,6 +2,7 @@
 
 export type CareerTab =
   | 'market'
+  | 'aircraft'
   | 'missions'
   | 'fleet'
   | 'staging'
@@ -16,6 +17,7 @@ export type CareerLocation = {
 
 const TAB_PATH: Record<CareerTab, string> = {
   market: '/market',
+  aircraft: '/aircraft',
   pilot: '/pilot',
   hangar: '/hangar',
   missions: '/logbook',
@@ -27,6 +29,7 @@ const TAB_PATH: Record<CareerTab, string> = {
 const PATH_TAB: Record<string, CareerTab> = {
   '/': 'market',
   '/market': 'market',
+  '/aircraft': 'aircraft',
   '/pilot': 'pilot',
   '/hangar': 'hangar',
   '/logbook': 'missions',

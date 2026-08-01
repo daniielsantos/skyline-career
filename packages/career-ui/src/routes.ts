@@ -15,28 +15,35 @@ export type CareerLocation = {
   airportIcao: string | null;
 };
 
+/** Canonical public paths (operational vocabulary). */
 const TAB_PATH: Record<CareerTab, string> = {
-  market: '/market',
-  aircraft: '/aircraft',
-  pilot: '/pilot',
+  market: '/freights',
+  aircraft: '/airframes',
   hangar: '/hangar',
+  staging: '/dispatch',
+  fleet: '/rivals',
+  pilot: '/company',
   missions: '/logbook',
-  fleet: '/npc-fleet',
-  staging: '/staging',
   settings: '/settings',
 };
 
+/** Canonical + legacy aliases so old bookmarks keep working. */
 const PATH_TAB: Record<string, CareerTab> = {
   '/': 'market',
+  '/freights': 'market',
   '/market': 'market',
+  '/airframes': 'aircraft',
   '/aircraft': 'aircraft',
-  '/pilot': 'pilot',
   '/hangar': 'hangar',
-  '/logbook': 'missions',
-  '/missions': 'missions',
+  '/dispatch': 'staging',
+  '/staging': 'staging',
+  '/rivals': 'fleet',
   '/npc-fleet': 'fleet',
   '/fleet': 'fleet',
-  '/staging': 'staging',
+  '/company': 'pilot',
+  '/pilot': 'pilot',
+  '/logbook': 'missions',
+  '/missions': 'missions',
   '/settings': 'settings',
 };
 

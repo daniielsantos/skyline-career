@@ -85,6 +85,7 @@ type MarketSortKey = 'distance' | 'cargo' | 'load' | 'expires' | 'pay';
 type SortDirection = 'asc' | 'desc';
 
 const MARKET_PAGE_SIZE = 10;
+const FLEET_PAGE_SIZE = 10;
 const MAX_STAGING_LOTS = 5;
 const SIMBRIEF_USER_KEY = 'skyline.simbriefUser';
 /** Career economy: 1 tick = 1 simulated hour. */
@@ -646,59 +647,6 @@ function phaseLabel(phase: string): string {
   }
 }
 
-function NpcActivityList(props: {
-  rows: NpcActivity[];
-  onOpen: (icao: string) => void;
-  busy?: boolean;
-  empty?: string;
-  nowMs: number;
-  weightSystem?: WeightSystem;
-}) {
-  if (props.rows.length === 0) {
-    return props.empty ? <p className="empty">{props.empty}</p> : null;
-  }
-  return (
-    <ul className="contract-list npc-list">
-      {props.rows.map((row) => {
-        const eta = liveEtaHours({
-          arrivesAtMs: row.arrivesAtMs,
-          nowMs: props.nowMs,
-          fallbackHours: row.etaHours,
-        });
-        const pct = liveProgress({
-          departedAtMs: row.departedAtMs,
-          arrivesAtMs: row.arrivesAtMs,
-          nowMs: props.nowMs,
-          fallbackPct: row.progressPct,
-        });
-        const phase = livePhase(eta, row.phase);
-        return (
-          <li key={row.id}>
-            <div className="route">
-              <IcaoLink icao={row.originIcao} onOpen={props.onOpen} disabled={props.busy} />
-              <span className="arrow">→</span>
-              <IcaoLink icao={row.destIcao} onOpen={props.onOpen} disabled={props.busy} />
-              {row.urgency === 'urgent' ? <span className="tag">Urgent</span> : null}
-              <span className={`phase-tag phase-${phase}`}>{phaseLabel(phase)}</span>
-            </div>
-            <p>
-              {row.npcName} · {row.commodityName} ·{' '}
-              {formatTonnes(row.cargoKg, props.weightSystem)} · ETA{' '}
-              {formatDuration(eta)}
-            </p>
-            <ProgressTrack pct={pct} label={`${row.flightHours ?? '?'}h block`} />
-            <small>
-              {row.aircraftLabel ?? row.aircraftClassId}
-              {row.homeRegion ? ` · home ${row.homeRegion}` : ''} ·{' '}
-              {Math.round(row.distanceNm).toLocaleString()} nm · {formatMoney(row.payUsd)}
-            </small>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 function MovementBoard(props: {
   title: string;
   rows: AirportMovement[];
@@ -781,6 +729,57 @@ function MovementBoard(props: {
   );
 }
 
+type FleetPhaseFilter =
+  | ''
+  | 'enroute'
+  | 'arriving'
+  | 'turnaround'
+  | 'resting'
+  | 'maintenance'
+  | 'idle';
+
+function resolveNpcLiveState(npc: NpcFleetMember, nowMs: number) {
+  const mission = npc.mission;
+  const eta = mission
+    ? liveEtaHours({
+        arrivesAtMs: mission.arrivesAtMs,
+        nowMs,
+        fallbackHours: mission.etaHours,
+      })
+    : 0;
+  const pct = mission
+    ? liveProgress({
+        departedAtMs: mission.departedAtMs,
+        arrivesAtMs: mission.arrivesAtMs,
+        nowMs,
+        fallbackPct: mission.progressPct,
+      })
+    : 0;
+  const turnaroundLeft =
+    npc.phase === 'turnaround' && typeof npc.busyUntilMs === 'number'
+      ? Math.max(0, (npc.busyUntilMs - nowMs) / MS_PER_TICK_DEFAULT)
+      : npc.turnaroundHoursLeft;
+  const restLeft =
+    npc.phase === 'resting' && typeof npc.restUntilMs === 'number'
+      ? Math.max(0, (npc.restUntilMs - nowMs) / MS_PER_TICK_DEFAULT)
+      : npc.restHoursLeft;
+  const mxLeft =
+    npc.phase === 'maintenance' && typeof npc.mxUntilMs === 'number'
+      ? Math.max(0, (npc.mxUntilMs - nowMs) / MS_PER_TICK_DEFAULT)
+      : npc.mxHoursLeft;
+  const phase =
+    mission != null
+      ? livePhase(eta, mission.phase)
+      : npc.phase === 'turnaround' && (turnaroundLeft ?? 0) <= 0
+        ? 'idle'
+        : npc.phase === 'resting' && (restLeft ?? 0) <= 0
+          ? 'idle'
+          : npc.phase === 'maintenance' && (mxLeft ?? 0) <= 0
+            ? 'idle'
+            : npc.phase;
+  return { mission, eta, pct, turnaroundLeft, restLeft, mxLeft, phase };
+}
+
 function FleetRoster(props: {
   fleet: NpcFleetMember[];
   onOpen: (icao: string) => void;
@@ -788,148 +787,260 @@ function FleetRoster(props: {
   nowMs: number;
   weightSystem?: WeightSystem;
 }) {
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [phaseFilter, setPhaseFilter] = useState<FleetPhaseFilter>('');
+
+  const enriched = useMemo(
+    () =>
+      props.fleet.map((npc) => ({
+        npc,
+        ...resolveNpcLiveState(npc, props.nowMs),
+      })),
+    [props.fleet, props.nowMs],
+  );
+
+  const filtered = useMemo(() => {
+    const tokens = query
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    return enriched.filter(({ npc, phase, mission }) => {
+      if (phaseFilter && phase !== phaseFilter) return false;
+      if (tokens.length === 0) return true;
+      const hay = [
+        npc.name,
+        npc.aircraftLabel,
+        aircraftClassLabel(npc.aircraftClassId),
+        npc.homeRegion,
+        regionLabel(npc.homeRegion),
+        npc.locationIcao ?? '',
+        mission?.originIcao ?? '',
+        mission?.destIcao ?? '',
+        mission?.commodityName ?? '',
+        phaseLabel(phase),
+      ]
+        .join(' ')
+        .toLowerCase();
+      return tokens.every((token) => hay.includes(token));
+    });
+  }, [enriched, phaseFilter, query]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / FLEET_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = filtered.slice(
+    (safePage - 1) * FLEET_PAGE_SIZE,
+    safePage * FLEET_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, phaseFilter, props.fleet.length]);
+
   if (props.fleet.length === 0) {
-    return <p className="empty">No NPC fleet seeded yet — Reset Brazil or wait for migration.</p>;
+    return (
+      <p className="empty">
+        No rival freighters seeded yet — Reset Brazil or wait for migration.
+      </p>
+    );
   }
+
+  const hasFilters = query.trim() !== '' || phaseFilter !== '';
+
   return (
-    <div className="table-wrap">
-      <table className="fleet-table">
-        <thead>
-          <tr>
-            <th>Operator</th>
-            <th>Aircraft</th>
-            <th>Home</th>
-            <th>Status</th>
-            <th>Mission</th>
-            <th>Progress</th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.fleet.map((npc) => {
-            const mission = npc.mission;
-            const eta = mission
-              ? liveEtaHours({
-                  arrivesAtMs: mission.arrivesAtMs,
-                  nowMs: props.nowMs,
-                  fallbackHours: mission.etaHours,
-                })
-              : 0;
-            const pct = mission
-              ? liveProgress({
-                  departedAtMs: mission.departedAtMs,
-                  arrivesAtMs: mission.arrivesAtMs,
-                  nowMs: props.nowMs,
-                  fallbackPct: mission.progressPct,
-                })
-              : 0;
-            const turnaroundLeft =
-              npc.phase === 'turnaround' && typeof npc.busyUntilMs === 'number'
-                ? Math.max(0, (npc.busyUntilMs - props.nowMs) / MS_PER_TICK_DEFAULT)
-                : npc.turnaroundHoursLeft;
-            const restLeft =
-              npc.phase === 'resting' && typeof npc.restUntilMs === 'number'
-                ? Math.max(0, (npc.restUntilMs - props.nowMs) / MS_PER_TICK_DEFAULT)
-                : npc.restHoursLeft;
-            const mxLeft =
-              npc.phase === 'maintenance' && typeof npc.mxUntilMs === 'number'
-                ? Math.max(0, (npc.mxUntilMs - props.nowMs) / MS_PER_TICK_DEFAULT)
-                : npc.mxHoursLeft;
-            const phase =
-              mission != null
-                ? livePhase(eta, mission.phase)
-                : npc.phase === 'turnaround' && (turnaroundLeft ?? 0) <= 0
-                  ? 'idle'
-                  : npc.phase === 'resting' && (restLeft ?? 0) <= 0
-                    ? 'idle'
-                    : npc.phase === 'maintenance' && (mxLeft ?? 0) <= 0
-                      ? 'idle'
-                      : npc.phase;
-            return (
-              <tr key={npc.id} className={`fleet-row phase-${phase}`}>
-                <td>
-                  <strong>{npc.name}</strong>
-                  <small>
-                    rel {(npc.reliability * 100).toFixed(0)}% · agg{' '}
-                    {(npc.aggressiveness * 100).toFixed(0)}%
-                  </small>
-                </td>
-                <td>
-                  {aircraftClassLabel(npc.aircraftClassId)}
-                  <small>{npc.aircraftLabel}</small>
-                </td>
-                <td title={regionLabel(npc.homeRegion)}>{npc.homeRegion}</td>
-                <td>
-                  <span
-                    className={`phase-tag phase-${phase}`}
-                    title={
-                      phase === 'resting'
-                        ? `Crew rest after duty day${
-                            typeof npc.dutyHoursAccum === 'number'
-                              ? ` · ${npc.dutyHoursAccum.toFixed(1)}h duty`
-                              : ''
-                          } · back in ${formatDuration(restLeft ?? 0)}`
-                        : phase === 'maintenance'
-                          ? `Shop visit${
-                              npc.locationIcao ? ` at ${npc.locationIcao}` : ''
-                            } · draws local aircraft parts · free in ${formatDuration(mxLeft ?? 0)}`
-                          : phase === 'turnaround'
-                            ? `Ground turnaround · free in ${formatDuration(turnaroundLeft ?? 0)}`
-                            : undefined
-                    }
+    <>
+      <div className="table-wrap">
+        <table className="fleet-table">
+          <thead>
+            <tr>
+              <th>Operator</th>
+              <th>Aircraft</th>
+              <th>Home</th>
+              <th>Status</th>
+              <th>Mission</th>
+              <th>Progress</th>
+            </tr>
+            <tr className="filter-row">
+              <th>
+                <input
+                  className="route-filter"
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Name / ICAO / type"
+                  aria-label="Filter rivals"
+                />
+              </th>
+              <th />
+              <th />
+              <th>
+                <select
+                  value={phaseFilter}
+                  onChange={(e) =>
+                    setPhaseFilter(e.target.value as FleetPhaseFilter)
+                  }
+                  aria-label="Filter by status"
+                >
+                  <option value="">All statuses</option>
+                  <option value="enroute">En route</option>
+                  <option value="arriving">Arriving</option>
+                  <option value="turnaround">Turnaround</option>
+                  <option value="resting">Resting</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="idle">Idle</option>
+                </select>
+              </th>
+              <th />
+              <th>
+                {hasFilters ? (
+                  <button
+                    type="button"
+                    className="clear-filters"
+                    onClick={() => {
+                      setQuery('');
+                      setPhaseFilter('');
+                    }}
                   >
-                    {phaseLabel(phase)}
-                  </span>
-                  {phase === 'turnaround' && turnaroundLeft !== undefined ? (
-                    <small>free in {formatDuration(turnaroundLeft)}</small>
-                  ) : null}
-                  {phase === 'resting' && restLeft !== undefined ? (
-                    <small>back in {formatDuration(restLeft)}</small>
-                  ) : null}
-                  {phase === 'maintenance' && mxLeft !== undefined ? (
+                    Clear
+                  </button>
+                ) : null}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map(
+              ({ npc, mission, eta, pct, turnaroundLeft, restLeft, mxLeft, phase }) => (
+                <tr key={npc.id} className={`fleet-row phase-${phase}`}>
+                  <td>
+                    <strong>{npc.name}</strong>
                     <small>
-                      {npc.locationIcao ? `${npc.locationIcao} · ` : ''}
-                      free in {formatDuration(mxLeft)}
+                      rel {(npc.reliability * 100).toFixed(0)}% · agg{' '}
+                      {(npc.aggressiveness * 100).toFixed(0)}%
                     </small>
-                  ) : null}
-                </td>
-                <td>
-                  {mission ? (
-                    <>
-                      <div className="route">
-                        <IcaoLink
-                          icao={mission.originIcao}
-                          onOpen={props.onOpen}
-                          disabled={props.busy}
-                        />
-                        <span className="arrow">→</span>
-                        <IcaoLink
-                          icao={mission.destIcao}
-                          onOpen={props.onOpen}
-                          disabled={props.busy}
-                        />
-                        {mission.urgency === 'urgent' ? (
-                          <span className="tag">Urgent</span>
-                        ) : null}
-                      </div>
+                  </td>
+                  <td>
+                    {aircraftClassLabel(npc.aircraftClassId)}
+                    <small>{npc.aircraftLabel}</small>
+                  </td>
+                  <td title={regionLabel(npc.homeRegion)}>{npc.homeRegion}</td>
+                  <td>
+                    <span
+                      className={`phase-tag phase-${phase}`}
+                      title={
+                        phase === 'resting'
+                          ? `Crew rest after duty day${
+                              typeof npc.dutyHoursAccum === 'number'
+                                ? ` · ${npc.dutyHoursAccum.toFixed(1)}h duty`
+                                : ''
+                            } · back in ${formatDuration(restLeft ?? 0)}`
+                          : phase === 'maintenance'
+                            ? `Shop visit${
+                                npc.locationIcao ? ` at ${npc.locationIcao}` : ''
+                              } · draws local aircraft parts · free in ${formatDuration(mxLeft ?? 0)}`
+                            : phase === 'turnaround'
+                              ? `Ground turnaround · free in ${formatDuration(turnaroundLeft ?? 0)}`
+                              : undefined
+                      }
+                    >
+                      {phaseLabel(phase)}
+                    </span>
+                    {phase === 'turnaround' && turnaroundLeft !== undefined ? (
+                      <small>free in {formatDuration(turnaroundLeft)}</small>
+                    ) : null}
+                    {phase === 'resting' && restLeft !== undefined ? (
+                      <small>back in {formatDuration(restLeft)}</small>
+                    ) : null}
+                    {phase === 'maintenance' && mxLeft !== undefined ? (
                       <small>
-                        {mission.commodityName} ·{' '}
-                        {formatTonnes(mission.cargoKg, props.weightSystem)} · ETA{' '}
-                        {formatDuration(eta)} · {formatMoney(mission.payUsd)}
+                        {npc.locationIcao ? `${npc.locationIcao} · ` : ''}
+                        free in {formatDuration(mxLeft)}
                       </small>
-                    </>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </td>
-                <td>
-                  {mission ? <ProgressTrack pct={pct} /> : <span className="muted">—</span>}
+                    ) : null}
+                  </td>
+                  <td>
+                    {mission ? (
+                      <>
+                        <div className="route">
+                          <IcaoLink
+                            icao={mission.originIcao}
+                            onOpen={props.onOpen}
+                            disabled={props.busy}
+                          />
+                          <span className="arrow">→</span>
+                          <IcaoLink
+                            icao={mission.destIcao}
+                            onOpen={props.onOpen}
+                            disabled={props.busy}
+                          />
+                          {mission.urgency === 'urgent' ? (
+                            <span className="tag">Urgent</span>
+                          ) : null}
+                        </div>
+                        <small>
+                          {mission.commodityName} ·{' '}
+                          {formatTonnes(mission.cargoKg, props.weightSystem)} · ETA{' '}
+                          {formatDuration(eta)} · {formatMoney(mission.payUsd)}
+                        </small>
+                      </>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    {mission ? (
+                      <ProgressTrack pct={pct} />
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              ),
+            )}
+            {pageRows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="empty">
+                  No rivals match the selected filters.
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+      <nav className="pagination" aria-label="Rival pages">
+        <p>
+          {filtered.length === 0
+            ? '0 records'
+            : `${(safePage - 1) * FLEET_PAGE_SIZE + 1}–${Math.min(
+                safePage * FLEET_PAGE_SIZE,
+                filtered.length,
+              )} of ${filtered.length}`}
+        </p>
+        <div>
+          <button
+            type="button"
+            disabled={safePage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </button>
+          <span>
+            Page {safePage} of {pageCount}
+          </span>
+          <button
+            type="button"
+            disabled={safePage >= pageCount}
+            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+          >
+            Next
+          </button>
+        </div>
+      </nav>
+    </>
   );
 }
 
@@ -971,8 +1082,20 @@ export function App() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toastState, setToastState] = useState<{ id: number; text: string } | null>(
+    null,
+  );
   const [toastKind, setToastKind] = useState<'ok' | 'warn' | 'fail'>('ok');
+  const toast = toastState?.text ?? null;
+  const toastSeqRef = useRef(0);
+  const setToast = useCallback((text: string | null) => {
+    if (text === null) {
+      setToastState(null);
+      return;
+    }
+    toastSeqRef.current += 1;
+    setToastState({ id: toastSeqRef.current, text });
+  }, []);
   const [simbriefUser, setSimbriefUser] = useState(loadSimbriefUser);
   const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
   const [ofpAutoStatus, setOfpAutoStatus] =
@@ -1054,6 +1177,7 @@ export function App() {
     '' | AircraftClass
   >('');
   const [aircraftMarketQuery, setAircraftMarketQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const loc = { tab, airportIcao };
@@ -1432,7 +1556,7 @@ export function App() {
   );
   const activeMission = useMemo(() => findActiveMission(missions), [missions]);
 
-  // Staging needs the complete route inventory. The global Market payload is capped
+  // Dispatch needs the complete route inventory. The global Freights payload is capped
   // at 200 rows and may omit valid same-route lots shown by the Terminal.
   useEffect(() => {
     if (!staging) {
@@ -1998,6 +2122,7 @@ export function App() {
   }
 
   function selectTab(next: Tab) {
+    setSidebarOpen(false);
     goToTab(next);
     void run(refresh, { refreshAfter: false });
   }
@@ -2118,8 +2243,8 @@ export function App() {
     if (!acf) return;
     const ok = await confirm({
       title: `Sell ${acf.label}?`,
-      body: 'Dealer buy-back pays about 70% of fair value. The airframe is relisted on the Aircraft Market for others.',
-      confirmLabel: 'Sell to market',
+      body: 'Dealer buy-back pays about 70% of fair value. The airframe is relisted on Airframes for others.',
+      confirmLabel: 'Sell airframe',
     });
     if (!ok) return;
     await run(async () => {
@@ -2391,7 +2516,7 @@ export function App() {
     }
     if (activeMission) {
       setError(
-        `Finish or cancel ${activeMission.id} in Staging before preparing another flight`,
+        `Finish or cancel ${activeMission.id} in Dispatch before preparing another flight`,
       );
       goToTab('staging');
       return;
@@ -3109,6 +3234,31 @@ export function App() {
   const terminalContractCount = showAirport
     ? airportView.outboundLots.length + airportView.inboundLots.length
     : 0;
+  const toastScope = showAirport ? `airport:${airportIcao}` : `tab:${tab}`;
+  const toastScopeRef = useRef<{ id: number; scope: string } | null>(null);
+
+  useEffect(() => {
+    if (!toastState) {
+      toastScopeRef.current = null;
+      return;
+    }
+    const recorded = toastScopeRef.current;
+    // The scope is captured one commit late so a toast raised together with a
+    // navigation (e.g. "editing manifest" jumping to Dispatch) survives it.
+    if (!recorded || recorded.id !== toastState.id) {
+      toastScopeRef.current = { id: toastState.id, scope: toastScope };
+      return;
+    }
+    if (recorded.scope !== toastScope) setToastState(null);
+  }, [toastState, toastScope]);
+
+  useEffect(() => {
+    if (!toastState) return;
+    const ms = toastKind === 'ok' ? 7000 : toastKind === 'warn' ? 11000 : 14000;
+    const timer = setTimeout(() => setToastState(null), ms);
+    return () => clearTimeout(timer);
+  }, [toastState, toastKind]);
+
   const activeMissionDistanceNm = activeMission
     ? lots.find(
         (lot) =>
@@ -3124,214 +3274,324 @@ export function App() {
         )
       : undefined;
 
+  const pageTitle = showAirport
+    ? airportView.airport.icao
+    : showStaging
+      ? 'Dispatch'
+      : tab === 'fleet'
+        ? 'Rivals'
+        : tab === 'aircraft'
+          ? 'Airframes'
+          : tab === 'hangar'
+            ? 'Hangar'
+            : tab === 'pilot'
+              ? 'Company'
+              : tab === 'missions'
+                ? 'Logbook'
+                : tab === 'settings'
+                  ? 'Settings'
+                  : 'Freights';
+  const pageLede = showAirport
+    ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'} · level ${airportView.airport.level}`
+    : showStaging
+      ? stagingMode === 'active'
+        ? 'Confirm OFP, preflight, and watch the active flight.'
+        : stagingMode === 'draft'
+          ? 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
+          : 'Prepare a freight from Freights, or resume after settling the last flight.'
+      : tab === 'fleet'
+        ? 'Competing freighters — idle, airborne, turnaround, shop MX, or crew rest.'
+        : tab === 'aircraft'
+          ? 'New, used, and lease airframes priced to Skyline freights — not real-world MSRP.'
+          : tab === 'hangar'
+            ? 'Your aircraft — ownership, condition, ferry, and maintenance.'
+            : tab === 'pilot'
+              ? hubSelected
+                ? 'Company identity, fleet snapshot, and progression.'
+                : 'Register your name and home hub to start the career.'
+              : tab === 'missions'
+                ? 'Historical flights — settled, cancelled, and past operations.'
+                : tab === 'settings'
+                  ? 'SimBrief, weight units, and local career preferences.'
+                  : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
+  const parkedIcao =
+    fleet.find((a) => a.status === 'parked')?.locationIcao ?? homeHubIcao;
+
   return (
-    <div className="shell">
-      <div className="atmosphere" aria-hidden="true" />
-      <header className="top">
-        <div className="brand-block">
-          <p className="brand">Skyline Career</p>
-          <h1>
-            {showAirport
-              ? airportView.airport.icao
-              : showStaging
-                ? stagingMode === 'active'
-                  ? 'Flight operations'
-                  : stagingMode === 'draft'
-                    ? 'Flight staging'
-                    : 'Staging'
-                : tab === 'fleet'
-                  ? 'NPC fleet'
-                  : tab === 'aircraft'
-                    ? 'Aircraft market'
-                    : tab === 'hangar'
-                      ? 'Hangar'
-                      : tab === 'pilot'
-                        ? 'Pilot'
-                        : tab === 'missions'
-                          ? 'Logbook'
-                          : 'Freight board'}
-          </h1>
-          <p className="lede">
-            {showAirport
-              ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'} · level ${airportView.airport.level}`
-              : showStaging
-                ? stagingMode === 'active'
-                  ? 'Dispatch, confirm OFP, preflight, and watch the active flight.'
-                  : stagingMode === 'draft'
-                    ? 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
-                    : 'Prepare a freight from the Market, or resume after settling the last flight.'
-                : tab === 'fleet'
-                  ? 'Competing freighters — idle, airborne, turnaround, shop MX, or crew rest.'
-                  : tab === 'aircraft'
-                    ? 'New, used, and lease airframes priced to Skyline freights — not real-world MSRP.'
-                    : tab === 'hangar'
-                      ? 'Your aircraft — ownership, condition, ferry, and maintenance.'
-                      : tab === 'pilot'
-                        ? hubSelected
-                          ? 'Company identity, fleet snapshot, and progression.'
-                          : 'Register your name and home hub to start the career.'
-                        : tab === 'missions'
-                          ? 'Historical flights — settled, cancelled, and past operations.'
-                          : 'Local cargo economy — prepare a flight, dispatch in SimBrief, watch it settle.'}
-          </p>
-        </div>
-        <div className="metrics">
-          {hubSelected && pilotName ? (
+    <div className={`app-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
+      {sidebarOpen ? (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
+      <aside className="sidebar" aria-label="Primary">
+        <p className="sidebar-brand">
+          SKY<span>LINE</span>
+        </p>
+        <nav className="sidebar-nav" aria-label="Board sections">
+          {showAirport ? (
             <button
               type="button"
-              className="metric pilot-chip"
-              title="Open Pilot profile"
-              onClick={() => selectTab('pilot')}
+              className="tab"
+              onClick={() => {
+                setSidebarOpen(false);
+                selectTab(tab);
+              }}
               disabled={busy}
             >
-              <span className="label">Pilot</span>
-              <strong>{pilotName}</strong>
+              ← Back
             </button>
           ) : null}
-          <div className="metric">
-            <span className="label">Wallet</span>
-            <strong>{formatMoney(wallet)}</strong>
-          </div>
-          <div className="metric" title="1 economy tick = 1 simulated hour">
-            <span className="label">Clock</span>
-            <strong>{formatClock(continuousHours)}</strong>
-          </div>
-          <div className="metric">
-            <span className="label">Active</span>
-            <strong>{activeCount}</strong>
-          </div>
-          <div className="metric" title="Competing freighters airborne or turning around">
-            <span className="label">NPC busy</span>
-            <strong>{npcBusy}</strong>
-          </div>
-        </div>
-      </header>
-
-      <nav className="tabs" aria-label="Board sections">
-        {showAirport ? (
           <button
             type="button"
-            className="tab"
-            onClick={() => selectTab(tab)}
+            className={!showAirport && tab === 'market' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('market')}
+            disabled={busy}
+            title="Freight board"
+          >
+            Freights
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'aircraft' ? 'tab active' : 'tab'}
+            onClick={() => {
+              selectTab('aircraft');
+              void refreshAircraftMarket().catch(() => undefined);
+            }}
+            disabled={busy}
+            title={
+              aircraftListings.length
+                ? `${aircraftListings.length} airframe listings today`
+                : 'Buy, used, and lease airframes'
+            }
+          >
+            Airframes
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'hangar' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('hangar')}
+            disabled={busy}
+            title={
+              fleet[0]
+                ? `Company hangar · ${fleet[0].label} at ${fleet[0].locationIcao}`
+                : 'Company hangar'
+            }
+          >
+            Hangar
+          </button>
+          <button
+            type="button"
+            className={!showAirport && showStaging ? 'tab active' : 'tab'}
+            onClick={() => selectTab('staging')}
+            disabled={busy}
+            title={
+              activeMission
+                ? `Live flight ${activeMission.originIcao}→${activeMission.destIcao} · ${activeMission.status}`
+                : staging
+                  ? `${staging.originIcao}→${staging.destIcao} · ${staging.lines.length} staged lot(s)`
+                  : 'Prepare and operate flights'
+            }
+          >
+            Dispatch
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'fleet' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('fleet')}
+            disabled={busy}
+            title={`${npcBusy} competing freighters busy`}
+          >
+            Rivals
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'pilot' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('pilot')}
+            disabled={busy}
+            title={
+              hubSelected && homeHubIcao
+                ? `Company profile · home ${homeHubIcao}`
+                : 'Company profile'
+            }
+          >
+            Company
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'missions' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('missions')}
+            disabled={busy}
+            title="Flight history"
+          >
+            Logbook
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'settings' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('settings')}
             disabled={busy}
           >
-            ← Back
+            Settings
           </button>
+          {showAirport ? <span className="tab active">Terminal</span> : null}
+        </nav>
+        {activeMission ? (
+          <div className="sidebar-active-card">
+            <span className="label">Active flight</span>
+            <strong>
+              {activeMission.originIcao}→{activeMission.destIcao}
+            </strong>
+            <p>{activeMission.status.replace(/_/g, ' ')}</p>
+            <button
+              type="button"
+              className="accept"
+              disabled={busy}
+              onClick={() => selectTab('staging')}
+            >
+              Open Dispatch
+            </button>
+          </div>
+        ) : staging ? (
+          <div className="sidebar-active-card">
+            <span className="label">Dispatch draft</span>
+            <strong>
+              {staging.originIcao}→{staging.destIcao}
+            </strong>
+            <p>{staging.lines.length} lot(s) staged</p>
+            <button
+              type="button"
+              className="accept"
+              disabled={busy}
+              onClick={() => selectTab('staging')}
+            >
+              Open Dispatch
+            </button>
+          </div>
         ) : null}
-        <button
-          type="button"
-          className={!showAirport && tab === 'market' ? 'tab active' : 'tab'}
-          onClick={() => selectTab('market')}
-          disabled={busy}
-        >
-          Market
-        </button>
-        <button
-          type="button"
-          className={!showAirport && tab === 'pilot' ? 'tab active' : 'tab'}
-          onClick={() => selectTab('pilot')}
-          disabled={busy}
-        >
-          Pilot
-          {hubSelected && homeHubIcao ? ` · ${homeHubIcao}` : ''}
-        </button>
-        <button
-          type="button"
-          className={!showAirport && tab === 'aircraft' ? 'tab active' : 'tab'}
-          onClick={() => {
-            selectTab('aircraft');
-            void refreshAircraftMarket().catch(() => undefined);
-          }}
-          disabled={busy}
-        >
-          Aircraft
-          {aircraftListings.length ? ` · ${aircraftListings.length}` : ''}
-        </button>
-        <button
-          type="button"
-          className={!showAirport && tab === 'hangar' ? 'tab active' : 'tab'}
-          onClick={() => selectTab('hangar')}
-          disabled={busy}
-        >
-          Hangar
-          {fleet[0] ? ` · ${fleet[0].locationIcao}` : ''}
-        </button>
-        <button
-          type="button"
-          className={!showAirport && tab === 'missions' ? 'tab active' : 'tab'}
-          onClick={() => selectTab('missions')}
-          disabled={busy}
-        >
-          Logbook
-        </button>
-        <button
-          type="button"
-          className={!showAirport && tab === 'fleet' ? 'tab active' : 'tab'}
-          onClick={() => selectTab('fleet')}
-          disabled={busy}
-        >
-          NPC fleet
-        </button>
-        <button
-          type="button"
-          className={!showAirport && showStaging ? 'tab active' : 'tab'}
-          onClick={() => selectTab('staging')}
-          disabled={busy}
-          title={
-            activeMission
-              ? `${activeMission.originIcao}→${activeMission.destIcao} · ${activeMission.status}`
-              : staging
-                ? `${staging.originIcao}→${staging.destIcao} · ${staging.lines.length} staged lot(s)`
-                : 'Flight staging / operations'
-          }
-        >
-          Staging
-          {activeMission
-            ? ' · live'
-            : staging
-              ? ` (${staging.lines.length})`
-              : ''}
-        </button>
-        <button
-          type="button"
-          className={!showAirport && tab === 'settings' ? 'tab active' : 'tab'}
-          onClick={() => selectTab('settings')}
-          disabled={busy}
-        >
-          Settings
-        </button>
-        {showAirport ? <span className="tab active terminal-tab">Terminal</span> : null}
-        <div className="spacer" />
-        <button
-          type="button"
-          className="action"
-          onClick={() => void onTick()}
-          disabled={busy}
-          title="Advance the economy by 24 hours (1 day)"
-        >
-          +1 day
-        </button>
-        <button
-          type="button"
-          className="action ghost"
-          onClick={onRefresh}
-          disabled={busy}
-        >
-          Refresh
-        </button>
-        <button
-          type="button"
-          className="action ghost"
-          onClick={() => void onResetBrazil()}
-          disabled={busy}
-          title="Clear the prototype save and initialize the Brazil-only world"
-        >
-          Reset Brazil
-        </button>
-      </nav>
+        <div className="sidebar-footer">
+          <span className="who">{pilotName || 'Skyline'}</span>
+          <span className="wallet">{formatMoney(wallet)}</span>
+          <span className="meta">
+            {parkedIcao ? `Aircraft at ${parkedIcao}` : 'No aircraft parked'}
+            {homeHubIcao ? ` · hub ${homeHubIcao}` : ''}
+          </span>
+          <button
+            type="button"
+            className="action ghost"
+            disabled={busy}
+            onClick={() => selectTab('settings')}
+          >
+            Settings
+          </button>
+        </div>
+      </aside>
 
-      {error ? <p className="banner error">{error}</p> : null}
-      {toast ? <p className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}>{toast}</p> : null}
+      <div className="main-column">
+        <header className="topbar">
+          <div className="topbar-title">
+            <button
+              type="button"
+              className="action ghost sidebar-toggle"
+              aria-label="Open navigation"
+              onClick={() => setSidebarOpen(true)}
+            >
+              Menu
+            </button>
+            <h1>{pageTitle}</h1>
+            <p className="lede">{pageLede}</p>
+          </div>
+          <div className="topbar-metrics">
+            {parkedIcao ? (
+              <div className="metric" title="Parked aircraft location">
+                <span className="label">Location</span>
+                <strong>{parkedIcao}</strong>
+              </div>
+            ) : null}
+            <div className="metric">
+              <span className="label">Wallet</span>
+              <strong>{formatMoney(wallet)}</strong>
+            </div>
+            <div className="metric" title="1 economy tick = 1 simulated hour">
+              <span className="label">Clock</span>
+              <strong>{formatClock(continuousHours)}</strong>
+            </div>
+            <div className="metric">
+              <span className="label">Active</span>
+              <strong>{activeCount}</strong>
+            </div>
+            <div
+              className="metric"
+              title="Competing freighters airborne or turning around"
+            >
+              <span className="label">Rivals</span>
+              <strong>{npcBusy}</strong>
+            </div>
+          </div>
+          <div className="topbar-actions">
+            <button
+              type="button"
+              className="action"
+              onClick={() => void onTick()}
+              disabled={busy}
+              title="Advance the economy by 24 hours (1 day)"
+            >
+              +1 day
+            </button>
+            <button
+              type="button"
+              className="action ghost"
+              onClick={onRefresh}
+              disabled={busy}
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              className="action ghost"
+              onClick={() => void onResetBrazil()}
+              disabled={busy}
+              title="Clear the prototype save and initialize the Brazil-only world"
+            >
+              Reset Brazil
+            </button>
+          </div>
+        </header>
+
+        <div className="main-content">
+      {error ? (
+        <p className="banner error" role="alert">
+          <span>{error}</span>
+          <button
+            type="button"
+            className="banner-close"
+            onClick={() => setError(null)}
+            aria-label="Dismiss message"
+          >
+            ×
+          </button>
+        </p>
+      ) : null}
+      {toast ? (
+        <p
+          className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span>{toast}</span>
+          <button
+            type="button"
+            className="banner-close"
+            onClick={() => setToast(null)}
+            aria-label="Dismiss message"
+          >
+            ×
+          </button>
+        </p>
+      ) : null}
 
       {!hubSelected ? (
         <section className="panel hub-picker" role="dialog" aria-labelledby="hub-picker-title">
@@ -3655,7 +3915,7 @@ export function App() {
                                     onClick={() => enterStagingFromContract(lot)}
                                     title={
                                       activeMission
-                                        ? `Finish or cancel ${activeMission.id} in Staging first`
+                                        ? `Finish or cancel ${activeMission.id} in Dispatch first`
                                         : lot.status !== 'available' || lot.availableKg <= 0
                                           ? 'This contract is no longer available'
                                           : `Prepare ${lot.originIcao} → ${lot.destIcao}`
@@ -3733,8 +3993,7 @@ export function App() {
       ) : hubSelected && tab === 'market' ? (
         <section className="panel">
           <div className="panel-head">
-            <h2>Available freights</h2>
-            <p>
+            <p className="panel-stats">
               {marketTotalLots > lots.length
                 ? `${lots.length} of ${marketTotalLots} lots`
                 : `${lots.length} lots`}
@@ -3762,24 +4021,9 @@ export function App() {
                 onClick={() => selectTab('staging')}
                 disabled={busy}
               >
-                Staging
+                Dispatch
               </button>{' '}
               before preparing another.
-            </p>
-          ) : fleet.find((a) => a.status === 'parked') ? (
-            <p className="banner ok">
-              Prepare freights from{' '}
-              <strong>{fleet.find((a) => a.status === 'parked')!.locationIcao}</strong>
-              . Other origins need a ferry from{' '}
-              <button
-                type="button"
-                className="linkish"
-                onClick={() => selectTab('hangar')}
-                disabled={busy}
-              >
-                Hangar
-              </button>
-              .
             </p>
           ) : null}
           <div className="table-wrap">
@@ -4035,12 +4279,12 @@ export function App() {
                         onClick={() => enterStaging(lot)}
                         title={
                           activeMission
-                            ? `Finish or cancel ${activeMission.id} in Staging first`
+                            ? `Finish or cancel ${activeMission.id} in Dispatch first`
                             : staging &&
                                 staging.originIcao === lot.originIcao &&
                                 staging.destIcao === lot.destIcao
                               ? 'Replace current staging draft with this lot as the starting line'
-                              : 'Open flight staging to choose aircraft and payload'
+                              : 'Open Dispatch to choose aircraft and payload'
                         }
                       >
                         {activeMission
@@ -4098,24 +4342,6 @@ export function App() {
               </button>
             </div>
           </nav>
-
-          <div className="panel-head npc-head">
-            <h2>NPC freights in progress</h2>
-            <p>
-              {npcActivity.length} airborne · open{' '}
-              <button type="button" className="linkish" onClick={() => selectTab('fleet')}>
-                NPC fleet
-              </button>{' '}
-              for full roster
-            </p>
-          </div>
-          <NpcActivityList
-            rows={npcActivity}
-            onOpen={openAirport}
-            busy={busy}
-            empty="No competing freighters airborne right now."
-            nowMs={displayNowMs}
-          />
         </section>
       ) : hubSelected && showStaging ? (
         <section className="panel staging-panel">
@@ -4125,11 +4351,11 @@ export function App() {
                 <div>
                   <h2>No active flight</h2>
                   <p>
-                    Staging is empty after settle or cancel. Your aircraft is at{' '}
+                    Dispatch is empty after settle or cancel. Your aircraft is at{' '}
                     <strong>
                       {fleet.find((a) => a.status === 'parked')?.locationIcao ?? '—'}
                     </strong>
-                    . Prepare a freight from that origin on the Market.
+                    . Prepare a freight from that origin on Freights.
                   </p>
                 </div>
                 <button
@@ -4138,7 +4364,7 @@ export function App() {
                   onClick={() => selectTab('market')}
                   disabled={busy}
                 >
-                  Open Market
+                  Open Freights
                 </button>
               </div>
               <div className="staging-empty">
@@ -4738,7 +4964,7 @@ export function App() {
                           : 'Waiting for OFP'}
                     </strong>
                     {simbriefUser.trim() ? (
-                      <small>Automatic check every 15 seconds while Staging is open.</small>
+                      <small>Automatic check every 15 seconds while Dispatch is open.</small>
                     ) : (
                       <small>
                         <button
@@ -5324,12 +5550,6 @@ export function App() {
         </section>
       ) : hubSelected && tab === 'settings' ? (
         <section className="panel settings-panel">
-          <div className="panel-head">
-            <div>
-              <h2>Settings</h2>
-              <p>Integrations and display preferences for this browser.</p>
-            </div>
-          </div>
           <div className="settings-grid">
             <div className="settings-card">
               <h3>SimBrief</h3>
@@ -5396,12 +5616,6 @@ export function App() {
         </section>
       ) : hubSelected && tab === 'pilot' ? (
         <section className="panel pilot-panel">
-          <div className="panel-head">
-            <div>
-              <h2>Pilot profile</h2>
-              <p>Company identity and fleet at a glance.</p>
-            </div>
-          </div>
           <div className="pilot-profile-grid">
             <div className="pilot-card">
               <h3>Identity</h3>
@@ -5513,13 +5727,10 @@ export function App() {
       ) : hubSelected && tab === 'aircraft' ? (
         <section className="panel">
           <div className="panel-head">
-            <div>
-              <h2>Aircraft market</h2>
-              <p>
-                Day {aircraftMarketDay || '—'} · {aircraftListings.length} listings · wallet{' '}
-                {formatMoney(wallet)}
-              </p>
-            </div>
+            <p className="panel-stats">
+              Day {aircraftMarketDay || '—'} · {aircraftListings.length} listings · wallet{' '}
+              {formatMoney(wallet)}
+            </p>
             <button
               type="button"
               className="action ghost"
@@ -5598,13 +5809,10 @@ export function App() {
       ) : hubSelected && tab === 'hangar' ? (
         <section className="panel hangar-panel">
           <div className="panel-head">
-            <div>
-              <h2>Company hangar</h2>
-              <p>
-                Aircraft must be at the mission origin to prepare cargo. Buy or lease from the
-                Aircraft market; ferry relocates instantly for a fee + Jet-A.
-              </p>
-            </div>
+            <p className="panel-stats">
+              Aircraft must be at the mission origin to prepare cargo. Buy or lease from the
+              Airframes; ferry relocates instantly for a fee + Jet-A.
+            </p>
             <button
               type="button"
               className="accept"
@@ -5614,7 +5822,7 @@ export function App() {
               }}
               disabled={busy}
             >
-              Aircraft market
+              Airframes
             </button>
           </div>
           {fleet.length === 0 ? (
@@ -5650,8 +5858,7 @@ export function App() {
         <section className="panel">
           <div className="panel-head">
             <div>
-              <h2>Competing fleet</h2>
-              <p>
+              <p className="panel-stats">
                 {npcBusy} busy · {npcSummary.airborne} airborne · {npcSummary.turnaround}{' '}
                 turnaround · {npcSummary.maintenance} MX · {npcSummary.resting} resting ·{' '}
                 {npcSummary.idle} idle
@@ -5673,12 +5880,9 @@ export function App() {
       ) : !hubSelected ? null : (
         <section className="panel logbook-panel">
           <div className="panel-head">
-            <div>
-              <h2>Logbook</h2>
-              <p>
-                Read-only flight history. Operate the current flight from Staging.
-              </p>
-            </div>
+            <p className="panel-stats">
+              {missions.length} flights recorded · read-only history.
+            </p>
             {activeMission ? (
               <button
                 type="button"
@@ -5686,7 +5890,7 @@ export function App() {
                 onClick={() => selectTab('staging')}
                 disabled={busy}
               >
-                Open Staging
+                Open Dispatch
               </button>
             ) : null}
           </div>
@@ -5712,7 +5916,7 @@ export function App() {
                           onClick={() => selectTab('staging')}
                           disabled={busy}
                         >
-                          Operate in Staging
+                          Operate in Dispatch
                         </button>
                       ) : null}
                       {m.lastOfpCheck ? (
@@ -5804,7 +6008,7 @@ export function App() {
               ))}
             {missions.length === 0 ? (
               <li className="empty">
-                No flights logged yet — prepare a freight from the Market.
+                No flights logged yet — prepare a freight from Freights.
               </li>
             ) : null}
           </ul>
@@ -5814,6 +6018,8 @@ export function App() {
       <footer className="foot">
         Saves to <code>profiles/career/</code> · same engine as <code>npm run career</code>
       </footer>
+        </div>
+      </div>
       {confirmDialog}
     </div>
   );

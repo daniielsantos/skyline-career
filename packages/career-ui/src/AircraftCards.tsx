@@ -272,11 +272,11 @@ function hangarWhereLabel(acf: PlayerAircraft): string {
 function hangarStatusNote(acf: PlayerAircraft): string | null {
   switch (acf.status) {
     case 'assigned':
-      return 'Finish or cancel the flight in Staging before moving this airframe.';
+      return 'Finish or cancel the flight in Dispatch before moving this airframe.';
     case 'maintenance':
       return 'Pay inspection and/or repair before dispatch.';
     case 'listed':
-      return 'On the Aircraft Market — unlist to fly again.';
+      return 'Listed on Airframes — unlist to fly again.';
     case 'leased_out':
       return 'Returns with utilization wear when the term ends.';
     default:

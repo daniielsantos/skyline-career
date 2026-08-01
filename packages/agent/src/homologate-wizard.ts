@@ -32,6 +32,12 @@ import {
   scoreRecipesForLvarFallback,
 } from './vendor-recipes.js';
 import { upsertRolesPackFromProfile } from './ofp-compliance/draft-roles-pack.js';
+import type { OfpRolesPackFile } from './ofp-compliance/scaffold-roles.js';
+import {
+  CAREER_CLASS_CHOICES,
+  inferCareerClassFromIcao,
+  registerCareerPlayerAirframe,
+} from './career-player-airframe-catalog.js';
 
 export interface HomologateWizardOptions {
   bridge: NamedPipeSimBridge;
@@ -151,6 +157,24 @@ async function writeCareerRolesPackAfterPromote(
     injectCapable: true,
     cabinAsBaggage,
   });
+  const inferredClass = inferCareerClassFromIcao(
+    result.pack.simbriefIcao ?? result.pack.icao ?? profile.match.icao ?? '',
+  );
+  const aircraftClassId = await chooseFromList(
+    ask,
+    'Skyline Career economic class',
+    CAREER_CLASS_CHOICES.map((choice) => choice.value),
+    { defaultValue: inferredClass },
+  );
+  const registered = await registerCareerPlayerAirframe({
+    repoRoot,
+    rolesPackPath: result.path,
+    pack: result.pack,
+    aircraftClassId:
+      CAREER_CLASS_CHOICES.find((choice) => choice.value === aircraftClassId)
+        ?.value ?? inferredClass,
+    title: profile.match.title ?? profile.displayName,
+  });
   printKv([
     ['roles pack', result.path],
     ['via', result.via],
@@ -160,6 +184,7 @@ async function writeCareerRolesPackAfterPromote(
       'roles',
       `crew=${result.pack.payload?.stationRoles?.crewStations?.join(',') ?? '—'} bags=${result.pack.payload?.stationRoles?.baggageStations?.join(',') ?? '—'}`,
     ],
+    ['Aircraft Market', `${registered.label} (${registered.aircraftClassId})`],
   ]);
 }
 
@@ -557,11 +582,31 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         const abs = packPath.includes(':') || packPath.startsWith('/') || packPath.startsWith('\\')
           ? packPath
           : join(repoRoot, packPath);
-        const pack = JSON.parse(await readFile(abs, 'utf8')) as Record<string, unknown>;
+        const pack = JSON.parse(await readFile(abs, 'utf8')) as OfpRolesPackFile;
         pack.loadMethod = 'native-simbrief';
         pack.injectCapable = false;
         await writeFile(abs, `${JSON.stringify(pack, null, 2)}\n`, 'utf8');
         console.log(`  Stamped ${abs}`);
+        const inferredClass = inferCareerClassFromIcao(matchIcao);
+        const aircraftClassId = await chooseFromList(
+          ask,
+          'Skyline Career economic class',
+          CAREER_CLASS_CHOICES.map((choice) => choice.value),
+          { defaultValue: inferredClass },
+        );
+        const registered = await registerCareerPlayerAirframe({
+          repoRoot,
+          rolesPackPath: abs,
+          pack,
+          aircraftClassId:
+            CAREER_CLASS_CHOICES.find(
+              (choice) => choice.value === aircraftClassId,
+            )?.value ?? inferredClass,
+          title: matchTitle,
+        });
+        console.log(
+          `  Aircraft Market: ${registered.label} (${registered.aircraftClassId})`,
+        );
       }
 
       printSection('Done');

@@ -6,6 +6,7 @@
 import {
   compareMissionIntentToOfp,
   estimateRouteCargoLimit,
+  findCareerPlayerAirframe,
   formatIntentOfpCheck,
   getAircraftClass,
   KG_TO_LB,
@@ -37,7 +38,7 @@ export type ClassCargoLimit = {
   fuelCapacityKg?: number;
 };
 
-const cargoLimitCache = new Map<FreighterClassId, ClassCargoLimit>();
+const cargoLimitCache = new Map<string, ClassCargoLimit>();
 
 /** Re-export shared estimator — class homologation fields live on AircraftClass. */
 export { estimateRouteCargoLimit };
@@ -45,15 +46,19 @@ export { estimateRouteCargoLimit };
 /** Live SimBrief freight cap for a career freighter class (cached). */
 export async function resolveClassMaxCargoKg(
   aircraftClassId: FreighterClassId,
+  airframeTypeId?: string,
 ): Promise<ClassCargoLimit> {
-  const cached = cargoLimitCache.get(aircraftClassId);
+  const cacheKey = airframeTypeId ?? aircraftClassId;
+  const cached = cargoLimitCache.get(cacheKey);
   if (cached) return cached;
   const aircraft = getAircraftClass(aircraftClassId);
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
   try {
     const resolved = await resolveSimBriefMaxCargoKg({
-      simbriefIcao: aircraft.simbriefIcao,
-      simbriefAirframeMatch: aircraft.simbriefAirframeMatch,
-      titleHint: aircraft.name,
+      simbriefIcao: airframe?.simbriefIcao ?? aircraft.simbriefIcao,
+      simbriefAirframeMatch:
+        airframe?.simbriefAirframeMatch ?? aircraft.simbriefAirframeMatch,
+      titleHint: airframe?.label ?? aircraft.name,
     });
     const value = {
       maxCargoKg: resolved.maxCargoKg,
@@ -64,18 +69,18 @@ export async function resolveClassMaxCargoKg(
       fuelCapacityKg:
         resolved.airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
     };
-    cargoLimitCache.set(aircraftClassId, value);
+    cargoLimitCache.set(cacheKey, value);
     return value;
   } catch {
     const value = {
       maxCargoKg: aircraft.maxCargoKg,
       source: 'class-fallback',
-      airframeLabel: aircraft.name,
+      airframeLabel: airframe?.label ?? aircraft.name,
       oewKg: aircraft.oewKg,
       mtowKg: aircraft.mtowKg,
       fuelCapacityKg: aircraft.fuelCapacityKg,
     };
-    cargoLimitCache.set(aircraftClassId, value);
+    cargoLimitCache.set(cacheKey, value);
     return value;
   }
 }
@@ -103,10 +108,12 @@ export async function buildMissionDispatch(
   units: 'KGS' | 'LBS';
 }> {
   const aircraft = getAircraftClass(mission.aircraftClassId);
+  const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
   const resolved = await resolveSimBriefDispatchType({
-    simbriefIcao: aircraft.simbriefIcao,
-    simbriefAirframeMatch: aircraft.simbriefAirframeMatch,
-    titleHint: aircraft.name,
+    simbriefIcao: airframe?.simbriefIcao ?? aircraft.simbriefIcao,
+    simbriefAirframeMatch:
+      airframe?.simbriefAirframeMatch ?? aircraft.simbriefAirframeMatch,
+    titleHint: airframe?.label ?? aircraft.name,
   });
   const units = normalizeDispatchUnits(opts.units);
   // A static_id identifies one dispatch revision, not the mission forever.

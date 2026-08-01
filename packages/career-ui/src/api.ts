@@ -7,6 +7,7 @@ export type AircraftClass =
 export type PlayerAircraft = {
   id: string;
   aircraftClassId: AircraftClass;
+  airframeTypeId?: string;
   label: string;
   locationIcao: string;
   fuelKg: number;
@@ -91,6 +92,7 @@ export type AircraftListing = {
   id: string;
   kind: 'new' | 'used' | 'lease';
   aircraftClassId: AircraftClass;
+  airframeTypeId?: string;
   label: string;
   basedIcao: string;
   askingUsd: number;
@@ -156,6 +158,7 @@ export type NpcActivity = {
   arrivesAtMs?: number;
   urgency: string;
   aircraftClassId: string;
+  airframeTypeId?: string;
   aircraftLabel?: string;
   homeRegion?: string;
   progressPct?: number;
@@ -523,6 +526,12 @@ export function fetchState() {
       pilotName?: string;
       homeHubIcao?: string;
       cashflow?: CareerCashflowSnapshot;
+      starterAircraft?: Array<{
+        typeId: string;
+        label: string;
+        aircraftClassId: AircraftClass;
+        simbriefIcao: string;
+      }>;
     }
   >('/api/state');
 }
@@ -540,17 +549,48 @@ export function fetchCashflow() {
 
 export function fetchMarket(
   aircraft?: AircraftClass,
-  opts: { query?: string } = {},
+  opts: {
+    query?: string;
+    originQuery?: string;
+    destQuery?: string;
+    page?: number;
+    pageSize?: number;
+    sort?: string;
+    distanceMaxNm?: number | string;
+    commodity?: string;
+    loadMaxKg?: number | string;
+    expiresWithinHours?: number | string;
+    minPayUsd?: number | string;
+  } = {},
 ) {
   const params = new URLSearchParams();
   if (aircraft) params.set('aircraft', aircraft);
   const query = opts.query?.trim();
   if (query) params.set('q', query);
+  const originQuery = opts.originQuery?.trim();
+  if (originQuery) params.set('originQ', originQuery);
+  const destQuery = opts.destQuery?.trim();
+  if (destQuery) params.set('destQ', destQuery);
+  if (opts.page !== undefined) params.set('page', String(opts.page));
+  if (opts.pageSize !== undefined) params.set('pageSize', String(opts.pageSize));
+  if (opts.sort) params.set('sort', opts.sort);
+  const distanceMaxNm = String(opts.distanceMaxNm ?? '').trim();
+  if (distanceMaxNm) params.set('distanceMaxNm', distanceMaxNm);
+  if (opts.commodity) params.set('commodity', opts.commodity);
+  const loadMaxKg = String(opts.loadMaxKg ?? '').trim();
+  if (loadMaxKg) params.set('loadMaxKg', loadMaxKg);
+  const expiresWithinHours = String(opts.expiresWithinHours ?? '').trim();
+  if (expiresWithinHours) params.set('expiresWithinHours', expiresWithinHours);
+  const minPayUsd = String(opts.minPayUsd ?? '').trim();
+  if (minPayUsd) params.set('minPayUsd', minPayUsd);
   const qs = params.toString();
   return api<
     ClockSync & {
       lots: MarketLot[];
       totalLots?: number;
+      page?: number;
+      pageSize?: number;
+      pageCount?: number;
       lotLimit?: number;
       npcActivity?: NpcActivity[];
       regionPressure?: RegionPressure[];
@@ -571,8 +611,13 @@ export function fetchRouteLots(originIcao: string, destIcao: string) {
   return api<ClockSync & { lots: MarketLot[] }>(`/api/market?${qs.toString()}`);
 }
 
-export function fetchCargoLimit(aircraft: AircraftClass, distanceNm?: number) {
+export function fetchCargoLimit(
+  aircraft: AircraftClass,
+  distanceNm?: number,
+  airframeTypeId?: string,
+) {
   const qs = new URLSearchParams({ aircraft });
+  if (airframeTypeId) qs.set('airframe', airframeTypeId);
   if (distanceNm !== undefined && Number.isFinite(distanceNm)) {
     qs.set('distanceNm', String(distanceNm));
   }
@@ -698,7 +743,11 @@ export function postStagingCommit(opts: {
   });
 }
 
-export function postSelectHub(opts: { icao: string; pilotName: string }) {
+export function postSelectHub(opts: {
+  icao: string;
+  pilotName: string;
+  airframeTypeId: string;
+}) {
   return api<{
     walletUsd: number;
     hubSelected: boolean;
@@ -707,6 +756,12 @@ export function postSelectHub(opts: { icao: string; pilotName: string }) {
     pilotName: string;
     homeHubIcao: string;
     homeCountryId: string | null;
+    starterAircraft: Array<{
+      typeId: string;
+      label: string;
+      aircraftClassId: AircraftClass;
+      simbriefIcao: string;
+    }>;
   }>('/api/fleet/select-hub', {
     method: 'POST',
     body: JSON.stringify(opts),

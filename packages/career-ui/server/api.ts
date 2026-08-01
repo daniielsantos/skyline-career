@@ -18,6 +18,7 @@ import {
   departMission,
   emptyMissionsStateV2,
   executeFerry,
+  findCareerPlayerAirframe,
   findOpenManifestForRoute,
   findPlayerAircraft,
   listActivePlayerMissions,
@@ -25,6 +26,7 @@ import {
   listAircraftMarket,
   listCareerHubIcaos,
   listParkedAt,
+  listStarterCareerPlayerAirframes,
   getCommodity,
   hubTierOf,
   countFuelHaulsEnroute,
@@ -38,6 +40,9 @@ import {
   listNpcFleetStatus,
   listRegionMarketPressure,
   listViableMarketLots,
+  parseMarketBoardSorts,
+  parsePositiveNumberParam,
+  queryMarketBoardPage,
   localUnitPriceUsd,
   regionFuelThin,
   missionRemainingCapacityKg,
@@ -116,6 +121,32 @@ export async function serverSourceStamp(dir: string = here): Promise<number> {
     const info = await stat(join(dir, file));
     newest = Math.max(newest, Math.floor(info.mtimeMs));
   }
+  // The API serves shared logic from its build output, so a rebuilt shared
+  // package must also invalidate a running server.
+  const sharedDist = join(repoRoot, 'packages', 'shared', 'dist');
+  try {
+    for (const file of await readdir(sharedDist)) {
+      if (!file.endsWith('.js')) continue;
+      const info = await stat(join(sharedDist, file));
+      newest = Math.max(newest, Math.floor(info.mtimeMs));
+    }
+  } catch {
+    /* shared not built yet */
+  }
+  const playerAirframeCatalog = join(
+    repoRoot,
+    'packages',
+    'shared',
+    'src',
+    'data',
+    'career-player-airframes.json',
+  );
+  try {
+    const info = await stat(playerAirframeCatalog);
+    newest = Math.max(newest, Math.floor(info.mtimeMs));
+  } catch {
+    /* catalog not built yet */
+  }
   return newest;
 }
 
@@ -146,12 +177,19 @@ function fleetPayload(
   missions: MissionsFile,
   world?: Pick<CareerEconomyWorld, 'airports'>,
 ) {
+  const starterAircraft = listStarterCareerPlayerAirframes().map((airframe) => ({
+    typeId: airframe.typeId,
+    label: airframe.label,
+    aircraftClassId: airframe.aircraftClassId,
+    simbriefIcao: airframe.simbriefIcao,
+  }));
   return {
     hubSelected: missions.hubSelected,
     fleet: withParkingRates(missions.fleet, world),
     hubs: listCareerHubIcaos(),
     pilotName: missions.pilotName,
     homeHubIcao: missions.homeHubIcao,
+    starterAircraft,
   };
 }
 
@@ -660,7 +698,11 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fleet/select-hub') {
-        const body = (await readBody(req)) as { icao?: string; pilotName?: string };
+        const body = (await readBody(req)) as {
+          icao?: string;
+          pilotName?: string;
+          airframeTypeId?: string;
+        };
         if (!body.icao) {
           send(res, 400, { error: 'icao required' });
           return;
@@ -669,10 +711,15 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'pilotName required' });
           return;
         }
+        if (!body.airframeTypeId || !String(body.airframeTypeId).trim()) {
+          send(res, 400, { error: 'airframeTypeId required' });
+          return;
+        }
         try {
           const result = await withCareerWrite((world, missions) => {
             const next = selectStarterHub(missions, body.icao!, {
               pilotName: body.pilotName!,
+              airframeTypeId: body.airframeTypeId!,
             });
             Object.assign(missions, next);
             syncHomeCountryFromHub(world, missions.homeHubIcao);
@@ -691,6 +738,7 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      // Generated board contains one listing per homologated player airframe.
       if (req.method === 'GET' && path === '/api/aircraft-market') {
         const payload = await withCareerWrite((world, missions) => {
           settleAircraftMarketOps(missions, world.tick, world);
@@ -1002,7 +1050,11 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'aircraft query required' });
           return;
         }
-        const cargoLimit = await resolveClassMaxCargoKg(aircraft);
+        const airframeTypeId = url.searchParams.get('airframe') ?? undefined;
+        const cargoLimit = await resolveClassMaxCargoKg(
+          aircraft,
+          airframeTypeId,
+        );
         const distanceNm = Number(url.searchParams.get('distanceNm'));
         const routeLimit =
           Number.isFinite(distanceNm) && distanceNm >= 0
@@ -1041,19 +1093,101 @@ export function createCareerApiServer(port = 8787) {
         const origin = url.searchParams.get('origin') ?? undefined;
         const dest = url.searchParams.get('dest') ?? undefined;
         const query = url.searchParams.get('q') ?? undefined;
+        const originQuery = url.searchParams.get('originQ') ?? undefined;
+        const destQuery = url.searchParams.get('destQ') ?? undefined;
+        const pageParam = url.searchParams.get('page');
+        const exactRoute = Boolean(origin?.trim() && dest?.trim());
+        const commodityParam = url.searchParams.get('commodity') ?? undefined;
         const filter = {
           originIcao: origin ?? undefined,
           destIcao: dest ?? undefined,
           query: query ?? undefined,
+          originQuery: originQuery ?? undefined,
+          destQuery: destQuery ?? undefined,
           nowMs,
         };
         const cargoLimit = aircraft ? await resolveClassMaxCargoKg(aircraft) : undefined;
-        const lots = aircraft
+        const listed = aircraft
           ? listViableMarketLots(world, aircraft, {
               ...filter,
               maxCargoKg: cargoLimit?.maxCargoKg,
             })
           : listMarketLots(world, filter);
+        const mapped = listed.map((row) => ({
+          id: row.lot.id,
+          originIcao: row.lot.originIcao,
+          destIcao: row.lot.destIcao,
+          originName: row.originName,
+          destName: row.destName,
+          distanceNm: routeDistanceNm(
+            world,
+            row.lot.originIcao,
+            row.lot.destIcao,
+          ),
+          commodityId: row.lot.commodityId,
+          commodityName: row.commodityName,
+          quantityKg: row.lot.quantityKg,
+          availableKg: row.availableKg,
+          payUsd: row.lot.payUsd,
+          urgency: row.lot.urgency,
+          reason: row.lot.reason,
+          createdAtTick: row.lot.createdAtTick,
+          expiresAtTick: row.lot.expiresAtTick,
+          ticksRemaining: Math.max(0, row.lot.expiresAtTick - world.tick),
+          perishable: Boolean(getCommodity(row.lot.commodityId).perishable),
+          pressure: row.pressure
+            ? {
+                originRegion: row.pressure.originRegion,
+                originRegionCapacity: row.pressure.originRegionCapacity,
+                laneSaturation: row.pressure.laneSaturation,
+                thinFleet: row.pressure.thinFleet,
+                laneBusy: row.pressure.laneBusy,
+                weather: row.pressure.weather,
+                idleEscalated: row.pressure.idleEscalated ?? false,
+                idlePayMult: row.pressure.idlePayMult ?? 1,
+                demandShock: row.pressure.demandShock ?? false,
+                shockLabels: row.pressure.shockLabels ?? [],
+                shockPayMult: row.pressure.shockPayMult ?? 1,
+                international: row.pressure.international ?? false,
+              }
+            : null,
+          npcClaim: row.npcClaim
+            ? {
+                npcName: row.npcClaim.npcName,
+                cargoKg: row.npcClaim.cargoKg,
+                etaHours: row.npcClaim.etaHours,
+              }
+            : null,
+        }));
+        const boardOpts = {
+          currentTick: world.tick,
+          distanceMaxNm: parsePositiveNumberParam(
+            url.searchParams.get('distanceMaxNm'),
+          ),
+          commodityId: commodityParam,
+          loadMaxKg: parsePositiveNumberParam(url.searchParams.get('loadMaxKg')),
+          expiresWithinHours: parsePositiveNumberParam(
+            url.searchParams.get('expiresWithinHours'),
+          ),
+          minPayUsd: parsePositiveNumberParam(url.searchParams.get('minPayUsd')),
+          sorts: parseMarketBoardSorts(url.searchParams.get('sort')),
+        };
+        // Exact OD (route drawer): full filtered set. Paginated Freights sends page=.
+        // Legacy callers without page keep a soft 200-row cap.
+        const paged =
+          exactRoute && pageParam === null
+            ? queryMarketBoardPage(mapped, {
+                ...boardOpts,
+                page: 1,
+                pageSize: Math.max(mapped.length, 1),
+              })
+            : queryMarketBoardPage(mapped, {
+                ...boardOpts,
+                page: parsePositiveNumberParam(pageParam) ?? 1,
+                pageSize:
+                  parsePositiveNumberParam(url.searchParams.get('pageSize')) ??
+                  (pageParam === null ? MARKET_LOT_LIMIT : 10),
+              });
         send(res, 200, {
           ...clockPayload(world, nowMs),
           aircraftClassId: aircraft ?? null,
@@ -1072,57 +1206,15 @@ export function createCareerApiServer(port = 8787) {
             weather: r.weather,
             fuelThin: regionFuelThin(world, r.region, nowMs),
           })),
-          totalLots: lots.length,
-          lotLimit: MARKET_LOT_LIMIT,
+          totalLots: paged.total,
+          page: paged.page,
+          pageSize: paged.pageSize,
+          pageCount: paged.pageCount,
+          lotLimit: paged.pageSize,
           countries: listWorldCountryIds(world),
           internationalLaneCount: world.internationalLanes?.length ?? 0,
           homeCountryId: world.homeCountryId ?? null,
-          lots: lots.slice(0, MARKET_LOT_LIMIT).map((row) => ({
-            id: row.lot.id,
-            originIcao: row.lot.originIcao,
-            destIcao: row.lot.destIcao,
-            originName: row.originName,
-            destName: row.destName,
-            distanceNm: routeDistanceNm(
-              world,
-              row.lot.originIcao,
-              row.lot.destIcao,
-            ),
-            commodityId: row.lot.commodityId,
-            commodityName: row.commodityName,
-            quantityKg: row.lot.quantityKg,
-            availableKg: row.availableKg,
-            payUsd: row.lot.payUsd,
-            urgency: row.lot.urgency,
-            reason: row.lot.reason,
-            createdAtTick: row.lot.createdAtTick,
-            expiresAtTick: row.lot.expiresAtTick,
-            ticksRemaining: Math.max(0, row.lot.expiresAtTick - world.tick),
-            perishable: Boolean(getCommodity(row.lot.commodityId).perishable),
-            pressure: row.pressure
-              ? {
-                  originRegion: row.pressure.originRegion,
-                  originRegionCapacity: row.pressure.originRegionCapacity,
-                  laneSaturation: row.pressure.laneSaturation,
-                  thinFleet: row.pressure.thinFleet,
-                  laneBusy: row.pressure.laneBusy,
-                  weather: row.pressure.weather,
-                  idleEscalated: row.pressure.idleEscalated ?? false,
-                  idlePayMult: row.pressure.idlePayMult ?? 1,
-                  demandShock: row.pressure.demandShock ?? false,
-                  shockLabels: row.pressure.shockLabels ?? [],
-                  shockPayMult: row.pressure.shockPayMult ?? 1,
-                  international: row.pressure.international ?? false,
-                }
-              : null,
-            npcClaim: row.npcClaim
-              ? {
-                  npcName: row.npcClaim.npcName,
-                  cargoKg: row.npcClaim.cargoKg,
-                  etaHours: row.npcClaim.etaHours,
-                }
-              : null,
-          })),
+          lots: paged.rows,
           events: listActiveEconomyEvents(world).map((ev) => ({
             id: ev.id,
             kind: ev.kind,
@@ -1465,6 +1557,7 @@ export function createCareerApiServer(port = 8787) {
           return {
             kind: 'ok' as const,
             aircraftClassId: playerAircraft.aircraftClassId,
+            airframeTypeId: playerAircraft.airframeTypeId,
           };
         });
         if (peek.kind === 'no_hub') {
@@ -1489,7 +1582,10 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const cargoLimit = await resolveClassMaxCargoKg(peek.aircraftClassId);
+        const cargoLimit = await resolveClassMaxCargoKg(
+          peek.aircraftClassId,
+          peek.airframeTypeId,
+        );
         try {
           const committed = await withCareerWrite((world, missions) => {
             if (!missions.hubSelected || missions.fleet.length === 0) {
@@ -1524,6 +1620,9 @@ export function createCareerApiServer(port = 8787) {
               );
             }
             const aircraft = playerAircraft.aircraftClassId;
+            const playerAirframe = findCareerPlayerAirframe(
+              playerAircraft.airframeTypeId,
+            );
             const stagingDistanceNm =
               routeDistanceNm(world, firstLot.originIcao, firstLot.destIcao) ?? 0;
             const routeCargoLimit = estimateRouteCargoLimit(
@@ -1580,6 +1679,10 @@ export function createCareerApiServer(port = 8787) {
                   maxCargoKg: operationalMaxCargoKg,
                 }),
                 aircraftId: playerAircraft.id,
+                airframeTypeId: playerAirframe?.typeId,
+                rolesPackRelPath:
+                  playerAirframe?.rolesPackRelPath ??
+                  intoMission.rolesPackRelPath,
               };
               const idx = missions.missions.findIndex((m) => m.id === mission.id);
               if (idx >= 0) missions.missions[idx] = mission;
@@ -1604,6 +1707,10 @@ export function createCareerApiServer(port = 8787) {
               mission = {
                 ...staged.mission,
                 aircraftId: playerAircraft.id,
+                airframeTypeId: playerAirframe?.typeId,
+                rolesPackRelPath:
+                  playerAirframe?.rolesPackRelPath ??
+                  staged.mission.rolesPackRelPath,
               };
               appended = staged.appended;
               lineCount = staged.lineCount;

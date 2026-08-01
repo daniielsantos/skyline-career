@@ -23,8 +23,8 @@ export const AIRCRAFT_CLASS_FILTERS: Array<{
 
 export function aircraftClassLabel(id: string): string {
   if (id === 'wide_freighter') return 'Wide';
-  if (id === 'light_turboprop') return 'Caravan';
-  if (id === 'light_ga') return 'Bonanza';
+  if (id === 'light_turboprop') return 'Light TP';
+  if (id === 'light_ga') return 'Light GA';
   if (id === 'narrow_freighter') return 'Narrow';
   return id.replace(/_/g, ' ');
 }
@@ -156,7 +156,7 @@ export function MarketListingCard(props: {
       />
       <div className="aircraft-card-body">
         <div className="aircraft-card-title">
-          <strong>{aircraftModelLabel(listing.aircraftClassId)}</strong>
+          <strong>{listing.label || aircraftModelLabel(listing.aircraftClassId)}</strong>
           <div className="aircraft-card-meta">
             <span>{aircraftClassLabel(listing.aircraftClassId)}</span>
             <button

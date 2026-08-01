@@ -343,6 +343,36 @@ describe('market board search', () => {
     assert.equal(listMarketLots(world, { query: 'ZZZZ' }).length, 0);
   });
 
+  it('filters origin and destination searches independently', () => {
+    const world = warmBoard('market-search-od');
+    const all = listMarketLots(world);
+    assert.ok(all.length > 0);
+    const lane = all[0]!.lot;
+    const byOrigin = listMarketLots(world, { originQuery: lane.originIcao });
+    assert.ok(byOrigin.length > 0);
+    assert.ok(byOrigin.every((row) => row.lot.originIcao === lane.originIcao));
+    const byDest = listMarketLots(world, { destQuery: lane.destIcao });
+    assert.ok(byDest.length > 0);
+    assert.ok(byDest.every((row) => row.lot.destIcao === lane.destIcao));
+    const both = listMarketLots(world, {
+      originQuery: lane.originIcao,
+      destQuery: lane.destIcao,
+    });
+    assert.ok(both.length > 0);
+    assert.ok(
+      both.every(
+        (row) =>
+          row.lot.originIcao === lane.originIcao &&
+          row.lot.destIcao === lane.destIcao,
+      ),
+    );
+    // Destination-only query must not match an origin-only airport.
+    const originOnly = listMarketLots(world, { destQuery: lane.originIcao });
+    assert.ok(
+      originOnly.every((row) => row.lot.destIcao === lane.originIcao),
+    );
+  });
+
   it('tokenizes the separators the board input accepts', () => {
     assert.deepEqual(marketQueryTokens('SBAR→SBGR'), ['sbar', 'sbgr']);
     assert.deepEqual(marketQueryTokens(' sbar , sbgr '), ['sbar', 'sbgr']);

@@ -24,6 +24,9 @@ No writable Skyline profile. Wizard early-exits on this path.
 3. Pilot: EFB/FMC **Load from SimBrief**
 4. `npm run compare-ofp -- --simbrief-user YOUR_ALIAS` → pass / warn
 5. Career Staging: **Validate Fuel and Payload** (no auto-inject)
+6. Give the wizard the completed roles-pack path; it registers the model in
+   the Aircraft Market under the suggested economic class (disable later with
+   `career-airframe disable` if needed)
 
 Do **not** run draft / calibrate / smoke write tests for this track.
 
@@ -37,7 +40,15 @@ Homologation wizard (`homologate`) after choosing load method 2:
 2. Confirm `loadMethod: "direct-injection"` on the Career roles pack
 3. Prefer CG from cfg/EFB; mark `envelopeSource` (`cfg` / `manual` / `live-sweep` / `calibrated-live`)
 4. Promote example profile; set pack `injectCapable: true`
-5. Career Staging auto-injects only when pack is direct-injection + injectCapable
+5. Confirm the suggested Skyline economic class; promote automatically upserts
+   `packages/shared/src/data/career-player-airframes.json`
+6. Career Staging auto-injects only when pack is direct-injection + injectCapable
+
+To pull a model off the Aircraft Market without deleting the roles pack / OFP
+homologation, set `"enabled": false` on that row (or run
+`msfs-compat-agent career-airframe disable --type <typeId>`). Owned aircraft
+keep flying; re-homologating or `career-airframe enable` puts it back on the
+board.
 
 On promote, the wizard offers to **write/merge** `profiles/ofp/*.json` automatically (or run offline):
 
@@ -45,7 +56,26 @@ On promote, the wizard offers to **write/merge** `profiles/ofp/*.json` automatic
 npm run draft-ofp-roles -- --profile profiles/examples/YOUR.json --write
 ```
 
-Known families (Bonanza, Caravan, …) merge into a shared family pack via `matchTitles`.
+Known families (Bonanza, C172 Classic/G1000, Commander 114/114TC, C208
+Asobo+Black Square, PMDG, …) share one Aircraft Market SKU. Same-station
+variants also merge into one OFP `matchTitles` pack; vendor forks keep
+separate packs under `familyRolesPackRelPaths`.
+
+### When is a new airframe a family vs a separate SKU?
+
+| Same Market SKU (family) | Separate Market SKUs |
+| --- | --- |
+| Same stations / cargo layout (Classic vs G1000, Commander 114 vs 114TC) | Truly different airplanes / payload maps that should price separately |
+| Vendor forks of the same economic type (Asobo vs Black Square C208) via `marketTypeId` + `familyRolesPackRelPaths` | Unrelated ICAOs |
+
+**OFP pack merge** (one `matchTitles` file) requires identical station maps. Vendor forks keep **separate** roles packs but one Market card.
+
+**Future homologations:** if the title matches an existing heuristic, promote is
+automatic — titles merge into the family pack (or accumulate vendor pack paths)
+and the Market row upserts in place. Creating a *new* family still needs one
+manual step: add a heuristic in `scaffold-roles.ts` (`titlePattern`,
+`familyPackRel` and/or `marketTypeId`, `marketLabel`, stations). After that,
+every later variant is automatic.
 
 Strict CG rollback on inject applies for trusted envelopes; `calibrated-live` is soft.
 
@@ -168,6 +198,7 @@ Omit `liveSources` only while discovering a new airframe — then the discovery 
 
 - [ ] Pack under `profiles/ofp/` with `matchTitles` or `matchTitlePattern`
 - [ ] `liveSources` declared (after live path is confirmed)
+- [ ] Player airframe registered in the Career catalog (wizard does this automatically)
 - [ ] Row in table below
 - [ ] Commit
 

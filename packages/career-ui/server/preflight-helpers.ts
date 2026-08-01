@@ -128,13 +128,21 @@ export async function runMissionPreflight(
       const roles = await resolveMissionRolesPack({
         repoRoot,
         rolesPackRelPath: mission.rolesPackRelPath,
+        airframeTypeId: mission.airframeTypeId,
+        strictAirframeMatch: Boolean(mission.airframeTypeId),
         liveTitle: liveTitle || identity.title,
       });
       ofp = applyOfpOverrides(expectation, {
         stationRoles: roles.pack.payload?.stationRoles,
         liveSources: roles.pack.liveSources,
       });
-    } catch {
+    } catch (rolesError) {
+      if (
+        rolesError instanceof Error &&
+        rolesError.message.includes('purchased airframe')
+      ) {
+        throw rolesError;
+      }
       // Freighter compare still works without roles; classic payload path.
     }
 

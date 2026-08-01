@@ -565,6 +565,8 @@ export interface MissionIntent {
   /** Freighter MVP always 0. */
   pax: 0;
   aircraftClassId: FreighterClassId;
+  /** Concrete homologated player model assigned to this flight. */
+  airframeTypeId?: string;
   rolesPackRelPath: string;
   /** Earliest lot deadline. */
   deadlineTick: number;
@@ -687,6 +689,8 @@ export interface AircraftListing {
   id: string;
   kind: AircraftListingKind;
   aircraftClassId: FreighterClassId;
+  /** Concrete homologated player model within the economic class. */
+  airframeTypeId?: string;
   label: string;
   basedIcao: string;
   /** Purchase price, or lease down-payment. */
@@ -805,6 +809,8 @@ export interface CareerLedgerEntry {
 export interface PlayerAircraft {
   id: string;
   aircraftClassId: FreighterClassId;
+  /** Concrete homologated model bought/leased from the aircraft market. */
+  airframeTypeId?: string;
   label: string;
   /** ICAO where the aircraft is parked (or last parked while assigned). */
   locationIcao: string;

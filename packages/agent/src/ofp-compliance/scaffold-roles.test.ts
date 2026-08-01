@@ -61,6 +61,7 @@ describe('scaffold-roles Black Square Caravan', () => {
       'Black Square Caravan Professional Cargo Pod N208BS',
     );
     assert.equal(h?.id, 'blacksquare-caravan-cargo-pod');
+    assert.equal(h?.marketTypeId, 'c208-caravan-cargo');
     assert.equal(h?.loadMethod, 'direct-injection');
     assert.equal(h?.injectCapable, true);
     const pack = buildRolesPackFromHeuristic(
@@ -69,6 +70,34 @@ describe('scaffold-roles Black Square Caravan', () => {
     );
     assert.equal(pack.loadMethod, 'direct-injection');
     assert.equal(pack.injectCapable, true);
+  });
+});
+
+describe('scaffold-roles Asobo C208B Cargo', () => {
+  it('shares the Caravan Market SKU with a separate station map', () => {
+    const h = matchHeuristic('C208B Cargo N208AS');
+    assert.equal(h?.id, 'asobo-c208b-cargo');
+    assert.equal(h?.marketTypeId, 'c208-caravan-cargo');
+    assert.equal(h?.marketLabel, 'Cessna 208 Caravan Cargo');
+    assert.deepEqual(h?.stationRoles.baggageStations, [
+      3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    ]);
+  });
+});
+
+describe('scaffold-roles Black Square Commander 114', () => {
+  it('matches NA and TC as one Market family', () => {
+    assert.equal(
+      matchHeuristic('Black Square Commander 114')?.id,
+      'blacksquare-commander-114',
+    );
+    assert.equal(
+      matchHeuristic('Black Square Commander 114TC N114TC')?.id,
+      'blacksquare-commander-114',
+    );
+    const h = matchHeuristic('Black Square Commander 114TC')!;
+    assert.equal(h.marketLabel, 'Rockwell Commander 114');
+    assert.equal(h.familyPackRel, 'blacksquare-commander-114.json');
   });
 });
 
@@ -91,6 +120,18 @@ describe('scaffold-roles Black Square Bonanza', () => {
     assert.equal(h.injectCapable, true);
     assert.deepEqual(h.stationRoles.crewStations, [1, 2]);
     assert.deepEqual(h.stationRoles.baggageStations, [3, 4, 5, 6, 7]);
+  });
+});
+
+describe('scaffold-roles Asobo C172SP Cargo', () => {
+  it('matches Classic and G1000 as one Market family', () => {
+    assert.equal(matchHeuristic('C172SP Classic Cargo')?.id, 'asobo-c172sp-cargo');
+    assert.equal(matchHeuristic('C172SP G1000 Cargo N172SP')?.id, 'asobo-c172sp-cargo');
+    const h = matchHeuristic('C172SP G1000 Cargo')!;
+    assert.equal(h.marketLabel, 'Cessna 172SP Cargo');
+    assert.equal(h.familyPackRel, 'asobo-c172sp-cargo.json');
+    assert.deepEqual(h.stationRoles.crewStations, [1, 2]);
+    assert.deepEqual(h.stationRoles.baggageStations, [3, 4, 5, 6]);
   });
 });
 

@@ -76,6 +76,33 @@ async function serverSourceStamp() {
     const info = await stat(join(dir, file));
     newest = Math.max(newest, Math.floor(info.mtimeMs));
   }
+  // The API serves shared logic from its build output, so a rebuilt shared
+  // package must also invalidate a running server.
+  const sharedDist = join(root, '..', 'shared', 'dist');
+  try {
+    for (const file of await readdir(sharedDist)) {
+      if (!file.endsWith('.js')) continue;
+      const info = await stat(join(sharedDist, file));
+      newest = Math.max(newest, Math.floor(info.mtimeMs));
+    }
+  } catch {
+    /* shared not built yet */
+  }
+  // Homologation updates this catalog without touching server/*.ts.
+  const playerAirframeCatalog = join(
+    root,
+    '..',
+    'shared',
+    'src',
+    'data',
+    'career-player-airframes.json',
+  );
+  try {
+    const info = await stat(playerAirframeCatalog);
+    newest = Math.max(newest, Math.floor(info.mtimeMs));
+  } catch {
+    /* catalog not built yet */
+  }
   return newest;
 }
 

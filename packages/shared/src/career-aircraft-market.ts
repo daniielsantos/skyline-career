@@ -20,6 +20,10 @@ import {
 } from './career-aircraft-pricing.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 import { applyWalletDelta } from './career-ledger.js';
+import {
+  findCareerPlayerAirframe,
+  listCareerPlayerAirframes,
+} from './career-player-airframes.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   AircraftListing,
@@ -60,10 +64,6 @@ const CLASS_ORDER: FreighterClassId[] = [
 const TICKS_PER_MONTH = TICKS_PER_DAY * 30;
 const LISTING_LIFE_TICKS = TICKS_PER_DAY * 5;
 const PLAYER_LISTING_LIFE_TICKS = TICKS_PER_DAY * 7;
-/** Soft target; hard class caps (≤7 low wallet, ≤9 high) may stop earlier. */
-const TARGET_LISTINGS_MIN = 5;
-const TARGET_LISTINGS_MAX = 10;
-
 /**
  * Estimated utilization while a player airframe is wet-leased out.
  * Calibrated so a 12‑mo term wears the asset without wiping it.
@@ -73,14 +73,6 @@ export const LEASE_OUT_HOURS_PER_MONTH: Record<FreighterClassId, number> = {
   light_turboprop: 36,
   narrow_freighter: 48,
   wide_freighter: 55,
-};
-
-/** Soft daily caps for generated listings (wallet-high relaxes jets slightly). */
-const CLASS_CAPS_BASE: Record<FreighterClassId, number> = {
-  light_ga: 3,
-  light_turboprop: 2,
-  narrow_freighter: 1,
-  wide_freighter: 1,
 };
 
 function hashSeed(seed: string): number {
@@ -157,18 +149,6 @@ function classLabelShort(classId: FreighterClassId): string {
   return CLASS_LABEL_SHORT[classId];
 }
 
-function classCaps(walletUsd: number): Record<FreighterClassId, number> {
-  const caps = { ...CLASS_CAPS_BASE };
-  if (walletUsd >= 250_000) {
-    caps.narrow_freighter = 2;
-    caps.wide_freighter = 2;
-  } else if (walletUsd >= 40_000) {
-    caps.narrow_freighter = 1;
-    caps.wide_freighter = 1;
-  }
-  return caps;
-}
-
 function hubPool(world: CareerEconomyWorld): string[] {
   const majors: string[] = [];
   const regionals: string[] = [];
@@ -211,36 +191,6 @@ function pickBasedIcao(
     return Object.keys(CAREER_HUB_COORDS)[0] ?? 'SBGR';
   }
   return pick(rng, pool);
-}
-
-function pickClass(
-  rng: () => number,
-  walletUsd: number,
-  counts: Record<FreighterClassId, number>,
-  caps: Record<FreighterClassId, number>,
-): FreighterClassId | null {
-  const open = CLASS_ORDER.filter((id) => counts[id]! < caps[id]!);
-  if (open.length === 0) return null;
-
-  const roll = rng();
-  let preferred: FreighterClassId;
-  if (walletUsd < 40_000) {
-    if (roll < 0.55) preferred = 'light_ga';
-    else if (roll < 0.9) preferred = 'light_turboprop';
-    else if (roll < 0.98) preferred = 'narrow_freighter';
-    else preferred = 'wide_freighter';
-  } else if (walletUsd < 250_000) {
-    if (roll < 0.3) preferred = 'light_ga';
-    else if (roll < 0.65) preferred = 'light_turboprop';
-    else if (roll < 0.92) preferred = 'narrow_freighter';
-    else preferred = 'wide_freighter';
-  } else if (roll < 0.15) preferred = 'light_ga';
-  else if (roll < 0.4) preferred = 'light_turboprop';
-  else if (roll < 0.75) preferred = 'narrow_freighter';
-  else preferred = 'wide_freighter';
-
-  if (open.includes(preferred)) return preferred;
-  return pick(rng, open);
 }
 
 function pickKind(rng: () => number): AircraftListingKind {
@@ -333,10 +283,6 @@ function priceListing(
   };
 }
 
-function makeLabel(classId: FreighterClassId): string {
-  return classLabelShort(classId);
-}
-
 export function generateAircraftMarketListings(opts: {
   world: CareerEconomyWorld;
   walletUsd: number;
@@ -346,21 +292,14 @@ export function generateAircraftMarketListings(opts: {
   const rng = mulberry32(
     hashSeed(`${opts.world.seed}:acf-market:d${opts.dayIndex}`),
   );
-  const caps = classCaps(opts.walletUsd);
-  const counts: Record<FreighterClassId, number> = {
-    light_ga: 0,
-    light_turboprop: 0,
-    narrow_freighter: 0,
-    wide_freighter: 0,
-  };
-  const count =
-    TARGET_LISTINGS_MIN +
-    Math.floor(rng() * (TARGET_LISTINGS_MAX - TARGET_LISTINGS_MIN + 1));
   const listings: AircraftListing[] = [];
 
-  for (let i = 0; i < count; i++) {
-    const aircraftClassId = pickClass(rng, opts.walletUsd, counts, caps);
-    if (!aircraftClassId) break;
+  // Every enabled homologated player airframe is represented on each daily
+  // board. Condition, location and sale kind still rotate by seed/day.
+  const marketAirframes = listCareerPlayerAirframes();
+  for (let i = 0; i < marketAirframes.length; i++) {
+    const airframe = marketAirframes[i]!;
+    const aircraftClassId = airframe.aircraftClassId;
     const kind = pickKind(rng);
     const condition = pickCondition(rng, kind, opts.walletUsd);
     const basedIcao = pickBasedIcao(opts.world, rng, kind, aircraftClassId);
@@ -373,13 +312,13 @@ export function generateAircraftMarketListings(opts: {
       opts.world,
       rng,
     );
-    counts[aircraftClassId]! += 1;
     const pcts = conditionPctsForListing(condition, kind);
     listings.push({
-      id: `acfl_${opts.dayIndex}_${i}_${aircraftClassId}`,
+      id: `acfl_${opts.dayIndex}_${i}_${airframe.typeId}`,
       kind,
       aircraftClassId,
-      label: makeLabel(aircraftClassId),
+      airframeTypeId: airframe.typeId,
+      label: airframe.label,
       basedIcao,
       askingUsd: Math.max(500, priced.askingUsd),
       leaseMonthlyUsd: priced.leaseMonthlyUsd,
@@ -632,6 +571,28 @@ export function ensureAircraftMarket(
   const tick = world.tick;
   let listings = Array.isArray(state.aircraftMarket) ? [...state.aircraftMarket] : [];
 
+  // Backfill boards created before concrete player airframes were introduced.
+  listings = listings.map((listing) => {
+    if (findCareerPlayerAirframe(listing.airframeTypeId)) return listing;
+    const seller = listing.sellerAircraftId
+      ? state.fleet.find((aircraft) => aircraft.id === listing.sellerAircraftId)
+      : undefined;
+    const sellerAirframe = findCareerPlayerAirframe(seller?.airframeTypeId);
+    const candidates = listCareerPlayerAirframes(listing.aircraftClassId);
+    const airframe =
+      sellerAirframe ??
+      (candidates.length > 0
+        ? candidates[hashSeed(listing.id) % candidates.length]
+        : undefined);
+    return airframe
+      ? {
+          ...listing,
+          airframeTypeId: airframe.typeId,
+          label: airframe.label,
+        }
+      : listing;
+  });
+
   // Expire stale rows (player listings expire too).
   listings = listings.map((l) => {
     if (l.status === 'available' && tick >= l.expiresAtTick) {
@@ -651,10 +612,29 @@ export function ensureAircraftMarket(
   const generatedAvailable = listings.filter(
     (l) => listingSource(l) === 'generated' && l.status === 'available',
   );
+  const generatedRows = listings.filter(
+    (listing) => listingSource(listing) === 'generated',
+  );
+  const marketAirframes = listCareerPlayerAirframes();
+  const marketAirframeIds = new Set(marketAirframes.map((airframe) => airframe.typeId));
+  const generatedAirframeIds = new Set(
+    generatedRows.map((listing) => listing.airframeTypeId),
+  );
+  const missingHomologatedAirframe = marketAirframes.some(
+    (airframe) => !generatedAirframeIds.has(airframe.typeId),
+  );
+  // Renamed / disabled / removed SKUs leave stale generated rows until refresh.
+  const staleDisabledAirframe = generatedRows.some(
+    (listing) =>
+      Boolean(listing.airframeTypeId) &&
+      !marketAirframeIds.has(listing.airframeTypeId!),
+  );
 
   const needRefresh =
     state.aircraftMarketDay !== day ||
-    (generatedAvailable.length === 0 && playerKeep.length === 0);
+    (generatedAvailable.length === 0 && playerKeep.length === 0) ||
+    missingHomologatedAirframe ||
+    staleDisabledAirframe;
 
   if (needRefresh) {
     const generated = generateAircraftMarketListings({
@@ -683,15 +663,13 @@ export function listAircraftMarket(
   return (state.aircraftMarket ?? []).filter((l) => l.status === 'available');
 }
 
-function nextAircraftId(state: CareerMissionsState, classId: FreighterClassId): string {
-  const prefix =
-    classId === 'light_ga'
-      ? 'acf_bonanza_'
-      : classId === 'light_turboprop'
-        ? 'acf_caravan_'
-        : classId === 'narrow_freighter'
-          ? 'acf_narrow_'
-          : 'acf_wide_';
+function nextAircraftId(
+  state: CareerMissionsState,
+  classId: FreighterClassId,
+  airframeTypeId?: string,
+): string {
+  const stem = (airframeTypeId ?? classId).replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+  const prefix = `acf_${stem}_`;
   let max = 0;
   for (const a of state.fleet) {
     if (!a.id.startsWith(prefix)) continue;
@@ -722,9 +700,13 @@ function buildAircraftFromListing(
     Math.max(0, hoursAirframe % interval),
   );
   const aircraft: PlayerAircraft = {
-    id: nextAircraftId(state, listing.aircraftClassId),
+    id: nextAircraftId(state, listing.aircraftClassId, listing.airframeTypeId),
     aircraftClassId: listing.aircraftClassId,
-    label: classLabelShort(listing.aircraftClassId),
+    airframeTypeId: listing.airframeTypeId,
+    label:
+      findCareerPlayerAirframe(listing.airframeTypeId)?.label ??
+      listing.label ??
+      classLabelShort(listing.aircraftClassId),
     locationIcao: listing.basedIcao,
     fuelKg: Math.round(capacity * 0.4),
     fuelCapacityKg: capacity,
@@ -860,7 +842,10 @@ export function sellPlayerAircraft(
     id: `acfl_sale_${aircraft.id}_${economyTick}`,
     kind: 'used',
     aircraftClassId: aircraft.aircraftClassId,
-    label: classLabelShort(aircraft.aircraftClassId),
+    airframeTypeId: aircraft.airframeTypeId,
+    label:
+      findCareerPlayerAirframe(aircraft.airframeTypeId)?.label ??
+      aircraft.label,
     basedIcao: aircraft.locationIcao,
     askingUsd: Math.max(500, askingUsd),
     condition: aircraft.condition ?? 'good',
@@ -925,7 +910,10 @@ export function listAircraftForLease(
     id: `acfl_lease_${aircraft.id}_${economyTick}`,
     kind: 'lease',
     aircraftClassId: aircraft.aircraftClassId,
-    label: classLabelShort(aircraft.aircraftClassId),
+    airframeTypeId: aircraft.airframeTypeId,
+    label:
+      findCareerPlayerAirframe(aircraft.airframeTypeId)?.label ??
+      aircraft.label,
     basedIcao: aircraft.locationIcao,
     askingUsd: monthly,
     leaseMonthlyUsd: monthly,

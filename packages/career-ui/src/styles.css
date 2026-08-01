@@ -649,9 +649,14 @@ th {
 }
 
 .sort-header span {
-  min-width: 0.8rem;
-  font-size: 0.9rem;
+  min-width: 1.1rem;
+  font-size: 0.85rem;
   letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.sort-header.is-sorted span {
+  color: var(--accent);
 }
 
 .filter-row th {
@@ -675,8 +680,15 @@ th {
   text-transform: none;
 }
 
+.filter-row .route-filter-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  min-width: 10.5rem;
+}
+
 .filter-row .route-filter {
-  min-width: 8rem;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -1672,7 +1684,7 @@ th {
 .pilot-signup {
   display: grid;
   gap: 1rem;
-  max-width: 22rem;
+  max-width: 28rem;
 }
 
 .pilot-field {

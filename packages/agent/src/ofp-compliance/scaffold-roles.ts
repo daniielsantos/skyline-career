@@ -63,6 +63,13 @@ export interface ScaffoldHeuristic {
   notes: string[];
   /** Family pack path relative to profiles/ofp (preferred over per-livery files). */
   familyPackRel?: string;
+  /** Stable Aircraft Market label when variants share one SKU (glass / TC / livery). */
+  marketLabel?: string;
+  /**
+   * Shared Aircraft Market typeId across OFP packs that differ in stations
+   * (e.g. Asobo vs Black Square Caravan). Defaults to heuristic id / pack ofpId.
+   */
+  marketTypeId?: string;
 }
 
 const PMDG_738_LIVE_SOURCES: OfpLiveSources = {
@@ -246,6 +253,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     icao: 'C208',
     titlePattern: /Black Square Caravan Professional Cargo Pod/i,
     familyPackRel: 'blacksquare-caravan-cargo-pod.json',
+    marketTypeId: 'c208-caravan-cargo',
+    marketLabel: 'Cessna 208 Caravan Cargo',
     stationRoles: {
       passengerStations: [],
       // Cabin seats + cabin cargo + belly pods — freighter career (pax=0).
@@ -276,9 +285,79 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Black Square Caravan Professional Cargo Pod',
+      'Market SKU shared with Asobo C208B Cargo (different station maps)',
       'liveSources: classic fuel tanks + classic stations/weights',
       'SimBrief: Default C208 only (structural maxcargo ≈ mzfw−oew)',
       'Host snapshot may expose stations 1–14; station 15 still in roles for full cfg',
+    ],
+  },
+  {
+    id: 'asobo-c208b-cargo',
+    icao: 'C208',
+    titlePattern: /C208B Cargo/i,
+    familyPackRel: 'asobo-c208b-cargo.json',
+    marketTypeId: 'c208-caravan-cargo',
+    marketLabel: 'Cessna 208 Caravan Cargo',
+    stationRoles: {
+      passengerStations: [],
+      baggageStations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      crewStations: [1, 2],
+    },
+    liveSources: CLASSIC_LIGHT_LIVE_SOURCES,
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    simbriefIcao: 'C208',
+    simbriefAirframeMatch: 'Default',
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'Station 3', role: 'baggage' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'Station 4', role: 'baggage' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Station 5', role: 'baggage' },
+      { simVarIndex: 6, cfgIndex: 5, name: 'Station 6', role: 'baggage' },
+      { simVarIndex: 7, cfgIndex: 6, name: 'Station 7', role: 'baggage' },
+      { simVarIndex: 8, cfgIndex: 7, name: 'Station 8', role: 'baggage' },
+      { simVarIndex: 9, cfgIndex: 8, name: 'Station 9', role: 'baggage' },
+      { simVarIndex: 10, cfgIndex: 9, name: 'Station 10', role: 'baggage' },
+      { simVarIndex: 11, cfgIndex: 10, name: 'Station 11', role: 'baggage' },
+      { simVarIndex: 12, cfgIndex: 11, name: 'Station 12', role: 'baggage' },
+    ],
+    notes: [
+      'Asobo C208B Cargo',
+      'Market SKU shared with Black Square Caravan Cargo Pod (different station maps)',
+      'liveSources: classic fuel tanks + classic stations/weights',
+      'SimBrief: Default C208',
+    ],
+  },
+  {
+    id: 'blacksquare-commander-114',
+    icao: 'AC11',
+    // NA and turbo share the same 5-station cargo layout.
+    titlePattern: /Black Square Commander 114(?:TC)?\b/i,
+    familyPackRel: 'blacksquare-commander-114.json',
+    marketLabel: 'Rockwell Commander 114',
+    stationRoles: {
+      passengerStations: [],
+      baggageStations: [3, 4, 5],
+      crewStations: [1, 2],
+    },
+    liveSources: CLASSIC_LIGHT_LIVE_SOURCES,
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    simbriefIcao: 'AC11',
+    simbriefAirframeMatch: 'Default',
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'Station 3', role: 'baggage' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'Station 4', role: 'baggage' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Station 5', role: 'baggage' },
+    ],
+    notes: [
+      'Black Square Commander 114 family (114 / 114TC) — same 5-station cargo layout',
+      'One Skyline Market SKU; either NA or TC matches the purchased airframe',
+      'liveSources: classic fuel tanks + classic stations/weights',
+      'SimBrief: Default AC11',
     ],
   },
   {
@@ -286,6 +365,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     icao: 'BE36',
     titlePattern: /Black Square (A36(?:TC)?|B36TP) Bonanza Professional/i,
     familyPackRel: 'blacksquare-bonanza-professional.json',
+    marketLabel: 'Beechcraft Bonanza BE36',
     stationRoles: {
       passengerStations: [],
       // Front/rear pax + aft baggage — career cargo (pax=0).
@@ -311,6 +391,38 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'Same 7-station layout; fuel capacities differ per variant profile',
       'liveSources: classic fuel tanks + classic stations/weights',
       'SimBrief: Default BE36',
+    ],
+  },
+  {
+    id: 'asobo-c172sp-cargo',
+    icao: 'C172',
+    // Classic steam-gauge and G1000 cargo share stations / SimBrief Default.
+    titlePattern: /C172SP (?:Classic|G1000) Cargo/i,
+    familyPackRel: 'asobo-c172sp-cargo.json',
+    marketLabel: 'Cessna 172SP Cargo',
+    stationRoles: {
+      passengerStations: [],
+      baggageStations: [3, 4, 5, 6],
+      crewStations: [1, 2],
+    },
+    liveSources: CLASSIC_LIGHT_LIVE_SOURCES,
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    simbriefIcao: 'C172',
+    simbriefAirframeMatch: 'Default',
+    stationMap: [
+      { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
+      { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
+      { simVarIndex: 3, cfgIndex: 2, name: 'Station 3', role: 'baggage' },
+      { simVarIndex: 4, cfgIndex: 3, name: 'Station 4', role: 'baggage' },
+      { simVarIndex: 5, cfgIndex: 4, name: 'Station 5', role: 'baggage' },
+      { simVarIndex: 6, cfgIndex: 5, name: 'Station 6', role: 'baggage' },
+    ],
+    notes: [
+      'Asobo C172SP Cargo family (Classic + G1000) — same 6-station cargo layout',
+      'One Skyline Market SKU; either glass matches the purchased airframe',
+      'liveSources: classic fuel tanks + classic stations/weights',
+      'SimBrief: Default C172',
     ],
   },
 ];

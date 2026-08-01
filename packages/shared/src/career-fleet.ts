@@ -13,8 +13,18 @@ import {
   quoteFuelUplift,
   type FuelUpliftQuote,
 } from './career-fuel.js';
-import { ensureAircraftConditionPcts } from './career-aircraft-maintenance.js';
+import {
+  ensureAircraftConditionPcts,
+  INSPECTION_INTERVAL_HOURS,
+} from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
+import {
+  defaultCareerPlayerAirframe,
+  findCareerPlayerAirframe,
+  isStarterAirframeCondition,
+  listStarterCareerPlayerAirframes,
+  type StarterAirframeCondition,
+} from './career-player-airframes.js';
 import type {
   CareerMissionsState,
   CareerMissionsStateV1,
@@ -182,10 +192,18 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
     raw.condition === 'tired'
       ? raw.condition
       : 'good';
+  const airframe =
+    findCareerPlayerAirframe(raw.airframeTypeId) ??
+    defaultCareerPlayerAirframe(aircraftClassId);
   const normalized: PlayerAircraft = {
     id: raw.id,
     aircraftClassId,
-    label: typeof raw.label === 'string' && raw.label.trim() ? raw.label : defaultLabel(aircraftClassId),
+    airframeTypeId: airframe?.typeId,
+    label:
+      airframe?.label ??
+      (typeof raw.label === 'string' && raw.label.trim()
+        ? raw.label
+        : defaultLabel(aircraftClassId)),
     locationIcao: String(raw.locationIcao).trim().toUpperCase(),
     fuelKg,
     fuelCapacityKg: capacity,
@@ -319,12 +337,19 @@ export function primaryParkedAircraft(
 }
 
 /**
- * First-open: register pilot name and park a starter Caravan at the chosen hub.
+ * First-open: register pilot name and park a chosen light starter at the hub.
+ * Condition is good or excellent only (starter fleet is never tired/fair).
  */
 export function selectStarterHub(
   state: CareerMissionsState,
   icao: string,
-  opts: { pilotName: string },
+  opts: {
+    pilotName: string;
+    /** Homologated light_ga / light_turboprop Market typeId. */
+    airframeTypeId?: string;
+    /** Test override only — production always rolls good/excellent. */
+    condition?: StarterAirframeCondition;
+  },
 ): CareerMissionsState {
   if (state.hubSelected && state.fleet.length > 0) {
     throw new Error('Starter hub already selected');
@@ -334,23 +359,67 @@ export function selectStarterHub(
   if (!CAREER_HUB_COORDS[hub]) {
     throw new Error(`Unknown career hub: ${hub}`);
   }
-  const capacity = PLAYER_FUEL_CAPACITY_KG.light_turboprop;
+
+  const starters = listStarterCareerPlayerAirframes();
+  const requested = opts.airframeTypeId?.trim();
+  const starterAirframe = requested
+    ? findCareerPlayerAirframe(requested)
+    : defaultCareerPlayerAirframe('light_turboprop');
+  if (
+    !starterAirframe ||
+    !starters.some((row) => row.typeId === starterAirframe.typeId)
+  ) {
+    throw new Error(
+      requested
+        ? `Starter aircraft must be an enabled light airframe (got ${requested})`
+        : 'No light starter airframes are registered in the player catalog',
+    );
+  }
+
+  const condition: StarterAirframeCondition = isStarterAirframeCondition(
+    opts.condition,
+  )
+    ? opts.condition
+    : Math.random() < 0.5
+      ? 'good'
+      : 'excellent';
+  const wear =
+    condition === 'excellent'
+      ? {
+          hoursAirframe: 12,
+          hoursEngine: 10,
+          airframeConditionPct: 94,
+          engineConditionPct: 96,
+          hoursSinceInspection: 12,
+        }
+      : {
+          hoursAirframe: 40,
+          hoursEngine: 35,
+          airframeConditionPct: 88,
+          engineConditionPct: 92,
+          hoursSinceInspection: 40,
+        };
+
+  const capacity = PLAYER_FUEL_CAPACITY_KG[starterAirframe.aircraftClassId];
+  const interval = INSPECTION_INTERVAL_HOURS[starterAirframe.aircraftClassId];
+  const stem = starterAirframe.typeId.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
   const starter: PlayerAircraft = {
-    id: 'acf_caravan_1',
-    aircraftClassId: 'light_turboprop',
-    label: 'Company Caravan',
+    id: `acf_${stem}_1`,
+    aircraftClassId: starterAirframe.aircraftClassId,
+    airframeTypeId: starterAirframe.typeId,
+    label: starterAirframe.label,
     locationIcao: hub,
     fuelKg: Math.round(capacity * 0.45),
     fuelCapacityKg: capacity,
     status: 'parked',
     ownership: 'owned',
-    condition: 'good',
-    hoursAirframe: 40,
-    hoursEngine: 35,
-    airframeConditionPct: 88,
-    engineConditionPct: 92,
-    hoursSinceInspection: 40,
-    maintenanceDueAtHours: 100,
+    condition,
+    hoursAirframe: wear.hoursAirframe,
+    hoursEngine: wear.hoursEngine,
+    airframeConditionPct: wear.airframeConditionPct,
+    engineConditionPct: wear.engineConditionPct,
+    hoursSinceInspection: wear.hoursSinceInspection,
+    maintenanceDueAtHours: interval,
   };
   ensureAircraftConditionPcts(starter);
   return {

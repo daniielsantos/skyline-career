@@ -19,10 +19,12 @@ import {
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { economyDayIndex } from './career-weather.js';
+import { listCareerPlayerAirframes } from './career-player-airframes.js';
 
 describe('aircraft market', () => {
   it('generates a stable new/used/lease board for a seed day', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-seed' });
+    const marketAirframes = listCareerPlayerAirframes();
     const a = generateAircraftMarketListings({
       world,
       walletUsd: 10_000,
@@ -35,14 +37,30 @@ describe('aircraft market', () => {
       dayIndex: 3,
       economyTick: world.tick,
     });
-    assert.ok(a.length >= 5 && a.length <= 10);
+    assert.equal(a.length, marketAirframes.length);
     assert.deepEqual(
       a.map((l) => l.id),
       b.map((l) => l.id),
     );
-    assert.ok(a.some((l) => l.kind === 'new'));
-    assert.ok(a.some((l) => l.kind === 'used'));
-    assert.ok(a.some((l) => l.kind === 'lease'));
+    assert.ok(a.every((l) => ['new', 'used', 'lease'].includes(l.kind)));
+    // With fewer Market SKUs after family merges, one day may miss a kind —
+    // sample a few days from the same seed for coverage.
+    const kinds = new Set<string>();
+    for (let day = 0; day < 12; day++) {
+      for (const listing of generateAircraftMarketListings({
+        world,
+        walletUsd: 10_000,
+        dayIndex: day,
+        economyTick: world.tick,
+      })) {
+        kinds.add(listing.kind);
+      }
+    }
+    assert.ok(kinds.has('new'));
+    assert.ok(kinds.has('used'));
+    assert.ok(kinds.has('lease'));
+    assert.ok(a.every((l) => Boolean(l.airframeTypeId)));
+    assert.ok(a.every((l) => l.label.length > 0));
     for (const used of a.filter((l) => l.kind === 'used')) {
       assert.ok(
         used.askingUsd < AIRCRAFT_MSRP_USD[used.aircraftClassId] * 0.95,
@@ -58,7 +76,7 @@ describe('aircraft market', () => {
     }
   });
 
-  it('respects soft class caps on a low-wallet board', () => {
+  it('lists every enabled homologated airframe even on a low-wallet board', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-caps' });
     const listings = generateAircraftMarketListings({
       world,
@@ -66,14 +84,10 @@ describe('aircraft market', () => {
       dayIndex: 1,
       economyTick: world.tick,
     });
-    const ga = listings.filter((l) => l.aircraftClassId === 'light_ga').length;
-    const caravan = listings.filter((l) => l.aircraftClassId === 'light_turboprop').length;
-    const narrow = listings.filter((l) => l.aircraftClassId === 'narrow_freighter').length;
-    const wide = listings.filter((l) => l.aircraftClassId === 'wide_freighter').length;
-    assert.ok(ga <= 3, `GA cap ${ga}`);
-    assert.ok(caravan <= 2, `Caravan cap ${caravan}`);
-    assert.ok(narrow <= 1, `narrow cap ${narrow}`);
-    assert.ok(wide <= 1, `wide cap ${wide}`);
+    assert.deepEqual(
+      new Set(listings.map((listing) => listing.airframeTypeId)),
+      new Set(listCareerPlayerAirframes().map((airframe) => airframe.typeId)),
+    );
   });
 
   it('purchases a listing against wallet and parks at basedIcao', () => {
@@ -103,6 +117,8 @@ describe('aircraft market', () => {
     assert.equal(debitUsd, usedGa!.askingUsd);
     assert.equal(aircraft.ownership, 'owned');
     assert.equal(aircraft.locationIcao, usedGa!.basedIcao);
+    assert.equal(aircraft.airframeTypeId, usedGa!.airframeTypeId);
+    assert.equal(aircraft.label, usedGa!.label);
     assert.equal(state.walletUsd, 0);
     assert.ok(state.fleet.some((a) => a.id === aircraft.id));
   });

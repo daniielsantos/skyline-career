@@ -94,8 +94,13 @@ type Tab = CareerTab;
 type TerminalSection = 'inventory' | 'contracts' | 'movements';
 type MarketSortKey = 'distance' | 'cargo' | 'load' | 'expires' | 'pay';
 type SortDirection = 'asc' | 'desc';
+type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
 
 const MARKET_PAGE_SIZE = 10;
+
+function formatMarketSortParam(sorts: MarketSortLevel[]): string {
+  return sorts.map((level) => `${level.key}:${level.direction}`).join(',');
+}
 const FLEET_PAGE_SIZE = 10;
 const MAX_STAGING_LOTS = 5;
 const SIMBRIEF_USER_KEY = 'skyline.simbriefUser';
@@ -1136,8 +1141,20 @@ export function App() {
   const [wallet, setWallet] = useState(0);
   const [lots, setLots] = useState<MarketLot[]>([]);
   const [marketTotalLots, setMarketTotalLots] = useState(0);
-  /** Kept in a ref so `refresh` stays stable while the board filter changes. */
-  const marketQueryRef = useRef('');
+  const [marketPageCount, setMarketPageCount] = useState(1);
+  /** Kept in a ref so `refresh` stays stable while board query params change. */
+  const marketFetchOptsRef = useRef({
+    originQuery: '',
+    destQuery: '',
+    page: 1,
+    pageSize: MARKET_PAGE_SIZE,
+    sort: '',
+    distanceMaxNm: '',
+    commodity: '',
+    loadMaxKg: '',
+    expiresWithinHours: '',
+    minPayUsd: '',
+  });
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
   const [npcActivity, setNpcActivity] = useState<NpcActivity[]>([]);
@@ -1213,16 +1230,14 @@ export function App() {
   const [watch, setWatch] = useState<WatchStatus | null>(null);
   const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
   const [marketPage, setMarketPage] = useState(1);
-  const [routeFilter, setRouteFilter] = useState('');
+  const [originFilter, setOriginFilter] = useState('');
+  const [destFilter, setDestFilter] = useState('');
   const [distanceMaxNm, setDistanceMaxNm] = useState('');
   const [cargoFilter, setCargoFilter] = useState('');
   const [loadMaxKg, setLoadMaxKg] = useState('');
   const [expiresWithinHours, setExpiresWithinHours] = useState('');
   const [minimumPayUsd, setMinimumPayUsd] = useState('');
-  const [marketSort, setMarketSort] = useState<{
-    key: MarketSortKey;
-    direction: SortDirection;
-  } | null>(null);
+  const [marketSorts, setMarketSorts] = useState<MarketSortLevel[]>([]);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
   const [stagingRouteLots, setStagingRouteLots] = useState<MarketLot[]>([]);
   const [stagingRouteLotsLoading, setStagingRouteLotsLoading] = useState(false);
@@ -1237,6 +1252,15 @@ export function App() {
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupHub, setSignupHub] = useState('');
+  const [signupAirframeId, setSignupAirframeId] = useState('');
+  const [starterAircraftOptions, setStarterAircraftOptions] = useState<
+    Array<{
+      typeId: string;
+      label: string;
+      aircraftClassId: AircraftClass;
+      simbriefIcao: string;
+    }>
+  >([]);
   const [aircraftListings, setAircraftListings] = useState<AircraftListing[]>([]);
   const [aircraftCatalog, setAircraftCatalog] = useState<
     Array<{
@@ -1323,7 +1347,7 @@ export function App() {
     setError(null);
     const [state, market, missionState, npcState, acMarket] = await Promise.all([
       fetchState(),
-      fetchMarket(undefined, { query: marketQueryRef.current }),
+      fetchMarket(undefined, marketFetchOptsRef.current),
       fetchMissions(),
       fetchNpcFleet(),
       fetchAircraftMarket().catch(() => null),
@@ -1338,6 +1362,14 @@ export function App() {
     setWallet(missionState.walletUsd);
     setLots(market.lots);
     setMarketTotalLots(market.totalLots ?? market.lots.length);
+    setMarketPageCount(market.pageCount ?? 1);
+    if (market.page && market.page !== marketFetchOptsRef.current.page) {
+      setMarketPage(market.page);
+      marketFetchOptsRef.current = {
+        ...marketFetchOptsRef.current,
+        page: market.page,
+      };
+    }
     setMarketEvents(market.events ?? []);
     setNpcActivity(npcState.activity.length ? npcState.activity : market.npcActivity ?? []);
     setNpcBusy(npcState.busy);
@@ -1360,6 +1392,18 @@ export function App() {
     setHubOptions(state.hubs ?? []);
     setPilotName(state.pilotName ?? '');
     setHomeHubIcao(state.homeHubIcao ?? '');
+    if (state.starterAircraft?.length) {
+      setStarterAircraftOptions(state.starterAircraft);
+      setSignupAirframeId((prev) => {
+        if (prev && state.starterAircraft!.some((row) => row.typeId === prev)) {
+          return prev;
+        }
+        const preferred =
+          state.starterAircraft!.find((row) => row.typeId === 'c208-caravan-cargo') ??
+          state.starterAircraft![0];
+        return preferred?.typeId ?? '';
+      });
+    }
     if (state.cashflow) setCashflow(state.cashflow);
     if (acMarket) {
       setAircraftListings(acMarket.listings);
@@ -1378,9 +1422,17 @@ export function App() {
   }, [airportIcao]);
 
   const refreshCargoLimit = useCallback(
-    async (aircraftClass: AircraftClass, distanceNm?: number) => {
+    async (
+      aircraftClass: AircraftClass,
+      distanceNm?: number,
+      airframeTypeId?: string,
+    ) => {
       try {
-        const limit = await fetchCargoLimit(aircraftClass, distanceNm);
+        const limit = await fetchCargoLimit(
+          aircraftClass,
+          distanceNm,
+          airframeTypeId,
+        );
         setStructuralMaxCargoKg(limit.maxCargoKg);
         setMaxCargoKg(limit.operationalMaxCargoKg);
         setEstimatedBlockFuelKg(limit.estimatedBlockFuelKg ?? null);
@@ -1410,19 +1462,50 @@ export function App() {
     });
   }, [refresh]);
 
-  // The board is capped server-side, so the route search has to run there too —
-  // otherwise ICAOs outside the first page of lots look empty.
+  // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
-    const query = routeFilter.trim();
-    if (query === marketQueryRef.current) return;
+    const nextOpts = {
+      originQuery: originFilter.trim(),
+      destQuery: destFilter.trim(),
+      page: marketPage,
+      pageSize: MARKET_PAGE_SIZE,
+      sort: formatMarketSortParam(marketSorts),
+      distanceMaxNm,
+      commodity: cargoFilter,
+      loadMaxKg,
+      expiresWithinHours,
+      minPayUsd: minimumPayUsd,
+    };
+    const prev = marketFetchOptsRef.current;
+    const unchanged =
+      prev.originQuery === nextOpts.originQuery &&
+      prev.destQuery === nextOpts.destQuery &&
+      prev.page === nextOpts.page &&
+      prev.pageSize === nextOpts.pageSize &&
+      prev.sort === nextOpts.sort &&
+      prev.distanceMaxNm === nextOpts.distanceMaxNm &&
+      prev.commodity === nextOpts.commodity &&
+      prev.loadMaxKg === nextOpts.loadMaxKg &&
+      prev.expiresWithinHours === nextOpts.expiresWithinHours &&
+      prev.minPayUsd === nextOpts.minPayUsd;
+    if (unchanged) return;
+
     let cancelled = false;
     const timer = setTimeout(() => {
-      void fetchMarket(undefined, { query })
+      void fetchMarket(undefined, nextOpts)
         .then((market) => {
           if (cancelled) return;
-          marketQueryRef.current = query;
+          marketFetchOptsRef.current = nextOpts;
           setLots(market.lots);
           setMarketTotalLots(market.totalLots ?? market.lots.length);
+          setMarketPageCount(market.pageCount ?? 1);
+          if (market.page && market.page !== nextOpts.page) {
+            setMarketPage(market.page);
+            marketFetchOptsRef.current = {
+              ...nextOpts,
+              page: market.page,
+            };
+          }
         })
         .catch((err: unknown) => {
           if (cancelled) return;
@@ -1433,7 +1516,17 @@ export function App() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [routeFilter]);
+  }, [
+    cargoFilter,
+    destFilter,
+    distanceMaxNm,
+    expiresWithinHours,
+    loadMaxKg,
+    marketPage,
+    marketSorts,
+    minimumPayUsd,
+    originFilter,
+  ]);
 
   useEffect(() => {
     if (!staging) {
@@ -1450,12 +1543,16 @@ export function App() {
     void refreshCargoLimit(
       staging.aircraft,
       stagingRouteDistanceNm(staging),
+      fleet.find((aircraft) => aircraft.id === staging.aircraftId)
+        ?.airframeTypeId,
     );
   }, [
     staging?.aircraft,
+    staging?.aircraftId,
     staging?.originIcao,
     staging?.destIcao,
     staging?.lines[0]?.lot.distanceNm,
+    fleet,
     refreshCargoLimit,
   ]);
 
@@ -2279,6 +2376,7 @@ export function App() {
       setHomeHubIcao('');
       setSignupName('');
       setSignupHub('');
+      setSignupAirframeId('');
       goToTab('pilot');
     });
   }
@@ -2286,6 +2384,7 @@ export function App() {
   async function onSelectHub() {
     const name = signupName.trim();
     const icao = signupHub.trim().toUpperCase();
+    const airframeTypeId = signupAirframeId.trim();
     if (name.length < 2) {
       setError('Enter a pilot name (at least 2 characters)');
       return;
@@ -2294,17 +2393,30 @@ export function App() {
       setError('Select a home hub ICAO');
       return;
     }
+    if (!airframeTypeId) {
+      setError('Select a starter aircraft');
+      return;
+    }
     await run(async () => {
-      const result = await postSelectHub({ icao, pilotName: name });
+      const result = await postSelectHub({
+        icao,
+        pilotName: name,
+        airframeTypeId,
+      });
       setHubSelected(result.hubSelected);
       setFleet(result.fleet);
       setHubOptions(result.hubs);
       setPilotName(result.pilotName);
       setHomeHubIcao(result.homeHubIcao);
       setWallet(result.walletUsd);
+      const starter = result.fleet[0];
+      const starterLabel = starter?.label ?? 'starter aircraft';
+      const conditionLabel = starter?.condition
+        ? ` · ${starter.condition}`
+        : '';
       setToastKind('ok');
       setToast(
-        `${result.pilotName} registered · Caravan parked at ${result.homeHubIcao}`,
+        `${result.pilotName} registered · ${starterLabel}${conditionLabel} parked at ${result.homeHubIcao}`,
       );
       goToTab('pilot');
     });
@@ -2820,9 +2932,17 @@ export function App() {
     goToTab('staging');
   }
 
-  function changeStagingAircraft(next: AircraftClass) {
-    if (!staging || busy || next === staging.aircraft) return;
-    if (staging.replaceManifest || staging.aircraftId) return;
+  function changeStagingAircraft(nextAircraftId: string) {
+    if (!staging || busy || nextAircraftId === staging.aircraftId) return;
+    if (staging.replaceManifest || staging.intoMissionId) return;
+    const selected = fleet.find(
+      (aircraft) =>
+        aircraft.id === nextAircraftId &&
+        aircraft.status === 'parked' &&
+        aircraft.locationIcao === staging.originIcao,
+    );
+    if (!selected) return;
+    const next = selected.aircraftClassId;
     const openFlight = openFlightForRoute(
       staging.originIcao,
       staging.destIcao,
@@ -2831,6 +2951,7 @@ export function App() {
     const nextDraft = clampDraftToCapacity({
       ...staging,
       aircraft: next,
+      aircraftId: selected.id,
       intoMissionId: openFlight?.id,
     });
     setStaging(nextDraft);
@@ -3177,92 +3298,11 @@ export function App() {
     () => fleet.some((a) => a.status === 'listed'),
     [fleet],
   );
-  const filteredLots = useMemo(() => {
-    const maxDistance = Number(distanceMaxNm);
-    const maxLoad = Number(loadMaxKg);
-    const maxExpiry = Number(expiresWithinHours);
-    const minPay = Number(minimumPayUsd);
-    const routeTokens = routeFilter
-      .trim()
-      .toLowerCase()
-      .split(/[\s,/>\-→]+/)
-      .filter(Boolean);
-    return lots.filter((lot) => {
-      if (routeTokens.length > 0) {
-        const blob =
-          `${lot.originIcao} ${lot.destIcao} ${lot.originName ?? ''} ${lot.destName ?? ''}`.toLowerCase();
-        if (!routeTokens.every((token) => blob.includes(token))) {
-          return false;
-        }
-      }
-      if (
-        distanceMaxNm &&
-        (lot.distanceNm === undefined || lot.distanceNm > maxDistance)
-      ) {
-        return false;
-      }
-      if (cargoFilter && lot.commodityId !== cargoFilter) return false;
-      if (loadMaxKg && lot.availableKg > maxLoad) return false;
-      if (
-        expiresWithinHours &&
-        Math.max(0, lot.expiresAtTick - continuousHours) > maxExpiry
-      ) {
-        return false;
-      }
-      if (minimumPayUsd && lot.payUsd < minPay) return false;
-      return true;
-    });
-  }, [
-    cargoFilter,
-    continuousHours,
-    distanceMaxNm,
-    expiresWithinHours,
-    loadMaxKg,
-    lots,
-    minimumPayUsd,
-    routeFilter,
-  ]);
-  const marketPageCount = Math.max(
-    1,
-    Math.ceil(filteredLots.length / MARKET_PAGE_SIZE),
-  );
   const safeMarketPage = Math.min(marketPage, marketPageCount);
-  const sortedLots = useMemo(() => {
-    if (!marketSort) return filteredLots;
-    const direction = marketSort.direction === 'asc' ? 1 : -1;
-    return filteredLots
-      .map((lot, index) => ({ lot, index }))
-      .sort((a, b) => {
-        let comparison = 0;
-        switch (marketSort.key) {
-          case 'distance':
-            comparison =
-              (a.lot.distanceNm ?? Number.POSITIVE_INFINITY) -
-              (b.lot.distanceNm ?? Number.POSITIVE_INFINITY);
-            break;
-          case 'cargo':
-            comparison = a.lot.commodityName.localeCompare(b.lot.commodityName);
-            break;
-          case 'load':
-            comparison = a.lot.availableKg - b.lot.availableKg;
-            break;
-          case 'expires':
-            comparison = a.lot.expiresAtTick - b.lot.expiresAtTick;
-            break;
-          case 'pay':
-            comparison = a.lot.payUsd - b.lot.payUsd;
-            break;
-        }
-        return comparison === 0 ? a.index - b.index : comparison * direction;
-      })
-      .map(({ lot }) => lot);
-  }, [filteredLots, marketSort]);
-  const pagedLots = sortedLots.slice(
-    (safeMarketPage - 1) * MARKET_PAGE_SIZE,
-    safeMarketPage * MARKET_PAGE_SIZE,
-  );
+  const pagedLots = lots;
   const hasMarketFilters = Boolean(
-    routeFilter.trim() ||
+    originFilter.trim() ||
+      destFilter.trim() ||
       distanceMaxNm ||
       cargoFilter ||
       loadMaxKg ||
@@ -3276,7 +3316,8 @@ export function App() {
   }
 
   function clearMarketFilters() {
-    setRouteFilter('');
+    setOriginFilter('');
+    setDestFilter('');
     setDistanceMaxNm('');
     setCargoFilter('');
     setLoadMaxKg('');
@@ -3286,17 +3327,36 @@ export function App() {
   }
 
   function toggleMarketSort(key: MarketSortKey) {
-    setMarketSort((current) => ({
-      key,
-      direction:
-        current?.key === key && current.direction === 'asc' ? 'desc' : 'asc',
-    }));
+    setMarketSorts((current) => {
+      const existing = current.findIndex((level) => level.key === key);
+      if (existing >= 0) {
+        const level = current[existing]!;
+        if (level.direction === 'asc') {
+          return current.map((item, i) =>
+            i === existing ? { key, direction: 'desc' as const } : item,
+          );
+        }
+        return current.filter((_, i) => i !== existing);
+      }
+      return [...current, { key, direction: 'asc' as const }];
+    });
     setMarketPage(1);
   }
 
   function sortIndicator(key: MarketSortKey): string {
-    if (marketSort?.key !== key) return '↕';
-    return marketSort.direction === 'asc' ? '↑' : '↓';
+    const index = marketSorts.findIndex((level) => level.key === key);
+    if (index < 0) return '↕';
+    const arrow = marketSorts[index]!.direction === 'asc' ? '↑' : '↓';
+    return marketSorts.length > 1 ? `${index + 1}${arrow}` : arrow;
+  }
+
+  function marketAriaSort(
+    key: MarketSortKey,
+  ): 'ascending' | 'descending' | 'none' | 'other' {
+    const index = marketSorts.findIndex((level) => level.key === key);
+    if (index < 0) return 'none';
+    if (index > 0) return 'other';
+    return marketSorts[0]!.direction === 'asc' ? 'ascending' : 'descending';
   }
 
   const stagingExisting =
@@ -3778,8 +3838,8 @@ export function App() {
             <div>
               <h2 id="hub-picker-title">Create pilot profile</h2>
               <p>
-                Choose a callsign and home hub. Your starter Caravan parks there — load cargo only
-                where the aircraft is parked, or ferry first.
+                Choose a callsign, home hub, and light starter aircraft. Condition
+                rolls good or excellent automatically.
               </p>
             </div>
           </div>
@@ -3823,7 +3883,32 @@ export function App() {
                 ))}
               </select>
             </label>
-            <button type="submit" className="accept" disabled={busy || signupName.trim().length < 2 || !signupHub}>
+            <label className="pilot-field">
+              Starter aircraft
+              <select
+                value={signupAirframeId}
+                onChange={(e) => setSignupAirframeId(e.target.value)}
+                disabled={busy || starterAircraftOptions.length === 0}
+                required
+              >
+                <option value="">Select light aircraft…</option>
+                {starterAircraftOptions.map((airframe) => (
+                  <option key={airframe.typeId} value={airframe.typeId}>
+                    {airframe.label} ({airframe.aircraftClassId === 'light_ga' ? 'Light GA' : 'Light TP'} · {airframe.simbriefIcao})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              className="accept"
+              disabled={
+                busy ||
+                signupName.trim().length < 2 ||
+                !signupHub ||
+                !signupAirframeId
+              }
+            >
               Start career
             </button>
           </form>
@@ -4144,9 +4229,9 @@ export function App() {
         <section className="panel">
           <div className="panel-head">
             <p className="panel-stats">
-              {marketTotalLots > lots.length
-                ? `${lots.length} of ${marketTotalLots} lots`
-                : `${lots.length} lots`}
+              {marketTotalLots > 0
+                ? `${marketTotalLots.toLocaleString()} matching lots`
+                : '0 matching lots'}
               {npcActivity.length > 0
                 ? ` · ${npcActivity.length} NPC airborne`
                 : ''}
@@ -4181,86 +4266,51 @@ export function App() {
               <thead>
                 <tr>
                   <th>Route</th>
-                  <th
-                    aria-sort={
-                      marketSort?.key === 'distance'
-                        ? marketSort.direction === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
+                  <th aria-sort={marketAriaSort('distance')}>
                     <button
                       type="button"
-                      className="sort-header"
+                      className={`sort-header${marketSorts.some((l) => l.key === 'distance') ? ' is-sorted' : ''}`}
+                      title="Sort by distance. Click another column to add a sort level; click again to reverse or clear."
                       onClick={() => toggleMarketSort('distance')}
                     >
                       Distance <span>{sortIndicator('distance')}</span>
                     </button>
                   </th>
-                  <th
-                    aria-sort={
-                      marketSort?.key === 'cargo'
-                        ? marketSort.direction === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
+                  <th aria-sort={marketAriaSort('cargo')}>
                     <button
                       type="button"
-                      className="sort-header"
+                      className={`sort-header${marketSorts.some((l) => l.key === 'cargo') ? ' is-sorted' : ''}`}
+                      title="Sort by cargo. Click another column to add a sort level; click again to reverse or clear."
                       onClick={() => toggleMarketSort('cargo')}
                     >
                       Cargo <span>{sortIndicator('cargo')}</span>
                     </button>
                   </th>
-                  <th
-                    aria-sort={
-                      marketSort?.key === 'load'
-                        ? marketSort.direction === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
+                  <th aria-sort={marketAriaSort('load')}>
                     <button
                       type="button"
-                      className="sort-header"
+                      className={`sort-header${marketSorts.some((l) => l.key === 'load') ? ' is-sorted' : ''}`}
+                      title="Sort by load. Click another column to add a sort level; click again to reverse or clear."
                       onClick={() => toggleMarketSort('load')}
                     >
                       Load <span>{sortIndicator('load')}</span>
                     </button>
                   </th>
-                  <th
-                    aria-sort={
-                      marketSort?.key === 'expires'
-                        ? marketSort.direction === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
+                  <th aria-sort={marketAriaSort('expires')}>
                     <button
                       type="button"
-                      className="sort-header"
+                      className={`sort-header${marketSorts.some((l) => l.key === 'expires') ? ' is-sorted' : ''}`}
+                      title="Sort by expiry. Click another column to add a sort level; click again to reverse or clear."
                       onClick={() => toggleMarketSort('expires')}
                     >
                       Expires <span>{sortIndicator('expires')}</span>
                     </button>
                   </th>
-                  <th
-                    aria-sort={
-                      marketSort?.key === 'pay'
-                        ? marketSort.direction === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
+                  <th aria-sort={marketAriaSort('pay')}>
                     <button
                       type="button"
-                      className="sort-header"
+                      className={`sort-header${marketSorts.some((l) => l.key === 'pay') ? ' is-sorted' : ''}`}
+                      title="Sort by pay. Click another column to add a sort level; click again to reverse or clear."
                       onClick={() => toggleMarketSort('pay')}
                     >
                       Pay <span>{sortIndicator('pay')}</span>
@@ -4270,16 +4320,28 @@ export function App() {
                 </tr>
                 <tr className="filter-row">
                   <th>
-                    <input
-                      type="search"
-                      className="route-filter"
-                      aria-label="Filter route by ICAO or city"
-                      placeholder="ICAO / city"
-                      value={routeFilter}
-                      onChange={(e) =>
-                        updateMarketFilter(setRouteFilter, e.target.value)
-                      }
-                    />
+                    <div className="route-filter-pair">
+                      <input
+                        type="search"
+                        className="route-filter"
+                        aria-label="Filter origin by ICAO or city"
+                        placeholder="Origin"
+                        value={originFilter}
+                        onChange={(e) =>
+                          updateMarketFilter(setOriginFilter, e.target.value)
+                        }
+                      />
+                      <input
+                        type="search"
+                        className="route-filter"
+                        aria-label="Filter destination by ICAO or city"
+                        placeholder="Dest"
+                        value={destFilter}
+                        onChange={(e) =>
+                          updateMarketFilter(setDestFilter, e.target.value)
+                        }
+                      />
+                    </div>
                   </th>
                   <th>
                     <select
@@ -4359,16 +4421,29 @@ export function App() {
                     </select>
                   </th>
                   <th>
-                    {hasMarketFilters ? (
+                    {hasMarketFilters || marketSorts.length > 0 ? (
                       <button
                         type="button"
                         className="clear-filters"
-                        onClick={clearMarketFilters}
+                        onClick={() => {
+                          clearMarketFilters();
+                          setMarketSorts([]);
+                        }}
+                        title={
+                          marketSorts.length > 1
+                            ? `Clear filters and ${marketSorts.length} sort levels`
+                            : 'Clear filters and sort'
+                        }
                       >
                         Clear
                       </button>
                     ) : (
-                      <span className="muted">Filters</span>
+                      <span
+                        className="muted"
+                        title="Click columns to build a combined sort (1, 2, …). Click again to reverse or clear that level."
+                      >
+                        Filters
+                      </span>
                     )}
                   </th>
                 </tr>
@@ -4454,10 +4529,12 @@ export function App() {
                   </tr>
                   );
                 })}
-                {filteredLots.length === 0 ? (
+                {pagedLots.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="empty">
-                      {lots.length === 0
+                      {marketTotalLots === 0 &&
+                      !hasMarketFilters &&
+                      marketSorts.length === 0
                         ? 'No lots yet — run +1 day to form market lanes.'
                         : 'No freights match the selected filters.'}
                     </td>
@@ -4468,12 +4545,12 @@ export function App() {
           </div>
           <nav className="pagination" aria-label="Freight pages">
             <p>
-              {filteredLots.length === 0
+              {marketTotalLots === 0
                 ? '0 records'
                 : `${(safeMarketPage - 1) * MARKET_PAGE_SIZE + 1}–${Math.min(
                     safeMarketPage * MARKET_PAGE_SIZE,
-                    filteredLots.length,
-                  )} of ${filteredLots.length}`}
+                    marketTotalLots,
+                  )} of ${marketTotalLots}`}
             </p>
             <div>
               <button
@@ -4648,7 +4725,8 @@ export function App() {
                   </h2>
                   <p>
                     {staging.originName} → {staging.destName} ·{' '}
-                    {aircraftClassLabel(staging.aircraft)}
+                    {fleet.find((aircraft) => aircraft.id === staging.aircraftId)
+                      ?.label ?? aircraftClassLabel(staging.aircraft)}
                     {staging.replaceManifest
                       ? ` · editing ${staging.intoMissionId}`
                       : stagingExisting
@@ -4660,25 +4738,33 @@ export function App() {
                   <label className="staging-aircraft">
                     Aircraft
                     <select
-                      value={staging.aircraft}
+                      value={staging.aircraftId ?? ''}
                       onChange={(event) =>
-                        changeStagingAircraft(event.target.value as AircraftClass)
+                        changeStagingAircraft(event.target.value)
                       }
                       disabled={
                         busy ||
-                        Boolean(staging.aircraftId) ||
+                        Boolean(staging.intoMissionId) ||
                         Boolean(staging.replaceManifest)
                       }
                       title={
-                        staging.aircraftId || staging.replaceManifest
-                          ? 'Class locked to the assigned aircraft'
+                        staging.intoMissionId || staging.replaceManifest
+                          ? 'Aircraft locked to the active flight'
                           : undefined
                       }
                     >
-                      <option value="narrow_freighter">Narrow (B738 BCF)</option>
-                      <option value="wide_freighter">Wide (MD-11F)</option>
-                      <option value="light_turboprop">Light TP (C208 Caravan)</option>
-                      <option value="light_ga">Light GA (BE36 Bonanza)</option>
+                      {fleet
+                        .filter(
+                          (aircraft) =>
+                            aircraft.id === staging.aircraftId ||
+                            (aircraft.status === 'parked' &&
+                              aircraft.locationIcao === staging.originIcao),
+                        )
+                        .map((aircraft) => (
+                          <option key={aircraft.id} value={aircraft.id}>
+                            {aircraft.label} · {aircraftClassLabel(aircraft.aircraftClassId)}
+                          </option>
+                        ))}
                     </select>
                   </label>
                   <button

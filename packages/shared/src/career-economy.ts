@@ -2847,6 +2847,17 @@ export function marketQueryTokens(query: string): string[] {
     .filter(Boolean);
 }
 
+/** Every token must appear in a single ICAO/city endpoint blob. */
+export function marketEndpointMatchesQuery(
+  tokens: string[],
+  icao: string,
+  name?: string,
+): boolean {
+  if (tokens.length === 0) return true;
+  const blob = `${icao} ${name ?? ''}`.toLowerCase();
+  return tokens.every((token) => blob.includes(token));
+}
+
 /** Every token must appear in the ICAO/city blob, matching the market board input. */
 export function marketLotMatchesQuery(
   tokens: string[],
@@ -2869,8 +2880,12 @@ export function listMarketLots(
     originIcao?: string;
     destIcao?: string;
     commodityId?: CommodityId;
-    /** Free-text ICAO/city search applied before any caller-side row cap. */
+    /** Free-text ICAO/city search applied to the whole route (legacy combined). */
     query?: string;
+    /** Free-text ICAO/city search applied only to origin. */
+    originQuery?: string;
+    /** Free-text ICAO/city search applied only to destination. */
+    destQuery?: string;
     nowMs?: number;
   } = {},
 ): MarketLotView[] {
@@ -2878,6 +2893,8 @@ export function listMarketLots(
   const views: MarketLotView[] = [];
   const nowMs = opts.nowMs ?? Date.now();
   const queryTokens = marketQueryTokens(opts.query ?? '');
+  const originQueryTokens = marketQueryTokens(opts.originQuery ?? '');
+  const destQueryTokens = marketQueryTokens(opts.destQuery ?? '');
 
   for (const lot of world.lots) {
     if (lot.status !== 'available' && lot.status !== 'reserved') {
@@ -2909,6 +2926,14 @@ export function listMarketLots(
         destName,
       })
     ) {
+      continue;
+    }
+    if (
+      !marketEndpointMatchesQuery(originQueryTokens, lot.originIcao, originName)
+    ) {
+      continue;
+    }
+    if (!marketEndpointMatchesQuery(destQueryTokens, lot.destIcao, destName)) {
       continue;
     }
     const oStock = origin ? ensurePile(origin, lot.commodityId) : pile(0, 1);

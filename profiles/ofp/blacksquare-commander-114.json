@@ -5,15 +5,19 @@
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "Black Square Commander 114"
+    "Black Square Commander 114",
+    "Black Square Commander 114TC"
   ],
-  "matchTitlePattern": "Black Square Commander 114",
+  "matchTitlePattern": "Black Square Commander 114(?:TC)?\\b",
   "notes": [
-    "Black Square Commander 114 — auto roles pack from homologated profile",
-    "Profile: blacksquare/commander-114@1.0.0",
-    "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct"
+    "Black Square Commander 114 family (114 / 114TC) — same 5-station cargo layout",
+    "One Skyline Market SKU; either NA or TC matches the purchased airframe",
+    "liveSources: classic fuel tanks + classic stations/weights",
+    "SimBrief: Default AC11",
+    "Homologated profile: blacksquare/commander-114@1.0.0",
+    "Title: Black Square Commander 114",
+    "Homologated profile: blacksquare/commander-114tc@1.0.0",
+    "Title: Black Square Commander 114TC"
   ],
   "fuel": {
     "unit": "lb"
@@ -24,62 +28,24 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "crewStations": [
-        1,
-        2
-      ],
-      "baggageStations": [
-        3,
-        4,
-        5
-      ],
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5],
       "passengerStations": []
     }
   },
   "liveSources": {
-    "fuel": [
-      "classic"
-    ],
-    "weights": [
-      "classic-weights"
-    ],
-    "payload": [
-      "classic-stations"
-    ]
+    "fuel": ["classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
   },
   "simbriefIcao": "AC11",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
-    {
-      "simVarIndex": 1,
-      "cfgIndex": 0,
-      "name": "Station 1",
-      "role": "crew"
-    },
-    {
-      "simVarIndex": 2,
-      "cfgIndex": 1,
-      "name": "Station 2",
-      "role": "crew"
-    },
-    {
-      "simVarIndex": 3,
-      "cfgIndex": 2,
-      "name": "Station 3",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 4,
-      "cfgIndex": 3,
-      "name": "Station 4",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 5,
-      "cfgIndex": 4,
-      "name": "Station 5",
-      "role": "baggage"
-    }
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" }
   ],
   "tolerances": {
     "fuelAbsLb": 50,
@@ -90,3 +56,4 @@
     "maxFuelIncreaseLb": 0
   }
 }
+

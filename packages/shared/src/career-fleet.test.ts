@@ -37,9 +37,39 @@ describe('career fleet hangar', () => {
     assert.equal(state.homeHubIcao, 'SBGR');
     assert.equal(state.fleet.length, 1);
     assert.equal(state.fleet[0]!.aircraftClassId, 'light_turboprop');
+    assert.equal(state.fleet[0]!.airframeTypeId, 'c208-caravan-cargo');
+    assert.ok(
+      state.fleet[0]!.condition === 'good' ||
+        state.fleet[0]!.condition === 'excellent',
+    );
     assert.equal(state.fleet[0]!.locationIcao, 'SBGR');
     assert.equal(state.fleet[0]!.status, 'parked');
     assert.ok(state.fleet[0]!.fuelKg > 0);
+  });
+
+  it('selectStarterHub lets the pilot pick a light GA starter', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
+      ...pilot,
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    assert.equal(state.fleet[0]!.aircraftClassId, 'light_ga');
+    assert.equal(state.fleet[0]!.airframeTypeId, 'asobo-c172sp-cargo');
+    assert.equal(state.fleet[0]!.label, 'Cessna 172SP Cargo');
+    assert.ok(
+      state.fleet[0]!.condition === 'good' ||
+        state.fleet[0]!.condition === 'excellent',
+    );
+  });
+
+  it('selectStarterHub rejects non-light or unknown starter airframes', () => {
+    assert.throws(
+      () =>
+        selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+          ...pilot,
+          airframeTypeId: 'pmdg-738-bcf-family',
+        }),
+      /light airframe/i,
+    );
   });
 
   it('free acquire is disabled — Aircraft Market purchase parks light_ga', () => {

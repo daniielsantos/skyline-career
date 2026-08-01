@@ -162,3 +162,99 @@ describe('upsertRolesPackFromProfile Bonanza family', () => {
     assert.equal(onDisk.matchTitles.length, 2);
   });
 });
+
+describe('upsertRolesPackFromProfile Commander 114 family', () => {
+  it('merges 114 and 114TC into blacksquare-commander-114.json', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ofp-ac11-'));
+    const na = minimalProfile({
+      profileId: 'blacksquare-commander-114',
+      profileKey: 'blacksquare/commander-114',
+      match: {
+        title: 'Black Square Commander 114',
+        publisher: 'blacksquare',
+        icao: 'AC11',
+      },
+      stations: [1, 2, 3, 4, 5].map((index) => ({
+        index,
+        name: `Station ${index}`,
+        maxLoad: 200,
+      })),
+    });
+    const first = await upsertRolesPackFromProfile(na, dir, {
+      loadMethod: 'direct-injection',
+      cabinAsBaggage: true,
+    });
+    assert.match(first.path, /blacksquare-commander-114\.json$/);
+
+    const tc = minimalProfile({
+      profileId: 'blacksquare-commander-114tc',
+      profileKey: 'blacksquare/commander-114tc',
+      match: {
+        title: 'Black Square Commander 114TC',
+        publisher: 'blacksquare',
+        icao: 'AC11',
+      },
+      stations: na.payload.stations,
+    });
+    const second = await upsertRolesPackFromProfile(tc, dir, {
+      loadMethod: 'direct-injection',
+    });
+    assert.equal(second.created, false);
+    assert.deepEqual(
+      [...(second.pack.matchTitles ?? [])].sort(),
+      [
+        'Black Square Commander 114',
+        'Black Square Commander 114TC',
+      ].sort(),
+    );
+  });
+});
+
+describe('upsertRolesPackFromProfile C172SP Cargo family', () => {
+  it('merges Classic and G1000 into asobo-c172sp-cargo.json', async () => {
+    assert.equal(
+      matchHeuristic('C172SP Classic Cargo')?.id,
+      'asobo-c172sp-cargo',
+    );
+    const dir = await mkdtemp(join(tmpdir(), 'ofp-c172-'));
+    const classic = minimalProfile({
+      profileId: 'asobo-c172sp-classic-cargo',
+      profileKey: 'asobo/c172sp-classic-cargo',
+      match: {
+        title: 'C172SP Classic Cargo',
+        publisher: 'asobo',
+        icao: 'C172',
+      },
+      stations: [1, 2, 3, 4, 5, 6].map((index) => ({
+        index,
+        name: `Station ${index}`,
+        maxLoad: 200,
+      })),
+    });
+    const first = await upsertRolesPackFromProfile(classic, dir, {
+      loadMethod: 'direct-injection',
+      cabinAsBaggage: true,
+    });
+    assert.match(first.path, /asobo-c172sp-cargo\.json$/);
+    assert.equal(first.pack.ofpId, 'asobo-c172sp-cargo');
+
+    const g1000 = minimalProfile({
+      profileId: 'asobo-c172sp-g1000-cargo',
+      profileKey: 'asobo/c172sp-g1000-cargo',
+      match: {
+        title: 'C172SP G1000 Cargo',
+        publisher: 'asobo',
+        icao: 'C172',
+      },
+      stations: classic.payload.stations,
+    });
+    const second = await upsertRolesPackFromProfile(g1000, dir, {
+      loadMethod: 'direct-injection',
+    });
+    assert.equal(second.created, false);
+    assert.deepEqual(
+      [...(second.pack.matchTitles ?? [])].sort(),
+      ['C172SP Classic Cargo', 'C172SP G1000 Cargo'].sort(),
+    );
+  });
+});

@@ -1,0 +1,71 @@
+[
+  {
+    "typeId": "blacksquare-bonanza-professional",
+    "aircraftClassId": "light_ga",
+    "label": "Beechcraft Bonanza BE36",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-bonanza-professional.json",
+    "simbriefIcao": "BE36",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "asobo-c172sp-cargo",
+    "aircraftClassId": "light_ga",
+    "label": "Cessna 172SP Cargo",
+    "rolesPackRelPath": "profiles/ofp/asobo-c172sp-cargo.json",
+    "simbriefIcao": "C172",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "blacksquare-commander-114",
+    "aircraftClassId": "light_ga",
+    "label": "Rockwell Commander 114",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-commander-114.json",
+    "simbriefIcao": "AC11",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "c208-caravan-cargo",
+    "aircraftClassId": "light_turboprop",
+    "label": "Cessna 208 Caravan Cargo",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-caravan-cargo-pod.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/asobo-c208b-cargo.json",
+      "profiles/ofp/blacksquare-caravan-cargo-pod.json"
+    ],
+    "simbriefIcao": "C208",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "pmdg-738-bcf-family",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Boeing 737-800 BCF",
+    "rolesPackRelPath": "profiles/ofp/pmdg-738-bcf.json",
+    "simbriefIcao": "B738",
+    "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Boeing Converted Freighter"
+  },
+  {
+    "typeId": "pmdg-738-pax-family",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Boeing 737-800 Passenger",
+    "rolesPackRelPath": "profiles/ofp/pmdg-738-pax.json",
+    "simbriefIcao": "B738",
+    "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Dual Class",
+    "enabled": false
+  },
+  {
+    "typeId": "toliss-a346-family",
+    "aircraftClassId": "wide_freighter",
+    "label": "Airbus A340-600",
+    "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
+    "simbriefIcao": "A346",
+    "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)"
+  },
+  {
+    "typeId": "tfdi-md11f-family",
+    "aircraftClassId": "wide_freighter",
+    "label": "McDonnell Douglas MD-11F",
+    "rolesPackRelPath": "profiles/ofp/tfdi-md11f.json",
+    "simbriefIcao": "MD1F",
+    "simbriefAirframeMatch": "TFDi Design \\(MSFS\\) - MD-11F"
+  }
+]

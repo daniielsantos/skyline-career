@@ -105,6 +105,7 @@ function usage(): never {
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
+  msfs-compat-agent career-airframe [wizard]|list|disable|enable [--type typeId]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
   msfs-compat-agent probe-payload-stations [--pipe <name>]
@@ -120,6 +121,7 @@ Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
+  career-airframe: interactive wizard (or list / disable / enable) for Market models
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
@@ -338,6 +340,73 @@ async function main(): Promise<void> {
       }),
     );
     return;
+  }
+
+  if (command === 'career-airframe') {
+    const sub = rest[0];
+    if (
+      !sub ||
+      sub === 'wizard' ||
+      sub === 'help' ||
+      sub === '--help'
+    ) {
+      const { runCareerAirframeWizard } = await import(
+        './career-airframe-wizard.js'
+      );
+      await runCareerAirframeWizard({ repoRoot });
+      return;
+    }
+    const {
+      listCareerPlayerAirframeCatalog,
+      setCareerPlayerAirframeEnabled,
+    } = await import('./career-player-airframe-catalog.js');
+    const typeId = getFlag(rest, '--type') ?? rest[1];
+    if (sub === 'list') {
+      const rows = await listCareerPlayerAirframeCatalog(repoRoot);
+      for (const row of rows) {
+        const flag = row.enabled === false ? 'disabled' : 'enabled';
+        console.log(
+          `${flag.padEnd(8)}  ${row.typeId.padEnd(36)}  ${row.aircraftClassId.padEnd(16)}  ${row.label}`,
+        );
+      }
+      if (rows.length === 0) console.log('(no player airframes registered)');
+      return;
+    }
+    if (sub === 'disable' || sub === 'enable') {
+      if (!typeId) {
+        console.error(
+          `Usage: node packages/agent/dist/cli.js career-airframe ${sub} --type <typeId>`,
+        );
+        console.error(
+          'Or run the wizard: node packages/agent/dist/cli.js career-airframe',
+        );
+        process.exit(1);
+      }
+      const row = await setCareerPlayerAirframeEnabled({
+        repoRoot,
+        typeId,
+        enabled: sub === 'enable',
+      });
+      console.log(
+        JSON.stringify(
+          {
+            typeId: row.typeId,
+            label: row.label,
+            enabled: row.enabled !== false,
+          },
+          null,
+          2,
+        ),
+      );
+      console.log(
+        'Restart career-ui / rebuild @msfs-compat/shared if the Market board does not refresh.',
+      );
+      return;
+    }
+    console.error(
+      'Usage: node packages/agent/dist/cli.js career-airframe [wizard]|list|disable|enable [--type typeId]',
+    );
+    process.exit(1);
   }
 
   if (command === 'status') {

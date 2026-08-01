@@ -1,0 +1,2059 @@
+{
+  "generatedAtIso": "2026-08-01T13:30:57.555Z",
+  "sourcePackage": "fsltl-traffic-base",
+  "airplanesRoot": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes",
+  "note": "AI traffic flight models — abstract type hints for Skyline NPC classes only. Do not use for player OFP homologation.",
+  "count": 71,
+  "bySuggestedClass": {
+    "light_turboprop": [
+      "208B",
+      "B350",
+      "C25C",
+      "DA62",
+      "LJ25",
+      "TBM930"
+    ],
+    "narrow_freighter": [
+      "A20N",
+      "A21N",
+      "A319",
+      "A320",
+      "A321",
+      "A321F",
+      "AT45",
+      "AT46",
+      "AT75",
+      "AT75F",
+      "AT76",
+      "B733",
+      "B733F",
+      "B734",
+      "B734F",
+      "B737",
+      "B737F",
+      "B738",
+      "B738F",
+      "B739",
+      "B73X",
+      "B763F",
+      "BCS1",
+      "BCS3",
+      "CRJ7",
+      "DH8C",
+      "DH8D",
+      "E170",
+      "E190",
+      "SF34",
+      "SF34F",
+      "SU95"
+    ],
+    "unmapped": [
+      "A306",
+      "A30B",
+      "B763"
+    ],
+    "wide_freighter": [
+      "A306F",
+      "A30BF",
+      "A332",
+      "A332F",
+      "A333",
+      "A333F",
+      "A343",
+      "A346",
+      "A359",
+      "A388",
+      "B744",
+      "B744F",
+      "B748",
+      "B748F",
+      "B772",
+      "B77L",
+      "B77LF",
+      "B77W",
+      "B788",
+      "B789",
+      "B78X",
+      "MD11F"
+    ],
+    "light_ga": [
+      "C152",
+      "C172SP",
+      "DA40_NG",
+      "DR400",
+      "G36",
+      "GENERIC_MEDIUM",
+      "P28A",
+      "VL3"
+    ]
+  },
+  "types": [
+    {
+      "folder": "FSLTL_Asobo_208B",
+      "icaoType": "208B",
+      "freighterVariant": false,
+      "suggestedClassId": "light_turboprop",
+      "oewKg": 2336,
+      "mtowKg": 3995,
+      "fuelCapacityKg": 986,
+      "fuelType": 2,
+      "estimatedPayloadKg": 673,
+      "cargoStationsMaxKg": null,
+      "stationCount": 15,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_03",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_04",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_05",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_06",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_07",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_08",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_09",
+          "weightLb": 0
+        },
+        {
+          "index": 9,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_10",
+          "weightLb": 0
+        },
+        {
+          "index": 10,
+          "label": "TT:MENU.PAYLOAD.CARGO_POD_1",
+          "weightLb": 0
+        },
+        {
+          "index": 11,
+          "label": "TT:MENU.PAYLOAD.CARGO_POD_2",
+          "weightLb": 0
+        },
+        {
+          "index": 12,
+          "label": "TT:MENU.PAYLOAD.CARGO_POD_3",
+          "weightLb": 0
+        },
+        {
+          "index": 13,
+          "label": "TT:MENU.PAYLOAD.CARGO_POD_4",
+          "weightLb": 0
+        },
+        {
+          "index": 14,
+          "label": "TT:MENU.PAYLOAD.CARGO_CABIN",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_208B\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A20N",
+      "icaoType": "A20N",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 67358,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 10637,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A20N\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A21N",
+      "icaoType": "A21N",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 67358,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 304,
+      "fuelType": 2,
+      "estimatedPayloadKg": 377,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A21N\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A306",
+      "icaoType": "A306",
+      "freighterVariant": false,
+      "suggestedClassId": null,
+      "oewKg": 78335,
+      "mtowKg": 170505,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 76023,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A306\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A306F",
+      "icaoType": "A306F",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 78335,
+      "mtowKg": 170505,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 76023,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A306F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A30B",
+      "icaoType": "A30B",
+      "freighterVariant": false,
+      "suggestedClassId": null,
+      "oewKg": 88504,
+      "mtowKg": 165897,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 61246,
+      "cargoStationsMaxKg": null,
+      "stationCount": 9,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 1,
+          "label": "Co-Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 2,
+          "label": "Crew\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "First Class\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "Coach 3-10\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "Coach 11-18\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "Coach 19-25\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "Forward Baggage\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "Aft Baggage\" ;",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A30B\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A30BF",
+      "icaoType": "A30BF",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 88504,
+      "mtowKg": 165897,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 61246,
+      "cargoStationsMaxKg": null,
+      "stationCount": 9,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 1,
+          "label": "Co-Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 2,
+          "label": "Crew\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "First Class\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "Coach 3-10\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "Coach 11-18\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "Coach 19-25\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "Forward Baggage\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "Aft Baggage\" ;",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A30BF\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A319",
+      "icaoType": "A319",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 67222,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 304,
+      "fuelType": 2,
+      "estimatedPayloadKg": 513,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A319\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A320",
+      "icaoType": "A320",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 65998,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 21273,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A320\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A321",
+      "icaoType": "A321",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 67358,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 10637,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A321\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A321F",
+      "icaoType": "A321F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 66497,
+      "mtowKg": 93500,
+      "fuelCapacityKg": 10637,
+      "fuelType": 2,
+      "estimatedPayloadKg": 16366,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A321F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A332",
+      "icaoType": "A332",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 67662,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A332\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_a332F",
+      "icaoType": "A332F",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 67662,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_a332F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A333",
+      "icaoType": "A333",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 68116,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 9,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 1,
+          "label": "Co-Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 2,
+          "label": "Crew\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "First Class\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "Coach 3-10\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "Coach 11-18\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "Coach 19-25\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "Forward Baggage\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "Aft Baggage\" ;",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A333\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A333F",
+      "icaoType": "A333F",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 68116,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 9,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 1,
+          "label": "Co-Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 2,
+          "label": "Crew\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "First Class\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "Coach 3-10\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "Coach 11-18\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "Coach 19-25\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "Forward Baggage\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "Aft Baggage\" ;",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A333F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A343",
+      "icaoType": "A343",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 131088,
+      "mtowKg": 276691,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 145147,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A343\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A346",
+      "icaoType": "A346",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 174179,
+      "mtowKg": 381018,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 206383,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A346\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A359",
+      "icaoType": "A359",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 236866,
+      "mtowKg": 250746,
+      "fuelCapacityKg": 111355,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A359\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_A388",
+      "icaoType": "A388",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 130408,
+      "mtowKg": 276691,
+      "fuelCapacityKg": 118524,
+      "fuelType": 2,
+      "estimatedPayloadKg": 27759,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_A388\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_AT45",
+      "icaoType": "AT45",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 13450,
+      "mtowKg": 22800,
+      "fuelCapacityKg": 5002,
+      "fuelType": 2,
+      "estimatedPayloadKg": 4348,
+      "cargoStationsMaxKg": 1844,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.FORWARD_BAGGAGE",
+          "weightLb": 2065
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 12240
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.REAR_BAGGAGE",
+          "weightLb": 2000
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_AT45\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_AT46",
+      "icaoType": "AT46",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 13450,
+      "mtowKg": 22800,
+      "fuelCapacityKg": 5002,
+      "fuelType": 2,
+      "estimatedPayloadKg": 4348,
+      "cargoStationsMaxKg": 1844,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.FORWARD_BAGGAGE",
+          "weightLb": 2065
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 12240
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.REAR_BAGGAGE",
+          "weightLb": 2000
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_AT46\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_AT75",
+      "icaoType": "AT75",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 13450,
+      "mtowKg": 22800,
+      "fuelCapacityKg": 5002,
+      "fuelType": 2,
+      "estimatedPayloadKg": 4348,
+      "cargoStationsMaxKg": 1844,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.FORWARD_BAGGAGE",
+          "weightLb": 2065
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 12240
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.REAR_BAGGAGE",
+          "weightLb": 2000
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_AT75\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_AT75F",
+      "icaoType": "AT75F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 13450,
+      "mtowKg": 22800,
+      "fuelCapacityKg": 5002,
+      "fuelType": 2,
+      "estimatedPayloadKg": 4348,
+      "cargoStationsMaxKg": 1844,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.FORWARD_BAGGAGE",
+          "weightLb": 2065
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 12240
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.REAR_BAGGAGE",
+          "weightLb": 2000
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_AT75F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_AT76",
+      "icaoType": "AT76",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 13450,
+      "mtowKg": 22800,
+      "fuelCapacityKg": 5002,
+      "fuelType": 2,
+      "estimatedPayloadKg": 4348,
+      "cargoStationsMaxKg": 1844,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.FORWARD_BAGGAGE",
+          "weightLb": 2065
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 12240
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.REAR_BAGGAGE",
+          "weightLb": 2000
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_AT76\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_B350",
+      "icaoType": "B350",
+      "freighterVariant": false,
+      "suggestedClassId": "light_turboprop",
+      "oewKg": 4516,
+      "mtowKg": 7484,
+      "fuelCapacityKg": 1591,
+      "fuelType": 2,
+      "estimatedPayloadKg": 1377,
+      "cargoStationsMaxKg": null,
+      "stationCount": 6,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 170
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 170
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 170
+        },
+        {
+          "index": 5,
+          "label": "TT:MENU.PAYLOAD.PASSENGER",
+          "weightLb": 170
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_B350\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B733",
+      "icaoType": "B733",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 32885,
+      "mtowKg": 62823,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 29482,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B733\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B733F",
+      "icaoType": "B733F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 32885,
+      "mtowKg": 62823,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 29482,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B733F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B734",
+      "icaoType": "B734",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 32885,
+      "mtowKg": 62823,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 29482,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B734\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B734F",
+      "icaoType": "B734F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 32885,
+      "mtowKg": 62823,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 29482,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B734F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B737",
+      "icaoType": "B737",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 62596,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 4987,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B737\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B737F",
+      "icaoType": "B737F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 64864,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 2719,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B737F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B738",
+      "icaoType": "B738",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 64864,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 2719,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B738\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B738F",
+      "icaoType": "B738F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 64864,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 2719,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B738F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B739",
+      "icaoType": "B739",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 64864,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 1671,
+      "fuelType": 2,
+      "estimatedPayloadKg": 1504,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B739\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B73X",
+      "icaoType": "B73X",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 64864,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 2719,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B73X\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B744",
+      "icaoType": "B744",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 183523,
+      "mtowKg": 396893,
+      "fuelCapacityKg": 1823,
+      "fuelType": 2,
+      "estimatedPayloadKg": 211547,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B744\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B744F",
+      "icaoType": "B744F",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 394665,
+      "mtowKg": 396893,
+      "fuelCapacityKg": 1823,
+      "fuelType": 2,
+      "estimatedPayloadKg": 405,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B744F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B748",
+      "icaoType": "B748",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 394665,
+      "mtowKg": 396893,
+      "fuelCapacityKg": 1823,
+      "fuelType": 2,
+      "estimatedPayloadKg": 405,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B748\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B748F",
+      "icaoType": "B748F",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 394665,
+      "mtowKg": 396893,
+      "fuelCapacityKg": 1823,
+      "fuelType": 2,
+      "estimatedPayloadKg": 405,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B748F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B763",
+      "icaoType": "B763",
+      "freighterVariant": false,
+      "suggestedClassId": null,
+      "oewKg": 186426,
+      "mtowKg": 186880,
+      "fuelCapacityKg": 912,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B763\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B763F",
+      "icaoType": "B763F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 186426,
+      "mtowKg": 186880,
+      "fuelCapacityKg": 912,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B763F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B772",
+      "icaoType": "B772",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 68116,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 17362,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B772\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B77L",
+      "icaoType": "B77L",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 68116,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 17362,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B77L\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B77LF",
+      "icaoType": "B77LF",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 68116,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 17362,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B77LF\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B77W",
+      "icaoType": "B77W",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 68116,
+      "mtowKg": 68492,
+      "fuelCapacityKg": 17362,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B77W\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B788",
+      "icaoType": "B788",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 183705,
+      "mtowKg": 227703,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 27851,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B788\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B789",
+      "icaoType": "B789",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 247208,
+      "mtowKg": 252651,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B789\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_B78X",
+      "icaoType": "B78X",
+      "freighterVariant": false,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 135488,
+      "mtowKg": 254012,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 102377,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_B78X\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_BCS1",
+      "icaoType": "BCS1",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 47945,
+      "mtowKg": 63100,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 8,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 1,
+          "label": "Co-Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 2,
+          "label": "25.5",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "Coach 3-10\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "Coach 11-18\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "Coach 19-25\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "Forward Baggage\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "Aft Baggage\" ;",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_BCS1\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_BCS3",
+      "icaoType": "BCS3",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 38632,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 13260,
+      "cargoStationsMaxKg": null,
+      "stationCount": 8,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 1,
+          "label": "Co-Pilot\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 2,
+          "label": "25.5",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "Coach 3-10\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "Coach 11-18\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "Coach 19-25\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "Forward Baggage\" ;",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "Aft Baggage\" ;",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_BCS3\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_C152",
+      "icaoType": "C152",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 490,
+      "mtowKg": 757,
+      "fuelCapacityKg": 67,
+      "fuelType": 1,
+      "estimatedPayloadKg": 200,
+      "cargoStationsMaxKg": null,
+      "stationCount": 2,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX",
+          "weightLb": 170
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_C152\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_C172SP",
+      "icaoType": "C172SP",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 767,
+      "mtowKg": 1160,
+      "fuelCapacityKg": 144,
+      "fuelType": 1,
+      "estimatedPayloadKg": 249,
+      "cargoStationsMaxKg": null,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_RIGHT",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.CARGO",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_C172SP\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_C25C",
+      "icaoType": "C25C",
+      "freighterVariant": false,
+      "suggestedClassId": "light_turboprop",
+      "oewKg": 4472,
+      "mtowKg": 7761,
+      "fuelCapacityKg": 2613,
+      "fuelType": 2,
+      "estimatedPayloadKg": 676,
+      "cargoStationsMaxKg": null,
+      "stationCount": 9,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 0
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_01",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_02",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_03",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_04",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "TT:MENU.PAYLOAD.PASSENGER_05",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE_01",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE_02",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_C25C\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_CRJ7",
+      "icaoType": "CRJ7",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 29937,
+      "mtowKg": 32205,
+      "fuelCapacityKg": 8886,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_CRJ7\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_DA40_NG",
+      "icaoType": "DA40_NG",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 900,
+      "mtowKg": 1280,
+      "fuelCapacityKg": 71,
+      "fuelType": 1,
+      "estimatedPayloadKg": 309,
+      "cargoStationsMaxKg": null,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_RIGHT",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_DA40_NG\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_DA62",
+      "icaoType": "DA62",
+      "freighterVariant": false,
+      "suggestedClassId": "light_turboprop",
+      "oewKg": 1570,
+      "mtowKg": 2300,
+      "fuelCapacityKg": 235,
+      "fuelType": 1,
+      "estimatedPayloadKg": 495,
+      "cargoStationsMaxKg": null,
+      "stationCount": 9,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.MIDDLE_PAX_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.MIDDLE_PAX_RIGHT",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE_NOSE_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_RIGHT",
+          "weightLb": 0
+        },
+        {
+          "index": 7,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE_NOSE_RIGHT",
+          "weightLb": 0
+        },
+        {
+          "index": 8,
+          "label": "TT:MENU.PAYLOAD.MIDDLE_PAX_CENTER",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_DA62\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_DH8C",
+      "icaoType": "DH8C",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 20814,
+      "mtowKg": 21772,
+      "fuelCapacityKg": 5470,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot",
+          "weightLb": 85
+        },
+        {
+          "index": 1,
+          "label": "Copilot",
+          "weightLb": 85
+        },
+        {
+          "index": 2,
+          "label": "default",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "default",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "default",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_DH8C\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_DH8D",
+      "icaoType": "DH8D",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 20814,
+      "mtowKg": 21772,
+      "fuelCapacityKg": 5470,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot",
+          "weightLb": 85
+        },
+        {
+          "index": 1,
+          "label": "Copilot",
+          "weightLb": 85
+        },
+        {
+          "index": 2,
+          "label": "default",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "default",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "default",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_DH8D\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_DR400",
+      "icaoType": "DR400",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 600,
+      "mtowKg": 900,
+      "fuelCapacityKg": 79,
+      "fuelType": 1,
+      "estimatedPayloadKg": 221,
+      "cargoStationsMaxKg": null,
+      "stationCount": 3,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_DR400\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_E170",
+      "icaoType": "E170",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 67209,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 16147,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_E170\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_E190",
+      "icaoType": "E190",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 67209,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 16116,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_E190\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_G36",
+      "icaoType": "G36",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 1179,
+      "mtowKg": 1656,
+      "fuelCapacityKg": 201,
+      "fuelType": 1,
+      "estimatedPayloadKg": 276,
+      "cargoStationsMaxKg": null,
+      "stationCount": 7,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX_RIGHT",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_RIGHT",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_G36\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Generic_Medium",
+      "icaoType": "GENERIC_MEDIUM",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 67358,
+      "mtowKg": 68039,
+      "fuelCapacityKg": 10637,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Generic_Medium\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_LJ25",
+      "icaoType": "LJ25",
+      "freighterVariant": false,
+      "suggestedClassId": "light_turboprop",
+      "oewKg": 4663,
+      "mtowKg": 7761,
+      "fuelCapacityKg": 495,
+      "fuelType": 1,
+      "estimatedPayloadKg": 2603,
+      "cargoStationsMaxKg": null,
+      "stationCount": 5,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot",
+          "weightLb": 85
+        },
+        {
+          "index": 1,
+          "label": "Copilot",
+          "weightLb": 85
+        },
+        {
+          "index": 2,
+          "label": "default",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "default",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "default",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_LJ25\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_MD11F",
+      "icaoType": "MD11F",
+      "freighterVariant": true,
+      "suggestedClassId": "wide_freighter",
+      "oewKg": 118059,
+      "mtowKg": 273289,
+      "fuelCapacityKg": 111355,
+      "fuelType": 2,
+      "estimatedPayloadKg": 43875,
+      "cargoStationsMaxKg": null,
+      "stationCount": 4,
+      "stations": [
+        {
+          "index": 0,
+          "label": "6.0",
+          "weightLb": 70
+        },
+        {
+          "index": 1,
+          "label": "6.0",
+          "weightLb": 10
+        },
+        {
+          "index": 2,
+          "label": "Fwd\" ;",
+          "weightLb": 16000
+        },
+        {
+          "index": 3,
+          "label": "Aft\" ;",
+          "weightLb": 9000
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_MD11F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_P28A",
+      "icaoType": "P28A",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 603,
+      "mtowKg": 1089,
+      "fuelCapacityKg": 185,
+      "fuelType": 1,
+      "estimatedPayloadKg": 301,
+      "cargoStationsMaxKg": null,
+      "stationCount": 7,
+      "stations": [
+        {
+          "index": 0,
+          "label": "Pilot",
+          "weightLb": 85
+        },
+        {
+          "index": 1,
+          "label": "Copilot",
+          "weightLb": 85
+        },
+        {
+          "index": 2,
+          "label": "Passenger Left Front",
+          "weightLb": 0
+        },
+        {
+          "index": 3,
+          "label": "Passenger Right Front",
+          "weightLb": 0
+        },
+        {
+          "index": 4,
+          "label": "Baggages",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "Passenger Left Back",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "passenger Right Back",
+          "weightLb": 0
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_P28A\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_SF34",
+      "icaoType": "SF34",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 8618,
+      "mtowKg": 13154,
+      "fuelCapacityKg": 5470,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_SF34\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_SF34F",
+      "icaoType": "SF34F",
+      "freighterVariant": true,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 8618,
+      "mtowKg": 13154,
+      "fuelCapacityKg": 5470,
+      "fuelType": 2,
+      "estimatedPayloadKg": 0,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_SF34F\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_SU95",
+      "icaoType": "SU95",
+      "freighterVariant": false,
+      "suggestedClassId": "narrow_freighter",
+      "oewKg": 32885,
+      "mtowKg": 49451,
+      "fuelCapacityKg": 456,
+      "fuelType": 2,
+      "estimatedPayloadKg": 16110,
+      "cargoStationsMaxKg": null,
+      "stationCount": 0,
+      "stations": [],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_SU95\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_TBM930",
+      "icaoType": "TBM930",
+      "freighterVariant": false,
+      "suggestedClassId": "light_turboprop",
+      "oewKg": 2072,
+      "mtowKg": 3354,
+      "fuelCapacityKg": 887,
+      "fuelType": 2,
+      "estimatedPayloadKg": 395,
+      "cargoStationsMaxKg": 45,
+      "stationCount": 8,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.COPILOT",
+          "weightLb": 170
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX_LEFT",
+          "weightLb": 100
+        },
+        {
+          "index": 3,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX_RIGHT",
+          "weightLb": 100
+        },
+        {
+          "index": 4,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_LEFT",
+          "weightLb": 0
+        },
+        {
+          "index": 5,
+          "label": "TT:MENU.PAYLOAD.REAR_PAX_RIGHT",
+          "weightLb": 0
+        },
+        {
+          "index": 6,
+          "label": "TT:MENU.PAYLOAD.REAR_BAGGAGE",
+          "weightLb": 80
+        },
+        {
+          "index": 7,
+          "label": "TT:MENU.PAYLOAD.FORWARD_BAGGAGE",
+          "weightLb": 20
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_TBM930\\flight_model.cfg"
+    },
+    {
+      "folder": "FSLTL_Asobo_VL3",
+      "icaoType": "VL3",
+      "freighterVariant": false,
+      "suggestedClassId": "light_ga",
+      "oewKg": 290,
+      "mtowKg": 473,
+      "fuelCapacityKg": 58,
+      "fuelType": 1,
+      "estimatedPayloadKg": 125,
+      "cargoStationsMaxKg": 5,
+      "stationCount": 3,
+      "stations": [
+        {
+          "index": 0,
+          "label": "TT:MENU.PAYLOAD.PILOT",
+          "weightLb": 160
+        },
+        {
+          "index": 1,
+          "label": "TT:MENU.PAYLOAD.FRONT_PAX",
+          "weightLb": 160
+        },
+        {
+          "index": 2,
+          "label": "TT:MENU.PAYLOAD.BAGGAGE",
+          "weightLb": 10
+        }
+      ],
+      "sourcePath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\fsltl-traffic-base\\SimObjects\\Airplanes\\FSLTL_Asobo_VL3\\flight_model.cfg"
+    }
+  ]
+}

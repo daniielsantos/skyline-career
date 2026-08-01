@@ -324,6 +324,8 @@ export async function applyMissionOfpLoad(
       const roles = await resolveMissionRolesPack({
         repoRoot,
         rolesPackRelPath: mission.rolesPackRelPath,
+        airframeTypeId: mission.airframeTypeId,
+        strictAirframeMatch: Boolean(mission.airframeTypeId),
         liveTitle:
           normalizeAircraftTitle(resolved.identity.title) ||
           resolved.identity.title,
@@ -338,7 +340,8 @@ export async function applyMissionOfpLoad(
       if (
         rolesError instanceof Error &&
         (rolesError.message.includes('loadMethod=') ||
-          rolesError.message.includes('injectCapable'))
+          rolesError.message.includes('injectCapable') ||
+          rolesError.message.includes('purchased airframe'))
       ) {
         throw rolesError;
       }

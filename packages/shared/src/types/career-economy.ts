@@ -707,6 +707,8 @@ export interface CareerMissionsState {
   aircraftMarketDay?: number;
   /** Economy day when abstract NPC demand last ran. */
   aircraftMarketDemandDay?: number;
+  /** Append-only company cashflow (income + expenses). */
+  ledger?: CareerLedgerEntry[];
 }
 
 /** Legacy missions save before hangar / fleet. */
@@ -723,6 +725,36 @@ export type PlayerAircraftStatus =
   | 'listed'
   | 'leased_out';
 export type AircraftOwnership = 'owned' | 'leased';
+
+/** Signed company cashflow row (see career-ledger). */
+export type CareerLedgerKind =
+  | 'freight_payout'
+  | 'hangar_parking'
+  | 'lease_payment'
+  | 'lease_out_income'
+  | 'lease_deposit'
+  | 'aircraft_buy'
+  | 'aircraft_lease_sign'
+  | 'aircraft_sell'
+  | 'aircraft_buyout'
+  | 'ferry'
+  | 'fuel'
+  | 'inspection'
+  | 'repair'
+  | 'other';
+
+export interface CareerLedgerEntry {
+  id: string;
+  atTick: number;
+  dayIndex: number;
+  /** Signed: +income / −expense. */
+  amountUsd: number;
+  kind: CareerLedgerKind;
+  note?: string;
+  aircraftId?: string;
+  missionId?: string;
+  icao?: string;
+}
 
 /** Player freighter parked at a career terminal when not on a mission. */
 export interface PlayerAircraft {

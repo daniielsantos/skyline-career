@@ -21,6 +21,7 @@ import {
   postSettle,
   postSelectHub,
   fetchAircraftMarket,
+  fetchCashflow,
   postAircraftBuy,
   postAircraftLease,
   postAircraftSell,
@@ -39,6 +40,7 @@ import {
   type AirportLot,
   type AirportMovement,
   type AirportView,
+  type CareerCashflowSnapshot,
   type EconomyEvent,
   type FuelHaulView,
   type MarketLot,
@@ -65,6 +67,7 @@ import {
   aircraftClassLabel,
   aircraftModelLabel,
 } from './AircraftCards';
+import { HangarCashflowPanel } from './CashflowPanel';
 import {
   displayToKg,
   formatMass,
@@ -1145,6 +1148,8 @@ export function App() {
   const [stagingRouteLotsError, setStagingRouteLotsError] = useState<string | null>(null);
   const [hubSelected, setHubSelected] = useState(true);
   const [fleet, setFleet] = useState<PlayerAircraft[]>([]);
+  const [hangarPane, setHangarPane] = useState<'aircraft' | 'cashflow'>('aircraft');
+  const [cashflow, setCashflow] = useState<CareerCashflowSnapshot | null>(null);
   const [hubOptions, setHubOptions] = useState<string[]>([]);
   const [ferryDest, setFerryDest] = useState('');
   const [pilotName, setPilotName] = useState('');
@@ -1274,6 +1279,7 @@ export function App() {
     setHubOptions(state.hubs ?? []);
     setPilotName(state.pilotName ?? '');
     setHomeHubIcao(state.homeHubIcao ?? '');
+    if (state.cashflow) setCashflow(state.cashflow);
     if (acMarket) {
       setAircraftListings(acMarket.listings);
       setAircraftCatalog(acMarket.catalog);
@@ -2138,9 +2144,19 @@ export function App() {
           : (result.leaseRepossessed?.length ?? 0) > 0
             ? ` · ${result.leaseRepossessed!.length} lease repossessed`
             : '';
-      setToastKind('ok');
+      const hangarDebit = result.hangarDebitUsd ?? 0;
+      const hangarShortfall = result.hangarShortfallUsd ?? 0;
+      const hangarNote =
+        hangarDebit > 0 && hangarShortfall > 0
+          ? ` · hangar −${formatMoney(hangarDebit)} (short ${formatMoney(hangarShortfall)})`
+          : hangarDebit > 0
+            ? ` · hangar −${formatMoney(hangarDebit)}`
+            : hangarShortfall > 0
+              ? ` · hangar unpaid ${formatMoney(hangarShortfall)}`
+              : '';
+      setToastKind(hangarShortfall > 0 ? 'warn' : 'ok');
       setToast(
-        `Time advanced ${formatDuration(24)} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}`,
+        `Time advanced ${formatDuration(24)} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}`,
       );
     });
   }
@@ -5125,22 +5141,57 @@ export function App() {
         <section className="panel hangar-panel">
           <div className="panel-head">
             <p className="panel-stats">
-              Aircraft must be at the mission origin to prepare cargo. Buy or lease from the
-              Airframes; ferry relocates instantly for a fee + Jet-A.
+              {hangarPane === 'aircraft'
+                ? 'Aircraft must be at the mission origin to prepare cargo. Buy or lease from the Airframes; ferry relocates instantly for a fee + Jet-A.'
+                : 'Company income and expenses — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
             </p>
-            <button
-              type="button"
-              className="accept"
-              onClick={() => {
-                selectTab('aircraft');
-                void refreshAircraftMarket().catch(() => undefined);
-              }}
-              disabled={busy}
-            >
-              Airframes
-            </button>
+            <div className="hangar-head-actions">
+              <div className="hangar-pane-toggle" role="tablist" aria-label="Hangar views">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={hangarPane === 'aircraft'}
+                  className={hangarPane === 'aircraft' ? 'tab active' : 'tab'}
+                  onClick={() => setHangarPane('aircraft')}
+                >
+                  Aircraft
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={hangarPane === 'cashflow'}
+                  className={hangarPane === 'cashflow' ? 'tab active' : 'tab'}
+                  onClick={() => {
+                    setHangarPane('cashflow');
+                    void fetchCashflow()
+                      .then((snap) => {
+                        setCashflow(snap);
+                        setWallet(snap.walletUsd);
+                      })
+                      .catch(() => undefined);
+                  }}
+                >
+                  Cashflow
+                </button>
+              </div>
+              {hangarPane === 'aircraft' ? (
+                <button
+                  type="button"
+                  className="accept"
+                  onClick={() => {
+                    selectTab('aircraft');
+                    void refreshAircraftMarket().catch(() => undefined);
+                  }}
+                  disabled={busy}
+                >
+                  Airframes
+                </button>
+              ) : null}
+            </div>
           </div>
-          {fleet.length === 0 ? (
+          {hangarPane === 'cashflow' ? (
+            <HangarCashflowPanel cashflow={cashflow} formatMoney={formatMoney} />
+          ) : fleet.length === 0 ? (
             <p className="empty">No aircraft yet — pick a starter hub.</p>
           ) : (
             <ul className="hangar-list">

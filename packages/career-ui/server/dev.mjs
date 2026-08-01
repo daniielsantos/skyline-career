@@ -1,4 +1,5 @@
 import { spawn, execSync } from 'node:child_process';
+import { readdir, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +66,19 @@ async function apiHealth() {
   }
 }
 
+/** Must match `serverSourceStamp` in api.ts. */
+async function serverSourceStamp() {
+  const dir = join(root, 'server');
+  const files = await readdir(dir);
+  let newest = 0;
+  for (const file of files) {
+    if (!file.endsWith('.ts')) continue;
+    const info = await stat(join(dir, file));
+    newest = Math.max(newest, Math.floor(info.mtimeMs));
+  }
+  return newest;
+}
+
 async function hasCareerUi() {
   try {
     const res = await fetch(`http://localhost:${uiPort}/`, {
@@ -81,8 +95,11 @@ async function hasCareerUi() {
 const kids = [];
 
 const health = await apiHealth();
+const sourceStamp = await serverSourceStamp();
 const apiIsCurrent =
-  health?.ok === true && health?.npcFleetTarget === NPC_FLEET_SIZE;
+  health?.ok === true &&
+  health?.npcFleetTarget === NPC_FLEET_SIZE &&
+  health?.sourceStamp === sourceStamp;
 
 if (apiIsCurrent) {
   console.log(
@@ -90,9 +107,11 @@ if (apiIsCurrent) {
   );
 } else {
   if (health?.ok) {
-    console.log(
-      `Career API on :${apiPort} is stale (npcFleetTarget=${health.npcFleetTarget ?? 'missing'}, want ${NPC_FLEET_SIZE}) — restarting`,
-    );
+    const reason =
+      health.npcFleetTarget !== NPC_FLEET_SIZE
+        ? `npcFleetTarget=${health.npcFleetTarget ?? 'missing'}, want ${NPC_FLEET_SIZE}`
+        : `server sources changed since it booted`;
+    console.log(`Career API on :${apiPort} is stale (${reason}) — restarting`);
   }
   killListenersOnPort(apiPort);
   // Brief pause so Windows releases the port.

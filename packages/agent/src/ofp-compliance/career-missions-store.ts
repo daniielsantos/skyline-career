@@ -5,6 +5,7 @@ import {
   emptyMissionsStateV2,
   normalizeMissionIntent,
   normalizeMissionsState,
+  applyWalletDelta,
 } from '@msfs-compat/shared';
 
 export const DEFAULT_CAREER_MISSIONS_PATH = 'profiles/career/local-missions.json';
@@ -61,7 +62,16 @@ export function findMission(
   return state.missions.find((m) => m.id === missionId);
 }
 
-export function creditWallet(state: CareerMissionsState, amountUsd: number): number {
-  state.walletUsd = Math.round((state.walletUsd + amountUsd) * 100) / 100;
+export function creditWallet(
+  state: CareerMissionsState,
+  amountUsd: number,
+  opts: { atTick?: number; kind?: 'freight_payout' | 'other'; note?: string } = {},
+): number {
+  applyWalletDelta(state, {
+    amountUsd,
+    kind: opts.kind ?? 'other',
+    atTick: opts.atTick ?? 0,
+    note: opts.note,
+  });
   return state.walletUsd;
 }

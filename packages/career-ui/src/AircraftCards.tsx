@@ -391,10 +391,22 @@ export function HangarAircraftCard(props: {
           </div>
         </div>
 
-        {acf.lease || acf.leaseOut ? (
+        {acf.lease || acf.leaseOut || acf.parkingUsdPerDay != null || ['assigned', 'leased_out', 'listed'].includes(acf.status) ? (
           <div>
             <p className="aircraft-card-section-label">Money</p>
             <div className="aircraft-card-money">
+              {acf.parkingUsdPerDay != null ? (
+                <span>
+                  Parking {props.formatMoney(acf.parkingUsdPerDay)}/day at{' '}
+                  {acf.locationIcao}
+                </span>
+              ) : acf.status === 'assigned' ? (
+                <span>Parking waived while assigned</span>
+              ) : acf.status === 'leased_out' ? (
+                <span>Parking waived while leased out</span>
+              ) : acf.status === 'listed' ? (
+                <span>Parking waived while listed</span>
+              ) : null}
               {acf.lease ? (
                 <>
                   <span>

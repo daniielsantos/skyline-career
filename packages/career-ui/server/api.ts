@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -15,7 +15,6 @@ import {
   commitStagedManifest,
   continuousEconomyHours,
   createSeedEconomyWorld,
-  debitWalletForFuel,
   departMission,
   emptyMissionsStateV2,
   ensureEconomyCaughtUp,
@@ -62,8 +61,13 @@ import {
   unlistAircraftForLease,
   sellPlayerAircraft,
   settleAircraftMarketOps,
+  settleHangarParkingFees,
   settleMission,
   signAircraftLease,
+  resolveHangarParkingUsdPerDay,
+  applyWalletDelta,
+  summarizeCareerLedger,
+  LEDGER_KIND_LABEL,
   stockTrend,
   tickEconomyN,
   withMissionLoadPolicy,
@@ -95,6 +99,23 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
+
+/**
+ * Newest mtime across server sources, captured at boot. `dev.mjs` compares it
+ * against disk so an API still serving pre-edit routes gets restarted.
+ */
+export async function serverSourceStamp(dir: string = here): Promise<number> {
+  const files = await readdir(dir);
+  let newest = 0;
+  for (const file of files) {
+    if (!file.endsWith('.ts')) continue;
+    const info = await stat(join(dir, file));
+    newest = Math.max(newest, Math.floor(info.mtimeMs));
+  }
+  return newest;
+}
+
+const bootSourceStamp = await serverSourceStamp();
 const economyPath = join(repoRoot, 'profiles', 'career', 'local-economy.json');
 const missionsPath = join(repoRoot, 'profiles', 'career', 'local-missions.json');
 /** Row cap for the market board — filters must run server-side to survive it. */
@@ -126,10 +147,24 @@ async function loadMissions(): Promise<MissionsFile> {
   return fresh;
 }
 
-function fleetPayload(missions: MissionsFile) {
+function withParkingRates(
+  fleet: PlayerAircraft[],
+  world?: Pick<CareerEconomyWorld, 'airports'>,
+): Array<PlayerAircraft & { parkingUsdPerDay: number | null }> {
+  const airports = world ?? { airports: [] };
+  return fleet.map((aircraft) => ({
+    ...aircraft,
+    parkingUsdPerDay: resolveHangarParkingUsdPerDay(aircraft, airports),
+  }));
+}
+
+function fleetPayload(
+  missions: MissionsFile,
+  world?: Pick<CareerEconomyWorld, 'airports'>,
+) {
   return {
     hubSelected: missions.hubSelected,
-    fleet: missions.fleet,
+    fleet: withParkingRates(missions.fleet, world),
     hubs: listCareerHubIcaos(),
     pilotName: missions.pilotName,
     homeHubIcao: missions.homeHubIcao,
@@ -319,6 +354,10 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     if (advancedTicks > 0) {
       const missions = await loadMissions();
       settleAircraftMarketOps(missions, caught.tick, caught);
+      settleHangarParkingFees(missions, caught, {
+        fromTick: caught.tick - advancedTicks,
+        toTick: caught.tick,
+      });
       listAircraftMarket(missions, caught);
       await writeJson(missionsPath, missions);
     }
@@ -693,7 +732,11 @@ export function createCareerApiServer(port = 8787) {
 
     try {
       if (req.method === 'GET' && path === '/api/health') {
-        send(res, 200, { ok: true, npcFleetTarget: NPC_FLEET_SIZE });
+        send(res, 200, {
+          ok: true,
+          npcFleetTarget: NPC_FLEET_SIZE,
+          sourceStamp: bootSourceStamp,
+        });
         return;
       }
 
@@ -713,16 +756,32 @@ export function createCareerApiServer(port = 8787) {
           npcFleet: world.npcs?.length ?? 0,
           npcBusy,
           npcFlights: world.npcFlights?.filter((f) => f.status === 'in_flight').length ?? 0,
-          ...fleetPayload(missions),
+          ...fleetPayload(missions, world),
+          cashflow: summarizeCareerLedger(missions, world.tick),
         });
         return;
       }
 
       if (req.method === 'GET' && path === '/api/fleet') {
+        const world = await loadEconomy();
         const missions = await loadMissions();
         send(res, 200, {
           walletUsd: missions.walletUsd,
-          ...fleetPayload(missions),
+          ...fleetPayload(missions, world),
+          cashflow: summarizeCareerLedger(missions, world.tick),
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/cashflow') {
+        const world = await loadEconomy();
+        const missions = await loadMissions();
+        send(res, 200, {
+          walletUsd: missions.walletUsd,
+          tick: world.tick,
+          dayIndex: economyDayIndex(world.tick),
+          labels: LEDGER_KIND_LABEL,
+          ...summarizeCareerLedger(missions, world.tick),
         });
         return;
       }
@@ -769,7 +828,7 @@ export function createCareerApiServer(port = 8787) {
           dayIndex: economyDayIndex(world.tick),
           listings,
           catalog: listAircraftClassCatalog(),
-          fleet: missions.fleet,
+          fleet: withParkingRates(missions.fleet),
         });
         return;
       }
@@ -790,7 +849,7 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
             aircraft: result.aircraft,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
             listings: listAircraftMarket(missions, world),
           });
         } catch (error) {
@@ -817,7 +876,7 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
             aircraft: result.aircraft,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
             listings: listAircraftMarket(missions, world),
           });
         } catch (error) {
@@ -843,7 +902,7 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: missions.walletUsd,
             creditUsd: result.creditUsd,
             listing: result.listing,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
             listings: listAircraftMarket(missions, world),
           });
         } catch (error) {
@@ -878,7 +937,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 200, {
             walletUsd: missions.walletUsd,
             listing: result.listing,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
             listings: listAircraftMarket(missions, world),
           });
         } catch (error) {
@@ -902,7 +961,7 @@ export function createCareerApiServer(port = 8787) {
           await writeJson(missionsPath, missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
             listings: listAircraftMarket(missions, world),
           });
         } catch (error) {
@@ -934,7 +993,7 @@ export function createCareerApiServer(port = 8787) {
             debitUsd: result.debitUsd,
             needsRepair: result.needsRepair,
             mro: result.mro,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
           });
         } catch (error) {
           send(res, 400, {
@@ -973,7 +1032,7 @@ export function createCareerApiServer(port = 8787) {
             debitUsd: result.debitUsd,
             aircraft: result.aircraft,
             mro: result.mro,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
           });
         } catch (error) {
           send(res, 400, {
@@ -991,12 +1050,13 @@ export function createCareerApiServer(port = 8787) {
         }
         const missions = await loadMissions();
         try {
-          const result = buyOutAircraftLease(missions, body.aircraftId);
+          const world = await loadEconomy();
+          const result = buyOutAircraftLease(missions, body.aircraftId, world.tick);
           await writeJson(missionsPath, missions);
           send(res, 200, {
             walletUsd: missions.walletUsd,
             debitUsd: result.debitUsd,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet, world),
           });
         } catch (error) {
           send(res, 400, {
@@ -1336,6 +1396,10 @@ export function createCareerApiServer(port = 8787) {
         });
         const missions = await loadMissions();
         const leaseOps = settleAircraftMarketOps(missions, world.tick, world);
+        const hangarOps = settleHangarParkingFees(missions, world, {
+          fromTick: world.tick - n,
+          toTick: world.tick,
+        });
         listAircraftMarket(missions, world);
         await writeJson(missionsPath, missions);
         const nowMs = Date.now();
@@ -1345,6 +1409,10 @@ export function createCareerApiServer(port = 8787) {
           leasePaidUsd: leaseOps.paidUsd,
           leaseRepossessed: leaseOps.repossessed,
           leaseOutEarnedUsd: leaseOps.leaseOutEarnedUsd,
+          hangarDebitUsd: hangarOps.debitUsd,
+          hangarRequestedUsd: hangarOps.requestedUsd,
+          hangarShortfallUsd: hangarOps.shortfallUsd,
+          hangarDaysCharged: hangarOps.daysCharged,
           walletUsd: missions.walletUsd,
         });
         return;
@@ -1670,7 +1738,7 @@ export function createCareerApiServer(port = 8787) {
               operationalMaxCargoKg,
             ),
             dispatch: dispatch ?? null,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
           });
         } catch (error) {
           send(res, 400, {
@@ -2001,10 +2069,16 @@ export function createCareerApiServer(port = 8787) {
             },
           );
           missions.missions[idx] = purchased.mission;
-          missions.walletUsd = debitWalletForFuel(
-            missions.walletUsd,
-            purchased.fuelDebitUsd,
-          );
+          if (purchased.fuelDebitUsd > 0) {
+            applyWalletDelta(missions, {
+              amountUsd: -purchased.fuelDebitUsd,
+              kind: 'fuel',
+              atTick: world.tick,
+              missionId: mission.id,
+              icao: mission.originIcao,
+              note: `${mission.originIcao}→${mission.destIcao}`,
+            });
+          }
           await persistEconomy(world);
           await writeJson(missionsPath, missions);
           send(res, 200, {
@@ -2012,7 +2086,7 @@ export function createCareerApiServer(port = 8787) {
             quote: purchased.quote,
             fuelDebitUsd: purchased.fuelDebitUsd,
             walletUsd: missions.walletUsd,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
           });
         } catch (error) {
           send(res, 400, {
@@ -2133,17 +2207,23 @@ export function createCareerApiServer(port = 8787) {
           const departedResult = departMission(world, existing, { fleet: missions });
           const departed = departedResult.mission;
           missions.missions[idx] = departed;
-          missions.walletUsd = debitWalletForFuel(
-            missions.walletUsd,
-            departedResult.fuelDebitUsd,
-          );
+          if (departedResult.fuelDebitUsd > 0) {
+            applyWalletDelta(missions, {
+              amountUsd: -departedResult.fuelDebitUsd,
+              kind: 'fuel',
+              atTick: world.tick,
+              missionId: departed.id,
+              icao: departed.originIcao,
+              note: `${departed.originIcao}→${departed.destIcao}`,
+            });
+          }
           await persistEconomy(world);
           await writeJson(missionsPath, missions);
           send(res, 200, {
             mission: departed,
             walletUsd: missions.walletUsd,
             fuelDebitUsd: departedResult.fuelDebitUsd,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
             preflightOverride: body.override === true,
           });
         } catch (error) {
@@ -2185,17 +2265,33 @@ export function createCareerApiServer(port = 8787) {
             residualFuelKg,
           });
           missions.missions[idx] = result.mission;
-          missions.walletUsd = debitWalletForFuel(
-            Math.round((missions.walletUsd + result.walletCreditUsd) * 100) / 100,
-            result.fuelDebitUsd,
-          );
+          if (result.walletCreditUsd > 0) {
+            applyWalletDelta(missions, {
+              amountUsd: result.walletCreditUsd,
+              kind: 'freight_payout',
+              atTick: world.tick,
+              missionId: result.mission.id,
+              icao: result.mission.destIcao,
+              note: `${result.mission.originIcao}→${result.mission.destIcao}`,
+            });
+          }
+          if (result.fuelDebitUsd > 0) {
+            applyWalletDelta(missions, {
+              amountUsd: -result.fuelDebitUsd,
+              kind: 'fuel',
+              atTick: world.tick,
+              missionId: result.mission.id,
+              icao: result.mission.destIcao,
+              note: 'settlement fuel',
+            });
+          }
           await persistEconomy(world);
           await writeJson(missionsPath, missions);
           send(res, 200, {
             mission: result.mission,
             walletUsd: missions.walletUsd,
             fuelDebitUsd: result.fuelDebitUsd,
-            fleet: missions.fleet,
+            fleet: withParkingRates(missions.fleet),
             settlement: {
               payoutUsd: result.settlement.payoutUsd,
               penaltyUsd: result.settlement.penaltyUsd,

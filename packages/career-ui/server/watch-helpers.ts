@@ -4,7 +4,7 @@
 
 import {
   createMissionFlightWatchState,
-  debitWalletForFuel,
+  applyWalletDelta,
   departMission,
   estimateMissionBlockHours,
   evaluateMinAirborneElapsed,
@@ -439,10 +439,16 @@ export class CareerWatchSession {
                 expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
               });
               freshMissions.missions[openIdx] = departed.mission;
-              freshMissions.walletUsd = debitWalletForFuel(
-                freshMissions.walletUsd,
-                departed.fuelDebitUsd,
-              );
+              if (departed.fuelDebitUsd > 0) {
+                applyWalletDelta(freshMissions, {
+                  amountUsd: -departed.fuelDebitUsd,
+                  kind: 'fuel',
+                  atTick: worldFresh.tick,
+                  missionId: departed.mission.id,
+                  icao: departed.mission.originIcao,
+                  note: `${departed.mission.originIcao}→${departed.mission.destIcao}`,
+                });
+              }
               this.missionStatus = departed.mission.status;
               this.walletUsd = freshMissions.walletUsd;
               this.watchState = {
@@ -482,12 +488,26 @@ export class CareerWatchSession {
               residualFuelKg,
             });
             freshMissions.missions[openIdx] = result.mission;
-            freshMissions.walletUsd = debitWalletForFuel(
-              Math.round(
-                (freshMissions.walletUsd + result.walletCreditUsd) * 100,
-              ) / 100,
-              result.fuelDebitUsd,
-            );
+            if (result.walletCreditUsd > 0) {
+              applyWalletDelta(freshMissions, {
+                amountUsd: result.walletCreditUsd,
+                kind: 'freight_payout',
+                atTick: worldFresh.tick,
+                missionId: result.mission.id,
+                icao: result.mission.destIcao,
+                note: `${result.mission.originIcao}→${result.mission.destIcao}`,
+              });
+            }
+            if (result.fuelDebitUsd > 0) {
+              applyWalletDelta(freshMissions, {
+                amountUsd: -result.fuelDebitUsd,
+                kind: 'fuel',
+                atTick: worldFresh.tick,
+                missionId: result.mission.id,
+                icao: result.mission.destIcao,
+                note: 'settlement fuel',
+              });
+            }
             this.missionStatus = result.mission.status;
             this.walletUsd = freshMissions.walletUsd;
             this.settlement = {

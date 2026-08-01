@@ -3,6 +3,7 @@
  */
 
 import { AIRCRAFT_MSRP_USD } from './career-aircraft-pricing.js';
+import { applyWalletDelta } from './career-ledger.js';
 import type {
   AirframeCondition,
   CareerMissionsState,
@@ -228,6 +229,7 @@ export function evaluateAircraftMaintenanceGate(aircraft: PlayerAircraft): void 
 export function clearAircraftMaintenance(
   state: CareerMissionsState,
   aircraftId: string,
+  opts: { atTick?: number } = {},
 ): {
   state: CareerMissionsState;
   debitUsd: number;
@@ -245,7 +247,14 @@ export function clearAircraftMaintenance(
       `Inspection $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
-  state.walletUsd = Math.round((state.walletUsd - debit) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -debit,
+    kind: 'inspection',
+    atTick: opts.atTick ?? 0,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: aircraft.label,
+  });
   aircraft.hoursSinceInspection = 0;
   syncMaintenanceDueAtHours(aircraft);
   const stillCritical =
@@ -262,7 +271,7 @@ export function clearAircraftMaintenance(
 export function repairAircraftCondition(
   state: CareerMissionsState,
   aircraftId: string,
-  opts: { airframePts?: number; enginePts?: number },
+  opts: { airframePts?: number; enginePts?: number; atTick?: number },
 ): {
   state: CareerMissionsState;
   debitUsd: number;
@@ -294,7 +303,14 @@ export function repairAircraftCondition(
       `Repair $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
-  state.walletUsd = Math.round((state.walletUsd - debit) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -debit,
+    kind: 'repair',
+    atTick: opts.atTick ?? 0,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: aircraft.label,
+  });
   aircraft.airframeConditionPct = clampConditionPct(
     (aircraft.airframeConditionPct ?? 100) + afApply,
   );

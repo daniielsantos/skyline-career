@@ -16,6 +16,7 @@ import {
   syncConditionBucket,
   syncMaintenanceDueAtHours,
 } from './career-aircraft-maintenance.js';
+import { applyWalletDelta } from './career-ledger.js';
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
@@ -178,7 +179,14 @@ export function clearAircraftMaintenanceWithParts(
     );
   }
   mro = deliverMroParts(world, mro);
-  state.walletUsd = Math.round((state.walletUsd - debit) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -debit,
+    kind: 'inspection',
+    atTick: world.tick,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: aircraft.label,
+  });
   aircraft.hoursSinceInspection = 0;
   syncMaintenanceDueAtHours(aircraft);
   const stillCritical =
@@ -235,7 +243,14 @@ export function repairAircraftConditionWithParts(
     );
   }
   mro = deliverMroParts(world, mro);
-  state.walletUsd = Math.round((state.walletUsd - debit) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -debit,
+    kind: 'repair',
+    atTick: world.tick,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: aircraft.label,
+  });
   aircraft.airframeConditionPct = clampConditionPct(
     (aircraft.airframeConditionPct ?? 100) + afApply,
   );

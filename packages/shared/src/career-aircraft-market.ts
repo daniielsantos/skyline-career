@@ -18,6 +18,7 @@ import {
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
 } from './career-aircraft-pricing.js';
+import { applyWalletDelta } from './career-ledger.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   AircraftListing,
@@ -501,7 +502,14 @@ function applyNpcTakeListing(
       return;
     }
     const deposit = listing.askingUsd;
-    state.walletUsd = Math.round((state.walletUsd + deposit) * 100) / 100;
+    applyWalletDelta(state, {
+      amountUsd: deposit,
+      kind: 'lease_deposit',
+      atTick: economyTick,
+      aircraftId: aircraft.id,
+      icao: listing.basedIcao || aircraft.locationIcao,
+      note: listing.label,
+    });
     aircraft.status = 'leased_out';
     aircraft.listedListingId = undefined;
     ensureAircraftConditionPcts(aircraft);
@@ -579,7 +587,14 @@ function settleLeaseOutIncome(
     }
 
     while (economyTick >= lease.nextDueTick && economyTick < lease.termEndsTick) {
-      state.walletUsd = Math.round((state.walletUsd + lease.monthlyUsd) * 100) / 100;
+      applyWalletDelta(state, {
+        amountUsd: lease.monthlyUsd,
+        kind: 'lease_out_income',
+        atTick: economyTick,
+        aircraftId: aircraft.id,
+        icao: aircraft.locationIcao,
+        note: lease.lesseeName ?? aircraft.label,
+      });
       earnedUsd += lease.monthlyUsd;
       wearHours += applyLeaseOutWear(aircraft, lease.lastWearTick, lease.nextDueTick);
       lease.lastWearTick = lease.nextDueTick;
@@ -767,7 +782,14 @@ export function purchaseAircraftListing(
   }
   const aircraft = buildAircraftFromListing(state, listing, 'owned', world.tick);
   listing.status = 'sold';
-  state.walletUsd = Math.round((state.walletUsd - listing.askingUsd) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -listing.askingUsd,
+    kind: 'aircraft_buy',
+    atTick: world.tick,
+    aircraftId: aircraft.id,
+    icao: listing.basedIcao,
+    note: listing.label,
+  });
   state.fleet = [...state.fleet, aircraft];
   return { state, aircraft, debitUsd: listing.askingUsd };
 }
@@ -798,7 +820,14 @@ export function signAircraftLease(
   }
   const aircraft = buildAircraftFromListing(state, listing, 'leased', world.tick);
   listing.status = 'sold';
-  state.walletUsd = Math.round((state.walletUsd - listing.askingUsd) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -listing.askingUsd,
+    kind: 'aircraft_lease_sign',
+    atTick: world.tick,
+    aircraftId: aircraft.id,
+    icao: listing.basedIcao,
+    note: listing.label,
+  });
   state.fleet = [...state.fleet, aircraft];
   return { state, aircraft, debitUsd: listing.askingUsd };
 }
@@ -844,7 +873,14 @@ export function sellPlayerAircraft(
     sellerAircraftId: aircraft.id,
   };
   state.fleet = state.fleet.filter((a) => a.id !== aircraftId);
-  state.walletUsd = Math.round((state.walletUsd + creditUsd) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: creditUsd,
+    kind: 'aircraft_sell',
+    atTick: economyTick,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: aircraft.label,
+  });
   state.aircraftMarket = [...(state.aircraftMarket ?? []), listing];
   return { state, creditUsd, listing };
 }
@@ -959,7 +995,14 @@ export function settleAircraftMarketOps(
         aircraft.leaseOverdue = true;
         break;
       }
-      state.walletUsd = Math.round((state.walletUsd - lease.monthlyUsd) * 100) / 100;
+      applyWalletDelta(state, {
+        amountUsd: -lease.monthlyUsd,
+        kind: 'lease_payment',
+        atTick: economyTick,
+        aircraftId: aircraft.id,
+        icao: aircraft.locationIcao,
+        note: aircraft.label,
+      });
       paidUsd += lease.monthlyUsd;
       lease.nextDueTick += TICKS_PER_MONTH;
       aircraft.leaseOverdue = false;
@@ -992,6 +1035,7 @@ export function settleAircraftMarketOps(
 export function buyOutAircraftLease(
   state: CareerMissionsState,
   aircraftId: string,
+  economyTick = 0,
 ): { state: CareerMissionsState; debitUsd: number } {
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
@@ -1004,7 +1048,14 @@ export function buyOutAircraftLease(
       `Buyout $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
-  state.walletUsd = Math.round((state.walletUsd - debit) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -debit,
+    kind: 'aircraft_buyout',
+    atTick: economyTick,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: aircraft.label,
+  });
   aircraft.ownership = 'owned';
   aircraft.lease = undefined;
   aircraft.leaseOverdue = false;

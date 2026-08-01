@@ -14,6 +14,7 @@ import {
   type FuelUpliftQuote,
 } from './career-fuel.js';
 import { ensureAircraftConditionPcts } from './career-aircraft-maintenance.js';
+import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
 import type {
   CareerMissionsState,
   CareerMissionsStateV1,
@@ -68,6 +69,7 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     aircraftMarket: [],
     aircraftMarketDay: undefined,
     aircraftMarketDemandDay: undefined,
+    ledger: [],
   };
 }
 
@@ -121,6 +123,7 @@ export function normalizeMissionsState(
     typeof (raw as CareerMissionsState).aircraftMarketDemandDay === 'number'
       ? (raw as CareerMissionsState).aircraftMarketDemandDay
       : undefined;
+  const ledger = normalizeCareerLedger((raw as CareerMissionsState).ledger);
   return {
     version: 2,
     walletUsd,
@@ -132,6 +135,7 @@ export function normalizeMissionsState(
     aircraftMarket,
     aircraftMarketDay,
     aircraftMarketDemandDay,
+    ledger,
   };
 }
 
@@ -812,7 +816,14 @@ export function executeFerry(
   aircraft.status = 'parked';
   aircraft.assignedMissionId = undefined;
 
-  state.walletUsd = Math.round((state.walletUsd - quote.totalCostUsd) * 100) / 100;
+  applyWalletDelta(state, {
+    amountUsd: -quote.totalCostUsd,
+    kind: 'ferry',
+    atTick: world.tick,
+    aircraftId: aircraft.id,
+    icao: quote.destIcao,
+    note: `${quote.originIcao}→${quote.destIcao}`,
+  });
 
   return {
     aircraft,

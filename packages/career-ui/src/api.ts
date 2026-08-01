@@ -40,6 +40,51 @@ export type PlayerAircraft = {
     startedAtTick?: number;
     lastWearTick?: number;
   };
+  /** Daily hangar fee when parked/maintenance; null when exempt. */
+  parkingUsdPerDay?: number | null;
+};
+
+export type CareerLedgerKind =
+  | 'freight_payout'
+  | 'hangar_parking'
+  | 'lease_payment'
+  | 'lease_out_income'
+  | 'lease_deposit'
+  | 'aircraft_buy'
+  | 'aircraft_lease_sign'
+  | 'aircraft_sell'
+  | 'aircraft_buyout'
+  | 'ferry'
+  | 'fuel'
+  | 'inspection'
+  | 'repair'
+  | 'other';
+
+export type CareerLedgerEntry = {
+  id: string;
+  atTick: number;
+  dayIndex: number;
+  amountUsd: number;
+  kind: CareerLedgerKind;
+  note?: string;
+  aircraftId?: string;
+  missionId?: string;
+  icao?: string;
+};
+
+export type CareerLedgerSummary = {
+  incomeUsd: number;
+  expenseUsd: number;
+  netUsd: number;
+  entryCount: number;
+  byKind?: Partial<Record<CareerLedgerKind, number>>;
+};
+
+export type CareerCashflowSnapshot = {
+  week: CareerLedgerSummary;
+  month: CareerLedgerSummary;
+  allTime: CareerLedgerSummary;
+  recent: CareerLedgerEntry[];
 };
 
 export type AircraftListing = {
@@ -475,8 +520,20 @@ export function fetchState() {
       hubs?: string[];
       pilotName?: string;
       homeHubIcao?: string;
+      cashflow?: CareerCashflowSnapshot;
     }
   >('/api/state');
+}
+
+export function fetchCashflow() {
+  return api<
+    CareerCashflowSnapshot & {
+      walletUsd: number;
+      tick: number;
+      dayIndex: number;
+      labels?: Record<string, string>;
+    }
+  >('/api/cashflow');
 }
 
 export function fetchMarket(
@@ -563,6 +620,10 @@ export function postTick(n = 24) {
     availableLots: number;
     leasePaidUsd?: number;
     leaseRepossessed?: string[];
+    hangarDebitUsd?: number;
+    hangarRequestedUsd?: number;
+    hangarShortfallUsd?: number;
+    hangarDaysCharged?: number;
     walletUsd?: number;
   }>('/api/tick', {
     method: 'POST',

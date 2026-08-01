@@ -2342,50 +2342,40 @@ th {
   font-weight: 500;
 }
 
-.airport-contracts {
-  display: grid;
-  gap: 1.25rem;
+.contracts-lanes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  margin: 0 0 0.85rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--line);
 }
 
-@media (min-width: 860px) {
-  .airport-contracts {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.airport-contracts h3 {
-  margin: 0 0 0.5rem;
-  font-family: var(--font-display);
-  font-size: 1.2rem;
+.contracts-lane {
+  border: 0;
+  background: none;
+  padding: 0.2rem 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.88rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
 }
 
-.contract-preflight {
+.contracts-lane:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.contracts-lane.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.contracts-clear-sort {
   margin-left: auto;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
-.contract-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.contract-list li {
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--line);
-}
-
-.contract-list li:first-child {
-  border-top: 0;
-}
-
-.contract-list p {
-  margin: 0.25rem 0;
-  color: var(--muted);
 }
 
 .terminal-sections {

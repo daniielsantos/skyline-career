@@ -92,11 +92,57 @@ import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
 
 type Tab = CareerTab;
 type TerminalSection = 'inventory' | 'contracts' | 'movements';
+type ContractsLane = 'outbound' | 'inbound';
 type MarketSortKey = 'distance' | 'cargo' | 'load' | 'expires' | 'pay';
 type SortDirection = 'asc' | 'desc';
 type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
 
+function compareAirportLot(
+  a: AirportLot,
+  b: AirportLot,
+  key: MarketSortKey,
+): number {
+  switch (key) {
+    case 'distance':
+      return (
+        (a.distanceNm ?? Number.POSITIVE_INFINITY) -
+        (b.distanceNm ?? Number.POSITIVE_INFINITY)
+      );
+    case 'cargo':
+      return a.commodityName.localeCompare(b.commodityName);
+    case 'load':
+      return a.availableKg - b.availableKg;
+    case 'expires':
+      return a.expiresAtTick - b.expiresAtTick;
+    case 'pay':
+      return a.payUsd - b.payUsd;
+  }
+}
+
+function sortAirportLots(
+  lots: readonly AirportLot[],
+  sorts: MarketSortLevel[],
+): AirportLot[] {
+  const levels =
+    sorts.length > 0
+      ? sorts
+      : ([{ key: 'pay', direction: 'desc' }] as MarketSortLevel[]);
+  return lots
+    .map((lot, index) => ({ lot, index }))
+    .sort((a, b) => {
+      for (const level of levels) {
+        const comparison = compareAirportLot(a.lot, b.lot, level.key);
+        if (comparison !== 0) {
+          return comparison * (level.direction === 'asc' ? 1 : -1);
+        }
+      }
+      return a.index - b.index;
+    })
+    .map(({ lot }) => lot);
+}
+
 const MARKET_PAGE_SIZE = 10;
+const CONTRACTS_PAGE_SIZE = 13;
 
 function formatMarketSortParam(sorts: MarketSortLevel[]): string {
   return sorts.map((level) => `${level.key}:${level.direction}`).join(',');
@@ -1126,6 +1172,10 @@ export function App() {
   const [airportView, setAirportView] = useState<AirportView | null>(null);
   const [terminalSection, setTerminalSection] =
     useState<TerminalSection>('inventory');
+  const [contractsLane, setContractsLane] =
+    useState<ContractsLane>('outbound');
+  const [contractsSorts, setContractsSorts] = useState<MarketSortLevel[]>([]);
+  const [contractsPage, setContractsPage] = useState(1);
   /** When Hangar was opened to ferry for a contract, Back restores this terminal. */
   const [airportReturn, setAirportReturn] = useState<{
     icao: string;
@@ -2281,6 +2331,9 @@ export function App() {
       setAirportView(view);
       if (airportIcao !== next) {
         setTerminalSection('inventory');
+        setContractsLane('outbound');
+        setContractsSorts([]);
+        setContractsPage(1);
       }
       setAirportIcao(next);
       writeCareerLocation({ tab, airportIcao: next });
@@ -2291,6 +2344,9 @@ export function App() {
     setAirportIcao(null);
     setAirportView(null);
     setTerminalSection('inventory');
+    setContractsLane('outbound');
+    setContractsSorts([]);
+    setContractsPage(1);
     setAirportReturn(null);
     writeCareerLocation({ tab, airportIcao: null });
   }
@@ -2299,6 +2355,9 @@ export function App() {
     setAirportIcao(null);
     setAirportView(null);
     setTerminalSection('inventory');
+    setContractsLane('outbound');
+    setContractsSorts([]);
+    setContractsPage(1);
     setTab(next);
     writeCareerLocation({ tab: next, airportIcao: null }, opts);
   }
@@ -3359,6 +3418,39 @@ export function App() {
     return marketSorts[0]!.direction === 'asc' ? 'ascending' : 'descending';
   }
 
+  function toggleContractsSort(key: MarketSortKey) {
+    setContractsSorts((current) => {
+      const existing = current.findIndex((level) => level.key === key);
+      if (existing >= 0) {
+        const level = current[existing]!;
+        if (level.direction === 'asc') {
+          return current.map((item, i) =>
+            i === existing ? { key, direction: 'desc' as const } : item,
+          );
+        }
+        return current.filter((_, i) => i !== existing);
+      }
+      return [...current, { key, direction: 'asc' as const }];
+    });
+    setContractsPage(1);
+  }
+
+  function contractsSortIndicator(key: MarketSortKey): string {
+    const index = contractsSorts.findIndex((level) => level.key === key);
+    if (index < 0) return '↕';
+    const arrow = contractsSorts[index]!.direction === 'asc' ? '↑' : '↓';
+    return contractsSorts.length > 1 ? `${index + 1}${arrow}` : arrow;
+  }
+
+  function contractsAriaSort(
+    key: MarketSortKey,
+  ): 'ascending' | 'descending' | 'none' | 'other' {
+    const index = contractsSorts.findIndex((level) => level.key === key);
+    if (index < 0) return 'none';
+    if (index > 0) return 'other';
+    return contractsSorts[0]!.direction === 'asc' ? 'ascending' : 'descending';
+  }
+
   const stagingExisting =
     staging?.intoMissionId && !staging.replaceManifest
       ? missions.find((m) => m.id === staging.intoMissionId)
@@ -3437,6 +3529,24 @@ export function App() {
   const terminalContractCount = showAirport
     ? airportView.outboundLots.length + airportView.inboundLots.length
     : 0;
+  const contractLots = showAirport
+    ? contractsLane === 'outbound'
+      ? airportView.outboundLots
+      : airportView.inboundLots
+    : [];
+  const sortedContractLots = useMemo(
+    () => sortAirportLots(contractLots, contractsSorts),
+    [contractLots, contractsSorts],
+  );
+  const contractsPageCount = Math.max(
+    1,
+    Math.ceil(sortedContractLots.length / CONTRACTS_PAGE_SIZE) || 1,
+  );
+  const safeContractsPage = Math.min(contractsPage, contractsPageCount);
+  const pagedContractLots = useMemo(() => {
+    const start = (safeContractsPage - 1) * CONTRACTS_PAGE_SIZE;
+    return sortedContractLots.slice(start, start + CONTRACTS_PAGE_SIZE);
+  }, [safeContractsPage, sortedContractLots]);
   const toastScope = showAirport ? `airport:${airportIcao}` : `tab:${tab}`;
   const toastScopeRef = useRef<{ id: number; scope: string } | null>(null);
 
@@ -3940,7 +4050,11 @@ export function App() {
                   ? 'terminal-section active'
                   : 'terminal-section'
               }
-              onClick={() => setTerminalSection('contracts')}
+              onClick={() => {
+                setContractsLane('outbound');
+                setContractsPage(1);
+                setTerminalSection('contracts');
+              }}
               disabled={busy}
             >
               Contracts ({terminalContractCount})
@@ -4114,15 +4228,144 @@ export function App() {
                         </p>
                       </div>
                     </div>
-                    <div className="airport-contracts">
-                      <div>
-                        <h3>Outbound</h3>
-                        {airportView.outboundLots.length === 0 ? (
-                          <p className="empty">No active outbound lots.</p>
-                        ) : (
-                          <ul className="contract-list">
-                            {airportView.outboundLots.map((lot) => (
-                              <li key={lot.id}>
+                    <nav
+                      className="contracts-lanes"
+                      aria-label="Contract direction"
+                    >
+                      <button
+                        type="button"
+                        className={
+                          contractsLane === 'outbound'
+                            ? 'contracts-lane active'
+                            : 'contracts-lane'
+                        }
+                        onClick={() => {
+                          setContractsLane('outbound');
+                          setContractsPage(1);
+                        }}
+                        disabled={busy}
+                      >
+                        Outbound ({airportView.outboundLots.length})
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          contractsLane === 'inbound'
+                            ? 'contracts-lane active'
+                            : 'contracts-lane'
+                        }
+                        onClick={() => {
+                          setContractsLane('inbound');
+                          setContractsPage(1);
+                        }}
+                        disabled={busy}
+                      >
+                        Inbound ({airportView.inboundLots.length})
+                      </button>
+                      {contractsSorts.length > 0 ? (
+                        <button
+                          type="button"
+                          className="clear-filters contracts-clear-sort"
+                          onClick={() => {
+                            setContractsSorts([]);
+                            setContractsPage(1);
+                          }}
+                          title={
+                            contractsSorts.length > 1
+                              ? `Clear ${contractsSorts.length} sort levels`
+                              : 'Clear sort'
+                          }
+                        >
+                          Clear sort
+                        </button>
+                      ) : null}
+                    </nav>
+                    {activeMission && contractsLane === 'outbound' ? (
+                      <p className="banner warn">
+                        Active flight {activeMission.id} (
+                        {activeMission.originIcao}→{activeMission.destIcao}) —
+                        finish or cancel it in{' '}
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => selectTab('staging')}
+                          disabled={busy}
+                        >
+                          Dispatch
+                        </button>{' '}
+                        before preparing another.
+                      </p>
+                    ) : null}
+                    <div className="table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Route</th>
+                            <th aria-sort={contractsAriaSort('distance')}>
+                              <button
+                                type="button"
+                                className={`sort-header${contractsSorts.some((l) => l.key === 'distance') ? ' is-sorted' : ''}`}
+                                title="Sort by distance. Click another column to add a sort level; click again to reverse or clear."
+                                onClick={() => toggleContractsSort('distance')}
+                              >
+                                Distance{' '}
+                                <span>{contractsSortIndicator('distance')}</span>
+                              </button>
+                            </th>
+                            <th aria-sort={contractsAriaSort('cargo')}>
+                              <button
+                                type="button"
+                                className={`sort-header${contractsSorts.some((l) => l.key === 'cargo') ? ' is-sorted' : ''}`}
+                                title="Sort by cargo. Click another column to add a sort level; click again to reverse or clear."
+                                onClick={() => toggleContractsSort('cargo')}
+                              >
+                                Cargo{' '}
+                                <span>{contractsSortIndicator('cargo')}</span>
+                              </button>
+                            </th>
+                            <th aria-sort={contractsAriaSort('load')}>
+                              <button
+                                type="button"
+                                className={`sort-header${contractsSorts.some((l) => l.key === 'load') ? ' is-sorted' : ''}`}
+                                title="Sort by load. Click another column to add a sort level; click again to reverse or clear."
+                                onClick={() => toggleContractsSort('load')}
+                              >
+                                Load{' '}
+                                <span>{contractsSortIndicator('load')}</span>
+                              </button>
+                            </th>
+                            <th aria-sort={contractsAriaSort('expires')}>
+                              <button
+                                type="button"
+                                className={`sort-header${contractsSorts.some((l) => l.key === 'expires') ? ' is-sorted' : ''}`}
+                                title="Sort by expiry. Click another column to add a sort level; click again to reverse or clear."
+                                onClick={() => toggleContractsSort('expires')}
+                              >
+                                Expires{' '}
+                                <span>{contractsSortIndicator('expires')}</span>
+                              </button>
+                            </th>
+                            <th aria-sort={contractsAriaSort('pay')}>
+                              <button
+                                type="button"
+                                className={`sort-header${contractsSorts.some((l) => l.key === 'pay') ? ' is-sorted' : ''}`}
+                                title="Sort by pay. Click another column to add a sort level; click again to reverse or clear."
+                                onClick={() => toggleContractsSort('pay')}
+                              >
+                                Pay <span>{contractsSortIndicator('pay')}</span>
+                              </button>
+                            </th>
+                            {contractsLane === 'outbound' ? (
+                              <th>
+                                <span className="muted">Action</span>
+                              </th>
+                            ) : null}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pagedContractLots.map((lot) => (
+                            <tr key={lot.id}>
+                              <td>
                                 <div className="route">
                                   <IcaoLink
                                     icao={lot.originIcao}
@@ -4138,90 +4381,124 @@ export function App() {
                                   {lot.urgency === 'urgent' ? (
                                     <span className="tag">Urgent</span>
                                   ) : null}
+                                </div>
+                                <NpcTakenBadge
+                                  claim={lot.npcClaim}
+                                  nowMs={displayNowMs}
+                                />
+                              </td>
+                              <td className="distance">
+                                {lot.distanceNm !== undefined
+                                  ? `${Math.round(lot.distanceNm).toLocaleString()} nm`
+                                  : '—'}
+                              </td>
+                              <td>
+                                <strong>{lot.commodityName}</strong>
+                                <small>{lot.reason}</small>
+                              </td>
+                              <td>{formatTonnes(lot.availableKg)}</td>
+                              <td>
+                                <LotExpiry
+                                  lot={lot}
+                                  tick={tick}
+                                  continuousHours={continuousHours}
+                                />
+                                {lot.perishable ? (
+                                  <small>Perishable</small>
+                                ) : null}
+                              </td>
+                              <td className="pay">{formatMoney(lot.payUsd)}</td>
+                              {contractsLane === 'outbound' ? (
+                                <td>
                                   <button
                                     type="button"
-                                    className="accept contract-preflight"
+                                    className="accept"
                                     disabled={
                                       busy ||
                                       Boolean(activeMission) ||
                                       lot.status !== 'available' ||
                                       lot.availableKg <= 0
                                     }
-                                    onClick={() => enterStagingFromContract(lot)}
+                                    onClick={() =>
+                                      enterStagingFromContract(lot)
+                                    }
                                     title={
                                       activeMission
                                         ? `Finish or cancel ${activeMission.id} in Dispatch first`
-                                        : lot.status !== 'available' || lot.availableKg <= 0
+                                        : lot.status !== 'available' ||
+                                            lot.availableKg <= 0
                                           ? 'This contract is no longer available'
                                           : `Prepare ${lot.originIcao} → ${lot.destIcao}`
                                     }
                                   >
-                                    {activeMission ? 'Flight busy' : 'Prepare flight'}
+                                    {activeMission
+                                      ? 'Flight busy'
+                                      : 'Prepare flight'}
                                   </button>
-                                </div>
-                                <p>
-                                  {lot.commodityName} · {formatTonnes(lot.availableKg)} ·{' '}
-                                  {formatMoney(lot.payUsd)}
-                                  {lot.distanceNm !== undefined
-                                    ? ` · ${Math.round(lot.distanceNm).toLocaleString()} nm`
-                                    : ''}
-                                </p>
-                                <NpcTakenBadge claim={lot.npcClaim} nowMs={displayNowMs} />
-                                <LotExpiry
-                                  lot={lot}
-                                  tick={tick}
-                                  continuousHours={continuousHours}
-                                />
-                                <small>{lot.reason}</small>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      <div>
-                        <h3>Inbound</h3>
-                        {airportView.inboundLots.length === 0 ? (
-                          <p className="empty">No active inbound lots.</p>
-                        ) : (
-                          <ul className="contract-list">
-                            {airportView.inboundLots.map((lot) => (
-                              <li key={lot.id}>
-                                <div className="route">
-                                  <IcaoLink
-                                    icao={lot.originIcao}
-                                    onOpen={openAirport}
-                                    disabled={busy}
-                                  />
-                                  <span className="arrow">→</span>
-                                  <IcaoLink
-                                    icao={lot.destIcao}
-                                    onOpen={openAirport}
-                                    disabled={busy}
-                                  />
-                                  {lot.urgency === 'urgent' ? (
-                                    <span className="tag">Urgent</span>
-                                  ) : null}
-                                </div>
-                                <p>
-                                  {lot.commodityName} · {formatTonnes(lot.availableKg)} ·{' '}
-                                  {formatMoney(lot.payUsd)}
-                                  {lot.distanceNm !== undefined
-                                    ? ` · ${Math.round(lot.distanceNm).toLocaleString()} nm`
-                                    : ''}
-                                </p>
-                                <NpcTakenBadge claim={lot.npcClaim} nowMs={displayNowMs} />
-                                <LotExpiry
-                                  lot={lot}
-                                  tick={tick}
-                                  continuousHours={continuousHours}
-                                />
-                                <small>{lot.reason}</small>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
+                                </td>
+                              ) : null}
+                            </tr>
+                          ))}
+                          {sortedContractLots.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={contractsLane === 'outbound' ? 7 : 6}
+                                className="empty"
+                              >
+                                {contractsLane === 'outbound'
+                                  ? 'No active outbound lots.'
+                                  : 'No active inbound lots.'}
+                              </td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
                     </div>
+                    <nav
+                      className="pagination"
+                      aria-label={
+                        contractsLane === 'outbound'
+                          ? 'Outbound contract pages'
+                          : 'Inbound contract pages'
+                      }
+                    >
+                      <p>
+                        {sortedContractLots.length === 0
+                          ? '0 records'
+                          : `${(safeContractsPage - 1) * CONTRACTS_PAGE_SIZE + 1}–${Math.min(
+                              safeContractsPage * CONTRACTS_PAGE_SIZE,
+                              sortedContractLots.length,
+                            )} of ${sortedContractLots.length}`}
+                      </p>
+                      <div>
+                        <button
+                          type="button"
+                          disabled={safeContractsPage <= 1}
+                          onClick={() =>
+                            setContractsPage(Math.max(1, safeContractsPage - 1))
+                          }
+                        >
+                          Previous
+                        </button>
+                        <span>
+                          Page {safeContractsPage} of {contractsPageCount}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={safeContractsPage >= contractsPageCount}
+                          onClick={() =>
+                            setContractsPage(
+                              Math.min(
+                                contractsPageCount,
+                                safeContractsPage + 1,
+                              ),
+                            )
+                          }
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </nav>
                   </>
                 ) : null}
         </section>

@@ -20,6 +20,8 @@ export interface FlightGroundSample {
   position?: { lat: number; lon: number };
   /** Optional ground speed (knots) for taxi phase display. */
   groundSpeedKt?: number;
+  /** Live vertical speed (feet per minute). Negative = descending. */
+  verticalSpeedFpm?: number;
 }
 
 /**
@@ -55,6 +57,13 @@ export interface MissionFlightWatchState {
   airborneEndedAtMs?: number;
   /** Planned route duration in wall-clock ms (OFP air time / distance estimate). */
   expectedRouteMs?: number;
+  /** Last vertical speed while airborne (fpm) — used to stamp landing rate. */
+  lastAirborneVsFpm?: number;
+  /**
+   * Vertical speed at first touchdown (fpm, typically negative).
+   * Captured once per watch session.
+   */
+  landingFpm?: number;
 }
 
 export type MissionFlightEvent =
@@ -112,6 +121,8 @@ export function createMissionFlightWatchState(
     airborneAtMs: seed.airborneAtMs,
     airborneEndedAtMs: seed.airborneEndedAtMs,
     expectedRouteMs: seed.expectedRouteMs,
+    lastAirborneVsFpm: seed.lastAirborneVsFpm,
+    landingFpm: seed.landingFpm,
   };
 }
 
@@ -338,7 +349,16 @@ export function evaluateMissionFlightTransition(
     airborneAtMs: state.airborneAtMs,
     airborneEndedAtMs: state.airborneEndedAtMs,
     expectedRouteMs: state.expectedRouteMs,
+    lastAirborneVsFpm: state.lastAirborneVsFpm,
+    landingFpm: state.landingFpm,
   };
+  if (
+    !sample.onGround &&
+    typeof sample.verticalSpeedFpm === 'number' &&
+    Number.isFinite(sample.verticalSpeedFpm)
+  ) {
+    nextState = { ...nextState, lastAirborneVsFpm: sample.verticalSpeedFpm };
+  }
   nextState = withAirborneClock(nextState, mission, opts, !sample.onGround);
 
   // Bootstrap: record first sample without firing transitions.
@@ -351,7 +371,7 @@ export function evaluateMissionFlightTransition(
 
   if (leftGround && departFrom.includes(mission.status)) {
     nextState = withAirborneClock(nextState, mission, opts, true);
-    nextState = { ...nextState, airborneEndedAtMs: undefined };
+    nextState = { ...nextState, airborneEndedAtMs: undefined, landingFpm: undefined };
     return {
       event: {
         type: 'depart',
@@ -363,9 +383,17 @@ export function evaluateMissionFlightTransition(
 
   if (touchedDown && (state.sawAirborne || nextState.sawAirborne)) {
     const nowMs = opts.nowMs ?? Date.now();
+    const landingFpm =
+      nextState.landingFpm ??
+      state.lastAirborneVsFpm ??
+      sample.verticalSpeedFpm;
     nextState = {
       ...nextState,
       airborneEndedAtMs: nextState.airborneEndedAtMs ?? nowMs,
+      landingFpm:
+        typeof landingFpm === 'number' && Number.isFinite(landingFpm)
+          ? Math.round(landingFpm)
+          : nextState.landingFpm,
     };
   }
 

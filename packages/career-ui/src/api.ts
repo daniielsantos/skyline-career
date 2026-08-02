@@ -358,6 +358,8 @@ export type Mission = {
   expectedRouteMs?: number;
   settledAtTick?: number;
   settledFuelKg?: number;
+  /** Touchdown vertical speed (fpm), typically negative. */
+  settledLandingFpm?: number;
   staticId?: string;
   lots?: MissionLotLine[];
   shipmentLotId?: string;
@@ -1049,6 +1051,8 @@ export type MissionSettlement = {
   onTime: boolean;
   deliveredKg: number;
   residualFuelKg: number | null;
+  /** Touchdown vertical speed (fpm), typically negative. */
+  landingFpm?: number | null;
 };
 
 export type WatchEvent =

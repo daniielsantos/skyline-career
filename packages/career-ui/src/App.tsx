@@ -92,6 +92,7 @@ import {
   buildFlightDebrief,
   deriveDispatchStep,
   dispatchStepStatusLine,
+  formatLandingFpm,
   resolveLoadPath,
   type FlightDebrief,
 } from './dispatch-flow';
@@ -5302,6 +5303,10 @@ export function App() {
                         : 'estimated'}
                     </dd>
                   </div>
+                  <div>
+                    <dt>Landing</dt>
+                    <dd>{formatLandingFpm(flightDebrief.landingFpm)}</dd>
+                  </div>
                   <div className="debrief-net">
                     <dt>Net</dt>
                     <dd>{formatMoney(flightDebrief.netUsd)}</dd>
@@ -6245,6 +6250,9 @@ export function App() {
                         : ''}
                       {m.settledFuelKg !== undefined
                         ? ` · remaining ${formatTonnes(m.settledFuelKg)}`
+                        : ''}
+                      {m.settledLandingFpm !== undefined
+                        ? ` · landing ${formatLandingFpm(m.settledLandingFpm)}`
                         : ''}
                       {m.payoutUsd !== undefined
                         ? ` · net ${formatMoney(

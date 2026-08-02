@@ -105,6 +105,7 @@ import { isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight } from './preflight-helpers.ts';
 import {
   CareerWatchSession,
+  probeLiveLandingFpm,
   probeLiveResidualFuelKg,
 } from './watch-helpers.ts';
 import { createPromiseLock } from './career-write-lock.ts';
@@ -2420,6 +2421,18 @@ export function createCareerApiServer(port = 8787) {
             // Manual/offline settle keeps the estimated-burn fallback.
             residualFuelKg = undefined;
           }
+          // Prefer Watch-captured touchdown VS; else probe the sim latch.
+          let landingFpm =
+            watchSession.getStatus().missionId === body.missionId
+              ? watchSession.getCapturedLandingFpm()
+              : undefined;
+          if (landingFpm === undefined) {
+            try {
+              landingFpm = await probeLiveLandingFpm();
+            } catch {
+              landingFpm = undefined;
+            }
+          }
           // Stop live watch first so an in-flight tick cannot rewrite this mission.
           const watch = watchSession.getStatus();
           if (watch.running && watch.missionId === body.missionId) {
@@ -2431,6 +2444,7 @@ export function createCareerApiServer(port = 8787) {
             const result = settleMission(world, missions.missions[idx]!, {
               fleet: missions,
               residualFuelKg,
+              landingFpm,
             });
             missions.missions[idx] = result.mission;
             if (result.walletCreditUsd > 0) {
@@ -2478,6 +2492,7 @@ export function createCareerApiServer(port = 8787) {
               onTime: settled.settlement.onTime,
               deliveredKg: settled.settlement.deliveredKg,
               residualFuelKg: settled.mission.settledFuelKg ?? null,
+              landingFpm: settled.mission.settledLandingFpm ?? null,
             },
           });
         } catch (error) {

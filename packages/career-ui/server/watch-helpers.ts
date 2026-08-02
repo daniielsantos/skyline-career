@@ -72,6 +72,8 @@ export type WatchStatusPayload = {
     onTime: boolean;
     deliveredKg: number;
     residualFuelKg: number | null;
+    /** Touchdown vertical speed (fpm), typically negative. */
+    landingFpm: number | null;
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -151,11 +153,22 @@ export async function sampleLiveFlight(
   } catch {
     groundSpeedKt = undefined;
   }
+  let verticalSpeedFpm: number | undefined;
+  try {
+    const vs = await bridge.readSimVar({
+      name: 'VERTICAL SPEED',
+      unit: 'feet per minute',
+    });
+    if (Number.isFinite(vs)) verticalSpeedFpm = vs;
+  } catch {
+    verticalSpeedFpm = undefined;
+  }
   return {
     onGround: snap.onGround,
     enginesRunning: snap.enginesRunning,
     position,
     groundSpeedKt,
+    verticalSpeedFpm,
   };
 }
 
@@ -287,6 +300,52 @@ export async function probeLiveResidualFuelKg(pipeName?: string): Promise<number
   }
 }
 
+/**
+ * Best-effort landing rate (fpm). Prefers latched touchdown normal velocity
+ * (fps → fpm); falls back to live VERTICAL SPEED when that is unavailable.
+ */
+export async function readLiveLandingFpm(
+  bridge: NamedPipeSimBridge,
+): Promise<number | undefined> {
+  try {
+    const tdFps = await bridge.readSimVar({
+      name: 'PLANE TOUCHDOWN NORMAL VELOCITY',
+      unit: 'feet per second',
+    });
+    if (Number.isFinite(tdFps) && Math.abs(tdFps) > 0.05) {
+      return Math.round(tdFps * 60);
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    const vs = await bridge.readSimVar({
+      name: 'VERTICAL SPEED',
+      unit: 'feet per minute',
+    });
+    if (Number.isFinite(vs) && Math.abs(vs) > 5) return Math.round(vs);
+  } catch {
+    /* ignore */
+  }
+  return undefined;
+}
+
+export async function probeLiveLandingFpm(
+  pipeName?: string,
+): Promise<number | undefined> {
+  const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
+  try {
+    await bridge.open('Skyline Career UI Settle Landing FPM');
+    return await readLiveLandingFpm(bridge);
+  } finally {
+    try {
+      await bridge.close({ disconnectHost: false });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export class CareerWatchSession {
   private bridge: NamedPipeSimBridge | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -329,6 +388,12 @@ export class CareerWatchSession {
   private preflightDepartBlockedLogged = false;
 
   constructor(private readonly cb: WatchCallbacks) {}
+
+  /** Last touchdown VS captured by Watch (before settle), if any. */
+  getCapturedLandingFpm(): number | undefined {
+    const fpm = this.watchState.landingFpm;
+    return typeof fpm === 'number' && Number.isFinite(fpm) ? fpm : undefined;
+  }
 
   getStatus(): WatchStatusPayload {
     const nowMs = Date.now();
@@ -710,6 +775,21 @@ export class CareerWatchSession {
         } catch {
           residualFuelKg = undefined;
         }
+        // Prefer sim touchdown-normal velocity when available (more accurate than
+        // the last airborne VERTICAL SPEED sample).
+        let landingFpm = this.watchState.landingFpm;
+        try {
+          const tdFps = await this.bridge.readSimVar({
+            name: 'PLANE TOUCHDOWN NORMAL VELOCITY',
+            unit: 'feet per second',
+          });
+          if (Number.isFinite(tdFps) && Math.abs(tdFps) > 0.05) {
+            landingFpm = Math.round(tdFps * 60);
+            this.watchState = { ...this.watchState, landingFpm };
+          }
+        } catch {
+          /* keep Watch-captured VS */
+        }
         const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
           const openIdx = freshMissions.missions.findIndex(
             (m) => m.id === this.missionId,
@@ -726,6 +806,7 @@ export class CareerWatchSession {
           const result = settleMission(worldFresh, openMission, {
             fleet: freshMissions,
             residualFuelKg,
+            landingFpm,
           });
           freshMissions.missions[openIdx] = result.mission;
           if (result.walletCreditUsd > 0) {
@@ -757,6 +838,7 @@ export class CareerWatchSession {
             onTime: result.settlement.onTime,
             deliveredKg: result.settlement.deliveredKg,
             residualFuelKg: result.mission.settledFuelKg ?? null,
+            landingFpm: result.mission.settledLandingFpm ?? null,
           };
           return true;
         });

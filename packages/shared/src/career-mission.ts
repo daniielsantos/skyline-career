@@ -1097,6 +1097,11 @@ export interface SettleMissionOpts {
   fleet?: CareerMissionsState;
   /** Actual fuel remaining in MSFS; falls back to estimated burn when unavailable. */
   residualFuelKg?: number;
+  /**
+   * Touchdown vertical speed (fpm). Typically negative.
+   * Captured by Flight Watch at first wheels-down.
+   */
+  landingFpm?: number;
   /** Wall-clock now for minimum airborne duration gate. */
   nowMs?: number;
   /**
@@ -1271,6 +1276,10 @@ export function settleMission(
     status: 'settled',
     settledAtTick: settleTick,
     settledFuelKg: residualFuelKg,
+    settledLandingFpm:
+      typeof opts.landingFpm === 'number' && Number.isFinite(opts.landingFpm)
+        ? Math.round(opts.landingFpm)
+        : working.settledLandingFpm,
     payoutUsd: pay.payoutUsd,
     penaltyUsd: pay.penaltyUsd,
     lateTicks: pay.lateTicks,

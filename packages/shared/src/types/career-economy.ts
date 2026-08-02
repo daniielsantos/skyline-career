@@ -606,6 +606,11 @@ export interface MissionIntent {
   tripFuelBurnKg?: number;
   /** Actual fuel remaining in MSFS when the mission settled. */
   settledFuelKg?: number;
+  /**
+   * Vertical speed at first touchdown (feet per minute).
+   * Typically negative for a descent (e.g. -220).
+   */
+  settledLandingFpm?: number;
   /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';

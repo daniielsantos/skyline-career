@@ -356,6 +356,46 @@ describe('evaluateMissionFlightTransition', () => {
     });
     assert.equal(later.elapsedMs, 20 * 60_000);
   });
+
+  it('captures landing FPM from last airborne vertical speed', () => {
+    const plannedMs = 3_600_000;
+    const nowMs = Date.now();
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: nowMs - plannedMs,
+      expectedRouteMs: plannedMs,
+      lastAirborneVsFpm: -212.4,
+    });
+    const down = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+        verticalSpeedFpm: 0,
+      },
+      state,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(down.nextState.landingFpm, -212);
+    state = down.nextState;
+
+    // Later taxi sample must not overwrite the captured touchdown rate.
+    const taxi = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+        verticalSpeedFpm: 0,
+      },
+      state,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(taxi.nextState.landingFpm, -212);
+    assert.equal(taxi.event.type, 'settle');
+  });
 });
 
 describe('pickActiveMission', () => {

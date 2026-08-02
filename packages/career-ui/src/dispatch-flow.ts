@@ -42,17 +42,40 @@ export type FlightDebrief = {
   penaltyUsd: number;
   fuelCostUsd: number;
   residualFuelKg: number | null;
+  /** Touchdown vertical speed (fpm), typically negative. */
+  landingFpm: number | null;
   netUsd: number;
 };
+
+/** Format touchdown rate for debrief/logbook (e.g. "−220 fpm"). */
+export function formatLandingFpm(fpm: number | null | undefined): string {
+  if (typeof fpm !== 'number' || !Number.isFinite(fpm)) return '—';
+  const rounded = Math.round(fpm);
+  const sign = rounded > 0 ? '+' : '';
+  return `${sign}${rounded} fpm`;
+}
 
 export function buildFlightDebrief(opts: {
   mission: Pick<
     Mission,
-    'id' | 'originIcao' | 'destIcao' | 'payUsd' | 'fuelUplift'
+    | 'id'
+    | 'originIcao'
+    | 'destIcao'
+    | 'payUsd'
+    | 'fuelUplift'
+    | 'settledLandingFpm'
   >;
   settlement: MissionSettlement;
 }): FlightDebrief {
   const fuelCostUsd = opts.mission.fuelUplift?.costUsd ?? 0;
+  const landingFpm =
+    typeof opts.settlement.landingFpm === 'number' &&
+    Number.isFinite(opts.settlement.landingFpm)
+      ? Math.round(opts.settlement.landingFpm)
+      : typeof opts.mission.settledLandingFpm === 'number' &&
+          Number.isFinite(opts.mission.settledLandingFpm)
+        ? Math.round(opts.mission.settledLandingFpm)
+        : null;
   return {
     missionId: opts.mission.id,
     originIcao: opts.mission.originIcao,
@@ -64,6 +87,7 @@ export function buildFlightDebrief(opts: {
     penaltyUsd: opts.settlement.penaltyUsd,
     fuelCostUsd,
     residualFuelKg: opts.settlement.residualFuelKg,
+    landingFpm,
     netUsd: opts.settlement.payoutUsd - fuelCostUsd,
   };
 }

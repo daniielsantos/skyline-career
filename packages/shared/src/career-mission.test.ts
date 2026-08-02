@@ -923,6 +923,24 @@ describe('settleMission', () => {
     assert.equal(result.settlement.destStockAfterKg, destAfter);
   });
 
+  it('stamps settledLandingFpm when provided', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-fpm' });
+    tickEconomyN(world, 24);
+    const lot = listMarketLots(world)[0]!.lot;
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_settle_fpm',
+    });
+    const departed = departMission(world, { ...mission, status: 'dispatched' });
+    const result = settleMission(world, departed.mission, {
+      skipMinAirborneGate: true,
+      landingFpm: -187.6,
+    });
+    assert.equal(result.mission.settledLandingFpm, -188);
+  });
+
   it('applies late penalty after deadline', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-late' });
     tickEconomyN(world, 24);

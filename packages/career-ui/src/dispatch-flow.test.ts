@@ -4,6 +4,7 @@ import type { Mission, MissionSettlement } from './api.ts';
 import {
   buildFlightDebrief,
   deriveDispatchStep,
+  formatLandingFpm,
   resolveLoadPath,
 } from './dispatch-flow.ts';
 
@@ -139,6 +140,7 @@ describe('buildFlightDebrief', () => {
       onTime: false,
       deliveredKg: 1000,
       residualFuelKg: 120,
+      landingFpm: -185,
     };
     const debrief = buildFlightDebrief({
       mission: mission({
@@ -157,5 +159,14 @@ describe('buildFlightDebrief', () => {
     });
     assert.equal(debrief.netUsd, 3700);
     assert.equal(debrief.penaltyUsd, 500);
+    assert.equal(debrief.landingFpm, -185);
+  });
+});
+
+describe('formatLandingFpm', () => {
+  it('formats signed fpm', () => {
+    assert.equal(formatLandingFpm(-220), '-220 fpm');
+    assert.equal(formatLandingFpm(40), '+40 fpm');
+    assert.equal(formatLandingFpm(null), '—');
   });
 });

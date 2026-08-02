@@ -36,6 +36,7 @@ import {
   postFerry,
   postStagingCommit,
   postTick,
+  postDebugCreditWallet,
   postWatchStart,
   postWatchStop,
   type AircraftClass,
@@ -2684,8 +2685,13 @@ export function App() {
     }, { refreshAfter: false });
   }
 
-  function onRefresh() {
-    void run(refresh, { refreshAfter: false });
+  async function onDebugCreditWallet() {
+    await run(async () => {
+      const result = await postDebugCreditWallet(100_000);
+      setWallet(result.walletUsd);
+      setToastKind('ok');
+      setToast(`Debug credit +${formatMoney(result.creditedUsd)}`);
+    }, { refreshAfter: false });
   }
 
   async function onTick() {
@@ -4352,10 +4358,11 @@ export function App() {
             <button
               type="button"
               className="action ghost"
-              onClick={onRefresh}
+              onClick={() => void onDebugCreditWallet()}
               disabled={busy}
+              title="Temporary test aid — add $100,000 to the wallet"
             >
-              Refresh
+              +$100k
             </button>
             <button
               type="button"

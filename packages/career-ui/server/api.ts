@@ -1456,6 +1456,30 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      // Temporary test aid — remove before release.
+      if (req.method === 'POST' && path === '/api/debug/credit-wallet') {
+        const body = (await readBody(req)) as { amountUsd?: number };
+        const amountUsd =
+          typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
+            ? Math.round(body.amountUsd * 100) / 100
+            : 100_000;
+        if (amountUsd === 0) {
+          send(res, 400, { error: 'amountUsd must be non-zero' });
+          return;
+        }
+        const payload = await withCareerWrite((world, missions) => {
+          applyWalletDelta(missions, {
+            amountUsd,
+            kind: 'other',
+            atTick: world.tick,
+            note: 'Debug wallet credit',
+          });
+          return { walletUsd: missions.walletUsd, creditedUsd: amountUsd };
+        });
+        send(res, 200, payload);
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/init') {
         const body = (await readBody(req)) as {
           seed?: string;

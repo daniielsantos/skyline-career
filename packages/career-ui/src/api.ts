@@ -698,6 +698,17 @@ export function postTick(n = 96) {
   });
 }
 
+/** Temporary test aid — credits the career wallet (default +$100k). */
+export function postDebugCreditWallet(amountUsd = 100_000) {
+  return api<{ walletUsd: number; creditedUsd: number }>(
+    '/api/debug/credit-wallet',
+    {
+      method: 'POST',
+      body: JSON.stringify({ amountUsd }),
+    },
+  );
+}
+
 export function postInitBrazil() {
   return api<{ tick: number; seed: string; airports: number }>('/api/init', {
     method: 'POST',

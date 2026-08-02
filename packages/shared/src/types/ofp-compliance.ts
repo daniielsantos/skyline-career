@@ -70,7 +70,13 @@ export interface OfpBriefingSummary {
   aircraftIcao?: string;
   tailNumber?: string;
   distanceNm?: number;
+  /** Gate-to-gate (taxi + air + taxi). Informational. */
   blockTime?: string;
+  /**
+   * SimBrief estimated air / enroute time (`est_time_enroute`) as `HH:MM`.
+   * Preferred for the career min-airborne settle gate.
+   */
+  airTime?: string;
   cruiseAltitudeFt?: number;
   alternateIcao?: string;
   route?: string;

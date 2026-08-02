@@ -102,6 +102,29 @@ describe('mapSimBriefOfpToBriefing', () => {
     });
   });
 
+  it('maps air time from est_time_enroute seconds', () => {
+    const briefing = mapSimBriefOfpToBriefing({
+      origin: { icao_code: 'SBCT' },
+      destination: { icao_code: 'SBJV' },
+      times: {
+        est_block: '00:59:00',
+        est_time_enroute: 1860,
+      },
+    });
+    assert.equal(briefing.blockTime, '00:59');
+    assert.equal(briefing.airTime, '00:31');
+  });
+
+  it('maps air time from HH:MM est_time_enroute', () => {
+    const briefing = mapSimBriefOfpToBriefing({
+      times: {
+        est_block: '00:59:00',
+        est_time_enroute: '00:31:12',
+      },
+    });
+    assert.equal(briefing.airTime, '00:31');
+  });
+
   it('falls back to air distance and scheduled block time', () => {
     const briefing = mapSimBriefOfpToBriefing({
       general: { route_ifps: 'DCT ABC', air_distance: 123 },

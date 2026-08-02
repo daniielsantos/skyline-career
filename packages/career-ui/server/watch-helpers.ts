@@ -346,6 +346,7 @@ export class CareerWatchSession {
         airborneAtMs,
         expectedRouteMs,
         nowMs,
+        airborneEndedAtMs: this.watchState.airborneEndedAtMs,
       });
       flightTime = {
         airborneAtMs,

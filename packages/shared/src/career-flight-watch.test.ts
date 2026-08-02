@@ -4,6 +4,7 @@ import {
   CAREER_HUB_COORDS,
   createMissionFlightWatchState,
   distanceNm,
+  evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
   flightPhaseFromSample,
   isNearAirport,
@@ -300,7 +301,20 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(lateEnough.event.type, 'settle');
   });
 
-  it('uses OFP block time when resolving expected route ms', () => {
+  it('uses OFP air time when resolving expected route ms', () => {
+    const msn = mission('dispatched');
+    msn.aircraftClassId = 'light_ga';
+    msn.lastOfpCheck = {
+      verdict: 'pass',
+      summary: 'ok',
+      checkedAtIso: new Date().toISOString(),
+      findings: [],
+      briefing: { blockTime: '0:59', airTime: '0:31', distanceNm: 86 },
+    };
+    assert.equal(resolveExpectedRouteMs(msn), 31 * 60_000);
+  });
+
+  it('uses OFP block time when air time and distance are missing', () => {
     assert.equal(parseBlockTimeToMs('1:30'), 90 * 60_000);
     const msn = mission('dispatched');
     msn.lastOfpCheck = {
@@ -308,9 +322,39 @@ describe('evaluateMissionFlightTransition', () => {
       summary: 'ok',
       checkedAtIso: new Date().toISOString(),
       findings: [],
-      briefing: { blockTime: '2:00', distanceNm: 800 },
+      briefing: { blockTime: '2:00' },
     };
     assert.equal(resolveExpectedRouteMs(msn), 2 * 3_600_000);
+  });
+
+  it('freezes airborne elapsed after touchdown', () => {
+    const plannedMs = 31 * 60_000;
+    const airborneAt = 1_000_000;
+    const touchdownAt = airborneAt + 20 * 60_000;
+    const state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: airborneAt,
+      expectedRouteMs: plannedMs,
+    });
+    const down = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      { destCoords: SBRF, nowMs: touchdownAt },
+    );
+    assert.equal(down.nextState.airborneEndedAtMs, touchdownAt);
+    const later = evaluateMinAirborneElapsed({
+      airborneAtMs: airborneAt,
+      expectedRouteMs: plannedMs,
+      nowMs: touchdownAt + 30 * 60_000,
+      airborneEndedAtMs: down.nextState.airborneEndedAtMs,
+    });
+    assert.equal(later.elapsedMs, 20 * 60_000);
   });
 });
 

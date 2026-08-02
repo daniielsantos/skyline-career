@@ -77,8 +77,13 @@ export interface SimBriefOfpJson {
         icao?: string;
       }>;
   times?: {
-    est_block?: string;
-    sched_block?: string;
+    est_block?: string | number;
+    sched_block?: string | number;
+    /** Estimated air/enroute time — seconds (classic) or HH:MM[:SS] (json v2). */
+    est_time_enroute?: string | number;
+    sched_time_enroute?: string | number;
+    taxi_out?: string | number;
+    taxi_in?: string | number;
   };
   fuel?: Record<string, string | number | undefined>;
   weights?: Record<string, string | number | undefined>;
@@ -105,10 +110,29 @@ function airportWithRunway(
   return runway ? `${icao}/${runway}` : icao;
 }
 
-function blockTime(value: string | undefined): string | undefined {
-  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(value?.trim() ?? '');
-  if (!match) return compactText(value);
+function blockTime(value: string | number | undefined): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    // SimBrief classic XML uses seconds for many time fields.
+    if (value >= 60) return secondsToHhMm(value);
+    return undefined;
+  }
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return undefined;
+  // Pure seconds as a digit string.
+  if (/^\d+$/.test(raw)) {
+    const sec = Number(raw);
+    if (Number.isFinite(sec) && sec >= 60) return secondsToHhMm(sec);
+  }
+  const match = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(raw);
+  if (!match) return compactText(raw);
   return `${match[1]!.padStart(2, '0')}:${match[2]}`;
+}
+
+function secondsToHhMm(totalSeconds: number): string {
+  const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
 /** Map SimBrief JSON v2 into the compact JetCard-style OFP strip. */
@@ -122,20 +146,50 @@ export function mapSimBriefOfpToBriefing(
     [origin, routeBody, destination].filter(Boolean).join(' '),
   );
 
-  return {
+  const block = blockTime(ofp.times?.est_block ?? ofp.times?.sched_block);
+  let airTime = blockTime(
+    ofp.times?.est_time_enroute ?? ofp.times?.sched_time_enroute,
+  );
+  // Derive air time from block − taxi when SimBrief omitted enroute.
+  if (!airTime && block && ofp.times) {
+    const taxiOut = num(ofp.times.taxi_out);
+    const taxiIn = num(ofp.times.taxi_in);
+    const blockMs = parseHhMmToMs(block);
+    if (
+      blockMs !== undefined &&
+      taxiOut !== undefined &&
+      taxiIn !== undefined
+    ) {
+      const airMs = blockMs - (taxiOut + taxiIn) * 1000;
+      if (airMs >= 60_000) airTime = secondsToHhMm(airMs / 1000);
+    }
+  }
+
+  const result: OfpBriefingSummary = {
     aircraftIcao: compactText(ofp.aircraft?.icaocode)?.toUpperCase(),
     tailNumber: compactText(ofp.aircraft?.reg)?.toUpperCase(),
     distanceNm:
       num(ofp.general?.route_distance) ??
       num(ofp.general?.air_distance) ??
       num(ofp.general?.gc_distance),
-    blockTime: blockTime(ofp.times?.est_block ?? ofp.times?.sched_block),
+    blockTime: block,
     cruiseAltitudeFt: num(ofp.general?.initial_altitude),
     alternateIcao: airportIcao(
       Array.isArray(ofp.alternate) ? ofp.alternate[0] : ofp.alternate,
     ),
     route,
   };
+  if (airTime) result.airTime = airTime;
+  return result;
+}
+
+function parseHhMmToMs(value: string): number | undefined {
+  const match = /^(\d+):(\d{2})$/.exec(value.trim());
+  if (!match) return undefined;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return undefined;
+  return Math.max(0, Math.round((hours * 60 + minutes) * 60_000));
 }
 
 function num(value: string | number | undefined): number | undefined {

@@ -354,6 +354,7 @@ export function DispatchActivePanel(props: {
                 ? ['Distance', `${Math.round(briefing.distanceNm)} NM`]
                 : null,
               briefing?.blockTime ? ['Block time', briefing.blockTime] : null,
+              briefing?.airTime ? ['Air time', briefing.airTime] : null,
               cruise ? ['Cruise', cruise] : null,
               briefing?.alternateIcao
                 ? ['Alternate', briefing.alternateIcao]
@@ -812,7 +813,7 @@ export function DispatchActivePanel(props: {
                       Airborne{' '}
                       {Math.round(props.watch.flightTime.elapsedMs / 60_000)}m /{' '}
                       {Math.round(props.watch.flightTime.expectedRouteMs / 60_000)}m
-                      planned ·{' '}
+                      air planned ·{' '}
                       {Math.round(props.watch.flightTime.ratio * 100)}%
                       {props.watch.flightTime.met
                         ? ' · settle unlocked'
@@ -821,6 +822,9 @@ export function DispatchActivePanel(props: {
                               Math.max(1, props.watch.flightTime.expectedRouteMs)) *
                               100,
                           )}%`}
+                      {props.watch.onGround && props.watch.sawAirborne
+                        ? ' · clock frozen on ground'
+                        : ''}
                     </span>
                   ) : null}
                   {props.watch?.lastEvent?.type === 'settle_blocked' ? (

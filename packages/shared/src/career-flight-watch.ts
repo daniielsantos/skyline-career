@@ -48,7 +48,12 @@ export interface MissionFlightWatchState {
   lastOnGround?: boolean;
   /** Wall-clock when the aircraft first left the ground (or watch saw airborne). */
   airborneAtMs?: number;
-  /** Planned route duration in wall-clock ms (OFP block / distance estimate). */
+  /**
+   * Wall-clock when wheels touched down after airborne.
+   * Freezes the airborne elapsed clock for the settle gate / UI.
+   */
+  airborneEndedAtMs?: number;
+  /** Planned route duration in wall-clock ms (OFP air time / distance estimate). */
   expectedRouteMs?: number;
 }
 
@@ -105,6 +110,7 @@ export function createMissionFlightWatchState(
     sawAirborne: seed.sawAirborne ?? false,
     lastOnGround: seed.lastOnGround,
     airborneAtMs: seed.airborneAtMs,
+    airborneEndedAtMs: seed.airborneEndedAtMs,
     expectedRouteMs: seed.expectedRouteMs,
   };
 }
@@ -125,13 +131,16 @@ export function estimateRouteMsFromDistance(
   aircraftClassId: string,
 ): number {
   const cruise = CRUISE_KT[aircraftClassId] ?? 430;
-  const hours = Math.max(0.5, distanceNm / Math.max(1, cruise) + 0.4);
+  // Short legs: climb/descent padding scales down — avoid the old 30 min floor
+  // that made an 86 NM GA hop look like an hour.
+  const padHours = Math.min(0.35, Math.max(0.08, distanceNm / 400));
+  const hours = Math.max(0.12, distanceNm / Math.max(1, cruise) + padHours);
   return Math.round(hours * 3_600_000);
 }
 
 /**
- * Planned route duration for anti-time-compression settle gate.
- * Priority: OFP blockTime → distance/cruise → fallbackHours → 30 min floor.
+ * Planned airborne duration for the anti-time-compression settle gate.
+ * Priority: OFP airTime → distance/cruise → OFP blockTime → fallbackHours → 12 min.
  */
 export function resolveExpectedRouteMs(
   mission: Pick<
@@ -140,20 +149,24 @@ export function resolveExpectedRouteMs(
   >,
   opts: { distanceNm?: number; fallbackHours?: number } = {},
 ): number {
-  const fromOfp = parseBlockTimeToMs(mission.lastOfpCheck?.briefing?.blockTime);
-  if (fromOfp && fromOfp > 0) return fromOfp;
+  const briefing = mission.lastOfpCheck?.briefing;
+  const fromAir = parseBlockTimeToMs(briefing?.airTime);
+  if (fromAir && fromAir > 0) return fromAir;
 
   const distanceNm =
-    opts.distanceNm ?? mission.lastOfpCheck?.briefing?.distanceNm;
+    opts.distanceNm ?? briefing?.distanceNm;
   if (typeof distanceNm === 'number' && Number.isFinite(distanceNm) && distanceNm > 0) {
     return estimateRouteMsFromDistance(distanceNm, mission.aircraftClassId);
   }
+
+  const fromBlock = parseBlockTimeToMs(briefing?.blockTime);
+  if (fromBlock && fromBlock > 0) return fromBlock;
 
   if (typeof opts.fallbackHours === 'number' && opts.fallbackHours > 0) {
     return Math.round(opts.fallbackHours * 3_600_000);
   }
 
-  return Math.round(0.5 * 3_600_000);
+  return Math.round(0.2 * 3_600_000);
 }
 
 export function minRequiredAirborneMs(expectedRouteMs: number): number {
@@ -172,6 +185,8 @@ export function evaluateMinAirborneElapsed(opts: {
   airborneAtMs: number;
   expectedRouteMs: number;
   nowMs: number;
+  /** When set (touchdown), freeze elapsed instead of counting taxi-in. */
+  airborneEndedAtMs?: number;
 }):
   | { ok: true; elapsedMs: number; requiredMs: number; expectedRouteMs: number }
   | {
@@ -181,7 +196,12 @@ export function evaluateMinAirborneElapsed(opts: {
       expectedRouteMs: number;
       message: string;
     } {
-  const elapsedMs = Math.max(0, opts.nowMs - opts.airborneAtMs);
+  const endMs =
+    typeof opts.airborneEndedAtMs === 'number' &&
+    Number.isFinite(opts.airborneEndedAtMs)
+      ? opts.airborneEndedAtMs
+      : opts.nowMs;
+  const elapsedMs = Math.max(0, endMs - opts.airborneAtMs);
   const requiredMs = minRequiredAirborneMs(opts.expectedRouteMs);
   if (elapsedMs >= requiredMs) {
     return {
@@ -223,6 +243,7 @@ function gateSettleByMinAirborne(
     airborneAtMs,
     expectedRouteMs,
     nowMs: opts.nowMs ?? Date.now(),
+    airborneEndedAtMs: state.airborneEndedAtMs,
   });
   if (check.ok) return null;
   return {
@@ -315,6 +336,7 @@ export function evaluateMissionFlightTransition(
     sawAirborne: state.sawAirborne || !sample.onGround,
     lastOnGround: sample.onGround,
     airborneAtMs: state.airborneAtMs,
+    airborneEndedAtMs: state.airborneEndedAtMs,
     expectedRouteMs: state.expectedRouteMs,
   };
   nextState = withAirborneClock(nextState, mission, opts, !sample.onGround);
@@ -329,12 +351,21 @@ export function evaluateMissionFlightTransition(
 
   if (leftGround && departFrom.includes(mission.status)) {
     nextState = withAirborneClock(nextState, mission, opts, true);
+    nextState = { ...nextState, airborneEndedAtMs: undefined };
     return {
       event: {
         type: 'depart',
         reason: 'wheels-up (SIM ON GROUND false)',
       },
       nextState,
+    };
+  }
+
+  if (touchedDown && (state.sawAirborne || nextState.sawAirborne)) {
+    const nowMs = opts.nowMs ?? Date.now();
+    nextState = {
+      ...nextState,
+      airborneEndedAtMs: nextState.airborneEndedAtMs ?? nowMs,
     };
   }
 

@@ -317,6 +317,7 @@ export type OfpBriefing = {
   tailNumber?: string;
   distanceNm?: number;
   blockTime?: string;
+  airTime?: string;
   cruiseAltitudeFt?: number;
   alternateIcao?: string;
   route?: string;

@@ -158,7 +158,7 @@ export interface LiveFuelState {
 }
 
 export interface LivePayloadState {
-  source: 'classic-stations' | 'pmdg-efb' | 'tfdi-efb';
+  source: 'classic-stations' | 'pmdg-efb' | 'tfdi-efb' | 'mass-balance';
   unit: 'lb';
   stations: Record<number, number>;
   /** Sum of all stations (includes crew/galley). */

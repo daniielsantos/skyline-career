@@ -13,6 +13,10 @@ import {
   evaluateMinAirborneElapsed,
   resolveExpectedRouteMs,
 } from './career-flight-watch.js';
+import {
+  findCareerPlayerAirframe,
+  listCareerPlayerAirframes,
+} from './career-player-airframes.js';
 import type {
   CareerMissionsState,
 } from './types/career-economy.js';
@@ -1379,13 +1383,15 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
   B738: ['B738', 'B38M'],
   MD1F: ['MD1F', 'MD11'],
   MD11: ['MD11', 'MD1F'],
-  /** SimBrief has no AC11 — Commander 114 OFPs use C182 (or legacy BE36) as proxy. */
-  AC11: ['AC11', 'C182', 'BE36'],
-  C182: ['C182', 'AC11'],
-  BE36: ['BE36', 'AC11'],
-  /** SimBrief has no C152 — C152 OFPs use C172 as proxy. */
-  C152: ['C152', 'C172'],
-  C172: ['C172', 'C152'],
+  /**
+   * Light GA: SimBrief proxies overlap (Commander→C182, C152→C172, Bonanza→BE36).
+   * Class-level fallback accepts any of these; prefer mission.airframeTypeId when set.
+   */
+  AC11: ['AC11', 'C182', 'BE36', 'C172', 'C152'],
+  C182: ['C182', 'AC11', 'BE36', 'C172', 'C152'],
+  BE36: ['BE36', 'AC11', 'C182', 'C172', 'C152'],
+  C152: ['C152', 'C172', 'C182', 'BE36', 'AC11'],
+  C172: ['C172', 'C152', 'C182', 'BE36', 'AC11'],
 };
 
 function normalizeIcao(code: string | undefined): string | undefined {
@@ -1398,8 +1404,45 @@ function airframesCompatible(expectedIcao: string, actualIcao: string | undefine
   if (!actual) return false;
   const expected = expectedIcao.toUpperCase();
   if (actual === expected) return true;
-  const aliases = AIRFRAME_ICAO_ALIASES[expected] ?? [expected];
-  return aliases.includes(actual);
+  const fromExpected = AIRFRAME_ICAO_ALIASES[expected] ?? [expected];
+  if (fromExpected.includes(actual)) return true;
+  const fromActual = AIRFRAME_ICAO_ALIASES[actual] ?? [actual];
+  return fromActual.includes(expected);
+}
+
+/** Expected SimBrief ICAO for Intent→OFP: owned airframe first, else class default. */
+function expectedOfpIcaoForMission(mission: MissionIntent): string {
+  const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
+  if (airframe?.simbriefIcao) return airframe.simbriefIcao.toUpperCase();
+  return getAircraftClass(mission.aircraftClassId).simbriefIcao.toUpperCase();
+}
+
+/**
+ * True when OFP ICAO matches the mission airframe, or (without airframeTypeId)
+ * any catalog SimBrief ICAO for the mission class / class default aliases.
+ */
+function ofpAirframeMatchesMission(
+  mission: MissionIntent,
+  ofpIcao: string | undefined,
+): boolean {
+  const actual = normalizeIcao(ofpIcao);
+  if (!actual) return false;
+
+  const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
+  if (airframe) {
+    return airframesCompatible(airframe.simbriefIcao, actual);
+  }
+
+  const classPeers = listCareerPlayerAirframes(mission.aircraftClassId, {
+    includeDisabled: true,
+  });
+  if (classPeers.some((peer) => airframesCompatible(peer.simbriefIcao, actual))) {
+    return true;
+  }
+  return airframesCompatible(
+    getAircraftClass(mission.aircraftClassId).simbriefIcao,
+    actual,
+  );
 }
 
 function cargoToleranceKg(intentCargoKg: number, tolerances: IntentOfpTolerances): number {
@@ -1448,7 +1491,6 @@ export function compareMissionIntentToOfp(
     ...(opts.tolerances ?? {}),
   };
   const findings: ComplianceFinding[] = [];
-  const aircraft = getAircraftClass(mission.aircraftClassId);
 
   const ofpOrig = normalizeIcao(ofp.originIcao);
   const ofpDest = normalizeIcao(ofp.destIcao);
@@ -1529,11 +1571,16 @@ export function compareMissionIntentToOfp(
       severity: 'warn',
       message: 'OFP has no aircraft ICAO — cannot verify freighter type',
     });
-  } else if (!airframesCompatible(aircraft.simbriefIcao, ofp.icao)) {
+  } else if (!ofpAirframeMatchesMission(mission, ofp.icao)) {
+    const expected = expectedOfpIcaoForMission(mission);
     findings.push({
       code: 'INTENT_AIRFRAME_MISMATCH',
       severity: 'fail',
-      message: `OFP airframe ${ofp.icao} is not compatible with mission class ${aircraft.id} (${aircraft.simbriefIcao})`,
+      message: `OFP airframe ${ofp.icao} is not compatible with mission ${
+        mission.airframeTypeId
+          ? `airframe ${mission.airframeTypeId} (${expected})`
+          : `class ${mission.aircraftClassId} (${expected})`
+      }`,
     });
   }
 

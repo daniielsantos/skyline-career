@@ -832,6 +832,29 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(check.findings.some((f) => f.code === 'INTENT_PAX_MISMATCH'));
   });
 
+  it('accepts Commander C182 OFP on light_ga when mission airframe is Commander', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        aircraftClassId: 'light_ga',
+        airframeTypeId: 'blacksquare-commander-114',
+        rolesPackRelPath: 'profiles/ofp/blacksquare-commander-114.json',
+        cargoKg: 200,
+        pax: 0,
+      }),
+      matchingOfp({
+        icao: 'C182',
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 100,
+          passengerCount: 0,
+          baggage: 200,
+          payload: 200,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+  });
+
   it('accepts MD11 as alias of MD1F wide freighter', () => {
     const check = compareMissionIntentToOfp(
       baseMission({

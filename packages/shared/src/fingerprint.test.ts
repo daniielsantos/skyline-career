@@ -26,6 +26,12 @@ describe('inferPublisher', () => {
     const { inferPublisher } = await import('./index.js');
     assert.equal(inferPublisher('C185F Skywagon Standard'), 'carenado');
   });
+
+  it('maps DC-6A to pmdg without vendor prefix', async () => {
+    const { inferPublisher } = await import('./index.js');
+    assert.equal(inferPublisher('DC-6A'), 'pmdg');
+    assert.equal(inferPublisher('DC-6A', 'asobo'), 'pmdg');
+  });
 });
 
 describe('titlesMatchForCatalog', () => {

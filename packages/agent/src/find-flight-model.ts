@@ -43,6 +43,8 @@ export type FlightModelCandidateGroup = {
   duplicates: FlightModelCandidate[];
   /** Tiny / MODULAR_MERGE-only cfg with no WEIGHT_AND_BALANCE. */
   stub: boolean;
+  /** VFS padlock / Access Denied — path exists but content unread. */
+  locked?: boolean;
   /** Human hint of what the cfg actually declares (W&B, stations, tanks). */
   summary?: string;
   /** Best nearby aircraft.cfg (modular common/ preferred). */
@@ -176,8 +178,8 @@ export const PUBLISHER_PACKAGE_PREFIXES: Readonly<Record<string, readonly string
   miltech: ['miltech'],
   fsreborn: ['fsreborn'],
   carenado: ['carenado', 'microsoft-', 'microsoft_'],
-  asobo: ['asobo-', 'asobo_'],
-  microsoft: ['microsoft-', 'microsoft_', 'carenado'],
+  asobo: ['asobo-', 'asobo_', 'microsoft-', 'microsoft_'],
+  microsoft: ['microsoft-', 'microsoft_', 'asobo-', 'asobo_', 'carenado'],
   aerosoft: ['aerosoft-'],
   justflight: ['justflight', 'just-flight', 'jf-'],
   flysimware: ['flysimware', 'fsw-'],
@@ -248,6 +250,13 @@ export function titleSearchTokens(title: string): string[] {
     'asobo',
   ]);
   const tokens = raw.filter((t) => !stop.has(t) && !/^[nN]\d/.test(t));
+  // Glue model designators split by punctuation: "PC-24" → pc24, "C-408" → c408.
+  for (let i = 0; i < raw.length - 1; i++) {
+    const a = raw[i]!;
+    const b = raw[i + 1]!;
+    if (/^[a-z]+$/i.test(a) && /^\d{1,4}$/.test(b)) tokens.push(`${a}${b}`);
+    if (/^\d{1,4}$/.test(a) && /^[a-z]+$/i.test(b)) tokens.push(`${a}${b}`);
+  }
   // Common vendor shorthand seen in Community folder names.
   if (tokens.includes('black') && tokens.includes('square')) {
     tokens.push('bksq', 'blacksquare');
@@ -287,6 +296,13 @@ export function titleSearchTokens(title: string): string[] {
     drop.add('black');
     drop.add('box');
   }
+  // Bare "24" from "PC-24" matches every *2024* / *islander24* package — keep pc24 only.
+  const hasGluedModel = tokens.some((t) => /^[a-z]+\d+$/i.test(t) || /^\d+[a-z]+$/i.test(t));
+  if (hasGluedModel) {
+    for (const t of tokens) {
+      if (/^\d{2,4}$/.test(t)) drop.add(t);
+    }
+  }
 
   return [...new Set(tokens.filter((t) => !drop.has(t)))];
 }
@@ -295,7 +311,13 @@ export function scorePathAgainstTokens(pathOrName: string, tokens: string[]): nu
   const hay = pathOrName.toLowerCase().replace(/\\/g, '/');
   let score = 0;
   for (const token of tokens) {
-    if (hay.includes(token)) score += token.length >= 5 ? 3 : 2;
+    if (!hay.includes(token)) continue;
+    // Prefer glued model ids (pc24, c408) over short ambiguous fragments (pc, cargo).
+    if (/^[a-z]+\d{2,4}$/i.test(token) || /^\d{2,4}[a-z]+$/i.test(token)) {
+      score += 6;
+    } else {
+      score += token.length >= 5 ? 3 : 2;
+    }
   }
   // Prefer non-turbo / non-turbine folders when title does not mention them.
   if (!tokens.some((t) => t.includes('turbo') || t.includes('turbine'))) {
@@ -314,6 +336,24 @@ export function scorePathAgainstTokens(pathOrName: string, tokens: string[]): nu
   if (/\/common\/config\//i.test(hay)) score += 1;
   // Attachments usually hold the real WEIGHT_AND_BALANCE / fuel merge parts.
   if (/\/attachments\//i.test(hay)) score += 2;
+  // AI traffic shells — never the player aircraft cfg.
+  if (/passiveaircraft/i.test(hay)) score -= 30;
+  // Prefer cargo preset when the live title says cargo.
+  if (tokens.includes('cargo') && /cargo/i.test(hay)) score += 4;
+  // When title is PC-24, demote PC-12 / PC-6 siblings that only share the "pc" prefix.
+  for (const glued of tokens) {
+    const m = /^([a-z]+)(\d{2,4})$/i.exec(glued);
+    if (!m) continue;
+    const prefix = m[1]!.toLowerCase();
+    const wantNum = m[2]!;
+    if (hay.includes(glued.toLowerCase())) {
+      score += 18;
+      continue;
+    }
+    const sibling = new RegExp(`${prefix}[-_]?(\\d{1,4})(?:\\b|_|-)`, 'i');
+    const hit = sibling.exec(hay);
+    if (hit && hit[1] !== wantNum) score -= 22;
+  }
   return score;
 }
 
@@ -690,14 +730,82 @@ export function summarizeFlightModelCfg(text: string): string | undefined {
   return bits.length > 0 ? bits.join(' · ') : undefined;
 }
 
+/** Live SimConnect W&B used to re-rank flight_model.cfg candidates. */
+export type LiveFlightModelHints = {
+  mtowLb?: number;
+  emptyWeightLb?: number;
+  stationCount?: number;
+};
+
+function stationLoadCount(text: string): number {
+  return [...text.matchAll(/^\s*station_load\.\d+\s*=/gim)].length;
+}
+
+/**
+ * Boost cfgs whose declared MTOW / empty / station count match the live aircraft.
+ * Far-off GA decoys (e.g. 2550 lb vs 18300 lb live) are demoted.
+ */
+export function scoreCfgAgainstLiveHints(
+  text: string,
+  hints: LiveFlightModelHints | undefined,
+): number {
+  if (!hints) return 0;
+  let score = 0;
+
+  const mtow = num(text, 'max_gross_weight');
+  if (
+    hints.mtowLb != null &&
+    hints.mtowLb > 0 &&
+    mtow != null &&
+    mtow > 0
+  ) {
+    const ratio = Math.abs(mtow - hints.mtowLb) / hints.mtowLb;
+    if (ratio <= 0.05) score += 40;
+    else if (ratio <= 0.1) score += 28;
+    else if (ratio <= 0.2) score += 16;
+    else if (ratio <= 0.35) score += 6;
+    else if (ratio >= 0.7) score -= 18;
+  }
+
+  const empty = num(text, 'empty_weight');
+  if (
+    hints.emptyWeightLb != null &&
+    hints.emptyWeightLb > 0 &&
+    empty != null &&
+    empty > 0
+  ) {
+    const ratio = Math.abs(empty - hints.emptyWeightLb) / hints.emptyWeightLb;
+    if (ratio <= 0.08) score += 12;
+    else if (ratio <= 0.15) score += 6;
+    else if (ratio >= 0.7) score -= 8;
+  }
+
+  const stations = stationLoadCount(text);
+  if (
+    hints.stationCount != null &&
+    hints.stationCount > 0 &&
+    stations > 0
+  ) {
+    const delta = Math.abs(stations - hints.stationCount);
+    if (delta === 0) score += 20;
+    else if (delta === 1) score += 12;
+    else if (delta === 2) score += 6;
+    else if (delta >= 5) score -= 10;
+  }
+
+  return score;
+}
+
 /**
  * Collapse candidates that share identical bytes. Modular packages often ship
  * the same MODULAR_MERGE stub under every preset — showing all 16 is noise.
  * Stub groups are demoted so attachment/common cfgs with real W&B rise.
  * Nearby aircraft.cfg (range/burn) is resolved and boosts ranking.
+ * Optional live MTOW/stations hints override path-token noise.
  */
 export async function groupFlightModelCandidatesByContent(
   candidates: FlightModelCandidate[],
+  liveHints?: LiveFlightModelHints,
 ): Promise<FlightModelCandidateGroup[]> {
   const byHash = new Map<
     string,
@@ -705,7 +813,9 @@ export async function groupFlightModelCandidatesByContent(
       hash: string;
       byteLength: number;
       stub: boolean;
+      locked: boolean;
       summary?: string;
+      text: string;
       items: FlightModelCandidate[];
     }
   >();
@@ -715,6 +825,22 @@ export async function groupFlightModelCandidatesByContent(
     try {
       bytes = await readFile(candidate.path);
     } catch {
+      // VFS padlocks: path is discoverable but content unread — still list it.
+      const lockedKey = `locked:${candidate.path.toLowerCase()}`;
+      const existing = byHash.get(lockedKey);
+      if (existing) {
+        existing.items.push(candidate);
+      } else {
+        byHash.set(lockedKey, {
+          hash: lockedKey,
+          byteLength: 0,
+          stub: false,
+          locked: true,
+          summary: 'locked (Access Denied — likely the real streamed aircraft)',
+          text: '',
+          items: [candidate],
+        });
+      }
       continue;
     }
     const hash = createHash('sha256').update(bytes).digest('hex');
@@ -728,7 +854,9 @@ export async function groupFlightModelCandidatesByContent(
         hash,
         byteLength: bytes.length,
         stub,
+        locked: false,
         summary: summarizeFlightModelCfg(text),
+        text,
         items: [candidate],
       });
     }
@@ -744,34 +872,42 @@ export async function groupFlightModelCandidatesByContent(
     if (entry.stub) {
       primary.score = Math.max(0, primary.score - 12);
     }
+    // Locked exact-model paths still beat readable decoys (passive AI / siblings).
+    if (entry.locked) {
+      primary.score += 8;
+    } else {
+      primary.score += scoreCfgAgainstLiveHints(entry.text, liveHints);
+    }
 
     let aircraftCfgPath: string | undefined;
     let catalogPerfSummary: string | undefined;
-    try {
-      aircraftCfgPath = await findAircraftCfgNearFlightModel(primary.path);
-      if (aircraftCfgPath) {
-        const ui = parseAircraftCfgUiText(await readFile(aircraftCfgPath, 'utf8'));
-        const bits: string[] = [];
-        if (ui.maxRangeNm != null && ui.maxRangeNm > 0) {
-          bits.push(`range ${ui.maxRangeNm} nm`);
-          primary.score += 8;
+    if (!entry.locked) {
+      try {
+        aircraftCfgPath = await findAircraftCfgNearFlightModel(primary.path);
+        if (aircraftCfgPath) {
+          const ui = parseAircraftCfgUiText(await readFile(aircraftCfgPath, 'utf8'));
+          const bits: string[] = [];
+          if (ui.maxRangeNm != null && ui.maxRangeNm > 0) {
+            bits.push(`range ${ui.maxRangeNm} nm`);
+            primary.score += 8;
+          }
+          if (isValidUiFuelBurnRateLbPerHour(ui.uiFuelBurnRateLbPerHour)) {
+            bits.push(`burn ${ui.uiFuelBurnRateLbPerHour} lb/h`);
+            primary.score += 3;
+          } else if (ui.uiFuelBurnRateRaw != null) {
+            bits.push(`burn cfg=${ui.uiFuelBurnRateRaw}`);
+          }
+          if (bits.length > 0) {
+            catalogPerfSummary = bits.join(' · ');
+          }
+          // Prefer common/config flight_model when it pairs with the UI aircraft.cfg.
+          if (/[\\/]common[\\/]config[\\/]flight_model\.cfg$/i.test(primary.path)) {
+            primary.score += 4;
+          }
         }
-        if (isValidUiFuelBurnRateLbPerHour(ui.uiFuelBurnRateLbPerHour)) {
-          bits.push(`burn ${ui.uiFuelBurnRateLbPerHour} lb/h`);
-          primary.score += 3;
-        } else if (ui.uiFuelBurnRateRaw != null) {
-          bits.push(`burn cfg=${ui.uiFuelBurnRateRaw}`);
-        }
-        if (bits.length > 0) {
-          catalogPerfSummary = bits.join(' · ');
-        }
-        // Prefer common/config flight_model when it pairs with the UI aircraft.cfg.
-        if (/[\\/]common[\\/]config[\\/]flight_model\.cfg$/i.test(primary.path)) {
-          primary.score += 4;
-        }
+      } catch {
+        /* Access Denied on VFS padlocks — leave unset */
       }
-    } catch {
-      /* Access Denied on VFS padlocks — leave unset */
     }
 
     groups.push({
@@ -780,6 +916,7 @@ export async function groupFlightModelCandidatesByContent(
       byteLength: entry.byteLength,
       duplicates: items.slice(1),
       stub: entry.stub,
+      locked: entry.locked || undefined,
       summary: entry.summary,
       aircraftCfgPath,
       catalogPerfSummary,
@@ -797,7 +934,7 @@ export async function groupFlightModelCandidatesByContent(
 export async function promptFlightModelPath(
   ask: AskFn,
   aircraftTitle: string,
-  opts: { publisher?: string } = {},
+  opts: { publisher?: string; liveHints?: LiveFlightModelHints } = {},
 ): Promise<string | undefined> {
   console.log('  Searching MSFS Community/Official/VFS for flight_model.cfg (+ nearby aircraft.cfg)…');
   const resolved = await resolveInstalledPackagesPath();
@@ -827,6 +964,21 @@ export async function promptFlightModelPath(
   };
   if (opts.publisher) {
     console.log(`  Filtering packages for publisher: ${opts.publisher}`);
+  }
+  if (
+    opts.liveHints?.mtowLb != null ||
+    opts.liveHints?.stationCount != null ||
+    opts.liveHints?.emptyWeightLb != null
+  ) {
+    const bits: string[] = [];
+    if (opts.liveHints.mtowLb != null) bits.push(`MTOW ${Math.round(opts.liveHints.mtowLb)} lb`);
+    if (opts.liveHints.emptyWeightLb != null) {
+      bits.push(`empty ${Math.round(opts.liveHints.emptyWeightLb)} lb`);
+    }
+    if (opts.liveHints.stationCount != null) {
+      bits.push(`${opts.liveHints.stationCount} stations`);
+    }
+    console.log(`  Ranking by live W&B: ${bits.join(' · ')}`);
   }
   let candidates = await findFlightModelCandidates(
     resolved.packagesRoot,
@@ -862,8 +1014,12 @@ export async function promptFlightModelPath(
     return manual.trim().replace(/^"(.*)"$/, '$1') || undefined;
   }
 
-  const groups = await groupFlightModelCandidatesByContent(candidates);
-  const top = groups.slice(0, 12);
+  const groups = await groupFlightModelCandidatesByContent(
+    candidates,
+    opts.liveHints,
+  );
+  // Show the full shortlist — omitting rows hid the real (often locked) aircraft.
+  const top = groups.slice(0, 50);
   console.log(
     groups.length < candidates.length
       ? `  Candidates (best match first; ${candidates.length} files → ${groups.length} unique contents):`
@@ -875,6 +1031,7 @@ export async function promptFlightModelPath(
   top.forEach((g, i) => {
     const c = g.primary;
     const tags: string[] = [];
+    if (g.locked) tags.push('locked');
     if (g.stub) tags.push(`${g.byteLength} B stub`);
     if (g.duplicates.length > 0) {
       tags.push(`identical x${g.duplicates.length + 1}`);
@@ -888,6 +1045,8 @@ export async function promptFlightModelPath(
     }
     if (g.catalogPerfSummary) {
       console.log(`        ↳ aircraft.cfg: ${g.catalogPerfSummary}`);
+    } else if (g.locked) {
+      console.log('        ↳ aircraft.cfg: locked with flight_model');
     } else if (g.aircraftCfgPath) {
       console.log('        ↳ aircraft.cfg: (no ui_max_range / burn)');
     } else {
@@ -913,7 +1072,7 @@ export async function promptFlightModelPath(
     console.log(`    … ${groups.length - top.length} more unique content(s) omitted`);
   }
   console.log(
-    '  Tip: prefer common/config (or a row that shows aircraft.cfg range) — preset stubs are often empty merges.',
+    '  Tip: prefer the player airframe (not passiveaircraft AI). [locked] = streamed VFS cfg — still selectable; unread W&B falls back to live SimVars.',
   );
 
   // No numeric default — Enter must skip, not silently pick #1 (often a decoy).

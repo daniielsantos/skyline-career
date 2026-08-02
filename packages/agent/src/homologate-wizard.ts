@@ -101,6 +101,8 @@ async function calibrateWithCgSources(
   console.log('  Prefer live CG FWD/AFT LIMIT (Mass & Balance tablet), then flight_model.cfg.');
   const liveCg = await readLiveCgState(bridge);
   let liveMtowLb: number | undefined;
+  let liveEmptyLb: number | undefined;
+  let liveStationCount: number | undefined;
   try {
     const mtow = await bridge.readSimVar({
       name: 'MAX GROSS WEIGHT',
@@ -109,6 +111,26 @@ async function calibrateWithCgSources(
     if (Number.isFinite(mtow) && mtow > 0) liveMtowLb = mtow;
   } catch {
     liveMtowLb = undefined;
+  }
+  try {
+    const empty = await bridge.readSimVar({
+      name: 'EMPTY WEIGHT',
+      unit: 'pounds',
+    });
+    if (Number.isFinite(empty) && empty > 0) liveEmptyLb = empty;
+  } catch {
+    liveEmptyLb = undefined;
+  }
+  try {
+    const stations = await bridge.readSimVar({
+      name: 'PAYLOAD STATION COUNT',
+      unit: 'number',
+    });
+    if (Number.isFinite(stations) && stations > 0) {
+      liveStationCount = Math.round(stations);
+    }
+  } catch {
+    liveStationCount = undefined;
   }
   printKv([
     ['live CG %MAC', liveCg.liveMac?.toFixed(1)],
@@ -119,10 +141,19 @@ async function calibrateWithCgSources(
         : 'unavailable',
     ],
     ['live MTOW', liveMtowLb != null ? formatLb(liveMtowLb) : 'unavailable'],
+    [
+      'live stations',
+      liveStationCount != null ? String(liveStationCount) : 'unavailable',
+    ],
   ]);
 
   const flightModelPath = await promptFlightModelPath(ask, aircraftTitle, {
     publisher,
+    liveHints: {
+      mtowLb: liveMtowLb,
+      emptyWeightLb: liveEmptyLb,
+      stationCount: liveStationCount,
+    },
   });
   if (flightModelPath) {
     printKv([['flight_model.cfg', flightModelPath]]);
@@ -826,28 +857,110 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
 
     if (loadMethod === 'native-simbrief') {
       printSection('OFP monitor path (native-simbrief)');
-      console.log('  No Skyline writable profile — skip draft / calibrate / smoke.');
-      console.log('  Checklist:');
-      console.log('    1. Scaffold roles pack: npm run scaffold-ofp-roles -- --write');
-      console.log(
-        '    2. Ensure pack has loadMethod: "native-simbrief" and injectCapable: false',
-      );
-      console.log('    3. In MSFS: EFB/FMC → Load from SimBrief / Import OFP');
-      console.log('    4. npm run compare-ofp -- --simbrief-user YOUR_ALIAS');
-      console.log('    5. Career Staging: Validate Fuel and Payload (Loaded vs Due)');
+      console.log('  No Skyline inject — draft a monitor profile for resolve/catalog, then roles pack.');
+      console.log('  Checklist after promote:');
+      console.log('    1. Ensure pack has loadMethod: "native-simbrief" and injectCapable: false');
+      console.log('    2. In MSFS: EFB/FMC/tablet → Load from SimBrief / Import OFP');
+      console.log('    3. npm run compare-ofp -- --simbrief-user YOUR_ALIAS');
+      console.log('    4. Career Staging: Validate Fuel and Payload (Loaded vs Due)');
       console.log('  Details: profiles/notes/ofp-homologation.md (track A)');
 
+      if (
+        !(await confirm(
+          ask,
+          'Promote monitor profile to profiles/examples @ 1.0.0 + seed catalog',
+          true,
+        ))
+      ) {
+        console.log('  Skipped promote — resolve will stay no_candidates until an example exists.');
+        printSection('Done');
+        return;
+      }
+
+      printSection('Draft monitor profile + promote');
+      const drafted = await draftProfileFromLive(bridge, {
+        outDir: draftsDir,
+        publisher: matchPublisher,
+        matchTitle,
+        icao: matchIcao,
+        monitorOnly: true,
+        fingerprint: liveFingerprint,
+      });
+      printKv([
+        ['draft', drafted.path],
+        ['profileKey', drafted.profile.profileKey],
+        ['tanks', String(drafted.profile.fuel.tanks.length)],
+        ['stations', String(drafted.profile.payload.stations.length)],
+        ['writePlans', 'empty (monitor-only)'],
+      ]);
+
+      const promoted = await promoteDraftProfile({
+        draftPath: drafted.path,
+        examplesDir,
+        notesDir,
+        repoRoot,
+        identityTitle: identity.title,
+        matchTitle,
+        atcModel: identity.atcModel,
+        icao: matchIcao,
+        liveFingerprint,
+        discoveryNotes: [
+          'Load method: native-simbrief (no Skyline inject).',
+          'Fuel/payload write plans intentionally empty — load via addon EFB/tablet.',
+          'Use compare-ofp + Career Loaded vs Due for validation.',
+        ],
+      });
+      printKv([
+        ['example', promoted.examplePath],
+        ['notes', promoted.notesPath],
+        ['profileKey', promoted.profile.profileKey],
+        ['semver', promoted.profile.semver],
+        ['fingerprint', promoted.profile.match.fingerprint?.slice(0, 16) + '…'],
+        ['icao', promoted.profile.match.icao],
+        ['loadMethod', 'native-simbrief'],
+        ['overwritten', promoted.overwritten ? 'yes' : 'no'],
+      ]);
+      console.log('  Next: npm run resolve  (should match this fingerprint)');
+
+      const packGuesses = [
+        join(repoRoot, 'profiles', 'ofp', `${promoted.profile.profileId}.json`),
+        join(
+          repoRoot,
+          'profiles',
+          'ofp',
+          `${matchPublisher}-${(matchIcao || 'zz').toLowerCase()}.json`,
+        ),
+        join(repoRoot, 'profiles', 'ofp', `${matchPublisher}-dc6.json`),
+      ];
+      let defaultPack = '';
+      for (const guess of packGuesses) {
+        try {
+          await readFile(guess, 'utf8');
+          defaultPack = guess;
+          break;
+        } catch {
+          /* try next */
+        }
+      }
       const packPathRaw = await ask(
-        'Optional: absolute/relative roles pack JSON to stamp loadMethod (blank skips)',
+        'Roles pack JSON to stamp loadMethod (blank skips)',
+        defaultPack,
       );
       const packPath = packPathRaw.trim().replace(/^"(.*)"$/, '$1');
       if (packPath) {
-        const abs = packPath.includes(':') || packPath.startsWith('/') || packPath.startsWith('\\')
-          ? packPath
-          : join(repoRoot, packPath);
+        const abs =
+          packPath.includes(':') ||
+          packPath.startsWith('/') ||
+          packPath.startsWith('\\')
+            ? packPath
+            : join(repoRoot, packPath);
         const pack = JSON.parse(await readFile(abs, 'utf8')) as OfpRolesPackFile;
         pack.loadMethod = 'native-simbrief';
         pack.injectCapable = false;
+        const titles = new Set(
+          [...(pack.matchTitles ?? []), matchTitle, identity.title].filter(Boolean),
+        );
+        pack.matchTitles = [...titles];
         await writeFile(abs, `${JSON.stringify(pack, null, 2)}\n`, 'utf8');
         console.log(`  Stamped ${abs}`);
         const inferredClass = inferCareerClassFromIcao(matchIcao);
@@ -870,10 +983,16 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         console.log(
           `  Aircraft Market: ${registered.label} (${registered.aircraftClassId})`,
         );
+      } else {
+        console.log(
+          '  No roles pack stamped — create/update with scaffold-ofp-roles or draft-ofp-roles.',
+        );
       }
 
       printSection('Done');
-      console.log('  Native SimBrief path complete — validate with compare-ofp after EFB import.');
+      console.log(
+        '  Native SimBrief path complete — resolve should match this fingerprint; validate with compare-ofp after tablet load.',
+      );
       return;
     }
 

@@ -9,6 +9,7 @@ import {
   groupFlightModelCandidatesByContent,
   listMsfsVfsProjectionCandidates,
   parseInstalledPackagesPath,
+  scoreCfgAgainstLiveHints,
   scorePathAgainstTokens,
   summarizeFlightModelCfg,
   titleSearchTokens,
@@ -39,6 +40,20 @@ describe('titleSearchTokens / scorePathAgainstTokens', () => {
     const pro = scorePathAgainstTokens('bksq-aircraft-bonanzapro', tokens);
     const tc = scorePathAgainstTokens('bksq-aircraft-bonanzatc', tokens);
     assert.ok(pro > tc);
+  });
+
+  it('glues PC-24 into pc24 and drops bare 24 that matches *2024* packages', () => {
+    const tokens = titleSearchTokens('PC-24 Cargo');
+    assert.ok(tokens.includes('pc24'));
+    assert.ok(tokens.includes('cargo'));
+    assert.ok(!tokens.includes('24'), 'bare 24 must not match Community *2024*');
+    const pc24 = scorePathAgainstTokens('microsoft_pc24_cargo', tokens);
+    const legacy2024 = scorePathAgainstTokens('flysimware-legacy-2024', tokens);
+    const pc12 = scorePathAgainstTokens('microsoft_pc12_ngx', tokens);
+    const passive = scorePathAgainstTokens('asobo_passiveaircraft_pc24', tokens);
+    assert.ok(pc24 > legacy2024);
+    assert.ok(pc24 > pc12);
+    assert.ok(pc24 > passive, 'player microsoft_pc24 must beat passive AI shell');
   });
 
   it('maps BN2 Islander titles to Black Box package tokens', () => {
@@ -95,7 +110,146 @@ describe('titleSearchTokens / scorePathAgainstTokens', () => {
   });
 });
 
+describe('scoreCfgAgainstLiveHints', () => {
+  it('boosts MTOW/station matches and demotes far-off GA decoys', () => {
+    const live = { mtowLb: 18300, emptyWeightLb: 11820, stationCount: 6 };
+    const match = scoreCfgAgainstLiveHints(
+      [
+        '[WEIGHT_AND_BALANCE]',
+        'max_gross_weight = 18300',
+        'empty_weight = 11800',
+        'station_load.0 = 180,0,0,0,TT:MENU.PAYLOAD.PILOT,1',
+        'station_load.1 = 180,0,0,0,TT:MENU.PAYLOAD.COPILOT,2',
+        'station_load.2 = 50,0,0,0,TT:MENU.PAYLOAD.CARGO_01,6',
+        'station_load.3 = 0,0,0,0,TT:MENU.PAYLOAD.CARGO_02,6',
+        'station_load.4 = 0,0,0,0,TT:MENU.PAYLOAD.CARGO_03,6',
+        'station_load.5 = 0,0,0,0,TT:MENU.PAYLOAD.CARGO_04,6',
+      ].join('\n'),
+      live,
+    );
+    const decoy = scoreCfgAgainstLiveHints(
+      [
+        '[WEIGHT_AND_BALANCE]',
+        'max_gross_weight = 2550',
+        'empty_weight = 1729',
+        'station_load.0 = 170,0,0,0,TT:MENU.PAYLOAD.PILOT,1',
+        'station_load.1 = 170,0,0,0,TT:MENU.PAYLOAD.COPILOT,2',
+        'station_load.2 = 0,0,0,0,TT:MENU.PAYLOAD.PASSENGER,1',
+        'station_load.3 = 0,0,0,0,TT:MENU.PAYLOAD.BAGGAGE,6',
+      ].join('\n'),
+      live,
+    );
+    assert.ok(match >= 60);
+    assert.ok(decoy < 0);
+    assert.ok(match > decoy + 40);
+  });
+});
+
 describe('groupFlightModelCandidatesByContent', () => {
+  it('keeps Access-Denied / missing paths as locked selectable rows', async () => {
+    const lockedPath = join(
+      await mkdtemp(join(tmpdir(), 'msfs-fm-locked-')),
+      'microsoft_pc24',
+      'presets',
+      'microsoft',
+      'pc24_cargo_loaded',
+      'config',
+      'flight_model.cfg',
+    );
+    const groups = await groupFlightModelCandidatesByContent([
+      {
+        path: lockedPath,
+        packageName: 'microsoft_pc24',
+        airplaneFolder: 'microsoft_pc24/presets/microsoft/pc24_cargo_loaded',
+        rootKind: 'VFSProjection',
+        score: 40,
+      },
+    ]);
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0]!.locked, true);
+    assert.match(groups[0]!.summary ?? '', /locked/i);
+    assert.ok(groups[0]!.primary.path.includes('pc24_cargo_loaded'));
+  });
+
+  it('ranks live MTOW/station matches above path-token decoys with aircraft.cfg range', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'msfs-fm-live-'));
+    const decoyDir = join(
+      root,
+      'Community',
+      'microsoft-legacy-ga',
+      'SimObjects',
+      'Airplanes',
+      'microsoft_legacy_cargo',
+      'common',
+      'config',
+    );
+    await mkdir(decoyDir, { recursive: true });
+    await writeFile(
+      join(decoyDir, 'flight_model.cfg'),
+      [
+        '[WEIGHT_AND_BALANCE]',
+        'max_gross_weight = 2550',
+        'empty_weight = 1729',
+        'station_load.0 = 170,0,0,0,TT:MENU.PAYLOAD.PILOT,1',
+        'station_load.1 = 170,0,0,0,TT:MENU.PAYLOAD.COPILOT,2',
+        'station_load.2 = 0,0,0,0,TT:MENU.PAYLOAD.PASSENGER,1',
+        'station_load.3 = 0,0,0,0,TT:MENU.PAYLOAD.BAGGAGE,6',
+      ].join('\n'),
+      'utf8',
+    );
+    await writeFile(
+      join(decoyDir, 'aircraft.cfg'),
+      'ui_max_range = 600\nui_fuel_burn_rate = 156.8\n',
+      'utf8',
+    );
+
+    const matchDir = join(
+      root,
+      'Community2024',
+      'microsoft-aircraft-pc24',
+      'SimObjects',
+      'Airplanes',
+      'microsoft_pc24',
+      'common',
+      'config',
+    );
+    await mkdir(matchDir, { recursive: true });
+    await writeFile(
+      join(matchDir, 'flight_model.cfg'),
+      [
+        '[WEIGHT_AND_BALANCE]',
+        'max_gross_weight = 18300',
+        'empty_weight = 11820',
+        'CG_forward_limit = 0.25',
+        'CG_aft_limit = 0.40',
+        'station_load.0 = 180,0,0,0,TT:MENU.PAYLOAD.PILOT,1',
+        'station_load.1 = 180,0,0,0,TT:MENU.PAYLOAD.COPILOT,2',
+        'station_load.2 = 50,0,0,0,TT:MENU.PAYLOAD.CARGO_01,6',
+        'station_load.3 = 0,0,0,0,TT:MENU.PAYLOAD.CARGO_02,6',
+        'station_load.4 = 0,0,0,0,TT:MENU.PAYLOAD.CARGO_03,6',
+        'station_load.5 = 0,0,0,0,TT:MENU.PAYLOAD.CARGO_04,6',
+      ].join('\n'),
+      'utf8',
+    );
+    await writeFile(
+      join(matchDir, 'aircraft.cfg'),
+      'ui_max_range = 2000\nui_fuel_burn_rate = 900\n',
+      'utf8',
+    );
+
+    const found = await findFlightModelCandidates(root, 'PC-24 Cargo', {
+      publisher: 'microsoft',
+    });
+    const groups = await groupFlightModelCandidatesByContent(found, {
+      mtowLb: 18300,
+      emptyWeightLb: 11820,
+      stationCount: 6,
+    });
+    assert.ok(groups.length >= 2);
+    assert.ok(groups[0]!.primary.path.includes('microsoft_pc24'));
+    assert.match(groups[0]!.summary ?? '', /MTOW 18300 lb/);
+  });
+
   it('collapses identical preset stubs and demotes them below real attachments', async () => {
     const root = await mkdtemp(join(tmpdir(), 'msfs-fm-dup-'));
     const plane = join(

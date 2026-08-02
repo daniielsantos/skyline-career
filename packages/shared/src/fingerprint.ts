@@ -56,6 +56,8 @@ const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\bnext\s*gen\s*sim\b|\bnextgensim\b/i, publisher: 'nextgensim' },
   { re: /\bflight\s*fx\b|\bflightfx\b/i, publisher: 'flightfx' },
   { re: /\bpmdg\b/i, publisher: 'pmdg' },
+  // PMDG DC-6 — live title is often just "DC-6A" / "DC-6" without vendor prefix.
+  { re: /\bDC-?6[AB]?\b/i, publisher: 'pmdg' },
   { re: /\bfenix\b/i, publisher: 'fenix' },
   { re: /\binibuilds\b/i, publisher: 'inibuilds' },
   { re: /\bworking\s*title\b/i, publisher: 'workingtitle' },

@@ -237,6 +237,16 @@
     "fuelBurnKgPerNm": 1.392
   },
   {
+    "typeId": "asobo-pc-24-cargo",
+    "aircraftClassId": "light_jet",
+    "label": "PC-24 Cargo",
+    "rolesPackRelPath": "profiles/ofp/asobo-pc-24-cargo.json",
+    "simbriefIcao": "PC24",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 800,
+    "fuelBurnKgPerNm": 1.4
+  },
+  {
     "typeId": "asobo-beechcraft-king-air-350i",
     "aircraftClassId": "light_turboprop",
     "label": "Beechcraft King Air 350i",

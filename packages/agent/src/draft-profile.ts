@@ -18,6 +18,13 @@ export interface DraftOptions {
    * on the classic fallback path (capacity already validated + writable).
    */
   liveTankIds?: string[];
+  /**
+   * Native SimBrief / tablet-load aircraft: discover read tanks/stations for resolve,
+   * but leave write plans empty (no Skyline inject).
+   */
+  monitorOnly?: boolean;
+  /** Live fingerprint to stamp on the draft (monitor / promote path). */
+  fingerprint?: string;
 }
 
 function slugify(value: string): string {
@@ -83,6 +90,7 @@ export async function draftProfileFromLive(
   // often ignore writes while classic LEFT/RIGHT AUX work.
   const preferClassicFromDiscovery =
     Array.isArray(options.liveTankIds) && options.liveTankIds.length > 0;
+  const monitorOnly = options.monitorOnly === true;
 
   if (!preferClassicFromDiscovery) {
     for (let i = 1; i <= 8; i++) {
@@ -104,21 +112,24 @@ export async function draftProfileFromLive(
           capacity,
           readVar: varName,
           readUnit: 'gallons',
-          writeVar: varName,
-          writeUnit: 'gallons',
+          ...(monitorOnly
+            ? {}
+            : { writeVar: varName, writeUnit: 'gallons' }),
         });
-        writePlan.push({
-          op: 'simvar_set',
-          var: varName,
-          unit: 'gallons',
-          valueExpr: fuelOffset > 0 ? `{${id}} + ${fuelOffset}` : `{${id}}`,
-        });
-        fuelChecks.push({
-          var: varName,
-          unit: 'gallons',
-          tolerancePct: 2.0,
-          valueExpr: `{${id}}`,
-        });
+        if (!monitorOnly) {
+          writePlan.push({
+            op: 'simvar_set',
+            var: varName,
+            unit: 'gallons',
+            valueExpr: fuelOffset > 0 ? `{${id}} + ${fuelOffset}` : `{${id}}`,
+          });
+          fuelChecks.push({
+            var: varName,
+            unit: 'gallons',
+            tolerancePct: 2.0,
+            valueExpr: `{${id}}`,
+          });
+        }
       } catch {
         // tank index not present
       }
@@ -227,26 +238,31 @@ export async function draftProfileFromLive(
         capacity: Math.round(capacity * 10) / 10,
         readVar: slot.quantityVar,
         readUnit: 'gallons',
-        writeVar: slot.quantityVar,
-        writeUnit: 'gallons',
+        ...(monitorOnly
+          ? {}
+          : { writeVar: slot.quantityVar, writeUnit: 'gallons' }),
       });
-      writePlan.push({
-        op: 'simvar_set',
-        var: slot.quantityVar,
-        unit: 'gallons',
-        valueExpr: fuelOffset > 0 ? `{${slot.id}} + ${fuelOffset}` : `{${slot.id}}`,
-      });
-      fuelChecks.push({
-        var: slot.quantityVar,
-        unit: 'gallons',
-        tolerancePct: 2.0,
-        valueExpr: `{${slot.id}}`,
-      });
+      if (!monitorOnly) {
+        writePlan.push({
+          op: 'simvar_set',
+          var: slot.quantityVar,
+          unit: 'gallons',
+          valueExpr: fuelOffset > 0 ? `{${slot.id}} + ${fuelOffset}` : `{${slot.id}}`,
+        });
+        fuelChecks.push({
+          var: slot.quantityVar,
+          unit: 'gallons',
+          tolerancePct: 2.0,
+          valueExpr: `{${slot.id}}`,
+        });
+      }
     }
   }
 
-  // Vendor fuel systems often ramp for ~0.5–1.5s after SimVar write.
-  writePlan.push({ op: 'delay', ms: 1000 });
+  if (!monitorOnly) {
+    // Vendor fuel systems often ramp for ~0.5–1.5s after SimVar write.
+    writePlan.push({ op: 'delay', ms: 1000 });
+  }
 
   let stationCount = 8;
   try {
@@ -264,22 +280,24 @@ export async function draftProfileFromLive(
 
   for (let i = 1; i <= stationCount; i++) {
     stations.push({ index: i, name: `Station ${i}`, maxLoad: 500 });
-    payloadPlan.push({
-      op: 'simvar_set',
-      var: `PAYLOAD STATION WEIGHT:${i}`,
-      unit: 'pounds',
-      valueExpr: `{station_${i}}`,
-    });
+    if (!monitorOnly) {
+      payloadPlan.push({
+        op: 'simvar_set',
+        var: `PAYLOAD STATION WEIGHT:${i}`,
+        unit: 'pounds',
+        valueExpr: `{station_${i}}`,
+      });
+    }
   }
-  payloadPlan.push({ op: 'delay', ms: 400 });
-  payloadChecks.push(
-    {
+  if (!monitorOnly) {
+    payloadPlan.push({ op: 'delay', ms: 400 });
+    payloadChecks.push({
       var: 'PAYLOAD STATION WEIGHT:1',
       unit: 'pounds',
       tolerancePct: 1.0,
       valueExpr: '{station_1}',
-    },
-  );
+    });
+  }
 
   const titleSlug = titleSlugForKey(title);
   const slug = slugify(`${publisher}-${titleSlug}`);
@@ -290,7 +308,7 @@ export async function draftProfileFromLive(
     semver: '0.1.0-draft',
     displayName: `${title} (draft)`,
     match: {
-      fingerprint: '0'.repeat(64),
+      fingerprint: options.fingerprint?.trim() || '0'.repeat(64),
       title,
       publisher,
       icao,
@@ -334,14 +352,20 @@ export async function draftProfileFromLive(
       constraints: { minMac: 0, maxMac: 50 },
     },
     fallback: { chain: ['simconnect-direct'] },
-    notes: [
-      'AUTO-DRAFT from live aircraft. Prefer: draft-profile --calibrate (or calibrate --profile).',
-      'Move to profiles/examples after smoke succeeds; bump semver and remove -draft.',
-      `Detected tanks=${tanks.length}, stations=${stationCount}, fuelOffset=${fuelOffset}`,
-      preferClassicFromDiscovery
-        ? `Fuel via classic slots from discovery writetest: ${options.liveTankIds!.join(', ')}.`
-        : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest filter).',
-    ],
+    notes: monitorOnly
+      ? [
+          'NATIVE-SIMBRIEF monitor profile — no Skyline fuel/payload inject.',
+          'Pilot loads OFP via addon EFB/FMC/tablet; Career uses Loaded vs Due only.',
+          `Detected tanks=${tanks.length}, stations=${stationCount} (read-only).`,
+        ]
+      : [
+          'AUTO-DRAFT from live aircraft. Prefer: draft-profile --calibrate (or calibrate --profile).',
+          'Move to profiles/examples after smoke succeeds; bump semver and remove -draft.',
+          `Detected tanks=${tanks.length}, stations=${stationCount}, fuelOffset=${fuelOffset}`,
+          preferClassicFromDiscovery
+            ? `Fuel via classic slots from discovery writetest: ${options.liveTankIds!.join(', ')}.`
+            : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest filter).',
+        ],
   };
 
   await mkdir(options.outDir, { recursive: true });

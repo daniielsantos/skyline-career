@@ -185,6 +185,17 @@ export function getOfpLoadProgress(missionId: string): OfpLoadProgress | null {
   return ofpLoadProgressByMission.get(missionId) ?? null;
 }
 
+/** True while a mission inject is actively planning/writing/verifying. */
+export function isOfpLoadBusy(missionId: string): boolean {
+  const phase = ofpLoadProgressByMission.get(missionId.trim())?.phase;
+  return (
+    phase === 'planning' ||
+    phase === 'injecting' ||
+    phase === 'balancing' ||
+    phase === 'verifying'
+  );
+}
+
 /** Request cancel of an in-flight OFP inject/rebalance for this mission. */
 export function requestOfpLoadCancel(missionId: string): boolean {
   const id = missionId.trim();
@@ -903,6 +914,10 @@ async function applyMissionOfpLoadExclusive(
         tanks: await readLiveTanks(bridge, resolved.profile),
         stations: afterLive.stations,
       };
+      publishLiveProgress(
+        'injecting',
+        `Fuel verified · ${Math.round(tanksToFuelLb(afterLive.tanks))} lb live`,
+      );
     } else {
       applyResult = {};
       restoreFuelOnRollback = false;
@@ -999,19 +1014,6 @@ async function applyMissionOfpLoadExclusive(
           );
           break;
         }
-
-        const trendNote =
-          macTrend > 0.05 ? 'drifting aft' : macTrend < -0.05 ? 'drifting fwd' : 'stable';
-        publishLiveProgress(
-          'balancing',
-          stillPlacing
-            ? `+${perSeatLb} lb/seat → ${bias} (${trendNote}) · ${Math.min(cargoPlacedLb + perSeatLb * seatCount, cargoTargetLb)}/${cargoTargetLb} lb` +
-              (liveMac !== undefined ? ` · ${liveMac.toFixed(1)}% MAC` : '')
-            : `Counterweight → ${bias} +${perSeatLb} lb/seat (${trendNote}, ${i + 1}/${CG_REBALANCE_MAX_ITERATIONS}` +
-              (liveMac !== undefined ? `, ${liveMac.toFixed(1)}% MAC` : '') +
-              `)`,
-          { cgAttempt: i + 1, liveMac },
-        );
 
         let nextStations = workingStations;
         let movedLb = 0;
@@ -1177,14 +1179,25 @@ async function applyMissionOfpLoadExclusive(
           tanks: afterLive.tanks,
           stations: await readLiveStations(bridge, resolved.profile),
         };
+        // Re-read CG after settle so the UI sees verified state for this round.
+        const verifiedCg = await readLiveCgState(bridge, {
+          readVar: resolved.profile.cg?.readVar,
+          readUnit: resolved.profile.cg?.readUnit,
+        });
+        const verifiedMac = verifiedCg.liveMac ?? liveMac;
+        lastLiveMac = verifiedMac;
+        prevLiveMac = verifiedMac;
+        const trendNote =
+          macTrend > 0.05 ? 'drifting aft' : macTrend < -0.05 ? 'drifting fwd' : 'stable';
+        // One progress publish per round — after write + settle + read-verify.
         publishLiveProgress(
           'balancing',
           stillPlacing
-            ? `Placed ${cargoPlacedLb}/${cargoTargetLb} lb (+${perSeatLb} lb/seat → ${bias}, ${trendNote})` +
-              (liveMac !== undefined ? ` · ${liveMac.toFixed(1)}% MAC` : '')
-            : `Counterweight applied (+${perSeatLb} lb/seat → ${bias}, ${trendNote})` +
-              (liveMac !== undefined ? ` · ${liveMac.toFixed(1)}% MAC` : ''),
-          { cgAttempt: i + 1, liveMac },
+            ? `Round ${i + 1}: placed ${cargoPlacedLb}/${cargoTargetLb} lb (+${perSeatLb} lb/seat → ${bias}, ${trendNote})` +
+              (verifiedMac !== undefined ? ` · ${verifiedMac.toFixed(1)}% MAC` : '')
+            : `Round ${i + 1}: counterweight (+${perSeatLb} lb/seat → ${bias}, ${trendNote})` +
+              (verifiedMac !== undefined ? ` · ${verifiedMac.toFixed(1)}% MAC` : ''),
+          { cgAttempt: i + 1, liveMac: verifiedMac },
         );
         if (payloadApply.payload && !payloadApply.payload.success) {
           break;
@@ -1392,22 +1405,14 @@ async function applyMissionOfpLoadExclusive(
             `${compareSummary}\n  [warn] CG_SOFT: live ${failure.actual.toFixed(1)}% MAC outside provisional envelope (apply kept)`;
         }
         if (snapshot.verdict === 'fail') {
-          rolledBack = true;
-          const restore = await engine.applyLoadPlan(
-            rollbackRequest(rollbackPlan, restoreFuelOnRollback),
-          );
-          rollbackOk = applySucceeded(restore);
-          afterLive = {
-            tanks: await readLiveTanks(bridge, resolved.profile),
-            stations: await readLiveStations(bridge, resolved.profile),
-          };
-          error = `Post-apply OFP compare failed: ${compareSummary}`;
-          if (rollbackOk === false) {
-            error += ' — ROLLBACK INCOMPLETE, check aircraft load manually';
-          } else {
-            error += restoreFuelOnRollback
-              ? ' — restored previous load'
-              : ' — restored previous payload (fuel left as-is)';
+          // Do NOT rollback a successful station/fuel write because OFP semantics
+          // disagree (e.g. SimBrief "baggage" cargo sitting on GA cabin seats, or
+          // soft-cap/CG stopped short of OFP lbs). Career Loaded vs Due is the
+          // Depart gate — wiping the inject left Sim at 0 with Due still full.
+          compareSummary =
+            `${compareSummary}\n  [warn] OFP_COMPARE_SOFT: injected load kept — fix Loaded vs Due or re-inject before depart`;
+          if (compareVerdict === 'fail') {
+            compareVerdict = 'warn';
           }
         }
       } catch (compareError) {

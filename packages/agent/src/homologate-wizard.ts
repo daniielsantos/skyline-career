@@ -2,7 +2,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import type { AircraftProfile, CareerPlayerAirframe } from '@msfs-compat/shared';
-import { normalizeAircraftTitle, inferPublisher } from '@msfs-compat/shared';
+import {
+  getAircraftClass,
+  normalizeAircraftTitle,
+  inferPublisher,
+} from '@msfs-compat/shared';
 import { buildSmokeStationTargets } from './smoke-targets.js';
 import { calibrateProfile } from './calibrate-profile.js';
 import { draftProfileFromVendorRecipe } from './draft-from-recipe.js';
@@ -28,6 +32,17 @@ import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProf
 import { probeLVars } from './probe-lvars.js';
 import { readLiveCgState } from './live-cg.js';
 import { promptFlightModelPath } from './find-flight-model.js';
+import {
+  applyClassPerfFallback,
+  catalogPerfPrintRows,
+  deriveFuelBurnKgPerNm,
+  loadAircraftPerfFromCfg,
+  type AircraftCfgUiStats,
+} from './parse-aircraft-cfg-ui.js';
+import {
+  readLiveCruiseTasKt,
+  sampleLiveCruiseFuelFlowKgPerHour,
+} from './sample-cruise-burn.js';
 import {
   inferPublisherFromLiveTitle,
   loadVendorRecipes,
@@ -74,7 +89,11 @@ async function calibrateWithCgSources(
   profilePath: string,
   aircraftTitle: string,
   publisher?: string,
-) {
+  icao?: string,
+): Promise<{
+  calibration: Awaited<ReturnType<typeof calibrateProfile>>;
+  perf: AircraftCfgUiStats;
+}> {
   printSection('CG source + empirical validation');
   console.log('  Prefer live CG FWD/AFT LIMIT (Mass & Balance tablet), then flight_model.cfg.');
   const liveCg = await readLiveCgState(bridge);
@@ -96,6 +115,21 @@ async function calibrateWithCgSources(
   } else {
     console.log('  Continuing without flight_model.cfg (live SimVar envelope / sweep only).');
   }
+
+  let perf = await loadAircraftPerfFromCfg({
+    flightModelPath: flightModelPath ?? undefined,
+  });
+  const inferredClass = inferCareerClassFromIcao(icao ?? '');
+  const classRow = getAircraftClass(inferredClass);
+  perf = applyClassPerfFallback(perf, classRow);
+  printSection('Catalog performance (range / burn)');
+  printKv([
+    ...catalogPerfPrintRows(perf),
+    [
+      'class fallback',
+      `${inferredClass} · range ${classRow.maxRangeNm} nm · burn ${classRow.fuelBurnKgPerNm} kg/nm`,
+    ],
+  ]);
 
   const forwardRaw = await ask(
     'Forward CG limit in %MAC override (blank = use live SimVar/cfg)',
@@ -140,7 +174,48 @@ async function calibrateWithCgSources(
   } else if (calibration.cgEnvelope?.source === 'simvar') {
     console.log('  Using live CG FWD/AFT LIMIT from the simulator (same as tablet).');
   }
-  return calibration;
+
+  if (
+    await confirm(
+      ask,
+      'Sample live cruise fuel flow now (stable cruise; engines producing flow)',
+      false,
+    )
+  ) {
+    const liveKgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(bridge);
+    if (liveKgPerHour == null) {
+      console.log('  No ENG FUEL FLOW reading — keeping catalog/class burn if any.');
+    } else {
+      const liveTas = await readLiveCruiseTasKt(bridge);
+      const cruiseKtRaw = await ask(
+        'Cruise TAS for kg/nm derivation (blank = live TAS / cfg cruise_speed)',
+        liveTas != null
+          ? String(liveTas)
+          : perf.cruiseSpeedKt != null
+            ? String(perf.cruiseSpeedKt)
+            : '',
+      );
+      const cruiseKt =
+        cruiseKtRaw.trim() === ''
+          ? liveTas ?? perf.cruiseSpeedKt
+          : Number(cruiseKtRaw);
+      const cruiseSpeedKt =
+        typeof cruiseKt === 'number' && Number.isFinite(cruiseKt) && cruiseKt > 0
+          ? cruiseKt
+          : perf.cruiseSpeedKt;
+      perf = {
+        ...perf,
+        cruiseFuelFlowKgPerHour: liveKgPerHour,
+        cruiseSpeedKt,
+        fuelBurnKgPerNm: deriveFuelBurnKgPerNm(liveKgPerHour, cruiseSpeedKt),
+        burnSource: 'live',
+      };
+      printSection('Catalog performance (after live sample)');
+      printKv(catalogPerfPrintRows(perf));
+    }
+  }
+
+  return { calibration, perf };
 }
 
 async function loadMarketCatalogRows(
@@ -225,6 +300,7 @@ async function writeCareerRolesPackAfterPromote(
   ask: AskFn,
   repoRoot: string,
   profile: AircraftProfile,
+  perf?: AircraftCfgUiStats,
 ): Promise<void> {
   printSection('Career OFP roles pack');
   const cabinAsBaggage = await confirm(
@@ -258,6 +334,11 @@ async function writeCareerRolesPackAfterPromote(
     CAREER_CLASS_CHOICES.find((choice) => choice.value === aircraftClassId)
       ?.value ?? inferredClass;
 
+  const classRow = getAircraftClass(classId);
+  const resolvedPerf = applyClassPerfFallback(perf ?? {}, classRow);
+  printSection('Catalog performance (final for Market)');
+  printKv(catalogPerfPrintRows(resolvedPerf));
+
   const family = await promptJoinMarketFamily(
     ask,
     repoRoot,
@@ -287,6 +368,18 @@ async function writeCareerRolesPackAfterPromote(
     aircraftClassId: classId,
     title: profile.match.title ?? profile.displayName,
     ...(family ? { typeId: family.typeId } : {}),
+    ...(resolvedPerf.maxRangeNm != null
+      ? { maxRangeNm: resolvedPerf.maxRangeNm }
+      : {}),
+    ...(resolvedPerf.cruiseFuelFlowKgPerHour != null
+      ? { cruiseFuelFlowKgPerHour: resolvedPerf.cruiseFuelFlowKgPerHour }
+      : {}),
+    ...(resolvedPerf.cruiseSpeedKt != null
+      ? { cruiseSpeedKt: resolvedPerf.cruiseSpeedKt }
+      : {}),
+    ...(resolvedPerf.fuelBurnKgPerNm != null
+      ? { fuelBurnKgPerNm: resolvedPerf.fuelBurnKgPerNm }
+      : {}),
   });
   printKv([
     ['roles pack', result.path],
@@ -298,6 +391,30 @@ async function writeCareerRolesPackAfterPromote(
       `crew=${result.pack.payload?.stationRoles?.crewStations?.join(',') ?? '—'} bags=${result.pack.payload?.stationRoles?.baggageStations?.join(',') ?? '—'}`,
     ],
     ['Aircraft Market', `${registered.label} (${registered.aircraftClassId})`],
+    [
+      'range',
+      registered.maxRangeNm != null
+        ? `${registered.maxRangeNm} nm · ${resolvedPerf.rangeSource ?? '—'}`
+        : '—',
+    ],
+    [
+      'cruise burn',
+      registered.cruiseFuelFlowKgPerHour != null
+        ? `${registered.cruiseFuelFlowKgPerHour} kg/h · ${resolvedPerf.burnSource ?? '—'}`
+        : '—',
+    ],
+    [
+      'cruise TAS',
+      registered.cruiseSpeedKt != null
+        ? `${registered.cruiseSpeedKt} kt`
+        : '—',
+    ],
+    [
+      'burn / nm',
+      registered.fuelBurnKgPerNm != null
+        ? `${registered.fuelBurnKgPerNm} kg/nm · ${resolvedPerf.burnSource ?? '—'}`
+        : '—',
+    ],
     ...(family
       ? [['family', `${family.label} (${family.compatibility})`] as [string, string]]
       : []),
@@ -1004,12 +1121,13 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         matchTitle,
         icao: matchIcao,
       });
-      const calibration = await calibrateWithCgSources(
+      const { calibration, perf } = await calibrateWithCgSources(
         ask,
         bridge,
         drafted.path,
         matchTitle,
         matchPublisher,
+        matchIcao,
       );
       let profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
       printKv([
@@ -1028,6 +1146,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         ['CG envelope', `${profile.cg?.constraints?.minMac}..${profile.cg?.constraints?.maxMac}`],
         ['CG source', profile.cg?.envelopeSource],
         ['fuelOffset', calibration.fuelOffsetApplied],
+        ...catalogPerfPrintRows(perf).filter(([k]) => k !== 'aircraft.cfg'),
       ]);
 
       printSection('5/5 Smoke');
@@ -1122,7 +1241,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         ['strategy', promoted.profile.fuel.strategy],
         ['loadMethod', 'direct-injection'],
       ]);
-      await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile);
+      await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile, perf);
       console.log('');
       console.log('Next:');
       console.log('  node packages/agent/dist/cli.js resolve');
@@ -1175,12 +1294,13 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       }
     }
 
-    const calibration = await calibrateWithCgSources(
+    const { calibration, perf } = await calibrateWithCgSources(
       ask,
       bridge,
       drafted.path,
       matchTitle,
       matchPublisher,
+      matchIcao,
     );
     profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
     printKv([
@@ -1197,6 +1317,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['CG envelope', `${profile.cg?.constraints?.minMac}..${profile.cg?.constraints?.maxMac}`],
       ['CG source', profile.cg?.envelopeSource],
       ['fuelOffset', calibration.fuelOffsetApplied],
+      ...catalogPerfPrintRows(perf).filter(([k]) => k !== 'aircraft.cfg'),
     ]);
 
     printSection('5/5 Smoke');
@@ -1302,7 +1423,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['icao', promoted.profile.match.icao],
       ['loadMethod', 'direct-injection'],
     ]);
-    await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile);
+    await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile, perf);
     console.log('');
     console.log('Next:');
     console.log('  node packages/agent/dist/cli.js resolve');

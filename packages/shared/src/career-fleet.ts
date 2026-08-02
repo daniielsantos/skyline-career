@@ -24,6 +24,7 @@ import {
   findCareerPlayerAirframe,
   isStarterAirframeCondition,
   listStarterCareerPlayerAirframes,
+  resolveAirframeMaxRangeNm,
   type StarterAirframeCondition,
 } from './career-player-airframes.js';
 import type {
@@ -41,14 +42,6 @@ export const PLAYER_FUEL_CAPACITY_KG: Record<FreighterClassId, number> = {
   light_ga: 380,
   narrow_freighter: 20_894,
   wide_freighter: 117_450,
-};
-
-/** Keep in sync with CAREER_AIRCRAFT_CLASSES.maxRangeNm. */
-const MAX_RANGE_NM: Record<FreighterClassId, number> = {
-  light_turboprop: 900,
-  light_ga: 800,
-  narrow_freighter: 2_500,
-  wide_freighter: 6_000,
 };
 
 /** Ferry fee USD per nm before class multiplier. */
@@ -138,6 +131,9 @@ export function normalizeMissionsState(
       ? (raw as CareerMissionsState).aircraftMarketDemandDay
       : undefined;
   const ledger = normalizeCareerLedger((raw as CareerMissionsState).ledger);
+  const airframePerfOverrides = normalizeAirframePerfOverrides(
+    (raw as CareerMissionsState).airframePerfOverrides,
+  );
   return {
     version: 2,
     walletUsd,
@@ -150,7 +146,62 @@ export function normalizeMissionsState(
     aircraftMarketDay,
     aircraftMarketDemandDay,
     ledger,
+    ...(airframePerfOverrides
+      ? { airframePerfOverrides }
+      : {}),
   };
+}
+
+function normalizeAirframePerfOverrides(
+  raw: CareerMissionsState['airframePerfOverrides'],
+): CareerMissionsState['airframePerfOverrides'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: NonNullable<CareerMissionsState['airframePerfOverrides']> = {};
+  for (const [typeId, row] of Object.entries(raw)) {
+    if (!typeId.trim() || !row || typeof row !== 'object') continue;
+    const next: NonNullable<CareerMissionsState['airframePerfOverrides']>[string] =
+      {};
+    if (
+      typeof row.cruiseFuelFlowKgPerHour === 'number' &&
+      Number.isFinite(row.cruiseFuelFlowKgPerHour) &&
+      row.cruiseFuelFlowKgPerHour > 0
+    ) {
+      next.cruiseFuelFlowKgPerHour =
+        Math.round(row.cruiseFuelFlowKgPerHour * 10) / 10;
+    }
+    if (
+      typeof row.cruiseSpeedKt === 'number' &&
+      Number.isFinite(row.cruiseSpeedKt) &&
+      row.cruiseSpeedKt > 0
+    ) {
+      next.cruiseSpeedKt = Math.round(row.cruiseSpeedKt);
+    }
+    if (
+      typeof row.fuelBurnKgPerNm === 'number' &&
+      Number.isFinite(row.fuelBurnKgPerNm) &&
+      row.fuelBurnKgPerNm > 0
+    ) {
+      next.fuelBurnKgPerNm = Math.round(row.fuelBurnKgPerNm * 1000) / 1000;
+    }
+    if (typeof row.updatedAtIso === 'string' && row.updatedAtIso.trim()) {
+      next.updatedAtIso = row.updatedAtIso.trim();
+    }
+    if (
+      typeof row.sampleCount === 'number' &&
+      Number.isFinite(row.sampleCount) &&
+      row.sampleCount > 0
+    ) {
+      next.sampleCount = Math.floor(row.sampleCount);
+    }
+    if (
+      next.cruiseFuelFlowKgPerHour != null ||
+      next.cruiseSpeedKt != null ||
+      next.fuelBurnKgPerNm != null
+    ) {
+      out[typeId] = next;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
@@ -809,10 +860,13 @@ export function quoteFerry(
   if (distanceNm === undefined) {
     throw new Error(`No route distance for ${aircraft.locationIcao}→${dest}`);
   }
-  const aircraftClassMax = MAX_RANGE_NM[aircraft.aircraftClassId];
-  if (distanceNm > aircraftClassMax) {
+  const maxRangeNm = resolveAirframeMaxRangeNm(
+    aircraft.airframeTypeId,
+    aircraft.aircraftClassId,
+  );
+  if (distanceNm > maxRangeNm) {
     throw new Error(
-      `Ferry ${aircraft.locationIcao}→${dest} is ${Math.round(distanceNm)} nm; max range is ${aircraftClassMax} nm`,
+      `Ferry ${aircraft.locationIcao}→${dest} is ${Math.round(distanceNm)} nm; max range is ${maxRangeNm} nm`,
     );
   }
 

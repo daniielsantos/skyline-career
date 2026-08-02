@@ -7,6 +7,7 @@ import {
   airplaneFolderFromCfgPath,
   findFlightModelCandidates,
   groupFlightModelCandidatesByContent,
+  listMsfsVfsProjectionCandidates,
   parseInstalledPackagesPath,
   scorePathAgainstTokens,
   summarizeFlightModelCfg,
@@ -325,5 +326,61 @@ describe('findFlightModelCandidates', () => {
       false,
     );
     assert.ok(found[0]!.path.includes('stockduke'));
+  });
+
+  it('finds cfg under VFSProjection/simobjects/airplanes when vfsProjectionRoot is set', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'msfs-fm-vfs-'));
+    const packagesRoot = join(root, 'Packages');
+    const vfsRoot = join(root, 'VFSProjection');
+    const planeDir = join(vfsRoot, 'simobjects', 'airplanes', 'asobo_c208b');
+    const cfgDir = join(planeDir, 'common', 'config');
+    await mkdir(cfgDir, { recursive: true });
+    await mkdir(packagesRoot, { recursive: true });
+    const cfg = join(cfgDir, 'flight_model.cfg');
+    await writeFile(
+      cfg,
+      '[WEIGHT_AND_BALANCE]\nmax_gross_weight = 8750\n',
+      'utf8',
+    );
+    await writeFile(
+      join(cfgDir, 'aircraft.cfg'),
+      'ui_max_range = 964\nui_fuel_burn_rate = 400\n',
+      'utf8',
+    );
+
+    const decoy = join(vfsRoot, 'simobjects', 'airplanes', 'asobo_b787');
+    await mkdir(join(decoy, 'common', 'config'), { recursive: true });
+    await writeFile(
+      join(decoy, 'common', 'config', 'flight_model.cfg'),
+      '[WEIGHT_AND_BALANCE]\n',
+      'utf8',
+    );
+
+    const found = await findFlightModelCandidates(packagesRoot, 'Cessna C208B Grand Caravan', {
+      vfsProjectionRoot: vfsRoot,
+      publisher: 'asobo',
+    });
+    assert.ok(found.length >= 1);
+    assert.equal(found[0]!.rootKind, 'VFSProjection');
+    assert.ok(found[0]!.path.includes('asobo_c208b'));
+    assert.equal(
+      found.some((c) => c.path.includes('asobo_b787')),
+      false,
+    );
+  });
+});
+
+describe('listMsfsVfsProjectionCandidates', () => {
+  it('includes sibling of Packages and Roaming default', () => {
+    const paths = listMsfsVfsProjectionCandidates(
+      { APPDATA: 'D:\\AppData\\Roaming' },
+      'D:\\MSFS\\Packages',
+    );
+    assert.ok(paths.some((p) => /VFSProjection$/i.test(p) && p.includes('MSFS')));
+    assert.ok(
+      paths.some((p) =>
+        p.replace(/\\/g, '/').endsWith('Microsoft Flight Simulator 2024/VFSProjection'),
+      ),
+    );
   });
 });

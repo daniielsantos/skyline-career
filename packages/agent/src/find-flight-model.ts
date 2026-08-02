@@ -1,12 +1,18 @@
 /**
- * Locate MSFS flight_model.cfg under Community / Official packages.
+ * Locate MSFS flight_model.cfg under Community / Official packages,
+ * and optionally under DevMode VFSProjection (streamed/official cfgs).
  * Resolves InstalledPackagesPath from UserCfg.opt so paths work on any PC.
  */
 import { createHash } from 'node:crypto';
 import { access, readdir, readFile } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import type { AskFn } from './prompt.js';
+import {
+  findAircraftCfgNearFlightModel,
+  isValidUiFuelBurnRateLbPerHour,
+  parseAircraftCfgUiText,
+} from './parse-aircraft-cfg-ui.js';
 
 const PACKAGE_ROOT_NAMES = [
   'Community2024',
@@ -15,6 +21,9 @@ const PACKAGE_ROOT_NAMES = [
   'Official2020',
   'Official',
 ] as const;
+
+/** RootKind for DevMode VFS Projector mounts (sim running). */
+export const VFS_PROJECTION_ROOT_KIND = 'VFSProjection';
 
 export type FlightModelCandidate = {
   path: string;
@@ -36,6 +45,10 @@ export type FlightModelCandidateGroup = {
   stub: boolean;
   /** Human hint of what the cfg actually declares (W&B, stations, tanks). */
   summary?: string;
+  /** Best nearby aircraft.cfg (modular common/ preferred). */
+  aircraftCfgPath?: string;
+  /** Range/burn from that aircraft.cfg, when readable. */
+  catalogPerfSummary?: string;
 };
 
 function envPath(...parts: string[]): string {
@@ -97,6 +110,54 @@ export async function resolveInstalledPackagesPath(
 }
 
 /**
+ * Candidate VFSProjection roots (DevMode → Tools → Virtual File System → Start).
+ * Scoped later to simobjects/airplanes — never walk the whole VFS tree.
+ */
+export function listMsfsVfsProjectionCandidates(
+  env: NodeJS.ProcessEnv = process.env,
+  packagesRoot?: string,
+): string[] {
+  const out: string[] = [];
+  const push = (p: string) => {
+    const abs = resolve(p);
+    if (!out.includes(abs)) out.push(abs);
+  };
+  if (packagesRoot) {
+    push(join(packagesRoot, '..', 'VFSProjection'));
+  }
+  const roaming =
+    env.APPDATA ??
+    (homedir() ? join(homedir(), 'AppData', 'Roaming') : undefined);
+  if (roaming) {
+    push(join(roaming, 'Microsoft Flight Simulator 2024', 'VFSProjection'));
+  }
+  const local = env.LOCALAPPDATA;
+  if (local) {
+    push(
+      join(
+        local,
+        'Packages',
+        'Microsoft.Limitless_8wekyb3d8bbwe',
+        'LocalCache',
+        'VFSProjection',
+      ),
+    );
+  }
+  return out;
+}
+
+/** First existing VFSProjection folder, or undefined when Projector is off. */
+export async function resolveMsfsVfsProjectionPath(
+  env: NodeJS.ProcessEnv = process.env,
+  packagesRoot?: string,
+): Promise<string | undefined> {
+  for (const candidate of listMsfsVfsProjectionCandidates(env, packagesRoot)) {
+    if (await pathExists(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
  * Community package-folder prefixes keyed by catalog publisher slug.
  * Used to avoid scanning rival vendors (e.g. blackbox when homologating blacksquare).
  */
@@ -114,9 +175,9 @@ export const PUBLISHER_PACKAGE_PREFIXES: Readonly<Record<string, readonly string
   hype: ['hype-', 'hypeperformance'],
   miltech: ['miltech'],
   fsreborn: ['fsreborn'],
-  carenado: ['carenado'],
-  tfdi: ['tfdidesign-', 'tfdi'],
-  asobo: ['asobo-'],
+  carenado: ['carenado', 'microsoft-', 'microsoft_'],
+  asobo: ['asobo-', 'asobo_'],
+  microsoft: ['microsoft-', 'microsoft_', 'carenado'],
   aerosoft: ['aerosoft-'],
 };
 
@@ -370,15 +431,101 @@ async function collectFlightModelsUnderPackage(
   return out;
 }
 
+/**
+ * Scan DevMode VFSProjection/simobjects/airplanes only.
+ * Padlocked / Access Denied files still appear as paths; grouping skips unreadable ones.
+ * Scores are slightly demoted so Community/Official wins when content matches both.
+ */
+async function collectFlightModelsFromVfsProjection(
+  vfsRoot: string,
+  tokens: string[],
+  opts: {
+    publisher?: string;
+    minScore?: number;
+    maxAirplanesToScan?: number;
+  } = {},
+): Promise<FlightModelCandidate[]> {
+  const airplanesRootCandidates = [
+    join(vfsRoot, 'simobjects', 'airplanes'),
+    join(vfsRoot, 'SimObjects', 'Airplanes'),
+  ];
+  let airplanesRoot: string | undefined;
+  for (const candidate of airplanesRootCandidates) {
+    if (await pathExists(candidate)) {
+      airplanesRoot = candidate;
+      break;
+    }
+  }
+  if (!airplanesRoot) return [];
+
+  const minScore = opts.minScore ?? 1;
+  const maxAirplanesToScan = opts.maxAirplanesToScan ?? 40;
+  const publisher = opts.publisher?.trim().toLowerCase() || undefined;
+  const modelTokens = modelSearchTokens(tokens);
+
+  const airplaneDirs = await listImmediateDirs(airplanesRoot);
+  const ranked = airplaneDirs
+    .map((dir) => {
+      const name = basename(dir);
+      return {
+        dir,
+        name,
+        score: scorePathAgainstTokens(name, tokens),
+        vendorOk: packageMatchesPublisher(name, publisher),
+      };
+    })
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+
+  const vendorHits = publisher ? ranked.filter((r) => r.vendorOk) : ranked;
+  const pool = vendorHits.length > 0 ? vendorHits : ranked;
+  const toScan = [
+    ...pool.filter((r) => r.score >= minScore),
+    ...(pool.every((r) => r.score < minScore) ? pool.slice(0, 8) : []),
+  ].slice(0, maxAirplanesToScan);
+
+  const out: FlightModelCandidate[] = [];
+  const seen = new Set<string>();
+  for (const item of toScan) {
+    if (seen.has(item.dir)) continue;
+    seen.add(item.dir);
+
+    if (modelTokens.length > 0) {
+      if (scorePathAgainstTokens(item.name, modelTokens) <= 0) continue;
+    }
+
+    for (const cfg of await listFlightModelCfgPaths(item.dir)) {
+      const score =
+        item.score +
+        scorePathAgainstTokens(cfg, tokens) -
+        // Prefer on-disk Community/Official when both surfaces exist.
+        1;
+      out.push({
+        path: cfg,
+        packageName: item.name,
+        airplaneFolder: flightModelDisplayLabel(item.dir, cfg),
+        rootKind: VFS_PROJECTION_ROOT_KIND,
+        score,
+      });
+    }
+  }
+  return out;
+}
+
 export type FindFlightModelOptions = {
   minScore?: number;
   maxPackagesToScan?: number;
   /** Catalog publisher slug (e.g. blacksquare) — restricts package folders when possible. */
   publisher?: string;
+  /**
+   * DevMode VFSProjection root.
+   * Omit or `false` = skip. Pass an absolute path to scan simobjects/airplanes
+   * (homologate resolves this when the Projector mount is live).
+   */
+  vfsProjectionRoot?: string | false;
 };
 
 /**
- * Search Community/Official package trees for flight_model.cfg ranked by aircraft title.
+ * Search Community/Official package trees (and optional VFSProjection) for flight_model.cfg.
  */
 export async function findFlightModelCandidates(
   packagesRoot: string,
@@ -423,6 +570,20 @@ export async function findFlightModelCandidates(
         ...(await collectFlightModelsUnderPackage(item.dir, rootName, tokens)),
       );
     }
+  }
+
+  if (typeof opts.vfsProjectionRoot === 'string' && opts.vfsProjectionRoot) {
+    found.push(
+      ...(await collectFlightModelsFromVfsProjection(
+        opts.vfsProjectionRoot,
+        tokens,
+        {
+          publisher,
+          minScore,
+          maxAirplanesToScan: maxPackagesToScan,
+        },
+      )),
+    );
   }
 
   found.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
@@ -527,6 +688,7 @@ export function summarizeFlightModelCfg(text: string): string | undefined {
  * Collapse candidates that share identical bytes. Modular packages often ship
  * the same MODULAR_MERGE stub under every preset — showing all 16 is noise.
  * Stub groups are demoted so attachment/common cfgs with real W&B rise.
+ * Nearby aircraft.cfg (range/burn) is resolved and boosts ranking.
  */
 export async function groupFlightModelCandidatesByContent(
   candidates: FlightModelCandidate[],
@@ -576,6 +738,36 @@ export async function groupFlightModelCandidatesByContent(
     if (entry.stub) {
       primary.score = Math.max(0, primary.score - 12);
     }
+
+    let aircraftCfgPath: string | undefined;
+    let catalogPerfSummary: string | undefined;
+    try {
+      aircraftCfgPath = await findAircraftCfgNearFlightModel(primary.path);
+      if (aircraftCfgPath) {
+        const ui = parseAircraftCfgUiText(await readFile(aircraftCfgPath, 'utf8'));
+        const bits: string[] = [];
+        if (ui.maxRangeNm != null && ui.maxRangeNm > 0) {
+          bits.push(`range ${ui.maxRangeNm} nm`);
+          primary.score += 8;
+        }
+        if (isValidUiFuelBurnRateLbPerHour(ui.uiFuelBurnRateLbPerHour)) {
+          bits.push(`burn ${ui.uiFuelBurnRateLbPerHour} lb/h`);
+          primary.score += 3;
+        } else if (ui.uiFuelBurnRateRaw != null) {
+          bits.push(`burn cfg=${ui.uiFuelBurnRateRaw}`);
+        }
+        if (bits.length > 0) {
+          catalogPerfSummary = bits.join(' · ');
+        }
+        // Prefer common/config flight_model when it pairs with the UI aircraft.cfg.
+        if (/[\\/]common[\\/]config[\\/]flight_model\.cfg$/i.test(primary.path)) {
+          primary.score += 4;
+        }
+      }
+    } catch {
+      /* Access Denied on VFS padlocks — leave unset */
+    }
+
     groups.push({
       primary,
       contentHash: entry.hash,
@@ -583,6 +775,8 @@ export async function groupFlightModelCandidatesByContent(
       duplicates: items.slice(1),
       stub: entry.stub,
       summary: entry.summary,
+      aircraftCfgPath,
+      catalogPerfSummary,
     });
   }
 
@@ -599,7 +793,7 @@ export async function promptFlightModelPath(
   aircraftTitle: string,
   opts: { publisher?: string } = {},
 ): Promise<string | undefined> {
-  console.log('  Searching MSFS Community/Official for flight_model.cfg…');
+  console.log('  Searching MSFS Community/Official/VFS for flight_model.cfg (+ nearby aircraft.cfg)…');
   const resolved = await resolveInstalledPackagesPath();
   if (!resolved) {
     console.log('  Could not resolve InstalledPackagesPath from UserCfg.opt.');
@@ -609,7 +803,22 @@ export async function promptFlightModelPath(
   }
 
   printInstalled(resolved);
-  const searchOpts: FindFlightModelOptions = { publisher: opts.publisher };
+  const vfsRoot = await resolveMsfsVfsProjectionPath(
+    process.env,
+    resolved.packagesRoot,
+  );
+  if (vfsRoot) {
+    console.log(`  VFSProjection: ${vfsRoot} (simobjects/airplanes)`);
+  } else {
+    console.log(
+      '  VFSProjection: not mounted (DevMode → Tools → Virtual File System → Start)',
+    );
+  }
+
+  const searchOpts: FindFlightModelOptions = {
+    publisher: opts.publisher,
+    vfsProjectionRoot: vfsRoot,
+  };
   if (opts.publisher) {
     console.log(`  Filtering packages for publisher: ${opts.publisher}`);
   }
@@ -633,10 +842,16 @@ export async function promptFlightModelPath(
   }
 
   if (candidates.length === 0) {
-    console.log('  No flight_model.cfg found under Community/Official.');
     console.log(
-      '  For streamed Marketplace aircraft, enable DevMode VFS Projector and paste a path, or skip.',
+      '  No flight_model.cfg found under Community/Official' +
+        (vfsRoot ? '/VFSProjection' : '') +
+        '.',
     );
+    if (!vfsRoot) {
+      console.log(
+        '  Tip: for streamed/official aircraft, enable DevMode VFS Projector and re-run, or paste a path.',
+      );
+    }
     const manual = await ask('flight_model.cfg path (blank to skip)');
     return manual.trim().replace(/^"(.*)"$/, '$1') || undefined;
   }
@@ -647,6 +862,9 @@ export async function promptFlightModelPath(
     groups.length < candidates.length
       ? `  Candidates (best match first; ${candidates.length} files → ${groups.length} unique contents):`
       : '  Candidates (best match first):',
+  );
+  console.log(
+    '  Range/burn come from aircraft.cfg (shown when found beside the flight_model).',
   );
   top.forEach((g, i) => {
     const c = g.primary;
@@ -660,9 +878,19 @@ export async function promptFlightModelPath(
       `    ${String(i + 1).padStart(2)}. [${c.rootKind}] ${shortPresetLabel(c.airplaneFolder)}  (score ${c.score})${tagStr}`,
     );
     if (g.summary) {
-      console.log(`        ↳ ${g.summary}`);
+      console.log(`        ↳ flight_model: ${g.summary}`);
     }
-    console.log(`        ${c.path}`);
+    if (g.catalogPerfSummary) {
+      console.log(`        ↳ aircraft.cfg: ${g.catalogPerfSummary}`);
+    } else if (g.aircraftCfgPath) {
+      console.log('        ↳ aircraft.cfg: (no ui_max_range / burn)');
+    } else {
+      console.log('        ↳ aircraft.cfg: not found / locked');
+    }
+    console.log(`        flight_model: ${c.path}`);
+    if (g.aircraftCfgPath) {
+      console.log(`        aircraft.cfg: ${g.aircraftCfgPath}`);
+    }
     if (g.duplicates.length > 0) {
       const also = g.duplicates
         .slice(0, 6)
@@ -679,7 +907,7 @@ export async function promptFlightModelPath(
     console.log(`    … ${groups.length - top.length} more unique content(s) omitted`);
   }
   console.log(
-    '  Tip: for modular aircraft prefer attachments (interior/wing) or common — preset stubs are often empty merges.',
+    '  Tip: prefer common/config (or a row that shows aircraft.cfg range) — preset stubs are often empty merges.',
   );
 
   // No numeric default — Enter must skip, not silently pick #1 (often a decoy).

@@ -5,6 +5,9 @@
 import {
   createMissionFlightWatchState,
   applyWalletDelta,
+  createCruiseSampleState,
+  cruiseSampleStatus,
+  DEFAULT_CRUISE_EMA_ALPHA,
   departMission,
   estimateMissionBlockHours,
   evaluateLoadVerification,
@@ -12,6 +15,8 @@ import {
   evaluateMissionFlightTransition,
   flightPhaseFromSample,
   loadVerificationDrifted,
+  mergeAirframePerfOverride,
+  pushCruiseTick,
   resolveLivePayloadLb,
   KG_TO_LB,
   resolveAirportCoords,
@@ -20,6 +25,8 @@ import {
   settleMission,
   type CareerEconomyWorld,
   type CareerMissionsState,
+  type CruiseSampleState,
+  type CruiseSampleStatus,
   type FlightGroundSample,
   type LoadVerificationWeights,
   type MissionFlightEvent,
@@ -27,6 +34,10 @@ import {
   type MissionIntent,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import {
+  readLiveCruiseTasKt,
+  sampleLiveCruiseFuelFlowKgPerHour,
+} from '../../agent/src/sample-cruise-burn.ts';
 import { isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart } from './preflight-helpers.ts';
 
@@ -82,6 +93,8 @@ export type WatchStatusPayload = {
   allowDepartOverride: boolean;
   /** Live airborne progress vs planned route (anti time-compression). */
   flightTime: WatchFlightTimePayload | null;
+  /** Stable-cruise burn/TAS sampler progress for this watch session. */
+  cruiseSample: CruiseSampleStatus | null;
 };
 
 type WatchCallbacks = {
@@ -386,6 +399,8 @@ export class CareerWatchSession {
   };
   private tickInFlight = false;
   private preflightDepartBlockedLogged = false;
+  private cruiseState: CruiseSampleState = createCruiseSampleState();
+  private cruiseStatus: CruiseSampleStatus | null = null;
 
   constructor(private readonly cb: WatchCallbacks) {}
 
@@ -451,6 +466,7 @@ export class CareerWatchSession {
       intervalSec: this.opts.intervalSec,
       allowDepartOverride: this.opts.allowDepartOverride,
       flightTime,
+      cruiseSample: this.cruiseStatus,
     };
   }
 
@@ -480,6 +496,8 @@ export class CareerWatchSession {
     this.lastError = null;
     this.settlement = null;
     this.preflightDepartBlockedLogged = false;
+    this.cruiseState = createCruiseSampleState();
+    this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
 
     const loaded = await this.cb.withCareerRead((_world, missions) => {
       const mission = missions.missions.find((m) => m.id === opts.missionId);
@@ -692,6 +710,49 @@ export class CareerWatchSession {
       this.lastEvent = event;
       this.lastEventAtIso = new Date().toISOString();
 
+      // Stable-cruise burn/TAS sample while airborne on an active freighter leg.
+      if (
+        current.status === 'in_flight' &&
+        !sample.onGround &&
+        this.bridge
+      ) {
+        try {
+          let altFt: number | undefined;
+          try {
+            const alt = await this.bridge.readSimVar({
+              name: 'PLANE ALTITUDE',
+              unit: 'feet',
+            });
+            if (Number.isFinite(alt)) altFt = alt;
+          } catch {
+            altFt = undefined;
+          }
+          const [tasKt, fuelFlowKgPerHour] = await Promise.all([
+            readLiveCruiseTasKt(this.bridge),
+            sampleLiveCruiseFuelFlowKgPerHour(this.bridge),
+          ]);
+          const pushed = pushCruiseTick(this.cruiseState, {
+            atMs: nowMs,
+            onGround: sample.onGround,
+            altFt,
+            vsFpm: sample.verticalSpeedFpm,
+            tasKt,
+            fuelFlowKgPerHour,
+          });
+          this.cruiseState = pushed.state;
+          this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+        } catch {
+          this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+        }
+      } else if (sample.onGround && this.cruiseState.window.length > 0) {
+        // Break the stable window on touchdown; keep any locked commit.
+        this.cruiseState = {
+          window: [],
+          committed: this.cruiseState.committed,
+        };
+        this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+      }
+
       // Persist airborne clock if Watch first saw wheels-up on an already in-flight mission.
       if (
         current.status === 'in_flight' &&
@@ -809,6 +870,21 @@ export class CareerWatchSession {
             landingFpm,
           });
           freshMissions.missions[openIdx] = result.mission;
+          const cruiseCommit = this.cruiseState.committed;
+          const airframeTypeId = openMission.airframeTypeId?.trim();
+          if (cruiseCommit && airframeTypeId) {
+            const prev =
+              freshMissions.airframePerfOverrides?.[airframeTypeId];
+            const merged = mergeAirframePerfOverride(
+              prev,
+              cruiseCommit,
+              DEFAULT_CRUISE_EMA_ALPHA,
+            );
+            freshMissions.airframePerfOverrides = {
+              ...(freshMissions.airframePerfOverrides ?? {}),
+              [airframeTypeId]: merged,
+            };
+          }
           if (result.walletCreditUsd > 0) {
             applyWalletDelta(freshMissions, {
               amountUsd: result.walletCreditUsd,

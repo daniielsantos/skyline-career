@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "carenado-404-titan-cargo",
+  "profileKey": "carenado/404-titan-cargo",
+  "semver": "1.0.0",
+  "displayName": "404 Titan Cargo (MSFS 2024)",
+  "match": {
+    "fingerprint": "6696571e60ce602daf0bcd5cbe9cc19eba9bcb2d5b7436300c3468ddbb1ca41a",
+    "title": "404 Titan Cargo",
+    "publisher": "carenado",
+    "icao": "C404",
+    "liveTitles": [
+      "404 Titan Cargo",
+      "404 Titan Cargo - Loaded"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 174,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 174,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 2"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 2"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 100
+    },
+    "calibration": {
+      "observedMac": 8.101320266723633,
+      "calibratedAtIso": "2026-08-02T16:43:17.497Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\microsoft_passiveaircraft_c404\\presets\\microsoft\\c404_titan_cargo\\config\\flight_model.cfg",
+      "sweep": {
+        "minObservedMac": 8.724264055490494,
+        "maxObservedMac": 12.876833975315094,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 4,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-08-02T16:43:24.556Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: 404 Titan Cargo.",
+    "ICAO type designator (catalog/SimBrief): C404.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Stations: 4.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/carenado-404-titan-cargo.md"
+  ]
+}

@@ -16,6 +16,7 @@ import {
 import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
+  resolveAirframeMaxRangeNm,
 } from './career-player-airframes.js';
 import type {
   CareerMissionsState,
@@ -537,7 +538,7 @@ export function reserveShipmentLot(
   return { lot, reservedKg: qty, payUsd };
 }
 
-/** Release a prior reservation (cancel before dispatch / settle). */
+/** Release a prior reservation (cancel before settle — including mid-flight). */
 export function releaseShipmentReservation(
   world: CareerEconomyWorld,
   lotId: string,
@@ -546,8 +547,11 @@ export function releaseShipmentReservation(
   const lot = findLot(world, lotId);
   const release = Math.min(Math.max(0, Math.floor(cargoKg)), lot.reservedKg);
   lot.reservedKg -= release;
-  if (lot.status === 'reserved' && lot.reservedKg < lot.quantityKg) {
-    lot.status = 'available';
+  if (
+    (lot.status === 'reserved' || lot.status === 'in_transit') &&
+    lot.reservedKg < lot.quantityKg
+  ) {
+    lot.status = lot.reservedKg > 0 ? 'reserved' : 'available';
   }
 }
 
@@ -685,6 +689,8 @@ export function commitStagedManifest(
     intoMission?: MissionIntent;
     /** Id for a brand-new flight (ignored when appending). */
     missionId?: string;
+    /** Concrete Market SKU — preferred for range gate when set. */
+    airframeTypeId?: string;
   },
 ): { mission: MissionIntent; appended: boolean; lineCount: number } {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
@@ -764,9 +770,13 @@ export function commitStagedManifest(
   if (distanceNm === undefined) {
     throw new Error(`Unknown route distance for ${originIcao}→${destIcao}`);
   }
-  if (distanceNm > aircraft.maxRangeNm) {
+  const maxRangeNm = resolveAirframeMaxRangeNm(
+    opts.airframeTypeId ?? opts.intoMission?.airframeTypeId,
+    aircraft.id,
+  );
+  if (distanceNm > maxRangeNm) {
     throw new Error(
-      `Route ${originIcao}→${destIcao} is ${Math.round(distanceNm)} nm; ${aircraft.name} max range is ${aircraft.maxRangeNm} nm`,
+      `Route ${originIcao}→${destIcao} is ${Math.round(distanceNm)} nm; max range is ${maxRangeNm} nm`,
     );
   }
 
@@ -981,7 +991,11 @@ export function cancelMission(
   opts: { fleet?: CareerMissionsState } = {},
 ): MissionIntent {
   const normalized = normalizeMissionIntent(mission);
-  if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
+  if (
+    normalized.status !== 'accepted' &&
+    normalized.status !== 'dispatched' &&
+    normalized.status !== 'in_flight'
+  ) {
     throw new Error(`Cannot cancel mission in status=${normalized.status}`);
   }
   // A mission can outlive its shipment lots: expired lots are pruned after a

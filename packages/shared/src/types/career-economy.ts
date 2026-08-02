@@ -763,6 +763,20 @@ export interface CareerMissionsState {
   aircraftMarketDemandDay?: number;
   /** Append-only company cashflow (income + expenses). */
   ledger?: CareerLedgerEntry[];
+  /**
+   * Runtime cruise perf learned from stable in-mission samples.
+   * Prefer over static catalog burn/TAS for Market/Hangar UI + planning.
+   */
+  airframePerfOverrides?: Record<string, AirframePerfOverride>;
+}
+
+/** Live-learned cruise burn / TAS for one Market airframe typeId. */
+export interface AirframePerfOverride {
+  cruiseFuelFlowKgPerHour?: number;
+  cruiseSpeedKt?: number;
+  fuelBurnKgPerNm?: number;
+  updatedAtIso?: string;
+  sampleCount?: number;
 }
 
 /** Legacy missions save before hangar / fleet. */

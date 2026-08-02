@@ -8,6 +8,9 @@ import {
   isCareerPlayerAirframeEnabled,
   listCareerPlayerAirframes,
   listStarterCareerPlayerAirframes,
+  resolveAirframeCruiseFuelFlowKgPerHour,
+  resolveAirframeCruiseSpeedKt,
+  resolveAirframeMaxRangeNm,
 } from './career-player-airframes.js';
 
 describe('career player airframes', () => {
@@ -112,6 +115,21 @@ describe('career player airframes', () => {
       findCareerPlayerAirframe('asobo-c172sp-cargo')?.label,
       'Cessna 172SP Cargo',
     );
+  });
+
+  it('exposes per-airframe range and burn for starters', () => {
+    const commander = findCareerPlayerAirframe('blacksquare-commander-114');
+    assert.equal(commander?.maxRangeNm, 800);
+    assert.equal(
+      resolveAirframeMaxRangeNm('blacksquare-commander-114', 'light_ga'),
+      800,
+    );
+    assert.ok(
+      (resolveAirframeCruiseFuelFlowKgPerHour('blacksquare-commander-114') ?? 0) >
+        20,
+    );
+    assert.equal(resolveAirframeMaxRangeNm('missing-type', 'light_ga'), 800);
+    assert.equal(resolveAirframeCruiseSpeedKt('carenado-404-titan-cargo'), 181);
   });
 });
 

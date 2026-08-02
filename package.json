@@ -25,6 +25,7 @@
     "start:local": "node scripts/start-skyline.mjs --mode simconnect",
     "start:local:mock": "node scripts/start-skyline.mjs --mode mock",
     "homologate": "node packages/agent/dist/cli.js homologate",
+    "sample-burn": "node packages/agent/dist/cli.js sample-burn",
     "probe-lvars": "node packages/agent/dist/cli.js probe-lvars --preset a2a-aerostar",
     "probe-pmdg-fuel": "node packages/agent/dist/cli.js probe-pmdg-fuel",
     "scaffold-ofp-roles": "node packages/agent/dist/cli.js scaffold-ofp-roles",

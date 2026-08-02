@@ -8,6 +8,11 @@ export type AircraftCatalogEntry = {
   leaseMonthlyUsd: number;
   maxCargoKg: number;
   maxRangeNm: number;
+  /** Optional cruise burn (kg/h) when known for the listing airframe. */
+  cruiseFuelFlowKgPerHour?: number;
+  /** Optional cruise TAS (kt). */
+  cruiseSpeedKt?: number;
+  fuelBurnKgPerNm?: number;
 };
 
 export const AIRCRAFT_CLASS_FILTERS: Array<{
@@ -173,6 +178,10 @@ export function MarketListingCard(props: {
                 {listing.condition}
               </span>
             ) : null}
+            <span>
+              {Math.round(listing.hoursAirframe)}/
+              {Math.round(listing.hoursEngine)} h
+            </span>
           </div>
         </div>
         <ul className="aircraft-card-specs">
@@ -191,10 +200,23 @@ export function MarketListingCard(props: {
             </strong>
           </li>
           <li>
-            <span>AF / ENG</span>
+            <span>Cruise</span>
             <strong>
-              {Math.round(listing.hoursAirframe)}/
-              {Math.round(listing.hoursEngine)}
+              {catalog?.cruiseSpeedKt != null
+                ? `${catalog.cruiseSpeedKt} kt`
+                : '—'}
+            </strong>
+          </li>
+          <li>
+            <span>Burn</span>
+            <strong>
+              {catalog?.cruiseFuelFlowKgPerHour != null
+                ? `${catalog.cruiseFuelFlowKgPerHour.toLocaleString(undefined, {
+                    maximumFractionDigits: 1,
+                  })} kg/h`
+                : catalog?.fuelBurnKgPerNm != null
+                  ? `${catalog.fuelBurnKgPerNm} kg/nm`
+                  : '—'}
             </strong>
           </li>
         </ul>
@@ -286,6 +308,7 @@ function hangarStatusNote(acf: PlayerAircraft): string | null {
 
 export function HangarAircraftCard(props: {
   aircraft: PlayerAircraft;
+  catalog?: AircraftCatalogEntry;
   busy: boolean;
   hubOptions: string[];
   ferryDest: string;
@@ -304,6 +327,7 @@ export function HangarAircraftCard(props: {
   onFerry: (id: string, dest: string) => void;
 }) {
   const acf = props.aircraft;
+  const catalog = props.catalog;
   const fuelPct =
     (acf.fuelKg / Math.max(1, acf.fuelCapacityKg)) * 100;
   const afPct = acf.airframeConditionPct ?? 100;
@@ -386,6 +410,20 @@ export function HangarAircraftCard(props: {
             <span>
               {props.formatMass(acf.fuelKg)} / {props.formatMass(acf.fuelCapacityKg)} fuel
             </span>
+            {catalog ? (
+              <span>{catalog.maxRangeNm.toLocaleString()} nm range</span>
+            ) : null}
+            {catalog?.cruiseSpeedKt != null ? (
+              <span>{catalog.cruiseSpeedKt} kt cruise</span>
+            ) : null}
+            {catalog?.cruiseFuelFlowKgPerHour != null ? (
+              <span>
+                {catalog.cruiseFuelFlowKgPerHour.toLocaleString(undefined, {
+                  maximumFractionDigits: 1,
+                })}{' '}
+                kg/h
+              </span>
+            ) : null}
             <span>{Math.round(acf.hoursAirframe ?? 0)} AF hrs</span>
             {inspLeft != null ? <span>inspection in {inspLeft}h</span> : null}
           </div>

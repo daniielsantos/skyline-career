@@ -27,6 +27,7 @@ import {
   listCareerHubIcaos,
   listParkedAt,
   listStarterCareerPlayerAirframes,
+  resolveAirframePerfForUi,
   getCommodity,
   hubTierOf,
   countFuelHaulsEnroute,
@@ -98,6 +99,7 @@ import {
 import {
   applyMissionOfpLoad,
   getOfpLoadProgress,
+  isOfpLoadBusy,
   probeSimBridgeStatus,
   requestOfpLoadCancel,
 } from './ofp-load-helpers.ts';
@@ -765,12 +767,47 @@ export function createCareerApiServer(port = 8787) {
           settleAircraftMarketOps(missions, world.tick, world);
           const listings = listAircraftMarket(missions, world);
           const nowMs = Date.now();
+          const catalog = listAircraftClassCatalog();
+          const catalogByClass = new Map(catalog.map((row) => [row.id, row]));
+          const typeIds = new Set<string>();
+          for (const listing of listings) {
+            if (listing.airframeTypeId) typeIds.add(listing.airframeTypeId);
+          }
+          for (const acf of missions.fleet) {
+            if (acf.airframeTypeId) typeIds.add(acf.airframeTypeId);
+          }
+          const airframePerf = Object.fromEntries(
+            [...typeIds].map((typeId) => {
+              const listing = listings.find((row) => row.airframeTypeId === typeId);
+              const fleetAcf = missions.fleet.find(
+                (row) => row.airframeTypeId === typeId,
+              );
+              const classId =
+                listing?.aircraftClassId ??
+                fleetAcf?.aircraftClassId ??
+                findCareerPlayerAirframe(typeId)?.aircraftClassId ??
+                'light_ga';
+              const classRow = catalogByClass.get(classId);
+              const liveOverride =
+                missions.airframePerfOverrides?.[typeId] ?? null;
+              return [
+                typeId,
+                resolveAirframePerfForUi(
+                  typeId,
+                  classId,
+                  classRow,
+                  liveOverride,
+                ),
+              ] as const;
+            }),
+          );
           return {
             ...clockPayload(world, nowMs),
             walletUsd: missions.walletUsd,
             dayIndex: economyDayIndex(world.tick),
             listings,
-            catalog: listAircraftClassCatalog(),
+            catalog,
+            airframePerf,
             fleet: withParkingRates(missions.fleet),
           };
         });
@@ -1724,6 +1761,7 @@ export function createCareerApiServer(port = 8787) {
                 aircraftClassId: aircraft,
                 maxCargoKg: operationalMaxCargoKg,
                 intoMission: intoMission ?? undefined,
+                airframeTypeId: playerAirframe?.typeId,
               });
               mission = {
                 ...staged.mission,
@@ -2576,6 +2614,14 @@ export function createCareerApiServer(port = 8787) {
           send(res, 409, {
             error: 'Purchase or authorize OFP block fuel before loading the aircraft',
             code: 'fuel_purchase_required',
+          });
+          return;
+        }
+        if (isOfpLoadBusy(mission.id) || isOfpLoadActive()) {
+          send(res, 409, {
+            error: 'OFP inject already in progress — wait or cancel first',
+            code: 'inject_in_progress',
+            progress: getOfpLoadProgress(mission.id),
           });
           return;
         }

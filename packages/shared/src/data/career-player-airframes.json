@@ -1,5 +1,17 @@
 [
   {
+    "typeId": "carenado-404-titan-cargo",
+    "aircraftClassId": "light_ga",
+    "label": "404 Titan Cargo",
+    "rolesPackRelPath": "profiles/ofp/carenado-404-titan-cargo.json",
+    "simbriefIcao": "C404",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 1840,
+    "cruiseFuelFlowKgPerHour": 160.7,
+    "cruiseSpeedKt": 181,
+    "fuelBurnKgPerNm": 0.888
+  },
+  {
     "typeId": "blacksquare-baron-58-professional",
     "aircraftClassId": "light_ga",
     "label": "Beechcraft Baron BE58",
@@ -45,7 +57,10 @@
     "oewKg": 740,
     "mtowKg": 1111,
     "maxCargoKg": 220,
-    "fuelCapacityKg": 152
+    "fuelCapacityKg": 152,
+    "maxRangeNm": 640,
+    "cruiseFuelFlowKgPerHour": 24.5,
+    "fuelBurnKgPerNm": 0.2
   },
   {
     "typeId": "asobo-cessna-c152",
@@ -57,7 +72,10 @@
     "oewKg": 508,
     "mtowKg": 757,
     "maxCargoKg": 120,
-    "fuelCapacityKg": 72
+    "fuelCapacityKg": 72,
+    "maxRangeNm": 415,
+    "cruiseFuelFlowKgPerHour": 18.1,
+    "fuelBurnKgPerNm": 0.168
   },
   {
     "typeId": "blacksquare-commander-114",
@@ -69,7 +87,10 @@
     "oewKg": 855,
     "mtowKg": 1424,
     "maxCargoKg": 320,
-    "fuelCapacityKg": 190
+    "fuelCapacityKg": 190,
+    "maxRangeNm": 800,
+    "cruiseFuelFlowKgPerHour": 32.8,
+    "fuelBurnKgPerNm": 0.189
   },
   {
     "typeId": "asobo-beechcraft-king-air-350i",

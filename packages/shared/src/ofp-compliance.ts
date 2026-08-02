@@ -535,12 +535,29 @@ function comparePayloadToOfp(
     }
   }
 
-  // Baggage
+  // Baggage / freighter cargo
   if (sheet?.baggage !== undefined) {
     const expected = toLb(sheet.baggage, sheet.unit);
-    if (live.baggageLb === undefined) {
+    const freighterStyle = (sheet.passengerCount ?? 0) <= 0;
+    const cabinAsCargo =
+      freighterStyle && (plan?.stationRoles?.passengerStations?.length ?? 0) > 0;
+    if (cabinAsCargo) {
+      // GA Career inject puts freighter "baggage" onto cabin seats first.
+      // Comparing only baggageStations false-fails (live bags=0, seats full).
+      const liveCargo =
+        live.ofpPayloadLb ??
+        (live.passengerWeightLb ?? 0) + (live.baggageLb ?? 0);
+      pushWeightDelta(
+        findings,
+        'BAGGAGE',
+        'Cargo (cabin seats + bags)',
+        expected,
+        liveCargo,
+        tol,
+      );
+    } else if (live.baggageLb === undefined) {
       // Freighter: fall back to ofpPayload/total so empty aircraft still fail.
-      if ((sheet.passengerCount ?? 0) <= 0) {
+      if (freighterStyle) {
         const liveCargo = live.ofpPayloadLb ?? live.total;
         pushWeightDelta(findings, 'BAGGAGE', 'Baggage (cargo)', expected, liveCargo, tol);
       } else {

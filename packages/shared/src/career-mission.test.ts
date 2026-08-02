@@ -1090,6 +1090,32 @@ describe('settleMission', () => {
     assert.equal(a.status, 'available');
     assert.equal(b.status, 'available');
   });
+
+  it('cancel mid-flight releases in_transit lots back to market', () => {
+    const world = createSeedEconomyWorld({ seed: 'cancel-inflight' });
+    const lot = pushTestLot(world, {
+      id: 'lot_can_air',
+      originIcao: 'SBKP',
+      destIcao: 'SBVT',
+      quantityKg: 500,
+      payUsd: 100,
+    });
+    let flight = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 500,
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+      missionId: 'msn_can_air',
+    });
+    flight = departMission(world, flight).mission;
+    assert.equal(flight.status, 'in_flight');
+    assert.equal(lot.status, 'in_transit');
+    assert.equal(lot.reservedKg, 500);
+    const cancelled = cancelMission(world, flight);
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(lot.reservedKg, 0);
+    assert.equal(lot.status, 'available');
+  });
 });
 
 describe('replaceMissionManifest', () => {

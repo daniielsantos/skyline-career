@@ -27,6 +27,14 @@ type CareerPlayerAirframeRow = {
   simbriefAirframeMatch: string;
   /** Omitted / true = on Aircraft Market. false = homologated but hidden. */
   enabled?: boolean;
+  oewKg?: number;
+  mtowKg?: number;
+  maxCargoKg?: number;
+  fuelCapacityKg?: number;
+  maxRangeNm?: number;
+  cruiseFuelFlowKgPerHour?: number;
+  cruiseSpeedKt?: number;
+  fuelBurnKgPerNm?: number;
 };
 
 export const CAREER_CLASS_CHOICES: Array<{
@@ -42,19 +50,39 @@ export const CAREER_CLASS_CHOICES: Array<{
 export function inferCareerClassFromIcao(icao: string): FreighterClassId {
   const normalized = icao.trim().toUpperCase();
   if (
-    ['C172', 'AC11', 'BE36', 'BE60', 'PA24', 'C185', 'C400', 'P46T', 'BE58', 'BN2P'].includes(
-      normalized,
-    )
+    [
+      'C152',
+      'C172',
+      'C182',
+      'C185',
+      'C404',
+      'AC11',
+      'BE36',
+      'BE58',
+      'BE60',
+      'PA24',
+      'PA31',
+      'PA32',
+      'C400',
+      'P46T',
+      'BN2P',
+      'M20P',
+      'SR22',
+    ].includes(normalized)
   ) {
     return 'light_ga';
   }
-  if (['C208', 'B190', 'E110'].includes(normalized)) {
+  if (['C208', 'B190', 'E110', 'PC12', 'TBM9'].includes(normalized)) {
     return 'light_turboprop';
   }
   if (['B738', 'B737', 'A320', 'A321'].includes(normalized)) {
     return 'narrow_freighter';
   }
-  return 'wide_freighter';
+  if (['MD11', 'MD1F', 'B744', 'B748', 'A332', 'A333', 'A339', 'A388'].includes(normalized)) {
+    return 'wide_freighter';
+  }
+  // Unknown ICAO — prefer GA over widebody so burn/range fallbacks stay sane.
+  return 'light_ga';
 }
 
 function catalogPath(repoRoot: string): string {
@@ -131,6 +159,10 @@ export async function registerCareerPlayerAirframe(opts: {
   title?: string;
   /** Profile id for one-off SKUs; families pass marketTypeId / pack.ofpId. */
   typeId?: string;
+  maxRangeNm?: number;
+  cruiseFuelFlowKgPerHour?: number;
+  cruiseSpeedKt?: number;
+  fuelBurnKgPerNm?: number;
 }): Promise<CareerPlayerAirframeRow> {
   const path = catalogPath(opts.repoRoot);
   const rows = await readCatalogRows(path);
@@ -176,6 +208,15 @@ export async function registerCareerPlayerAirframe(opts: {
     .filter((item) => item !== primary)
     .sort((a, b) => a.localeCompare(b));
 
+  const pickNum = (
+    next: number | undefined,
+    prev: number | undefined,
+  ): number | undefined => {
+    if (typeof next === 'number' && Number.isFinite(next) && next > 0) return next;
+    if (typeof prev === 'number' && Number.isFinite(prev) && prev > 0) return prev;
+    return undefined;
+  };
+
   const row: CareerPlayerAirframeRow = {
     typeId,
     aircraftClassId: opts.aircraftClassId,
@@ -184,7 +225,31 @@ export async function registerCareerPlayerAirframe(opts: {
     ...(extras.length > 0 ? { familyRolesPackRelPaths: [primary, ...extras].sort() } : {}),
     simbriefIcao,
     simbriefAirframeMatch,
+    ...(existing?.oewKg != null ? { oewKg: existing.oewKg } : {}),
+    ...(existing?.mtowKg != null ? { mtowKg: existing.mtowKg } : {}),
+    ...(existing?.maxCargoKg != null ? { maxCargoKg: existing.maxCargoKg } : {}),
+    ...(existing?.fuelCapacityKg != null
+      ? { fuelCapacityKg: existing.fuelCapacityKg }
+      : {}),
   };
+  const maxRangeNm = pickNum(opts.maxRangeNm, existing?.maxRangeNm);
+  const cruiseFuelFlowKgPerHour = pickNum(
+    opts.cruiseFuelFlowKgPerHour,
+    existing?.cruiseFuelFlowKgPerHour,
+  );
+  const cruiseSpeedKt = pickNum(opts.cruiseSpeedKt, existing?.cruiseSpeedKt);
+  const fuelBurnKgPerNm = pickNum(opts.fuelBurnKgPerNm, existing?.fuelBurnKgPerNm);
+  if (maxRangeNm != null) row.maxRangeNm = Math.round(maxRangeNm);
+  if (cruiseFuelFlowKgPerHour != null) {
+    row.cruiseFuelFlowKgPerHour =
+      Math.round(cruiseFuelFlowKgPerHour * 10) / 10;
+  }
+  if (cruiseSpeedKt != null) {
+    row.cruiseSpeedKt = Math.round(cruiseSpeedKt);
+  }
+  if (fuelBurnKgPerNm != null) {
+    row.fuelBurnKgPerNm = Math.round(fuelBurnKgPerNm * 1000) / 1000;
+  }
   // Keep family list unique sorted (primary may appear twice above).
   if (row.familyRolesPackRelPaths) {
     row.familyRolesPackRelPaths = [...new Set(row.familyRolesPackRelPaths)].sort();
@@ -226,5 +291,46 @@ export async function listCareerPlayerAirframeCatalog(
   repoRoot: string,
 ): Promise<CareerPlayerAirframeRow[]> {
   return readCatalogRows(catalogPath(repoRoot));
+}
+
+/** Patch cruise burn / TAS fields on an already-registered Market airframe. */
+export async function updateCareerPlayerAirframeBurn(opts: {
+  repoRoot: string;
+  typeId: string;
+  cruiseFuelFlowKgPerHour: number;
+  fuelBurnKgPerNm: number;
+  cruiseSpeedKt?: number;
+}): Promise<CareerPlayerAirframeRow> {
+  const typeId = opts.typeId.trim();
+  if (!typeId) throw new Error('typeId is required');
+  if (
+    !(opts.cruiseFuelFlowKgPerHour > 0) ||
+    !(opts.fuelBurnKgPerNm > 0)
+  ) {
+    throw new Error('cruiseFuelFlowKgPerHour and fuelBurnKgPerNm must be positive');
+  }
+  if (
+    opts.cruiseSpeedKt != null &&
+    !(opts.cruiseSpeedKt > 0)
+  ) {
+    throw new Error('cruiseSpeedKt must be positive when provided');
+  }
+  const rows = await readCatalogRows(catalogPath(opts.repoRoot));
+  const idx = rows.findIndex((row) => row.typeId === typeId);
+  if (idx < 0) {
+    throw new Error(`No Skyline player airframe registered as ${typeId}`);
+  }
+  const next: CareerPlayerAirframeRow = {
+    ...rows[idx]!,
+    cruiseFuelFlowKgPerHour:
+      Math.round(opts.cruiseFuelFlowKgPerHour * 10) / 10,
+    fuelBurnKgPerNm: Math.round(opts.fuelBurnKgPerNm * 1000) / 1000,
+    ...(opts.cruiseSpeedKt != null
+      ? { cruiseSpeedKt: Math.round(opts.cruiseSpeedKt) }
+      : {}),
+  };
+  rows[idx] = next;
+  await writeCatalogRows(opts.repoRoot, rows);
+  return next;
 }
 

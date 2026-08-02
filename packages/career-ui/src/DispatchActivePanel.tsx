@@ -248,9 +248,6 @@ export function DispatchActivePanel(props: {
           <p>
             {mission.id} · {props.aircraftClassLabel(mission.aircraftClassId)} ·{' '}
             <span className={`status status-${mission.status}`}>{mission.status}</span>
-            <span className="dispatch-step-chip">
-              {DISPATCH_STEP_LABEL[step]}
-            </span>
           </p>
         </div>
       </div>
@@ -288,17 +285,6 @@ export function DispatchActivePanel(props: {
         </span>
       </div>
 
-      <p className="staging-ops-reason">
-        {formatWeightText(mission.reason, weightSystem)}
-      </p>
-      <p className="staging-ops-reason">
-        {mission.fuelUplift
-          ? `Fuel uplift ${props.formatTonnes(mission.fuelUplift.requestedKg)} · ${props.formatMoney(mission.fuelUplift.costUsd)} · ${mission.fuelUplift.scarcity} @ ${mission.fuelUplift.originIcao}`
-          : step === 'fuel' || step === 'flight_plan'
-            ? `Jet-A is purchased against the OFP before load (not on Depart).`
-            : 'Fuel authorized for this OFP.'}
-      </p>
-
       {(mission.lots?.length ?? 0) > 0 ||
       ['accepted', 'dispatched'].includes(mission.status) ? (
         <div className="staging-section">
@@ -309,10 +295,10 @@ export function DispatchActivePanel(props: {
                 type="button"
                 className="action compact"
                 disabled={busy}
-                title="Adjust payload or lots, then regenerate the OFP"
+                title="Adjust cargo lots, then regenerate the OFP"
                 onClick={() => props.onEditManifest(mission)}
               >
-                Edit manifest
+                Edit cargo
               </button>
             ) : null}
           </div>
@@ -509,10 +495,16 @@ export function DispatchActivePanel(props: {
         )
       ) : null}
 
-      {showFuelCard && mission.fuelUplift && step !== 'fuel' ? (
+      {showFuelCard &&
+      mission.fuelUplift &&
+      step !== 'fuel' &&
+      (mission.fuelUplift.costUsd > 0 || mission.fuelUplift.requestedKg > 0.5) ? (
         <p className="dispatch-fuel-paid">
           Fuel paid {props.formatMoney(mission.fuelUplift.costUsd)} ·{' '}
           {props.formatTonnes(mission.fuelUplift.requestedKg)}
+          {mission.fuelUplift.scarcity !== 'ok'
+            ? ` · ${mission.fuelUplift.scarcity}`
+            : ''}
         </p>
       ) : null}
 
@@ -706,8 +698,22 @@ export function DispatchActivePanel(props: {
           })()
         : null}
 
-      {primaryCta ? (
-        <div className="dispatch-primary-actions">{primaryCta}</div>
+      {primaryCta ||
+      ['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
+        <div className="dispatch-primary-actions">
+          {primaryCta}
+          {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
+            <button
+              type="button"
+              className="action ghost danger"
+              disabled={busy}
+              title="Abort this flight — no payout; cargo returns to the market"
+              onClick={() => props.onCancel(mission)}
+            >
+              Cancel flight
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {showWatch
@@ -827,6 +833,33 @@ export function DispatchActivePanel(props: {
                         : ''}
                     </span>
                   ) : null}
+                  {props.watch?.cruiseSample &&
+                  props.watch.cruiseSample.phase !== 'idle' ? (
+                    <span
+                      className={
+                        props.watch.cruiseSample.phase === 'locked'
+                          ? 'watch-flight-time ok'
+                          : 'watch-flight-time pending'
+                      }
+                      title="Stable cruise fuel flow + TAS (≥3 min level) updates this airframe's burn after settle"
+                    >
+                      Cruise{' '}
+                      {props.watch.cruiseSample.phase === 'locked'
+                        ? 'locked'
+                        : 'sampling'}{' '}
+                      {Math.round(props.watch.cruiseSample.elapsedMs / 1000)}s /{' '}
+                      {Math.round(props.watch.cruiseSample.requiredMs / 1000)}s
+                      {props.watch.cruiseSample.tasKt != null
+                        ? ` · ${props.watch.cruiseSample.tasKt} kt`
+                        : ''}
+                      {props.watch.cruiseSample.fuelFlowKgPerHour != null
+                        ? ` · ${props.watch.cruiseSample.fuelFlowKgPerHour.toLocaleString(
+                            undefined,
+                            { maximumFractionDigits: 1 },
+                          )} kg/h`
+                        : ''}
+                    </span>
+                  ) : null}
                   {props.watch?.lastEvent?.type === 'settle_blocked' ? (
                     <span className="watch-footer-error">
                       {props.watch.lastEvent.reason}
@@ -890,16 +923,6 @@ export function DispatchActivePanel(props: {
               onClick={() => props.onSettle(mission)}
             >
               Settle without MSFS
-            </button>
-          ) : null}
-          {['accepted', 'dispatched'].includes(mission.status) ? (
-            <button
-              type="button"
-              className="action ghost danger"
-              disabled={busy}
-              onClick={() => props.onCancel(mission)}
-            >
-              Cancel flight
             </button>
           ) : null}
           {!simbriefUser.trim() ? (

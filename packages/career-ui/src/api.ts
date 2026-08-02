@@ -799,6 +799,16 @@ export function fetchAircraftMarket() {
         maxCargoKg: number;
         maxRangeNm: number;
       }>;
+      airframePerf?: Record<
+        string,
+        {
+          maxCargoKg: number;
+          maxRangeNm: number;
+          cruiseFuelFlowKgPerHour?: number;
+          cruiseSpeedKt?: number;
+          fuelBurnKgPerNm: number;
+        }
+      >;
       fleet: PlayerAircraft[];
     }
   >('/api/aircraft-market');
@@ -1094,6 +1104,21 @@ export type WatchStatus = {
     elapsedMs: number;
     ratio: number;
     met: boolean;
+  } | null;
+  cruiseSample?: {
+    phase: 'idle' | 'collecting' | 'locked';
+    elapsedMs: number;
+    requiredMs: number;
+    tasKt?: number;
+    fuelFlowKgPerHour?: number;
+    committed?: {
+      cruiseSpeedKt: number;
+      cruiseFuelFlowKgPerHour: number;
+      fuelBurnKgPerNm: number;
+      sampleCount: number;
+      durationSec: number;
+      committedAtMs: number;
+    };
   } | null;
 };
 

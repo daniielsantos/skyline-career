@@ -105,6 +105,7 @@ function usage(): never {
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
+  msfs-compat-agent sample-burn [--type typeId] [--pipe <name>]
   msfs-compat-agent career-airframe [wizard]|list|disable|enable [--type typeId]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
@@ -121,6 +122,7 @@ Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
+  sample-burn: live cruise fuel-flow sample → patch career-player-airframes.json burn
   career-airframe: interactive wizard (or list / disable / enable) for Market models
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
@@ -337,6 +339,18 @@ async function main(): Promise<void> {
         draftsDir: join(repoRoot, 'profiles', 'drafts'),
         examplesDir: join(repoRoot, 'profiles', 'examples'),
         notesDir: join(repoRoot, 'profiles', 'notes'),
+      }),
+    );
+    return;
+  }
+
+  if (command === 'sample-burn' || command === 'burn-sample') {
+    const { runSampleBurnWizard } = await import('./sample-burn-wizard.js');
+    await withBridge(pipeName, async (bridge) =>
+      runSampleBurnWizard({
+        bridge,
+        repoRoot,
+        typeId: getFlag(rest, '--type'),
       }),
     );
     return;

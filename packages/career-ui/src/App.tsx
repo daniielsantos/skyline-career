@@ -71,6 +71,7 @@ import {
   MarketListingCard,
   aircraftClassLabel,
   aircraftModelLabel,
+  type AircraftCatalogEntry,
 } from './AircraftCards';
 import { HangarCashflowPanel } from './CashflowPanel';
 import { HubNetworkMap } from './HubNetworkMap';
@@ -87,7 +88,6 @@ import {
   saveWeightSystem,
   type WeightSystem,
 } from './weight-units';
-import { evaluateLoadVerification } from './load-verification';
 import {
   buildFlightDebrief,
   deriveDispatchStep,
@@ -1341,6 +1341,18 @@ export function App() {
       maxRangeNm: number;
     }>
   >([]);
+  const [airframePerf, setAirframePerf] = useState<
+    Record<
+      string,
+      {
+        maxCargoKg: number;
+        maxRangeNm: number;
+        cruiseFuelFlowKgPerHour?: number;
+        cruiseSpeedKt?: number;
+        fuelBurnKgPerNm: number;
+      }
+    >
+  >({});
   const [aircraftMarketDay, setAircraftMarketDay] = useState(0);
   const [aircraftMarketClass, setAircraftMarketClass] = useState<
     '' | AircraftClass
@@ -1479,6 +1491,7 @@ export function App() {
     if (acMarket) {
       setAircraftListings(acMarket.listings);
       setAircraftCatalog(acMarket.catalog);
+      setAirframePerf(acMarket.airframePerf ?? {});
       setAircraftMarketDay(acMarket.dayIndex);
       setWallet(acMarket.walletUsd);
       if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
@@ -2163,9 +2176,14 @@ export function App() {
       !editingManifest &&
       !watchAutoPaused &&
       !alreadyVerified &&
-      autoLoadedOfpKeyRef.current !== ofpKey;
+      autoLoadedOfpKeyRef.current !== ofpKey &&
+      !ofpInjectInFlightRef.current;
 
     if (!eligible || !activeMission || !ofpKey) {
+      if (ofpInjectInFlightRef.current) {
+        // Keep Cancel visible; progress overlay owns live weights.
+        return;
+      }
       if (alreadyVerified && ofpKey) {
         autoLoadedOfpKeyRef.current = ofpKey;
         setLoadOfpAutoStatus('done');
@@ -2187,6 +2205,8 @@ export function App() {
       },
       abort,
     };
+    // Claim this OFP key immediately so effect remounts cannot start a second inject.
+    autoLoadedOfpKeyRef.current = ofpKey;
     setLoadOfpAutoStatus('waiting');
 
     async function tryLoadOfp() {
@@ -2221,6 +2241,10 @@ export function App() {
         if (!result.ok) {
           const cancelledInject =
             result.error === 'Inject cancelled' || abort.signal.aborted;
+          // Allow Retry for this OFP after a failed/cancelled attempt.
+          if (autoLoadedOfpKeyRef.current === ofpKey) {
+            autoLoadedOfpKeyRef.current = null;
+          }
           setLoadOfpAutoStatus('failed');
           setLoadOfpAutoError(
             cancelledInject ? 'Inject cancelled' : result.error ?? 'OFP load failed',
@@ -2266,6 +2290,9 @@ export function App() {
         setLoadOfpProgress(null);
       } catch (err) {
         stopped = true;
+        if (autoLoadedOfpKeyRef.current === ofpKey) {
+          autoLoadedOfpKeyRef.current = null;
+        }
         if (abort.signal.aborted) {
           setLoadOfpAutoStatus('failed');
           setLoadOfpAutoError('Inject cancelled');
@@ -2293,9 +2320,8 @@ export function App() {
     }, 15_000);
     return () => {
       cancelled = true;
-      // Do NOT abort the fetch here — soft dep churn (weight unit, airport null,
-      // preflight stamp) was killing inject mid-pipe and the UI restarted a second
-      // load. User Cancel still calls abort + /api/load-ofp/cancel.
+      // Do NOT abort the fetch here — soft dep churn was killing inject mid-pipe.
+      // User Cancel still calls abort + /api/load-ofp/cancel.
       if (loadOfpControlRef.current?.abort === abort) {
         loadOfpControlRef.current = null;
       }
@@ -2310,8 +2336,8 @@ export function App() {
     activeMission?.lastOfpCheck?.staticId,
     activeMission?.lastOfpCheck?.verdict,
     activeMission?.fuelAuthorizedOfpId,
-    activeMission?.lastPreflightCheck?.checkedAtIso,
-    activeMission?.lastPreflightCheck?.loadVerification?.ready,
+    // Intentionally NOT lastPreflightCheck.* — progress poll used to mutate those
+    // mid-inject, remount this effect, hide Cancel, and start a second inject.
     airportIcao,
     loadOfpRetryToken,
     preferManualLoad,
@@ -2319,7 +2345,6 @@ export function App() {
     staging?.replaceManifest,
     tab,
     watchAutoPaused,
-    weightSystem,
   ]);
 
   // Live inject progress (planning → injecting → balancing CG → verifying).
@@ -2333,8 +2358,9 @@ export function App() {
         const { progress } = await fetchLoadOfpProgress(activeMission!.id);
         if (cancelled) return;
         setLoadOfpProgress(progress);
-        // Overlay live Sim weights onto Preflight cards while inject owns the pipe
-        // (background /api/preflight is paused during loading).
+        // Overlay live Sim weights onto Preflight cards while inject owns the pipe.
+        // Do NOT touch checkedAtIso / ready — those remounted the auto-inject effect
+        // and hid Cancel / started a second inject.
         if (
           progress &&
           (progress.livePayloadLb !== undefined ||
@@ -2350,41 +2376,22 @@ export function App() {
               if (!prev || !verification) {
                 return mission;
               }
-              const plannedPayload =
-                progress.plannedPayloadLb ?? verification.payload.plannedLb;
-              const plannedFuel =
-                progress.plannedFuelLb ?? verification.fuel.plannedLb;
               const livePayload =
                 progress.livePayloadLb ?? verification.payload.liveLb;
               const liveFuel = progress.liveFuelLb ?? verification.fuel.liveLb;
-              // Display-only during inject — authoritative READY is written by
-              // post-inject preflight / Watch persist afterward.
-              const weights = evaluateLoadVerification({
-                plannedFuelLb: plannedFuel,
-                liveFuelLb: liveFuel,
-                plannedPayloadLb: plannedPayload,
-                livePayloadLb: livePayload,
-              });
               return {
                 ...mission,
                 lastPreflightCheck: {
                   ...prev,
-                  checkedAtIso: progress.updatedAtIso || prev.checkedAtIso,
-                  verdict: weights.ready
-                    ? prev.verdict === 'fail'
-                      ? 'pass'
-                      : prev.verdict
-                    : 'fail',
                   loadVerification: {
                     ...verification,
-                    ready: weights.ready,
                     fuel: {
                       ...verification.fuel,
-                      ...weights.fuel,
+                      liveLb: liveFuel,
                     },
                     payload: {
                       ...verification.payload,
-                      ...weights.payload,
+                      liveLb: livePayload,
                     },
                     cg: verification.cg
                       ? {
@@ -2430,6 +2437,8 @@ export function App() {
       simBridge?.onGround !== false &&
       !watch?.running &&
       loadOfpAutoStatus !== 'loading' &&
+      loadOfpAutoStatus !== 'waiting' &&
+      !ofpInjectInFlightRef.current &&
       !staging?.replaceManifest;
     if (!eligible || !activeMission) return;
 
@@ -2495,7 +2504,8 @@ export function App() {
       // Inject owns the SimBridge pipe — do not auto-start Watch until inject
       // leaves waiting/loading (Watch tick is the Loaded vs Due owner afterward).
       loadOfpAutoStatus !== 'loading' &&
-      loadOfpAutoStatus !== 'waiting';
+      loadOfpAutoStatus !== 'waiting' &&
+      !ofpInjectInFlightRef.current;
 
     if (!eligible || !activeMission) {
       if (!alreadyWatching) {
@@ -2771,6 +2781,7 @@ export function App() {
     const acMarket = await fetchAircraftMarket();
     setAircraftListings(acMarket.listings);
     setAircraftCatalog(acMarket.catalog);
+    setAirframePerf(acMarket.airframePerf ?? {});
     setAircraftMarketDay(acMarket.dayIndex);
     setWallet(acMarket.walletUsd);
     if (acMarket.fleet) setFleet(acMarket.fleet);
@@ -3442,18 +3453,26 @@ export function App() {
   }
 
   async function onCancel(mission: Mission) {
+    const airborne = mission.status === 'in_flight';
     const ok = await confirm({
-      title: 'Cancel this flight?',
+      title: airborne ? 'Abort this flight?' : 'Cancel this flight?',
       body: (
         <>
           <p>
             <code>{mission.id}</code> · releases {mission.lots?.length ?? 1} lot
             reservation(s) back to the market when still active.
           </p>
-          <p>No payout.</p>
+          {airborne ? (
+            <p>
+              You are already airborne — aborting ends the contract with no
+              payout. Cargo returns to the market.
+            </p>
+          ) : (
+            <p>No payout.</p>
+          )}
         </>
       ),
-      confirmLabel: 'Yes, cancel flight',
+      confirmLabel: airborne ? 'Yes, abort flight' : 'Yes, cancel flight',
       cancelLabel: 'Keep flying',
       tone: 'danger',
     });
@@ -3529,6 +3548,9 @@ export function App() {
           },
     );
     loadOfpControlRef.current?.stop();
+    // Free the OFP key so Retry can start a clean inject.
+    autoLoadedOfpKeyRef.current = null;
+    ofpInjectInFlightRef.current = false;
     try {
       // Tell the server first so long settle loops see the flag.
       await postCancelLoadOfp(missionId);
@@ -3709,6 +3731,48 @@ export function App() {
     () => new Map(aircraftCatalog.map((c) => [c.id, c])),
     [aircraftCatalog],
   );
+
+  function listingCatalogEntry(
+    listing: AircraftListing,
+  ): AircraftCatalogEntry | undefined {
+    const classRow = catalogByClass.get(listing.aircraftClassId);
+    const perf = listing.airframeTypeId
+      ? airframePerf[listing.airframeTypeId]
+      : undefined;
+    if (!classRow && !perf) return undefined;
+    return {
+      id: listing.aircraftClassId,
+      name: classRow?.name ?? listing.label,
+      msrpUsd: classRow?.msrpUsd ?? 0,
+      leaseMonthlyUsd: classRow?.leaseMonthlyUsd ?? 0,
+      maxCargoKg: perf?.maxCargoKg ?? classRow?.maxCargoKg ?? 0,
+      maxRangeNm: perf?.maxRangeNm ?? classRow?.maxRangeNm ?? 0,
+      cruiseFuelFlowKgPerHour: perf?.cruiseFuelFlowKgPerHour,
+      cruiseSpeedKt: perf?.cruiseSpeedKt,
+      fuelBurnKgPerNm: perf?.fuelBurnKgPerNm,
+    };
+  }
+
+  function hangarCatalogEntry(
+    acf: PlayerAircraft,
+  ): AircraftCatalogEntry | undefined {
+    const classRow = catalogByClass.get(acf.aircraftClassId);
+    const perf = acf.airframeTypeId
+      ? airframePerf[acf.airframeTypeId]
+      : undefined;
+    if (!classRow && !perf) return undefined;
+    return {
+      id: acf.aircraftClassId,
+      name: classRow?.name ?? acf.label,
+      msrpUsd: classRow?.msrpUsd ?? 0,
+      leaseMonthlyUsd: classRow?.leaseMonthlyUsd ?? 0,
+      maxCargoKg: perf?.maxCargoKg ?? classRow?.maxCargoKg ?? 0,
+      maxRangeNm: perf?.maxRangeNm ?? classRow?.maxRangeNm ?? 0,
+      cruiseFuelFlowKgPerHour: perf?.cruiseFuelFlowKgPerHour,
+      cruiseSpeedKt: perf?.cruiseSpeedKt,
+      fuelBurnKgPerNm: perf?.fuelBurnKgPerNm,
+    };
+  }
   const filteredAircraftListings = useMemo(() => {
     const q = aircraftMarketQuery.trim().toLowerCase();
     return aircraftListings.filter((listing) => {
@@ -6049,7 +6113,7 @@ export function App() {
                   <MarketListingCard
                     key={listing.id}
                     listing={listing}
-                    catalog={catalogByClass.get(listing.aircraftClassId)}
+                    catalog={listingCatalogEntry(listing)}
                     wallet={wallet}
                     busy={busy}
                     formatMoney={formatMoney}
@@ -6125,6 +6189,7 @@ export function App() {
                 <HangarAircraftCard
                   key={acf.id}
                   aircraft={acf}
+                  catalog={hangarCatalogEntry(acf)}
                   busy={busy}
                   hubOptions={hubOptions}
                   ferryDest={ferryDest}

@@ -12,7 +12,11 @@
  * Caravan) share one Market SKU via familyRolesPackRelPaths.
  */
 import catalogJson from './data/career-player-airframes.json' with { type: 'json' };
-import type { FreighterClassId, PlayerAircraft } from './types/career-economy.js';
+import type {
+  FreighterClassId,
+  PlayerAircraft,
+  AirframePerfOverride,
+} from './types/career-economy.js';
 
 export interface CareerPlayerAirframe {
   typeId: string;
@@ -33,6 +37,159 @@ export interface CareerPlayerAirframe {
   mtowKg?: number;
   maxCargoKg?: number;
   fuelCapacityKg?: number;
+  /**
+   * Max range (nm) — usually from aircraft.cfg ui_max_range.
+   * Falls back to CAREER_AIRCRAFT_CLASSES.maxRangeNm when omitted.
+   */
+  maxRangeNm?: number;
+  /**
+   * Cruise fuel flow (kg/hour) — from ui_fuel_burn_rate (lbs→kg) or live sample.
+   */
+  cruiseFuelFlowKgPerHour?: number;
+  /**
+   * Typical cruise TAS (kt) — from flight_model cruise_speed or live sample.
+   */
+  cruiseSpeedKt?: number;
+  /**
+   * Planning burn (kg/nm). Derived from cruise flow ÷ cruise KTAS, or live sample.
+   * Falls back to class fuelBurnKgPerNm when omitted.
+   */
+  fuelBurnKgPerNm?: number;
+}
+
+/** Keep in sync with CAREER_AIRCRAFT_CLASSES (avoid circular import). */
+const CLASS_PERF_FALLBACK: Record<
+  FreighterClassId,
+  { maxRangeNm: number; fuelBurnKgPerNm: number }
+> = {
+  light_ga: { maxRangeNm: 800, fuelBurnKgPerNm: 0.35 },
+  light_turboprop: { maxRangeNm: 900, fuelBurnKgPerNm: 0.8 },
+  narrow_freighter: { maxRangeNm: 2_500, fuelBurnKgPerNm: 5 },
+  wide_freighter: { maxRangeNm: 6_000, fuelBurnKgPerNm: 12 },
+};
+
+/** Prefer per-airframe catalog range; else class default. */
+export function resolveAirframeMaxRangeNm(
+  airframeTypeId: string | null | undefined,
+  aircraftClassId: FreighterClassId | string,
+): number {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  if (
+    typeof airframe?.maxRangeNm === 'number' &&
+    Number.isFinite(airframe.maxRangeNm) &&
+    airframe.maxRangeNm > 0
+  ) {
+    return Math.round(airframe.maxRangeNm);
+  }
+  return (
+    CLASS_PERF_FALLBACK[aircraftClassId as FreighterClassId]?.maxRangeNm ?? 800
+  );
+}
+
+/** Prefer per-airframe planning burn; else class default. */
+export function resolveAirframeFuelBurnKgPerNm(
+  airframeTypeId: string | null | undefined,
+  aircraftClassId: FreighterClassId | string,
+): number {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  if (
+    typeof airframe?.fuelBurnKgPerNm === 'number' &&
+    Number.isFinite(airframe.fuelBurnKgPerNm) &&
+    airframe.fuelBurnKgPerNm > 0
+  ) {
+    return airframe.fuelBurnKgPerNm;
+  }
+  return (
+    CLASS_PERF_FALLBACK[aircraftClassId as FreighterClassId]?.fuelBurnKgPerNm ??
+    0.35
+  );
+}
+
+/** Cruise fuel flow (kg/h) when known on the airframe catalog. */
+export function resolveAirframeCruiseFuelFlowKgPerHour(
+  airframeTypeId: string | null | undefined,
+): number | undefined {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  if (
+    typeof airframe?.cruiseFuelFlowKgPerHour === 'number' &&
+    Number.isFinite(airframe.cruiseFuelFlowKgPerHour) &&
+    airframe.cruiseFuelFlowKgPerHour > 0
+  ) {
+    return airframe.cruiseFuelFlowKgPerHour;
+  }
+  return undefined;
+}
+
+/** Cruise TAS (kt) — catalog value, or derived from kg/h ÷ kg/nm when both exist. */
+export function resolveAirframeCruiseSpeedKt(
+  airframeTypeId: string | null | undefined,
+): number | undefined {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  if (
+    typeof airframe?.cruiseSpeedKt === 'number' &&
+    Number.isFinite(airframe.cruiseSpeedKt) &&
+    airframe.cruiseSpeedKt > 0
+  ) {
+    return Math.round(airframe.cruiseSpeedKt);
+  }
+  const flow = resolveAirframeCruiseFuelFlowKgPerHour(airframeTypeId);
+  const burnNm =
+    typeof airframe?.fuelBurnKgPerNm === 'number' &&
+    Number.isFinite(airframe.fuelBurnKgPerNm) &&
+    airframe.fuelBurnKgPerNm > 0
+      ? airframe.fuelBurnKgPerNm
+      : undefined;
+  if (flow != null && burnNm != null) {
+    return Math.round(flow / burnNm);
+  }
+  return undefined;
+}
+
+/** Specs for market/hangar cards — airframe overrides with class fallback. */
+export function resolveAirframePerfForUi(
+  airframeTypeId: string | null | undefined,
+  aircraftClassId: FreighterClassId | string,
+  classFallback?: { maxCargoKg: number; maxRangeNm: number },
+  liveOverride?: AirframePerfOverride | null,
+): {
+  maxCargoKg: number;
+  maxRangeNm: number;
+  cruiseFuelFlowKgPerHour?: number;
+  cruiseSpeedKt?: number;
+  fuelBurnKgPerNm: number;
+} {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  const catalogFlow = resolveAirframeCruiseFuelFlowKgPerHour(airframeTypeId);
+  const catalogSpeed = resolveAirframeCruiseSpeedKt(airframeTypeId);
+  const catalogBurn = resolveAirframeFuelBurnKgPerNm(
+    airframeTypeId,
+    aircraftClassId,
+  );
+  const overrideFlow =
+    typeof liveOverride?.cruiseFuelFlowKgPerHour === 'number' &&
+    liveOverride.cruiseFuelFlowKgPerHour > 0
+      ? liveOverride.cruiseFuelFlowKgPerHour
+      : undefined;
+  const overrideSpeed =
+    typeof liveOverride?.cruiseSpeedKt === 'number' &&
+    liveOverride.cruiseSpeedKt > 0
+      ? Math.round(liveOverride.cruiseSpeedKt)
+      : undefined;
+  const overrideBurn =
+    typeof liveOverride?.fuelBurnKgPerNm === 'number' &&
+    liveOverride.fuelBurnKgPerNm > 0
+      ? liveOverride.fuelBurnKgPerNm
+      : undefined;
+  return {
+    maxCargoKg:
+      typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
+        ? airframe.maxCargoKg
+        : (classFallback?.maxCargoKg ?? 450),
+    maxRangeNm: resolveAirframeMaxRangeNm(airframeTypeId, aircraftClassId),
+    cruiseFuelFlowKgPerHour: overrideFlow ?? catalogFlow,
+    cruiseSpeedKt: overrideSpeed ?? catalogSpeed,
+    fuelBurnKgPerNm: overrideBurn ?? catalogBurn,
+  };
 }
 
 export const CAREER_PLAYER_AIRFRAMES: readonly CareerPlayerAirframe[] =

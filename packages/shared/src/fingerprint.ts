@@ -48,6 +48,10 @@ const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\bcarenado\b/i, publisher: 'carenado' },
   // Default / Marketplace Saab 340 — live titles are often just "340 Cargo - …".
   { re: /\bsaab\s*340\b|\b340\s+cargo\b|\bs340b?\b/i, publisher: 'carenado' },
+  // C400 Corvalis — live title has no vendor prefix; MSFS may report asobo package.
+  { re: /\bc400\b.*\bcorvalis\b|\bcorvalis\b/i, publisher: 'carenado' },
+  // C185F Skywagon — same aircraft homologated as carenado; live title is Asobo/Microsoft.
+  { re: /\bc185f?\b.*\bskywagon\b|\bskywagon\b/i, publisher: 'carenado' },
   { re: /\bfs\s*reborn\b|\bfsreborn\b/i, publisher: 'fsreborn' },
   { re: /\bnext\s*gen\s*sim\b|\bnextgensim\b/i, publisher: 'nextgensim' },
   { re: /\bflight\s*fx\b|\bflightfx\b/i, publisher: 'flightfx' },
@@ -55,6 +59,7 @@ const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\bfenix\b/i, publisher: 'fenix' },
   { re: /\binibuilds\b/i, publisher: 'inibuilds' },
   { re: /\bworking\s*title\b/i, publisher: 'workingtitle' },
+  { re: /\bjust\s*flight\b/i, publisher: 'justflight' },
   { re: /\basobo\b/i, publisher: 'asobo' },
 ];
 
@@ -66,6 +71,7 @@ export const KNOWN_PUBLISHERS: readonly string[] = [
     'carenado',
     'flightfx',
     'hype',
+    'justflight',
     'miltech',
     'orbx',
   ]),

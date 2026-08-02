@@ -9,6 +9,8 @@ export const DEFAULT_PAYLOAD_TOL_LB = 75;
  *
  * Policy:
  * - Stations near-zero while mass-balance still heavy → Accu-Sim under-read → trust MB.
+ * - Stations much heavier than mass-balance → ghost SimConnect stations (PMDG tablet
+ *   cargo holds) → trust MB.
  * - Otherwise prefer station sum (includes intentionally emptied stations).
  * - Mass-balance may be 0 (emptied aircraft); never treat low MB as “unknown”.
  */
@@ -31,6 +33,15 @@ export function resolveLivePayloadLb(opts: {
     mb !== undefined &&
     mb >= 50 &&
     (station === undefined || station + 75 < mb * 0.5)
+  ) {
+    return { payloadLb: mb, source: 'mass-balance' };
+  }
+  // Inflated classic stations vs tablet/EFB cargo (e.g. PMDG DC-6 Fuel/Load Manager).
+  if (
+    mb !== undefined &&
+    station !== undefined &&
+    station > mb * 2 + 200 &&
+    station - mb > 400
   ) {
     return { payloadLb: mb, source: 'mass-balance' };
   }

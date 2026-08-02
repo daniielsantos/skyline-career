@@ -8,7 +8,10 @@
     "fingerprint": "e885c5431e01590e366d446e44e7be0a0520c7cd1608162cfa9da0949395c0f2",
     "title": "A2A Piper Aerostar 600",
     "publisher": "a2a",
-    "icao": "AEST"
+    "icao": "AEST",
+    "liveTitles": [
+      "A2A Piper Aerostar 600"
+    ]
   },
   "capabilities": [
     "simconnect",
@@ -82,19 +85,19 @@
         {
           "var": "FUEL TANK LEFT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 3,
           "valueExpr": "{LEFT_MAIN}"
         },
         {
           "var": "FUEL TANK RIGHT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 3,
           "valueExpr": "{RIGHT_MAIN}"
         },
         {
           "var": "FUEL TANK CENTER QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 3,
           "valueExpr": "{CENTER}"
         }
       ]
@@ -106,37 +109,44 @@
       {
         "index": 1,
         "name": "Character1Weight",
-        "maxLoad": 300
+        "maxLoad": 300,
+        "arm": 5
       },
       {
         "index": 2,
         "name": "Character2Weight",
-        "maxLoad": 300
+        "maxLoad": 300,
+        "arm": 5
       },
       {
         "index": 3,
         "name": "Character3Weight",
-        "maxLoad": 300
+        "maxLoad": 300,
+        "arm": 2.6
       },
       {
         "index": 4,
         "name": "Character4Weight",
-        "maxLoad": 300
+        "maxLoad": 300,
+        "arm": 2.6
       },
       {
         "index": 5,
         "name": "Character5Weight",
-        "maxLoad": 300
+        "maxLoad": 300,
+        "arm": 0
       },
       {
         "index": 6,
         "name": "Character6Weight",
-        "maxLoad": 300
+        "maxLoad": 300,
+        "arm": 0
       },
       {
         "index": 7,
         "name": "baggage",
-        "maxLoad": 400
+        "maxLoad": 400,
+        "arm": -8.3
       }
     ],
     "writePlan": [
@@ -226,9 +236,31 @@
   "cg": {
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
     "constraints": {
-      "minMac": -13,
-      "maxMac": 23
+      "minMac": 0,
+      "maxMac": 100
+    },
+    "calibration": {
+      "observedMac": -1.0685015469789505,
+      "calibratedAtIso": "2026-08-02T22:14:06.129Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\a2a-aircraft-aerostar600\\SimObjects\\Airplanes\\aerostar600\\common\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        0.491999,
+        0,
+        0.200002
+      ],
+      "sweep": {
+        "minObservedMac": -1.6911761835217476,
+        "maxObservedMac": 16.587963700294495,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 7,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-02T22:14:14.678Z"
+      }
     }
   },
   "fallback": {
@@ -240,9 +272,9 @@
     "Homologated via wizard: A2A Piper Aerostar 600.",
     "ICAO type designator (catalog/SimBrief): AEST.",
     "Drafted from vendor recipe a2a-accusim.",
-    "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy.",
+    "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy. Tank set varies (fuselage vs tip) — draft keeps only tanks with live capacity ≥ 5.",
     "Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, CENTER.",
-    "See profiles/notes/a2a-piper-aerostar-600.md",
+    "See profiles/notes/a2a-accusim.md",
     "Homologated with interactive wizard (recipe lvar-bridge).",
     "See profiles/notes/a2a-piper-aerostar-600.md"
   ]

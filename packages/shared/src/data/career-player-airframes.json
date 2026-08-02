@@ -12,6 +12,18 @@
     "fuelBurnKgPerNm": 0.888
   },
   {
+    "typeId": "a2a-piper-aerostar-600",
+    "aircraftClassId": "light_ga",
+    "label": "A2A Piper Aerostar 600",
+    "rolesPackRelPath": "profiles/ofp/a2a-piper-aerostar-600.json",
+    "simbriefIcao": "AEST",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 1400,
+    "cruiseFuelFlowKgPerHour": 66.5,
+    "cruiseSpeedKt": 190,
+    "fuelBurnKgPerNm": 0.35
+  },
+  {
     "typeId": "blacksquare-baron-58-professional",
     "aircraftClassId": "light_ga",
     "label": "Beechcraft Baron BE58",
@@ -48,6 +60,30 @@
     "simbriefAirframeMatch": "Default"
   },
   {
+    "typeId": "carenado-c185f-skywagon",
+    "aircraftClassId": "light_ga",
+    "label": "C185F Skywagon",
+    "rolesPackRelPath": "profiles/ofp/carenado-c185f-skywagon.json",
+    "simbriefIcao": "C182",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 721,
+    "cruiseFuelFlowKgPerHour": 49.4,
+    "cruiseSpeedKt": 147,
+    "fuelBurnKgPerNm": 0.336
+  },
+  {
+    "typeId": "carenado-c400-corvalis",
+    "aircraftClassId": "light_ga",
+    "label": "C400 Corvalis",
+    "rolesPackRelPath": "profiles/ofp/carenado-c400-corvalis.json",
+    "simbriefIcao": "BE36",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 1250,
+    "cruiseFuelFlowKgPerHour": 75.3,
+    "cruiseSpeedKt": 235,
+    "fuelBurnKgPerNm": 0.32
+  },
+  {
     "typeId": "asobo-c172sp-cargo",
     "aircraftClassId": "light_ga",
     "label": "Cessna 172SP Cargo",
@@ -78,6 +114,78 @@
     "fuelBurnKgPerNm": 0.168
   },
   {
+    "typeId": "cows-da40-xls",
+    "aircraftClassId": "light_ga",
+    "label": "DA40-XLS",
+    "rolesPackRelPath": "profiles/ofp/cows-da40-xls.json",
+    "simbriefIcao": "C172",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 800,
+    "cruiseFuelFlowKgPerHour": 31.3,
+    "cruiseSpeedKt": 130,
+    "fuelBurnKgPerNm": 0.241
+  },
+  {
+    "typeId": "cows-da42",
+    "aircraftClassId": "light_ga",
+    "label": "DA42",
+    "rolesPackRelPath": "profiles/ofp/cows-da42.json",
+    "simbriefIcao": "DA42",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 1225,
+    "cruiseFuelFlowKgPerHour": 49.9,
+    "cruiseSpeedKt": 175,
+    "fuelBurnKgPerNm": 0.285
+  },
+  {
+    "typeId": "skyward-da50",
+    "aircraftClassId": "light_ga",
+    "label": "DA50",
+    "rolesPackRelPath": "profiles/ofp/skyward-da50.json",
+    "simbriefIcao": "C182",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 700,
+    "cruiseFuelFlowKgPerHour": 31.3,
+    "cruiseSpeedKt": 165,
+    "fuelBurnKgPerNm": 0.19
+  },
+  {
+    "typeId": "justflight-just-flight-pa28-arrow-iii",
+    "aircraftClassId": "light_ga",
+    "label": "Just Flight PA28 Turbo Arrow IV",
+    "rolesPackRelPath": "profiles/ofp/justflight-just-flight-pa28-arrow-iii.json",
+    "simbriefIcao": "PA24",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 780,
+    "cruiseFuelFlowKgPerHour": 38.6,
+    "cruiseSpeedKt": 172,
+    "fuelBurnKgPerNm": 0.224
+  },
+  {
+    "typeId": "justflight-just-flight-pa28-warrior-ii",
+    "aircraftClassId": "light_ga",
+    "label": "Just Flight PA28 Warrior II",
+    "rolesPackRelPath": "profiles/ofp/justflight-just-flight-pa28-warrior-ii.json",
+    "simbriefIcao": "C172",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 637,
+    "cruiseFuelFlowKgPerHour": 22.9,
+    "cruiseSpeedKt": 111,
+    "fuelBurnKgPerNm": 0.206
+  },
+  {
+    "typeId": "carenado-piper-pa28-236-dakota",
+    "aircraftClassId": "light_ga",
+    "label": "Piper PA28-236 Dakota",
+    "rolesPackRelPath": "profiles/ofp/carenado-piper-pa28-236-dakota.json",
+    "simbriefIcao": "C172",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 740,
+    "cruiseFuelFlowKgPerHour": 48.5,
+    "cruiseSpeedKt": 124,
+    "fuelBurnKgPerNm": 0.391
+  },
+  {
     "typeId": "blacksquare-commander-114",
     "aircraftClassId": "light_ga",
     "label": "Rockwell Commander 114",
@@ -91,6 +199,30 @@
     "maxRangeNm": 800,
     "cruiseFuelFlowKgPerHour": 32.8,
     "fuelBurnKgPerNm": 0.189
+  },
+  {
+    "typeId": "asobo-cessna-citation-cj4",
+    "aircraftClassId": "light_jet",
+    "label": "Cessna Citation CJ4",
+    "rolesPackRelPath": "profiles/ofp/asobo-cessna-citation-cj4.json",
+    "simbriefIcao": "C25C",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 2165,
+    "cruiseFuelFlowKgPerHour": 571.5,
+    "cruiseSpeedKt": 451,
+    "fuelBurnKgPerNm": 1.267
+  },
+  {
+    "typeId": "livtoair-citation-cj3",
+    "aircraftClassId": "light_jet",
+    "label": "Citation CJ3+",
+    "rolesPackRelPath": "profiles/ofp/livtoair-citation-cj3.json",
+    "simbriefIcao": "C25B",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 2040,
+    "cruiseFuelFlowKgPerHour": 455.9,
+    "cruiseSpeedKt": 416,
+    "fuelBurnKgPerNm": 1.096
   },
   {
     "typeId": "flysimware-learjet-35a-cargo",
@@ -113,6 +245,18 @@
     "simbriefAirframeMatch": "Default"
   },
   {
+    "typeId": "carenado-c408-skycourier-cargo",
+    "aircraftClassId": "light_turboprop",
+    "label": "C408 SkyCourier Cargo",
+    "rolesPackRelPath": "profiles/ofp/carenado-c408-skycourier-cargo.json",
+    "simbriefIcao": "C408",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 920,
+    "cruiseFuelFlowKgPerHour": 168,
+    "cruiseSpeedKt": 210,
+    "fuelBurnKgPerNm": 0.8
+  },
+  {
     "typeId": "c208-caravan-cargo",
     "aircraftClassId": "light_turboprop",
     "label": "Cessna 208 Caravan Cargo",
@@ -123,6 +267,18 @@
     ],
     "simbriefIcao": "C208",
     "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "inibuilds-f406-caravan-ii-cargo",
+    "aircraftClassId": "light_turboprop",
+    "label": "iniBuilds F406 Caravan II Cargo",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-f406-caravan-ii-cargo.json",
+    "simbriefIcao": "F406",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 1153,
+    "cruiseFuelFlowKgPerHour": 42.6,
+    "cruiseSpeedKt": 210,
+    "fuelBurnKgPerNm": 0.203
   },
   {
     "typeId": "sws-kodiak-100-cargo",
@@ -137,11 +293,31 @@
     "fuelBurnKgPerNm": 0.576
   },
   {
+    "typeId": "nextgensim-emb-110p1-bandeirante",
+    "aircraftClassId": "light_turboprop",
+    "label": "NextGenSim EMB-110P1 Bandeirante",
+    "rolesPackRelPath": "profiles/ofp/nextgensim-emb-110p1-bandeirante.json",
+    "simbriefIcao": "E110",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 1060,
+    "cruiseFuelFlowKgPerHour": 182.3,
+    "cruiseSpeedKt": 220,
+    "fuelBurnKgPerNm": 0.829
+  },
+  {
     "typeId": "carenado-saab-340-cargo",
     "aircraftClassId": "light_turboprop",
     "label": "Saab 340 Cargo",
     "rolesPackRelPath": "profiles/ofp/carenado-saab-340-cargo.json",
     "simbriefIcao": "SF34",
+    "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "pmdg-dc6",
+    "aircraftClassId": "medium_piston",
+    "label": "DC-6A",
+    "rolesPackRelPath": "profiles/ofp/pmdg-dc6.json",
+    "simbriefIcao": "DC6",
     "simbriefAirframeMatch": "Default"
   },
   {

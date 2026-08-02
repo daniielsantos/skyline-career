@@ -1,0 +1,104 @@
+{
+  "source": "simbrief",
+  "icao": "PA24",
+  "ofpId": "justflight-just-flight-pa28-arrow-iii",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "Just Flight PA28 Arrow III",
+    "Just Flight PA28 Turbo Arrow III",
+    "Just Flight PA28 Turbo Arrow IV"
+  ],
+  "matchTitlePattern": "Just Flight PA28 Arrow III",
+  "notes": [
+    "Just Flight PA28 Arrow III — auto roles pack from homologated profile",
+    "Profile: justflight/just-flight-pa28-arrow-iii@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct",
+    "Just Flight PA28 Turbo Arrow III — auto roles pack from homologated profile",
+    "Profile: justflight/just-flight-pa28-turbo-arrow-iii@1.0.0",
+    "Joined Market family: Just Flight PA28 Arrow III (justflight-just-flight-pa28-arrow-iii)",
+    "Homologated profile: justflight/just-flight-pa28-turbo-arrow-iii@1.0.0",
+    "Title: Just Flight PA28 Turbo Arrow III",
+    "Just Flight PA28 Turbo Arrow IV — auto roles pack from homologated profile",
+    "Profile: justflight/just-flight-pa28-turbo-arrow-iv@1.0.0",
+    "Joined Market family: Just Flight PA28 Turbo Arrow III (justflight-just-flight-pa28-arrow-iii)",
+    "Homologated profile: justflight/just-flight-pa28-turbo-arrow-iv@1.0.0",
+    "Title: Just Flight PA28 Turbo Arrow IV"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "PA24",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Station 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Station 2",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Station 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Station 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Station 5",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

@@ -1,14 +1,18 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "asobo-c185f-skywagon-standard",
-  "profileKey": "asobo/c185f-skywagon-standard",
+  "profileId": "justflight-just-flight-pa28-arrow-iii",
+  "profileKey": "justflight/just-flight-pa28-arrow-iii",
   "semver": "1.0.0",
-  "displayName": "C185F Skywagon Standard (MSFS 2024 Asobo)",
+  "displayName": "Just Flight PA28 Arrow III (MSFS 2024)",
   "match": {
-    "fingerprint": "d6db544a8018d8e9b6cfeba0ce494aefc4fa4a25328ac3858269543485859d4c",
-    "title": "C185F Skywagon Standard",
-    "publisher": "asobo",
-    "icao": "C185"
+    "fingerprint": "331f7f891cd1f60b14fcce91f24165a9c4d492a7477fe8dff60c46342fba8454",
+    "title": "Just Flight PA28 Arrow III",
+    "publisher": "justflight",
+    "icao": "PA24",
+    "liveTitles": [
+      "Just Flight PA28 Arrow III",
+      "Just Flight PA28 Arrow III C-GQYI"
+    ]
   },
   "capabilities": [
     "simconnect"
@@ -27,55 +31,55 @@
     "tanks": [
       {
         "id": "LEFT_MAIN",
-        "name": "FUELSYSTEM:1",
-        "capacity": 32.5,
-        "readVar": "FUELSYSTEM TANK QUANTITY:1",
+        "name": "Left Main",
+        "capacity": 38.5,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
-        "writeVar": "FUELSYSTEM TANK QUANTITY:1",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
         "writeUnit": "gallons"
       },
       {
         "id": "RIGHT_MAIN",
-        "name": "FUELSYSTEM:2",
-        "capacity": 32.5,
-        "readVar": "FUELSYSTEM TANK QUANTITY:2",
+        "name": "Right Main",
+        "capacity": 38.5,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
-        "writeVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "writeUnit": "gallons"
       }
     ],
     "writePlan": [
       {
         "op": "simvar_set",
-        "var": "FUELSYSTEM TANK QUANTITY:1",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN} + 1.5"
+        "valueExpr": "{LEFT_MAIN}"
       },
       {
         "op": "simvar_set",
-        "var": "FUELSYSTEM TANK QUANTITY:2",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN} + 1.5"
+        "valueExpr": "{RIGHT_MAIN}"
       },
       {
         "op": "delay",
-        "ms": 400
+        "ms": 1000
       }
     ],
     "verify": {
-      "timeoutMs": 6000,
+      "timeoutMs": 8000,
       "pollIntervalMs": 250,
       "checks": [
         {
-          "var": "FUELSYSTEM TANK QUANTITY:1",
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 3,
           "valueExpr": "{LEFT_MAIN}"
         },
         {
-          "var": "FUELSYSTEM TANK QUANTITY:2",
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 2,
+          "tolerancePct": 3,
           "valueExpr": "{RIGHT_MAIN}"
         }
       ]
@@ -87,27 +91,32 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 1.05
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 1.05
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.08
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.08
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -4.14
       }
     ],
     "writePlan": [
@@ -162,9 +171,31 @@
   "cg": {
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 10,
-      "maxMac": 45
+      "minMac": 14.000000000000002,
+      "maxMac": 30
+    },
+    "calibration": {
+      "observedMac": 21.345338225364685,
+      "calibratedAtIso": "2026-08-02T19:34:59.676Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\justflight-aircraft-pa28-arrow-bundle\\SimObjects\\Airplanes\\JF_PA28_Arrow\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        0.2,
+        0,
+        0.4
+      ],
+      "sweep": {
+        "minObservedMac": 20.041750371456146,
+        "maxObservedMac": 30.419135093688965,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 5,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-02T19:35:06.779Z"
+      }
     }
   },
   "fallback": {
@@ -173,8 +204,12 @@
     ]
   },
   "notes": [
-    "Homologated MSFS 2024 Asobo C185F Skywagon Standard.",
-    "Fuel writeOffset +1.5 gal on FUELSYSTEM:1/2; capacity ~32.5 gal/side.",
-    "Payload stations 1-5 writable via PAYLOAD STATION WEIGHT."
+    "Homologated via wizard: Just Flight PA28 Arrow III.",
+    "ICAO type designator (catalog/SimBrief): PA24.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Stations: 5.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/justflight-just-flight-pa28-arrow-iii.md"
   ]
 }

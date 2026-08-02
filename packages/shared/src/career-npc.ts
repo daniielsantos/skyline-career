@@ -55,7 +55,7 @@ export {
 } from './career-npc-airframes.js';
 
 /** About four operators per mapped region; enough capacity for a 52-hub world. */
-export const NPC_FLEET_SIZE = 44;
+export const NPC_FLEET_SIZE = 48;
 
 /** Target mix: jets for heavy freight + GA for LTL / short-haul competition. */
 export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
@@ -64,6 +64,7 @@ export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
 }> = [
   { aircraftClassId: 'narrow_freighter', count: 14 },
   { aircraftClassId: 'wide_freighter', count: 10 },
+  { aircraftClassId: 'medium_piston', count: 4 },
   { aircraftClassId: 'light_jet', count: 4 },
   { aircraftClassId: 'light_turboprop', count: 10 },
   { aircraftClassId: 'light_ga', count: 6 },
@@ -81,6 +82,7 @@ export const NPC_MX_INTERVAL_HOURS: Record<FreighterClassId, number> = {
   light_ga: 90,
   light_turboprop: 110,
   light_jet: 150,
+  medium_piston: 160,
   narrow_freighter: 180,
   wide_freighter: 220,
 };
@@ -90,6 +92,7 @@ export const NPC_MX_SHOP_HOURS: Record<FreighterClassId, number> = {
   light_ga: 2,
   light_turboprop: 2.5,
   light_jet: 3,
+  medium_piston: 3.5,
   narrow_freighter: 4,
   wide_freighter: 5.5,
 };
@@ -99,6 +102,7 @@ export const NPC_MX_PARTS_KG: Record<FreighterClassId, number> = {
   light_ga: 40,
   light_turboprop: 60,
   light_jet: 120,
+  medium_piston: 160,
   narrow_freighter: 200,
   wide_freighter: 400,
 };
@@ -115,6 +119,7 @@ const MAX_REST_HOURS = 16;
 const CRUISE_KT: Record<FreighterClassId, number> = {
   narrow_freighter: 430,
   wide_freighter: 480,
+  medium_piston: 290,
   light_jet: 430,
   light_turboprop: 185,
   light_ga: 170,

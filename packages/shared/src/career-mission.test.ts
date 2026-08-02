@@ -52,6 +52,10 @@ describe('mission load method policy', () => {
       loadMethod: 'direct-injection',
       injectCapable: true,
     });
+    assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'medium_piston' }), {
+      loadMethod: 'native-simbrief',
+      injectCapable: false,
+    });
     assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'light_ga' }), {
       loadMethod: 'direct-injection',
       injectCapable: true,

@@ -26,6 +26,15 @@ describe('resolveLivePayloadLb', () => {
     assert.equal(r.payloadLb, 850);
   });
 
+  it('uses mass-balance when classic stations are inflated vs MB', () => {
+    const r = resolveLivePayloadLb({
+      stationSumLb: 4711,
+      massBalanceLb: 230,
+    });
+    assert.equal(r.source, 'mass-balance');
+    assert.equal(r.payloadLb, 230);
+  });
+
   it('allows zero mass-balance (emptied aircraft)', () => {
     const r = resolveLivePayloadLb({ massBalanceLb: 0, stationSumLb: 0 });
     assert.equal(r.source, 'stations');

@@ -15,6 +15,19 @@ describe('normalizeAircraftTitle', () => {
   });
 });
 
+describe('inferPublisher', () => {
+  it('maps C400 Corvalis to carenado without vendor prefix', async () => {
+    const { inferPublisher } = await import('./index.js');
+    assert.equal(inferPublisher('C400 Corvalis'), 'carenado');
+    assert.equal(inferPublisher('C400 Corvalis', 'asobo'), 'carenado');
+  });
+
+  it('maps C185F Skywagon to carenado without vendor prefix', async () => {
+    const { inferPublisher } = await import('./index.js');
+    assert.equal(inferPublisher('C185F Skywagon Standard'), 'carenado');
+  });
+});
+
 describe('titlesMatchForCatalog', () => {
   it('matches cleaned Saab live title to catalog match title', () => {
     assert.equal(

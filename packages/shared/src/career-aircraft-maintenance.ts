@@ -16,6 +16,7 @@ export const INSPECTION_INTERVAL_HOURS: Record<FreighterClassId, number> = {
   light_ga: 80,
   light_turboprop: 100,
   light_jet: 140,
+  medium_piston: 150,
   narrow_freighter: 160,
   wide_freighter: 200,
 };
@@ -25,6 +26,7 @@ export const WEAR_PCT_PER_HOUR: Record<FreighterClassId, number> = {
   light_ga: 0.1,
   light_turboprop: 0.1,
   light_jet: 0.09,
+  medium_piston: 0.085,
   narrow_freighter: 0.08,
   wide_freighter: 0.07,
 };
@@ -34,6 +36,7 @@ export const INSPECTION_COST_RATE: Record<FreighterClassId, number> = {
   light_ga: 0.008,
   light_turboprop: 0.007,
   light_jet: 0.006,
+  medium_piston: 0.0055,
   narrow_freighter: 0.005,
   wide_freighter: 0.004,
 };
@@ -43,6 +46,7 @@ export const REPAIR_PCT_COST_RATE: Record<FreighterClassId, number> = {
   light_ga: 0.0004,
   light_turboprop: 0.00035,
   light_jet: 0.00032,
+  medium_piston: 0.0003,
   narrow_freighter: 0.0003,
   wide_freighter: 0.00025,
 };

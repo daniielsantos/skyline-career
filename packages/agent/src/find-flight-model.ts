@@ -179,6 +179,9 @@ export const PUBLISHER_PACKAGE_PREFIXES: Readonly<Record<string, readonly string
   asobo: ['asobo-', 'asobo_'],
   microsoft: ['microsoft-', 'microsoft_', 'carenado'],
   aerosoft: ['aerosoft-'],
+  justflight: ['justflight', 'just-flight', 'jf-'],
+  flysimware: ['flysimware', 'fsw-'],
+  sws: ['sws-', 'sws_'],
 };
 
 /** Tokens that only identify a vendor — not enough to keep an airplane folder. */
@@ -204,6 +207,9 @@ const VENDOR_ONLY_TOKENS = new Set([
   'tfdi',
   'aerosoft',
   'microsoft',
+  'justflight',
+  'flysimware',
+  'sws',
 ]);
 
 export function packageMatchesPublisher(

@@ -141,6 +141,29 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelReserveKg: 400,
   },
   {
+    id: 'medium_piston',
+    name: 'Medium piston (DC-6 class)',
+    /**
+     * 4-engine radial freighter / classic airliner.
+     * Between Caravan (~1.7 t) and B738 BCF (~18 t); DC-6A freighter payload ≈ 10 t.
+     */
+    maxCargoKg: 10_000,
+    maxRangeNm: 2_200,
+    rolesPackRelPath: 'profiles/ofp/medium-piston-class.json',
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'DC6',
+    simbriefAirframeMatch: 'Default',
+    fuelBurnKgPerNm: 3.2,
+    fuelTaxiKg: 180,
+    /** ~19,400 lb avgas usable planning capacity. */
+    fuelCapacityKg: 8_800,
+    oewKg: 25_000,
+    mtowKg: 48_500,
+    fuelRouteFactor: 1.35,
+    fuelReserveKg: 900,
+  },
+  {
     id: 'light_ga',
     name: 'Light GA (BE36 Bonanza Professional)',
     /**
@@ -315,6 +338,7 @@ export function parseFreighterClassId(raw: string | undefined): FreighterClassId
   if (
     raw === 'narrow_freighter' ||
     raw === 'wide_freighter' ||
+    raw === 'medium_piston' ||
     raw === 'light_jet' ||
     raw === 'light_turboprop' ||
     raw === 'light_ga'
@@ -323,6 +347,15 @@ export function parseFreighterClassId(raw: string | undefined): FreighterClassId
   }
   if (raw === 'narrow' || raw === 'bcf' || raw === '738') return 'narrow_freighter';
   if (raw === 'wide' || raw === 'md11' || raw === 'md-11f') return 'wide_freighter';
+  if (
+    raw === 'medium' ||
+    raw === 'piston' ||
+    raw === 'dc6' ||
+    raw === 'dc-6' ||
+    raw === 'douglas'
+  ) {
+    return 'medium_piston';
+  }
   if (
     raw === 'jet' ||
     raw === 'lightjet' ||

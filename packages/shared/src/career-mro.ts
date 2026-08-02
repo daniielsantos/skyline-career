@@ -30,6 +30,7 @@ export const MRO_KG_PER_REPAIR_POINT: Record<FreighterClassId, number> = {
   light_ga: 12,
   light_turboprop: 18,
   light_jet: 28,
+  medium_piston: 38,
   narrow_freighter: 45,
   wide_freighter: 80,
 };
@@ -39,6 +40,7 @@ export const MRO_KG_PER_INSPECTION: Record<FreighterClassId, number> = {
   light_ga: 40,
   light_turboprop: 60,
   light_jet: 120,
+  medium_piston: 160,
   narrow_freighter: 200,
   wide_freighter: 400,
 };

@@ -44,6 +44,7 @@ export const CAREER_CLASS_CHOICES: Array<{
   { value: 'light_ga', label: 'light_ga — piston / small GA' },
   { value: 'light_turboprop', label: 'light_turboprop — C208-size turboprop' },
   { value: 'light_jet', label: 'light_jet — Learjet / Citation-size bizjet' },
+  { value: 'medium_piston', label: 'medium_piston — DC-6 / classic 4-engine' },
   { value: 'narrow_freighter', label: 'narrow_freighter — narrow-body jet' },
   { value: 'wide_freighter', label: 'wide_freighter — wide-body jet' },
 ];
@@ -75,6 +76,9 @@ export function inferCareerClassFromIcao(icao: string): FreighterClassId {
   }
   if (['C208', 'B190', 'E110', 'PC12', 'TBM9'].includes(normalized)) {
     return 'light_turboprop';
+  }
+  if (['DC6', 'DC6A', 'DC6B', 'DC3', 'DC4', 'C46', 'L188'].includes(normalized)) {
+    return 'medium_piston';
   }
   if (
     [

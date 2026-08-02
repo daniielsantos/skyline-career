@@ -289,11 +289,27 @@ export const NPC_AIRFRAME_VARIANTS: readonly NpcAirframeVariant[] = [
     freighter: false,
     maxCargoKg: 1_000,
   },
+  // —— medium piston (classic 4-engine / regional freighter) ——
+  {
+    typeId: 'DC6',
+    aircraftClassId: 'medium_piston',
+    label: 'Douglas DC-6',
+    freighter: true,
+    maxCargoKg: 10_000,
+  },
+  {
+    typeId: 'DC6B',
+    aircraftClassId: 'medium_piston',
+    label: 'Douglas DC-6B',
+    freighter: false,
+    maxCargoKg: 8_500,
+  },
 ];
 
 const BY_CLASS: Record<FreighterClassId, NpcAirframeVariant[]> = {
   narrow_freighter: [],
   wide_freighter: [],
+  medium_piston: [],
   light_jet: [],
   light_turboprop: [],
   light_ga: [],

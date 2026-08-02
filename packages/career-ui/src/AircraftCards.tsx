@@ -23,6 +23,7 @@ export const AIRCRAFT_CLASS_FILTERS: Array<{
   { id: 'light_ga', label: 'GA' },
   { id: 'light_turboprop', label: 'Turboprop' },
   { id: 'light_jet', label: 'Light jet' },
+  { id: 'medium_piston', label: 'Med. piston' },
   { id: 'narrow_freighter', label: 'Narrow' },
   { id: 'wide_freighter', label: 'Wide' },
 ];
@@ -31,6 +32,7 @@ export function aircraftClassLabel(id: string): string {
   if (id === 'wide_freighter') return 'Wide';
   if (id === 'light_turboprop') return 'Light TP';
   if (id === 'light_jet') return 'Light jet';
+  if (id === 'medium_piston') return 'Med. piston';
   if (id === 'light_ga') return 'Light GA';
   if (id === 'narrow_freighter') return 'Narrow';
   return id.replace(/_/g, ' ');
@@ -40,6 +42,7 @@ export function aircraftModelLabel(id: AircraftClass): string {
   if (id === 'wide_freighter') return 'McDonnell Douglas MD-11F';
   if (id === 'light_turboprop') return 'Cessna 208 Caravan Cargo';
   if (id === 'light_jet') return 'Learjet 35A';
+  if (id === 'medium_piston') return 'Douglas DC-6';
   if (id === 'light_ga') return 'Beechcraft Bonanza BE36';
   return 'Boeing 737-800 BCF';
 }

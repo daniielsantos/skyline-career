@@ -1,6 +1,7 @@
 export type AircraftClass =
   | 'narrow_freighter'
   | 'wide_freighter'
+  | 'medium_piston'
   | 'light_jet'
   | 'light_turboprop'
   | 'light_ga';

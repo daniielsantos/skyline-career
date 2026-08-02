@@ -108,6 +108,7 @@ const DEFAULT_DEPART_FROM: readonly MissionStatus[] = ['accepted', 'dispatched']
 const CRUISE_KT: Record<string, number> = {
   narrow_freighter: 430,
   wide_freighter: 480,
+  medium_piston: 290,
   light_jet: 430,
   light_turboprop: 185,
   light_ga: 170,

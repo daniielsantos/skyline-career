@@ -29,17 +29,19 @@ import { getAircraftClass } from './career-mission.js';
 import type { NpcFlight } from './types/career-economy.js';
 
 describe('NPC freighter fleet', () => {
-  it('seeds jets plus light jet, Caravan and Bonanza GA freighters', () => {
+  it('seeds jets plus medium piston, light jet, Caravan and Bonanza GA freighters', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-seed' });
     assert.equal(world.npcs.length, NPC_FLEET_SIZE);
     assert.equal(world.npcFlights.length, 0);
     const narrow = world.npcs.filter((n) => n.aircraftClassId === 'narrow_freighter');
     const wide = world.npcs.filter((n) => n.aircraftClassId === 'wide_freighter');
+    const mediumPiston = world.npcs.filter((n) => n.aircraftClassId === 'medium_piston');
     const lightJet = world.npcs.filter((n) => n.aircraftClassId === 'light_jet');
     const caravan = world.npcs.filter((n) => n.aircraftClassId === 'light_turboprop');
     const bonanza = world.npcs.filter((n) => n.aircraftClassId === 'light_ga');
     assert.equal(narrow.length, 14);
     assert.equal(wide.length, 10);
+    assert.equal(mediumPiston.length, 4);
     assert.equal(lightJet.length, 4);
     assert.equal(caravan.length, 10);
     assert.equal(bonanza.length, 6);
@@ -97,6 +99,10 @@ describe('NPC freighter fleet', () => {
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_turboprop').length,
       10,
+    );
+    assert.equal(
+      migrated.npcs.filter((n) => n.aircraftClassId === 'medium_piston').length,
+      4,
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_jet').length,

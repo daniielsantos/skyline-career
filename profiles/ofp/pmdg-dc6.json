@@ -1,0 +1,64 @@
+{
+  "source": "simbrief",
+  "icao": "DC6",
+  "ofpId": "pmdg-dc6",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "DC-6A",
+    "PMDG DC-6A",
+    "DC-6",
+    "PMDG DC-6"
+  ],
+  "matchTitlePattern": "DC-?6A?\\b",
+  "notes": [
+    "PMDG Douglas DC-6 / DC-6A — load fuel/cargo on the PMDG tablet; no Skyline inject / no in-plane SimBrief.",
+    "Fuel reads: classic L/R main + aux + tip (4 mains on the tablet). Do not request FUEL TOTAL (throws on this airframe).",
+    "Payload: all 12 SimConnect stations count as cargo (freighter). Tablet Lower+Main may differ slightly from station sum.",
+    "SimBrief Default DC6 OEW often diverges from PMDG empty — EMPTY_WEIGHT warn is expected.",
+    "Skyline class: medium_piston"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [],
+      "passengerStations": [],
+      "baggageStations": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "DC6",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Cargo 1", "role": "baggage" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Cargo 2", "role": "baggage" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Cargo 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Cargo 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Cargo 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Cargo 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Cargo 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Cargo 8", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Cargo 9", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Cargo 10", "role": "baggage" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Cargo 11", "role": "baggage" },
+    { "simVarIndex": 12, "cfgIndex": 11, "name": "Cargo 12", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 250,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 400,
+    "weightAbsLb": 800,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

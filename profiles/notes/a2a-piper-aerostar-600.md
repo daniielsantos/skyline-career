@@ -4,54 +4,25 @@
 **Match title:** `A2A Piper Aerostar 600`  
 **ICAO (SimBrief type):** `AEST`  
 **Publisher:** `a2a`  
-**Stations (profile):** 7 — Character1–6 + Baggage (LVars)  
-**Recipe:** `a2a-accusim`  
+**Stations:** 7  
 **Profile:** `a2a/piper-aerostar-600@1.0.0`
-
-> Family quirks (ghost stations, `SeatNCharacter`, wizard smoke): see **`profiles/notes/a2a-accusim.md`**.
 
 ## Fuel tanks
 
-| Id | Write LVar | Capacity (usable) | Classic mirror |
-|----|------------|-------------------|----------------|
-| `LEFT_MAIN` | `FuelLeftWingTank` | ~62 gal (`FuelWingTankCapacity`) | `FUEL TANK LEFT MAIN QUANTITY` |
-| `RIGHT_MAIN` | `FuelRightWingTank` | ~62 gal | `FUEL TANK RIGHT MAIN QUANTITY` |
-| `CENTER` | `FuelFuselageTank` | ~41.5 gal (`FuelFuselageTankCapacity`) | `FUEL TANK CENTER QUANTITY` |
+| Var | Capacity | Id |
+|-----|----------|----|
+| `FUEL TANK LEFT MAIN QUANTITY` | 62 | LEFT_MAIN |
+| `FUEL TANK RIGHT MAIN QUANTITY` | 62 | RIGHT_MAIN |
+| `FUEL TANK CENTER QUANTITY` | 41.5 | CENTER |
 
-Wing tanks total ~124 gal usable; fuselage ~41.5. Classic QUANTITY writes are ignored (Accu-Sim).
+## Notes
 
-## Payload
-
-| Station | Write LVars | What / how to set |
-|---------|-------------|-------------------|
-| 1–6 | `CharacterNWeight` + `SeatNCharacter` | Seat weight (lb) + occupancy so EFB paints the seat |
-| 7 | `BaggageWeight` | Baggage (lb). Cap via `BaggageMax` / tablet max (~240 lb on this airframe) |
-
-```powershell
-# seats + baggage
-node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20 `
-  --station 1=180 --station 2=50 --station 3=25 --station 7=40
-```
-
-## Homologation path
-
-1. Classic writetest fails → recipe match `a2a-accusim`
-2. LVar write probe (e.g. `FuelLeftWingTank`)
-3. `draftProfileFromVendorRecipe` → `lvar-bridge` (+ `SeatNCharacter` soft-bool steps)
-4. Smoke / tablet check → promote
-
-```powershell
-npm run start:local
-npm run homologate
-node packages/agent/dist/cli.js apply-auto --fuel-left 30 --fuel-right 30 --fuel-center 20 --station 1=180 --station 2=50 --station 3=25
-```
-
-## Package / sources
-
-- Community package (example): `a2a-aircraft-aerostar600`
-- Tablet: `html_ui/.../Aerostar600App/A2ATabletApp.js` (Fuel* / Character* / Seat*)
+- Drafted from vendor recipe a2a-accusim.
+- Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy. Tank set varies (fuselage vs tip) — draft keeps only tanks with live capacity ≥ 5.
+- Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, CENTER.
+- See profiles/notes/a2a-accusim.md
+- Homologated with interactive wizard (recipe lvar-bridge).
 
 ## Homologated
 
 - `profiles/examples/a2a-piper-aerostar-600.json`
-- Recipe: `profiles/vendors/a2a-accusim.json`

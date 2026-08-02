@@ -124,19 +124,41 @@ export function fuelFromClassicSnapshot(
   snapshot: SimSnapshot,
   densityLbPerGal = DEFAULT_JET_A_LB_PER_GAL,
 ): LiveFuelState {
-  const leftGal = snapshot.vars?.['FUEL TANK LEFT MAIN QUANTITY'] ?? 0;
-  const rightGal = snapshot.vars?.['FUEL TANK RIGHT MAIN QUANTITY'] ?? 0;
-  const centerGal = snapshot.vars?.['FUEL TANK CENTER QUANTITY'] ?? 0;
-  const left = galToLb(leftGal, densityLbPerGal);
-  const right = galToLb(rightGal, densityLbPerGal);
-  const center = galToLb(centerGal, densityLbPerGal);
+  const gal = (name: string): number => {
+    const v = snapshot.vars?.[name];
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
+  };
+
+  const leftMain = gal('FUEL TANK LEFT MAIN QUANTITY');
+  const rightMain = gal('FUEL TANK RIGHT MAIN QUANTITY');
+  const center = gal('FUEL TANK CENTER QUANTITY') + gal('FUEL TANK CENTER2 QUANTITY');
+  const leftAux = gal('FUEL TANK LEFT AUX QUANTITY');
+  const rightAux = gal('FUEL TANK RIGHT AUX QUANTITY');
+  const leftTip = gal('FUEL TANK LEFT TIP QUANTITY');
+  const rightTip = gal('FUEL TANK RIGHT TIP QUANTITY');
+
+  const tankGal =
+    leftMain + rightMain + center + leftAux + rightAux + leftTip + rightTip;
+  // Optional FUEL TOTAL when the host already put it on the snapshot (never force-read —
+  // it throws on PMDG DC-6 and some other airframes).
+  const totalQtyGal = gal('FUEL TOTAL QUANTITY');
+  const totalGal =
+    totalQtyGal > tankGal * 1.02 + 1 ? totalQtyGal : Math.max(tankGal, totalQtyGal);
+
+  const left = galToLb(leftMain + leftAux + leftTip, densityLbPerGal);
+  const right = galToLb(rightMain + rightAux + rightTip, densityLbPerGal);
+  const centerLb = galToLb(center, densityLbPerGal);
+  const tankTotal = left + right + centerLb;
+  const total = galToLb(totalGal, densityLbPerGal);
+
   return {
     source: 'classic',
     unit: 'lb',
     left,
     right,
-    center,
-    total: left + right + center,
+    center: centerLb,
+    // Keep L/R/C for display; total may exceed their sum when TOTAL QUANTITY wins.
+    total: Math.max(total, tankTotal),
   };
 }
 
@@ -300,6 +322,33 @@ export async function readLiveLoad(
       // Keep partial snapshot; compare will surface an unavailable/mismatch finding.
     }
   }
+
+  // Snapshot struct only carries L/R/C. Hydrate AUX/TIP only when the pack
+  // opts into classic+mass-balance (multi-tank freighters like PMDG DC-6) or
+  // declares many cargo stations — avoid extra SimConnect traffic on light GA.
+  const needsExtraClassicTanks =
+    wants(prefs.fuel, 'classic') &&
+    (wants(prefs.fuel, 'mass-balance') ||
+      (opts.stationRoles?.baggageStations?.length ?? 0) >= 8);
+  if (needsExtraClassicTanks) {
+    // Do NOT request FUEL TOTAL QUANTITY or TIP LEFT/RIGHT: NAME_UNRECOGNIZED on
+    // several payware airframes (including PMDG DC-6) and spam the host log.
+    const classicFuelVars = [
+      'FUEL TANK LEFT AUX QUANTITY',
+      'FUEL TANK RIGHT AUX QUANTITY',
+      'FUEL TANK LEFT TIP QUANTITY',
+      'FUEL TANK RIGHT TIP QUANTITY',
+      'FUEL TANK CENTER2 QUANTITY',
+    ] as const;
+    for (const name of classicFuelVars) {
+      if (snapshot.vars[name] !== undefined) continue;
+      try {
+        snapshot.vars[name] = await bridge.readSimVar({ name, unit: 'gallons' });
+      } catch {
+        // optional slot
+      }
+    }
+  }
   let payload = payloadFromSnapshot(snapshot);
   payload = enrichPayloadWithRoles(payload, opts.stationRoles, opts.roleWeightUnit ?? 'lb');
 
@@ -396,7 +445,9 @@ export async function readLiveLoad(
       ...payload,
       source: 'mass-balance',
       total: resolvedPayload.payloadLb,
-      ofpPayloadLb: payload.ofpPayloadLb ?? resolvedPayload.payloadLb,
+      // Prefer MB for OFP compare too — station role sums can be ghost weights (PMDG DC-6).
+      ofpPayloadLb: resolvedPayload.payloadLb,
+      baggageLb: resolvedPayload.payloadLb,
     };
   }
 

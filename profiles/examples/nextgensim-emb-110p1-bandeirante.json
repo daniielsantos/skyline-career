@@ -8,7 +8,10 @@
     "fingerprint": "d30c3cfeb262369dc1d7889de0ba8d6960d0c2c14d1419411fd92b6a4501dee4",
     "title": "NextGenSim EMB-110P1 Bandeirante",
     "publisher": "nextgensim",
-    "icao": "E110"
+    "icao": "E110",
+    "liveTitles": [
+      "NextGenSim EMB-110P1 Bandeirante"
+    ]
   },
   "capabilities": [
     "simconnect"
@@ -59,11 +62,11 @@
       },
       {
         "op": "delay",
-        "ms": 400
+        "ms": 1000
       }
     ],
     "verify": {
-      "timeoutMs": 6000,
+      "timeoutMs": 8000,
       "pollIntervalMs": 250,
       "checks": [
         {
@@ -87,82 +90,98 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 12.491
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 12.491
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 7.862
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 7.862
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 7.862
       },
       {
         "index": 6,
         "name": "Station 6",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 5.32
       },
       {
         "index": 7,
         "name": "Station 7",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 5.32
       },
       {
         "index": 8,
         "name": "Station 8",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 5.32
       },
       {
         "index": 9,
         "name": "Station 9",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 2.777
       },
       {
         "index": 10,
         "name": "Station 10",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 2.777
       },
       {
         "index": 11,
         "name": "Station 11",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 2.777
       },
       {
         "index": 12,
         "name": "Station 12",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 0.234
       },
       {
         "index": 13,
         "name": "Station 13",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 0.234
       },
       {
         "index": 14,
         "name": "Station 14",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": 0.234
       },
       {
         "index": 15,
         "name": "Station 15",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.308
       },
       {
         "index": 16,
         "name": "Station 16",
-        "maxLoad": 500
+        "maxLoad": 500,
+        "arm": -2.308
       }
     ],
     "writePlan": [
@@ -283,9 +302,26 @@
   "cg": {
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
     "constraints": {
-      "minMac": -4,
+      "minMac": 4,
       "maxMac": 32
+    },
+    "calibration": {
+      "observedMac": 9.012283384799957,
+      "calibratedAtIso": "2026-08-02T21:24:50.012Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\nextgensim-aircraft-bandeirante\\SimObjects\\Airplanes\\NextGen_EMB110\\attachments\\nextgensim\\Function_Exterior_110P1\\config\\flight_model.cfg",
+      "sweep": {
+        "minObservedMac": 11.175121366977692,
+        "maxObservedMac": 14.11694884300232,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 15,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-02T21:24:59.307Z"
+      }
     }
   },
   "fallback": {
@@ -296,7 +332,7 @@
   "notes": [
     "Homologated via wizard: NextGenSim EMB-110P1 Bandeirante.",
     "ICAO type designator (catalog/SimBrief): E110.",
-    "Draft preferred FUELSYSTEM where capacity >= 5.",
+    "Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).",
     "AUX deferred for v1.",
     "Stations: 16.",
     "Homologated with interactive wizard.",

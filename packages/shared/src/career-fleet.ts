@@ -41,6 +41,7 @@ export const PLAYER_FUEL_CAPACITY_KG: Record<FreighterClassId, number> = {
   light_turboprop: 1_010,
   light_ga: 380,
   light_jet: 2_810,
+  medium_piston: 8_800,
   narrow_freighter: 20_894,
   wide_freighter: 117_450,
 };
@@ -52,6 +53,7 @@ const FERRY_CLASS_MULT: Record<FreighterClassId, number> = {
   light_turboprop: 1,
   light_ga: 0.85,
   light_jet: 1.5,
+  medium_piston: 1.9,
   narrow_freighter: 2.2,
   wide_freighter: 4,
 };
@@ -213,6 +215,7 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
     aircraftClassId !== 'light_turboprop' &&
     aircraftClassId !== 'light_ga' &&
     aircraftClassId !== 'light_jet' &&
+    aircraftClassId !== 'medium_piston' &&
     aircraftClassId !== 'narrow_freighter' &&
     aircraftClassId !== 'wide_freighter'
   ) {
@@ -368,6 +371,7 @@ function defaultLabel(aircraftClassId: FreighterClassId): string {
   if (aircraftClassId === 'light_turboprop') return 'Company Caravan';
   if (aircraftClassId === 'light_ga') return 'Company Bonanza';
   if (aircraftClassId === 'light_jet') return 'Company Light Jet';
+  if (aircraftClassId === 'medium_piston') return 'Company DC-6';
   if (aircraftClassId === 'narrow_freighter') return 'Company Narrow';
   return 'Company Wide';
 }

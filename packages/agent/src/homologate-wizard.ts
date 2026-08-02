@@ -3,6 +3,7 @@ import { basename, join } from 'node:path';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import type { AircraftProfile, CareerPlayerAirframe } from '@msfs-compat/shared';
 import {
+  computeFingerprintV2,
   getAircraftClass,
   normalizeAircraftTitle,
   inferPublisher,
@@ -28,21 +29,23 @@ import {
   readAfterWriteSettles,
   writeTolerance,
 } from './discover-fuel-tanks.js';
-import { ensureAuxTanks, cleanIcaoCode, normalizeConfirmedIcao, promoteDraftProfile } from './promote-profile.js';
+import {
+  ensureAuxTanks,
+  cleanIcaoCode,
+  listExamplesByMatchTitle,
+  normalizeConfirmedIcao,
+  promoteDraftProfile,
+} from './promote-profile.js';
+import { sampleAircraftStructure } from './sample-structure.js';
 import { probeLVars } from './probe-lvars.js';
 import { readLiveCgState } from './live-cg.js';
 import { promptFlightModelPath } from './find-flight-model.js';
 import {
   applyClassPerfFallback,
   catalogPerfPrintRows,
-  deriveFuelBurnKgPerNm,
   loadAircraftPerfFromCfg,
   type AircraftCfgUiStats,
 } from './parse-aircraft-cfg-ui.js';
-import {
-  readLiveCruiseTasKt,
-  sampleLiveCruiseFuelFlowKgPerHour,
-} from './sample-cruise-burn.js';
 import {
   inferPublisherFromLiveTitle,
   loadVendorRecipes,
@@ -97,6 +100,16 @@ async function calibrateWithCgSources(
   printSection('CG source + empirical validation');
   console.log('  Prefer live CG FWD/AFT LIMIT (Mass & Balance tablet), then flight_model.cfg.');
   const liveCg = await readLiveCgState(bridge);
+  let liveMtowLb: number | undefined;
+  try {
+    const mtow = await bridge.readSimVar({
+      name: 'MAX GROSS WEIGHT',
+      unit: 'pounds',
+    });
+    if (Number.isFinite(mtow) && mtow > 0) liveMtowLb = mtow;
+  } catch {
+    liveMtowLb = undefined;
+  }
   printKv([
     ['live CG %MAC', liveCg.liveMac?.toFixed(1)],
     [
@@ -105,6 +118,7 @@ async function calibrateWithCgSources(
         ? `${liveCg.minMac.toFixed(0)}–${liveCg.maxMac.toFixed(0)}% (SimVar)`
         : 'unavailable',
     ],
+    ['live MTOW', liveMtowLb != null ? formatLb(liveMtowLb) : 'unavailable'],
   ]);
 
   const flightModelPath = await promptFlightModelPath(ask, aircraftTitle, {
@@ -173,46 +187,6 @@ async function calibrateWithCgSources(
     );
   } else if (calibration.cgEnvelope?.source === 'simvar') {
     console.log('  Using live CG FWD/AFT LIMIT from the simulator (same as tablet).');
-  }
-
-  if (
-    await confirm(
-      ask,
-      'Sample live cruise fuel flow now (stable cruise; engines producing flow)',
-      false,
-    )
-  ) {
-    const liveKgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(bridge);
-    if (liveKgPerHour == null) {
-      console.log('  No ENG FUEL FLOW reading — keeping catalog/class burn if any.');
-    } else {
-      const liveTas = await readLiveCruiseTasKt(bridge);
-      const cruiseKtRaw = await ask(
-        'Cruise TAS for kg/nm derivation (blank = live TAS / cfg cruise_speed)',
-        liveTas != null
-          ? String(liveTas)
-          : perf.cruiseSpeedKt != null
-            ? String(perf.cruiseSpeedKt)
-            : '',
-      );
-      const cruiseKt =
-        cruiseKtRaw.trim() === ''
-          ? liveTas ?? perf.cruiseSpeedKt
-          : Number(cruiseKtRaw);
-      const cruiseSpeedKt =
-        typeof cruiseKt === 'number' && Number.isFinite(cruiseKt) && cruiseKt > 0
-          ? cruiseKt
-          : perf.cruiseSpeedKt;
-      perf = {
-        ...perf,
-        cruiseFuelFlowKgPerHour: liveKgPerHour,
-        cruiseSpeedKt,
-        fuelBurnKgPerNm: deriveFuelBurnKgPerNm(liveKgPerHour, cruiseSpeedKt),
-        burnSource: 'live',
-      };
-      printSection('Catalog performance (after live sample)');
-      printKv(catalogPerfPrintRows(perf));
-    }
   }
 
   return { calibration, perf };
@@ -804,6 +778,31 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     );
     printKv([['catalog ICAO', matchIcao]]);
 
+    const existingForTitle = await listExamplesByMatchTitle(examplesDir, matchTitle);
+    if (existingForTitle.length > 0) {
+      console.log(
+        `  Re-homologation: will overwrite ${existingForTitle
+          .map((e) => e.profile.profileKey)
+          .join(', ')} (same match title).`,
+      );
+    }
+
+    const publisherForFp = inferPublisher(
+      [identity.title, matchTitle, identity.atcModel].filter(Boolean).join(' '),
+      matchPublisher,
+    );
+    const { structure: liveStructure } = await sampleAircraftStructure(bridge);
+    const { fingerprint: liveFingerprint } = computeFingerprintV2({
+      identity: {
+        title: identity.title,
+        publisher: publisherForFp,
+        atcModel: identity.atcModel,
+        atcType: identity.atcType,
+        icao: identity.icao ?? identity.atcModel,
+      },
+      structure: liveStructure,
+    });
+
     printSection('Load method');
     console.log('  How should Career load fuel/payload for this aircraft?');
     console.log(
@@ -1225,6 +1224,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         matchTitle,
         atcModel: identity.atcModel,
         icao: matchIcao,
+        liveFingerprint,
         discoveryNotes,
         runSeed: await confirm(ask, 'Run db:seed (Postgres if DATABASE_URL set)', true),
       });
@@ -1240,6 +1240,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         ['icao', promoted.profile.match.icao],
         ['strategy', promoted.profile.fuel.strategy],
         ['loadMethod', 'direct-injection'],
+        ['overwritten', promoted.overwritten ? 'yes' : 'no'],
       ]);
       await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile, perf);
       console.log('');
@@ -1409,6 +1410,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       matchTitle,
       atcModel: identity.atcModel,
       icao: matchIcao,
+      liveFingerprint,
       discoveryNotes,
       runSeed: await confirm(ask, 'Run db:seed (Postgres if DATABASE_URL set)', true),
     });
@@ -1422,6 +1424,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['fingerprint', promoted.profile.match.fingerprint?.slice(0, 16) + '…'],
       ['icao', promoted.profile.match.icao],
       ['loadMethod', 'direct-injection'],
+      ['overwritten', promoted.overwritten ? 'yes' : 'no'],
     ]);
     await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile, perf);
     console.log('');

@@ -1,8 +1,8 @@
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { AircraftProfile, FuelTankProfile } from '@msfs-compat/shared';
-import { normalizeAircraftTitle } from '@msfs-compat/shared';
+import { isPlaceholderFingerprint, normalizeAircraftTitle } from '@msfs-compat/shared';
 
 export function cleanIcaoCode(options: {
   icao?: string | null;
@@ -103,6 +103,75 @@ export async function ensureAuxTanks(
   return profile;
 }
 
+export interface ExistingExampleProfile {
+  path: string;
+  file: string;
+  profile: AircraftProfile;
+}
+
+/** Find example profiles that share the same catalog match title. */
+export async function listExamplesByMatchTitle(
+  examplesDir: string,
+  matchTitle: string,
+): Promise<ExistingExampleProfile[]> {
+  const want = normalizeAircraftTitle(matchTitle);
+  let files: string[] = [];
+  try {
+    files = (await readdir(examplesDir)).filter((f) => f.endsWith('.json'));
+  } catch {
+    return [];
+  }
+  const out: ExistingExampleProfile[] = [];
+  for (const file of files) {
+    const path = join(examplesDir, file);
+    try {
+      const profile = JSON.parse(await readFile(path, 'utf8')) as AircraftProfile;
+      const title = normalizeAircraftTitle(profile.match?.title ?? '');
+      if (title && title === want) {
+        out.push({ path, file, profile });
+      }
+    } catch {
+      // skip unreadable
+    }
+  }
+  return out;
+}
+
+/**
+ * Pick which existing example to overwrite on re-homologation.
+ * Prefer live fingerprint match, then same profileKey, then same publisher, else first.
+ */
+export function pickHomologationOverwriteTarget(
+  existing: ExistingExampleProfile[],
+  draft: Pick<AircraftProfile, 'profileKey' | 'match'>,
+  liveFingerprint?: string | null,
+): ExistingExampleProfile | undefined {
+  if (existing.length === 0) return undefined;
+
+  const fp = liveFingerprint?.trim();
+  if (fp && !isPlaceholderFingerprint(fp)) {
+    const byFp = existing.find(
+      (e) =>
+        e.profile.match?.fingerprint === fp &&
+        !isPlaceholderFingerprint(e.profile.match?.fingerprint),
+    );
+    if (byFp) return byFp;
+  }
+
+  const byKey = existing.find((e) => e.profile.profileKey === draft.profileKey);
+  if (byKey) return byKey;
+
+  const publisher = draft.match?.publisher?.trim().toLowerCase();
+  if (publisher) {
+    const byPub = existing.find(
+      (e) => (e.profile.match?.publisher ?? '').trim().toLowerCase() === publisher,
+    );
+    if (byPub) return byPub;
+  }
+
+  return existing[0];
+}
+
 export async function promoteDraftProfile(options: {
   draftPath: string;
   examplesDir: string;
@@ -113,9 +182,17 @@ export async function promoteDraftProfile(options: {
   matchTitle?: string;
   atcModel?: string | null;
   icao?: string | null;
+  /** Live fingerprint — used to overwrite the profile resolve already matches. */
+  liveFingerprint?: string | null;
   discoveryNotes?: string[];
   runSeed?: boolean;
-}): Promise<{ examplePath: string; notesPath: string; profile: AircraftProfile }> {
+}): Promise<{
+  examplePath: string;
+  notesPath: string;
+  profile: AircraftProfile;
+  overwritten: boolean;
+  removedDuplicates: string[];
+}> {
   const profile = JSON.parse(await readFile(options.draftPath, 'utf8')) as AircraftProfile;
 
   profile.semver = '1.0.0';
@@ -141,6 +218,40 @@ export async function promoteDraftProfile(options: {
         title,
       });
   profile.displayName = `${title} (MSFS 2024)`;
+
+  await mkdir(options.examplesDir, { recursive: true });
+  await mkdir(options.notesDir, { recursive: true });
+
+  const existing = await listExamplesByMatchTitle(options.examplesDir, title);
+  const target = pickHomologationOverwriteTarget(existing, profile, options.liveFingerprint);
+  const removedDuplicates: string[] = [];
+  let examplePath = join(options.examplesDir, basename(options.draftPath));
+  let overwritten = false;
+
+  if (target) {
+    overwritten = true;
+    // Keep catalog identity so fingerprint / profileKey stay stable across re-homologation.
+    profile.profileKey = target.profile.profileKey;
+    profile.profileId = target.profile.profileId;
+    profile.match.publisher = target.profile.match.publisher ?? profile.match.publisher;
+    examplePath = target.path;
+    for (const other of existing) {
+      if (other.path === target.path) continue;
+      try {
+        await unlink(other.path);
+        removedDuplicates.push(other.file);
+      } catch {
+        // ignore
+      }
+    }
+    console.log(
+      `[promote] Re-homologating — overwriting ${basename(examplePath)} (${profile.profileKey})` +
+        (removedDuplicates.length
+          ? `; removed duplicates: ${removedDuplicates.join(', ')}`
+          : ''),
+    );
+  }
+
   const stem = notesFileStem(profile);
   profile.notes = [
     `Homologated via wizard: ${title}.`,
@@ -149,18 +260,20 @@ export async function promoteDraftProfile(options: {
     `See profiles/notes/${stem}.md`,
   ];
 
-  await mkdir(options.examplesDir, { recursive: true });
-  await mkdir(options.notesDir, { recursive: true });
-
-  const examplePath = join(options.examplesDir, basename(options.draftPath));
   await writeFile(examplePath, `${JSON.stringify(profile, null, 2)}\n`, 'utf8');
-  await unlink(options.draftPath);
+  try {
+    await unlink(options.draftPath);
+  } catch {
+    // draft may already be gone
+  }
 
   const notesPath = join(options.notesDir, `${stem}.md`);
-  await writeFile(notesPath, buildNotesMarkdown(profile, options, basename(options.draftPath)), 'utf8');
+  await writeFile(notesPath, buildNotesMarkdown(profile, options, basename(examplePath)), 'utf8');
 
   await runNodeScript(options.repoRoot, 'scripts/backfill-fingerprints.mjs');
   const updated = JSON.parse(await readFile(examplePath, 'utf8')) as AircraftProfile;
+
+  await clearCachedProfileDocument(options.repoRoot, updated.profileKey, updated.semver);
 
   if (options.runSeed !== false) {
     try {
@@ -172,7 +285,22 @@ export async function promoteDraftProfile(options: {
     }
   }
 
-  return { examplePath, notesPath, profile: updated };
+  return { examplePath, notesPath, profile: updated, overwritten, removedDuplicates };
+}
+
+/** Drop stale catalog cache so the next resolve re-fetches the updated document. */
+async function clearCachedProfileDocument(
+  repoRoot: string,
+  profileKey: string,
+  semver: string,
+): Promise<void> {
+  const slug = `${profileKey.replace(/\//g, '__')}__${semver}.json`;
+  const cachePath = join(repoRoot, 'profiles', 'cache', slug);
+  try {
+    await unlink(cachePath);
+  } catch {
+    // no cache entry
+  }
 }
 
 function buildNotesMarkdown(

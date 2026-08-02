@@ -17,6 +17,7 @@ export const HANGAR_PARKING_BASE_USD: Record<FreighterClassId, number> = {
   light_ga: 45,
   light_turboprop: 85,
   light_jet: 180,
+  medium_piston: 260,
   narrow_freighter: 320,
   wide_freighter: 900,
 };

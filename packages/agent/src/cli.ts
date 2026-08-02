@@ -1448,8 +1448,8 @@ async function main(): Promise<void> {
       console.log(`career commands:
   career init [--save path] [--seed s] [--reset]
   career tick [--n 24] [--save path]
-  career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter|light_jet|light_turboprop|light_ga] [--save path] [--json]
-  career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter|light_jet|light_turboprop|light_ga] [--save path] [--missions path] [--json]
+  career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--json]
+  career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--missions path] [--json]
   career missions [--missions path] [--json]
   career cancel --mission <id> [--save path] [--missions path]
   career dispatch --mission <id> [--simbrief-user ALIAS] [--no-open] [--compare] [--missions path] [--save path]
@@ -1501,7 +1501,7 @@ async function main(): Promise<void> {
       const aircraftClassId = parseFreighterClassId(aircraftRaw);
       if (aircraftRaw && !aircraftClassId) {
         console.error(
-          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter|light_jet|light_turboprop|light_ga)`,
+          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga)`,
         );
         process.exit(1);
       }
@@ -1569,7 +1569,7 @@ async function main(): Promise<void> {
       const aircraftClassId = parseFreighterClassId(aircraftRaw) as FreighterClassId | undefined;
       if (!aircraftClassId) {
         console.error(
-          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter|light_jet|light_turboprop|light_ga)`,
+          `Unknown aircraft class: ${aircraftRaw} (use narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga)`,
         );
         process.exit(1);
       }

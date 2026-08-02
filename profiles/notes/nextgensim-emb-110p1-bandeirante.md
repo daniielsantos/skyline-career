@@ -16,11 +16,10 @@
 
 ## Notes
 
-- Draft preferred FUELSYSTEM where capacity >= 5.
+- Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).
 - AUX deferred for v1.
 - Stations: 16.
 - Homologated with interactive wizard.
-- ICAO `E110` confirmed for catalog / future SimBrief OFP integration.
 
 ## Homologated
 

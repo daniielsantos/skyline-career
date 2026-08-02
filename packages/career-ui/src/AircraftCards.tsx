@@ -191,7 +191,7 @@ export function MarketListingCard(props: {
             </strong>
           </li>
           <li>
-            <span>Hours</span>
+            <span>AF / ENG</span>
             <strong>
               {Math.round(listing.hoursAirframe)}/
               {Math.round(listing.hoursEngine)}

@@ -32,11 +32,14 @@ export async function readLiveCgState(
   bridge: NamedPipeSimBridge,
   opts: { readVar?: string; readUnit?: string } = {},
 ): Promise<LiveCgState> {
-  const [liveMac, minMac, maxMac] = await Promise.all([
-    tryReadMac(bridge, opts.readVar ?? 'CG PERCENT', opts.readUnit ?? 'Percent over 100'),
-    tryReadMac(bridge, 'CG FWD LIMIT'),
-    tryReadMac(bridge, 'CG AFT LIMIT'),
-  ]);
+  // Sequential reads — safer on the named pipe even with a write mutex.
+  const liveMac = await tryReadMac(
+    bridge,
+    opts.readVar ?? 'CG PERCENT',
+    opts.readUnit ?? 'Percent over 100',
+  );
+  const minMac = await tryReadMac(bridge, 'CG FWD LIMIT');
+  const maxMac = await tryReadMac(bridge, 'CG AFT LIMIT');
   let forward = minMac;
   let aft = maxMac;
   if (forward !== undefined && aft !== undefined && forward > aft) {

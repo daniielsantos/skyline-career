@@ -5,6 +5,7 @@ import {
   assertRolesPackAllowsDirectInjection,
   cancelMission,
   careerAllowsDirectInject,
+  careerLoadWeightMatchOk,
   careerPreflightReady,
   commitStagedManifest,
   compareMissionIntentToOfp,
@@ -100,6 +101,13 @@ describe('mission load method policy', () => {
     assert.equal(softenCareerPreflightVerdict(true, 'fail'), 'warn');
     assert.equal(softenCareerPreflightVerdict(false, 'pass'), 'fail');
     assert.equal(softenCareerPreflightVerdict(true, 'pass'), 'pass');
+  });
+
+  it('rejects Loaded vs Due when Sim payload is empty but Due cargo is set', () => {
+    assert.equal(careerLoadWeightMatchOk(0, 992, 75), false);
+    assert.equal(careerLoadWeightMatchOk(174, 174, 50), true);
+    assert.equal(careerLoadWeightMatchOk(undefined, 992, 75), false);
+    assert.equal(careerLoadWeightMatchOk(0, undefined, 75), true);
   });
 });
 

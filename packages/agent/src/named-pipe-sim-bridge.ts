@@ -112,8 +112,12 @@ export class NamedPipeSimBridge implements SimBridge {
   }
 
   async delay(ms: number): Promise<void> {
-    await this.ensureOpen();
-    await this.client.call('delay', { ms });
+    // Local sleep only — never round-trip through the named pipe. IPC delays
+    // held the SimBridge Host busy and contributed to mid-inject disconnects
+    // (STATUS_PIPE_DISCONNECTED / 0xC00000B0) under multi-step OFP loads.
+    if (ms > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, ms));
+    }
   }
 
   async readPmdgNg3Fuel(): Promise<{

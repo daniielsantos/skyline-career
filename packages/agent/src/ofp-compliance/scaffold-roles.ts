@@ -375,7 +375,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     liveSources: CLASSIC_LIGHT_LIVE_SOURCES,
     loadMethod: 'direct-injection',
     injectCapable: true,
-    simbriefIcao: 'AC11',
+    simbriefIcao: 'C182',
     simbriefAirframeMatch: 'Default',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
@@ -388,7 +388,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'Black Square Commander 114 family (114 / 114TC) — same 5-station cargo layout',
       'One Skyline Market SKU; either NA or TC matches the purchased airframe',
       'liveSources: classic fuel tanks + classic stations/weights',
-      'SimBrief: Default AC11',
+      'SimBrief has no AC11 — dispatch uses Default C182 as performance proxy',
     ],
   },
   {

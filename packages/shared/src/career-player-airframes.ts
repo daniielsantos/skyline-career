@@ -28,6 +28,11 @@ export interface CareerPlayerAirframe {
   simbriefAirframeMatch: string;
   /** When false, omitted from Aircraft Market. Owned fleet still resolves. Default true. */
   enabled?: boolean;
+  /** Optional real-airframe weights — prefer over SimBrief proxy for light GA caps. */
+  oewKg?: number;
+  mtowKg?: number;
+  maxCargoKg?: number;
+  fuelCapacityKg?: number;
 }
 
 export const CAREER_PLAYER_AIRFRAMES: readonly CareerPlayerAirframe[] =
@@ -91,12 +96,23 @@ export function listCareerPlayerAirframes(
   );
 }
 
-/** Light GA + light turboprop models offered as the free starter airframe. */
+/** Fixed free-starter choices (not the full light Market board). */
+export const STARTER_AIRFRAME_TYPE_IDS = [
+  'asobo-cessna-c152',
+  'asobo-c172sp-cargo',
+  'blacksquare-commander-114',
+] as const;
+
+/** Default when signup omits airframeTypeId. */
+export const DEFAULT_STARTER_AIRFRAME_TYPE_ID =
+  'asobo-c172sp-cargo' as const;
+
+/** C152 / C172 / Commander 114 — free starter airframes only. */
 export function listStarterCareerPlayerAirframes(): CareerPlayerAirframe[] {
-  return [
-    ...listCareerPlayerAirframes('light_ga'),
-    ...listCareerPlayerAirframes('light_turboprop'),
-  ];
+  return STARTER_AIRFRAME_TYPE_IDS.map((typeId) => findCareerPlayerAirframe(typeId)).filter(
+    (row): row is CareerPlayerAirframe =>
+      row != null && isCareerPlayerAirframeEnabled(row),
+  );
 }
 
 export const STARTER_AIRFRAME_CONDITIONS = ['good', 'excellent'] as const;
@@ -119,4 +135,4 @@ export function playerAircraftDisplayLabel(
 ): string {
   return findCareerPlayerAirframe(aircraft.airframeTypeId)?.label ?? aircraft.label;
 }
-
+

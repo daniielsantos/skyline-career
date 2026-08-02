@@ -49,7 +49,9 @@ async function executeWritePlan(
         await ctx.bridge.triggerEvent({ event: step.event!, data: step.data });
         break;
       case 'delay':
-        await ctx.bridge.delay(step.ms ?? 0);
+        if (!ctx.skipSettle) {
+          await ctx.bridge.delay(step.ms ?? 0);
+        }
         break;
       default:
         throw new Error(`Unsupported write operation`);
@@ -102,6 +104,11 @@ export class StationWritebackPayloadStrategy implements PayloadStrategy {
 
     try {
       await executeWritePlan(ctx.profile.payload.writePlan, vars, ctx);
+      // Brief settle so station writes stick before verify / next step.
+      // skipSettle: caller (multi-step inject) settles locally between rounds.
+      if (!ctx.skipSettle) {
+        await ctx.bridge.delay(400);
+      }
       return {
         success: true,
         strategyUsed: this.name,

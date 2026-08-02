@@ -53,6 +53,24 @@ export async function resolveClassMaxCargoKg(
   if (cached) return cached;
   const aircraft = getAircraftClass(aircraftClassId);
   const airframe = findCareerPlayerAirframe(airframeTypeId);
+  if (
+    airframe &&
+    typeof airframe.maxCargoKg === 'number' &&
+    airframe.maxCargoKg > 0 &&
+    typeof airframe.oewKg === 'number' &&
+    typeof airframe.mtowKg === 'number'
+  ) {
+    const value = {
+      maxCargoKg: Math.floor(airframe.maxCargoKg),
+      source: 'airframe-catalog',
+      airframeLabel: airframe.label,
+      oewKg: airframe.oewKg,
+      mtowKg: airframe.mtowKg,
+      fuelCapacityKg: airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
+    };
+    cargoLimitCache.set(cacheKey, value);
+    return value;
+  }
   try {
     const resolved = await resolveSimBriefMaxCargoKg({
       simbriefIcao: airframe?.simbriefIcao ?? aircraft.simbriefIcao,
@@ -60,25 +78,33 @@ export async function resolveClassMaxCargoKg(
         airframe?.simbriefAirframeMatch ?? aircraft.simbriefAirframeMatch,
       titleHint: airframe?.label ?? aircraft.name,
     });
+    const catalogCap =
+      typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
+        ? Math.floor(airframe.maxCargoKg)
+        : undefined;
     const value = {
-      maxCargoKg: resolved.maxCargoKg,
-      source: resolved.source,
+      maxCargoKg: catalogCap
+        ? Math.min(resolved.maxCargoKg, catalogCap)
+        : resolved.maxCargoKg,
+      source: catalogCap ? 'simbrief+airframe-cap' : resolved.source,
       airframeLabel: resolved.airframe.comments || resolved.airframe.name,
-      oewKg: resolved.airframe.oewKg ?? aircraft.oewKg,
-      mtowKg: resolved.airframe.mtowKg ?? aircraft.mtowKg,
+      oewKg: airframe?.oewKg ?? resolved.airframe.oewKg ?? aircraft.oewKg,
+      mtowKg: airframe?.mtowKg ?? resolved.airframe.mtowKg ?? aircraft.mtowKg,
       fuelCapacityKg:
-        resolved.airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
+        airframe?.fuelCapacityKg ??
+        resolved.airframe.fuelCapacityKg ??
+        aircraft.fuelCapacityKg,
     };
     cargoLimitCache.set(cacheKey, value);
     return value;
   } catch {
     const value = {
-      maxCargoKg: aircraft.maxCargoKg,
-      source: 'class-fallback',
+      maxCargoKg: airframe?.maxCargoKg ?? aircraft.maxCargoKg,
+      source: airframe?.maxCargoKg ? 'airframe-catalog' : 'class-fallback',
       airframeLabel: airframe?.label ?? aircraft.name,
-      oewKg: aircraft.oewKg,
-      mtowKg: aircraft.mtowKg,
-      fuelCapacityKg: aircraft.fuelCapacityKg,
+      oewKg: airframe?.oewKg ?? aircraft.oewKg,
+      mtowKg: airframe?.mtowKg ?? aircraft.mtowKg,
+      fuelCapacityKg: airframe?.fuelCapacityKg ?? aircraft.fuelCapacityKg,
     };
     cargoLimitCache.set(cacheKey, value);
     return value;

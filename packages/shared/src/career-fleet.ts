@@ -19,6 +19,7 @@ import {
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
 import {
+  DEFAULT_STARTER_AIRFRAME_TYPE_ID,
   defaultCareerPlayerAirframe,
   findCareerPlayerAirframe,
   isStarterAirframeCondition,
@@ -66,6 +67,9 @@ export function listCareerHubIcaos(): string[] {
 
 export const PILOT_NAME_MIN_LEN = 2;
 export const PILOT_NAME_MAX_LEN = 40;
+
+/** Wallet credited when a new pilot registers (tight — ferry / fuel matter early). */
+export const STARTER_WALLET_USD = 1_000;
 
 export function emptyMissionsStateV2(): CareerMissionsState {
   return {
@@ -364,15 +368,15 @@ export function selectStarterHub(
   const requested = opts.airframeTypeId?.trim();
   const starterAirframe = requested
     ? findCareerPlayerAirframe(requested)
-    : defaultCareerPlayerAirframe('light_turboprop');
+    : findCareerPlayerAirframe(DEFAULT_STARTER_AIRFRAME_TYPE_ID) ?? starters[0];
   if (
     !starterAirframe ||
     !starters.some((row) => row.typeId === starterAirframe.typeId)
   ) {
     throw new Error(
       requested
-        ? `Starter aircraft must be an enabled light airframe (got ${requested})`
-        : 'No light starter airframes are registered in the player catalog',
+        ? `Starter aircraft must be C152, C172, or Commander 114 (got ${requested})`
+        : 'No starter airframes are registered in the player catalog',
     );
   }
 
@@ -425,6 +429,7 @@ export function selectStarterHub(
   return {
     ...state,
     version: 2,
+    walletUsd: STARTER_WALLET_USD,
     pilotName,
     homeHubIcao: hub,
     hubSelected: true,

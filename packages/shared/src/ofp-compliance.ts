@@ -28,7 +28,10 @@ export type {
 };
 
 export const KG_TO_LB = 2.2046226218;
+/** Jet-A / Jet-A1 nominal density (lb/US gal). */
 export const DEFAULT_JET_A_LB_PER_GAL = 6.7;
+/** Avgas 100LL nominal density (lb/US gal) — light piston / GA. */
+export const DEFAULT_AVGAS_LB_PER_GAL = 6.0;
 
 /** Full probe cascade when pack does not declare liveSources (new aircraft). */
 export const DISCOVERY_LIVE_SOURCES: Required<OfpLiveSources> = {
@@ -472,12 +475,18 @@ function comparePayloadToOfp(
   const sheet = ofp.loadSheet;
   const tol = ofp.tolerances.payloadAbsLb;
 
+  // Freighter OFPs often put cargo in loadSheet.baggage without payload.total.
+  // Still treat that as the planned payload total so empty aircraft fail closed.
+  const freighterCargoLb =
+    sheet?.baggage !== undefined && (sheet.passengerCount ?? 0) <= 0
+      ? toLb(sheet.baggage, sheet.unit)
+      : undefined;
   const plannedPayloadTotalLb =
     plan?.total !== undefined
       ? toLb(plan.total, plan.unit)
       : sheet?.payload !== undefined
         ? toLb(sheet.payload, sheet.unit)
-        : undefined;
+        : freighterCargoLb;
 
   if (plannedPayloadTotalLb === undefined && !plan?.stations && !sheet?.baggage && sheet?.passengerCount === undefined) {
     return;
@@ -530,13 +539,19 @@ function comparePayloadToOfp(
   if (sheet?.baggage !== undefined) {
     const expected = toLb(sheet.baggage, sheet.unit);
     if (live.baggageLb === undefined) {
-      findings.push({
-        code: 'BAGGAGE_UNMAPPED',
-        severity: 'warn',
-        message:
-          'OFP has Baggage but payload.stationRoles.baggageStations is not set — cannot verify live',
-        expected,
-      });
+      // Freighter: fall back to ofpPayload/total so empty aircraft still fail.
+      if ((sheet.passengerCount ?? 0) <= 0) {
+        const liveCargo = live.ofpPayloadLb ?? live.total;
+        pushWeightDelta(findings, 'BAGGAGE', 'Baggage (cargo)', expected, liveCargo, tol);
+      } else {
+        findings.push({
+          code: 'BAGGAGE_UNMAPPED',
+          severity: 'warn',
+          message:
+            'OFP has Baggage but payload.stationRoles.baggageStations is not set — cannot verify live',
+          expected,
+        });
+      }
     } else {
       pushWeightDelta(findings, 'BAGGAGE', 'Baggage', expected, live.baggageLb, tol);
     }

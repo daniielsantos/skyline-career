@@ -41,23 +41,35 @@
     "label": "Cessna 172SP Cargo",
     "rolesPackRelPath": "profiles/ofp/asobo-c172sp-cargo.json",
     "simbriefIcao": "C172",
-    "simbriefAirframeMatch": "Default"
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 740,
+    "mtowKg": 1111,
+    "maxCargoKg": 220,
+    "fuelCapacityKg": 152
   },
   {
     "typeId": "asobo-cessna-c152",
     "aircraftClassId": "light_ga",
     "label": "Cessna C152",
     "rolesPackRelPath": "profiles/ofp/asobo-cessna-c152.json",
-    "simbriefIcao": "C152",
-    "simbriefAirframeMatch": "Default"
+    "simbriefIcao": "C172",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 508,
+    "mtowKg": 757,
+    "maxCargoKg": 120,
+    "fuelCapacityKg": 72
   },
   {
     "typeId": "blacksquare-commander-114",
     "aircraftClassId": "light_ga",
     "label": "Rockwell Commander 114",
     "rolesPackRelPath": "profiles/ofp/blacksquare-commander-114.json",
-    "simbriefIcao": "AC11",
-    "simbriefAirframeMatch": "Default"
+    "simbriefIcao": "C182",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 855,
+    "mtowKg": 1424,
+    "maxCargoKg": 320,
+    "fuelCapacityKg": 190
   },
   {
     "typeId": "asobo-beechcraft-king-air-350i",

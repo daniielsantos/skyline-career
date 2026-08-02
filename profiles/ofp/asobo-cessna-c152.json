@@ -13,7 +13,8 @@
     "Profile: asobo/cessna-c152@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct"
+    "Fuel strategy: simconnect-direct",
+    "SimBrief has no C152 — dispatch uses Default C172 as performance proxy"
   ],
   "fuel": {
     "unit": "lb"
@@ -46,7 +47,7 @@
       "classic-stations"
     ]
   },
-  "simbriefIcao": "C152",
+  "simbriefIcao": "C172",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
     {

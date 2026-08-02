@@ -7,8 +7,12 @@ import {
   applyWalletDelta,
   departMission,
   estimateMissionBlockHours,
+  evaluateLoadVerification,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
+  flightPhaseFromSample,
+  loadVerificationDrifted,
+  resolveLivePayloadLb,
   KG_TO_LB,
   resolveAirportCoords,
   resolveExpectedRouteMs,
@@ -17,11 +21,14 @@ import {
   type CareerEconomyWorld,
   type CareerMissionsState,
   type FlightGroundSample,
+  type LoadVerificationWeights,
   type MissionFlightEvent,
   type MissionFlightWatchState,
   type MissionIntent,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import { isOfpLoadActive } from './ofp-load-state.ts';
+import { preflightBlocksDepart } from './preflight-helpers.ts';
 
 export type WatchFlightTimePayload = {
   airborneAtMs: number;
@@ -39,7 +46,21 @@ export type WatchStatusPayload = {
   phase: string | null;
   onGround: boolean | null;
   enginesRunning: boolean | null;
+  groundSpeedKt: number | null;
   position: { lat: number; lon: number } | null;
+  /** Live fuel total (lb) sampled on the Watch pipe. */
+  liveFuelLb: number | null;
+  /** Live payload total (lb) — stations/mass-balance policy. */
+  livePayloadLb: number | null;
+  /**
+   * Authoritative Loaded vs Due from the Watch owner (also persisted on mission).
+   * UI should prefer this over inventing ready client-side.
+   */
+  loadVerification: {
+    ready: boolean;
+    fuel: { plannedLb?: number; liveLb: number; ok: boolean };
+    payload: { plannedLb?: number; liveLb?: number; ok: boolean };
+  } | null;
   sawAirborne: boolean;
   lastEvent: MissionFlightEvent | null;
   lastEventAtIso: string | null;
@@ -104,16 +125,12 @@ type WatchOptions = {
   allowDepartOverride?: boolean;
 };
 
-function phaseFromSample(sample: FlightGroundSample): string {
-  if (!sample.onGround) return 'airborne';
-  return sample.enginesRunning ? 'ground+engines' : 'ground';
-}
-
 export async function sampleLiveFlight(
   bridge: NamedPipeSimBridge,
 ): Promise<FlightGroundSample> {
   const snap = await bridge.snapshot();
   let position: { lat: number; lon: number } | undefined;
+  let groundSpeedKt: number | undefined;
   try {
     const lat = await bridge.readSimVar({ name: 'PLANE LATITUDE', unit: 'degrees' });
     const lon = await bridge.readSimVar({ name: 'PLANE LONGITUDE', unit: 'degrees' });
@@ -123,10 +140,114 @@ export async function sampleLiveFlight(
   } catch {
     position = undefined;
   }
+  try {
+    const gs = await bridge.readSimVar({
+      name: 'GROUND VELOCITY',
+      unit: 'knots',
+    });
+    if (Number.isFinite(gs) && gs >= 0) {
+      groundSpeedKt = gs;
+    }
+  } catch {
+    groundSpeedKt = undefined;
+  }
   return {
     onGround: snap.onGround,
     enginesRunning: snap.enginesRunning,
     position,
+    groundSpeedKt,
+  };
+}
+
+/**
+ * Lightweight fuel + payload totals on an already-open Watch bridge.
+ * Stations + mass-balance via resolveLivePayloadLb (same policy as preflight/inject).
+ */
+export async function sampleLiveLoadLb(
+  bridge: NamedPipeSimBridge,
+  plannedPayloadLb?: number,
+): Promise<{
+  fuelLb: number | null;
+  payloadLb: number | null;
+  payloadSource: 'stations' | 'mass-balance' | 'none';
+}> {
+  let fuelLb: number | null = null;
+  try {
+    const fuel = await bridge.readSimVar({
+      name: 'FUEL TOTAL QUANTITY WEIGHT',
+      unit: 'pounds',
+    });
+    if (Number.isFinite(fuel) && fuel >= 0) fuelLb = fuel;
+  } catch {
+    try {
+      const gal = await bridge.readSimVar({
+        name: 'FUEL TOTAL QUANTITY',
+        unit: 'gallons',
+      });
+      const dens = await bridge.readSimVar({
+        name: 'FUEL WEIGHT PER GALLON',
+        unit: 'pounds',
+      });
+      const fuel = gal * dens;
+      if (Number.isFinite(fuel) && fuel >= 0) fuelLb = fuel;
+    } catch {
+      fuelLb = null;
+    }
+  }
+
+  let stationSum = 0;
+  let stationsRead = 0;
+  for (let index = 1; index <= 16; index += 1) {
+    try {
+      const w = await bridge.readSimVar({
+        name: `PAYLOAD STATION WEIGHT:${index}`,
+        unit: 'pounds',
+      });
+      if (Number.isFinite(w) && w >= 0) {
+        stationSum += w;
+        stationsRead += 1;
+      }
+    } catch {
+      /* station missing — stop after a gap of failures at the start */
+      if (stationsRead === 0 && index >= 8) break;
+    }
+  }
+
+  let massBalanceLb: number | undefined;
+  if (fuelLb !== null) {
+    try {
+      const empty = await bridge.readSimVar({
+        name: 'EMPTY WEIGHT',
+        unit: 'pounds',
+      });
+      const gross = await bridge.readSimVar({
+        name: 'TOTAL WEIGHT',
+        unit: 'pounds',
+      });
+      if (
+        Number.isFinite(empty) &&
+        empty > 0 &&
+        Number.isFinite(gross) &&
+        gross > empty
+      ) {
+        massBalanceLb = Math.max(0, gross - empty - Math.max(0, fuelLb));
+      }
+    } catch {
+      massBalanceLb = undefined;
+    }
+  }
+
+  const resolved = resolveLivePayloadLb({
+    stationSumLb: stationsRead > 0 ? stationSum : undefined,
+    massBalanceLb,
+    plannedLb: plannedPayloadLb,
+  });
+
+  return {
+    fuelLb,
+    payloadLb:
+      resolved.payloadLb !== undefined ? resolved.payloadLb : null,
+    payloadSource: resolved.source,
   };
 }
 
@@ -174,6 +295,11 @@ export class CareerWatchSession {
   private missionId: string | null = null;
   private missionStatus: string | null = null;
   private lastSample: FlightGroundSample | null = null;
+  /** Sticky display phase (taxi hysteresis). */
+  private lastPhase: string | null = null;
+  private lastLiveFuelLb: number | null = null;
+  private lastLivePayloadLb: number | null = null;
+  private lastLoadVerification: LoadVerificationWeights | null = null;
   private lastEvent: MissionFlightEvent | null = null;
   private lastEventAtIso: string | null = null;
   private lastError: string | null = null;
@@ -230,14 +356,24 @@ export class CareerWatchSession {
         met: check.ok,
       };
     }
+    if (this.lastSample) {
+      this.lastPhase = flightPhaseFromSample(this.lastSample, this.lastPhase);
+    }
     return {
       running: this.running,
       missionId: this.missionId,
       missionStatus: this.missionStatus,
-      phase: this.lastSample ? phaseFromSample(this.lastSample) : null,
+      phase: this.lastPhase,
       onGround: this.lastSample?.onGround ?? null,
       enginesRunning: this.lastSample?.enginesRunning ?? null,
+      groundSpeedKt:
+        typeof this.lastSample?.groundSpeedKt === 'number'
+          ? this.lastSample.groundSpeedKt
+          : null,
       position: this.lastSample?.position ?? null,
+      liveFuelLb: this.lastLiveFuelLb,
+      livePayloadLb: this.lastLivePayloadLb,
+      loadVerification: this.lastLoadVerification,
       sawAirborne: this.watchState.sawAirborne,
       lastEvent: this.lastEvent,
       lastEventAtIso: this.lastEventAtIso,
@@ -269,24 +405,33 @@ export class CareerWatchSession {
     };
     this.missionId = opts.missionId;
     this.lastSample = null;
+    this.lastPhase = null;
+    this.lastLiveFuelLb = null;
+    this.lastLivePayloadLb = null;
+    this.lastLoadVerification = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
     this.lastError = null;
     this.settlement = null;
     this.preflightDepartBlockedLogged = false;
 
-    const missions = await this.cb.loadMissions();
-    const mission = missions.missions.find((m) => m.id === opts.missionId);
-    if (!mission) {
+    const loaded = await this.cb.withCareerRead((_world, missions) => {
+      const mission = missions.missions.find((m) => m.id === opts.missionId);
+      return mission
+        ? { mission, walletUsd: missions.walletUsd }
+        : null;
+    });
+    if (!loaded) {
       this.missionId = null;
       throw new Error(`Unknown mission ${opts.missionId}`);
     }
+    const { mission } = loaded;
     if (!['accepted', 'dispatched', 'in_flight'].includes(mission.status)) {
       this.missionId = null;
       throw new Error(`Mission ${mission.id} is ${mission.status} — nothing to watch`);
     }
     this.missionStatus = mission.status;
-    this.walletUsd = missions.walletUsd;
+    this.walletUsd = loaded.walletUsd;
     this.watchState = createMissionFlightWatchState({
       sawAirborne: mission.status === 'in_flight',
       airborneAtMs: mission.airborneAtMs,
@@ -328,7 +473,8 @@ export class CareerWatchSession {
     }
     if (this.bridge) {
       try {
-        await this.bridge.close();
+        // Keep shared SimConnect alive for inject / preflight.
+        await this.bridge.close({ disconnectHost: false });
       } catch {
         /* ignore */
       }
@@ -339,6 +485,11 @@ export class CareerWatchSession {
 
   private async tick(): Promise<void> {
     if (!this.running || !this.bridge || !this.missionId || this.tickInFlight) {
+      return;
+    }
+    // OFP inject owns SimConnect traffic — concurrent Watch samples on a second
+    // pipe client were a common trigger for STATUS_PIPE_DISCONNECTED (0xC00000B0).
+    if (isOfpLoadActive()) {
       return;
     }
     this.tickInFlight = true;
@@ -365,6 +516,78 @@ export class CareerWatchSession {
       if (current.status === 'settled' || current.status === 'cancelled' || current.status === 'failed') {
         await this.stop();
         return;
+      }
+
+      // Loaded vs Due: Watch owns the pipe — sample + persist (single source of truth).
+      const prevVerification = current.lastPreflightCheck?.loadVerification;
+      if (
+        prevVerification &&
+        current.status === 'dispatched' &&
+        sample.onGround
+      ) {
+        try {
+          const load = await sampleLiveLoadLb(
+            this.bridge,
+            prevVerification.payload.plannedLb,
+          );
+          this.lastLiveFuelLb = load.fuelLb;
+          this.lastLivePayloadLb = load.payloadLb;
+          const nextWeights = evaluateLoadVerification({
+            plannedFuelLb: prevVerification.fuel.plannedLb,
+            liveFuelLb: load.fuelLb ?? undefined,
+            plannedPayloadLb: prevVerification.payload.plannedLb,
+            livePayloadLb: load.payloadLb ?? undefined,
+          });
+          this.lastLoadVerification = nextWeights;
+          if (
+            loadVerificationDrifted(
+              {
+                ready: prevVerification.ready,
+                fuel: prevVerification.fuel,
+                payload: prevVerification.payload,
+              },
+              nextWeights,
+            )
+          ) {
+            await this.cb.updateOpenMission(
+              this.missionId,
+              (_missions, openMission, openIdx) => {
+                const prev = openMission.lastPreflightCheck;
+                if (!prev?.loadVerification) return false;
+                openMission.lastPreflightCheck = {
+                  ...prev,
+                  checkedAtIso: new Date().toISOString(),
+                  verdict: nextWeights.ready
+                    ? prev.verdict === 'fail'
+                      ? 'pass'
+                      : prev.verdict
+                    : 'fail',
+                  loadVerification: {
+                    ...prev.loadVerification,
+                    ready: nextWeights.ready,
+                    fuel: {
+                      ...prev.loadVerification.fuel,
+                      ...nextWeights.fuel,
+                    },
+                    payload: {
+                      ...prev.loadVerification.payload,
+                      ...nextWeights.payload,
+                    },
+                    aircraft: {
+                      onGround: sample.onGround,
+                      enginesRunning: sample.enginesRunning,
+                    },
+                  },
+                };
+                // Keep local mission snapshot in sync for depart gate below.
+                current.lastPreflightCheck = openMission.lastPreflightCheck;
+                return true;
+              },
+            );
+          }
+        } catch {
+          /* keep previous live load / verification */
+        }
       }
 
       const destTerminal = world.airports.find((a) => a.icao === current.destIcao);
@@ -427,12 +650,12 @@ export class CareerWatchSession {
 
       if (event.type === 'depart' && this.opts.autoDepart) {
         if (
-          current.lastPreflightCheck?.verdict === 'fail' &&
+          preflightBlocksDepart(current) &&
           !this.opts.allowDepartOverride
         ) {
           if (!this.preflightDepartBlockedLogged) {
             this.lastError =
-              'Auto-depart blocked: Preflight failed — fix load or restart Watch with override';
+              'Auto-depart blocked: Preflight not ready — fix load or restart Watch with override';
             this.preflightDepartBlockedLogged = true;
           }
         } else {

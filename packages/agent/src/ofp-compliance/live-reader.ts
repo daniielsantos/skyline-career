@@ -2,6 +2,7 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
   applyPmdgEfbPayloadCorrection,
   enrichPayloadWithRoles,
+  resolveLivePayloadLb,
   resolveLiveSourcePrefs,
   toLb,
   type LiveFuelState,
@@ -165,6 +166,34 @@ export function fuelFromMassBalance(
     center: 0,
     total,
   };
+}
+
+/**
+ * Payload from gross − empty − fuel. Used when PAYLOAD STATION WEIGHT:* reads as 0
+ * (Black Square Accu-Sim tablet can show load while classic station SimVars stay empty).
+ */
+export function payloadLbFromMassBalance(
+  snapshot: SimSnapshot,
+  fuelTotalLb: number,
+): number | undefined {
+  const emptyLb = snapshot.vars?.['EMPTY WEIGHT'];
+  const grossLb = snapshot.grossWeightLb ?? snapshot.vars?.['TOTAL WEIGHT'];
+  if (
+    emptyLb === undefined ||
+    !Number.isFinite(emptyLb) ||
+    emptyLb <= 0 ||
+    grossLb === undefined ||
+    !Number.isFinite(grossLb) ||
+    grossLb <= 0
+  ) {
+    return undefined;
+  }
+  const payloadLb = grossLb - emptyLb - Math.max(0, fuelTotalLb);
+  if (!Number.isFinite(payloadLb)) {
+    return undefined;
+  }
+  // Allow 0 — emptied aircraft must not become "unknown" and freeze READY.
+  return Math.max(0, payloadLb);
 }
 
 export function preferMassBalanceFuel(
@@ -350,6 +379,25 @@ export async function readLiveLoad(
   }
   if (!fuel) {
     fuel = fuelFromClassicSnapshot(snapshot, density);
+  }
+
+  // Accu-Sim / some GA: station SimVars read 0 while gross weight includes the load.
+  // Also: stations cleared while TOTAL WEIGHT still lags → trust stations vs planned.
+  const mbPayloadLb = payloadLbFromMassBalance(snapshot, fuel.total);
+  const resolvedPayload = resolveLivePayloadLb({
+    stationSumLb: payload.total,
+    massBalanceLb: mbPayloadLb,
+  });
+  if (
+    resolvedPayload.source === 'mass-balance' &&
+    resolvedPayload.payloadLb !== undefined
+  ) {
+    payload = {
+      ...payload,
+      source: 'mass-balance',
+      total: resolvedPayload.payloadLb,
+      ofpPayloadLb: payload.ofpPayloadLb ?? resolvedPayload.payloadLb,
+    };
   }
 
   let weights = weightsFromSnapshot(snapshot, fuel.total, payload.ofpPayloadLb ?? payload.total);

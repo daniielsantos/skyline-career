@@ -3715,3 +3715,118 @@ textarea {
   color: var(--ink);
   border-color: var(--line);
 }
+
+/* -- Network map (OpenFreeMap Dark / MapLibre) ------------- */
+.network-map-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.hub-network-map {
+  position: relative;
+  flex: 1;
+  min-height: 28rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0b0b0c;
+}
+
+.hub-network-map-canvas {
+  width: 100%;
+  height: min(70vh, 40rem);
+  background: #0b0b0c;
+}
+
+.hub-network-map .maplibregl-map {
+  font: inherit;
+}
+
+.hub-network-map .maplibregl-ctrl-attrib {
+  background: rgba(12, 12, 14, 0.75) !important;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.65rem;
+}
+
+.hub-network-map .maplibregl-ctrl-attrib a {
+  color: rgba(240, 193, 75, 0.75);
+}
+
+.hub-network-map .maplibregl-ctrl-group {
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+.hub-network-map .maplibregl-ctrl-group button {
+  background-color: #16161a;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.hub-network-map .maplibregl-ctrl-group button + button {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.hub-map-marker {
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+}
+
+.hub-map-popup .maplibregl-popup-content {
+  background: #111114;
+  border: 1px solid rgba(240, 193, 75, 0.35);
+  color: #f5f2ea;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.hub-map-popup .maplibregl-popup-tip {
+  border-top-color: #111114;
+}
+
+.hub-network-map-legend {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0.4rem 0.65rem;
+  list-style: none;
+  background: rgba(12, 12, 14, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.72);
+  pointer-events: none;
+}
+
+.hub-network-map-legend .dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.3rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.hub-network-map-legend .dot.major {
+  background: #f0c14b;
+}
+
+.hub-network-map-legend .dot.regional {
+  background: #c9a227;
+}
+
+.hub-network-map-legend .dot.spoke {
+  background: #a89060;
+}

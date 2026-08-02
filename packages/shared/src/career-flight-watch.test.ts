@@ -5,6 +5,7 @@ import {
   createMissionFlightWatchState,
   distanceNm,
   evaluateMissionFlightTransition,
+  flightPhaseFromSample,
   isNearAirport,
   parseBlockTimeToMs,
   pickActiveMission,
@@ -323,5 +324,55 @@ describe('pickActiveMission', () => {
     c.id = 'c';
     assert.equal(pickActiveMission([a, b, c], 'b')?.id, 'b');
     assert.equal(pickActiveMission([a, b, c])?.id, 'c');
+  });
+});
+
+describe('flightPhaseFromSample', () => {
+  it('reports taxi when moving on ground with engines', () => {
+    assert.equal(
+      flightPhaseFromSample({
+        onGround: true,
+        enginesRunning: true,
+        groundSpeedKt: 12,
+      }),
+      'taxi',
+    );
+    assert.equal(
+      flightPhaseFromSample({
+        onGround: true,
+        enginesRunning: true,
+        groundSpeedKt: 2,
+      }),
+      'ground+engines',
+    );
+    assert.equal(
+      flightPhaseFromSample({ onGround: false, enginesRunning: true }),
+      'airborne',
+    );
+  });
+
+  it('keeps taxi sticky across brief ground-speed dips', () => {
+    assert.equal(
+      flightPhaseFromSample(
+        {
+          onGround: true,
+          enginesRunning: true,
+          groundSpeedKt: 3,
+        },
+        'taxi',
+      ),
+      'taxi',
+    );
+    assert.equal(
+      flightPhaseFromSample(
+        {
+          onGround: true,
+          enginesRunning: true,
+          groundSpeedKt: 1,
+        },
+        'taxi',
+      ),
+      'ground+engines',
+    );
   });
 });

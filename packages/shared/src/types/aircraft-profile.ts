@@ -214,8 +214,11 @@ export interface LoadPlanRequest {
    * How CG envelope failures affect apply success.
    * - strict: CG out of envelope fails the apply (default)
    * - soft: CG is reported but does not fail the apply
+   * - none: skip CG read/wait (use for rapid multi-step payload writes)
    */
-  cgPolicy?: 'strict' | 'soft';
+  cgPolicy?: 'strict' | 'soft' | 'none';
+  /** Skip post-write fuel/payload verify polling (faster multi-step inject). */
+  skipVerify?: boolean;
 }
 
 export interface OperationResult {

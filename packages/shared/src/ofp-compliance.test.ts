@@ -208,6 +208,51 @@ describe('compareOfpToLive preflight', () => {
     assert.ok(snap.findings.some((f) => f.code === 'PAYLOAD_TOTAL'));
   });
 
+  it('fails freighter baggage-only OFP when aircraft payload is empty', () => {
+    const ofp = normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit: 'lb', total: 174 },
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 174,
+        baggage: 992,
+        passengerCount: 0,
+      },
+      payload: {
+        unit: 'lb',
+        stationRoles: {
+          crewStations: [1, 2],
+          baggageStations: [3, 4, 5],
+          passengerStations: [],
+        },
+      },
+      tolerances: { payloadAbsLb: 75 },
+    });
+    const livePayload = enrichPayloadWithRoles(
+      {
+        source: 'classic-stations',
+        unit: 'lb',
+        stations: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        total: 0,
+      },
+      ofp.payload?.stationRoles,
+    );
+    const snap = compareOfpToLive({
+      ofp,
+      liveFuel: makeFuel({ left: 87, right: 87, center: 0, total: 174 }),
+      livePayload,
+      phase: 'preflight',
+    });
+    assert.equal(snap.verdict, 'fail');
+    assert.ok(
+      snap.findings.some(
+        (f) =>
+          f.severity === 'fail' &&
+          (f.code === 'PAYLOAD_TOTAL' || f.code === 'BAGGAGE'),
+      ),
+    );
+  });
+
   it('warns when baggage/pax planned without station roles', () => {
     const ofp = normalizeOfpExpectation({
       source: 'simbrief',

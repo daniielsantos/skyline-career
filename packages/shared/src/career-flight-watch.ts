@@ -7,12 +7,38 @@ import type { MissionIntent, MissionStatus } from './types/career-economy.js';
 /** Minimum airborne wall-clock fraction of planned route time before settle. */
 export const MIN_AIRBORNE_TIME_RATIO = 0.7;
 
+/** Enter taxi when ground speed reaches this (kt). */
+export const TAXI_GROUND_SPEED_KT = 5;
+/** Stay in taxi until ground speed drops below this (kt) — hysteresis vs jitter. */
+export const TAXI_GROUND_SPEED_EXIT_KT = 2;
+
 /** Minimal live gates used for career auto-depart / auto-settle. */
 export interface FlightGroundSample {
   onGround: boolean;
   enginesRunning: boolean;
   /** Optional aircraft position (degrees). */
   position?: { lat: number; lon: number };
+  /** Optional ground speed (knots) for taxi phase display. */
+  groundSpeedKt?: number;
+}
+
+/**
+ * Human/telemetry phase from a live sample.
+ * Mission status still only advances on wheels-up / settle — taxi is display-only.
+ * Pass `prevPhase` to keep taxi sticky across brief GS dips.
+ */
+export function flightPhaseFromSample(
+  sample: FlightGroundSample,
+  prevPhase?: string | null,
+): string {
+  if (!sample.onGround) return 'airborne';
+  const gs = sample.groundSpeedKt;
+  const wasTaxi = prevPhase === 'taxi';
+  const threshold = wasTaxi ? TAXI_GROUND_SPEED_EXIT_KT : TAXI_GROUND_SPEED_KT;
+  const moving =
+    typeof gs === 'number' && Number.isFinite(gs) && gs >= threshold;
+  if (sample.enginesRunning && moving) return 'taxi';
+  return sample.enginesRunning ? 'ground+engines' : 'ground';
 }
 
 export interface MissionFlightWatchState {

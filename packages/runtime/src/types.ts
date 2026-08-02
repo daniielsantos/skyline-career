@@ -57,6 +57,11 @@ export interface StrategyContext {
   profile: AircraftProfile;
   bridge: SimBridge;
   snapshot: SimSnapshot;
+  /**
+   * Multi-step inject/rebalance: skip writePlan `delay` ops and post-write
+   * settle IPC so the pipe stays free for station writes.
+   */
+  skipSettle?: boolean;
 }
 
 export interface CapabilityScore {

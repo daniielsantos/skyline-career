@@ -27,6 +27,9 @@ export class DefaultProfileEngine implements ProfileEngine {
   }
 
   async applyLoadPlan(request: LoadPlanRequest) {
+    // Fast path (skipVerify): one snapshot for gating, no capability re-probe.
+    // Capability detect() itself calls snapshot() again and was doubling pipe
+    // traffic on every CG rebalance round.
     const snapshot = await this.bridge.snapshot();
     const gate = this.gating.evaluate(this.profile.gating, snapshot);
 
@@ -42,8 +45,15 @@ export class DefaultProfileEngine implements ProfileEngine {
       return { fuel: request.fuel ? blocked : undefined, payload: request.payload ? blocked : undefined };
     }
 
-    const ctx = { profile: this.profile, bridge: this.bridge, snapshot };
-    await this.capabilityDetector.detect(this.profile, this.bridge);
+    const ctx = {
+      profile: this.profile,
+      bridge: this.bridge,
+      snapshot,
+      skipSettle: Boolean(request.skipVerify),
+    };
+    if (!request.skipVerify) {
+      await this.capabilityDetector.detect(this.profile, this.bridge);
+    }
 
     const fuelStrategy =
       this.registry.resolveFuel(this.profile.fuel.strategy) ??
@@ -57,7 +67,7 @@ export class DefaultProfileEngine implements ProfileEngine {
 
     if (request.payload && payloadStrategy) {
       results.payload = await payloadStrategy.setPayload(request.payload, ctx);
-      if (results.payload.success) {
+      if (results.payload.success && !request.skipVerify) {
         results.payload = {
           ...results.payload,
           ...(await payloadStrategy.verify(request.payload, ctx).then((v) =>
@@ -69,7 +79,7 @@ export class DefaultProfileEngine implements ProfileEngine {
 
     if (request.fuel && fuelStrategy) {
       results.fuel = await fuelStrategy.setFuel(request.fuel, ctx);
-      if (results.fuel.success) {
+      if (results.fuel.success && !request.skipVerify) {
         const verified = await fuelStrategy.verify(request.fuel, ctx);
         if (!verified.ok) {
           results.fuel = { ...results.fuel, success: false, errorCode: 'FUEL_VERIFY_FAILED' };
@@ -77,11 +87,11 @@ export class DefaultProfileEngine implements ProfileEngine {
       }
     }
 
-    if (this.profile.cg?.constraints) {
+    if (this.profile.cg?.constraints && request.cgPolicy !== 'none') {
       // MSFS updates weight stations immediately, but its derived CG SimVar can
       // lag behind. Reading it too early can reject a valid load or falsely
       // report that a rollback failed.
-      await new Promise((resolve) => setTimeout(resolve, 750));
+      await new Promise((resolve) => setTimeout(resolve, 1200));
       let cg = await this.bridge.readSimVar({
         name: this.profile.cg.readVar ?? 'CG PERCENT',
         unit: this.profile.cg.readUnit ?? 'Percent over 100',
@@ -92,10 +102,14 @@ export class DefaultProfileEngine implements ProfileEngine {
       let minMac = this.profile.cg.constraints.minMac;
       let maxMac = this.profile.cg.constraints.maxMac;
       try {
-        const [fwdRaw, aftRaw] = await Promise.all([
-          this.bridge.readSimVar({ name: 'CG FWD LIMIT', unit: 'Percent over 100' }),
-          this.bridge.readSimVar({ name: 'CG AFT LIMIT', unit: 'Percent over 100' }),
-        ]);
+        const fwdRaw = await this.bridge.readSimVar({
+          name: 'CG FWD LIMIT',
+          unit: 'Percent over 100',
+        });
+        const aftRaw = await this.bridge.readSimVar({
+          name: 'CG AFT LIMIT',
+          unit: 'Percent over 100',
+        });
         if (Number.isFinite(fwdRaw) && Number.isFinite(aftRaw)) {
           let fwd = normalizeMacPercent(fwdRaw);
           let aft = normalizeMacPercent(aftRaw);

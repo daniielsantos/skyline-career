@@ -115,6 +115,8 @@ describe('scaffold-roles Black Square Commander 114', () => {
     const h = matchHeuristic('Black Square Commander 114TC')!;
     assert.equal(h.marketLabel, 'Rockwell Commander 114');
     assert.equal(h.familyPackRel, 'blacksquare-commander-114.json');
+    assert.equal(h.icao, 'AC11');
+    assert.equal(h.simbriefIcao, 'C182');
   });
 });
 

@@ -3,6 +3,7 @@
  * OFP only supplies totals (block fuel / cargo); this module distributes them.
  */
 import {
+  DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
   KG_TO_LB,
   ofpCargoKg,
@@ -19,7 +20,8 @@ export type OfpLoadPlanErrorCode =
   | 'FUEL_OVER_CAPACITY'
   | 'CARGO_OVER_CAPACITY'
   | 'NO_TANKS'
-  | 'NO_CARGO';
+  | 'NO_CARGO'
+  | 'MTOW_NO_ROOM';
 
 export class OfpLoadPlanError extends Error {
   readonly code: OfpLoadPlanErrorCode;
@@ -31,16 +33,33 @@ export class OfpLoadPlanError extends Error {
   }
 }
 
+/** Operating crew seat weight (lb) on every mapped crew station. */
+export const FREIGHTER_PILOT_LB = 170;
+/**
+ * Soft cap for human seats (crew + passengers). Structural maxLoad is often 500;
+ * we never treat that as a normal occupant/cargo dump target.
+ */
+export const SEAT_OCCUPANT_SOFT_MAX_LB = 300;
+/**
+ * Soft cap per rear-baggage station on GA cabins (passenger seats present).
+ * More than this usually drives CG past the aft limit on light singles.
+ */
+export const GA_BAGGAGE_SOFT_MAX_LB = 50;
+
 export type BuildOfpLoadPlanInput = {
   ofp: OfpExpectation;
   profile: AircraftProfile;
   stationRoles?: OfpStationRoleMap;
-  /** Live station weights (lb) — used to preserve crew/service/pax stations. */
+  /** Live station weights (lb) — used for unknown/service stations only. */
   liveStationsLb?: Record<number, number>;
   /** Override Jet-A density (lb/gal). Defaults to DEFAULT_JET_A_LB_PER_GAL. */
   fuelLbPerGal?: number;
   /** Fallback cargo kg when OFP has no baggage/payload (e.g. mission.cargoKg). */
   cargoKgFallback?: number;
+  /** Live EMPTY WEIGHT (lb) — enables MTOW cargo clamp. */
+  emptyWeightLb?: number;
+  /** Live MAX GROSS WEIGHT (lb) — enables MTOW cargo clamp. */
+  maxGrossWeightLb?: number;
 };
 
 export type BuiltOfpLoadPlan = {
@@ -52,6 +71,14 @@ export type BuiltOfpLoadPlan = {
   baggageCapacityLb: number;
   preservedStations: number[];
   baggageStations: number[];
+  /** Crew seats — seeded at FREIGHTER_PILOT_LB. */
+  crewStations: number[];
+  /** Cabin passenger seats — filled before baggage. */
+  passengerStations: number[];
+  /** crewStations + passengerStations — soft-capped human seats. */
+  seatStations: number[];
+  /** seatStations + baggageStations — full CG / capacity pool. */
+  movableStations: number[];
 };
 
 const SYMMETRIC_PAIRS: Array<[string, string]> = [
@@ -69,6 +96,37 @@ function roundFuel(value: number, unit: string): number {
 
 function roundLb(value: number): number {
   return Math.round(value);
+}
+
+/**
+ * Pick fuel density for gallon↔lb. Light piston tanks often report Jet-A density
+ * in MSFS; prefer avgas (~6.0) when capacity looks GA-sized.
+ */
+export function resolveFuelDensityLbPerGal(
+  profile: AircraftProfile,
+  liveLbPerGal?: number,
+): number {
+  const unit = profile.fuel.unit ?? 'gallons';
+  const capacityTotal = profile.fuel.tanks.reduce(
+    (sum, t) => sum + (t.capacity ?? 0),
+    0,
+  );
+  const lightPistonGallons =
+    unit === 'gallons' && capacityTotal > 0 && capacityTotal <= 120;
+  if (
+    liveLbPerGal !== undefined &&
+    Number.isFinite(liveLbPerGal) &&
+    liveLbPerGal > 4 &&
+    liveLbPerGal < 9
+  ) {
+    if (lightPistonGallons && liveLbPerGal >= 6.45) {
+      return DEFAULT_AVGAS_LB_PER_GAL;
+    }
+    return liveLbPerGal;
+  }
+  return lightPistonGallons
+    ? DEFAULT_AVGAS_LB_PER_GAL
+    : DEFAULT_JET_A_LB_PER_GAL;
 }
 
 /**
@@ -171,9 +229,81 @@ export function distributeFuelAcrossTanks(
   return { tanks: result, unit, capacityTotal };
 }
 
+/** Soft max for a seat index (never above structural maxLoad). */
+export function seatSoftMaxLb(
+  profile: AircraftProfile,
+  index: number,
+  softMax = SEAT_OCCUPANT_SOFT_MAX_LB,
+): number {
+  const station = profile.payload.stations.find((s) => s.index === index);
+  const hard = station?.maxLoad ?? softMax;
+  return Math.min(hard, softMax);
+}
+
 /**
- * Distribute cargo lb across baggage stations proportional to maxLoad.
- * Preserves crew/service/passenger stations from liveStationsLb (or 0).
+ * Career Loaded vs Due helper: station-total planned payload after GA soft-caps.
+ * Live UI should compare against `live.payload.total` (all stations), not ofpPayloadLb
+ * (pax+bags only — that was showing Sim 550 while the tablet showed 1050).
+ */
+export function plannedStationPayloadLb(opts: {
+  cargoLb: number;
+  stationRoles?: OfpStationRoleMap;
+  /** When set with maxGross, clamp cargo like buildOfpLoadPlan. */
+  emptyWeightLb?: number;
+  maxGrossWeightLb?: number;
+  blockFuelLb?: number;
+}): {
+  /** crew floors + placed cargo — compare to live.payload.total */
+  plannedTotalLb: number;
+  /** cargo after soft-cap / MTOW clamps */
+  cargoPlacedLb: number;
+  crewLb: number;
+  gaCabin: boolean;
+} {
+  const roles = opts.stationRoles;
+  const crewN = roles?.crewStations?.length ?? 0;
+  const paxN = roles?.passengerStations?.length ?? 0;
+  const bagN = roles?.baggageStations?.length ?? 0;
+  const gaCabin = paxN > 0;
+  const crewLb = crewN * FREIGHTER_PILOT_LB;
+  let cargoLb = Math.max(0, opts.cargoLb);
+
+  if (
+    opts.emptyWeightLb !== undefined &&
+    opts.maxGrossWeightLb !== undefined &&
+    opts.blockFuelLb !== undefined &&
+    opts.emptyWeightLb > 0 &&
+    opts.maxGrossWeightLb > 0
+  ) {
+    const room =
+      opts.maxGrossWeightLb -
+      opts.emptyWeightLb -
+      opts.blockFuelLb -
+      crewLb -
+      25;
+    if (room >= 0) cargoLb = Math.min(cargoLb, room);
+  }
+
+  if (gaCabin) {
+    const seatCargoRoom =
+      crewN * Math.max(0, SEAT_OCCUPANT_SOFT_MAX_LB - FREIGHTER_PILOT_LB) +
+      paxN * SEAT_OCCUPANT_SOFT_MAX_LB;
+    const bagRoom = bagN * GA_BAGGAGE_SOFT_MAX_LB;
+    cargoLb = Math.min(cargoLb, seatCargoRoom + bagRoom);
+  }
+
+  return {
+    plannedTotalLb: roundLb(crewLb + cargoLb),
+    cargoPlacedLb: roundLb(cargoLb),
+    crewLb: roundLb(crewLb),
+    gaCabin,
+  };
+}
+
+/**
+ * Distribute cargo lb across stations.
+ * Priority: passenger seats → crew spare (soft-capped) → baggage last.
+ * Freighter packs with no passenger seats keep crew at 170 and put cargo on baggage.
  */
 export function distributeCargoAcrossStations(
   cargoLb: number,
@@ -185,29 +315,52 @@ export function distributeCargoAcrossStations(
   total: number;
   preservedStations: number[];
   baggageStations: number[];
+  crewStations: number[];
+  passengerStations: number[];
+  seatStations: number[];
+  movableStations: number[];
   baggageCapacityLb: number;
+  /** Cargo actually placed (may be less than requested when GA soft-caps clamp). */
+  cargoPlacedLb: number;
+  crewLb: number;
 } {
+  const crewStations = [...(stationRoles?.crewStations ?? [])].filter((idx) =>
+    profile.payload.stations.some((s) => s.index === idx),
+  );
+  const passengerStations = [...(stationRoles?.passengerStations ?? [])].filter(
+    (idx) => profile.payload.stations.some((s) => s.index === idx),
+  );
   const baggageStations = [...(stationRoles?.baggageStations ?? [])].filter((idx) =>
     profile.payload.stations.some((s) => s.index === idx),
   );
-  if (baggageStations.length === 0) {
+  const gaCabin = passengerStations.length > 0;
+  if (
+    baggageStations.length === 0 &&
+    crewStations.length === 0 &&
+    passengerStations.length === 0
+  ) {
     throw new OfpLoadPlanError(
       'NO_CARGO_STATIONS',
-      'No baggage stations mapped for this aircraft — cannot load OFP cargo safely',
+      'No baggage/crew/passenger stations mapped for this aircraft — cannot load OFP cargo safely',
     );
   }
 
-  const preserveSet = new Set<number>([
-    ...(stationRoles?.crewStations ?? []),
-    ...(stationRoles?.serviceStations ?? []),
-    ...(stationRoles?.passengerStations ?? []),
-  ]);
+  const preserveSet = new Set<number>([...(stationRoles?.serviceStations ?? [])]);
+  const seatStations = [...new Set([...crewStations, ...passengerStations])];
+  const movableStations = [...new Set([...seatStations, ...baggageStations])];
 
   const stations: Record<number, number> = {};
   const preservedStations: number[] = [];
+  let crewLb = 0;
 
   for (const station of profile.payload.stations) {
-    if (preserveSet.has(station.index)) {
+    if (crewStations.includes(station.index)) {
+      const value = Math.min(FREIGHTER_PILOT_LB, station.maxLoad);
+      stations[station.index] = value;
+      crewLb += value;
+    } else if (passengerStations.includes(station.index)) {
+      stations[station.index] = 0;
+    } else if (preserveSet.has(station.index)) {
       const live = liveStationsLb[station.index];
       stations[station.index] = roundLb(
         Number.isFinite(live) ? Math.min(Math.max(0, live!), station.maxLoad) : 0,
@@ -216,7 +369,6 @@ export function distributeCargoAcrossStations(
     } else if (baggageStations.includes(station.index)) {
       stations[station.index] = 0;
     } else {
-      // Unknown role: preserve live if present, else zero.
       const live = liveStationsLb[station.index];
       stations[station.index] = roundLb(
         Number.isFinite(live) ? Math.min(Math.max(0, live!), station.maxLoad) : 0,
@@ -225,45 +377,286 @@ export function distributeCargoAcrossStations(
     }
   }
 
-  const caps = baggageStations.map((idx) => {
-    const station = profile.payload.stations.find((s) => s.index === idx)!;
-    return { idx, max: station.maxLoad };
-  });
-  const baggageCapacityLb = caps.reduce((sum, c) => sum + c.max, 0);
-  if (cargoLb > baggageCapacityLb + 0.5) {
+  const seatSoftMax = Object.fromEntries(
+    seatStations.map((idx) => [idx, seatSoftMaxLb(profile, idx)]),
+  );
+  const seatRoomLb = seatStations.reduce((sum, idx) => {
+    const cap = seatSoftMax[idx] ?? SEAT_OCCUPANT_SOFT_MAX_LB;
+    return sum + Math.max(0, cap - (stations[idx] ?? 0));
+  }, 0);
+  const baggageHardCapacityLb = baggageStations.reduce((sum, idx) => {
+    const station = profile.payload.stations.find((s) => s.index === idx);
+    return sum + (station?.maxLoad ?? 0);
+  }, 0);
+  const baggageSoftMax = Object.fromEntries(
+    baggageStations.map((idx) => {
+      const hard =
+        profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
+      const soft = gaCabin ? Math.min(hard, GA_BAGGAGE_SOFT_MAX_LB) : hard;
+      return [idx, soft] as const;
+    }),
+  );
+  const baggageFillCapacityLb = baggageStations.reduce(
+    (sum, idx) => sum + (baggageSoftMax[idx] ?? 0),
+    0,
+  );
+  // Freighter: full baggage. GA: seats soft-cap + ~50 lb/baggage station.
+  const fillCapacityLb = gaCabin
+    ? seatRoomLb + baggageFillCapacityLb
+    : baggageStations.length > 0
+      ? baggageHardCapacityLb
+      : seatRoomLb;
+  const baggageCapacityLb = gaCabin ? baggageFillCapacityLb : baggageHardCapacityLb;
+
+  let requestedCargo = roundLb(cargoLb);
+  if (!gaCabin && requestedCargo > fillCapacityLb + 0.5) {
     throw new OfpLoadPlanError(
       'CARGO_OVER_CAPACITY',
-      `Cargo ${roundLb(cargoLb)} lb exceeds baggage station capacity ${roundLb(baggageCapacityLb)} lb`,
+      `Cargo ${requestedCargo} lb exceeds station capacity ${roundLb(fillCapacityLb)} lb`,
     );
   }
-
-  // Proportional fill by maxLoad; largest remainder method for integer lb.
-  let assigned = 0;
-  const rawShares = caps.map((c) => ({
-    idx: c.idx,
-    exact: baggageCapacityLb > 0 ? (cargoLb * c.max) / baggageCapacityLb : 0,
-  }));
-  for (const share of rawShares) {
-    const floor = Math.floor(share.exact);
-    stations[share.idx] = floor;
-    assigned += floor;
-  }
-  let leftover = roundLb(cargoLb) - assigned;
-  const byFrac = rawShares
-    .map((s) => ({ idx: s.idx, frac: s.exact - Math.floor(s.exact) }))
-    .sort((a, b) => b.frac - a.frac);
-  for (const item of byFrac) {
-    if (leftover <= 0) break;
-    const cap = caps.find((c) => c.idx === item.idx)!.max;
-    const cur = stations[item.idx] ?? 0;
-    if (cur < cap) {
-      stations[item.idx] = cur + 1;
-      leftover -= 1;
-    }
+  // GA: clamp instead of failing — extra OFP cargo cannot fit without blowing CG.
+  if (gaCabin && requestedCargo > fillCapacityLb) {
+    requestedCargo = roundLb(fillCapacityLb);
   }
 
+  let remainingCargo = requestedCargo;
+  const crewRetain = Object.fromEntries(
+    crewStations.map((idx) => [idx, Math.min(FREIGHTER_PILOT_LB, stations[idx] ?? 0)]),
+  );
+  const beforeAll = { ...stations };
+
+  if (gaCabin) {
+    // GA / pax cabin: fill seats (soft-capped) before touching rear baggage.
+    const beforeSeats = { ...stations };
+    const afterSeats = equalizeMovableStations(
+      stations,
+      profile,
+      seatStations,
+      remainingCargo,
+      {
+        minRetainByIndex: {
+          ...crewRetain,
+          ...Object.fromEntries(passengerStations.map((idx) => [idx, 0])),
+        },
+        softMaxByIndex: seatSoftMax,
+      },
+    );
+    const placedOnSeats = seatStations.reduce(
+      (sum, idx) =>
+        sum + Math.max(0, (afterSeats[idx] ?? 0) - (beforeSeats[idx] ?? 0)),
+      0,
+    );
+    Object.assign(stations, afterSeats);
+    remainingCargo = Math.max(0, remainingCargo - placedOnSeats);
+  }
+
+  if (remainingCargo > 0 && baggageStations.length > 0) {
+    // Freighter (no pax) or leftover after seats: cargo on baggage (GA soft-capped).
+    const afterBags = equalizeMovableStations(
+      stations,
+      profile,
+      baggageStations,
+      remainingCargo,
+      {
+        minRetainByIndex: Object.fromEntries(baggageStations.map((idx) => [idx, 0])),
+        softMaxByIndex: gaCabin ? baggageSoftMax : undefined,
+      },
+    );
+    Object.assign(stations, afterBags);
+    remainingCargo = 0;
+  } else if (remainingCargo > 0 && seatStations.length > 0) {
+    // No baggage mapped — last resort onto seats (still soft-capped).
+    const afterSeats = equalizeMovableStations(
+      stations,
+      profile,
+      seatStations,
+      remainingCargo,
+      { minRetainByIndex: crewRetain, softMaxByIndex: seatSoftMax },
+    );
+    Object.assign(stations, afterSeats);
+  }
+
+  const cargoPlacedLb = movableStations.reduce(
+    (sum, idx) => sum + Math.max(0, (stations[idx] ?? 0) - (beforeAll[idx] ?? 0)),
+    0,
+  );
   const total = Object.values(stations).reduce((a, b) => a + b, 0);
-  return { stations, total, preservedStations, baggageStations, baggageCapacityLb };
+  return {
+    stations,
+    total,
+    preservedStations,
+    baggageStations,
+    crewStations,
+    passengerStations,
+    seatStations,
+    movableStations,
+    baggageCapacityLb,
+    cargoPlacedLb: roundLb(cargoPlacedLb),
+    crewLb,
+  };
+}
+
+/**
+ * Split `cargoLb` evenly across movable seats on top of current weights.
+ * Uses water-filling so caps/floors still yield a near-equal layout.
+ */
+export function equalizeMovableStations(
+  stations: Record<number, number>,
+  profile: AircraftProfile,
+  movableIndexes: number[],
+  cargoLb: number,
+  opts?: {
+    minRetainByIndex?: Record<number, number>;
+    softMaxByIndex?: Record<number, number>;
+  },
+): Record<number, number> {
+  const next: Record<number, number> = { ...stations };
+  const minRetain = opts?.minRetainByIndex ?? {};
+  const softMax = opts?.softMaxByIndex ?? {};
+  const caps = movableIndexes.map((idx) => {
+    const station = profile.payload.stations.find((s) => s.index === idx);
+    const hard = station?.maxLoad ?? 0;
+    const max = Math.min(hard, softMax[idx] ?? hard);
+    const floor = Math.min(max, Math.max(0, minRetain[idx] ?? next[idx] ?? 0));
+    // Keep existing weight when above floor (do not wipe already-placed cargo).
+    next[idx] = Math.max(floor, Math.min(max, next[idx] ?? 0));
+    return { idx, max, floor };
+  });
+  let remaining = Math.max(0, roundLb(cargoLb));
+  while (remaining > 0) {
+    const open = caps
+      .map((c) => ({ ...c, room: c.max - (next[c.idx] ?? 0) }))
+      .filter((c) => c.room > 0)
+      .sort((a, b) => (next[a.idx] ?? 0) - (next[b.idx] ?? 0) || a.idx - b.idx);
+    if (open.length === 0) break;
+    const take = Math.min(1, remaining, open[0]!.room);
+    next[open[0]!.idx] = (next[open[0]!.idx] ?? 0) + take;
+    remaining -= take;
+  }
+  return next;
+}
+
+/** Progressive-load / CG nudge step per seat (lb). */
+export const CG_BALANCE_STEP_LB = 50;
+
+/**
+ * Pick load bias from live CG and its movement (counterweight).
+ * - Too aft → load forward; if still drifting aft, keep forward.
+ * - Too forward → load aft; if still drifting forward, keep aft.
+ * - Inside envelope → equal.
+ */
+export function resolveCgCounterweightBias(opts: {
+  liveMac: number;
+  lo: number;
+  hi: number;
+  prevMac?: number;
+}): 'equal' | 'forward' | 'aft' {
+  const { liveMac, lo, hi } = opts;
+  if (liveMac >= lo && liveMac <= hi) return 'equal';
+  if (liveMac > hi) return 'forward';
+  if (liveMac < lo) return 'aft';
+  return 'equal';
+}
+
+/**
+ * Per-seat step size: larger when CG is still drifting the wrong way,
+ * smaller when it is already correcting (avoid overshoot).
+ */
+export function cgCounterweightPerSeatLb(opts: {
+  liveMac: number;
+  lo: number;
+  hi: number;
+  prevMac?: number;
+  baseLb?: number;
+}): number {
+  const base = opts.baseLb ?? CG_BALANCE_STEP_LB;
+  if (opts.prevMac === undefined) return base;
+  const delta = opts.liveMac - opts.prevMac;
+  // Still moving wrong way → stronger counterweight.
+  if (opts.liveMac > opts.hi && delta > 0.05) return Math.min(100, base * 2);
+  if (opts.liveMac < opts.lo && delta < -0.05) return Math.min(100, base * 2);
+  // Already correcting → ease off.
+  if (opts.liveMac > opts.hi && delta < -0.1) return Math.max(25, Math.round(base / 2));
+  if (opts.liveMac < opts.lo && delta > 0.1) return Math.max(25, Math.round(base / 2));
+  return base;
+}
+
+/**
+ * One load round: add up to `perSeatLb` on **each** eligible seat (not a global 50 lb).
+ * - equal: every movable seat gets up to perSeatLb
+ * - forward / aft: only the forward or aft half (by arm) get up to perSeatLb each
+ * `cargoBudgetLb` caps how much total mass may still be placed this round.
+ * Optional softMaxByIndex caps human seats below structural maxLoad.
+ */
+export function allocateCargoRoundPerSeat(
+  stations: Record<number, number>,
+  profile: AircraftProfile,
+  movableIndexes: number[],
+  perSeatLb: number,
+  bias: 'equal' | 'forward' | 'aft',
+  cargoBudgetLb: number,
+  opts?: { softMaxByIndex?: Record<number, number> },
+): ShiftCargoForCgResult {
+  const next: Record<number, number> = { ...stations };
+  let budget = Math.max(0, roundLb(cargoBudgetLb));
+  const perSeat = Math.max(0, roundLb(perSeatLb));
+  if (budget <= 0 || perSeat <= 0 || movableIndexes.length === 0) {
+    return { stations: next, movedLb: 0 };
+  }
+
+  const { indexes: forwardFirst } = orderStationsLongitudinal(profile, movableIndexes);
+  const half = Math.max(1, Math.ceil(forwardFirst.length / 2));
+  const targets =
+    bias === 'forward'
+      ? forwardFirst.slice(0, half)
+      : bias === 'aft'
+        ? forwardFirst.slice(-half)
+        : [...forwardFirst];
+
+  const softMax = opts?.softMaxByIndex ?? {};
+  const maxByIndex = new Map(
+    profile.payload.stations.map((s) => {
+      const soft = softMax[s.index];
+      const max = soft !== undefined ? Math.min(s.maxLoad, soft) : s.maxLoad;
+      return [s.index, max] as const;
+    }),
+  );
+  let movedLb = 0;
+  // Prefer lighter seats so we do not pile one side while emptying another.
+  const orderedTargets = [...targets].sort(
+    (a, b) => (next[a] ?? 0) - (next[b] ?? 0) || a - b,
+  );
+  for (const idx of orderedTargets) {
+    if (budget <= 0) break;
+    const maxLoad = maxByIndex.get(idx) ?? 0;
+    const room = Math.max(0, maxLoad - (next[idx] ?? 0));
+    const take = Math.min(perSeat, room, budget);
+    if (take <= 0) continue;
+    next[idx] = (next[idx] ?? 0) + take;
+    budget -= take;
+    movedLb += take;
+  }
+  return { stations: next, movedLb };
+}
+
+/** @deprecated Use allocateCargoRoundPerSeat — kept as alias for older call sites. */
+export function allocateCargoStep(
+  stations: Record<number, number>,
+  profile: AircraftProfile,
+  movableIndexes: number[],
+  stepLb: number,
+  bias: 'equal' | 'forward' | 'aft',
+): ShiftCargoForCgResult {
+  // Legacy callers treated stepLb as a global budget; approximate with one round.
+  return allocateCargoRoundPerSeat(
+    stations,
+    profile,
+    movableIndexes,
+    CG_BALANCE_STEP_LB,
+    bias,
+    stepLb,
+  );
 }
 
 /**
@@ -296,30 +689,40 @@ export type ShiftCargoForCgResult = {
 };
 
 /**
- * Move cargo lb toward the nose (`forward`) or tail (`aft`) among baggage stations.
- * Preserves non-baggage weights; keeps total baggage mass constant.
+ * Move payload lb toward the nose (`forward`) or tail (`aft`) among movable stations
+ * (typically crew + baggage). Preserves non-movable weights; keeps movable mass constant.
+ * Optional minRetainByIndex keeps a floor on seats (e.g. 170 lb crew) when sourcing.
  */
 export function shiftCargoForCg(
   stations: Record<number, number>,
   profile: AircraftProfile,
-  baggageIndexes: number[],
+  movableIndexes: number[],
   direction: 'forward' | 'aft',
   amountLb: number,
+  opts?: {
+    minRetainByIndex?: Record<number, number>;
+    softMaxByIndex?: Record<number, number>;
+  },
 ): ShiftCargoForCgResult {
   const next: Record<number, number> = { ...stations };
   let remaining = Math.max(0, roundLb(amountLb));
-  if (remaining <= 0 || baggageIndexes.length < 2) {
+  if (remaining <= 0 || movableIndexes.length < 2) {
     return { stations: next, movedLb: 0 };
   }
 
-  const { indexes: forwardFirst } = orderStationsLongitudinal(profile, baggageIndexes);
+  const { indexes: forwardFirst } = orderStationsLongitudinal(profile, movableIndexes);
+  const softMax = opts?.softMaxByIndex ?? {};
   const maxByIndex = new Map(
-    profile.payload.stations.map((s) => [s.index, s.maxLoad] as const),
+    profile.payload.stations.map((s) => {
+      const soft = softMax[s.index];
+      const max = soft !== undefined ? Math.min(s.maxLoad, soft) : s.maxLoad;
+      return [s.index, max] as const;
+    }),
   );
-  const baggageSet = new Set(forwardFirst);
+  const movableSet = new Set(forwardFirst);
+  const minRetain = opts?.minRetainByIndex ?? {};
 
-  // Sources: stations that currently hold weight on the "wrong" side.
-  // Targets: stations with spare capacity on the desired side.
+  // Sources / targets stay longitudinal; among equal options we still respect floors/soft max.
   const sources =
     direction === 'forward' ? [...forwardFirst].reverse() : [...forwardFirst];
   const targets =
@@ -328,16 +731,16 @@ export function shiftCargoForCg(
   let movedLb = 0;
   for (const src of sources) {
     if (remaining <= 0) break;
-    if (!baggageSet.has(src)) continue;
-    let available = next[src] ?? 0;
+    if (!movableSet.has(src)) continue;
+    const floor = Math.max(0, minRetain[src] ?? 0);
+    let available = Math.max(0, (next[src] ?? 0) - floor);
     if (available <= 0) continue;
     const srcPos = forwardFirst.indexOf(src);
 
     for (const dst of targets) {
       if (remaining <= 0 || available <= 0) break;
-      if (src === dst || !baggageSet.has(dst)) continue;
+      if (src === dst || !movableSet.has(dst)) continue;
       const dstPos = forwardFirst.indexOf(dst);
-      // forward: dst must be more forward than src (smaller index in forwardFirst)
       if (direction === 'forward' && dstPos >= srcPos) continue;
       if (direction === 'aft' && dstPos <= srcPos) continue;
 
@@ -358,18 +761,49 @@ export function shiftCargoForCg(
   return { stations: next, movedLb };
 }
 
-/** Step size for iterative CG rebalance (lb). */
-export function cgRebalanceStepLb(opts: {
-  excessMac: number;
-  cargoLb: number;
+/** Step size for iterative CG rebalance (lb) — fixed 50 lb nudges. */
+export function cgRebalanceStepLb(_opts?: {
+  excessMac?: number;
+  cargoLb?: number;
 }): number {
-  const byExcess = Math.round(Math.abs(opts.excessMac) * 80);
-  const byCargo = Math.round(opts.cargoLb * 0.08);
-  return Math.max(25, Math.min(200, byExcess, Math.max(25, byCargo)));
+  return CG_BALANCE_STEP_LB;
+}
+
+/**
+ * True when live fuel already matches the planned quantity (total), so we can
+ * skip a fuel rewrite. Tank split may differ (vendor systems rebalance); total
+ * is what OFP / preflight care about.
+ */
+export function liveFuelMatchesTarget(
+  liveTanks: Record<string, number>,
+  targetTanks: Record<string, number>,
+  opts?: { absTol?: number; pctTol?: number },
+): boolean {
+  const absTol = opts?.absTol ?? 1.5;
+  const pctTol = opts?.pctTol ?? 2;
+  let liveTotal = 0;
+  let targetTotal = 0;
+  for (const v of Object.values(liveTanks)) {
+    if (Number.isFinite(v)) liveTotal += v;
+  }
+  for (const v of Object.values(targetTanks)) {
+    if (Number.isFinite(v)) targetTotal += v;
+  }
+  const tol = Math.max(Math.abs(targetTotal) * (pctTol / 100), absTol, 0.01);
+  return Math.abs(liveTotal - targetTotal) <= tol;
 }
 
 export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan {
-  const { ofp, profile, stationRoles, liveStationsLb, fuelLbPerGal, cargoKgFallback } = input;
+  const {
+    ofp,
+    profile,
+    stationRoles,
+    liveStationsLb,
+    fuelLbPerGal,
+    cargoKgFallback,
+    emptyWeightLb,
+    maxGrossWeightLb,
+  } = input;
 
   const sheet = ofp.loadSheet;
   const blockRaw = sheet?.blockFuel ?? ofp.fuel.total;
@@ -383,15 +817,52 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
   if (cargoKg === undefined || !Number.isFinite(cargoKg) || cargoKg < 0) {
     throw new OfpLoadPlanError('NO_CARGO', 'OFP has no cargo/baggage weight to load');
   }
-  const cargoLb = cargoKg * KG_TO_LB;
+  let cargoLb = cargoKg * KG_TO_LB;
 
-  const fuel = distributeFuelAcrossTanks(blockFuelLb, profile, fuelLbPerGal);
+  const fuel = distributeFuelAcrossTanks(
+    blockFuelLb,
+    profile,
+    resolveFuelDensityLbPerGal(profile, fuelLbPerGal),
+  );
+
+  const crewStations = stationRoles?.crewStations ?? ofp.payload?.stationRoles?.crewStations ?? [];
+  let plannedCrewLb = 0;
+  for (const idx of crewStations) {
+    const st = profile.payload.stations.find((s) => s.index === idx);
+    plannedCrewLb += st
+      ? Math.min(FREIGHTER_PILOT_LB, st.maxLoad)
+      : FREIGHTER_PILOT_LB;
+  }
+
+  if (
+    Number.isFinite(emptyWeightLb) &&
+    emptyWeightLb! > 0 &&
+    Number.isFinite(maxGrossWeightLb) &&
+    maxGrossWeightLb! > 0
+  ) {
+    const marginLb = 25;
+    const roomLb =
+      maxGrossWeightLb! - emptyWeightLb! - blockFuelLb - plannedCrewLb - marginLb;
+    if (roomLb < 0.5) {
+      throw new OfpLoadPlanError(
+        'MTOW_NO_ROOM',
+        `No payload room under MTOW ${roundLb(maxGrossWeightLb!)} lb ` +
+          `(empty ${roundLb(emptyWeightLb!)} + fuel ${roundLb(blockFuelLb)} + crew ${roundLb(plannedCrewLb)})`,
+      );
+    }
+    if (cargoLb > roomLb) {
+      cargoLb = roundLb(roomLb);
+    }
+  }
+
   const payload = distributeCargoAcrossStations(
     cargoLb,
     profile,
     stationRoles ?? ofp.payload?.stationRoles,
     liveStationsLb,
   );
+  // GA soft-caps may place less cargo than the OFP asks for.
+  cargoLb = payload.cargoPlacedLb;
 
   return {
     plan: {
@@ -405,6 +876,10 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
     baggageCapacityLb: payload.baggageCapacityLb,
     preservedStations: payload.preservedStations,
     baggageStations: payload.baggageStations,
+    crewStations: payload.crewStations,
+    passengerStations: payload.passengerStations,
+    seatStations: payload.seatStations,
+    movableStations: payload.movableStations,
   };
 }
 

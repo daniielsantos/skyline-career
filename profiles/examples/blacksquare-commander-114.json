@@ -160,6 +160,18 @@
           "unit": "pounds",
           "tolerancePct": 1,
           "valueExpr": "{station_1}"
+        },
+        {
+          "var": "PAYLOAD STATION WEIGHT:2",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_2}"
+        },
+        {
+          "var": "PAYLOAD STATION WEIGHT:3",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_3}"
         }
       ]
     }

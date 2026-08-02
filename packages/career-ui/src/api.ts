@@ -657,6 +657,20 @@ export function fetchAirport(icao: string) {
   return api<AirportView>(`/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}`);
 }
 
+export type NetworkHub = {
+  icao: string;
+  name: string;
+  region: string;
+  hubTier: 'major' | 'regional' | 'spoke';
+  lat: number;
+  lon: number;
+  level?: number;
+};
+
+export function fetchNetworkHubs() {
+  return api<{ homeHubIcao: string | null; hubs: NetworkHub[] }>('/api/hubs');
+}
+
 export function fetchMissions() {
   return api<{ walletUsd: number; missions: Mission[] }>('/api/missions');
 }
@@ -1049,7 +1063,15 @@ export type WatchStatus = {
   phase: string | null;
   onGround: boolean | null;
   enginesRunning: boolean | null;
+  groundSpeedKt?: number | null;
   position: { lat: number; lon: number } | null;
+  liveFuelLb?: number | null;
+  livePayloadLb?: number | null;
+  loadVerification?: {
+    ready: boolean;
+    fuel: { plannedLb?: number; liveLb: number; ok: boolean };
+    payload: { plannedLb?: number; liveLb?: number; ok: boolean };
+  } | null;
   sawAirborne: boolean;
   lastEvent: WatchEvent | null;
   lastEventAtIso: string | null;
@@ -1171,6 +1193,7 @@ export type SimBridgeStatus = {
   enginesRunning: boolean | null;
   parkingBrake: boolean | null;
   phase: string | null;
+  groundSpeedKt?: number | null;
   source: 'watch' | 'probe';
   error: string | null;
   checkedAtIso: string;
@@ -1207,6 +1230,7 @@ export type OfpLoadResult = {
   rollbackOk: boolean | null;
   compareSummary: string | null;
   compareVerdict: 'pass' | 'warn' | 'fail' | null;
+  cgRebalanceMoves?: number;
   preflight: {
     check: {
       verdict: 'pass' | 'warn' | 'fail';
@@ -1231,17 +1255,52 @@ export type OfpLoadResult = {
   error: string | null;
 };
 
-export function postLoadOfp(opts: {
+export type OfpLoadProgress = {
   missionId: string;
-  simbriefUser?: string;
-  simbriefUserid?: string;
-  runPreflightAfter?: boolean;
-}) {
+  phase: 'planning' | 'injecting' | 'balancing' | 'verifying' | 'done' | 'failed';
+  message: string;
+  cgAttempt?: number;
+  cgMaxAttempts?: number;
+  liveMac?: number;
+  liveFuelLb?: number;
+  livePayloadLb?: number;
+  plannedFuelLb?: number;
+  plannedPayloadLb?: number;
+  updatedAtIso: string;
+};
+
+export function fetchLoadOfpProgress(missionId: string) {
+  return api<{ progress: OfpLoadProgress | null }>(
+    `/api/load-ofp/progress?missionId=${encodeURIComponent(missionId)}`,
+  );
+}
+
+export function postCancelLoadOfp(missionId: string) {
+  return api<{
+    ok: boolean;
+    accepted: boolean;
+    progress: OfpLoadProgress | null;
+  }>('/api/load-ofp/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ missionId }),
+  });
+}
+
+export function postLoadOfp(
+  opts: {
+    missionId: string;
+    simbriefUser?: string;
+    simbriefUserid?: string;
+    runPreflightAfter?: boolean;
+  },
+  init?: { signal?: AbortSignal },
+) {
   return (async () => {
     const res = await fetch('/api/load-ofp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(opts),
+      signal: init?.signal,
     });
     const data = (await res.json()) as OfpLoadResult & { error?: string };
     // Soft apply failures still return a structured body with ok:false.

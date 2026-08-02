@@ -50,7 +50,9 @@ async function executeWritePlan(
         await ctx.bridge.triggerEvent({ event: step.event!, data: step.data });
         break;
       case 'delay':
-        await ctx.bridge.delay(step.ms ?? 0);
+        if (!ctx.skipSettle) {
+          await ctx.bridge.delay(step.ms ?? 0);
+        }
         break;
       default:
         throw new Error(`Unsupported write operation`);

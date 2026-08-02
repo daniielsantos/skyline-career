@@ -97,8 +97,11 @@ import {
 } from './dispatch-helpers.ts';
 import {
   applyMissionOfpLoad,
+  getOfpLoadProgress,
   probeSimBridgeStatus,
+  requestOfpLoadCancel,
 } from './ofp-load-helpers.ts';
+import { isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight } from './preflight-helpers.ts';
 import {
   CareerWatchSession,
@@ -664,6 +667,23 @@ export function createCareerApiServer(port = 8787) {
             store: store.kind,
           };
         });
+        send(res, 200, payload);
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/hubs') {
+        const payload = await withCareerRead((world, missions) => ({
+          homeHubIcao: missions.homeHubIcao ?? null,
+          hubs: world.airports.map((airport) => ({
+            icao: airport.icao,
+            name: airport.name,
+            region: airport.region,
+            hubTier: airport.hubTier ?? 'spoke',
+            lat: airport.lat,
+            lon: airport.lon,
+            level: airport.level,
+          })),
+        }));
         send(res, 200, payload);
         return;
       }
@@ -2226,6 +2246,20 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
+        if (isOfpLoadActive()) {
+          send(res, 409, {
+            error: 'OFP inject in progress — preflight paused',
+            code: 'ofp_inject_active',
+          });
+          return;
+        }
+        if (watchSession.getStatus().running) {
+          send(res, 409, {
+            error: 'Flight Watch owns SimBridge — preflight paused',
+            code: 'watch_active',
+          });
+          return;
+        }
         const probe = await loadMissions();
         const probeMission = probe.missions.find((m) => m.id === body.missionId);
         if (!probeMission) {
@@ -2463,6 +2497,33 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/load-ofp/progress') {
+        const missionId = url.searchParams.get('missionId')?.trim();
+        if (!missionId) {
+          send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        send(res, 200, {
+          progress: getOfpLoadProgress(missionId),
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/load-ofp/cancel') {
+        const body = (await readBody(req)) as { missionId?: string };
+        if (!body.missionId?.trim()) {
+          send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        const accepted = requestOfpLoadCancel(body.missionId);
+        send(res, 200, {
+          ok: true,
+          accepted,
+          progress: getOfpLoadProgress(body.missionId.trim()),
+        });
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/load-ofp') {
         const body = (await readBody(req)) as {
           missionId?: string;
@@ -2504,9 +2565,8 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          // Avoid Named Pipe contention with the live watch session.
-          const watch = watchSession.getStatus();
-          if (watch.running && watch.missionId === body.missionId) {
+          // Any Watch pipe client contends with inject — stop regardless of mission.
+          if (watchSession.getStatus().running) {
             await watchSession.stop();
           }
           const result = await applyMissionOfpLoad(mission, {
@@ -2580,6 +2640,13 @@ export function createCareerApiServer(port = 8787) {
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        if (isOfpLoadActive()) {
+          send(res, 409, {
+            error: 'OFP inject in progress — Watch start blocked',
+            code: 'ofp_inject_active',
+          });
           return;
         }
         try {

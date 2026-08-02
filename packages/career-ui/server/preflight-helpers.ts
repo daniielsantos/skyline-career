@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   KG_TO_LB,
-  careerPreflightReady,
+  evaluateLoadVerification,
   normalizeAircraftTitle,
   ofpCargoKg,
   ofpFuelToLb,
@@ -20,6 +20,7 @@ import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compliance/run-compare.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
+import { plannedStationPayloadLb } from '../../agent/src/ofp-load-plan.ts';
 import { readLiveCgState } from '../../agent/src/live-cg.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 const here = dirname(fileURLToPath(import.meta.url));
@@ -196,9 +197,47 @@ export async function runMissionPreflight(
     }
 
     // Ready = fuel + payload OK. CG / empty-weight notes never block Depart alone.
-    const fuelOk = !fuelFailed;
-    const payloadOk = !payloadFailed;
-    const ready = careerPreflightReady({ fuelFailed, payloadFailed });
+    // Always gate on numeric Loaded vs Due — finding codes alone can miss freighter
+    // baggage-only OFPs and show ✓ with Sim 0 / Due 992.
+    const plannedFuelLb = ofpFuelToLb(ofp.fuel).total;
+    const liveFuelLb = live.fuel.total;
+    // Compare station totals (matches the Mass & Balance tablet sum). Using
+    // ofpPayloadLb (pax+bags only) made Sim look like ~550 while seats showed 1050.
+    const cargoLb =
+      cargoKg !== undefined ? cargoKg * KG_TO_LB : undefined;
+    const plannedPayload = cargoLb !== undefined
+      ? plannedStationPayloadLb({
+          cargoLb,
+          stationRoles: ofp.payload?.stationRoles,
+          emptyWeightLb: live.weights?.emptyLb,
+          maxGrossWeightLb: live.weights?.maxGrossLb,
+          blockFuelLb: plannedFuelLb,
+        })
+      : undefined;
+    const plannedPayloadLb = plannedPayload?.plannedTotalLb;
+    const livePayloadLb = live.payload?.total ?? live.payload?.ofpPayloadLb;
+    const fuelTolLb = Math.max(
+      ofp.tolerances?.fuelAbsLb ?? 50,
+      Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
+    );
+    const payloadTolLb = ofp.tolerances?.payloadAbsLb ?? 75;
+    // Finding codes can miss freighter baggage-only OFPs; GA soft-cap uses
+    // station totals only. evaluateLoadVerification is the shared numeric gate.
+    const weights = evaluateLoadVerification({
+      plannedFuelLb,
+      liveFuelLb,
+      plannedPayloadLb,
+      livePayloadLb,
+      fuelTolLb,
+      payloadTolLb,
+    });
+    const fuelOk = plannedPayload?.gaCabin
+      ? weights.fuel.ok
+      : !fuelFailed && weights.fuel.ok;
+    const payloadOk = plannedPayload?.gaCabin
+      ? weights.payload.ok
+      : !payloadFailed && weights.payload.ok;
+    const ready = fuelOk && payloadOk;
     const careerVerdict = softenCareerPreflightVerdict(ready, snapshot.verdict);
 
     const check: PreflightCheckResult = {
@@ -216,13 +255,13 @@ export async function runMissionPreflight(
       loadVerification: {
         ready,
         fuel: {
-          plannedLb: ofpFuelToLb(ofp.fuel).total,
-          liveLb: live.fuel.total,
+          plannedLb: plannedFuelLb,
+          liveLb: liveFuelLb,
           ok: fuelOk,
         },
         payload: {
-          plannedLb: cargoKg !== undefined ? cargoKg * KG_TO_LB : undefined,
-          liveLb: live.payload?.ofpPayloadLb ?? live.payload?.total,
+          plannedLb: plannedPayloadLb,
+          liveLb: livePayloadLb,
           ok: payloadOk,
         },
         aircraft: {

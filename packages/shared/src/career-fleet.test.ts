@@ -17,6 +17,7 @@ import {
   releaseAircraftOnCancel,
   relocateAircraftOnSettle,
   selectStarterHub,
+  STARTER_WALLET_USD,
   acquireCompanyAircraft,
   listAircraftMarket,
   purchaseAircraftListing,
@@ -26,18 +27,20 @@ import {
 const pilot = { pilotName: 'Ada Skyline' };
 
 describe('career fleet hangar', () => {
-  it('selectStarterHub registers pilot and parks a Caravan at the hub', () => {
+  it('selectStarterHub registers pilot and parks a C172 at the hub', () => {
     let state = emptyMissionsStateV2();
     assert.equal(state.hubSelected, false);
     assert.equal(state.pilotName, '');
     assert.equal(state.homeHubIcao, '');
+    assert.equal(state.walletUsd, 0);
     state = selectStarterHub(state, 'sbgr', pilot);
     assert.equal(state.hubSelected, true);
     assert.equal(state.pilotName, 'Ada Skyline');
     assert.equal(state.homeHubIcao, 'SBGR');
+    assert.equal(state.walletUsd, STARTER_WALLET_USD);
     assert.equal(state.fleet.length, 1);
-    assert.equal(state.fleet[0]!.aircraftClassId, 'light_turboprop');
-    assert.equal(state.fleet[0]!.airframeTypeId, 'c208-caravan-cargo');
+    assert.equal(state.fleet[0]!.aircraftClassId, 'light_ga');
+    assert.equal(state.fleet[0]!.airframeTypeId, 'asobo-c172sp-cargo');
     assert.ok(
       state.fleet[0]!.condition === 'good' ||
         state.fleet[0]!.condition === 'excellent',
@@ -50,25 +53,33 @@ describe('career fleet hangar', () => {
   it('selectStarterHub lets the pilot pick a light GA starter', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
       ...pilot,
-      airframeTypeId: 'asobo-c172sp-cargo',
+      airframeTypeId: 'asobo-cessna-c152',
     });
     assert.equal(state.fleet[0]!.aircraftClassId, 'light_ga');
-    assert.equal(state.fleet[0]!.airframeTypeId, 'asobo-c172sp-cargo');
-    assert.equal(state.fleet[0]!.label, 'Cessna 172SP Cargo');
+    assert.equal(state.fleet[0]!.airframeTypeId, 'asobo-cessna-c152');
+    assert.equal(state.fleet[0]!.label, 'Cessna C152');
     assert.ok(
       state.fleet[0]!.condition === 'good' ||
         state.fleet[0]!.condition === 'excellent',
     );
   });
 
-  it('selectStarterHub rejects non-light or unknown starter airframes', () => {
+  it('selectStarterHub rejects non-starter or unknown airframes', () => {
     assert.throws(
       () =>
         selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
           ...pilot,
           airframeTypeId: 'pmdg-738-bcf-family',
         }),
-      /light airframe/i,
+      /C152, C172, or Commander 114/i,
+    );
+    assert.throws(
+      () =>
+        selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+          ...pilot,
+          airframeTypeId: 'c208-caravan-cargo',
+        }),
+      /C152, C172, or Commander 114/i,
     );
   });
 
@@ -270,19 +281,19 @@ describe('career fleet hangar', () => {
 
     const quote = quotePlayerMissionOfpFuel(world, state, mission, {
       ofpId: 'ofp-1',
-      requiredBlockFuelKg: 500,
+      requiredBlockFuelKg: 300,
     });
     assert.equal(quote.currentFuelKg, 100);
-    assert.equal(quote.shortfallKg, 400);
+    assert.equal(quote.shortfallKg, 200);
     assert.ok(quote.uplift.costUsd > 0);
 
     const purchase = purchasePlayerMissionOfpFuel(world, state, mission, {
       ofpId: 'ofp-1',
-      requiredBlockFuelKg: 500,
+      requiredBlockFuelKg: 300,
     });
-    assert.equal(aircraft.fuelKg, 500);
+    assert.equal(aircraft.fuelKg, 300);
     assert.equal(purchase.mission.fuelAuthorizedOfpId, 'ofp-1');
-    assert.equal(purchase.mission.fuelUplift?.requestedKg, 400);
+    assert.equal(purchase.mission.fuelUplift?.requestedKg, 200);
     assert.ok(purchase.mission.tripFuelBurnKg! > 0);
     assert.ok(purchase.fuelDebitUsd > 0);
 

@@ -25,6 +25,8 @@ export class NamedPipeClient {
   private socket: Socket | null = null;
   private buffer = '';
   private readonly pending = new Map<string, Pending>();
+  /** Serialize writes — concurrent call() was able to interleave NDJSON on the pipe. */
+  private writeChain: Promise<void> = Promise.resolve();
 
   constructor(options: NamedPipeClientOptions = {}) {
     const pipeName = options.pipeName ?? process.env.MSFS_COMPAT_PIPE ?? 'msfs-compat-simbridge';
@@ -78,31 +80,40 @@ export class NamedPipeClient {
   }
 
   async call<T = unknown>(method: IpcMethod, params: Record<string, unknown> = {}): Promise<T> {
-    if (!this.isConnected || !this.socket) {
-      throw new IpcClientError('NOT_CONNECTED', 'Named pipe client is not connected');
-    }
+    const run = async (): Promise<T> => {
+      if (!this.isConnected || !this.socket) {
+        throw new IpcClientError('NOT_CONNECTED', 'Named pipe client is not connected');
+      }
 
-    const id = randomUUID();
-    const request: IpcRequest = { id, type: 'request', method, params };
+      const id = randomUUID();
+      const request: IpcRequest = { id, type: 'request', method, params };
 
-    const response = await new Promise<IpcResponse>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new IpcClientError('TIMEOUT', `Request timed out: ${method}`));
-      }, this.requestTimeoutMs);
+      const response = await new Promise<IpcResponse>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.pending.delete(id);
+          reject(new IpcClientError('TIMEOUT', `Request timed out: ${method}`));
+        }, this.requestTimeoutMs);
 
-      this.pending.set(id, { resolve, reject, timer });
-      this.socket!.write(`${JSON.stringify(request)}\n`);
-    });
+        this.pending.set(id, { resolve, reject, timer });
+        this.socket!.write(`${JSON.stringify(request)}\n`);
+      });
 
-    if (!response.ok) {
-      throw new IpcClientError(
-        response.error?.code ?? 'INTERNAL',
-        response.error?.message ?? 'Unknown IPC error',
-      );
-    }
+      if (!response.ok) {
+        throw new IpcClientError(
+          response.error?.code ?? 'INTERNAL',
+          response.error?.message ?? 'Unknown IPC error',
+        );
+      }
 
-    return response.result as T;
+      return response.result as T;
+    };
+
+    const queued = this.writeChain.then(run, run);
+    this.writeChain = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
   }
 
   private onData(chunk: string): void {

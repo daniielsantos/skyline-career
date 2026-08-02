@@ -201,6 +201,20 @@ export function careerPreflightReady(opts: {
   return !opts.fuelFailed && !opts.payloadFailed;
 }
 
+/**
+ * Numeric Loaded vs Due match. Prefer this over finding codes alone — freighter
+ * OFPs can omit PAYLOAD_TOTAL (baggage-only sheet) while the UI still shows Due cargo.
+ */
+export function careerLoadWeightMatchOk(
+  liveLb: number | undefined,
+  plannedLb: number | undefined,
+  toleranceLb: number,
+): boolean {
+  if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
+  if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
+  return Math.abs(liveLb - plannedLb) <= Math.max(0, toleranceLb);
+}
+
 export function softenCareerPreflightVerdict(
   ready: boolean,
   snapshotVerdict: 'pass' | 'warn' | 'fail',
@@ -1365,6 +1379,13 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
   B738: ['B738', 'B38M'],
   MD1F: ['MD1F', 'MD11'],
   MD11: ['MD11', 'MD1F'],
+  /** SimBrief has no AC11 — Commander 114 OFPs use C182 (or legacy BE36) as proxy. */
+  AC11: ['AC11', 'C182', 'BE36'],
+  C182: ['C182', 'AC11'],
+  BE36: ['BE36', 'AC11'],
+  /** SimBrief has no C152 — C152 OFPs use C172 as proxy. */
+  C152: ['C152', 'C172'],
+  C172: ['C172', 'C152'],
 };
 
 function normalizeIcao(code: string | undefined): string | undefined {

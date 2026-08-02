@@ -133,6 +133,13 @@ export function dispatchStepStatusLine(input: {
   missionFuelQuoteError: string | null;
   loadOfpAutoStatus: 'idle' | 'waiting' | 'loading' | 'done' | 'failed';
   loadOfpAutoError: string | null;
+  loadOfpProgress?: {
+    phase: 'planning' | 'injecting' | 'balancing' | 'verifying' | 'done' | 'failed';
+    message: string;
+    cgAttempt?: number;
+    cgMaxAttempts?: number;
+    liveMac?: number;
+  } | null;
   loadPath: LoadPath;
   simBridgeConnected: boolean;
   watchRunning: boolean;
@@ -180,9 +187,12 @@ export function dispatchStepStatusLine(input: {
           return 'Waiting for SimBridge — inject resumes when the host is connected.';
         }
         if (input.loadOfpAutoStatus === 'loading') {
-          return 'Loading OFP fuel and cargo into the aircraft…';
+          if (input.loadOfpProgress?.message) {
+            return `${input.loadOfpProgress.message} · Cancel stops everything.`;
+          }
+          return 'Loading fuel/payload and balancing CG — Cancel stops everything.';
         }
-        return 'Injecting OFP fuel and payload — Loaded vs Due updates live.';
+        return 'Inject fuel & payload when ready — Loaded vs Due updates live.';
       }
       if (input.loadPath === 'efb') {
         return 'Import the OFP in the aircraft EFB/FMC. Waiting for live preflight…';

@@ -10,10 +10,11 @@
   ],
   "matchTitlePattern": "Black Square Commander 114(?:TC)?\\b",
   "notes": [
-    "Black Square Commander 114 family (114 / 114TC) — same 5-station cargo layout",
+    "Black Square Commander 114 family (114 / 114TC) — Pilot/Copilot + 2 pax + rear baggage",
+    "Cargo fills seats (soft-capped ~300 lb) before rear baggage (~50 lb)",
     "One Skyline Market SKU; either NA or TC matches the purchased airframe",
     "liveSources: classic fuel tanks + classic stations/weights",
-    "SimBrief: Default AC11",
+    "SimBrief has no AC11 — dispatch uses Default C182 as performance proxy",
     "Homologated profile: blacksquare/commander-114@1.0.0",
     "Title: Black Square Commander 114",
     "Homologated profile: blacksquare/commander-114tc@1.0.0",
@@ -29,8 +30,8 @@
     "unit": "lb",
     "stationRoles": {
       "crewStations": [1, 2],
-      "baggageStations": [3, 4, 5],
-      "passengerStations": []
+      "passengerStations": [3, 4],
+      "baggageStations": [5]
     }
   },
   "liveSources": {
@@ -38,14 +39,14 @@
     "weights": ["classic-weights"],
     "payload": ["classic-stations"]
   },
-  "simbriefIcao": "AC11",
+  "simbriefIcao": "C182",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
-    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
-    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
-    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
-    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
-    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" }
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Left Pax", "role": "passenger" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Right Pax", "role": "passenger" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Rear Baggage", "role": "baggage" }
   ],
   "tolerances": {
     "fuelAbsLb": 50,
@@ -56,4 +57,4 @@
     "maxFuelIncreaseLb": 0
   }
 }
-
+

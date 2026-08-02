@@ -16,6 +16,10 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
+  optimizeDeps: {
+    // MapLibre v6 ships a separate worker ESM; Vite's dep optimizer mishandles it.
+    exclude: ['maplibre-gl'],
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

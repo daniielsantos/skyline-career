@@ -17,11 +17,14 @@ import {
   postFuelQuote,
   postInitBrazil,
   postLoadOfp,
+  postCancelLoadOfp,
+  fetchLoadOfpProgress,
   postPreflight,
   postSettle,
   postSelectHub,
   fetchAircraftMarket,
   fetchCashflow,
+  fetchNetworkHubs,
   postAircraftBuy,
   postAircraftLease,
   postAircraftSell,
@@ -45,7 +48,9 @@ import {
   type FuelHaulView,
   type MarketLot,
   type MissionFuelQuote,
+  type OfpLoadProgress,
   type Mission,
+  type NetworkHub,
   type NpcActivity,
   type NpcFleetMember,
   type PlayerAircraft,
@@ -68,6 +73,7 @@ import {
   aircraftModelLabel,
 } from './AircraftCards';
 import { HangarCashflowPanel } from './CashflowPanel';
+import { HubNetworkMap } from './HubNetworkMap';
 import {
   displayToKg,
   formatMass,
@@ -81,6 +87,7 @@ import {
   saveWeightSystem,
   type WeightSystem,
 } from './weight-units';
+import { evaluateLoadVerification } from './load-verification';
 import {
   buildFlightDebrief,
   deriveDispatchStep,
@@ -1243,9 +1250,18 @@ export function App() {
     'idle' | 'waiting' | 'loading' | 'done' | 'failed'
   >('idle');
   const [loadOfpAutoError, setLoadOfpAutoError] = useState<string | null>(null);
+  const [loadOfpProgress, setLoadOfpProgress] = useState<OfpLoadProgress | null>(
+    null,
+  );
   const [loadOfpRetryToken, setLoadOfpRetryToken] = useState(0);
   const [preferManualLoad, setPreferManualLoad] = useState(false);
   const autoLoadedOfpKeyRef = useRef<string | null>(null);
+  /** Prevents a second /api/load-ofp while one is already in flight (effect reruns). */
+  const ofpInjectInFlightRef = useRef(false);
+  const loadOfpControlRef = useRef<{
+    stop: () => void;
+    abort: AbortController;
+  } | null>(null);
   const [missionFuelQuote, setMissionFuelQuote] = useState<{
     quote: MissionFuelQuote;
     walletUsd: number;
@@ -1279,6 +1295,8 @@ export function App() {
   const [airframeLabel, setAirframeLabel] = useState<string | null>(null);
   const [watch, setWatch] = useState<WatchStatus | null>(null);
   const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
+  const simBridgeRef = useRef(simBridge);
+  simBridgeRef.current = simBridge;
   const [marketPage, setMarketPage] = useState(1);
   const [originFilter, setOriginFilter] = useState('');
   const [destFilter, setDestFilter] = useState('');
@@ -1328,6 +1346,8 @@ export function App() {
   >('');
   const [aircraftMarketQuery, setAircraftMarketQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [networkHubs, setNetworkHubs] = useState<NetworkHub[]>([]);
+  const [networkHubsLoading, setNetworkHubsLoading] = useState(false);
 
   useEffect(() => {
     const loc = { tab, airportIcao };
@@ -1449,7 +1469,7 @@ export function App() {
           return prev;
         }
         const preferred =
-          state.starterAircraft!.find((row) => row.typeId === 'c208-caravan-cargo') ??
+          state.starterAircraft!.find((row) => row.typeId === 'asobo-c172sp-cargo') ??
           state.starterAircraft![0];
         return preferred?.typeId ?? '';
       });
@@ -1470,6 +1490,9 @@ export function App() {
       setAirportView(view);
     }
   }, [airportIcao]);
+
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
 
   const refreshCargoLimit = useCallback(
     async (
@@ -1673,6 +1696,15 @@ export function App() {
     return () => window.clearInterval(id);
   }, [tab, airportIcao, refresh]);
 
+  useEffect(() => {
+    if (tab !== 'map' || !hubSelected) return;
+    void refreshNetworkHubs().catch((err) => {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, hubSelected]);
+
   // Poll MSFS watch session while active (or briefly after settle to catch final status).
   useEffect(() => {
     let cancelled = false;
@@ -1712,6 +1744,101 @@ export function App() {
               });
             });
           }
+          // Skip no-op updates so the sticky footer doesn't re-render every poll
+          // from checkedAtIso / ground-speed jitter alone. Still push when live
+          // fuel/payload drift enough to refresh Loaded vs Due.
+          const liveFuelDelta = Math.abs(
+            (prev?.liveFuelLb ?? 0) - (status.liveFuelLb ?? 0),
+          );
+          const livePayloadDelta = Math.abs(
+            (prev?.livePayloadLb ?? 0) - (status.livePayloadLb ?? 0),
+          );
+          const verificationChanged =
+            prev?.loadVerification?.ready !== status.loadVerification?.ready ||
+            Math.abs(
+              (prev?.loadVerification?.payload.liveLb ?? 0) -
+                (status.loadVerification?.payload.liveLb ?? 0),
+            ) >= 15 ||
+            Math.abs(
+              (prev?.loadVerification?.fuel.liveLb ?? 0) -
+                (status.loadVerification?.fuel.liveLb ?? 0),
+            ) >= 15;
+          if (
+            prev &&
+            prev.running === status.running &&
+            prev.missionId === status.missionId &&
+            prev.missionStatus === status.missionStatus &&
+            prev.phase === status.phase &&
+            prev.onGround === status.onGround &&
+            prev.enginesRunning === status.enginesRunning &&
+            prev.sawAirborne === status.sawAirborne &&
+            prev.lastError === status.lastError &&
+            prev.lastEvent?.type === status.lastEvent?.type &&
+            Boolean(prev.settlement) === Boolean(status.settlement) &&
+            prev.flightTime?.met === status.flightTime?.met &&
+            Math.round((prev.flightTime?.elapsedMs ?? 0) / 60_000) ===
+              Math.round((status.flightTime?.elapsedMs ?? 0) / 60_000) &&
+            liveFuelDelta < 25 &&
+            livePayloadDelta < 25 &&
+            !verificationChanged
+          ) {
+            return prev;
+          }
+          // Mirror Watch-persisted Loaded vs Due into local mission state.
+          if (
+            status.running &&
+            status.missionId &&
+            status.loadVerification
+          ) {
+            const missionId = status.missionId;
+            const verification = status.loadVerification;
+            queueMicrotask(() => {
+              setMissions((current) =>
+                current.map((mission) => {
+                  if (mission.id !== missionId) return mission;
+                  const prevCheck = mission.lastPreflightCheck;
+                  if (!prevCheck?.loadVerification) return mission;
+                  if (
+                    prevCheck.loadVerification.ready === verification.ready &&
+                    Math.abs(
+                      (prevCheck.loadVerification.payload.liveLb ?? 0) -
+                        (verification.payload.liveLb ?? 0),
+                    ) < 1 &&
+                    Math.abs(
+                      (prevCheck.loadVerification.fuel.liveLb ?? 0) -
+                        (verification.fuel.liveLb ?? 0),
+                    ) < 1
+                  ) {
+                    return mission;
+                  }
+                  return {
+                    ...mission,
+                    lastPreflightCheck: {
+                      ...prevCheck,
+                      checkedAtIso: new Date().toISOString(),
+                      verdict: verification.ready
+                        ? prevCheck.verdict === 'fail'
+                          ? 'pass'
+                          : prevCheck.verdict
+                        : 'fail',
+                      loadVerification: {
+                        ...prevCheck.loadVerification,
+                        ready: verification.ready,
+                        fuel: {
+                          ...prevCheck.loadVerification.fuel,
+                          ...verification.fuel,
+                        },
+                        payload: {
+                          ...prevCheck.loadVerification.payload,
+                          ...verification.payload,
+                        },
+                      },
+                    },
+                  };
+                }),
+              );
+            });
+          }
           return status;
         });
       } catch {
@@ -1721,7 +1848,7 @@ export function App() {
     void pollWatch();
     const id = window.setInterval(() => {
       void pollWatch();
-    }, watch?.running ? (watch.onGround === false ? 5_000 : 2_000) : 8_000);
+    }, watch?.running ? (watch.onGround === false ? 5_000 : 3_000) : 8_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -1729,38 +1856,62 @@ export function App() {
   }, [watch?.running, watch?.onGround, refresh]);
 
   // Independent SimBridge probe — does not require Watch to be running.
+  // When Watch is already sampling, skip probing entirely (server would only
+  // mirror Watch anyway, and the extra poll re-rendered the status bar).
   useEffect(() => {
+    if (watch?.running) return;
     let cancelled = false;
+    let consecutiveFailures = 0;
     async function pollBridge() {
       try {
         const status = await fetchSimBridgeStatus();
-        if (!cancelled) setSimBridge(status);
+        if (cancelled) return;
+        consecutiveFailures = 0;
+        setSimBridge((prev) => {
+          if (
+            prev &&
+            prev.connected === status.connected &&
+            prev.phase === status.phase &&
+            prev.onGround === status.onGround &&
+            prev.enginesRunning === status.enginesRunning &&
+            prev.error === status.error &&
+            prev.aircraftTitle === status.aircraftTitle
+          ) {
+            return prev;
+          }
+          return status;
+        });
       } catch {
-        if (!cancelled) {
-          setSimBridge({
+        if (cancelled) return;
+        consecutiveFailures += 1;
+        // Only flip to disconnected after repeated failures — single blips
+        // from pipe contention were flashing the status bar.
+        if (consecutiveFailures >= 3) {
+          setSimBridge((prev) => ({
             connected: false,
-            mode: null,
-            aircraftTitle: null,
-            onGround: null,
-            enginesRunning: null,
-            parkingBrake: null,
-            phase: null,
+            mode: prev?.mode ?? null,
+            aircraftTitle: prev?.aircraftTitle ?? null,
+            onGround: prev?.onGround ?? null,
+            enginesRunning: prev?.enginesRunning ?? null,
+            parkingBrake: prev?.parkingBrake ?? null,
+            phase: prev?.phase ?? null,
+            groundSpeedKt: prev?.groundSpeedKt ?? null,
             source: 'probe',
             error: 'SimBridge status unavailable',
             checkedAtIso: new Date().toISOString(),
-          });
+          }));
         }
       }
     }
     void pollBridge();
     const id = window.setInterval(() => {
       void pollBridge();
-    }, watch?.running ? (watch.onGround === false ? 10_000 : 5_000) : 8_000);
+    }, 8_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [watch?.running, watch?.onGround]);
+  }, [watch?.running]);
 
   const continuousHours = useMemo(() => {
     const frac = Math.max(0, displayNowMs - lastBatchAtMs) / msPerTick;
@@ -2028,37 +2179,59 @@ export function App() {
     let stopped = false;
     let inFlight = false;
     let toastedFailure = false;
+    const abort = new AbortController();
+    loadOfpControlRef.current = {
+      stop: () => {
+        stopped = true;
+      },
+      abort,
+    };
     setLoadOfpAutoStatus('waiting');
 
     async function tryLoadOfp() {
       if (cancelled || stopped || inFlight || !activeMission) return;
-      if (!simBridge?.connected) {
+      if (ofpInjectInFlightRef.current) return;
+      const bridge = simBridgeRef.current;
+      if (!bridge?.connected) {
         setLoadOfpAutoStatus('waiting');
         return;
       }
-      if (simBridge.onGround === false) {
+      if (bridge.onGround === false) {
         setLoadOfpAutoStatus('waiting');
         setLoadOfpAutoError('Waiting for aircraft on ground before loading OFP');
         return;
       }
       inFlight = true;
+      ofpInjectInFlightRef.current = true;
       setLoadOfpAutoStatus('loading');
       setLoadOfpAutoError(null);
+      setLoadOfpProgress(null);
       try {
-        const result = await postLoadOfp({
-          missionId: activeMission.id,
-          simbriefUser: username,
-          runPreflightAfter: true,
-        });
-        if (cancelled) return;
-        await refresh();
+        const result = await postLoadOfp(
+          {
+            missionId: activeMission.id,
+            simbriefUser: username,
+            runPreflightAfter: true,
+          },
+          { signal: abort.signal },
+        );
+        // Always stop retries after one attempt (success or fail).
+        stopped = true;
         if (!result.ok) {
-          // Applying/rolling back is stateful. Never repeat automatically after
-          // an actual attempt; wait for an explicit user retry.
-          stopped = true;
+          const cancelledInject =
+            result.error === 'Inject cancelled' || abort.signal.aborted;
           setLoadOfpAutoStatus('failed');
-          setLoadOfpAutoError(result.error ?? 'OFP load failed');
-          if (!toastedFailure) {
+          setLoadOfpAutoError(
+            cancelledInject ? 'Inject cancelled' : result.error ?? 'OFP load failed',
+          );
+          setLoadOfpProgress(null);
+          // Refresh so Loaded vs Due isn't stuck on a stale Sim 0 from mid-inject.
+          try {
+            await refreshRef.current();
+          } catch {
+            /* soft */
+          }
+          if (!toastedFailure && !cancelledInject) {
             toastedFailure = true;
             setToastKind('fail');
             setToast(
@@ -2069,8 +2242,8 @@ export function App() {
           }
           return;
         }
-        stopped = true;
         autoLoadedOfpKeyRef.current = ofpKey;
+        await refreshRef.current();
         setLoadOfpAutoStatus('done');
         setLoadOfpAutoError(null);
         const fuelKg = result.plan.blockFuelLb / KG_TO_LB;
@@ -2084,22 +2257,32 @@ export function App() {
           `Loaded OFP into ${result.identity.title || 'aircraft'} · ` +
             `fuel ${formatMassExact(fuelKg, weightSystem)} · ` +
             `cargo ${formatMassExact(cargoKg, weightSystem)}` +
+            (result.cgRebalanceMoves
+              ? ` · CG rebalanced ×${result.cgRebalanceMoves}`
+              : '') +
             (pf ? ` · Preflight ${preflightReady ? 'READY' : pf.toUpperCase()}` : ''),
         );
+        setLoadOfpProgress(null);
       } catch (err) {
-        if (!cancelled) {
-          stopped = true;
-          const message = err instanceof Error ? err.message : String(err);
+        stopped = true;
+        if (abort.signal.aborted) {
           setLoadOfpAutoStatus('failed');
-          setLoadOfpAutoError(message);
-          if (!toastedFailure) {
-            toastedFailure = true;
-            setToastKind('fail');
-            setToast(`Auto OFP load failed · ${message}`);
-          }
+          setLoadOfpAutoError('Inject cancelled');
+          setLoadOfpProgress(null);
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        setLoadOfpAutoStatus('failed');
+        setLoadOfpAutoError(message);
+        setLoadOfpProgress(null);
+        if (!toastedFailure) {
+          toastedFailure = true;
+          setToastKind('fail');
+          setToast(`Auto OFP load failed · ${message}`);
         }
       } finally {
         inFlight = false;
+        ofpInjectInFlightRef.current = false;
       }
     }
 
@@ -2109,6 +2292,12 @@ export function App() {
     }, 15_000);
     return () => {
       cancelled = true;
+      // Do NOT abort the fetch here — soft dep churn (weight unit, airport null,
+      // preflight stamp) was killing inject mid-pipe and the UI restarted a second
+      // load. User Cancel still calls abort + /api/load-ofp/cancel.
+      if (loadOfpControlRef.current?.abort === abort) {
+        loadOfpControlRef.current = null;
+      }
       window.clearInterval(id);
     };
   }, [
@@ -2125,9 +2314,6 @@ export function App() {
     airportIcao,
     loadOfpRetryToken,
     preferManualLoad,
-    refresh,
-    simBridge?.connected,
-    simBridge?.onGround,
     simbriefUser,
     staging?.replaceManifest,
     tab,
@@ -2135,7 +2321,99 @@ export function App() {
     weightSystem,
   ]);
 
+  // Live inject progress (planning → injecting → balancing CG → verifying).
+  useEffect(() => {
+    if (loadOfpAutoStatus !== 'loading' || !activeMission?.id) {
+      return;
+    }
+    let cancelled = false;
+    async function poll() {
+      try {
+        const { progress } = await fetchLoadOfpProgress(activeMission!.id);
+        if (cancelled) return;
+        setLoadOfpProgress(progress);
+        // Overlay live Sim weights onto Preflight cards while inject owns the pipe
+        // (background /api/preflight is paused during loading).
+        if (
+          progress &&
+          (progress.livePayloadLb !== undefined ||
+            progress.liveFuelLb !== undefined ||
+            progress.liveMac !== undefined)
+        ) {
+          const missionId = activeMission!.id;
+          setMissions((current) =>
+            current.map((mission) => {
+              if (mission.id !== missionId) return mission;
+              const prev = mission.lastPreflightCheck;
+              const verification = prev?.loadVerification;
+              if (!prev || !verification) {
+                return mission;
+              }
+              const plannedPayload =
+                progress.plannedPayloadLb ?? verification.payload.plannedLb;
+              const plannedFuel =
+                progress.plannedFuelLb ?? verification.fuel.plannedLb;
+              const livePayload =
+                progress.livePayloadLb ?? verification.payload.liveLb;
+              const liveFuel = progress.liveFuelLb ?? verification.fuel.liveLb;
+              // Display-only during inject — authoritative READY is written by
+              // post-inject preflight / Watch persist afterward.
+              const weights = evaluateLoadVerification({
+                plannedFuelLb: plannedFuel,
+                liveFuelLb: liveFuel,
+                plannedPayloadLb: plannedPayload,
+                livePayloadLb: livePayload,
+              });
+              return {
+                ...mission,
+                lastPreflightCheck: {
+                  ...prev,
+                  checkedAtIso: progress.updatedAtIso || prev.checkedAtIso,
+                  verdict: weights.ready
+                    ? prev.verdict === 'fail'
+                      ? 'pass'
+                      : prev.verdict
+                    : 'fail',
+                  loadVerification: {
+                    ...verification,
+                    ready: weights.ready,
+                    fuel: {
+                      ...verification.fuel,
+                      ...weights.fuel,
+                    },
+                    payload: {
+                      ...verification.payload,
+                      ...weights.payload,
+                    },
+                    cg: verification.cg
+                      ? {
+                          ...verification.cg,
+                          liveMac: progress.liveMac ?? verification.cg.liveMac,
+                        }
+                      : verification.cg,
+                  },
+                },
+              };
+            }),
+          );
+        }
+      } catch {
+        /* soft — inject request is the source of truth for completion */
+      }
+    }
+    void poll();
+    const id = window.setInterval(() => {
+      void poll();
+    }, 700);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [loadOfpAutoStatus, activeMission?.id]);
+
   // Continuously refresh Loaded vs Due while staging on the ground.
+  // Full /api/preflight opens its own pipe — pause while Watch owns SimBridge
+  // (Watch tick persists loadVerification as the single source of truth).
   useEffect(() => {
     const username = simbriefUser.trim();
     const ofp = activeMission?.lastOfpCheck;
@@ -2149,6 +2427,7 @@ export function App() {
       activeMission?.fuelAuthorizedOfpId === ofp?.ofpId &&
       Boolean(simBridge?.connected) &&
       simBridge?.onGround !== false &&
+      !watch?.running &&
       loadOfpAutoStatus !== 'loading' &&
       !staging?.replaceManifest;
     if (!eligible || !activeMission) return;
@@ -2179,7 +2458,7 @@ export function App() {
     void refreshLiveLoad();
     const id = window.setInterval(() => {
       void refreshLiveLoad();
-    }, 2_000);
+    }, 10_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -2196,6 +2475,7 @@ export function App() {
     simbriefUser,
     staging?.replaceManifest,
     tab,
+    watch?.running,
   ]);
 
   // Keep Watch running for every operational mission; Preflight gates auto-depart.
@@ -2210,7 +2490,11 @@ export function App() {
       ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
       !alreadyWatching &&
       !watchAutoPaused &&
-      !watch?.settlement;
+      !watch?.settlement &&
+      // Inject owns the SimBridge pipe — do not auto-start Watch until inject
+      // leaves waiting/loading (Watch tick is the Loaded vs Due owner afterward).
+      loadOfpAutoStatus !== 'loading' &&
+      loadOfpAutoStatus !== 'waiting';
 
     if (!eligible || !activeMission) {
       if (!alreadyWatching) {
@@ -2265,6 +2549,7 @@ export function App() {
     activeMission?.lastPreflightCheck?.checkedAtIso,
     activeMission?.lastPreflightCheck?.verdict,
     airportIcao,
+    loadOfpAutoStatus,
     tab,
     watch?.running,
     watch?.missionId,
@@ -2489,6 +2774,18 @@ export function App() {
     setWallet(acMarket.walletUsd);
     if (acMarket.fleet) setFleet(acMarket.fleet);
     return acMarket;
+  }
+
+  async function refreshNetworkHubs() {
+    setNetworkHubsLoading(true);
+    try {
+      const payload = await fetchNetworkHubs();
+      setNetworkHubs(payload.hubs);
+      if (payload.homeHubIcao) setHomeHubIcao(payload.homeHubIcao);
+      return payload;
+    } finally {
+      setNetworkHubsLoading(false);
+    }
   }
 
   async function onBuyAircraft(listingId: string) {
@@ -3209,6 +3506,41 @@ export function App() {
     );
   }
 
+  async function onCancelInject() {
+    const missionId = activeMission?.id;
+    if (!missionId || loadOfpAutoStatus !== 'loading') return;
+    // Flip UI immediately — cancel stops inject + rebalance + verify.
+    setLoadOfpAutoStatus('failed');
+    setLoadOfpAutoError('Cancelling…');
+    setLoadOfpProgress((prev) =>
+      prev
+        ? {
+            ...prev,
+            phase: 'failed',
+            message: 'Cancel requested — stopping…',
+            updatedAtIso: new Date().toISOString(),
+          }
+        : {
+            missionId,
+            phase: 'failed',
+            message: 'Cancel requested — stopping…',
+            updatedAtIso: new Date().toISOString(),
+          },
+    );
+    loadOfpControlRef.current?.stop();
+    try {
+      // Tell the server first so long settle loops see the flag.
+      await postCancelLoadOfp(missionId);
+    } catch {
+      /* soft — local stop still applies */
+    }
+    loadOfpControlRef.current?.abort.abort();
+    setLoadOfpAutoError('Inject cancelled');
+    setLoadOfpProgress(null);
+    setToastKind('warn');
+    setToast('Inject cancelled');
+  }
+
   async function onLoadFuelAndPayload(mission: Mission) {
     const username = simbriefUser.trim();
     if (!username) {
@@ -3216,34 +3548,74 @@ export function App() {
       setToast('Enter SimBrief username before loading fuel and payload');
       return;
     }
+    const abort = new AbortController();
+    loadOfpControlRef.current = {
+      stop: () => {
+        /* manual path uses abort + status */
+      },
+      abort,
+    };
     setLoadOfpAutoStatus('loading');
+    setLoadOfpProgress(null);
     let succeeded = false;
     let failureMessage: string | null = null;
+    let userCancelled = false;
     await run(async () => {
       try {
-        const result = await postLoadOfp({
-          missionId: mission.id,
-          simbriefUser: username,
-          runPreflightAfter: true,
-        });
+        const result = await postLoadOfp(
+          {
+            missionId: mission.id,
+            simbriefUser: username,
+            runPreflightAfter: true,
+          },
+          { signal: abort.signal },
+        );
+        if (abort.signal.aborted) {
+          userCancelled = true;
+          return;
+        }
         if (!result.ok) {
+          if (result.error === 'Inject cancelled') {
+            userCancelled = true;
+            return;
+          }
           throw new Error(result.error ?? 'Fuel and payload load failed');
         }
         succeeded = true;
         setLoadOfpAutoStatus('done');
         setLoadOfpAutoError(null);
+        setLoadOfpProgress(null);
         setToastKind('ok');
         setToast(
-          `Fuel and payload loaded · cargo ${formatMassExact(result.plan.cargoLb / KG_TO_LB, weightSystem)} · live validation active`,
+          `Fuel and payload loaded · cargo ${formatMassExact(result.plan.cargoLb / KG_TO_LB, weightSystem)}` +
+            (result.cgRebalanceMoves
+              ? ` · CG rebalanced ×${result.cgRebalanceMoves}`
+              : '') +
+            ` · live validation active`,
         );
       } catch (err) {
+        if (abort.signal.aborted) {
+          userCancelled = true;
+          return;
+        }
         failureMessage = err instanceof Error ? err.message : String(err);
         throw err;
+      } finally {
+        if (loadOfpControlRef.current?.abort === abort) {
+          loadOfpControlRef.current = null;
+        }
       }
     });
+    if (userCancelled) {
+      setLoadOfpAutoStatus('failed');
+      setLoadOfpAutoError('Inject cancelled');
+      setLoadOfpProgress(null);
+      return;
+    }
     if (!succeeded) {
       setLoadOfpAutoStatus('failed');
       setLoadOfpAutoError(failureMessage ?? 'Fuel and payload load failed');
+      setLoadOfpProgress(null);
     }
   }
 
@@ -3267,9 +3639,8 @@ export function App() {
   async function onDepart(mission: Mission) {
     let override = false;
     const preflightReady =
-      mission.lastPreflightCheck?.loadVerification?.ready ??
-      mission.lastPreflightCheck?.verdict !== 'fail';
-    if (mission.lastPreflightCheck && !preflightReady) {
+      mission.lastPreflightCheck?.loadVerification?.ready === true;
+    if (!mission.lastPreflightCheck || !preflightReady) {
       const ok = await confirm({
         title: 'Depart with failed Preflight?',
         body: `Preflight is not ready for ${mission.id}. Depart anyway without fixing fuel/payload?`,
@@ -3516,6 +3887,7 @@ export function App() {
     missionFuelQuoteError,
     loadOfpAutoStatus,
     loadOfpAutoError,
+    loadOfpProgress,
     loadPath: activeLoadPath,
     simBridgeConnected: Boolean(simBridge?.connected),
     watchRunning: Boolean(
@@ -3584,11 +3956,13 @@ export function App() {
             ? 'Hangar'
             : tab === 'pilot'
               ? 'Company'
-              : tab === 'missions'
-                ? 'Logbook'
-                : tab === 'settings'
-                  ? 'Settings'
-                  : 'Freights';
+              : tab === 'map'
+                ? 'Network'
+                : tab === 'missions'
+                  ? 'Logbook'
+                  : tab === 'settings'
+                    ? 'Settings'
+                    : 'Freights';
   const pageLede = showAirport
     ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'}`
     : showStaging
@@ -3609,11 +3983,13 @@ export function App() {
               ? hubSelected
                 ? 'Company identity, fleet snapshot, and progression.'
                 : 'Register your name and home hub to start the career.'
-              : tab === 'missions'
-                ? 'Historical flights — settled, cancelled, and past operations.'
-                : tab === 'settings'
-                  ? 'SimBrief, weight units, and local career preferences.'
-                  : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
+              : tab === 'map'
+                ? 'Registered Skyline hubs on OpenFreeMap Dark (free public tiles).'
+                : tab === 'missions'
+                  ? 'Historical flights — settled, cancelled, and past operations.'
+                  : tab === 'settings'
+                    ? 'SimBrief, weight units, and local career preferences.'
+                    : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
   const parkedIcao =
     fleet.find((a) => a.status === 'parked')?.locationIcao ?? homeHubIcao;
 
@@ -3728,6 +4104,19 @@ export function App() {
             }
           >
             Company
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'map' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('map')}
+            disabled={busy}
+            title={
+              networkHubs.length
+                ? `${networkHubs.length} hubs on the network map`
+                : 'Interactive hub network map'
+            }
+          >
+            Network
           </button>
           <button
             type="button"
@@ -4001,10 +4390,10 @@ export function App() {
                 disabled={busy || starterAircraftOptions.length === 0}
                 required
               >
-                <option value="">Select light aircraft…</option>
+                <option value="">Select starter…</option>
                 {starterAircraftOptions.map((airframe) => (
                   <option key={airframe.typeId} value={airframe.typeId}>
-                    {airframe.label} ({airframe.aircraftClassId === 'light_ga' ? 'Light GA' : 'Light TP'} · {airframe.simbriefIcao})
+                    {airframe.label}
                   </option>
                 ))}
               </select>
@@ -5351,6 +5740,7 @@ export function App() {
               missionFuelQuoteError={missionFuelQuoteError}
               loadOfpAutoStatus={loadOfpAutoStatus}
               loadOfpAutoError={loadOfpAutoError}
+              loadOfpProgress={loadOfpProgress}
               simBridge={simBridge}
               watch={watch}
               watchAutoStatus={watchAutoStatus}
@@ -5365,6 +5755,7 @@ export function App() {
                 setMissionFuelQuoteRetryToken((token) => token + 1)
               }
               onLoadFuelAndPayload={(m) => void onLoadFuelAndPayload(m)}
+              onCancelInject={() => void onCancelInject()}
               onRetryInject={() => retryAutoLoadOfp()}
               onContinueManually={() => continueManuallyLoad()}
               onDepart={(m) => void onDepart(m)}
@@ -5437,6 +5828,43 @@ export function App() {
               </p>
             </div>
           </div>
+        </section>
+      ) : hubSelected && tab === 'map' ? (
+        <section className="panel network-map-panel">
+          <div className="panel-head">
+            <div>
+              <h2>Network</h2>
+              <p>
+                {networkHubsLoading
+                  ? 'Loading hubs…'
+                  : `${networkHubs.length} registered hubs · click a marker to open the terminal`}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="action ghost"
+              disabled={busy || networkHubsLoading}
+              onClick={() => {
+                void refreshNetworkHubs().catch((err) => {
+                  setToastKind('fail');
+                  setToast(err instanceof Error ? err.message : String(err));
+                });
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+          {networkHubs.length === 0 && !networkHubsLoading ? (
+            <p className="empty">No hubs in the economy world yet.</p>
+          ) : (
+            <HubNetworkMap
+              hubs={networkHubs}
+              highlightIcao={homeHubIcao}
+              onSelectHub={(icao) => {
+                void openAirport(icao);
+              }}
+            />
+          )}
         </section>
       ) : hubSelected && tab === 'pilot' ? (
         <section className="panel pilot-panel">

@@ -62,10 +62,11 @@ export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
   aircraftClassId: FreighterClassId;
   count: number;
 }> = [
-  { aircraftClassId: 'narrow_freighter', count: 16 },
+  { aircraftClassId: 'narrow_freighter', count: 14 },
   { aircraftClassId: 'wide_freighter', count: 10 },
+  { aircraftClassId: 'light_jet', count: 4 },
   { aircraftClassId: 'light_turboprop', count: 10 },
-  { aircraftClassId: 'light_ga', count: 8 },
+  { aircraftClassId: 'light_ga', count: 6 },
 ] as const;
 
 /** Minimum airborne block so ultra-short hops aren't instant. */
@@ -79,6 +80,7 @@ const TURNAROUND_HOURS = 1;
 export const NPC_MX_INTERVAL_HOURS: Record<FreighterClassId, number> = {
   light_ga: 90,
   light_turboprop: 110,
+  light_jet: 150,
   narrow_freighter: 180,
   wide_freighter: 220,
 };
@@ -87,6 +89,7 @@ export const NPC_MX_INTERVAL_HOURS: Record<FreighterClassId, number> = {
 export const NPC_MX_SHOP_HOURS: Record<FreighterClassId, number> = {
   light_ga: 2,
   light_turboprop: 2.5,
+  light_jet: 3,
   narrow_freighter: 4,
   wide_freighter: 5.5,
 };
@@ -95,6 +98,7 @@ export const NPC_MX_SHOP_HOURS: Record<FreighterClassId, number> = {
 export const NPC_MX_PARTS_KG: Record<FreighterClassId, number> = {
   light_ga: 40,
   light_turboprop: 60,
+  light_jet: 120,
   narrow_freighter: 200,
   wide_freighter: 400,
 };
@@ -111,6 +115,7 @@ const MAX_REST_HOURS = 16;
 const CRUISE_KT: Record<FreighterClassId, number> = {
   narrow_freighter: 430,
   wide_freighter: 480,
+  light_jet: 430,
   light_turboprop: 185,
   light_ga: 170,
 };

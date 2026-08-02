@@ -1,0 +1,50 @@
+{
+  "source": "simbrief",
+  "icao": "LJ35",
+  "ofpId": "light-jet-class",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [],
+  "notes": [
+    "Class-level fallback for light_jet (Learjet 35A economics).",
+    "Replaced per airframe when a concrete jet is homologated (e.g. Flysimware LJ35A).",
+    "SimBrief: Default LJ35"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [3, 4, 5, 6],
+      "crewStations": [1, 2]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "LJ35",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Cabin / cargo 1", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Cabin / cargo 2", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Cabin / cargo 3", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Cabin / cargo 4", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 75,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 100,
+    "weightAbsLb": 200,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

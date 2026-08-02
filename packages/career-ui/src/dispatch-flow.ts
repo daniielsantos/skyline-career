@@ -102,7 +102,8 @@ export function resolveLoadPath(
     mission.loadMethod === 'direct-injection'
       ? mission.loadMethod
       : mission.aircraftClassId === 'light_turboprop' ||
-          mission.aircraftClassId === 'light_ga'
+          mission.aircraftClassId === 'light_ga' ||
+          mission.aircraftClassId === 'light_jet'
         ? 'direct-injection'
         : 'native-simbrief';
   const injectCapable =

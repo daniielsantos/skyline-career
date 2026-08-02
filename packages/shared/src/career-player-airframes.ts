@@ -64,6 +64,7 @@ const CLASS_PERF_FALLBACK: Record<
 > = {
   light_ga: { maxRangeNm: 800, fuelBurnKgPerNm: 0.35 },
   light_turboprop: { maxRangeNm: 900, fuelBurnKgPerNm: 0.8 },
+  light_jet: { maxRangeNm: 2_000, fuelBurnKgPerNm: 1.4 },
   narrow_freighter: { maxRangeNm: 2_500, fuelBurnKgPerNm: 5 },
   wide_freighter: { maxRangeNm: 6_000, fuelBurnKgPerNm: 12 },
 };
@@ -212,6 +213,7 @@ const BY_ID = new Map(CAREER_PLAYER_AIRFRAMES.map((airframe) => [airframe.typeId
 const LEGACY_DEFAULT_BY_CLASS: Record<FreighterClassId, string> = {
   light_ga: 'blacksquare-bonanza-professional',
   light_turboprop: 'c208-caravan-cargo',
+  light_jet: 'flysimware-learjet-35a',
   narrow_freighter: 'pmdg-738-bcf-family',
   wide_freighter: 'tfdi-md11f-family',
 };

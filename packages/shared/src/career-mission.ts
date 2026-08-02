@@ -121,6 +121,26 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelReserveKg: 200,
   },
   {
+    id: 'light_jet',
+    name: 'Light jet (Learjet 35A class)',
+    /** Structural payload ≈ LJ35A max payload (~3190 lb). */
+    maxCargoKg: 1_450,
+    maxRangeNm: 2_000,
+    rolesPackRelPath: 'profiles/ofp/light-jet-class.json',
+    loadMethod: 'direct-injection',
+    injectCapable: true,
+    simbriefIcao: 'LJ35',
+    simbriefAirframeMatch: 'Default',
+    fuelBurnKgPerNm: 1.4,
+    fuelTaxiKg: 80,
+    /** ~6198 lb usable Jet-A. */
+    fuelCapacityKg: 2_810,
+    oewKg: 4_680,
+    mtowKg: 8_300,
+    fuelRouteFactor: 1.5,
+    fuelReserveKg: 400,
+  },
+  {
     id: 'light_ga',
     name: 'Light GA (BE36 Bonanza Professional)',
     /**
@@ -295,6 +315,7 @@ export function parseFreighterClassId(raw: string | undefined): FreighterClassId
   if (
     raw === 'narrow_freighter' ||
     raw === 'wide_freighter' ||
+    raw === 'light_jet' ||
     raw === 'light_turboprop' ||
     raw === 'light_ga'
   ) {
@@ -302,6 +323,17 @@ export function parseFreighterClassId(raw: string | undefined): FreighterClassId
   }
   if (raw === 'narrow' || raw === 'bcf' || raw === '738') return 'narrow_freighter';
   if (raw === 'wide' || raw === 'md11' || raw === 'md-11f') return 'wide_freighter';
+  if (
+    raw === 'jet' ||
+    raw === 'lightjet' ||
+    raw === 'light_jet' ||
+    raw === 'lj35' ||
+    raw === 'learjet' ||
+    raw === 'citation' ||
+    raw === 'cj'
+  ) {
+    return 'light_jet';
+  }
   if (raw === 'caravan' || raw === 'c208' || raw === 'light' || raw === 'turboprop') {
     return 'light_turboprop';
   }

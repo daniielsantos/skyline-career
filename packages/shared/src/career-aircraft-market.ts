@@ -57,6 +57,7 @@ export {
 const CLASS_ORDER: FreighterClassId[] = [
   'light_ga',
   'light_turboprop',
+  'light_jet',
   'narrow_freighter',
   'wide_freighter',
 ];
@@ -71,6 +72,7 @@ const PLAYER_LISTING_LIFE_TICKS = TICKS_PER_DAY * 7;
 export const LEASE_OUT_HOURS_PER_MONTH: Record<FreighterClassId, number> = {
   light_ga: 28,
   light_turboprop: 36,
+  light_jet: 42,
   narrow_freighter: 48,
   wide_freighter: 55,
 };
@@ -130,6 +132,7 @@ export function sellBackValueUsd(aircraft: PlayerAircraft): number {
 const CLASS_LABEL_SHORT: Record<FreighterClassId, string> = {
   light_ga: 'Beechcraft Bonanza BE36',
   light_turboprop: 'Cessna 208 Caravan Cargo',
+  light_jet: 'Learjet 35A',
   narrow_freighter: 'Boeing 737-800 BCF',
   wide_freighter: 'McDonnell Douglas MD-11F',
 };
@@ -141,6 +144,7 @@ const CLASS_SPECS: Record<
 > = {
   light_ga: { maxCargoKg: 450, maxRangeNm: 800 },
   light_turboprop: { maxCargoKg: 1_704, maxRangeNm: 900 },
+  light_jet: { maxCargoKg: 1_450, maxRangeNm: 2_000 },
   narrow_freighter: { maxCargoKg: 18_137, maxRangeNm: 2_500 },
   wide_freighter: { maxCargoKg: 90_000, maxRangeNm: 6_000 },
 };
@@ -174,7 +178,9 @@ function pickBasedIcao(
 
   // Jets almost always at majors.
   if (
-    (classId === 'narrow_freighter' || classId === 'wide_freighter') &&
+    (classId === 'narrow_freighter' ||
+      classId === 'wide_freighter' ||
+      classId === 'light_jet') &&
     majors.length > 0
   ) {
     if (rng() < 0.85 || regionals.length === 0) return pick(rng, majors).icao;
@@ -348,6 +354,7 @@ function npcDemandScore(listing: AircraftListing): number {
   let score = listing.askingUsd;
   if (listing.aircraftClassId === 'light_ga') score *= 0.55;
   else if (listing.aircraftClassId === 'light_turboprop') score *= 0.7;
+  else if (listing.aircraftClassId === 'light_jet') score *= 0.9;
   else if (listing.aircraftClassId === 'narrow_freighter') score *= 1.15;
   else score *= 1.35;
   if (listing.kind === 'used') score *= 0.85;
@@ -1061,7 +1068,7 @@ export function estimateMissionBlockHours(
   const cruise =
     aircraftClassId === 'wide_freighter'
       ? 480
-      : aircraftClassId === 'narrow_freighter'
+      : aircraftClassId === 'narrow_freighter' || aircraftClassId === 'light_jet'
         ? 430
         : aircraftClassId === 'light_turboprop'
           ? 185

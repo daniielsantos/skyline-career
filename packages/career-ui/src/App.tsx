@@ -493,6 +493,7 @@ function idleUptickPct(lot: MarketLot): number | null {
 function fallbackMaxCargoKg(aircraft: AircraftClass): number {
   if (aircraft === 'wide_freighter') return 90_000;
   if (aircraft === 'light_turboprop') return 1_704;
+  if (aircraft === 'light_jet') return 1_450;
   if (aircraft === 'light_ga') return 450;
   return 18_137;
 }
@@ -500,6 +501,7 @@ function fallbackMaxCargoKg(aircraft: AircraftClass): number {
 function aircraftMaxRangeNm(aircraft: AircraftClass): number {
   if (aircraft === 'wide_freighter') return 6_000;
   if (aircraft === 'light_turboprop') return 900;
+  if (aircraft === 'light_jet') return 2_000;
   if (aircraft === 'light_ga') return 800;
   return 2_500;
 }
@@ -523,7 +525,8 @@ function preferredLoadMethod(
     return mission.loadMethod;
   }
   return mission.aircraftClassId === 'light_turboprop' ||
-    mission.aircraftClassId === 'light_ga'
+    mission.aircraftClassId === 'light_ga' ||
+    mission.aircraftClassId === 'light_jet'
     ? 'direct-injection'
     : 'native-simbrief';
 }

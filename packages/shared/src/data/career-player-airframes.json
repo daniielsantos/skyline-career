@@ -93,6 +93,18 @@
     "fuelBurnKgPerNm": 0.189
   },
   {
+    "typeId": "flysimware-learjet-35a-cargo",
+    "aircraftClassId": "light_jet",
+    "label": "LEARJET 35A CARGO",
+    "rolesPackRelPath": "profiles/ofp/flysimware-learjet-35a-cargo.json",
+    "simbriefIcao": "35A",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 2366,
+    "cruiseFuelFlowKgPerHour": 598.7,
+    "cruiseSpeedKt": 430,
+    "fuelBurnKgPerNm": 1.392
+  },
+  {
     "typeId": "asobo-beechcraft-king-air-350i",
     "aircraftClassId": "light_turboprop",
     "label": "Beechcraft King Air 350i",
@@ -111,6 +123,18 @@
     ],
     "simbriefIcao": "C208",
     "simbriefAirframeMatch": "Default"
+  },
+  {
+    "typeId": "sws-kodiak-100-cargo",
+    "aircraftClassId": "light_turboprop",
+    "label": "Kodiak 100 Cargo",
+    "rolesPackRelPath": "profiles/ofp/sws-kodiak-100-cargo.json",
+    "simbriefIcao": "KODI",
+    "simbriefAirframeMatch": "Default",
+    "maxRangeNm": 1132,
+    "cruiseFuelFlowKgPerHour": 100.2,
+    "cruiseSpeedKt": 174,
+    "fuelBurnKgPerNm": 0.576
   },
   {
     "typeId": "carenado-saab-340-cargo",

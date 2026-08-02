@@ -550,7 +550,10 @@ function mapAirportMovements(
           ? 185
           : m.aircraftClassId === 'light_ga'
             ? 170
-            : 430;
+            : m.aircraftClassId === 'light_jet' ||
+                m.aircraftClassId === 'narrow_freighter'
+              ? 430
+              : 430;
     const flightHours = Math.max(2, Math.ceil(dist / cruise));
     const departedAt = m.departedAtTick ?? m.dispatchedAtTick ?? m.acceptedAtTick;
     let etaHours = flightHours;

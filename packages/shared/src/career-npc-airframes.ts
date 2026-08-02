@@ -260,11 +260,41 @@ export const NPC_AIRFRAME_VARIANTS: readonly NpcAirframeVariant[] = [
     freighter: false,
     maxCargoKg: 125,
   },
+  // —— light jet (bizjets / air taxi cargo) ——
+  {
+    typeId: 'LJ35',
+    aircraftClassId: 'light_jet',
+    label: 'Learjet 35',
+    freighter: false,
+    maxCargoKg: 1_450,
+  },
+  {
+    typeId: 'C25B',
+    aircraftClassId: 'light_jet',
+    label: 'Citation CJ3',
+    freighter: false,
+    maxCargoKg: 900,
+  },
+  {
+    typeId: 'C56X',
+    aircraftClassId: 'light_jet',
+    label: 'Citation XLS',
+    freighter: false,
+    maxCargoKg: 1_100,
+  },
+  {
+    typeId: 'E55P',
+    aircraftClassId: 'light_jet',
+    label: 'Phenom 300',
+    freighter: false,
+    maxCargoKg: 1_000,
+  },
 ];
 
 const BY_CLASS: Record<FreighterClassId, NpcAirframeVariant[]> = {
   narrow_freighter: [],
   wide_freighter: [],
+  light_jet: [],
   light_turboprop: [],
   light_ga: [],
 };

@@ -17,6 +17,8 @@ describe('career player airframe registration', () => {
     assert.equal(inferCareerClassFromIcao('BE60'), 'light_ga');
     assert.equal(inferCareerClassFromIcao('C404'), 'light_ga');
     assert.equal(inferCareerClassFromIcao('C208'), 'light_turboprop');
+    assert.equal(inferCareerClassFromIcao('LJ35'), 'light_jet');
+    assert.equal(inferCareerClassFromIcao('C25B'), 'light_jet');
     assert.equal(inferCareerClassFromIcao('B738'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD1F'), 'wide_freighter');
     assert.equal(inferCareerClassFromIcao('ZZZZ'), 'light_ga');

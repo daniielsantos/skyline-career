@@ -2053,6 +2053,11 @@ th {
   --class-tone-b: #2f5c42;
 }
 
+.aircraft-card-stripe.class-light_jet {
+  --class-tone-a: #6a8a9e;
+  --class-tone-b: #2f4a5c;
+}
+
 .aircraft-card-stripe.class-narrow_freighter {
   --class-tone-a: #7a6a9a;
   --class-tone-b: #42385c;

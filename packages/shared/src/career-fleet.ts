@@ -40,6 +40,7 @@ import type {
 export const PLAYER_FUEL_CAPACITY_KG: Record<FreighterClassId, number> = {
   light_turboprop: 1_010,
   light_ga: 380,
+  light_jet: 2_810,
   narrow_freighter: 20_894,
   wide_freighter: 117_450,
 };
@@ -50,6 +51,7 @@ export const FERRY_FEE_USD_PER_NM = 2.5;
 const FERRY_CLASS_MULT: Record<FreighterClassId, number> = {
   light_turboprop: 1,
   light_ga: 0.85,
+  light_jet: 1.5,
   narrow_freighter: 2.2,
   wide_freighter: 4,
 };
@@ -210,6 +212,7 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
   if (
     aircraftClassId !== 'light_turboprop' &&
     aircraftClassId !== 'light_ga' &&
+    aircraftClassId !== 'light_jet' &&
     aircraftClassId !== 'narrow_freighter' &&
     aircraftClassId !== 'wide_freighter'
   ) {
@@ -364,6 +367,7 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
 function defaultLabel(aircraftClassId: FreighterClassId): string {
   if (aircraftClassId === 'light_turboprop') return 'Company Caravan';
   if (aircraftClassId === 'light_ga') return 'Company Bonanza';
+  if (aircraftClassId === 'light_jet') return 'Company Light Jet';
   if (aircraftClassId === 'narrow_freighter') return 'Company Narrow';
   return 'Company Wide';
 }
@@ -600,13 +604,7 @@ export function relocateAircraftOnSettle(
   aircraft.assignedMissionId = undefined;
   const due =
     aircraft.maintenanceDueAtHours ??
-    (aircraft.aircraftClassId === 'light_ga'
-      ? 80
-      : aircraft.aircraftClassId === 'light_turboprop'
-        ? 100
-        : aircraft.aircraftClassId === 'narrow_freighter'
-          ? 160
-          : 200);
+    INSPECTION_INTERVAL_HOURS[aircraft.aircraftClassId];
   if ((aircraft.hoursAirframe ?? 0) >= due) {
     aircraft.status = 'maintenance';
   } else {

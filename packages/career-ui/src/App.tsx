@@ -2279,7 +2279,7 @@ export function App() {
     void pollOfp();
     const id = window.setInterval(() => {
       void pollOfp();
-    }, 15_000);
+    }, 10_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -3272,8 +3272,12 @@ export function App() {
     setStaging(draft);
     setPreferredAircraft(aircraft);
     setError(null);
-    setAirportReturn(null);
+    const restoreAirport = airportIcao
+      ? { icao: airportIcao, section: terminalSection }
+      : null;
     closeAirport();
+    // closeAirport clears airportReturn — restore after so Back can reopen the terminal.
+    setAirportReturn(restoreAirport);
     goToTab('staging');
   }
 
@@ -3315,6 +3319,11 @@ export function App() {
     if (staging?.replaceManifest) {
       setStaging(null);
       goToTab('staging');
+      return;
+    }
+    setStaging(null);
+    if (airportReturn) {
+      void returnToAirport();
       return;
     }
     goToTab('market');
@@ -3417,6 +3426,7 @@ export function App() {
     setStaging(draft);
     setPreferredAircraft(draft.aircraft);
     setError(null);
+    setAirportReturn(null);
     setToastKind('ok');
     setToast('Editing manifest — adjust payload, then Save & re-dispatch');
     goToTab('staging');
@@ -3575,7 +3585,7 @@ export function App() {
       });
       setToastKind('ok');
       setToast(
-        `SimBrief opened · ${result.airframeLabel} · ${result.units ?? 'KGS'} · Generate OFP — auto-confirm runs every 15s`,
+        `SimBrief opened · ${result.airframeLabel} · ${result.units ?? 'KGS'} · Generate OFP — auto-confirm runs every 10s`,
       );
     });
   }
@@ -5931,7 +5941,7 @@ export function App() {
                     onClick={exitStaging}
                     disabled={busy}
                   >
-                    {staging.replaceManifest ? 'Back to flight' : 'Back to market'}
+                    Back
                   </button>
                 </div>
               </div>
@@ -6211,14 +6221,6 @@ export function App() {
                   {formatMoney(stagingPayUsd + (stagingExisting?.payUsd ?? 0))} total
                 </p>
                 <div className="cargo-dialog-actions">
-                  <button
-                    type="button"
-                    className="action ghost"
-                    onClick={exitStaging}
-                    disabled={busy}
-                  >
-                    {staging.replaceManifest ? 'Back to flight' : 'Back to market'}
-                  </button>
                   <button
                     type="button"
                     className="accept"

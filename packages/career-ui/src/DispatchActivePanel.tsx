@@ -414,7 +414,7 @@ export function DispatchActivePanel(props: {
           <p>
             {!simbriefUser.trim()
               ? 'Set your username in Settings, then open SimBrief from the primary action.'
-              : 'Generate the OFP in SimBrief. Skyline confirms automatically every 15 seconds while Dispatch is open.'}
+              : 'Generate the OFP in SimBrief. Skyline confirms automatically every 10 seconds while Dispatch is open.'}
           </p>
         </div>
       ) : null}

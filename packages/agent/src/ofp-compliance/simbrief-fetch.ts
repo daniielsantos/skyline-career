@@ -10,6 +10,7 @@ import {
   type OfpExpectation,
   type OfpLoadSheet,
   type OfpPayloadPlan,
+  type OfpRouteWaypoint,
   type OfpStationRoleMap,
   type OfpWeightUnit,
 } from '@msfs-compat/shared';
@@ -88,7 +89,28 @@ export interface SimBriefOfpJson {
   fuel?: Record<string, string | number | undefined>;
   weights?: Record<string, string | number | undefined>;
   fetch?: { userid?: string; status?: string; fetchtime?: string };
+  /** Navlog fixes — array in json=v2; sometimes a single object. */
+  navlog?:
+    | {
+        fix?: SimBriefNavlogFix | SimBriefNavlogFix[];
+      }
+    | SimBriefNavlogFix[];
 }
+
+export type SimBriefNavlogFix = {
+  ident?: string;
+  name?: string;
+  type?: string;
+  pos_lat?: string | number;
+  pos_long?: string | number;
+  pos_lon?: string | number;
+  lat?: string | number;
+  lon?: string | number;
+  latitude?: string | number;
+  longitude?: string | number;
+  is_sid_star?: string | number;
+  via_airway?: string;
+};
 
 function compactText(value: string | undefined): string | undefined {
   const compact = value?.trim().replace(/\s+/g, ' ');
@@ -165,6 +187,7 @@ export function mapSimBriefOfpToBriefing(
     }
   }
 
+  const waypoints = mapSimBriefNavlogWaypoints(ofp);
   const result: OfpBriefingSummary = {
     aircraftIcao: compactText(ofp.aircraft?.icaocode)?.toUpperCase(),
     tailNumber: compactText(ofp.aircraft?.reg)?.toUpperCase(),
@@ -180,7 +203,106 @@ export function mapSimBriefOfpToBriefing(
     route,
   };
   if (airTime) result.airTime = airTime;
+  if (waypoints?.length) result.waypoints = waypoints;
   return result;
+}
+
+/** Extract ordered navlog fixes that carry usable WGS84 coordinates. */
+export function mapSimBriefNavlogWaypoints(
+  ofp: SimBriefOfpJson,
+): OfpRouteWaypoint[] | undefined {
+  const fixes = collectSimBriefNavlogFixes(ofp);
+  const out: OfpRouteWaypoint[] = [];
+  for (const fix of fixes) {
+    const ident = compactText(fix.ident ?? fix.name)?.toUpperCase();
+    const lat =
+      num(fix.pos_lat) ?? num(fix.latitude) ?? num(fix.lat);
+    const lon =
+      num(fix.pos_long) ??
+      num(fix.pos_lon) ??
+      num(fix.longitude) ??
+      num(fix.lon);
+    if (!ident || lat === undefined || lon === undefined) continue;
+    if (lat === 0 && lon === 0) continue;
+    const type = compactText(fix.type)?.toLowerCase();
+    out.push(type ? { ident, lat, lon, type } : { ident, lat, lon });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+function collectSimBriefNavlogFixes(ofp: SimBriefOfpJson): SimBriefNavlogFix[] {
+  const navlog = ofp.navlog as unknown;
+  if (!navlog) return [];
+  if (Array.isArray(navlog)) return navlog as SimBriefNavlogFix[];
+  if (typeof navlog !== 'object') return [];
+
+  const asRecord = navlog as Record<string, unknown>;
+  const raw = asRecord.fix ?? asRecord.Fix ?? asRecord.fixes;
+  return coerceFixList(raw);
+}
+
+function coerceFixList(raw: unknown): SimBriefNavlogFix[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as SimBriefNavlogFix[];
+  if (typeof raw !== 'object') return [];
+  const obj = raw as Record<string, unknown>;
+  // Single fix object.
+  if (
+    'ident' in obj ||
+    'name' in obj ||
+    'pos_lat' in obj ||
+    'pos_long' in obj
+  ) {
+    return [obj as SimBriefNavlogFix];
+  }
+  // XML→JSON sometimes emits { "0": fix, "1": fix, ... }.
+  const values = Object.values(obj);
+  if (
+    values.length > 0 &&
+    values.every(
+      (v) =>
+        v &&
+        typeof v === 'object' &&
+        ('ident' in (v as object) ||
+          'name' in (v as object) ||
+          'pos_lat' in (v as object)),
+    )
+  ) {
+    return values as SimBriefNavlogFix[];
+  }
+  return [];
+}
+
+/** Diagnostic for UI when waypoints are missing after confirm. */
+export function diagnoseSimBriefNavlog(ofp: SimBriefOfpJson): {
+  present: boolean;
+  fixCount: number;
+  withCoords: number;
+  topKeys: string[];
+} {
+  const fixes = collectSimBriefNavlogFixes(ofp);
+  let withCoords = 0;
+  for (const fix of fixes) {
+    const lat = num(fix.pos_lat) ?? num(fix.latitude) ?? num(fix.lat);
+    const lon =
+      num(fix.pos_long) ??
+      num(fix.pos_lon) ??
+      num(fix.longitude) ??
+      num(fix.lon);
+    if (lat !== undefined && lon !== undefined && !(lat === 0 && lon === 0)) {
+      withCoords += 1;
+    }
+  }
+  return {
+    present: ofp.navlog != null,
+    fixCount: fixes.length,
+    withCoords,
+    topKeys: ofp.navlog
+      ? Array.isArray(ofp.navlog)
+        ? ['(array)']
+        : Object.keys(ofp.navlog as object).slice(0, 12)
+      : [],
+  };
 }
 
 function parseHhMmToMs(value: string): number | undefined {

@@ -1896,6 +1896,8 @@ export function App() {
                   const mergedStations =
                     verification.payload.stations ??
                     prevCheck.loadVerification.payload.stations;
+                  const { tanks: _prevTanks, ...prevFuelRest } =
+                    prevCheck.loadVerification.fuel;
                   const payloadOk =
                     livePayloadLb !== undefined
                       ? verification.payload.liveLb !== undefined
@@ -1917,7 +1919,7 @@ export function App() {
                         ...prevCheck.loadVerification,
                         ready,
                         fuel: {
-                          ...prevCheck.loadVerification.fuel,
+                          ...prevFuelRest,
                           ...fuelRest,
                           ...(mergedTanks ? { tanks: mergedTanks } : {}),
                         },
@@ -3410,6 +3412,40 @@ export function App() {
     });
   }
 
+  async function onRefreshOfpBriefing(mission: Mission) {
+    const username = simbriefUser.trim();
+    if (!username) {
+      throw new Error('Enter SimBrief username in Settings first');
+    }
+    const result = await postConfirmOfp({
+      missionId: mission.id,
+      simbriefUser: username,
+    });
+    setMissions((current) =>
+      current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+    );
+    const wptCount = result.mission.lastOfpCheck?.briefing?.waypoints?.length ?? 0;
+    const diag = result.ofp.navlogDiag;
+    setToastKind(wptCount > 0 ? 'ok' : 'warn');
+    if (wptCount > 0) {
+      setToast(`Navlog loaded · ${wptCount} fixes on the route map`);
+    } else if (diag && !diag.present) {
+      setToast(
+        'SimBrief OFP has no navlog — re-open SimBrief (Detailed Navlog is now forced), generate again, then Load navlog',
+      );
+    } else if (diag && diag.fixCount > 0 && diag.withCoords === 0) {
+      setToast(
+        `Navlog has ${diag.fixCount} fixes but no coordinates — enable Detailed Navlog and regenerate the OFP`,
+      );
+    } else {
+      setToast(
+        `OFP refreshed without route fixes${
+          diag ? ` (navlog keys: ${diag.topKeys.join(',') || 'none'})` : ''
+        }`,
+      );
+    }
+  }
+
   async function onCancel(mission: Mission) {
     const airborne = mission.status === 'in_flight';
     const ok = await confirm({
@@ -3585,6 +3621,7 @@ export function App() {
           throw new Error(result.error ?? 'Fuel and payload load failed');
         }
         succeeded = true;
+        setSkylineInjectEnabled(false);
         setLoadOfpAutoStatus('done');
         setLoadOfpAutoError(null);
         setLoadOfpProgress(null);
@@ -5811,6 +5848,7 @@ export function App() {
               onContinueManually={() => continueManuallyLoad()}
               onDepart={(m) => void onDepart(m)}
               onSettle={(m) => void onSettle(m)}
+              onRefreshOfpBriefing={onRefreshOfpBriefing}
             />
           ) : null}
         </section>

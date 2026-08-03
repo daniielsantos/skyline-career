@@ -45,13 +45,18 @@ export function isUsableFuelTankBreakdown(
   return true;
 }
 
+/**
+ * Prefer a usable next tank map; otherwise keep previous *if still usable*.
+ * Never keep an all-zero glitch when FUEL TOTAL is still high.
+ */
 export function pickFuelTankBreakdown(
   next: LoadFuelTankBreakdown | undefined,
   prev: LoadFuelTankBreakdown | undefined,
   totalFuelLb?: number | null,
 ): LoadFuelTankBreakdown | undefined {
   if (next && isUsableFuelTankBreakdown(next, totalFuelLb)) return next;
-  return prev;
+  if (prev && isUsableFuelTankBreakdown(prev, totalFuelLb)) return prev;
+  return undefined;
 }
 
 /** Prefer defined live payload; never let a missing sample wipe a good total. */

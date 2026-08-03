@@ -323,6 +323,12 @@ export type OfpBriefing = {
   cruiseAltitudeFt?: number;
   alternateIcao?: string;
   route?: string;
+  waypoints?: Array<{
+    ident: string;
+    lat: number;
+    lon: number;
+    type?: string;
+  }>;
 };
 
 export type MissionLotLine = {
@@ -1018,6 +1024,12 @@ export function postConfirmOfp(opts: {
       blockFuel?: number;
       ofpId?: string;
       briefing: OfpBriefing;
+      navlogDiag?: {
+        present: boolean;
+        fixCount: number;
+        withCoords: number;
+        topKeys: string[];
+      };
     };
   }>('/api/confirm-ofp', {
     method: 'POST',

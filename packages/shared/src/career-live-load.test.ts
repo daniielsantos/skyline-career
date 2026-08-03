@@ -87,6 +87,32 @@ describe('isUsableFuelTankBreakdown', () => {
       prev,
     );
   });
+
+  it('pickFuelTankBreakdown drops unusable prev when total fuel is present', () => {
+    assert.equal(
+      pickFuelTankBreakdown(
+        { left: 0, right: 0, center: 0 },
+        { left: 0, right: 0, center: 0 },
+        521,
+      ),
+      undefined,
+    );
+    assert.equal(
+      pickFuelTankBreakdown(undefined, { left: 0, right: 0, center: 0 }, 521),
+      undefined,
+    );
+  });
+
+  it('pickFuelTankBreakdown accepts empty tanks when aircraft is empty', () => {
+    assert.deepEqual(
+      pickFuelTankBreakdown(
+        { left: 0, right: 0, center: 0 },
+        undefined,
+        0,
+      ),
+      { left: 0, right: 0, center: 0 },
+    );
+  });
 });
 
 describe('evaluateLoadVerification', () => {

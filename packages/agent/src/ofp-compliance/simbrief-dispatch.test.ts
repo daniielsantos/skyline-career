@@ -37,6 +37,7 @@ describe('buildDispatchRedirectUrl', () => {
     assert.equal(qs.get('orig'), 'SBGR');
     assert.equal(qs.get('dest'), 'SBGL');
     assert.equal(qs.get('units'), 'KGS');
+    assert.equal(qs.get('navlog'), '1');
     assert.equal(qs.get('pax'), null);
   });
 

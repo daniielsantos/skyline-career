@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   KG_TO_LB,
   evaluateLoadVerification,
+  isUsableFuelTankBreakdown,
   normalizeAircraftTitle,
   ofpCargoKg,
   ofpFuelToLb,
@@ -171,10 +172,6 @@ export async function runMissionPreflight(
       previousStationSumLb,
     });
     const checkedAtIso = new Date().toISOString();
-    const fuelFailed = snapshot.findings.some(
-      (finding) =>
-        finding.severity === 'fail' && finding.code.startsWith('FUEL_'),
-    );
     const payloadFailed = snapshot.findings.some(
       (finding) =>
         finding.severity === 'fail' &&
@@ -264,9 +261,9 @@ export async function runMissionPreflight(
       fuelTolLb,
       payloadTolLb,
     });
-    const fuelOk = plannedPayload?.gaCabin
-      ? weights.fuel.ok
-      : !fuelFailed && weights.fuel.ok;
+    // Loaded vs Due uses block-fuel total only. Per-tank FUEL_LEFT/RIGHT findings
+    // are softened to warn (classic L/R can glitch while TOTAL matches).
+    const fuelOk = weights.fuel.ok;
     const payloadOk = plannedPayload?.gaCabin
       ? weights.payload.ok
       : !payloadFailed && weights.payload.ok;
@@ -291,11 +288,24 @@ export async function runMissionPreflight(
           plannedLb: plannedFuelLb,
           liveLb: liveFuelLb,
           ok: fuelOk,
-          tanks: {
-            left: live.fuel.left,
-            right: live.fuel.right,
-            center: live.fuel.center,
-          },
+          // Omit classic L/R/C when they glitch to 0 while FUEL TOTAL / mass-balance
+          // still shows fuel — READY uses liveLb, not the schematic.
+          ...(isUsableFuelTankBreakdown(
+            {
+              left: live.fuel.left,
+              right: live.fuel.right,
+              center: live.fuel.center,
+            },
+            liveFuelLb,
+          )
+            ? {
+                tanks: {
+                  left: live.fuel.left,
+                  right: live.fuel.right,
+                  center: live.fuel.center,
+                },
+              }
+            : {}),
         },
         payload: {
           plannedLb: plannedPayloadLb,

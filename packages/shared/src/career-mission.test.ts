@@ -98,6 +98,8 @@ describe('mission load method policy', () => {
   it('softens Preflight CG and keeps ready on fuel+payload only', () => {
     assert.equal(softenCgFindingSeverity('CG_OUT_OF_ENVELOPE', 'fail'), 'warn');
     assert.equal(softenCgFindingSeverity('FUEL_TOTAL', 'fail'), 'fail');
+    assert.equal(softenCgFindingSeverity('FUEL_LEFT', 'fail'), 'warn');
+    assert.equal(softenCgFindingSeverity('FUEL_RIGHT', 'fail'), 'warn');
     assert.equal(
       careerPreflightReady({ fuelFailed: false, payloadFailed: false }),
       true,

@@ -66,6 +66,14 @@ export interface OfpStationRoleMap {
 }
 
 /** Compact operational briefing shown after a SimBrief OFP is confirmed. */
+export interface OfpRouteWaypoint {
+  ident: string;
+  lat: number;
+  lon: number;
+  /** SimBrief fix type (`wpt`, `vor`, `ndb`, `apt`, …). */
+  type?: string;
+}
+
 export interface OfpBriefingSummary {
   aircraftIcao?: string;
   tailNumber?: string;
@@ -80,6 +88,8 @@ export interface OfpBriefingSummary {
   cruiseAltitudeFt?: number;
   alternateIcao?: string;
   route?: string;
+  /** Ordered navlog fixes with coordinates (when SimBrief provided them). */
+  waypoints?: OfpRouteWaypoint[];
 }
 
 export interface OfpPayloadPlan {

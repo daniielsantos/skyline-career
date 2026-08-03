@@ -7,6 +7,7 @@ import {
 } from './dispatch-flow';
 import { formatMassExact, formatWeightText, KG_TO_LB, type WeightSystem } from './weight-units';
 import { FuelTankSchematic, PayloadStationSchematic } from './LoadSchematic';
+import { DispatchRouteCard } from './DispatchRouteCard';
 import {
   pickFuelTankBreakdown,
   pickLivePayloadLb,
@@ -106,6 +107,8 @@ export function DispatchActivePanel(props: {
   onContinueManually: () => void;
   onDepart: (mission: Mission) => void;
   onSettle: (mission: Mission) => void;
+  /** Re-fetch SimBrief OFP to refresh briefing (incl. navlog waypoints). */
+  onRefreshOfpBriefing: (mission: Mission) => Promise<void>;
 }) {
   const {
     mission,
@@ -520,6 +523,8 @@ export function DispatchActivePanel(props: {
                     const watchFuel = props.watch.loadVerification!.fuel;
                     const watchPayload = props.watch.loadVerification!.payload;
                     const { tanks: _watchTanks, ...watchFuelRest } = watchFuel;
+                    const { tanks: _baseTanks, ...baseFuelRest } =
+                      baseVerification.fuel;
                     const {
                       liveLb: _watchPayloadLive,
                       stations: _watchStations,
@@ -555,7 +560,7 @@ export function DispatchActivePanel(props: {
                       ...baseVerification,
                       ready: fuelOk && payloadOk,
                       fuel: {
-                        ...baseVerification.fuel,
+                        ...baseFuelRest,
                         ...watchFuelRest,
                         liveLb: liveFuelLb,
                         ok: fuelOk,
@@ -588,27 +593,36 @@ export function DispatchActivePanel(props: {
                 injectProgress.liveStations ||
                 injectProgress.liveFuelLb !== undefined ||
                 injectProgress.livePayloadLb !== undefined)
-                ? {
-                    ...verification,
-                    fuel: {
-                      ...verification.fuel,
-                      ...(injectProgress.liveFuelLb !== undefined
-                        ? { liveLb: injectProgress.liveFuelLb }
-                        : {}),
-                      ...(injectProgress.liveTanks
-                        ? { tanks: injectProgress.liveTanks }
-                        : {}),
-                    },
-                    payload: {
-                      ...verification.payload,
-                      ...(injectProgress.livePayloadLb !== undefined
-                        ? { liveLb: injectProgress.livePayloadLb }
-                        : {}),
-                      ...(injectProgress.liveStations
-                        ? { stations: injectProgress.liveStations }
-                        : {}),
-                    },
-                  }
+                ? (() => {
+                    const injectFuelLb =
+                      injectProgress.liveFuelLb ?? verification.fuel.liveLb;
+                    const { tanks: _vTanks, ...fuelWithoutTanks } =
+                      verification.fuel;
+                    const injectTanks = pickFuelTankBreakdown(
+                      injectProgress.liveTanks,
+                      verification.fuel.tanks,
+                      injectFuelLb,
+                    );
+                    return {
+                      ...verification,
+                      fuel: {
+                        ...fuelWithoutTanks,
+                        ...(injectProgress.liveFuelLb !== undefined
+                          ? { liveLb: injectProgress.liveFuelLb }
+                          : {}),
+                        ...(injectTanks ? { tanks: injectTanks } : {}),
+                      },
+                      payload: {
+                        ...verification.payload,
+                        ...(injectProgress.livePayloadLb !== undefined
+                          ? { liveLb: injectProgress.livePayloadLb }
+                          : {}),
+                        ...(injectProgress.liveStations
+                          ? { stations: injectProgress.liveStations }
+                          : {}),
+                      },
+                    };
+                  })()
                 : verification;
             const liveVerification = verificationWithInject;
             // Never trust a stale ready/ok flag when Sim vs Due numbers disagree.
@@ -627,8 +641,7 @@ export function DispatchActivePanel(props: {
                 liveVerification.payload.liveLb -
                   liveVerification.payload.plannedLb,
               ) <= 75;
-            const fuelOk =
-              Boolean(liveVerification?.fuel.ok) && fuelNumbersOk;
+            const fuelOk = fuelNumbersOk;
             const payloadOk =
               Boolean(liveVerification?.payload.ok) && payloadNumbersOk;
             const ready =
@@ -865,6 +878,18 @@ export function DispatchActivePanel(props: {
             );
           })()
         : null}
+
+      {showPreflight ? (
+        <DispatchRouteCard
+          originIcao={mission.originIcao}
+          destIcao={mission.destIcao}
+          waypoints={mission.lastOfpCheck?.briefing?.waypoints}
+          busy={busy}
+          canRefreshNavlog={Boolean(simbriefUser.trim())}
+          onOpenAirport={props.onOpenAirport}
+          onRefreshNavlog={() => props.onRefreshOfpBriefing(mission)}
+        />
+      ) : null}
 
       {primaryCta ? (
         <div className="dispatch-primary-actions">{primaryCta}</div>

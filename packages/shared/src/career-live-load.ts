@@ -128,14 +128,19 @@ export function isUsableFuelTankBreakdown(
   return true;
 }
 
-/** Prefer a usable next tank map; otherwise keep previous. */
+/**
+ * Prefer a usable next tank map; otherwise keep previous *if still usable*.
+ * Never keep an all-zero glitch when FUEL TOTAL is still high — that froze the
+ * Preflight L/R schematic at 0 while Sim total stayed correct.
+ */
 export function pickFuelTankBreakdown(
   next: FuelTankBreakdown | undefined,
   prev: FuelTankBreakdown | undefined,
   totalFuelLb?: number | null,
 ): FuelTankBreakdown | undefined {
   if (next && isUsableFuelTankBreakdown(next, totalFuelLb)) return next;
-  return prev;
+  if (prev && isUsableFuelTankBreakdown(prev, totalFuelLb)) return prev;
+  return undefined;
 }
 
 /**

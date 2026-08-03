@@ -4070,3 +4070,169 @@ textarea {
 .hub-network-map-legend .dot.spoke {
   background: #a89060;
 }
+
+/* Dispatch route map (below Preflight) — compact; Network styles untouched */
+.dispatch-route-map-card {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.85rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--surface);
+}
+
+.dispatch-route-map-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.85rem;
+}
+
+.dispatch-route-map-head strong {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+}
+
+.dispatch-route-map-head small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.dispatch-route-map-empty {
+  margin: 0;
+  padding: 1.25rem 0.5rem;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.dispatch-route-map-hint {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: start;
+}
+
+.dispatch-route-map-hint p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.dispatch-route-map-error {
+  margin: 0;
+  color: color-mix(in srgb, var(--danger, #e35d6a) 85%, var(--text));
+  font-size: 0.78rem;
+}
+
+.dispatch-route-map {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b0b0c;
+}
+
+.dispatch-route-map-canvas {
+  width: 100%;
+  height: 15.5rem;
+  background: #0b0b0c;
+}
+
+.dispatch-route-map .maplibregl-map {
+  font: inherit;
+}
+
+.dispatch-route-map .maplibregl-ctrl-attrib {
+  background: rgba(12, 12, 14, 0.75) !important;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.65rem;
+}
+
+.dispatch-route-map .maplibregl-ctrl-attrib a {
+  color: rgba(110, 168, 254, 0.8);
+}
+
+.dispatch-route-map .maplibregl-ctrl-group {
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+.dispatch-route-map .maplibregl-ctrl-group button {
+  background-color: #16161a;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dispatch-route-marker {
+  display: grid;
+  justify-items: center;
+  gap: 0.12rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #f2f5fa;
+  font: inherit;
+  line-height: 1.1;
+}
+
+.dispatch-route-marker-icao {
+  padding: 0.18rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.dispatch-route-marker-dep .dispatch-route-marker-icao {
+  background: color-mix(in srgb, var(--ok, #3dcf8e) 78%, #0b0b0c);
+}
+
+.dispatch-route-marker-arr .dispatch-route-marker-icao {
+  background: color-mix(in srgb, var(--accent, #6ea8fe) 82%, #0b0b0c);
+}
+
+.dispatch-route-marker-kind {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.dispatch-route-wpt {
+  margin: 0;
+  padding: 0.12rem 0.32rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.2rem;
+  background: rgba(22, 22, 26, 0.92);
+  color: #d7e4ff;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: default;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.dispatch-route-popup .maplibregl-popup-content {
+  padding: 0.45rem 0.55rem;
+  background: #16161a;
+  color: #f2f5fa;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.3rem;
+  font-size: 0.78rem;
+  box-shadow: none;
+}
+
+.dispatch-route-popup .maplibregl-popup-tip {
+  border-top-color: #16161a;
+}

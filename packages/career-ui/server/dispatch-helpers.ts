@@ -27,6 +27,7 @@ import {
 import {
   fetchSimBriefLatestOfp,
   mapSimBriefOfpToBriefing,
+  diagnoseSimBriefNavlog,
 } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 
 export type ClassCargoLimit = {
@@ -188,6 +189,7 @@ export async function confirmMissionOfp(
     blockFuelKg?: number;
     ofpId?: string;
     briefing: ReturnType<typeof mapSimBriefOfpToBriefing>;
+    navlogDiag?: ReturnType<typeof diagnoseSimBriefNavlog>;
   };
 }> {
   if (!mission.staticId) {
@@ -207,6 +209,7 @@ export async function confirmMissionOfp(
     staticId: mission.staticId,
   });
   const check = compareMissionIntentToOfp(mission, expectation);
+  const briefing = mapSimBriefOfpToBriefing(raw);
   return {
     check,
     summary: formatIntentOfpCheck(check),
@@ -224,7 +227,8 @@ export async function confirmMissionOfp(
             ? expectation.loadSheet.blockFuel / KG_TO_LB
             : expectation.loadSheet.blockFuel,
       ofpId: expectation.ofpId,
-      briefing: mapSimBriefOfpToBriefing(raw),
+      briefing,
+      navlogDiag: diagnoseSimBriefNavlog(raw),
     },
   };
 }

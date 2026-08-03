@@ -59,6 +59,8 @@ export function buildDispatchRedirectUrl(params: SimBriefDispatchParams): string
   qs.set('orig', params.orig.trim().toUpperCase());
   qs.set('dest', params.dest.trim().toUpperCase());
   qs.set('units', params.units === 'LBS' ? 'LBS' : 'KGS');
+  // Required for aircraft uplink and for our route map (lat/lon per fix).
+  qs.set('navlog', '1');
 
   if (params.staticId) {
     qs.set('static_id', params.staticId);

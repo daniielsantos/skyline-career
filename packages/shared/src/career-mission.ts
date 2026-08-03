@@ -275,6 +275,14 @@ export function softenCareerPreflightVerdict(
 export function softenCgFindingSeverity(code: string, severity: string): string {
   const isCg = code.startsWith('CG_') || code.includes('CG');
   if (isCg && severity === 'fail') return 'warn';
+  // Career Loaded vs Due gates on block-fuel total; per-tank splits are advisory
+  // (classic L/R often glitch to 0 while FUEL TOTAL still matches).
+  if (
+    severity === 'fail' &&
+    (code === 'FUEL_LEFT' || code === 'FUEL_RIGHT' || code === 'FUEL_CENTER')
+  ) {
+    return 'warn';
+  }
   return severity;
 }
 

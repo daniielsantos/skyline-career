@@ -128,6 +128,17 @@ export async function serverSourceStamp(dir: string = here): Promise<number> {
     const info = await stat(join(dir, file));
     newest = Math.max(newest, Math.floor(info.mtimeMs));
   }
+  // Agent SimBrief fetch/dispatch is imported by server — must restart when it changes.
+  const agentOfp = join(repoRoot, 'packages', 'agent', 'src', 'ofp-compliance');
+  try {
+    for (const file of await readdir(agentOfp)) {
+      if (!file.endsWith('.ts')) continue;
+      const info = await stat(join(agentOfp, file));
+      newest = Math.max(newest, Math.floor(info.mtimeMs));
+    }
+  } catch {
+    /* agent path missing */
+  }
   // The API serves shared logic from its build output, so a rebuilt shared
   // package must also invalidate a running server.
   const sharedDist = join(repoRoot, 'packages', 'shared', 'dist');

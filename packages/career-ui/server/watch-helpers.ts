@@ -893,6 +893,8 @@ export class CareerWatchSession {
                   liveFuelLb,
                 );
                 const mergedStations = load.stations ?? prevLv.payload.stations;
+                const { tanks: _prevTanks, ...prevFuelRest } =
+                  prev.loadVerification.fuel;
                 openMission.lastPreflightCheck = {
                   ...prev,
                   checkedAtIso: new Date().toISOString(),
@@ -905,7 +907,7 @@ export class CareerWatchSession {
                     ...prev.loadVerification,
                     ready: nextWeights.ready,
                     fuel: {
-                      ...prev.loadVerification.fuel,
+                      ...prevFuelRest,
                       ...nextWeights.fuel,
                       ...(mergedTanks ? { tanks: mergedTanks } : {}),
                     },

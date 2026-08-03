@@ -136,6 +136,76 @@ describe('mapSimBriefOfpToBriefing', () => {
     assert.equal(briefing.blockTime, '01:25');
     assert.equal(briefing.route, 'KORD DCT ABC KFAR');
   });
+
+  it('maps navlog fixes with coordinates onto briefing.waypoints', () => {
+    const briefing = mapSimBriefOfpToBriefing({
+      origin: { icao_code: 'KDTW', plan_rwy: '04R' },
+      destination: { icao_code: 'KORD', plan_rwy: '09L' },
+      general: { route: 'METRO4 DUNKS DCT PMM DCT' },
+      navlog: {
+        fix: [
+          {
+            ident: 'KDTW',
+            type: 'apt',
+            pos_lat: '42.2162',
+            pos_long: '-83.3554',
+          },
+          {
+            ident: 'DUNKS',
+            type: 'wpt',
+            pos_lat: '41.712',
+            pos_long: '-85.421',
+          },
+          {
+            ident: 'PMM',
+            type: 'vor',
+            pos_lat: '42.212',
+            pos_long: '-85.553',
+          },
+          {
+            ident: 'KORD',
+            type: 'apt',
+            pos_lat: '41.9742',
+            pos_long: '-87.9073',
+          },
+        ],
+      },
+    });
+    assert.equal(briefing.route, 'KDTW/04R METRO4 DUNKS DCT PMM DCT KORD/09L');
+    assert.deepEqual(briefing.waypoints, [
+      { ident: 'KDTW', lat: 42.2162, lon: -83.3554, type: 'apt' },
+      { ident: 'DUNKS', lat: 41.712, lon: -85.421, type: 'wpt' },
+      { ident: 'PMM', lat: 42.212, lon: -85.553, type: 'vor' },
+      { ident: 'KORD', lat: 41.9742, lon: -87.9073, type: 'apt' },
+    ]);
+  });
+
+  it('maps navlog when fix list is an object map (XML→JSON style)', () => {
+    const briefing = mapSimBriefOfpToBriefing({
+      origin: { icao_code: 'KDTW' },
+      destination: { icao_code: 'KORD' },
+      navlog: {
+        fix: {
+          '0': {
+            ident: 'DUNKS',
+            type: 'wpt',
+            pos_lat: '41.712',
+            pos_long: '-85.421',
+          },
+          '1': {
+            ident: 'PMM',
+            type: 'vor',
+            pos_lat: '42.212',
+            pos_long: '-85.553',
+          },
+        },
+      } as never,
+    });
+    assert.deepEqual(briefing.waypoints, [
+      { ident: 'DUNKS', lat: 41.712, lon: -85.421, type: 'wpt' },
+      { ident: 'PMM', lat: 42.212, lon: -85.553, type: 'vor' },
+    ]);
+  });
 });
 
 describe('fetchSimBriefLatestOfp static_id', () => {

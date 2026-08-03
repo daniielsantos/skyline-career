@@ -2,7 +2,7 @@
 
 **In-sim title (example):** `Kodiak 100 Cargo`  
 **Match title:** `Kodiak 100 Cargo`  
-**ICAO (SimBrief type):** `KODI`  
+**ICAO (SimBrief type):** `KODI` (OFP/ATC may print `K100`; both accepted)  
 **Publisher:** `sws`  
 **Stations:** 11  
 **Profile:** `sws/kodiak-100-cargo@1.0.0`

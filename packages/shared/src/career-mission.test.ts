@@ -798,6 +798,29 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(check.findings.some((f) => f.code === 'INTENT_OFP_OK'));
   });
 
+  it('accepts K100 OFP ICAO for Kodiak catalog type KODI', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'sws-kodiak-100-cargo',
+        cargoKg: 500,
+        rolesPackRelPath: 'profiles/ofp/sws-kodiak-100-cargo.json',
+      }),
+      matchingOfp({
+        icao: 'K100',
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 600,
+          passengerCount: 0,
+          baggage: 500,
+          payload: 500,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
   it('fails on origin/dest edits', () => {
     const check = compareMissionIntentToOfp(
       baseMission(),

@@ -1505,6 +1505,12 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
   MD1F: ['MD1F', 'MD11'],
   MD11: ['MD11', 'MD1F'],
   /**
+   * Kodiak 100: SimBrief UI/API type is KODI; OFP/ATC field prints official ICAO K100.
+   * @see https://forum.navigraph.com/t/incorrect-icao-type-designator-for-kodiak-100/19414
+   */
+  KODI: ['KODI', 'K100'],
+  K100: ['K100', 'KODI'],
+  /**
    * Light GA: SimBrief proxies overlap (Commander→C182, C152→C172, Bonanza→BE36).
    * Class-level fallback accepts any of these; prefer mission.airframeTypeId when set.
    */

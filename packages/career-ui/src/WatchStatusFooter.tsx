@@ -59,15 +59,9 @@ export function WatchStatusFooter(props: Props) {
           : bridgeConnected
             ? 'Sampling live aircraft…'
             : 'SimBridge not connected yet';
+  // Server already sticky-holds pipeConnected across single blips; trust it.
   const watchPipeLive =
-    watchRunning &&
-    props.watch?.pipeConnected !== false &&
-    !(
-      typeof props.watch?.lastError === 'string' &&
-      /not connected|pipe closed|0xC00000B0|Reconnecting|retry in/i.test(
-        props.watch.lastError,
-      )
-    );
+    watchRunning && props.watch?.pipeConnected !== false;
   const statusLabel =
     props.loadOfpAutoStatus === 'loading'
       ? 'INJECTING…'

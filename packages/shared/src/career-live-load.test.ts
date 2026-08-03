@@ -5,8 +5,13 @@ import {
   isUsableFuelTankBreakdown,
   loadVerificationDrifted,
   pickFuelTankBreakdown,
+  pickStableLiveFuelLb,
   resolveLivePayloadLb,
 } from './career-live-load.js';
+import {
+  DEFAULT_JET_A_LB_PER_GAL,
+  sanitizeFuelDensityLbPerGal,
+} from './ofp-compliance.js';
 
 describe('resolveLivePayloadLb', () => {
   it('uses mass-balance when stations under-read vs heavy aircraft', () => {
@@ -112,6 +117,50 @@ describe('isUsableFuelTankBreakdown', () => {
       ),
       { left: 0, right: 0, center: 0 },
     );
+  });
+});
+
+describe('pickStableLiveFuelLb', () => {
+  it('keeps previous when next matches Jet-A→avgas density flicker', () => {
+    const planned = 678;
+    const prev = 674;
+    const next = 605; // 674 * (6.0/6.7) ≈ 604
+    assert.equal(
+      pickStableLiveFuelLb({ next, prev, plannedLb: planned }),
+      prev,
+    );
+  });
+
+  it('accepts a real fuel drop larger than the density ratio', () => {
+    assert.equal(
+      pickStableLiveFuelLb({
+        next: 400,
+        prev: 674,
+        plannedLb: 678,
+      }),
+      400,
+    );
+  });
+
+  it('accepts next when it matches planned', () => {
+    assert.equal(
+      pickStableLiveFuelLb({
+        next: 670,
+        prev: 605,
+        plannedLb: 678,
+      }),
+      670,
+    );
+  });
+});
+
+describe('sanitizeFuelDensityLbPerGal', () => {
+  it('rejects avgas density on large-capacity tanks', () => {
+    assert.equal(
+      sanitizeFuelDensityLbPerGal(6.0, { totalCapacityGal: 315 }),
+      DEFAULT_JET_A_LB_PER_GAL,
+    );
+    assert.equal(sanitizeFuelDensityLbPerGal(6.0, { totalCapacityGal: 80 }), 6.0);
   });
 });
 

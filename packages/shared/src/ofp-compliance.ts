@@ -33,6 +33,33 @@ export const DEFAULT_JET_A_LB_PER_GAL = 6.7;
 /** Avgas 100LL nominal density (lb/US gal) — light piston / GA. */
 export const DEFAULT_AVGAS_LB_PER_GAL = 6.0;
 
+/**
+ * Sanitize MSFS `FUEL WEIGHT PER GALLON` for gallon→lb conversion.
+ * Large tanks (turboprop/jet) sometimes flicker to avgas ~6.0, which drops
+ * Preflight live fuel ~11% and flaps Ready↔Fail (e.g. Kodiak 674↔605 lb).
+ */
+export function sanitizeFuelDensityLbPerGal(
+  liveLbPerGal: number | undefined,
+  opts?: { totalCapacityGal?: number },
+): number {
+  const cap = opts?.totalCapacityGal;
+  const largeCapacity =
+    typeof cap === 'number' && Number.isFinite(cap) && cap > 140;
+
+  if (
+    typeof liveLbPerGal === 'number' &&
+    Number.isFinite(liveLbPerGal) &&
+    liveLbPerGal > 4 &&
+    liveLbPerGal < 9
+  ) {
+    if (largeCapacity && liveLbPerGal < 6.35) {
+      return DEFAULT_JET_A_LB_PER_GAL;
+    }
+    return liveLbPerGal;
+  }
+  return DEFAULT_JET_A_LB_PER_GAL;
+}
+
 /** Full probe cascade when pack does not declare liveSources (new aircraft). */
 export const DISCOVERY_LIVE_SOURCES: Required<OfpLiveSources> = {
   fuel: ['pmdg-ng3', 'classic', 'mass-balance', 'tfdi-efb'],

@@ -5,6 +5,7 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
   deriveCompliancePhase,
   resolveAveragePassengerWeight,
+  sanitizeFuelDensityLbPerGal,
   type ComplianceBaseline,
   type ComplianceSnapshot,
   type LiveFuelState,
@@ -36,24 +37,31 @@ export async function resolveLiveFuelDensityLbPerGal(
   } catch {
     dens = undefined;
   }
-  let gallons = 0;
+  let quantityGal = 0;
+  let capacityGal: number | undefined;
   try {
-    const [left, right, center] = await Promise.all([
+    const [left, right, center, cap] = await Promise.all([
       bridge.readSimVar({ name: 'FUEL TANK LEFT MAIN QUANTITY', unit: 'gallons' }),
       bridge.readSimVar({ name: 'FUEL TANK RIGHT MAIN QUANTITY', unit: 'gallons' }),
       bridge.readSimVar({ name: 'FUEL TANK CENTER QUANTITY', unit: 'gallons' }),
+      bridge
+        .readSimVar({ name: 'FUEL TOTAL CAPACITY', unit: 'gallons' })
+        .catch(() => Number.NaN),
     ]);
-    gallons =
+    quantityGal =
       (Number.isFinite(left) ? left : 0) +
       (Number.isFinite(right) ? right : 0) +
       (Number.isFinite(center) ? center : 0);
+    if (Number.isFinite(cap) && cap > 0) capacityGal = cap;
   } catch {
-    gallons = 0;
+    quantityGal = 0;
   }
-  const lightPiston = gallons > 0 && gallons <= 120;
+  // Use tank capacity (not quantity aboard) so a half-full Kodiak is not treated as GA.
+  const sizeGal = capacityGal ?? quantityGal;
+  const lightPiston = sizeGal > 0 && sizeGal <= 120;
   if (dens !== undefined && Number.isFinite(dens) && dens > 4 && dens < 9) {
     if (lightPiston && dens >= 6.45) return DEFAULT_AVGAS_LB_PER_GAL;
-    return dens;
+    return sanitizeFuelDensityLbPerGal(dens, { totalCapacityGal: sizeGal });
   }
   return lightPiston ? DEFAULT_AVGAS_LB_PER_GAL : DEFAULT_JET_A_LB_PER_GAL;
 }

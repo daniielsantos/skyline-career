@@ -1,4 +1,8 @@
 import { careerLoadWeightMatchOk, careerPreflightReady } from './career-mission.js';
+import {
+  DEFAULT_AVGAS_LB_PER_GAL,
+  DEFAULT_JET_A_LB_PER_GAL,
+} from './ofp-compliance.js';
 
 /** Default Loaded vs Due tolerances (lb). */
 export const DEFAULT_FUEL_TOL_LB = 50;
@@ -141,6 +145,46 @@ export function pickFuelTankBreakdown(
   if (next && isUsableFuelTankBreakdown(next, totalFuelLb)) return next;
   if (prev && isUsableFuelTankBreakdown(prev, totalFuelLb)) return prev;
   return undefined;
+}
+
+/**
+ * Reject single-sample fuel dips that match the Jet-A→avgas density flicker
+ * (~6.7→6.0 ≈ 10.4%) so Preflight Ready does not flap while fuel is unchanged.
+ */
+export function pickStableLiveFuelLb(opts: {
+  next: number | undefined | null;
+  prev: number | undefined | null;
+  plannedLb?: number;
+  tolLb?: number;
+}): number | undefined {
+  const next =
+    typeof opts.next === 'number' && Number.isFinite(opts.next)
+      ? opts.next
+      : undefined;
+  const prev =
+    typeof opts.prev === 'number' && Number.isFinite(opts.prev)
+      ? opts.prev
+      : undefined;
+  if (next === undefined) return prev;
+  if (prev === undefined) return next;
+
+  const planned =
+    typeof opts.plannedLb === 'number' && Number.isFinite(opts.plannedLb)
+      ? opts.plannedLb
+      : undefined;
+  const tol = opts.tolLb ?? DEFAULT_FUEL_TOL_LB;
+  if (planned === undefined || planned < 100) return next;
+
+  const prevOk = Math.abs(prev - planned) <= tol;
+  const nextOk = Math.abs(next - planned) <= tol;
+  if (!prevOk || nextOk || next >= prev) return next;
+
+  // Density flicker: live weight scales by avgas/Jet-A when gallons are unchanged.
+  const densityRatio = DEFAULT_AVGAS_LB_PER_GAL / DEFAULT_JET_A_LB_PER_GAL;
+  if (Math.abs(next - prev * densityRatio) <= Math.max(15, tol * 0.4)) {
+    return prev;
+  }
+  return next;
 }
 
 /**

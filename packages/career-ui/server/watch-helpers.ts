@@ -19,12 +19,14 @@ import {
   isUsableFuelTankBreakdown,
   loadVerificationDrifted,
   mergeAirframePerfOverride,
+  DEFAULT_JET_A_LB_PER_GAL,
   pickFuelTankBreakdown,
+  pickStableLiveFuelLb,
   pushCruiseTick,
   pushFlightScoreSample,
   resolveLivePayloadLb,
+  sanitizeFuelDensityLbPerGal,
   KG_TO_LB,
-  DEFAULT_JET_A_LB_PER_GAL,
   resolveAirportCoords,
   resolveExpectedRouteMs,
   routeDistanceNm,
@@ -170,6 +172,10 @@ type WatchOptions = {
 
 export async function sampleLiveFlight(
   bridge: NamedPipeSimBridge,
+  opts?: {
+    /** Keep last-known position when a lat/lon read soft-fails (avoids map blink). */
+    previousPosition?: { lat: number; lon: number } | null;
+  },
 ): Promise<
   FlightGroundSample & {
     bankDeg?: number;
@@ -189,11 +195,25 @@ export async function sampleLiveFlight(
   try {
     const lat = await bridge.readSimVar({ name: 'PLANE LATITUDE', unit: 'degrees' });
     const lon = await bridge.readSimVar({ name: 'PLANE LONGITUDE', unit: 'degrees' });
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      !(lat === 0 && lon === 0)
+    ) {
       position = { lat, lon };
     }
   } catch {
     position = undefined;
+  }
+  if (!position && opts?.previousPosition) {
+    const prev = opts.previousPosition;
+    if (
+      Number.isFinite(prev.lat) &&
+      Number.isFinite(prev.lon) &&
+      !(prev.lat === 0 && prev.lon === 0)
+    ) {
+      position = { lat: prev.lat, lon: prev.lon };
+    }
   }
   try {
     const gs = await bridge.readSimVar({
@@ -295,14 +315,27 @@ export async function sampleLiveLoadLb(
   stations?: Record<number, number>;
 }> {
   let density = DEFAULT_JET_A_LB_PER_GAL;
+  let totalCapacityGal: number | undefined;
   try {
     const dens = await bridge.readSimVar({
       name: 'FUEL WEIGHT PER GALLON',
       unit: 'pounds',
     });
-    if (Number.isFinite(dens) && dens > 0.1) density = dens;
+    try {
+      const cap = await bridge.readSimVar({
+        name: 'FUEL TOTAL CAPACITY',
+        unit: 'gallons',
+      });
+      if (Number.isFinite(cap) && cap > 0) totalCapacityGal = cap;
+    } catch {
+      /* capacity optional — density sanitize still applies defaults */
+    }
+    density = sanitizeFuelDensityLbPerGal(
+      Number.isFinite(dens) && dens > 0.1 ? dens : undefined,
+      { totalCapacityGal },
+    );
   } catch {
-    /* keep Jet-A default */
+    density = sanitizeFuelDensityLbPerGal(undefined, { totalCapacityGal });
   }
 
   const readGal = async (name: string): Promise<number> => {
@@ -560,6 +593,11 @@ export class CareerWatchSession {
   private lastError: string | null = null;
   private settlement: WatchStatusPayload['settlement'] = null;
   private walletUsd: number | null = null;
+  /** Wall clock of last fully successful Watch tick (pipe + sample). */
+  private lastSuccessfulTickAtMs = 0;
+  /** Last time we ran the heavy Loaded vs Due SimVar pass. */
+  private lastLoadSampleAtMs = 0;
+  private consecutivePipeErrors = 0;
   private opts: Required<
     Pick<
       WatchOptions,
@@ -658,14 +696,26 @@ export class CareerWatchSession {
       lastEvent: this.lastEvent,
       lastEventAtIso: this.lastEventAtIso,
       lastError: this.lastError,
-      pipeConnected:
-        Boolean(this.bridge?.isPipeConnected) &&
-        !(
+      // Hold "connected" briefly across single pipe blips so the footer/map don't
+      // flap MSFS CONNECTED ↔ RECONNECTING while SimBridge recovers.
+      pipeConnected: (() => {
+        const hardDown =
+          !this.bridge?.isPipeConnected &&
+          Date.now() - this.lastSuccessfulTickAtMs > 12_000;
+        const reconnecting =
           typeof this.lastError === 'string' &&
-          /not connected|pipe closed|0xC00000B0|Reconnecting/i.test(
+          /not connected|pipe closed|0xC00000B0|Reconnecting|retry in/i.test(
             this.lastError,
-          )
-        ),
+          ) &&
+          this.consecutivePipeErrors >= 2;
+        if (hardDown || reconnecting) return false;
+        if (this.bridge?.isPipeConnected) return true;
+        return (
+          this.running &&
+          this.lastSuccessfulTickAtMs > 0 &&
+          Date.now() - this.lastSuccessfulTickAtMs < 12_000
+        );
+      })(),
       settlement: this.settlement,
       walletUsd: this.walletUsd,
       autoDepart: this.opts.autoDepart,
@@ -713,6 +763,9 @@ export class CareerWatchSession {
     this.lastError = null;
     this.pipeRetryAtMs = 0;
     this.pipeBackoffMs = 2_000;
+    this.lastSuccessfulTickAtMs = 0;
+    this.lastLoadSampleAtMs = 0;
+    this.consecutivePipeErrors = 0;
     this.settlement = null;
     this.preflightDepartBlockedLogged = false;
     this.cruiseState = createCruiseSampleState();
@@ -834,11 +887,15 @@ export class CareerWatchSession {
         missionId: this.missionId,
         pipeConnected: this.bridge.isPipeConnected,
       });
-      const sample = await sampleLiveFlight(this.bridge);
+      const sample = await sampleLiveFlight(this.bridge, {
+        previousPosition: this.lastSample?.position ?? null,
+      });
       this.lastSample = sample;
       this.lastError = null;
       this.pipeBackoffMs = 2_000;
       this.pipeRetryAtMs = 0;
+      this.consecutivePipeErrors = 0;
+      this.lastSuccessfulTickAtMs = Date.now();
 
       const snap = await this.cb.withCareerRead((world, missions) => {
         const idx = missions.missions.findIndex((m) => m.id === this.missionId);
@@ -867,11 +924,18 @@ export class CareerWatchSession {
       }
 
       // Loaded vs Due: Watch owns the pipe — sample + persist (single source of truth).
+      // Heavy tank/station reads every tick were thrashing SimBridge (status + map blink).
+      // When already READY, refresh load at most every 10s; always sample when not ready.
       const prevVerification = current.lastPreflightCheck?.loadVerification;
+      const loadDue =
+        !prevVerification?.ready ||
+        this.lastLoadSampleAtMs === 0 ||
+        Date.now() - this.lastLoadSampleAtMs >= 10_000;
       if (
         prevVerification &&
         current.status === 'dispatched' &&
-        sample.onGround
+        sample.onGround &&
+        loadDue
       ) {
         try {
           const prevWatchFuel = prevVerification.fuel as WatchLoadVerification['fuel'];
@@ -888,12 +952,21 @@ export class CareerWatchSession {
             prevVerification.payload.plannedLb,
             previousStationSumLb,
           );
+          this.lastLoadSampleAtMs = Date.now();
           // Only keep prior totals when this sample failed to read them (null).
           // Zero is a real reading (user emptied fuel/payload) and must update READY.
-          const liveFuelLb =
-            load.fuelLb !== null
-              ? load.fuelLb
-              : (prevVerification.fuel.liveLb ?? undefined);
+          // Density flicker (Jet-A↔avgas) is rejected via pickStableLiveFuelLb.
+          const rawFuelLb =
+            load.fuelLb !== null ? load.fuelLb : undefined;
+          const liveFuelLb = pickStableLiveFuelLb({
+            next: rawFuelLb,
+            prev: prevVerification.fuel.liveLb,
+            plannedLb: prevVerification.fuel.plannedLb,
+          });
+          const fuelSampleRejected =
+            typeof rawFuelLb === 'number' &&
+            typeof liveFuelLb === 'number' &&
+            Math.abs(rawFuelLb - liveFuelLb) > 1;
           const livePayloadLb =
             load.payloadLb !== null
               ? load.payloadLb
@@ -909,7 +982,7 @@ export class CareerWatchSession {
             livePayloadLb,
           });
           const tanks = pickFuelTankBreakdown(
-            load.fuelTanks,
+            fuelSampleRejected ? undefined : load.fuelTanks,
             prevWatchFuel.tanks,
             liveFuelLb,
           );
@@ -1328,9 +1401,11 @@ export class CareerWatchSession {
       }
     } catch (error) {
       this.lastError = error instanceof Error ? error.message : String(error);
+      this.consecutivePipeErrors += 1;
       watchDebugLog('watch', 'tick error', {
         error: this.lastError,
         pipeConnected: this.bridge?.isPipeConnected ?? false,
+        consecutivePipeErrors: this.consecutivePipeErrors,
         ms: Date.now() - tickStarted,
       });
       // Close + schedule reopen on next tick. Immediate open here raced probes

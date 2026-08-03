@@ -59,6 +59,49 @@ export function pickFuelTankBreakdown(
   return undefined;
 }
 
+/** Jet-A / avgas nominal densities (lb/US gal) — mirror shared ofp-compliance. */
+const CLIENT_JET_A_LB_PER_GAL = 6.7;
+const CLIENT_AVGAS_LB_PER_GAL = 6.0;
+
+/**
+ * Reject single-sample fuel dips that match Jet-A→avgas density flicker.
+ * Browser-safe mirror of shared pickStableLiveFuelLb.
+ */
+export function pickStableLiveFuelLb(opts: {
+  next: number | undefined | null;
+  prev: number | undefined | null;
+  plannedLb?: number;
+  tolLb?: number;
+}): number | undefined {
+  const next =
+    typeof opts.next === 'number' && Number.isFinite(opts.next)
+      ? opts.next
+      : undefined;
+  const prev =
+    typeof opts.prev === 'number' && Number.isFinite(opts.prev)
+      ? opts.prev
+      : undefined;
+  if (next === undefined) return prev;
+  if (prev === undefined) return next;
+
+  const planned =
+    typeof opts.plannedLb === 'number' && Number.isFinite(opts.plannedLb)
+      ? opts.plannedLb
+      : undefined;
+  const tol = opts.tolLb ?? DEFAULT_FUEL_TOL_LB;
+  if (planned === undefined || planned < 100) return next;
+
+  const prevOk = Math.abs(prev - planned) <= tol;
+  const nextOk = Math.abs(next - planned) <= tol;
+  if (!prevOk || nextOk || next >= prev) return next;
+
+  const densityRatio = CLIENT_AVGAS_LB_PER_GAL / CLIENT_JET_A_LB_PER_GAL;
+  if (Math.abs(next - prev * densityRatio) <= Math.max(15, tol * 0.4)) {
+    return prev;
+  }
+  return next;
+}
+
 /** Prefer defined live payload; never let a missing sample wipe a good total. */
 export function pickLivePayloadLb(
   next: number | undefined,

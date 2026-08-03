@@ -1,4 +1,5 @@
 import type { Mission, MissionFuelQuote, SimBridgeStatus, WatchStatus } from './api';
+import { useRef } from 'react';
 import {
   DISPATCH_STEP_LABEL,
   DISPATCH_STEP_ORDER,
@@ -121,6 +122,24 @@ export function DispatchActivePanel(props: {
   const watchRunning = Boolean(
     props.watch?.running && props.watch.missionId === mission.id,
   );
+  const lastAircraftRef = useRef<{ lat: number; lon: number } | null>(null);
+  const watchPos = props.watch?.position;
+  if (
+    watchRunning &&
+    watchPos &&
+    Number.isFinite(watchPos.lat) &&
+    Number.isFinite(watchPos.lon) &&
+    !(watchPos.lat === 0 && watchPos.lon === 0)
+  ) {
+    lastAircraftRef.current = watchPos;
+  }
+  if (!watchRunning) {
+    lastAircraftRef.current = null;
+  }
+  const stickyAircraft =
+    watchRunning && (watchPos ?? lastAircraftRef.current)
+      ? (watchPos ?? lastAircraftRef.current)
+      : null;
   const showOfpCard = Boolean(mission.lastOfpCheck);
   const showFuelCard =
     step === 'fuel' ||
@@ -874,11 +893,7 @@ export function DispatchActivePanel(props: {
           originIcao={mission.originIcao}
           destIcao={mission.destIcao}
           waypoints={mission.lastOfpCheck?.briefing?.waypoints}
-          aircraft={
-            watchRunning && props.watch?.position
-              ? props.watch.position
-              : null
-          }
+          aircraft={stickyAircraft}
           busy={busy}
           canRefreshNavlog={Boolean(simbriefUser.trim())}
           onOpenAirport={props.onOpenAirport}

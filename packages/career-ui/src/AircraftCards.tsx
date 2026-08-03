@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { estimateSellBackUsd } from './aircraft-pricing';
+import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 import type { AircraftClass, AircraftListing, PlayerAircraft } from './api';
 
 export type AircraftCatalogEntry = {
@@ -316,7 +318,7 @@ export function HangarAircraftCard(props: {
   aircraft: PlayerAircraft;
   catalog?: AircraftCatalogEntry;
   busy: boolean;
-  hubOptions: string[];
+  hubOptions: FerryHubOption[];
   ferryDest: string;
   ownedCount: number;
   hasListed: boolean;
@@ -353,7 +355,9 @@ export function HangarAircraftCard(props: {
     !props.hasListed;
   const canSell =
     (acf.ownership ?? 'owned') === 'owned' &&
-    (acf.status === 'parked' || acf.status === 'maintenance');
+    (acf.status === 'parked' || acf.status === 'maintenance') &&
+    props.ownedCount >= 2;
+  const sellBackUsd = canSell ? estimateSellBackUsd(acf) : null;
   const canRepair =
     (acf.status === 'parked' || acf.status === 'maintenance') &&
     (afPct < 100 || engPct < 100);
@@ -412,27 +416,53 @@ export function HangarAircraftCard(props: {
               { label: 'Engine', pct: engPct },
             ]}
           />
-          <div className="aircraft-card-meta" style={{ marginTop: '0.35rem' }}>
-            <span>
-              {props.formatMass(acf.fuelKg)} / {props.formatMass(acf.fuelCapacityKg)} fuel
-            </span>
-            {catalog ? (
-              <span>{catalog.maxRangeNm.toLocaleString()} nm range</span>
-            ) : null}
-            {catalog?.cruiseSpeedKt != null ? (
-              <span>{catalog.cruiseSpeedKt} kt cruise</span>
-            ) : null}
-            {catalog?.cruiseFuelFlowKgPerHour != null ? (
-              <span>
-                {catalog.cruiseFuelFlowKgPerHour.toLocaleString(undefined, {
-                  maximumFractionDigits: 1,
-                })}{' '}
-                kg/h
-              </span>
-            ) : null}
-            <span>{Math.round(acf.hoursAirframe ?? 0)} AF hrs</span>
-            {inspLeft != null ? <span>inspection in {inspLeft}h</span> : null}
-          </div>
+          <ul className="aircraft-card-specs">
+            <li>
+              <span>Fuel</span>
+              <strong>
+                {props.formatMass(acf.fuelKg)} /{' '}
+                {props.formatMass(acf.fuelCapacityKg)}
+              </strong>
+            </li>
+            <li>
+              <span>Range</span>
+              <strong>
+                {catalog
+                  ? `${catalog.maxRangeNm.toLocaleString()} nm`
+                  : '—'}
+              </strong>
+            </li>
+            <li>
+              <span>Cruise</span>
+              <strong>
+                {catalog?.cruiseSpeedKt != null
+                  ? `${catalog.cruiseSpeedKt} kt`
+                  : '—'}
+              </strong>
+            </li>
+            <li>
+              <span>Burn</span>
+              <strong>
+                {catalog?.cruiseFuelFlowKgPerHour != null
+                  ? `${catalog.cruiseFuelFlowKgPerHour.toLocaleString(undefined, {
+                      maximumFractionDigits: 1,
+                    })} kg/h`
+                  : catalog?.fuelBurnKgPerNm != null
+                    ? `${catalog.fuelBurnKgPerNm} kg/nm`
+                    : '—'}
+              </strong>
+            </li>
+            <li>
+              <span>Hours</span>
+              <strong>{Math.round(acf.hoursAirframe ?? 0)} AF</strong>
+            </li>
+            <li>
+              <span>Inspect</span>
+              <strong>
+                {inspLeft != null ? `${inspLeft}h` : '—'}
+              </strong>
+            </li>
+          </ul>
         </div>
 
         {acf.lease || acf.leaseOut || acf.parkingUsdPerDay != null || ['assigned', 'leased_out', 'listed'].includes(acf.status) ? (
@@ -536,31 +566,25 @@ export function HangarAircraftCard(props: {
             type="button"
             className="action ghost"
             disabled={props.busy}
+            title={`Dealer buy-back ${props.formatMoney(sellBackUsd ?? 0)}`}
             onClick={() => props.onSell(acf.id)}
           >
-            Sell
+            Sell · {props.formatMoney(sellBackUsd ?? 0)}
           </button>
         ) : null}
       </div>
 
       {acf.status === 'parked' ? (
         <div className="hangar-ferry">
-          <label className="staging-aircraft">
+          <label className="staging-aircraft ferry-hub-label">
             Ferry to
-            <select
+            <FerryHubCombobox
+              hubs={props.hubOptions}
+              excludeIcao={acf.locationIcao}
               value={props.ferryDest}
-              onChange={(e) => props.onFerryDestChange(e.target.value)}
+              onChange={props.onFerryDestChange}
               disabled={props.busy}
-            >
-              <option value="">Select hub…</option>
-              {props.hubOptions
-                .filter((h) => h !== acf.locationIcao)
-                .map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-            </select>
+            />
           </label>
           <button
             type="button"

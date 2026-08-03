@@ -163,6 +163,23 @@ describe('aircraft market', () => {
     assert.ok(state.aircraftMarket?.some((l) => l.id === listing.id));
   });
 
+  it('rejects selling the last owned aircraft', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-last' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'Solo',
+    });
+    const only = state.fleet[0]!;
+    assert.equal(
+      state.fleet.filter((a) => (a.ownership ?? 'owned') === 'owned').length,
+      1,
+    );
+    assert.throws(
+      () => sellPlayerAircraft(state, only.id, world.tick),
+      /at least one owned aircraft/i,
+    );
+    assert.ok(state.fleet.some((a) => a.id === only.id));
+  });
+
   it('preserves player listings across a day refresh', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-preserve' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {

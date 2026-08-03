@@ -2180,6 +2180,92 @@ tr.lot-locked {
   padding: 0 1rem 1rem;
 }
 
+.ferry-hub-label {
+  position: relative;
+  flex: 1 1 12rem;
+  min-width: 11rem;
+  max-width: 18rem;
+}
+
+.ferry-hub-combobox {
+  position: relative;
+}
+
+.ferry-hub-combobox input {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 11rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: uppercase;
+}
+
+.ferry-hub-combobox input:focus {
+  outline: 1px solid color-mix(in srgb, var(--accent, #e08a3c) 70%, transparent);
+  outline-offset: 1px;
+}
+
+.ferry-hub-menu {
+  position: fixed;
+  z-index: 80;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 0.45rem 1.1rem rgba(0, 0, 0, 0.35);
+}
+
+.ferry-hub-suggestions {
+  margin: 0;
+  padding: 0.2rem 0;
+  list-style: none;
+}
+
+.ferry-hub-option {
+  display: grid;
+  gap: 0.05rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ferry-hub-option strong {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+
+.ferry-hub-option span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.ferry-hub-option:hover,
+.ferry-hub-option.is-active {
+  background: color-mix(in srgb, var(--accent, #e08a3c) 18%, transparent);
+}
+
+.ferry-hub-empty {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .hangar-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2400,11 +2486,15 @@ tr.lot-locked {
 .aircraft-card-specs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem;
+  gap: 0.35rem 0.55rem;
   margin: 0;
   padding: 0.45rem 0 0;
   border-top: 1px solid var(--line);
   list-style: none;
+}
+
+.hangar-card-body .aircraft-card-specs {
+  margin-top: 0.55rem;
 }
 
 .aircraft-card-specs li {

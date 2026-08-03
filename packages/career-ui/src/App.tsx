@@ -70,6 +70,7 @@ import {
   pickFuelTankBreakdown,
   pickLivePayloadLb,
 } from './load-verification';
+import { estimateSellBackUsd } from './aircraft-pricing';
 import { useConfirm } from './ConfirmDialog';
 import {
   AIRCRAFT_CLASS_FILTERS,
@@ -2926,9 +2927,19 @@ export function App() {
   async function onSellAircraft(aircraftId: string) {
     const acf = fleet.find((a) => a.id === aircraftId);
     if (!acf) return;
+    const ownedCount = fleet.filter(
+      (a) => (a.ownership ?? 'owned') === 'owned',
+    ).length;
+    if (ownedCount < 2) {
+      setError(
+        'Keep at least one owned aircraft — buy another before selling this one',
+      );
+      return;
+    }
+    const creditUsd = estimateSellBackUsd(acf);
     const ok = await confirm({
       title: `Sell ${acf.label}?`,
-      body: 'Dealer buy-back pays about 70% of fair value. The airframe is relisted on Airframes for others.',
+      body: `Dealer buy-back pays ${formatMoney(creditUsd)} (about 70% of fair value). The airframe is relisted on Airframes for others.`,
       confirmLabel: 'Sell airframe',
     });
     if (!ok) return;
@@ -6636,7 +6647,10 @@ export function App() {
                   aircraft={acf}
                   catalog={hangarCatalogEntry(acf)}
                   busy={busy}
-                  hubOptions={hubOptions.map((hub) => hub.icao)}
+                  hubOptions={hubOptions.map((hub) => ({
+                    icao: hub.icao,
+                    name: hub.name,
+                  }))}
                   ferryDest={ferryDest}
                   ownedCount={ownedFleetCount}
                   hasListed={hasListedAircraft}

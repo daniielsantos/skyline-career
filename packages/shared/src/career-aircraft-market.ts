@@ -851,6 +851,11 @@ export function sellPlayerAircraft(
   if (aircraft.ownership === 'leased') {
     throw new Error('Cannot sell a leased aircraft — return or buy out the lease');
   }
+  if (countOwned(state) <= 1) {
+    throw new Error(
+      'Keep at least one owned aircraft — buy another before selling this one',
+    );
+  }
   const creditUsd = sellBackValueUsd(aircraft);
   const askingUsd = Math.round(creditUsd * 1.05);
   ensureAircraftConditionPcts(aircraft);

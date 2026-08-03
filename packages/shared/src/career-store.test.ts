@@ -203,7 +203,7 @@ describe('career store', () => {
 
     const loaded = await store.loadEconomy();
     assert.equal(loaded.world.seed, 'v1-upgrade');
-    assert.ok(loaded.world.airports.length >= 28);
+    assert.ok(loaded.world.airports.length >= 60);
     // Empty lots table + blob lots → dirty so API/persist path would rewrite.
     assert.equal(loaded.dirty, true);
 

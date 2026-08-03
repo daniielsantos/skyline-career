@@ -17,11 +17,11 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Lot prune: `pruneDeadLots` drops `expired`/`delivered` after 48 ticks (~12h at 15-min batches; tick + migrate/load). Logbook untouched.
 - Player inbound soft-shadow: accept/depart publishes `inboundPending`; soft fill / lane sat = NPC + player.
 - Hub tiers (`major`/`regional`/`spoke`): curated offline from BR cargo roles; capacity/flow scale + lane lot caps; formLots ranks by absolute kg.
-- Brazil map: 28 hubs across BR-N / BR-NE / BR-CO / BR-SE / BR-S (Manaus major, Brasília redistributor).
-- Cargo corridors: curated OD weights bias `formLots` formation + mild pay; legacy saves gain missing hubs via `ensureCareerHubCoverage`.
+- Brazil map: 60 hubs across BR-N / BR-NE / BR-CO / BR-SE / BR-S (catalog `career-br-hubs.ts`; Manaus major, Brasília redistributor; densified from 28).
+- Cargo corridors: curated OD weights bias `formLots` formation + mild pay; BR+US auto feeders (≥2 partners/hub); legacy saves gain missing hubs via `ensureCareerHubCoverage`.
 - Idle-lot escalation: available lots raise pay from `basePayUsd` after 25% of life (cap +40%); flip urgent late; Market shows Idle +N% chip.
 - Demand shocks: regional events (harvest/outage/congestion/festival/strike) affect prod/cons + freight pay/urgency/life; Market banner + lot chips.
-- Fuel road logistics: background tanker fleet (20 trucks, ≤32 t) redistributes Jet-A hub→spoke; Terminal Fuel logistics block. US has 9 Jet-A production hubs (KMIA/KATL/KJFK/KORD/KIAH/KDFW/KDEN/KLAX/KSEA).
+- Fuel road logistics: background tanker fleet (28 trucks, ≤32 t) redistributes Jet-A hub→spoke; Terminal Fuel logistics block. US has 9 Jet-A production hubs (KMIA/KATL/KJFK/KORD/KIAH/KDFW/KDEN/KLAX/KSEA); BR densified to ~20 producers.
 - Hub level 1→5: sticky XP from traffic (lots/settles/fuel/trucks); real capacity/flow/lane/pay/NPC-bid impact; soft quiet penalty without demotion.
 - Aircraft market: Skyline-priced new/used/lease board with class caps/scarcity, abstract NPC demand (0–2/day), sell→relist, list spare for lease / leased_out income; free acquire removed (starter Caravan only).
 - Aircraft wear/MX: AF+eng condition %, wear per block hour, workshop inspection gate + optional repair (MSRP-calibrated); no annual/TBO yet.

@@ -30,6 +30,15 @@ export type CareerCorridorEdge = {
   weight: number;
 };
 
+/** Minimal hub shape for auto feeder corridor generation (BR or US). */
+export type CareerFeederHub = {
+  icao: string;
+  region: string;
+  hubTier: HubTier;
+  lat: number;
+  lon: number;
+};
+
 const drySpoke = {
   produce: { general: 1.1, supplies: 1.0, perishables: 0.9 } as Partial<
     Record<CommodityId, number>
@@ -1042,11 +1051,11 @@ function feederWeight(from: HubTier, to: HubTier): number {
 }
 
 /**
- * Auto feeder corridors so every US hub has ≥2 partners.
+ * Auto feeder corridors so every hub has ≥2 partners.
  * Dedupes against existing manual trunks (caller merges).
  */
-export function buildUsFeederCorridors(
-  hubs: readonly UsCareerHubDef[],
+export function buildCareerFeederCorridors(
+  hubs: readonly CareerFeederHub[],
   existing: readonly CareerCorridorEdge[] = [],
 ): CareerCorridorEdge[] {
   const majors = hubs.filter((h) => h.hubTier === 'major');
@@ -1087,7 +1096,7 @@ export function buildUsFeederCorridors(
         return a.nm - b.nm;
       });
 
-    const picks: UsCareerHubDef[] = [];
+    const picks: CareerFeederHub[] = [];
     for (const row of sameRegion) {
       if (picks.length >= need) break;
       // Prefer regional/major; allow spoke only if region is thin.
@@ -1135,6 +1144,17 @@ export function buildUsFeederCorridors(
   }
 
   return out;
+}
+
+/**
+ * Auto feeder corridors so every US hub has ≥2 partners.
+ * Dedupes against existing manual trunks (caller merges).
+ */
+export function buildUsFeederCorridors(
+  hubs: readonly UsCareerHubDef[],
+  existing: readonly CareerCorridorEdge[] = [],
+): CareerCorridorEdge[] {
+  return buildCareerFeederCorridors(hubs, existing);
 }
 
 /** Runtime assert helpers for tests / seed wiring. */

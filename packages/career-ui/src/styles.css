@@ -726,11 +726,18 @@ th {
   text-transform: none;
 }
 
+.filter-row .route-filter-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 10.5rem;
+}
+
 .filter-row .route-filter-pair {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
-  min-width: 10.5rem;
+  min-width: 0;
 }
 
 .filter-row .access-filter-cell {
@@ -1282,6 +1289,10 @@ tr.lot-locked {
   font-style: normal;
   font-size: 0.72rem;
   color: var(--muted);
+}
+
+.staging-capacity .staging-est-net-loss {
+  color: var(--danger, #c44);
 }
 
 .staging-empty {
@@ -1863,6 +1874,11 @@ tr.lot-locked {
   line-height: 1.4;
 }
 
+.market-signals-line {
+  display: inline;
+  margin: 0;
+}
+
 .market-signals-label {
   font-weight: 600;
   color: var(--ink);
@@ -1870,6 +1886,30 @@ tr.lot-locked {
 
 .market-signals-token {
   cursor: help;
+}
+
+.market-signals-more {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+.market-signals-more:hover {
+  color: var(--ink);
+}
+
+.market-signals-world {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .market-events-summary {

@@ -287,6 +287,8 @@ export interface NpcFleetMemberView {
     flightHours: number;
     urgency: ShipmentLot['urgency'];
     phase: 'enroute' | 'arriving';
+    /** True when origin/dest countries differ. */
+    international?: boolean;
   };
 }
 

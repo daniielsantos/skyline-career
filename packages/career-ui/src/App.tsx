@@ -153,6 +153,7 @@ type MarketSortKey =
 type SortDirection = 'asc' | 'desc';
 type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
 type AccessFilter = '' | 'open' | 'locked';
+type LaneFilter = '' | 'intl' | 'domestic';
 
 const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [
   { key: 'access', direction: 'asc' },
@@ -364,44 +365,149 @@ function RegionPressureChips(props: {
   );
 }
 
-/** Compact text line for Market head (no colored pill rainbow). */
-function MarketSignalsLine(props: { regions: RegionPressure[] }) {
-  const tokens: { key: string; text: string; title: string }[] = [];
+/** Compact climate for Freights: local region first, rest collapsed. */
+function MarketSignalsLine(props: {
+  regions: RegionPressure[];
+  focusIcao?: string;
+  focusRegion?: string;
+}) {
+  const [worldOpen, setWorldOpen] = useState(false);
+  const tokens: {
+    key: string;
+    region: string;
+    text: string;
+    title: string;
+  }[] = [];
   for (const r of props.regions) {
     if (r.thinFleet) {
       tokens.push({
         key: `thin-${r.region}`,
-        text: `${r.region} thin`,
+        region: r.region,
+        text: 'thin fleet',
         title: `${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting · ${r.maintenance ?? 0} in MX — thinner local fleet tends to raise outbound freights`,
       });
     }
     if (r.weather === 'marginal' || r.weather === 'poor') {
       tokens.push({
         key: `wx-${r.region}`,
-        text: `${r.region} ${r.weather}`,
+        region: r.region,
+        text: r.weather,
         title: `${regionLabel(r.region)}: simulated ${r.weather} weather today — freights pay more / expire sooner; local NPCs bid less`,
       });
     }
     if (r.fuelThin) {
       tokens.push({
         key: `fuel-${r.region}`,
-        text: `${r.region} fuel thin`,
+        region: r.region,
+        text: 'fuel thin',
         title: `${regionLabel(r.region)}: non-hub Jet-A is low and no road tanker is inbound — expect higher uplift prices until trucks catch up`,
       });
     }
   }
   if (tokens.length === 0) return null;
+
+  const focusRegion = props.focusRegion;
+  const focusCountry = focusRegion
+    ? countryIdFromRegionLabel(focusRegion)
+    : undefined;
+  const local = focusRegion
+    ? tokens.filter((t) => t.region === focusRegion)
+    : [];
+  const country =
+    focusCountry && focusRegion
+      ? tokens.filter(
+          (t) =>
+            t.region !== focusRegion &&
+            countryIdFromRegionLabel(t.region) === focusCountry,
+        )
+      : [];
+  const world = tokens.filter((t) => {
+    if (focusRegion && t.region === focusRegion) return false;
+    if (
+      focusCountry &&
+      countryIdFromRegionLabel(t.region) === focusCountry
+    ) {
+      return false;
+    }
+    return true;
+  });
+  // No hub focus yet — keep one short country-agnostic collapse of everything.
+  const awaitingRegion = Boolean(props.focusIcao) && !focusRegion;
+  const primary = focusRegion
+    ? local
+    : awaitingRegion
+      ? []
+      : tokens.slice(0, 3);
+  const collapsed = focusRegion
+    ? [...country, ...world]
+    : awaitingRegion
+      ? tokens
+      : tokens.slice(3);
+
+  const nearLabel = props.focusIcao
+    ? `Near ${props.focusIcao}${focusRegion ? ` · ${focusRegion}` : ''}`
+    : focusRegion
+      ? regionLabel(focusRegion)
+      : 'Signals';
+
   return (
-    <p className="market-signals">
-      <span className="market-signals-label">Signals</span>
-      {tokens.map((t) => (
-        <span key={t.key} className="market-signals-token" title={t.title}>
-          {' '}
-          · {t.text}
-        </span>
-      ))}
-    </p>
+    <div className="market-signals">
+      <p className="market-signals-line">
+        <span className="market-signals-label">{nearLabel}</span>
+        {awaitingRegion ? null : primary.length === 0 ? (
+          <span className="market-signals-token"> · clear</span>
+        ) : (
+          primary.map((t) => (
+            <span key={t.key} className="market-signals-token" title={t.title}>
+              {' '}
+              · {focusRegion ? t.text : `${t.region} ${t.text}`}
+            </span>
+          ))
+        )}
+        {collapsed.length > 0 ? (
+          <>
+            {' '}
+            <button
+              type="button"
+              className="market-signals-more"
+              aria-expanded={worldOpen}
+              onClick={() => setWorldOpen((v) => !v)}
+            >
+              {worldOpen
+                ? 'Hide more'
+                : `More · ${collapsed.length} signal${collapsed.length === 1 ? '' : 's'}`}
+            </button>
+          </>
+        ) : null}
+      </p>
+      {worldOpen && collapsed.length > 0 ? (
+        <p className="market-signals-world">
+          {collapsed.map((t, i) => (
+            <span key={t.key} className="market-signals-token" title={t.title}>
+              {i > 0 ? ' · ' : ''}
+              {t.region} {t.text}
+            </span>
+          ))}
+        </p>
+      ) : null}
+    </div>
   );
+}
+
+function countryIdFromRegionLabel(region: string): string {
+  const raw = region.trim().toUpperCase();
+  const dash = raw.indexOf('-');
+  if (dash > 0) return raw.slice(0, dash);
+  return raw.slice(0, 2) || raw;
+}
+
+function resolveHubRegion(
+  icao: string | undefined,
+  hubs: readonly { icao: string; region: string }[],
+): string | undefined {
+  if (!icao) return undefined;
+  const id = icao.trim().toUpperCase();
+  return hubs.find((h) => h.icao.toUpperCase() === id)?.region;
 }
 
 function FuelLogisticsBlock(props: {
@@ -957,6 +1063,7 @@ function FleetRoster(props: {
   const [query, setQuery] = useState('');
   const [phaseFilter, setPhaseFilter] = useState<FleetPhaseFilter>('');
   const [countryFilter, setCountryFilter] = useState('');
+  const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
 
   const enriched = useMemo(
     () =>
@@ -990,6 +1097,11 @@ function FleetRoster(props: {
       ) {
         return false;
       }
+      if (laneFilter === 'intl') {
+        if (!mission?.international) return false;
+      } else if (laneFilter === 'domestic') {
+        if (!mission || mission.international) return false;
+      }
       if (tokens.length === 0) return true;
       const hay = [
         npc.name,
@@ -1004,13 +1116,14 @@ function FleetRoster(props: {
         mission?.originIcao ?? '',
         mission?.destIcao ?? '',
         mission?.commodityName ?? '',
+        mission?.international ? 'intl international' : '',
         phaseLabel(phase),
       ]
         .join(' ')
         .toLowerCase();
       return tokens.every((token) => hay.includes(token));
     });
-  }, [enriched, phaseFilter, countryFilter, query]);
+  }, [enriched, phaseFilter, countryFilter, laneFilter, query]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / FLEET_PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -1025,7 +1138,7 @@ function FleetRoster(props: {
 
   useEffect(() => {
     setPage(1);
-  }, [query, phaseFilter, countryFilter, props.fleet.length]);
+  }, [query, phaseFilter, countryFilter, laneFilter, props.fleet.length]);
 
   if (props.fleet.length === 0) {
     return (
@@ -1036,7 +1149,10 @@ function FleetRoster(props: {
   }
 
   const hasFilters =
-    query.trim() !== '' || phaseFilter !== '' || countryFilter !== '';
+    query.trim() !== '' ||
+    phaseFilter !== '' ||
+    countryFilter !== '' ||
+    laneFilter !== '';
 
   return (
     <>
@@ -1094,7 +1210,22 @@ function FleetRoster(props: {
                   <option value="idle">Idle</option>
                 </select>
               </th>
-              <th />
+              <th>
+                <select
+                  aria-label="Filter by route scope"
+                  value={laneFilter}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setLaneFilter(
+                      next === 'intl' || next === 'domestic' ? next : '',
+                    );
+                  }}
+                >
+                  <option value="">Any route</option>
+                  <option value="intl">Intl</option>
+                  <option value="domestic">Domestic</option>
+                </select>
+              </th>
               <th>
                 {hasFilters ? (
                   <button
@@ -1104,6 +1235,7 @@ function FleetRoster(props: {
                       setQuery('');
                       setPhaseFilter('');
                       setCountryFilter('');
+                      setLaneFilter('');
                     }}
                   >
                     Clear
@@ -1179,6 +1311,11 @@ function FleetRoster(props: {
                           />
                           {mission.urgency === 'urgent' ? (
                             <span className="tag">Urgent</span>
+                          ) : null}
+                          {mission.international ? (
+                            <span className="tag" title="International lane freight">
+                              intl
+                            </span>
                           ) : null}
                         </div>
                         <small>
@@ -1290,6 +1427,7 @@ export function App() {
     expiresWithinHours: '',
     minPayUsd: '',
     access: '' as AccessFilter,
+    lane: '' as LaneFilter,
   });
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
@@ -1364,6 +1502,13 @@ export function App() {
     useState<number | null>(null);
   const [estimatedBlockFuelKg, setEstimatedBlockFuelKg] =
     useState<number | null>(null);
+  const [estimatedFuelCostUsd, setEstimatedFuelCostUsd] =
+    useState<number | null>(null);
+  const [estimatedFuelUnitPriceUsd, setEstimatedFuelUnitPriceUsd] =
+    useState<number | null>(null);
+  const [estimatedFuelScarcity, setEstimatedFuelScarcity] = useState<
+    'ok' | 'partial' | 'dry' | null
+  >(null);
   const [routeFuelCapacityKg, setRouteFuelCapacityKg] =
     useState<number | null>(null);
   const [routeFuelDeficitKg, setRouteFuelDeficitKg] =
@@ -1385,6 +1530,7 @@ export function App() {
   const [expiresWithinHours, setExpiresWithinHours] = useState('');
   const [minimumPayUsd, setMinimumPayUsd] = useState('');
   const [accessFilter, setAccessFilter] = useState<AccessFilter>('');
+  const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
@@ -1598,16 +1744,24 @@ export function App() {
       aircraftClass: AircraftClass,
       distanceNm?: number,
       airframeTypeId?: string,
+      route?: { originIcao?: string; destIcao?: string },
     ) => {
       try {
         const limit = await fetchCargoLimit(
           aircraftClass,
           distanceNm,
           airframeTypeId,
+          {
+            originIcao: route?.originIcao,
+            destIcao: route?.destIcao,
+          },
         );
         setStructuralMaxCargoKg(limit.maxCargoKg);
         setMaxCargoKg(limit.operationalMaxCargoKg);
         setEstimatedBlockFuelKg(limit.estimatedBlockFuelKg ?? null);
+        setEstimatedFuelCostUsd(limit.estimatedFuelCostUsd ?? null);
+        setEstimatedFuelUnitPriceUsd(limit.estimatedFuelUnitPriceUsd ?? null);
+        setEstimatedFuelScarcity(limit.estimatedFuelScarcity ?? null);
         setRouteFuelCapacityKg(limit.fuelCapacityKg ?? null);
         setRouteFuelDeficitKg(limit.fuelDeficitKg ?? null);
         setRouteFuelFeasible(limit.fuelFeasible ?? null);
@@ -1618,6 +1772,9 @@ export function App() {
         setStructuralMaxCargoKg(fallback);
         setMaxCargoKg(fallback);
         setEstimatedBlockFuelKg(null);
+        setEstimatedFuelCostUsd(null);
+        setEstimatedFuelUnitPriceUsd(null);
+        setEstimatedFuelScarcity(null);
         setRouteFuelCapacityKg(null);
         setRouteFuelDeficitKg(null);
         setRouteFuelFeasible(null);
@@ -1648,6 +1805,7 @@ export function App() {
       expiresWithinHours,
       minPayUsd: minimumPayUsd,
       access: accessFilter,
+      lane: laneFilter,
     };
     const prev = marketFetchOptsRef.current;
     const unchanged =
@@ -1661,7 +1819,8 @@ export function App() {
       prev.loadMaxKg === nextOpts.loadMaxKg &&
       prev.expiresWithinHours === nextOpts.expiresWithinHours &&
       prev.minPayUsd === nextOpts.minPayUsd &&
-      prev.access === nextOpts.access;
+      prev.access === nextOpts.access &&
+      prev.lane === nextOpts.lane;
     if (unchanged) return;
 
     let cancelled = false;
@@ -1696,6 +1855,7 @@ export function App() {
     destFilter,
     distanceMaxNm,
     expiresWithinHours,
+    laneFilter,
     loadMaxKg,
     marketPage,
     marketSorts,
@@ -1708,6 +1868,9 @@ export function App() {
       setMaxCargoKg(null);
       setStructuralMaxCargoKg(null);
       setEstimatedBlockFuelKg(null);
+      setEstimatedFuelCostUsd(null);
+      setEstimatedFuelUnitPriceUsd(null);
+      setEstimatedFuelScarcity(null);
       setRouteFuelCapacityKg(null);
       setRouteFuelDeficitKg(null);
       setRouteFuelFeasible(null);
@@ -1720,6 +1883,10 @@ export function App() {
       stagingRouteDistanceNm(staging),
       fleet.find((aircraft) => aircraft.id === staging.aircraftId)
         ?.airframeTypeId,
+      {
+        originIcao: staging.originIcao,
+        destIcao: staging.destIcao,
+      },
     );
   }, [
     staging?.aircraft,
@@ -1799,7 +1966,8 @@ export function App() {
   }, [tab, airportIcao, refresh]);
 
   useEffect(() => {
-    if (tab !== 'map' || !hubSelected) return;
+    if (!hubSelected) return;
+    if (tab !== 'map' && tab !== 'market') return;
     void refreshNetworkHubs().catch((err) => {
       setToastKind('fail');
       setToast(err instanceof Error ? err.message : String(err));
@@ -4006,7 +4174,8 @@ export function App() {
       loadMaxKg ||
       expiresWithinHours ||
       minimumPayUsd ||
-      accessFilter,
+      accessFilter ||
+      laneFilter,
   );
 
   function updateMarketFilter(setter: (value: string) => void, value: string) {
@@ -4023,6 +4192,7 @@ export function App() {
     setExpiresWithinHours('');
     setMinimumPayUsd('');
     setAccessFilter('');
+    setLaneFilter('');
     setMarketPage(1);
   }
 
@@ -5295,7 +5465,14 @@ export function App() {
                 ? ` · aircraft at ${fleet.find((a) => a.status === 'parked')!.locationIcao}`
                 : ''}
             </p>
-            <MarketSignalsLine regions={regionPressure} />
+            <MarketSignalsLine
+              regions={regionPressure}
+              focusIcao={parkedIcao || undefined}
+              focusRegion={resolveHubRegion(
+                parkedIcao || homeHubIcao || undefined,
+                networkHubs,
+              )}
+            />
           </div>
           <MarketEventsSummary
             events={marketEvents}
@@ -5385,27 +5562,44 @@ export function App() {
                 </tr>
                 <tr className="filter-row">
                   <th>
-                    <div className="route-filter-pair">
-                      <input
-                        type="search"
-                        className="route-filter"
-                        aria-label="Filter origin by ICAO or city"
-                        placeholder="Origin"
-                        value={originFilter}
-                        onChange={(e) =>
-                          updateMarketFilter(setOriginFilter, e.target.value)
-                        }
-                      />
-                      <input
-                        type="search"
-                        className="route-filter"
-                        aria-label="Filter destination by ICAO or city"
-                        placeholder="Dest"
-                        value={destFilter}
-                        onChange={(e) =>
-                          updateMarketFilter(setDestFilter, e.target.value)
-                        }
-                      />
+                    <div className="route-filter-stack">
+                      <div className="route-filter-pair">
+                        <input
+                          type="search"
+                          className="route-filter"
+                          aria-label="Filter origin by ICAO or city"
+                          placeholder="Origin"
+                          value={originFilter}
+                          onChange={(e) =>
+                            updateMarketFilter(setOriginFilter, e.target.value)
+                          }
+                        />
+                        <input
+                          type="search"
+                          className="route-filter"
+                          aria-label="Filter destination by ICAO or city"
+                          placeholder="Dest"
+                          value={destFilter}
+                          onChange={(e) =>
+                            updateMarketFilter(setDestFilter, e.target.value)
+                          }
+                        />
+                      </div>
+                      <select
+                        aria-label="Filter by route scope"
+                        value={laneFilter}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setLaneFilter(
+                            next === 'intl' || next === 'domestic' ? next : '',
+                          );
+                          setMarketPage(1);
+                        }}
+                      >
+                        <option value="">Any route</option>
+                        <option value="intl">Intl</option>
+                        <option value="domestic">Domestic</option>
+                      </select>
                     </div>
                   </th>
                   <th>
@@ -5993,6 +6187,43 @@ export function App() {
                   <strong>
                     {formatMoney(stagingPayUsd + (stagingExisting?.payUsd ?? 0))}
                   </strong>
+                </span>
+                <span>
+                  Est. net
+                  <strong
+                    className={
+                      estimatedFuelCostUsd !== null
+                        ? stagingPayUsd +
+                            (stagingExisting?.payUsd ?? 0) -
+                            estimatedFuelCostUsd >=
+                          0
+                          ? undefined
+                          : 'staging-est-net-loss'
+                        : undefined
+                    }
+                  >
+                    {estimatedFuelCostUsd !== null
+                      ? formatMoney(
+                          stagingPayUsd +
+                            (stagingExisting?.payUsd ?? 0) -
+                            estimatedFuelCostUsd,
+                        )
+                      : '—'}
+                  </strong>
+                  <em>
+                    {estimatedFuelCostUsd !== null
+                      ? `pay − Jet-A ${formatMoney(estimatedFuelCostUsd)}${
+                          estimatedFuelUnitPriceUsd !== null
+                            ? ` · $${estimatedFuelUnitPriceUsd.toFixed(2)}/kg`
+                            : ''
+                        }${
+                          estimatedFuelScarcity &&
+                          estimatedFuelScarcity !== 'ok'
+                            ? ` · fuel ${estimatedFuelScarcity}`
+                            : ''
+                        }`
+                      : 'planning fuel × origin Jet-A'}
+                  </em>
                 </span>
               </div>
 

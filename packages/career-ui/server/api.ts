@@ -44,10 +44,11 @@ import {
   listRegionMarketPressure,
   listViableMarketLots,
   parseMarketBoardAccessFilter,
+  parseMarketBoardLaneFilter,
   parseMarketBoardSorts,
   parsePositiveNumberParam,
   queryMarketBoardPage,
-  localUnitPriceUsd,
+  quoteFuelUplift,
   regionFuelThin,
   missionRemainingCapacityKg,
   hoursToMs,
@@ -78,6 +79,7 @@ import {
   LEDGER_KIND_LABEL,
   openCareerStore,
   listWorldCountryIds,
+  computeEconomyPulse,
   syncHomeCountryFromHub,
   stockTrend,
   tickEconomyN,
@@ -501,6 +503,7 @@ function mapNpcFleet(world: Awaited<ReturnType<typeof loadEconomy>>, nowMs = Dat
           flightHours: row.mission.flightHours,
           urgency: row.mission.urgency,
           phase: row.mission.phase,
+          international: Boolean(row.mission.international),
         }
       : null,
   }));
@@ -1139,6 +1142,8 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const airframeTypeId = url.searchParams.get('airframe') ?? undefined;
+        const originIcao = url.searchParams.get('origin')?.trim().toUpperCase();
+        const destIcao = url.searchParams.get('dest')?.trim().toUpperCase();
         const cargoLimit = await resolveClassMaxCargoKg(
           aircraft,
           airframeTypeId,
@@ -1153,6 +1158,38 @@ export function createCareerApiServer(port = 8787) {
                 cargoLimit,
               )
             : undefined;
+        let estimatedFuelCostUsd: number | null = null;
+        let estimatedFuelUnitPriceUsd: number | null = null;
+        let estimatedFuelScarcity: 'ok' | 'partial' | 'dry' | null = null;
+        const blockFuelKg = routeLimit?.estimatedBlockFuelKg;
+        if (
+          originIcao &&
+          typeof blockFuelKg === 'number' &&
+          Number.isFinite(blockFuelKg) &&
+          blockFuelKg > 0
+        ) {
+          try {
+            const fuelQuote = await withCareerRead((world) =>
+              quoteFuelUplift(world, {
+                originIcao,
+                destIcao: destIcao || undefined,
+                aircraftClassId: aircraft,
+                distanceNm:
+                  Number.isFinite(distanceNm) && distanceNm >= 0
+                    ? distanceNm
+                    : undefined,
+                requestedKg: blockFuelKg,
+              }),
+            );
+            estimatedFuelCostUsd = fuelQuote.costUsd;
+            estimatedFuelUnitPriceUsd = fuelQuote.unitPriceUsd;
+            estimatedFuelScarcity = fuelQuote.scarcity;
+          } catch {
+            estimatedFuelCostUsd = null;
+            estimatedFuelUnitPriceUsd = null;
+            estimatedFuelScarcity = null;
+          }
+        }
         send(res, 200, {
           aircraftClassId: aircraft,
           maxCargoKg: cargoLimit.maxCargoKg,
@@ -1166,6 +1203,9 @@ export function createCareerApiServer(port = 8787) {
           estimatedBlockFuelKg: routeLimit?.estimatedBlockFuelKg ?? null,
           fuelDeficitKg: routeLimit?.fuelDeficitKg ?? null,
           fuelFeasible: routeLimit?.fuelFeasible ?? null,
+          estimatedFuelCostUsd,
+          estimatedFuelUnitPriceUsd,
+          estimatedFuelScarcity,
         });
         return;
       }
@@ -1227,6 +1267,7 @@ export function createCareerApiServer(port = 8787) {
             cargoOps ?? undefined,
             row.lot.commodityId,
           ),
+          international: Boolean(row.pressure?.international),
           pressure: row.pressure
             ? {
                 originRegion: row.pressure.originRegion,
@@ -1268,6 +1309,7 @@ export function createCareerApiServer(port = 8787) {
           accessFilter: parseMarketBoardAccessFilter(
             url.searchParams.get('access'),
           ),
+          laneFilter: parseMarketBoardLaneFilter(url.searchParams.get('lane')),
           // Sticky unlocked-first unless client sends access:desc.
           sorts: requestedSorts,
         };
@@ -1512,6 +1554,12 @@ export function createCareerApiServer(port = 8787) {
           });
           return { walletUsd: missions.walletUsd, creditedUsd: amountUsd };
         });
+        send(res, 200, payload);
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/debug/economy-pulse') {
+        const payload = await withCareerRead((world) => computeEconomyPulse(world));
         send(res, 200, payload);
         return;
       }

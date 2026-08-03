@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 20;
+export const FUEL_TRUCK_FLEET_SIZE = 28;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 6 },
-  { truckClassId: 'semi_tanker', count: 10 },
-  { truckClassId: 'btrain_tanker', count: 4 },
+  { truckClassId: 'rigid_tanker', count: 8 },
+  { truckClassId: 'semi_tanker', count: 14 },
+  { truckClassId: 'btrain_tanker', count: 6 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -105,6 +105,14 @@ const TRUCK_NAME_POOL = [
   'Pacific Pipe Road',
   'Great Lakes Fuel',
   'Lone Star Tankers',
+  'Interior BR Tank',
+  'Amazon Spoke Fuel',
+  'CO Agro Jet-A',
+  'SE Feeders Fuel',
+  'NE Sertão Tank',
+  'Sul Fronteira Fuel',
+  'Gateway Jet Haul',
+  'Coastal BR Tankers',
 ] as const;
 
 function hashSeed(seed: string): number {

@@ -23,6 +23,7 @@ import {
   regionAverageHubLevel,
 } from './career-hub-level.js';
 import { getAircraftClass, reserveShipmentLot } from './career-mission.js';
+import { isDomesticOd } from './career-partition.js';
 import {
   npcAirframeLabel,
   npcMaxCargoKg,
@@ -54,20 +55,20 @@ export {
   type NpcAirframeVariant,
 } from './career-npc-airframes.js';
 
-/** About one operator per mapped hub; sized for a 128-hub (28 BR + 100 US) world. */
-export const NPC_FLEET_SIZE = 96;
+/** About one operator per mapped hub; sized for a 160-hub (60 BR + 100 US) world. */
+export const NPC_FLEET_SIZE = 120;
 
 /** Target mix: jets for heavy freight + GA for LTL / short-haul competition. */
 export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
   aircraftClassId: FreighterClassId;
   count: number;
 }> = [
-  { aircraftClassId: 'narrow_freighter', count: 28 },
-  { aircraftClassId: 'wide_freighter', count: 20 },
-  { aircraftClassId: 'medium_piston', count: 8 },
-  { aircraftClassId: 'light_jet', count: 8 },
-  { aircraftClassId: 'light_turboprop', count: 20 },
-  { aircraftClassId: 'light_ga', count: 12 },
+  { aircraftClassId: 'narrow_freighter', count: 35 },
+  { aircraftClassId: 'wide_freighter', count: 25 },
+  { aircraftClassId: 'medium_piston', count: 10 },
+  { aircraftClassId: 'light_jet', count: 10 },
+  { aircraftClassId: 'light_turboprop', count: 25 },
+  { aircraftClassId: 'light_ga', count: 15 },
 ] as const;
 
 /** Minimum airborne block so ultra-short hops aren't instant. */
@@ -1283,6 +1284,12 @@ export function listNpcFleetStatus(
       turnaroundHoursLeft = Math.max(0, msToHours(npcBusyUntilMs(npc) - nowMs));
     }
 
+    const originRegion = flight
+      ? airportRegion(world, flight.originIcao) ?? ''
+      : '';
+    const destRegion = flight
+      ? airportRegion(world, flight.destIcao) ?? ''
+      : '';
     const mission =
       flight && activity
         ? {
@@ -1305,6 +1312,9 @@ export function listNpcFleetStatus(
             flightHours: activity.flightHours,
             urgency: activity.urgency,
             phase: activity.phase,
+            international:
+              Boolean(originRegion && destRegion) &&
+              !isDomesticOd(originRegion, destRegion),
           }
         : undefined;
 

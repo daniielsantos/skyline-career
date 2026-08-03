@@ -6,6 +6,8 @@ export * from './types/career-economy.js';
 export * from './ofp-compliance.js';
 export * from './career-clock.js';
 export * from './career-economy.js';
+export * from './career-economy-pulse.js';
+export * from './career-br-hubs.js';
 export * from './career-us-hubs.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';

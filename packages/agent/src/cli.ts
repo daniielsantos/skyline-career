@@ -69,6 +69,7 @@ import {
   compareMissionIntentToOfp,
   createMissionFlightWatchState,
   createSeedEconomyWorld,
+  computeEconomyPulse,
   departMission,
   evaluateMissionFlightTransition,
   findOpenManifestForRoute,
@@ -1448,6 +1449,7 @@ async function main(): Promise<void> {
       console.log(`career commands:
   career init [--save path] [--seed s] [--reset]
   career tick [--n 24] [--save path]
+  career pulse [--save path] [--json]
   career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--json]
   career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--missions path] [--json]
   career missions [--missions path] [--json]
@@ -1481,6 +1483,50 @@ async function main(): Promise<void> {
       console.log(
         `tick=${world.tick} (+${n})  availableLots=${afterLots} (was ${beforeLots})  saved=${savePath}`,
       );
+      return;
+    }
+
+    if (sub === 'pulse') {
+      const world = await loadOrCreateCareerEconomy(savePath, {
+        seed: getFlag(subArgs, '--seed'),
+      });
+      const pulse = computeEconomyPulse(world);
+      if (asJson) {
+        console.log(JSON.stringify(pulse, null, 2));
+        return;
+      }
+      const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
+      const money = (n: number | null) =>
+        n === null ? '—' : `$${n.toFixed(2)}/kg`;
+      const fill = (n: number | null) =>
+        n === null ? '—' : pct(n);
+      console.log(
+        `Economy pulse  tick=${pulse.tick}  lots=${pulse.availableLots} available  hubs=${pulse.airportCount}  home=${pulse.homeCountryId ?? '—'}  intl=${pct(pulse.intlSharePct)}`,
+      );
+      for (const c of pulse.countries) {
+        if (c.countryId === 'INTL') {
+          console.log(
+            `  INTL  avail=${c.availableLots}  pay/kg p50=${money(c.payPerKgP50)}  lanes busy=${pct(c.laneBusyPct)}`,
+          );
+          continue;
+        }
+        console.log(
+          `  ${c.countryId.padEnd(4)} hubs=${String(c.hubs).padStart(3)}  avail=${String(c.availableLots).padStart(3)}  live=${pct(c.liveHubPct).padStart(4)}  fill p50=${fill(c.fillP50).padStart(4)}  pay/kg p50=${money(c.payPerKgP50)}  lanes busy=${pct(c.laneBusyPct)}  dead=${c.deadHubs} quiet=${c.quietHubs}`,
+        );
+        if (c.deadHubIcaos.length > 0 && c.deadHubs > 0) {
+          const more =
+            c.deadHubs > c.deadHubIcaos.length
+              ? ` +${c.deadHubs - c.deadHubIcaos.length}`
+              : '';
+          console.log(`         dead: ${c.deadHubIcaos.join(' ')}${more}`);
+        }
+      }
+      if (pulse.notes.length > 0) {
+        console.log('  notes:');
+        for (const note of pulse.notes) {
+          console.log(`    · ${note}`);
+        }
+      }
       return;
     }
 

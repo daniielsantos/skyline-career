@@ -213,6 +213,8 @@ export type NpcMission = {
   flightHours: number;
   urgency: string;
   phase: 'enroute' | 'arriving';
+  /** True when origin/dest countries differ. */
+  international?: boolean;
 };
 
 export type NpcFleetMember = {
@@ -642,6 +644,8 @@ export function fetchMarket(
     minPayUsd?: number | string;
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';
+    /** Route scope: intl = cross-country, domestic = same country. */
+    lane?: 'intl' | 'domestic' | '';
   } = {},
 ) {
   const params = new URLSearchParams();
@@ -666,6 +670,8 @@ export function fetchMarket(
   if (minPayUsd) params.set('minPayUsd', minPayUsd);
   const access = String(opts.access ?? '').trim();
   if (access === 'open' || access === 'locked') params.set('access', access);
+  const lane = String(opts.lane ?? '').trim();
+  if (lane === 'intl' || lane === 'domestic') params.set('lane', lane);
   const qs = params.toString();
   return api<
     ClockSync & {
@@ -698,12 +704,17 @@ export function fetchCargoLimit(
   aircraft: AircraftClass,
   distanceNm?: number,
   airframeTypeId?: string,
+  opts: { originIcao?: string; destIcao?: string } = {},
 ) {
   const qs = new URLSearchParams({ aircraft });
   if (airframeTypeId) qs.set('airframe', airframeTypeId);
   if (distanceNm !== undefined && Number.isFinite(distanceNm)) {
     qs.set('distanceNm', String(distanceNm));
   }
+  const origin = opts.originIcao?.trim().toUpperCase();
+  if (origin) qs.set('origin', origin);
+  const dest = opts.destIcao?.trim().toUpperCase();
+  if (dest) qs.set('dest', dest);
   return api<{
     aircraftClassId: AircraftClass;
     maxCargoKg: number;
@@ -716,6 +727,9 @@ export function fetchCargoLimit(
     fuelCapacityKg?: number | null;
     fuelDeficitKg?: number | null;
     fuelFeasible?: boolean | null;
+    estimatedFuelCostUsd?: number | null;
+    estimatedFuelUnitPriceUsd?: number | null;
+    estimatedFuelScarcity?: 'ok' | 'partial' | 'dry' | null;
   }>(`/api/cargo-limit?${qs.toString()}`);
 }
 

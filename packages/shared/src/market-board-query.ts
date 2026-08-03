@@ -26,9 +26,14 @@ export type MarketBoardSortable = {
   payUsd: number;
   /** True when Cargo Ops has this commodity locked for the player. */
   cargoLocked?: boolean;
+  /** Cross-country lane freight (from lot pressure). */
+  international?: boolean;
 };
 
 export type MarketBoardAccessFilter = 'open' | 'locked';
+
+/** Freights route scope: international lanes vs domestic. */
+export type MarketBoardLaneFilter = 'intl' | 'domestic';
 
 export type MarketBoardQueryOpts = {
   /** Max great-circle distance (nm). */
@@ -42,6 +47,8 @@ export type MarketBoardQueryOpts = {
   minPayUsd?: number;
   /** Cargo Ops lock filter: open = unlocked only, locked = locked only. */
   accessFilter?: MarketBoardAccessFilter;
+  /** International vs domestic route filter. */
+  laneFilter?: MarketBoardLaneFilter;
   /** Current economy tick (integer batches). */
   currentTick: number;
   sorts?: MarketBoardSortLevel[];
@@ -113,6 +120,14 @@ export function parseMarketBoardAccessFilter(
   return undefined;
 }
 
+export function parseMarketBoardLaneFilter(
+  raw: string | null | undefined,
+): MarketBoardLaneFilter | undefined {
+  const v = raw?.trim().toLowerCase();
+  if (v === 'intl' || v === 'domestic') return v;
+  return undefined;
+}
+
 function compareBoardRow<T extends MarketBoardSortable>(
   a: T,
   b: T,
@@ -148,6 +163,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     | 'expiresWithinHours'
     | 'minPayUsd'
     | 'accessFilter'
+    | 'laneFilter'
     | 'currentTick'
   >,
 ): boolean {
@@ -190,6 +206,8 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
   }
   if (opts.accessFilter === 'open' && row.cargoLocked) return false;
   if (opts.accessFilter === 'locked' && !row.cargoLocked) return false;
+  if (opts.laneFilter === 'intl' && !row.international) return false;
+  if (opts.laneFilter === 'domestic' && row.international) return false;
   return true;
 }
 

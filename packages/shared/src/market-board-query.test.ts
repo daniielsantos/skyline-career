@@ -124,6 +124,34 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
+  it('filters by international vs domestic lane', () => {
+    const mixed = [
+      row({ payUsd: 100, commodityId: 'general', international: false }),
+      row({ payUsd: 800, commodityId: 'electronics', international: true }),
+      row({ payUsd: 200, commodityId: 'machinery', international: false }),
+    ];
+    const intl = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      laneFilter: 'intl',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      intl.rows.map((r) => r.commodityId),
+      ['electronics'],
+    );
+    const domestic = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      laneFilter: 'domestic',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      domestic.rows.map((r) => r.commodityId),
+      ['general', 'machinery'],
+    );
+  });
+
   it('applies filters before sort so totals are global', () => {
     const result = queryMarketBoardPage(rows, {
       currentTick: 0,

@@ -1,4 +1,9 @@
 import {
+  assertBrCareerHubCatalog,
+  BR_CAREER_HUBS,
+  buildBrFeederCorridors,
+} from './career-br-hubs.js';
+import {
   assertUsCareerHubCatalog,
   buildUsFeederCorridors,
   US_CAREER_HUBS,
@@ -260,36 +265,9 @@ export const HUB_TIER_PROFILE: Record<
   },
 };
 
-/** Curated ICAO → tier map (BR hand list + US catalog). */
+/** Curated ICAO → tier map (BR + US catalogs). */
 export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
-  SBGR: 'major',
-  SBKP: 'major',
-  SBGL: 'major',
-  SBEG: 'major',
-  SBCF: 'regional',
-  SBCT: 'regional',
-  SBPA: 'regional',
-  SBSV: 'regional',
-  SBRF: 'regional',
-  SBFZ: 'regional',
-  SBVT: 'regional',
-  SBBR: 'regional',
-  SBBE: 'regional',
-  SBGO: 'regional',
-  SBRP: 'spoke',
-  SBFL: 'spoke',
-  SBNF: 'spoke',
-  SBLO: 'spoke',
-  SBJV: 'spoke',
-  SBSG: 'spoke',
-  SBAR: 'spoke',
-  SBMO: 'spoke',
-  SBJP: 'spoke',
-  SBPS: 'spoke',
-  SBCY: 'spoke',
-  SBCG: 'spoke',
-  SBPV: 'spoke',
-  SBMQ: 'spoke',
+  ...Object.fromEntries(BR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(US_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
@@ -316,7 +294,7 @@ export function laneLotCaps(
 }
 
 /**
- * Curated domestic cargo corridors (bidirectional) + auto US feeders.
+ * Curated domestic cargo corridors (bidirectional) + auto BR/US feeders.
  * Weights > 1 favor formation + a mild pay bump.
  */
 const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
@@ -441,6 +419,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   weight: number;
 }> = [
   ...CAREER_CARGO_CORRIDORS_MANUAL,
+  ...buildBrFeederCorridors(BR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildUsFeederCorridors(US_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
@@ -653,6 +632,7 @@ export const CAREER_CARGO_COMMODITIES: readonly CommodityDef[] =
 
 /** Major Jet-A production hubs (BR + US career anchors). */
 export const FUEL_HUB_ICAOS = new Set([
+  // BR producers (~1 per 3 hubs at 60 airports)
   'SBGR',
   'SBGL',
   'SBKP',
@@ -663,6 +643,16 @@ export const FUEL_HUB_ICAOS = new Set([
   'SBSV',
   'SBEG',
   'SBBR',
+  'SBFZ',
+  'SBBE',
+  'SBGO',
+  'SBVT',
+  'SBSN',
+  'SBPJ',
+  'SBFI',
+  'SBSL',
+  'SBTE',
+  'SBUL',
   // US continental Jet-A producers (~1 per 2–3 airports).
   'KMIA',
   'KATL',
@@ -859,37 +849,12 @@ export function getCommodity(id: CommodityId): CommodityDef {
 export const CAREER_HUB_COORDS: Readonly<
   Record<string, { lat: number; lon: number; name?: string }>
 > = {
-  SBGR: { lat: -23.4356, lon: -46.4731, name: 'São Paulo/Guarulhos' },
-  SBGL: { lat: -22.8099, lon: -43.2506, name: 'Rio de Janeiro/Galeão' },
-  SBKP: { lat: -23.0074, lon: -47.1345, name: 'Campinas/Viracopos' },
-  SBCF: { lat: -19.6244, lon: -43.9719, name: 'Belo Horizonte/Confins' },
-  SBVT: { lat: -20.2581, lon: -40.2864, name: 'Vitória' },
-  SBRP: { lat: -21.1364, lon: -47.7767, name: 'Ribeirão Preto' },
-  SBCT: { lat: -25.5285, lon: -49.1758, name: 'Curitiba' },
-  SBPA: { lat: -29.9944, lon: -51.1714, name: 'Porto Alegre' },
-  SBFL: { lat: -27.6703, lon: -48.5525, name: 'Florianópolis' },
-  SBNF: { lat: -26.8794, lon: -48.6514, name: 'Navegantes' },
-  SBLO: { lat: -23.3336, lon: -51.1301, name: 'Londrina' },
-  SBJV: { lat: -26.2245, lon: -48.7974, name: 'Joinville' },
-  SBSV: { lat: -12.9086, lon: -38.3225, name: 'Salvador' },
-  SBRF: { lat: -8.1265, lon: -34.9236, name: 'Recife' },
-  SBFZ: { lat: -3.7763, lon: -38.5326, name: 'Fortaleza' },
-  SBSG: { lat: -5.7681, lon: -35.3761, name: 'Natal/São Gonçalo' },
-  SBAR: { lat: -10.984, lon: -37.0703, name: 'Aracaju' },
-  SBMO: { lat: -9.5108, lon: -35.7917, name: 'Maceió' },
-  SBJP: { lat: -7.1484, lon: -34.9507, name: 'João Pessoa' },
-  SBPS: { lat: -16.4386, lon: -39.0809, name: 'Porto Seguro' },
-  // North
-  SBEG: { lat: -3.0386, lon: -60.0497, name: 'Manaus' },
-  SBBE: { lat: -1.3792, lon: -48.4761, name: 'Belém' },
-  SBPV: { lat: -8.7093, lon: -63.9023, name: 'Porto Velho' },
-  SBMQ: { lat: 0.0506, lon: -51.0722, name: 'Macapá' },
-  // Center-West
-  SBBR: { lat: -15.8692, lon: -47.9208, name: 'Brasília' },
-  SBGO: { lat: -16.632, lon: -49.2207, name: 'Goiânia' },
-  SBCY: { lat: -15.6529, lon: -56.1167, name: 'Cuiabá' },
-  SBCG: { lat: -20.4687, lon: -54.6725, name: 'Campo Grande' },
-  // US continental map (100 hubs)
+  ...Object.fromEntries(
+    BR_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
   ...Object.fromEntries(
     US_CAREER_HUBS.map((h) => [
       h.icao,
@@ -1019,12 +984,15 @@ function ensurePile(
 }
 
 /**
- * Seed the career cargo world: Brazil domestic hubs + sparse US anchors,
+ * Seed the career cargo world: Brazil domestic hubs + US continental map,
  * with asymmetric production/consumption so ticks create explainable lanes.
  */
 export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEconomyWorld {
   const seed = opts.seed?.trim() || 'skyline-career-br-v1';
   const rng = mulberry32(hashSeed(seed));
+
+  assertBrCareerHubCatalog();
+  assertUsCareerHubCatalog();
 
   const hubs: Array<{
     icao: string;
@@ -1036,233 +1004,14 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     /** Relative consumption bias. */
     consume: Partial<Record<CommodityId, number>>;
   }> = [
-    {
-      icao: 'SBGR',
-      name: 'São Paulo/Guarulhos',
-      region: 'BR-SE',
-      hubTier: 'major',
-      produce: { electronics: 1.4, general: 1.1, supplies: 1.2, machinery: 0.9 },
-      consume: { perishables: 1.2, general: 1.0, supplies: 0.9 },
-    },
-    {
-      icao: 'SBGL',
-      name: 'Rio de Janeiro/Galeão',
-      region: 'BR-SE',
-      hubTier: 'major',
-      produce: { perishables: 1.3, general: 0.8, supplies: 1.1 },
-      consume: { electronics: 1.1, machinery: 1.0, supplies: 1.0 },
-    },
-    {
-      icao: 'SBKP',
-      name: 'Campinas/Viracopos',
-      region: 'BR-SE',
-      hubTier: 'major',
-      produce: { electronics: 1.6, machinery: 1.2, supplies: 1.0 },
-      consume: { general: 0.9, perishables: 0.7, supplies: 0.85 },
-    },
-    {
-      icao: 'SBCF',
-      name: 'Belo Horizonte/Confins',
-      region: 'BR-SE',
-      hubTier: 'regional',
-      produce: { machinery: 1.3, general: 1.0, supplies: 1.15 },
-      consume: { electronics: 0.9, perishables: 1.0, supplies: 0.95 },
-    },
-    {
-      icao: 'SBVT',
-      name: 'Vitória',
-      region: 'BR-SE',
-      hubTier: 'regional',
-      produce: { general: 1.2, machinery: 0.8 },
-      consume: { electronics: 0.9, perishables: 1.0 },
-    },
-    {
-      icao: 'SBRP',
-      name: 'Ribeirão Preto',
-      region: 'BR-SE',
-      hubTier: 'spoke',
-      produce: { machinery: 1.0, perishables: 1.2 },
-      consume: { electronics: 0.9, general: 0.8 },
-    },
-    {
-      icao: 'SBCT',
-      name: 'Curitiba',
-      region: 'BR-S',
-      hubTier: 'regional',
-      produce: { machinery: 1.1, perishables: 1.0 },
-      consume: { electronics: 0.9, general: 1.0 },
-    },
-    {
-      icao: 'SBPA',
-      name: 'Porto Alegre',
-      region: 'BR-S',
-      hubTier: 'regional',
-      produce: { machinery: 1.2, general: 1.1 },
-      consume: { electronics: 1.0, perishables: 1.1 },
-    },
-    {
-      icao: 'SBFL',
-      name: 'Florianópolis',
-      region: 'BR-S',
-      hubTier: 'spoke',
-      produce: { electronics: 0.8, perishables: 1.1 },
-      consume: { machinery: 0.9, general: 1.0 },
-    },
-    {
-      icao: 'SBNF',
-      name: 'Navegantes',
-      region: 'BR-S',
-      hubTier: 'spoke',
-      produce: { general: 1.3, machinery: 1.0 },
-      consume: { electronics: 0.9, perishables: 0.8 },
-    },
-    {
-      icao: 'SBLO',
-      name: 'Londrina',
-      region: 'BR-S',
-      hubTier: 'spoke',
-      produce: { perishables: 1.4, machinery: 0.8 },
-      consume: { electronics: 0.9, general: 0.9 },
-    },
-    {
-      icao: 'SBJV',
-      name: 'Joinville',
-      region: 'BR-S',
-      hubTier: 'spoke',
-      produce: { machinery: 1.3, general: 0.9 },
-      consume: { electronics: 0.8, perishables: 0.9 },
-    },
-    {
-      icao: 'SBSV',
-      name: 'Salvador',
-      region: 'BR-NE',
-      hubTier: 'regional',
-      produce: { perishables: 1.5, general: 0.9 },
-      consume: { electronics: 0.8, machinery: 0.7 },
-    },
-    {
-      icao: 'SBRF',
-      name: 'Recife',
-      region: 'BR-NE',
-      hubTier: 'regional',
-      produce: { general: 1.2, perishables: 1.0 },
-      consume: { electronics: 1.1, machinery: 0.9 },
-    },
-    {
-      icao: 'SBFZ',
-      name: 'Fortaleza',
-      region: 'BR-NE',
-      hubTier: 'regional',
-      produce: { perishables: 1.3, general: 1.0 },
-      consume: { electronics: 1.0, machinery: 0.8 },
-    },
-    {
-      icao: 'SBSG',
-      name: 'Natal/São Gonçalo',
-      region: 'BR-NE',
-      hubTier: 'spoke',
-      produce: { perishables: 1.2, general: 0.8 },
-      consume: { electronics: 0.9, machinery: 0.8 },
-    },
-    {
-      icao: 'SBAR',
-      name: 'Aracaju',
-      region: 'BR-NE',
-      hubTier: 'spoke',
-      produce: { perishables: 1.2, general: 0.9 },
-      consume: { electronics: 0.8, machinery: 0.9 },
-    },
-    {
-      icao: 'SBMO',
-      name: 'Maceió',
-      region: 'BR-NE',
-      hubTier: 'spoke',
-      produce: { perishables: 1.3, general: 0.8 },
-      consume: { electronics: 0.9, machinery: 0.8 },
-    },
-    {
-      icao: 'SBJP',
-      name: 'João Pessoa',
-      region: 'BR-NE',
-      hubTier: 'spoke',
-      produce: { perishables: 1.1, general: 0.9 },
-      consume: { electronics: 0.8, machinery: 0.8 },
-    },
-    {
-      icao: 'SBPS',
-      name: 'Porto Seguro',
-      region: 'BR-NE',
-      hubTier: 'spoke',
-      produce: { perishables: 1.1, general: 0.7 },
-      consume: { electronics: 0.8, machinery: 0.7 },
-    },
-    // North — Manaus is the domestic cargo anchor
-    {
-      icao: 'SBEG',
-      name: 'Manaus',
-      region: 'BR-N',
-      hubTier: 'major',
-      produce: { electronics: 1.9, machinery: 1.1, general: 0.9 },
-      consume: { perishables: 1.3, general: 1.1 },
-    },
-    {
-      icao: 'SBBE',
-      name: 'Belém',
-      region: 'BR-N',
-      hubTier: 'regional',
-      produce: { perishables: 1.4, general: 1.1 },
-      consume: { electronics: 0.9, machinery: 0.8 },
-    },
-    {
-      icao: 'SBPV',
-      name: 'Porto Velho',
-      region: 'BR-N',
-      hubTier: 'spoke',
-      produce: { general: 1.1, perishables: 1.0 },
-      consume: { electronics: 0.8, machinery: 0.9 },
-    },
-    {
-      icao: 'SBMQ',
-      name: 'Macapá',
-      region: 'BR-N',
-      hubTier: 'spoke',
-      produce: { perishables: 1.1, general: 0.9 },
-      consume: { electronics: 0.8, machinery: 0.7 },
-    },
-    // Center-West — Brasília redistributes
-    {
-      icao: 'SBBR',
-      name: 'Brasília',
-      region: 'BR-CO',
-      hubTier: 'regional',
-      produce: { general: 1.2, electronics: 0.9 },
-      consume: { perishables: 1.2, machinery: 1.0, electronics: 1.0 },
-    },
-    {
-      icao: 'SBGO',
-      name: 'Goiânia',
-      region: 'BR-CO',
-      hubTier: 'regional',
-      produce: { perishables: 1.3, machinery: 1.0 },
-      consume: { electronics: 0.9, general: 1.0 },
-    },
-    {
-      icao: 'SBCY',
-      name: 'Cuiabá',
-      region: 'BR-CO',
-      hubTier: 'spoke',
-      produce: { perishables: 1.4, general: 1.0 },
-      consume: { electronics: 0.8, machinery: 0.9 },
-    },
-    {
-      icao: 'SBCG',
-      name: 'Campo Grande',
-      region: 'BR-CO',
-      hubTier: 'spoke',
-      produce: { perishables: 1.2, machinery: 0.9 },
-      consume: { electronics: 0.8, general: 0.9 },
-    },
-    // US continental — 100 hubs from catalog (Dry-biased spokes fill Network holes)
+    ...BR_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+    })),
     ...US_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
@@ -1272,8 +1021,6 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       consume: h.consume,
     })),
   ];
-
-  assertUsCareerHubCatalog();
 
   const airports: AirportTerminal[] = hubs.map((h) => {
     const coords = CAREER_HUB_COORDS[h.icao];

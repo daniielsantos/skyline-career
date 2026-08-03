@@ -16,6 +16,8 @@
   "capabilities": [
     "simconnect"
   ],
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "gating": {
     "requireOnGround": true,
     "requireEnginesOff": false,

@@ -22,6 +22,13 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+/** Skyline inject profiles need non-empty write plans; EFB/native-simbrief may be empty. */
+function requiresInjectWritePlans(profile) {
+  if (profile.injectCapable === false) return false;
+  if (profile.loadMethod === 'native-simbrief') return false;
+  return true;
+}
+
 function validateProfile(profile, fileName) {
   for (const key of REQUIRED_TOP_LEVEL) {
     assert(profile[key] !== undefined, `${fileName}: missing ${key}`);
@@ -32,8 +39,18 @@ function validateProfile(profile, fileName) {
   assert(/^[a-f0-9]{64}$/.test(profile.match.fingerprint), `${fileName}: invalid fingerprint`);
 
   assert(Array.isArray(profile.fuel.tanks) && profile.fuel.tanks.length > 0, `${fileName}: fuel.tanks required`);
-  assert(Array.isArray(profile.fuel.writePlan) && profile.fuel.writePlan.length > 0, `${fileName}: fuel.writePlan required`);
-  assert(Array.isArray(profile.payload.writePlan) && profile.payload.writePlan.length > 0, `${fileName}: payload.writePlan required`);
+  assert(Array.isArray(profile.fuel.writePlan), `${fileName}: fuel.writePlan must be an array`);
+  assert(Array.isArray(profile.payload.writePlan), `${fileName}: payload.writePlan must be an array`);
+  if (requiresInjectWritePlans(profile)) {
+    assert(
+      profile.fuel.writePlan.length > 0,
+      `${fileName}: fuel.writePlan required (inject profiles)`,
+    );
+    assert(
+      profile.payload.writePlan.length > 0,
+      `${fileName}: payload.writePlan required (inject profiles)`,
+    );
+  }
 
   return true;
 }

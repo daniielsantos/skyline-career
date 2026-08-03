@@ -35,6 +35,15 @@
     "displayName": {
       "type": "string"
     },
+    "loadMethod": {
+      "type": "string",
+      "enum": ["direct-injection", "native-simbrief", "manual"],
+      "description": "How Career expects OFP fuel/payload to be loaded for this airframe."
+    },
+    "injectCapable": {
+      "type": "boolean",
+      "description": "False when Skyline must not write fuel/payload (EFB/tablet owns load)."
+    },
     "match": {
       "type": "object",
       "required": ["fingerprint"],
@@ -45,7 +54,11 @@
         },
         "title": { "type": "string" },
         "publisher": { "type": "string" },
-        "icao": { "type": "string" }
+        "icao": { "type": "string" },
+        "liveTitles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
       "additionalProperties": false
     },
@@ -223,7 +236,8 @@
         },
         "writePlan": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
+          "description": "May be empty when injectCapable is false / loadMethod is native-simbrief.",
           "items": { "$ref": "#/$defs/writeOp" }
         },
         "verify": { "$ref": "#/$defs/verifyBlock" }
@@ -261,7 +275,8 @@
         },
         "writePlan": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
+          "description": "May be empty when injectCapable is false / loadMethod is native-simbrief.",
           "items": { "$ref": "#/$defs/writeOp" }
         },
         "verify": { "$ref": "#/$defs/verifyBlock" }

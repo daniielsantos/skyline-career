@@ -1,4 +1,8 @@
-import type { Mission, MissionSettlement } from './api';
+import type {
+  Mission,
+  MissionSettlement,
+  FlightScoreSnapshot,
+} from './api';
 
 export type DispatchStepId =
   | 'manifest'
@@ -46,6 +50,7 @@ export type FlightDebrief = {
   landingFpm: number | null;
   /** Airborne duration (wheels-up → touchdown/settle), ms. */
   flightDurationMs: number | null;
+  flightScore: FlightScoreSnapshot | null;
   netUsd: number;
 };
 
@@ -77,6 +82,7 @@ export function buildFlightDebrief(opts: {
     | 'fuelUplift'
     | 'settledLandingFpm'
     | 'settledFlightDurationMs'
+    | 'settledFlightScore'
   >;
   settlement: MissionSettlement;
 }): FlightDebrief {
@@ -97,6 +103,8 @@ export function buildFlightDebrief(opts: {
           Number.isFinite(opts.mission.settledFlightDurationMs)
         ? Math.round(opts.mission.settledFlightDurationMs)
         : null;
+  const flightScore =
+    opts.settlement.flightScore ?? opts.mission.settledFlightScore ?? null;
   return {
     missionId: opts.mission.id,
     originIcao: opts.mission.originIcao,
@@ -110,6 +118,7 @@ export function buildFlightDebrief(opts: {
     residualFuelKg: opts.settlement.residualFuelKg,
     landingFpm,
     flightDurationMs,
+    flightScore,
     netUsd: opts.settlement.payoutUsd - fuelCostUsd,
   };
 }

@@ -5414,6 +5414,66 @@ export function App() {
                     <dd>{formatMoney(flightDebrief.netUsd)}</dd>
                   </div>
                 </dl>
+                {flightDebrief.flightScore ? (
+                  <div className="flight-score" aria-label="Flight score">
+                    <div className="flight-score-head">
+                      <strong>FLIGHT SCORE</strong>
+                      <span
+                        className={
+                          flightDebrief.flightScore.pct >= 90
+                            ? 'flight-score-pct flight-score-pct-good'
+                            : flightDebrief.flightScore.pct >= 70
+                              ? 'flight-score-pct flight-score-pct-ok'
+                              : 'flight-score-pct flight-score-pct-low'
+                        }
+                      >
+                        {Math.round(flightDebrief.flightScore.pct)}%
+                      </span>
+                    </div>
+                    <p className="flight-score-total">
+                      {flightDebrief.flightScore.earned}/
+                      {flightDebrief.flightScore.max} pts
+                    </p>
+                    <ul className="flight-score-cats">
+                      {flightDebrief.flightScore.categories.map((cat) => (
+                        <li key={cat.id}>
+                          <div className="flight-score-cat-head">
+                            <span>{cat.label}</span>
+                            <span>
+                              {cat.earned}/{cat.max}
+                            </span>
+                          </div>
+                          <div
+                            className="flight-score-bar"
+                            role="presentation"
+                          >
+                            <div
+                              className="flight-score-bar-fill"
+                              style={{
+                                width: `${
+                                  cat.max > 0
+                                    ? Math.round((100 * cat.earned) / cat.max)
+                                    : 0
+                                }%`,
+                              }}
+                            />
+                          </div>
+                          <ul className="flight-score-metrics">
+                            {cat.metrics.map((m) => (
+                              <li key={m.id}>
+                                <span>{m.label}</span>
+                                <span>
+                                  {m.points}/{m.maxPoints}
+                                  {m.detail ? ` · ${m.detail}` : ''}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 <div className="debrief-actions">
                   <button
                     type="button"

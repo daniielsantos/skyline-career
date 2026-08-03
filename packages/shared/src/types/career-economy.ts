@@ -1,5 +1,6 @@
 /** Skyline Career — local cargo logistics economy (Slice 1). */
 
+import type { FlightScoreSnapshot } from '../career-flight-score.js';
 import type { OfpBriefingSummary, OfpLoadMethod } from './ofp-compliance.js';
 
 export type { OfpLoadMethod };
@@ -615,6 +616,8 @@ export interface MissionIntent {
   settledLandingFpm?: number;
   /** Wall-clock airborne duration (wheels-up → touchdown/settle), ms. */
   settledFlightDurationMs?: number;
+  /** OnAir-style flight scorecard captured by Watch (envelope / taxi / landing). */
+  settledFlightScore?: FlightScoreSnapshot;
   /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';

@@ -6,6 +6,7 @@ import {
   createMissionFlightWatchState,
   applyWalletDelta,
   createCruiseSampleState,
+  createFlightScoreAccumulator,
   cruiseSampleStatus,
   DEFAULT_CRUISE_EMA_ALPHA,
   departMission,
@@ -13,12 +14,14 @@ import {
   evaluateLoadVerification,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
+  finalizeFlightScore,
   flightPhaseFromSample,
   isUsableFuelTankBreakdown,
   loadVerificationDrifted,
   mergeAirframePerfOverride,
   pickFuelTankBreakdown,
   pushCruiseTick,
+  pushFlightScoreSample,
   resolveLivePayloadLb,
   KG_TO_LB,
   DEFAULT_JET_A_LB_PER_GAL,
@@ -31,6 +34,8 @@ import {
   type CruiseSampleState,
   type CruiseSampleStatus,
   type FlightGroundSample,
+  type FlightScoreAccumulator,
+  type FlightScoreSnapshot,
   type FuelTankBreakdown,
   type MissionFlightEvent,
   type MissionFlightWatchState,
@@ -106,6 +111,8 @@ export type WatchStatusPayload = {
     landingFpm: number | null;
     /** Airborne wall-clock duration (ms), when known. */
     flightDurationMs: number | null;
+    /** Flight scorecard from Watch telemetry. */
+    flightScore: FlightScoreSnapshot | null;
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -163,7 +170,19 @@ type WatchOptions = {
 
 export async function sampleLiveFlight(
   bridge: NamedPipeSimBridge,
-): Promise<FlightGroundSample> {
+): Promise<
+  FlightGroundSample & {
+    bankDeg?: number;
+    pitchDeg?: number;
+    gForce?: number;
+    indicatedAirspeedKt?: number;
+    altitudeFt?: number;
+    overspeedWarning?: boolean;
+    stallWarning?: boolean;
+    gearDown?: boolean;
+    flapsPct?: number;
+  }
+> {
   const snap = await bridge.snapshot();
   let position: { lat: number; lon: number } | undefined;
   let groundSpeedKt: number | undefined;
@@ -197,12 +216,61 @@ export async function sampleLiveFlight(
   } catch {
     verticalSpeedFpm = undefined;
   }
+
+  const readOpt = async (
+    name: string,
+    unit: string,
+  ): Promise<number | undefined> => {
+    try {
+      const v = await bridge.readSimVar({ name, unit });
+      return Number.isFinite(v) ? v : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const [bankDeg, pitchDeg, gForce, indicatedAirspeedKt, altitudeFt, gearPct, flapsPct] =
+    await Promise.all([
+      readOpt('PLANE BANK DEGREES', 'degrees'),
+      readOpt('PLANE PITCH DEGREES', 'degrees'),
+      readOpt('G FORCE', 'Gforce'),
+      readOpt('AIRSPEED INDICATED', 'knots'),
+      readOpt('PLANE ALTITUDE', 'feet'),
+      readOpt('GEAR TOTAL PCT EXTENDED', 'percent'),
+      readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'percent'),
+    ]);
+
+  let overspeedWarning: boolean | undefined;
+  let stallWarning: boolean | undefined;
+  try {
+    const o = await bridge.readSimVar({ name: 'OVERSPEED WARNING', unit: 'bool' });
+    if (Number.isFinite(o)) overspeedWarning = o > 0.5;
+  } catch {
+    overspeedWarning = undefined;
+  }
+  try {
+    const s = await bridge.readSimVar({ name: 'STALL WARNING', unit: 'bool' });
+    if (Number.isFinite(s)) stallWarning = s > 0.5;
+  } catch {
+    stallWarning = undefined;
+  }
+
   return {
     onGround: snap.onGround,
     enginesRunning: snap.enginesRunning,
     position,
     groundSpeedKt,
     verticalSpeedFpm,
+    bankDeg,
+    pitchDeg,
+    gForce,
+    indicatedAirspeedKt,
+    altitudeFt,
+    overspeedWarning,
+    stallWarning,
+    gearDown:
+      typeof gearPct === 'number' ? gearPct >= 80 : undefined,
+    flapsPct,
   };
 }
 
@@ -519,6 +587,8 @@ export class CareerWatchSession {
   private preflightDepartBlockedLogged = false;
   private cruiseState: CruiseSampleState = createCruiseSampleState();
   private cruiseStatus: CruiseSampleStatus | null = null;
+  private scoreAcc: FlightScoreAccumulator = createFlightScoreAccumulator();
+  private lastFlightScore: FlightScoreSnapshot | null = null;
 
   constructor(private readonly cb: WatchCallbacks) {}
 
@@ -532,6 +602,11 @@ export class CareerWatchSession {
   getCapturedAirborneEndedAtMs(): number | undefined {
     const ended = this.watchState.airborneEndedAtMs;
     return typeof ended === 'number' && Number.isFinite(ended) ? ended : undefined;
+  }
+
+  /** Finalized scorecard from this Watch session (updated each tick). */
+  getCapturedFlightScore(): FlightScoreSnapshot | null {
+    return this.lastFlightScore;
   }
 
   getStatus(): WatchStatusPayload {
@@ -642,6 +717,8 @@ export class CareerWatchSession {
     this.preflightDepartBlockedLogged = false;
     this.cruiseState = createCruiseSampleState();
     this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+    this.scoreAcc = createFlightScoreAccumulator();
+    this.lastFlightScore = finalizeFlightScore(this.scoreAcc);
 
     const loaded = await this.cb.withCareerRead((_world, missions) => {
       const mission = missions.missions.find((m) => m.id === opts.missionId);
@@ -999,6 +1076,33 @@ export class CareerWatchSession {
       this.lastEvent = event;
       this.lastEventAtIso = new Date().toISOString();
 
+      // Flight score: envelope peaks + taxi GS + landing snapshot.
+      const postTouchdown =
+        typeof nextState.airborneEndedAtMs === 'number' ||
+        (nextState.sawAirborne && sample.onGround && nextState.landingFpm != null);
+      this.scoreAcc = pushFlightScoreSample(this.scoreAcc, {
+        onGround: sample.onGround,
+        sawAirborne: nextState.sawAirborne,
+        postTouchdown,
+        groundSpeedKt: sample.groundSpeedKt,
+        bankDeg: sample.bankDeg,
+        pitchDeg: sample.pitchDeg,
+        gForce: sample.gForce,
+        indicatedAirspeedKt: sample.indicatedAirspeedKt,
+        altitudeFt: sample.altitudeFt,
+        overspeedWarning: sample.overspeedWarning,
+        stallWarning: sample.stallWarning,
+        gearDown: sample.gearDown,
+        flapsPct: sample.flapsPct,
+        landingVsFpm:
+          postTouchdown && nextState.landingFpm != null
+            ? nextState.landingFpm
+            : undefined,
+      });
+      this.lastFlightScore = finalizeFlightScore(this.scoreAcc, {
+        landingVsFpm: nextState.landingFpm,
+      });
+
       // Stable-cruise burn/TAS sample while airborne on an active freighter leg.
       if (
         current.status === 'in_flight' &&
@@ -1159,6 +1263,11 @@ export class CareerWatchSession {
             landingFpm,
             airborneEndedAtMs: this.watchState.airborneEndedAtMs,
             nowMs: Date.now(),
+            flightScore:
+              this.lastFlightScore ??
+              finalizeFlightScore(this.scoreAcc, {
+                landingVsFpm: landingFpm,
+              }),
           });
           freshMissions.missions[openIdx] = result.mission;
           const cruiseCommit = this.cruiseState.committed;
@@ -1207,6 +1316,7 @@ export class CareerWatchSession {
             residualFuelKg: result.mission.settledFuelKg ?? null,
             landingFpm: result.mission.settledLandingFpm ?? null,
             flightDurationMs: result.mission.settledFlightDurationMs ?? null,
+            flightScore: result.mission.settledFlightScore ?? null,
           };
           return true;
         });

@@ -61,7 +61,7 @@ async function resolveEndpoint(
     const view = await fetchAirport(code);
     const { lat, lon, name } = view.airport;
     if (usableCoords(lat, lon)) {
-      return { icao: code, lat, lon, name };
+      return { icao: code, lat, lon: lon!, name };
     }
   } catch {
     /* missing */

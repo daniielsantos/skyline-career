@@ -143,6 +143,34 @@ describe('buildFlightDebrief', () => {
       residualFuelKg: 120,
       landingFpm: -185,
       flightDurationMs: 69 * 60_000,
+      flightScore: {
+        earned: 44,
+        max: 51,
+        pct: 86,
+        categories: [
+          {
+            id: 'envelope',
+            label: 'Envelope',
+            earned: 20,
+            max: 20,
+            metrics: [],
+          },
+          {
+            id: 'taxi',
+            label: 'Taxi',
+            earned: 8,
+            max: 8,
+            metrics: [],
+          },
+          {
+            id: 'landing',
+            label: 'Landing',
+            earned: 16,
+            max: 23,
+            metrics: [],
+          },
+        ],
+      },
     };
     const debrief = buildFlightDebrief({
       mission: mission({
@@ -164,6 +192,8 @@ describe('buildFlightDebrief', () => {
     assert.equal(debrief.landingFpm, -185);
     assert.equal(debrief.flightDurationMs, 69 * 60_000);
     assert.equal(formatFlightDurationMs(debrief.flightDurationMs), '1h 9m');
+    assert.equal(debrief.flightScore?.pct, 86);
+    assert.equal(debrief.flightScore?.earned, 44);
   });
 });
 

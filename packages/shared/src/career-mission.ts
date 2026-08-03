@@ -13,6 +13,7 @@ import {
   evaluateMinAirborneElapsed,
   resolveExpectedRouteMs,
 } from './career-flight-watch.js';
+import type { FlightScoreSnapshot } from './career-flight-score.js';
 import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
@@ -1194,6 +1195,8 @@ export interface SettleMissionOpts {
    * settled flight duration.
    */
   airborneEndedAtMs?: number;
+  /** Finalized Watch flight scorecard (envelope / taxi / landing). */
+  flightScore?: FlightScoreSnapshot;
   /** Wall-clock now for minimum airborne duration gate. */
   nowMs?: number;
   /**
@@ -1388,6 +1391,7 @@ export function settleMission(
         ? Math.round(opts.landingFpm)
         : working.settledLandingFpm,
     settledFlightDurationMs,
+    settledFlightScore: opts.flightScore ?? working.settledFlightScore,
     payoutUsd: pay.payoutUsd,
     penaltyUsd: pay.penaltyUsd,
     lateTicks: pay.lateTicks,

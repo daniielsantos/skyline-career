@@ -23,6 +23,7 @@ export * from './career-store.js';
 export * from './career-mission.js';
 export * from './career-live-load.js';
 export * from './career-flight-watch.js';
+export * from './career-flight-score.js';
 export * from './cruise-sample.js';
 export * from './fingerprint.js';
 export * from './profile-structure.js';

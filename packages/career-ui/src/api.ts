@@ -63,6 +63,31 @@ export type CareerLedgerKind =
   | 'repair'
   | 'other';
 
+/** OnAir-style flight scorecard (mirrors @msfs-compat/shared FlightScoreSnapshot). */
+export type FlightScoreMetric = {
+  id: string;
+  label: string;
+  category: 'envelope' | 'taxi' | 'landing';
+  points: number;
+  maxPoints: number;
+  detail?: string;
+};
+
+export type FlightScoreCategory = {
+  id: 'envelope' | 'taxi' | 'landing';
+  label: string;
+  earned: number;
+  max: number;
+  metrics: FlightScoreMetric[];
+};
+
+export type FlightScoreSnapshot = {
+  earned: number;
+  max: number;
+  pct: number;
+  categories: FlightScoreCategory[];
+};
+
 export type CareerLedgerEntry = {
   id: string;
   atTick: number;
@@ -370,6 +395,8 @@ export type Mission = {
   settledLandingFpm?: number;
   /** Airborne wall-clock duration when settled (ms). */
   settledFlightDurationMs?: number;
+  /** Watch flight scorecard from the completed leg. */
+  settledFlightScore?: FlightScoreSnapshot;
   staticId?: string;
   lots?: MissionLotLine[];
   shipmentLotId?: string;
@@ -1094,6 +1121,8 @@ export type MissionSettlement = {
   landingFpm?: number | null;
   /** Airborne wall-clock duration (ms). */
   flightDurationMs?: number | null;
+  /** Flight scorecard from Watch telemetry. */
+  flightScore?: FlightScoreSnapshot | null;
 };
 
 export type WatchEvent =

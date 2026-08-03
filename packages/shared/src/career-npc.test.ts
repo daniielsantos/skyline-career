@@ -12,6 +12,7 @@ import {
   listRegionMarketPressure,
   migrateEconomyWorld,
   hoursToTicks,
+  NPC_FLEET_COMPOSITION,
   NPC_FLEET_SIZE,
   NPC_MX_INTERVAL_HOURS,
   NPC_MX_PARTS_KG,
@@ -28,6 +29,13 @@ import {
 import { getAircraftClass } from './career-mission.js';
 import type { NpcFlight } from './types/career-economy.js';
 
+function npcCompositionCount(aircraftClassId: string): number {
+  return (
+    NPC_FLEET_COMPOSITION.find((slot) => slot.aircraftClassId === aircraftClassId)
+      ?.count ?? 0
+  );
+}
+
 describe('NPC freighter fleet', () => {
   it('seeds jets plus medium piston, light jet, Caravan and Bonanza GA freighters', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-seed' });
@@ -39,12 +47,12 @@ describe('NPC freighter fleet', () => {
     const lightJet = world.npcs.filter((n) => n.aircraftClassId === 'light_jet');
     const caravan = world.npcs.filter((n) => n.aircraftClassId === 'light_turboprop');
     const bonanza = world.npcs.filter((n) => n.aircraftClassId === 'light_ga');
-    assert.equal(narrow.length, 14);
-    assert.equal(wide.length, 10);
-    assert.equal(mediumPiston.length, 4);
-    assert.equal(lightJet.length, 4);
-    assert.equal(caravan.length, 10);
-    assert.equal(bonanza.length, 6);
+    assert.equal(narrow.length, npcCompositionCount('narrow_freighter'));
+    assert.equal(wide.length, npcCompositionCount('wide_freighter'));
+    assert.equal(mediumPiston.length, npcCompositionCount('medium_piston'));
+    assert.equal(lightJet.length, npcCompositionCount('light_jet'));
+    assert.equal(caravan.length, npcCompositionCount('light_turboprop'));
+    assert.equal(bonanza.length, npcCompositionCount('light_ga'));
     assert.ok(world.npcs.every((n) => n.status === 'idle'));
     assert.ok(world.npcs.every((n) => n.reliability > 0 && n.aggressiveness > 0));
   });
@@ -83,7 +91,10 @@ describe('NPC freighter fleet', () => {
           n.aircraftClassId === 'wide_freighter',
       )
       .map((n) => ({ ...n }));
-    assert.equal(jetOnly.length, 24);
+    assert.equal(
+      jetOnly.length,
+      npcCompositionCount('narrow_freighter') + npcCompositionCount('wide_freighter'),
+    );
     const migrated = migrateEconomyWorld({
       version: 3,
       seed: world.seed,
@@ -98,19 +109,19 @@ describe('NPC freighter fleet', () => {
     });
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_turboprop').length,
-      10,
+      npcCompositionCount('light_turboprop'),
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'medium_piston').length,
-      4,
+      npcCompositionCount('medium_piston'),
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_jet').length,
-      4,
+      npcCompositionCount('light_jet'),
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_ga').length,
-      6,
+      npcCompositionCount('light_ga'),
     );
     assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
   });

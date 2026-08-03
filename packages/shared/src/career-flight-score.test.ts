@@ -105,4 +105,24 @@ describe('pushFlightScoreSample + finalizeFlightScore', () => {
     });
     assert.equal(acc.bounceCount, 1);
   });
+
+  it('auto-passes landing gear for fixed-gear aircraft', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -180,
+      gForce: 1.1,
+      gearDown: false,
+      gearRetractable: false,
+      flapsPct: 25,
+    });
+    const score = finalizeFlightScore(acc);
+    const gear = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_gear');
+    assert.equal(gear?.points, 1);
+    assert.equal(gear?.detail, 'fixed gear');
+  });
 });

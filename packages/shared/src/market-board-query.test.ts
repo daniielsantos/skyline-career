@@ -38,7 +38,7 @@ describe('queryMarketBoardPage', () => {
     row({ payUsd: 300, distanceNm: 200, commodityName: 'C', availableKg: 100, expiresAtTick: 60 }),
   ];
 
-  it('defaults to pay desc and paginates', () => {
+  it('defaults to unlocked-first (stable) and paginates', () => {
     const page1 = queryMarketBoardPage(rows, {
       currentTick: 0,
       page: 1,
@@ -46,9 +46,10 @@ describe('queryMarketBoardPage', () => {
     });
     assert.equal(page1.total, 3);
     assert.equal(page1.pageCount, 2);
+    // All unlocked → preserve input order within access.
     assert.deepEqual(
       page1.rows.map((r) => r.payUsd),
-      [500, 300],
+      [100, 500],
     );
     const page2 = queryMarketBoardPage(rows, {
       currentTick: 0,
@@ -57,7 +58,69 @@ describe('queryMarketBoardPage', () => {
     });
     assert.deepEqual(
       page2.rows.map((r) => r.payUsd),
-      [100],
+      [300],
+    );
+  });
+
+  it('keeps unlocked first even when client only asks for pay desc', () => {
+    const mixed = [
+      row({ payUsd: 900, commodityId: 'electronics', cargoLocked: true }),
+      row({ payUsd: 200, commodityId: 'general', cargoLocked: false }),
+      row({ payUsd: 400, commodityId: 'supplies', cargoLocked: false }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      sorts: [{ key: 'pay', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [400, 200, 900],
+    );
+  });
+
+  it('allows locked-first when access:desc is explicit', () => {
+    const mixed = [
+      row({ payUsd: 200, commodityId: 'general', cargoLocked: false }),
+      row({ payUsd: 900, commodityId: 'electronics', cargoLocked: true }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      sorts: [
+        { key: 'access', direction: 'desc' },
+        { key: 'pay', direction: 'desc' },
+      ],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.equal(result.rows[0]?.cargoLocked, true);
+  });
+
+  it('filters by Cargo Ops access', () => {
+    const mixed = [
+      row({ payUsd: 100, commodityId: 'general', cargoLocked: false }),
+      row({ payUsd: 200, commodityId: 'electronics', cargoLocked: true }),
+    ];
+    const open = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      accessFilter: 'open',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      open.rows.map((r) => r.commodityId),
+      ['general'],
+    );
+    const locked = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      accessFilter: 'locked',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      locked.rows.map((r) => r.commodityId),
+      ['electronics'],
     );
   });
 

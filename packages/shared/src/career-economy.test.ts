@@ -8,6 +8,7 @@ import {
   DEAD_LOT_RETENTION_TICKS,
   ensureCareerHubCoverage,
   ensureEconomyCaughtUp,
+  ensureSeedMarketFormed,
   escalateIdleLots,
   hubTierOf,
   HUB_TIER_PROFILE,
@@ -29,6 +30,7 @@ import {
   tickEconomyN,
 } from './career-economy.js';
 import { NPC_FLEET_SIZE } from './career-npc.js';
+import { US_CAREER_HUBS } from './career-us-hubs.js';
 import type {
   CareerEconomyWorld,
   CommodityId,
@@ -38,18 +40,18 @@ import type {
 } from './types/career-economy.js';
 
 describe('career-economy seed', () => {
-  it('creates 28 BR + 24 US hubs across 11 regions', () => {
+  it('creates 28 BR + 100 US hubs across 11 regions', () => {
     const world = createSeedEconomyWorld({ seed: 'test-a' });
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 52);
+    assert.equal(world.airports.length, 128);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 10);
     const br = world.airports.filter((a) => a.icao.startsWith('SB'));
     const us = world.airports.filter((a) => a.icao.startsWith('K'));
     assert.equal(br.length, 28);
-    assert.equal(us.length, 24);
+    assert.equal(us.length, 100);
     assert.deepEqual(
       new Set(world.airports.map((airport) => airport.region)),
       new Set([
@@ -143,16 +145,17 @@ describe('cargo corridors', () => {
     assert.equal(corridorWeight('SBGR', 'SBPS'), 1);
   });
 
-  it('gives every US regional at least two gateway corridors', () => {
-    const usRegionals = ['KBOS', 'KEWR', 'KCLT', 'KDTW', 'KMSP', 'KMEM', 'KPHX', 'KSFO'];
-    for (const icao of usRegionals) {
+  it('gives every US hub at least two gateway corridors', () => {
+    for (const hub of US_CAREER_HUBS) {
       assert.ok(
-        corridorPartners(icao).length >= 2,
-        `expected ${icao} to have at least two corridor partners`,
+        corridorPartners(hub.icao).length >= 2,
+        `expected ${hub.icao} to have at least two corridor partners`,
       );
     }
     assert.ok(corridorWeight('KMEM', 'KDFW') > 1);
     assert.ok(corridorWeight('KMEM', 'KIAH') > 1);
+    assert.ok(corridorPartners('KPDX').length >= 2);
+    assert.ok(corridorPartners('KOMA').length >= 2);
   });
 
   it('releases critically full regionals to a domestic off-corridor shortage', () => {
@@ -458,6 +461,16 @@ describe('tickEconomyN market formation', () => {
     }
   });
 
+  it('ensureSeedMarketFormed warms an empty tick-0 board once', () => {
+    const world = createSeedEconomyWorld({ seed: 'seed-warm' });
+    assert.equal(world.tick, 0);
+    assert.equal(world.lots.length, 0);
+    assert.equal(ensureSeedMarketFormed(world), true);
+    assert.ok(world.tick >= 96);
+    assert.ok(listMarketLots(world).length > 0);
+    assert.equal(ensureSeedMarketFormed(world), false);
+  });
+
   it('concentrates market activity on major hubs over spokes', () => {
     const world = createSeedEconomyWorld({ seed: 'tier-market' });
     tickEconomyN(world, 48);
@@ -511,6 +524,19 @@ describe('tickEconomyN market formation', () => {
       assert.ok(row.lot.quantityKg <= 2_000);
       assert.ok(row.lot.quantityKg >= 400);
     }
+  });
+
+  it('forms lots involving expanded US spokes (PDX/OMA)', () => {
+    const world = createSeedEconomyWorld({ seed: 'us-spoke-lots' });
+    tickEconomyN(world, 48);
+    const touch = world.lots.some(
+      (lot) =>
+        lot.originIcao === 'KPDX' ||
+        lot.destIcao === 'KPDX' ||
+        lot.originIcao === 'KOMA' ||
+        lot.destIcao === 'KOMA',
+    );
+    assert.ok(touch, 'expected market activity on new US spoke/regional hubs');
   });
 
   it('pays more on origin-region lots when home NPC fleet is resting', () => {
@@ -813,11 +839,12 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 20);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 52);
+    assert.equal(migrated.airports.length, 128);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(migrated.airports.some((a) => a.icao === 'KLAX'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'KPDX'));
     assert.ok((migrated.internationalLanes?.length ?? 0) >= 10);
     const again = createSeedEconomyWorld({ seed: 'hub-coverage-idem' });
     assert.equal(ensureCareerHubCoverage(again), false);

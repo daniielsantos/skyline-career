@@ -18,6 +18,7 @@ import {
   INSPECTION_INTERVAL_HOURS,
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
+import { normalizeCareerCargoOps } from './career-cargo-ops.js';
 import {
   DEFAULT_STARTER_AIRFRAME_TYPE_ID,
   defaultCareerPlayerAirframe,
@@ -81,6 +82,7 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     aircraftMarketDay: undefined,
     aircraftMarketDemandDay: undefined,
     ledger: [],
+    cargoOps: normalizeCareerCargoOps(undefined),
   };
 }
 
@@ -138,6 +140,9 @@ export function normalizeMissionsState(
   const airframePerfOverrides = normalizeAirframePerfOverrides(
     (raw as CareerMissionsState).airframePerfOverrides,
   );
+  const cargoOps = normalizeCareerCargoOps(
+    (raw as CareerMissionsState).cargoOps,
+  );
   return {
     version: 2,
     walletUsd,
@@ -150,6 +155,7 @@ export function normalizeMissionsState(
     aircraftMarketDay,
     aircraftMarketDemandDay,
     ledger,
+    cargoOps,
     ...(airframePerfOverrides
       ? { airframePerfOverrides }
       : {}),

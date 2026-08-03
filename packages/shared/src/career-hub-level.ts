@@ -15,7 +15,9 @@ const COMMODITY_IDS: readonly CommodityId[] = [
   'perishables',
   'machinery',
   'general',
+  'supplies',
   'fuel',
+  'mro_parts',
 ];
 
 export const HUB_LEVEL_MIN = 1;

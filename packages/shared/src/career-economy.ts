@@ -1,4 +1,9 @@
 import {
+  assertUsCareerHubCatalog,
+  buildUsFeederCorridors,
+  US_CAREER_HUBS,
+} from './career-us-hubs.js';
+import {
   ensureWorldHubLevels,
   hubLevelHealthMult,
   hubLevelLaneBonus,
@@ -169,6 +174,7 @@ export {
   npcLaneSaturation,
   npcRegionBidCapacity,
   NPC_AIRFRAME_VARIANTS,
+  NPC_FLEET_COMPOSITION,
   NPC_FLEET_SIZE,
   NPC_MX_INTERVAL_HOURS,
   NPC_MX_PARTS_KG,
@@ -254,7 +260,7 @@ export const HUB_TIER_PROFILE: Record<
   },
 };
 
-/** Curated ICAO → tier map for the Brazil career seed (not fetched at runtime). */
+/** Curated ICAO → tier map (BR hand list + US catalog). */
 export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   SBGR: 'major',
   SBKP: 'major',
@@ -284,31 +290,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   SBCG: 'spoke',
   SBPV: 'spoke',
   SBMQ: 'spoke',
-  // US continental map
-  KMIA: 'major',
-  KATL: 'major',
-  KJFK: 'major',
-  KORD: 'major',
-  KIAH: 'major',
-  KDFW: 'major',
-  KDEN: 'major',
-  KLAX: 'major',
-  KSEA: 'major',
-  KBOS: 'regional',
-  KEWR: 'regional',
-  KCLT: 'regional',
-  KDTW: 'regional',
-  KMSP: 'regional',
-  KMEM: 'regional',
-  KPHX: 'regional',
-  KSFO: 'regional',
-  KPHL: 'spoke',
-  KMCO: 'spoke',
-  KFLL: 'spoke',
-  KCVG: 'spoke',
-  KAUS: 'spoke',
-  KSLC: 'spoke',
-  KSAN: 'spoke',
+  ...Object.fromEntries(US_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -334,11 +316,10 @@ export function laneLotCaps(
 }
 
 /**
- * Curated domestic cargo corridors on the Brazil career map (bidirectional).
- * Weights > 1 favor formation + a mild pay bump. Calibrated offline from
- * domestic TECA/hub roles: GRU/VCP/Manaus anchors, BSB redistributor, spoke feeders.
+ * Curated domestic cargo corridors (bidirectional) + auto US feeders.
+ * Weights > 1 favor formation + a mild pay bump.
  */
-export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
+const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   a: string;
   b: string;
   weight: number;
@@ -452,6 +433,15 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   { a: 'KSFO', b: 'KLAX', weight: 1.8 },
   { a: 'KSFO', b: 'KSEA', weight: 1.6 },
   { a: 'KSAN', b: 'KLAX', weight: 1.6 },
+];
+
+export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
+  a: string;
+  b: string;
+  weight: number;
+}> = [
+  ...CAREER_CARGO_CORRIDORS_MANUAL,
+  ...buildUsFeederCorridors(US_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -638,6 +628,11 @@ export const CAREER_COMMODITIES: readonly CommodityDef[] = [
     basePricePerKg: 2.2,
   },
   {
+    id: 'supplies',
+    name: 'Supplies',
+    basePricePerKg: 2.5,
+  },
+  {
     id: 'fuel',
     name: 'Jet-A fuel',
     basePricePerKg: 0.95,
@@ -764,6 +759,54 @@ export function ensureWorldMroInventory(world: CareerEconomyWorld): void {
 }
 
 /**
+ * Backfill Supplies piles on legacy airports (Tier-0 Dry ladder companion to General).
+ */
+export function ensureAirportSuppliesInventory(terminal: AirportTerminal): void {
+  const tier = hubTierOf(terminal);
+  const cap =
+    tier === 'major' ? 90_000 : tier === 'regional' ? 45_000 : 22_000;
+  const prod =
+    tier === 'major' ? 180 : tier === 'regional' ? 90 : 40;
+  const cons =
+    tier === 'major' ? 160 : tier === 'regional' ? 95 : 55;
+
+  if (!terminal.inventory.supplies) {
+    terminal.inventory.supplies = pile(Math.round(cap * 0.45), cap);
+  } else {
+    terminal.inventory.supplies.capacityKg = Math.max(
+      terminal.inventory.supplies.capacityKg,
+      cap,
+    );
+    terminal.inventory.supplies.stockKg = clamp(
+      terminal.inventory.supplies.stockKg,
+      0,
+      terminal.inventory.supplies.capacityKg,
+    );
+  }
+
+  terminal.baseProduction = {
+    ...terminal.baseProduction,
+    supplies: terminal.baseProduction?.supplies ?? prod,
+  };
+  terminal.baseConsumption = {
+    ...terminal.baseConsumption,
+    supplies: terminal.baseConsumption?.supplies ?? cons,
+  };
+  if (terminal.production.supplies === undefined) {
+    terminal.production = { ...terminal.production, supplies: prod };
+  }
+  if (terminal.consumption.supplies === undefined) {
+    terminal.consumption = { ...terminal.consumption, supplies: cons };
+  }
+}
+
+export function ensureWorldSuppliesInventory(world: CareerEconomyWorld): void {
+  for (const ap of world.airports) {
+    ensureAirportSuppliesInventory(ap);
+  }
+}
+
+/**
  * Stamp curated hubTier on legacy airports. First time only: rescale cargo
  * warehouses/flows toward the tier profile so flat ~70t seeds become majors vs spokes.
  */
@@ -846,31 +889,13 @@ export const CAREER_HUB_COORDS: Readonly<
   SBGO: { lat: -16.632, lon: -49.2207, name: 'Goiânia' },
   SBCY: { lat: -15.6529, lon: -56.1167, name: 'Cuiabá' },
   SBCG: { lat: -20.4687, lon: -54.6725, name: 'Campo Grande' },
-  // US continental map
-  KMIA: { lat: 25.7959, lon: -80.287, name: 'Miami International' },
-  KATL: { lat: 33.6407, lon: -84.4277, name: 'Atlanta/Hartsfield' },
-  KCLT: { lat: 35.214, lon: -80.9431, name: 'Charlotte/Douglas' },
-  KMCO: { lat: 28.4294, lon: -81.309, name: 'Orlando International' },
-  KFLL: { lat: 26.0726, lon: -80.1527, name: 'Fort Lauderdale' },
-  KJFK: { lat: 40.6398, lon: -73.7789, name: 'New York/JFK' },
-  KBOS: { lat: 42.3656, lon: -71.0096, name: 'Boston/Logan' },
-  KEWR: { lat: 40.6895, lon: -74.1745, name: 'Newark Liberty' },
-  KPHL: { lat: 39.8719, lon: -75.2411, name: 'Philadelphia' },
-  KORD: { lat: 41.9742, lon: -87.9073, name: "Chicago/O'Hare" },
-  KDTW: { lat: 42.2162, lon: -83.3554, name: 'Detroit Metro' },
-  KMSP: { lat: 44.8848, lon: -93.2223, name: 'Minneapolis/St Paul' },
-  KCVG: { lat: 39.0488, lon: -84.6678, name: 'Cincinnati/Northern Kentucky' },
-  KIAH: { lat: 29.9844, lon: -95.3414, name: 'Houston/Intercontinental' },
-  KDFW: { lat: 32.8998, lon: -97.0403, name: 'Dallas/Fort Worth' },
-  KMEM: { lat: 35.0424, lon: -89.9767, name: 'Memphis' },
-  KAUS: { lat: 30.1945, lon: -97.6699, name: 'Austin-Bergstrom' },
-  KDEN: { lat: 39.8561, lon: -104.6737, name: 'Denver International' },
-  KPHX: { lat: 33.4342, lon: -112.0116, name: 'Phoenix Sky Harbor' },
-  KSLC: { lat: 40.7899, lon: -111.9791, name: 'Salt Lake City' },
-  KLAX: { lat: 33.9416, lon: -118.4085, name: 'Los Angeles International' },
-  KSEA: { lat: 47.4502, lon: -122.3088, name: 'Seattle/Tacoma' },
-  KSFO: { lat: 37.6213, lon: -122.379, name: 'San Francisco' },
-  KSAN: { lat: 32.7336, lon: -117.1897, name: 'San Diego' },
+  // US continental map (100 hubs)
+  ...Object.fromEntries(
+    US_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -1016,32 +1041,32 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       name: 'São Paulo/Guarulhos',
       region: 'BR-SE',
       hubTier: 'major',
-      produce: { electronics: 1.4, general: 1.1, machinery: 0.9 },
-      consume: { perishables: 1.2, general: 1.0 },
+      produce: { electronics: 1.4, general: 1.1, supplies: 1.2, machinery: 0.9 },
+      consume: { perishables: 1.2, general: 1.0, supplies: 0.9 },
     },
     {
       icao: 'SBGL',
       name: 'Rio de Janeiro/Galeão',
       region: 'BR-SE',
       hubTier: 'major',
-      produce: { perishables: 1.3, general: 0.8 },
-      consume: { electronics: 1.1, machinery: 1.0 },
+      produce: { perishables: 1.3, general: 0.8, supplies: 1.1 },
+      consume: { electronics: 1.1, machinery: 1.0, supplies: 1.0 },
     },
     {
       icao: 'SBKP',
       name: 'Campinas/Viracopos',
       region: 'BR-SE',
       hubTier: 'major',
-      produce: { electronics: 1.6, machinery: 1.2 },
-      consume: { general: 0.9, perishables: 0.7 },
+      produce: { electronics: 1.6, machinery: 1.2, supplies: 1.0 },
+      consume: { general: 0.9, perishables: 0.7, supplies: 0.85 },
     },
     {
       icao: 'SBCF',
       name: 'Belo Horizonte/Confins',
       region: 'BR-SE',
       hubTier: 'regional',
-      produce: { machinery: 1.3, general: 1.0 },
-      consume: { electronics: 0.9, perishables: 1.0 },
+      produce: { machinery: 1.3, general: 1.0, supplies: 1.15 },
+      consume: { electronics: 0.9, perishables: 1.0, supplies: 0.95 },
     },
     {
       icao: 'SBVT',
@@ -1237,200 +1262,18 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       produce: { perishables: 1.2, machinery: 0.9 },
       consume: { electronics: 0.8, general: 0.9 },
     },
-    // US continental — 6 regions + sparse intl lanes to BR
-    {
-      icao: 'KMIA',
-      name: 'Miami International',
-      region: 'US-SE',
-      hubTier: 'major',
-      produce: { electronics: 1.5, perishables: 1.3, general: 1.0 },
-      consume: { machinery: 1.1, general: 1.0 },
-    },
-    {
-      icao: 'KATL',
-      name: 'Atlanta/Hartsfield',
-      region: 'US-SE',
-      hubTier: 'major',
-      produce: { general: 1.5, electronics: 1.2, machinery: 1.0 },
-      consume: { perishables: 1.1, general: 1.0 },
-    },
-    {
-      icao: 'KCLT',
-      name: 'Charlotte/Douglas',
-      region: 'US-SE',
-      hubTier: 'regional',
-      produce: { general: 1.2, machinery: 0.9 },
-      consume: { electronics: 1.0, perishables: 0.9 },
-    },
-    {
-      icao: 'KMCO',
-      name: 'Orlando International',
-      region: 'US-SE',
-      hubTier: 'spoke',
-      produce: { perishables: 1.2, general: 0.9 },
-      consume: { electronics: 1.0, machinery: 0.8 },
-    },
-    {
-      icao: 'KFLL',
-      name: 'Fort Lauderdale',
-      region: 'US-SE',
-      hubTier: 'spoke',
-      produce: { perishables: 1.1, general: 0.9 },
-      consume: { electronics: 1.0, machinery: 0.8 },
-    },
-    {
-      icao: 'KJFK',
-      name: 'New York/JFK',
-      region: 'US-NE',
-      hubTier: 'major',
-      produce: { electronics: 1.4, general: 1.2 },
-      consume: { perishables: 1.2, machinery: 1.0 },
-    },
-    {
-      icao: 'KBOS',
-      name: 'Boston/Logan',
-      region: 'US-NE',
-      hubTier: 'regional',
-      produce: { electronics: 1.3, general: 1.0 },
-      consume: { perishables: 1.1, machinery: 0.9 },
-    },
-    {
-      icao: 'KEWR',
-      name: 'Newark Liberty',
-      region: 'US-NE',
-      hubTier: 'regional',
-      produce: { general: 1.3, machinery: 1.1 },
-      consume: { electronics: 1.0, perishables: 1.0 },
-    },
-    {
-      icao: 'KPHL',
-      name: 'Philadelphia',
-      region: 'US-NE',
-      hubTier: 'spoke',
-      produce: { general: 1.1, perishables: 0.9 },
-      consume: { electronics: 0.9, machinery: 0.9 },
-    },
-    {
-      icao: 'KORD',
-      name: "Chicago/O'Hare",
-      region: 'US-MW',
-      hubTier: 'major',
-      produce: { machinery: 1.5, general: 1.3, electronics: 1.1 },
-      consume: { perishables: 1.1, general: 1.0 },
-    },
-    {
-      icao: 'KDTW',
-      name: 'Detroit Metro',
-      region: 'US-MW',
-      hubTier: 'regional',
-      produce: { machinery: 1.4, general: 1.0 },
-      consume: { electronics: 1.0, perishables: 0.9 },
-    },
-    {
-      icao: 'KMSP',
-      name: 'Minneapolis/St Paul',
-      region: 'US-MW',
-      hubTier: 'regional',
-      produce: { perishables: 1.3, general: 1.1 },
-      consume: { electronics: 0.9, machinery: 1.0 },
-    },
-    {
-      icao: 'KCVG',
-      name: 'Cincinnati/Northern Kentucky',
-      region: 'US-MW',
-      hubTier: 'spoke',
-      produce: { general: 1.2, machinery: 0.9 },
-      consume: { electronics: 0.9, perishables: 0.9 },
-    },
-    {
-      icao: 'KIAH',
-      name: 'Houston/Intercontinental',
-      region: 'US-SC',
-      hubTier: 'major',
-      produce: { machinery: 1.5, general: 1.1 },
-      consume: { electronics: 1.0, perishables: 0.9 },
-    },
-    {
-      icao: 'KDFW',
-      name: 'Dallas/Fort Worth',
-      region: 'US-SC',
-      hubTier: 'major',
-      produce: { electronics: 1.3, general: 1.4, machinery: 1.1 },
-      consume: { perishables: 1.0, general: 1.0 },
-    },
-    {
-      icao: 'KMEM',
-      name: 'Memphis',
-      region: 'US-SC',
-      hubTier: 'regional',
-      produce: { general: 1.6, electronics: 1.1 },
-      consume: { machinery: 0.9, perishables: 0.9 },
-    },
-    {
-      icao: 'KAUS',
-      name: 'Austin-Bergstrom',
-      region: 'US-SC',
-      hubTier: 'spoke',
-      produce: { electronics: 1.2, general: 0.9 },
-      consume: { perishables: 0.9, machinery: 0.8 },
-    },
-    {
-      icao: 'KDEN',
-      name: 'Denver International',
-      region: 'US-MT',
-      hubTier: 'major',
-      produce: { general: 1.3, machinery: 1.1, electronics: 1.0 },
-      consume: { perishables: 1.0, general: 1.0 },
-    },
-    {
-      icao: 'KPHX',
-      name: 'Phoenix Sky Harbor',
-      region: 'US-MT',
-      hubTier: 'regional',
-      produce: { electronics: 1.1, general: 1.2 },
-      consume: { perishables: 1.0, machinery: 0.9 },
-    },
-    {
-      icao: 'KSLC',
-      name: 'Salt Lake City',
-      region: 'US-MT',
-      hubTier: 'spoke',
-      produce: { general: 1.1, perishables: 0.9 },
-      consume: { electronics: 0.9, machinery: 0.8 },
-    },
-    {
-      icao: 'KLAX',
-      name: 'Los Angeles International',
-      region: 'US-W',
-      hubTier: 'major',
-      produce: { electronics: 1.6, general: 1.3, perishables: 1.1 },
-      consume: { machinery: 1.0, general: 1.0 },
-    },
-    {
-      icao: 'KSEA',
-      name: 'Seattle/Tacoma',
-      region: 'US-W',
-      hubTier: 'major',
-      produce: { electronics: 1.5, machinery: 1.2, general: 1.0 },
-      consume: { perishables: 1.0, general: 1.0 },
-    },
-    {
-      icao: 'KSFO',
-      name: 'San Francisco',
-      region: 'US-W',
-      hubTier: 'regional',
-      produce: { electronics: 1.4, general: 1.1 },
-      consume: { perishables: 1.1, machinery: 0.9 },
-    },
-    {
-      icao: 'KSAN',
-      name: 'San Diego',
-      region: 'US-W',
-      hubTier: 'spoke',
-      produce: { electronics: 1.1, general: 0.9 },
-      consume: { perishables: 1.0, machinery: 0.8 },
-    },
+    // US continental — 100 hubs from catalog (Dry-biased spokes fill Network holes)
+    ...US_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+    })),
   ];
+
+  assertUsCareerHubCatalog();
 
   const airports: AirportTerminal[] = hubs.map((h) => {
     const coords = CAREER_HUB_COORDS[h.icao];
@@ -1702,6 +1545,7 @@ export function migrateEconomyWorld(
   migrateNpcTimestamps(migrated, Number.isFinite(version) ? version : 0);
   ensureWorldFuelInventory(migrated);
   ensureWorldMroInventory(migrated);
+  ensureWorldSuppliesInventory(migrated);
   ensureWorldHubTiers(migrated);
   ensureFuelTruckFleet(migrated);
   ensureWorldHubLevels(migrated);
@@ -2836,6 +2680,20 @@ export function tickEconomyN(
   ensureNpcFleet(world);
   ensureFuelTruckFleet(world);
   return world;
+}
+
+/**
+ * Fresh seeds start at tick 0 with an empty board. Warm one career day so
+ * Freights/Contracts exist on first boot and after reset without a manual +1 day.
+ * No-op when the world already has time or available lots.
+ */
+export function ensureSeedMarketFormed(world: CareerEconomyWorld): boolean {
+  const hasAvailable = world.lots.some(
+    (lot) => lot.status === 'available' && lot.quantityKg > lot.reservedKg,
+  );
+  if (world.tick > 0 || hasAvailable) return false;
+  tickEconomyN(world, TICKS_PER_DAY);
+  return true;
 }
 
 /** Split a free-text route search ("SBAR", "SBAR SBGR", "SBAR→SBGR") into tokens. */

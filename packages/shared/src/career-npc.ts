@@ -54,20 +54,20 @@ export {
   type NpcAirframeVariant,
 } from './career-npc-airframes.js';
 
-/** About four operators per mapped region; enough capacity for a 52-hub world. */
-export const NPC_FLEET_SIZE = 48;
+/** About one operator per mapped hub; sized for a 128-hub (28 BR + 100 US) world. */
+export const NPC_FLEET_SIZE = 96;
 
 /** Target mix: jets for heavy freight + GA for LTL / short-haul competition. */
 export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
   aircraftClassId: FreighterClassId;
   count: number;
 }> = [
-  { aircraftClassId: 'narrow_freighter', count: 14 },
-  { aircraftClassId: 'wide_freighter', count: 10 },
-  { aircraftClassId: 'medium_piston', count: 4 },
-  { aircraftClassId: 'light_jet', count: 4 },
-  { aircraftClassId: 'light_turboprop', count: 10 },
-  { aircraftClassId: 'light_ga', count: 6 },
+  { aircraftClassId: 'narrow_freighter', count: 28 },
+  { aircraftClassId: 'wide_freighter', count: 20 },
+  { aircraftClassId: 'medium_piston', count: 8 },
+  { aircraftClassId: 'light_jet', count: 8 },
+  { aircraftClassId: 'light_turboprop', count: 20 },
+  { aircraftClassId: 'light_ga', count: 12 },
 ] as const;
 
 /** Minimum airborne block so ultra-short hops aren't instant. */

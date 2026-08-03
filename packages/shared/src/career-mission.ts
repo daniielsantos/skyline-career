@@ -15,6 +15,14 @@ import {
 } from './career-flight-watch.js';
 import type { FlightScoreSnapshot } from './career-flight-score.js';
 import {
+  applyCargoOpsOnSettle,
+  cargoOpsIsUnlocked,
+  cargoOpsLatePenaltyMult,
+  cargoOpsPayMult,
+  cargoOpsValueScorePenaltyFraction,
+  type CargoOpsDelta,
+} from './career-cargo-ops.js';
+import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
   resolveAirframeMaxRangeNm,
@@ -641,6 +649,8 @@ export function acceptMission(
     maxCargoKg?: number;
     /** Append cargo onto this open flight (same OD + aircraft). */
     intoMission?: MissionIntent;
+    /** Player cargo ladder — gates unlock + pay mult. */
+    cargoOps?: CareerMissionsState['cargoOps'];
   },
 ): MissionIntent {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
@@ -649,6 +659,12 @@ export function acceptMission(
       ? Math.floor(opts.maxCargoKg)
       : aircraft.maxCargoKg;
   const lot = findLot(world, opts.lotId);
+  if (!cargoOpsIsUnlocked(opts.cargoOps, lot.commodityId)) {
+    const name = getCommodity(lot.commodityId).name;
+    throw new Error(
+      `Cargo Ops: ${name} is locked — fly Dry freights (General / Supplies) to unlock`,
+    );
+  }
   const avail = lotAvailableKg(lot);
   if (avail <= 0) {
     throw new Error(`Lot ${opts.lotId} has no remaining cargo`);
@@ -699,7 +715,9 @@ export function acceptMission(
     );
   }
 
-  const { payUsd } = reserveShipmentLot(world, opts.lotId, cargoKg);
+  const { payUsd: reservedPay } = reserveShipmentLot(world, opts.lotId, cargoKg);
+  const payMult = cargoOpsPayMult(opts.cargoOps, lot.commodityId);
+  const payUsd = Math.max(1, Math.round(reservedPay * payMult));
   const line: MissionLotLine = {
     shipmentLotId: lot.id,
     commodityId: lot.commodityId,
@@ -765,6 +783,8 @@ export function commitStagedManifest(
     missionId?: string;
     /** Concrete Market SKU — preferred for range gate when set. */
     airframeTypeId?: string;
+    /** Player cargo ladder — gates unlock + pay mult. */
+    cargoOps?: CareerMissionsState['cargoOps'];
   },
 ): { mission: MissionIntent; appended: boolean; lineCount: number } {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
@@ -880,6 +900,7 @@ export function commitStagedManifest(
         maxCargoKg,
         intoMission: mission,
         missionId: i === 0 && !into ? opts.missionId : undefined,
+        cargoOps: opts.cargoOps,
       });
     }
     if (!mission) {
@@ -919,6 +940,7 @@ export function replaceMissionManifest(
     lines: StagedManifestLine[];
     aircraftClassId?: FreighterClassId;
     maxCargoKg?: number;
+    cargoOps?: CareerMissionsState['cargoOps'];
   },
 ): MissionIntent {
   const normalized = normalizeMissionIntent(mission);
@@ -1023,6 +1045,7 @@ export function replaceMissionManifest(
         maxCargoKg,
         intoMission: next,
         missionId: index === 0 ? normalized.id : undefined,
+        cargoOps: opts.cargoOps,
       });
     }
     if (!next) {
@@ -1213,23 +1236,40 @@ export interface SettleMissionResult {
   walletCreditUsd: number;
   /** Fuel debit if this settle auto-departed (else 0). */
   fuelDebitUsd: number;
+  /** Cargo Ops ladder deltas from this settle (when fleet provided). */
+  cargoOpsDeltas?: CargoOpsDelta[];
 }
 
 /** Late penalty as a fraction of pay per overdue tick. */
-function latePenaltyRate(urgency: MissionIntent['urgency']): number {
-  return urgency === 'urgent' ? 0.12 : 0.06;
+function latePenaltyRate(
+  urgency: MissionIntent['urgency'],
+  commodityId: MissionIntent['commodityId'],
+): number {
+  const base = urgency === 'urgent' ? 0.12 : 0.06;
+  return base * cargoOpsLatePenaltyMult(commodityId);
 }
 
 function computeSettlementPay(
   mission: MissionIntent,
   settleTick: number,
+  flightScorePct?: number | null,
 ): { lateTicks: number; penaltyUsd: number; payoutUsd: number; onTime: boolean } {
   const lateTicks = Math.max(0, settleTick - mission.deadlineTick);
   const onTime = lateTicks === 0;
-  const rate = latePenaltyRate(mission.urgency);
-  const penaltyUsd = onTime
+  const rate = latePenaltyRate(mission.urgency, mission.commodityId);
+  let penaltyUsd = onTime
     ? 0
     : Math.min(mission.payUsd, Math.round(mission.payUsd * lateTicks * rate));
+  const valueCut = cargoOpsValueScorePenaltyFraction(
+    mission.commodityId,
+    flightScorePct,
+  );
+  if (valueCut > 0) {
+    penaltyUsd = Math.min(
+      mission.payUsd,
+      penaltyUsd + Math.round(mission.payUsd * valueCut),
+    );
+  }
   const payoutUsd = Math.max(0, mission.payUsd - penaltyUsd);
   return { lateTicks, penaltyUsd, payoutUsd, onTime };
 }
@@ -1329,7 +1369,8 @@ export function settleMission(
   let lastDestStock = 0;
   const settlementLines: MissionSettlementLine[] = [];
 
-  const pay = computeSettlementPay(working, settleTick);
+  const scorePct = opts.flightScore?.pct;
+  const pay = computeSettlementPay(working, settleTick, scorePct);
   // Allocate penalty across lines proportional to payUsd.
   let penaltyLeft = pay.penaltyUsd;
 
@@ -1398,10 +1439,22 @@ export function settleMission(
   };
   clearPlayerInbound(world, settled.id);
 
+  let cargoOpsDeltas: CargoOpsDelta[] | undefined;
+  if (opts.fleet) {
+    const applied = applyCargoOpsOnSettle(opts.fleet.cargoOps, settled, {
+      onTime: pay.onTime,
+      lateTicks: pay.lateTicks,
+      flightScore: opts.flightScore ?? settled.settledFlightScore,
+    });
+    opts.fleet.cargoOps = applied.cargoOps;
+    cargoOpsDeltas = applied.deltas;
+  }
+
   return {
     mission: settled,
     walletCreditUsd: pay.payoutUsd,
     fuelDebitUsd,
+    cargoOpsDeltas,
     settlement: {
       missionId: settled.id,
       deliveredKg: working.cargoKg,

@@ -4,6 +4,7 @@ import type { Mission, MissionSettlement } from './api.ts';
 import {
   buildFlightDebrief,
   deriveDispatchStep,
+  formatCargoOpsDebriefLine,
   formatFlightDurationMs,
   formatLandingFpm,
   resolveLoadPath,
@@ -194,6 +195,37 @@ describe('buildFlightDebrief', () => {
     assert.equal(formatFlightDurationMs(debrief.flightDurationMs), '1h 9m');
     assert.equal(debrief.flightScore?.pct, 86);
     assert.equal(debrief.flightScore?.earned, 44);
+    assert.deepEqual(debrief.cargoOpsDeltas, []);
+  });
+
+  it('includes cargo ops deltas when settlement provides them', () => {
+    const debrief = buildFlightDebrief({
+      mission: mission({ payUsd: 1000 }),
+      settlement: {
+        payoutUsd: 1000,
+        penaltyUsd: 0,
+        lateTicks: 0,
+        onTime: true,
+        deliveredKg: 100,
+        residualFuelKg: null,
+        cargoOpsDeltas: [
+          {
+            commodityId: 'general',
+            deltaRep: 4,
+            repBefore: 55,
+            repAfter: 59,
+            settlesOkAfter: 1,
+            unlockedNow: false,
+            clean: true,
+          },
+        ],
+      },
+    });
+    assert.equal(debrief.cargoOpsDeltas.length, 1);
+    assert.match(
+      formatCargoOpsDebriefLine(debrief.cargoOpsDeltas),
+      /General \+4→59 · clean/,
+    );
   });
 });
 

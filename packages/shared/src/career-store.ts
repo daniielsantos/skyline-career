@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   createSeedEconomyWorld,
   ensureEconomyCaughtUp,
+  ensureSeedMarketFormed,
   migrateEconomyWorld,
 } from './career-economy.js';
 import { emptyMissionsStateV2, normalizeMissionsState } from './career-fleet.js';
@@ -145,7 +146,8 @@ class JsonCareerStore implements CareerStore {
       const world = migrateEconomyWorld(existing);
       const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
       ensureHomeCountryId(caught);
-      const dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
+      let dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
+      if (ensureSeedMarketFormed(caught)) dirty = true;
       return { world: caught, advancedTicks, settledFlights, dirty };
     }
     if (existing) {
@@ -154,6 +156,7 @@ class JsonCareerStore implements CareerStore {
       );
     }
     const fresh = createSeedEconomyWorld();
+    ensureSeedMarketFormed(fresh);
     await this.saveEconomy(fresh);
     return { world: fresh, advancedTicks: 0, settledFlights: 0, dirty: false };
   }
@@ -475,6 +478,7 @@ class SqliteCareerStore implements CareerStore {
       | undefined;
     if (!row) {
       const fresh = createSeedEconomyWorld();
+      ensureSeedMarketFormed(fresh);
       await this.saveEconomy(fresh);
       return { world: fresh, advancedTicks: 0, settledFlights: 0, dirty: false };
     }
@@ -503,6 +507,8 @@ class SqliteCareerStore implements CareerStore {
     if (countLotsRows(this.db) === 0 && caught.lots.length > 0) {
       dirty = true;
     }
+    // Heal tick-0 empty boards (pre-warm saves / first boot without /api/init).
+    if (ensureSeedMarketFormed(caught)) dirty = true;
     return { world: caught, advancedTicks, settledFlights, dirty };
   }
 
@@ -613,9 +619,12 @@ async function migrateJsonIntoSqlite(
   if (economyRaw && Array.isArray(economyRaw.airports)) {
     const world = migrateEconomyWorld(economyRaw);
     ensureHomeCountryId(world);
+    ensureSeedMarketFormed(world);
     await store.saveEconomy(world);
   } else if (!economyRaw) {
-    await store.saveEconomy(createSeedEconomyWorld());
+    const fresh = createSeedEconomyWorld();
+    ensureSeedMarketFormed(fresh);
+    await store.saveEconomy(fresh);
   } else {
     throw new Error(
       `Cannot migrate ${economyPath}: missing airports[]; leaving JSON in place`,

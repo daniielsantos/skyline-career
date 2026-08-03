@@ -10,6 +10,7 @@ export type CommodityId =
   | 'perishables'
   | 'machinery'
   | 'general'
+  | 'supplies'
   | 'fuel'
   | 'mro_parts';
 
@@ -777,6 +778,31 @@ export interface CareerMissionsState {
    * Prefer over static catalog burn/TAS for Market/Hangar UI + planning.
    */
   airframePerfOverrides?: Record<string, AirframePerfOverride>;
+  /**
+   * Commodity ladder progression (Dry → Value → Time → Heavy).
+   * Unlocks market freights and scales pay by reputation.
+   */
+  cargoOps?: CareerCargoOps;
+};
+
+/** Per-commodity reputation + unlock for the Cargo Ops ladder. */
+export type CargoOpsCommodityId =
+  | 'general'
+  | 'supplies'
+  | 'electronics'
+  | 'perishables'
+  | 'machinery';
+
+export interface CargoOpsCommodityState {
+  unlocked: boolean;
+  /** 0–100 operator reputation for this commodity. */
+  rep: number;
+  /** Count of clean settles (on-time + score threshold). */
+  settlesOk: number;
+}
+
+export interface CareerCargoOps {
+  commodities: Record<CargoOpsCommodityId, CargoOpsCommodityState>;
 }
 
 /** Live-learned cruise burn / TAS for one Market airframe typeId. */

@@ -95,9 +95,10 @@ describe('career partition', () => {
     };
     assert.equal(brOnly.airports.length, 28);
     assert.equal(ensureCareerHubCoverage(brOnly as typeof full), true);
-    assert.equal(brOnly.airports.length, 52);
+    assert.equal(brOnly.airports.length, 128);
     assert.ok(brOnly.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'KSEA'));
+    assert.ok(brOnly.airports.some((a) => a.icao === 'KPDX'));
     assert.ok((brOnly.internationalLanes?.length ?? 0) >= 10);
 
     const migrated = migrateEconomyWorld({
@@ -111,7 +112,7 @@ describe('career partition', () => {
       npcs: [],
       npcFlights: [],
     });
-    assert.equal(migrated.airports.length, 52);
+    assert.equal(migrated.airports.length, 128);
     assert.ok((migrated.internationalLanes?.length ?? 0) >= 10);
   });
 

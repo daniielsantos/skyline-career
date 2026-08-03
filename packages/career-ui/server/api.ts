@@ -8,6 +8,7 @@ import {
   buyOutAircraftLease,
   CAREER_COMMODITIES,
   cancelMission,
+  cargoOpsIsUnlocked,
   clearAircraftMaintenanceWithParts,
   repairAircraftConditionWithParts,
   hoursUntilInspection,
@@ -17,6 +18,7 @@ import {
   createSeedEconomyWorld,
   departMission,
   emptyMissionsStateV2,
+  ensureSeedMarketFormed,
   executeFerry,
   findCareerPlayerAirframe,
   findOpenManifestForRoute,
@@ -41,6 +43,7 @@ import {
   listNpcFleetStatus,
   listRegionMarketPressure,
   listViableMarketLots,
+  parseMarketBoardAccessFilter,
   parseMarketBoardSorts,
   parsePositiveNumberParam,
   queryMarketBoardPage,
@@ -201,10 +204,19 @@ function fleetPayload(
     aircraftClassId: airframe.aircraftClassId,
     simbriefIcao: airframe.simbriefIcao,
   }));
+  const hubs = listCareerHubIcaos().map((icao) => {
+    const airport = world?.airports.find((a) => a.icao === icao);
+    return {
+      icao,
+      name: airport?.name ?? icao,
+      region: airport?.region ?? '',
+      hubTier: (airport?.hubTier ?? 'spoke') as 'major' | 'regional' | 'spoke',
+    };
+  });
   return {
     hubSelected: missions.hubSelected,
     fleet: withParkingRates(missions.fleet, world),
-    hubs: listCareerHubIcaos(),
+    hubs,
     pilotName: missions.pilotName,
     homeHubIcao: missions.homeHubIcao,
     starterAircraft,
@@ -681,6 +693,7 @@ export function createCareerApiServer(port = 8787) {
               world.npcFlights?.filter((f) => f.status === 'in_flight').length ?? 0,
             ...fleetPayload(missions, world),
             cashflow: summarizeCareerLedger(missions, world.tick),
+            cargoOps: missions.cargoOps ?? null,
             homeCountryId: world.homeCountryId ?? null,
             countries: listWorldCountryIds(world),
             internationalLaneCount: world.internationalLanes?.length ?? 0,
@@ -1158,9 +1171,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/market') {
-        const world = await withCareerWrite((w, missions) => {
+        const { world, cargoOps } = await withCareerWrite((w, missions) => {
           reconcilePlayerInbound(w, missions.missions);
-          return w;
+          return { world: w, cargoOps: missions.cargoOps };
         });
         const nowMs = Date.now();
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
@@ -1210,6 +1223,10 @@ export function createCareerApiServer(port = 8787) {
           expiresAtTick: row.lot.expiresAtTick,
           ticksRemaining: Math.max(0, row.lot.expiresAtTick - world.tick),
           perishable: Boolean(getCommodity(row.lot.commodityId).perishable),
+          cargoLocked: !cargoOpsIsUnlocked(
+            cargoOps ?? undefined,
+            row.lot.commodityId,
+          ),
           pressure: row.pressure
             ? {
                 originRegion: row.pressure.originRegion,
@@ -1234,6 +1251,9 @@ export function createCareerApiServer(port = 8787) {
               }
             : null,
         }));
+        const requestedSorts = parseMarketBoardSorts(
+          url.searchParams.get('sort'),
+        );
         const boardOpts = {
           currentTick: world.tick,
           distanceMaxNm: parsePositiveNumberParam(
@@ -1245,7 +1265,11 @@ export function createCareerApiServer(port = 8787) {
             url.searchParams.get('expiresWithinHours'),
           ),
           minPayUsd: parsePositiveNumberParam(url.searchParams.get('minPayUsd')),
-          sorts: parseMarketBoardSorts(url.searchParams.get('sort')),
+          accessFilter: parseMarketBoardAccessFilter(
+            url.searchParams.get('access'),
+          ),
+          // Sticky unlocked-first unless client sends access:desc.
+          sorts: requestedSorts,
         };
         // Exact OD (route drawer): full filtered set. Paginated Freights sends page=.
         // Legacy callers without page keep a soft 200-row cap.
@@ -1499,17 +1523,23 @@ export function createCareerApiServer(port = 8787) {
         };
         const fresh = await withCareerLock(async () => {
           const world = createSeedEconomyWorld({ seed: body.seed });
+          // Warm one career day so Freights/Contracts exist without a manual +1 day.
+          ensureSeedMarketFormed(world);
           await persistEconomyUnlocked(world);
           if (body.resetMissions) {
             await saveMissions(emptyMissionsStateV2());
           }
           return world;
         });
+        const availableLots = fresh.lots.filter(
+          (lot) => lot.status === 'available' && lot.quantityKg > lot.reservedKg,
+        ).length;
         send(res, 200, {
           tick: fresh.tick,
           seed: fresh.seed,
           airports: fresh.airports.length,
           npcFleet: fresh.npcs.length,
+          availableLots,
         });
         return;
       }
@@ -1554,6 +1584,7 @@ export function createCareerApiServer(port = 8787) {
               aircraftClassId: aircraft,
               maxCargoKg: cargoLimit.maxCargoKg,
               intoMission: intoMission ?? undefined,
+              cargoOps: missions.cargoOps,
             });
             const appended = Boolean(intoMission) && mission.lots.length > beforeLots;
             if (intoMission) {
@@ -1776,6 +1807,7 @@ export function createCareerApiServer(port = 8787) {
                   lines,
                   aircraftClassId: aircraft,
                   maxCargoKg: operationalMaxCargoKg,
+                  cargoOps: missions.cargoOps,
                 }),
                 aircraftId: playerAircraft.id,
                 airframeTypeId: playerAirframe?.typeId,
@@ -1803,6 +1835,7 @@ export function createCareerApiServer(port = 8787) {
                 maxCargoKg: operationalMaxCargoKg,
                 intoMission: intoMission ?? undefined,
                 airframeTypeId: playerAirframe?.typeId,
+                cargoOps: missions.cargoOps,
               });
               mission = {
                 ...staged.mission,
@@ -2564,6 +2597,7 @@ export function createCareerApiServer(port = 8787) {
               fuelDebitUsd: result.fuelDebitUsd,
               fleet: withParkingRates(missions.fleet),
               settlement: result.settlement,
+              cargoOpsDeltas: result.cargoOpsDeltas ?? [],
             };
           });
           if (settled.kind === 'missing') {
@@ -2585,6 +2619,7 @@ export function createCareerApiServer(port = 8787) {
               landingFpm: settled.mission.settledLandingFpm ?? null,
               flightDurationMs: settled.mission.settledFlightDurationMs ?? null,
               flightScore: settled.mission.settledFlightScore ?? null,
+              cargoOpsDeltas: settled.cargoOpsDeltas,
             },
           });
         } catch (error) {

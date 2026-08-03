@@ -6,7 +6,8 @@ export type MarketBoardSortKey =
   | 'cargo'
   | 'load'
   | 'expires'
-  | 'pay';
+  | 'pay'
+  | 'access';
 
 export type MarketBoardSortDirection = 'asc' | 'desc';
 
@@ -23,7 +24,11 @@ export type MarketBoardSortable = {
   availableKg: number;
   expiresAtTick: number;
   payUsd: number;
+  /** True when Cargo Ops has this commodity locked for the player. */
+  cargoLocked?: boolean;
 };
+
+export type MarketBoardAccessFilter = 'open' | 'locked';
 
 export type MarketBoardQueryOpts = {
   /** Max great-circle distance (nm). */
@@ -35,6 +40,8 @@ export type MarketBoardQueryOpts = {
   expiresWithinHours?: number;
   /** Minimum contract pay (USD). */
   minPayUsd?: number;
+  /** Cargo Ops lock filter: open = unlocked only, locked = locked only. */
+  accessFilter?: MarketBoardAccessFilter;
   /** Current economy tick (integer batches). */
   currentTick: number;
   sorts?: MarketBoardSortLevel[];
@@ -49,7 +56,29 @@ const SORT_KEYS = new Set<MarketBoardSortKey>([
   'load',
   'expires',
   'pay',
+  'access',
 ]);
+
+/** Default Freights sort: unlocked first (no secondary pay sort). */
+export const DEFAULT_MARKET_BOARD_SORTS: readonly MarketBoardSortLevel[] = [
+  { key: 'access', direction: 'asc' },
+];
+
+/**
+ * Keep Cargo Ops access as the primary sort unless the client explicitly asks
+ * for locked-first (`access:desc`). Prevents pay-only sorts from burying open lots.
+ */
+export function ensureAccessPrimarySort(
+  sorts: readonly MarketBoardSortLevel[] | null | undefined,
+): MarketBoardSortLevel[] {
+  const levels = sorts?.length ? [...sorts] : [...DEFAULT_MARKET_BOARD_SORTS];
+  const access = levels.find((s) => s.key === 'access');
+  const rest = levels.filter((s) => s.key !== 'access');
+  return [
+    access ?? { key: 'access', direction: 'asc' },
+    ...rest,
+  ];
+}
 
 /** Parse `distance:asc,pay:desc` (or repeated `sort=` values joined). */
 export function parseMarketBoardSorts(
@@ -76,6 +105,14 @@ export function formatMarketBoardSorts(sorts: MarketBoardSortLevel[]): string {
   return sorts.map((s) => `${s.key}:${s.direction}`).join(',');
 }
 
+export function parseMarketBoardAccessFilter(
+  raw: string | null | undefined,
+): MarketBoardAccessFilter | undefined {
+  const v = raw?.trim().toLowerCase();
+  if (v === 'open' || v === 'locked') return v;
+  return undefined;
+}
+
 function compareBoardRow<T extends MarketBoardSortable>(
   a: T,
   b: T,
@@ -95,6 +132,9 @@ function compareBoardRow<T extends MarketBoardSortable>(
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
       return a.payUsd - b.payUsd;
+    case 'access':
+      // Unlocked (false) before locked (true) when ascending.
+      return Number(Boolean(a.cargoLocked)) - Number(Boolean(b.cargoLocked));
   }
 }
 
@@ -107,6 +147,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     | 'loadMaxKg'
     | 'expiresWithinHours'
     | 'minPayUsd'
+    | 'accessFilter'
     | 'currentTick'
   >,
 ): boolean {
@@ -147,12 +188,14 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
   ) {
     return false;
   }
+  if (opts.accessFilter === 'open' && row.cargoLocked) return false;
+  if (opts.accessFilter === 'locked' && !row.cargoLocked) return false;
   return true;
 }
 
 /**
- * Filter → multi-sort → paginate a market board. Default sort is pay desc
- * (same as listMarketLots) when no sorts are provided.
+ * Filter → multi-sort → paginate a market board.
+ * Default sort: unlocked first (stable within access).
  */
 export function queryMarketBoardPage<T extends MarketBoardSortable>(
   rows: readonly T[],
@@ -165,10 +208,9 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
   pageCount: number;
 } {
   const filtered = rows.filter((row) => marketBoardRowMatchesFilters(row, opts));
-  const sorts =
-    opts.sorts && opts.sorts.length > 0
-      ? opts.sorts
-      : ([{ key: 'pay', direction: 'desc' }] as MarketBoardSortLevel[]);
+  const sorts = ensureAccessPrimarySort(
+    opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined,
+  );
 
   const sorted = filtered
     .map((row, index) => ({ row, index }))

@@ -2,6 +2,7 @@ import type {
   Mission,
   MissionSettlement,
   FlightScoreSnapshot,
+  CargoOpsDelta,
 } from './api';
 
 export type DispatchStepId =
@@ -51,8 +52,33 @@ export type FlightDebrief = {
   /** Airborne duration (wheels-up → touchdown/settle), ms. */
   flightDurationMs: number | null;
   flightScore: FlightScoreSnapshot | null;
+  cargoOpsDeltas: CargoOpsDelta[];
   netUsd: number;
 };
+
+const CARGO_OPS_LABELS: Record<string, string> = {
+  general: 'General',
+  supplies: 'Supplies',
+  electronics: 'Electronics',
+  perishables: 'Perishables',
+  machinery: 'Machinery',
+};
+
+/** Compact toast / debrief line for Cargo Ops rep deltas. */
+export function formatCargoOpsDebriefLine(
+  deltas: CargoOpsDelta[] | null | undefined,
+): string {
+  if (!deltas?.length) return '';
+  return deltas
+    .map((d) => {
+      const name = CARGO_OPS_LABELS[d.commodityId] ?? d.commodityId;
+      const sign = d.deltaRep > 0 ? '+' : '';
+      const unlock = d.unlockedNow ? ' · unlocked' : '';
+      const clean = d.clean ? ' · clean' : '';
+      return `${name} ${sign}${d.deltaRep}→${d.repAfter}${clean}${unlock}`;
+    })
+    .join(' · ');
+}
 
 /** Format touchdown rate for debrief/logbook (e.g. "−220 fpm"). */
 export function formatLandingFpm(fpm: number | null | undefined): string {
@@ -119,6 +145,7 @@ export function buildFlightDebrief(opts: {
     landingFpm,
     flightDurationMs,
     flightScore,
+    cargoOpsDeltas: opts.settlement.cargoOpsDeltas ?? [],
     netUsd: opts.settlement.payoutUsd - fuelCostUsd,
   };
 }

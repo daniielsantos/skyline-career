@@ -3,6 +3,7 @@
  */
 
 import {
+  advanceFlightPhase,
   createMissionFlightWatchState,
   applyWalletDelta,
   createCruiseSampleState,
@@ -10,12 +11,12 @@ import {
   cruiseSampleStatus,
   DEFAULT_CRUISE_EMA_ALPHA,
   departMission,
+  distanceNm as greatCircleDistanceNm,
   estimateMissionBlockHours,
   evaluateLoadVerification,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
   finalizeFlightScore,
-  flightPhaseFromSample,
   isUsableFuelTankBreakdown,
   loadVerificationDrifted,
   mergeAirframePerfOverride,
@@ -31,8 +32,10 @@ import {
   resolveExpectedRouteMs,
   routeDistanceNm,
   settleMission,
+  watchIntervalMsForPhase,
   type CareerEconomyWorld,
   type CareerMissionsState,
+  type CargoOpsDelta,
   type CruiseSampleState,
   type CruiseSampleStatus,
   type FlightGroundSample,
@@ -115,11 +118,16 @@ export type WatchStatusPayload = {
     flightDurationMs: number | null;
     /** Flight scorecard from Watch telemetry. */
     flightScore: FlightScoreSnapshot | null;
+    /** Cargo Ops ladder deltas from this settle. */
+    cargoOpsDeltas?: CargoOpsDelta[];
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
   autoSettle: boolean;
+  /** Cruise poll cap (seconds) — adaptive phase intervals may be faster. */
   intervalSec: number;
+  /** Effective poll interval for the current phase (ms). */
+  intervalMs: number;
   allowDepartOverride: boolean;
   /** Live airborne progress vs planned route (anti time-compression). */
   flightTime: WatchFlightTimePayload | null;
@@ -186,7 +194,9 @@ export async function sampleLiveFlight(
     overspeedWarning?: boolean;
     stallWarning?: boolean;
     gearDown?: boolean;
+    gearRetractable?: boolean;
     flapsPct?: number;
+    aglFt?: number;
   }
 > {
   const snap = await bridge.snapshot();
@@ -249,16 +259,27 @@ export async function sampleLiveFlight(
     }
   };
 
-  const [bankDeg, pitchDeg, gForce, indicatedAirspeedKt, altitudeFt, gearPct, flapsPct] =
-    await Promise.all([
-      readOpt('PLANE BANK DEGREES', 'degrees'),
-      readOpt('PLANE PITCH DEGREES', 'degrees'),
-      readOpt('G FORCE', 'Gforce'),
-      readOpt('AIRSPEED INDICATED', 'knots'),
-      readOpt('PLANE ALTITUDE', 'feet'),
-      readOpt('GEAR TOTAL PCT EXTENDED', 'percent'),
-      readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'percent'),
-    ]);
+  const [
+    bankDeg,
+    pitchDeg,
+    gForce,
+    indicatedAirspeedKt,
+    altitudeFt,
+    gearPct,
+    flapsPct,
+    aglFt,
+    gearRetractableRaw,
+  ] = await Promise.all([
+    readOpt('PLANE BANK DEGREES', 'degrees'),
+    readOpt('PLANE PITCH DEGREES', 'degrees'),
+    readOpt('G FORCE', 'Gforce'),
+    readOpt('AIRSPEED INDICATED', 'knots'),
+    readOpt('PLANE ALTITUDE', 'feet'),
+    readOpt('GEAR TOTAL PCT EXTENDED', 'percent'),
+    readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'percent'),
+    readOpt('PLANE ALT ABOVE GROUND', 'feet'),
+    readOpt('IS GEAR RETRACTABLE', 'bool'),
+  ]);
 
   let overspeedWarning: boolean | undefined;
   let stallWarning: boolean | undefined;
@@ -275,6 +296,11 @@ export async function sampleLiveFlight(
     stallWarning = undefined;
   }
 
+  const gearRetractable =
+    typeof gearRetractableRaw === 'number'
+      ? gearRetractableRaw > 0.5
+      : undefined;
+
   return {
     onGround: snap.onGround,
     enginesRunning: snap.enginesRunning,
@@ -290,7 +316,9 @@ export async function sampleLiveFlight(
     stallWarning,
     gearDown:
       typeof gearPct === 'number' ? gearPct >= 80 : undefined,
+    gearRetractable,
     flapsPct,
+    aglFt,
   };
 }
 
@@ -577,14 +605,28 @@ export async function probeLiveLandingFpm(
 
 export class CareerWatchSession {
   private bridge: NamedPipeSimBridge | null = null;
-  private timer: ReturnType<typeof setInterval> | undefined;
+  private timer: ReturnType<typeof setTimeout> | undefined;
   private watchState: MissionFlightWatchState = createMissionFlightWatchState();
   private running = false;
   private missionId: string | null = null;
   private missionStatus: string | null = null;
-  private lastSample: FlightGroundSample | null = null;
-  /** Sticky display phase (taxi hysteresis). */
+  private lastSample: (FlightGroundSample & {
+    aglFt?: number;
+    gearRetractable?: boolean;
+    gearDown?: boolean;
+    flapsPct?: number;
+    bankDeg?: number;
+    pitchDeg?: number;
+    gForce?: number;
+    indicatedAirspeedKt?: number;
+    altitudeFt?: number;
+    overspeedWarning?: boolean;
+    stallWarning?: boolean;
+  }) | null = null;
+  /** Sticky flight phase for UI + adaptive poll. */
   private lastPhase: string | null = null;
+  /** Effective poll interval for the current phase (ms). */
+  private intervalMs = 2_000;
   private lastLiveFuelLb: number | null = null;
   private lastLivePayloadLb: number | null = null;
   private lastLoadVerification: WatchLoadVerification | null = null;
@@ -675,7 +717,7 @@ export class CareerWatchSession {
       };
     }
     if (this.lastSample) {
-      this.lastPhase = flightPhaseFromSample(this.lastSample, this.lastPhase);
+      // Phase is advanced in tick(); keep sticky value for getStatus between ticks.
     }
     return {
       running: this.running,
@@ -721,6 +763,7 @@ export class CareerWatchSession {
       autoDepart: this.opts.autoDepart,
       autoSettle: this.opts.autoSettle,
       intervalSec: this.opts.intervalSec,
+      intervalMs: this.intervalMs,
       allowDepartOverride: this.opts.allowDepartOverride,
       flightTime,
       cruiseSample: this.cruiseStatus,
@@ -755,6 +798,9 @@ export class CareerWatchSession {
     this.missionId = opts.missionId;
     this.lastSample = null;
     this.lastPhase = null;
+    this.intervalMs = watchIntervalMsForPhase('ground', {
+      cruiseCapMs: Math.max(1, Math.floor(opts.intervalSec ?? 5)) * 1000,
+    });
     this.lastLiveFuelLb = null;
     this.lastLivePayloadLb = null;
     this.lastLoadVerification = null;
@@ -829,19 +875,28 @@ export class CareerWatchSession {
     // close was returning 0xC00000B0 and kicking the reconnect storm.
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    // First sample immediately, then on interval.
+    // First sample immediately; each tick rearms setTimeout with phase interval.
     await this.tick();
-    this.timer = setInterval(() => {
-      void this.tick();
-    }, this.opts.intervalSec * 1000);
 
     return this.getStatus();
+  }
+
+  private scheduleNextTick(delayMs: number): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    if (!this.running) return;
+    const ms = Math.max(200, Math.round(delayMs));
+    this.timer = setTimeout(() => {
+      void this.tick();
+    }, ms);
   }
 
   async stop(): Promise<WatchStatusPayload> {
     this.running = false;
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = undefined;
     }
     if (this.bridge) {
@@ -866,9 +921,13 @@ export class CareerWatchSession {
       watchDebugLog('watch', 'tick skipped — OFP inject active', {
         missionId: this.missionId,
       });
+      this.scheduleNextTick(this.intervalMs);
       return;
     }
     if (Date.now() < this.pipeRetryAtMs) {
+      this.scheduleNextTick(
+        Math.max(500, this.pipeRetryAtMs - Date.now()),
+      );
       return;
     }
     this.tickInFlight = true;
@@ -1120,6 +1179,10 @@ export class CareerWatchSession {
         current.originIcao,
         current.destIcao,
       );
+      const liveDistToDestNm =
+        sample.position && destCoords
+          ? greatCircleDistanceNm(sample.position, destCoords)
+          : undefined;
       const fallbackHours = estimateMissionBlockHours(
         world,
         current.originIcao,
@@ -1149,10 +1212,31 @@ export class CareerWatchSession {
       this.lastEvent = event;
       this.lastEventAtIso = new Date().toISOString();
 
-      // Flight score: envelope peaks + taxi GS + landing snapshot.
       const postTouchdown =
         typeof nextState.airborneEndedAtMs === 'number' ||
         (nextState.sawAirborne && sample.onGround && nextState.landingFpm != null);
+
+      this.lastPhase = advanceFlightPhase(
+        this.lastPhase,
+        {
+          onGround: sample.onGround,
+          enginesRunning: sample.enginesRunning,
+          groundSpeedKt: sample.groundSpeedKt,
+          verticalSpeedFpm: sample.verticalSpeedFpm,
+          altitudeFt: sample.altitudeFt,
+          aglFt: sample.aglFt,
+          distanceToDestNm: liveDistToDestNm,
+          sawAirborne: nextState.sawAirborne,
+          postTouchdown,
+        },
+        {
+          airborneAtMs: nextState.airborneAtMs,
+          touchdownAtMs: nextState.airborneEndedAtMs,
+          nowMs,
+        },
+      );
+
+      // Flight score: envelope peaks + taxi GS + landing snapshot.
       this.scoreAcc = pushFlightScoreSample(this.scoreAcc, {
         onGround: sample.onGround,
         sawAirborne: nextState.sawAirborne,
@@ -1166,6 +1250,7 @@ export class CareerWatchSession {
         overspeedWarning: sample.overspeedWarning,
         stallWarning: sample.stallWarning,
         gearDown: sample.gearDown,
+        gearRetractable: sample.gearRetractable,
         flapsPct: sample.flapsPct,
         landingVsFpm:
           postTouchdown && nextState.landingFpm != null
@@ -1390,6 +1475,7 @@ export class CareerWatchSession {
             landingFpm: result.mission.settledLandingFpm ?? null,
             flightDurationMs: result.mission.settledFlightDurationMs ?? null,
             flightScore: result.mission.settledFlightScore ?? null,
+            cargoOpsDeltas: result.cargoOpsDeltas ?? [],
           };
           return true;
         });
@@ -1433,8 +1519,16 @@ export class CareerWatchSession {
         livePayloadLb: this.lastLivePayloadLb,
         ready: this.lastLoadVerification?.ready ?? null,
         pipeConnected: this.bridge?.isPipeConnected ?? false,
+        phase: this.lastPhase,
+        intervalMs: this.intervalMs,
       });
       this.tickInFlight = false;
+      if (this.running) {
+        this.intervalMs = watchIntervalMsForPhase(this.lastPhase, {
+          cruiseCapMs: this.opts.intervalSec * 1000,
+        });
+        this.scheduleNextTick(this.intervalMs);
+      }
     }
   }
 }

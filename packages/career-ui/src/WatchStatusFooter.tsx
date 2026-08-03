@@ -1,5 +1,25 @@
 import type { SimBridgeStatus, WatchStatus } from './api';
 
+const FLIGHT_PHASE_LABEL: Record<string, string> = {
+  ground: 'On ground',
+  taxi_out: 'Taxi out',
+  takeoff: 'Takeoff',
+  climb: 'Climb',
+  cruise: 'Cruise',
+  descent: 'Descent',
+  approach: 'Approach',
+  landing: 'Landing',
+  taxi_in: 'Taxi in',
+  taxi: 'Taxi',
+  airborne: 'Airborne',
+  'ground+engines': 'On ground · engines',
+};
+
+function formatWatchPhaseLabel(phase: string | null | undefined): string {
+  if (!phase) return '—';
+  return FLIGHT_PHASE_LABEL[phase] ?? phase;
+}
+
 type Props = {
   missionStatus?: string | null;
   simBridge: SimBridgeStatus | null;
@@ -43,12 +63,21 @@ export function WatchStatusFooter(props: Props) {
     watchRunning && props.watch?.groundSpeedKt != null
       ? props.watch.groundSpeedKt
       : (props.simBridge?.groundSpeedKt ?? null);
-  const stageDetail =
-    bridgePhase === 'taxi' ||
-    (bridgeOnGround === true &&
-      bridgeEngines &&
-      typeof bridgeGs === 'number' &&
-      bridgeGs >= 5)
+  const stageDetail = watchRunning
+    ? formatWatchPhaseLabel(bridgePhase) !== '—'
+      ? formatWatchPhaseLabel(bridgePhase)
+      : bridgeOnGround === true
+        ? bridgeEngines
+          ? 'On ground · engines running'
+          : 'On ground · engines off'
+        : bridgeOnGround === false
+          ? 'Airborne'
+          : 'Sampling live aircraft…'
+    : bridgePhase === 'taxi' ||
+        (bridgeOnGround === true &&
+          bridgeEngines &&
+          typeof bridgeGs === 'number' &&
+          bridgeGs >= 5)
       ? 'Taxiing'
       : bridgeOnGround === true
         ? bridgeEngines

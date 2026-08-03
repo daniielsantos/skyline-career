@@ -47,6 +47,8 @@ export type FlightScoreSample = {
   overspeedWarning?: boolean;
   stallWarning?: boolean;
   gearDown?: boolean;
+  /** False for fixed-gear airframes (Kodiak, C172, …). */
+  gearRetractable?: boolean;
   flapsPct?: number;
   /** Touchdown vertical speed (fpm); typically negative. */
   landingVsFpm?: number;
@@ -72,6 +74,7 @@ export type FlightScoreAccumulator = {
     gForce?: number;
     iasKt?: number;
     gearDown?: boolean;
+    gearRetractable?: boolean;
     flapsPct?: number;
   };
 };
@@ -187,6 +190,7 @@ export function pushFlightScoreSample(
         gForce: sample.gForce,
         iasKt: sample.indicatedAirspeedKt,
         gearDown: sample.gearDown,
+        gearRetractable: sample.gearRetractable,
         flapsPct: sample.flapsPct,
       },
     };
@@ -392,15 +396,24 @@ export function finalizeFlightScore(
     ),
   );
 
+  const gearRetractable = acc.landing?.gearRetractable !== false;
   const gearDown = acc.landing?.gearDown === true;
+  const gearOk =
+    Boolean(acc.landing) && (!gearRetractable || gearDown);
   landing.push(
     binaryMetric(
       'landing_gear',
       'Landing gear down',
       'landing',
-      Boolean(acc.landing) && gearDown,
+      gearOk,
       1,
-      acc.landing ? (gearDown ? 'down' : 'up / unknown') : 'not captured',
+      acc.landing
+        ? !gearRetractable
+          ? 'fixed gear'
+          : gearDown
+            ? 'down'
+            : 'up / unknown'
+        : 'not captured',
     ),
   );
 

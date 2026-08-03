@@ -733,6 +733,13 @@ th {
   min-width: 10.5rem;
 }
 
+.filter-row .access-filter-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
 .filter-row .route-filter {
   min-width: 0;
   box-sizing: border-box;
@@ -1055,6 +1062,93 @@ th {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.cargo-ops-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cargo-ops-panel h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.cargo-ops-tiers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.cargo-ops-tier {
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cargo-ops-tier.locked {
+  opacity: 0.72;
+}
+
+.cargo-ops-tier-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.78rem;
+}
+
+.cargo-ops-lock {
+  color: var(--muted);
+}
+
+.cargo-ops-commodities {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.cargo-ops-commodity-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.cargo-ops-bar {
+  height: 0.28rem;
+  margin-top: 0.28rem;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.cargo-ops-bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.cargo-ops-debrief {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+}
+
+.cargo-ops-debrief p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+tr.lot-locked {
+  opacity: 0.7;
 }
 
 .flight-score {
@@ -4242,7 +4336,7 @@ textarea {
 
 .dispatch-route-map-canvas {
   width: 100%;
-  height: 20rem;
+  height: 26rem;
   background: #0b0b0c;
 }
 

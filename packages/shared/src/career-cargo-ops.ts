@@ -1,0 +1,390 @@
+/**
+ * Cargo Ops ladder — unlock freights by commodity reputation.
+ * Dry (general + supplies) → Value (electronics) → Time (perishables) → Heavy (machinery).
+ */
+
+import type {
+  CargoOpsCommodityId,
+  CargoOpsCommodityState,
+  CareerCargoOps,
+  CommodityId,
+  MissionIntent,
+} from './types/career-economy.js';
+import type { FlightScoreSnapshot } from './career-flight-score.js';
+
+export const CARGO_OPS_COMMODITY_IDS: readonly CargoOpsCommodityId[] = [
+  'general',
+  'supplies',
+  'electronics',
+  'perishables',
+  'machinery',
+] as const;
+
+export const CARGO_OPS_DRY_IDS: readonly CargoOpsCommodityId[] = [
+  'general',
+  'supplies',
+] as const;
+
+/** Score % required for a "clean" settle that counts toward unlock. */
+export const CARGO_OPS_CLEAN_SCORE: Record<CargoOpsCommodityId, number> = {
+  general: 70,
+  supplies: 70,
+  electronics: 80,
+  perishables: 75,
+  machinery: 75,
+};
+
+export type CargoOpsTierId = 'dry' | 'value' | 'time' | 'heavy';
+
+export const CARGO_OPS_TIERS: readonly {
+  id: CargoOpsTierId;
+  label: string;
+  commodityIds: readonly CargoOpsCommodityId[];
+}[] = [
+  { id: 'dry', label: 'Dry', commodityIds: ['general', 'supplies'] },
+  { id: 'value', label: 'Value', commodityIds: ['electronics'] },
+  { id: 'time', label: 'Time', commodityIds: ['perishables'] },
+  { id: 'heavy', label: 'Heavy', commodityIds: ['machinery'] },
+];
+
+function clampRep(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function defaultCommodityState(
+  id: CargoOpsCommodityId,
+): CargoOpsCommodityState {
+  const dry = id === 'general' || id === 'supplies';
+  return {
+    unlocked: dry,
+    rep: dry ? 55 : 0,
+    settlesOk: 0,
+  };
+}
+
+export function emptyCareerCargoOps(): CareerCargoOps {
+  const commodities = {} as Record<
+    CargoOpsCommodityId,
+    CargoOpsCommodityState
+  >;
+  for (const id of CARGO_OPS_COMMODITY_IDS) {
+    commodities[id] = defaultCommodityState(id);
+  }
+  return { commodities };
+}
+
+export function isCargoOpsCommodityId(
+  id: string,
+): id is CargoOpsCommodityId {
+  return (CARGO_OPS_COMMODITY_IDS as readonly string[]).includes(id);
+}
+
+export function normalizeCareerCargoOps(raw: unknown): CareerCargoOps {
+  const base = emptyCareerCargoOps();
+  if (!raw || typeof raw !== 'object') return base;
+  const src = (raw as CareerCargoOps).commodities;
+  if (!src || typeof src !== 'object') return base;
+  for (const id of CARGO_OPS_COMMODITY_IDS) {
+    const row = src[id];
+    if (!row || typeof row !== 'object') continue;
+    base.commodities[id] = {
+      unlocked: Boolean(row.unlocked) || id === 'general' || id === 'supplies',
+      rep: clampRep(typeof row.rep === 'number' ? row.rep : base.commodities[id].rep),
+      settlesOk:
+        typeof row.settlesOk === 'number' && Number.isFinite(row.settlesOk)
+          ? Math.max(0, Math.floor(row.settlesOk))
+          : 0,
+    };
+  }
+  // Sticky unlocks once earned; Dry always open.
+  refreshCargoOpsUnlocks(base);
+  return base;
+}
+
+function dryReady(ops: CareerCargoOps): boolean {
+  const g = ops.commodities.general;
+  const s = ops.commodities.supplies;
+  if (g.rep >= 60 && g.settlesOk >= 3) return true;
+  if (s.rep >= 60 && s.settlesOk >= 3) return true;
+  const settles = g.settlesOk + s.settlesOk;
+  const rep = Math.max(g.rep, s.rep);
+  return settles >= 3 && rep >= 60;
+}
+
+function valueReady(ops: CareerCargoOps): boolean {
+  const e = ops.commodities.electronics;
+  return e.unlocked && e.rep >= 65 && e.settlesOk >= 4;
+}
+
+function valueHeavyShortcut(ops: CareerCargoOps): boolean {
+  const e = ops.commodities.electronics;
+  return e.unlocked && e.rep >= 75 && e.settlesOk >= 6;
+}
+
+function timeReady(ops: CareerCargoOps): boolean {
+  const p = ops.commodities.perishables;
+  return p.unlocked && p.rep >= 65 && p.settlesOk >= 3;
+}
+
+/** Recompute sticky unlocks from current rep / settlesOk. */
+export function refreshCargoOpsUnlocks(ops: CareerCargoOps): CareerCargoOps {
+  ops.commodities.general.unlocked = true;
+  ops.commodities.supplies.unlocked = true;
+  if (dryReady(ops)) ops.commodities.electronics.unlocked = true;
+  if (valueReady(ops)) ops.commodities.perishables.unlocked = true;
+  if (timeReady(ops) || valueHeavyShortcut(ops)) {
+    ops.commodities.machinery.unlocked = true;
+  }
+  return ops;
+}
+
+export function cargoOpsIsUnlocked(
+  ops: CareerCargoOps | undefined,
+  commodityId: CommodityId,
+): boolean {
+  // No ladder state → do not gate (legacy callers / unit tests).
+  if (ops == null) return true;
+  if (!isCargoOpsCommodityId(commodityId)) return true;
+  const state = normalizeCareerCargoOps(ops).commodities[commodityId];
+  return state.unlocked;
+}
+
+/** Pay multiplier from reputation (1.0 at mid rep). */
+export function cargoOpsPayMult(
+  ops: CareerCargoOps | undefined,
+  commodityId: CommodityId,
+): number {
+  if (ops == null || !isCargoOpsCommodityId(commodityId)) return 1;
+  const rep = normalizeCareerCargoOps(ops).commodities[commodityId].rep;
+  if (rep < 30) return 0.85;
+  if (rep < 50) return 0.95;
+  if (rep < 70) return 1.0;
+  if (rep < 85) return 1.08;
+  return 1.15;
+}
+
+export type CargoOpsSettleInput = {
+  commodityId: CommodityId;
+  onTime: boolean;
+  lateTicks: number;
+  cancelled?: boolean;
+  failed?: boolean;
+  flightScorePct?: number | null;
+};
+
+export type CargoOpsDelta = {
+  commodityId: CargoOpsCommodityId;
+  deltaRep: number;
+  repBefore: number;
+  repAfter: number;
+  settlesOkAfter: number;
+  unlockedNow: boolean;
+  clean: boolean;
+};
+
+function scorePctOf(
+  score: FlightScoreSnapshot | null | undefined,
+): number | undefined {
+  if (!score || typeof score.pct !== 'number' || !Number.isFinite(score.pct)) {
+    return undefined;
+  }
+  return score.pct;
+}
+
+/**
+ * Reputation delta for one commodity line after settle.
+ * Dry without Watch score: on-time still counts as clean.
+ * Higher tiers need a score sample to advance settlesOk.
+ */
+export function computeCargoOpsRepDelta(
+  commodityId: CargoOpsCommodityId,
+  input: {
+    onTime: boolean;
+    lateTicks: number;
+    cancelled?: boolean;
+    failed?: boolean;
+    flightScorePct?: number | null;
+  },
+): { deltaRep: number; clean: boolean } {
+  if (input.cancelled || input.failed) {
+    const cancel =
+      commodityId === 'electronics'
+        ? -8
+        : commodityId === 'perishables'
+          ? -10
+          : commodityId === 'machinery'
+            ? -8
+            : -5;
+    return { deltaRep: cancel, clean: false };
+  }
+
+  const threshold = CARGO_OPS_CLEAN_SCORE[commodityId];
+  const score = input.flightScorePct;
+  const hasScore = typeof score === 'number' && Number.isFinite(score);
+  const dry = commodityId === 'general' || commodityId === 'supplies';
+  const scoreOk = hasScore ? score! >= threshold : dry;
+  const clean = Boolean(input.onTime && scoreOk);
+
+  if (input.lateTicks >= 2) {
+    const d =
+      commodityId === 'perishables'
+        ? -14
+        : commodityId === 'electronics'
+          ? -8
+          : commodityId === 'machinery'
+            ? -7
+            : -6;
+    return { deltaRep: d, clean: false };
+  }
+  if (input.lateTicks === 1) {
+    const d =
+      commodityId === 'perishables'
+        ? -8
+        : commodityId === 'electronics'
+          ? -4
+          : commodityId === 'machinery'
+            ? -4
+            : -3;
+    return { deltaRep: d, clean: false };
+  }
+
+  // On-time
+  if (hasScore && score! < 50) {
+    const d =
+      commodityId === 'electronics'
+        ? -6
+        : commodityId === 'perishables'
+          ? -4
+          : commodityId === 'machinery'
+            ? -3
+            : -2;
+    return { deltaRep: d, clean: false };
+  }
+
+  if (clean) {
+    const d =
+      commodityId === 'perishables'
+        ? 6
+        : commodityId === 'electronics' || commodityId === 'machinery'
+          ? 5
+          : 4;
+    return { deltaRep: d, clean: true };
+  }
+
+  // On-time but weak score (or higher tier without score)
+  if (input.onTime && hasScore && score! < threshold) {
+    if (commodityId === 'perishables') return { deltaRep: -2, clean: false };
+    if (commodityId === 'electronics') return { deltaRep: 0, clean: false };
+    if (commodityId === 'machinery') return { deltaRep: -1, clean: false };
+    return { deltaRep: 1, clean: false };
+  }
+
+  if (input.onTime && !hasScore && !dry) {
+    return { deltaRep: 1, clean: false };
+  }
+
+  return { deltaRep: 0, clean: false };
+}
+
+export function applyCargoOpsOnSettle(
+  ops: CareerCargoOps | undefined,
+  mission: Pick<MissionIntent, 'commodityId' | 'lots' | 'status'>,
+  settlement: {
+    onTime: boolean;
+    lateTicks: number;
+    flightScore?: FlightScoreSnapshot | null;
+  },
+): { cargoOps: CareerCargoOps; deltas: CargoOpsDelta[] } {
+  const next = normalizeCareerCargoOps(ops);
+  const scorePct = scorePctOf(settlement.flightScore ?? undefined);
+  const lines =
+    Array.isArray(mission.lots) && mission.lots.length > 0
+      ? mission.lots.map((l) => l.commodityId)
+      : [mission.commodityId];
+  const seen = new Set<CargoOpsCommodityId>();
+  const deltas: CargoOpsDelta[] = [];
+
+  for (const rawId of lines) {
+    if (!isCargoOpsCommodityId(rawId) || seen.has(rawId)) continue;
+    seen.add(rawId);
+    const before = next.commodities[rawId];
+    const unlockedBefore = before.unlocked;
+    const { deltaRep, clean } = computeCargoOpsRepDelta(rawId, {
+      onTime: settlement.onTime,
+      lateTicks: settlement.lateTicks,
+      flightScorePct: scorePct,
+    });
+    const repAfter = clampRep(before.rep + deltaRep);
+    const settlesOkAfter = clean ? before.settlesOk + 1 : before.settlesOk;
+    next.commodities[rawId] = {
+      ...before,
+      rep: repAfter,
+      settlesOk: settlesOkAfter,
+    };
+    refreshCargoOpsUnlocks(next);
+    deltas.push({
+      commodityId: rawId,
+      deltaRep,
+      repBefore: before.rep,
+      repAfter,
+      settlesOkAfter,
+      unlockedNow: !unlockedBefore && next.commodities[rawId].unlocked,
+      clean,
+    });
+  }
+
+  // Flag commodities newly unlocked as a side-effect (e.g. Dry unlocks Value).
+  for (const id of CARGO_OPS_COMMODITY_IDS) {
+    const was =
+      ops != null
+        ? normalizeCareerCargoOps(ops).commodities[id].unlocked
+        : id === 'general' || id === 'supplies';
+    const now = next.commodities[id].unlocked;
+    if (!was && now) {
+      const existing = deltas.find((d) => d.commodityId === id);
+      if (existing) existing.unlockedNow = true;
+      else {
+        deltas.push({
+          commodityId: id,
+          deltaRep: 0,
+          repBefore: next.commodities[id].rep,
+          repAfter: next.commodities[id].rep,
+          settlesOkAfter: next.commodities[id].settlesOk,
+          unlockedNow: true,
+          clean: false,
+        });
+      }
+    }
+  }
+
+  return { cargoOps: next, deltas };
+}
+
+/** Extra Value-tier payout haircut when score is soft (fraction of contract pay). */
+export function cargoOpsValueScorePenaltyFraction(
+  commodityId: CommodityId,
+  flightScorePct: number | null | undefined,
+): number {
+  if (commodityId !== 'electronics') return 0;
+  if (typeof flightScorePct !== 'number' || !Number.isFinite(flightScorePct)) {
+    return 0;
+  }
+  return flightScorePct < 70 ? 0.05 : 0;
+}
+
+/** Perishables late penalty multiplier vs normal rate. */
+export function cargoOpsLatePenaltyMult(commodityId: CommodityId): number {
+  return commodityId === 'perishables' ? 1.5 : 1;
+}
+
+export function formatCargoOpsDeltas(deltas: CargoOpsDelta[]): string {
+  if (deltas.length === 0) return '';
+  return deltas
+    .map((d) => {
+      const sign = d.deltaRep > 0 ? '+' : '';
+      const unlock = d.unlockedNow ? ' · unlocked' : '';
+      return `${d.commodityId} ${sign}${d.deltaRep}→${d.repAfter}${unlock}`;
+    })
+    .join(' · ');
+}

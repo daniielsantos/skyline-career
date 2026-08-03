@@ -552,6 +552,40 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
+export type CargoOpsCommodityId =
+  | 'general'
+  | 'supplies'
+  | 'electronics'
+  | 'perishables'
+  | 'machinery';
+
+export type CargoOpsCommodityState = {
+  unlocked: boolean;
+  rep: number;
+  settlesOk: number;
+};
+
+export type CareerCargoOps = {
+  commodities: Record<CargoOpsCommodityId, CargoOpsCommodityState>;
+};
+
+export type CargoOpsDelta = {
+  commodityId: CargoOpsCommodityId;
+  deltaRep: number;
+  repBefore: number;
+  repAfter: number;
+  settlesOkAfter: number;
+  unlockedNow: boolean;
+  clean: boolean;
+};
+
+export type StarterHubOption = {
+  icao: string;
+  name: string;
+  region: string;
+  hubTier: 'major' | 'regional' | 'spoke';
+};
+
 export function fetchState() {
   return api<
     ClockSync & {
@@ -564,10 +598,11 @@ export function fetchState() {
       npcFlights?: number;
       hubSelected?: boolean;
       fleet?: PlayerAircraft[];
-      hubs?: string[];
+      hubs?: StarterHubOption[];
       pilotName?: string;
       homeHubIcao?: string;
       cashflow?: CareerCashflowSnapshot;
+      cargoOps?: CareerCargoOps | null;
       starterAircraft?: Array<{
         typeId: string;
         label: string;
@@ -603,6 +638,8 @@ export function fetchMarket(
     loadMaxKg?: number | string;
     expiresWithinHours?: number | string;
     minPayUsd?: number | string;
+    /** Cargo Ops: open = unlocked only, locked = locked only. */
+    access?: 'open' | 'locked' | '';
   } = {},
 ) {
   const params = new URLSearchParams();
@@ -625,6 +662,8 @@ export function fetchMarket(
   if (expiresWithinHours) params.set('expiresWithinHours', expiresWithinHours);
   const minPayUsd = String(opts.minPayUsd ?? '').trim();
   if (minPayUsd) params.set('minPayUsd', minPayUsd);
+  const access = String(opts.access ?? '').trim();
+  if (access === 'open' || access === 'locked') params.set('access', access);
   const qs = params.toString();
   return api<
     ClockSync & {
@@ -747,7 +786,12 @@ export function postDebugCreditWallet(amountUsd = 100_000) {
 }
 
 export function postInitBrazil() {
-  return api<{ tick: number; seed: string; airports: number }>('/api/init', {
+  return api<{
+    tick: number;
+    seed: string;
+    airports: number;
+    availableLots?: number;
+  }>('/api/init', {
     method: 'POST',
     body: JSON.stringify({ resetMissions: true }),
   });
@@ -819,7 +863,7 @@ export function postSelectHub(opts: {
     walletUsd: number;
     hubSelected: boolean;
     fleet: PlayerAircraft[];
-    hubs: string[];
+    hubs: StarterHubOption[];
     pilotName: string;
     homeHubIcao: string;
     homeCountryId: string | null;
@@ -995,7 +1039,7 @@ export function postFerry(opts: {
     walletUsd: number;
     hubSelected?: boolean;
     fleet?: PlayerAircraft[];
-    hubs?: string[];
+    hubs?: StarterHubOption[];
   }>('/api/fleet/ferry', {
     method: 'POST',
     body: JSON.stringify(opts),
@@ -1123,6 +1167,8 @@ export type MissionSettlement = {
   flightDurationMs?: number | null;
   /** Flight scorecard from Watch telemetry. */
   flightScore?: FlightScoreSnapshot | null;
+  /** Cargo Ops ladder deltas from this settle. */
+  cargoOpsDeltas?: CargoOpsDelta[];
 };
 
 export type WatchEvent =
@@ -1168,6 +1214,8 @@ export type WatchStatus = {
   autoDepart: boolean;
   autoSettle: boolean;
   intervalSec: number;
+  /** Effective Watch poll interval for the current flight phase (ms). */
+  intervalMs?: number;
   allowDepartOverride?: boolean;
   flightTime?: {
     airborneAtMs: number;

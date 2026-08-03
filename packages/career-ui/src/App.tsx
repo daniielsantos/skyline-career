@@ -57,6 +57,7 @@ import {
   type PlayerAircraft,
   type RegionPressure,
   type SimBridgeStatus,
+  type StarterHubOption,
   type WatchStatus,
 } from './api';
 import {
@@ -79,7 +80,39 @@ import {
   type AircraftCatalogEntry,
 } from './AircraftCards';
 import { HangarCashflowPanel } from './CashflowPanel';
+import { CargoOpsPanel } from './CargoOpsPanel';
+import type { CareerCargoOps } from './api';
 import { HubNetworkMap } from './HubNetworkMap';
+
+function normalizeStarterHubs(
+  hubs: Array<StarterHubOption | string> | null | undefined,
+): StarterHubOption[] {
+  if (!hubs?.length) return [];
+  return hubs.map((hub) =>
+    typeof hub === 'string'
+      ? { icao: hub, name: hub, region: '', hubTier: 'spoke' as const }
+      : hub,
+  );
+}
+
+function hubTierLabel(tier: StarterHubOption['hubTier']): string {
+  switch (tier) {
+    case 'major':
+      return 'Major';
+    case 'regional':
+      return 'Regional';
+    default:
+      return 'Spoke';
+  }
+}
+
+function formatStarterHubOption(hub: StarterHubOption): string {
+  const place = hub.name && hub.name !== hub.icao ? hub.name : '';
+  const tier = hubTierLabel(hub.hubTier);
+  if (place && hub.region) return `${hub.icao} — ${place} · ${tier} · ${hub.region}`;
+  if (place) return `${hub.icao} — ${place} · ${tier}`;
+  return `${hub.icao} · ${tier}`;
+}
 import {
   displayToKg,
   formatMass,
@@ -97,6 +130,7 @@ import {
   buildFlightDebrief,
   deriveDispatchStep,
   dispatchStepStatusLine,
+  formatCargoOpsDebriefLine,
   formatFlightDurationMs,
   formatLandingFpm,
   resolveLoadPath,
@@ -108,14 +142,26 @@ import { WatchStatusFooter } from './WatchStatusFooter';
 type Tab = CareerTab;
 type TerminalSection = 'inventory' | 'contracts' | 'movements';
 type ContractsLane = 'outbound' | 'inbound';
-type MarketSortKey = 'distance' | 'cargo' | 'load' | 'expires' | 'pay';
+type MarketSortKey =
+  | 'distance'
+  | 'cargo'
+  | 'load'
+  | 'expires'
+  | 'pay'
+  | 'access';
 type SortDirection = 'asc' | 'desc';
 type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
+type AccessFilter = '' | 'open' | 'locked';
+
+const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [
+  { key: 'access', direction: 'asc' },
+];
 
 function compareAirportLot(
   a: AirportLot,
   b: AirportLot,
   key: MarketSortKey,
+  isLocked: (commodityId: string) => boolean,
 ): number {
   switch (key) {
     case 'distance':
@@ -131,22 +177,32 @@ function compareAirportLot(
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
       return a.payUsd - b.payUsd;
+    case 'access':
+      return Number(isLocked(a.commodityId)) - Number(isLocked(b.commodityId));
   }
 }
 
 function sortAirportLots(
   lots: readonly AirportLot[],
   sorts: MarketSortLevel[],
+  isLocked: (commodityId: string) => boolean,
 ): AirportLot[] {
-  const levels =
+  const access = sorts.find((level) => level.key === 'access');
+  const rest = sorts.filter((level) => level.key !== 'access');
+  const levels: MarketSortLevel[] =
     sorts.length > 0
-      ? sorts
-      : ([{ key: 'pay', direction: 'desc' }] as MarketSortLevel[]);
+      ? [access ?? { key: 'access', direction: 'asc' }, ...rest]
+      : DEFAULT_BOARD_SORTS;
   return lots
     .map((lot, index) => ({ lot, index }))
     .sort((a, b) => {
       for (const level of levels) {
-        const comparison = compareAirportLot(a.lot, b.lot, level.key);
+        const comparison = compareAirportLot(
+          a.lot,
+          b.lot,
+          level.key,
+          isLocked,
+        );
         if (comparison !== 0) {
           return comparison * (level.direction === 'asc' ? 1 : -1);
         }
@@ -160,7 +216,13 @@ const MARKET_PAGE_SIZE = 10;
 const CONTRACTS_PAGE_SIZE = 13;
 
 function formatMarketSortParam(sorts: MarketSortLevel[]): string {
-  return sorts.map((level) => `${level.key}:${level.direction}`).join(',');
+  const access = sorts.find((level) => level.key === 'access');
+  const rest = sorts.filter((level) => level.key !== 'access');
+  const levels: MarketSortLevel[] = [
+    access ?? { key: 'access', direction: 'asc' },
+    ...rest,
+  ];
+  return levels.map((level) => `${level.key}:${level.direction}`).join(',');
 }
 const FLEET_PAGE_SIZE = 10;
 const MAX_STAGING_LOTS = 5;
@@ -1193,8 +1255,11 @@ export function App() {
     useState<TerminalSection>('inventory');
   const [contractsLane, setContractsLane] =
     useState<ContractsLane>('outbound');
-  const [contractsSorts, setContractsSorts] = useState<MarketSortLevel[]>([]);
+  const [contractsSorts, setContractsSorts] =
+    useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
   const [contractsPage, setContractsPage] = useState(1);
+  const [contractsAccessFilter, setContractsAccessFilter] =
+    useState<AccessFilter>('');
   /** When Hangar was opened to ferry for a contract, Back restores this terminal. */
   const [airportReturn, setAirportReturn] = useState<{
     icao: string;
@@ -1217,12 +1282,13 @@ export function App() {
     destQuery: '',
     page: 1,
     pageSize: MARKET_PAGE_SIZE,
-    sort: '',
+    sort: formatMarketSortParam(DEFAULT_BOARD_SORTS),
     distanceMaxNm: '',
     commodity: '',
     loadMaxKg: '',
     expiresWithinHours: '',
     minPayUsd: '',
+    access: '' as AccessFilter,
   });
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
@@ -1317,16 +1383,21 @@ export function App() {
   const [loadMaxKg, setLoadMaxKg] = useState('');
   const [expiresWithinHours, setExpiresWithinHours] = useState('');
   const [minimumPayUsd, setMinimumPayUsd] = useState('');
-  const [marketSorts, setMarketSorts] = useState<MarketSortLevel[]>([]);
+  const [accessFilter, setAccessFilter] = useState<AccessFilter>('');
+  const [marketSorts, setMarketSorts] =
+    useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
   const [stagingRouteLots, setStagingRouteLots] = useState<MarketLot[]>([]);
   const [stagingRouteLotsLoading, setStagingRouteLotsLoading] = useState(false);
   const [stagingRouteLotsError, setStagingRouteLotsError] = useState<string | null>(null);
   const [hubSelected, setHubSelected] = useState(true);
   const [fleet, setFleet] = useState<PlayerAircraft[]>([]);
-  const [hangarPane, setHangarPane] = useState<'aircraft' | 'cashflow'>('aircraft');
+  const [hangarPane, setHangarPane] = useState<
+    'aircraft' | 'cashflow' | 'cargo'
+  >('aircraft');
+  const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [cashflow, setCashflow] = useState<CareerCashflowSnapshot | null>(null);
-  const [hubOptions, setHubOptions] = useState<string[]>([]);
+  const [hubOptions, setHubOptions] = useState<StarterHubOption[]>([]);
   const [ferryDest, setFerryDest] = useState('');
   const [pilotName, setPilotName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
@@ -1454,6 +1525,7 @@ export function App() {
     setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
     setDisplayNowMs(serverNow);
     setWallet(missionState.walletUsd);
+    setCargoOps(state.cargoOps ?? null);
     setLots(market.lots);
     setMarketTotalLots(market.totalLots ?? market.lots.length);
     setMarketPageCount(market.pageCount ?? 1);
@@ -1483,7 +1555,7 @@ export function App() {
     setMissions(missionState.missions.slice().reverse());
     setHubSelected(Boolean(state.hubSelected) && (state.fleet?.length ?? 0) > 0);
     setFleet(state.fleet ?? []);
-    setHubOptions(state.hubs ?? []);
+    setHubOptions(normalizeStarterHubs(state.hubs));
     setPilotName(state.pilotName ?? '');
     setHomeHubIcao(state.homeHubIcao ?? '');
     if (state.starterAircraft?.length) {
@@ -1508,7 +1580,8 @@ export function App() {
       if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
     }
     if (!(state.hubSelected && (state.fleet?.length ?? 0) > 0)) {
-      setSignupHub((prev) => prev || state.hubs?.[0] || 'SBGR');
+      const firstHub = normalizeStarterHubs(state.hubs)[0]?.icao;
+      setSignupHub((prev) => prev || firstHub || 'SBGR');
     }
     if (airportIcao) {
       const view = await fetchAirport(airportIcao);
@@ -1573,6 +1646,7 @@ export function App() {
       loadMaxKg,
       expiresWithinHours,
       minPayUsd: minimumPayUsd,
+      access: accessFilter,
     };
     const prev = marketFetchOptsRef.current;
     const unchanged =
@@ -1585,7 +1659,8 @@ export function App() {
       prev.commodity === nextOpts.commodity &&
       prev.loadMaxKg === nextOpts.loadMaxKg &&
       prev.expiresWithinHours === nextOpts.expiresWithinHours &&
-      prev.minPayUsd === nextOpts.minPayUsd;
+      prev.minPayUsd === nextOpts.minPayUsd &&
+      prev.access === nextOpts.access;
     if (unchanged) return;
 
     let cancelled = false;
@@ -1615,6 +1690,7 @@ export function App() {
       clearTimeout(timer);
     };
   }, [
+    accessFilter,
     cargoFilter,
     destFilter,
     distanceMaxNm,
@@ -1755,10 +1831,13 @@ export function App() {
             queueMicrotask(() => {
               if (debrief) setFlightDebrief(debrief);
               setToastKind(status.settlement!.onTime ? 'ok' : 'warn');
+              const cargoLine = formatCargoOpsDebriefLine(
+                debrief?.cargoOpsDeltas ?? status.settlement!.cargoOpsDeltas,
+              );
               setToast(
                 `Flight settled · net ${formatMoney(
                   debrief?.netUsd ?? status.settlement!.payoutUsd,
-                )}`,
+                )}${cargoLine ? ` · ${cargoLine}` : ''}`,
               );
               if (typeof status.walletUsd === 'number') {
                 setWallet(status.walletUsd);
@@ -2593,7 +2672,8 @@ export function App() {
       if (airportIcao !== next) {
         setTerminalSection('inventory');
         setContractsLane('outbound');
-        setContractsSorts([]);
+        setContractsSorts([...DEFAULT_BOARD_SORTS]);
+        setContractsAccessFilter('');
         setContractsPage(1);
       }
       setAirportIcao(next);
@@ -2606,7 +2686,8 @@ export function App() {
     setAirportView(null);
     setTerminalSection('inventory');
     setContractsLane('outbound');
-    setContractsSorts([]);
+    setContractsSorts([...DEFAULT_BOARD_SORTS]);
+    setContractsAccessFilter('');
     setContractsPage(1);
     setAirportReturn(null);
     writeCareerLocation({ tab, airportIcao: null });
@@ -2617,7 +2698,8 @@ export function App() {
     setAirportView(null);
     setTerminalSection('inventory');
     setContractsLane('outbound');
-    setContractsSorts([]);
+    setContractsSorts([...DEFAULT_BOARD_SORTS]);
+    setContractsAccessFilter('');
     setContractsPage(1);
     setTab(next);
     writeCareerLocation({ tab: next, airportIcao: null }, opts);
@@ -2692,7 +2774,13 @@ export function App() {
     await run(async () => {
       const result = await postInitBrazil();
       setToastKind('ok');
-      setToast(`Career world initialized · ${result.airports} airports`);
+      setToast(
+        `Career world initialized · ${result.airports} airports${
+          typeof result.availableLots === 'number'
+            ? ` · ${result.availableLots} freights ready`
+            : ''
+        }`,
+      );
       closeAirport();
       setStaging(null);
       setFleet([]);
@@ -2702,6 +2790,12 @@ export function App() {
       setSignupName('');
       setSignupHub('');
       setSignupAirframeId('');
+      // Force market refetch even if filter/sort opts are unchanged.
+      marketFetchOptsRef.current = {
+        ...marketFetchOptsRef.current,
+        page: -1,
+      };
+      await refresh();
       goToTab('pilot');
     });
   }
@@ -2730,7 +2824,7 @@ export function App() {
       });
       setHubSelected(result.hubSelected);
       setFleet(result.fleet);
-      setHubOptions(result.hubs);
+      setHubOptions(normalizeStarterHubs(result.hubs));
       setPilotName(result.pilotName);
       setHomeHubIcao(result.homeHubIcao);
       setWallet(result.walletUsd);
@@ -2743,6 +2837,7 @@ export function App() {
       setToast(
         `${result.pilotName} registered · ${starterLabel}${conditionLabel} parked at ${result.homeHubIcao}`,
       );
+      await refresh();
       goToTab('pilot');
     });
   }
@@ -3074,6 +3169,14 @@ export function App() {
       goToTab('pilot');
       return;
     }
+    if (isCargoOpsCommodityLocked(lot.commodityId)) {
+      setError(
+        `Cargo Ops: ${lot.commodityName} is locked — unlock it in Hangar → Cargo Ops`,
+      );
+      setHangarPane('cargo');
+      goToTab('hangar');
+      return;
+    }
     if (activeMission) {
       setError(
         `Finish or cancel ${activeMission.id} in Dispatch before preparing another flight`,
@@ -3131,6 +3234,14 @@ export function App() {
     setAirportReturn(null);
     closeAirport();
     goToTab('staging');
+  }
+
+  function isCargoOpsCommodityLocked(commodityId: string): boolean {
+    const row =
+      cargoOps?.commodities?.[
+        commodityId as keyof NonNullable<typeof cargoOps>['commodities']
+      ];
+    return Boolean(row && !row.unlocked);
   }
 
   function enterStagingFromContract(lot: AirportLot) {
@@ -3744,7 +3855,12 @@ export function App() {
       });
       setFlightDebrief(debrief);
       setToastKind(result.settlement.onTime ? 'ok' : 'warn');
-      setToast(`Flight settled · net ${formatMoney(debrief.netUsd)}`);
+      const cargoLine = formatCargoOpsDebriefLine(debrief.cargoOpsDeltas);
+      setToast(
+        `Flight settled · net ${formatMoney(debrief.netUsd)}${
+          cargoLine ? ` · ${cargoLine}` : ''
+        }`,
+      );
       setStaging(null);
       goToTab('staging');
     });
@@ -3832,7 +3948,8 @@ export function App() {
       cargoFilter ||
       loadMaxKg ||
       expiresWithinHours ||
-      minimumPayUsd,
+      minimumPayUsd ||
+      accessFilter,
   );
 
   function updateMarketFilter(setter: (value: string) => void, value: string) {
@@ -3848,11 +3965,19 @@ export function App() {
     setLoadMaxKg('');
     setExpiresWithinHours('');
     setMinimumPayUsd('');
+    setAccessFilter('');
     setMarketPage(1);
   }
 
   function toggleMarketSort(key: MarketSortKey) {
     setMarketSorts((current) => {
+      if (key === 'access') {
+        const existing = current.find((level) => level.key === 'access');
+        const rest = current.filter((level) => level.key !== 'access');
+        // Never drop access — only flip unlocked-first ↔ locked-first.
+        const direction = existing?.direction === 'asc' ? 'desc' : 'asc';
+        return [{ key: 'access', direction }, ...rest];
+      }
       const existing = current.findIndex((level) => level.key === key);
       if (existing >= 0) {
         const level = current[existing]!;
@@ -3886,6 +4011,12 @@ export function App() {
 
   function toggleContractsSort(key: MarketSortKey) {
     setContractsSorts((current) => {
+      if (key === 'access') {
+        const existing = current.find((level) => level.key === 'access');
+        const rest = current.filter((level) => level.key !== 'access');
+        const direction = existing?.direction === 'asc' ? 'desc' : 'asc';
+        return [{ key: 'access', direction }, ...rest];
+      }
       const existing = current.findIndex((level) => level.key === key);
       if (existing >= 0) {
         const level = current[existing]!;
@@ -4001,10 +4132,21 @@ export function App() {
       ? airportView.outboundLots
       : airportView.inboundLots
     : [];
-  const sortedContractLots = useMemo(
-    () => sortAirportLots(contractLots, contractsSorts),
-    [contractLots, contractsSorts],
-  );
+  const sortedContractLots = useMemo(() => {
+    const filtered =
+      contractsAccessFilter === 'open'
+        ? contractLots.filter((lot) => !isCargoOpsCommodityLocked(lot.commodityId))
+        : contractsAccessFilter === 'locked'
+          ? contractLots.filter((lot) =>
+              isCargoOpsCommodityLocked(lot.commodityId),
+            )
+          : contractLots;
+    return sortAirportLots(
+      filtered,
+      contractsSorts,
+      isCargoOpsCommodityLocked,
+    );
+  }, [contractLots, contractsSorts, contractsAccessFilter, cargoOps]);
   const contractsPageCount = Math.max(
     1,
     Math.ceil(sortedContractLots.length / CONTRACTS_PAGE_SIZE) || 1,
@@ -4470,12 +4612,56 @@ export function App() {
                 <option value="">Select ICAO…</option>
                 {(hubOptions.length > 0
                   ? hubOptions
-                  : ['SBGR', 'SBGL', 'SBKP', 'SBCF', 'SBPA', 'SBRF']
-                ).map((icao) => (
-                  <option key={icao} value={icao}>
-                    {icao}
-                  </option>
-                ))}
+                  : ([
+                      {
+                        icao: 'SBGR',
+                        name: 'São Paulo/Guarulhos',
+                        region: 'BR-SE',
+                        hubTier: 'major',
+                      },
+                      {
+                        icao: 'SBGL',
+                        name: 'Rio de Janeiro/Galeão',
+                        region: 'BR-SE',
+                        hubTier: 'major',
+                      },
+                      {
+                        icao: 'SBKP',
+                        name: 'Campinas/Viracopos',
+                        region: 'BR-SE',
+                        hubTier: 'major',
+                      },
+                      {
+                        icao: 'SBCF',
+                        name: 'Belo Horizonte/Confins',
+                        region: 'BR-SE',
+                        hubTier: 'regional',
+                      },
+                      {
+                        icao: 'SBPA',
+                        name: 'Porto Alegre',
+                        region: 'BR-S',
+                        hubTier: 'regional',
+                      },
+                      {
+                        icao: 'SBRF',
+                        name: 'Recife',
+                        region: 'BR-NE',
+                        hubTier: 'regional',
+                      },
+                    ] as StarterHubOption[])
+                )
+                  .slice()
+                  .sort((a, b) => {
+                    const tierRank = { major: 0, regional: 1, spoke: 2 };
+                    const tr = tierRank[a.hubTier] - tierRank[b.hubTier];
+                    return tr !== 0 ? tr : a.icao.localeCompare(b.icao);
+                  })
+                  .map((hub) => (
+                    <option key={hub.icao} value={hub.icao}>
+                      {formatStarterHubOption(hub)}
+                    </option>
+                  ))}
               </select>
             </label>
             <label className="pilot-field">
@@ -4747,18 +4933,19 @@ export function App() {
                       >
                         Inbound ({airportView.inboundLots.length})
                       </button>
-                      {contractsSorts.length > 0 ? (
+                      {contractsSorts.length > 0 || contractsAccessFilter ? (
                         <button
                           type="button"
                           className="clear-filters contracts-clear-sort"
                           onClick={() => {
-                            setContractsSorts([]);
+                            setContractsSorts([...DEFAULT_BOARD_SORTS]);
+                            setContractsAccessFilter('');
                             setContractsPage(1);
                           }}
                           title={
                             contractsSorts.length > 1
-                              ? `Clear ${contractsSorts.length} sort levels`
-                              : 'Clear sort'
+                              ? `Reset ${contractsSorts.length} sort levels`
+                              : 'Reset access filter and sort'
                           }
                         >
                           Clear sort
@@ -4841,15 +5028,51 @@ export function App() {
                               </button>
                             </th>
                             {contractsLane === 'outbound' ? (
-                              <th>
-                                <span className="muted">Action</span>
+                              <th aria-sort={contractsAriaSort('access')}>
+                                <button
+                                  type="button"
+                                  className={`sort-header${contractsSorts.some((l) => l.key === 'access') ? ' is-sorted' : ''}`}
+                                  title="Sort by Cargo Ops access (unlocked first by default). Click again to reverse or clear."
+                                  onClick={() => toggleContractsSort('access')}
+                                >
+                                  Access{' '}
+                                  <span>{contractsSortIndicator('access')}</span>
+                                </button>
                               </th>
                             ) : null}
                           </tr>
+                          {contractsLane === 'outbound' ? (
+                            <tr className="filter-row">
+                              <th colSpan={6} />
+                              <th>
+                                <select
+                                  aria-label="Filter by Cargo Ops access"
+                                  value={contractsAccessFilter}
+                                  onChange={(e) => {
+                                    setContractsAccessFilter(
+                                      e.target.value as AccessFilter,
+                                    );
+                                    setContractsPage(1);
+                                  }}
+                                >
+                                  <option value="">Any</option>
+                                  <option value="open">Open</option>
+                                  <option value="locked">Locked</option>
+                                </select>
+                              </th>
+                            </tr>
+                          ) : null}
                         </thead>
                         <tbody>
-                          {pagedContractLots.map((lot) => (
-                            <tr key={lot.id}>
+                          {pagedContractLots.map((lot) => {
+                            const cargoLocked = isCargoOpsCommodityLocked(
+                              lot.commodityId,
+                            );
+                            return (
+                            <tr
+                              key={lot.id}
+                              className={cargoLocked ? 'lot-locked' : undefined}
+                            >
                               <td>
                                 <div className="route">
                                   <IcaoLink
@@ -4865,6 +5088,14 @@ export function App() {
                                   />
                                   {lot.urgency === 'urgent' ? (
                                     <span className="tag">Urgent</span>
+                                  ) : null}
+                                  {cargoLocked ? (
+                                    <span
+                                      className="tag"
+                                      title="Unlock via Cargo Ops ladder"
+                                    >
+                                      locked
+                                    </span>
                                   ) : null}
                                 </div>
                                 <NpcTakenBadge
@@ -4901,6 +5132,7 @@ export function App() {
                                     disabled={
                                       busy ||
                                       Boolean(activeMission) ||
+                                      cargoLocked ||
                                       lot.status !== 'available' ||
                                       lot.availableKg <= 0
                                     }
@@ -4908,7 +5140,9 @@ export function App() {
                                       enterStagingFromContract(lot)
                                     }
                                     title={
-                                      activeMission
+                                      cargoLocked
+                                        ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
+                                        : activeMission
                                         ? `Finish or cancel ${activeMission.id} in Dispatch first`
                                         : lot.status !== 'available' ||
                                             lot.availableKg <= 0
@@ -4916,14 +5150,17 @@ export function App() {
                                           : `Prepare ${lot.originIcao} → ${lot.destIcao}`
                                     }
                                   >
-                                    {activeMission
-                                      ? 'Flight busy'
-                                      : 'Prepare flight'}
+                                    {cargoLocked
+                                      ? 'Locked'
+                                      : activeMission
+                                        ? 'Flight busy'
+                                        : 'Prepare flight'}
                                   </button>
                                 </td>
                               ) : null}
                             </tr>
-                          ))}
+                            );
+                          })}
                           {sortedContractLots.length === 0 ? (
                             <tr>
                               <td
@@ -5078,7 +5315,16 @@ export function App() {
                       Pay <span>{sortIndicator('pay')}</span>
                     </button>
                   </th>
-                  <th></th>
+                  <th aria-sort={marketAriaSort('access')}>
+                    <button
+                      type="button"
+                      className={`sort-header${marketSorts.some((l) => l.key === 'access') ? ' is-sorted' : ''}`}
+                      title="Sort by Cargo Ops access (unlocked first by default). Click again to reverse or clear."
+                      onClick={() => toggleMarketSort('access')}
+                    >
+                      Access <span>{sortIndicator('access')}</span>
+                    </button>
+                  </th>
                 </tr>
                 <tr className="filter-row">
                   <th>
@@ -5183,30 +5429,46 @@ export function App() {
                     </select>
                   </th>
                   <th>
-                    {hasMarketFilters || marketSorts.length > 0 ? (
-                      <button
-                        type="button"
-                        className="clear-filters"
-                        onClick={() => {
-                          clearMarketFilters();
-                          setMarketSorts([]);
+                    <div className="access-filter-cell">
+                      <select
+                        aria-label="Filter by Cargo Ops access"
+                        value={accessFilter}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setAccessFilter(
+                            next === 'open' || next === 'locked' ? next : '',
+                          );
+                          setMarketPage(1);
                         }}
-                        title={
-                          marketSorts.length > 1
-                            ? `Clear filters and ${marketSorts.length} sort levels`
-                            : 'Clear filters and sort'
-                        }
                       >
-                        Clear
-                      </button>
-                    ) : (
-                      <span
-                        className="muted"
-                        title="Click columns to build a combined sort (1, 2, …). Click again to reverse or clear that level."
-                      >
-                        Filters
-                      </span>
-                    )}
+                        <option value="">Any</option>
+                        <option value="open">Open</option>
+                        <option value="locked">Locked</option>
+                      </select>
+                      {hasMarketFilters ||
+                      marketSorts.length !== DEFAULT_BOARD_SORTS.length ||
+                      marketSorts.some(
+                        (level, i) =>
+                          level.key !== DEFAULT_BOARD_SORTS[i]?.key ||
+                          level.direction !== DEFAULT_BOARD_SORTS[i]?.direction,
+                      ) ? (
+                        <button
+                          type="button"
+                          className="clear-filters"
+                          onClick={() => {
+                            clearMarketFilters();
+                            setMarketSorts([...DEFAULT_BOARD_SORTS]);
+                          }}
+                          title={
+                            marketSorts.length > 1
+                              ? `Clear filters and reset ${marketSorts.length} sort levels`
+                              : 'Clear filters and reset sort'
+                          }
+                        >
+                          Clear
+                        </button>
+                      ) : null}
+                    </div>
                   </th>
                 </tr>
               </thead>
@@ -5214,8 +5476,9 @@ export function App() {
                 {pagedLots.map((lot) => {
                   const meta = lotPressureMeta(lot);
                   const idlePct = idleUptickPct(lot);
+                  const cargoLocked = isCargoOpsCommodityLocked(lot.commodityId);
                   return (
-                  <tr key={lot.id}>
+                  <tr key={lot.id} className={cargoLocked ? 'lot-locked' : undefined}>
                     <td>
                       <div className="route">
                         <IcaoLink icao={lot.originIcao} onOpen={openAirport} disabled={busy} />
@@ -5225,6 +5488,11 @@ export function App() {
                         {lot.pressure?.international ? (
                           <span className="tag" title="International lane freight">
                             intl
+                          </span>
+                        ) : null}
+                        {cargoLocked ? (
+                          <span className="tag" title="Unlock via Cargo Ops ladder">
+                            locked
                           </span>
                         ) : null}
                       </div>
@@ -5267,10 +5535,12 @@ export function App() {
                       <button
                         type="button"
                         className="accept"
-                        disabled={busy || Boolean(activeMission)}
+                        disabled={busy || Boolean(activeMission) || cargoLocked}
                         onClick={() => enterStaging(lot)}
                         title={
-                          activeMission
+                          cargoLocked
+                            ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
+                            : activeMission
                             ? `Finish or cancel ${activeMission.id} in Dispatch first`
                             : staging &&
                                 staging.originIcao === lot.originIcao &&
@@ -5279,7 +5549,9 @@ export function App() {
                               : 'Open Dispatch to choose aircraft and payload'
                         }
                       >
-                        {activeMission
+                        {cargoLocked
+                          ? 'Locked'
+                          : activeMission
                           ? 'Flight busy'
                           : staging &&
                               staging.originIcao === lot.originIcao &&
@@ -5297,7 +5569,7 @@ export function App() {
                       {marketTotalLots === 0 &&
                       !hasMarketFilters &&
                       marketSorts.length === 0
-                        ? 'No lots yet — run +1 day to form market lanes.'
+                        ? 'No freights yet — try Reset world again or advance +1 day.'
                         : 'No freights match the selected filters.'}
                     </td>
                   </tr>
@@ -5472,6 +5744,12 @@ export function App() {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                ) : null}
+                {flightDebrief.cargoOpsDeltas.length > 0 ? (
+                  <div className="cargo-ops-debrief" aria-label="Cargo Ops">
+                    <strong>CARGO OPS</strong>
+                    <p>{formatCargoOpsDebriefLine(flightDebrief.cargoOpsDeltas)}</p>
                   </div>
                 ) : null}
                 <div className="debrief-actions">
@@ -6228,7 +6506,9 @@ export function App() {
             <p className="panel-stats">
               {hangarPane === 'aircraft'
                 ? 'Aircraft must be at the mission origin to prepare cargo. Buy or lease from the Airframes; ferry relocates instantly for a fee + Jet-A.'
-                : 'Company income and expenses — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
+                : hangarPane === 'cargo'
+                  ? 'Unlock higher freights with clean settles. Dry (General + Supplies) is always open.'
+                  : 'Company income and expenses — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
             </p>
             <div className="hangar-head-actions">
               <div className="hangar-pane-toggle" role="tablist" aria-label="Hangar views">
@@ -6258,6 +6538,15 @@ export function App() {
                 >
                   Cashflow
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={hangarPane === 'cargo'}
+                  className={hangarPane === 'cargo' ? 'tab active' : 'tab'}
+                  onClick={() => setHangarPane('cargo')}
+                >
+                  Cargo Ops
+                </button>
               </div>
               {hangarPane === 'aircraft' ? (
                 <button
@@ -6276,6 +6565,8 @@ export function App() {
           </div>
           {hangarPane === 'cashflow' ? (
             <HangarCashflowPanel cashflow={cashflow} formatMoney={formatMoney} />
+          ) : hangarPane === 'cargo' ? (
+            <CargoOpsPanel cargoOps={cargoOps} />
           ) : fleet.length === 0 ? (
             <p className="empty">No aircraft yet — pick a starter hub.</p>
           ) : (
@@ -6286,7 +6577,7 @@ export function App() {
                   aircraft={acf}
                   catalog={hangarCatalogEntry(acf)}
                   busy={busy}
-                  hubOptions={hubOptions}
+                  hubOptions={hubOptions.map((hub) => hub.icao)}
                   ferryDest={ferryDest}
                   ownedCount={ownedFleetCount}
                   hasListed={hasListedAircraft}

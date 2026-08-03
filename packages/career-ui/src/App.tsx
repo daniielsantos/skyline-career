@@ -1956,11 +1956,23 @@ export function App() {
                             ...(tanksChanged && usableTanks
                               ? { tanks: usableTanks }
                               : {}),
+                            ...(verification.fuel.tankCapacity
+                              ? {
+                                  tankCapacity:
+                                    verification.fuel.tankCapacity,
+                                }
+                              : {}),
                           },
                           payload: {
                             ...prevCheck.loadVerification.payload,
                             ...(stationsChanged && nextStations
                               ? { stations: nextStations }
+                              : {}),
+                            ...(verification.payload.stationMax
+                              ? {
+                                  stationMax:
+                                    verification.payload.stationMax,
+                                }
                               : {}),
                           },
                         },
@@ -1985,6 +1997,12 @@ export function App() {
                   const mergedStations =
                     verification.payload.stations ??
                     prevCheck.loadVerification.payload.stations;
+                  const mergedTankCapacity =
+                    verification.fuel.tankCapacity ??
+                    prevCheck.loadVerification.fuel.tankCapacity;
+                  const mergedStationMax =
+                    verification.payload.stationMax ??
+                    prevCheck.loadVerification.payload.stationMax;
                   const { tanks: _prevTanks, ...prevFuelRest } =
                     prevCheck.loadVerification.fuel;
                   const payloadOk =
@@ -2011,6 +2029,9 @@ export function App() {
                           ...prevFuelRest,
                           ...fuelRest,
                           ...(mergedTanks ? { tanks: mergedTanks } : {}),
+                          ...(mergedTankCapacity
+                            ? { tankCapacity: mergedTankCapacity }
+                            : {}),
                         },
                         payload: {
                           ...prevCheck.loadVerification.payload,
@@ -2019,6 +2040,9 @@ export function App() {
                           ok: payloadOk,
                           ...(mergedStations
                             ? { stations: mergedStations }
+                            : {}),
+                          ...(mergedStationMax
+                            ? { stationMax: mergedStationMax }
                             : {}),
                         },
                       },
@@ -2389,12 +2413,18 @@ export function App() {
                       ...(progress.liveTanks
                         ? { tanks: progress.liveTanks }
                         : {}),
+                      ...(progress.tankCapacity
+                        ? { tankCapacity: progress.tankCapacity }
+                        : {}),
                     },
                     payload: {
                       ...verification.payload,
                       liveLb: livePayload,
                       ...(progress.liveStations
                         ? { stations: progress.liveStations }
+                        : {}),
+                      ...(progress.stationMax
+                        ? { stationMax: progress.stationMax }
                         : {}),
                     },
                     cg: verification.cg
@@ -3459,6 +3489,12 @@ export function App() {
   }
 
   function addLotToStaging(lot: MarketLot) {
+    if (isCargoOpsCommodityLocked(lot.commodityId)) {
+      setError(
+        `Cargo Ops: ${lot.commodityName} is locked — unlock it in Hangar → Cargo Ops`,
+      );
+      return;
+    }
     setStaging((current) => {
       if (!current) return current;
       if (lot.originIcao !== current.originIcao || lot.destIcao !== current.destIcao) {
@@ -5954,10 +5990,10 @@ export function App() {
                   Estimated block fuel exceeds tank capacity
                   {estimatedBlockFuelKg !== null &&
                   routeFuelCapacityKg !== null
-                    ? ` (${formatTonnes(estimatedBlockFuelKg)} required > ${formatTonnes(routeFuelCapacityKg)} max`
+                    ? ` (${Math.round(estimatedBlockFuelKg)} kg required > ${Math.round(routeFuelCapacityKg)} kg max`
                     : ''}
-                  {routeFuelDeficitKg !== null && routeFuelDeficitKg > 0
-                    ? ` · deficit ${formatTonnes(routeFuelDeficitKg)}`
+                  {routeFuelDeficitKg !== null && routeFuelDeficitKg >= 1
+                    ? ` · deficit ${Math.round(routeFuelDeficitKg)} kg`
                     : ''}
                   {estimatedBlockFuelKg !== null &&
                   routeFuelCapacityKg !== null
@@ -6109,12 +6145,26 @@ export function App() {
                     {stagingCandidates.map((lot) => {
                       const room = stagingRemainingKg(staging);
                       const maxKg = Math.min(lot.availableKg, room);
+                      const cargoLocked = isCargoOpsCommodityLocked(
+                        lot.commodityId,
+                      );
                       return (
-                        <li key={lot.id}>
+                        <li
+                          key={lot.id}
+                          className={cargoLocked ? 'lot-locked' : undefined}
+                        >
                           <div>
                             <strong>{lot.commodityName}</strong>
                             {lot.urgency === 'urgent' ? (
                               <span className="tag">Urgent</span>
+                            ) : null}
+                            {cargoLocked ? (
+                              <span
+                                className="tag"
+                                title="Unlock via Cargo Ops ladder"
+                              >
+                                locked
+                              </span>
                             ) : null}
                             <small>
                               {formatTonnes(lot.availableKg)} · {formatMoney(lot.payUsd)}
@@ -6123,10 +6173,19 @@ export function App() {
                           <button
                             type="button"
                             className="accept"
-                            disabled={busy || maxKg <= 0}
+                            disabled={busy || maxKg <= 0 || cargoLocked}
+                            title={
+                              cargoLocked
+                                ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
+                                : undefined
+                            }
                             onClick={() => addLotToStaging(lot)}
                           >
-                            {maxKg <= 0 ? 'No room' : `Add · up to ${formatTonnes(maxKg)}`}
+                            {cargoLocked
+                              ? 'Locked'
+                              : maxKg <= 0
+                                ? 'No room'
+                                : `Add · up to ${formatTonnes(maxKg)}`}
                           </button>
                         </li>
                       );

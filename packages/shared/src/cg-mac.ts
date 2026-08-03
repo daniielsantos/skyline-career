@@ -7,6 +7,14 @@ export function normalizeMacPercent(value: number): number {
   return Math.abs(value) <= 1.5 ? value * 100 : value;
 }
 
+/**
+ * Same scale as CG: SimConnect "Percent over 100" (0.0–1.0) → 0–100 points.
+ * Values already in 0–100 (or beyond ±1.5) pass through unchanged.
+ */
+export function normalizeSimPercent(value: number): number {
+  return normalizeMacPercent(value);
+}
+
 export type CgEnvelopeSource =
   | 'manual'
   | 'simvar'

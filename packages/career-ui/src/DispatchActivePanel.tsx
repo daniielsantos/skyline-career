@@ -87,7 +87,9 @@ export function DispatchActivePanel(props: {
     liveFuelLb?: number;
     livePayloadLb?: number;
     liveTanks?: { left: number; right: number; center: number };
+    tankCapacity?: { left: number; right: number; center: number };
     liveStations?: Record<number, number>;
+    stationMax?: Record<number, number>;
     plannedFuelLb?: number;
     plannedPayloadLb?: number;
   } | null;
@@ -537,6 +539,7 @@ export function DispatchActivePanel(props: {
                     const {
                       liveLb: _watchPayloadLive,
                       stations: _watchStations,
+                      stationMax: _watchStationMax,
                       ok: _watchPayloadOk,
                       ...watchPayloadRest
                     } = watchPayload;
@@ -550,6 +553,12 @@ export function DispatchActivePanel(props: {
                       baseVerification.fuel.tanks,
                       liveFuelLb,
                     );
+                    const tankCapacity =
+                      watchFuel.tankCapacity ??
+                      baseVerification.fuel.tankCapacity;
+                    const stationMax =
+                      watchPayload.stationMax ??
+                      baseVerification.payload.stationMax;
                     // Recompute ok from live numbers so a stale ready flag cannot stick.
                     const fuelTol = 50;
                     const payloadTol = 75;
@@ -574,6 +583,7 @@ export function DispatchActivePanel(props: {
                         liveLb: liveFuelLb,
                         ok: fuelOk,
                         ...(tanks ? { tanks } : {}),
+                        ...(tankCapacity ? { tankCapacity } : {}),
                       },
                       payload: {
                         ...baseVerification.payload,
@@ -588,6 +598,7 @@ export function DispatchActivePanel(props: {
                                 baseVerification.payload.stations,
                             }
                           : {}),
+                        ...(stationMax ? { stationMax } : {}),
                       },
                     };
                   })()
@@ -620,6 +631,9 @@ export function DispatchActivePanel(props: {
                           ? { liveLb: injectProgress.liveFuelLb }
                           : {}),
                         ...(injectTanks ? { tanks: injectTanks } : {}),
+                        ...(injectProgress.tankCapacity
+                          ? { tankCapacity: injectProgress.tankCapacity }
+                          : {}),
                       },
                       payload: {
                         ...verification.payload,
@@ -628,6 +642,9 @@ export function DispatchActivePanel(props: {
                           : {}),
                         ...(injectProgress.liveStations
                           ? { stations: injectProgress.liveStations }
+                          : {}),
+                        ...(injectProgress.stationMax
+                          ? { stationMax: injectProgress.stationMax }
                           : {}),
                       },
                     };
@@ -798,6 +815,7 @@ export function DispatchActivePanel(props: {
                       <b>{fuelOk ? '✓' : '✗'}</b>
                       <FuelTankSchematic
                         tanks={liveVerification.fuel.tanks}
+                        tankCapacity={liveVerification.fuel.tankCapacity}
                         weightSystem={weightSystem}
                       />
                     </div>
@@ -816,6 +834,7 @@ export function DispatchActivePanel(props: {
                       <b>{payloadOk ? '✓' : '✗'}</b>
                       <PayloadStationSchematic
                         stations={liveVerification.payload.stations}
+                        stationMax={liveVerification.payload.stationMax}
                         weightSystem={weightSystem}
                       />
                     </div>

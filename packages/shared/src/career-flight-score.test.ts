@@ -125,4 +125,29 @@ describe('pushFlightScoreSample + finalizeFlightScore', () => {
     assert.equal(gear?.points, 1);
     assert.equal(gear?.detail, 'fixed gear');
   });
+
+  it('awards flaps and gear when percent is in 0–100 points', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -120,
+      gForce: 1.05,
+      gearDown: true,
+      gearRetractable: true,
+      flapsPct: 33,
+    });
+    const score = finalizeFlightScore(acc);
+    const flaps = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_flaps');
+    const gear = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_gear');
+    assert.equal(flaps?.points, 1);
+    assert.equal(flaps?.detail, '33%');
+    assert.equal(gear?.points, 1);
+    assert.equal(gear?.detail, 'down');
+  });
 });

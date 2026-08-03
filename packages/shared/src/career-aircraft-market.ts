@@ -4,7 +4,7 @@ import {
   routeDistanceNm,
   type CareerEconomyWorld,
 } from './career-economy.js';
-import { PLAYER_FUEL_CAPACITY_KG } from './career-fleet.js';
+import { resolvePlayerFuelCapacityKg } from './career-fleet.js';
 import {
   applyAircraftHoursAfterMission,
   conditionPctsForListing,
@@ -698,7 +698,10 @@ function buildAircraftFromListing(
   ownership: 'owned' | 'leased',
   economyTick: number,
 ): PlayerAircraft {
-  const capacity = PLAYER_FUEL_CAPACITY_KG[listing.aircraftClassId];
+  const capacity = resolvePlayerFuelCapacityKg(
+    listing.airframeTypeId,
+    listing.aircraftClassId,
+  );
   const interval = INSPECTION_INTERVAL_HOURS[listing.aircraftClassId];
   const hoursAirframe = listing.hoursAirframe;
   const pcts =

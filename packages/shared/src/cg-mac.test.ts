@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { normalizeMacPercent, resolveCgEnvelope } from './cg-mac.js';
+import { normalizeMacPercent, normalizeSimPercent, resolveCgEnvelope } from './cg-mac.js';
 
 describe('normalizeMacPercent', () => {
   it('converts Percent-over-100 fractions to %MAC points', () => {
@@ -8,6 +8,15 @@ describe('normalizeMacPercent', () => {
     assert.equal(normalizeMacPercent(0.4), 40);
     assert.equal(normalizeMacPercent(39), 39);
     assert.equal(normalizeMacPercent(-0.22), -22);
+  });
+});
+
+describe('normalizeSimPercent', () => {
+  it('maps flap/gear fractions to 0–100', () => {
+    assert.equal(normalizeSimPercent(0), 0);
+    assert.equal(normalizeSimPercent(0.33), 33);
+    assert.equal(normalizeSimPercent(1), 100);
+    assert.equal(normalizeSimPercent(25), 25);
   });
 });
 

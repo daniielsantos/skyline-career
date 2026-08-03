@@ -48,6 +48,10 @@ import {
   isOfpLoadActive,
   withOfpLoadExclusive,
 } from './ofp-load-state.ts';
+import {
+  stationMaxFromProfile,
+  tankCapacityLbFromProfile,
+} from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import type { CareerWatchSession } from './watch-helpers.ts';
@@ -152,8 +156,12 @@ export type OfpLoadProgress = {
   livePayloadLb?: number;
   /** Classic L/R/C breakdown for Preflight schematic while inject runs. */
   liveTanks?: { left: number; right: number; center: number };
+  /** Classic L/R/C capacity (lb) for schematic fill while inject runs. */
+  tankCapacity?: { left: number; right: number; center: number };
   /** Per-station live weights for Preflight schematic while inject runs. */
   liveStations?: Record<number, number>;
+  /** Profile maxLoad (lb) keyed by station index. */
+  stationMax?: Record<number, number>;
   plannedFuelLb?: number;
   plannedPayloadLb?: number;
   updatedAtIso: string;
@@ -847,6 +855,9 @@ async function applyMissionOfpLoadExclusive(
       }
     }
 
+    const schematicStationMax = stationMaxFromProfile(resolved.profile);
+    const schematicTankCapacity = tankCapacityLbFromProfile(resolved.profile);
+
     const publishLiveProgress = (
       phase: OfpLoadProgressPhase,
       message: string,
@@ -868,7 +879,11 @@ async function applyMissionOfpLoadExclusive(
         // Prefer working plan when station SimVars under-read mid-inject.
         livePayloadLb: Math.max(liveStationSum, workingSum),
         liveTanks: schematicTanksFromProfile(afterLive.tanks),
+        ...(schematicTankCapacity
+          ? { tankCapacity: schematicTankCapacity }
+          : {}),
         liveStations: stationsForUi,
+        ...(schematicStationMax ? { stationMax: schematicStationMax } : {}),
         plannedFuelLb,
         plannedPayloadLb,
       });

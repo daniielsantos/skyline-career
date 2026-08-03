@@ -47,6 +47,22 @@ export const PLAYER_FUEL_CAPACITY_KG: Record<FreighterClassId, number> = {
   wide_freighter: 117_450,
 };
 
+/** Prefer airframe catalog tank when present; else class planning capacity. */
+export function resolvePlayerFuelCapacityKg(
+  airframeTypeId: string | null | undefined,
+  aircraftClassId: FreighterClassId,
+): number {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  if (
+    typeof airframe?.fuelCapacityKg === 'number' &&
+    Number.isFinite(airframe.fuelCapacityKg) &&
+    airframe.fuelCapacityKg > 0
+  ) {
+    return Math.round(airframe.fuelCapacityKg);
+  }
+  return PLAYER_FUEL_CAPACITY_KG[aircraftClassId];
+}
+
 /** Ferry fee USD per nm before class multiplier. */
 export const FERRY_FEE_USD_PER_NM = 2.5;
 
@@ -227,10 +243,23 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
   ) {
     return null;
   }
-  const capacity =
+  const airframe =
+    findCareerPlayerAirframe(raw.airframeTypeId) ??
+    defaultCareerPlayerAirframe(aircraftClassId);
+  const classCap = PLAYER_FUEL_CAPACITY_KG[aircraftClassId];
+  const catalogCap = resolvePlayerFuelCapacityKg(
+    airframe?.typeId ?? raw.airframeTypeId,
+    aircraftClassId,
+  );
+  const storedCap =
     typeof raw.fuelCapacityKg === 'number' && raw.fuelCapacityKg > 0
       ? raw.fuelCapacityKg
-      : PLAYER_FUEL_CAPACITY_KG[aircraftClassId];
+      : undefined;
+  // Migrate saves that still carry the class-default tank (e.g. Commander as 380 kg).
+  const capacity =
+    storedCap !== undefined && storedCap !== classCap
+      ? storedCap
+      : catalogCap;
   const fuelKg = Math.max(
     0,
     Math.min(
@@ -259,9 +288,6 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
     raw.condition === 'tired'
       ? raw.condition
       : 'good';
-  const airframe =
-    findCareerPlayerAirframe(raw.airframeTypeId) ??
-    defaultCareerPlayerAirframe(aircraftClassId);
   const normalized: PlayerAircraft = {
     id: raw.id,
     aircraftClassId,
@@ -469,7 +495,10 @@ export function selectStarterHub(
           hoursSinceInspection: 40,
         };
 
-  const capacity = PLAYER_FUEL_CAPACITY_KG[starterAirframe.aircraftClassId];
+  const capacity = resolvePlayerFuelCapacityKg(
+    starterAirframe.typeId,
+    starterAirframe.aircraftClassId,
+  );
   const interval = INSPECTION_INTERVAL_HOURS[starterAirframe.aircraftClassId];
   const stem = starterAirframe.typeId.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
   const starter: PlayerAircraft = {

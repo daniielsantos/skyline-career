@@ -25,6 +25,7 @@ import {
 import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
+  resolveAirframeFuelBurnKgPerNm,
   resolveAirframeMaxRangeNm,
 } from './career-player-airframes.js';
 import type {
@@ -300,6 +301,9 @@ export function softenCgFindingSeverity(code: string, severity: string): string 
  * Uses homologated class weights (or live SimBrief OEW/MTOW override):
  * min(structuralMaxCargo, MTOW − OEW − takeoffFuel − margin).
  * New aircraft homologations must fill oewKg/mtowKg/fuel* on AircraftClass.
+ *
+ * Prefer per-airframe fuel burn / tank when provided — class light_ga burn is
+ * Bonanza-sized and will falsely fail Commander / C172 tank checks on short hops.
  */
 export function estimateRouteCargoLimit(
   aircraftClassId: FreighterClassId,
@@ -309,6 +313,12 @@ export function estimateRouteCargoLimit(
     oewKg?: number;
     mtowKg?: number;
     fuelCapacityKg?: number;
+    /** Prefer catalog airframe burn when known. */
+    fuelBurnKgPerNm?: number;
+    fuelTaxiKg?: number;
+    fuelReserveKg?: number;
+    fuelRouteFactor?: number;
+    airframeTypeId?: string;
   } = {},
 ): {
   operationalMaxCargoKg: number;
@@ -325,25 +335,51 @@ export function estimateRouteCargoLimit(
   const mtowKg = weights.mtowKg ?? aircraft.mtowKg;
   const fuelCapacityKg =
     weights.fuelCapacityKg ?? aircraft.fuelCapacityKg;
+  const burnKgPerNm =
+    (typeof weights.fuelBurnKgPerNm === 'number' &&
+    weights.fuelBurnKgPerNm > 0
+      ? weights.fuelBurnKgPerNm
+      : undefined) ??
+    (weights.airframeTypeId
+      ? resolveAirframeFuelBurnKgPerNm(weights.airframeTypeId, aircraftClassId)
+      : aircraft.fuelBurnKgPerNm);
+  // Scale taxi/reserve when the airframe tank is smaller than the class template
+  // (e.g. Commander 190 kg vs Bonanza-class 380 kg planning defaults).
+  const capacityRatio =
+    aircraft.fuelCapacityKg > 0
+      ? Math.min(1, fuelCapacityKg / aircraft.fuelCapacityKg)
+      : 1;
+  const fuelTaxiKg =
+    typeof weights.fuelTaxiKg === 'number' && weights.fuelTaxiKg >= 0
+      ? weights.fuelTaxiKg
+      : Math.max(5, Math.round(aircraft.fuelTaxiKg * capacityRatio));
+  const fuelReserveKg =
+    typeof weights.fuelReserveKg === 'number' && weights.fuelReserveKg >= 0
+      ? weights.fuelReserveKg
+      : Math.max(20, Math.round(aircraft.fuelReserveKg * capacityRatio));
+  const fuelRouteFactor =
+    typeof weights.fuelRouteFactor === 'number' && weights.fuelRouteFactor > 0
+      ? weights.fuelRouteFactor
+      : aircraft.fuelRouteFactor;
   const nm = Math.max(0, Number.isFinite(distanceNm) ? distanceNm : 0);
   const structural = Math.max(0, Math.floor(structuralMaxCargoKg));
   const estimatedBlockFuelKg = Math.round(
-    aircraft.fuelTaxiKg +
-      aircraft.fuelBurnKgPerNm * nm * aircraft.fuelRouteFactor +
-      aircraft.fuelReserveKg,
+    fuelTaxiKg + burnKgPerNm * nm * fuelRouteFactor + fuelReserveKg,
   );
-  const takeoffFuelKg = Math.max(0, estimatedBlockFuelKg - aircraft.fuelTaxiKg);
+  const takeoffFuelKg = Math.max(0, estimatedBlockFuelKg - fuelTaxiKg);
   const marginKg = Math.max(25, Math.round(structural * 0.02));
   const mtowPayloadKg = Math.max(
     0,
     Math.floor(mtowKg - oewKg - takeoffFuelKg - marginKg),
   );
+  // Allow 1 kg float/round slack so equal display values don't hard-block.
+  const fuelFeasible = estimatedBlockFuelKg <= fuelCapacityKg + 1;
   return {
     operationalMaxCargoKg: Math.min(structural, mtowPayloadKg),
     estimatedBlockFuelKg,
     fuelCapacityKg,
     fuelDeficitKg: Math.max(0, estimatedBlockFuelKg - fuelCapacityKg),
-    fuelFeasible: estimatedBlockFuelKg <= fuelCapacityKg,
+    fuelFeasible,
     structuralMaxCargoKg: structural,
     oewKg,
     mtowKg,

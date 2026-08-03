@@ -115,6 +115,7 @@ export type LoadVerificationFuel = {
   liveLb: number;
   ok: boolean;
   tanks?: LoadFuelTankBreakdown;
+  tankCapacity?: LoadFuelTankBreakdown;
 };
 
 export type LoadVerificationPayload = {
@@ -122,6 +123,7 @@ export type LoadVerificationPayload = {
   liveLb?: number;
   ok: boolean;
   stations?: Record<number, number>;
+  stationMax?: Record<number, number>;
 };
 
 export function evaluateLoadVerification(opts: {
@@ -132,7 +134,9 @@ export function evaluateLoadVerification(opts: {
   fuelTolLb?: number;
   payloadTolLb?: number;
   fuelTanks?: LoadFuelTankBreakdown;
+  fuelTankCapacity?: LoadFuelTankBreakdown;
   payloadStations?: Record<number, number>;
+  payloadStationMax?: Record<number, number>;
 }): {
   ready: boolean;
   fuel: LoadVerificationFuel;
@@ -160,12 +164,14 @@ export function evaluateLoadVerification(opts: {
       liveLb: liveFuel ?? 0,
       ok: fuelOk,
       ...(opts.fuelTanks ? { tanks: opts.fuelTanks } : {}),
+      ...(opts.fuelTankCapacity ? { tankCapacity: opts.fuelTankCapacity } : {}),
     },
     payload: {
       plannedLb: opts.plannedPayloadLb,
       liveLb: livePayload,
       ok: payloadOk,
       ...(opts.payloadStations ? { stations: opts.payloadStations } : {}),
+      ...(opts.payloadStationMax ? { stationMax: opts.payloadStationMax } : {}),
     },
   };
 }

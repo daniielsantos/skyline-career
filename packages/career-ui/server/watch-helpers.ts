@@ -28,6 +28,7 @@ import {
   resolveLivePayloadLb,
   sanitizeFuelDensityLbPerGal,
   KG_TO_LB,
+  normalizeSimPercent,
   resolveAirportCoords,
   resolveExpectedRouteMs,
   routeDistanceNm,
@@ -54,6 +55,7 @@ import {
 import { watchDebugLog, WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import { isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart } from './preflight-helpers.ts';
+import { pickStationMax, pickTankCapacity, readClassicFuelTankCapacityLb } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 
 export type WatchLoadVerification = {
@@ -63,12 +65,16 @@ export type WatchLoadVerification = {
     liveLb: number;
     ok: boolean;
     tanks?: FuelTankBreakdown;
+    /** Classic L/R/C capacity (lb) for schematic fill. */
+    tankCapacity?: FuelTankBreakdown;
   };
   payload: {
     plannedLb?: number;
     liveLb?: number;
     ok: boolean;
     stations?: Record<number, number>;
+    /** Profile maxLoad (lb) keyed by station index. */
+    stationMax?: Record<number, number>;
   };
 };
 
@@ -265,8 +271,8 @@ export async function sampleLiveFlight(
     gForce,
     indicatedAirspeedKt,
     altitudeFt,
-    gearPct,
-    flapsPct,
+    gearPctRaw,
+    flapsPctRaw,
     aglFt,
     gearRetractableRaw,
   ] = await Promise.all([
@@ -275,8 +281,10 @@ export async function sampleLiveFlight(
     readOpt('G FORCE', 'Gforce'),
     readOpt('AIRSPEED INDICATED', 'knots'),
     readOpt('PLANE ALTITUDE', 'feet'),
-    readOpt('GEAR TOTAL PCT EXTENDED', 'percent'),
-    readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'percent'),
+    // Native unit is Percent over 100 (0.0–1.0). Requesting "percent" can still
+    // return a fraction depending on the host — normalize to 0–100 either way.
+    readOpt('GEAR TOTAL PCT EXTENDED', 'Percent over 100'),
+    readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'Percent over 100'),
     readOpt('PLANE ALT ABOVE GROUND', 'feet'),
     readOpt('IS GEAR RETRACTABLE', 'bool'),
   ]);
@@ -300,6 +308,10 @@ export async function sampleLiveFlight(
     typeof gearRetractableRaw === 'number'
       ? gearRetractableRaw > 0.5
       : undefined;
+  const gearPct =
+    typeof gearPctRaw === 'number' ? normalizeSimPercent(gearPctRaw) : undefined;
+  const flapsPct =
+    typeof flapsPctRaw === 'number' ? normalizeSimPercent(flapsPctRaw) : undefined;
 
   return {
     onGround: snap.onGround,
@@ -340,6 +352,7 @@ export async function sampleLiveLoadLb(
   grossWeightLb?: number | null;
   stationSumLb?: number | null;
   fuelTanks?: FuelTankBreakdown;
+  fuelTankCapacity?: FuelTankBreakdown;
   stations?: Record<number, number>;
 }> {
   let density = DEFAULT_JET_A_LB_PER_GAL;
@@ -390,6 +403,7 @@ export async function sampleLiveLoadLb(
   const centerLb = centerGal * density;
   const tankTotalLb = leftLb + rightLb + centerLb;
   const fuelTanks = { left: leftLb, right: rightLb, center: centerLb };
+  const fuelTankCapacity = await readClassicFuelTankCapacityLb(bridge, density);
 
   let fuelLb: number | null = tankTotalLb > 0 ? tankTotalLb : null;
   try {
@@ -517,6 +531,7 @@ export async function sampleLiveLoadLb(
     grossWeightLb: grossWeightLb ?? null,
     stationSumLb: stationsRead > 0 ? stationSum : null,
     ...(usableTanks ? { fuelTanks: usableTanks } : {}),
+    ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
     ...(stationsRead > 0 ? { stations } : {}),
   };
 }
@@ -1045,8 +1060,16 @@ export class CareerWatchSession {
             prevWatchFuel.tanks,
             liveFuelLb,
           );
+          const tankCapacity = pickTankCapacity(
+            load.fuelTankCapacity,
+            prevWatchFuel.tankCapacity,
+          );
           // Prefer fresh station map (including all-zero) over a stale schematic.
           const stations = load.stations ?? prevWatchPayload.stations;
+          const stationMax = pickStationMax(
+            undefined,
+            prevWatchPayload.stationMax,
+          );
           const stationSumNow = load.stations
             ? Object.values(load.stations).reduce(
                 (sum, lb) => sum + (Number.isFinite(lb) ? lb : 0),
@@ -1070,6 +1093,7 @@ export class CareerWatchSession {
             nextPayloadOk: nextWeights.payload.ok,
             nextFuelOk: nextWeights.fuel.ok,
             tanks: load.fuelTanks ?? null,
+            tankCapacity: load.fuelTankCapacity ?? null,
             stationKeys: load.stations ? Object.keys(load.stations).length : 0,
           });
           this.lastLoadVerification = {
@@ -1077,10 +1101,12 @@ export class CareerWatchSession {
             fuel: {
               ...nextWeights.fuel,
               ...(tanks ? { tanks } : {}),
+              ...(tankCapacity ? { tankCapacity } : {}),
             },
             payload: {
               ...nextWeights.payload,
               ...(stations ? { stations } : {}),
+              ...(stationMax ? { stationMax } : {}),
             },
           };
           if (
@@ -1109,7 +1135,15 @@ export class CareerWatchSession {
                   prevLv.fuel.tanks,
                   liveFuelLb,
                 );
+                const mergedTankCapacity = pickTankCapacity(
+                  load.fuelTankCapacity,
+                  prevLv.fuel.tankCapacity,
+                );
                 const mergedStations = load.stations ?? prevLv.payload.stations;
+                const mergedStationMax = pickStationMax(
+                  undefined,
+                  prevLv.payload.stationMax,
+                );
                 const { tanks: _prevTanks, ...prevFuelRest } =
                   prev.loadVerification.fuel;
                 openMission.lastPreflightCheck = {
@@ -1127,11 +1161,17 @@ export class CareerWatchSession {
                       ...prevFuelRest,
                       ...nextWeights.fuel,
                       ...(mergedTanks ? { tanks: mergedTanks } : {}),
+                      ...(mergedTankCapacity
+                        ? { tankCapacity: mergedTankCapacity }
+                        : {}),
                     },
                     payload: {
                       ...prev.loadVerification.payload,
                       ...nextWeights.payload,
                       ...(mergedStations ? { stations: mergedStations } : {}),
+                      ...(mergedStationMax
+                        ? { stationMax: mergedStationMax }
+                        : {}),
                     },
                     aircraft: {
                       onGround: sample.onGround,
@@ -1151,10 +1191,12 @@ export class CareerWatchSession {
               fuel: {
                 ...nextWeights.fuel,
                 ...(tanks ? { tanks } : {}),
+                ...(tankCapacity ? { tankCapacity } : {}),
               },
               payload: {
                 ...nextWeights.payload,
                 ...(stations ? { stations } : {}),
+                ...(stationMax ? { stationMax } : {}),
               },
             };
           }

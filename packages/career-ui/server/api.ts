@@ -2068,6 +2068,7 @@ export function createCareerApiServer(port = 8787) {
 
         const dispatchCargoLimit = await resolveClassMaxCargoKg(
           prep.aircraftClassId,
+          prep.mission.airframeTypeId,
         );
         const dispatchRouteLimit = estimateRouteCargoLimit(
           prep.aircraftClassId,

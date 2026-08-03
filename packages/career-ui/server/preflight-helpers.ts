@@ -24,6 +24,12 @@ import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-
 import { plannedStationPayloadLb } from '../../agent/src/ofp-load-plan.ts';
 import { readLiveCgState } from '../../agent/src/live-cg.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
+import {
+  pickStationMax,
+  pickTankCapacity,
+  readClassicFuelTankCapacityLb,
+  resolveSchematicCapsFromCatalog,
+} from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
@@ -66,12 +72,14 @@ export type PreflightCheckResult = {
       liveLb: number;
       ok: boolean;
       tanks?: { left: number; right: number; center: number };
+      tankCapacity?: { left: number; right: number; center: number };
     };
     payload: {
       plannedLb?: number;
       liveLb?: number;
       ok: boolean;
       stations?: Record<number, number>;
+      stationMax?: Record<number, number>;
     };
     aircraft: { onGround: boolean; enginesRunning: boolean };
     cg?: {
@@ -270,6 +278,23 @@ export async function runMissionPreflight(
     const ready = fuelOk && payloadOk;
     const careerVerdict = softenCareerPreflightVerdict(ready, snapshot.verdict);
 
+    const catalogCaps = await resolveSchematicCapsFromCatalog({
+      repoRoot,
+      title: liveTitle || identity.title,
+      icao: identity.icao,
+    });
+    let liveTankCapacity: { left: number; right: number; center: number } | undefined;
+    try {
+      liveTankCapacity = await readClassicFuelTankCapacityLb(bridge);
+    } catch {
+      liveTankCapacity = undefined;
+    }
+    const tankCapacity = pickTankCapacity(
+      liveTankCapacity,
+      catalogCaps.tankCapacity,
+    );
+    const stationMax = pickStationMax(catalogCaps.stationMax, undefined);
+
     const check: PreflightCheckResult = {
       verdict: careerVerdict,
       summary: formatComplianceSummary({
@@ -306,6 +331,7 @@ export async function runMissionPreflight(
                 },
               }
             : {}),
+          ...(tankCapacity ? { tankCapacity } : {}),
         },
         payload: {
           plannedLb: plannedPayloadLb,
@@ -314,6 +340,7 @@ export async function runMissionPreflight(
           ...(live.payload?.stations
             ? { stations: { ...live.payload.stations } }
             : {}),
+          ...(stationMax ? { stationMax } : {}),
         },
         aircraft: {
           onGround: live.onGround,

@@ -149,6 +149,20 @@ describe('estimateRouteCargoLimit', () => {
     assert.equal(result.fuelDeficitKg, 345);
   });
 
+  it('uses Commander airframe burn so short light_ga hops stay feasible', () => {
+    const result = estimateRouteCargoLimit('light_ga', 152, 320, {
+      fuelCapacityKg: 190,
+      oewKg: 855,
+      mtowKg: 1424,
+      airframeTypeId: 'blacksquare-commander-114',
+    });
+    assert.equal(result.fuelCapacityKg, 190);
+    assert.ok(result.estimatedBlockFuelKg < result.fuelCapacityKg);
+    assert.equal(result.fuelFeasible, true);
+    // Must be well below Bonanza-class estimate (~196 kg) that used to block this hop.
+    assert.ok(result.estimatedBlockFuelKg < 160);
+  });
+
   it('uses live SimBrief weights when supplied', () => {
     const result = estimateRouteCargoLimit(
       'light_turboprop',

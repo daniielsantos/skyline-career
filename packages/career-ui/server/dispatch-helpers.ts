@@ -11,6 +11,7 @@ import {
   getAircraftClass,
   KG_TO_LB,
   ofpCargoKg,
+  resolveAirframeFuelBurnKgPerNm,
   type FreighterClassId,
   type MissionIntent,
 } from '@msfs-compat/shared';
@@ -37,6 +38,8 @@ export type ClassCargoLimit = {
   oewKg?: number;
   mtowKg?: number;
   fuelCapacityKg?: number;
+  fuelBurnKgPerNm?: number;
+  airframeTypeId?: string;
 };
 
 const cargoLimitCache = new Map<string, ClassCargoLimit>();
@@ -54,6 +57,10 @@ export async function resolveClassMaxCargoKg(
   if (cached) return cached;
   const aircraft = getAircraftClass(aircraftClassId);
   const airframe = findCareerPlayerAirframe(airframeTypeId);
+  const fuelBurnKgPerNm = resolveAirframeFuelBurnKgPerNm(
+    airframe?.typeId ?? airframeTypeId,
+    aircraftClassId,
+  );
   if (
     airframe &&
     typeof airframe.maxCargoKg === 'number' &&
@@ -68,6 +75,8 @@ export async function resolveClassMaxCargoKg(
       oewKg: airframe.oewKg,
       mtowKg: airframe.mtowKg,
       fuelCapacityKg: airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
+      fuelBurnKgPerNm,
+      airframeTypeId: airframe.typeId,
     };
     cargoLimitCache.set(cacheKey, value);
     return value;
@@ -95,6 +104,8 @@ export async function resolveClassMaxCargoKg(
         airframe?.fuelCapacityKg ??
         resolved.airframe.fuelCapacityKg ??
         aircraft.fuelCapacityKg,
+      fuelBurnKgPerNm,
+      airframeTypeId: airframe?.typeId ?? airframeTypeId,
     };
     cargoLimitCache.set(cacheKey, value);
     return value;
@@ -106,6 +117,8 @@ export async function resolveClassMaxCargoKg(
       oewKg: airframe?.oewKg ?? aircraft.oewKg,
       mtowKg: airframe?.mtowKg ?? aircraft.mtowKg,
       fuelCapacityKg: airframe?.fuelCapacityKg ?? aircraft.fuelCapacityKg,
+      fuelBurnKgPerNm,
+      airframeTypeId: airframe?.typeId ?? airframeTypeId,
     };
     cargoLimitCache.set(cacheKey, value);
     return value;

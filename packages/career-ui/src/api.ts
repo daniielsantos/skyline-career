@@ -432,12 +432,14 @@ export type Mission = {
         liveLb: number;
         ok: boolean;
         tanks?: { left: number; right: number; center: number };
+        tankCapacity?: { left: number; right: number; center: number };
       };
       payload: {
         plannedLb?: number;
         liveLb?: number;
         ok: boolean;
         stations?: Record<number, number>;
+        stationMax?: Record<number, number>;
       };
       aircraft: {
         onGround: boolean;
@@ -1195,12 +1197,14 @@ export type WatchStatus = {
       liveLb: number;
       ok: boolean;
       tanks?: { left: number; right: number; center: number };
+      tankCapacity?: { left: number; right: number; center: number };
     };
     payload: {
       plannedLb?: number;
       liveLb?: number;
       ok: boolean;
       stations?: Record<number, number>;
+      stationMax?: Record<number, number>;
     };
   } | null;
   sawAirborne: boolean;
@@ -1415,7 +1419,9 @@ export type OfpLoadProgress = {
   liveFuelLb?: number;
   livePayloadLb?: number;
   liveTanks?: { left: number; right: number; center: number };
+  tankCapacity?: { left: number; right: number; center: number };
   liveStations?: Record<number, number>;
+  stationMax?: Record<number, number>;
   plannedFuelLb?: number;
   plannedPayloadLb?: number;
   updatedAtIso: string;

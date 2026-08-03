@@ -1449,6 +1449,10 @@ tr.lot-locked {
   background: var(--surface-2);
 }
 
+.staging-candidates li.lot-locked {
+  opacity: 0.7;
+}
+
 .staging-existing li small,
 .staging-candidates li small,
 .staging-line small {
@@ -3424,6 +3428,7 @@ small {
 .load-schematic-wing,
 .load-schematic-center,
 .load-schematic-station {
+  position: relative;
   display: grid;
   gap: 0.1rem;
   min-width: 2.6rem;
@@ -3431,6 +3436,25 @@ small {
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 80%, transparent);
   text-align: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.load-schematic-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--schematic-fill, 0) * 100%);
+  background: color-mix(in srgb, var(--ok, #2f6f4e) 42%, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.load-schematic-label,
+.load-schematic strong {
+  position: relative;
+  z-index: 1;
 }
 
 .load-schematic-wing {

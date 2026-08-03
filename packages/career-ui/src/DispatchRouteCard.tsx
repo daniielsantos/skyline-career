@@ -6,6 +6,7 @@ import {
 } from './api';
 import {
   DispatchRouteMap,
+  type DispatchAircraftPosition,
   type DispatchRouteEndpoint,
   type DispatchRouteWaypoint,
 } from './DispatchRouteMap';
@@ -73,6 +74,8 @@ export function DispatchRouteCard(props: {
   originIcao: string;
   destIcao: string;
   waypoints?: DispatchRouteWaypoint[];
+  /** Live aircraft from Watch (updates as the plane moves). */
+  aircraft?: DispatchAircraftPosition | null;
   busy?: boolean;
   canRefreshNavlog?: boolean;
   onOpenAirport: (icao: string) => void;
@@ -108,6 +111,11 @@ export function DispatchRouteCard(props: {
   }, [props.originIcao, props.destIcao]);
 
   const wptCount = props.waypoints?.length ?? 0;
+  const hasAircraft =
+    props.aircraft != null &&
+    Number.isFinite(props.aircraft.lat) &&
+    Number.isFinite(props.aircraft.lon) &&
+    !(props.aircraft.lat === 0 && props.aircraft.lon === 0);
 
   async function refreshNavlog() {
     if (!props.onRefreshNavlog || refreshing) return;
@@ -130,6 +138,7 @@ export function DispatchRouteCard(props: {
           {props.originIcao.trim().toUpperCase()} →{' '}
           {props.destIcao.trim().toUpperCase()}
           {wptCount > 0 ? ` · ${wptCount} navlog fixes` : ''}
+          {hasAircraft ? ' · live aircraft' : ''}
         </small>
       </div>
       {loading ? (
@@ -140,6 +149,7 @@ export function DispatchRouteCard(props: {
             origin={origin}
             dest={dest}
             waypoints={props.waypoints}
+            aircraft={hasAircraft ? props.aircraft : null}
             onSelectAirport={props.onOpenAirport}
           />
           {wptCount === 0 ? (

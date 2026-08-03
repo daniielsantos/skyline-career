@@ -1189,6 +1189,11 @@ export interface SettleMissionOpts {
    * Captured by Flight Watch at first wheels-down.
    */
   landingFpm?: number;
+  /**
+   * Wall-clock when airborne ended (touchdown). Used with airborneAtMs for
+   * settled flight duration.
+   */
+  airborneEndedAtMs?: number;
   /** Wall-clock now for minimum airborne duration gate. */
   nowMs?: number;
   /**
@@ -1358,6 +1363,21 @@ export function settleMission(
     });
   }
 
+  const settledFlightDurationMs = (() => {
+    const start = working.airborneAtMs;
+    if (typeof start !== 'number' || !Number.isFinite(start)) {
+      return working.settledFlightDurationMs;
+    }
+    const end =
+      typeof opts.airborneEndedAtMs === 'number' &&
+      Number.isFinite(opts.airborneEndedAtMs)
+        ? opts.airborneEndedAtMs
+        : typeof opts.nowMs === 'number' && Number.isFinite(opts.nowMs)
+          ? opts.nowMs
+          : Date.now();
+    return Math.max(0, Math.round(end - start));
+  })();
+
   const settled: MissionIntent = {
     ...working,
     status: 'settled',
@@ -1367,6 +1387,7 @@ export function settleMission(
       typeof opts.landingFpm === 'number' && Number.isFinite(opts.landingFpm)
         ? Math.round(opts.landingFpm)
         : working.settledLandingFpm,
+    settledFlightDurationMs,
     payoutUsd: pay.payoutUsd,
     penaltyUsd: pay.penaltyUsd,
     lateTicks: pay.lateTicks,

@@ -1,4 +1,11 @@
-import type { CareerCashflowSnapshot, CareerLedgerEntry, CareerLedgerSummary } from './api';
+import { useEffect, useMemo, useState } from 'react';
+import type {
+  CareerCashflowSnapshot,
+  CareerLedgerEntry,
+  CareerLedgerSummary,
+} from './api';
+
+const CASHFLOW_PAGE_SIZE = 20;
 
 const KIND_LABEL: Record<string, string> = {
   freight_payout: 'Freight payout',
@@ -51,27 +58,13 @@ function SummaryCard(props: {
   );
 }
 
-function LedgerRow(props: {
-  entry: CareerLedgerEntry;
-  formatMoney: (n: number) => string;
-}) {
-  const { entry, formatMoney } = props;
+function amountCell(entry: CareerLedgerEntry, formatMoney: (n: number) => string) {
   const positive = entry.amountUsd >= 0;
   return (
-    <li className="cashflow-row">
-      <div className="cashflow-row-main">
-        <strong>{kindLabel(entry.kind)}</strong>
-        <span className={positive ? 'cashflow-pos' : 'cashflow-neg'}>
-          {positive ? '+' : '−'}
-          {formatMoney(Math.abs(entry.amountUsd))}
-        </span>
-      </div>
-      <div className="cashflow-row-meta">
-        <span>Day {entry.dayIndex}</span>
-        {entry.icao ? <span>{entry.icao}</span> : null}
-        {entry.note ? <span>{entry.note}</span> : null}
-      </div>
-    </li>
+    <span className={positive ? 'cashflow-pos' : 'cashflow-neg'}>
+      {positive ? '+' : '−'}
+      {formatMoney(Math.abs(entry.amountUsd))}
+    </span>
   );
 }
 
@@ -80,6 +73,21 @@ export function HangarCashflowPanel(props: {
   formatMoney: (n: number) => string;
 }) {
   const snap = props.cashflow;
+  const [page, setPage] = useState(1);
+
+  const recent = snap?.recent ?? [];
+  const pageCount = Math.max(1, Math.ceil(recent.length / CASHFLOW_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+
+  useEffect(() => {
+    setPage(1);
+  }, [recent.length]);
+
+  const pageEntries = useMemo(() => {
+    const start = (safePage - 1) * CASHFLOW_PAGE_SIZE;
+    return recent.slice(start, start + CASHFLOW_PAGE_SIZE);
+  }, [recent, safePage]);
+
   if (!snap) {
     return <p className="empty">Loading cashflow…</p>;
   }
@@ -91,6 +99,15 @@ export function HangarCashflowPanel(props: {
       </p>
     );
   }
+
+  const total = recent.length;
+  const rangeLabel =
+    total === 0
+      ? '0 records'
+      : `${(safePage - 1) * CASHFLOW_PAGE_SIZE + 1}–${Math.min(
+          safePage * CASHFLOW_PAGE_SIZE,
+          total,
+        )} of ${total}`;
 
   return (
     <div className="cashflow-panel">
@@ -114,15 +131,64 @@ export function HangarCashflowPanel(props: {
 
       <div className="cashflow-history">
         <p className="aircraft-card-section-label">Recent activity</p>
-        <ul className="cashflow-list">
-          {snap.recent.map((entry) => (
-            <LedgerRow
-              key={entry.id}
-              entry={entry}
-              formatMoney={props.formatMoney}
-            />
-          ))}
-        </ul>
+        {total === 0 ? (
+          <p className="empty">No recent ledger rows.</p>
+        ) : (
+          <>
+            <div className="table-wrap">
+              <table className="cashflow-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Day</th>
+                    <th scope="col">Activity</th>
+                    <th scope="col">ICAO</th>
+                    <th scope="col">Note</th>
+                    <th scope="col" className="cashflow-col-amount">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td>{entry.dayIndex}</td>
+                      <td>{kindLabel(entry.kind)}</td>
+                      <td>{entry.icao ?? '—'}</td>
+                      <td className="cashflow-col-note">
+                        {entry.note?.trim() ? entry.note : '—'}
+                      </td>
+                      <td className="cashflow-col-amount">
+                        {amountCell(entry, props.formatMoney)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <nav className="pagination" aria-label="Cashflow activity pages">
+              <p>{rangeLabel}</p>
+              <div>
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {safePage} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={safePage >= pageCount}
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
+          </>
+        )}
       </div>
     </div>
   );

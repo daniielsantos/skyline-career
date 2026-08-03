@@ -368,6 +368,8 @@ export type Mission = {
   settledFuelKg?: number;
   /** Touchdown vertical speed (fpm), typically negative. */
   settledLandingFpm?: number;
+  /** Airborne wall-clock duration when settled (ms). */
+  settledFlightDurationMs?: number;
   staticId?: string;
   lots?: MissionLotLine[];
   shipmentLotId?: string;
@@ -1090,6 +1092,8 @@ export type MissionSettlement = {
   residualFuelKg: number | null;
   /** Touchdown vertical speed (fpm), typically negative. */
   landingFpm?: number | null;
+  /** Airborne wall-clock duration (ms). */
+  flightDurationMs?: number | null;
 };
 
 export type WatchEvent =

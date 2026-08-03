@@ -613,6 +613,8 @@ export interface MissionIntent {
    * Typically negative for a descent (e.g. -220).
    */
   settledLandingFpm?: number;
+  /** Wall-clock airborne duration (wheels-up → touchdown/settle), ms. */
+  settledFlightDurationMs?: number;
   /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';

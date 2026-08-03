@@ -94,8 +94,6 @@ export function DispatchActivePanel(props: {
   skylineInjectEnabled: boolean;
   simBridge: SimBridgeStatus | null;
   watch: WatchStatus | null;
-  watchAutoStatus: 'idle' | 'waiting' | 'connecting' | 'blocked';
-  watchAutoPaused: boolean;
   onOpenAirport: (icao: string) => void;
   onSelectSettings: () => void;
   onDispatch: (mission: Mission) => void;
@@ -132,14 +130,6 @@ export function DispatchActivePanel(props: {
   const showPreflight =
     Boolean(mission.lastPreflightCheck) &&
     (step === 'load' || step === 'ready' || step === 'en_route');
-  const showWatch =
-    step === 'load' ||
-    step === 'ready' ||
-    step === 'en_route' ||
-    watchRunning ||
-    props.watchAutoStatus === 'waiting' ||
-    props.watchAutoStatus === 'connecting' ||
-    props.loadOfpAutoStatus === 'loading';
 
   const primaryCta = (() => {
     if (step === 'flight_plan') {
@@ -884,6 +874,11 @@ export function DispatchActivePanel(props: {
           originIcao={mission.originIcao}
           destIcao={mission.destIcao}
           waypoints={mission.lastOfpCheck?.briefing?.waypoints}
+          aircraft={
+            watchRunning && props.watch?.position
+              ? props.watch.position
+              : null
+          }
           busy={busy}
           canRefreshNavlog={Boolean(simbriefUser.trim())}
           onOpenAirport={props.onOpenAirport}
@@ -894,193 +889,6 @@ export function DispatchActivePanel(props: {
       {primaryCta ? (
         <div className="dispatch-primary-actions">{primaryCta}</div>
       ) : null}
-
-      {showWatch
-        ? (() => {
-            const bridgeConnected = Boolean(
-              props.loadOfpAutoStatus === 'loading' ||
-                watchRunning ||
-                props.simBridge?.connected,
-            );
-            const bridgeOnGround =
-              watchRunning &&
-              props.watch?.onGround !== null &&
-              props.watch?.onGround !== undefined
-                ? props.watch.onGround
-                : props.simBridge?.onGround ?? null;
-            const bridgeEngines =
-              watchRunning &&
-              props.watch?.enginesRunning !== null &&
-              props.watch?.enginesRunning !== undefined
-                ? props.watch.enginesRunning
-                : props.simBridge?.enginesRunning ?? null;
-            const bridgePhase =
-              (watchRunning ? props.watch?.phase : null) ??
-              props.simBridge?.phase ??
-              null;
-            const bridgeGs =
-              watchRunning &&
-              props.watch?.groundSpeedKt !== null &&
-              props.watch?.groundSpeedKt !== undefined
-                ? props.watch.groundSpeedKt
-                : props.simBridge?.groundSpeedKt ?? null;
-            const stageDetail =
-              bridgePhase === 'taxi' ||
-              (bridgeOnGround === true &&
-                bridgeEngines &&
-                typeof bridgeGs === 'number' &&
-                bridgeGs >= 5)
-                ? 'Taxiing'
-                : bridgeOnGround === true
-                  ? bridgeEngines
-                    ? 'On ground · engines running'
-                    : 'On ground · engines off'
-                  : bridgeOnGround === false
-                    ? 'Airborne'
-                    : bridgeConnected
-                      ? 'Sampling live aircraft…'
-                      : 'SimBridge not connected yet';
-            const watchPipeLive =
-              watchRunning &&
-              props.watch?.pipeConnected !== false &&
-              !(
-                typeof props.watch?.lastError === 'string' &&
-                /not connected|pipe closed|0xC00000B0|Reconnecting|retry in/i.test(
-                  props.watch.lastError,
-                )
-              );
-            // Prefer a stable connected label — don't flash CONNECTING… over an
-            // already-live SimBridge/Watch link (retry loops looked like flicker).
-            // Inject stops Watch (pipe exclusive) — keep the footer on load/inject.
-            const statusLabel =
-              props.loadOfpAutoStatus === 'loading'
-                ? 'INJECTING…'
-                : watchPipeLive
-                  ? 'MSFS CONNECTED'
-                  : watchRunning
-                    ? 'RECONNECTING…'
-                    : bridgeConnected
-                      ? 'SIMBRIDGE CONNECTED'
-                      : props.watchAutoStatus === 'connecting'
-                        ? 'CONNECTING…'
-                        : props.watchAutoPaused
-                          ? 'WATCH PAUSED'
-                          : 'WAITING FOR MSFS';
-
-            return (
-              <footer
-                className={`watch-status-footer ${
-                  props.loadOfpAutoStatus === 'loading'
-                    ? 'watch-connected'
-                    : watchPipeLive || bridgeConnected
-                      ? 'watch-connected'
-                      : 'watch-waiting'
-                }`}
-              >
-                <div className="watch-footer-primary">
-                  <span
-                    className={`watch-dot ${
-                      props.loadOfpAutoStatus === 'loading'
-                        ? 'checking'
-                        : watchRunning && !watchPipeLive
-                          ? 'checking'
-                          : !bridgeConnected &&
-                              props.watchAutoStatus === 'connecting'
-                            ? 'checking'
-                            : watchPipeLive || bridgeConnected
-                              ? 'on'
-                              : 'off'
-                    }`}
-                  />
-                  <strong>{statusLabel}</strong>
-                  <div className="watch-footer-item">
-                    <span>Phase</span>
-                    <b>{stageDetail}</b>
-                  </div>
-                  <div className="watch-footer-item">
-                    <span>Mission</span>
-                    <b>{mission.status}</b>
-                  </div>
-                </div>
-                <div className="watch-footer-secondary">
-                  <span>
-                    {bridgePhase ??
-                      props.watch?.phase ??
-                      props.simBridge?.phase ??
-                      'idle'}
-                  </span>
-                  {props.watch?.flightTime ? (
-                    <span
-                      className={
-                        props.watch.flightTime.met
-                          ? 'watch-flight-time ok'
-                          : 'watch-flight-time pending'
-                      }
-                      title="Minimum airborne time is 70% of the planned OFP/route block (wall clock)"
-                    >
-                      Airborne{' '}
-                      {Math.round(props.watch.flightTime.elapsedMs / 60_000)}m /{' '}
-                      {Math.round(props.watch.flightTime.expectedRouteMs / 60_000)}m
-                      air planned ·{' '}
-                      {Math.round(props.watch.flightTime.ratio * 100)}%
-                      {props.watch.flightTime.met
-                        ? ' · settle unlocked'
-                        : ` · need ≥${Math.round(
-                            (props.watch.flightTime.requiredMs /
-                              Math.max(1, props.watch.flightTime.expectedRouteMs)) *
-                              100,
-                          )}%`}
-                      {props.watch.onGround && props.watch.sawAirborne
-                        ? ' · clock frozen on ground'
-                        : ''}
-                    </span>
-                  ) : null}
-                  {props.watch?.cruiseSample &&
-                  props.watch.cruiseSample.phase !== 'idle' ? (
-                    <span
-                      className={
-                        props.watch.cruiseSample.phase === 'locked'
-                          ? 'watch-flight-time ok'
-                          : 'watch-flight-time pending'
-                      }
-                      title="Stable cruise fuel flow + TAS (≥3 min level) updates this airframe's burn after settle"
-                    >
-                      Cruise{' '}
-                      {props.watch.cruiseSample.phase === 'locked'
-                        ? 'locked'
-                        : 'sampling'}{' '}
-                      {Math.round(props.watch.cruiseSample.elapsedMs / 1000)}s /{' '}
-                      {Math.round(props.watch.cruiseSample.requiredMs / 1000)}s
-                      {props.watch.cruiseSample.tasKt != null
-                        ? ` · ${props.watch.cruiseSample.tasKt} kt`
-                        : ''}
-                      {props.watch.cruiseSample.fuelFlowKgPerHour != null
-                        ? ` · ${props.watch.cruiseSample.fuelFlowKgPerHour.toLocaleString(
-                            undefined,
-                            { maximumFractionDigits: 1 },
-                          )} kg/h`
-                        : ''}
-                    </span>
-                  ) : null}
-                  {props.watch?.lastEvent?.type === 'settle_blocked' ? (
-                    <span className="watch-footer-error">
-                      {props.watch.lastEvent.reason}
-                    </span>
-                  ) : null}
-                  {props.watch?.lastError ? (
-                    <span className="watch-footer-error">
-                      {props.watch.lastError}
-                    </span>
-                  ) : props.simBridge?.error && !bridgeConnected ? (
-                    <span className="watch-footer-error">
-                      {props.simBridge.error}
-                    </span>
-                  ) : null}
-                </div>
-              </footer>
-            );
-          })()
-        : null}
 
       <details className="dispatch-advanced">
         <summary>Advanced</summary>

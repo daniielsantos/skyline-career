@@ -104,6 +104,8 @@ export type WatchStatusPayload = {
     residualFuelKg: number | null;
     /** Touchdown vertical speed (fpm), typically negative. */
     landingFpm: number | null;
+    /** Airborne wall-clock duration (ms), when known. */
+    flightDurationMs: number | null;
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -524,6 +526,12 @@ export class CareerWatchSession {
   getCapturedLandingFpm(): number | undefined {
     const fpm = this.watchState.landingFpm;
     return typeof fpm === 'number' && Number.isFinite(fpm) ? fpm : undefined;
+  }
+
+  /** Touchdown wall-clock from Watch, if wheels-down was observed. */
+  getCapturedAirborneEndedAtMs(): number | undefined {
+    const ended = this.watchState.airborneEndedAtMs;
+    return typeof ended === 'number' && Number.isFinite(ended) ? ended : undefined;
   }
 
   getStatus(): WatchStatusPayload {
@@ -1149,6 +1157,8 @@ export class CareerWatchSession {
             fleet: freshMissions,
             residualFuelKg,
             landingFpm,
+            airborneEndedAtMs: this.watchState.airborneEndedAtMs,
+            nowMs: Date.now(),
           });
           freshMissions.missions[openIdx] = result.mission;
           const cruiseCommit = this.cruiseState.committed;
@@ -1196,6 +1206,7 @@ export class CareerWatchSession {
             deliveredKg: result.settlement.deliveredKg,
             residualFuelKg: result.mission.settledFuelKg ?? null,
             landingFpm: result.mission.settledLandingFpm ?? null,
+            flightDurationMs: result.mission.settledFlightDurationMs ?? null,
           };
           return true;
         });

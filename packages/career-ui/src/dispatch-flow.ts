@@ -44,6 +44,8 @@ export type FlightDebrief = {
   residualFuelKg: number | null;
   /** Touchdown vertical speed (fpm), typically negative. */
   landingFpm: number | null;
+  /** Airborne duration (wheels-up → touchdown/settle), ms. */
+  flightDurationMs: number | null;
   netUsd: number;
 };
 
@@ -55,6 +57,16 @@ export function formatLandingFpm(fpm: number | null | undefined): string {
   return `${sign}${rounded} fpm`;
 }
 
+/** Format airborne duration for debrief (e.g. "1h 09m"). */
+export function formatFlightDurationMs(ms: number | null | undefined): string {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '—';
+  const totalMinutes = Math.max(0, Math.round(ms / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours <= 0) return `${minutes}m`;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
 export function buildFlightDebrief(opts: {
   mission: Pick<
     Mission,
@@ -64,6 +76,7 @@ export function buildFlightDebrief(opts: {
     | 'payUsd'
     | 'fuelUplift'
     | 'settledLandingFpm'
+    | 'settledFlightDurationMs'
   >;
   settlement: MissionSettlement;
 }): FlightDebrief {
@@ -75,6 +88,14 @@ export function buildFlightDebrief(opts: {
       : typeof opts.mission.settledLandingFpm === 'number' &&
           Number.isFinite(opts.mission.settledLandingFpm)
         ? Math.round(opts.mission.settledLandingFpm)
+        : null;
+  const flightDurationMs =
+    typeof opts.settlement.flightDurationMs === 'number' &&
+    Number.isFinite(opts.settlement.flightDurationMs)
+      ? Math.round(opts.settlement.flightDurationMs)
+      : typeof opts.mission.settledFlightDurationMs === 'number' &&
+          Number.isFinite(opts.mission.settledFlightDurationMs)
+        ? Math.round(opts.mission.settledFlightDurationMs)
         : null;
   return {
     missionId: opts.mission.id,
@@ -88,6 +109,7 @@ export function buildFlightDebrief(opts: {
     fuelCostUsd,
     residualFuelKg: opts.settlement.residualFuelKg,
     landingFpm,
+    flightDurationMs,
     netUsd: opts.settlement.payoutUsd - fuelCostUsd,
   };
 }

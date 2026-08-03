@@ -97,11 +97,13 @@ import {
   buildFlightDebrief,
   deriveDispatchStep,
   dispatchStepStatusLine,
+  formatFlightDurationMs,
   formatLandingFpm,
   resolveLoadPath,
   type FlightDebrief,
 } from './dispatch-flow';
 import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
+import { WatchStatusFooter } from './WatchStatusFooter';
 
 type Tab = CareerTab;
 type TerminalSection = 'inventory' | 'contracts' | 'movements';
@@ -1786,6 +1788,13 @@ export function App() {
               (prev?.loadVerification?.fuel.liveLb ?? 0) -
                 (status.loadVerification?.fuel.liveLb ?? 0),
             ) >= 15;
+          // ~0.0005° ≈ 55 m — keep Dispatch route aircraft marker moving in cruise.
+          const positionStable =
+            (prev?.position == null && status.position == null) ||
+            (prev?.position != null &&
+              status.position != null &&
+              Math.abs(prev.position.lat - status.position.lat) < 0.0005 &&
+              Math.abs(prev.position.lon - status.position.lon) < 0.0005);
           if (
             prev &&
             prev.running === status.running &&
@@ -1804,7 +1813,8 @@ export function App() {
               Math.round((status.flightTime?.elapsedMs ?? 0) / 60_000) &&
             liveFuelDelta < 25 &&
             livePayloadDelta < 25 &&
-            !verificationChanged
+            !verificationChanged &&
+            positionStable
           ) {
             return prev;
           }
@@ -5336,17 +5346,18 @@ export function App() {
                 {dispatchStatusText}
               </p>
               <div className="panel-head missions-head">
-                <div>
+                <div className="missions-head-spacer" aria-hidden="true" />
+                <div className="missions-head-center">
                   <h2>
                     {flightDebrief.originIcao} → {flightDebrief.destIcao}
                   </h2>
                   <p>
-                    {flightDebrief.missionId} ·{' '}
                     {flightDebrief.onTime
                       ? 'On time'
                       : `Late ${flightDebrief.lateTicks}h`}
                   </p>
                 </div>
+                <div className="missions-head-spacer" aria-hidden="true" />
               </div>
               <section className="debrief-card" aria-live="polite">
                 <div className="debrief-card-head">
@@ -5386,6 +5397,12 @@ export function App() {
                       {flightDebrief.residualFuelKg !== null
                         ? formatTonnes(flightDebrief.residualFuelKg)
                         : 'estimated'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Flight time</dt>
+                    <dd>
+                      {formatFlightDurationMs(flightDebrief.flightDurationMs)}
                     </dd>
                   </div>
                   <div>
@@ -5833,8 +5850,6 @@ export function App() {
               skylineInjectEnabled={skylineInjectEnabled}
               simBridge={simBridge}
               watch={watch}
-              watchAutoStatus={watchAutoStatus}
-              watchAutoPaused={watchAutoPaused}
               onOpenAirport={openAirport}
               onSelectSettings={() => selectTab('settings')}
               onDispatch={(m) => void onDispatch(m)}
@@ -6395,9 +6410,15 @@ export function App() {
         </section>
       )}
 
-      <footer className="foot">
-        Saves to <code>profiles/career/</code> · same engine as <code>npm run career</code>
-      </footer>
+      <WatchStatusFooter
+        missionStatus={activeMission?.status ?? null}
+        activeMissionId={activeMission?.id ?? null}
+        simBridge={simBridge}
+        watch={watch}
+        watchAutoStatus={watchAutoStatus}
+        watchAutoPaused={watchAutoPaused}
+        loadOfpAutoStatus={loadOfpAutoStatus}
+      />
         </div>
       </div>
       {confirmDialog}

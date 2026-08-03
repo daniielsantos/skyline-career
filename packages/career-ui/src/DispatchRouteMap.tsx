@@ -33,7 +33,23 @@ export type DispatchRouteWaypoint = {
   type?: string;
 };
 
+export type DispatchAircraftPosition = {
+  lat: number;
+  lon: number;
+};
+
 type LatLon = { lat: number; lon: number };
+
+function usableAircraftPosition(
+  pos: DispatchAircraftPosition | null | undefined,
+): pos is DispatchAircraftPosition {
+  return (
+    !!pos &&
+    Number.isFinite(pos.lat) &&
+    Number.isFinite(pos.lon) &&
+    !(pos.lat === 0 && pos.lon === 0)
+  );
+}
 
 function toCartesian(lat: number, lon: number): [number, number, number] {
   const phi = (lat * Math.PI) / 180;
@@ -156,6 +172,16 @@ function waypointMarker(waypoint: DispatchRouteWaypoint): HTMLButtonElement {
   return el;
 }
 
+function aircraftMarkerEl(): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'dispatch-route-ac';
+  el.title = 'Aircraft';
+  el.setAttribute('aria-label', 'Aircraft position');
+  el.innerHTML =
+    '<span class="dispatch-route-ac-dot" aria-hidden="true"></span>';
+  return el;
+}
+
 function ensureRouteLayer(map: Map): void {
   if (map.getSource(ROUTE_SOURCE_ID)) return;
   map.addSource(ROUTE_SOURCE_ID, {
@@ -221,12 +247,15 @@ export function DispatchRouteMap(props: {
   origin: DispatchRouteEndpoint;
   dest: DispatchRouteEndpoint;
   waypoints?: DispatchRouteWaypoint[];
+  /** Live aircraft position from Watch — updated without re-fitting the route. */
+  aircraft?: DispatchAircraftPosition | null;
   onSelectAirport?: (icao: string) => void;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  const aircraftMarkerRef = useRef<Marker | null>(null);
   const onSelectRef = useRef(props.onSelectAirport);
   onSelectRef.current = props.onSelectAirport;
 
@@ -257,6 +286,8 @@ export function DispatchRouteMap(props: {
       resizeObserver?.disconnect();
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
+      aircraftMarkerRef.current?.remove();
+      aircraftMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -340,6 +371,42 @@ export function DispatchRouteMap(props: {
     if (map.isStyleLoaded()) paint();
     else map.once('load', paint);
   }, [props.origin, props.dest, props.waypoints]);
+
+  // Live aircraft — move marker only; do not refit route bounds each tick.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const sync = () => {
+      if (!usableAircraftPosition(props.aircraft)) {
+        aircraftMarkerRef.current?.remove();
+        aircraftMarkerRef.current = null;
+        return;
+      }
+      const lngLat: [number, number] = [props.aircraft.lon, props.aircraft.lat];
+      if (aircraftMarkerRef.current) {
+        aircraftMarkerRef.current.setLngLat(lngLat);
+        return;
+      }
+      const marker = new Marker({
+        element: aircraftMarkerEl(),
+        anchor: 'center',
+      })
+        .setLngLat(lngLat)
+        .setPopup(
+          new Popup({
+            offset: 12,
+            closeButton: false,
+            className: 'dispatch-route-popup',
+          }).setHTML('<strong>Aircraft</strong><br/>Live position'),
+        )
+        .addTo(map);
+      aircraftMarkerRef.current = marker;
+    };
+
+    if (map.isStyleLoaded()) sync();
+    else map.once('load', sync);
+  }, [props.aircraft]);
 
   return (
     <div className={props.className ?? 'dispatch-route-map'}>

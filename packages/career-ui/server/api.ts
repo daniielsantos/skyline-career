@@ -2512,6 +2512,10 @@ export function createCareerApiServer(port = 8787) {
               landingFpm = undefined;
             }
           }
+          const airborneEndedAtMs =
+            watchSession.getStatus().missionId === body.missionId
+              ? watchSession.getCapturedAirborneEndedAtMs()
+              : undefined;
           // Stop live watch first so an in-flight tick cannot rewrite this mission.
           const watch = watchSession.getStatus();
           if (watch.running && watch.missionId === body.missionId) {
@@ -2524,6 +2528,8 @@ export function createCareerApiServer(port = 8787) {
               fleet: missions,
               residualFuelKg,
               landingFpm,
+              airborneEndedAtMs,
+              nowMs: Date.now(),
             });
             missions.missions[idx] = result.mission;
             if (result.walletCreditUsd > 0) {
@@ -2572,6 +2578,7 @@ export function createCareerApiServer(port = 8787) {
               deliveredKg: settled.settlement.deliveredKg,
               residualFuelKg: settled.mission.settledFuelKg ?? null,
               landingFpm: settled.mission.settledLandingFpm ?? null,
+              flightDurationMs: settled.mission.settledFlightDurationMs ?? null,
             },
           });
         } catch (error) {

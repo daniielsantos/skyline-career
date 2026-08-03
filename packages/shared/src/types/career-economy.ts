@@ -645,11 +645,13 @@ export interface MissionIntent {
         plannedLb?: number;
         liveLb: number;
         ok: boolean;
+        tanks?: { left: number; right: number; center: number };
       };
       payload: {
         plannedLb?: number;
         liveLb?: number;
         ok: boolean;
+        stations?: Record<number, number>;
       };
       aircraft: {
         onGround: boolean;

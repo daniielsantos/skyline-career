@@ -23,6 +23,7 @@ import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-
 import { plannedStationPayloadLb } from '../../agent/src/ofp-load-plan.ts';
 import { readLiveCgState } from '../../agent/src/live-cg.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
+import { withSimBridgeExclusive } from './simbridge-gate.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
 const ofpCache = new Map<string, Promise<OfpExpectation>>();
@@ -59,8 +60,18 @@ export type PreflightCheckResult = {
   phase: string;
   loadVerification: {
     ready: boolean;
-    fuel: { plannedLb?: number; liveLb: number; ok: boolean };
-    payload: { plannedLb?: number; liveLb?: number; ok: boolean };
+    fuel: {
+      plannedLb?: number;
+      liveLb: number;
+      ok: boolean;
+      tanks?: { left: number; right: number; center: number };
+    };
+    payload: {
+      plannedLb?: number;
+      liveLb?: number;
+      ok: boolean;
+      stations?: Record<number, number>;
+    };
     aircraft: { onGround: boolean; enginesRunning: boolean };
     cg?: {
       liveMac?: number;
@@ -120,6 +131,7 @@ export async function runMissionPreflight(
   const bridge = new NamedPipeSimBridge(
     opts.pipeName ? { pipeName: opts.pipeName } : {},
   );
+  return withSimBridgeExclusive(async () => {
   try {
     await bridge.open('Skyline Career UI Preflight');
     const identity = await bridge.getAircraftIdentity();
@@ -147,9 +159,16 @@ export async function runMissionPreflight(
       // Freighter compare still works without roles; classic payload path.
     }
 
+    const previousStationSumLb = mission.lastPreflightCheck?.loadVerification
+      ?.payload?.stations
+      ? Object.values(
+          mission.lastPreflightCheck.loadVerification.payload.stations,
+        ).reduce((sum, lb) => sum + (Number.isFinite(lb) ? lb : 0), 0)
+      : undefined;
     const { snapshot, live } = await compareOnce(bridge, {
       ofp,
       locked: false,
+      previousStationSumLb,
     });
     const checkedAtIso = new Date().toISOString();
     const fuelFailed = snapshot.findings.some(
@@ -215,7 +234,21 @@ export async function runMissionPreflight(
         })
       : undefined;
     const plannedPayloadLb = plannedPayload?.plannedTotalLb;
-    const livePayloadLb = live.payload?.total ?? live.payload?.ofpPayloadLb;
+    const stationSumLb = live.payload?.stations
+      ? Object.values(live.payload.stations).reduce(
+          (sum, lb) => sum + (Number.isFinite(lb) ? lb : 0),
+          0,
+        )
+      : undefined;
+    // Prefer emptied classic stations over a stale mass-balance READY.
+    const clearedStations =
+      stationSumLb !== undefined &&
+      stationSumLb < 50 &&
+      previousStationSumLb !== undefined &&
+      previousStationSumLb > 200;
+    const livePayloadLb = clearedStations
+      ? stationSumLb
+      : (live.payload?.total ?? live.payload?.ofpPayloadLb);
     const fuelTolLb = Math.max(
       ofp.tolerances?.fuelAbsLb ?? 50,
       Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
@@ -258,11 +291,19 @@ export async function runMissionPreflight(
           plannedLb: plannedFuelLb,
           liveLb: liveFuelLb,
           ok: fuelOk,
+          tanks: {
+            left: live.fuel.left,
+            right: live.fuel.right,
+            center: live.fuel.center,
+          },
         },
         payload: {
           plannedLb: plannedPayloadLb,
           liveLb: livePayloadLb,
           ok: payloadOk,
+          ...(live.payload?.stations
+            ? { stations: { ...live.payload.stations } }
+            : {}),
         },
         aircraft: {
           onGround: live.onGround,
@@ -316,6 +357,7 @@ export async function runMissionPreflight(
       /* ignore */
     }
   }
+  });
 }
 
 /** True when mission must not auto/manual depart without override. */

@@ -20,6 +20,7 @@ export interface CompareOnceOptions {
   baseline?: ComplianceBaseline;
   previousFuel?: LiveFuelState;
   previousAtMs?: number;
+  previousStationSumLb?: number;
 }
 
 /** Prefer avgas for light piston when MSFS reports Jet-A density on small tanks. */
@@ -82,6 +83,7 @@ export async function compareOnce(
     stationRoles,
     roleWeightUnit,
     liveSources: opts.ofp.liveSources,
+    previousStationSumLb: opts.previousStationSumLb,
   });
   const phase = deriveCompliancePhase(
     { onGround: live.onGround, enginesRunning: live.enginesRunning },

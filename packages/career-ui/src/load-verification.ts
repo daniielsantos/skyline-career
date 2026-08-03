@@ -16,6 +16,66 @@ function matchOk(
   return Math.abs(liveLb - plannedLb) <= Math.max(0, toleranceLb);
 }
 
+/** Per-side classic fuel breakdown (aux/tip folded into L/R by the live reader). */
+export type LoadFuelTankBreakdown = {
+  left: number;
+  right: number;
+  center: number;
+};
+
+/** Classic L/R/C sometimes glitch to zero while FUEL TOTAL is still valid. */
+export function isUsableFuelTankBreakdown(
+  tanks: LoadFuelTankBreakdown,
+  totalFuelLb?: number | null,
+): boolean {
+  const sum =
+    Math.max(0, tanks.left) +
+    Math.max(0, tanks.right) +
+    Math.max(0, tanks.center);
+  const total =
+    typeof totalFuelLb === 'number' && Number.isFinite(totalFuelLb)
+      ? Math.max(0, totalFuelLb)
+      : undefined;
+  if (sum < 1) {
+    return total === undefined || total < 1;
+  }
+  if (total !== undefined && total > 50 && sum < total * 0.15) {
+    return false;
+  }
+  return true;
+}
+
+export function pickFuelTankBreakdown(
+  next: LoadFuelTankBreakdown | undefined,
+  prev: LoadFuelTankBreakdown | undefined,
+  totalFuelLb?: number | null,
+): LoadFuelTankBreakdown | undefined {
+  if (next && isUsableFuelTankBreakdown(next, totalFuelLb)) return next;
+  return prev;
+}
+
+/** Prefer defined live payload; never let a missing sample wipe a good total. */
+export function pickLivePayloadLb(
+  next: number | undefined,
+  prev: number | undefined,
+): number | undefined {
+  return typeof next === 'number' && Number.isFinite(next) ? next : prev;
+}
+
+export type LoadVerificationFuel = {
+  plannedLb?: number;
+  liveLb: number;
+  ok: boolean;
+  tanks?: LoadFuelTankBreakdown;
+};
+
+export type LoadVerificationPayload = {
+  plannedLb?: number;
+  liveLb?: number;
+  ok: boolean;
+  stations?: Record<number, number>;
+};
+
 export function evaluateLoadVerification(opts: {
   plannedFuelLb?: number;
   liveFuelLb?: number;
@@ -23,10 +83,12 @@ export function evaluateLoadVerification(opts: {
   livePayloadLb?: number;
   fuelTolLb?: number;
   payloadTolLb?: number;
+  fuelTanks?: LoadFuelTankBreakdown;
+  payloadStations?: Record<number, number>;
 }): {
   ready: boolean;
-  fuel: { plannedLb?: number; liveLb: number; ok: boolean };
-  payload: { plannedLb?: number; liveLb?: number; ok: boolean };
+  fuel: LoadVerificationFuel;
+  payload: LoadVerificationPayload;
 } {
   const fuelTol = opts.fuelTolLb ?? DEFAULT_FUEL_TOL_LB;
   const payloadTol = opts.payloadTolLb ?? DEFAULT_PAYLOAD_TOL_LB;
@@ -49,11 +111,13 @@ export function evaluateLoadVerification(opts: {
       plannedLb: opts.plannedFuelLb,
       liveLb: liveFuel ?? 0,
       ok: fuelOk,
+      ...(opts.fuelTanks ? { tanks: opts.fuelTanks } : {}),
     },
     payload: {
       plannedLb: opts.plannedPayloadLb,
       liveLb: livePayload,
       ok: payloadOk,
+      ...(opts.payloadStations ? { stations: opts.payloadStations } : {}),
     },
   };
 }

@@ -48,6 +48,7 @@ import {
   isOfpLoadActive,
   withOfpLoadExclusive,
 } from './ofp-load-state.ts';
+import { withSimBridgeExclusive } from './simbridge-gate.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import type { CareerWatchSession } from './watch-helpers.ts';
 
@@ -149,6 +150,10 @@ export type OfpLoadProgress = {
   /** Live totals while inject runs (UI Loaded vs Due overlay). */
   liveFuelLb?: number;
   livePayloadLb?: number;
+  /** Classic L/R/C breakdown for Preflight schematic while inject runs. */
+  liveTanks?: { left: number; right: number; center: number };
+  /** Per-station live weights for Preflight schematic while inject runs. */
+  liveStations?: Record<number, number>;
   plannedFuelLb?: number;
   plannedPayloadLb?: number;
   updatedAtIso: string;
@@ -428,8 +433,12 @@ async function probeSimBridgeStatusUnlocked(opts: {
   const checkedAtIso = new Date().toISOString();
   const watch = opts.watchSession?.getStatus();
   if (watch?.running) {
+    const pipeDown =
+      watch.pipeConnected === false ||
+      (typeof watch.lastError === 'string' &&
+        /not connected|pipe closed|0xC00000B0|Reconnecting/i.test(watch.lastError));
     return {
-      connected: true,
+      connected: !pipeDown,
       mode: 'watch',
       aircraftTitle: null,
       onGround: watch.onGround,
@@ -464,6 +473,7 @@ async function probeSimBridgeStatusUnlocked(opts: {
   const bridge = new NamedPipeSimBridge(
     opts.pipeName ? { pipeName: opts.pipeName } : {},
   );
+  return withSimBridgeExclusive(async () => {
   try {
     await bridge.open('Skyline Career UI SimBridge Probe');
     const ping = await bridge.ping();
@@ -542,6 +552,7 @@ async function probeSimBridgeStatusUnlocked(opts: {
       /* ignore */
     }
   }
+  });
 }
 
 export async function applyMissionOfpLoad(
@@ -767,6 +778,36 @@ async function applyMissionOfpLoadExclusive(
       return qty * fuelLbPerGal;
     };
 
+    const tankQtyToLb = (qty: number): number => {
+      if (!Number.isFinite(qty) || qty <= 0) return 0;
+      const unit = resolved.profile.fuel.unit ?? 'gallons';
+      if (unit === 'pounds') return qty;
+      if (unit === 'kilograms') return qty * 2.20462262185;
+      if (unit === 'liters') return qty * (fuelLbPerGal / 3.785411784);
+      return qty * fuelLbPerGal;
+    };
+
+    /** Fold profile tank ids into the Preflight L/R/C schematic. */
+    const schematicTanksFromProfile = (
+      tanks: Record<string, number>,
+    ): { left: number; right: number; center: number } => {
+      let left = 0;
+      let right = 0;
+      let center = 0;
+      for (const [id, qty] of Object.entries(tanks)) {
+        const lb = tankQtyToLb(qty);
+        const key = id.toLowerCase();
+        if (/(center|centre)/.test(key)) center += lb;
+        else if (/right|_r\b|^r_/.test(key)) right += lb;
+        else if (/left|_l\b|^l_/.test(key)) left += lb;
+        else {
+          left += lb / 2;
+          right += lb / 2;
+        }
+      }
+      return { left, right, center };
+    };
+
     afterLive = {
       tanks: { ...beforeLive.tanks },
       stations: { ...beforeLive.stations },
@@ -811,6 +852,12 @@ async function applyMissionOfpLoadExclusive(
       message: string,
       extra?: { cgAttempt?: number; liveMac?: number },
     ) => {
+      const liveStationSum = sumRecord(afterLive.stations);
+      const workingSum = sumRecord(workingStations);
+      const stationsForUi =
+        liveStationSum >= workingSum * 0.5
+          ? { ...afterLive.stations }
+          : { ...workingStations };
       setOfpLoadProgress(mission.id, {
         phase,
         message,
@@ -819,10 +866,9 @@ async function applyMissionOfpLoadExclusive(
         liveMac: extra?.liveMac,
         liveFuelLb: tanksToFuelLb(afterLive.tanks),
         // Prefer working plan when station SimVars under-read mid-inject.
-        livePayloadLb: Math.max(
-          sumRecord(afterLive.stations),
-          sumRecord(workingStations),
-        ),
+        livePayloadLb: Math.max(liveStationSum, workingSum),
+        liveTanks: schematicTanksFromProfile(afterLive.tanks),
+        liveStations: stationsForUi,
         plannedFuelLb,
         plannedPayloadLb,
       });

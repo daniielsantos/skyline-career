@@ -3,6 +3,25 @@ import { randomUUID } from 'node:crypto';
 import type { IpcMethod, IpcRequest, IpcResponse } from './types.js';
 import { IpcClientError } from './types.js';
 
+// Optional debug hook — career-ui sets this to persist pipe events.
+let pipeDebugLog:
+  | ((message: string, data?: Record<string, unknown>) => void)
+  | null = null;
+
+export function setNamedPipeDebugLog(
+  fn: ((message: string, data?: Record<string, unknown>) => void) | null,
+): void {
+  pipeDebugLog = fn;
+}
+
+function dbg(message: string, data?: Record<string, unknown>): void {
+  try {
+    pipeDebugLog?.(message, data);
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface NamedPipeClientOptions {
   pipeName?: string;
   connectTimeoutMs?: number;
@@ -43,13 +62,16 @@ export class NamedPipeClient {
 
   async connect(): Promise<void> {
     if (this.isConnected) {
+      dbg('connect: already connected', { pipe: this.pipePath });
       return;
     }
 
+    dbg('connect: opening', { pipe: this.pipePath });
     await new Promise<void>((resolve, reject) => {
       const socket = createConnection(this.pipePath);
       const timer = setTimeout(() => {
         socket.destroy();
+        dbg('connect: timeout', { pipe: this.pipePath });
         reject(new IpcClientError('TIMEOUT', `Timed out connecting to ${this.pipePath}`));
       }, this.connectTimeoutMs);
 
@@ -58,19 +80,30 @@ export class NamedPipeClient {
         this.socket = socket;
         socket.setEncoding('utf8');
         socket.on('data', (chunk: string) => this.onData(chunk));
-        socket.on('error', (err) => this.failAll(err));
-        socket.on('close', () => this.failAll(new IpcClientError('NOT_CONNECTED', 'Pipe closed')));
+        socket.on('error', (err) => {
+          dbg('socket error', { message: err.message });
+          if (this.socket === socket) this.socket = null;
+          this.failAll(err);
+        });
+        socket.on('close', () => {
+          dbg('socket close', { pipe: this.pipePath });
+          if (this.socket === socket) this.socket = null;
+          this.failAll(new IpcClientError('NOT_CONNECTED', 'Pipe closed'));
+        });
+        dbg('connect: ok', { pipe: this.pipePath });
         resolve();
       });
 
       socket.once('error', (err) => {
         clearTimeout(timer);
+        dbg('connect: error', { message: err.message });
         reject(new IpcClientError('NOT_CONNECTED', err.message));
       });
     });
   }
 
   async close(): Promise<void> {
+    dbg('client.close', { wasConnected: this.isConnected });
     const socket = this.socket;
     this.socket = null;
     this.failAll(new IpcClientError('NOT_CONNECTED', 'Client closed'));
@@ -82,6 +115,7 @@ export class NamedPipeClient {
   async call<T = unknown>(method: IpcMethod, params: Record<string, unknown> = {}): Promise<T> {
     const run = async (): Promise<T> => {
       if (!this.isConnected || !this.socket) {
+        dbg('call: NOT_CONNECTED', { method });
         throw new IpcClientError('NOT_CONNECTED', 'Named pipe client is not connected');
       }
 

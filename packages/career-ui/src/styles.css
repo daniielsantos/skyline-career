@@ -579,7 +579,51 @@ body {
 }
 
 .missions-head {
-  align-items: start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem 1rem;
+  width: 100%;
+}
+
+.missions-head-spacer {
+  min-width: 0;
+}
+
+.missions-head-center {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.missions-head-center h2 {
+  margin: 0;
+  font-size: 2.25rem;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+}
+
+.missions-head-center .icao-link {
+  font-size: 2.25rem;
+  letter-spacing: 0.06em;
+  text-underline-offset: 0.22em;
+}
+
+.missions-head-center p {
+  margin: 0;
+}
+
+.missions-head-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
+}
+
+.missions-head-cancel {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .simbrief-field {
@@ -2824,7 +2868,7 @@ small {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  align-items: baseline;
+  align-items: start;
 }
 
 .ofp-result-pass .ofp-result-head strong {
@@ -3002,9 +3046,111 @@ small {
 
 .preflight-summary-card .ofp-result-head > .preflight-head-actions {
   display: flex;
+  flex-direction: column;
+  align-items: end;
+  justify-content: start;
+  gap: 0.35rem;
+  text-align: right;
+}
+
+.skyline-inject-row {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: end;
-  gap: 0.65rem;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  max-width: min(32rem, 100%);
+}
+
+.skyline-inject-status {
+  margin: 0;
+  flex: 1 1 10rem;
+  max-width: 18rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+  text-align: right;
+}
+
+.skyline-inject-status-busy {
+  color: color-mix(in srgb, var(--accent, #6ea8fe) 75%, var(--text));
+}
+
+.skyline-inject-status-fail {
+  color: color-mix(in srgb, var(--danger, #e35d6a) 85%, var(--text));
+}
+
+.skyline-inject-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--surface-2);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.skyline-inject-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.skyline-inject-switch-on {
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+  background: color-mix(in srgb, var(--ok) 12%, var(--surface-2));
+}
+
+.skyline-inject-switch-busy {
+  border-color: color-mix(in srgb, var(--accent, #6ea8fe) 50%, var(--line));
+}
+
+.skyline-inject-switch-track {
+  position: relative;
+  width: 2.1rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 35%, var(--surface));
+  transition: background 0.15s ease;
+}
+
+.skyline-inject-switch-on .skyline-inject-switch-track {
+  background: color-mix(in srgb, var(--ok) 70%, #1a1a1a);
+}
+
+.skyline-inject-switch-knob {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: #f2f2f2;
+  transition: transform 0.15s ease;
+}
+
+.skyline-inject-switch-on .skyline-inject-switch-knob {
+  transform: translateX(0.95rem);
+}
+
+.skyline-inject-switch-label {
+  display: grid;
+  gap: 0.05rem;
+  line-height: 1.15;
+}
+
+.skyline-inject-switch-label strong {
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.skyline-inject-switch-label small {
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .preflight-summary-card .ofp-result-head small {
@@ -3017,6 +3163,7 @@ small {
   grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
   gap: 0.65rem;
   margin-top: 0.75rem;
+  align-items: start;
 }
 
 .preflight-load-grid > div {
@@ -3026,6 +3173,11 @@ small {
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--line);
   background: var(--surface-2);
+  align-content: start;
+}
+
+.preflight-load-grid > div:has(.load-schematic) {
+  min-width: min(100%, 11rem);
 }
 
 .preflight-load-grid span,
@@ -3057,6 +3209,83 @@ small {
 
 .preflight-load-fail b {
   color: var(--danger);
+}
+
+.load-schematic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  padding-right: 1.1rem;
+}
+
+.load-schematic-fuel {
+  align-items: stretch;
+}
+
+.load-schematic-wing,
+.load-schematic-center,
+.load-schematic-station {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 2.6rem;
+  padding: 0.28rem 0.4rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  text-align: center;
+}
+
+.load-schematic-wing {
+  flex: 1 1 2.8rem;
+  clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%);
+}
+
+.load-schematic-fuel .load-schematic-wing:last-child {
+  clip-path: polygon(0 0, 92% 0, 100% 100%, 8% 100%);
+}
+
+.load-schematic-center {
+  flex: 0 0 2.4rem;
+  border-radius: 0.2rem;
+}
+
+.load-schematic-fuselage {
+  flex: 0 0 0.55rem;
+  align-self: stretch;
+  margin: 0.15rem 0;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: 0.15rem;
+}
+
+.load-schematic-stations {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.5rem, 1fr));
+  width: 100%;
+}
+
+.load-schematic-label {
+  color: var(--muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.load-schematic strong {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.preflight-load-ok .load-schematic-wing,
+.preflight-load-ok .load-schematic-center,
+.preflight-load-ok .load-schematic-station {
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
+}
+
+.preflight-load-fail .load-schematic-wing,
+.preflight-load-fail .load-schematic-center,
+.preflight-load-fail .load-schematic-station {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
 }
 
 .preflight-technical {

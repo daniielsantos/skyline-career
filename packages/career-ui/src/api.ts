@@ -396,11 +396,13 @@ export type Mission = {
         plannedLb?: number;
         liveLb: number;
         ok: boolean;
+        tanks?: { left: number; right: number; center: number };
       };
       payload: {
         plannedLb?: number;
         liveLb?: number;
         ok: boolean;
+        stations?: Record<number, number>;
       };
       aircraft: {
         onGround: boolean;
@@ -1097,13 +1099,25 @@ export type WatchStatus = {
   livePayloadLb?: number | null;
   loadVerification?: {
     ready: boolean;
-    fuel: { plannedLb?: number; liveLb: number; ok: boolean };
-    payload: { plannedLb?: number; liveLb?: number; ok: boolean };
+    fuel: {
+      plannedLb?: number;
+      liveLb: number;
+      ok: boolean;
+      tanks?: { left: number; right: number; center: number };
+    };
+    payload: {
+      plannedLb?: number;
+      liveLb?: number;
+      ok: boolean;
+      stations?: Record<number, number>;
+    };
   } | null;
   sawAirborne: boolean;
   lastEvent: WatchEvent | null;
   lastEventAtIso: string | null;
   lastError: string | null;
+  /** False when Watch is running but the named-pipe socket dropped. */
+  pipeConnected?: boolean;
   settlement: MissionSettlement | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -1307,6 +1321,8 @@ export type OfpLoadProgress = {
   liveMac?: number;
   liveFuelLb?: number;
   livePayloadLb?: number;
+  liveTanks?: { left: number; right: number; center: number };
+  liveStations?: Record<number, number>;
   plannedFuelLb?: number;
   plannedPayloadLb?: number;
   updatedAtIso: string;

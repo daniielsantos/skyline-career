@@ -6,6 +6,11 @@ import {
   type LoadPath,
 } from './dispatch-flow';
 import { formatMassExact, formatWeightText, KG_TO_LB, type WeightSystem } from './weight-units';
+import { FuelTankSchematic, PayloadStationSchematic } from './LoadSchematic';
+import {
+  pickFuelTankBreakdown,
+  pickLivePayloadLb,
+} from './load-verification';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
   const currentIndex = DISPATCH_STEP_ORDER.indexOf(props.current);
@@ -51,7 +56,6 @@ function IcaoLink(props: {
 export function DispatchActivePanel(props: {
   mission: Mission;
   step: DispatchStepId;
-  statusText: string;
   loadPath: LoadPath;
   busy: boolean;
   weightSystem: WeightSystem;
@@ -80,9 +84,13 @@ export function DispatchActivePanel(props: {
     liveMac?: number;
     liveFuelLb?: number;
     livePayloadLb?: number;
+    liveTanks?: { left: number; right: number; center: number };
+    liveStations?: Record<number, number>;
     plannedFuelLb?: number;
     plannedPayloadLb?: number;
   } | null;
+  /** User-armed Skyline inject (default off). */
+  skylineInjectEnabled: boolean;
   simBridge: SimBridgeStatus | null;
   watch: WatchStatus | null;
   watchAutoStatus: 'idle' | 'waiting' | 'connecting' | 'blocked';
@@ -94,9 +102,7 @@ export function DispatchActivePanel(props: {
   onEditManifest: (mission: Mission) => void;
   onBuyFuel: (mission: Mission) => void;
   onRetryFuelQuote: () => void;
-  onLoadFuelAndPayload: (mission: Mission) => void;
-  onCancelInject: () => void;
-  onRetryInject: () => void;
+  onToggleSkylineInject: (enabled: boolean) => void;
   onContinueManually: () => void;
   onDepart: (mission: Mission) => void;
   onSettle: (mission: Mission) => void;
@@ -104,7 +110,6 @@ export function DispatchActivePanel(props: {
   const {
     mission,
     step,
-    statusText,
     loadPath,
     busy,
     weightSystem,
@@ -125,11 +130,13 @@ export function DispatchActivePanel(props: {
     Boolean(mission.lastPreflightCheck) &&
     (step === 'load' || step === 'ready' || step === 'en_route');
   const showWatch =
+    step === 'load' ||
     step === 'ready' ||
     step === 'en_route' ||
     watchRunning ||
     props.watchAutoStatus === 'waiting' ||
-    props.watchAutoStatus === 'connecting';
+    props.watchAutoStatus === 'connecting' ||
+    props.loadOfpAutoStatus === 'loading';
 
   const primaryCta = (() => {
     if (step === 'flight_plan') {
@@ -184,54 +191,16 @@ export function DispatchActivePanel(props: {
       }
       return null;
     }
-    if (step === 'load' && loadPath === 'inject') {
-      if (props.loadOfpAutoStatus === 'failed') {
-        return (
-          <button
-            type="button"
-            className="accept"
-            disabled={busy}
-            onClick={props.onRetryInject}
-          >
-            Retry inject
-          </button>
-        );
-      }
-      if (props.loadOfpAutoStatus === 'loading') {
-        return (
-          <button
-            type="button"
-            className="accept"
-            onClick={() => props.onCancelInject()}
-            title="Stop fuel inject, payload load, and CG rebalance"
-          >
-            Cancel
-          </button>
-        );
-      }
-      return (
-        <button
-          type="button"
-          className="accept"
-          disabled={busy || !props.simBridge?.connected}
-          onClick={() => props.onLoadFuelAndPayload(mission)}
-        >
-          Inject fuel & payload
-        </button>
-      );
-    }
     return null;
   })();
 
   return (
     <>
       <DispatchStepper current={step} />
-      <p className="dispatch-step-status" role="status">
-        {statusText}
-      </p>
 
       <div className="panel-head missions-head">
-        <div>
+        <div className="missions-head-spacer" aria-hidden="true" />
+        <div className="missions-head-center">
           <h2>
             <IcaoLink
               icao={mission.originIcao}
@@ -246,9 +215,22 @@ export function DispatchActivePanel(props: {
             />
           </h2>
           <p>
-            {mission.id} · {props.aircraftClassLabel(mission.aircraftClassId)} ·{' '}
+            {props.aircraftClassLabel(mission.aircraftClassId)} ·{' '}
             <span className={`status status-${mission.status}`}>{mission.status}</span>
           </p>
+        </div>
+        <div className="missions-head-actions">
+          {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
+            <button
+              type="button"
+              className="action ghost danger missions-head-cancel"
+              disabled={busy}
+              title="Abort this flight — no payout; cargo returns to the market"
+              onClick={() => props.onCancel(mission)}
+            >
+              Cancel flight
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -508,38 +490,17 @@ export function DispatchActivePanel(props: {
         </p>
       ) : null}
 
-      {showLoadPanel ? (
-        <div
-          className={`dispatch-step-card ${
-            props.loadOfpAutoStatus === 'failed' ? 'dispatch-step-card-fail' : ''
-          }`}
-          aria-live="polite"
-        >
+      {showLoadPanel && loadPath !== 'inject' ? (
+        <div className="dispatch-step-card" aria-live="polite">
           <strong>
-            {loadPath === 'inject'
-              ? props.loadOfpAutoStatus === 'failed'
-                ? 'Inject failed'
-                : props.loadOfpAutoStatus === 'loading'
-                  ? 'Loading aircraft…'
-                  : 'Skyline inject'
-              : loadPath === 'efb'
-                ? 'Import OFP in the aircraft EFB'
-                : 'Load manually'}
+            {loadPath === 'efb'
+              ? 'Import OFP in the aircraft EFB'
+              : 'Load manually'}
           </strong>
           <p>
-            {loadPath === 'inject'
-              ? props.loadOfpAutoStatus === 'failed'
-                ? props.loadOfpAutoError ??
-                  'Retry inject from the primary action, or continue manually in Advanced.'
-                : props.loadOfpAutoStatus === 'loading'
-                  ? props.loadOfpProgress?.message ??
-                    'Fuel + equal payload, then 50 lb CG steps. Press Cancel to stop everything.'
-                  : !props.simBridge?.connected
-                    ? 'Start the local SimBridge host. Loading resumes automatically when connected.'
-                    : 'Loaded vs Due updates live after inject. CG is advisory on Preflight.'
-              : loadPath === 'efb'
-                ? 'Use Import SimBrief / Load OFP on the aircraft EFB or FMC. Waiting for live preflight…'
-                : 'Set fuel and payload in Mass & Balance / EFB. Waiting for live preflight…'}
+            {loadPath === 'efb'
+              ? 'Use Import SimBrief / Load OFP on the aircraft EFB or FMC. Waiting for live preflight…'
+              : 'Set fuel and payload in Mass & Balance / EFB. Waiting for live preflight…'}
           </p>
         </div>
       ) : null}
@@ -547,33 +508,138 @@ export function DispatchActivePanel(props: {
       {showPreflight && mission.lastPreflightCheck
         ? (() => {
             const check = mission.lastPreflightCheck;
-            const verification = check.loadVerification;
+            const baseVerification = check.loadVerification;
+            // Prefer Watch live breakdown when present. Zero liveLb is real
+            // (user emptied load) — only keep mission totals when Watch omits liveLb.
+            const verification =
+              baseVerification &&
+              props.watch?.running &&
+              props.watch.missionId === mission.id &&
+              props.watch.loadVerification
+                ? (() => {
+                    const watchFuel = props.watch.loadVerification!.fuel;
+                    const watchPayload = props.watch.loadVerification!.payload;
+                    const { tanks: _watchTanks, ...watchFuelRest } = watchFuel;
+                    const {
+                      liveLb: _watchPayloadLive,
+                      stations: _watchStations,
+                      ok: _watchPayloadOk,
+                      ...watchPayloadRest
+                    } = watchPayload;
+                    const liveFuelLb = watchFuel.liveLb;
+                    const livePayloadLb = pickLivePayloadLb(
+                      watchPayload.liveLb,
+                      baseVerification.payload.liveLb,
+                    );
+                    const tanks = pickFuelTankBreakdown(
+                      watchFuel.tanks,
+                      baseVerification.fuel.tanks,
+                      liveFuelLb,
+                    );
+                    // Recompute ok from live numbers so a stale ready flag cannot stick.
+                    const fuelTol = 50;
+                    const payloadTol = 75;
+                    const fuelOk =
+                      baseVerification.fuel.plannedLb === undefined ||
+                      Math.abs(
+                        liveFuelLb - baseVerification.fuel.plannedLb,
+                      ) <= fuelTol;
+                    const payloadOk =
+                      baseVerification.payload.plannedLb === undefined
+                        ? true
+                        : livePayloadLb !== undefined &&
+                          Math.abs(
+                            livePayloadLb - baseVerification.payload.plannedLb,
+                          ) <= payloadTol;
+                    return {
+                      ...baseVerification,
+                      ready: fuelOk && payloadOk,
+                      fuel: {
+                        ...baseVerification.fuel,
+                        ...watchFuelRest,
+                        liveLb: liveFuelLb,
+                        ok: fuelOk,
+                        ...(tanks ? { tanks } : {}),
+                      },
+                      payload: {
+                        ...baseVerification.payload,
+                        ...watchPayloadRest,
+                        liveLb: livePayloadLb,
+                        ok: payloadOk,
+                        ...(watchPayload.stations ||
+                        baseVerification.payload.stations
+                          ? {
+                              stations:
+                                watchPayload.stations ??
+                                baseVerification.payload.stations,
+                            }
+                          : {}),
+                      },
+                    };
+                  })()
+                : baseVerification;
+            // While Skyline inject owns the pipe, progress poll carries live L/R/C + stations.
+            const injectProgress = props.loadOfpProgress;
+            const verificationWithInject =
+              verification &&
+              props.loadOfpAutoStatus === 'loading' &&
+              injectProgress &&
+              (injectProgress.liveTanks ||
+                injectProgress.liveStations ||
+                injectProgress.liveFuelLb !== undefined ||
+                injectProgress.livePayloadLb !== undefined)
+                ? {
+                    ...verification,
+                    fuel: {
+                      ...verification.fuel,
+                      ...(injectProgress.liveFuelLb !== undefined
+                        ? { liveLb: injectProgress.liveFuelLb }
+                        : {}),
+                      ...(injectProgress.liveTanks
+                        ? { tanks: injectProgress.liveTanks }
+                        : {}),
+                    },
+                    payload: {
+                      ...verification.payload,
+                      ...(injectProgress.livePayloadLb !== undefined
+                        ? { liveLb: injectProgress.livePayloadLb }
+                        : {}),
+                      ...(injectProgress.liveStations
+                        ? { stations: injectProgress.liveStations }
+                        : {}),
+                    },
+                  }
+                : verification;
+            const liveVerification = verificationWithInject;
             // Never trust a stale ready/ok flag when Sim vs Due numbers disagree.
             const fuelNumbersOk =
-              !verification ||
-              verification.fuel.plannedLb === undefined ||
+              !liveVerification ||
+              liveVerification.fuel.plannedLb === undefined ||
               Math.abs(
-                (verification.fuel.liveLb ?? 0) - verification.fuel.plannedLb,
+                (liveVerification.fuel.liveLb ?? 0) -
+                  liveVerification.fuel.plannedLb,
               ) <= 50;
             const payloadNumbersOk =
-              !verification ||
-              verification.payload.plannedLb === undefined ||
-              verification.payload.liveLb === undefined ||
+              !liveVerification ||
+              liveVerification.payload.plannedLb === undefined ||
+              liveVerification.payload.liveLb === undefined ||
               Math.abs(
-                verification.payload.liveLb - verification.payload.plannedLb,
+                liveVerification.payload.liveLb -
+                  liveVerification.payload.plannedLb,
               ) <= 75;
-            const fuelOk = Boolean(verification?.fuel.ok) && fuelNumbersOk;
+            const fuelOk =
+              Boolean(liveVerification?.fuel.ok) && fuelNumbersOk;
             const payloadOk =
-              Boolean(verification?.payload.ok) && payloadNumbersOk;
+              Boolean(liveVerification?.payload.ok) && payloadNumbersOk;
             const ready =
-              verification != null
+              liveVerification != null
                 ? fuelOk && payloadOk
                 : check.verdict !== 'fail';
             const noteLabel =
-              verification?.weightNoteCount &&
-              verification.weightNoteCount === check.findings.length
-                ? `${verification.weightNoteCount} weight ${
-                    verification.weightNoteCount === 1 ? 'note' : 'notes'
+              liveVerification?.weightNoteCount &&
+              liveVerification.weightNoteCount === check.findings.length
+                ? `${liveVerification.weightNoteCount} weight ${
+                    liveVerification.weightNoteCount === 1 ? 'note' : 'notes'
                   }`
                 : `${check.findings.length} technical ${
                     check.findings.length === 1 ? 'detail' : 'details'
@@ -601,11 +667,99 @@ export function DispatchActivePanel(props: {
                         : 'Fix the mismatched aircraft load before departure.'}
                     </small>
                   </div>
-                  <span>
-                    Checked {new Date(check.checkedAtIso).toLocaleTimeString()}
-                  </span>
+                  <div className="preflight-head-actions">
+                    {loadPath === 'inject' ? (
+                      <div className="skyline-inject-row">
+                        {(() => {
+                          const injectStatus =
+                            props.loadOfpAutoStatus === 'failed'
+                              ? (props.loadOfpAutoError ??
+                                'Inject failed — turn on to retry, or continue manually in Advanced.')
+                              : props.loadOfpAutoStatus === 'loading'
+                                ? (props.loadOfpProgress?.message ??
+                                  'Writing fuel + payload and balancing CG. Turn off to stop.')
+                                : props.watch?.running &&
+                                    props.watch.missionId === mission.id &&
+                                    !props.simBridge?.connected
+                                  ? (props.watch.lastError ??
+                                    'Watch reconnecting to SimBridge…')
+                                  : !props.simBridge?.connected
+                                    ? 'Start SimBridge, then turn inject on.'
+                                    : null;
+                          return injectStatus ? (
+                            <p
+                              className={`skyline-inject-status${
+                                props.loadOfpAutoStatus === 'failed'
+                                  ? ' skyline-inject-status-fail'
+                                  : props.loadOfpAutoStatus === 'loading'
+                                    ? ' skyline-inject-status-busy'
+                                    : ''
+                              }`}
+                              aria-live="polite"
+                            >
+                              {injectStatus}
+                            </p>
+                          ) : null;
+                        })()}
+                        <button
+                          type="button"
+                          role="switch"
+                          className={`skyline-inject-switch${
+                            props.skylineInjectEnabled
+                              ? ' skyline-inject-switch-on'
+                              : ''
+                          }${
+                            props.loadOfpAutoStatus === 'loading'
+                              ? ' skyline-inject-switch-busy'
+                              : ''
+                          }`}
+                          aria-checked={props.skylineInjectEnabled}
+                          disabled={
+                            props.loadOfpAutoStatus === 'loading'
+                              ? false
+                              : busy || !props.simBridge?.connected
+                          }
+                          title={
+                            props.skylineInjectEnabled
+                              ? props.loadOfpAutoStatus === 'loading'
+                                ? 'Turn off to cancel fuel/payload inject'
+                                : 'Skyline inject is on — turn off to leave load as-is'
+                              : 'Turn on to write OFP fuel and payload into the sim'
+                          }
+                          onClick={() =>
+                            props.onToggleSkylineInject(
+                              !props.skylineInjectEnabled,
+                            )
+                          }
+                        >
+                          <span
+                            className="skyline-inject-switch-track"
+                            aria-hidden="true"
+                          >
+                            <span className="skyline-inject-switch-knob" />
+                          </span>
+                          <span className="skyline-inject-switch-label">
+                            <strong>Skyline inject</strong>
+                            <small>
+                              {props.loadOfpAutoStatus === 'loading'
+                                ? 'Writing…'
+                                : props.loadOfpAutoStatus === 'failed'
+                                  ? 'Failed · off'
+                                  : props.skylineInjectEnabled
+                                    ? 'On'
+                                    : 'Off'}
+                            </small>
+                          </span>
+                        </button>
+                      </div>
+                    ) : null}
+                    <span>
+                      Checked{' '}
+                      {new Date(check.checkedAtIso).toLocaleTimeString()}
+                    </span>
+                  </div>
                 </div>
-                {verification ? (
+                {liveVerification ? (
                   <div className="preflight-load-grid">
                     <div
                       className={
@@ -613,9 +767,17 @@ export function DispatchActivePanel(props: {
                       }
                     >
                       <span>Fuel</span>
-                      <strong>Sim {massFromLb(verification.fuel.liveLb)}</strong>
-                      <small>Due {massFromLb(verification.fuel.plannedLb)}</small>
+                      <strong>
+                        Sim {massFromLb(liveVerification.fuel.liveLb)}
+                      </strong>
+                      <small>
+                        Due {massFromLb(liveVerification.fuel.plannedLb)}
+                      </small>
                       <b>{fuelOk ? '✓' : '✗'}</b>
+                      <FuelTankSchematic
+                        tanks={liveVerification.fuel.tanks}
+                        weightSystem={weightSystem}
+                      />
                     </div>
                     <div
                       className={
@@ -624,51 +786,57 @@ export function DispatchActivePanel(props: {
                     >
                       <span>Payload (stations)</span>
                       <strong>
-                        Sim {massFromLb(verification.payload.liveLb)}
+                        Sim {massFromLb(liveVerification.payload.liveLb)}
                       </strong>
                       <small>
-                        Due {massFromLb(verification.payload.plannedLb)}
+                        Due {massFromLb(liveVerification.payload.plannedLb)}
                       </small>
                       <b>{payloadOk ? '✓' : '✗'}</b>
+                      <PayloadStationSchematic
+                        stations={liveVerification.payload.stations}
+                        weightSystem={weightSystem}
+                      />
                     </div>
-                    {verification.cg ? (
+                    {liveVerification.cg ? (
                       <div
                         className={
-                          verification.cg.ok
+                          liveVerification.cg.ok
                             ? 'preflight-load-ok'
                             : 'preflight-load-warn'
                         }
                       >
                         <span>CG</span>
                         <strong>
-                          {verification.cg.liveMac !== undefined
-                            ? `${verification.cg.liveMac.toFixed(1)}% MAC`
+                          {liveVerification.cg.liveMac !== undefined
+                            ? `${liveVerification.cg.liveMac.toFixed(1)}% MAC`
                             : 'n/a'}
                         </strong>
                         <small>
-                          {verification.cg.minMac !== undefined &&
-                          verification.cg.maxMac !== undefined
-                            ? `envelope ${verification.cg.minMac}–${verification.cg.maxMac}`
+                          {liveVerification.cg.minMac !== undefined &&
+                          liveVerification.cg.maxMac !== undefined
+                            ? `envelope ${liveVerification.cg.minMac}–${liveVerification.cg.maxMac}`
                             : 'advisory only'}
                         </small>
                         <b>
-                          {verification.cg.severity === 'warn' ? '⚠' : 'ℹ'}
+                          {liveVerification.cg.severity === 'warn' ? '⚠' : 'ℹ'}
                         </b>
                       </div>
                     ) : null}
                     <div className="preflight-aircraft-state">
                       <span>Aircraft</span>
                       <strong>
-                        {verification.aircraft.onGround ? 'On ground' : 'Airborne'}
+                        {liveVerification.aircraft.onGround
+                          ? 'On ground'
+                          : 'Airborne'}
                       </strong>
                       <small>
-                        {verification.aircraft.enginesRunning
+                        {liveVerification.aircraft.enginesRunning
                           ? 'Engines running'
                           : 'Engines off'}
                       </small>
                       <b>
-                        {verification.aircraft.onGround &&
-                        !verification.aircraft.enginesRunning
+                        {liveVerification.aircraft.onGround &&
+                        !liveVerification.aircraft.enginesRunning
                           ? 'READY'
                           : 'CHECK'}
                       </b>
@@ -698,28 +866,16 @@ export function DispatchActivePanel(props: {
           })()
         : null}
 
-      {primaryCta ||
-      ['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
-        <div className="dispatch-primary-actions">
-          {primaryCta}
-          {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
-            <button
-              type="button"
-              className="action ghost danger"
-              disabled={busy}
-              title="Abort this flight — no payout; cargo returns to the market"
-              onClick={() => props.onCancel(mission)}
-            >
-              Cancel flight
-            </button>
-          ) : null}
-        </div>
+      {primaryCta ? (
+        <div className="dispatch-primary-actions">{primaryCta}</div>
       ) : null}
 
       {showWatch
         ? (() => {
             const bridgeConnected = Boolean(
-              watchRunning || props.simBridge?.connected,
+              props.loadOfpAutoStatus === 'loading' ||
+                watchRunning ||
+                props.simBridge?.connected,
             );
             const bridgeOnGround =
               watchRunning &&
@@ -759,35 +915,56 @@ export function DispatchActivePanel(props: {
                     : bridgeConnected
                       ? 'Sampling live aircraft…'
                       : 'SimBridge not connected yet';
+            const watchPipeLive =
+              watchRunning &&
+              props.watch?.pipeConnected !== false &&
+              !(
+                typeof props.watch?.lastError === 'string' &&
+                /not connected|pipe closed|0xC00000B0|Reconnecting|retry in/i.test(
+                  props.watch.lastError,
+                )
+              );
             // Prefer a stable connected label — don't flash CONNECTING… over an
             // already-live SimBridge/Watch link (retry loops looked like flicker).
-            const statusLabel = watchRunning
-              ? 'MSFS CONNECTED'
-              : bridgeConnected
-                ? 'SIMBRIDGE CONNECTED'
-                : props.watchAutoStatus === 'connecting'
-                  ? 'CONNECTING…'
-                  : props.watchAutoPaused
-                    ? 'WATCH PAUSED'
-                    : 'WAITING FOR MSFS';
+            // Inject stops Watch (pipe exclusive) — keep the footer on load/inject.
+            const statusLabel =
+              props.loadOfpAutoStatus === 'loading'
+                ? 'INJECTING…'
+                : watchPipeLive
+                  ? 'MSFS CONNECTED'
+                  : watchRunning
+                    ? 'RECONNECTING…'
+                    : bridgeConnected
+                      ? 'SIMBRIDGE CONNECTED'
+                      : props.watchAutoStatus === 'connecting'
+                        ? 'CONNECTING…'
+                        : props.watchAutoPaused
+                          ? 'WATCH PAUSED'
+                          : 'WAITING FOR MSFS';
 
             return (
               <footer
                 className={`watch-status-footer ${
-                  watchRunning || bridgeConnected
+                  props.loadOfpAutoStatus === 'loading'
                     ? 'watch-connected'
-                    : 'watch-waiting'
+                    : watchPipeLive || bridgeConnected
+                      ? 'watch-connected'
+                      : 'watch-waiting'
                 }`}
               >
                 <div className="watch-footer-primary">
                   <span
                     className={`watch-dot ${
-                      !bridgeConnected &&
-                      props.watchAutoStatus === 'connecting'
+                      props.loadOfpAutoStatus === 'loading'
                         ? 'checking'
-                        : watchRunning || bridgeConnected
-                          ? 'on'
-                          : 'off'
+                        : watchRunning && !watchPipeLive
+                          ? 'checking'
+                          : !bridgeConnected &&
+                              props.watchAutoStatus === 'connecting'
+                            ? 'checking'
+                            : watchPipeLive || bridgeConnected
+                              ? 'on'
+                              : 'off'
                     }`}
                   />
                   <strong>{statusLabel}</strong>

@@ -296,6 +296,7 @@ export async function readLiveLoad(
     stationRoles?: OfpStationRoleMap;
     roleWeightUnit?: OfpWeightUnit;
     liveSources?: OfpLiveSources;
+    previousStationSumLb?: number;
   } = {},
 ): Promise<LiveLoadReading> {
   const prefs = resolveLiveSourcePrefs(opts.liveSources);
@@ -436,6 +437,7 @@ export async function readLiveLoad(
   const resolvedPayload = resolveLivePayloadLb({
     stationSumLb: payload.total,
     massBalanceLb: mbPayloadLb,
+    previousStationSumLb: opts.previousStationSumLb,
   });
   if (
     resolvedPayload.source === 'mass-balance' &&

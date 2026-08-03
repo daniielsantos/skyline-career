@@ -6,7 +6,13 @@ import type {
   SimVarReadRequest,
   SimVarWriteRequest,
 } from '@msfs-compat/runtime';
-import { NamedPipeClient, type NamedPipeClientOptions } from './ipc/named-pipe-client.js';
+import {
+  NamedPipeClient,
+  setNamedPipeDebugLog,
+  type NamedPipeClientOptions,
+} from './ipc/named-pipe-client.js';
+
+export { setNamedPipeDebugLog };
 
 /**
  * SimBridge implementation that talks to the C# SimBridgeHost over Named Pipe IPC.
@@ -160,8 +166,24 @@ export class NamedPipeSimBridge implements SimBridge {
   }
 
   private async ensureOpen(): Promise<void> {
-    if (!this.autoConnected) {
-      await this.open();
+    // Pipe can drop (0xC00000B0 / host recycle) while autoConnected stays true.
+    // Always re-open when the socket is gone so Watch ticks keep sampling load.
+    if (this.client.isConnected && this.autoConnected) {
+      return;
     }
+    if (!this.client.isConnected) {
+      this.autoConnected = false;
+      try {
+        await this.client.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    await this.open();
+  }
+
+  /** True when the NDJSON pipe socket is alive. */
+  get isPipeConnected(): boolean {
+    return this.client.isConnected;
   }
 }

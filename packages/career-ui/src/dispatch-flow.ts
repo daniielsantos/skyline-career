@@ -205,19 +205,22 @@ export function dispatchStepStatusLine(input: {
         if (input.loadOfpAutoStatus === 'failed') {
           return (
             input.loadOfpAutoError ??
-            'Aircraft load failed — retry inject or continue manually.'
+            'Aircraft load failed — enable Skyline inject in Preflight to retry, or continue manually.'
           );
         }
         if (!input.simBridgeConnected) {
-          return 'Waiting for SimBridge — inject resumes when the host is connected.';
+          return 'Waiting for SimBridge — then enable Skyline inject in Preflight.';
         }
         if (input.loadOfpAutoStatus === 'loading') {
           if (input.loadOfpProgress?.message) {
-            return `${input.loadOfpProgress.message} · Cancel stops everything.`;
+            return `${input.loadOfpProgress.message} · Turn inject off to stop.`;
           }
-          return 'Loading fuel/payload and balancing CG — Cancel stops everything.';
+          return 'Loading fuel/payload and balancing CG — turn Skyline inject off to stop.';
         }
-        return 'Inject fuel & payload when ready — Loaded vs Due updates live.';
+        if (!input.mission?.lastPreflightCheck) {
+          return 'Reading live fuel and payload from MSFS… Preflight opens when the first sample lands.';
+        }
+        return 'Enable Skyline inject in Preflight to write fuel & payload — Loaded vs Due updates live.';
       }
       if (input.loadPath === 'efb') {
         return 'Import the OFP in the aircraft EFB/FMC. Waiting for live preflight…';

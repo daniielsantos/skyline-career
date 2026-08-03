@@ -65,6 +65,10 @@ import {
   writeCareerLocation,
   type CareerTab,
 } from './routes';
+import {
+  pickFuelTankBreakdown,
+  pickLivePayloadLb,
+} from './load-verification';
 import { useConfirm } from './ConfirmDialog';
 import {
   AIRCRAFT_CLASS_FILTERS,
@@ -521,24 +525,6 @@ function findActiveMission(missions: Mission[]): Mission | undefined {
   );
 }
 
-function preferredLoadMethod(
-  mission: Mission,
-): 'native-simbrief' | 'direct-injection' {
-  if (mission.loadMethod === 'native-simbrief' || mission.loadMethod === 'direct-injection') {
-    return mission.loadMethod;
-  }
-  return mission.aircraftClassId === 'light_turboprop' ||
-    mission.aircraftClassId === 'light_ga' ||
-    mission.aircraftClassId === 'light_jet'
-    ? 'direct-injection'
-    : 'native-simbrief';
-}
-
-function missionInjectCapable(mission: Mission): boolean {
-  if (typeof mission.injectCapable === 'boolean') return mission.injectCapable;
-  return preferredLoadMethod(mission) === 'direct-injection';
-}
-
 /** Format a wall-clock duration in hours; shows minutes when under 2 hours. */
 function formatDuration(hours: number): string {
   const totalMinutes = Math.max(0, Math.round(Math.abs(hours) * 60));
@@ -599,6 +585,23 @@ function formatDeadline(deadlineTick: number, continuousHours: number): string {
     return `Due now (${formatClock(deadlineTick)})`;
   }
   return `Due in ${formatDuration(deltaTicks * HOURS_PER_TICK)} · ${formatClock(deadlineTick)}`;
+}
+
+function stationMapDrifted(
+  prev: Record<number, number> | undefined,
+  next: Record<number, number> | undefined,
+  tolLb: number,
+): boolean {
+  if (!next) return false;
+  if (!prev) return true;
+  const keys = new Set([
+    ...Object.keys(prev).map(Number),
+    ...Object.keys(next).map(Number),
+  ]);
+  for (const key of keys) {
+    if (Math.abs((prev[key] ?? 0) - (next[key] ?? 0)) >= tolLb) return true;
+  }
+  return false;
 }
 
 function liveProgress(opts: {
@@ -1260,10 +1263,10 @@ export function App() {
   const [loadOfpProgress, setLoadOfpProgress] = useState<OfpLoadProgress | null>(
     null,
   );
-  const [loadOfpRetryToken, setLoadOfpRetryToken] = useState(0);
+  /** User must arm Skyline inject (default off) — no auto-inject on Preflight. */
+  const [skylineInjectEnabled, setSkylineInjectEnabled] = useState(false);
   const [preferManualLoad, setPreferManualLoad] = useState(false);
-  const autoLoadedOfpKeyRef = useRef<string | null>(null);
-  /** Prevents a second /api/load-ofp while one is already in flight (effect reruns). */
+  /** Prevents a second /api/load-ofp while one is already in flight. */
   const ofpInjectInFlightRef = useRef(false);
   const loadOfpControlRef = useRef<{
     stop: () => void;
@@ -1793,6 +1796,7 @@ export function App() {
             prev.enginesRunning === status.enginesRunning &&
             prev.sawAirborne === status.sawAirborne &&
             prev.lastError === status.lastError &&
+            prev.pipeConnected === status.pipeConnected &&
             prev.lastEvent?.type === status.lastEvent?.type &&
             Boolean(prev.settlement) === Boolean(status.settlement) &&
             prev.flightTime?.met === status.flightTime?.met &&
@@ -1829,28 +1833,102 @@ export function App() {
                         (verification.fuel.liveLb ?? 0),
                     ) < 1
                   ) {
-                    return mission;
+                    const prevTanks = prevCheck.loadVerification.fuel.tanks;
+                    const nextTanks = verification.fuel.tanks;
+                    const prevStations =
+                      prevCheck.loadVerification.payload.stations;
+                    const nextStations = verification.payload.stations;
+                    const usableTanks = pickFuelTankBreakdown(
+                      nextTanks,
+                      prevTanks,
+                      verification.fuel.liveLb,
+                    );
+                    const tanksChanged =
+                      usableTanks != null &&
+                      usableTanks === nextTanks &&
+                      (!prevTanks ||
+                        Math.abs(prevTanks.left - nextTanks!.left) >= 5 ||
+                        Math.abs(prevTanks.right - nextTanks!.right) >= 5 ||
+                        Math.abs(prevTanks.center - nextTanks!.center) >= 5);
+                    const stationsChanged =
+                      nextStations != null &&
+                      stationMapDrifted(prevStations, nextStations, 5);
+                    if (!tanksChanged && !stationsChanged) {
+                      return mission;
+                    }
+                    return {
+                      ...mission,
+                      lastPreflightCheck: {
+                        ...prevCheck,
+                        loadVerification: {
+                          ...prevCheck.loadVerification,
+                          fuel: {
+                            ...prevCheck.loadVerification.fuel,
+                            ...(tanksChanged && usableTanks
+                              ? { tanks: usableTanks }
+                              : {}),
+                          },
+                          payload: {
+                            ...prevCheck.loadVerification.payload,
+                            ...(stationsChanged && nextStations
+                              ? { stations: nextStations }
+                              : {}),
+                          },
+                        },
+                      },
+                    };
                   }
+                  const livePayloadLb = pickLivePayloadLb(
+                    verification.payload.liveLb,
+                    prevCheck.loadVerification.payload.liveLb,
+                  );
+                  const { tanks: _nextTanks, ...fuelRest } = verification.fuel;
+                  const {
+                    liveLb: _nextPayloadLive,
+                    stations: _nextStations,
+                    ...payloadRest
+                  } = verification.payload;
+                  const mergedTanks = pickFuelTankBreakdown(
+                    verification.fuel.tanks,
+                    prevCheck.loadVerification.fuel.tanks,
+                    verification.fuel.liveLb,
+                  );
+                  const mergedStations =
+                    verification.payload.stations ??
+                    prevCheck.loadVerification.payload.stations;
+                  const payloadOk =
+                    livePayloadLb !== undefined
+                      ? verification.payload.liveLb !== undefined
+                        ? verification.payload.ok
+                        : prevCheck.loadVerification.payload.ok
+                      : false;
+                  const ready = verification.fuel.ok && payloadOk;
                   return {
                     ...mission,
                     lastPreflightCheck: {
                       ...prevCheck,
                       checkedAtIso: new Date().toISOString(),
-                      verdict: verification.ready
+                      verdict: ready
                         ? prevCheck.verdict === 'fail'
                           ? 'pass'
                           : prevCheck.verdict
                         : 'fail',
                       loadVerification: {
                         ...prevCheck.loadVerification,
-                        ready: verification.ready,
+                        ready,
                         fuel: {
                           ...prevCheck.loadVerification.fuel,
-                          ...verification.fuel,
+                          ...fuelRest,
+                          ...(mergedTanks ? { tanks: mergedTanks } : {}),
                         },
                         payload: {
                           ...prevCheck.loadVerification.payload,
-                          ...verification.payload,
+                          ...payloadRest,
+                          liveLb: livePayloadLb,
+                          ok: payloadOk,
+                          ...(mergedStations
+                            ? { stations: mergedStations }
+                            : {}),
                         },
                       },
                     },
@@ -1861,6 +1939,36 @@ export function App() {
           }
           return status;
         });
+        if (status.running) {
+          setSimBridge((prev) => {
+            const connected = Boolean(status.pipeConnected);
+            const next = {
+              connected,
+              mode: 'watch' as const,
+              aircraftTitle: prev?.aircraftTitle ?? null,
+              onGround: status.onGround,
+              enginesRunning: status.enginesRunning,
+              parkingBrake: prev?.parkingBrake ?? null,
+              phase: status.phase,
+              groundSpeedKt: status.groundSpeedKt,
+              source: 'watch' as const,
+              error: status.lastError,
+              checkedAtIso: new Date().toISOString(),
+            };
+            if (
+              prev &&
+              prev.connected === next.connected &&
+              prev.phase === next.phase &&
+              prev.onGround === next.onGround &&
+              prev.enginesRunning === next.enginesRunning &&
+              prev.error === next.error &&
+              prev.source === 'watch'
+            ) {
+              return prev;
+            }
+            return next;
+          });
+        }
       } catch {
         /* ignore watch poll errors */
       }
@@ -2143,217 +2251,8 @@ export function App() {
     tab,
   ]);
 
-  // Auto-load OFP into the aircraft after confirm (pass/warn), then Preflight runs server-side.
-  useEffect(() => {
-    const username = simbriefUser.trim();
-    const ofp = activeMission?.lastOfpCheck;
-    const ofpOk = ofp?.verdict === 'pass' || ofp?.verdict === 'warn';
-    const ofpKey =
-      activeMission && ofp
-        ? `${activeMission.id}:${ofp.ofpId ?? ''}:${ofp.staticId ?? activeMission.staticId ?? ''}:${ofp.checkedAtIso}`
-        : null;
-    const fuelAuthorized =
-      Boolean(ofp?.ofpId) &&
-      activeMission?.fuelAuthorizedOfpId === ofp?.ofpId;
-    const alreadyVerified =
-      fuelAuthorized &&
-      Boolean(ofp) &&
-      Boolean(activeMission?.lastPreflightCheck?.loadVerification?.ready) &&
-      Boolean(activeMission?.lastPreflightCheck?.checkedAtIso) &&
-      Boolean(ofp?.checkedAtIso) &&
-      Date.parse(activeMission!.lastPreflightCheck!.checkedAtIso) >=
-        Date.parse(ofp!.checkedAtIso);
-    const editingManifest = Boolean(staging?.replaceManifest);
-    const canAutoInject =
-      Boolean(activeMission) &&
-      preferredLoadMethod(activeMission!) === 'direct-injection' &&
-      missionInjectCapable(activeMission!) &&
-      !preferManualLoad;
-    const eligible =
-      tab === 'staging' &&
-      !airportIcao &&
-      Boolean(activeMission) &&
-      ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
-      ofpOk &&
-      Boolean(username) &&
-      Boolean(ofpKey) &&
-      fuelAuthorized &&
-      canAutoInject &&
-      !editingManifest &&
-      !watchAutoPaused &&
-      !alreadyVerified &&
-      autoLoadedOfpKeyRef.current !== ofpKey &&
-      !ofpInjectInFlightRef.current;
-
-    if (!eligible || !activeMission || !ofpKey) {
-      if (ofpInjectInFlightRef.current) {
-        // Keep Cancel visible; progress overlay owns live weights.
-        return;
-      }
-      if (alreadyVerified && ofpKey) {
-        autoLoadedOfpKeyRef.current = ofpKey;
-        setLoadOfpAutoStatus('done');
-        setLoadOfpAutoError(null);
-      } else if (!ofpOk) {
-        setLoadOfpAutoStatus('idle');
-      }
-      return;
-    }
-
-    let cancelled = false;
-    let stopped = false;
-    let inFlight = false;
-    let toastedFailure = false;
-    const abort = new AbortController();
-    loadOfpControlRef.current = {
-      stop: () => {
-        stopped = true;
-      },
-      abort,
-    };
-    // Claim this OFP key immediately so effect remounts cannot start a second inject.
-    autoLoadedOfpKeyRef.current = ofpKey;
-    setLoadOfpAutoStatus('waiting');
-
-    async function tryLoadOfp() {
-      if (cancelled || stopped || inFlight || !activeMission) return;
-      if (ofpInjectInFlightRef.current) return;
-      const bridge = simBridgeRef.current;
-      if (!bridge?.connected) {
-        setLoadOfpAutoStatus('waiting');
-        return;
-      }
-      if (bridge.onGround === false) {
-        setLoadOfpAutoStatus('waiting');
-        setLoadOfpAutoError('Waiting for aircraft on ground before loading OFP');
-        return;
-      }
-      inFlight = true;
-      ofpInjectInFlightRef.current = true;
-      setLoadOfpAutoStatus('loading');
-      setLoadOfpAutoError(null);
-      setLoadOfpProgress(null);
-      try {
-        const result = await postLoadOfp(
-          {
-            missionId: activeMission.id,
-            simbriefUser: username,
-            runPreflightAfter: true,
-          },
-          { signal: abort.signal },
-        );
-        // Always stop retries after one attempt (success or fail).
-        stopped = true;
-        if (!result.ok) {
-          const cancelledInject =
-            result.error === 'Inject cancelled' || abort.signal.aborted;
-          // Allow Retry for this OFP after a failed/cancelled attempt.
-          if (autoLoadedOfpKeyRef.current === ofpKey) {
-            autoLoadedOfpKeyRef.current = null;
-          }
-          setLoadOfpAutoStatus('failed');
-          setLoadOfpAutoError(
-            cancelledInject ? 'Inject cancelled' : result.error ?? 'OFP load failed',
-          );
-          setLoadOfpProgress(null);
-          // Refresh so Loaded vs Due isn't stuck on a stale Sim 0 from mid-inject.
-          try {
-            await refreshRef.current();
-          } catch {
-            /* soft */
-          }
-          if (!toastedFailure && !cancelledInject) {
-            toastedFailure = true;
-            setToastKind('fail');
-            setToast(
-              result.rolledBack
-                ? `Auto OFP load failed · ${result.error ?? 'rolled back'}`
-                : `Auto OFP load failed · ${result.error ?? 'unknown error'}`,
-            );
-          }
-          return;
-        }
-        autoLoadedOfpKeyRef.current = ofpKey;
-        await refreshRef.current();
-        setLoadOfpAutoStatus('done');
-        setLoadOfpAutoError(null);
-        const fuelKg = result.plan.blockFuelLb / KG_TO_LB;
-        const cargoKg = result.plan.cargoLb / KG_TO_LB;
-        const pf = result.preflight?.check.verdict;
-        const preflightReady = result.preflight?.check.loadVerification?.ready;
-        setToastKind(
-          preflightReady ? 'ok' : pf === 'fail' ? 'fail' : pf === 'warn' ? 'warn' : 'ok',
-        );
-        setToast(
-          `Loaded OFP into ${result.identity.title || 'aircraft'} · ` +
-            `fuel ${formatMassExact(fuelKg, weightSystem)} · ` +
-            `cargo ${formatMassExact(cargoKg, weightSystem)}` +
-            (result.cgRebalanceMoves
-              ? ` · CG rebalanced ×${result.cgRebalanceMoves}`
-              : '') +
-            (pf ? ` · Preflight ${preflightReady ? 'READY' : pf.toUpperCase()}` : ''),
-        );
-        setLoadOfpProgress(null);
-      } catch (err) {
-        stopped = true;
-        if (autoLoadedOfpKeyRef.current === ofpKey) {
-          autoLoadedOfpKeyRef.current = null;
-        }
-        if (abort.signal.aborted) {
-          setLoadOfpAutoStatus('failed');
-          setLoadOfpAutoError('Inject cancelled');
-          setLoadOfpProgress(null);
-          return;
-        }
-        const message = err instanceof Error ? err.message : String(err);
-        setLoadOfpAutoStatus('failed');
-        setLoadOfpAutoError(message);
-        setLoadOfpProgress(null);
-        if (!toastedFailure) {
-          toastedFailure = true;
-          setToastKind('fail');
-          setToast(`Auto OFP load failed · ${message}`);
-        }
-      } finally {
-        inFlight = false;
-        ofpInjectInFlightRef.current = false;
-      }
-    }
-
-    void tryLoadOfp();
-    const id = window.setInterval(() => {
-      void tryLoadOfp();
-    }, 15_000);
-    return () => {
-      cancelled = true;
-      // Do NOT abort the fetch here — soft dep churn was killing inject mid-pipe.
-      // User Cancel still calls abort + /api/load-ofp/cancel.
-      if (loadOfpControlRef.current?.abort === abort) {
-        loadOfpControlRef.current = null;
-      }
-      window.clearInterval(id);
-    };
-  }, [
-    activeMission?.id,
-    activeMission?.status,
-    activeMission?.staticId,
-    activeMission?.lastOfpCheck?.checkedAtIso,
-    activeMission?.lastOfpCheck?.ofpId,
-    activeMission?.lastOfpCheck?.staticId,
-    activeMission?.lastOfpCheck?.verdict,
-    activeMission?.fuelAuthorizedOfpId,
-    // Intentionally NOT lastPreflightCheck.* — progress poll used to mutate those
-    // mid-inject, remount this effect, hide Cancel, and start a second inject.
-    airportIcao,
-    loadOfpRetryToken,
-    preferManualLoad,
-    simbriefUser,
-    staging?.replaceManifest,
-    tab,
-    watchAutoPaused,
-  ]);
-
   // Live inject progress (planning → injecting → balancing CG → verifying).
+  // Skyline inject is user-armed from Preflight (default off) — no auto-start.
   useEffect(() => {
     if (loadOfpAutoStatus !== 'loading' || !activeMission?.id) {
       return;
@@ -2371,7 +2270,9 @@ export function App() {
           progress &&
           (progress.livePayloadLb !== undefined ||
             progress.liveFuelLb !== undefined ||
-            progress.liveMac !== undefined)
+            progress.liveMac !== undefined ||
+            progress.liveTanks ||
+            progress.liveStations)
         ) {
           const missionId = activeMission!.id;
           setMissions((current) =>
@@ -2394,10 +2295,16 @@ export function App() {
                     fuel: {
                       ...verification.fuel,
                       liveLb: liveFuel,
+                      ...(progress.liveTanks
+                        ? { tanks: progress.liveTanks }
+                        : {}),
                     },
                     payload: {
                       ...verification.payload,
                       liveLb: livePayload,
+                      ...(progress.liveStations
+                        ? { stations: progress.liveStations }
+                        : {}),
                     },
                     cg: verification.cg
                       ? {
@@ -2428,6 +2335,8 @@ export function App() {
   // Continuously refresh Loaded vs Due while staging on the ground.
   // Full /api/preflight opens its own pipe — pause while Watch owns SimBridge
   // (Watch tick persists loadVerification as the single source of truth).
+  // First Preflight must succeed before Watch starts — otherwise the Load step
+  // has no Preflight card / Skyline inject toggle.
   useEffect(() => {
     const username = simbriefUser.trim();
     const ofp = activeMission?.lastOfpCheck;
@@ -2494,9 +2403,42 @@ export function App() {
     watch?.running,
   ]);
 
-  // Keep Watch running for every operational mission; Preflight gates auto-depart.
+  // If Watch started before the first Preflight (stuck Load with no card), stop
+  // it once so /api/preflight can bootstrap Loaded vs Due + inject toggle.
   useEffect(() => {
-    const preflight = activeMission?.lastPreflightCheck;
+    if (
+      !watch?.running ||
+      !activeMission ||
+      watch.missionId !== activeMission.id ||
+      activeMission.lastPreflightCheck
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        await postWatchStop();
+        if (!cancelled) {
+          setWatch(null);
+          setToastKind('warn');
+          setToast('Waiting for first Preflight before Watch…');
+        }
+      } catch {
+        /* soft */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeMission?.id,
+    activeMission?.lastPreflightCheck,
+    watch?.missionId,
+    watch?.running,
+  ]);
+
+  // Keep Watch running after the first Preflight exists; Preflight gates auto-depart.
+  useEffect(() => {
     const alreadyWatching =
       Boolean(watch?.running) && watch?.missionId === activeMission?.id;
     const eligible =
@@ -2504,6 +2446,8 @@ export function App() {
       !airportIcao &&
       Boolean(activeMission) &&
       ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
+      // Need an initial Loaded vs Due card before Watch owns the pipe.
+      Boolean(activeMission?.lastPreflightCheck?.loadVerification) &&
       !alreadyWatching &&
       !watchAutoPaused &&
       !watch?.settlement &&
@@ -2534,14 +2478,18 @@ export function App() {
           missionId: activeMission.id,
           intervalSec: 5,
         });
-        if (cancelled) return;
-        stopped = true;
+        // Always apply status — if the effect remounted mid-request, skipping
+        // setWatch left the UI thinking Watch was off while the server ran,
+        // so probe/preflight fought the pipe and postWatchStart looped.
         setWatch(status);
-        setWatchAutoStatus('idle');
-        setToastKind('ok');
-        setToast(
-          `Watch started · MSFS connected · auto-depart/settle near ${activeMission.destIcao}`,
-        );
+        stopped = true;
+        if (!cancelled) {
+          setWatchAutoStatus('idle');
+          setToastKind('ok');
+          setToast(
+            `Watch started · MSFS connected · auto-depart/settle near ${activeMission.destIcao}`,
+          );
+        }
       } catch {
         if (!cancelled) {
           setWatchAutoStatus('waiting');
@@ -2563,8 +2511,9 @@ export function App() {
     activeMission?.id,
     activeMission?.status,
     activeMission?.destIcao,
-    activeMission?.lastPreflightCheck?.checkedAtIso,
-    activeMission?.lastPreflightCheck?.verdict,
+    // Presence of first Preflight only — do NOT depend on ready/checkedAtIso
+    // (those flip every sample and remounted this effect → Watch start storms).
+    Boolean(activeMission?.lastPreflightCheck?.loadVerification),
     airportIcao,
     loadOfpAutoStatus,
     tab,
@@ -2574,19 +2523,17 @@ export function App() {
     watchAutoPaused,
   ]);
 
-  // Reset watch auto-pause when switching missions or getting a fresh preflight.
+  // Reset watch auto-pause only when switching missions (not on every live check).
   useEffect(() => {
     setWatchAutoPaused(false);
-  }, [
-    activeMission?.id,
-    activeMission?.lastPreflightCheck?.checkedAtIso,
-  ]);
+  }, [activeMission?.id]);
 
   useEffect(() => {
-    autoLoadedOfpKeyRef.current = null;
     setPreferManualLoad(false);
+    setSkylineInjectEnabled(false);
     setLoadOfpAutoStatus('idle');
     setLoadOfpAutoError(null);
+    setLoadOfpProgress(null);
   }, [activeMission?.id]);
 
   // Draft is only for pre-commit preparation; once a flight is operational, clear it.
@@ -3518,17 +3465,9 @@ export function App() {
     });
   }
 
-  function retryAutoLoadOfp() {
-    setPreferManualLoad(false);
-    autoLoadedOfpKeyRef.current = null;
-    setLoadOfpAutoError(null);
-    setLoadOfpAutoStatus('waiting');
-    setLoadOfpRetryToken((token) => token + 1);
-  }
-
   function continueManuallyLoad() {
     setPreferManualLoad(true);
-    autoLoadedOfpKeyRef.current = null;
+    setSkylineInjectEnabled(false);
     setLoadOfpAutoStatus('idle');
     setLoadOfpAutoError(null);
     setToastKind('ok');
@@ -3537,10 +3476,37 @@ export function App() {
     );
   }
 
+  function onToggleSkylineInject(enabled: boolean) {
+    if (!enabled) {
+      setSkylineInjectEnabled(false);
+      if (loadOfpAutoStatus === 'loading') {
+        void onCancelInject();
+      }
+      return;
+    }
+    if (!activeMission) return;
+    if (!simBridge?.connected) {
+      setToastKind('warn');
+      setToast('Start SimBridge before enabling Skyline inject');
+      return;
+    }
+    if (simBridge.onGround === false) {
+      setToastKind('warn');
+      setToast('Aircraft must be on ground to inject fuel and payload');
+      return;
+    }
+    setSkylineInjectEnabled(true);
+    void onLoadFuelAndPayload(activeMission);
+  }
+
   async function onCancelInject() {
     const missionId = activeMission?.id;
-    if (!missionId || loadOfpAutoStatus !== 'loading') return;
+    if (!missionId || loadOfpAutoStatus !== 'loading') {
+      setSkylineInjectEnabled(false);
+      return;
+    }
     // Flip UI immediately — cancel stops inject + rebalance + verify.
+    setSkylineInjectEnabled(false);
     setLoadOfpAutoStatus('failed');
     setLoadOfpAutoError('Cancelling…');
     setLoadOfpProgress((prev) =>
@@ -3559,8 +3525,6 @@ export function App() {
           },
     );
     loadOfpControlRef.current?.stop();
-    // Free the OFP key so Retry can start a clean inject.
-    autoLoadedOfpKeyRef.current = null;
     ofpInjectInFlightRef.current = false;
     try {
       // Tell the server first so long settle loops see the flag.
@@ -3578,10 +3542,12 @@ export function App() {
   async function onLoadFuelAndPayload(mission: Mission) {
     const username = simbriefUser.trim();
     if (!username) {
+      setSkylineInjectEnabled(false);
       setToastKind('warn');
       setToast('Enter SimBrief username before loading fuel and payload');
       return;
     }
+    if (ofpInjectInFlightRef.current) return;
     const abort = new AbortController();
     loadOfpControlRef.current = {
       stop: () => {
@@ -3589,7 +3555,10 @@ export function App() {
       },
       abort,
     };
+    ofpInjectInFlightRef.current = true;
+    setSkylineInjectEnabled(true);
     setLoadOfpAutoStatus('loading');
+    setLoadOfpAutoError(null);
     setLoadOfpProgress(null);
     let succeeded = false;
     let failureMessage: string | null = null;
@@ -3635,18 +3604,21 @@ export function App() {
         failureMessage = err instanceof Error ? err.message : String(err);
         throw err;
       } finally {
+        ofpInjectInFlightRef.current = false;
         if (loadOfpControlRef.current?.abort === abort) {
           loadOfpControlRef.current = null;
         }
       }
     });
     if (userCancelled) {
+      setSkylineInjectEnabled(false);
       setLoadOfpAutoStatus('failed');
       setLoadOfpAutoError('Inject cancelled');
       setLoadOfpProgress(null);
       return;
     }
     if (!succeeded) {
+      setSkylineInjectEnabled(false);
       setLoadOfpAutoStatus('failed');
       setLoadOfpAutoError(failureMessage ?? 'Fuel and payload load failed');
       setLoadOfpProgress(null);
@@ -5802,7 +5774,6 @@ export function App() {
             <DispatchActivePanel
               mission={activeMission}
               step={dispatchStep}
-              statusText={dispatchStatusText}
               loadPath={activeLoadPath}
               busy={busy}
               weightSystem={weightSystem}
@@ -5822,6 +5793,7 @@ export function App() {
               loadOfpAutoStatus={loadOfpAutoStatus}
               loadOfpAutoError={loadOfpAutoError}
               loadOfpProgress={loadOfpProgress}
+              skylineInjectEnabled={skylineInjectEnabled}
               simBridge={simBridge}
               watch={watch}
               watchAutoStatus={watchAutoStatus}
@@ -5835,9 +5807,7 @@ export function App() {
               onRetryFuelQuote={() =>
                 setMissionFuelQuoteRetryToken((token) => token + 1)
               }
-              onLoadFuelAndPayload={(m) => void onLoadFuelAndPayload(m)}
-              onCancelInject={() => void onCancelInject()}
-              onRetryInject={() => retryAutoLoadOfp()}
+              onToggleSkylineInject={onToggleSkylineInject}
               onContinueManually={() => continueManuallyLoad()}
               onDepart={(m) => void onDepart(m)}
               onSettle={(m) => void onSettle(m)}

@@ -110,6 +110,7 @@ import {
   probeLiveLandingFpm,
   probeLiveResidualFuelKg,
 } from './watch-helpers.ts';
+import { WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import { createPromiseLock } from './career-write-lock.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -2713,6 +2714,27 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/watch/status') {
         send(res, 200, watchSession.getStatus());
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/watch/debug-log') {
+        const { readFile } = await import('node:fs/promises');
+        const maxLines = Math.min(
+          500,
+          Math.max(20, Number(url.searchParams.get('lines') ?? 120) || 120),
+        );
+        let text = '';
+        try {
+          text = await readFile(WATCH_DEBUG_LOG_PATH, 'utf8');
+        } catch {
+          text = '';
+        }
+        const lines = text ? text.trimEnd().split(/\r?\n/) : [];
+        send(res, 200, {
+          path: WATCH_DEBUG_LOG_PATH,
+          lineCount: lines.length,
+          lines: lines.slice(-maxLines),
+        });
         return;
       }
 

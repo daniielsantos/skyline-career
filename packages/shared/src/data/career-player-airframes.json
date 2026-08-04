@@ -1,5 +1,21 @@
 [
   {
+    "typeId": "blacksquare-commander-114",
+    "aircraftClassId": "light_ga",
+    "label": "Rockwell Commander 114",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-commander-114.json",
+    "simbriefIcao": "C182",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 855,
+    "mtowKg": 1424,
+    "maxCargoKg": 680,
+    "fuelCapacityKg": 191,
+    "maxRangeNm": 725,
+    "cruiseFuelFlowKgPerHour": 36.3,
+    "cruiseSpeedKt": 174,
+    "fuelBurnKgPerNm": 0.209
+  },
+  {
     "typeId": "nextgensim-emb-110p1f-bandeirante",
     "aircraftClassId": "light_turboprop",
     "label": "NextGenSim EMB-110 Bandeirante",

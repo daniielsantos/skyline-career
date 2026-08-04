@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 import type { AircraftClass, AircraftListing, PlayerAircraft } from './api';
@@ -429,10 +429,45 @@ export function HangarAircraftCard(props: {
   const canRepair =
     (acf.status === 'parked' || acf.status === 'maintenance') &&
     (afPct < 100 || engPct < 100);
+  const canBuyout = acf.ownership === 'leased' && Boolean(acf.lease);
   const pilotHere =
     props.pilotIcao.trim().toUpperCase() ===
     acf.locationIcao.trim().toUpperCase();
   const pilotLabel = props.pilotIcao.trim().toUpperCase() || '—';
+  const [moveMode, setMoveMode] = useState<'ferry' | 'pilot'>(
+    pilotHere ? 'ferry' : 'pilot',
+  );
+  const showMove =
+    acf.status === 'parked' || acf.status === 'maintenance';
+  const showManage = canRepair || canList || canSell || canBuyout;
+
+  const primaryAction =
+    acf.status === 'maintenance'
+      ? {
+          label: 'Inspect',
+          title: 'Pay inspection to clear AOG',
+          onClick: () => props.onClearMaintenance(acf.id),
+        }
+      : acf.status === 'listed'
+        ? {
+            label: 'Unlist',
+            title: 'Remove from Airframes market',
+            onClick: () => props.onUnlist(acf.id),
+          }
+        : acf.status === 'parked' && !pilotHere
+          ? {
+              label: 'Travel here',
+              title: `Travel to ${acf.locationIcao} (pilot reposition)`,
+              onClick: () => props.onTravel(acf.locationIcao),
+            }
+          : null;
+
+  const moveExcludeIcao =
+    moveMode === 'ferry' ? acf.locationIcao : props.pilotIcao;
+  const moveValue = moveMode === 'ferry' ? props.ferryDest : props.travelDest;
+  const moveOnChange =
+    moveMode === 'ferry' ? props.onFerryDestChange : props.onTravelDestChange;
+  const moveReady = Boolean(moveValue?.trim());
 
   return (
     <li className="hangar-card">
@@ -595,127 +630,130 @@ export function HangarAircraftCard(props: {
         ) : null}
       </div>
 
-      <div className="hangar-actions">
-        {acf.status === 'maintenance' ? (
+      <div className="hangar-footer">
+        {primaryAction ? (
           <button
             type="button"
-            className="accept"
+            className="accept hangar-primary"
             disabled={props.busy}
-            onClick={() => props.onClearMaintenance(acf.id)}
+            title={primaryAction.title}
+            onClick={primaryAction.onClick}
           >
-            Inspect
+            {primaryAction.label}
           </button>
         ) : null}
-        {canRepair ? (
-          <button
-            type="button"
-            className="action ghost"
-            disabled={props.busy}
-            onClick={() => props.onRepair(acf.id)}
-          >
-            Repair
-          </button>
+
+        {showMove ? (
+          <div className="hangar-move">
+            <div
+              className="hangar-move-toggle"
+              role="group"
+              aria-label="Move mode"
+            >
+              <button
+                type="button"
+                className={moveMode === 'ferry' ? 'is-active' : undefined}
+                disabled={props.busy || acf.status !== 'parked'}
+                onClick={() => setMoveMode('ferry')}
+              >
+                Aircraft
+              </button>
+              <button
+                type="button"
+                className={moveMode === 'pilot' ? 'is-active' : undefined}
+                disabled={props.busy}
+                onClick={() => setMoveMode('pilot')}
+              >
+                Pilot
+              </button>
+            </div>
+            <div className="hangar-move-row">
+              <label className="staging-aircraft ferry-hub-label">
+                {moveMode === 'ferry' ? 'Ferry to' : 'Pilot to'}
+                <FerryHubCombobox
+                  hubs={props.hubOptions}
+                  excludeIcao={moveExcludeIcao}
+                  value={moveValue}
+                  onChange={moveOnChange}
+                  disabled={
+                    props.busy ||
+                    (moveMode === 'ferry' && acf.status !== 'parked')
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="ghost hangar-move-go"
+                disabled={
+                  props.busy ||
+                  !moveReady ||
+                  (moveMode === 'ferry' && acf.status !== 'parked')
+                }
+                onClick={() => {
+                  if (moveMode === 'ferry') {
+                    props.onFerry(acf.id, props.ferryDest);
+                  } else {
+                    props.onTravel(props.travelDest);
+                  }
+                }}
+              >
+                Go
+              </button>
+            </div>
+          </div>
+        ) : note ? (
+          <p className="hangar-card-note">{note}</p>
         ) : null}
-        {acf.status === 'listed' ? (
-          <button
-            type="button"
-            className="accept"
-            disabled={props.busy}
-            onClick={() => props.onUnlist(acf.id)}
-          >
-            Unlist
-          </button>
-        ) : null}
-        {acf.ownership === 'leased' && acf.lease ? (
-          <button
-            type="button"
-            className="action ghost"
-            disabled={props.busy || acf.status === 'assigned'}
-            onClick={() => props.onBuyout(acf.id)}
-          >
-            Buy out
-          </button>
-        ) : null}
-        {canList ? (
-          <button
-            type="button"
-            className="action ghost"
-            disabled={props.busy}
-            onClick={() => props.onListForLease(acf.id)}
-          >
-            List for lease
-          </button>
-        ) : null}
-        {canSell ? (
-          <button
-            type="button"
-            className="action ghost"
-            disabled={props.busy}
-            title={`Dealer buy-back ${props.formatMoney(sellBackUsd ?? 0)}`}
-            onClick={() => props.onSell(acf.id)}
-          >
-            Sell · {props.formatMoney(sellBackUsd ?? 0)}
-          </button>
+
+        {showManage ? (
+          <details className="hangar-manage">
+            <summary>Manage</summary>
+            <div className="hangar-manage-actions">
+              {canRepair ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={props.busy}
+                  onClick={() => props.onRepair(acf.id)}
+                >
+                  Repair
+                </button>
+              ) : null}
+              {canBuyout ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={props.busy || acf.status === 'assigned'}
+                  onClick={() => props.onBuyout(acf.id)}
+                >
+                  Buy out
+                </button>
+              ) : null}
+              {canList ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={props.busy}
+                  onClick={() => props.onListForLease(acf.id)}
+                >
+                  List for lease
+                </button>
+              ) : null}
+              {canSell ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={props.busy}
+                  title={`Dealer buy-back ${props.formatMoney(sellBackUsd ?? 0)}`}
+                  onClick={() => props.onSell(acf.id)}
+                >
+                  Sell · {props.formatMoney(sellBackUsd ?? 0)}
+                </button>
+              ) : null}
+            </div>
+          </details>
         ) : null}
       </div>
-
-      {acf.status === 'parked' ? (
-        <div className="hangar-ferry">
-          {!pilotHere ? (
-            <button
-              type="button"
-              className="accept"
-              disabled={props.busy}
-              title={`Travel to ${acf.locationIcao} (pilot reposition)`}
-              onClick={() => props.onTravel(acf.locationIcao)}
-            >
-              Travel here
-            </button>
-          ) : null}
-          <label className="staging-aircraft ferry-hub-label">
-            Ferry to
-            <FerryHubCombobox
-              hubs={props.hubOptions}
-              excludeIcao={acf.locationIcao}
-              value={props.ferryDest}
-              onChange={props.onFerryDestChange}
-              disabled={props.busy}
-            />
-          </label>
-          <button
-            type="button"
-            className="accept"
-            disabled={props.busy || !props.ferryDest}
-            onClick={() => props.onFerry(acf.id, props.ferryDest)}
-          >
-            Ferry now
-          </button>
-        </div>
-      ) : note ? (
-        <p className="hangar-card-note">{note}</p>
-      ) : null}
-      {acf.status === 'parked' || acf.status === 'maintenance' ? (
-        <div className="hangar-ferry hangar-pilot-travel">
-          <label className="staging-aircraft ferry-hub-label">
-            Pilot travel
-            <FerryHubCombobox
-              hubs={props.hubOptions}
-              excludeIcao={props.pilotIcao}
-              value={props.travelDest}
-              onChange={props.onTravelDestChange}
-              disabled={props.busy}
-            />
-          </label>
-          <button
-            type="button"
-            className="ghost"
-            disabled={props.busy || !props.travelDest}
-            onClick={() => props.onTravel(props.travelDest)}
-          >
-            Go
-          </button>
-        </div>
-      ) : null}
     </li>
   );
 }

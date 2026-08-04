@@ -2280,6 +2280,118 @@ tr.lot-locked {
   padding: 0 1rem 1rem;
 }
 
+.hangar-footer {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.15rem 1rem 1rem;
+}
+
+.hangar-primary {
+  width: 100%;
+}
+
+.hangar-move {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.hangar-move-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.hangar-move-toggle button {
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.hangar-move-toggle button + button {
+  border-left: 1px solid var(--line);
+}
+
+.hangar-move-toggle button.is-active {
+  background: color-mix(in srgb, var(--accent, #e08a3c) 22%, transparent);
+  color: var(--ink);
+}
+
+.hangar-move-toggle button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hangar-move-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.55rem;
+}
+
+.hangar-move-row .ferry-hub-label {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: none;
+}
+
+.hangar-move-go {
+  flex: 0 0 auto;
+  min-width: 3.5rem;
+}
+
+.hangar-manage {
+  border-top: 1px solid var(--line);
+  padding-top: 0.35rem;
+}
+
+.hangar-manage > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.hangar-manage > summary::-webkit-details-marker {
+  display: none;
+}
+
+.hangar-manage > summary::after {
+  content: ' ▾';
+  font-size: 0.7em;
+}
+
+.hangar-manage[open] > summary::after {
+  content: ' ▴';
+}
+
+.hangar-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.hangar-manage-actions .action,
+.hangar-manage-actions .ghost {
+  flex: 1 1 auto;
+  min-width: 5.5rem;
+}
+
 .hangar-pilot-travel {
   margin-top: 0.45rem;
   padding-top: 0.45rem;
@@ -2387,9 +2499,9 @@ tr.lot-locked {
 
 .hangar-card-note {
   margin: 0;
-  padding: 0 1rem 1rem;
-  font-size: 0.88rem;
   color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .aircraft-market-toolbar {

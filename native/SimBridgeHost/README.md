@@ -34,7 +34,7 @@ npm run host:simconnect
 
 ```powershell
 node packages/agent/dist/cli.js live
-node packages/agent/dist/cli.js smoke --profile profiles/examples/asobo-c172-skyhawk.json
+node packages/agent/dist/cli.js smoke --profile profiles/examples/nextgensim-emb-110p1f-bandeirante.json
 ```
 
 ## Modes

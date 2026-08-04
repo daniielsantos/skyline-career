@@ -1,6 +1,6 @@
 import type { SimBridge, SimSnapshot } from '@msfs-compat/runtime';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
-import profile from '../../profiles/examples/asobo-c172-skyhawk.json' with { type: 'json' };
+import profile from '../../../../profiles/examples/nextgensim-emb-110p1f-bandeirante.json' with { type: 'json' };
 
 /**
  * In-memory SimBridge for local tests before wiring real SimConnect.

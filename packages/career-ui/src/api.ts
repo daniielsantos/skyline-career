@@ -53,10 +53,19 @@ export type CareerLedgerKind =
   | 'lease_payment'
   | 'lease_out_income'
   | 'lease_deposit'
+  | 'lease_early_return'
   | 'aircraft_buy'
   | 'aircraft_lease_sign'
   | 'aircraft_sell'
   | 'aircraft_buyout'
+  | 'fbo_buy'
+  | 'fbo_storage'
+  | 'fbo_hold_expire'
+  | 'fbo_spot_sale'
+  | 'fbo_reroute'
+  | 'crew_fee'
+  | 'crew_salary'
+  | 'crew_hire'
   | 'ferry'
   | 'fuel'
   | 'inspection'
@@ -271,6 +280,7 @@ export type AirportMovement = {
   departedAtMs?: number;
   urgency: string;
   distanceNm?: number;
+  crewOperated?: boolean;
 };
 
 export type RegionPressure = {
@@ -401,6 +411,16 @@ export type Mission = {
   airborneAtMs?: number;
   expectedRouteMs?: number;
   settledAtTick?: number;
+  /** Company crew (AI) operating this leg. */
+  crewOperated?: boolean;
+  crewMemberId?: string;
+  crewFeeUsd?: number;
+  /** Empty return fee quoted at dispatch (charged when return starts). */
+  crewReturnFeeUsd?: number;
+  crewRoundTrip?: boolean;
+  crewDeadhead?: boolean;
+  crewReturnIcao?: string;
+  crewOutboundMissionId?: string;
   settledFuelKg?: number;
   /** Touchdown vertical speed (fpm), typically negative. */
   settledLandingFpm?: number;
@@ -514,6 +534,8 @@ export type AirportLot = {
   commodityId: string;
   commodityName: string;
   availableKg: number;
+  quantityKg?: number;
+  reservedKg?: number;
   payUsd: number;
   urgency: string;
   status: string;
@@ -535,6 +557,99 @@ export type EconomyEvent = {
   startsAtTick: number;
   endsAtTick: number;
   label: string;
+};
+
+export type PlayerFboHold = {
+  id: string;
+  fboId: string;
+  lotId: string;
+  commodityId: string;
+  originIcao: string;
+  destIcao: string;
+  cargoKg: number;
+  payUsd: number;
+  urgency: 'normal' | 'urgent';
+  reason: string;
+  acceptedAtTick: number;
+  deadlineTick: number;
+  distanceNm?: number;
+};
+
+export type PlayerFboSnapshot = {
+  fbos: Array<{
+    id: string;
+    icao: string;
+    tier: number;
+    capacityKg: number;
+    usedKg: number;
+    canUpgradeToTier2?: boolean;
+    upgradeUsd?: number | null;
+    parkingFeeMult?: number;
+    serviceCostMult?: number;
+  }>;
+  holds: PlayerFboHold[];
+  canBuyAtHome: boolean;
+  homeBuyUsd: number | null;
+  canBuyAtIcao?: boolean;
+  buyAtIcaoUsd?: number | null;
+  buyAtIcaoReason?: string | null;
+  phase1MaxOwned: number;
+  maxOwned?: number;
+};
+
+export type CompanyCrewSnapshot = {
+  slotsUnlocked: number;
+  slotsInUse: number;
+  slotsFree: number;
+  rosterSlotsFree?: number;
+  slotsMax?: number;
+  feeFrac: number;
+  baseIcao?: string | null;
+  members?: Array<{
+    id: string;
+    displayName: string;
+    baseIcao: string;
+    locationIcao: string;
+    status: 'idle' | 'airborne';
+    missionId?: string;
+    aircraftId?: string;
+    lastFeeUsd?: number;
+    perkId?: 'fuel' | 'wear' | 'on_time' | 'value';
+    perkLabel?: string;
+    perkHint?: string;
+    salaryUsdPerDay?: number;
+    portraitId?: string;
+    originIcao?: string;
+    destIcao?: string;
+    airborneAtMs?: number;
+    expectedRouteMs?: number;
+    arrivesAtMs?: number;
+  }>;
+  hirePool?: Array<{
+    id: string;
+    displayName: string;
+    perkId: 'fuel' | 'wear' | 'on_time' | 'value';
+    perkLabel: string;
+    perkHint: string;
+    salaryUsdPerDay: number;
+    hireUsd: number;
+    portraitId?: string;
+  }>;
+  hirePoolDay?: number;
+  inFlight: Array<{
+    missionId: string;
+    originIcao: string;
+    destIcao: string;
+    aircraftId?: string;
+    crewMemberId?: string;
+    airborneAtMs?: number;
+    expectedRouteMs?: number;
+    arrivesAtMs?: number;
+    crewFeeUsd?: number;
+    crewDeadhead?: boolean;
+    crewRoundTrip?: boolean;
+    crewReturnIcao?: string;
+  }>;
 };
 
 export type AirportView = ClockSync & {
@@ -571,6 +686,8 @@ export type AirportView = ClockSync & {
   fuelInbound?: FuelHaulView[];
   fuelRecent?: FuelHaulView[];
   fuelHaulsEnroute?: number;
+  playerFbos?: PlayerFboSnapshot | null;
+  homeHubIcao?: string | null;
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -649,6 +766,8 @@ export function fetchState() {
       cashflow?: CareerCashflowSnapshot;
       companyCredit?: CompanyCreditSnapshot;
       cargoOps?: CareerCargoOps | null;
+      playerFbos?: PlayerFboSnapshot | null;
+      companyCrew?: CompanyCrewSnapshot | null;
       starterAircraft?: Array<{
         typeId: string;
         label: string;
@@ -839,8 +958,8 @@ export function fetchMissions() {
   return api<{ walletUsd: number; missions: Mission[] }>('/api/missions');
 }
 
-/** Advance economy batches; default one career day (96 × 15-min ticks). */
-export function postTick(n = 96) {
+/** Advance economy batches; default one 15-min tick. */
+export function postTick(n = 1) {
   return api<{
     tick: number;
     availableLots: number;
@@ -1038,7 +1157,7 @@ export function postAircraftSell(opts: { aircraftId: string }) {
 
 export function postAircraftListLease(opts: {
   aircraftId: string;
-  termMonths?: 12 | 24;
+  termMonths?: 6 | 12;
 }) {
   return api<{
     walletUsd: number;
@@ -1111,6 +1230,201 @@ export function postAircraftBuyout(opts: { aircraftId: string }) {
     debitUsd: number;
     fleet: PlayerAircraft[];
   }>('/api/aircraft-market/buyout', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftReturnLease(opts: { aircraftId: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    remainingMonths: number;
+    fleet: PlayerAircraft[];
+  }>('/api/aircraft-market/return-lease', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFboBuy(opts?: { icao?: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    fbo: { id: string; icao: string; tier: number; capacityKg: number };
+    playerFbos: PlayerFboSnapshot;
+    companyCrew?: CompanyCrewSnapshot;
+  }>('/api/fbo/buy', {
+    method: 'POST',
+    body: JSON.stringify(opts ?? {}),
+  });
+}
+
+export function postFboUpgrade(opts: { fboId: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    fbo: { id: string; icao: string; tier: number; capacityKg: number };
+    playerFbos: PlayerFboSnapshot;
+    companyCrew?: CompanyCrewSnapshot;
+    fleet?: PlayerAircraft[];
+  }>('/api/fbo/upgrade', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFboHold(opts: { lotId: string; cargoKg?: number }) {
+  return api<{
+    hold: PlayerFboHold;
+    playerFbos: PlayerFboSnapshot;
+    walletUsd: number;
+  }>('/api/fbo/hold', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFboCancelHold(opts: { holdId: string }) {
+  return api<{
+    releasedKg: number;
+    playerFbos: PlayerFboSnapshot;
+    walletUsd: number;
+  }>('/api/fbo/cancel-hold', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFboReroute(opts: {
+  holdId: string;
+  destIcao: string;
+  quoteOnly?: boolean;
+}) {
+  return api<{
+    quoteOnly: boolean;
+    feeUsd: number;
+    debitUsd?: number;
+    payAfterUsd?: number;
+    haircutApplied?: boolean;
+    bumpApplied?: boolean;
+    bumpFrac?: number;
+    previousDestIcao: string;
+    destIcao: string;
+    hold?: PlayerFboHold;
+    playerFbos: PlayerFboSnapshot;
+    walletUsd: number;
+  }>('/api/fbo/reroute', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFboRelease(opts: {
+  holdId: string;
+  aircraft?: AircraftClass;
+  aircraftId?: string;
+}) {
+  return api<{
+    mission: Mission;
+    playerFbos: PlayerFboSnapshot;
+    walletUsd: number;
+    missions: Mission[];
+  }>('/api/fbo/release', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFboSplit(opts: {
+  holdId: string;
+  legs: Array<{ aircraftId: string; cargoKg: number }>;
+}) {
+  return api<{
+    missions: Mission[];
+    hold: PlayerFboHold | null;
+    allocatedKg: number;
+    remainingKg: number;
+    playerFbos: PlayerFboSnapshot;
+    fleet: PlayerAircraft[];
+    walletUsd: number;
+    allMissions: Mission[];
+  }>('/api/fbo/split', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postFboReturnMission(opts: { missionId: string }) {
+  return api<{
+    mission: Mission;
+    hold: PlayerFboHold;
+    merged: boolean;
+    playerFbos: PlayerFboSnapshot;
+    fleet: PlayerAircraft[];
+    walletUsd: number;
+    missions: Mission[];
+  }>('/api/fbo/return-mission', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postCrewAssign(opts: {
+  missionId: string;
+  crewMemberId: string;
+}) {
+  return api<{
+    mission: Mission;
+    companyCrew: CompanyCrewSnapshot;
+    missions: Mission[];
+  }>('/api/crew/assign', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postCrewDispatch(opts: {
+  missionId?: string;
+  holdId?: string;
+  aircraftId?: string;
+  crewMemberId?: string;
+}) {
+  return api<{
+    mission: Mission;
+    crewFeeUsd: number;
+    returnFeeUsd: number;
+    totalRoundTripFeeUsd: number;
+    fuelDebitUsd: number;
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+    playerFbos: PlayerFboSnapshot;
+    companyCrew: CompanyCrewSnapshot;
+    missions: Mission[];
+  }>('/api/crew/dispatch', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postCrewHire(opts: { candidateId: string }) {
+  return api<{
+    member: NonNullable<CompanyCrewSnapshot['members']>[number];
+    debitUsd: number;
+    walletUsd: number;
+    companyCrew: CompanyCrewSnapshot;
+  }>('/api/crew/hire', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postCrewFire(opts: { memberId: string }) {
+  return api<{
+    member: NonNullable<CompanyCrewSnapshot['members']>[number];
+    walletUsd: number;
+    companyCrew: CompanyCrewSnapshot;
+  }>('/api/crew/fire', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

@@ -14,9 +14,10 @@ import {
   INSPECTION_INTERVAL_HOURS,
 } from './career-aircraft-maintenance.js';
 import {
-  AIRCRAFT_LEASE_MONTHLY_RATE,
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
+  resolveAircraftLeaseMonthlyUsd,
+  resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 import { applyWalletDelta } from './career-ledger.js';
@@ -40,6 +41,9 @@ export {
   AIRCRAFT_LEASE_MONTHLY_RATE,
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
+  cargoMsrpMultiplier,
+  resolveAircraftLeaseMonthlyUsd,
+  resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
 
 export {
@@ -111,24 +115,54 @@ function isPlayerListing(listing: AircraftListing): boolean {
   return src === 'player_sale' || src === 'player_lease';
 }
 
-export function aircraftMsrpUsd(classId: FreighterClassId): number {
-  return AIRCRAFT_MSRP_USD[classId];
+function maxCargoKgForAirframe(
+  airframeTypeId: string | null | undefined,
+): number | undefined {
+  const cargo = findCareerPlayerAirframe(airframeTypeId)?.maxCargoKg;
+  return typeof cargo === 'number' && Number.isFinite(cargo) && cargo > 0
+    ? cargo
+    : undefined;
 }
 
-export function aircraftLeaseMonthlyUsd(classId: FreighterClassId): number {
-  return Math.round(AIRCRAFT_MSRP_USD[classId] * AIRCRAFT_LEASE_MONTHLY_RATE[classId]);
+export function aircraftMsrpUsd(
+  classId: FreighterClassId,
+  opts?: { maxCargoKg?: number | null; airframeTypeId?: string | null },
+): number {
+  return resolveAircraftMsrpUsd({
+    aircraftClassId: classId,
+    maxCargoKg:
+      opts?.maxCargoKg ?? maxCargoKgForAirframe(opts?.airframeTypeId),
+  });
+}
+
+export function aircraftLeaseMonthlyUsd(
+  classId: FreighterClassId,
+  opts?: { maxCargoKg?: number | null; airframeTypeId?: string | null },
+): number {
+  return resolveAircraftLeaseMonthlyUsd({
+    aircraftClassId: classId,
+    maxCargoKg:
+      opts?.maxCargoKg ?? maxCargoKgForAirframe(opts?.airframeTypeId),
+  });
 }
 
 export function fairValueUsd(
   classId: FreighterClassId,
   condition: AirframeCondition,
+  opts?: { maxCargoKg?: number | null; airframeTypeId?: string | null },
 ): number {
-  return Math.round(AIRCRAFT_MSRP_USD[classId] * CONDITION_PRICE_MULT[condition]);
+  return Math.round(
+    aircraftMsrpUsd(classId, opts) * CONDITION_PRICE_MULT[condition],
+  );
 }
 
 export function sellBackValueUsd(aircraft: PlayerAircraft): number {
   const condition = aircraft.condition ?? 'good';
-  return Math.round(fairValueUsd(aircraft.aircraftClassId, condition) * 0.7);
+  return Math.round(
+    fairValueUsd(aircraft.aircraftClassId, condition, {
+      airframeTypeId: aircraft.airframeTypeId,
+    }) * 0.7,
+  );
 }
 
 const CLASS_LABEL_SHORT: Record<FreighterClassId, string> = {
@@ -260,9 +294,16 @@ function priceListing(
   basedIcao: string,
   world: CareerEconomyWorld,
   rng: () => number,
+  maxCargoKg?: number,
 ): { askingUsd: number; leaseMonthlyUsd?: number; leaseTermMonths?: number } {
-  const msrp = AIRCRAFT_MSRP_USD[classId];
-  const monthly = aircraftLeaseMonthlyUsd(classId);
+  const msrp = resolveAircraftMsrpUsd({
+    aircraftClassId: classId,
+    maxCargoKg,
+  });
+  const monthly = resolveAircraftLeaseMonthlyUsd({
+    aircraftClassId: classId,
+    maxCargoKg,
+  });
   const spokeDiscount =
     hubTierOf(
       world.airports.find((a) => a.icao === basedIcao) ?? {
@@ -274,8 +315,9 @@ function priceListing(
       : 1;
 
   if (kind === 'lease') {
-    const entryMonths = 1 + (rng() < 0.45 ? 1 : 0);
-    const termMonths = rng() < 0.5 ? 12 : 24;
+    // Always two months up front; short career terms (not multi-year finance).
+    const entryMonths = 2;
+    const termMonths = rng() < 0.55 ? 6 : 12;
     return {
       askingUsd: Math.round(monthly * entryMonths),
       leaseMonthlyUsd: monthly,
@@ -322,6 +364,7 @@ export function generateAircraftMarketListings(opts: {
       basedIcao,
       opts.world,
       rng,
+      airframe.maxCargoKg,
     );
     const pcts = conditionPctsForListing(condition, kind);
     listings.push({
@@ -748,7 +791,11 @@ function buildAircraftFromListing(
       monthlyUsd: listing.leaseMonthlyUsd,
       nextDueTick: economyTick + TICKS_PER_MONTH,
       termEndsTick: economyTick + listing.leaseTermMonths * TICKS_PER_MONTH,
-      buyoutUsd: Math.round(fairValueUsd(listing.aircraftClassId, listing.condition) * 0.85),
+      buyoutUsd: Math.round(
+        fairValueUsd(listing.aircraftClassId, listing.condition, {
+          airframeTypeId: listing.airframeTypeId,
+        }) * 0.85,
+      ),
       listingId: listing.id,
     };
   }
@@ -906,7 +953,7 @@ export function listAircraftForLease(
   state: CareerMissionsState,
   aircraftId: string,
   economyTick: number,
-  opts?: { termMonths?: 12 | 24 },
+  opts?: { termMonths?: 6 | 12 },
 ): { state: CareerMissionsState; listing: AircraftListing } {
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
@@ -925,8 +972,10 @@ export function listAircraftForLease(
   if (existingPlayerLease) {
     throw new Error('You already have one aircraft listed for lease');
   }
-  const monthly = aircraftLeaseMonthlyUsd(aircraft.aircraftClassId);
-  const termMonths = opts?.termMonths ?? 12;
+  const monthly = aircraftLeaseMonthlyUsd(aircraft.aircraftClassId, {
+    airframeTypeId: aircraft.airframeTypeId,
+  });
+  const termMonths = opts?.termMonths ?? 6;
   const listing: AircraftListing = {
     id: `acfl_lease_${aircraft.id}_${economyTick}`,
     kind: 'lease',
@@ -1072,6 +1121,86 @@ export function buyOutAircraftLease(
   return { state, debitUsd: debit };
 }
 
+/** Months still owed on a player lease (at least 1 while the term is active). */
+export function leaseRemainingMonths(
+  aircraft: PlayerAircraft,
+  economyTick: number,
+): number {
+  const lease = aircraft.lease;
+  if (!lease) return 0;
+  const ticksLeft = lease.termEndsTick - economyTick;
+  if (ticksLeft <= 0) return 0;
+  return Math.max(1, Math.ceil(ticksLeft / TICKS_PER_MONTH));
+}
+
+/**
+ * Early-return penalty: half the remaining months of rent, clamped to 1–3 months.
+ * Deposit already paid is not refunded.
+ */
+export function quoteLeaseEarlyReturnUsd(
+  aircraft: PlayerAircraft,
+  economyTick: number,
+): number {
+  if (aircraft.ownership !== 'leased' || !aircraft.lease) {
+    throw new Error('Aircraft is not under lease');
+  }
+  const remaining = leaseRemainingMonths(aircraft, economyTick);
+  if (remaining <= 0) {
+    throw new Error('Lease term already ended — the lessor will reclaim the airframe');
+  }
+  const monthsBilled = Math.min(3, Math.max(1, Math.ceil(remaining * 0.5)));
+  return Math.round(aircraft.lease.monthlyUsd * monthsBilled);
+}
+
+/**
+ * Return a leased airframe before term end. Pays the early-return penalty and
+ * removes the aircraft from the fleet (same outcome as natural repossess).
+ */
+export function returnAircraftLeaseEarly(
+  state: CareerMissionsState,
+  aircraftId: string,
+  economyTick = 0,
+): { state: CareerMissionsState; debitUsd: number; remainingMonths: number } {
+  const aircraft = state.fleet.find((a) => a.id === aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  if (aircraft.ownership !== 'leased' || !aircraft.lease) {
+    throw new Error('Aircraft is not under lease');
+  }
+  if (aircraft.leaseOverdue) {
+    throw new Error(
+      'Lease payment is overdue — clear the due month before returning early',
+    );
+  }
+  if (aircraft.status === 'assigned') {
+    throw new Error('Finish or cancel the assigned mission before returning the lease');
+  }
+  if (aircraft.status === 'listed') {
+    throw new Error('Unlist the airframe before returning the lease');
+  }
+  if (aircraft.status !== 'parked' && aircraft.status !== 'maintenance') {
+    throw new Error(`Cannot return lease while aircraft is ${aircraft.status}`);
+  }
+
+  const remainingMonths = leaseRemainingMonths(aircraft, economyTick);
+  const debit = quoteLeaseEarlyReturnUsd(aircraft, economyTick);
+  if (state.walletUsd < debit) {
+    throw new Error(
+      `Early return $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
+    );
+  }
+
+  applyWalletDelta(state, {
+    amountUsd: -debit,
+    kind: 'lease_early_return',
+    atTick: economyTick,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: `${aircraft.label} · ${remainingMonths} mo left`,
+  });
+  state.fleet = state.fleet.filter((a) => a.id !== aircraft.id);
+  return { state, debitUsd: debit, remainingMonths };
+}
+
 export function estimateMissionBlockHours(
   world: CareerEconomyWorld,
   originIcao: string,
@@ -1114,13 +1243,16 @@ export function assertAircraftDispatchable(aircraft: PlayerAircraft): void {
   }
 }
 
-/** True when used asking price is below a typical new price for the class. */
+/** True when used asking price is below a typical new price for the airframe. */
 export function listingIsCheaperThanNew(listing: AircraftListing): boolean {
+  const msrp = aircraftMsrpUsd(listing.aircraftClassId, {
+    airframeTypeId: listing.airframeTypeId,
+  });
   if (listing.kind === 'new') return false;
   if (listing.kind === 'lease') {
-    return (listing.askingUsd ?? 0) < AIRCRAFT_MSRP_USD[listing.aircraftClassId] * 0.15;
+    return (listing.askingUsd ?? 0) < msrp * 0.15;
   }
-  return listing.askingUsd < AIRCRAFT_MSRP_USD[listing.aircraftClassId] * 0.95;
+  return listing.askingUsd < msrp * 0.95;
 }
 
 export function listAircraftClassCatalog(): Array<{

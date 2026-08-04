@@ -3,6 +3,7 @@
  */
 
 import { hubTierOf, type CareerEconomyWorld } from './career-economy.js';
+import { fboParkingFeeMult } from './career-fbo-perks.js';
 import { applyWalletDelta } from './career-ledger.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
@@ -65,14 +66,17 @@ export function quoteHangarParkingUsdPerDay(
 export function resolveHangarParkingUsdPerDay(
   aircraft: PlayerAircraft,
   world: Pick<CareerEconomyWorld, 'airports'>,
+  state?: Pick<CareerMissionsState, 'playerFbos'>,
 ): number | null {
   if (!isHangarParkingBillable(aircraft)) return null;
   const icao = aircraft.locationIcao.toUpperCase();
   const airport = world.airports.find((a) => a.icao.toUpperCase() === icao);
-  return quoteHangarParkingUsdPerDay(
+  const base = quoteHangarParkingUsdPerDay(
     aircraft.aircraftClassId,
     hubTierOf(airport ?? { icao }),
   );
+  const mult = state ? fboParkingFeeMult(state, icao) : 1;
+  return Math.round(base * mult * 100) / 100;
 }
 
 /**
@@ -103,7 +107,7 @@ export function settleHangarParkingFees(
   let requestedUsd = 0;
 
   for (const aircraft of state.fleet) {
-    const usdPerDay = resolveHangarParkingUsdPerDay(aircraft, world);
+    const usdPerDay = resolveHangarParkingUsdPerDay(aircraft, world, state);
     if (usdPerDay == null || usdPerDay <= 0) continue;
     const debitUsd = Math.round(usdPerDay * daysCharged * 100) / 100;
     requestedUsd += debitUsd;

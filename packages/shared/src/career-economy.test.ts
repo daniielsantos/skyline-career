@@ -1036,6 +1036,61 @@ describe('pruneDeadLots', () => {
     );
   });
 
+  it('does not expire reserved or partially-booked lots past market expiry', () => {
+    const world = createSeedEconomyWorld({ seed: 'expire-reserved' });
+    world.tick = 10;
+    world.lots = [
+      {
+        id: 'reserved-crew',
+        commodityId: 'supplies',
+        originIcao: 'KABI',
+        destIcao: 'KDFW',
+        quantityKg: 2_000,
+        reservedKg: 2_000,
+        createdAtTick: 1,
+        expiresAtTick: 5,
+        payUsd: 400,
+        urgency: 'normal',
+        reason: 'crew airborne',
+        status: 'reserved',
+      },
+      {
+        id: 'partial-booked',
+        commodityId: 'general',
+        originIcao: 'KABI',
+        destIcao: 'KDFW',
+        quantityKg: 3_000,
+        reservedKg: 1_000,
+        createdAtTick: 1,
+        expiresAtTick: 5,
+        payUsd: 300,
+        urgency: 'normal',
+        reason: 'partial',
+        status: 'available',
+      },
+      {
+        id: 'pure-available',
+        commodityId: 'electronics',
+        originIcao: 'KABI',
+        destIcao: 'KDFW',
+        quantityKg: 500,
+        reservedKg: 0,
+        createdAtTick: 1,
+        expiresAtTick: 5,
+        payUsd: 50,
+        urgency: 'normal',
+        reason: 'expire me',
+        status: 'available',
+      },
+    ];
+
+    tickEconomyN(world, 1, { fromBatchAtMs: world.lastBatchAtMs });
+
+    assert.equal(world.lots.find((l) => l.id === 'reserved-crew')?.status, 'reserved');
+    assert.equal(world.lots.find((l) => l.id === 'partial-booked')?.status, 'available');
+    assert.equal(world.lots.find((l) => l.id === 'pure-available')?.status, 'expired');
+  });
+
   it('prunes bloated saves on migrate', () => {
     const seeded = createSeedEconomyWorld({ seed: 'prune-migrate' });
     seeded.tick = 200;

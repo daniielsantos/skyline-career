@@ -608,6 +608,26 @@ export interface MissionIntent {
   fuelAuthorizedOfpId?: string;
   /** Player fleet aircraft that flies this mission. */
   aircraftId?: string;
+  /**
+   * Company crew (AI) is operating this leg on the player's airframe.
+   * Settles on wall-clock ETA — no Flight Watch required.
+   */
+  crewOperated?: boolean;
+  /** Crew fee charged at dispatch (USD). */
+  crewFeeUsd?: number;
+  /** Roster member flying this leg (company crew). */
+  crewMemberId?: string;
+  /**
+   * Outbound crew leg that auto-queues an empty return to crewReturnIcao
+   * after cargo settle.
+   */
+  crewRoundTrip?: boolean;
+  /** Empty reposition leg spawned after a round-trip outbound settle. */
+  crewDeadhead?: boolean;
+  /** ICAO the aircraft returns to after a crewRoundTrip outbound. */
+  crewReturnIcao?: string;
+  /** Outbound mission id that spawned this deadhead return. */
+  crewOutboundMissionId?: string;
   /** Trip fuel burned (estimate) applied on settle. */
   tripFuelBurnKg?: number;
   /** Actual fuel remaining in MSFS when the mission settled. */
@@ -792,7 +812,93 @@ export interface CareerMissionsState {
   cargoOps?: CareerCargoOps;
   /** Revolving company credit line (Hangar cashflow). */
   companyCredit?: CompanyCreditState;
+  /** Player-owned FBOs + bonded contract holds (company assets). */
+  playerFbos?: PlayerFboState;
+  /** Company crew roster (AI slots based at an FBO). */
+  companyCrew?: CompanyCrewState;
 };
+
+/** Player FBO ownership + bonded warehouse holds. */
+export type PlayerFboTier = 1 | 2;
+
+export interface PlayerFbo {
+  id: string;
+  icao: string;
+  tier: PlayerFboTier;
+  capacityKg: number;
+}
+
+export interface PlayerFboHold {
+  id: string;
+  fboId: string;
+  lotId: string;
+  commodityId: CommodityId;
+  originIcao: string;
+  destIcao: string;
+  cargoKg: number;
+  payUsd: number;
+  urgency: ShipmentLot['urgency'];
+  reason: string;
+  acceptedAtTick: number;
+  /** From lot.expiresAtTick — clock does not pause in storage. */
+  deadlineTick: number;
+  /** Great-circle origin→dest (nm); refreshed on reroute. */
+  distanceNm?: number;
+}
+
+export interface PlayerFboState {
+  fbos: PlayerFbo[];
+  holds: PlayerFboHold[];
+}
+
+export type CompanyCrewStatus = 'idle' | 'airborne';
+
+/** Concrete perks tied to Skyline loops (burn, wear, on-time, Value freight). */
+export type CompanyCrewPerkId = 'fuel' | 'wear' | 'on_time' | 'value';
+
+/** Candidate available to hire at the FBO hire desk (short pool, not a market board). */
+export interface CompanyCrewCandidate {
+  id: string;
+  displayName: string;
+  perkId: CompanyCrewPerkId;
+  salaryUsdPerDay: number;
+  /** One-time signing cost to hire. */
+  hireUsd: number;
+  /**
+   * Portrait asset id under career-ui/public/crew/ (`man_1`…`woman_5`).
+   * Assigned from display-name gender when missing.
+   */
+  portraitId?: string;
+}
+
+/** Named company crew slot — based at an FBO, not a limbo flag. */
+export interface CompanyCrewMember {
+  id: string;
+  displayName: string;
+  /** Employing FBO ICAO (home base). */
+  baseIcao: string;
+  /** Where they are now (idle snaps back to base after settle). */
+  locationIcao: string;
+  status: CompanyCrewStatus;
+  missionId?: string;
+  aircraftId?: string;
+  lastFeeUsd?: number;
+  perkId?: CompanyCrewPerkId;
+  salaryUsdPerDay?: number;
+  hiredAtTick?: number;
+  /** Portrait asset id under career-ui/public/crew/ (`man_1`…`woman_5`). */
+  portraitId?: string;
+}
+
+export interface CompanyCrewState {
+  members: CompanyCrewMember[];
+  /** Short hire desk at the crew base FBO. */
+  hirePool?: CompanyCrewCandidate[];
+  /** Economy day when hirePool was last rolled. */
+  hirePoolDay?: number;
+  hirePoolIcao?: string;
+}
+
 
 /** Persistent revolving credit balance on the company. */
 export interface CompanyCreditState {
@@ -867,10 +973,19 @@ export type CareerLedgerKind =
   | 'lease_payment'
   | 'lease_out_income'
   | 'lease_deposit'
+  | 'lease_early_return'
   | 'aircraft_buy'
   | 'aircraft_lease_sign'
   | 'aircraft_sell'
   | 'aircraft_buyout'
+  | 'fbo_buy'
+  | 'fbo_storage'
+  | 'fbo_hold_expire'
+  | 'fbo_spot_sale'
+  | 'fbo_reroute'
+  | 'crew_fee'
+  | 'crew_salary'
+  | 'crew_hire'
   | 'ferry'
   | 'pilot_travel'
   | 'fuel'

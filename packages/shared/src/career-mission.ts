@@ -469,6 +469,19 @@ function missionLines(mission: MissionIntent): MissionLotLine[] {
 export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
   const lots = missionLines(mission);
   if (lots.length === 0) {
+    if (mission.crewDeadhead) {
+      return {
+        ...mission,
+        lots: [],
+        shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
+        commodityId: mission.commodityId || 'general',
+        cargoKg: 0,
+        payUsd: 0,
+        deadlineTick: mission.deadlineTick,
+        urgency: 'normal',
+        reason: mission.reason || 'Crew return',
+      };
+    }
     throw new Error(`Mission ${mission.id} has no lot lines`);
   }
   const cargoKg = lots.reduce((sum, line) => sum + line.cargoKg, 0);
@@ -1169,10 +1182,12 @@ export function departMission(
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot depart mission in status=${normalized.status}`);
   }
-  for (const line of normalized.lots) {
-    const lot = findLot(world, line.shipmentLotId);
-    if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
-      lot.status = 'in_transit';
+  if (!normalized.crewDeadhead) {
+    for (const line of normalized.lots) {
+      const lot = findLot(world, line.shipmentLotId);
+      if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
+        lot.status = 'in_transit';
+      }
     }
   }
 
@@ -1263,6 +1278,8 @@ export interface SettleMissionOpts {
    * Live Watch / UI settle keep the gate on.
    */
   skipMinAirborneGate?: boolean;
+  /** Multiply airframe/engine hours applied on settle (crew wear perk). */
+  hoursMult?: number;
 }
 
 export interface SettleMissionResult {
@@ -1396,7 +1413,13 @@ export function settleMission(
         working.destIcao,
         aircraft.aircraftClassId,
       );
-      applyAircraftHoursAfterMission(aircraft, blockHours);
+      const hoursMult =
+        typeof opts.hoursMult === 'number' &&
+        Number.isFinite(opts.hoursMult) &&
+        opts.hoursMult > 0
+          ? opts.hoursMult
+          : 1;
+      applyAircraftHoursAfterMission(aircraft, blockHours * hoursMult);
     }
   }
 
@@ -1406,41 +1429,49 @@ export function settleMission(
   const settlementLines: MissionSettlementLine[] = [];
 
   const scorePct = opts.flightScore?.pct;
-  const pay = computeSettlementPay(working, settleTick, scorePct);
+  const pay = working.crewDeadhead
+    ? { lateTicks: 0, penaltyUsd: 0, payoutUsd: 0, onTime: true }
+    : computeSettlementPay(working, settleTick, scorePct);
   // Allocate penalty across lines proportional to payUsd.
   let penaltyLeft = pay.penaltyUsd;
 
-  for (let i = 0; i < working.lots.length; i++) {
-    const line = working.lots[i]!;
-    const delivery = applyFreightDelivery(world, {
-      commodityId: line.commodityId,
-      originIcao: working.originIcao,
-      destIcao: working.destIcao,
-      kg: line.cargoKg,
-    });
-    lastOriginStock = delivery.originStockKg;
-    lastDestStock = delivery.destStockKg;
+  if (!working.crewDeadhead) {
+    for (let i = 0; i < working.lots.length; i++) {
+      const line = working.lots[i]!;
+      const delivery = applyFreightDelivery(world, {
+        commodityId: line.commodityId,
+        originIcao: working.originIcao,
+        destIcao: working.destIcao,
+        kg: line.cargoKg,
+      });
+      lastOriginStock = delivery.originStockKg;
+      lastDestStock = delivery.destStockKg;
 
-    const lot = findLot(world, line.shipmentLotId);
-    shrinkDeliveredLot(lot, line.cargoKg);
+      const lot = world.lots.find((l) => l.id === line.shipmentLotId);
+      if (lot) {
+        shrinkDeliveredLot(lot, line.cargoKg);
+      }
 
-    const isLast = i === working.lots.length - 1;
-    const linePenalty = isLast
-      ? penaltyLeft
-      : Math.min(
-          line.payUsd,
-          Math.round(pay.penaltyUsd * (line.payUsd / Math.max(1, working.payUsd))),
-        );
-    penaltyLeft = Math.max(0, penaltyLeft - linePenalty);
-    const linePayout = Math.max(0, line.payUsd - linePenalty);
-    settlementLines.push({
-      shipmentLotId: line.shipmentLotId,
-      commodityId: line.commodityId,
-      deliveredKg: line.cargoKg,
-      payUsd: line.payUsd,
-      penaltyUsd: linePenalty,
-      payoutUsd: linePayout,
-    });
+      const isLast = i === working.lots.length - 1;
+      const linePenalty = isLast
+        ? penaltyLeft
+        : Math.min(
+            line.payUsd,
+            Math.round(
+              pay.penaltyUsd * (line.payUsd / Math.max(1, working.payUsd)),
+            ),
+          );
+      penaltyLeft = Math.max(0, penaltyLeft - linePenalty);
+      const linePayout = Math.max(0, line.payUsd - linePenalty);
+      settlementLines.push({
+        shipmentLotId: line.shipmentLotId,
+        commodityId: line.commodityId,
+        deliveredKg: line.cargoKg,
+        payUsd: line.payUsd,
+        penaltyUsd: linePenalty,
+        payoutUsd: linePayout,
+      });
+    }
   }
 
   const settledFlightDurationMs = (() => {
@@ -1476,7 +1507,7 @@ export function settleMission(
   clearPlayerInbound(world, settled.id);
 
   let cargoOpsDeltas: CargoOpsDelta[] | undefined;
-  if (opts.fleet) {
+  if (opts.fleet && !working.crewDeadhead) {
     const applied = applyCargoOpsOnSettle(opts.fleet.cargoOps, settled, {
       onTime: pay.onTime,
       lateTicks: pay.lateTicks,

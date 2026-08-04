@@ -104,6 +104,34 @@ export function greatCircleLine(
   return coords;
 }
 
+/** Point at fraction `t` (0…1) along the great-circle from a → b. */
+export function pointOnGreatCircle(
+  a: LatLon,
+  b: LatLon,
+  t: number,
+): { lat: number; lon: number } {
+  const u = Math.max(0, Math.min(1, t));
+  const A = toCartesian(a.lat, a.lon);
+  const B = toCartesian(b.lat, b.lon);
+  const dot = Math.max(
+    -1,
+    Math.min(1, A[0]! * B[0]! + A[1]! * B[1]! + A[2]! * B[2]!),
+  );
+  const omega = Math.acos(dot);
+  if (!(omega > 1e-9)) {
+    return { lat: a.lat, lon: a.lon };
+  }
+  const sinOmega = Math.sin(omega);
+  const s0 = Math.sin((1 - u) * omega) / sinOmega;
+  const s1 = Math.sin(u * omega) / sinOmega;
+  const [lon, lat] = fromCartesian(
+    s0 * A[0]! + s1 * B[0]!,
+    s0 * A[1]! + s1 * B[1]!,
+    s0 * A[2]! + s1 * B[2]!,
+  );
+  return { lat, lon };
+}
+
 function near(a: LatLon, b: LatLon, tolDeg = 0.05): boolean {
   return Math.abs(a.lat - b.lat) < tolDeg && Math.abs(a.lon - b.lon) < tolDeg;
 }
@@ -145,12 +173,12 @@ export function routeLineCoordinates(
 
 function endpointMarker(
   endpoint: DispatchRouteEndpoint,
-  kind: 'dep' | 'arr',
+  kind: 'dep' | 'arr' | 'fbo',
 ): HTMLButtonElement {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `dispatch-route-marker dispatch-route-marker-${kind}`;
-  const label = kind === 'dep' ? 'DEP' : 'ARR';
+  const label = kind === 'dep' ? 'DEP' : kind === 'arr' ? 'ARR' : 'FBO';
   el.title = `${label} ${endpoint.icao}${endpoint.name ? ` · ${endpoint.name}` : ''}`;
   el.setAttribute(
     'aria-label',
@@ -211,12 +239,20 @@ function ensureRouteLayer(map: Map): void {
 function setRouteLine(
   map: Map,
   origin: DispatchRouteEndpoint,
-  dest: DispatchRouteEndpoint,
+  dest: DispatchRouteEndpoint | null | undefined,
   waypoints?: DispatchRouteWaypoint[],
 ): void {
   ensureRouteLayer(map);
   const source = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
   if (!source) return;
+  if (!dest) {
+    source.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: [] },
+    });
+    return;
+  }
   source.setData({
     type: 'Feature',
     properties: {},
@@ -245,10 +281,15 @@ function intermediateWaypoints(
 
 export function DispatchRouteMap(props: {
   origin: DispatchRouteEndpoint;
-  dest: DispatchRouteEndpoint;
+  /** When omitted, only the origin/base pin is shown (no route line). */
+  dest?: DispatchRouteEndpoint | null;
   waypoints?: DispatchRouteWaypoint[];
   /** Live aircraft position from Watch — updated without re-fitting the route. */
   aircraft?: DispatchAircraftPosition | null;
+  /** Popup title for the aircraft marker. */
+  aircraftLabel?: string | null;
+  /** Origin marker role — FBO base vs departure. */
+  originRole?: 'dep' | 'fbo';
   onSelectAirport?: (icao: string) => void;
   className?: string;
 }) {
@@ -264,11 +305,8 @@ export function DispatchRouteMap(props: {
     const map = new Map({
       container: containerRef.current,
       style: OPENFREEMAP_DARK,
-      center: [
-        (props.origin.lon + props.dest.lon) / 2,
-        (props.origin.lat + props.dest.lat) / 2,
-      ],
-      zoom: 4,
+      center: [props.origin.lon, props.origin.lat],
+      zoom: 5,
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -303,19 +341,36 @@ export function DispatchRouteMap(props: {
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
 
-      setRouteLine(map, props.origin, props.dest, props.waypoints);
+      const dest = props.dest ?? null;
+      setRouteLine(map, props.origin, dest, props.waypoints);
 
-      const ends: Array<{ endpoint: DispatchRouteEndpoint; kind: 'dep' | 'arr' }> =
-        [
-          { endpoint: props.origin, kind: 'dep' },
-          { endpoint: props.dest, kind: 'arr' },
-        ];
+      // Route gone → drop aircraft; live effect will recreate if needed.
+      if (!dest) {
+        aircraftMarkerRef.current?.remove();
+        aircraftMarkerRef.current = null;
+      }
+
+      const originKind = props.originRole ?? 'dep';
+      const ends: Array<{
+        endpoint: DispatchRouteEndpoint;
+        kind: 'dep' | 'arr' | 'fbo';
+      }> = [{ endpoint: props.origin, kind: originKind }];
+      if (dest) {
+        ends.push({ endpoint: dest, kind: 'arr' });
+      }
+
       for (const { endpoint, kind } of ends) {
         const el = endpointMarker(endpoint, kind);
         el.addEventListener('click', (event) => {
           event.stopPropagation();
           onSelectRef.current?.(endpoint.icao);
         });
+        const title =
+          kind === 'dep'
+            ? 'Departure'
+            : kind === 'arr'
+              ? 'Arrival'
+              : 'FBO base';
         const marker = new Marker({ element: el, anchor: 'bottom' })
           .setLngLat([endpoint.lon, endpoint.lat])
           .setPopup(
@@ -324,7 +379,7 @@ export function DispatchRouteMap(props: {
               closeButton: false,
               className: 'dispatch-route-popup',
             }).setHTML(
-              `<strong>${kind === 'dep' ? 'Departure' : 'Arrival'}</strong><br/>${endpoint.icao}${
+              `<strong>${title}</strong><br/>${endpoint.icao}${
                 endpoint.name ? ` · ${endpoint.name}` : ''
               }`,
             ),
@@ -333,44 +388,52 @@ export function DispatchRouteMap(props: {
         markersRef.current.push(marker);
       }
 
-      for (const wpt of intermediateWaypoints(
-        props.origin,
-        props.dest,
-        props.waypoints,
-      )) {
-        const el = waypointMarker(wpt);
-        const marker = new Marker({ element: el, anchor: 'bottom' })
-          .setLngLat([wpt.lon, wpt.lat])
-          .setPopup(
-            new Popup({
-              offset: 10,
-              closeButton: false,
-              className: 'dispatch-route-popup',
-            }).setHTML(
-              `<strong>${wpt.ident}</strong>${
-                wpt.type ? `<br/>${wpt.type}` : ''
-              }`,
-            ),
-          )
-          .addTo(map);
-        markersRef.current.push(marker);
-      }
+      if (dest) {
+        for (const wpt of intermediateWaypoints(
+          props.origin,
+          dest,
+          props.waypoints,
+        )) {
+          const el = waypointMarker(wpt);
+          const marker = new Marker({ element: el, anchor: 'bottom' })
+            .setLngLat([wpt.lon, wpt.lat])
+            .setPopup(
+              new Popup({
+                offset: 10,
+                closeButton: false,
+                className: 'dispatch-route-popup',
+              }).setHTML(
+                `<strong>${wpt.ident}</strong>${
+                  wpt.type ? `<br/>${wpt.type}` : ''
+                }`,
+              ),
+            )
+            .addTo(map);
+          markersRef.current.push(marker);
+        }
 
-      const bounds = new LngLatBounds();
-      for (const p of buildRouteTrack(
-        props.origin,
-        props.dest,
-        props.waypoints,
-      )) {
-        bounds.extend([p.lon, p.lat]);
+        const bounds = new LngLatBounds();
+        for (const p of buildRouteTrack(
+          props.origin,
+          dest,
+          props.waypoints,
+        )) {
+          bounds.extend([p.lon, p.lat]);
+        }
+        map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
+      } else {
+        map.flyTo({
+          center: [props.origin.lon, props.origin.lat],
+          zoom: 5.5,
+          duration: 500,
+        });
       }
-      map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
       map.resize();
     };
 
     if (map.isStyleLoaded()) paint();
     else map.once('load', paint);
-  }, [props.origin, props.dest, props.waypoints]);
+  }, [props.origin, props.dest, props.waypoints, props.originRole]);
 
   // Live aircraft — move marker only; do not refit route bounds each tick.
   useEffect(() => {
@@ -388,6 +451,7 @@ export function DispatchRouteMap(props: {
         aircraftMarkerRef.current.setLngLat(lngLat);
         return;
       }
+      const title = props.aircraftLabel?.trim() || 'Aircraft';
       const marker = new Marker({
         element: aircraftMarkerEl(),
         anchor: 'center',
@@ -398,7 +462,11 @@ export function DispatchRouteMap(props: {
             offset: 12,
             closeButton: false,
             className: 'dispatch-route-popup',
-          }).setHTML('<strong>Aircraft</strong><br/>Live position'),
+          }).setHTML(
+            `<strong>${title}</strong><br/>${
+              props.aircraftLabel?.trim() ? 'En route' : 'Live position'
+            }`,
+          ),
         )
         .addTo(map);
       aircraftMarkerRef.current = marker;
@@ -406,7 +474,7 @@ export function DispatchRouteMap(props: {
 
     if (map.isStyleLoaded()) sync();
     else map.once('load', sync);
-  }, [props.aircraft]);
+  }, [props.aircraft, props.aircraftLabel]);
 
   return (
     <div className={props.className ?? 'dispatch-route-map'}>

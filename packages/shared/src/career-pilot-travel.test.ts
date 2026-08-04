@@ -109,6 +109,31 @@ describe('pilot travel', () => {
     assert.equal(state.pilotIcao, 'SBGL');
   });
 
+  it('crew settle relocates aircraft without moving the pilot', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'CrewPilotStay',
+    });
+    const mission = {
+      id: 'msn_crew',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      aircraftId: state.fleet[0]!.id,
+      status: 'in_flight',
+      aircraftClassId: state.fleet[0]!.aircraftClassId,
+      crewOperated: true,
+      lots: [],
+      cargoKg: 100,
+      payUsd: 500,
+      acceptedAtTick: 0,
+    } as unknown as MissionIntent;
+    state.fleet[0]!.status = 'assigned';
+    state.fleet[0]!.assignedMissionId = mission.id;
+    state.pilotIcao = 'SBGR';
+    relocateAircraftOnSettle(state, mission);
+    assert.equal(state.fleet[0]!.locationIcao, 'SBGL');
+    assert.equal(state.pilotIcao, 'SBGR');
+  });
+
   it('persists pilot_travel ledger kind', () => {
     const entries = normalizeCareerLedger([
       {

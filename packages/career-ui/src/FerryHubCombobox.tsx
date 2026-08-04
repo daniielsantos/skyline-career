@@ -37,7 +37,14 @@ export function FerryHubCombobox(props: {
   const [menuBox, setMenuBox] = useState<MenuBox | null>(null);
 
   useEffect(() => {
-    setQuery(props.value);
+    setQuery((current) => {
+      const committed = (props.value ?? '').trim().toUpperCase();
+      if (committed) return committed;
+      const q = current.trim().toUpperCase();
+      if (!q) return '';
+      // Parent cleared (or never committed): keep in-progress filter text.
+      return current;
+    });
   }, [props.value]);
 
   const available = useMemo(
@@ -119,9 +126,14 @@ export function FerryHubCombobox(props: {
       props.onChange('');
       return;
     }
-    props.onChange(
-      available.some((hub) => hub.icao === trimmed) ? trimmed : '',
-    );
+    // Commit only exact ICAOs. Partial filter must not push '' in a way that
+    // re-syncs and wipes the query — parent clear is ok if we keep local text.
+    if (available.some((hub) => hub.icao === trimmed)) {
+      props.onChange(trimmed);
+      setOpen(false);
+    } else {
+      props.onChange('');
+    }
   }
 
   useEffect(() => {
@@ -196,6 +208,12 @@ export function FerryHubCombobox(props: {
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
+            if (open) {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+              return;
+            }
             setOpen(false);
             e.currentTarget.blur();
           }

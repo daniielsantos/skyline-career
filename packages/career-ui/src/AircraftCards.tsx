@@ -300,22 +300,36 @@ export function MarketListingCard(props: {
         />
       </div>
       <div className="aircraft-card-price">
-        {listing.kind === 'lease' ? (
-          <>
-            <span className="price-main">{props.formatMoney(listing.askingUsd)}</span>
-            <span className="price-term">deposit due now</span>
-            {listing.leaseMonthlyUsd != null ? (
+        <div className="aircraft-card-price-details">
+          <span className="price-main">
+            {props.formatMoney(listing.askingUsd)}
+          </span>
+          {listing.kind === 'lease' ? (
+            <>
+              <span className="price-term">deposit due now</span>
               <span className="price-sub">
-                {props.formatMoney(listing.leaseMonthlyUsd)} / month
+                {listing.leaseMonthlyUsd != null
+                  ? `${props.formatMoney(listing.leaseMonthlyUsd)} / month`
+                  : '—'}
               </span>
-            ) : null}
-            {listing.leaseTermMonths != null ? (
-              <span className="price-term">{listing.leaseTermMonths}-month term</span>
-            ) : null}
-          </>
-        ) : (
-          <span className="price-main">{props.formatMoney(listing.askingUsd)}</span>
-        )}
+              <span className="price-term">
+                {listing.leaseTermMonths != null
+                  ? `${listing.leaseTermMonths}-month term`
+                  : '—'}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="price-term">purchase price</span>
+              <span className="price-sub is-empty" aria-hidden="true">
+                —
+              </span>
+              <span className="price-term is-empty" aria-hidden="true">
+                —
+              </span>
+            </>
+          )}
+        </div>
         {listing.source === 'player_lease' ? (
           <span className="muted">Your listing</span>
         ) : listing.kind === 'lease' ? (
@@ -397,6 +411,7 @@ export function HangarAircraftCard(props: {
   onRepair: (id: string) => void;
   onUnlist: (id: string) => void;
   onBuyout: (id: string) => void;
+  onReturnLease: (id: string) => void;
   onListForLease: (id: string) => void;
   onSell: (id: string) => void;
   onFerry: (id: string, dest: string) => void;
@@ -425,11 +440,17 @@ export function HangarAircraftCard(props: {
     (acf.ownership ?? 'owned') === 'owned' &&
     (acf.status === 'parked' || acf.status === 'maintenance') &&
     props.ownedCount >= 2;
-  const sellBackUsd = canSell ? estimateSellBackUsd(acf) : null;
+  const sellBackUsd = canSell
+    ? estimateSellBackUsd(acf, { maxCargoKg: catalog?.maxCargoKg })
+    : null;
   const canRepair =
     (acf.status === 'parked' || acf.status === 'maintenance') &&
     (afPct < 100 || engPct < 100);
   const canBuyout = acf.ownership === 'leased' && Boolean(acf.lease);
+  const canReturnLease =
+    canBuyout &&
+    !acf.leaseOverdue &&
+    (acf.status === 'parked' || acf.status === 'maintenance');
   const pilotHere =
     props.pilotIcao.trim().toUpperCase() ===
     acf.locationIcao.trim().toUpperCase();
@@ -439,7 +460,8 @@ export function HangarAircraftCard(props: {
   );
   const showMove =
     acf.status === 'parked' || acf.status === 'maintenance';
-  const showManage = canRepair || canList || canSell || canBuyout;
+  const showManage =
+    canRepair || canList || canSell || canBuyout || canReturnLease;
 
   const primaryAction =
     acf.status === 'maintenance'
@@ -734,6 +756,16 @@ export function HangarAircraftCard(props: {
                     onClick={() => props.onBuyout(acf.id)}
                   >
                     Buy out
+                  </button>
+                ) : null}
+                {canReturnLease ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy}
+                    onClick={() => props.onReturnLease(acf.id)}
+                  >
+                    Return lease
                   </button>
                 ) : null}
                 {canList ? (

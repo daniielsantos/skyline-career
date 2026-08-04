@@ -1,4 +1,5 @@
 import type { CareerCargoOps, CargoOpsCommodityId } from './api';
+import { CommodityIcon } from './CommodityIcon';
 
 const TIER_ROWS: {
   id: string;
@@ -71,7 +72,8 @@ export function CargoOpsPanel(props: { cargoOps: CareerCargoOps | null | undefin
                   return (
                     <li key={id}>
                       <div className="cargo-ops-commodity-head">
-                        <span>
+                        <span className="commodity-inline">
+                          <CommodityIcon commodityId={id} size={28} />
                           {LABELS[id]}
                           {!row.unlocked ? ' · locked' : ''}
                         </span>

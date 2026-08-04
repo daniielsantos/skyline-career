@@ -13,6 +13,7 @@ import {
   quoteFuelUplift,
   type FuelUpliftQuote,
 } from './career-fuel.js';
+import { fboServiceCostMult } from './career-fbo-perks.js';
 import {
   ensureAircraftConditionPcts,
   INSPECTION_INTERVAL_HOURS,
@@ -107,6 +108,8 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     ledger: [],
     cargoOps: normalizeCareerCargoOps(undefined),
     companyCredit: normalizeCompanyCredit(undefined),
+    playerFbos: { fbos: [], holds: [] },
+    companyCrew: { members: [] },
   };
 }
 
@@ -175,6 +178,37 @@ export function normalizeMissionsState(
   const companyCredit = normalizeCompanyCredit(
     (raw as CareerMissionsState).companyCredit,
   );
+  // Full sanitize happens in ensurePlayerFbos / career-fbo ops (avoids fleet↔mission cycle).
+  const playerFbosRaw = (raw as CareerMissionsState).playerFbos;
+  const playerFbos =
+    playerFbosRaw &&
+    typeof playerFbosRaw === 'object' &&
+    Array.isArray(playerFbosRaw.fbos) &&
+    Array.isArray(playerFbosRaw.holds)
+      ? {
+          fbos: playerFbosRaw.fbos,
+          holds: playerFbosRaw.holds,
+        }
+      : { fbos: [], holds: [] };
+  // Full sanitize in ensureCompanyCrew / career-crew ops.
+  const companyCrewRaw = (raw as CareerMissionsState).companyCrew;
+  const companyCrew =
+    companyCrewRaw &&
+    typeof companyCrewRaw === 'object' &&
+    Array.isArray(companyCrewRaw.members)
+      ? {
+          members: companyCrewRaw.members,
+          ...(Array.isArray(companyCrewRaw.hirePool)
+            ? { hirePool: companyCrewRaw.hirePool }
+            : {}),
+          ...(typeof companyCrewRaw.hirePoolDay === 'number'
+            ? { hirePoolDay: companyCrewRaw.hirePoolDay }
+            : {}),
+          ...(typeof companyCrewRaw.hirePoolIcao === 'string'
+            ? { hirePoolIcao: companyCrewRaw.hirePoolIcao }
+            : {}),
+        }
+      : { members: [] };
   return {
     version: 2,
     walletUsd,
@@ -190,6 +224,8 @@ export function normalizeMissionsState(
     ledger,
     cargoOps,
     companyCredit,
+    playerFbos,
+    companyCrew,
     ...(airframePerfOverrides
       ? { airframePerfOverrides }
       : {}),
@@ -596,6 +632,7 @@ export function assignAircraftToMission(
   aircraftId: string,
   missionId: string,
   originIcao: string,
+  opts: { requirePilotAtOrigin?: boolean } = {},
 ): PlayerAircraft {
   const aircraft = findPlayerAircraft(state, aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
@@ -617,7 +654,12 @@ export function assignAircraftToMission(
   if (aircraft.leaseOverdue) {
     throw new Error(`Aircraft ${aircraft.id} has an overdue lease payment`);
   }
-  assertPilotWithAircraftAtOrigin(state, aircraft, originIcao);
+  const requirePilot = opts.requirePilotAtOrigin !== false;
+  if (requirePilot) {
+    assertPilotWithAircraftAtOrigin(state, aircraft, originIcao);
+  } else {
+    assertAircraftAtOrigin(aircraft, originIcao);
+  }
   aircraft.status = 'assigned';
   aircraft.assignedMissionId = missionId;
   return aircraft;
@@ -635,7 +677,9 @@ export function releaseAircraftOnCancel(
   aircraft.assignedMissionId = undefined;
   // Stay at origin (never left).
   aircraft.locationIcao = mission.originIcao.toUpperCase();
-  syncPilotIcaoTo(state, aircraft.locationIcao);
+  if (mission.crewOperated !== true) {
+    syncPilotIcaoTo(state, aircraft.locationIcao);
+  }
   return aircraft;
 }
 
@@ -671,7 +715,10 @@ export function relocateAircraftOnSettle(
 
   aircraft.locationIcao = mission.destIcao.toUpperCase();
   aircraft.assignedMissionId = undefined;
-  syncPilotIcaoTo(state, aircraft.locationIcao);
+  // Company crew flies the airframe; the player's hub position stays put.
+  if (mission.crewOperated !== true) {
+    syncPilotIcaoTo(state, aircraft.locationIcao);
+  }
   const due =
     aircraft.maintenanceDueAtHours ??
     INSPECTION_INTERVAL_HOURS[aircraft.aircraftClassId];
@@ -722,6 +769,7 @@ export function applyPlayerDepartFuel(
       aircraftClassId: aircraft.aircraftClassId,
       requestedKg: shortfall,
       distanceNm,
+      costMult: fboServiceCostMult(state, mission.originIcao),
     });
     fuelUplift = deliverFuelUplift(world, quote);
     fuelDebitUsd = fuelUplift.costUsd;
@@ -800,6 +848,7 @@ export function quotePlayerMissionOfpFuel(
     destIcao: mission.destIcao,
     aircraftClassId: aircraft.aircraftClassId,
     requestedKg: Math.max(1, shortfallKg),
+    costMult: fboServiceCostMult(state, mission.originIcao),
   });
   const uplift: FuelUpliftQuote =
     shortfallKg > 0
@@ -950,6 +999,7 @@ export function quoteFerry(
       aircraftClassId: aircraft.aircraftClassId,
       requestedKg: fuelUpliftKg,
       distanceNm,
+      costMult: fboServiceCostMult(state, aircraft.locationIcao),
     });
     fuelCostUsd = quote.costUsd;
     fuelScarcity = quote.scarcity;
@@ -997,6 +1047,7 @@ export function executeFerry(
       aircraftClassId: aircraft.aircraftClassId,
       requestedKg: quote.fuelUpliftKg,
       distanceNm: quote.distanceNm,
+      costMult: fboServiceCostMult(state, aircraft.locationIcao),
     });
     const uplift = deliverFuelUplift(world, fuelQuote);
     aircraft.fuelKg = Math.min(

@@ -1,73 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
-  fetchAirport,
-  fetchNetworkHubs,
-  type NetworkHub,
-} from './api';
-import {
   DispatchRouteMap,
   type DispatchAircraftPosition,
   type DispatchRouteEndpoint,
   type DispatchRouteWaypoint,
 } from './DispatchRouteMap';
-
-let hubsCache: NetworkHub[] | null = null;
-let hubsInflight: Promise<NetworkHub[]> | null = null;
-
-async function loadNetworkHubs(): Promise<NetworkHub[]> {
-  if (hubsCache) return hubsCache;
-  if (hubsInflight) return hubsInflight;
-  hubsInflight = fetchNetworkHubs()
-    .then((result) => {
-      hubsCache = result.hubs;
-      return result.hubs;
-    })
-    .finally(() => {
-      hubsInflight = null;
-    });
-  return hubsInflight;
-}
-
-function usableCoords(
-  lat: number | undefined,
-  lon: number | undefined,
-): lat is number {
-  return (
-    typeof lat === 'number' &&
-    typeof lon === 'number' &&
-    Number.isFinite(lat) &&
-    Number.isFinite(lon) &&
-    !(lat === 0 && lon === 0)
-  );
-}
-
-async function resolveEndpoint(
-  icao: string,
-): Promise<DispatchRouteEndpoint | null> {
-  const code = icao.trim().toUpperCase();
-  if (!code) return null;
-
-  try {
-    const hubs = await loadNetworkHubs();
-    const hub = hubs.find((h) => h.icao.toUpperCase() === code);
-    if (hub && usableCoords(hub.lat, hub.lon)) {
-      return { icao: code, lat: hub.lat, lon: hub.lon, name: hub.name };
-    }
-  } catch {
-    /* fall through to airport terminal */
-  }
-
-  try {
-    const view = await fetchAirport(code);
-    const { lat, lon, name } = view.airport;
-    if (usableCoords(lat, lon)) {
-      return { icao: code, lat, lon: lon!, name };
-    }
-  } catch {
-    /* missing */
-  }
-  return null;
-}
+import { resolveAirportEndpoint } from './resolve-airport-endpoint';
 
 /** Compact route map card for Dispatch — below Preflight. */
 export function DispatchRouteCard(props: {
@@ -93,8 +31,8 @@ export function DispatchRouteCard(props: {
     setLoading(true);
     void (async () => {
       const [o, d] = await Promise.all([
-        resolveEndpoint(props.originIcao),
-        resolveEndpoint(props.destIcao),
+        resolveAirportEndpoint(props.originIcao),
+        resolveAirportEndpoint(props.destIcao),
       ]);
       if (cancelled) return;
       setOrigin(o);
@@ -178,8 +116,8 @@ export function DispatchRouteCard(props: {
         </>
       ) : (
         <p className="dispatch-route-map-empty">
-          Coordinates unavailable
-          {missing.length > 0 ? ` for ${missing.join(', ')}` : ''}.
+          Map unavailable
+          {missing.length ? ` — missing coords for ${missing.join(', ')}` : ''}.
         </p>
       )}
     </section>

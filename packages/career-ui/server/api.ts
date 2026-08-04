@@ -6,6 +6,7 @@ import {
   acceptMission,
   assignAircraftToMission,
   buyOutAircraftLease,
+  returnAircraftLeaseEarly,
   CAREER_COMMODITIES,
   cancelMission,
   cargoOpsIsUnlocked,
@@ -67,14 +68,37 @@ import {
   reconcilePlayerInbound,
   replaceMissionManifest,
   routeDistanceNm,
+  estimateMissionBlockHours,
   selectStarterHub,
   listAircraftForLease,
   unlistAircraftForLease,
   sellPlayerAircraft,
   settleAircraftMarketOps,
   settleHangarParkingFees,
+  settleFboOps,
   settleCompanyCredit,
   companyCreditSnapshot,
+  buyFboTier1,
+  upgradeFboToTier2,
+  holdLotAtFbo,
+  cancelFboHold,
+  releaseFboHoldToMission,
+  rerouteFboHold,
+  splitFboHold,
+  returnMissionToFboHold,
+  quoteFboRerouteUsd,
+  quoteFboReroutePayAfterUsd,
+  playerFboSnapshot,
+  playerFboSnapshotAtIcao,
+  fboServiceCostMult,
+  dispatchCrewMission,
+  assignCrewMemberToMission,
+  settleCrewOpsDue,
+  settleCrewDailyOps,
+  companyCrewSnapshot,
+  hireCrewCandidate,
+  fireCrewMember,
+  releaseCompanyCrewFromMission,
   drawCompanyCredit,
   repayCompanyCredit,
   assertCompanyCreditAllowsOps,
@@ -197,11 +221,16 @@ async function loadMissions(): Promise<MissionsFile> {
 function withParkingRates(
   fleet: PlayerAircraft[],
   world?: Pick<CareerEconomyWorld, 'airports'>,
+  missions?: Pick<CareerMissionsState, 'playerFbos'>,
 ): Array<PlayerAircraft & { parkingUsdPerDay: number | null }> {
   const airports = world ?? { airports: [] };
   return fleet.map((aircraft) => ({
     ...aircraft,
-    parkingUsdPerDay: resolveHangarParkingUsdPerDay(aircraft, airports),
+    parkingUsdPerDay: resolveHangarParkingUsdPerDay(
+      aircraft,
+      airports,
+      missions,
+    ),
   }));
 }
 
@@ -226,13 +255,14 @@ function fleetPayload(
   });
   return {
     hubSelected: missions.hubSelected,
-    fleet: withParkingRates(missions.fleet, world),
+    fleet: withParkingRates(missions.fleet, world, missions),
     hubs,
     pilotName: missions.pilotName,
     homeHubIcao: missions.homeHubIcao,
     pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
     starterAircraft,
     companyCredit: companyCreditSnapshot(missions),
+    playerFbos: playerFboSnapshot(missions, world),
   };
 }
 
@@ -297,6 +327,15 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
       fromTick: caught.tick - advancedTicks,
       toTick: caught.tick,
     });
+    settleFboOps(missions, caught, {
+      fromTick: caught.tick - advancedTicks,
+      toTick: caught.tick,
+    });
+    settleCrewDailyOps(missions, caught, {
+      fromTick: caught.tick - advancedTicks,
+      toTick: caught.tick,
+    });
+    settleCrewOpsDue(missions, caught, Date.now());
     listAircraftMarket(missions, caught);
     await saveMissions(missions);
   }
@@ -323,6 +362,11 @@ async function withCareerRead<T>(
   return withCareerLock(async () => {
     const world = await loadEconomyUnlocked();
     const missions = await loadMissions();
+    const crew = settleCrewOpsDue(missions, world, Date.now());
+    if (crew.settled.length > 0) {
+      await persistEconomyUnlocked(world);
+      await saveMissions(missions);
+    }
     return fn(world, missions);
   });
 }
@@ -337,6 +381,7 @@ async function withCareerWrite<T>(
   return withCareerLock(async () => {
     const world = await loadEconomyUnlocked();
     const missions = await loadMissions();
+    settleCrewOpsDue(missions, world, Date.now());
     const result = await fn(world, missions);
     await persistEconomyUnlocked(world);
     await saveMissions(missions);
@@ -540,6 +585,7 @@ type AirportMovement = {
   departedAtMs?: number;
   urgency: string;
   distanceNm?: number;
+  crewOperated?: boolean;
 };
 
 function mapAirportMovements(
@@ -581,45 +627,57 @@ function mapAirportMovements(
     if (!['accepted', 'dispatched', 'in_flight'].includes(m.status)) continue;
     if (m.originIcao !== icao && m.destIcao !== icao) continue;
     const dist = routeDistanceNm(world, m.originIcao, m.destIcao) ?? 0;
-    const cruise =
-      m.aircraftClassId === 'wide_freighter'
-        ? 480
-        : m.aircraftClassId === 'light_turboprop'
-          ? 185
-          : m.aircraftClassId === 'light_ga'
-            ? 170
-            : m.aircraftClassId === 'medium_piston'
-              ? 290
-              : m.aircraftClassId === 'light_jet' ||
-                  m.aircraftClassId === 'narrow_freighter'
-                ? 430
-                : 430;
-    const flightHours = Math.max(2, Math.ceil(dist / cruise));
+    const blockHours = estimateMissionBlockHours(
+      world,
+      m.originIcao,
+      m.destIcao,
+      m.aircraftClassId,
+    );
     const departedAt = m.departedAtTick ?? m.dispatchedAtTick ?? m.acceptedAtTick;
-    let etaHours = flightHours;
-    let etaMs = hoursToMs(flightHours);
+    let etaHours = blockHours;
+    let etaMs = hoursToMs(blockHours);
     let progressPct = 0;
     let phase = m.status === 'in_flight' ? 'enroute' : 'boarding';
     let arrivesAtMs: number | undefined;
     let departedAtMs: number | undefined;
-    if (m.status === 'in_flight' && departedAt !== undefined) {
-      // Approximate player ETA from tick stamps relative to batch anchor.
-      departedAtMs = world.lastBatchAtMs - (world.tick - departedAt) * MS_PER_TICK;
-      arrivesAtMs = departedAtMs + hoursToMs(flightHours);
-      etaMs = Math.max(0, arrivesAtMs - nowMs);
-      etaHours = msToHours(etaMs);
-      const duration = Math.max(1, arrivesAtMs - departedAtMs);
-      const flown = Math.min(duration, Math.max(0, nowMs - departedAtMs));
-      progressPct = Math.min(100, Math.round((flown / duration) * 100));
-      phase = etaMs <= MS_PER_TICK ? 'arriving' : 'enroute';
+    if (m.status === 'in_flight') {
+      const hasWallClock =
+        typeof m.airborneAtMs === 'number' &&
+        Number.isFinite(m.airborneAtMs) &&
+        typeof m.expectedRouteMs === 'number' &&
+        Number.isFinite(m.expectedRouteMs) &&
+        m.expectedRouteMs > 0;
+      if (hasWallClock) {
+        departedAtMs = m.airborneAtMs;
+        arrivesAtMs = m.airborneAtMs! + m.expectedRouteMs!;
+      } else if (departedAt !== undefined) {
+        // Approximate from economy ticks when wall-clock stamps are missing.
+        departedAtMs =
+          world.lastBatchAtMs - (world.tick - departedAt) * MS_PER_TICK;
+        arrivesAtMs = departedAtMs + hoursToMs(blockHours);
+      }
+      if (departedAtMs !== undefined && arrivesAtMs !== undefined) {
+        etaMs = Math.max(0, arrivesAtMs - nowMs);
+        etaHours = msToHours(etaMs);
+        const duration = Math.max(1, arrivesAtMs - departedAtMs);
+        const flown = Math.min(duration, Math.max(0, nowMs - departedAtMs));
+        progressPct = Math.min(100, Math.round((flown / duration) * 100));
+        phase = etaMs <= MS_PER_TICK ? 'arriving' : 'enroute';
+      }
     }
     const movement: AirportMovement = {
       id: m.id,
       kind: 'player',
-      operatorName: 'You',
+      operatorName: m.crewOperated
+        ? m.crewDeadhead
+          ? 'Crew return'
+          : 'Crew'
+        : 'You',
       originIcao: m.originIcao,
       destIcao: m.destIcao,
-      commodityName: getCommodity(m.commodityId).name,
+      commodityName: m.crewDeadhead
+        ? 'Empty return'
+        : getCommodity(m.commodityId).name,
       cargoKg: m.cargoKg,
       payUsd: m.payUsd,
       aircraftClassId: m.aircraftClassId,
@@ -629,12 +687,13 @@ function mapAirportMovements(
       progressPct,
       arrivesAtTick:
         m.status === 'in_flight' && departedAt !== undefined
-          ? departedAt + flightHours
+          ? departedAt + Math.max(1, Math.ceil(blockHours))
           : undefined,
       arrivesAtMs,
       departedAtMs,
       urgency: m.urgency,
       distanceNm: dist,
+      crewOperated: m.crewOperated === true,
     };
     if (m.destIcao === icao) arrivals.push(movement);
     if (m.originIcao === icao) departures.push(movement);
@@ -708,6 +767,8 @@ export function createCareerApiServer(port = 8787) {
             ...fleetPayload(missions, world),
             cashflow: summarizeCareerLedger(missions, world.tick),
             cargoOps: missions.cargoOps ?? null,
+            playerFbos: playerFboSnapshot(missions, world),
+            companyCrew: companyCrewSnapshot(missions, world),
             homeCountryId: world.homeCountryId ?? null,
             countries: listWorldCountryIds(world),
             internationalLaneCount: world.internationalLanes?.length ?? 0,
@@ -1013,7 +1074,7 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           const result = await withCareerWrite((world, missions) => {
-            const term = body.termMonths === 24 ? (24 as const) : (12 as const);
+            const term = body.termMonths === 12 ? (12 as const) : (6 as const);
             const listed = listAircraftForLease(
               missions,
               body.aircraftId!,
@@ -1144,7 +1205,36 @@ export function createCareerApiServer(port = 8787) {
             return {
               walletUsd: missions.walletUsd,
               debitUsd: boughtOut.debitUsd,
-              fleet: withParkingRates(missions.fleet, world),
+              fleet: withParkingRates(missions.fleet, world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/return-lease') {
+        const body = (await readBody(req)) as { aircraftId?: string };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const returned = returnAircraftLeaseEarly(
+              missions,
+              body.aircraftId!,
+              world.tick,
+            );
+            return {
+              walletUsd: missions.walletUsd,
+              debitUsd: returned.debitUsd,
+              remainingMonths: returned.remainingMonths,
+              fleet: withParkingRates(missions.fleet, world, missions),
             };
           });
           send(res, 200, result);
@@ -1281,7 +1371,7 @@ export function createCareerApiServer(port = 8787) {
           blockFuelKg > 0
         ) {
           try {
-            const fuelQuote = await withCareerRead((world) =>
+            const fuelQuote = await withCareerRead((world, missions) =>
               quoteFuelUplift(world, {
                 originIcao,
                 destIcao: destIcao || undefined,
@@ -1291,6 +1381,7 @@ export function createCareerApiServer(port = 8787) {
                     ? distanceNm
                     : undefined,
                 requestedKg: blockFuelKg,
+                costMult: fboServiceCostMult(missions, originIcao),
               }),
             );
             estimatedFuelCostUsd = fuelQuote.costUsd;
@@ -1604,7 +1695,478 @@ export function createCareerApiServer(port = 8787) {
           ),
           fuelInbound,
           fuelRecent,
+          playerFbos: playerFboSnapshotAtIcao(missions, world, icao),
+          homeHubIcao: missions.homeHubIcao || null,
         });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/buy') {
+        const body = (await readBody(req)) as { icao?: string };
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const icao = (body.icao ?? missions.homeHubIcao).trim().toUpperCase();
+            const bought = buyFboTier1(missions, world, icao);
+            return {
+              walletUsd: missions.walletUsd,
+              debitUsd: bought.debitUsd,
+              fbo: bought.fbo,
+              playerFbos: playerFboSnapshot(missions, world),
+              companyCrew: companyCrewSnapshot(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/upgrade') {
+        const body = (await readBody(req)) as { fboId?: string };
+        if (!body.fboId) {
+          send(res, 400, { error: 'fboId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const upgraded = upgradeFboToTier2(missions, world, body.fboId!);
+            return {
+              walletUsd: missions.walletUsd,
+              debitUsd: upgraded.debitUsd,
+              fbo: upgraded.fbo,
+              playerFbos: playerFboSnapshot(missions, world),
+              companyCrew: companyCrewSnapshot(missions, world),
+              fleet: withParkingRates(missions.fleet, world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/hold') {
+        const body = (await readBody(req)) as {
+          lotId?: string;
+          cargoKg?: number;
+        };
+        if (!body.lotId) {
+          send(res, 400, { error: 'lotId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const held = holdLotAtFbo(missions, world, {
+              lotId: body.lotId!,
+              cargoKg: body.cargoKg,
+            });
+            return {
+              hold: held.hold,
+              playerFbos: playerFboSnapshot(missions, world),
+              walletUsd: missions.walletUsd,
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/cancel-hold') {
+        const body = (await readBody(req)) as { holdId?: string };
+        if (!body.holdId) {
+          send(res, 400, { error: 'holdId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const cancelled = cancelFboHold(missions, world, body.holdId!);
+            return {
+              releasedKg: cancelled.releasedKg,
+              playerFbos: playerFboSnapshot(missions, world),
+              walletUsd: missions.walletUsd,
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/reroute') {
+        const body = (await readBody(req)) as {
+          holdId?: string;
+          destIcao?: string;
+          quoteOnly?: boolean;
+        };
+        if (!body.holdId || !body.destIcao?.trim()) {
+          send(res, 400, { error: 'holdId and destIcao required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const hold = (missions.playerFbos?.holds ?? []).find(
+              (h) => h.id === body.holdId,
+            );
+            if (!hold) throw new Error(`Unknown FBO hold ${body.holdId}`);
+            const feeUsd = quoteFboRerouteUsd(world, hold, body.destIcao!);
+            if (body.quoteOnly) {
+              const payQuote = quoteFboReroutePayAfterUsd(
+                world,
+                hold,
+                body.destIcao!,
+              );
+              return {
+                quoteOnly: true as const,
+                feeUsd,
+                payAfterUsd: payQuote.payAfterUsd,
+                haircutApplied: payQuote.haircutApplied,
+                bumpApplied: payQuote.bumpApplied,
+                bumpFrac: payQuote.bumpFrac,
+                previousDestIcao: hold.destIcao,
+                destIcao: body.destIcao!.trim().toUpperCase(),
+                walletUsd: missions.walletUsd,
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }
+            assertCompanyCreditAllowsOps(missions);
+            const rerouted = rerouteFboHold(missions, world, {
+              holdId: body.holdId!,
+              destIcao: body.destIcao!,
+            });
+            return {
+              quoteOnly: false as const,
+              debitUsd: rerouted.debitUsd,
+              feeUsd: rerouted.debitUsd,
+              hold: rerouted.hold,
+              previousDestIcao: rerouted.previousDestIcao,
+              destIcao: rerouted.hold.destIcao,
+              haircutApplied: rerouted.haircutApplied,
+              bumpApplied: rerouted.bumpApplied,
+              payAfterUsd: rerouted.hold.payUsd,
+              playerFbos: playerFboSnapshot(missions, world),
+              walletUsd: missions.walletUsd,
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/release') {
+        const body = (await readBody(req)) as {
+          holdId?: string;
+          aircraft?: string;
+          aircraftId?: string;
+        };
+        if (!body.holdId) {
+          send(res, 400, { error: 'holdId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const hold = (missions.playerFbos?.holds ?? []).find(
+              (h) => h.id === body.holdId,
+            );
+            let aircraftClassId = parseFreighterClassId(body.aircraft);
+            let maxCargoKg: number | undefined;
+            if (body.aircraftId) {
+              const acf = findPlayerAircraft(missions, body.aircraftId);
+              if (!acf) {
+                throw new Error(`Unknown aircraft ${body.aircraftId}`);
+              }
+              aircraftClassId = acf.aircraftClassId;
+              const catalog = acf.airframeTypeId
+                ? findCareerPlayerAirframe(acf.airframeTypeId)
+                : undefined;
+              if (catalog?.maxCargoKg) maxCargoKg = catalog.maxCargoKg;
+            } else if (!aircraftClassId && hold) {
+              const parked = missions.fleet.find(
+                (a) =>
+                  a.locationIcao.toUpperCase() === hold.originIcao &&
+                  (a.status === 'parked' || a.status === 'maintenance'),
+              );
+              aircraftClassId = parked?.aircraftClassId ?? 'light_ga';
+              if (parked?.airframeTypeId) {
+                const catalog = findCareerPlayerAirframe(parked.airframeTypeId);
+                if (catalog?.maxCargoKg) maxCargoKg = catalog.maxCargoKg;
+              }
+            }
+            const released = releaseFboHoldToMission(missions, world, {
+              holdId: body.holdId!,
+              aircraftClassId: aircraftClassId ?? 'light_ga',
+              maxCargoKg,
+            });
+            return {
+              mission: withMissionLoadPolicy(released.mission),
+              playerFbos: playerFboSnapshot(missions, world),
+              walletUsd: missions.walletUsd,
+              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/split') {
+        const body = (await readBody(req)) as {
+          holdId?: string;
+          legs?: Array<{ aircraftId?: string; cargoKg?: number }>;
+        };
+        if (!body.holdId) {
+          send(res, 400, { error: 'holdId required' });
+          return;
+        }
+        if (!Array.isArray(body.legs) || body.legs.length === 0) {
+          send(res, 400, { error: 'legs required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const split = splitFboHold(missions, world, {
+              holdId: body.holdId!,
+              legs: body.legs!.map((leg) => ({
+                aircraftId: String(leg.aircraftId ?? ''),
+                cargoKg: Number(leg.cargoKg),
+              })),
+            });
+            return {
+              missions: split.missions.map((m) => withMissionLoadPolicy(m)),
+              hold: split.hold,
+              allocatedKg: split.allocatedKg,
+              remainingKg: split.remainingKg,
+              playerFbos: playerFboSnapshot(missions, world),
+              fleet: withParkingRates(missions.fleet, world, missions),
+              walletUsd: missions.walletUsd,
+              allMissions: missions.missions.map((m) =>
+                withMissionLoadPolicy(m),
+              ),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/return-mission') {
+        const body = (await readBody(req)) as { missionId?: string };
+        if (!body.missionId?.trim()) {
+          send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const returned = returnMissionToFboHold(
+              missions,
+              world,
+              body.missionId!.trim(),
+            );
+            return {
+              mission: withMissionLoadPolicy(returned.mission),
+              hold: returned.hold,
+              merged: returned.merged,
+              playerFbos: playerFboSnapshot(missions, world),
+              fleet: withParkingRates(missions.fleet, world, missions),
+              walletUsd: missions.walletUsd,
+              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/crew/assign') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          crewMemberId?: string;
+        };
+        if (!body.missionId?.trim() || !body.crewMemberId?.trim()) {
+          send(res, 400, { error: 'missionId and crewMemberId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const mission = assignCrewMemberToMission(missions, {
+              missionId: body.missionId!.trim(),
+              crewMemberId: body.crewMemberId!.trim(),
+            });
+            return {
+              mission: withMissionLoadPolicy(mission),
+              companyCrew: companyCrewSnapshot(missions, world),
+              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/crew/dispatch') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          holdId?: string;
+          aircraftId?: string;
+          crewMemberId?: string;
+        };
+        if (!body.missionId && !body.holdId) {
+          send(res, 400, { error: 'missionId or holdId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            let missionId = body.missionId?.trim();
+            if (!missionId && body.holdId) {
+              const hold = (missions.playerFbos?.holds ?? []).find(
+                (h) => h.id === body.holdId,
+              );
+              if (!hold) throw new Error(`Unknown hold ${body.holdId}`);
+              let aircraftClassId: FreighterClassId = 'light_ga';
+              let maxCargoKg: number | undefined;
+              if (body.aircraftId) {
+                const acf = findPlayerAircraft(missions, body.aircraftId);
+                if (!acf) throw new Error(`Unknown aircraft ${body.aircraftId}`);
+                aircraftClassId = acf.aircraftClassId;
+                const catalog = acf.airframeTypeId
+                  ? findCareerPlayerAirframe(acf.airframeTypeId)
+                  : undefined;
+                if (catalog?.maxCargoKg) maxCargoKg = catalog.maxCargoKg;
+              } else {
+                const parked = missions.fleet.find(
+                  (a) =>
+                    a.status === 'parked' &&
+                    a.locationIcao.toUpperCase() ===
+                      hold.originIcao.toUpperCase(),
+                );
+                if (parked) {
+                  aircraftClassId = parked.aircraftClassId;
+                  const catalog = parked.airframeTypeId
+                    ? findCareerPlayerAirframe(parked.airframeTypeId)
+                    : undefined;
+                  if (catalog?.maxCargoKg) maxCargoKg = catalog.maxCargoKg;
+                }
+              }
+              const released = releaseFboHoldToMission(missions, world, {
+                holdId: body.holdId!,
+                aircraftClassId,
+                maxCargoKg,
+              });
+              missionId = released.mission.id;
+            }
+            const dispatched = dispatchCrewMission(missions, world, {
+              missionId: missionId!,
+              aircraftId: body.aircraftId,
+              crewMemberId: body.crewMemberId,
+              nowMs: Date.now(),
+            });
+            return {
+              mission: withMissionLoadPolicy(dispatched.mission),
+              crewFeeUsd: dispatched.crewFeeUsd,
+              returnFeeUsd: dispatched.returnFeeUsd,
+              totalRoundTripFeeUsd: dispatched.totalRoundTripFeeUsd,
+              fuelDebitUsd: dispatched.fuelDebitUsd,
+              walletUsd: missions.walletUsd,
+              fleet: withParkingRates(missions.fleet, world, missions),
+              playerFbos: playerFboSnapshot(missions, world),
+              companyCrew: companyCrewSnapshot(missions, world),
+              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/crew/hire') {
+        const body = (await readBody(req)) as { candidateId?: string };
+        if (!body.candidateId?.trim()) {
+          send(res, 400, { error: 'candidateId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const hired = hireCrewCandidate(missions, world, body.candidateId!.trim());
+            return {
+              member: hired.member,
+              debitUsd: hired.debitUsd,
+              walletUsd: missions.walletUsd,
+              companyCrew: companyCrewSnapshot(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/crew/fire') {
+        const body = (await readBody(req)) as { memberId?: string };
+        if (!body.memberId?.trim()) {
+          send(res, 400, { error: 'memberId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const fired = fireCrewMember(missions, body.memberId!.trim());
+            return {
+              member: fired,
+              walletUsd: missions.walletUsd,
+              companyCrew: companyCrewSnapshot(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 
@@ -1627,11 +2189,35 @@ export function createCareerApiServer(port = 8787) {
             fromTick: world.tick - n,
             toTick: world.tick,
           });
+          const fboOps = settleFboOps(missions, world, {
+            fromTick: world.tick - n,
+            toTick: world.tick,
+          });
+          const crewDaily = settleCrewDailyOps(missions, world, {
+            fromTick: world.tick - n,
+            toTick: world.tick,
+          });
           const creditOps = settleCompanyCredit(missions, {
             fromTick: world.tick - n,
             toTick: world.tick,
           });
           listAircraftMarket(missions, world);
+          // Debug time skip: crew legs use wall-clock, not economy ticks.
+          const advanceMs = n * MS_PER_TICK;
+          for (const mission of missions.missions) {
+            if (
+              mission.crewOperated === true &&
+              mission.status === 'in_flight' &&
+              typeof mission.airborneAtMs === 'number' &&
+              Number.isFinite(mission.airborneAtMs)
+            ) {
+              mission.airborneAtMs = Math.max(
+                0,
+                mission.airborneAtMs - advanceMs,
+              );
+            }
+          }
+          const crewOps = settleCrewOpsDue(missions, world, Date.now());
           const nowMs = Date.now();
           return {
             ...clockPayload(world, nowMs),
@@ -1643,11 +2229,18 @@ export function createCareerApiServer(port = 8787) {
             hangarRequestedUsd: hangarOps.requestedUsd,
             hangarShortfallUsd: hangarOps.shortfallUsd,
             hangarDaysCharged: hangarOps.daysCharged,
+            fboStorageDebitUsd: fboOps.storage.debitUsd,
+            fboHoldsExpired: fboOps.expired.length,
+            fboExpirePenaltyUsd: fboOps.expirePenaltyUsd,
+            crewSalaryDebitUsd: crewDaily.salary.debitUsd,
+            crewSettled: crewOps.settled.length,
             creditInterestPaidUsd: creditOps.interestPaidUsd,
             creditInterestCompoundedUsd: creditOps.interestCompoundedUsd,
             creditOverdueDays: creditOps.overdueDays,
             creditPrincipalUsd: creditOps.principalUsd,
             companyCredit: companyCreditSnapshot(missions),
+            playerFbos: playerFboSnapshot(missions, world),
+            companyCrew: companyCrewSnapshot(missions, world),
             walletUsd: missions.walletUsd,
           };
         });
@@ -2192,6 +2785,9 @@ export function createCareerApiServer(port = 8787) {
               }
             }
             const cancelled = cancelMission(world, existing, { fleet: missions });
+            if (existing.crewOperated || existing.crewMemberId) {
+              releaseCompanyCrewFromMission(missions, cancelled.id);
+            }
             let reservedAfter = 0;
             let anyReturned = false;
             for (const line of lines) {

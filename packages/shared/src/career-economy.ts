@@ -908,7 +908,7 @@ export function isNearAirport(
 }
 
 export function routeDistanceNm(
-  world: CareerEconomyWorld,
+  world: Pick<CareerEconomyWorld, 'airports'>,
   originIcao: string,
   destIcao: string,
 ): number | undefined {
@@ -1738,9 +1738,10 @@ export function pruneDeadLots(
 
 function expireLots(world: CareerEconomyWorld): void {
   for (const lot of world.lots) {
-    if (lot.status !== 'available' && lot.status !== 'reserved') {
-      continue;
-    }
+    // Only unbooked market remainder expires. Reserved / in_transit cargo is
+    // owned by holds or airborne missions until settle / FBO expire paths run.
+    if (lot.status !== 'available') continue;
+    if (lot.reservedKg > 0) continue;
     if (world.tick >= lot.expiresAtTick) {
       lot.status = 'expired';
     }

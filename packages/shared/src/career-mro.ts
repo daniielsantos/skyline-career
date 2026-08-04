@@ -17,6 +17,7 @@ import {
   syncMaintenanceDueAtHours,
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta } from './career-ledger.js';
+import { fboServiceCostMult } from './career-fbo-perks.js';
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
@@ -175,7 +176,10 @@ export function clearAircraftMaintenanceWithParts(
     icao: aircraft.locationIcao,
     requestedKg: mroKgForInspection(aircraft.aircraftClassId),
   });
-  const debit = Math.round((labor * mro.laborSurcharge + mro.partsCostUsd) * 100) / 100;
+  const serviceMult = fboServiceCostMult(state, aircraft.locationIcao);
+  const debit =
+    Math.round((labor * mro.laborSurcharge + mro.partsCostUsd) * serviceMult * 100) /
+    100;
   if (state.walletUsd < debit) {
     throw new Error(
       `Inspection $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}` +
@@ -239,7 +243,10 @@ export function repairAircraftConditionWithParts(
     icao: aircraft.locationIcao,
     requestedKg: mroKgForRepair(aircraft.aircraftClassId, afApply, engApply),
   });
-  const debit = Math.round((labor * mro.laborSurcharge + mro.partsCostUsd) * 100) / 100;
+  const serviceMult = fboServiceCostMult(state, aircraft.locationIcao);
+  const debit =
+    Math.round((labor * mro.laborSurcharge + mro.partsCostUsd) * serviceMult * 100) /
+    100;
   if (state.walletUsd < debit) {
     throw new Error(
       `Repair $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}` +

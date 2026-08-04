@@ -71,6 +71,8 @@ export function ensureV3Ddl(db: SqliteDb): void {
       aircraft_market_day INTEGER,
       aircraft_market_demand_day INTEGER,
       airframe_perf_json TEXT,
+      player_fbos_json TEXT,
+      company_crew_json TEXT,
       updated_at_ms INTEGER NOT NULL,
       FOREIGN KEY (company_id) REFERENCES companies(id)
     );
@@ -178,6 +180,12 @@ export function ensureV3Ddl(db: SqliteDb): void {
   }
   if (!columnExists(db, 'ledger', 'company_id')) {
     db.exec(`ALTER TABLE ledger ADD COLUMN company_id TEXT NOT NULL DEFAULT 'local'`);
+  }
+  if (!columnExists(db, 'company_state', 'player_fbos_json')) {
+    db.exec(`ALTER TABLE company_state ADD COLUMN player_fbos_json TEXT`);
+  }
+  if (!columnExists(db, 'company_state', 'company_crew_json')) {
+    db.exec(`ALTER TABLE company_state ADD COLUMN company_crew_json TEXT`);
   }
   db.exec(`
     CREATE INDEX IF NOT EXISTS ledger_company_tick_idx ON ledger(company_id, at_tick);
@@ -974,11 +982,13 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
     `INSERT INTO company_state (
        company_id, wallet_usd, pilot_name, pilot_icao, hub_selected,
        company_credit_json, cargo_ops_json, aircraft_market_json,
-       aircraft_market_day, aircraft_market_demand_day, airframe_perf_json, updated_at_ms
+       aircraft_market_day, aircraft_market_demand_day, airframe_perf_json,
+       player_fbos_json, company_crew_json, updated_at_ms
      ) VALUES (
        @company_id, @wallet_usd, @pilot_name, @pilot_icao, @hub_selected,
        @company_credit_json, @cargo_ops_json, @aircraft_market_json,
-       @aircraft_market_day, @aircraft_market_demand_day, @airframe_perf_json, @updated_at_ms
+       @aircraft_market_day, @aircraft_market_demand_day, @airframe_perf_json,
+       @player_fbos_json, @company_crew_json, @updated_at_ms
      )
      ON CONFLICT(company_id) DO UPDATE SET
        wallet_usd = excluded.wallet_usd,
@@ -991,6 +1001,11 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        aircraft_market_day = excluded.aircraft_market_day,
        aircraft_market_demand_day = excluded.aircraft_market_demand_day,
        airframe_perf_json = excluded.airframe_perf_json,
+       player_fbos_json = excluded.player_fbos_json,
+       company_crew_json = COALESCE(
+         excluded.company_crew_json,
+         company_state.company_crew_json
+       ),
        updated_at_ms = excluded.updated_at_ms`,
   ).run({
     company_id: LOCAL_COMPANY_ID,
@@ -1010,6 +1025,13 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
     airframe_perf_json: state.airframePerfOverrides
       ? JSON.stringify(state.airframePerfOverrides)
       : null,
+    player_fbos_json: state.playerFbos
+      ? JSON.stringify(state.playerFbos)
+      : null,
+    // null + COALESCE keeps prior roster when a write omits companyCrew.
+    company_crew_json: state.companyCrew
+      ? JSON.stringify(state.companyCrew)
+      : null,
     updated_at_ms: now,
   });
 }
@@ -1022,7 +1044,8 @@ export function readCompanyStateScalars(
     .prepare(
       `SELECT wallet_usd, pilot_name, pilot_icao, hub_selected, company_credit_json,
               cargo_ops_json, aircraft_market_json, aircraft_market_day,
-              aircraft_market_demand_day, airframe_perf_json
+              aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
+              company_crew_json
        FROM company_state WHERE company_id = ?`,
     )
     .get(companyId) as
@@ -1037,6 +1060,8 @@ export function readCompanyStateScalars(
         aircraft_market_day: number | null;
         aircraft_market_demand_day: number | null;
         airframe_perf_json: string | null;
+        player_fbos_json: string | null;
+        company_crew_json: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -1076,6 +1101,20 @@ export function readCompanyStateScalars(
   if (row.airframe_perf_json) {
     try {
       out.airframePerfOverrides = JSON.parse(row.airframe_perf_json);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (row.player_fbos_json) {
+    try {
+      out.playerFbos = JSON.parse(row.player_fbos_json);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (row.company_crew_json) {
+    try {
+      out.companyCrew = JSON.parse(row.company_crew_json);
     } catch {
       /* ignore */
     }

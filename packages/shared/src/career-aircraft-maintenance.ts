@@ -2,7 +2,8 @@
  * Skyline aircraft wear + inspection — calibrated to career freights / MSRP.
  */
 
-import { AIRCRAFT_MSRP_USD } from './career-aircraft-pricing.js';
+import { resolveAircraftMsrpUsd } from './career-aircraft-pricing.js';
+import { findCareerPlayerAirframe } from './career-player-airframes.js';
 import { applyWalletDelta } from './career-ledger.js';
 import type {
   AirframeCondition,
@@ -10,6 +11,13 @@ import type {
   FreighterClassId,
   PlayerAircraft,
 } from './types/career-economy.js';
+
+function msrpForAircraft(aircraft: PlayerAircraft): number {
+  return resolveAircraftMsrpUsd({
+    aircraftClassId: aircraft.aircraftClassId,
+    maxCargoKg: findCareerPlayerAirframe(aircraft.airframeTypeId)?.maxCargoKg,
+  });
+}
 
 /** Hours between mandatory workshop inspections. */
 export const INSPECTION_INTERVAL_HOURS: Record<FreighterClassId, number> = {
@@ -149,8 +157,7 @@ export function hoursUntilInspection(aircraft: PlayerAircraft): number {
 
 export function inspectionCostUsd(aircraft: PlayerAircraft): number {
   return Math.round(
-    AIRCRAFT_MSRP_USD[aircraft.aircraftClassId] *
-      INSPECTION_COST_RATE[aircraft.aircraftClassId],
+    msrpForAircraft(aircraft) * INSPECTION_COST_RATE[aircraft.aircraftClassId],
   );
 }
 
@@ -168,7 +175,7 @@ export function repairPointCostUsd(
   const mult = which === 'engine' ? 0.85 : 1;
   return Math.max(
     1,
-    Math.round(AIRCRAFT_MSRP_USD[aircraft.aircraftClassId] * rate * mult),
+    Math.round(msrpForAircraft(aircraft) * rate * mult),
   );
 }
 

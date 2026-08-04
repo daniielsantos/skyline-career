@@ -75,6 +75,8 @@ export function quoteFuelUplift(
     destIcao?: string;
     distanceNm?: number;
     requestedKg?: number;
+    /** Multiplier on final cost (e.g. FBO service perk). */
+    costMult?: number;
   },
 ): FuelUpliftQuote {
   const originIcao = opts.originIcao.trim().toUpperCase();
@@ -94,8 +96,14 @@ export function quoteFuelUplift(
     opts.requestedKg,
   );
   const availableKg = Math.max(0, Math.floor(stock.stockKg));
+  const costMult =
+    typeof opts.costMult === 'number' &&
+    Number.isFinite(opts.costMult) &&
+    opts.costMult > 0
+      ? opts.costMult
+      : 1;
   const unitPriceUsd =
-    Math.round(localUnitPriceUsd('fuel', stock) * 1000) / 1000;
+    Math.round(localUnitPriceUsd('fuel', stock) * costMult * 1000) / 1000;
   const fromTerminal = Math.min(requestedKg, availableKg);
   const shortfall = requestedKg - fromTerminal;
   let costUsd = fromTerminal * unitPriceUsd;

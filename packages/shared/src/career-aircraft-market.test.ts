@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  AIRCRAFT_MSRP_USD,
   __testApplyNpcDemand,
   applyAircraftHoursAfterMission,
   clearAircraftMaintenance,
@@ -11,6 +10,10 @@ import {
   listAircraftForLease,
   listAircraftMarket,
   purchaseAircraftListing,
+  quoteLeaseEarlyReturnUsd,
+  leaseRemainingMonths,
+  resolveAircraftMsrpUsd,
+  returnAircraftLeaseEarly,
   sellPlayerAircraft,
   settleAircraftMarketOps,
   signAircraftLease,
@@ -19,7 +22,10 @@ import {
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { economyDayIndex } from './career-weather.js';
-import { listCareerPlayerAirframes } from './career-player-airframes.js';
+import {
+  findCareerPlayerAirframe,
+  listCareerPlayerAirframes,
+} from './career-player-airframes.js';
 
 describe('aircraft market', () => {
   it('generates a stable new/used/lease board for a seed day', () => {
@@ -62,17 +68,34 @@ describe('aircraft market', () => {
     assert.ok(a.every((l) => Boolean(l.airframeTypeId)));
     assert.ok(a.every((l) => l.label.length > 0));
     for (const used of a.filter((l) => l.kind === 'used')) {
+      const msrp = resolveAircraftMsrpUsd({
+        aircraftClassId: used.aircraftClassId,
+        maxCargoKg: findCareerPlayerAirframe(used.airframeTypeId)?.maxCargoKg,
+      });
       assert.ok(
-        used.askingUsd < AIRCRAFT_MSRP_USD[used.aircraftClassId] * 0.95,
-        `${used.id} used should be below new MSRP`,
+        used.askingUsd < msrp * 0.95,
+        `${used.id} used should be below airframe new MSRP`,
       );
     }
     for (const lease of a.filter((l) => l.kind === 'lease')) {
+      const msrp = resolveAircraftMsrpUsd({
+        aircraftClassId: lease.aircraftClassId,
+        maxCargoKg: findCareerPlayerAirframe(lease.airframeTypeId)?.maxCargoKg,
+      });
       assert.ok(
-        (lease.askingUsd ?? 0) < AIRCRAFT_MSRP_USD[lease.aircraftClassId] * 0.2,
+        (lease.askingUsd ?? 0) < msrp * 0.2,
         'lease entry should be far below purchase',
       );
       assert.ok((lease.leaseMonthlyUsd ?? 0) > 0);
+      assert.ok(
+        lease.leaseTermMonths === 6 || lease.leaseTermMonths === 12,
+        'lease terms are short career contracts',
+      );
+      assert.equal(
+        lease.askingUsd,
+        Math.round((lease.leaseMonthlyUsd ?? 0) * 2),
+        'lease deposit is two months',
+      );
     }
   });
 
@@ -140,6 +163,66 @@ describe('aircraft market', () => {
     assert.ok(aircraft.lease);
     assert.ok((aircraft.lease!.monthlyUsd ?? 0) > 0);
     assert.ok(aircraft.lease!.termEndsTick > world.tick);
+  });
+
+  it('early-returns a lease with a remaining-month penalty and drops the airframe', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-early-return' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
+      pilotName: 'EarlyReturn',
+    });
+    state.aircraftMarketDemandDay = economyDayIndex(world.tick);
+    const listings = listAircraftMarket(state, world);
+    const lease = listings.find(
+      (l) => l.kind === 'lease' && (l.source ?? 'generated') === 'generated',
+    );
+    assert.ok(lease);
+    state.walletUsd = lease!.askingUsd + 200_000;
+    const { aircraft } = signAircraftLease(state, world, lease!.id);
+    const monthly = aircraft.lease!.monthlyUsd;
+    const remaining = leaseRemainingMonths(aircraft, world.tick);
+    const expected = quoteLeaseEarlyReturnUsd(aircraft, world.tick);
+    assert.equal(
+      expected,
+      Math.round(monthly * Math.min(3, Math.max(1, Math.ceil(remaining * 0.5)))),
+    );
+    const before = state.walletUsd;
+    const result = returnAircraftLeaseEarly(state, aircraft.id, world.tick);
+    assert.equal(result.debitUsd, expected);
+    assert.equal(state.walletUsd, before - expected);
+    assert.ok(!state.fleet.some((a) => a.id === aircraft.id));
+    assert.ok(
+      (state.ledger ?? []).some(
+        (e) => e.kind === 'lease_early_return' && e.aircraftId === aircraft.id,
+      ),
+    );
+  });
+
+  it('rejects early return when lease is overdue or aircraft is assigned', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-early-block' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBRF', {
+      pilotName: 'Blocked',
+    });
+    state.aircraftMarketDemandDay = economyDayIndex(world.tick);
+    const listings = listAircraftMarket(state, world);
+    const lease = listings.find(
+      (l) => l.kind === 'lease' && (l.source ?? 'generated') === 'generated',
+    );
+    assert.ok(lease);
+    state.walletUsd = lease!.askingUsd + 200_000;
+    const { aircraft } = signAircraftLease(state, world, lease!.id);
+
+    aircraft.leaseOverdue = true;
+    assert.throws(
+      () => returnAircraftLeaseEarly(state, aircraft.id, world.tick),
+      /overdue/i,
+    );
+    aircraft.leaseOverdue = false;
+
+    aircraft.status = 'assigned';
+    assert.throws(
+      () => returnAircraftLeaseEarly(state, aircraft.id, world.tick),
+      /mission/i,
+    );
   });
 
   it('sell-back credits wallet and relists used on the board', () => {

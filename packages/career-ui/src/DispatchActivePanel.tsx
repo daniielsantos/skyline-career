@@ -13,6 +13,7 @@ import {
   PayloadStationSchematic,
 } from './LoadSchematic';
 import { DispatchRouteCard } from './DispatchRouteCard';
+import { CrewFlyControls } from './CrewFlyControls';
 import {
   formatPayloadDueLine,
   pickFuelTankBreakdown,
@@ -134,6 +135,12 @@ export function DispatchActivePanel(props: {
   onContinueManually: () => void;
   onDepart: (mission: Mission) => void;
   onSettle: (mission: Mission) => void;
+  /** Company crew AI dispatch (accepted/dispatched only). */
+  onCrewDispatch?: (mission: Mission, crewMemberId: string) => void;
+  /** Persist preferred crew on the mission before Crew fly. */
+  onCrewAssign?: (mission: Mission, crewMemberId: string) => void;
+  idleCrew?: Array<{ id: string; displayName: string; perkLabel?: string }>;
+  crewSlotsFree?: number;
   /** Re-fetch SimBrief OFP to refresh briefing (incl. navlog waypoints). */
   onRefreshOfpBriefing: (mission: Mission) => Promise<void>;
 }) {
@@ -1071,6 +1078,32 @@ export function DispatchActivePanel(props: {
             >
               Continue manually
             </button>
+          ) : null}
+          {['accepted', 'dispatched'].includes(mission.status) &&
+          props.onCrewDispatch &&
+          (props.idleCrew?.length ?? 0) > 0 &&
+          !mission.crewOperated ? (
+            <CrewFlyControls
+              idleCrew={props.idleCrew ?? []}
+              busy={busy}
+              buttonLabel="Send with crew"
+              value={mission.crewMemberId}
+              onSelect={(crewMemberId) =>
+                props.onCrewAssign?.(mission, crewMemberId)
+              }
+              onFly={(crewMemberId) =>
+                props.onCrewDispatch?.(mission, crewMemberId)
+              }
+            />
+          ) : null}
+          {mission.crewOperated && mission.status === 'in_flight' ? (
+            <span className="settings-chip">
+              Crew airborne
+              {typeof mission.airborneAtMs === 'number' &&
+              typeof mission.expectedRouteMs === 'number'
+                ? ` · ETA ${new Date(mission.airborneAtMs + mission.expectedRouteMs).toLocaleTimeString()}`
+                : ''}
+            </span>
           ) : null}
           {['accepted', 'dispatched'].includes(mission.status) ? (
             <button

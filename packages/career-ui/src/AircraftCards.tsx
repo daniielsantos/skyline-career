@@ -493,25 +493,27 @@ export function HangarAircraftCard(props: {
         }
       />
       <div className="hangar-card-body">
-        <div className="aircraft-card-title">
-          <strong>{acf.label}</strong>
-          <div className="aircraft-card-meta">
-            <span>{aircraftClassLabel(acf.aircraftClassId)}</span>
-            {acf.condition ? (
-              <span className={`badge badge-cond-${acf.condition}`}>
-                {acf.condition}
-              </span>
-            ) : null}
-            {acf.leaseOverdue ? (
-              <span className="badge badge-warn">lease overdue</span>
-            ) : null}
+        <div className="hangar-section hangar-section-title">
+          <div className="aircraft-card-title">
+            <strong>{acf.label}</strong>
+            <div className="aircraft-card-meta">
+              <span>{aircraftClassLabel(acf.aircraftClassId)}</span>
+              {acf.condition ? (
+                <span className={`badge badge-cond-${acf.condition}`}>
+                  {acf.condition}
+                </span>
+              ) : null}
+              {acf.leaseOverdue ? (
+                <span className="badge badge-warn">lease overdue</span>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        <div>
+        <div className="hangar-section hangar-section-where">
           <p className="aircraft-card-section-label">Where</p>
-          <div className="aircraft-card-meta">
-            <span>{hangarWhereLabel(acf)}</span>
+          <div className="hangar-where-line">
+            <span className="hangar-where-status">{hangarWhereLabel(acf)}</span>
             <button
               type="button"
               className="icao-link"
@@ -521,13 +523,13 @@ export function HangarAircraftCard(props: {
             >
               {acf.locationIcao}
             </button>
-            <span className="muted">
-              · pilot {pilotHere ? 'here' : `at ${pilotLabel}`}
-            </span>
+          </div>
+          <div className="hangar-where-line hangar-where-pilot">
+            Pilot {pilotHere ? 'here' : `at ${pilotLabel}`}
           </div>
         </div>
 
-        <div>
+        <div className="hangar-section hangar-section-health">
           <p className="aircraft-card-section-label">Health</p>
           <ConditionBars
             rows={[
@@ -585,174 +587,180 @@ export function HangarAircraftCard(props: {
           </ul>
         </div>
 
-        {acf.lease || acf.leaseOut || acf.parkingUsdPerDay != null || ['assigned', 'leased_out', 'listed'].includes(acf.status) ? (
-          <div>
-            <p className="aircraft-card-section-label">Money</p>
-            <div className="aircraft-card-money">
-              {acf.parkingUsdPerDay != null ? (
+        <div className="hangar-section hangar-section-money">
+          <p className="aircraft-card-section-label">Money</p>
+          <div className="aircraft-card-money">
+            {acf.parkingUsdPerDay != null ? (
+              <span>
+                Parking {props.formatMoney(acf.parkingUsdPerDay)}/day at{' '}
+                {acf.locationIcao}
+              </span>
+            ) : acf.status === 'assigned' ? (
+              <span>Parking waived while assigned</span>
+            ) : acf.status === 'leased_out' ? (
+              <span>Parking waived while leased out</span>
+            ) : acf.status === 'listed' ? (
+              <span>Parking waived while listed</span>
+            ) : (
+              <span className="muted">No parking charge right now</span>
+            )}
+            {acf.lease ? (
+              <>
                 <span>
-                  Parking {props.formatMoney(acf.parkingUsdPerDay)}/day at{' '}
-                  {acf.locationIcao}
+                  Lease {props.formatMoney(acf.lease.monthlyUsd)}/mo · next due
+                  tick {acf.lease.nextDueTick}
                 </span>
-              ) : acf.status === 'assigned' ? (
-                <span>Parking waived while assigned</span>
-              ) : acf.status === 'leased_out' ? (
-                <span>Parking waived while leased out</span>
-              ) : acf.status === 'listed' ? (
-                <span>Parking waived while listed</span>
-              ) : null}
-              {acf.lease ? (
-                <>
-                  <span>
-                    Lease {props.formatMoney(acf.lease.monthlyUsd)}/mo · next due
-                    tick {acf.lease.nextDueTick}
-                  </span>
-                  {acf.lease.buyoutUsd != null ? (
-                    <span>Buyout {props.formatMoney(acf.lease.buyoutUsd)}</span>
-                  ) : null}
-                </>
-              ) : null}
-              {acf.leaseOut ? (
-                <>
-                  <span>
-                    Income {props.formatMoney(acf.leaseOut.monthlyUsd)}/mo
-                    {acf.leaseOut.lesseeName
-                      ? ` · ${acf.leaseOut.lesseeName}`
-                      : ''}
-                  </span>
-                  <span>
-                    Deposit held {props.formatMoney(acf.leaseOut.depositUsd)}
-                  </span>
-                </>
-              ) : null}
-            </div>
+                {acf.lease.buyoutUsd != null ? (
+                  <span>Buyout {props.formatMoney(acf.lease.buyoutUsd)}</span>
+                ) : null}
+              </>
+            ) : null}
+            {acf.leaseOut ? (
+              <>
+                <span>
+                  Income {props.formatMoney(acf.leaseOut.monthlyUsd)}/mo
+                  {acf.leaseOut.lesseeName
+                    ? ` · ${acf.leaseOut.lesseeName}`
+                    : ''}
+                </span>
+                <span>
+                  Deposit held {props.formatMoney(acf.leaseOut.depositUsd)}
+                </span>
+              </>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
 
       <div className="hangar-footer">
-        {primaryAction ? (
-          <button
-            type="button"
-            className="accept hangar-primary"
-            disabled={props.busy}
-            title={primaryAction.title}
-            onClick={primaryAction.onClick}
-          >
-            {primaryAction.label}
-          </button>
-        ) : null}
-
-        {showMove ? (
-          <div className="hangar-move">
-            <div
-              className="hangar-move-toggle"
-              role="group"
-              aria-label="Move mode"
+        <div className="hangar-footer-primary">
+          {primaryAction ? (
+            <button
+              type="button"
+              className="accept hangar-primary"
+              disabled={props.busy}
+              title={primaryAction.title}
+              onClick={primaryAction.onClick}
             >
-              <button
-                type="button"
-                className={moveMode === 'ferry' ? 'is-active' : undefined}
-                disabled={props.busy || acf.status !== 'parked'}
-                onClick={() => setMoveMode('ferry')}
+              {primaryAction.label}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="hangar-footer-move">
+          {showMove ? (
+            <div className="hangar-move">
+              <div
+                className="hangar-move-toggle"
+                role="group"
+                aria-label="Move mode"
               >
-                Aircraft
-              </button>
-              <button
-                type="button"
-                className={moveMode === 'pilot' ? 'is-active' : undefined}
-                disabled={props.busy}
-                onClick={() => setMoveMode('pilot')}
-              >
-                Pilot
-              </button>
-            </div>
-            <div className="hangar-move-row">
-              <label className="staging-aircraft ferry-hub-label">
-                {moveMode === 'ferry' ? 'Ferry to' : 'Pilot to'}
-                <FerryHubCombobox
-                  hubs={props.hubOptions}
-                  excludeIcao={moveExcludeIcao}
-                  value={moveValue}
-                  onChange={moveOnChange}
+                <button
+                  type="button"
+                  className={moveMode === 'ferry' ? 'is-active' : undefined}
+                  disabled={props.busy || acf.status !== 'parked'}
+                  onClick={() => setMoveMode('ferry')}
+                >
+                  Aircraft
+                </button>
+                <button
+                  type="button"
+                  className={moveMode === 'pilot' ? 'is-active' : undefined}
+                  disabled={props.busy}
+                  onClick={() => setMoveMode('pilot')}
+                >
+                  Pilot
+                </button>
+              </div>
+              <div className="hangar-move-row">
+                <label className="staging-aircraft ferry-hub-label">
+                  {moveMode === 'ferry' ? 'Ferry to' : 'Pilot to'}
+                  <FerryHubCombobox
+                    hubs={props.hubOptions}
+                    excludeIcao={moveExcludeIcao}
+                    value={moveValue}
+                    onChange={moveOnChange}
+                    disabled={
+                      props.busy ||
+                      (moveMode === 'ferry' && acf.status !== 'parked')
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="ghost hangar-move-go"
                   disabled={
                     props.busy ||
+                    !moveReady ||
                     (moveMode === 'ferry' && acf.status !== 'parked')
                   }
-                />
-              </label>
-              <button
-                type="button"
-                className="ghost hangar-move-go"
-                disabled={
-                  props.busy ||
-                  !moveReady ||
-                  (moveMode === 'ferry' && acf.status !== 'parked')
-                }
-                onClick={() => {
-                  if (moveMode === 'ferry') {
-                    props.onFerry(acf.id, props.ferryDest);
-                  } else {
-                    props.onTravel(props.travelDest);
-                  }
-                }}
-              >
-                Go
-              </button>
+                  onClick={() => {
+                    if (moveMode === 'ferry') {
+                      props.onFerry(acf.id, props.ferryDest);
+                    } else {
+                      props.onTravel(props.travelDest);
+                    }
+                  }}
+                >
+                  Go
+                </button>
+              </div>
             </div>
-          </div>
-        ) : note ? (
-          <p className="hangar-card-note">{note}</p>
-        ) : null}
+          ) : note ? (
+            <p className="hangar-card-note">{note}</p>
+          ) : null}
+        </div>
 
-        {showManage ? (
-          <details className="hangar-manage">
-            <summary>Manage</summary>
-            <div className="hangar-manage-actions">
-              {canRepair ? (
-                <button
-                  type="button"
-                  className="action ghost"
-                  disabled={props.busy}
-                  onClick={() => props.onRepair(acf.id)}
-                >
-                  Repair
-                </button>
-              ) : null}
-              {canBuyout ? (
-                <button
-                  type="button"
-                  className="action ghost"
-                  disabled={props.busy || acf.status === 'assigned'}
-                  onClick={() => props.onBuyout(acf.id)}
-                >
-                  Buy out
-                </button>
-              ) : null}
-              {canList ? (
-                <button
-                  type="button"
-                  className="action ghost"
-                  disabled={props.busy}
-                  onClick={() => props.onListForLease(acf.id)}
-                >
-                  List for lease
-                </button>
-              ) : null}
-              {canSell ? (
-                <button
-                  type="button"
-                  className="action ghost"
-                  disabled={props.busy}
-                  title={`Dealer buy-back ${props.formatMoney(sellBackUsd ?? 0)}`}
-                  onClick={() => props.onSell(acf.id)}
-                >
-                  Sell · {props.formatMoney(sellBackUsd ?? 0)}
-                </button>
-              ) : null}
-            </div>
-          </details>
-        ) : null}
+        <div className="hangar-footer-manage">
+          {showManage ? (
+            <details className="hangar-manage">
+              <summary>Manage</summary>
+              <div className="hangar-manage-actions">
+                {canRepair ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy}
+                    onClick={() => props.onRepair(acf.id)}
+                  >
+                    Repair
+                  </button>
+                ) : null}
+                {canBuyout ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy || acf.status === 'assigned'}
+                    onClick={() => props.onBuyout(acf.id)}
+                  >
+                    Buy out
+                  </button>
+                ) : null}
+                {canList ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy}
+                    onClick={() => props.onListForLease(acf.id)}
+                  >
+                    List for lease
+                  </button>
+                ) : null}
+                {canSell ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy}
+                    title={`Dealer buy-back ${props.formatMoney(sellBackUsd ?? 0)}`}
+                    onClick={() => props.onSell(acf.id)}
+                  >
+                    Sell · {props.formatMoney(sellBackUsd ?? 0)}
+                  </button>
+                ) : null}
+              </div>
+            </details>
+          ) : null}
+        </div>
       </div>
     </li>
   );

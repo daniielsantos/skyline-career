@@ -2071,6 +2071,7 @@ tr.lot-locked {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  align-items: stretch;
 }
 
 .hangar-head-actions {
@@ -2245,12 +2246,15 @@ tr.lot-locked {
 
 .hangar-card {
   display: grid;
-  gap: 0.85rem;
+  grid-template-rows: auto 1fr auto;
+  gap: 0;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   background: var(--panel);
   box-shadow: 0 10px 28px rgba(20, 32, 51, 0.05);
+  height: 100%;
+  min-height: 100%;
 }
 
 /* Compact Pilot snapshot still uses hangar-main without the stripe shell. */
@@ -2283,11 +2287,33 @@ tr.lot-locked {
 .hangar-footer {
   display: grid;
   gap: 0.55rem;
-  padding: 0.15rem 1rem 1rem;
+  align-content: start;
+  padding: 0.35rem 1rem 1rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.hangar-footer-primary {
+  display: grid;
+  align-items: stretch;
+  min-height: 2.55rem;
+}
+
+.hangar-footer-move {
+  min-height: 5.4rem;
+  display: grid;
+  align-content: start;
+}
+
+.hangar-footer-manage {
+  min-height: 1.55rem;
+  display: grid;
+  align-content: start;
 }
 
 .hangar-primary {
   width: 100%;
+  align-self: stretch;
 }
 
 .hangar-move {
@@ -2351,8 +2377,8 @@ tr.lot-locked {
 }
 
 .hangar-manage {
-  border-top: 1px solid var(--line);
-  padding-top: 0.35rem;
+  border-top: 0;
+  padding-top: 0;
 }
 
 .hangar-manage > summary {
@@ -2493,8 +2519,58 @@ tr.lot-locked {
 
 .hangar-card-body {
   display: grid;
+  grid-template-rows: auto auto auto 1fr;
   gap: 0.75rem;
-  padding: 0.9rem 1rem 0.15rem;
+  padding: 0.9rem 1rem 0.75rem;
+  align-content: start;
+}
+
+.hangar-section {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.hangar-section-title .aircraft-card-title strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: 2.3em;
+}
+
+.hangar-section-where {
+  min-height: 3.6rem;
+}
+
+.hangar-where-line {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.35rem 0.45rem;
+  min-width: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.hangar-where-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hangar-where-pilot {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.hangar-section-money {
+  align-self: end;
+}
+
+.hangar-section-money .aircraft-card-money {
+  min-height: 3.4rem;
 }
 
 .hangar-card-note {
@@ -2715,6 +2791,7 @@ tr.lot-locked {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem 0.55rem;
+  min-height: 1.35rem;
   font-size: 0.88rem;
   color: var(--muted);
 }
@@ -2750,15 +2827,16 @@ tr.lot-locked {
 .aircraft-card-specs strong {
   font-size: 0.88rem;
   font-weight: 650;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* One shared grid so the label column fits the longest label and stays aligned. */
+/* Fixed label column so Fuel/Airframe/Engine bars line up across cards. */
 .aircraft-condition-bars {
   display: grid;
-  grid-template-columns: auto minmax(3rem, 1fr) 2.4rem;
+  grid-template-columns: 4.75rem minmax(3rem, 1fr) 2.6rem;
   gap: 0.4rem 0.5rem;
   align-items: center;
   font-size: 0.78rem;
@@ -2818,10 +2896,19 @@ tr.lot-locked {
 .aircraft-card-money {
   display: grid;
   gap: 0.2rem;
+  align-content: start;
   padding: 0.45rem 0.55rem;
   border: 1px solid var(--line);
   background: rgba(20, 32, 51, 0.03);
   font-size: 0.88rem;
+}
+
+.aircraft-card-money > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .aircraft-card-price {

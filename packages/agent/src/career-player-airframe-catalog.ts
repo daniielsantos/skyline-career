@@ -9,7 +9,7 @@
  * Family heuristics register one Market SKU (heuristic.marketTypeId / ofpId).
  * Vendor forks with different stations accumulate familyRolesPackRelPaths.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import type { FreighterClassId } from '@msfs-compat/shared';
 import {
@@ -390,6 +390,107 @@ export async function setCareerPlayerAirframeEnabled(opts: {
   rows[idx] = next;
   await writeCatalogRows(opts.repoRoot, rows);
   return next;
+}
+
+export type RemoveCareerPlayerAirframeFamilyResult = {
+  typeId: string;
+  label: string;
+  deletedPaths: string[];
+  missingPaths: string[];
+};
+
+function packStem(relPath: string): string {
+  const base = relPath.replace(/\\/g, '/').split('/').pop() ?? relPath;
+  return base.replace(/\.json$/i, '');
+}
+
+async function tryUnlink(path: string): Promise<'deleted' | 'missing'> {
+  try {
+    await unlink(path);
+    return 'deleted';
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: unknown }).code)
+        : '';
+    if (code === 'ENOENT') return 'missing';
+    throw error;
+  }
+}
+
+/**
+ * Remove a Market SKU and its family homologation artifacts (OFP packs,
+ * example/draft profiles, notes). Hangar fleet is left alone — sell those
+ * in-game if needed.
+ */
+export async function removeCareerPlayerAirframeFamily(opts: {
+  repoRoot: string;
+  typeId: string;
+  /** When false, only drop the Market catalog row. Default true. */
+  deleteHomologationFiles?: boolean;
+}): Promise<RemoveCareerPlayerAirframeFamilyResult> {
+  const typeId = opts.typeId.trim();
+  if (!typeId) throw new Error('typeId is required');
+  const rows = await readCatalogRows(catalogPath(opts.repoRoot));
+  const idx = rows.findIndex((row) => row.typeId === typeId);
+  if (idx < 0) {
+    throw new Error(`No Skyline player airframe registered as ${typeId}`);
+  }
+  const row = rows[idx]!;
+  const packRels = [
+    ...new Set([
+      row.rolesPackRelPath,
+      ...(row.familyRolesPackRelPaths ?? []),
+    ]),
+  ].filter((p) => p.trim().length > 0);
+
+  rows.splice(idx, 1);
+  await writeCatalogRows(opts.repoRoot, rows);
+
+  const deletedPaths: string[] = [];
+  const missingPaths: string[] = [];
+  if (opts.deleteHomologationFiles === false) {
+    return {
+      typeId: row.typeId,
+      label: row.label,
+      deletedPaths,
+      missingPaths,
+    };
+  }
+
+  const stems = [...new Set(packRels.map(packStem))];
+  const candidates: string[] = [];
+  for (const rel of packRels) {
+    candidates.push(resolve(opts.repoRoot, rel));
+  }
+  for (const stem of stems) {
+    candidates.push(
+      resolve(opts.repoRoot, 'profiles', 'ofp', `${stem}.json`),
+      resolve(opts.repoRoot, 'profiles', 'examples', `${stem}.json`),
+      resolve(opts.repoRoot, 'profiles', 'drafts', `${stem}.json`),
+      resolve(opts.repoRoot, 'profiles', 'notes', `${stem}.md`),
+    );
+  }
+
+  const seen = new Set<string>();
+  for (const abs of candidates) {
+    const key = abs.replace(/\\/g, '/').toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const result = await tryUnlink(abs);
+    const rel = relative(opts.repoRoot, abs).replace(/\\/g, '/');
+    if (result === 'deleted') deletedPaths.push(rel);
+    else missingPaths.push(rel);
+  }
+  deletedPaths.sort((a, b) => a.localeCompare(b));
+  missingPaths.sort((a, b) => a.localeCompare(b));
+
+  return {
+    typeId: row.typeId,
+    label: row.label,
+    deletedPaths,
+    missingPaths,
+  };
 }
 
 export async function listCareerPlayerAirframeCatalog(

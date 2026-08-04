@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import {
   inferCareerClassFromIcao,
   registerCareerPlayerAirframe,
+  removeCareerPlayerAirframeFamily,
   setCareerPlayerAirframeEnabled,
   updateCareerPlayerAirframeBurn,
   deriveCareerMarketWeights,
@@ -256,6 +257,92 @@ describe('career player airframe registration', () => {
       assert.equal(saved[0]?.cruiseFuelFlowKgPerHour, 82.4);
       assert.equal(saved[0]?.fuelBurnKgPerNm, 0.412);
       assert.equal(saved[0]?.cruiseSpeedKt, 200);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('removes Market family catalog row and homologation files', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'skyline-remove-'));
+    try {
+      const catalogDir = join(
+        repoRoot,
+        'packages',
+        'shared',
+        'src',
+        'data',
+      );
+      const ofpDir = join(repoRoot, 'profiles', 'ofp');
+      const examplesDir = join(repoRoot, 'profiles', 'examples');
+      const notesDir = join(repoRoot, 'profiles', 'notes');
+      await mkdir(catalogDir, { recursive: true });
+      await mkdir(ofpDir, { recursive: true });
+      await mkdir(examplesDir, { recursive: true });
+      await mkdir(notesDir, { recursive: true });
+      await writeFile(
+        join(catalogDir, 'career-player-airframes.json'),
+        JSON.stringify(
+          [
+            {
+              typeId: 'nextgensim-emb-110p1f-bandeirante',
+              aircraftClassId: 'light_turboprop',
+              label: 'NextGenSim EMB-110P1F Bandeirante',
+              rolesPackRelPath:
+                'profiles/ofp/nextgensim-emb-110p1f-bandeirante.json',
+              familyRolesPackRelPaths: [
+                'profiles/ofp/nextgensim-emb-110p-bandeirante.json',
+                'profiles/ofp/nextgensim-emb-110p1f-bandeirante.json',
+              ],
+              simbriefIcao: 'E110',
+              simbriefAirframeMatch: 'Default',
+            },
+            {
+              typeId: 'keep-me',
+              aircraftClassId: 'light_ga',
+              label: 'Keep Me',
+              rolesPackRelPath: 'profiles/ofp/keep-me.json',
+              simbriefIcao: 'C172',
+              simbriefAirframeMatch: 'Default',
+            },
+          ],
+          null,
+          2,
+        ) + '\n',
+        'utf8',
+      );
+      for (const stem of [
+        'nextgensim-emb-110p1f-bandeirante',
+        'nextgensim-emb-110p-bandeirante',
+      ]) {
+        await writeFile(join(ofpDir, `${stem}.json`), '{}\n', 'utf8');
+        await writeFile(join(examplesDir, `${stem}.json`), '{}\n', 'utf8');
+        await writeFile(join(notesDir, `${stem}.md`), '# note\n', 'utf8');
+      }
+
+      const result = await removeCareerPlayerAirframeFamily({
+        repoRoot,
+        typeId: 'nextgensim-emb-110p1f-bandeirante',
+      });
+      assert.equal(result.typeId, 'nextgensim-emb-110p1f-bandeirante');
+      assert.ok(result.deletedPaths.length >= 6);
+      assert.ok(
+        result.deletedPaths.some((p) =>
+          p.includes('nextgensim-emb-110p1f-bandeirante.json'),
+        ),
+      );
+      assert.ok(
+        result.deletedPaths.some((p) =>
+          p.includes('nextgensim-emb-110p-bandeirante.json'),
+        ),
+      );
+
+      const saved = JSON.parse(
+        await readFile(join(catalogDir, 'career-player-airframes.json'), 'utf8'),
+      ) as Array<{ typeId: string }>;
+      assert.deepEqual(
+        saved.map((r) => r.typeId),
+        ['keep-me'],
+      );
     } finally {
       await rm(repoRoot, { recursive: true, force: true });
     }

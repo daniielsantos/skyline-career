@@ -107,7 +107,7 @@ function usage(): never {
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
   msfs-compat-agent sample-burn [--type typeId] [--pipe <name>]
-  msfs-compat-agent career-airframe [wizard]|list|disable|enable [--type typeId]
+  msfs-compat-agent career-airframe [wizard]|list|disable|enable|remove [--type typeId] [--keep-files]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
   msfs-compat-agent probe-payload-stations [--pipe <name>]
@@ -124,7 +124,7 @@ Notes:
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
   sample-burn: live cruise fuel-flow sample → patch career-player-airframes.json burn
-  career-airframe: interactive wizard (or list / disable / enable) for Market models
+  career-airframe: interactive wizard (or list / disable / enable / remove) for Market models
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
@@ -373,6 +373,7 @@ async function main(): Promise<void> {
     }
     const {
       listCareerPlayerAirframeCatalog,
+      removeCareerPlayerAirframeFamily,
       setCareerPlayerAirframeEnabled,
     } = await import('./career-player-airframe-catalog.js');
     const typeId = getFlag(rest, '--type') ?? rest[1];
@@ -418,8 +419,26 @@ async function main(): Promise<void> {
       );
       return;
     }
+    if (sub === 'remove' || sub === 'delete') {
+      if (!typeId) {
+        console.error(
+          'Usage: node packages/agent/dist/cli.js career-airframe remove --type <typeId> [--keep-files]',
+        );
+        process.exit(1);
+      }
+      const result = await removeCareerPlayerAirframeFamily({
+        repoRoot,
+        typeId,
+        deleteHomologationFiles: !hasFlag(rest, '--keep-files'),
+      });
+      console.log(JSON.stringify(result, null, 2));
+      console.log(
+        'Restart career-ui / rebuild @msfs-compat/shared, then re-run homologate.',
+      );
+      return;
+    }
     console.error(
-      'Usage: node packages/agent/dist/cli.js career-airframe [wizard]|list|disable|enable [--type typeId]',
+      'Usage: node packages/agent/dist/cli.js career-airframe [wizard]|list|disable|enable|remove [--type typeId]',
     );
     process.exit(1);
   }

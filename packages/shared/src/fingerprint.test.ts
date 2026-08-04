@@ -72,6 +72,42 @@ describe('titlesMatchForCatalog', () => {
       true,
     );
   });
+
+  it('does not alias Learjet / Saab cargo onto passenger', () => {
+    assert.equal(
+      titlesMatchForCatalog('LEARJET 35A PASSENGER', 'LEARJET 35A CARGO'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('LEARJET 35A CARGO', 'LEARJET 35A CARGO'),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog('Saab 340 Passenger', 'Saab 340 Cargo'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('340 Cargo - Loaded', 'Saab 340 Cargo'),
+      true,
+    );
+  });
+
+  it('does not alias Learjet PASSENGER LONG RANGE onto plain PASSENGER', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'LEARJET 35A PASSENGER LONG RANGE',
+        'LEARJET 35A PASSENGER',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'LEARJET 35A PASSENGER LONG RANGE',
+        'LEARJET 35A PASSENGER LONG RANGE',
+      ),
+      true,
+    );
+  });
 });
 
 describe('fingerprintFromProfile liveTitles', () => {

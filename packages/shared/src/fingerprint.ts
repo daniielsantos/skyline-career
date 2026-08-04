@@ -185,6 +185,50 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
   const profileTokenList = tokens(profile);
   const profileTokens = new Set(profileTokenList);
 
+  // Cargo vs passenger / pax are distinct Market / OFP variants even when the
+  // SimConnect tank/station fingerprint is identical (Learjet 35A, Saab 340, …).
+  const cargoRole = new Set(['cargo', 'freight', 'freighter', 'mail']);
+  const paxRole = new Set(['passenger', 'passengers', 'pax', 'cabin']);
+  const roleOf = (toks: string[]): 'cargo' | 'pax' | null => {
+    if (toks.some((t) => cargoRole.has(t))) return 'cargo';
+    if (toks.some((t) => paxRole.has(t))) return 'pax';
+    return null;
+  };
+  const liveRole = roleOf(liveTokens);
+  const profileRole = roleOf(profileTokenList);
+  if (liveRole && profileRole && liveRole !== profileRole) {
+    return false;
+  }
+
+  // Config / range suffixes are first-class variants (Learjet "PASSENGER LONG RANGE"
+  // must not alias onto plain "PASSENGER" via substring or token overlap).
+  const variantTokens = new Set([
+    'long',
+    'range',
+    'short',
+    'extended',
+    'xr',
+    'lr',
+    'er',
+    'vip',
+    'exec',
+    'executive',
+    'combi',
+  ]);
+  const liveVariants = new Set(liveTokens.filter((t) => variantTokens.has(t)));
+  const profileVariants = new Set(
+    profileTokenList.filter((t) => variantTokens.has(t)),
+  );
+  if (liveVariants.size > 0 || profileVariants.size > 0) {
+    if (
+      liveVariants.size !== profileVariants.size ||
+      [...liveVariants].some((t) => !profileVariants.has(t)) ||
+      [...profileVariants].some((t) => !liveVariants.has(t))
+    ) {
+      return false;
+    }
+  }
+
   // Model codes like 110p / 110p1f / c208b must agree. Otherwise
   // "EMB-110P" token-overlaps "EMB-110P1F" and falsely aliases variants.
   const isModelToken = (t: string) => /^\d{2,4}[a-z0-9]{0,4}$/i.test(t);
@@ -201,10 +245,38 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     }
   }
 
-  if (live.includes(profile) || profile.includes(live)) return true;
+  // Substring only when the longer side adds no extra meaningful tokens
+  // (avoids "… PASSENGER LONG RANGE" ⊇ "… PASSENGER").
+  if (live.includes(profile) || profile.includes(live)) {
+    const liveExtra = liveTokens.filter((t) => !profileTokens.has(t));
+    const profileExtra = profileTokenList.filter((t) => !new Set(liveTokens).has(t));
+    if (liveExtra.length === 0 || profileExtra.length === 0) {
+      const extras = liveExtra.length > 0 ? liveExtra : profileExtra;
+      const benign = new Set(['saab', 'cessna', 'beechcraft', 'piper', 'dassault']);
+      if (extras.every((t) => benign.has(t))) return true;
+    }
+  }
 
   const shared = liveTokens.filter((t) => profileTokens.has(t));
   // Prefer numeric model tokens (340, 208, 737) — one shared model id + one word is enough.
   const sharedModel = shared.some((t) => isModelToken(t));
   return sharedModel ? shared.length >= 2 : shared.length >= 3;
+}
+
+/** Profile match.title / liveTitles accept this in-sim title for resolve. */
+export function profileAcceptsLiveTitle(
+  profile: {
+    match?: { title?: string; liveTitles?: string[] };
+    displayName?: string;
+    profileId?: string;
+  },
+  liveTitle: string,
+): boolean {
+  const candidates = [
+    profile.match?.title,
+    ...(profile.match?.liveTitles ?? []),
+    profile.displayName,
+  ].filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+  if (candidates.length === 0) return false;
+  return candidates.some((t) => titlesMatchForCatalog(liveTitle, t));
 }

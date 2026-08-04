@@ -11,7 +11,7 @@ import type {
   ProfileManifest,
   ProfileResolveResponse,
 } from '@msfs-compat/shared';
-import { computeFingerprintV2, signDocument, titlesMatchForCatalog } from '@msfs-compat/shared';
+import { computeFingerprintV2, profileAcceptsLiveTitle, signDocument } from '@msfs-compat/shared';
 import type { CatalogBackend, CatalogEntry } from './types.js';
 
 const { Pool } = pg;
@@ -131,12 +131,30 @@ export class PostgresCatalogStore implements CatalogBackend {
        ORDER BY CASE ap.status WHEN 'active' THEN 0 ELSE 1 END,
                 ap.confidence_score DESC`,
     );
-    const matched = rows.filter((row) => {
-      const profileTitle =
-        row.profile_document.match?.title ?? row.profile_document.displayName ?? '';
-      return titlesMatchForCatalog(liveTitle, String(profileTitle));
-    });
+    const matched = rows.filter((row) =>
+      profileAcceptsLiveTitle(
+        {
+          match: row.profile_document.match as
+            | { title?: string; liveTitles?: string[] }
+            | undefined,
+          displayName: row.profile_document.displayName as string | undefined,
+        },
+        liveTitle,
+      ),
+    );
     return matched[0] ?? null;
+  }
+
+  private profileRowAcceptsTitle(row: ProfileRow, liveTitle: string): boolean {
+    return profileAcceptsLiveTitle(
+      {
+        match: row.profile_document.match as
+          | { title?: string; liveTitles?: string[] }
+          | undefined,
+        displayName: row.profile_document.displayName as string | undefined,
+      },
+      liveTitle,
+    );
   }
 
   private async resolveTitleForFingerprint(fingerprint: string): Promise<string | null> {
@@ -147,11 +165,15 @@ export class PostgresCatalogStore implements CatalogBackend {
     return rows[0]?.title ?? null;
   }
 
-  private toFingerprintResponse(fingerprint: string, best: ProfileRow | null): FingerprintResponse {
+  private toFingerprintResponse(
+    fingerprint: string,
+    best: ProfileRow | null,
+    opts?: { structurallyKnown?: boolean },
+  ): FingerprintResponse {
     if (!best) {
       return {
         fingerprint,
-        known: false,
+        known: Boolean(opts?.structurallyKnown),
         homologationRequired: true,
         profileStatus: 'none',
       };
@@ -233,10 +255,16 @@ export class PostgresCatalogStore implements CatalogBackend {
       ],
     );
 
+    const byFp = await this.findBestProfile(fingerprint);
+    const titleOk = byFp
+      ? this.profileRowAcceptsTitle(byFp, request.identity.title)
+      : false;
     const best =
-      (await this.findBestProfile(fingerprint)) ??
+      (titleOk ? byFp : null) ??
       (await this.findBestProfileByTitle(request.identity.title));
-    return this.toFingerprintResponse(fingerprint, best);
+    return this.toFingerprintResponse(fingerprint, best, {
+      structurallyKnown: Boolean(byFp),
+    });
   }
 
   async resolveProfile(
@@ -262,12 +290,13 @@ export class PostgresCatalogStore implements CatalogBackend {
       [fingerprint, channel],
     );
 
+    const title = await this.resolveTitleForFingerprint(fingerprint);
     let best: ProfileRow | null = released.rows[0] ?? (await this.findBestProfile(fingerprint));
-    if (!best) {
-      const title = await this.resolveTitleForFingerprint(fingerprint);
-      if (title) {
-        best = await this.findBestProfileByTitle(title);
-      }
+    if (best && title && !this.profileRowAcceptsTitle(best, title)) {
+      best = null;
+    }
+    if (!best && title) {
+      best = await this.findBestProfileByTitle(title);
     }
     if (!best) return null;
     return this.toResolveResponse(best);

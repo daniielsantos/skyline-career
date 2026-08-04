@@ -1,0 +1,183 @@
+{
+  "source": "simbrief",
+  "icao": "LJ35",
+  "ofpId": "flysimware-learjet-35a-passenger-long-range",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "LEARJET 35A PASSENGER LONG RANGE"
+  ],
+  "matchTitlePattern": "LEARJET 35A PASSENGER LONG RANGE",
+  "notes": [
+    "LEARJET 35A PASSENGER LONG RANGE — auto roles pack from homologated profile",
+    "Profile: flysimware/learjet-35a-passenger-long-range@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "LJ35",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "COPILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "STATION 1",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "STATION 2",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "STATION 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "STATION 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "STATION 5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "STATION 6",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "STATION 7",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "STATION 8",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 11,
+      "cfgIndex": 10,
+      "name": "SUITCASE 1",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 12,
+      "cfgIndex": 11,
+      "name": "SUITCASE 2",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 13,
+      "cfgIndex": 12,
+      "name": "SUITCASE 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 14,
+      "cfgIndex": 13,
+      "name": "DUFFLE BAG",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 15,
+      "cfgIndex": 14,
+      "name": "SUITCASE/DUFFLE BAGS",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 16,
+      "cfgIndex": 15,
+      "name": "SUITCASE 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 17,
+      "cfgIndex": 16,
+      "name": "SUITCASE 5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 18,
+      "cfgIndex": 17,
+      "name": "BRIEFCASES",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

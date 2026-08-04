@@ -2,6 +2,7 @@ import type { AircraftProfile } from '@msfs-compat/shared';
 import {
   isPlaceholderFingerprint,
   normalizeAircraftTitle,
+  profileAcceptsLiveTitle,
   titlesMatchForCatalog,
 } from '@msfs-compat/shared';
 import type { LoadedProfile } from './profile-registry.js';
@@ -56,7 +57,10 @@ function scoreProfile(
     profile.match.fingerprint === fingerprint &&
     !isPlaceholderFingerprint(profile.match.fingerprint)
   ) {
-    return { score: 1.0, reason: 'exact_fingerprint' };
+    // Same tank/station hash is not enough for cargo↔passenger siblings.
+    if (profileAcceptsLiveTitle(profile, identity.title)) {
+      return { score: 1.0, reason: 'exact_fingerprint' };
+    }
   }
 
   const title = normalizeAircraftTitle(identity.title ?? '');

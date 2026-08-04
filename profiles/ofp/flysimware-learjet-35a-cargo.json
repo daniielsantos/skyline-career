@@ -5,7 +5,8 @@
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "LEARJET 35A CARGO"
+    "LEARJET 35A CARGO",
+    "LEARJET 35A CARGO LONG RANGE"
   ],
   "matchTitlePattern": "LEARJET 35A CARGO",
   "notes": [
@@ -13,7 +14,12 @@
     "Profile: flysimware/learjet-35a-cargo@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct"
+    "Fuel strategy: simconnect-direct",
+    "LEARJET 35A CARGO LONG RANGE — auto roles pack from homologated profile",
+    "Profile: flysimware/learjet-35a-cargo-long-range@1.0.0",
+    "Joined Market family: LEARJET 35A PASSENGER LONG RANGE (flysimware-learjet-35a-cargo)",
+    "Homologated profile: flysimware/learjet-35a-cargo-long-range@1.0.0",
+    "Title: LEARJET 35A CARGO LONG RANGE"
   ],
   "fuel": {
     "unit": "lb"

@@ -126,13 +126,52 @@ export function fuelTankBreakdownSum(tanks: FuelTankBreakdown): number {
   );
 }
 
+function outerTankLb(tanks: FuelTankBreakdown): number {
+  return (
+    Math.max(0, tanks.leftAux ?? 0) +
+    Math.max(0, tanks.rightAux ?? 0) +
+    Math.max(0, tanks.leftTip ?? 0) +
+    Math.max(0, tanks.rightTip ?? 0)
+  );
+}
+
+function mainTankLb(tanks: FuelTankBreakdown): number {
+  return (
+    Math.max(0, tanks.left) +
+    Math.max(0, tanks.right) +
+    Math.max(0, tanks.center)
+  );
+}
+
+/**
+ * True when tip/aux collapse toward zero while main tanks hold or rise —
+ * typical SimConnect hole on jets with tip/aux tanks (also mid fuel-inject
+ * when mains are ramping up and AUX briefly reads 0).
+ */
+export function outerTanksCollapsedWhileMainsStable(
+  next: FuelTankBreakdown,
+  prev: FuelTankBreakdown,
+): boolean {
+  const prevOuter = outerTankLb(prev);
+  const nextOuter = outerTankLb(next);
+  if (prevOuter < 25) return false;
+  if (nextOuter > prevOuter * 0.15) return false;
+  const prevMain = mainTankLb(prev);
+  const nextMain = mainTankLb(next);
+  const mainTol = Math.max(40, prevMain * 0.08);
+  // Mains held (±tol) OR increased (inject ramp) while outers vanished.
+  return nextMain >= prevMain - mainTol;
+}
+
 /**
  * Classic L/R/C SimVars sometimes return all zeros while FUEL TOTAL is still valid.
  * Reject those glitches so UI keeps the previous schematic / omits tanks.
+ * Also reject tip/aux-only collapses (Learjet post-inject flicker).
  */
 export function isUsableFuelTankBreakdown(
   tanks: FuelTankBreakdown,
   totalFuelLb?: number | null,
+  prev?: FuelTankBreakdown | null,
 ): boolean {
   const sum = fuelTankBreakdownSum(tanks);
   const total =
@@ -140,9 +179,13 @@ export function isUsableFuelTankBreakdown(
       ? Math.max(0, totalFuelLb)
       : undefined;
   if (sum < 1) {
-    return total === undefined || total < 1;
+    // Failed reads leave total undefined — do not treat that as an empty aircraft.
+    return total !== undefined && total < 1;
   }
   if (total !== undefined && total > 50 && sum < total * 0.15) {
+    return false;
+  }
+  if (prev && outerTanksCollapsedWhileMainsStable(tanks, prev)) {
     return false;
   }
   return true;
@@ -152,26 +195,71 @@ export function isUsableFuelTankBreakdown(
  * Prefer a usable next tank map; otherwise keep previous *if still usable*.
  * Never keep an all-zero glitch when FUEL TOTAL is still high — that froze the
  * Preflight L/R schematic at 0 while Sim total stayed correct.
+ * When only tip/aux collapse (mains held or rising), keep fresh mains and
+ * hold the previous outer tanks so the tip schematic does not flash empty.
  */
 export function pickFuelTankBreakdown(
   next: FuelTankBreakdown | undefined,
   prev: FuelTankBreakdown | undefined,
   totalFuelLb?: number | null,
 ): FuelTankBreakdown | undefined {
-  if (next && isUsableFuelTankBreakdown(next, totalFuelLb)) return next;
+  if (next && isUsableFuelTankBreakdown(next, totalFuelLb, prev)) return next;
+  if (
+    next &&
+    prev &&
+    outerTanksCollapsedWhileMainsStable(next, prev) &&
+    isUsableFuelTankBreakdown(
+      { left: next.left, right: next.right, center: next.center },
+      totalFuelLb,
+    )
+  ) {
+    return {
+      left: next.left,
+      right: next.right,
+      center: next.center,
+      ...(prev.leftAux != null ? { leftAux: prev.leftAux } : {}),
+      ...(prev.rightAux != null ? { rightAux: prev.rightAux } : {}),
+      ...(prev.leftTip != null ? { leftTip: prev.leftTip } : {}),
+      ...(prev.rightTip != null ? { rightTip: prev.rightTip } : {}),
+    };
+  }
   if (prev && isUsableFuelTankBreakdown(prev, totalFuelLb)) return prev;
   return undefined;
 }
 
 /**
+ * When tip/aux are held for the schematic but FUEL TOTAL / tank-sum under-read
+ * (Learjet flash: Sim 2508 = L+R while TL/TR still show 527), prefer the
+ * breakdown sum so the Fuel card matches the tanks row.
+ */
+export function liveFuelLbCoherentWithTanks(
+  liveFuelLb: number | undefined | null,
+  tanks: FuelTankBreakdown | undefined | null,
+): number | undefined {
+  const live =
+    typeof liveFuelLb === 'number' && Number.isFinite(liveFuelLb)
+      ? liveFuelLb
+      : undefined;
+  if (!tanks) return live;
+  const sum = fuelTankBreakdownSum(tanks);
+  if (sum < 1) return live;
+  if (live === undefined) return sum;
+  if (sum > live + 40) return sum;
+  return live;
+}
+
+/**
  * Reject single-sample fuel dips that match the Jet-A→avgas density flicker
  * (~6.7→6.0 ≈ 10.4%) so Preflight Ready does not flap while fuel is unchanged.
+ * Also rejects dips that line up with tip/aux SimConnect collapse.
  */
 export function pickStableLiveFuelLb(opts: {
   next: number | undefined | null;
   prev: number | undefined | null;
   plannedLb?: number;
   tolLb?: number;
+  nextTanks?: FuelTankBreakdown | null;
+  prevTanks?: FuelTankBreakdown | null;
 }): number | undefined {
   const next =
     typeof opts.next === 'number' && Number.isFinite(opts.next)
@@ -193,14 +281,43 @@ export function pickStableLiveFuelLb(opts: {
 
   const prevOk = Math.abs(prev - planned) <= tol;
   const nextOk = Math.abs(next - planned) <= tol;
-  if (!prevOk || nextOk || next >= prev) return next;
+  if (!prevOk || nextOk || next >= prev) {
+    // Even when next "wins", lift it to match held tip tanks on the schematic.
+    return liveFuelLbCoherentWithTanks(next, opts.nextTanks ?? opts.prevTanks);
+  }
 
   // Density flicker: live weight scales by avgas/Jet-A when gallons are unchanged.
   const densityRatio = DEFAULT_AVGAS_LB_PER_GAL / DEFAULT_JET_A_LB_PER_GAL;
   if (Math.abs(next - prev * densityRatio) <= Math.max(15, tol * 0.4)) {
-    return prev;
+    return liveFuelLbCoherentWithTanks(prev, opts.prevTanks);
   }
-  return next;
+
+  if (
+    opts.prevTanks &&
+    opts.nextTanks &&
+    outerTanksCollapsedWhileMainsStable(opts.nextTanks, opts.prevTanks)
+  ) {
+    const lostOuter =
+      outerTankLb(opts.prevTanks) - outerTankLb(opts.nextTanks);
+    const drop = prev - next;
+    if (
+      lostOuter > 30 &&
+      Math.abs(drop - lostOuter) <= Math.max(50, lostOuter * 0.3)
+    ) {
+      return liveFuelLbCoherentWithTanks(prev, opts.prevTanks);
+    }
+  }
+
+  // Tips held on schematic while total under-read (nextTanks already merged).
+  const coherentNext = liveFuelLbCoherentWithTanks(next, opts.nextTanks);
+  if (
+    coherentNext !== undefined &&
+    prevOk &&
+    Math.abs(coherentNext - planned!) <= tol
+  ) {
+    return coherentNext;
+  }
+  return coherentNext ?? next;
 }
 
 /**

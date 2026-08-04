@@ -71,6 +71,7 @@ import {
 import {
   pickFuelTankBreakdown,
   pickLivePayloadLb,
+  pickStableLiveFuelLb,
 } from './load-verification';
 import { estimateSellBackUsd } from './aircraft-pricing';
 import { useConfirm } from './ConfirmDialog';
@@ -2120,7 +2121,19 @@ export function App() {
                       (!prevTanks ||
                         Math.abs(prevTanks.left - nextTanks!.left) >= 5 ||
                         Math.abs(prevTanks.right - nextTanks!.right) >= 5 ||
-                        Math.abs(prevTanks.center - nextTanks!.center) >= 5);
+                        Math.abs(prevTanks.center - nextTanks!.center) >= 5 ||
+                        Math.abs(
+                          (prevTanks.leftAux ?? 0) - (nextTanks!.leftAux ?? 0),
+                        ) >= 5 ||
+                        Math.abs(
+                          (prevTanks.rightAux ?? 0) - (nextTanks!.rightAux ?? 0),
+                        ) >= 5 ||
+                        Math.abs(
+                          (prevTanks.leftTip ?? 0) - (nextTanks!.leftTip ?? 0),
+                        ) >= 5 ||
+                        Math.abs(
+                          (prevTanks.rightTip ?? 0) - (nextTanks!.rightTip ?? 0),
+                        ) >= 5);
                     const stationsChanged =
                       nextStations != null &&
                       stationMapDrifted(prevStations, nextStations, 5);
@@ -2582,7 +2595,19 @@ export function App() {
               }
               const livePayload =
                 progress.livePayloadLb ?? verification.payload.liveLb;
-              const liveFuel = progress.liveFuelLb ?? verification.fuel.liveLb;
+              const stableTanks = pickFuelTankBreakdown(
+                progress.liveTanks,
+                verification.fuel.tanks,
+                progress.liveFuelLb ?? verification.fuel.liveLb,
+              );
+              const liveFuel =
+                pickStableLiveFuelLb({
+                  next: progress.liveFuelLb,
+                  prev: verification.fuel.liveLb,
+                  plannedLb: verification.fuel.plannedLb,
+                  nextTanks: stableTanks ?? progress.liveTanks,
+                  prevTanks: verification.fuel.tanks,
+                }) ?? verification.fuel.liveLb;
               return {
                 ...mission,
                 lastPreflightCheck: {
@@ -2592,9 +2617,7 @@ export function App() {
                     fuel: {
                       ...verification.fuel,
                       liveLb: liveFuel,
-                      ...(progress.liveTanks
-                        ? { tanks: progress.liveTanks }
-                        : {}),
+                      ...(stableTanks ? { tanks: stableTanks } : {}),
                       ...(progress.tankCapacity
                         ? { tankCapacity: progress.tankCapacity }
                         : {}),

@@ -856,6 +856,32 @@ export function liveFuelMatchesTarget(
   return Math.abs(liveTotal - targetTotal) <= tol;
 }
 
+/** Default Career OFP fuel inject passes (ramp current → planned). */
+export const FUEL_INJECT_ROUNDS = 4;
+
+/**
+ * Interpolate tank quantities from `from` toward `to` for round `round`
+ * (1-based). The final round snaps exactly to `to`.
+ */
+export function fuelTankTargetsForRound(
+  from: Record<string, number>,
+  to: Record<string, number>,
+  round: number,
+  totalRounds: number = FUEL_INJECT_ROUNDS,
+): Record<string, number> {
+  const rounds = Math.max(1, Math.floor(totalRounds));
+  const step = Math.min(rounds, Math.max(1, Math.floor(round)));
+  const keys = new Set([...Object.keys(from), ...Object.keys(to)]);
+  const out: Record<string, number> = {};
+  const t = step / rounds;
+  for (const id of keys) {
+    const a = Number.isFinite(from[id]) ? from[id]! : 0;
+    const b = Number.isFinite(to[id]) ? to[id]! : 0;
+    out[id] = step >= rounds ? b : a + (b - a) * t;
+  }
+  return out;
+}
+
 export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan {
   const {
     ofp,

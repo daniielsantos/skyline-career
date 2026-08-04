@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import { formatMassExact, KG_TO_LB, type WeightSystem } from './weight-units';
 
 type FuelTanks = {
@@ -59,21 +59,61 @@ function sidePresent(
   return (qty !== undefined && qty > 0.5) || (cap !== undefined && cap > 0.5);
 }
 
+function outerSum(t: FuelTanks): number {
+  return (
+    (t.leftAux ?? 0) +
+    (t.rightAux ?? 0) +
+    (t.leftTip ?? 0) +
+    (t.rightTip ?? 0)
+  );
+}
+
+/**
+ * Hold last non-zero tip/aux while mains stay loaded — stops the Learjet UI flash
+ * (TL/TR → 0 lb, Sim 2508 = L+R only) when capacity still shows the tip cells.
+ */
+function stickyOuterTanks(
+  tanks: FuelTanks,
+  prevSticky: FuelTanks | undefined,
+): FuelTanks {
+  const mains = tanks.left + tanks.right + tanks.center;
+  if (mains < 50) return tanks;
+  const prev = prevSticky;
+  if (!prev || outerSum(prev) < 25) return tanks;
+  if (outerSum(tanks) > outerSum(prev) * 0.15) return tanks;
+  return {
+    ...tanks,
+    ...(prev.leftAux != null ? { leftAux: prev.leftAux } : {}),
+    ...(prev.rightAux != null ? { rightAux: prev.rightAux } : {}),
+    ...(prev.leftTip != null ? { leftTip: prev.leftTip } : {}),
+    ...(prev.rightTip != null ? { rightTip: prev.rightTip } : {}),
+  };
+}
+
 /** Compact wing tank schematic: (Tip) (Aux) L | (C) | R (Aux) (Tip) with live Sim values. */
 export function FuelTankSchematic(props: {
   tanks?: FuelTanks;
   tankCapacity?: FuelTanks;
   weightSystem: WeightSystem;
 }) {
-  const tanks = props.tanks;
-  if (!tanks) return null;
+  const stickyRef = useRef<FuelTanks | undefined>(undefined);
+  const incoming = props.tanks;
+  if (!incoming) return null;
+  const tanks = stickyOuterTanks(incoming, stickyRef.current);
+  if (outerSum(tanks) >= 25 || tanks.left + tanks.right + tanks.center < 50) {
+    stickyRef.current = tanks;
+  }
   const cap = props.tankCapacity;
-  const showCenter =
-    tanks.center > 0.5 || (cap !== undefined && cap.center > 0.5);
   const showLeftTip = sidePresent(tanks.leftTip, cap?.leftTip);
   const showRightTip = sidePresent(tanks.rightTip, cap?.rightTip);
   const showLeftAux = sidePresent(tanks.leftAux, cap?.leftAux);
   const showRightAux = sidePresent(tanks.rightAux, cap?.rightAux);
+  // Jets with tip/aux: empty center is normal (fuel in mains+tips) — don't paint a red C.
+  const hasWingOuters =
+    showLeftTip || showRightTip || showLeftAux || showRightAux;
+  const showCenter =
+    tanks.center > 0.5 ||
+    (cap !== undefined && cap.center > 0.5 && !hasWingOuters);
   // Many jets (e.g. Learjet) map tip tanks to AUX SimVars — label as Tip when no TIP exists.
   const auxAsTip = !showLeftTip && !showRightTip;
   const leftOuterLabel = showLeftTip ? 'TL' : auxAsTip ? 'TL' : 'AL';

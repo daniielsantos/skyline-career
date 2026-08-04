@@ -1,0 +1,285 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "flysimware-learjet-35a-cargo-long-range",
+  "profileKey": "flysimware/learjet-35a-cargo-long-range",
+  "semver": "1.0.0",
+  "displayName": "LEARJET 35A CARGO LONG RANGE (MSFS 2024)",
+  "match": {
+    "fingerprint": "d293eca3e02fbca0024e57a042f60d5ce3c44d76cf9ab917f4055a082f98d5d6",
+    "title": "LEARJET 35A CARGO LONG RANGE",
+    "publisher": "flysimware",
+    "icao": "LJ35",
+    "liveTitles": [
+      "LEARJET 35A CARGO LONG RANGE"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 187.2,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 187.2,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "CENTER",
+        "name": "Center",
+        "capacity": 200,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK CENTER QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 178.5,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT AUX QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 178.5,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK CENTER QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{CENTER} + 2"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX} + 2"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX} + 2"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK CENTER QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{CENTER}"
+        },
+        {
+          "var": "FUEL TANK LEFT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_AUX}"
+        },
+        {
+          "var": "FUEL TANK RIGHT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_AUX}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 500,
+        "arm": 15.4
+      },
+      {
+        "index": 2,
+        "name": "COPILOT",
+        "maxLoad": 500,
+        "arm": 15.4
+      },
+      {
+        "index": 3,
+        "name": "STATION 1",
+        "maxLoad": 500,
+        "arm": 12.1
+      },
+      {
+        "index": 4,
+        "name": "CARGO LOWER",
+        "maxLoad": 500,
+        "arm": 6.1
+      },
+      {
+        "index": 5,
+        "name": "CARGO UPPER",
+        "maxLoad": 500,
+        "arm": 4.1
+      },
+      {
+        "index": 6,
+        "name": "BOXES REAR",
+        "maxLoad": 500,
+        "arm": -1.2
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 5,
+      "maxMac": 30
+    },
+    "calibration": {
+      "observedMac": 18.940553069114685,
+      "calibratedAtIso": "2026-08-04T04:40:31.412Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\flysimware-learjet-35a\\SimObjects\\Airplanes\\FSW_L35A\\presets\\FSW\\Learjet_35A_Cargo_LR\\config\\flight_model.cfg",
+      "sweep": {
+        "minObservedMac": 14.864474534988403,
+        "maxObservedMac": 19.244952499866486,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 6,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-04T04:40:38.812Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: LEARJET 35A CARGO LONG RANGE.",
+    "ICAO type designator (catalog/SimBrief): LJ35.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, CENTER, LEFT_AUX, RIGHT_AUX).",
+    "AUX/Aft tanks included.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6.",
+    "Station maxLoad: placeholder until cfg or clamp.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/flysimware-learjet-35a-cargo-long-range.md"
+  ]
+}

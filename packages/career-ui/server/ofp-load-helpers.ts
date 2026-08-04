@@ -9,6 +9,9 @@ import {
   assertRolesPackAllowsDirectInjection,
   flightPhaseFromSample,
   normalizeAircraftTitle,
+  pickFuelTankBreakdown,
+  pickStableLiveFuelLb,
+  liveFuelLbCoherentWithTanks,
   resolveLivePayloadLb,
   type AircraftProfile,
   type FuelTankBreakdown,
@@ -27,6 +30,8 @@ import {
   CG_BALANCE_STEP_LB,
   cgCounterweightPerSeatLb,
   equalizeMovableStations,
+  fuelTankTargetsForRound,
+  FUEL_INJECT_ROUNDS,
   liveFuelMatchesTarget,
   FREIGHTER_PILOT_LB,
   GA_BAGGAGE_SOFT_MAX_LB,
@@ -70,6 +75,8 @@ const CG_REBALANCE_MARGIN_MAC = 1;
 const CG_REBALANCE_MAX_ITERATIONS = 24;
 /** Settle after payload writes before trusting live CG (MSFS lag). */
 const PAYLOAD_CG_SETTLE_MS = 900;
+/** Settle between staged fuel inject rounds (shorter than payload CG settle). */
+const FUEL_ROUND_SETTLE_MS = 450;
 /** Gap between station/fuel SimVar writes during inject (Host pipe stability). */
 const INJECT_WRITE_GAP_MS = 50;
 
@@ -323,6 +330,28 @@ async function readLiveTanks(
     }
   }
   return tanks;
+}
+
+/**
+ * After a fuel write, AUX/TIP SimVars often read 0 for a beat while mains already
+ * show the new quantity (Learjet → Sim 2508 = L+R only, tips flash empty).
+ * Prefer the written target when live collapsed relative to what we just applied.
+ */
+function preferWrittenFuelTanks(
+  live: Record<string, number>,
+  written: Record<string, number>,
+): Record<string, number> {
+  const out: Record<string, number> = { ...live };
+  for (const [id, raw] of Object.entries(written)) {
+    const w = Number.isFinite(raw) ? raw : 0;
+    const l = Number.isFinite(out[id]) ? out[id]! : 0;
+    if (w > 0.5 && l < w * 0.15) {
+      out[id] = w;
+    } else if (!(id in out)) {
+      out[id] = w;
+    }
+  }
+  return out;
 }
 
 async function readLiveStations(
@@ -939,6 +968,9 @@ async function applyMissionOfpLoadExclusive(
 
     const schematicStationMax = stationMaxFromProfile(resolved.profile);
     const schematicTankCapacity = tankCapacityLbFromProfile(resolved.profile);
+    let lastGoodSchematicTanks: FuelTankBreakdown | undefined =
+      schematicTanksFromProfile(beforeLive.tanks);
+    let lastGoodFuelLb: number | undefined = tanksToFuelLb(beforeLive.tanks);
 
     const publishLiveProgress = (
       phase: OfpLoadProgressPhase,
@@ -951,16 +983,74 @@ async function applyMissionOfpLoadExclusive(
         liveStationSum >= workingSum * 0.5
           ? { ...afterLive.stations }
           : { ...workingStations };
+      const rawFuelLb = tanksToFuelLb(afterLive.tanks);
+      const rawTanks = schematicTanksFromProfile(afterLive.tanks);
+      const heldTanks =
+        pickFuelTankBreakdown(rawTanks, lastGoodSchematicTanks, rawFuelLb) ??
+        rawTanks;
+      // Stabilize with held tanks so Sim total matches tip schematic (not L+R only).
+      const liveFuelLb =
+        liveFuelLbCoherentWithTanks(
+          pickStableLiveFuelLb({
+            next: rawFuelLb,
+            prev: lastGoodFuelLb,
+            plannedLb: plannedFuelLb,
+            nextTanks: heldTanks,
+            prevTanks: lastGoodSchematicTanks,
+          }) ?? rawFuelLb,
+          heldTanks,
+        ) ?? rawFuelLb;
+      const liveTanks = heldTanks;
+      if (liveTanks) lastGoodSchematicTanks = liveTanks;
+      if (typeof liveFuelLb === 'number' && Number.isFinite(liveFuelLb)) {
+        lastGoodFuelLb = liveFuelLb;
+      }
+      const rawOuterLb =
+        (rawTanks.leftAux ?? 0) +
+        (rawTanks.rightAux ?? 0) +
+        (rawTanks.leftTip ?? 0) +
+        (rawTanks.rightTip ?? 0);
+      const heldOuterLb =
+        (liveTanks.leftAux ?? 0) +
+        (liveTanks.rightAux ?? 0) +
+        (liveTanks.leftTip ?? 0) +
+        (liveTanks.rightTip ?? 0);
+      // Log tip holds / fuel phases only — balance rounds would flood the file.
+      if (
+        message.startsWith('Fuel') ||
+        message.startsWith('Injecting OFP fuel') ||
+        heldOuterLb > rawOuterLb + 25 ||
+        Math.abs(rawFuelLb - liveFuelLb) > 25
+      ) {
+        watchDebugLog('inject', 'progress', {
+          phase,
+          liveFuelLb: Math.round(liveFuelLb),
+          rawFuelLb: Math.round(rawFuelLb),
+          tanks: {
+            left: Math.round(liveTanks.left),
+            right: Math.round(liveTanks.right),
+            center: Math.round(liveTanks.center),
+            leftAux: Math.round(liveTanks.leftAux ?? 0),
+            rightAux: Math.round(liveTanks.rightAux ?? 0),
+          },
+          rawOuter: {
+            leftAux: Math.round(rawTanks.leftAux ?? 0),
+            rightAux: Math.round(rawTanks.rightAux ?? 0),
+          },
+          heldOuter: heldOuterLb > rawOuterLb + 25,
+          heldFuel: Math.abs(rawFuelLb - liveFuelLb) > 25,
+        });
+      }
       setOfpLoadProgress(mission.id, {
         phase,
         message,
         cgAttempt: extra?.cgAttempt,
         cgMaxAttempts: CG_REBALANCE_MAX_ITERATIONS,
         liveMac: extra?.liveMac,
-        liveFuelLb: tanksToFuelLb(afterLive.tanks),
+        liveFuelLb,
         // Prefer working plan when station SimVars under-read mid-inject.
         livePayloadLb: Math.max(liveStationSum, workingSum),
-        liveTanks: schematicTanksFromProfile(afterLive.tanks),
+        liveTanks,
         ...(schematicTankCapacity
           ? { tankCapacity: schematicTankCapacity }
           : {}),
@@ -1059,35 +1149,106 @@ async function applyMissionOfpLoadExclusive(
       }
     };
 
+    const applyFuelRound = async (tanks: Record<string, number>) => {
+      const t0 = Date.now();
+      const fuel = { ...built.plan.fuel!, tanks };
+      try {
+        const result = await engine!.applyLoadPlan({
+          fuel,
+          cgPolicy: 'none',
+          skipVerify: true,
+          writeGapMs: INJECT_WRITE_GAP_MS,
+        });
+        watchDebugLog('inject', 'fuel round ok', {
+          ms: Date.now() - t0,
+          success: result.fuel?.success ?? null,
+          errorCode: result.fuel?.errorCode ?? null,
+          tanks: Object.fromEntries(
+            Object.entries(tanks).map(([k, v]) => [k, Math.round(v * 10) / 10]),
+          ),
+        });
+        return result;
+      } catch (err) {
+        watchDebugLog('inject', 'fuel round throw', {
+          ms: Date.now() - t0,
+          pipeDisconnect: isPipeDisconnectError(err),
+          error: err instanceof Error ? err.message : String(err),
+        });
+        if (!isPipeDisconnectError(err)) throw err;
+        await reconnectBridge();
+        watchDebugLog('inject', 'fuel round retry after reconnect', {});
+        const result = await engine!.applyLoadPlan({
+          fuel,
+          cgPolicy: 'none',
+          skipVerify: true,
+          writeGapMs: INJECT_WRITE_GAP_MS,
+        });
+        watchDebugLog('inject', 'fuel round retry result', {
+          success: result.fuel?.success ?? null,
+          errorCode: result.fuel?.errorCode ?? null,
+        });
+        return result;
+      }
+    };
+
     assertOfpLoadNotCancelled(mission.id);
     publishLiveProgress(
       'injecting',
       fuelAlreadyOk
         ? `Fuel OK — loading payload +${CG_BALANCE_STEP_LB} lb/seat across ${seatCount} seats…`
-        : 'Injecting OFP fuel…',
+        : `Injecting OFP fuel (1/${FUEL_INJECT_ROUNDS})…`,
     );
 
     if (!fuelAlreadyOk && built.plan.fuel) {
-      applyResult = await engine.applyLoadPlan({
-        fuel: built.plan.fuel,
-        cgPolicy: 'none',
-        // Live tank read below is the source of truth — avoid 6s verify IPC storms.
-        skipVerify: true,
-        writeGapMs: INJECT_WRITE_GAP_MS,
-      });
-      restoreFuelOnRollback = Boolean(
-        applyResult.fuel && !applyResult.fuel.success,
-      );
-      assertOfpLoadNotCancelled(mission.id);
-      await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
-      afterLive = {
-        tanks: await readLiveTanks(bridge, resolved.profile),
-        stations: afterLive.stations,
-      };
-      publishLiveProgress(
-        'injecting',
-        `Fuel verified · ${Math.round(tanksToFuelLb(afterLive.tanks))} lb live`,
-      );
+      const startTanks = { ...beforeLive.tanks };
+      const endTanks = built.plan.fuel.tanks ?? {};
+      restoreFuelOnRollback = false;
+      for (let round = 1; round <= FUEL_INJECT_ROUNDS; round++) {
+        assertOfpLoadNotCancelled(mission.id);
+        const tanks = fuelTankTargetsForRound(
+          startTanks,
+          endTanks,
+          round,
+          FUEL_INJECT_ROUNDS,
+        );
+        publishLiveProgress(
+          'injecting',
+          `Injecting OFP fuel (${round}/${FUEL_INJECT_ROUNDS})…`,
+        );
+        const fuelApply = await applyFuelRound(tanks);
+        applyResult = {
+          ...(applyResult ?? {}),
+          fuel: fuelApply.fuel ?? applyResult?.fuel,
+        };
+        if (fuelApply.fuel && !fuelApply.fuel.success) {
+          restoreFuelOnRollback = true;
+          break;
+        }
+        const settleMs =
+          round < FUEL_INJECT_ROUNDS
+            ? FUEL_ROUND_SETTLE_MS
+            : PAYLOAD_CG_SETTLE_MS;
+        await delayCancellable(mission.id, settleMs);
+        const liveTanks = await readLiveTanks(bridge, resolved.profile);
+        afterLive = {
+          tanks: preferWrittenFuelTanks(liveTanks, tanks),
+          stations: afterLive.stations,
+        };
+        // Seed sticky schematic from the write we just applied so tip holds work
+        // even if beforeLive started with AUX already glitched to 0.
+        lastGoodSchematicTanks =
+          pickFuelTankBreakdown(
+            schematicTanksFromProfile(afterLive.tanks),
+            lastGoodSchematicTanks,
+            tanksToFuelLb(afterLive.tanks),
+          ) ?? schematicTanksFromProfile(tanks);
+        lastGoodFuelLb = tanksToFuelLb(afterLive.tanks);
+        publishLiveProgress(
+          'injecting',
+          `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(tanksToFuelLb(afterLive.tanks))} lb live`,
+        );
+      }
+      if (!applyResult) applyResult = {};
     } else {
       applyResult = {};
       restoreFuelOnRollback = false;

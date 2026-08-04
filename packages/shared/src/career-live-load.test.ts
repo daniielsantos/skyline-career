@@ -93,6 +93,86 @@ describe('isUsableFuelTankBreakdown', () => {
     );
   });
 
+  it('pickFuelTankBreakdown keeps previous on tip/aux post-inject flicker', () => {
+    const prev = {
+      left: 1200,
+      right: 1200,
+      center: 0,
+      leftAux: 800,
+      rightAux: 800,
+    };
+    const glitch = { left: 1200, right: 1200, center: 0 };
+    assert.deepEqual(pickFuelTankBreakdown(glitch, prev, 4000), prev);
+  });
+
+  it('pickFuelTankBreakdown keeps tips when mains rise mid fuel-inject', () => {
+    const prev = {
+      left: 800,
+      right: 800,
+      center: 200,
+      leftAux: 400,
+      rightAux: 400,
+    };
+    // AUX read hole while LEFT/RIGHT MAIN already stepped up.
+    const glitch = { left: 1100, right: 1100, center: 100 };
+    assert.deepEqual(pickFuelTankBreakdown(glitch, prev, 3200), {
+      left: 1100,
+      right: 1100,
+      center: 100,
+      leftAux: 400,
+      rightAux: 400,
+    });
+  });
+
+  it('pickStableLiveFuelLb lifts Sim total to match held tip tanks', () => {
+    const held = {
+      left: 1254,
+      right: 1254,
+      center: 0,
+      leftAux: 527,
+      rightAux: 527,
+    };
+    assert.equal(
+      pickStableLiveFuelLb({
+        next: 2508,
+        prev: 3563,
+        plannedLb: 3563,
+        nextTanks: held,
+        prevTanks: held,
+      }),
+      3562,
+    );
+  });
+
+  it('pickFuelTankBreakdown rejects all-zero when total fuel read failed', () => {
+    assert.equal(
+      pickFuelTankBreakdown({ left: 0, right: 0, center: 0 }, undefined, null),
+      undefined,
+    );
+  });
+
+  it('pickStableLiveFuelLb keeps previous when tip collapse matches the dip', () => {
+    const prevTanks = {
+      left: 1200,
+      right: 1200,
+      center: 0,
+      leftAux: 800,
+      rightAux: 800,
+    };
+    const nextTanks = { left: 1200, right: 1200, center: 0 };
+    assert.equal(
+      pickStableLiveFuelLb({
+        next: 2400,
+        prev: 4000,
+        plannedLb: 4000,
+        tolLb: 50,
+        nextTanks,
+        prevTanks,
+      }),
+      4000,
+    );
+  });
+
   it('pickFuelTankBreakdown drops unusable prev when total fuel is present', () => {
     assert.equal(
       pickFuelTankBreakdown(

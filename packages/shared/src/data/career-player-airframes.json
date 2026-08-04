@@ -98,12 +98,17 @@
   {
     "typeId": "flysimware-learjet-35a-cargo",
     "aircraftClassId": "light_jet",
-    "label": "LEARJET 35A CARGO",
+    "label": "LEARJET 35A CARGO LONG RANGE",
     "rolesPackRelPath": "profiles/ofp/flysimware-learjet-35a-cargo.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/flysimware-learjet-35a-cargo.json",
+      "profiles/ofp/flysimware-learjet-35a-passenger-long-range.json",
+      "profiles/ofp/flysimware-learjet-35a-passenger.json"
+    ],
     "simbriefIcao": "LJ35",
     "simbriefAirframeMatch": "Default",
     "oewKg": 4700,
-    "mtowKg": 8301,
+    "mtowKg": 8893,
     "maxCargoKg": 907,
     "fuelCapacityKg": 2831,
     "maxRangeNm": 2366,

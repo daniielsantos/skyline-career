@@ -17,6 +17,8 @@ import {
   careerOperationalCargoMaxLb,
   cgCounterweightPerSeatLb,
   cgRebalanceStepLb,
+  fuelTankTargetsForRound,
+  FUEL_INJECT_ROUNDS,
   liveFuelMatchesTarget,
   resolveCgCounterweightBias,
   distributeCargoAcrossStations,
@@ -422,6 +424,25 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       ),
       false,
     );
+  });
+
+  it('ramps fuel tanks across FUEL_INJECT_ROUNDS and snaps on the last', () => {
+    const from = { LEFT_MAIN: 0, RIGHT_MAIN: 10 };
+    const to = { LEFT_MAIN: 40, RIGHT_MAIN: 50 };
+    assert.equal(FUEL_INJECT_ROUNDS, 4);
+    assert.deepEqual(fuelTankTargetsForRound(from, to, 1), {
+      LEFT_MAIN: 10,
+      RIGHT_MAIN: 20,
+    });
+    assert.deepEqual(fuelTankTargetsForRound(from, to, 2), {
+      LEFT_MAIN: 20,
+      RIGHT_MAIN: 30,
+    });
+    assert.deepEqual(fuelTankTargetsForRound(from, to, 3), {
+      LEFT_MAIN: 30,
+      RIGHT_MAIN: 40,
+    });
+    assert.deepEqual(fuelTankTargetsForRound(from, to, 4), to);
   });
 });
 

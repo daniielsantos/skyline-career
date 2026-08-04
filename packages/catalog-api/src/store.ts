@@ -16,8 +16,8 @@ import {
   computeFingerprintV2,
   fingerprintFromProfile,
   hashAndSignProfile,
+  profileAcceptsLiveTitle,
   signDocument,
-  titlesMatchForCatalog,
 } from '@msfs-compat/shared';
 import type { CatalogBackend, CatalogEntry } from './types.js';
 
@@ -157,10 +157,9 @@ export class FileCatalogStore implements CatalogBackend {
   }
 
   findByLiveTitle(liveTitle: string): CatalogEntry | undefined {
-    const matches = this.index.entries.filter((e) => {
-      const profileTitle = e.profile.match?.title ?? e.profile.displayName ?? '';
-      return titlesMatchForCatalog(liveTitle, profileTitle);
-    });
+    const matches = this.index.entries.filter((e) =>
+      profileAcceptsLiveTitle(e.profile, liveTitle),
+    );
     if (matches.length === 0) return undefined;
     matches.sort((a, b) => b.confidenceScore - a.confidenceScore);
     return matches[0];
@@ -192,12 +191,17 @@ export class FileCatalogStore implements CatalogBackend {
 
     void this.persistIndex();
 
+    const byFp = this.findByFingerprint(fingerprint);
+    // Same tank/station hash can serve cargo + passenger; only accept when the
+    // live title matches this profile (or its liveTitles aliases).
     const entry =
-      this.findByFingerprint(fingerprint) ?? this.findByLiveTitle(request.identity.title);
+      (byFp && profileAcceptsLiveTitle(byFp.profile, request.identity.title)
+        ? byFp
+        : undefined) ?? this.findByLiveTitle(request.identity.title);
     if (!entry) {
       return {
         fingerprint,
-        known: false,
+        known: Boolean(byFp),
         homologationRequired: true,
         profileStatus: 'none',
       };
@@ -216,6 +220,12 @@ export class FileCatalogStore implements CatalogBackend {
 
   resolveProfile(fingerprint: string, _simVersion: string, _channel = 'stable'): ProfileResolveResponse | null {
     let entry = this.findByFingerprint(fingerprint);
+    if (entry) {
+      const seen = this.index.seen[fingerprint];
+      if (seen?.title && !profileAcceptsLiveTitle(entry.profile, seen.title)) {
+        entry = this.findByLiveTitle(seen.title);
+      }
+    }
     if (!entry) {
       const seen = this.index.seen[fingerprint];
       if (seen?.title) {

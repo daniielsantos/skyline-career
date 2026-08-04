@@ -1059,6 +1059,8 @@ export class CareerWatchSession {
             next: rawFuelLb,
             prev: prevVerification.fuel.liveLb,
             plannedLb: prevVerification.fuel.plannedLb,
+            nextTanks: load.fuelTanks,
+            prevTanks: prevWatchFuel.tanks,
           });
           const fuelSampleRejected =
             typeof rawFuelLb === 'number' &&

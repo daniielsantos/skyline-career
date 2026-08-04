@@ -1,5 +1,9 @@
 import type { AircraftIdentity, AircraftStructure } from '@msfs-compat/shared';
-import { computeFingerprintV2, inferPublisher } from '@msfs-compat/shared';
+import {
+  computeFingerprintV2,
+  inferPublisher,
+  profileAcceptsLiveTitle,
+} from '@msfs-compat/shared';
 import { CatalogClient } from './catalog-client.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { ProfileCache } from './profile-cache.js';
@@ -74,40 +78,52 @@ export async function resolveLiveAircraft(options: LiveResolveOptions): Promise<
         });
       }
 
-      try {
-        const resolved = await client.resolveProfile({ fingerprint, simVersion, clientId });
-        catalogMeta.resolve = resolved;
+      const needsHomologation =
+        catalogMeta.register &&
+        typeof catalogMeta.register === 'object' &&
+        (catalogMeta.register as { homologationRequired?: boolean })
+          .homologationRequired === true;
 
-        let cached = await cache.findByKey(resolved.profileKey, resolved.semver);
-        if (!cached || cached.documentHash !== resolved.documentHash) {
-          const envelope = await client.getDocument(resolved.profileKey, resolved.semver);
-          cached = await cache.writeEnvelope(envelope);
-        }
+      // Structural fingerprint may hit a sibling variant (cargo vs passenger).
+      // Only resolve a catalog profile when register accepted the live title.
+      if (!needsHomologation) {
+        try {
+          const resolved = await client.resolveProfile({ fingerprint, simVersion, clientId });
+          catalogMeta.resolve = resolved;
 
-        return {
-          matched: true,
-          confidence: resolved.confidenceScore ?? 1,
-          reason: 'catalog_fingerprint',
-          profile: cached.profile,
-          path: cached.path,
-          candidates: [
-            {
-              profileKey: resolved.profileKey,
-              title: cached.profile.match.title ?? resolved.profileKey,
-              icao: cached.profile.match.icao,
-              score: resolved.confidenceScore ?? 1,
+          let cached = await cache.findByKey(resolved.profileKey, resolved.semver);
+          if (!cached || cached.documentHash !== resolved.documentHash) {
+            const envelope = await client.getDocument(resolved.profileKey, resolved.semver);
+            cached = await cache.writeEnvelope(envelope);
+          }
+
+          if (profileAcceptsLiveTitle(cached.profile, identity.title)) {
+            return {
+              matched: true,
+              confidence: resolved.confidenceScore ?? 1,
+              reason: 'catalog_fingerprint',
+              profile: cached.profile,
               path: cached.path,
-            },
-          ],
-          fingerprint,
-          structuralHash,
-          identity,
-          structure,
-          source: 'catalog',
-          catalog: catalogMeta,
-        };
-      } catch (err) {
-        catalogMeta.error = err instanceof Error ? err.message : String(err);
+              candidates: [
+                {
+                  profileKey: resolved.profileKey,
+                  title: cached.profile.match.title ?? resolved.profileKey,
+                  icao: cached.profile.match.icao,
+                  score: resolved.confidenceScore ?? 1,
+                  path: cached.path,
+                },
+              ],
+              fingerprint,
+              structuralHash,
+              identity,
+              structure,
+              source: 'catalog',
+              catalog: catalogMeta,
+            };
+          }
+        } catch (err) {
+          catalogMeta.error = err instanceof Error ? err.message : String(err);
+        }
       }
     }
   } catch (err) {
@@ -116,7 +132,7 @@ export async function resolveLiveAircraft(options: LiveResolveOptions): Promise<
   }
 
   const fromCache = await cache.findByFingerprint(fingerprint);
-  if (fromCache) {
+  if (fromCache && profileAcceptsLiveTitle(fromCache.profile, identity.title)) {
     return {
       matched: true,
       confidence: 1,

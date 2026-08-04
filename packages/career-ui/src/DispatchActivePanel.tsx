@@ -17,6 +17,8 @@ import {
   formatPayloadDueLine,
   pickFuelTankBreakdown,
   pickLivePayloadLb,
+  pickStableLiveFuelLb,
+  stabilizeDisplayedFuel,
 } from './load-verification';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
@@ -149,6 +151,19 @@ export function DispatchActivePanel(props: {
     props.watch?.running && props.watch.missionId === mission.id,
   );
   const lastAircraftRef = useRef<{ lat: number; lon: number } | null>(null);
+  /** Hold last good fuel total + tip/aux map across inject/watch flicker frames. */
+  const stickyFuelRef = useRef<{
+    liveLb?: number;
+    tanks?: {
+      left: number;
+      right: number;
+      center: number;
+      leftAux?: number;
+      rightAux?: number;
+      leftTip?: number;
+      rightTip?: number;
+    };
+  }>({});
   const watchPos = props.watch?.position;
   if (
     watchRunning &&
@@ -586,16 +601,32 @@ export function DispatchActivePanel(props: {
                       ok: _watchPayloadOk,
                       ...watchPayloadRest
                     } = watchPayload;
-                    const liveFuelLb = watchFuel.liveLb;
+                    const tanks = pickFuelTankBreakdown(
+                      watchFuel.tanks,
+                      stickyFuelRef.current.tanks ??
+                        baseVerification.fuel.tanks,
+                      watchFuel.liveLb,
+                    );
+                    const liveFuelLb =
+                      pickStableLiveFuelLb({
+                        next: watchFuel.liveLb,
+                        prev:
+                          stickyFuelRef.current.liveLb ??
+                          baseVerification.fuel.liveLb,
+                        plannedLb: baseVerification.fuel.plannedLb,
+                        nextTanks: tanks ?? watchFuel.tanks,
+                        prevTanks:
+                          stickyFuelRef.current.tanks ??
+                          baseVerification.fuel.tanks,
+                      }) ?? watchFuel.liveLb;
                     const livePayloadLb = pickLivePayloadLb(
                       watchPayload.liveLb,
                       baseVerification.payload.liveLb,
                     );
-                    const tanks = pickFuelTankBreakdown(
-                      watchFuel.tanks,
-                      baseVerification.fuel.tanks,
-                      liveFuelLb,
-                    );
+                    if (typeof liveFuelLb === 'number') {
+                      stickyFuelRef.current.liveLb = liveFuelLb;
+                    }
+                    if (tanks) stickyFuelRef.current.tanks = tanks;
                     const tankCapacity =
                       watchFuel.tankCapacity ??
                       baseVerification.fuel.tankCapacity;
@@ -657,22 +688,36 @@ export function DispatchActivePanel(props: {
                 injectProgress.liveFuelLb !== undefined ||
                 injectProgress.livePayloadLb !== undefined)
                 ? (() => {
-                    const injectFuelLb =
+                    const rawInjectFuel =
                       injectProgress.liveFuelLb ?? verification.fuel.liveLb;
                     const { tanks: _vTanks, ...fuelWithoutTanks } =
                       verification.fuel;
                     const injectTanks = pickFuelTankBreakdown(
                       injectProgress.liveTanks,
-                      verification.fuel.tanks,
-                      injectFuelLb,
+                      stickyFuelRef.current.tanks ?? verification.fuel.tanks,
+                      rawInjectFuel,
                     );
+                    const injectFuelLb =
+                      pickStableLiveFuelLb({
+                        next: rawInjectFuel,
+                        prev:
+                          stickyFuelRef.current.liveLb ??
+                          verification.fuel.liveLb,
+                        plannedLb: verification.fuel.plannedLb,
+                        nextTanks: injectTanks ?? injectProgress.liveTanks,
+                        prevTanks:
+                          stickyFuelRef.current.tanks ??
+                          verification.fuel.tanks,
+                      }) ?? rawInjectFuel;
+                    if (typeof injectFuelLb === 'number') {
+                      stickyFuelRef.current.liveLb = injectFuelLb;
+                    }
+                    if (injectTanks) stickyFuelRef.current.tanks = injectTanks;
                     return {
                       ...verification,
                       fuel: {
                         ...fuelWithoutTanks,
-                        ...(injectProgress.liveFuelLb !== undefined
-                          ? { liveLb: injectProgress.liveFuelLb }
-                          : {}),
+                        liveLb: injectFuelLb,
                         ...(injectTanks ? { tanks: injectTanks } : {}),
                         ...(injectProgress.tankCapacity
                           ? { tankCapacity: injectProgress.tankCapacity }
@@ -693,35 +738,60 @@ export function DispatchActivePanel(props: {
                     };
                   })()
                 : verification;
-            const liveVerification = verificationWithInject;
+            const rawView = verificationWithInject;
+            // One last gate before paint: tip hold + Sim total must match tank row.
+            const stabilizedFuel = rawView
+              ? stabilizeDisplayedFuel({
+                  liveLb: rawView.fuel.liveLb,
+                  plannedLb: rawView.fuel.plannedLb,
+                  tanks: rawView.fuel.tanks,
+                  tankCapacity: rawView.fuel.tankCapacity,
+                  stickyLiveLb: stickyFuelRef.current.liveLb,
+                  stickyTanks: stickyFuelRef.current.tanks,
+                })
+              : undefined;
+            if (stabilizedFuel?.tanks) {
+              stickyFuelRef.current.tanks = stabilizedFuel.tanks;
+            }
+            if (
+              typeof stabilizedFuel?.liveLb === 'number' &&
+              Number.isFinite(stabilizedFuel.liveLb)
+            ) {
+              stickyFuelRef.current.liveLb = stabilizedFuel.liveLb;
+            }
+            // Paint + ok gates always use the stabilized view (not raw watch/inject).
+            const view =
+              rawView && stabilizedFuel
+                ? {
+                    ...rawView,
+                    fuel: {
+                      ...rawView.fuel,
+                      liveLb: stabilizedFuel.liveLb ?? rawView.fuel.liveLb,
+                      ...(stabilizedFuel.tanks
+                        ? { tanks: stabilizedFuel.tanks }
+                        : {}),
+                    },
+                  }
+                : rawView;
             // Never trust a stale ready/ok flag when Sim vs Due numbers disagree.
             const fuelNumbersOk =
-              !liveVerification ||
-              liveVerification.fuel.plannedLb === undefined ||
-              Math.abs(
-                (liveVerification.fuel.liveLb ?? 0) -
-                  liveVerification.fuel.plannedLb,
-              ) <= 50;
+              !view ||
+              view.fuel.plannedLb === undefined ||
+              Math.abs((view.fuel.liveLb ?? 0) - view.fuel.plannedLb) <= 50;
             const payloadNumbersOk =
-              !liveVerification ||
-              liveVerification.payload.plannedLb === undefined ||
-              liveVerification.payload.liveLb === undefined ||
-              Math.abs(
-                liveVerification.payload.liveLb -
-                  liveVerification.payload.plannedLb,
-              ) <= 75;
+              !view ||
+              view.payload.plannedLb === undefined ||
+              view.payload.liveLb === undefined ||
+              Math.abs(view.payload.liveLb - view.payload.plannedLb) <= 75;
             const fuelOk = fuelNumbersOk;
-            const payloadOk =
-              Boolean(liveVerification?.payload.ok) && payloadNumbersOk;
+            const payloadOk = Boolean(view?.payload.ok) && payloadNumbersOk;
             const ready =
-              liveVerification != null
-                ? fuelOk && payloadOk
-                : check.verdict !== 'fail';
+              view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
             const noteLabel =
-              liveVerification?.weightNoteCount &&
-              liveVerification.weightNoteCount === check.findings.length
-                ? `${liveVerification.weightNoteCount} weight ${
-                    liveVerification.weightNoteCount === 1 ? 'note' : 'notes'
+              view?.weightNoteCount &&
+              view.weightNoteCount === check.findings.length
+                ? `${view.weightNoteCount} weight ${
+                    view.weightNoteCount === 1 ? 'note' : 'notes'
                   }`
                 : `${check.findings.length} technical ${
                     check.findings.length === 1 ? 'detail' : 'details'
@@ -841,7 +911,7 @@ export function DispatchActivePanel(props: {
                     </span>
                   </div>
                 </div>
-                {liveVerification ? (
+                {view ? (
                   <div className="preflight-load-grid">
                     <div
                       className={
@@ -850,15 +920,15 @@ export function DispatchActivePanel(props: {
                     >
                       <span>Fuel</span>
                       <strong>
-                        Sim {massFromLb(liveVerification.fuel.liveLb)}
+                        Sim {massFromLb(view.fuel.liveLb)}
                       </strong>
                       <small>
-                        Due {massFromLb(liveVerification.fuel.plannedLb)}
+                        Due {massFromLb(view.fuel.plannedLb)}
                       </small>
                       <b>{fuelOk ? '✓' : '✗'}</b>
                       <FuelTankSchematic
-                        tanks={liveVerification.fuel.tanks}
-                        tankCapacity={liveVerification.fuel.tankCapacity}
+                        tanks={view.fuel.tanks}
+                        tankCapacity={view.fuel.tankCapacity}
                         weightSystem={weightSystem}
                       />
                     </div>
@@ -869,51 +939,51 @@ export function DispatchActivePanel(props: {
                     >
                       <span>Payload (stations)</span>
                       <strong>
-                        Sim {massFromLb(liveVerification.payload.liveLb)}
+                        Sim {massFromLb(view.payload.liveLb)}
                       </strong>
                       <small>
                         {formatPayloadDueLine(
-                          liveVerification.payload,
+                          view.payload,
                           massFromLb,
                         )}
                       </small>
                       <b>{payloadOk ? '✓' : '✗'}</b>
                       <PayloadStationSchematic
-                        stations={liveVerification.payload.stations}
-                        stationMax={liveVerification.payload.stationMax}
+                        stations={view.payload.stations}
+                        stationMax={view.payload.stationMax}
                         weightSystem={weightSystem}
                       />
                     </div>
-                    {liveVerification.cg ? (
+                    {view.cg ? (
                       <div
                         className={
-                          liveVerification.cg.ok
+                          view.cg.ok
                             ? 'preflight-load-ok'
                             : 'preflight-load-warn'
                         }
                       >
                         <span>CG</span>
                         <strong>
-                          {liveVerification.cg.liveMac !== undefined
-                            ? `${liveVerification.cg.liveMac.toFixed(1)}% MAC`
+                          {view.cg.liveMac !== undefined
+                            ? `${view.cg.liveMac.toFixed(1)}% MAC`
                             : 'n/a'}
                         </strong>
                         <small>
-                          {liveVerification.cg.minMac !== undefined &&
-                          liveVerification.cg.maxMac !== undefined
-                            ? `envelope ${liveVerification.cg.minMac}–${liveVerification.cg.maxMac}`
+                          {view.cg.minMac !== undefined &&
+                          view.cg.maxMac !== undefined
+                            ? `envelope ${view.cg.minMac}–${view.cg.maxMac}`
                             : 'advisory only'}
                         </small>
                         <b>
-                          {liveVerification.cg.severity === 'warn' ? '⚠' : 'ℹ'}
+                          {view.cg.severity === 'warn' ? '⚠' : 'ℹ'}
                         </b>
-                        {liveVerification.cg.minMac !== undefined &&
-                        liveVerification.cg.maxMac !== undefined ? (
+                        {view.cg.minMac !== undefined &&
+                        view.cg.maxMac !== undefined ? (
                           <CgEnvelopeSchematic
-                            liveMac={liveVerification.cg.liveMac}
-                            minMac={liveVerification.cg.minMac}
-                            maxMac={liveVerification.cg.maxMac}
-                            ok={liveVerification.cg.ok}
+                            liveMac={view.cg.liveMac}
+                            minMac={view.cg.minMac}
+                            maxMac={view.cg.maxMac}
+                            ok={view.cg.ok}
                           />
                         ) : null}
                       </div>
@@ -921,18 +991,18 @@ export function DispatchActivePanel(props: {
                     <div className="preflight-aircraft-state">
                       <span>Aircraft</span>
                       <strong>
-                        {liveVerification.aircraft.onGround
+                        {view.aircraft.onGround
                           ? 'On ground'
                           : 'Airborne'}
                       </strong>
                       <small>
-                        {liveVerification.aircraft.enginesRunning
+                        {view.aircraft.enginesRunning
                           ? 'Engines running'
                           : 'Engines off'}
                       </small>
                       <b>
-                        {liveVerification.aircraft.onGround &&
-                        !liveVerification.aircraft.enginesRunning
+                        {view.aircraft.onGround &&
+                        !view.aircraft.enginesRunning
                           ? 'READY'
                           : 'CHECK'}
                       </b>

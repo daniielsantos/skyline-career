@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +70,7 @@ import {
   createMissionFlightWatchState,
   createSeedEconomyWorld,
   computeEconomyPulse,
+  sweepEconomyPulse,
   departMission,
   evaluateMissionFlightTransition,
   findOpenManifestForRoute,
@@ -84,6 +85,7 @@ import {
   resolveAirportCoords,
   settleMission,
   tickEconomyN,
+  TICKS_PER_DAY,
   type CommodityId,
   type ComplianceBaseline,
   type FreighterClassId,
@@ -1522,6 +1524,8 @@ async function main(): Promise<void> {
   career init [--save path] [--seed s] [--reset]
   career tick [--n 24] [--save path]
   career pulse [--save path] [--json]
+  career pulse --days 7 [--every-days 1] [--write] [--out path] [--save path] [--json]
+  career pulse --ticks 672 [--every 96] [--write] [--out path] [--save path] [--json]
   career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--json]
   career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--missions path] [--json]
   career missions [--missions path] [--json]
@@ -1562,40 +1566,160 @@ async function main(): Promise<void> {
       const world = await loadOrCreateCareerEconomy(savePath, {
         seed: getFlag(subArgs, '--seed'),
       });
-      const pulse = computeEconomyPulse(world);
-      if (asJson) {
-        console.log(JSON.stringify(pulse, null, 2));
-        return;
-      }
+      const days = getNumberFlag(subArgs, '--days');
+      const ticksFlag = getNumberFlag(subArgs, '--ticks');
+      const everyDays = getNumberFlag(subArgs, '--every-days');
+      const everyTicks = getNumberFlag(subArgs, '--every');
+      const doSweep =
+        days !== undefined ||
+        ticksFlag !== undefined ||
+        everyDays !== undefined ||
+        everyTicks !== undefined ||
+        hasFlag(subArgs, '--sweep');
+
       const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
       const money = (n: number | null) =>
         n === null ? '—' : `$${n.toFixed(2)}/kg`;
-      const fill = (n: number | null) =>
-        n === null ? '—' : pct(n);
-      console.log(
-        `Economy pulse  tick=${pulse.tick}  lots=${pulse.availableLots} available  hubs=${pulse.airportCount}  home=${pulse.homeCountryId ?? '—'}  intl=${pct(pulse.intlSharePct)}`,
-      );
-      for (const c of pulse.countries) {
-        if (c.countryId === 'INTL') {
-          console.log(
-            `  INTL  avail=${c.availableLots}  pay/kg p50=${money(c.payPerKgP50)}  lanes busy=${pct(c.laneBusyPct)}`,
-          );
-          continue;
+      const pay = (n: number | null) =>
+        n === null ? '—' : `$${Math.round(n).toLocaleString('en-US')}`;
+      const fill = (n: number | null) => (n === null ? '—' : pct(n));
+
+      if (!doSweep) {
+        const pulse = computeEconomyPulse(world);
+        if (asJson) {
+          console.log(JSON.stringify(pulse, null, 2));
+          return;
         }
         console.log(
-          `  ${c.countryId.padEnd(4)} hubs=${String(c.hubs).padStart(3)}  avail=${String(c.availableLots).padStart(3)}  live=${pct(c.liveHubPct).padStart(4)}  fill p50=${fill(c.fillP50).padStart(4)}  pay/kg p50=${money(c.payPerKgP50)}  lanes busy=${pct(c.laneBusyPct)}  dead=${c.deadHubs} quiet=${c.quietHubs}`,
+          `Economy pulse  tick=${pulse.tick}  lots=${pulse.availableLots} available  hubs=${pulse.airportCount}  home=${pulse.homeCountryId ?? '—'}  intl=${pct(pulse.intlSharePct)}`,
         );
-        if (c.deadHubIcaos.length > 0 && c.deadHubs > 0) {
-          const more =
-            c.deadHubs > c.deadHubIcaos.length
-              ? ` +${c.deadHubs - c.deadHubIcaos.length}`
-              : '';
-          console.log(`         dead: ${c.deadHubIcaos.join(' ')}${more}`);
+        console.log(
+          `  board pay  p50=${pay(pulse.payUsdP50)}  avg=${pay(pulse.payUsdAvg)}`,
+        );
+        const st = pulse.lotStatus;
+        console.log(
+          `  lot status  avail=${st.available}  reserved=${st.reserved}  transit=${st.in_transit}  expired=${st.expired}  delivered=${st.delivered}${st.other ? `  other=${st.other}` : ''}`,
+        );
+        console.log('  commodities:');
+        for (const c of pulse.commodities) {
+          console.log(
+            `    ${c.commodityId.padEnd(12)} lots=${String(c.availableLots).padStart(3)}  fill p50=${fill(c.fillP50).padStart(4)}  pay p50=${pay(c.payUsdP50).padStart(8)}  avg=${pay(c.payUsdAvg).padStart(8)}  $/kg p50=${money(c.payPerKgP50)}  surplus=${c.hubsSurplus}  shortage=${c.hubsShortage}`,
+          );
+        }
+        for (const c of pulse.countries) {
+          if (c.countryId === 'INTL') {
+            console.log(
+              `  INTL  avail=${c.availableLots}  pay/kg p50=${money(c.payPerKgP50)}  lane busy=${pct(c.laneBusyPct)}`,
+            );
+            continue;
+          }
+          console.log(
+            `  ${c.countryId.padEnd(4)} hubs=${String(c.hubs).padStart(3)}  avail=${String(c.availableLots).padStart(3)}  live=${pct(c.liveHubPct).padStart(4)}  fill p50=${fill(c.fillP50).padStart(4)}  pay/kg p50=${money(c.payPerKgP50)}  lane busy=${pct(c.laneBusyPct)}  dead=${c.deadHubs} quiet=${c.quietHubs}`,
+          );
+          if (c.deadHubIcaos.length > 0 && c.deadHubs > 0) {
+            const more =
+              c.deadHubs > c.deadHubIcaos.length
+                ? ` +${c.deadHubs - c.deadHubIcaos.length}`
+                : '';
+            console.log(`         dead: ${c.deadHubIcaos.join(' ')}${more}`);
+          }
+        }
+        if (pulse.notes.length > 0) {
+          console.log('  notes:');
+          for (const note of pulse.notes) {
+            console.log(`    · ${note}`);
+          }
+        }
+        return;
+      }
+
+      const ticks = ticksFlag ?? Math.round((days ?? 7) * TICKS_PER_DAY);
+      const every = everyTicks ?? Math.round((everyDays ?? 1) * TICKS_PER_DAY);
+      const write = hasFlag(subArgs, '--write');
+      const report = sweepEconomyPulse(world, { ticks, every });
+      if (write) {
+        await saveCareerEconomy(savePath, world);
+      }
+      const reportPath = resolve(
+        getFlag(subArgs, '--out') ??
+          join(dirname(savePath), 'economy-pulse-sweep.json'),
+      );
+      await writeFile(
+        reportPath,
+        `${JSON.stringify(
+          {
+            generatedAtIso: new Date().toISOString(),
+            economySave: savePath,
+            wroteEconomy: write,
+            ...report,
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      console.error(`Wrote pulse sweep report → ${reportPath}`);
+      if (asJson) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      const pctDelta = (n: number) => {
+        const pts = n * 100;
+        const sign = pts > 0 ? '+' : '';
+        return `${sign}${pts.toFixed(1)}pt`;
+      };
+      const payDelta = (n: number | null) => {
+        if (n === null) return '—';
+        const sign = n > 0 ? '+' : '';
+        return `${sign}$${Math.round(n).toLocaleString('en-US')}`;
+      };
+      const fillDelta = (n: number | null) => {
+        if (n === null) return '—';
+        const pts = n * 100;
+        const sign = pts > 0 ? '+' : '';
+        return `${sign}${pts.toFixed(1)}pt`;
+      };
+      const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
+      const daysAdvanced = report.ticksAdvanced / TICKS_PER_DAY;
+      console.log(
+        `Economy sweep  ${daysAdvanced.toFixed(1)}d (${report.ticksAdvanced} ticks)  every ${report.sampleEvery} ticks  samples=${report.sampleCount}  tick ${report.startTick}→${report.endTick}${write ? `  wrote=${savePath}` : '  (economy memory only — pass --write to save)'}`,
+      );
+      console.log(`  report  ${reportPath}  (overwrites)`);
+      console.log(
+        `  board lots  ${report.first.availableLots} → ${report.last.availableLots} (${signed(report.delta.availableLots)})`,
+      );
+      console.log(
+        `  board pay   p50 ${pay(report.first.payUsdP50)} → ${pay(report.last.payUsdP50)} (${payDelta(report.delta.payUsdP50)})   avg ${pay(report.first.payUsdAvg)} → ${pay(report.last.payUsdAvg)} (${payDelta(report.delta.payUsdAvg)})`,
+      );
+      console.log(
+        `  intl share  ${pct(report.first.intlSharePct)} → ${pct(report.last.intlSharePct)} (${pctDelta(report.delta.intlSharePct)})`,
+      );
+      const st0 = report.first.lotStatus;
+      const st1 = report.last.lotStatus;
+      const dSt = report.delta.lotStatus;
+      console.log(
+        `  lot status  avail ${st0.available}→${st1.available} (${signed(dSt.available)})  reserved ${st0.reserved}→${st1.reserved} (${signed(dSt.reserved)})  transit ${st0.in_transit}→${st1.in_transit} (${signed(dSt.in_transit)})  expired ${st0.expired}→${st1.expired} (${signed(dSt.expired)})`,
+      );
+      console.log('  commodities (start → end / Δ):');
+      for (let i = 0; i < report.last.commodities.length; i++) {
+        const a = report.first.commodities[i]!;
+        const b = report.last.commodities[i]!;
+        const d = report.delta.commodities[i]!;
+        console.log(
+          `    ${b.commodityId.padEnd(12)} lots ${String(a.availableLots).padStart(4)}→${String(b.availableLots).padStart(4)} (${signed(d.availableLots).padStart(5)})  pay p50 ${pay(a.payUsdP50)}→${pay(b.payUsdP50)} (${payDelta(d.payUsdP50)})  fill ${fill(a.fillP50)}→${fill(b.fillP50)} (${fillDelta(d.fillP50)})  surplus ${a.hubsSurplus}→${b.hubsSurplus}  shortage ${a.hubsShortage}→${b.hubsShortage}`,
+        );
+      }
+      if (report.samples.length > 2) {
+        console.log('  samples:');
+        for (const s of report.samples) {
+          console.log(
+            `    #${s.sampleIndex} tick=${s.atTick}  lots=${s.pulse.availableLots}  pay p50=${pay(s.pulse.payUsdP50)}  avg=${pay(s.pulse.payUsdAvg)}  intl=${pct(s.pulse.intlSharePct)}`,
+          );
         }
       }
-      if (pulse.notes.length > 0) {
-        console.log('  notes:');
-        for (const note of pulse.notes) {
+      if (report.last.notes.length > 0) {
+        console.log('  notes (end):');
+        for (const note of report.last.notes) {
           console.log(`    · ${note}`);
         }
       }

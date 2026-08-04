@@ -14,6 +14,7 @@ coverage/
 profiles/cache/
 profiles/career/local-economy.json
 profiles/career/local-missions.json
+profiles/career/economy-pulse-sweep.json
 artifacts/
 
 # .NET build outputs (never commit)

@@ -6181,16 +6181,29 @@ export function App() {
                                     }}
                                   >
                                     <td>
-                                      <strong>
-                                        {hold.originIcao}→{hold.destIcao}
-                                      </strong>
-                                      <small className="commodity-inline">
+                                      <div className="commodity-cell">
                                         <CommodityIcon
                                           commodityId={hold.commodityId}
-                                          size={24}
+                                          size={40}
+                                          title={hold.commodityId}
                                         />
-                                        {hold.commodityId}
-                                      </small>
+                                        <div>
+                                          <div className="route">
+                                            <IcaoLink
+                                              icao={hold.originIcao}
+                                              onOpen={openAirport}
+                                              disabled={busy}
+                                            />
+                                            <span className="arrow">→</span>
+                                            <IcaoLink
+                                              icao={hold.destIcao}
+                                              onOpen={openAirport}
+                                              disabled={busy}
+                                            />
+                                          </div>
+                                          <small>{hold.commodityId}</small>
+                                        </div>
+                                      </div>
                                     </td>
                                     <td>
                                       {hold.distanceNm !== undefined
@@ -6383,16 +6396,43 @@ export function App() {
                                           }}
                                         >
                                           <td>
-                                            <strong>
-                                              {m.originIcao}→{m.destIcao}
-                                            </strong>
-                                            <small>
-                                              {returningLeg
-                                                ? `Returning · ${crewName ?? 'Crew'}`
-                                                : airborneLeg
-                                                  ? `${crewName ?? 'Crew'} en route`
-                                                  : m.commodityId}
-                                            </small>
+                                            <div
+                                              className={
+                                                returningLeg || airborneLeg
+                                                  ? undefined
+                                                  : 'commodity-cell'
+                                              }
+                                            >
+                                              {!returningLeg && !airborneLeg ? (
+                                                <CommodityIcon
+                                                  commodityId={m.commodityId}
+                                                  size={40}
+                                                  title={m.commodityId}
+                                                />
+                                              ) : null}
+                                              <div>
+                                                <div className="route">
+                                                  <IcaoLink
+                                                    icao={m.originIcao}
+                                                    onOpen={openAirport}
+                                                    disabled={busy}
+                                                  />
+                                                  <span className="arrow">→</span>
+                                                  <IcaoLink
+                                                    icao={m.destIcao}
+                                                    onOpen={openAirport}
+                                                    disabled={busy}
+                                                  />
+                                                </div>
+                                                <small>
+                                                  {returningLeg
+                                                    ? `Returning · ${crewName ?? 'Crew'}`
+                                                    : airborneLeg
+                                                      ? `${crewName ?? 'Crew'} en route`
+                                                      : m.commodityId}
+                                                </small>
+                                              </div>
+                                            </div>
                                           </td>
                                           <td>
                                             {acf?.label ??

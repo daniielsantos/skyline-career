@@ -5,7 +5,8 @@ import {
   ensureSeedMarketFormed,
   tickEconomyN,
 } from './career-economy.js';
-import { computeEconomyPulse, median } from './career-economy-pulse.js';
+import { computeEconomyPulse, mean, median, sweepEconomyPulse } from './career-economy-pulse.js';
+import { TICKS_PER_DAY } from './career-clock.js';
 import type { CareerEconomyWorld, ShipmentLot } from './types/career-economy.js';
 
 describe('median', () => {
@@ -19,6 +20,16 @@ describe('median', () => {
 
   it('averages middle pair for even length', () => {
     assert.equal(median([1, 2, 3, 4]), 2.5);
+  });
+});
+
+describe('mean', () => {
+  it('returns null for empty', () => {
+    assert.equal(mean([]), null);
+  });
+
+  it('averages values', () => {
+    assert.equal(mean([1, 2, 3]), 2);
   });
 });
 
@@ -41,6 +52,26 @@ describe('computeEconomyPulse', () => {
     assert.equal(pulse.availableLots, sumLots);
     assert.ok(Number.isFinite(pulse.intlSharePct));
     assert.ok(pulse.intlSharePct >= 0 && pulse.intlSharePct <= 1);
+
+    assert.ok(pulse.commodities.length >= 5);
+    const commodityLots = pulse.commodities.reduce(
+      (n, c) => n + c.availableLots,
+      0,
+    );
+    assert.equal(commodityLots, pulse.availableLots);
+    if (pulse.availableLots > 0) {
+      assert.ok(pulse.payUsdP50 !== null);
+      assert.ok(pulse.payUsdAvg !== null);
+    }
+    assert.equal(
+      pulse.lotStatus.available +
+        pulse.lotStatus.reserved +
+        pulse.lotStatus.in_transit +
+        pulse.lotStatus.expired +
+        pulse.lotStatus.delivered +
+        pulse.lotStatus.other,
+      world.lots.length,
+    );
 
     for (const c of pulse.countries) {
       assert.ok(Number.isFinite(c.availableLots));
@@ -65,6 +96,14 @@ describe('computeEconomyPulse', () => {
     const pulse = computeEconomyPulse(world);
     assert.equal(pulse.availableLots, 0);
     assert.equal(pulse.intlSharePct, 0);
+    assert.equal(pulse.payUsdP50, null);
+    assert.equal(pulse.payUsdAvg, null);
+    assert.equal(pulse.lotStatus.available, 0);
+    for (const c of pulse.commodities) {
+      assert.equal(c.availableLots, 0);
+      assert.equal(c.payUsdP50, null);
+      assert.equal(c.payUsdAvg, null);
+    }
     for (const c of pulse.countries) {
       assert.equal(c.availableLots, 0);
       assert.equal(c.payPerKgP50, null);
@@ -77,7 +116,9 @@ describe('computeEconomyPulse', () => {
   });
 
   it('buckets cross-country lots as INTL', () => {
-    const world = createSeedEconomyWorld({ seed: 'pulse-intl' }) as CareerEconomyWorld;
+    const world = createSeedEconomyWorld({
+      seed: 'pulse-intl',
+    }) as CareerEconomyWorld;
     const br = world.airports.find((a) => a.icao.startsWith('SB'));
     const us = world.airports.find((a) => a.icao.startsWith('K'));
     assert.ok(br && us);
@@ -99,10 +140,113 @@ describe('computeEconomyPulse', () => {
     const pulse = computeEconomyPulse(world);
     assert.equal(pulse.availableLots, 1);
     assert.equal(pulse.intlSharePct, 1);
+    assert.equal(pulse.payUsdP50, 2000);
+    assert.equal(pulse.payUsdAvg, 2000);
+    assert.equal(pulse.lotStatus.available, 1);
+    const general = pulse.commodities.find((c) => c.commodityId === 'general');
+    assert.ok(general);
+    assert.equal(general!.availableLots, 1);
+    assert.equal(general!.payUsdP50, 2000);
+    assert.equal(general!.payPerKgP50, 2);
     const intl = pulse.countries.find((c) => c.countryId === 'INTL');
     assert.ok(intl);
     assert.equal(intl!.availableLots, 1);
     assert.ok(intl!.payPerKgP50 !== null);
     assert.equal(intl!.payPerKgP50, 2);
+  });
+
+  it('counts reserved and surplus/shortage hubs', () => {
+    const world = createSeedEconomyWorld({ seed: 'pulse-status' });
+    ensureSeedMarketFormed(world);
+    const ap = world.airports[0]!;
+    const pile = ap.inventory.electronics;
+    assert.ok(pile);
+    pile.stockKg = pile.capacityKg;
+    const empty = world.airports[1]!;
+    const emptyPile = empty.inventory.electronics;
+    assert.ok(emptyPile);
+    emptyPile.stockKg = 0;
+
+    world.lots = [
+      {
+        id: 'lot_avail',
+        commodityId: 'electronics',
+        originIcao: ap.icao,
+        destIcao: empty.icao,
+        quantityKg: 500,
+        reservedKg: 0,
+        payUsd: 900,
+        urgency: 'normal',
+        reason: 'pulse',
+        status: 'available',
+        createdAtTick: world.tick,
+        expiresAtTick: world.tick + 48,
+      },
+      {
+        id: 'lot_reserved',
+        commodityId: 'electronics',
+        originIcao: ap.icao,
+        destIcao: empty.icao,
+        quantityKg: 500,
+        reservedKg: 500,
+        payUsd: 800,
+        urgency: 'normal',
+        reason: 'pulse',
+        status: 'reserved',
+        createdAtTick: world.tick,
+        expiresAtTick: world.tick + 48,
+      },
+      {
+        id: 'lot_transit',
+        commodityId: 'supplies',
+        originIcao: ap.icao,
+        destIcao: empty.icao,
+        quantityKg: 400,
+        reservedKg: 400,
+        payUsd: 400,
+        urgency: 'normal',
+        reason: 'pulse',
+        status: 'in_transit',
+        createdAtTick: world.tick,
+        expiresAtTick: world.tick + 48,
+      },
+    ];
+
+    const pulse = computeEconomyPulse(world);
+    assert.equal(pulse.lotStatus.available, 1);
+    assert.equal(pulse.lotStatus.reserved, 1);
+    assert.equal(pulse.lotStatus.in_transit, 1);
+    assert.equal(pulse.availableLots, 1);
+    const electronics = pulse.commodities.find(
+      (c) => c.commodityId === 'electronics',
+    );
+    assert.ok(electronics);
+    assert.equal(electronics!.availableLots, 1);
+    assert.ok(electronics!.hubsSurplus >= 1);
+    assert.ok(electronics!.hubsShortage >= 1);
+  });
+});
+
+describe('sweepEconomyPulse', () => {
+  it('advances ticks and reports start/end deltas', () => {
+    const world = createSeedEconomyWorld({ seed: 'pulse-sweep' });
+    ensureSeedMarketFormed(world);
+    const start = world.tick;
+    const report = sweepEconomyPulse(world, {
+      ticks: TICKS_PER_DAY,
+      every: TICKS_PER_DAY,
+    });
+    assert.equal(report.ticksAdvanced, TICKS_PER_DAY);
+    assert.equal(report.sampleCount, 2);
+    assert.equal(report.startTick, start);
+    assert.equal(report.endTick, start + TICKS_PER_DAY);
+    assert.equal(world.tick, start + TICKS_PER_DAY);
+    assert.equal(report.first.tick, start);
+    assert.equal(report.last.tick, start + TICKS_PER_DAY);
+    assert.equal(
+      report.delta.availableLots,
+      report.last.availableLots - report.first.availableLots,
+    );
+    assert.equal(report.delta.commodities.length, report.last.commodities.length);
   });
 });

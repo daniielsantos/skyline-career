@@ -1,0 +1,301 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "a2a-piper-pa-24-250-comanche",
+  "profileKey": "a2a/piper-pa-24-250-comanche",
+  "semver": "1.0.0",
+  "displayName": "A2A Piper PA-24-250 Comanche (MSFS 2024)",
+  "match": {
+    "fingerprint": "fb02891e26e382bfc2fffbd3ca3bcb7ace0235ea44b0f67bd23c6c5f240c6d0d",
+    "title": "A2A Piper PA-24-250 Comanche",
+    "publisher": "a2a",
+    "icao": "PA24",
+    "liveTitles": [
+      "A2A Piper PA-24-250 Comanche"
+    ]
+  },
+  "capabilities": [
+    "simconnect",
+    "lvar"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "lvar-bridge",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left wing",
+        "capacity": 30,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FuelLeftWingTank",
+        "writeUnit": "number"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right wing",
+        "capacity": 30,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FuelRightWingTank",
+        "writeUnit": "number"
+      },
+      {
+        "id": "LEFT_TIP",
+        "name": "Left tip",
+        "capacity": 15,
+        "readVar": "FUEL TANK LEFT TIP QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FuelLeftTipTank",
+        "writeUnit": "number"
+      },
+      {
+        "id": "RIGHT_TIP",
+        "name": "Right tip",
+        "capacity": 15,
+        "readVar": "FUEL TANK RIGHT TIP QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FuelRightTipTank",
+        "writeUnit": "number"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "lvar_set",
+        "name": "FuelLeftWingTank",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "FuelRightWingTank",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "FuelLeftTipTank",
+        "valueExpr": "{LEFT_TIP}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "FuelRightTipTank",
+        "valueExpr": "{RIGHT_TIP}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK LEFT TIP QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_TIP}"
+        },
+        {
+          "var": "FUEL TANK RIGHT TIP QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_TIP}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "lvar-bridge",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Character1Weight",
+        "maxLoad": 300,
+        "arm": 0.08
+      },
+      {
+        "index": 2,
+        "name": "Character2Weight",
+        "maxLoad": 300,
+        "arm": 0.08
+      },
+      {
+        "index": 3,
+        "name": "Character3Weight",
+        "maxLoad": 300,
+        "arm": -2.5
+      },
+      {
+        "index": 4,
+        "name": "Character4Weight",
+        "maxLoad": 300,
+        "arm": -2.5
+      },
+      {
+        "index": 5,
+        "name": "Character5Weight",
+        "maxLoad": 300,
+        "arm": -4.45
+      },
+      {
+        "index": 6,
+        "name": "Character6Weight",
+        "maxLoad": 300,
+        "arm": -4.5
+      },
+      {
+        "index": 7,
+        "name": "baggage",
+        "maxLoad": 400,
+        "arm": 0
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "lvar_set",
+        "name": "Character1Weight",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat1Character",
+        "valueExpr": "{station_1} / ({station_1} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character2Weight",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat2Character",
+        "valueExpr": "{station_2} / ({station_2} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character3Weight",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat3Character",
+        "valueExpr": "{station_3} / ({station_3} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character4Weight",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat4Character",
+        "valueExpr": "{station_4} / ({station_4} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character5Weight",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat5Character",
+        "valueExpr": "{station_5} / ({station_5} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Character6Weight",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "Seat6Character",
+        "valueExpr": "{station_6} / ({station_6} + 0.001)"
+      },
+      {
+        "op": "lvar_set",
+        "name": "BaggageWeight",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 2,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 100
+    },
+    "calibration": {
+      "observedMac": -4.541464149951935,
+      "calibratedAtIso": "2026-08-04T02:28:19.268Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\a2a-aircraft-pa24\\SimObjects\\Airplanes\\pa24-250\\common\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        0.893,
+        0,
+        0
+      ],
+      "sweep": {
+        "minObservedMac": -5.748426914215088,
+        "maxObservedMac": -5.748426914215088,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 6,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-04T02:28:27.831Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "lvar-bridge"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: A2A Piper PA-24-250 Comanche.",
+    "ICAO type designator (catalog/SimBrief): PA24.",
+    "Drafted from vendor recipe a2a-accusim.",
+    "Tablet/Accu-Sim owns load. Classic FUEL TANK / PAYLOAD STATION are mirrors; write Fuel*/Character* LVars and SeatNCharacter occupancy. Tank set varies (fuselage vs tip) — draft keeps only tanks with live capacity ≥ 5.",
+    "Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, LEFT_TIP, RIGHT_TIP.",
+    "See profiles/notes/a2a-accusim.md",
+    "Homologated with interactive wizard (recipe lvar-bridge).",
+    "See profiles/notes/a2a-piper-pa-24-250-comanche.md"
+  ]
+}

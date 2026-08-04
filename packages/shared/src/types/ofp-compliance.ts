@@ -160,9 +160,14 @@ export interface OfpExpectation {
 export interface LiveFuelState {
   source: LiveFuelSource;
   unit: 'lb';
+  /** Classic LEFT MAIN only (aux/tip reported separately when present). */
   left: number;
   right: number;
   center: number;
+  leftAux?: number;
+  rightAux?: number;
+  leftTip?: number;
+  rightTip?: number;
   total: number;
   ageMs?: number;
 }

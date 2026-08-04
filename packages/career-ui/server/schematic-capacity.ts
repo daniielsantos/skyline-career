@@ -46,11 +46,25 @@ export async function readClassicFuelTankCapacityLb(
   const rightAuxCap = await readGal('FUEL TANK RIGHT AUX CAPACITY');
   const leftTipCap = await readGal('FUEL TANK LEFT TIP CAPACITY');
   const rightTipCap = await readGal('FUEL TANK RIGHT TIP CAPACITY');
-  const left = (leftMainCap + leftAuxCap + leftTipCap) * densityLbPerGal;
-  const right = (rightMainCap + rightAuxCap + rightTipCap) * densityLbPerGal;
+  const left = leftMainCap * densityLbPerGal;
+  const right = rightMainCap * densityLbPerGal;
   const center = centerCapGal * densityLbPerGal;
-  if (left + right + center < 1) return undefined;
-  return { left, right, center };
+  const leftAux = leftAuxCap * densityLbPerGal;
+  const rightAux = rightAuxCap * densityLbPerGal;
+  const leftTip = leftTipCap * densityLbPerGal;
+  const rightTip = rightTipCap * densityLbPerGal;
+  if (left + right + center + leftAux + rightAux + leftTip + rightTip < 1) {
+    return undefined;
+  }
+  return {
+    left,
+    right,
+    center,
+    ...(leftAux > 0.5 ? { leftAux } : {}),
+    ...(rightAux > 0.5 ? { rightAux } : {}),
+    ...(leftTip > 0.5 ? { leftTip } : {}),
+    ...(rightTip > 0.5 ? { rightTip } : {}),
+  };
 }
 
 /** Structural maxLoad (lb) keyed by station index. */
@@ -71,8 +85,7 @@ export function stationMaxFromProfile(
 }
 
 /**
- * Fold profile fuel tanks into classic L/R/C capacity (lb), matching live-reader
- * aux/tip → wing sides.
+ * Fold profile fuel tanks into classic L/R/C (+ aux/tip) capacity (lb).
  */
 export function tankCapacityLbFromProfile(
   profile: AircraftProfile,
@@ -90,16 +103,34 @@ export function tankCapacityLbFromProfile(
   let left = 0;
   let right = 0;
   let center = 0;
+  let leftAux = 0;
+  let rightAux = 0;
+  let leftTip = 0;
+  let rightTip = 0;
   for (const tank of profile.fuel?.tanks ?? []) {
     const id = (tank.id ?? '').toUpperCase();
     const lb = toLb(tank.capacity ?? 0);
     if (!lb) continue;
-    if (id.includes('LEFT')) left += lb;
+    if (id.includes('LEFT') && id.includes('TIP')) leftTip += lb;
+    else if (id.includes('RIGHT') && id.includes('TIP')) rightTip += lb;
+    else if (id.includes('LEFT') && id.includes('AUX')) leftAux += lb;
+    else if (id.includes('RIGHT') && id.includes('AUX')) rightAux += lb;
+    else if (id.includes('LEFT')) left += lb;
     else if (id.includes('RIGHT')) right += lb;
     else if (id.includes('CENTER')) center += lb;
   }
-  if (left + right + center < 1) return undefined;
-  return { left, right, center };
+  if (left + right + center + leftAux + rightAux + leftTip + rightTip < 1) {
+    return undefined;
+  }
+  return {
+    left,
+    right,
+    center,
+    ...(leftAux > 0.5 ? { leftAux } : {}),
+    ...(rightAux > 0.5 ? { rightAux } : {}),
+    ...(leftTip > 0.5 ? { leftTip } : {}),
+    ...(rightTip > 0.5 ? { rightTip } : {}),
+  };
 }
 
 export function pickTankCapacity(
@@ -107,7 +138,17 @@ export function pickTankCapacity(
   prev: FuelTankBreakdown | undefined,
 ): FuelTankBreakdown | undefined {
   const usable = (c?: FuelTankBreakdown) =>
-    Boolean(c && c.left + c.right + c.center > 1);
+    Boolean(
+      c &&
+        c.left +
+          c.right +
+          c.center +
+          (c.leftAux ?? 0) +
+          (c.rightAux ?? 0) +
+          (c.leftTip ?? 0) +
+          (c.rightTip ?? 0) >
+          1,
+    );
   if (usable(next)) return next;
   if (usable(prev)) return prev;
   return undefined;

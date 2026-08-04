@@ -1,0 +1,221 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "asobo-c172sp-classic-passengers",
+  "profileKey": "asobo/c172sp-classic-passengers",
+  "semver": "1.0.0",
+  "displayName": "C172SP Classic Passengers (MSFS 2024)",
+  "match": {
+    "fingerprint": "2cc2f2abf7b6e18161ae6c729d2a0feeb346bbbd22aa518b6edf6521df5659f1",
+    "title": "C172SP Classic Passengers",
+    "publisher": "asobo",
+    "icao": "C172",
+    "liveTitles": [
+      "C172SP Classic Passengers"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 28,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 28,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 1.5"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 1.5"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 15,
+      "maxMac": 35
+    },
+    "calibration": {
+      "observedMac": 17.501413822174072,
+      "calibratedAtIso": "2026-08-04T01:33:51.765Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\asobo_c172sp_g1000\\attachments\\asobo\\function_exterior\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -2.7,
+        0,
+        1.5
+      ],
+      "sweep": {
+        "minObservedMac": 15.990225970745087,
+        "maxObservedMac": 27.560096979141235,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 6,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-08-04T01:33:59.156Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: C172SP Classic Passengers.",
+    "ICAO type designator (catalog/SimBrief): C172.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6.",
+    "Station maxLoad: placeholder until cfg or clamp.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/asobo-c172sp-classic-passengers.md"
+  ]
+}

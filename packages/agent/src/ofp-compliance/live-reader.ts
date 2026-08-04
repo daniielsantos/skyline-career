@@ -145,10 +145,21 @@ export function fuelFromClassicSnapshot(
   const totalGal =
     totalQtyGal > tankGal * 1.02 + 1 ? totalQtyGal : Math.max(tankGal, totalQtyGal);
 
-  const left = galToLb(leftMain + leftAux + leftTip, densityLbPerGal);
-  const right = galToLb(rightMain + rightAux + rightTip, densityLbPerGal);
+  const left = galToLb(leftMain, densityLbPerGal);
+  const right = galToLb(rightMain, densityLbPerGal);
   const centerLb = galToLb(center, densityLbPerGal);
-  const tankTotal = left + right + centerLb;
+  const leftAuxLb = galToLb(leftAux, densityLbPerGal);
+  const rightAuxLb = galToLb(rightAux, densityLbPerGal);
+  const leftTipLb = galToLb(leftTip, densityLbPerGal);
+  const rightTipLb = galToLb(rightTip, densityLbPerGal);
+  const tankTotal =
+    left +
+    right +
+    centerLb +
+    leftAuxLb +
+    rightAuxLb +
+    leftTipLb +
+    rightTipLb;
   const total = galToLb(totalGal, densityLbPerGal);
 
   return {
@@ -157,7 +168,11 @@ export function fuelFromClassicSnapshot(
     left,
     right,
     center: centerLb,
-    // Keep L/R/C for display; total may exceed their sum when TOTAL QUANTITY wins.
+    ...(leftAuxLb > 0.5 ? { leftAux: leftAuxLb } : {}),
+    ...(rightAuxLb > 0.5 ? { rightAux: rightAuxLb } : {}),
+    ...(leftTipLb > 0.5 ? { leftTip: leftTipLb } : {}),
+    ...(rightTipLb > 0.5 ? { rightTip: rightTipLb } : {}),
+    // Keep L/R/C (+ aux/tip) for display; total may exceed their sum when TOTAL QUANTITY wins.
     total: Math.max(total, tankTotal),
   };
 }

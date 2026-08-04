@@ -105,7 +105,26 @@ export type FuelTankBreakdown = {
   left: number;
   right: number;
   center: number;
+  /** Classic LEFT AUX (often tip tanks on jets) — omitted when unused. */
+  leftAux?: number;
+  rightAux?: number;
+  /** Classic LEFT/RIGHT TIP — omitted when unused. */
+  leftTip?: number;
+  rightTip?: number;
 };
+
+/** Sum all classic tank sides present on a breakdown (lb). */
+export function fuelTankBreakdownSum(tanks: FuelTankBreakdown): number {
+  return (
+    Math.max(0, tanks.left) +
+    Math.max(0, tanks.right) +
+    Math.max(0, tanks.center) +
+    Math.max(0, tanks.leftAux ?? 0) +
+    Math.max(0, tanks.rightAux ?? 0) +
+    Math.max(0, tanks.leftTip ?? 0) +
+    Math.max(0, tanks.rightTip ?? 0)
+  );
+}
 
 /**
  * Classic L/R/C SimVars sometimes return all zeros while FUEL TOTAL is still valid.
@@ -115,10 +134,7 @@ export function isUsableFuelTankBreakdown(
   tanks: FuelTankBreakdown,
   totalFuelLb?: number | null,
 ): boolean {
-  const sum =
-    Math.max(0, tanks.left) +
-    Math.max(0, tanks.right) +
-    Math.max(0, tanks.center);
+  const sum = fuelTankBreakdownSum(tanks);
   const total =
     typeof totalFuelLb === 'number' && Number.isFinite(totalFuelLb)
       ? Math.max(0, totalFuelLb)

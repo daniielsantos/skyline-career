@@ -1,0 +1,133 @@
+{
+  "source": "simbrief",
+  "icao": "F406",
+  "ofpId": "inibuilds-f406-caravan-ii-passenger",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "iniBuilds F406 Caravan II (Passenger)",
+    "iniBuilds F406 Caravan II (Cargo)"
+  ],
+  "matchTitlePattern": "iniBuilds F406 Caravan II \\(Passenger\\)",
+  "notes": [
+    "iniBuilds F406 Caravan II (Passenger) — auto roles pack from homologated profile",
+    "Profile: inibuilds/f406-caravan-ii-passenger@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct",
+    "iniBuilds F406 Caravan II (Cargo) — auto roles pack from homologated profile",
+    "Profile: inibuilds/f406-caravan-ii-cargo@1.0.0",
+    "Joined Market family: iniBuilds F406 Caravan II (Passenger) (inibuilds-f406-caravan-ii-passenger)",
+    "Homologated profile: inibuilds/f406-caravan-ii-cargo@1.0.0",
+    "Title: iniBuilds F406 Caravan II (Cargo)"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "F406",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "COPILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "BAGGAGE",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "AVIONICS CARGO",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "NOSE CARGO",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "ROW A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "ROW B",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "ROW C",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "ROW D",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "ROW E",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

@@ -111,6 +111,26 @@ describe('resolveMissionRolesPack', () => {
     }
   });
 
+  it('accepts Saab 340 Passenger or Cargo under the shared Market SKU', async () => {
+    const cases = [
+      ['340 Passenger', /carenado-saab-340-passenger\.json$/],
+      ['Saab 340 Passenger', /carenado-saab-340-passenger\.json$/],
+      ['340 Cargo', /microsoft-saab-340-cargo\.json$/],
+      ['340 Cargo - Empty', /microsoft-saab-340-cargo\.json$/],
+      ['Saab 340 Cargo', /microsoft-saab-340-cargo\.json$/],
+    ] as const;
+    for (const [liveTitle, pathRe] of cases) {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: 'profiles/ofp/carenado-saab-340-passenger.json',
+        liveTitle,
+        airframeTypeId: 'carenado-saab-340-passenger',
+        strictAirframeMatch: true,
+      });
+      assert.match(roles.path.replace(/\\/g, '/'), pathRe);
+    }
+  });
+
   it('picks the matching Bandeirante family pack for each live title', async () => {
     const cases = [
       [

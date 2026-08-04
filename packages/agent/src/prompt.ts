@@ -20,7 +20,8 @@ export async function withPrompts<T>(fn: (ask: AskFn) => Promise<T>): Promise<T>
 
 export async function confirm(ask: AskFn, question: string, preferYes = true): Promise<boolean> {
   const yn = preferYes ? 'Y/n' : 'y/N';
-  const raw = (await ask(`${question} (${yn})`)).toLowerCase();
+  const fallback = preferYes ? 'Y' : 'N';
+  const raw = (await ask(`${question} (${yn})`, fallback)).toLowerCase();
   if (!raw) return preferYes;
   return raw === 'y' || raw === 'yes';
 }

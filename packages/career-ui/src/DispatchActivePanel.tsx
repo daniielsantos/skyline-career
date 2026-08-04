@@ -7,7 +7,11 @@ import {
   type LoadPath,
 } from './dispatch-flow';
 import { formatMassExact, formatWeightText, KG_TO_LB, type WeightSystem } from './weight-units';
-import { FuelTankSchematic, PayloadStationSchematic } from './LoadSchematic';
+import {
+  CgEnvelopeSchematic,
+  FuelTankSchematic,
+  PayloadStationSchematic,
+} from './LoadSchematic';
 import { DispatchRouteCard } from './DispatchRouteCard';
 import {
   formatPayloadDueLine,
@@ -68,7 +72,8 @@ export function DispatchActivePanel(props: {
   formatTonnes: (kg: number) => string;
   formatDeadline: (tick: number, hours: number) => string;
   aircraftClassLabel: (id: string) => string;
-  fallbackMaxCargoKg: (cls: string) => number;
+  /** Structural/operational cargo ceiling for this mission (kg). */
+  missionMaxCargoKg: (mission: Mission) => number;
   ofpAutoStatus: 'idle' | 'waiting' | 'checking';
   missionFuelQuote: {
     quote: MissionFuelQuote;
@@ -87,8 +92,24 @@ export function DispatchActivePanel(props: {
     liveMac?: number;
     liveFuelLb?: number;
     livePayloadLb?: number;
-    liveTanks?: { left: number; right: number; center: number };
-    tankCapacity?: { left: number; right: number; center: number };
+  liveTanks?: {
+    left: number;
+    right: number;
+    center: number;
+    leftAux?: number;
+    rightAux?: number;
+    leftTip?: number;
+    rightTip?: number;
+  };
+  tankCapacity?: {
+    left: number;
+    right: number;
+    center: number;
+    leftAux?: number;
+    rightAux?: number;
+    leftTip?: number;
+    rightTip?: number;
+  };
     liveStations?: Record<number, number>;
     stationMax?: Record<number, number>;
     plannedFuelLb?: number;
@@ -277,7 +298,7 @@ export function DispatchActivePanel(props: {
             {props.formatTonnes(
               Math.max(
                 0,
-                props.fallbackMaxCargoKg(mission.aircraftClassId) - mission.cargoKg,
+                props.missionMaxCargoKg(mission) - mission.cargoKg,
               ),
             )}
           </strong>
@@ -886,6 +907,15 @@ export function DispatchActivePanel(props: {
                         <b>
                           {liveVerification.cg.severity === 'warn' ? '⚠' : 'ℹ'}
                         </b>
+                        {liveVerification.cg.minMac !== undefined &&
+                        liveVerification.cg.maxMac !== undefined ? (
+                          <CgEnvelopeSchematic
+                            liveMac={liveVerification.cg.liveMac}
+                            minMac={liveVerification.cg.minMac}
+                            maxMac={liveVerification.cg.maxMac}
+                            ok={liveVerification.cg.ok}
+                          />
+                        ) : null}
                       </div>
                     ) : null}
                     <div className="preflight-aircraft-state">

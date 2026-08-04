@@ -402,11 +402,30 @@ export async function sampleLiveLoadLb(
   const leftTip = await readGal('FUEL TANK LEFT TIP QUANTITY');
   const rightTip = await readGal('FUEL TANK RIGHT TIP QUANTITY');
 
-  const leftLb = (leftMain + leftAux + leftTip) * density;
-  const rightLb = (rightMain + rightAux + rightTip) * density;
+  const leftLb = leftMain * density;
+  const rightLb = rightMain * density;
   const centerLb = centerGal * density;
-  const tankTotalLb = leftLb + rightLb + centerLb;
-  const fuelTanks = { left: leftLb, right: rightLb, center: centerLb };
+  const leftAuxLb = leftAux * density;
+  const rightAuxLb = rightAux * density;
+  const leftTipLb = leftTip * density;
+  const rightTipLb = rightTip * density;
+  const tankTotalLb =
+    leftLb +
+    rightLb +
+    centerLb +
+    leftAuxLb +
+    rightAuxLb +
+    leftTipLb +
+    rightTipLb;
+  const fuelTanks: FuelTankBreakdown = {
+    left: leftLb,
+    right: rightLb,
+    center: centerLb,
+    ...(leftAuxLb > 0.5 ? { leftAux: leftAuxLb } : {}),
+    ...(rightAuxLb > 0.5 ? { rightAux: rightAuxLb } : {}),
+    ...(leftTipLb > 0.5 ? { leftTip: leftTipLb } : {}),
+    ...(rightTipLb > 0.5 ? { rightTip: rightTipLb } : {}),
+  };
   const fuelTankCapacity = await readClassicFuelTankCapacityLb(bridge, density);
 
   let fuelLb: number | null = tankTotalLb > 0 ? tankTotalLb : null;

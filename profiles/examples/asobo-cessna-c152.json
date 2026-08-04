@@ -1,0 +1,203 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "asobo-cessna-c152",
+  "profileKey": "asobo/cessna-c152",
+  "semver": "1.0.0",
+  "displayName": "Cessna C152 (MSFS 2024)",
+  "match": {
+    "fingerprint": "5d467d83c37d4376b97093aee695d91c1cbda00168e8f7cc1ef21d88db8042d6",
+    "title": "Cessna C152",
+    "publisher": "asobo",
+    "icao": "C172",
+    "liveTitles": [
+      "Cessna C152"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "FUELSYSTEM:1",
+        "capacity": 13,
+        "readVar": "FUELSYSTEM TANK QUANTITY:1",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:1",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "FUELSYSTEM:2",
+        "capacity": 13,
+        "readVar": "FUELSYSTEM TANK QUANTITY:2",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:1",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 0.8"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:2",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 0.8"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:1",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:2",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 500,
+        "arm": -7.5
+      },
+      {
+        "index": 2,
+        "name": "FRONT PAX",
+        "maxLoad": 500,
+        "arm": -7.5
+      },
+      {
+        "index": 3,
+        "name": "Baggage Area 1",
+        "maxLoad": 500,
+        "arm": -9.58
+      },
+      {
+        "index": 4,
+        "name": "Baggage Area 2",
+        "maxLoad": 500,
+        "arm": -11.24
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 12,
+      "maxMac": 34
+    },
+    "calibration": {
+      "observedMac": 11.537470668554306,
+      "calibratedAtIso": "2026-08-04T01:53:22.086Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\asobo_c152\\common\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -5.5,
+        0,
+        0
+      ],
+      "sweep": {
+        "minObservedMac": 17.574043571949005,
+        "maxObservedMac": 29.144957661628723,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 4,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-04T01:53:29.050Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Cessna C152.",
+    "ICAO type designator (catalog/SimBrief): C172.",
+    "Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4.",
+    "Station maxLoad: placeholder until cfg or clamp.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/asobo-cessna-c152.md"
+  ]
+}

@@ -208,6 +208,7 @@ const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
     'blackbox-bn2-islander-cargo-tip-tanks',
   'blackbox-bn2-islander-cargo-garmin-tip-tanks':
     'blackbox-bn2-islander-cargo-tip-tanks',
+  'microsoft-saab-340-cargo': 'carenado-saab-340-passenger',
 };
 
 const BY_ID = new Map(CAREER_PLAYER_AIRFRAMES.map((airframe) => [airframe.typeId, airframe]));

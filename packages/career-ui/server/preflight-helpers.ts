@@ -14,6 +14,7 @@ import {
   ofpFuelToLb,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
+  type FuelTankBreakdown,
   type MissionIntent,
   type OfpExpectation,
 } from '@msfs-compat/shared';
@@ -71,8 +72,24 @@ export type PreflightCheckResult = {
       plannedLb?: number;
       liveLb: number;
       ok: boolean;
-      tanks?: { left: number; right: number; center: number };
-      tankCapacity?: { left: number; right: number; center: number };
+      tanks?: {
+        left: number;
+        right: number;
+        center: number;
+        leftAux?: number;
+        rightAux?: number;
+        leftTip?: number;
+        rightTip?: number;
+      };
+      tankCapacity?: {
+        left: number;
+        right: number;
+        center: number;
+        leftAux?: number;
+        rightAux?: number;
+        leftTip?: number;
+        rightTip?: number;
+      };
     };
       payload: {
         plannedLb?: number;
@@ -287,7 +304,7 @@ export async function runMissionPreflight(
       title: liveTitle || identity.title,
       icao: identity.icao,
     });
-    let liveTankCapacity: { left: number; right: number; center: number } | undefined;
+    let liveTankCapacity: FuelTankBreakdown | undefined;
     try {
       liveTankCapacity = await readClassicFuelTankCapacityLb(bridge);
     } catch {
@@ -324,6 +341,18 @@ export async function runMissionPreflight(
               left: live.fuel.left,
               right: live.fuel.right,
               center: live.fuel.center,
+              ...(live.fuel.leftAux != null
+                ? { leftAux: live.fuel.leftAux }
+                : {}),
+              ...(live.fuel.rightAux != null
+                ? { rightAux: live.fuel.rightAux }
+                : {}),
+              ...(live.fuel.leftTip != null
+                ? { leftTip: live.fuel.leftTip }
+                : {}),
+              ...(live.fuel.rightTip != null
+                ? { rightTip: live.fuel.rightTip }
+                : {}),
             },
             liveFuelLb,
           )
@@ -332,6 +361,18 @@ export async function runMissionPreflight(
                   left: live.fuel.left,
                   right: live.fuel.right,
                   center: live.fuel.center,
+                  ...(live.fuel.leftAux != null
+                    ? { leftAux: live.fuel.leftAux }
+                    : {}),
+                  ...(live.fuel.rightAux != null
+                    ? { rightAux: live.fuel.rightAux }
+                    : {}),
+                  ...(live.fuel.leftTip != null
+                    ? { leftTip: live.fuel.leftTip }
+                    : {}),
+                  ...(live.fuel.rightTip != null
+                    ? { rightTip: live.fuel.rightTip }
+                    : {}),
                 },
               }
             : {}),

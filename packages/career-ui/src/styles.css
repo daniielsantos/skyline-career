@@ -3623,7 +3623,9 @@ small {
 
 .load-schematic-wing,
 .load-schematic-center,
-.load-schematic-station {
+.load-schematic-station,
+.load-schematic-tip,
+.load-schematic-aux {
   position: relative;
   display: grid;
   gap: 0.1rem;
@@ -3658,8 +3660,32 @@ small {
   clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%);
 }
 
-.load-schematic-fuel .load-schematic-wing:last-child {
+.load-schematic-fuel .load-schematic-wing:has(+ .load-schematic-aux-right),
+.load-schematic-fuel .load-schematic-wing:has(+ .load-schematic-tip-right),
+.load-schematic-fuel .load-schematic-wing:last-of-type {
   clip-path: polygon(0 0, 92% 0, 100% 100%, 8% 100%);
+}
+
+.load-schematic-tip,
+.load-schematic-aux {
+  flex: 0 0 2.15rem;
+  min-width: 2.15rem;
+}
+
+.load-schematic-tip-left {
+  clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.load-schematic-tip-right {
+  clip-path: polygon(0 0, 82% 0, 100% 100%, 0 100%);
+}
+
+.load-schematic-aux-left {
+  clip-path: polygon(12% 0, 100% 0, 94% 100%, 0 100%);
+}
+
+.load-schematic-aux-right {
+  clip-path: polygon(0 0, 88% 0, 100% 100%, 6% 100%);
 }
 
 .load-schematic-center {
@@ -3696,14 +3722,108 @@ small {
 
 .preflight-load-ok .load-schematic-wing,
 .preflight-load-ok .load-schematic-center,
-.preflight-load-ok .load-schematic-station {
+.preflight-load-ok .load-schematic-station,
+.preflight-load-ok .load-schematic-tip,
+.preflight-load-ok .load-schematic-aux {
   border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
 }
 
 .preflight-load-fail .load-schematic-wing,
 .preflight-load-fail .load-schematic-center,
-.preflight-load-fail .load-schematic-station {
+.preflight-load-fail .load-schematic-station,
+.preflight-load-fail .load-schematic-tip,
+.preflight-load-fail .load-schematic-aux {
   border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+
+.load-schematic-cg {
+  display: grid;
+  grid-template-columns: 0.7rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: stretch;
+  min-height: 6.5rem;
+  margin-top: 0.5rem;
+  padding-right: 0.25rem;
+}
+
+.cg-schematic-rail {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 0.2rem;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--danger) 18%, transparent),
+      color-mix(in srgb, var(--danger) 8%, transparent) 18%,
+      color-mix(in srgb, var(--surface) 70%, transparent) 18%,
+      color-mix(in srgb, var(--surface) 70%, transparent) 82%,
+      color-mix(in srgb, var(--danger) 8%, transparent) 82%,
+      color-mix(in srgb, var(--danger) 18%, transparent)
+    );
+  overflow: hidden;
+}
+
+.cg-schematic-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--ok) 38%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ok) 55%, var(--line));
+  border-bottom: 1px solid color-mix(in srgb, var(--ok) 55%, var(--line));
+}
+
+.cg-schematic-marker {
+  position: absolute;
+  left: -0.12rem;
+  right: -0.12rem;
+  height: 0.18rem;
+  transform: translateY(-50%);
+  background: var(--ink);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg) 65%, transparent);
+  border-radius: 0.05rem;
+}
+
+.load-schematic-cg-ok .cg-schematic-marker {
+  background: var(--ok);
+}
+
+.load-schematic-cg-warn .cg-schematic-marker {
+  background: var(--warn, #d4a017);
+}
+
+.cg-schematic-scale {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.cg-schematic-live {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
+.load-schematic-cg-ok .cg-schematic-live {
+  color: var(--ok);
+}
+
+.load-schematic-cg-warn .cg-schematic-live {
+  color: var(--warn, #d4a017);
+}
+
+.cg-schematic-aft,
+.cg-schematic-fwd {
+  font-variant-numeric: tabular-nums;
 }
 
 .preflight-technical {

@@ -11,6 +11,7 @@ import {
   normalizeAircraftTitle,
   resolveLivePayloadLb,
   type AircraftProfile,
+  type FuelTankBreakdown,
   type LoadPlanRequest,
   type MissionIntent,
 } from '@msfs-compat/shared';
@@ -171,9 +172,9 @@ export type OfpLoadProgress = {
   liveFuelLb?: number;
   livePayloadLb?: number;
   /** Classic L/R/C breakdown for Preflight schematic while inject runs. */
-  liveTanks?: { left: number; right: number; center: number };
+  liveTanks?: FuelTankBreakdown;
   /** Classic L/R/C capacity (lb) for schematic fill while inject runs. */
-  tankCapacity?: { left: number; right: number; center: number };
+  tankCapacity?: FuelTankBreakdown;
   /** Per-station live weights for Preflight schematic while inject runs. */
   liveStations?: Record<number, number>;
   /** Profile maxLoad (lb) keyed by station index. */
@@ -854,17 +855,25 @@ async function applyMissionOfpLoadExclusive(
       return qty * fuelLbPerGal;
     };
 
-    /** Fold profile tank ids into the Preflight L/R/C schematic. */
+    /** Fold profile tank ids into the Preflight L/R/C (+ aux/tip) schematic. */
     const schematicTanksFromProfile = (
       tanks: Record<string, number>,
-    ): { left: number; right: number; center: number } => {
+    ): FuelTankBreakdown => {
       let left = 0;
       let right = 0;
       let center = 0;
+      let leftAux = 0;
+      let rightAux = 0;
+      let leftTip = 0;
+      let rightTip = 0;
       for (const [id, qty] of Object.entries(tanks)) {
         const lb = tankQtyToLb(qty);
         const key = id.toLowerCase();
         if (/(center|centre)/.test(key)) center += lb;
+        else if (/tip/.test(key) && /right|_r\b|^r_/.test(key)) rightTip += lb;
+        else if (/tip/.test(key) && /left|_l\b|^l_/.test(key)) leftTip += lb;
+        else if (/aux/.test(key) && /right|_r\b|^r_/.test(key)) rightAux += lb;
+        else if (/aux/.test(key) && /left|_l\b|^l_/.test(key)) leftAux += lb;
         else if (/right|_r\b|^r_/.test(key)) right += lb;
         else if (/left|_l\b|^l_/.test(key)) left += lb;
         else {
@@ -872,7 +881,15 @@ async function applyMissionOfpLoadExclusive(
           right += lb / 2;
         }
       }
-      return { left, right, center };
+      return {
+        left,
+        right,
+        center,
+        ...(leftAux > 0.5 ? { leftAux } : {}),
+        ...(rightAux > 0.5 ? { rightAux } : {}),
+        ...(leftTip > 0.5 ? { leftTip } : {}),
+        ...(rightTip > 0.5 ? { rightTip } : {}),
+      };
     };
 
     afterLive = {

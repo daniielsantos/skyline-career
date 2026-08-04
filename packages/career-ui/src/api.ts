@@ -386,6 +386,8 @@ export type Mission = {
   payoutUsd?: number;
   urgency: string;
   aircraftClassId: string;
+  /** Concrete Market airframe assigned to this flight. */
+  airframeTypeId?: string;
   /** Preferred OFP load path for this class (manual always allowed). */
   loadMethod?: 'native-simbrief' | 'direct-injection';
   /** True when Skyline can inject fuel/payload for this class. */
@@ -440,8 +442,24 @@ export type Mission = {
         plannedLb?: number;
         liveLb: number;
         ok: boolean;
-        tanks?: { left: number; right: number; center: number };
-        tankCapacity?: { left: number; right: number; center: number };
+        tanks?: {
+          left: number;
+          right: number;
+          center: number;
+          leftAux?: number;
+          rightAux?: number;
+          leftTip?: number;
+          rightTip?: number;
+        };
+        tankCapacity?: {
+          left: number;
+          right: number;
+          center: number;
+          leftAux?: number;
+          rightAux?: number;
+          leftTip?: number;
+          rightTip?: number;
+        };
       };
       payload: {
         plannedLb?: number;
@@ -1284,8 +1302,24 @@ export type WatchStatus = {
       plannedLb?: number;
       liveLb: number;
       ok: boolean;
-      tanks?: { left: number; right: number; center: number };
-      tankCapacity?: { left: number; right: number; center: number };
+      tanks?: {
+        left: number;
+        right: number;
+        center: number;
+        leftAux?: number;
+        rightAux?: number;
+        leftTip?: number;
+        rightTip?: number;
+      };
+      tankCapacity?: {
+        left: number;
+        right: number;
+        center: number;
+        leftAux?: number;
+        rightAux?: number;
+        leftTip?: number;
+        rightTip?: number;
+      };
     };
     payload: {
       plannedLb?: number;
@@ -1508,8 +1542,24 @@ export type OfpLoadProgress = {
   liveMac?: number;
   liveFuelLb?: number;
   livePayloadLb?: number;
-  liveTanks?: { left: number; right: number; center: number };
-  tankCapacity?: { left: number; right: number; center: number };
+  liveTanks?: {
+    left: number;
+    right: number;
+    center: number;
+    leftAux?: number;
+    rightAux?: number;
+    leftTip?: number;
+    rightTip?: number;
+  };
+  tankCapacity?: {
+    left: number;
+    right: number;
+    center: number;
+    leftAux?: number;
+    rightAux?: number;
+    leftTip?: number;
+    rightTip?: number;
+  };
   liveStations?: Record<number, number>;
   stationMax?: Record<number, number>;
   plannedFuelLb?: number;

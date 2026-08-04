@@ -6580,9 +6580,29 @@ export function App() {
               formatTonnes={formatTonnes}
               formatDeadline={formatDeadline}
               aircraftClassLabel={aircraftClassLabel}
-              fallbackMaxCargoKg={(cls) =>
-                fallbackMaxCargoKg(cls as AircraftClass)
-              }
+              missionMaxCargoKg={(mission) => {
+                const typeId =
+                  mission.airframeTypeId?.trim() ||
+                  fleet.find((a) => a.id === mission.aircraftId)?.airframeTypeId
+                    ?.trim() ||
+                  fleet.find(
+                    (a) => a.aircraftClassId === mission.aircraftClassId,
+                  )?.airframeTypeId?.trim();
+                const fromAirframe =
+                  typeId && airframePerf[typeId]?.maxCargoKg
+                    ? airframePerf[typeId]!.maxCargoKg
+                    : undefined;
+                if (
+                  typeof fromAirframe === 'number' &&
+                  Number.isFinite(fromAirframe) &&
+                  fromAirframe > 0
+                ) {
+                  return fromAirframe;
+                }
+                return fallbackMaxCargoKg(
+                  mission.aircraftClassId as AircraftClass,
+                );
+              }}
               ofpAutoStatus={ofpAutoStatus}
               missionFuelQuote={missionFuelQuote}
               missionFuelQuoteStatus={missionFuelQuoteStatus}

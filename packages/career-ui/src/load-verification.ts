@@ -16,22 +16,35 @@ function matchOk(
   return Math.abs(liveLb - plannedLb) <= Math.max(0, toleranceLb);
 }
 
-/** Per-side classic fuel breakdown (aux/tip folded into L/R by the live reader). */
+/** Per-side classic fuel breakdown (aux/tip shown separately when present). */
 export type LoadFuelTankBreakdown = {
   left: number;
   right: number;
   center: number;
+  leftAux?: number;
+  rightAux?: number;
+  leftTip?: number;
+  rightTip?: number;
 };
+
+function fuelTankBreakdownSum(tanks: LoadFuelTankBreakdown): number {
+  return (
+    Math.max(0, tanks.left) +
+    Math.max(0, tanks.right) +
+    Math.max(0, tanks.center) +
+    Math.max(0, tanks.leftAux ?? 0) +
+    Math.max(0, tanks.rightAux ?? 0) +
+    Math.max(0, tanks.leftTip ?? 0) +
+    Math.max(0, tanks.rightTip ?? 0)
+  );
+}
 
 /** Classic L/R/C sometimes glitch to zero while FUEL TOTAL is still valid. */
 export function isUsableFuelTankBreakdown(
   tanks: LoadFuelTankBreakdown,
   totalFuelLb?: number | null,
 ): boolean {
-  const sum =
-    Math.max(0, tanks.left) +
-    Math.max(0, tanks.right) +
-    Math.max(0, tanks.center);
+  const sum = fuelTankBreakdownSum(tanks);
   const total =
     typeof totalFuelLb === 'number' && Number.isFinite(totalFuelLb)
       ? Math.max(0, totalFuelLb)

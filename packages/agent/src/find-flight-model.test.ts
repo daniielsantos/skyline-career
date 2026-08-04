@@ -11,6 +11,7 @@ import {
   parseInstalledPackagesPath,
   scoreCfgAgainstLiveHints,
   scorePathAgainstTokens,
+  scoreStationSourcePath,
   summarizeFlightModelCfg,
   titleSearchTokens,
 } from './find-flight-model.js';
@@ -142,6 +143,47 @@ describe('scoreCfgAgainstLiveHints', () => {
     assert.ok(match >= 60);
     assert.ok(decoy < 0);
     assert.ok(match > decoy + 40);
+  });
+});
+
+describe('scoreStationSourcePath', () => {
+  const wb7 = [
+    '[WEIGHT_AND_BALANCE]',
+    'max_gross_weight = 13250',
+    'empty_weight = 7500',
+    'station_load.0 = 170,0,0,0,Pilot,1',
+    'station_load.1 = 170,0,0,0,Copilot,2',
+    'station_load.2 = 0,0,0,0,Cargo,6',
+    'station_load.3 = 0,0,0,0,Cargo,6',
+    'station_load.4 = 0,0,0,0,Cargo,6',
+    'station_load.5 = 0,0,0,0,Cargo,6',
+    'station_load.6 = 0,0,0,0,Cargo,6',
+  ].join('\n');
+
+  it('boosts Function_Exterior when station count matches live', () => {
+    const exterior = scoreStationSourcePath(
+      'pkg/SimObjects/Airplanes/NextGen_EMB110/attachments/nextgensim/Function_Exterior_110P1F/config/flight_model.cfg',
+      wb7,
+      { stationCount: 7 },
+    );
+    const common = scoreStationSourcePath(
+      'pkg/SimObjects/Airplanes/NextGen_EMB110/common/config/flight_model.cfg',
+      wb7,
+      { stationCount: 7 },
+    );
+    assert.ok(exterior >= 20);
+    assert.equal(common, 0);
+  });
+
+  it('does not boost when station count is far off', () => {
+    assert.equal(
+      scoreStationSourcePath(
+        'pkg/attachments/nextgensim/Function_Exterior_110P/config/flight_model.cfg',
+        wb7,
+        { stationCount: 3 },
+      ),
+      0,
+    );
   });
 });
 
@@ -290,6 +332,72 @@ describe('groupFlightModelCandidatesByContent', () => {
     // Real W&B attachment should rank above demoted identical stubs.
     assert.ok(cargoGroup!.primary.score >= stubGroup!.primary.score);
     assert.match(cargoGroup!.summary ?? '', /MTOW 6600 lb/);
+  });
+
+  it('ranks Function_Exterior above common when live station count matches', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'msfs-fm-exterior-'));
+    const plane = join(
+      root,
+      'Community2024',
+      'nextgensim-aircraft-bandeirante',
+      'SimObjects',
+      'Airplanes',
+      'NextGen_EMB110',
+    );
+    const wb = [
+      '[WEIGHT_AND_BALANCE]',
+      'max_gross_weight = 13250',
+      'empty_weight = 7500',
+      'station_load.0 = 170,1.0,0,0,Pilot,1',
+      'station_load.1 = 170,1.0,0,0,Copilot,2',
+      'station_load.2 = 0,5.0,0,0,Cargo,6',
+      'station_load.3 = 0,6.0,0,0,Cargo,6',
+      'station_load.4 = 0,7.0,0,0,Cargo,6',
+      'station_load.5 = 0,8.0,0,0,Cargo,6',
+      'station_load.6 = 0,9.0,0,0,Cargo,6',
+    ].join('\n');
+    const commonDir = join(plane, 'common', 'config');
+    await mkdir(commonDir, { recursive: true });
+    await writeFile(join(commonDir, 'flight_model.cfg'), wb, 'utf8');
+    await writeFile(
+      join(commonDir, 'aircraft.cfg'),
+      'ui_max_range = 1060\nui_fuel_burn_rate = 400\n',
+      'utf8',
+    );
+    const exteriorDir = join(
+      plane,
+      'attachments',
+      'nextgensim',
+      'Function_Exterior_110P1F',
+      'config',
+    );
+    await mkdir(exteriorDir, { recursive: true });
+    // Same station count / MTOW, different arms — content must differ for two groups.
+    await writeFile(
+      join(exteriorDir, 'flight_model.cfg'),
+      wb.replace('station_load.2 = 0,5.0', 'station_load.2 = 0,12.5'),
+      'utf8',
+    );
+
+    const found = await findFlightModelCandidates(
+      root,
+      'NextGenSim EMB-110P1F Bandeirante',
+      { publisher: 'nextgensim' },
+    );
+    const groups = await groupFlightModelCandidatesByContent(found, {
+      mtowLb: 13250,
+      emptyWeightLb: 7500,
+      stationCount: 7,
+    });
+    assert.ok(groups.length >= 2);
+    assert.match(
+      groups[0]!.primary.path.replace(/\\/g, '/'),
+      /Function_Exterior_110P1F/,
+    );
+    assert.ok(
+      groups[0]!.primary.score > (groups[1]?.primary.score ?? 0),
+      `expected Exterior score > common (${groups[0]!.primary.score} vs ${groups[1]?.primary.score})`,
+    );
   });
 });
 

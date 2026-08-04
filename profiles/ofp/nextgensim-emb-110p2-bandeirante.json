@@ -1,16 +1,16 @@
 {
   "source": "simbrief",
   "icao": "E110",
-  "ofpId": "nextgensim-emb-110p1-bandeirante",
+  "ofpId": "nextgensim-emb-110p2-bandeirante",
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "NextGenSim EMB-110P1 Bandeirante"
+    "NextGenSim EMB-110P2 Bandeirante"
   ],
-  "matchTitlePattern": "NextGenSim EMB-110P1 Bandeirante",
+  "matchTitlePattern": "NextGenSim EMB-110P2 Bandeirante",
   "notes": [
-    "NextGenSim EMB-110P1 Bandeirante — auto roles pack from homologated profile",
-    "Profile: nextgensim/emb-110p1-bandeirante@1.0.0",
+    "NextGenSim EMB-110P2 Bandeirante — auto roles pack from homologated profile",
+    "Profile: nextgensim/emb-110p2-bandeirante@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct"
@@ -63,7 +63,7 @@
     ]
   },
   "simbriefIcao": "E110",
-  "simbriefAirframeMatch": "NextGen Simulations \\(MSFS\\) - EMB-110P1$",
+  "simbriefAirframeMatch": "NextGen Simulations \\(MSFS\\) - EMB-110P2$",
   "stationMap": [
     {
       "simVarIndex": 1,

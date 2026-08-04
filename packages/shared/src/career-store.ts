@@ -16,25 +16,36 @@ import { emptyMissionsStateV2, normalizeMissionsState } from './career-fleet.js'
 import { normalizeMissionIntent } from './career-mission.js';
 import { readJsonFile, renameJsonAside, writeJsonFileAtomic } from './career-json-io.js';
 import {
-  normalizeCareerLedger,
   summarizeCareerLedger,
   type CareerLedgerSummary,
 } from './career-ledger.js';
 import { ensureHomeCountryId } from './career-partition.js';
+import {
+  assembleMissionsFromTables,
+  companyTablesPopulated,
+  countLotsRows,
+  economyBlobHasHotArrays,
+  ensureLocalCompany,
+  ensureV3Ddl,
+  hydrateWorldFromTables,
+  migrateV2toV3IfNeeded,
+  missionsBlobStub,
+  persistCompanyTables,
+  persistWorldLiveTables,
+  readLedgerRowsV3,
+  replaceLedgerV3,
+  stripEconomyHotArrays,
+} from './career-store-v3.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
-  CareerLedgerKind,
   CareerMissionsState,
-  CommodityId,
-  ShipmentLot,
-  ShipmentLotStatus,
 } from './types/career-economy.js';
 
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '2';
+export const CAREER_STORE_SCHEMA_VERSION = '3';
 
 export type EconomyLoadResult = {
   world: CareerEconomyWorld;
@@ -82,7 +93,6 @@ function economyNeedsRewrite(
   const trucksBefore = Array.isArray(existing.fuelTrucks)
     ? existing.fuelTrucks.length
     : 0;
-  const lotsBefore = Array.isArray(existing.lots) ? existing.lots.length : 0;
   const airportsBefore = Array.isArray(existing.airports) ? existing.airports.length : 0;
   const hubLevelSigBefore = Array.isArray(existing.airports)
     ? (existing.airports as Array<{ level?: number; levelXp?: number; levelCurveVersion?: number }>)
@@ -111,12 +121,12 @@ function economyNeedsRewrite(
     version !== 3 ||
     caught.npcs.length !== npcCountBefore ||
     (caught.fuelTrucks?.length ?? 0) !== trucksBefore ||
-    caught.lots.length !== lotsBefore ||
     caught.airports.length !== airportsBefore ||
     npcRegionsAfter !== npcRegionsBefore ||
     hubLevelSigAfter !== hubLevelSigBefore ||
     missingHubTiers ||
-    missingHomeCountry
+    missingHomeCountry ||
+    economyBlobHasHotArrays(existing)
   );
 }
 
@@ -127,7 +137,6 @@ function normalizeMissions(raw: Record<string, unknown>): CareerMissionsState {
 }
 
 function missionsPayloadForBlob(state: CareerMissionsState): CareerMissionsState {
-  // Ledger is also materialized in SQLite; keep a copy in the blob for JSON export / fallback.
   return normalizeMissions(state as unknown as Record<string, unknown>);
 }
 
@@ -287,21 +296,26 @@ function ensureSqliteSchema(db: SqliteDb): void {
     CREATE INDEX IF NOT EXISTS lots_expires_idx ON lots(expires_at_tick);
   `);
 
+  ensureV3Ddl(db);
+
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
     | undefined;
   if (!ver) {
+    ensureLocalCompany(db);
     db.prepare(`INSERT INTO meta (key, value) VALUES ('schema_version', ?)`).run(
       CAREER_STORE_SCHEMA_VERSION,
     );
     return;
   }
+
   const current = Number.parseInt(ver.value, 10);
-  if (!Number.isFinite(current) || current < 2) {
-    // v1 → v2: lots table + indexes already ensured by CREATE IF NOT EXISTS above.
-    metaSet(db, 'schema_version', CAREER_STORE_SCHEMA_VERSION);
+  if (!Number.isFinite(current) || current < 3) {
+    migrateV2toV3IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   } else if (ver.value !== CAREER_STORE_SCHEMA_VERSION) {
     metaSet(db, 'schema_version', CAREER_STORE_SCHEMA_VERSION);
+  } else {
+    ensureLocalCompany(db);
   }
 }
 
@@ -310,145 +324,6 @@ function metaSet(db: SqliteDb, key: string, value: string): void {
     `INSERT INTO meta (key, value) VALUES (?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   ).run(key, value);
-}
-
-function readLedgerRows(db: SqliteDb): CareerLedgerEntry[] {
-  const rows = db
-    .prepare(
-      `SELECT id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao
-       FROM ledger ORDER BY at_tick ASC, id ASC`,
-    )
-    .all() as Array<{
-    id: string;
-    at_tick: number;
-    day_index: number;
-    amount_usd: number;
-    kind: string;
-    note: string | null;
-    aircraft_id: string | null;
-    mission_id: string | null;
-    icao: string | null;
-  }>;
-  return normalizeCareerLedger(
-    rows.map((r) => ({
-      id: r.id,
-      atTick: r.at_tick,
-      dayIndex: r.day_index,
-      amountUsd: r.amount_usd,
-      kind: r.kind as CareerLedgerKind,
-      note: r.note ?? undefined,
-      aircraftId: r.aircraft_id ?? undefined,
-      missionId: r.mission_id ?? undefined,
-      icao: r.icao ?? undefined,
-    })),
-  );
-}
-
-/** Caller should wrap in a transaction when combining with other writes. */
-function replaceLedger(db: SqliteDb, entries: CareerLedgerEntry[]): void {
-  const del = db.prepare(`DELETE FROM ledger`);
-  const ins = db.prepare(
-    `INSERT INTO ledger (id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao)
-     VALUES (@id, @at_tick, @day_index, @amount_usd, @kind, @note, @aircraft_id, @mission_id, @icao)`,
-  );
-  del.run();
-  for (const e of entries) {
-    ins.run({
-      id: e.id,
-      at_tick: e.atTick,
-      day_index: e.dayIndex,
-      amount_usd: e.amountUsd,
-      kind: e.kind,
-      note: e.note ?? null,
-      aircraft_id: e.aircraftId ?? null,
-      mission_id: e.missionId ?? null,
-      icao: e.icao ?? null,
-    });
-  }
-}
-
-function countLotsRows(db: SqliteDb): number {
-  const row = db.prepare(`SELECT COUNT(*) AS n FROM lots`).get() as { n: number } | undefined;
-  return Number(row?.n ?? 0);
-}
-
-function readLotsRows(db: SqliteDb): ShipmentLot[] {
-  const rows = db
-    .prepare(
-      `SELECT id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-              created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
-       FROM lots ORDER BY created_at_tick ASC, id ASC`,
-    )
-    .all() as Array<{
-    id: string;
-    commodity_id: string;
-    origin_icao: string;
-    dest_icao: string;
-    quantity_kg: number;
-    reserved_kg: number;
-    created_at_tick: number;
-    expires_at_tick: number;
-    pay_usd: number;
-    base_pay_usd: number | null;
-    urgency: string;
-    reason: string;
-    status: string;
-  }>;
-  return rows.map((r) => {
-    const lot: ShipmentLot = {
-      id: r.id,
-      commodityId: r.commodity_id as CommodityId,
-      originIcao: r.origin_icao,
-      destIcao: r.dest_icao,
-      quantityKg: r.quantity_kg,
-      reservedKg: r.reserved_kg,
-      createdAtTick: r.created_at_tick,
-      expiresAtTick: r.expires_at_tick,
-      payUsd: r.pay_usd,
-      urgency: r.urgency === 'urgent' ? 'urgent' : 'normal',
-      reason: r.reason,
-      status: r.status as ShipmentLotStatus,
-    };
-    if (typeof r.base_pay_usd === 'number' && Number.isFinite(r.base_pay_usd)) {
-      lot.basePayUsd = r.base_pay_usd;
-    }
-    return lot;
-  });
-}
-
-/** Caller should wrap in a transaction when combining with other writes. */
-function replaceLots(db: SqliteDb, lots: ShipmentLot[]): void {
-  const del = db.prepare(`DELETE FROM lots`);
-  const ins = db.prepare(
-    `INSERT INTO lots (
-       id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-       created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
-     ) VALUES (
-       @id, @commodity_id, @origin_icao, @dest_icao, @quantity_kg, @reserved_kg,
-       @created_at_tick, @expires_at_tick, @pay_usd, @base_pay_usd, @urgency, @reason, @status
-     )`,
-  );
-  del.run();
-  for (const lot of lots) {
-    ins.run({
-      id: lot.id,
-      commodity_id: lot.commodityId,
-      origin_icao: lot.originIcao,
-      dest_icao: lot.destIcao,
-      quantity_kg: lot.quantityKg,
-      reserved_kg: lot.reservedKg,
-      created_at_tick: lot.createdAtTick,
-      expires_at_tick: lot.expiresAtTick,
-      pay_usd: lot.payUsd,
-      base_pay_usd:
-        typeof lot.basePayUsd === 'number' && Number.isFinite(lot.basePayUsd)
-          ? lot.basePayUsd
-          : null,
-      urgency: lot.urgency,
-      reason: lot.reason,
-      status: lot.status,
-    });
-  }
 }
 
 class SqliteCareerStore implements CareerStore {
@@ -496,18 +371,11 @@ class SqliteCareerStore implements CareerStore {
       throw new Error('SQLite economy_json has no airports[]; refusing to reseed');
     }
     const world = migrateEconomyWorld(existing);
-    // Materialized lots table is source of truth when non-empty (dual-write with blob).
-    if (countLotsRows(this.db) > 0) {
-      world.lots = readLotsRows(this.db);
-    }
+    // Schema v3: lots / inbound / npcFlights / events are table SoT.
+    hydrateWorldFromTables(this.db, world);
     const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
     ensureHomeCountryId(caught);
     let dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
-    // Schema v2 backfill: blob has lots but table empty → persist on this load.
-    if (countLotsRows(this.db) === 0 && caught.lots.length > 0) {
-      dirty = true;
-    }
-    // Heal tick-0 empty boards (pre-warm saves / first boot without /api/init).
     if (ensureSeedMarketFormed(caught)) dirty = true;
     return { world: caught, advancedTicks, settledFlights, dirty };
   }
@@ -517,7 +385,8 @@ class SqliteCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    const json = JSON.stringify(toSave);
+    const blob = stripEconomyHotArrays(toSave);
+    const json = JSON.stringify(blob);
     const now = Date.now();
     runInTransaction(this.db, () => {
       this.db
@@ -526,7 +395,7 @@ class SqliteCareerStore implements CareerStore {
            ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
         )
         .run(json, now);
-      replaceLots(this.db, toSave.lots ?? []);
+      persistWorldLiveTables(this.db, toSave);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
       metaSet(this.db, 'economy_tick', String(toSave.tick));
     });
@@ -551,38 +420,43 @@ class SqliteCareerStore implements CareerStore {
         }`,
       );
     }
-    if (!Array.isArray(existing.missions)) {
+    // After v3 migrate, missions[] may be empty stub — tables are SoT.
+    const hasMissionArray = Array.isArray(existing.missions);
+    if (!hasMissionArray && !companyTablesPopulated(this.db)) {
       throw new Error('SQLite missions_json has no missions[]; refusing to wipe career');
     }
-    const normalized = normalizeMissions(existing);
-    const tableLedger = readLedgerRows(this.db);
-    if (tableLedger.length > 0) {
-      normalized.ledger = tableLedger;
-    } else if (!normalized.ledger) {
-      normalized.ledger = [];
-    }
-    return normalized;
+    const blobNormalized = normalizeMissions(
+      hasMissionArray ? existing : { ...existing, missions: [] },
+    );
+    const assembled = assembleMissionsFromTables(this.db, blobNormalized);
+    return normalizeMissions(assembled as unknown as Record<string, unknown>);
   }
 
   async saveMissions(state: CareerMissionsState): Promise<void> {
     const normalized = missionsPayloadForBlob(state);
-    const ledger = normalizeCareerLedger(normalized.ledger ?? []);
+    const ledger = normalized.ledger ?? [];
     normalized.ledger = ledger;
-    const json = JSON.stringify(normalized);
+    const stub = missionsBlobStub(normalized);
+    const json = JSON.stringify(stub);
     const now = Date.now();
     runInTransaction(this.db, () => {
+      ensureLocalCompany(this.db, {
+        displayName: normalized.pilotName || '',
+        homeHubIcao: normalized.homeHubIcao || '',
+      });
       this.db
         .prepare(
           `INSERT INTO missions_json (id, json, updated_at_ms) VALUES (1, ?, ?)
            ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
         )
         .run(json, now);
-      replaceLedger(this.db, ledger);
+      persistCompanyTables(this.db, normalized);
+      replaceLedgerV3(this.db, ledger);
     });
   }
 
   async loadLedger(): Promise<CareerLedgerEntry[]> {
-    const fromTable = readLedgerRows(this.db);
+    const fromTable = readLedgerRowsV3(this.db);
     if (fromTable.length > 0) return fromTable;
     const missions = await this.loadMissions();
     return missions.ledger ?? [];
@@ -692,3 +566,6 @@ export function createJsonCareerStore(opts: {
 }): CareerStore {
   return new JsonCareerStore(opts.economyPath, opts.missionsPath);
 }
+
+/** @internal test helper */
+export { countLotsRows };

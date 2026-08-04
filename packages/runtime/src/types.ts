@@ -62,6 +62,8 @@ export interface StrategyContext {
    * settle IPC so the pipe stays free for station writes.
    */
   skipSettle?: boolean;
+  /** Pause after each non-delay writePlan step (see LoadPlanRequest.writeGapMs). */
+  writeGapMs?: number;
 }
 
 export interface CapabilityScore {

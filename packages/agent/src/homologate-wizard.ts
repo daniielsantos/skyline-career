@@ -30,6 +30,11 @@ import {
   writeTolerance,
 } from './discover-fuel-tanks.js';
 import {
+  discoverWritablePayloadStations,
+  liveStationIndexes as stickyStationIndexes,
+  probeStationMaxLoads,
+} from './discover-payload-stations.js';
+import {
   ensureAuxTanks,
   cleanIcaoCode,
   listExamplesByMatchTitle,
@@ -60,9 +65,11 @@ import {
 } from './ofp-compliance/scaffold-roles.js';
 import {
   CAREER_CLASS_CHOICES,
+  deriveCareerMarketWeights,
   inferCareerClassFromIcao,
   registerCareerPlayerAirframe,
 } from './career-player-airframe-catalog.js';
+import { careerOperationalCargoMaxLb } from './ofp-load-plan.js';
 import {
   findMarketFamilyCandidates,
   stationLayoutFromProfile,
@@ -77,15 +84,6 @@ export interface HomologateWizardOptions {
   notesDir: string;
 }
 
-type WritetestOutcome = {
-  var: string;
-  matched: boolean;
-  changed: boolean;
-  writeOffsetHint: number | null;
-  before: number | { error: string };
-  after: number | { error: string } | null;
-};
-
 async function calibrateWithCgSources(
   ask: AskFn,
   bridge: NamedPipeSimBridge,
@@ -96,6 +94,8 @@ async function calibrateWithCgSources(
 ): Promise<{
   calibration: Awaited<ReturnType<typeof calibrateProfile>>;
   perf: AircraftCfgUiStats;
+  emptyWeightLb?: number;
+  mtowLb?: number;
 }> {
   printSection('CG source + empirical validation');
   console.log('  Prefer live CG FWD/AFT LIMIT (Mass & Balance tablet), then flight_model.cfg.');
@@ -141,6 +141,10 @@ async function calibrateWithCgSources(
         : 'unavailable',
     ],
     ['live MTOW', liveMtowLb != null ? formatLb(liveMtowLb) : 'unavailable'],
+    [
+      'live empty',
+      liveEmptyLb != null ? formatLb(liveEmptyLb) : 'unavailable',
+    ],
     [
       'live stations',
       liveStationCount != null ? String(liveStationCount) : 'unavailable',
@@ -220,7 +224,7 @@ async function calibrateWithCgSources(
     console.log('  Using live CG FWD/AFT LIMIT from the simulator (same as tablet).');
   }
 
-  return { calibration, perf };
+  return { calibration, perf, emptyWeightLb: liveEmptyLb, mtowLb: liveMtowLb };
 }
 
 async function loadMarketCatalogRows(
@@ -306,6 +310,11 @@ async function writeCareerRolesPackAfterPromote(
   repoRoot: string,
   profile: AircraftProfile,
   perf?: AircraftCfgUiStats,
+  liveWeights?: {
+    emptyWeightLb?: number;
+    mtowLb?: number;
+    lbPerGal?: number;
+  },
 ): Promise<void> {
   printSection('Career OFP roles pack');
   const cabinAsBaggage = await confirm(
@@ -366,6 +375,47 @@ async function writeCareerRolesPackAfterPromote(
         }
       : {}),
   });
+  const roles = result.pack.payload?.stationRoles;
+  const cargoMaxLoadLb = careerOperationalCargoMaxLb({
+    stations: profile.payload.stations,
+    stationRoles: roles,
+  });
+  const fuelCapacityGal = profile.fuel.tanks.reduce(
+    (sum, tank) =>
+      sum +
+      (typeof tank.capacity === 'number' &&
+      Number.isFinite(tank.capacity) &&
+      tank.capacity > 0
+        ? tank.capacity
+        : 0),
+    0,
+  );
+  let marketWeights = deriveCareerMarketWeights({
+    emptyWeightLb: liveWeights?.emptyWeightLb,
+    mtowLb: liveWeights?.mtowLb,
+    cargoMaxLoadLb,
+    fuelCapacityGal,
+    lbPerGal: liveWeights?.lbPerGal,
+  });
+  // Shared Market SKU with different station maps: keep the tighter cargo ceiling.
+  if (
+    family != null &&
+    family.compatibility === 'different-stations' &&
+    marketWeights.maxCargoKg != null
+  ) {
+    const catalog = await loadMarketCatalogRows(repoRoot);
+    const existing = catalog.find((row) => row.typeId === family.typeId);
+    if (
+      typeof existing?.maxCargoKg === 'number' &&
+      Number.isFinite(existing.maxCargoKg) &&
+      existing.maxCargoKg > 0
+    ) {
+      marketWeights = {
+        ...marketWeights,
+        maxCargoKg: Math.min(existing.maxCargoKg, marketWeights.maxCargoKg),
+      };
+    }
+  }
   const registered = await registerCareerPlayerAirframe({
     repoRoot,
     rolesPackPath: result.path,
@@ -373,6 +423,7 @@ async function writeCareerRolesPackAfterPromote(
     aircraftClassId: classId,
     title: profile.match.title ?? profile.displayName,
     ...(family ? { typeId: family.typeId } : {}),
+    ...marketWeights,
     ...(resolvedPerf.maxRangeNm != null
       ? { maxRangeNm: resolvedPerf.maxRangeNm }
       : {}),
@@ -386,6 +437,16 @@ async function writeCareerRolesPackAfterPromote(
       ? { fuelBurnKgPerNm: resolvedPerf.fuelBurnKgPerNm }
       : {}),
   });
+  const bagIdx = roles?.baggageStations ?? [];
+  const cargoStationNote =
+    bagIdx.length > 0
+      ? bagIdx
+          .map((idx) => {
+            const st = profile.payload.stations.find((s) => s.index === idx);
+            return `S${idx}:${st?.maxLoad ?? '?'}`;
+          })
+          .join(' ')
+      : '—';
   printKv([
     ['roles pack', result.path],
     ['via', result.via],
@@ -396,6 +457,25 @@ async function writeCareerRolesPackAfterPromote(
       `crew=${result.pack.payload?.stationRoles?.crewStations?.join(',') ?? '—'} bags=${result.pack.payload?.stationRoles?.baggageStations?.join(',') ?? '—'}`,
     ],
     ['Aircraft Market', `${registered.label} (${registered.aircraftClassId})`],
+    [
+      'cargo ceiling',
+      `${cargoMaxLoadLb} lb → ${registered.maxCargoKg ?? '—'} kg (${cargoStationNote})`,
+    ],
+    [
+      'weights',
+      [
+        registered.oewKg != null ? `OEW ${registered.oewKg} kg` : null,
+        registered.mtowKg != null ? `MTOW ${registered.mtowKg} kg` : null,
+        registered.maxCargoKg != null
+          ? `cargo ${registered.maxCargoKg} kg`
+          : null,
+        registered.fuelCapacityKg != null
+          ? `fuel ${registered.fuelCapacityKg} kg`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || '—',
+    ],
     [
       'range',
       registered.maxRangeNm != null
@@ -566,67 +646,6 @@ async function readProfileStationWeights(
 function formatStationsLine(stations: StationWeight[]): string {
   if (stations.length === 0) return '—';
   return stations.map((s) => `${s.index}=${roundFuel(s.lb)}`).join(' ');
-}
-
-async function runPayloadWritetest(bridge: NamedPipeSimBridge): Promise<WritetestOutcome[]> {
-  const tests: Array<{ name: string; unit: string; value: number }> = [
-    { name: 'PAYLOAD STATION WEIGHT:1', unit: 'pounds', value: 180 },
-    { name: 'PAYLOAD STATION WEIGHT:3', unit: 'pounds', value: 50 },
-  ];
-
-  const outcomes: WritetestOutcome[] = [];
-  for (const test of tests) {
-    let before: number | { error: string };
-    try {
-      before = await bridge.readSimVar({ name: test.name, unit: test.unit });
-    } catch (e) {
-      before = { error: e instanceof Error ? e.message : String(e) };
-    }
-    if (typeof before !== 'number') {
-      outcomes.push({
-        var: test.name,
-        matched: false,
-        changed: false,
-        writeOffsetHint: null,
-        before,
-        after: null,
-      });
-      continue;
-    }
-    try {
-      await bridge.writeSimVar(test);
-      await bridge.delay(350);
-    } catch {
-      outcomes.push({
-        var: test.name,
-        matched: false,
-        changed: false,
-        writeOffsetHint: null,
-        before,
-        after: null,
-      });
-      continue;
-    }
-    let after: number | { error: string };
-    try {
-      after = await bridge.readSimVar({ name: test.name, unit: test.unit });
-    } catch (e) {
-      after = { error: e instanceof Error ? e.message : String(e) };
-    }
-    const matched =
-      typeof after === 'number'
-        ? Math.abs(after - test.value) <= Math.max(Math.abs(test.value) * 0.05, 0.25)
-        : false;
-    outcomes.push({
-      var: test.name,
-      matched,
-      changed: typeof after === 'number' ? Math.abs(after - before) > 0.05 : false,
-      writeOffsetHint: typeof after === 'number' ? Number((test.value - after).toFixed(3)) : null,
-      before,
-      after,
-    });
-  }
-  return outcomes;
 }
 
 async function runSmoke(
@@ -1088,19 +1107,55 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       );
     }
 
-    console.log('  Payload station sample writes...');
-    const outcomes = await runPayloadWritetest(bridge);
-    const matched = outcomes.filter((o) => o.matched);
-    const failed = outcomes.filter((o) => !o.matched);
-    for (const o of matched) {
-      console.log(`  ✓ ${o.var}  offset=${o.writeOffsetHint ?? '—'}`);
+    console.log('  Payload station writetest (write → settle → restore, 50 ms gap)...');
+    const stationProbes = await discoverWritablePayloadStations(bridge, {
+      writeGapMs: 50,
+      settleMs: 400,
+    });
+    const liveStationIndexes = stickyStationIndexes(stationProbes);
+    for (const p of stationProbes) {
+      if (p.live) {
+        console.log(`  ✓ Station ${String(p.index).padStart(2)}  writable (restored)`);
+      } else if (p.note?.includes('ghost') || (p.after !== null && !p.changed)) {
+        console.log(`  · Station ${String(p.index).padStart(2)}  ghost (write ignored)`);
+      } else if (p.changed) {
+        console.log(
+          `  ~ Station ${String(p.index).padStart(2)}  partial — ${p.note ?? 'did not reach target'}`,
+        );
+      } else {
+        console.log(
+          `  ✗ Station ${String(p.index).padStart(2)}  ${p.note ?? 'write ignored'}`,
+        );
+      }
     }
-    for (const o of failed) {
-      const stuck =
-        typeof o.before === 'number' && typeof o.after === 'number' && Math.abs(o.after - o.before) < 0.05
-          ? ' (write ignored — value unchanged)'
-          : '';
-      console.log(`  ✗ ${o.var}${stuck}`);
+    console.log(
+      liveStationIndexes.length > 0
+        ? `  → Sticky stations for draft: ${liveStationIndexes.join(', ')}`
+        : '  → No payload stations retained weight after writetest.',
+    );
+
+    let liveStationMaxLoads: Record<number, number> = {};
+    if (liveStationIndexes.length > 0) {
+      console.log(
+        '  Station maxLoad clamp probe (write high → read ceiling → restore)...',
+      );
+      liveStationMaxLoads = await probeStationMaxLoads(
+        bridge,
+        liveStationIndexes,
+        { writeGapMs: 50, settleMs: 400 },
+      );
+      for (const idx of liveStationIndexes) {
+        const maxLb = liveStationMaxLoads[idx];
+        if (maxLb != null) {
+          console.log(
+            `  ✓ Station ${String(idx).padStart(2)}  maxLoad ${maxLb} lb (clamp)`,
+          );
+        } else {
+          console.log(
+            `  · Station ${String(idx).padStart(2)}  no clamp (placeholder 500 until cfg)`,
+          );
+        }
+      }
     }
 
     let fsWriteOk = false;
@@ -1239,14 +1294,15 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         matchTitle,
         icao: matchIcao,
       });
-      const { calibration, perf } = await calibrateWithCgSources(
-        ask,
-        bridge,
-        drafted.path,
-        matchTitle,
-        matchPublisher,
-        matchIcao,
-      );
+      const { calibration, perf, emptyWeightLb, mtowLb } =
+        await calibrateWithCgSources(
+          ask,
+          bridge,
+          drafted.path,
+          matchTitle,
+          matchPublisher,
+          matchIcao,
+        );
       let profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
       printKv([
         ['draft', drafted.path],
@@ -1361,7 +1417,13 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         ['loadMethod', 'direct-injection'],
         ['overwritten', promoted.overwritten ? 'yes' : 'no'],
       ]);
-      await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile, perf);
+      await writeCareerRolesPackAfterPromote(
+        ask,
+        repoRoot,
+        promoted.profile,
+        perf,
+        { emptyWeightLb, mtowLb, lbPerGal },
+      );
       console.log('');
       console.log('Next:');
       console.log('  node packages/agent/dist/cli.js resolve');
@@ -1384,6 +1446,13 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       console.log('  TIP tanks detected live — will be included in draft.');
     }
 
+    if (liveStationIndexes.length === 0) {
+      console.log(
+        '  No sticky payload stations — cannot draft an inject profile. Fix SimConnect payload or use NATIVE-SIMBRIEF monitor path.',
+      );
+      return;
+    }
+
     if (!(await confirm(ask, 'Continue to draft + calibrate', true))) {
       console.log('Stopped after discovery.');
       return;
@@ -1396,6 +1465,8 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       icao: matchIcao,
       publisher: matchPublisher,
       liveTankIds: liveTanks.map((t) => t.id),
+      liveStationIndexes,
+      liveStationMaxLoads,
     });
     let profile = drafted.profile;
     // Safety net: if discovery missed AUX but probe capacities said real, still allow ensureAux.
@@ -1414,14 +1485,15 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       }
     }
 
-    const { calibration, perf } = await calibrateWithCgSources(
-      ask,
-      bridge,
-      drafted.path,
-      matchTitle,
-      matchPublisher,
-      matchIcao,
-    );
+    const { calibration, perf, emptyWeightLb, mtowLb } =
+      await calibrateWithCgSources(
+        ask,
+        bridge,
+        drafted.path,
+        matchTitle,
+        matchPublisher,
+        matchIcao,
+      );
     profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
     printKv([
       ['draft', drafted.path],
@@ -1516,7 +1588,12 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
           ? 'Fuel via classic FUEL TANK * (offset 0). Do not use FUELSYSTEM.'
           : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).',
       includeAux ? 'AUX/Aft tanks included.' : 'AUX deferred for v1.',
-      `Stations: ${profile.payload.stations.length}.`,
+      `Payload stations from writetest: ${liveStationIndexes.join(', ')}.`,
+      Object.keys(liveStationMaxLoads).length > 0
+        ? `Station maxLoad from live clamp: ${Object.entries(liveStationMaxLoads)
+            .map(([i, lb]) => `S${i}=${lb}`)
+            .join(', ')}.`
+        : 'Station maxLoad: placeholder until cfg or clamp.',
       'Homologated with interactive wizard.',
     ];
 
@@ -1545,7 +1622,13 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       ['loadMethod', 'direct-injection'],
       ['overwritten', promoted.overwritten ? 'yes' : 'no'],
     ]);
-    await writeCareerRolesPackAfterPromote(ask, repoRoot, promoted.profile, perf);
+    await writeCareerRolesPackAfterPromote(
+      ask,
+      repoRoot,
+      promoted.profile,
+      perf,
+      { emptyWeightLb, mtowLb, lbPerGal },
+    );
     console.log('');
     console.log('Next:');
     console.log('  node packages/agent/dist/cli.js resolve');

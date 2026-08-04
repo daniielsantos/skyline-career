@@ -10,6 +10,7 @@ import { formatMassExact, formatWeightText, KG_TO_LB, type WeightSystem } from '
 import { FuelTankSchematic, PayloadStationSchematic } from './LoadSchematic';
 import { DispatchRouteCard } from './DispatchRouteCard';
 import {
+  formatPayloadDueLine,
   pickFuelTankBreakdown,
   pickLivePayloadLb,
 } from './load-verification';
@@ -97,6 +98,8 @@ export function DispatchActivePanel(props: {
   skylineInjectEnabled: boolean;
   simBridge: SimBridgeStatus | null;
   watch: WatchStatus | null;
+  /** Why the Preflight card has not opened yet (first sample failed). */
+  preflightBootstrapError?: string | null;
   onOpenAirport: (icao: string) => void;
   onSelectSettings: () => void;
   onDispatch: (mission: Mission) => void;
@@ -519,6 +522,25 @@ export function DispatchActivePanel(props: {
         </div>
       ) : null}
 
+      {showLoadPanel &&
+      loadPath === 'inject' &&
+      !mission.lastPreflightCheck ? (
+        <div className="dispatch-step-card" aria-live="polite">
+          <strong>Waiting for Preflight</strong>
+          <p>
+            {props.preflightBootstrapError
+              ? props.preflightBootstrapError
+              : !props.simBridge?.connected
+                ? 'SimBridge is offline — start the bridge, then stay in the Bandeirante cockpit at the origin.'
+                : props.simBridge.onGround === false
+                  ? 'MSFS reports airborne — Preflight only runs on the ground.'
+                  : props.simBridge.aircraftTitle
+                    ? `Reading “${props.simBridge.aircraftTitle}”… the Preflight card opens when the first sample lands (engines can be off).`
+                    : 'SimBridge is up, but no aircraft title yet — load the Bandeirante at the gate (cold & dark is fine; main menu / world map is not).'}
+          </p>
+        </div>
+      ) : null}
+
       {showPreflight && mission.lastPreflightCheck
         ? (() => {
             const check = mission.lastPreflightCheck;
@@ -829,7 +851,10 @@ export function DispatchActivePanel(props: {
                         Sim {massFromLb(liveVerification.payload.liveLb)}
                       </strong>
                       <small>
-                        Due {massFromLb(liveVerification.payload.plannedLb)}
+                        {formatPayloadDueLine(
+                          liveVerification.payload,
+                          massFromLb,
+                        )}
                       </small>
                       <b>{payloadOk ? '✓' : '✗'}</b>
                       <PayloadStationSchematic

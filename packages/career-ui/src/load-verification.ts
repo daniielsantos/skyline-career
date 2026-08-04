@@ -120,11 +120,36 @@ export type LoadVerificationFuel = {
 
 export type LoadVerificationPayload = {
   plannedLb?: number;
+  cargoLb?: number;
+  crewLb?: number;
   liveLb?: number;
   ok: boolean;
   stations?: Record<number, number>;
   stationMax?: Record<number, number>;
 };
+
+/**
+ * Preflight Due line: total station payload, with mission cargo vs crew floor.
+ * Crew is always n×170 in the plan — soft-cap cargo on crew seats stays in cargoLb.
+ */
+export function formatPayloadDueLine(
+  payload: Pick<LoadVerificationPayload, 'plannedLb' | 'cargoLb' | 'crewLb'>,
+  formatLb: (lb: number | undefined) => string,
+): string {
+  const due = formatLb(payload.plannedLb);
+  const cargo =
+    typeof payload.cargoLb === 'number' && Number.isFinite(payload.cargoLb)
+      ? payload.cargoLb
+      : undefined;
+  const crew =
+    typeof payload.crewLb === 'number' && Number.isFinite(payload.crewLb)
+      ? payload.crewLb
+      : undefined;
+  if (cargo !== undefined && crew !== undefined) {
+    return `Due ${due} · ${formatLb(cargo)} cargo + ${formatLb(crew)} crew`;
+  }
+  return `Due ${due}`;
+}
 
 export function evaluateLoadVerification(opts: {
   plannedFuelLb?: number;

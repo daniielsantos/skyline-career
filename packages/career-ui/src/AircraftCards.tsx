@@ -144,8 +144,8 @@ export function MarketListingCard(props: {
 }) {
   const { listing, catalog } = props;
   const pcts = listingConditionPcts(listing);
-  const isPlayerListing =
-    listing.source === 'player_sale' || listing.source === 'player_lease';
+  const isYourLease = listing.source === 'player_lease';
+  const isResale = listing.source === 'player_sale';
   const canAfford = props.wallet >= listing.askingUsd;
 
   return (
@@ -155,15 +155,21 @@ export function MarketListingCard(props: {
         badges={
           <>
             <span className={`badge badge-kind-${listing.kind}`}>{listing.kind}</span>
-            {isPlayerListing ? (
-              <span className="badge badge-player" title="From your hangar">
-                hangar
+            {isYourLease ? (
+              <span className="badge badge-player" title="Your lease listing — still in Hangar">
+                yours
               </span>
-            ) : (
-              <span className={`badge badge-cond-${listing.condition}`}>
-                {listing.condition}
+            ) : isResale ? (
+              <span
+                className="badge badge-player"
+                title="Trade-in from a player sell-back — same as other used stock"
+              >
+                resale
               </span>
-            )}
+            ) : null}
+            <span className={`badge badge-cond-${listing.condition}`}>
+              {listing.condition}
+            </span>
           </>
         }
       />
@@ -181,11 +187,6 @@ export function MarketListingCard(props: {
             >
               {listing.basedIcao}
             </button>
-            {isPlayerListing ? (
-              <span className={`badge badge-cond-${listing.condition}`}>
-                {listing.condition}
-              </span>
-            ) : null}
             <span>
               {Math.round(listing.hoursAirframe)}/
               {Math.round(listing.hoursEngine)} h
@@ -320,12 +321,15 @@ export function HangarAircraftCard(props: {
   busy: boolean;
   hubOptions: FerryHubOption[];
   ferryDest: string;
+  travelDest: string;
+  pilotIcao: string;
   ownedCount: number;
   hasListed: boolean;
   formatMoney: (n: number) => string;
   formatMass: (kg: number) => string;
   onOpenAirport: (icao: string) => void;
   onFerryDestChange: (icao: string) => void;
+  onTravelDestChange: (icao: string) => void;
   onClearMaintenance: (id: string) => void;
   onRepair: (id: string) => void;
   onUnlist: (id: string) => void;
@@ -333,6 +337,7 @@ export function HangarAircraftCard(props: {
   onListForLease: (id: string) => void;
   onSell: (id: string) => void;
   onFerry: (id: string, dest: string) => void;
+  onTravel: (destIcao: string) => void;
 }) {
   const acf = props.aircraft;
   const catalog = props.catalog;
@@ -361,6 +366,10 @@ export function HangarAircraftCard(props: {
   const canRepair =
     (acf.status === 'parked' || acf.status === 'maintenance') &&
     (afPct < 100 || engPct < 100);
+  const pilotHere =
+    props.pilotIcao.trim().toUpperCase() ===
+    acf.locationIcao.trim().toUpperCase();
+  const pilotLabel = props.pilotIcao.trim().toUpperCase() || '—';
 
   return (
     <li className="hangar-card">
@@ -372,6 +381,14 @@ export function HangarAircraftCard(props: {
             <span className="badge badge-ownership">
               {(acf.ownership ?? 'owned') === 'leased' ? 'leased' : 'owned'}
             </span>
+            {!pilotHere ? (
+              <span
+                className="badge badge-warn"
+                title={`Pilot is at ${pilotLabel} — travel here before dispatch`}
+              >
+                pilot away
+              </span>
+            ) : null}
           </>
         }
       />
@@ -404,6 +421,9 @@ export function HangarAircraftCard(props: {
             >
               {acf.locationIcao}
             </button>
+            <span className="muted">
+              · pilot {pilotHere ? 'here' : `at ${pilotLabel}`}
+            </span>
           </div>
         </div>
 
@@ -576,6 +596,17 @@ export function HangarAircraftCard(props: {
 
       {acf.status === 'parked' ? (
         <div className="hangar-ferry">
+          {!pilotHere ? (
+            <button
+              type="button"
+              className="accept"
+              disabled={props.busy}
+              title={`Travel to ${acf.locationIcao} (pilot reposition)`}
+              onClick={() => props.onTravel(acf.locationIcao)}
+            >
+              Travel here
+            </button>
+          ) : null}
           <label className="staging-aircraft ferry-hub-label">
             Ferry to
             <FerryHubCombobox
@@ -597,6 +628,28 @@ export function HangarAircraftCard(props: {
         </div>
       ) : note ? (
         <p className="hangar-card-note">{note}</p>
+      ) : null}
+      {acf.status === 'parked' || acf.status === 'maintenance' ? (
+        <div className="hangar-ferry hangar-pilot-travel">
+          <label className="staging-aircraft ferry-hub-label">
+            Pilot travel
+            <FerryHubCombobox
+              hubs={props.hubOptions}
+              excludeIcao={props.pilotIcao}
+              value={props.travelDest}
+              onChange={props.onTravelDestChange}
+              disabled={props.busy}
+            />
+          </label>
+          <button
+            type="button"
+            className="ghost"
+            disabled={props.busy || !props.travelDest}
+            onClick={() => props.onTravel(props.travelDest)}
+          >
+            Go
+          </button>
+        </div>
       ) : null}
     </li>
   );

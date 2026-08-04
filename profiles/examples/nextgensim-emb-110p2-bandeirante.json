@@ -1,16 +1,16 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "nextgensim-emb-110p1-bandeirante",
-  "profileKey": "nextgensim/emb-110p1-bandeirante",
+  "profileId": "nextgensim-emb-110p2-bandeirante",
+  "profileKey": "nextgensim/emb-110p2-bandeirante",
   "semver": "1.0.0",
-  "displayName": "NextGenSim EMB-110P1 Bandeirante (MSFS 2024)",
+  "displayName": "NextGenSim EMB-110P2 Bandeirante (MSFS 2024)",
   "match": {
-    "fingerprint": "a3ef5884b66ddcf84acf29b3a5f825407680a3b73dd9074aa3688521171a506b",
-    "title": "NextGenSim EMB-110P1 Bandeirante",
+    "fingerprint": "858b1c35f68d1795fe7135f1b04181256a0d8ac512a286059684201952ced71a",
+    "title": "NextGenSim EMB-110P2 Bandeirante",
     "publisher": "nextgensim",
     "icao": "E110",
     "liveTitles": [
-      "NextGenSim EMB-110P1 Bandeirante"
+      "NextGenSim EMB-110P2 Bandeirante"
     ]
   },
   "capabilities": [
@@ -357,18 +357,18 @@
       "maxMac": 32
     },
     "calibration": {
-      "observedMac": 9.492219984531403,
-      "calibratedAtIso": "2026-08-03T23:42:04.073Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\nextgensim-aircraft-bandeirante\\SimObjects\\Airplanes\\NextGen_EMB110\\attachments\\nextgensim\\Function_Exterior_110P1\\config\\flight_model.cfg",
+      "observedMac": 9.49232280254364,
+      "calibratedAtIso": "2026-08-03T23:48:19.410Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\nextgensim-aircraft-bandeirante\\SimObjects\\Airplanes\\NextGen_EMB110\\attachments\\nextgensim\\Function_Exterior_110P2\\config\\flight_model.cfg",
       "sweep": {
-        "minObservedMac": 11.175043135881424,
-        "maxObservedMac": 14.622417092323303,
+        "minObservedMac": 11.175089329481125,
+        "maxObservedMac": 14.622442424297333,
         "payloadLb": 200,
         "forwardStation": 2,
         "aftStation": 18,
         "usedStationArms": true,
         "restored": true,
-        "sampledAtIso": "2026-08-03T23:42:14.150Z"
+        "sampledAtIso": "2026-08-03T23:48:29.425Z"
       }
     }
   },
@@ -378,12 +378,12 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: NextGenSim EMB-110P1 Bandeirante.",
+    "Homologated via wizard: NextGenSim EMB-110P2 Bandeirante.",
     "ICAO type designator (catalog/SimBrief): E110.",
     "Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/nextgensim-emb-110p1-bandeirante.md"
+    "See profiles/notes/nextgensim-emb-110p2-bandeirante.md"
   ]
 }

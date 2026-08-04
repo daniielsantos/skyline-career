@@ -130,6 +130,20 @@ async function hasCareerUi() {
   }
 }
 
+async function waitForApiReady(opts = {}) {
+  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const intervalMs = opts.intervalMs ?? 250;
+  const shouldAbort = opts.shouldAbort ?? (() => false);
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (shouldAbort()) return null;
+    const h = await apiHealth();
+    if (h?.ok === true) return h;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null;
+}
+
 const kids = [];
 
 const health = await apiHealth();
@@ -150,16 +164,53 @@ if (apiIsCurrent) {
         ? `npcFleetTarget=${health.npcFleetTarget ?? 'missing'}, want ${NPC_FLEET_SIZE}`
         : `server sources changed since it booted`;
     console.log(`Career API on :${apiPort} is stale (${reason}) — restarting`);
+  } else {
+    console.log(`Starting Career API on :${apiPort}…`);
   }
   killListenersOnPort(apiPort);
   // Brief pause so Windows releases the port.
   await new Promise((r) => setTimeout(r, 400));
-  kids.push(
-    spawn(process.execPath, ['--import', 'tsx', join(root, 'server', 'api.ts')], {
+  const apiChild = spawn(
+    process.execPath,
+    ['--import', 'tsx', join(root, 'server', 'api.ts')],
+    {
       cwd: root,
       stdio: 'inherit',
       env: { ...process.env },
-    }),
+    },
+  );
+  kids.push(apiChild);
+  let apiExit = null;
+  apiChild.once('exit', (code, signal) => {
+    apiExit = { code, signal };
+  });
+  const ready = await waitForApiReady({
+    shouldAbort: () => apiExit != null,
+  });
+  if (!ready) {
+    if (apiExit) {
+      console.error(
+        `Career API exited before ready (code=${apiExit.code ?? 'null'} signal=${apiExit.signal ?? 'null'})`,
+      );
+    } else {
+      console.error(
+        `Career API failed to become ready on http://127.0.0.1:${apiPort} within 60s.`,
+      );
+    }
+    console.error(
+      'Check the stack above (often SQLite migrate / profiles/career). Then re-run npm run career:ui',
+    );
+    for (const kid of kids) {
+      try {
+        kid.kill('SIGTERM');
+      } catch {
+        /* ignore */
+      }
+    }
+    process.exit(1);
+  }
+  console.log(
+    `Career API ready at http://127.0.0.1:${apiPort} (npcFleetTarget=${NPC_FLEET_SIZE})`,
   );
 }
 

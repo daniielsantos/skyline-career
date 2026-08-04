@@ -74,13 +74,17 @@ export type PreflightCheckResult = {
       tanks?: { left: number; right: number; center: number };
       tankCapacity?: { left: number; right: number; center: number };
     };
-    payload: {
-      plannedLb?: number;
-      liveLb?: number;
-      ok: boolean;
-      stations?: Record<number, number>;
-      stationMax?: Record<number, number>;
-    };
+      payload: {
+        plannedLb?: number;
+        /** Mission cargo in the Due total (excludes crew floor). */
+        cargoLb?: number;
+        /** Crew floor in the Due total (n × 170 lb) — not seat fill above that. */
+        crewLb?: number;
+        liveLb?: number;
+        ok: boolean;
+        stations?: Record<number, number>;
+        stationMax?: Record<number, number>;
+      };
     aircraft: { onGround: boolean; enginesRunning: boolean };
     cg?: {
       liveMac?: number;
@@ -337,6 +341,12 @@ export async function runMissionPreflight(
           plannedLb: plannedPayloadLb,
           liveLb: livePayloadLb,
           ok: payloadOk,
+          ...(plannedPayload
+            ? {
+                cargoLb: plannedPayload.cargoPlacedLb,
+                crewLb: plannedPayload.crewLb,
+              }
+            : {}),
           ...(live.payload?.stations
             ? { stations: { ...live.payload.stations } }
             : {}),

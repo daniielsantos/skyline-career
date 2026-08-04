@@ -797,6 +797,37 @@ export function scoreCfgAgainstLiveHints(
 }
 
 /**
+ * When live station count matches, prefer Function_Exterior (and similar
+ * attachment parts) over common/config — common often has fuel/MTOW while
+ * Exterior holds the real station arms used for CG.
+ */
+export function scoreStationSourcePath(
+  path: string,
+  text: string,
+  hints: LiveFlightModelHints | undefined,
+): number {
+  if (!hints?.stationCount || hints.stationCount <= 0) return 0;
+  const stations = stationLoadCount(text);
+  if (stations <= 0) return 0;
+  const delta = Math.abs(stations - hints.stationCount);
+  // Only nudge when this cfg is plausibly the live payload layout.
+  if (delta > 1) return 0;
+
+  const hay = path.replace(/\\/g, '/');
+  if (/\/Function_Exterior[^/]*\//i.test(hay)) {
+    return delta === 0 ? 22 : 10;
+  }
+  // Other modular payload/exterior attachments (e.g. part_interior_cargo).
+  if (
+    /\/attachments\//i.test(hay) &&
+    /exterior|payload|interior_cargo|part_interior/i.test(hay)
+  ) {
+    return delta === 0 ? 10 : 4;
+  }
+  return 0;
+}
+
+/**
  * Collapse candidates that share identical bytes. Modular packages often ship
  * the same MODULAR_MERGE stub under every preset — showing all 16 is noise.
  * Stub groups are demoted so attachment/common cfgs with real W&B rise.
@@ -877,6 +908,7 @@ export async function groupFlightModelCandidatesByContent(
       primary.score += 8;
     } else {
       primary.score += scoreCfgAgainstLiveHints(entry.text, liveHints);
+      primary.score += scoreStationSourcePath(primary.path, entry.text, liveHints);
     }
 
     let aircraftCfgPath: string | undefined;
@@ -900,8 +932,17 @@ export async function groupFlightModelCandidatesByContent(
           if (bits.length > 0) {
             catalogPerfSummary = bits.join(' · ');
           }
-          // Prefer common/config flight_model when it pairs with the UI aircraft.cfg.
-          if (/[\\/]common[\\/]config[\\/]flight_model\.cfg$/i.test(primary.path)) {
+          // Prefer common/config for UI range/burn pairing — but not when live
+          // station count already matched (Exterior is the better station source).
+          const stations = stationLoadCount(entry.text);
+          const exactStations =
+            liveHints?.stationCount != null &&
+            liveHints.stationCount > 0 &&
+            stations === liveHints.stationCount;
+          if (
+            !exactStations &&
+            /[\\/]common[\\/]config[\\/]flight_model\.cfg$/i.test(primary.path)
+          ) {
             primary.score += 4;
           }
         }

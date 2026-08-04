@@ -46,6 +46,74 @@ export const SEAT_OCCUPANT_SOFT_MAX_LB = 300;
  */
 export const GA_BAGGAGE_SOFT_MAX_LB = 50;
 
+/**
+ * Market / staging cargo ceiling (lb) from sticky stations + roles.
+ * Same rules as Career inject:
+ * - Freighter (no passenger seats): sum of baggage station maxLoad
+ * - GA cabin (passenger seats): soft-cap room on crew spare + pax + rear bags,
+ *   never above each station's structural maxLoad when known
+ */
+export function careerOperationalCargoMaxLb(opts: {
+  stations: Array<{ index: number; maxLoad?: number }>;
+  stationRoles?: {
+    crewStations?: number[];
+    passengerStations?: number[];
+    baggageStations?: number[];
+  };
+}): number {
+  const roles = opts.stationRoles;
+  const crew = roles?.crewStations ?? [];
+  const pax = roles?.passengerStations ?? [];
+  const bags = roles?.baggageStations ?? [];
+  const FALLBACK_MAX_LOAD_LB = 500;
+  const hardCap = (idx: number): number => {
+    const st = opts.stations.find((s) => s.index === idx);
+    return typeof st?.maxLoad === 'number' &&
+      Number.isFinite(st.maxLoad) &&
+      st.maxLoad > 0
+      ? st.maxLoad
+      : 0;
+  };
+  /** Prefer measured maxLoad; else draft placeholder for freighter sums. */
+  const bagCap = (idx: number): number => hardCap(idx) || FALLBACK_MAX_LOAD_LB;
+
+  if (pax.length > 0) {
+    const crewSpare = crew.reduce((sum, idx) => {
+      const soft = Math.min(
+        hardCap(idx) || SEAT_OCCUPANT_SOFT_MAX_LB,
+        SEAT_OCCUPANT_SOFT_MAX_LB,
+      );
+      return sum + Math.max(0, soft - FREIGHTER_PILOT_LB);
+    }, 0);
+    const paxRoom = pax.reduce((sum, idx) => {
+      const soft = Math.min(
+        hardCap(idx) || SEAT_OCCUPANT_SOFT_MAX_LB,
+        SEAT_OCCUPANT_SOFT_MAX_LB,
+      );
+      return sum + soft;
+    }, 0);
+    const bagRoom = bags.reduce((sum, idx) => {
+      const soft = Math.min(
+        hardCap(idx) || GA_BAGGAGE_SOFT_MAX_LB,
+        GA_BAGGAGE_SOFT_MAX_LB,
+      );
+      return sum + soft;
+    }, 0);
+    return roundLb(crewSpare + paxRoom + bagRoom);
+  }
+
+  if (bags.length > 0) {
+    return roundLb(bags.reduce((sum, idx) => sum + bagCap(idx), 0));
+  }
+
+  const crewSet = new Set(crew);
+  return roundLb(
+    opts.stations
+      .filter((st) => !crewSet.has(st.index))
+      .reduce((sum, st) => sum + bagCap(st.index), 0),
+  );
+}
+
 export type BuildOfpLoadPlanInput = {
   ofp: OfpExpectation;
   profile: AircraftProfile;
@@ -409,14 +477,9 @@ export function distributeCargoAcrossStations(
   const baggageCapacityLb = gaCabin ? baggageFillCapacityLb : baggageHardCapacityLb;
 
   let requestedCargo = roundLb(cargoLb);
-  if (!gaCabin && requestedCargo > fillCapacityLb + 0.5) {
-    throw new OfpLoadPlanError(
-      'CARGO_OVER_CAPACITY',
-      `Cargo ${requestedCargo} lb exceeds station capacity ${roundLb(fillCapacityLb)} lb`,
-    );
-  }
-  // GA: clamp instead of failing — extra OFP cargo cannot fit without blowing CG.
-  if (gaCabin && requestedCargo > fillCapacityLb) {
+  // Clamp to station capacity (GA and freighter). Hard-failing blocked inject on
+  // airframes whose ghost stations inflated capacity in the roles pack.
+  if (requestedCargo > fillCapacityLb) {
     requestedCargo = roundLb(fillCapacityLb);
   }
 

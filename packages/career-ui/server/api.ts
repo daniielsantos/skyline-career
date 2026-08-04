@@ -20,6 +20,9 @@ import {
   emptyMissionsStateV2,
   ensureSeedMarketFormed,
   executeFerry,
+  quoteFerry,
+  quotePilotTravel,
+  executePilotTravel,
   findCareerPlayerAirframe,
   findOpenManifestForRoute,
   findPlayerAircraft,
@@ -61,7 +64,6 @@ import {
   purchaseAircraftListing,
   purchasePlayerMissionOfpFuel,
   quotePlayerMissionOfpFuel,
-  quoteFerry,
   reconcilePlayerInbound,
   replaceMissionManifest,
   routeDistanceNm,
@@ -71,6 +73,11 @@ import {
   sellPlayerAircraft,
   settleAircraftMarketOps,
   settleHangarParkingFees,
+  settleCompanyCredit,
+  companyCreditSnapshot,
+  drawCompanyCredit,
+  repayCompanyCredit,
+  assertCompanyCreditAllowsOps,
   settleMission,
   signAircraftLease,
   resolveHangarParkingUsdPerDay,
@@ -79,6 +86,7 @@ import {
   LEDGER_KIND_LABEL,
   openCareerStore,
   listWorldCountryIds,
+  localUnitPriceUsd,
   computeEconomyPulse,
   syncHomeCountryFromHub,
   stockTrend,
@@ -103,6 +111,7 @@ import {
 } from './dispatch-helpers.ts';
 import {
   applyMissionOfpLoad,
+  getLastProbeAircraftTitle,
   getOfpLoadProgress,
   isOfpLoadBusy,
   probeSimBridgeStatus,
@@ -221,7 +230,9 @@ function fleetPayload(
     hubs,
     pilotName: missions.pilotName,
     homeHubIcao: missions.homeHubIcao,
+    pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
     starterAircraft,
+    companyCredit: companyCreditSnapshot(missions),
   };
 }
 
@@ -746,10 +757,61 @@ export function createCareerApiServer(port = 8787) {
             homeCountryId: world.homeCountryId ?? null,
             store: store.kind,
             labels: LEDGER_KIND_LABEL,
+            companyCredit: companyCreditSnapshot(missions),
             ...cashflow,
           };
         });
         send(res, 200, payload);
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/credit/draw') {
+        const body = (await readBody(req)) as { amountUsd?: number };
+        const amountUsd =
+          typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
+            ? body.amountUsd
+            : NaN;
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const drawn = drawCompanyCredit(missions, amountUsd, world.tick);
+            return {
+              walletUsd: missions.walletUsd,
+              drawnUsd: drawn.drawnUsd,
+              companyCredit: drawn.snapshot,
+              ...fleetPayload(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/credit/repay') {
+        const body = (await readBody(req)) as { amountUsd?: number };
+        const amountUsd =
+          typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
+            ? body.amountUsd
+            : NaN;
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const repaid = repayCompanyCredit(missions, amountUsd, world.tick);
+            return {
+              walletUsd: missions.walletUsd,
+              repaidUsd: repaid.repaidUsd,
+              companyCredit: repaid.snapshot,
+              ...fleetPayload(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 
@@ -856,6 +918,7 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
             settleAircraftMarketOps(missions, world.tick);
             const purchased = purchaseAircraftListing(
               missions,
@@ -868,6 +931,7 @@ export function createCareerApiServer(port = 8787) {
               aircraft: purchased.aircraft,
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
+              companyCredit: companyCreditSnapshot(missions),
             };
           });
           send(res, 200, result);
@@ -887,6 +951,7 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
             settleAircraftMarketOps(missions, world.tick);
             const leased = signAircraftLease(missions, world, body.listingId!);
             return {
@@ -895,6 +960,7 @@ export function createCareerApiServer(port = 8787) {
               aircraft: leased.aircraft,
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
+              companyCredit: companyCreditSnapshot(missions),
             };
           });
           send(res, 200, result);
@@ -1113,6 +1179,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
             const ferried = executeFerry(world, missions, {
               aircraftId: body.aircraftId!,
               destIcao: body.destIcao!,
@@ -1123,6 +1190,51 @@ export function createCareerApiServer(port = 8787) {
               walletDebitUsd: ferried.walletDebitUsd,
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/pilot/travel') {
+        const body = (await readBody(req)) as {
+          destIcao?: string;
+          quoteOnly?: boolean;
+        };
+        if (!body.destIcao) {
+          send(res, 400, { error: 'destIcao required' });
+          return;
+        }
+        try {
+          if (body.quoteOnly) {
+            const quoted = await withCareerRead((world, missions) => {
+              const quote = quotePilotTravel(world, missions, body.destIcao!);
+              return {
+                quote,
+                walletUsd: missions.walletUsd,
+                pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
+              };
+            });
+            send(res, 200, quoted);
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            const traveled = executePilotTravel(
+              world,
+              missions,
+              body.destIcao!,
+              world.tick,
+            );
+            return {
+              quote: traveled.quote,
+              walletDebitUsd: traveled.walletDebitUsd,
+              walletUsd: missions.walletUsd,
+              ...fleetPayload(missions, world),
             };
           });
           send(res, 200, result);
@@ -1515,6 +1627,10 @@ export function createCareerApiServer(port = 8787) {
             fromTick: world.tick - n,
             toTick: world.tick,
           });
+          const creditOps = settleCompanyCredit(missions, {
+            fromTick: world.tick - n,
+            toTick: world.tick,
+          });
           listAircraftMarket(missions, world);
           const nowMs = Date.now();
           return {
@@ -1527,6 +1643,11 @@ export function createCareerApiServer(port = 8787) {
             hangarRequestedUsd: hangarOps.requestedUsd,
             hangarShortfallUsd: hangarOps.shortfallUsd,
             hangarDaysCharged: hangarOps.daysCharged,
+            creditInterestPaidUsd: creditOps.interestPaidUsd,
+            creditInterestCompoundedUsd: creditOps.interestCompoundedUsd,
+            creditOverdueDays: creditOps.overdueDays,
+            creditPrincipalUsd: creditOps.principalUsd,
+            companyCredit: companyCreditSnapshot(missions),
             walletUsd: missions.walletUsd,
           };
         });
@@ -1609,6 +1730,7 @@ export function createCareerApiServer(port = 8787) {
         const cargoLimit = await resolveClassMaxCargoKg(aircraft);
         try {
           const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
             const lot = world.lots.find((l) => l.id === body.lotId);
             if (!lot) return { kind: 'missing_lot' as const };
 
@@ -1766,6 +1888,7 @@ export function createCareerApiServer(port = 8787) {
         );
         try {
           const committed = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
             if (!missions.hubSelected || missions.fleet.length === 0) {
               throw new Error('Select a starter hub before staging a flight');
             }
@@ -1823,6 +1946,38 @@ export function createCareerApiServer(port = 8787) {
                 destIcao: firstLot.destIcao,
                 aircraftClassId: aircraft,
               });
+            }
+            // Retry after a successful cargo write but failed client/dispatch response:
+            // open route is already full — treat matching lots as idempotent success.
+            if (intoMission && !replace) {
+              const remaining = missionRemainingCapacityKg(
+                intoMission,
+                operationalMaxCargoKg,
+              );
+              if (remaining <= 0) {
+                const onFlight = new Set(
+                  (intoMission.lots ?? []).map((line) => line.shipmentLotId),
+                );
+                const retryOfSameLoad = lines.every((line) =>
+                  onFlight.has(line.lotId),
+                );
+                if (retryOfSameLoad) {
+                  return {
+                    mission: intoMission,
+                    appended: false,
+                    lineCount: intoMission.lots?.length ?? 0,
+                    operationalMaxCargoKg,
+                    estimatedBlockFuelKg: routeCargoLimit.estimatedBlockFuelKg,
+                    walletUsd: missions.walletUsd,
+                    fleet: withParkingRates(missions.fleet),
+                    idempotent: true,
+                  };
+                }
+                throw new Error(
+                  `Flight ${intoMission.id} is already at capacity (${intoMission.cargoKg} kg). ` +
+                    `Edit the manifest from Dispatch instead of accepting again.`,
+                );
+              }
             }
             const activeMissions = listActivePlayerMissions(missions.missions);
             if (!intoMission && activeMissions.length > 0) {
@@ -1932,33 +2087,42 @@ export function createCareerApiServer(port = 8787) {
                 opened: boolean;
               }
             | undefined;
+          let dispatchError: string | undefined;
           if (body.openDispatch !== false) {
-            const built = await buildMissionDispatch(mission, {
-              units: body.units ?? body.weightSystem,
-            });
-            mission = await withCareerWrite((world, missions) => {
-              const idx = missions.missions.findIndex((m) => m.id === mission.id);
-              const dispatched: MissionIntent = {
-                ...mission,
+            try {
+              const built = await buildMissionDispatch(mission, {
+                units: body.units ?? body.weightSystem,
+                liveTitle: getLastProbeAircraftTitle(),
+              });
+              mission = await withCareerWrite((world, missions) => {
+                const idx = missions.missions.findIndex((m) => m.id === mission.id);
+                const dispatched: MissionIntent = {
+                  ...mission,
+                  staticId: built.staticId,
+                  status: 'dispatched',
+                  dispatchedAtTick: world.tick,
+                  lastOfpCheck: undefined,
+                  lastPreflightCheck: undefined,
+                  fuelAuthorizedOfpId: undefined,
+                };
+                if (idx >= 0) missions.missions[idx] = dispatched;
+                else missions.missions.push(dispatched);
+                return dispatched;
+              });
+              openDispatchUrl(built.url);
+              dispatch = {
+                url: built.url,
                 staticId: built.staticId,
-                status: 'dispatched',
-                dispatchedAtTick: world.tick,
-                lastOfpCheck: undefined,
-                lastPreflightCheck: undefined,
-                fuelAuthorizedOfpId: undefined,
+                type: built.type,
+                airframeLabel: built.airframeLabel,
+                opened: true,
               };
-              if (idx >= 0) missions.missions[idx] = dispatched;
-              else missions.missions.push(dispatched);
-              return dispatched;
-            });
-            openDispatchUrl(built.url);
-            dispatch = {
-              url: built.url,
-              staticId: built.staticId,
-              type: built.type,
-              airframeLabel: built.airframeLabel,
-              opened: true,
-            };
+            } catch (error) {
+              // Cargo is already reserved — don't fail the accept with a dispatch error
+              // (that left the UI retrying Max/Accept onto a full flight).
+              dispatchError =
+                error instanceof Error ? error.message : String(error);
+            }
           }
 
           send(res, 200, {
@@ -1977,6 +2141,7 @@ export function createCareerApiServer(port = 8787) {
               committed.operationalMaxCargoKg,
             ),
             dispatch: dispatch ?? null,
+            dispatchError: dispatchError ?? null,
             fleet: committed.fleet,
           });
         } catch (error) {
@@ -2136,6 +2301,7 @@ export function createCareerApiServer(port = 8787) {
 
         const built = await buildMissionDispatch(prep.mission, {
           units: body.units ?? body.weightSystem,
+          liveTitle: getLastProbeAircraftTitle(),
         });
         const mission = await withCareerWrite((world, missions) => {
           const idx = missions.missions.findIndex((m) => m.id === body.missionId);
@@ -2765,8 +2931,11 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           // Any Watch pipe client contends with inject — stop regardless of mission.
+          // beginOfpLoadActive alone is not enough: a mid-tick sample can still
+          // share the Host until stop completes and the exclusive gate drains.
           if (watchSession.getStatus().running) {
             await watchSession.stop();
+            await new Promise((r) => setTimeout(r, 400));
           }
           const result = await applyMissionOfpLoad(mission, {
             username: body.simbriefUser,

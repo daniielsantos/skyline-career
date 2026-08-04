@@ -30,9 +30,13 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   aircraft_sell: 'Aircraft sale',
   aircraft_buyout: 'Lease buyout',
   ferry: 'Ferry',
+  pilot_travel: 'Pilot travel',
   fuel: 'Jet-A',
   inspection: 'Inspection',
   repair: 'Repair',
+  credit_draw: 'Credit draw',
+  credit_repay: 'Credit repay',
+  credit_interest: 'Credit interest',
   other: 'Other',
 };
 

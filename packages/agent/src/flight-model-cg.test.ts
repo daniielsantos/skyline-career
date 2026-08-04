@@ -25,7 +25,21 @@ station_load.1 = 120, -3.75, 0, 0, "Rear seat"
     assert.equal(parsed.maxMac, 32);
     assert.deepEqual(parsed.emptyWeightCgPosition, [-3.25, 0, 1.1]);
     assert.deepEqual(parsed.stationArms, { 1: 4.5, 2: -3.75 });
+    assert.deepEqual(parsed.stationMaxLoads, { 1: 180, 2: 120 });
+    assert.equal(parsed.stationNames[1], 'Pilot');
     assert.equal(parsed.path, 'C:/Community/example/flight_model.cfg');
+  });
+
+  it('ignores zero station_load weight (unknown max) but keeps arm/name', () => {
+    const parsed = parseFlightModelCg(`
+[WEIGHT_AND_BALANCE]
+station_load.0 = 170, 12.5, -1.2, 0.3, TT:MENU.PAYLOAD.PILOT
+station_load.2 = 0, 5.2, 0, -1.1, TT:MENU.PAYLOAD.CARGO_CABIN_1
+`);
+    assert.equal(parsed.stationMaxLoads[1], 170);
+    assert.equal(parsed.stationMaxLoads[3], undefined);
+    assert.equal(parsed.stationArms[3], 5.2);
+    assert.match(parsed.stationNames[3] ?? '', /Cargo Cabin 1/i);
   });
 
   it('accepts limits already expressed as percentage points', () => {

@@ -173,9 +173,8 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
   const live = normalize(normalizeAircraftTitle(liveTitle));
   const profile = normalize(normalizeAircraftTitle(profileTitle));
   if (!live || !profile) return false;
-  if (live === profile || live.includes(profile) || profile.includes(live)) return true;
+  if (live === profile) return true;
 
-  // Token overlap: "340 Cargo" vs "Saab 340 Cargo" share enough identity tokens.
   const stop = new Set(['the', 'and', 'for', 'msfs', 'aircraft', 'airplane', 'default']);
   const tokens = (s: string) =>
     s
@@ -183,9 +182,29 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
       .map((t) => t.trim())
       .filter((t) => t.length >= 2 && !stop.has(t));
   const liveTokens = tokens(live);
-  const profileTokens = new Set(tokens(profile));
+  const profileTokenList = tokens(profile);
+  const profileTokens = new Set(profileTokenList);
+
+  // Model codes like 110p / 110p1f / c208b must agree. Otherwise
+  // "EMB-110P" token-overlaps "EMB-110P1F" and falsely aliases variants.
+  const isModelToken = (t: string) => /^\d{2,4}[a-z0-9]{0,4}$/i.test(t);
+  const liveModels = liveTokens.filter(isModelToken);
+  const profileModels = profileTokenList.filter(isModelToken);
+  if (liveModels.length > 0 && profileModels.length > 0) {
+    const liveSet = new Set(liveModels);
+    const profileSet = new Set(profileModels);
+    if (
+      liveModels.some((m) => !profileSet.has(m)) ||
+      profileModels.some((m) => !liveSet.has(m))
+    ) {
+      return false;
+    }
+  }
+
+  if (live.includes(profile) || profile.includes(live)) return true;
+
   const shared = liveTokens.filter((t) => profileTokens.has(t));
   // Prefer numeric model tokens (340, 208, 737) — one shared model id + one word is enough.
-  const sharedModel = shared.some((t) => /^\d{2,4}[a-z]?$/i.test(t));
+  const sharedModel = shared.some((t) => isModelToken(t));
   return sharedModel ? shared.length >= 2 : shared.length >= 3;
 }

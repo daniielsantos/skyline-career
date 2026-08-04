@@ -149,6 +149,13 @@ export type FerryQuote = {
   totalCostUsd: number;
 };
 
+export type PilotTravelQuote = {
+  originIcao: string;
+  destIcao: string;
+  distanceNm: number;
+  costUsd: number;
+};
+
 export type ClockSync = {
   serverNowMs: number;
   lastBatchAtMs: number;
@@ -438,6 +445,10 @@ export type Mission = {
       };
       payload: {
         plannedLb?: number;
+        /** Mission cargo in Due (excludes crew floor). */
+        cargoLb?: number;
+        /** Crew floor in Due (n × 170 lb) — cargo soft-capped on crew seats stays in cargoLb. */
+        crewLb?: number;
         liveLb?: number;
         ok: boolean;
         stations?: Record<number, number>;
@@ -583,6 +594,17 @@ export type CargoOpsDelta = {
   clean: boolean;
 };
 
+export type CompanyCreditSnapshot = {
+  principalUsd: number;
+  limitUsd: number;
+  availableUsd: number;
+  collateralUsd: number;
+  repScore: number;
+  overdueDays: number;
+  dailyInterestUsd: number;
+  lastSettledDayIndex: number;
+};
+
 export type StarterHubOption = {
   icao: string;
   name: string;
@@ -605,7 +627,9 @@ export function fetchState() {
       hubs?: StarterHubOption[];
       pilotName?: string;
       homeHubIcao?: string;
+      pilotIcao?: string;
       cashflow?: CareerCashflowSnapshot;
+      companyCredit?: CompanyCreditSnapshot;
       cargoOps?: CareerCargoOps | null;
       starterAircraft?: Array<{
         typeId: string;
@@ -624,8 +648,33 @@ export function fetchCashflow() {
       tick: number;
       dayIndex: number;
       labels?: Record<string, string>;
+      companyCredit?: CompanyCreditSnapshot;
     }
   >('/api/cashflow');
+}
+
+export function postCreditDraw(amountUsd: number) {
+  return api<{
+    walletUsd: number;
+    drawnUsd: number;
+    companyCredit: CompanyCreditSnapshot;
+    fleet?: PlayerAircraft[];
+  }>('/api/credit/draw', {
+    method: 'POST',
+    body: JSON.stringify({ amountUsd }),
+  });
+}
+
+export function postCreditRepay(amountUsd: number) {
+  return api<{
+    walletUsd: number;
+    repaidUsd: number;
+    companyCredit: CompanyCreditSnapshot;
+    fleet?: PlayerAircraft[];
+  }>('/api/credit/repay', {
+    method: 'POST',
+    body: JSON.stringify({ amountUsd }),
+  });
 }
 
 export function fetchMarket(
@@ -783,6 +832,11 @@ export function postTick(n = 96) {
     hangarRequestedUsd?: number;
     hangarShortfallUsd?: number;
     hangarDaysCharged?: number;
+    creditInterestPaidUsd?: number;
+    creditInterestCompoundedUsd?: number;
+    creditOverdueDays?: number;
+    creditPrincipalUsd?: number;
+    companyCredit?: CompanyCreditSnapshot;
     walletUsd?: number;
   }>('/api/tick', {
     method: 'POST',
@@ -857,6 +911,7 @@ export function postStagingCommit(opts: {
     lineCount?: number;
     remainingKg?: number;
     fleet?: PlayerAircraft[];
+    dispatchError?: string | null;
     dispatch?: {
       url: string;
       staticId: string;
@@ -1056,7 +1111,26 @@ export function postFerry(opts: {
     hubSelected?: boolean;
     fleet?: PlayerAircraft[];
     hubs?: StarterHubOption[];
+    pilotIcao?: string;
   }>('/api/fleet/ferry', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPilotTravel(opts: {
+  destIcao: string;
+  quoteOnly?: boolean;
+}) {
+  return api<{
+    quote: PilotTravelQuote;
+    walletDebitUsd?: number;
+    walletUsd: number;
+    pilotIcao?: string;
+    hubSelected?: boolean;
+    fleet?: PlayerAircraft[];
+    hubs?: StarterHubOption[];
+  }>('/api/pilot/travel', {
     method: 'POST',
     body: JSON.stringify(opts),
   });
@@ -1215,6 +1289,8 @@ export type WatchStatus = {
     };
     payload: {
       plannedLb?: number;
+      cargoLb?: number;
+      crewLb?: number;
       liveLb?: number;
       ok: boolean;
       stations?: Record<number, number>;

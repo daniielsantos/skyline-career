@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  inferSimBriefAirframeMatchFromTitle,
   matchSimBriefAirframe,
+  preferSimBriefAirframeMatch,
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
   type SimBriefAirframe,
@@ -80,6 +82,51 @@ describe('matchSimBriefAirframe', () => {
       'TFDi Design MD-11F GE',
     );
     assert.equal(ge?.internalId, '81536_ge');
+  });
+});
+
+describe('inferSimBriefAirframeMatchFromTitle', () => {
+  it('anchors NextGen EMB-110 variants without collapsing P1F into P', () => {
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('NextGenSim EMB-110P1F Bandeirante'),
+      'NextGen Simulations \\(MSFS\\) - EMB-110P1F$',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('NextGenSim EMB-110P2 Bandeirante'),
+      'NextGen Simulations \\(MSFS\\) - EMB-110P2$',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('NextGenSim EMB-110P1 Bandeirante'),
+      'NextGen Simulations \\(MSFS\\) - EMB-110P1$',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('NextGenSim EMB-110P Bandeirante'),
+      'NextGen Simulations \\(MSFS\\) - EMB-110P$',
+    );
+  });
+});
+
+describe('preferSimBriefAirframeMatch', () => {
+  it('prefers anchored pack match over Market Default', () => {
+    assert.equal(
+      preferSimBriefAirframeMatch({
+        packMatch: 'NextGen Simulations \\(MSFS\\) - EMB-110P2$',
+        catalogMatch: 'Default',
+        classMatch: 'Default',
+      }),
+      'NextGen Simulations \\(MSFS\\) - EMB-110P2$',
+    );
+  });
+
+  it('uses title inference when pack is Default', () => {
+    assert.equal(
+      preferSimBriefAirframeMatch({
+        packMatch: 'Default',
+        inferredFromTitle: 'NextGen Simulations \\(MSFS\\) - EMB-110P$',
+        catalogMatch: 'Default',
+      }),
+      'NextGen Simulations \\(MSFS\\) - EMB-110P$',
+    );
   });
 });
 

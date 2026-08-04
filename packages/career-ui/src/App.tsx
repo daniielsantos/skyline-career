@@ -34,6 +34,7 @@ import {
   postAircraftRepair,
   postAircraftBuyout,
   postFerry,
+  postPilotTravel,
   postStagingCommit,
   postTick,
   postDebugCreditWallet,
@@ -45,6 +46,7 @@ import {
   type AirportMovement,
   type AirportView,
   type CareerCashflowSnapshot,
+  type CompanyCreditSnapshot,
   type EconomyEvent,
   type FuelHaulView,
   type MarketLot,
@@ -1472,6 +1474,11 @@ export function App() {
   );
   /** User must arm Skyline inject (default off) — no auto-inject on Preflight. */
   const [skylineInjectEnabled, setSkylineInjectEnabled] = useState(false);
+  /** First /api/preflight failure while Load has no card yet (was silently swallowed). */
+  const [preflightBootstrapError, setPreflightBootstrapError] = useState<
+    string | null
+  >(null);
+  const preflightBootstrapErrorRef = useRef<string | null>(null);
   const [preferManualLoad, setPreferManualLoad] = useState(false);
   /** Prevents a second /api/load-ofp while one is already in flight. */
   const ofpInjectInFlightRef = useRef(false);
@@ -1544,10 +1551,14 @@ export function App() {
   >('aircraft');
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [cashflow, setCashflow] = useState<CareerCashflowSnapshot | null>(null);
+  const [companyCredit, setCompanyCredit] =
+    useState<CompanyCreditSnapshot | null>(null);
   const [hubOptions, setHubOptions] = useState<StarterHubOption[]>([]);
   const [ferryDest, setFerryDest] = useState('');
+  const [travelDest, setTravelDest] = useState('');
   const [pilotName, setPilotName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
+  const [pilotIcao, setPilotIcao] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupHub, setSignupHub] = useState('');
   const [signupAirframeId, setSignupAirframeId] = useState('');
@@ -1705,6 +1716,7 @@ export function App() {
     setHubOptions(normalizeStarterHubs(state.hubs));
     setPilotName(state.pilotName ?? '');
     setHomeHubIcao(state.homeHubIcao ?? '');
+    setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
     if (state.starterAircraft?.length) {
       setStarterAircraftOptions(state.starterAircraft);
       setSignupAirframeId((prev) => {
@@ -1718,6 +1730,7 @@ export function App() {
       });
     }
     if (state.cashflow) setCashflow(state.cashflow);
+    if (state.companyCredit) setCompanyCredit(state.companyCredit);
     if (acMarket) {
       setAircraftListings(acMarket.listings);
       setAircraftCatalog(acMarket.catalog);
@@ -2658,13 +2671,21 @@ export function App() {
           simbriefUser: username,
         });
         if (cancelled) return;
+        setPreflightBootstrapError(null);
+        preflightBootstrapErrorRef.current = null;
         setMissions((current) =>
           current.map((mission) =>
             mission.id === result.mission.id ? result.mission : mission,
           ),
         );
-      } catch {
-        // Soft background refresh: bridge status already reports connectivity.
+      } catch (err) {
+        // Soft background refresh — but surface the first failure so Load
+        // isn't a blank wait when SimBridge is up and the sample still fails.
+        if (cancelled || activeMission.lastPreflightCheck) return;
+        const message = err instanceof Error ? err.message : String(err);
+        if (preflightBootstrapErrorRef.current === message) return;
+        preflightBootstrapErrorRef.current = message;
+        setPreflightBootstrapError(message);
       } finally {
         inFlight = false;
       }
@@ -2692,6 +2713,14 @@ export function App() {
     tab,
     watch?.running,
   ]);
+
+  // Reset bootstrap hint when leaving this mission / getting a Preflight card.
+  useEffect(() => {
+    if (!activeMission?.id || activeMission.lastPreflightCheck) {
+      setPreflightBootstrapError(null);
+      preflightBootstrapErrorRef.current = null;
+    }
+  }, [activeMission?.id, activeMission?.lastPreflightCheck]);
 
   // If Watch started before the first Preflight (stuck Load with no card), stop
   // it once so /api/preflight can bootstrap Loaded vs Due + inject toggle.
@@ -2847,9 +2876,10 @@ export function App() {
 
   async function run(
     action: () => Promise<void>,
-    opts: { refreshAfter?: boolean } = {},
+    opts: { refreshAfter?: boolean; lockUi?: boolean } = {},
   ) {
-    setBusy(true);
+    const lockUi = opts.lockUi !== false;
+    if (lockUi) setBusy(true);
     setError(null);
     try {
       await action();
@@ -2859,7 +2889,7 @@ export function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(false);
+      if (lockUi) setBusy(false);
     }
   }
 
@@ -2877,7 +2907,7 @@ export function App() {
       }
       setAirportIcao(next);
       writeCareerLocation({ tab, airportIcao: next });
-    }, { refreshAfter: false });
+    }, { refreshAfter: false, lockUi: false });
   }
 
   function closeAirport() {
@@ -2908,7 +2938,8 @@ export function App() {
     setAirportReturn(null);
     setSidebarOpen(false);
     goToTab(next);
-    void run(refresh, { refreshAfter: false });
+    // Soft refresh in background — don't flash disabled on every nav button.
+    void run(refresh, { refreshAfter: false, lockUi: false });
   }
 
   async function returnToAirport() {
@@ -2922,7 +2953,7 @@ export function App() {
       setAirportIcao(icao);
       setTerminalSection(section);
       writeCareerLocation({ tab, airportIcao: icao });
-    }, { refreshAfter: false });
+    }, { refreshAfter: false, lockUi: false });
   }
 
   async function onDebugCreditWallet() {
@@ -2954,9 +2985,21 @@ export function App() {
             : hangarShortfall > 0
               ? ` · hangar unpaid ${formatMoney(hangarShortfall)}`
               : '';
-      setToastKind(hangarShortfall > 0 ? 'warn' : 'ok');
+      const creditPaid = result.creditInterestPaidUsd ?? 0;
+      const creditCompounded = result.creditInterestCompoundedUsd ?? 0;
+      const creditOverdue = result.creditOverdueDays ?? 0;
+      const creditNote =
+        creditCompounded > 0
+          ? ` · credit interest unpaid ${formatMoney(creditCompounded)} (overdue ${creditOverdue}d)`
+          : creditPaid > 0
+            ? ` · credit interest −${formatMoney(creditPaid)}`
+            : '';
+      if (result.companyCredit) setCompanyCredit(result.companyCredit);
+      setToastKind(
+        hangarShortfall > 0 || creditCompounded > 0 ? 'warn' : 'ok',
+      );
       setToast(
-        `Time advanced ${formatDuration(HOURS_PER_DAY)} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}`,
+        `Time advanced ${formatDuration(HOURS_PER_DAY)} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}${creditNote}`,
       );
     });
   }
@@ -2986,6 +3029,7 @@ export function App() {
       setHubSelected(false);
       setPilotName('');
       setHomeHubIcao('');
+      setPilotIcao('');
       setSignupName('');
       setSignupHub('');
       setSignupAirframeId('');
@@ -3026,6 +3070,7 @@ export function App() {
       setHubOptions(normalizeStarterHubs(result.hubs));
       setPilotName(result.pilotName);
       setHomeHubIcao(result.homeHubIcao);
+      setPilotIcao(result.homeHubIcao);
       setWallet(result.walletUsd);
       const starter = result.fleet[0];
       const starterLabel = starter?.label ?? 'starter aircraft';
@@ -3279,6 +3324,42 @@ export function App() {
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
       setToast(
         `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}`,
+      );
+    });
+  }
+
+  async function onPilotTravel(destIcao: string) {
+    if (!destIcao.trim()) return;
+    const dest = destIcao.trim().toUpperCase();
+    let quoteRes: Awaited<ReturnType<typeof postPilotTravel>>;
+    try {
+      setBusy(true);
+      setError(null);
+      quoteRes = await postPilotTravel({ destIcao: dest, quoteOnly: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    } finally {
+      setBusy(false);
+    }
+    const quote = quoteRes.quote;
+    const ok = await confirm({
+      title: `Travel ${quote.originIcao} → ${quote.destIcao}?`,
+      body: `${Math.round(quote.distanceNm)} nm · ${formatMoney(quote.costUsd)} (instant pilot reposition — aircraft stays put).`,
+      confirmLabel: 'Travel now',
+      cancelLabel: 'Not now',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postPilotTravel({ destIcao: dest });
+      if (result.fleet) setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      if (result.pilotIcao) setPilotIcao(result.pilotIcao);
+      else setPilotIcao(dest);
+      setTravelDest('');
+      setToastKind('ok');
+      setToast(
+        `Pilot at ${result.pilotIcao ?? dest} · −${formatMoney(result.walletDebitUsd ?? quote.costUsd)}`,
       );
     });
   }
@@ -3720,26 +3801,45 @@ export function App() {
         })),
       });
       if (result.fleet) setFleet(result.fleet);
+      if (result.mission) {
+        setMissions((prev) => {
+          const idx = prev.findIndex((m) => m.id === result.mission.id);
+          if (idx >= 0) {
+            const next = prev.slice();
+            next[idx] = result.mission;
+            return next;
+          }
+          return [result.mission, ...prev];
+        });
+      }
+      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
       setStaging(null);
       setWatchAutoPaused(false);
-      setToastKind('ok');
-      const rem =
-        result.remainingKg !== undefined
-          ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
+      if (result.dispatchError) {
+        setToastKind('warn');
+        setToast(
+          `Flight ${result.mission.id} accepted, but SimBrief dispatch failed: ${result.dispatchError}`,
+        );
+      } else {
+        setToastKind('ok');
+        const rem =
+          result.remainingKg !== undefined
+            ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
+            : '';
+        const dispatchNote = result.dispatch
+          ? ` · SimBrief ${result.dispatch.airframeLabel}`
           : '';
-      const dispatchNote = result.dispatch
-        ? ` · SimBrief ${result.dispatch.airframeLabel}`
-        : '';
-      const action = result.replaced
-        ? 'Updated'
-        : result.appended
+        const action = result.replaced
           ? 'Updated'
-          : 'Created';
-      setToast(
-        `${action} ${result.mission.id} · ${
-          result.lineCount ?? staging.lines.length
-        } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem}${dispatchNote}`,
-      );
+          : result.appended
+            ? 'Updated'
+            : 'Created';
+        setToast(
+          `${action} ${result.mission.id} · ${
+            result.lineCount ?? staging.lines.length
+          } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem}${dispatchNote}`,
+        );
+      }
       goToTab('staging');
     });
   }
@@ -4456,6 +4556,7 @@ export function App() {
                     : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
   const parkedIcao =
     fleet.find((a) => a.status === 'parked')?.locationIcao ?? homeHubIcao;
+  const signalFocusIcao = pilotIcao || parkedIcao || homeHubIcao;
 
   return (
     <div className={`app-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
@@ -4638,8 +4739,9 @@ export function App() {
           <span className="who">{pilotName || 'Skyline'}</span>
           <span className="wallet">{formatMoney(wallet)}</span>
           <span className="meta">
-            {parkedIcao ? `Aircraft at ${parkedIcao}` : 'No aircraft parked'}
-            {homeHubIcao ? ` · hub ${homeHubIcao}` : ''}
+            {pilotIcao ? `Pilot at ${pilotIcao}` : 'Pilot location —'}
+            {parkedIcao ? ` · aircraft at ${parkedIcao}` : ''}
+            {homeHubIcao ? ` · home ${homeHubIcao}` : ''}
           </span>
           <button
             type="button"
@@ -4707,10 +4809,10 @@ export function App() {
             </p>
           </div>
           <div className="topbar-metrics">
-            {parkedIcao ? (
-              <div className="metric" title="Parked aircraft location">
-                <span className="label">Location</span>
-                <strong>{parkedIcao}</strong>
+            {pilotIcao ? (
+              <div className="metric" title="Where you (the pilot) currently are">
+                <span className="label">Pilot</span>
+                <strong>{pilotIcao}</strong>
               </div>
             ) : null}
             <div className="metric">
@@ -5467,9 +5569,9 @@ export function App() {
             </p>
             <MarketSignalsLine
               regions={regionPressure}
-              focusIcao={parkedIcao || undefined}
+              focusIcao={signalFocusIcao || undefined}
               focusRegion={resolveHubRegion(
-                parkedIcao || homeHubIcao || undefined,
+                signalFocusIcao || undefined,
                 networkHubs,
               )}
             />
@@ -6491,6 +6593,7 @@ export function App() {
               skylineInjectEnabled={skylineInjectEnabled}
               simBridge={simBridge}
               watch={watch}
+              preflightBootstrapError={preflightBootstrapError}
               onOpenAirport={openAirport}
               onSelectSettings={() => selectTab('settings')}
               onDispatch={(m) => void onDispatch(m)}
@@ -6626,6 +6729,16 @@ export function App() {
                   <dd>
                     {homeHubIcao ? (
                       <IcaoLink icao={homeHubIcao} onOpen={openAirport} disabled={busy} />
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Current position</dt>
+                  <dd>
+                    {pilotIcao ? (
+                      <IcaoLink icao={pilotIcao} onOpen={openAirport} disabled={busy} />
                     ) : (
                       '—'
                     )}
@@ -6808,10 +6921,10 @@ export function App() {
           <div className="panel-head">
             <p className="panel-stats">
               {hangarPane === 'aircraft'
-                ? 'Aircraft must be at the mission origin to prepare cargo. Buy or lease from the Airframes; ferry relocates instantly for a fee + Jet-A.'
+                ? 'Aircraft must be at the mission origin and you must be with it. Travel repositions the pilot; ferry moves the airframe.'
                 : hangarPane === 'cargo'
                   ? 'Unlock higher freights with clean settles. Dry (General + Supplies) is always open.'
-                  : 'Company income and expenses — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
+                  : 'Company income, expenses, and revolving credit — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
             </p>
             <div className="hangar-head-actions">
               <div className="hangar-pane-toggle" role="tablist" aria-label="Hangar views">
@@ -6835,6 +6948,9 @@ export function App() {
                       .then((snap) => {
                         setCashflow(snap);
                         setWallet(snap.walletUsd);
+                        if (snap.companyCredit) {
+                          setCompanyCredit(snap.companyCredit);
+                        }
                       })
                       .catch(() => undefined);
                   }}
@@ -6851,23 +6967,36 @@ export function App() {
                   Cargo Ops
                 </button>
               </div>
-              {hangarPane === 'aircraft' ? (
-                <button
-                  type="button"
-                  className="accept"
-                  onClick={() => {
-                    selectTab('aircraft');
-                    void refreshAircraftMarket().catch(() => undefined);
-                  }}
-                  disabled={busy}
-                >
-                  Airframes
-                </button>
-              ) : null}
             </div>
           </div>
           {hangarPane === 'cashflow' ? (
-            <HangarCashflowPanel cashflow={cashflow} formatMoney={formatMoney} />
+            <HangarCashflowPanel
+              cashflow={cashflow}
+              companyCredit={companyCredit}
+              walletUsd={wallet}
+              busy={busy}
+              formatMoney={formatMoney}
+              onCreditUpdated={({ walletUsd, companyCredit: next }) => {
+                setWallet(walletUsd);
+                setCompanyCredit(next);
+                void fetchCashflow()
+                  .then((snap) => {
+                    setCashflow(snap);
+                    if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
+                  })
+                  .catch(() => undefined);
+                setToastKind('ok');
+                setToast(
+                  next.principalUsd > 0
+                    ? `Credit line · drawn ${formatMoney(next.principalUsd)} / ${formatMoney(next.limitUsd)}`
+                    : `Credit cleared · available ${formatMoney(next.availableUsd)}`,
+                );
+              }}
+              onCreditError={(message) => {
+                setToastKind('fail');
+                setToast(message);
+              }}
+            />
           ) : hangarPane === 'cargo' ? (
             <CargoOpsPanel cargoOps={cargoOps} />
           ) : fleet.length === 0 ? (
@@ -6885,12 +7014,15 @@ export function App() {
                     name: hub.name,
                   }))}
                   ferryDest={ferryDest}
+                  travelDest={travelDest}
+                  pilotIcao={pilotIcao}
                   ownedCount={ownedFleetCount}
                   hasListed={hasListedAircraft}
                   formatMoney={formatMoney}
                   formatMass={formatTonnes}
                   onOpenAirport={openAirport}
                   onFerryDestChange={setFerryDest}
+                  onTravelDestChange={setTravelDest}
                   onClearMaintenance={(id) => void onClearMaintenance(id)}
                   onRepair={(id) => void onRepairAircraft(id)}
                   onUnlist={(id) => void onUnlistAircraft(id)}
@@ -6898,6 +7030,7 @@ export function App() {
                   onListForLease={(id) => void onListForLease(id)}
                   onSell={(id) => void onSellAircraft(id)}
                   onFerry={(id, dest) => void onFerry(id, dest)}
+                  onTravel={(dest) => void onPilotTravel(dest)}
                 />
               ))}
             </ul>

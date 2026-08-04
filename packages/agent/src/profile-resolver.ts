@@ -75,15 +75,10 @@ function scoreProfile(
   }
 
   if (icao && profileIcao && icao === profileIcao) {
-    const titleTokens = norm(title).split(/[\s\-_]+/).filter(Boolean);
-    const profileTokens = titles
-      .flatMap((t) => norm(t).split(/[\s\-_]+/))
-      .filter(Boolean);
-    const shared = titleTokens.some((t) => profileTokens.includes(t) || profileIcao.includes(t));
-    return {
-      score: shared ? 0.75 : 0.55,
-      reason: shared ? 'icao_with_title_token' : 'icao_only',
-    };
+    // ICAO alone is a weak hint (many variants share E110). Do not boost on
+    // shared words like "Bandeirante" / publisher — that aliased EMB-110P→P1F.
+    // Title aliases already returned above via titlesMatchForCatalog.
+    return { score: 0.55, reason: 'icao_only' };
   }
 
   return { score: 0, reason: 'no_match' };
@@ -128,7 +123,10 @@ export function resolveProfile(
   }
 
   const close = ranked.filter((r) => Math.abs(r.score - best.score) < 0.05 && r.score >= minConfidence);
-  if (close.length > 1 && best.reason === 'icao_only') {
+  if (
+    close.length > 1 &&
+    (best.reason === 'icao_only' || best.reason === 'icao_with_title_token')
+  ) {
     return {
       matched: false,
       confidence: best.score,

@@ -28,6 +28,11 @@ async function executeWritePlan(
   vars: Record<string, number>,
   ctx: StrategyContext,
 ): Promise<void> {
+  const gapMs = ctx.writeGapMs && ctx.writeGapMs > 0 ? ctx.writeGapMs : 0;
+  const localGap = () =>
+    gapMs > 0
+      ? new Promise<void>((resolve) => setTimeout(resolve, gapMs))
+      : Promise.resolve();
   for (const step of plan) {
     switch (step.op) {
       case 'simvar_set':
@@ -36,18 +41,22 @@ async function executeWritePlan(
           unit: step.unit!,
           value: evaluateExpr(step.valueExpr!, vars),
         });
+        await localGap();
         break;
       case 'lvar_set':
         await ctx.bridge.writeLVar({
           name: step.name!,
           value: evaluateExpr(step.valueExpr!, vars),
         });
+        await localGap();
         break;
       case 'hvar_trigger':
         await ctx.bridge.triggerHVar(step.name!);
+        await localGap();
         break;
       case 'event':
         await ctx.bridge.triggerEvent({ event: step.event!, data: step.data });
+        await localGap();
         break;
       case 'delay':
         if (!ctx.skipSettle) {

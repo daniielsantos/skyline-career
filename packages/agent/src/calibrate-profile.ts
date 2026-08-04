@@ -7,6 +7,7 @@ import {
 } from '@msfs-compat/shared';
 import { sweepCgEnvelope, type CgSweepResult } from './cg-sweep.js';
 import { readFlightModelCg } from './flight-model-cg.js';
+import { STATION_MAX_LOAD_PLACEHOLDER_LB } from './discover-payload-stations.js';
 import { readLiveCgState } from './live-cg.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 
@@ -219,6 +220,24 @@ export async function calibrateProfile(
       const arm = cfg.stationArms[station.index];
       if (arm !== undefined && station.arm !== arm) {
         station.arm = arm;
+        updated = true;
+      }
+      const cfgMax = cfg.stationMaxLoads[station.index];
+      // Fill placeholder only — live clamp already stamped real ceilings.
+      if (
+        cfgMax !== undefined &&
+        cfgMax > 0 &&
+        station.maxLoad === STATION_MAX_LOAD_PLACEHOLDER_LB
+      ) {
+        station.maxLoad = cfgMax;
+        updated = true;
+      }
+      const cfgName = cfg.stationNames[station.index];
+      if (
+        cfgName &&
+        (!station.name || /^Station\s+\d+$/i.test(station.name))
+      ) {
+        station.name = cfgName;
         updated = true;
       }
     }

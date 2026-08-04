@@ -31,6 +31,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Partition contract:** `homeCountryId` / `countryIdFromRegion` (`BR-SE` → `BR`); domestic lot formation per country.
 - **US continental medium map:** 6 regions (NE/SE/MW/SC/MT/W), 24 US hubs, sparse BR↔US intl lanes, NPC fleet 44, fuel trucks 20; resilient regional corridors (≥2 gateways per US regional), critical-full domestic overflow valve, and near-full production throttle; Market `intl` chip; health/market expose `countries` + `internationalLaneCount`.
 - **Lots table (schema v2):** `lots` dual-written with `economy_json` on `saveEconomy`; hydrate overlay on load when table non-empty; real meta upgrade 1→2. Tick/missions still in-memory.
+- **Schema v3:** lots are SoT (stripped from `economy_json`); `companies`/`company_state`/`fleet_aircraft`/`missions` + `inbound_pending`/`npc_flights`/`economy_events`; ledger has `company_id` (`local` for SP). Tick still in-memory behind `CareerStore`.
 - **Map expansion playbook:** `.cursor/rules/career-map-expansion.mdc` — checklist when adding airports/regions (seed constants + auto coverage on migrate).
 - **15-min economy ticks:** `MS_PER_TICK = 900_000`, `TICKS_PER_DAY = 96`; physics (flight/rest/MX/fuel) uses `MS_PER_HOUR`; per-tick flows ÷4 and tick lifetimes ×4 so a career day stays ~24h wall-clock. Old saves need Reset world (no tick-scale migrate).
 - **NPC airframe variants:** curated ICAO types from FSLTL traffic `flight_model.cfg` scrape (A321F, MD11F, 208B, …) — label + optional cargo ceiling only; not player OFP flight models. Legacy fleets backfill via `ensureNpcAirframes`.
@@ -38,7 +39,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 ## Near-term priorities (current Brazil career)
 
 1. Polish only if needed — NPC operational cargo ceiling; optional real METAR.
-2. Strip lots from economy blob once dual-write is proven; optional indexed market SQL reads.
+2. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 
@@ -65,8 +66,8 @@ Do **not** start Postgres or multi-server partition until single-player SQLite +
 
 ### Persistence
 
-- **Now:** SQLite embedded (`skyline.sqlite`) via `CareerStore` facade; JSON import one-shot; ledger + lots dual-written (blobs still carry copies).
-- **Later:** Postgres (multiplayer) behind the same facade; strip hot arrays from blobs.
+- **Now:** SQLite embedded (`skyline.sqlite`) via `CareerStore` facade; schema v3 tables for hot/contested state; cold remainder in blobs.
+- **Later:** Postgres (multiplayer) behind the same facade; airport stock / NPC roster / fuel / market listings tables (v4+).
 - Always prune dead lots; DB without retention still explodes.
 
 ## Optional later

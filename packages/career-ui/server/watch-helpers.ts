@@ -70,6 +70,10 @@ export type WatchLoadVerification = {
   };
   payload: {
     plannedLb?: number;
+    /** Mission cargo portion of plannedLb (excludes crew floor). */
+    cargoLb?: number;
+    /** Crew floor portion of plannedLb (n × 170 lb). */
+    crewLb?: number;
     liveLb?: number;
     ok: boolean;
     stations?: Record<number, number>;

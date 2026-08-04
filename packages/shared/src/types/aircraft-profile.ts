@@ -219,6 +219,12 @@ export interface LoadPlanRequest {
   cgPolicy?: 'strict' | 'soft' | 'none';
   /** Skip post-write fuel/payload verify polling (faster multi-step inject). */
   skipVerify?: boolean;
+  /**
+   * Pause between each writePlan step (simvar/lvar/hvar/event).
+   * Useful on multi-station inject to avoid Host pipe disconnects.
+   * Applied even when skipVerify/skipSettle skips profile `delay` ops.
+   */
+  writeGapMs?: number;
 }
 
 export interface OperationResult {

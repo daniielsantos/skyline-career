@@ -3,6 +3,8 @@
  * open Dispatch Redirect and fetch OFPs without going through the CLI.
  */
 
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   compareMissionIntentToOfp,
   estimateRouteCargoLimit,
@@ -22,6 +24,8 @@ import {
   openDispatchInBrowser,
 } from '../../agent/src/ofp-compliance/simbrief-dispatch.ts';
 import {
+  inferSimBriefAirframeMatchFromTitle,
+  preferSimBriefAirframeMatch,
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
 } from '../../agent/src/ofp-compliance/simbrief-airframes.ts';
@@ -30,6 +34,10 @@ import {
   mapSimBriefOfpToBriefing,
   diagnoseSimBriefNavlog,
 } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
+import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(here, '..', '..', '..');
 
 export type ClassCargoLimit = {
   maxCargoKg: number;
@@ -47,12 +55,73 @@ const cargoLimitCache = new Map<string, ClassCargoLimit>();
 /** Re-export shared estimator — class homologation fields live on AircraftClass. */
 export { estimateRouteCargoLimit };
 
+/** Resolve SimBrief ICAO/match preferring the live/family roles pack. */
+export async function resolveDispatchSimBriefParams(opts: {
+  aircraftClassId: FreighterClassId;
+  airframeTypeId?: string;
+  rolesPackRelPath?: string;
+  liveTitle?: string | null;
+}): Promise<{
+  simbriefIcao: string;
+  simbriefAirframeMatch: string;
+  titleHint: string;
+}> {
+  const aircraft = getAircraftClass(opts.aircraftClassId);
+  const airframe = findCareerPlayerAirframe(opts.airframeTypeId);
+  const rolesPackRelPath =
+    opts.rolesPackRelPath?.trim() ||
+    airframe?.rolesPackRelPath ||
+    aircraft.rolesPackRelPath;
+
+  let packMatch: string | undefined;
+  let packIcao: string | undefined;
+  let packTitle: string | undefined;
+  if (rolesPackRelPath) {
+    try {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath,
+        liveTitle: opts.liveTitle,
+        airframeTypeId: opts.airframeTypeId,
+        strictAirframeMatch: false,
+      });
+      packMatch = roles.pack.simbriefAirframeMatch?.trim();
+      packIcao = roles.pack.simbriefIcao?.trim();
+      packTitle = roles.pack.matchTitles?.[0]?.trim();
+    } catch {
+      // Fall through to catalog / class defaults.
+    }
+  }
+
+  const titleHint =
+    opts.liveTitle?.trim() ||
+    packTitle ||
+    airframe?.label ||
+    aircraft.name;
+  const inferred =
+    inferSimBriefAirframeMatchFromTitle(opts.liveTitle ?? '') ??
+    inferSimBriefAirframeMatchFromTitle(packTitle ?? '') ??
+    inferSimBriefAirframeMatchFromTitle(airframe?.label ?? '');
+
+  return {
+    simbriefIcao: packIcao || airframe?.simbriefIcao || aircraft.simbriefIcao,
+    simbriefAirframeMatch: preferSimBriefAirframeMatch({
+      packMatch,
+      inferredFromTitle: inferred,
+      catalogMatch: airframe?.simbriefAirframeMatch,
+      classMatch: aircraft.simbriefAirframeMatch,
+    }),
+    titleHint,
+  };
+}
+
 /** Live SimBrief freight cap for a career freighter class (cached). */
 export async function resolveClassMaxCargoKg(
   aircraftClassId: FreighterClassId,
   airframeTypeId?: string,
+  opts: { liveTitle?: string | null } = {},
 ): Promise<ClassCargoLimit> {
-  const cacheKey = airframeTypeId ?? aircraftClassId;
+  const cacheKey = `${airframeTypeId ?? aircraftClassId}::${opts.liveTitle?.trim() || ''}`;
   const cached = cargoLimitCache.get(cacheKey);
   if (cached) return cached;
   const aircraft = getAircraftClass(aircraftClassId);
@@ -82,12 +151,12 @@ export async function resolveClassMaxCargoKg(
     return value;
   }
   try {
-    const resolved = await resolveSimBriefMaxCargoKg({
-      simbriefIcao: airframe?.simbriefIcao ?? aircraft.simbriefIcao,
-      simbriefAirframeMatch:
-        airframe?.simbriefAirframeMatch ?? aircraft.simbriefAirframeMatch,
-      titleHint: airframe?.label ?? aircraft.name,
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId,
+      airframeTypeId,
+      liveTitle: opts.liveTitle,
     });
+    const resolved = await resolveSimBriefMaxCargoKg(params);
     const catalogCap =
       typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
         ? Math.floor(airframe.maxCargoKg)
@@ -127,8 +196,6 @@ export async function resolveClassMaxCargoKg(
 
 export type DispatchWeightSystem = 'metric' | 'imperial';
 
-const KG_TO_LB = 2.2046226218;
-
 function normalizeDispatchUnits(
   units?: 'KGS' | 'LBS' | DispatchWeightSystem,
 ): 'KGS' | 'LBS' {
@@ -138,7 +205,10 @@ function normalizeDispatchUnits(
 
 export async function buildMissionDispatch(
   mission: MissionIntent,
-  opts: { units?: 'KGS' | 'LBS' | DispatchWeightSystem } = {},
+  opts: {
+    units?: 'KGS' | 'LBS' | DispatchWeightSystem;
+    liveTitle?: string | null;
+  } = {},
 ): Promise<{
   url: string;
   staticId: string;
@@ -147,14 +217,13 @@ export async function buildMissionDispatch(
   cargoThousands: number;
   units: 'KGS' | 'LBS';
 }> {
-  const aircraft = getAircraftClass(mission.aircraftClassId);
-  const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
-  const resolved = await resolveSimBriefDispatchType({
-    simbriefIcao: airframe?.simbriefIcao ?? aircraft.simbriefIcao,
-    simbriefAirframeMatch:
-      airframe?.simbriefAirframeMatch ?? aircraft.simbriefAirframeMatch,
-    titleHint: airframe?.label ?? aircraft.name,
+  const params = await resolveDispatchSimBriefParams({
+    aircraftClassId: mission.aircraftClassId,
+    airframeTypeId: mission.airframeTypeId,
+    rolesPackRelPath: mission.rolesPackRelPath,
+    liveTitle: opts.liveTitle,
   });
+  const resolved = await resolveSimBriefDispatchType(params);
   const units = normalizeDispatchUnits(opts.units);
   // A static_id identifies one dispatch revision, not the mission forever.
   // Reusing it after payload edits lets SimBrief return the previous OFP and

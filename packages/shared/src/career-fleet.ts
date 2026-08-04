@@ -19,6 +19,12 @@ import {
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
+import { normalizeCompanyCredit } from './career-company-credit.js';
+import {
+  assertPilotAtIcao,
+  resolvePilotIcao,
+  syncPilotIcaoTo,
+} from './career-pilot-travel.js';
 import {
   DEFAULT_STARTER_AIRFRAME_TYPE_ID,
   defaultCareerPlayerAirframe,
@@ -94,11 +100,13 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     hubSelected: false,
     pilotName: '',
     homeHubIcao: '',
+    pilotIcao: '',
     aircraftMarket: [],
     aircraftMarketDay: undefined,
     aircraftMarketDemandDay: undefined,
     ledger: [],
     cargoOps: normalizeCareerCargoOps(undefined),
+    companyCredit: normalizeCompanyCredit(undefined),
   };
 }
 
@@ -139,6 +147,11 @@ export function normalizeMissionsState(
   if (hubSelected && !homeHubIcao && fleet[0]) {
     homeHubIcao = fleet[0].locationIcao;
   }
+  const pilotIcao = resolvePilotIcao(
+    (raw as CareerMissionsState).pilotIcao,
+    homeHubIcao,
+    fleet,
+  );
   const aircraftMarket = Array.isArray(
     (raw as CareerMissionsState).aircraftMarket,
   )
@@ -159,6 +172,9 @@ export function normalizeMissionsState(
   const cargoOps = normalizeCareerCargoOps(
     (raw as CareerMissionsState).cargoOps,
   );
+  const companyCredit = normalizeCompanyCredit(
+    (raw as CareerMissionsState).companyCredit,
+  );
   return {
     version: 2,
     walletUsd,
@@ -167,11 +183,13 @@ export function normalizeMissionsState(
     hubSelected,
     pilotName,
     homeHubIcao,
+    pilotIcao,
     aircraftMarket,
     aircraftMarketDay,
     aircraftMarketDemandDay,
     ledger,
     cargoOps,
+    companyCredit,
     ...(airframePerfOverrides
       ? { airframePerfOverrides }
       : {}),
@@ -526,6 +544,7 @@ export function selectStarterHub(
     walletUsd: STARTER_WALLET_USD,
     pilotName,
     homeHubIcao: hub,
+    pilotIcao: hub,
     hubSelected: true,
     fleet: [starter],
   };
@@ -562,6 +581,16 @@ export function assertAircraftAtOrigin(
   }
 }
 
+/** Aircraft parked at origin and pilot co-located for dispatch. */
+export function assertPilotWithAircraftAtOrigin(
+  state: CareerMissionsState,
+  aircraft: PlayerAircraft,
+  originIcao: string,
+): void {
+  assertAircraftAtOrigin(aircraft, originIcao);
+  assertPilotAtIcao(state, originIcao);
+}
+
 export function assignAircraftToMission(
   state: CareerMissionsState,
   aircraftId: string,
@@ -588,7 +617,7 @@ export function assignAircraftToMission(
   if (aircraft.leaseOverdue) {
     throw new Error(`Aircraft ${aircraft.id} has an overdue lease payment`);
   }
-  assertAircraftAtOrigin(aircraft, originIcao);
+  assertPilotWithAircraftAtOrigin(state, aircraft, originIcao);
   aircraft.status = 'assigned';
   aircraft.assignedMissionId = missionId;
   return aircraft;
@@ -606,6 +635,7 @@ export function releaseAircraftOnCancel(
   aircraft.assignedMissionId = undefined;
   // Stay at origin (never left).
   aircraft.locationIcao = mission.originIcao.toUpperCase();
+  syncPilotIcaoTo(state, aircraft.locationIcao);
   return aircraft;
 }
 
@@ -641,6 +671,7 @@ export function relocateAircraftOnSettle(
 
   aircraft.locationIcao = mission.destIcao.toUpperCase();
   aircraft.assignedMissionId = undefined;
+  syncPilotIcaoTo(state, aircraft.locationIcao);
   const due =
     aircraft.maintenanceDueAtHours ??
     INSPECTION_INTERVAL_HOURS[aircraft.aircraftClassId];
@@ -751,6 +782,7 @@ export function quotePlayerMissionOfpFuel(
       `Aircraft ${aircraft.label} is at ${aircraft.locationIcao}, not ${mission.originIcao}`,
     );
   }
+  assertPilotAtIcao(state, mission.originIcao);
 
   const requiredBlockFuelKg = Math.max(0, Math.ceil(opts.requiredBlockFuelKg));
   if (requiredBlockFuelKg > aircraft.fuelCapacityKg) {

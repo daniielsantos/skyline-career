@@ -14,6 +14,7 @@ import {
   allocateCargoRoundPerSeat,
   buildOfpLoadPlan,
   buildRollbackPlan,
+  careerOperationalCargoMaxLb,
   cgCounterweightPerSeatLb,
   cgRebalanceStepLb,
   liveFuelMatchesTarget,
@@ -58,6 +59,87 @@ describe('distributeFuelAcrossTanks', () => {
     assert.throws(
       () => distributeFuelAcrossTanks(overLb, profile),
       (err: unknown) => err instanceof OfpLoadPlanError && err.code === 'FUEL_OVER_CAPACITY',
+    );
+  });
+});
+
+describe('careerOperationalCargoMaxLb', () => {
+  const commanderStations = [
+    { index: 1, maxLoad: 500 },
+    { index: 2, maxLoad: 500 },
+    { index: 3, maxLoad: 500 },
+    { index: 4, maxLoad: 500 },
+    { index: 5, maxLoad: 500 },
+  ];
+
+  it('uses GA soft-cap room when passenger seats exist', () => {
+    // crew spare 2×130 + pax 2×300 + bag 50 = 910
+    assert.equal(
+      careerOperationalCargoMaxLb({
+        stations: commanderStations,
+        stationRoles: {
+          crewStations: [1, 2],
+          passengerStations: [3, 4],
+          baggageStations: [5],
+        },
+      }),
+      910,
+    );
+  });
+
+  it('uses full baggage maxLoad for freighter (no pax seats)', () => {
+    assert.equal(
+      careerOperationalCargoMaxLb({
+        stations: [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 500 },
+          { index: 7, maxLoad: 500 },
+        ],
+        stationRoles: {
+          crewStations: [1, 2],
+          passengerStations: [],
+          baggageStations: [3, 7],
+        },
+      }),
+      1000,
+    );
+  });
+
+  it('honors measured clamp maxLoads below the soft-cap / placeholder', () => {
+    assert.equal(
+      careerOperationalCargoMaxLb({
+        stations: [
+          { index: 1, maxLoad: 340 },
+          { index: 2, maxLoad: 340 },
+          { index: 3, maxLoad: 200 },
+          { index: 4, maxLoad: 200 },
+          { index: 5, maxLoad: 40 },
+        ],
+        stationRoles: {
+          crewStations: [1, 2],
+          passengerStations: [3, 4],
+          baggageStations: [5],
+        },
+      }),
+      // crew spare 2×(300-170)=260 but hard 340→soft 300; pax 2×200; bag min(40,50)=40
+      260 + 400 + 40,
+    );
+    assert.equal(
+      careerOperationalCargoMaxLb({
+        stations: [
+          { index: 1, maxLoad: 170 },
+          { index: 2, maxLoad: 170 },
+          { index: 3, maxLoad: 340 },
+          { index: 4, maxLoad: 340 },
+        ],
+        stationRoles: {
+          crewStations: [1, 2],
+          passengerStations: [],
+          baggageStations: [3, 4],
+        },
+      }),
+      680,
     );
   });
 });
@@ -121,12 +203,11 @@ describe('distributeCargoAcrossStations', () => {
     assert.equal(result.total, 300 * 4 + 50);
   });
 
-  it('rejects cargo over baggage capacity', async () => {
+  it('clamps cargo over baggage capacity', async () => {
     const profile = await loadCaravanProfile();
-    assert.throws(
-      () => distributeCargoAcrossStations(50_000, profile, CARAVAN_ROLES),
-      (err: unknown) => err instanceof OfpLoadPlanError && err.code === 'CARGO_OVER_CAPACITY',
-    );
+    const result = distributeCargoAcrossStations(50_000, profile, CARAVAN_ROLES);
+    assert.ok(result.cargoPlacedLb <= result.baggageCapacityLb + 0.5);
+    assert.equal(result.cargoPlacedLb, result.baggageCapacityLb);
   });
 
   it('rejects when no crew, passenger, or baggage stations are mapped', async () => {

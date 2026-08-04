@@ -98,6 +98,22 @@ describe('buildRolesPackFromProfile', () => {
     assert.deepEqual(pack.liveSources?.fuel, ['classic']);
     assert.ok(pack.matchTitles?.includes('Test GA Aircraft'));
   });
+
+  it('infers anchored SimBrief match for NextGen EMB-110 titles', () => {
+    const pack = buildRolesPackFromProfile(
+      minimalProfile({
+        match: {
+          title: 'NextGenSim EMB-110P1F Bandeirante',
+          publisher: 'nextgensim',
+          icao: 'E110',
+        },
+      }),
+    );
+    assert.equal(
+      pack.simbriefAirframeMatch,
+      'NextGen Simulations \\(MSFS\\) - EMB-110P1F$',
+    );
+  });
 });
 
 describe('upsertRolesPackFromProfile Bonanza family', () => {

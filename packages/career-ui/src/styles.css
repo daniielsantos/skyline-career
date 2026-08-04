@@ -2091,6 +2091,66 @@ tr.lot-locked {
   gap: 1.25rem;
 }
 
+.company-credit-block {
+  padding: 0.15rem 0 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.company-credit-block.is-overdue {
+  border-bottom-color: color-mix(in srgb, #c45c26 55%, var(--line));
+}
+
+.company-credit-blurb {
+  margin: 0.25rem 0 0.65rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.company-credit-dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0.55rem 1rem;
+  margin: 0 0 0.85rem;
+}
+
+.company-credit-dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.company-credit-dl dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.company-credit-dl dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.company-credit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.55rem 0.75rem;
+}
+
+.company-credit-actions label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.company-credit-actions input {
+  width: 7.5rem;
+}
+
 .cashflow-summary-grid {
   display: grid;
   gap: 0.85rem;
@@ -2218,6 +2278,12 @@ tr.lot-locked {
   align-items: end;
   gap: 0.75rem;
   padding: 0 1rem 1rem;
+}
+
+.hangar-pilot-travel {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
 }
 
 .ferry-hub-label {

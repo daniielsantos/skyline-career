@@ -1,11 +1,11 @@
-# NextGenSim EMB-110P1 Bandeirante — discovery
+# NextGenSim EMB-110P2 Bandeirante — discovery
 
-**In-sim title (example):** `NextGenSim EMB-110P1 Bandeirante`  
-**Match title:** `NextGenSim EMB-110P1 Bandeirante`  
+**In-sim title (example):** `NextGenSim EMB-110P2 Bandeirante`  
+**Match title:** `NextGenSim EMB-110P2 Bandeirante`  
 **ICAO (SimBrief type):** `E110`  
 **Publisher:** `nextgensim`  
 **Stations:** 20  
-**Profile:** `nextgensim/emb-110p1-bandeirante@1.0.0`
+**Profile:** `nextgensim/emb-110p2-bandeirante@1.0.0`
 
 ## Fuel tanks
 
@@ -23,4 +23,4 @@
 
 ## Homologated
 
-- `profiles/examples/nextgensim-emb-110p1-bandeirante.json`
+- `profiles/examples/nextgensim-emb-110p2-bandeirante.json`

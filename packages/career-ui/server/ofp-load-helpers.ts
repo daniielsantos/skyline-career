@@ -25,6 +25,7 @@ import {
   buildRollbackPlan,
   CG_BALANCE_STEP_LB,
   cgCounterweightPerSeatLb,
+  equalizeMovableStations,
   liveFuelMatchesTarget,
   FREIGHTER_PILOT_LB,
   GA_BAGGAGE_SOFT_MAX_LB,
@@ -52,8 +53,9 @@ import {
   stationMaxFromProfile,
   tankCapacityLbFromProfile,
 } from './schematic-capacity.ts';
-import { withSimBridgeExclusive } from './simbridge-gate.ts';
+import { withSimBridgeExclusive, acquireSimBridgeExclusive } from './simbridge-gate.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
+import { watchDebugLog } from './debug-log.ts';
 import type { CareerWatchSession } from './watch-helpers.ts';
 
 export { isOfpLoadActive };
@@ -67,6 +69,20 @@ const CG_REBALANCE_MARGIN_MAC = 1;
 const CG_REBALANCE_MAX_ITERATIONS = 24;
 /** Settle after payload writes before trusting live CG (MSFS lag). */
 const PAYLOAD_CG_SETTLE_MS = 900;
+/** Gap between station/fuel SimVar writes during inject (Host pipe stability). */
+const INJECT_WRITE_GAP_MS = 50;
+
+/** Compact station map for watch-debug.log (only non-zero, rounded). */
+function stationsSnapshot(stations: Record<number, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const idx of Object.keys(stations)
+    .map(Number)
+    .sort((a, b) => a - b)) {
+    const v = stations[idx] ?? 0;
+    if (v > 0.5) out[String(idx)] = Math.round(v);
+  }
+  return out;
+}
 
 /** Local sleep — do not use bridge.delay IPC during inject (keeps the pipe free). */
 async function delayCancellable(missionId: string, ms: number): Promise<void> {
@@ -193,6 +209,12 @@ let lastProbeSnapshot: SimBridgeStatusPayload | null = null;
 /** Serialize probe opens so concurrent UI polls don't thrash the named pipe. */
 let probeInFlight: Promise<SimBridgeStatusPayload> | null = null;
 const PROBE_STALE_OK_MS = 20_000;
+
+/** Last known live MSFS title from SimBridge probe (for dispatch / family packs). */
+export function getLastProbeAircraftTitle(): string | null {
+  const title = lastProbeSnapshot?.aircraftTitle?.trim();
+  return title || null;
+}
 
 export function getOfpLoadProgress(missionId: string): OfpLoadProgress | null {
   return ofpLoadProgressByMission.get(missionId) ?? null;
@@ -416,9 +438,13 @@ function rollbackRequest(
   restoreFuel: boolean,
 ): LoadPlanRequest {
   if (restoreFuel) {
-    return { ...full, cgPolicy: 'soft' };
+    return { ...full, cgPolicy: 'soft', writeGapMs: INJECT_WRITE_GAP_MS };
   }
-  return { payload: full.payload, cgPolicy: 'soft' };
+  return {
+    payload: full.payload,
+    cgPolicy: 'soft',
+    writeGapMs: INJECT_WRITE_GAP_MS,
+  };
 }
 
 export async function probeSimBridgeStatus(opts: {
@@ -607,6 +633,11 @@ async function applyMissionOfpLoadExclusive(
 
   beginOfpLoad(mission.id);
   beginOfpLoadActive();
+  watchDebugLog('inject', 'begin', {
+    missionId: mission.id,
+    staticId: mission.staticId,
+    writeGapMs: INJECT_WRITE_GAP_MS,
+  });
   try {
   setOfpLoadProgress(mission.id, {
     phase: 'planning',
@@ -637,6 +668,18 @@ async function applyMissionOfpLoadExclusive(
     requestTimeoutMs: 60_000,
     connectTimeoutMs: 10_000,
   });
+
+  // Hold the exclusive gate for the whole write session so probe/preflight/Watch
+  // reopen cannot open a second pipe client mid-inject (0xC00000B0).
+  const releaseSimBridgeGate = await acquireSimBridgeExclusive();
+  let simBridgeGateHeld = true;
+  const releaseSimBridgeGateOnce = () => {
+    if (!simBridgeGateHeld) return;
+    simBridgeGateHeld = false;
+    releaseSimBridgeGate();
+  };
+  // Brief settle after draining the previous client (Watch stop / probe).
+  await new Promise((r) => setTimeout(r, 300));
 
   let built: BuiltOfpLoadPlan | null = null;
   let rolledBack = false;
@@ -777,6 +820,22 @@ async function applyMissionOfpLoadExclusive(
       sumRecord(built.plan.payload?.stations) ??
       built.cargoLb + built.crewStations.length * FREIGHTER_PILOT_LB;
 
+    watchDebugLog('inject', 'plan ready', {
+      missionId: mission.id,
+      title: identity.title,
+      profileKey,
+      cargoLb: built.cargoLb,
+      crewStations: built.crewStations,
+      passengerStations: built.passengerStations,
+      baggageStations: built.baggageStations,
+      seatStations: built.seatStations,
+      plannedFuelLb,
+      plannedPayloadLb,
+      cgPolicy,
+      beforeStations: stationsSnapshot(beforeLive.stations),
+      beforeFuelLb: sumRecord(beforeLive.tanks),
+    });
+
     const tanksToFuelLb = (tanks: Record<string, number>): number => {
       const qty = sumRecord(tanks);
       const unit = resolved.profile.fuel.unit ?? 'gallons';
@@ -825,7 +884,7 @@ async function applyMissionOfpLoadExclusive(
       ...built.crewStations,
       ...(built.passengerStations ?? []),
     ];
-    const baggageStations = built.baggageStations;
+    let baggageStations = [...built.baggageStations];
     const minRetainByIndex: Record<number, number> = {};
     for (const idx of built.crewStations) {
       minRetainByIndex[idx] = FREIGHTER_PILOT_LB;
@@ -835,14 +894,20 @@ async function applyMissionOfpLoadExclusive(
       seatSoftMaxByIndex[idx] = seatSoftMaxLb(resolved.profile, idx);
     }
     const preferSeatFill = (built.passengerStations?.length ?? 0) > 0;
-    const baggageSoftMaxByIndex: Record<number, number> = {};
-    for (const idx of baggageStations) {
-      const hard =
-        resolved.profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
-      baggageSoftMaxByIndex[idx] = preferSeatFill
-        ? Math.min(hard, GA_BAGGAGE_SOFT_MAX_LB)
-        : hard;
-    }
+    let baggageSoftMaxByIndex: Record<number, number> = {};
+    const rebuildBaggageSoftMax = () => {
+      baggageSoftMaxByIndex = {};
+      for (const idx of baggageStations) {
+        const hard =
+          resolved.profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
+        baggageSoftMaxByIndex[idx] = preferSeatFill
+          ? Math.min(hard, GA_BAGGAGE_SOFT_MAX_LB)
+          : hard;
+      }
+    };
+    rebuildBaggageSoftMax();
+    /** Stations that ignore SimConnect writes (ghost indexes). */
+    let prunedDeadStations = false;
 
     // Start from crew floors; pax/baggage empty. Cargo prefers seats, baggage last.
     let workingStations: Record<number, number> = {};
@@ -934,20 +999,46 @@ async function applyMissionOfpLoadExclusive(
       stations: Record<number, number>,
       total: number,
     ) => {
+      const t0 = Date.now();
       try {
-        return await engine!.applyLoadPlan({
+        const result = await engine!.applyLoadPlan({
           payload: { stations, total },
           cgPolicy: 'none',
           skipVerify: true,
+          writeGapMs: INJECT_WRITE_GAP_MS,
         });
+        watchDebugLog('inject', 'payload round ok', {
+          ms: Date.now() - t0,
+          total: Math.round(total),
+          success: result.payload?.success ?? null,
+          errorCode: result.payload?.errorCode ?? null,
+          stations: stationsSnapshot(stations),
+        });
+        return result;
       } catch (err) {
+        watchDebugLog('inject', 'payload round throw', {
+          ms: Date.now() - t0,
+          total: Math.round(total),
+          pipeDisconnect: isPipeDisconnectError(err),
+          error: err instanceof Error ? err.message : String(err),
+          stations: stationsSnapshot(stations),
+        });
         if (!isPipeDisconnectError(err)) throw err;
         await reconnectBridge();
-        return engine!.applyLoadPlan({
+        watchDebugLog('inject', 'payload round retry after reconnect', {
+          total: Math.round(total),
+        });
+        const result = await engine!.applyLoadPlan({
           payload: { stations, total },
           cgPolicy: 'none',
           skipVerify: true,
+          writeGapMs: INJECT_WRITE_GAP_MS,
         });
+        watchDebugLog('inject', 'payload round retry result', {
+          success: result.payload?.success ?? null,
+          errorCode: result.payload?.errorCode ?? null,
+        });
+        return result;
       }
     };
 
@@ -965,6 +1056,7 @@ async function applyMissionOfpLoadExclusive(
         cgPolicy: 'none',
         // Live tank read below is the source of truth — avoid 6s verify IPC storms.
         skipVerify: true,
+        writeGapMs: INJECT_WRITE_GAP_MS,
       });
       restoreFuelOnRollback = Boolean(
         applyResult.fuel && !applyResult.fuel.success,
@@ -991,6 +1083,7 @@ async function applyMissionOfpLoadExclusive(
         payload: { stations: workingStations, total: seedTotal },
         cgPolicy: 'none',
         skipVerify: true,
+        writeGapMs: INJECT_WRITE_GAP_MS,
       });
       applyResult = {
         ...applyResult,
@@ -1073,14 +1166,23 @@ async function applyMissionOfpLoadExclusive(
               : 'Payload complete',
             { cgAttempt: i, liveMac },
           );
+          watchDebugLog('inject', 'balance done', {
+            round: i,
+            reason: 'cargo+cg ok',
+            cargoPlacedLb: Math.round(cargoPlacedLb),
+            cargoTargetLb: Math.round(cargoTargetLb),
+            liveMac,
+            working: stationsSnapshot(workingStations),
+          });
           break;
         }
 
         let nextStations = workingStations;
         let movedLb = 0;
+        let placeIndexes: number[] = [];
+        let placeBias: 'equal' | 'forward' | 'aft' = bias;
         if (stillPlacing) {
           // Seats first (soft-capped). Baggage only when seats are full or freighter.
-          let placeIndexes: number[];
           let softMax: Record<number, number> | undefined;
           if (preferSeatFill && roomUnderSoftCap(seatStations)) {
             placeIndexes = seatStations;
@@ -1100,6 +1202,12 @@ async function applyMissionOfpLoadExclusive(
                 `CG at aft limit (${liveMac.toFixed(1)}% MAC) — stopping baggage add at ${cargoPlacedLb} lb`,
                 { cgAttempt: i + 1, liveMac },
               );
+              watchDebugLog('inject', 'balance stop', {
+                round: i,
+                reason: 'aft_limit',
+                cargoPlacedLb: Math.round(cargoPlacedLb),
+                liveMac,
+              });
               break;
             }
             placeIndexes = baggageStations;
@@ -1110,22 +1218,54 @@ async function applyMissionOfpLoadExclusive(
           } else {
             // Soft-caps full — accept partial cargo instead of forcing structural max.
             cargoTargetLb = cargoPlacedLb;
+            watchDebugLog('inject', 'balance stop', {
+              round: i,
+              reason: 'soft_caps_full',
+              cargoPlacedLb: Math.round(cargoPlacedLb),
+              cargoTargetLb: Math.round(cargoTargetLb),
+              working: stationsSnapshot(workingStations),
+            });
             break;
           }
-          const placeBias =
+          placeBias =
             placeIndexes === baggageStations || !preferSeatFill ? bias : 'equal';
-          const placed = allocateCargoRoundPerSeat(
+          const stepLb =
+            placeIndexes === baggageStations
+              ? Math.min(perSeatLb, GA_BAGGAGE_SOFT_MAX_LB)
+              : perSeatLb;
+          let placed = allocateCargoRoundPerSeat(
             workingStations,
             resolved.profile,
             placeIndexes,
-            // Baggage: small steps so we can stop at the aft CG limit.
-            placeIndexes === baggageStations
-              ? Math.min(perSeatLb, GA_BAGGAGE_SOFT_MAX_LB)
-              : perSeatLb,
+            stepLb,
             placeBias,
             cargoTargetLb - cargoPlacedLb,
             softMax ? { softMaxByIndex: softMax } : undefined,
           );
+          // Forward/aft half can be full while other stations still have room —
+          // fall back to equal so freighter cargo does not stall mid-cabin.
+          if (
+            placed.movedLb <= 0 &&
+            placeBias !== 'equal' &&
+            (roomOnBaggage() || roomUnderSoftCap(seatStations))
+          ) {
+            watchDebugLog('inject', 'bias half full — fallback equal', {
+              round: i,
+              placeBias,
+              placeIndexes,
+              liveMac,
+            });
+            placeBias = 'equal';
+            placed = allocateCargoRoundPerSeat(
+              workingStations,
+              resolved.profile,
+              placeIndexes,
+              stepLb,
+              'equal',
+              cargoTargetLb - cargoPlacedLb,
+              softMax ? { softMaxByIndex: softMax } : undefined,
+            );
+          }
           nextStations = placed.stations;
           movedLb = placed.movedLb;
           cargoPlacedLb += movedLb;
@@ -1191,9 +1331,23 @@ async function applyMissionOfpLoadExclusive(
                 ],
               },
             };
+            watchDebugLog('inject', 'balance stop', {
+              round: i,
+              reason: 'ga_cg_advisory',
+              liveMac,
+              cargoPlacedLb: Math.round(cargoPlacedLb),
+            });
             break;
           }
         } else {
+          watchDebugLog('inject', 'balance stop', {
+            round: i,
+            reason: 'nothing_to_do',
+            stillPlacing,
+            inEnvelope,
+            cargoPlacedLb: Math.round(cargoPlacedLb),
+            cargoTargetLb: Math.round(cargoTargetLb),
+          });
           break;
         }
 
@@ -1214,6 +1368,19 @@ async function applyMissionOfpLoadExclusive(
               },
             };
           }
+          watchDebugLog('inject', 'balance stop', {
+            round: i,
+            reason: 'moved_lb_zero',
+            stillPlacing,
+            placeBias,
+            placeIndexes,
+            liveMac,
+            lo,
+            hi,
+            cargoPlacedLb: Math.round(cargoPlacedLb),
+            cargoTargetLb: Math.round(cargoTargetLb),
+            working: stationsSnapshot(workingStations),
+          });
           break;
         }
 
@@ -1248,6 +1415,137 @@ async function applyMissionOfpLoadExclusive(
         const verifiedMac = verifiedCg.liveMac ?? liveMac;
         lastLiveMac = verifiedMac;
         prevLiveMac = verifiedMac;
+        const liveSum = sumRecord(afterLive.stations);
+        const workSum = sumRecord(workingStations);
+        const underApplied = liveSum + 75 < workSum * 0.7;
+        watchDebugLog('inject', 'balance round', {
+          round: i + 1,
+          stillPlacing,
+          placeBias,
+          placeIndexes,
+          movedLb: Math.round(movedLb),
+          perSeatLb,
+          cargoPlacedLb: Math.round(cargoPlacedLb),
+          cargoTargetLb: Math.round(cargoTargetLb),
+          liveMac: verifiedMac,
+          lo,
+          hi,
+          writeOk: payloadApply.payload?.success ?? null,
+          writeError: payloadApply.payload?.errorCode ?? null,
+          workingSum: Math.round(workSum),
+          liveSum: Math.round(liveSum),
+          underApplied,
+          working: stationsSnapshot(workingStations),
+          live: stationsSnapshot(afterLive.stations),
+        });
+
+        // Ghost stations: SimConnect writePlan "succeeds" but live stays 0 (e.g. Bandeirante S8–S16).
+        // Prune once, clamp cargo to sticky capacity, and rewrite onto stations that stick.
+        if (
+          !prunedDeadStations &&
+          underApplied &&
+          baggageStations.length > 0
+        ) {
+          const dead = baggageStations.filter((idx) => {
+            const want = workingStations[idx] ?? 0;
+            const got = afterLive.stations[idx] ?? 0;
+            return want > 20 && got < 5;
+          });
+          if (dead.length > 0) {
+            prunedDeadStations = true;
+            const originalCargoLb = built.cargoLb;
+            baggageStations = baggageStations.filter((idx) => !dead.includes(idx));
+            rebuildBaggageSoftMax();
+            for (const idx of dead) {
+              workingStations[idx] = 0;
+            }
+            const bagCap = baggageStations.reduce((sum, idx) => {
+              const hard =
+                resolved.profile.payload.stations.find((s) => s.index === idx)
+                  ?.maxLoad ?? 0;
+              return sum + hard;
+            }, 0);
+            const clampedTarget = Math.min(originalCargoLb, bagCap);
+            for (const idx of baggageStations) {
+              workingStations[idx] = 0;
+            }
+            workingStations = equalizeMovableStations(
+              workingStations,
+              resolved.profile,
+              baggageStations,
+              clampedTarget,
+              {
+                minRetainByIndex: Object.fromEntries(
+                  baggageStations.map((idx) => [idx, 0]),
+                ),
+                softMaxByIndex: preferSeatFill
+                  ? baggageSoftMaxByIndex
+                  : undefined,
+              },
+            );
+            cargoTargetLb = clampedTarget;
+            cargoPlacedLb = baggageStations.reduce(
+              (sum, idx) => sum + (workingStations[idx] ?? 0),
+              0,
+            );
+            const rewriteTotal = Object.values(workingStations).reduce(
+              (a, b) => a + b,
+              0,
+            );
+            built = {
+              ...built,
+              cargoLb: clampedTarget,
+              baggageStations,
+              plan: {
+                ...built.plan,
+                payload: { stations: workingStations, total: rewriteTotal },
+              },
+            };
+            watchDebugLog('inject', 'dead stations pruned', {
+              dead,
+              stickyBaggage: baggageStations,
+              clampedCargoLb: Math.round(clampedTarget),
+              originalCargoLb: Math.round(originalCargoLb),
+              rewriteTotal: Math.round(rewriteTotal),
+              working: stationsSnapshot(workingStations),
+            });
+            assertOfpLoadNotCancelled(mission.id);
+            const rewriteApply = await applyPayloadRound(
+              workingStations,
+              rewriteTotal,
+            );
+            assertOfpLoadNotCancelled(mission.id);
+            await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
+            applyResult = {
+              ...applyResult,
+              payload: rewriteApply.payload ?? applyResult.payload,
+            };
+            afterLive = {
+              tanks: afterLive.tanks,
+              stations: await readLiveStations(bridge, resolved.profile),
+            };
+            watchDebugLog('inject', 'dead stations rewrite', {
+              writeOk: rewriteApply.payload?.success ?? null,
+              live: stationsSnapshot(afterLive.stations),
+              liveSum: Math.round(sumRecord(afterLive.stations)),
+              workingSum: Math.round(rewriteTotal),
+            });
+            if (rewriteApply.payload && !rewriteApply.payload.success) {
+              watchDebugLog('inject', 'balance stop', {
+                round: i + 1,
+                reason: 'dead_station_rewrite_failed',
+                errorCode: rewriteApply.payload.errorCode,
+              });
+              break;
+            }
+            // Sync cargoPlaced to what actually stuck after rewrite.
+            cargoPlacedLb = baggageStations.reduce(
+              (sum, idx) => sum + (afterLive.stations[idx] ?? 0),
+              0,
+            );
+          }
+        }
+
         const trendNote =
           macTrend > 0.05 ? 'drifting aft' : macTrend < -0.05 ? 'drifting fwd' : 'stable';
         // One progress publish per round — after write + settle + read-verify.
@@ -1261,9 +1559,25 @@ async function applyMissionOfpLoadExclusive(
           { cgAttempt: i + 1, liveMac: verifiedMac },
         );
         if (payloadApply.payload && !payloadApply.payload.success) {
+          watchDebugLog('inject', 'balance stop', {
+            round: i + 1,
+            reason: 'payload_write_failed',
+            errorCode: payloadApply.payload.errorCode,
+            details: payloadApply.payload.details ?? null,
+            working: stationsSnapshot(workingStations),
+            live: stationsSnapshot(afterLive.stations),
+          });
           break;
         }
       }
+
+      watchDebugLog('inject', 'balance loop exit', {
+        cargoPlacedLb: Math.round(cargoPlacedLb),
+        cargoTargetLb: Math.round(cargoTargetLb),
+        cgRebalanceMoves,
+        working: stationsSnapshot(workingStations),
+        live: stationsSnapshot(afterLive.stations),
+      });
 
       const finalCg = await readLiveCgState(bridge, {
         readVar: resolved.profile.cg?.readVar,
@@ -1316,7 +1630,8 @@ async function applyMissionOfpLoadExclusive(
     };
 
     // Station SimVars can under-read on Accu-Sim while gross weight shows the load.
-    // Prefer mass-balance total; also trust in-memory workingStations when reads are ~0.
+    // Only trust in-memory workingStations when mass-balance also shows the mass
+    // (ghost stations that ignore writes must NOT fake a successful inject).
     const plannedPayloadSumLb =
       built.plan.payload?.total ??
       sumRecord(built.plan.payload?.stations) ??
@@ -1327,12 +1642,54 @@ async function applyMissionOfpLoadExclusive(
       resolved.profile,
       afterLive.stations,
     );
+    const stationSumLb = sumRecord(afterLive.stations);
+    let massBalanceLb: number | undefined;
+    try {
+      const empty = await bridge.readSimVar({ name: 'EMPTY WEIGHT', unit: 'pounds' });
+      const gross = await bridge.readSimVar({ name: 'TOTAL WEIGHT', unit: 'pounds' });
+      const fuelLb = await bridge.readSimVar({
+        name: 'FUEL TOTAL QUANTITY WEIGHT',
+        unit: 'pounds',
+      });
+      if (
+        Number.isFinite(empty) &&
+        Number.isFinite(gross) &&
+        Number.isFinite(fuelLb) &&
+        empty > 0 &&
+        gross > empty
+      ) {
+        massBalanceLb = Math.max(0, gross - empty - Math.max(0, fuelLb));
+      }
+    } catch {
+      /* optional */
+    }
+    const massConfirmsWorking =
+      massBalanceLb !== undefined &&
+      massBalanceLb + 100 >= workingSumLb * 0.7;
     if (
+      livePayloadSumLb + 75 < plannedPayloadSumLb * 0.5 &&
+      workingSumLb >= plannedPayloadSumLb * 0.5 &&
+      massConfirmsWorking
+    ) {
+      watchDebugLog('inject', 'trust working (mass-balance confirms)', {
+        livePayloadSumLb: Math.round(livePayloadSumLb),
+        workingSumLb: Math.round(workingSumLb),
+        massBalanceLb: massBalanceLb !== undefined ? Math.round(massBalanceLb) : null,
+        stationSumLb: Math.round(stationSumLb),
+      });
+      livePayloadSumLb = workingSumLb;
+      afterLive = { ...afterLive, stations: { ...workingStations } };
+    } else if (
       livePayloadSumLb + 75 < plannedPayloadSumLb * 0.5 &&
       workingSumLb >= plannedPayloadSumLb * 0.5
     ) {
-      livePayloadSumLb = workingSumLb;
-      afterLive = { ...afterLive, stations: { ...workingStations } };
+      watchDebugLog('inject', 'refuse trust working (mass under-read)', {
+        livePayloadSumLb: Math.round(livePayloadSumLb),
+        workingSumLb: Math.round(workingSumLb),
+        massBalanceLb: massBalanceLb !== undefined ? Math.round(massBalanceLb) : null,
+        stationSumLb: Math.round(stationSumLb),
+        live: stationsSnapshot(afterLive.stations),
+      });
     }
 
     const payloadInjectStuck =
@@ -1340,6 +1697,13 @@ async function applyMissionOfpLoadExclusive(
       plannedPayloadSumLb > 75 &&
       livePayloadSumLb + 75 < plannedPayloadSumLb * 0.5;
     if (payloadInjectStuck && applyResult) {
+      watchDebugLog('inject', 'payload stuck vs plan', {
+        livePayloadSumLb: Math.round(livePayloadSumLb),
+        plannedPayloadSumLb: Math.round(plannedPayloadSumLb),
+        workingSumLb: Math.round(workingSumLb),
+        live: stationsSnapshot(afterLive.stations),
+        working: stationsSnapshot(workingStations),
+      });
       applyResult = {
         ...applyResult,
         payload: {
@@ -1490,6 +1854,8 @@ async function applyMissionOfpLoadExclusive(
       } catch {
         /* ignore */
       }
+      // Let post-inject preflight take the exclusive gate.
+      releaseSimBridgeGateOnce();
       try {
         preflight = await runMissionPreflight(mission, {
           username,
@@ -1527,6 +1893,20 @@ async function applyMissionOfpLoadExclusive(
       });
     }
 
+    watchDebugLog('inject', 'end', {
+      ok: !error,
+      error,
+      cgRebalanceMoves,
+      compareVerdict,
+      fuelOk: applyResult?.fuel?.success ?? null,
+      payloadOk: applyResult?.payload?.success ?? null,
+      payloadError: applyResult?.payload?.errorCode ?? null,
+      afterStations: stationsSnapshot(afterLive.stations),
+      afterFuelTanks: afterLive.tanks,
+      rolledBack,
+      rollbackOk,
+    });
+
     return {
       ok: !error,
       plan: built,
@@ -1548,6 +1928,10 @@ async function applyMissionOfpLoadExclusive(
   } catch (err) {
     if (err instanceof OfpLoadCancelledError) {
       error = 'Inject cancelled';
+      watchDebugLog('inject', 'cancelled', {
+        missionId: mission.id,
+        cgRebalanceMoves,
+      });
       setOfpLoadProgress(mission.id, {
         phase: 'failed',
         message: 'Inject cancelled',
@@ -1607,6 +1991,13 @@ async function applyMissionOfpLoadExclusive(
     error = formatPipeError(
       err instanceof Error ? err.message : String(err),
     );
+    watchDebugLog('inject', 'throw', {
+      missionId: mission.id,
+      error,
+      pipeDisconnect: isPipeDisconnectError(err),
+      cgRebalanceMoves,
+      afterStations: stationsSnapshot(afterLive.stations),
+    });
     setOfpLoadProgress(mission.id, {
       phase: 'failed',
       message: error,
@@ -1647,6 +2038,7 @@ async function applyMissionOfpLoadExclusive(
       cgRebalanceMoves,
     };
   } finally {
+    releaseSimBridgeGateOnce();
     try {
       await bridge.close({ disconnectHost: false });
     } catch {

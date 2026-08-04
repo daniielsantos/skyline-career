@@ -216,7 +216,8 @@ export async function discoverClassicFuelTanks(
       }
       // Restore original quantity.
       await bridge.writeSimVar({ name: slot.quantityVar, unit: 'gallons', value: before });
-      await bridge.delay(200);
+      // Local gap between tank probes — avoid pipe IPC delay storms.
+      await new Promise<void>((resolve) => setTimeout(resolve, 200));
     } catch (error) {
       note = error instanceof Error ? error.message : String(error);
       after = null;

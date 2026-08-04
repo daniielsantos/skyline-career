@@ -45,11 +45,16 @@ export class DefaultProfileEngine implements ProfileEngine {
       return { fuel: request.fuel ? blocked : undefined, payload: request.payload ? blocked : undefined };
     }
 
+    const writeGapMs =
+      typeof request.writeGapMs === 'number' && request.writeGapMs > 0
+        ? request.writeGapMs
+        : undefined;
     const ctx = {
       profile: this.profile,
       bridge: this.bridge,
       snapshot,
       skipSettle: Boolean(request.skipVerify),
+      writeGapMs,
     };
     if (!request.skipVerify) {
       await this.capabilityDetector.detect(this.profile, this.bridge);

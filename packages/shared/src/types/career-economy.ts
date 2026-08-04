@@ -767,6 +767,11 @@ export interface CareerMissionsState {
   pilotName: string;
   /** Home / starter hub ICAO; empty until registered. */
   homeHubIcao: string;
+  /**
+   * Where the pilot currently is (career hub). Independent of aircraft ferry.
+   * Empty until registered; migrate from homeHubIcao.
+   */
+  pilotIcao?: string;
   /** Active aircraft-market board (refreshed by economy day). */
   aircraftMarket?: AircraftListing[];
   /** Economy day index when aircraftMarket was last regenerated. */
@@ -785,7 +790,31 @@ export interface CareerMissionsState {
    * Unlocks market freights and scales pay by reputation.
    */
   cargoOps?: CareerCargoOps;
+  /** Revolving company credit line (Hangar cashflow). */
+  companyCredit?: CompanyCreditState;
 };
+
+/** Persistent revolving credit balance on the company. */
+export interface CompanyCreditState {
+  /** Outstanding principal (includes compounded unpaid interest). */
+  principalUsd: number;
+  /** Consecutive economy days with unpaid interest (0 = current). */
+  overdueDays: number;
+  /** Last economy day index for which interest was settled. */
+  lastSettledDayIndex: number;
+}
+
+/** Player-facing credit snapshot for UI / API. */
+export interface CompanyCreditSnapshot {
+  principalUsd: number;
+  limitUsd: number;
+  availableUsd: number;
+  collateralUsd: number;
+  repScore: number;
+  overdueDays: number;
+  dailyInterestUsd: number;
+  lastSettledDayIndex: number;
+}
 
 /** Per-commodity reputation + unlock for the Cargo Ops ladder. */
 export type CargoOpsCommodityId =
@@ -843,9 +872,13 @@ export type CareerLedgerKind =
   | 'aircraft_sell'
   | 'aircraft_buyout'
   | 'ferry'
+  | 'pilot_travel'
   | 'fuel'
   | 'inspection'
   | 'repair'
+  | 'credit_draw'
+  | 'credit_repay'
+  | 'credit_interest'
   | 'other';
 
 export interface CareerLedgerEntry {

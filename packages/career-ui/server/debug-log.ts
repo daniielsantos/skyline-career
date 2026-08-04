@@ -1,6 +1,7 @@
 /**
- * Append-only debug log for Watch / pipe / Loaded vs Due.
+ * Append-only debug log for Watch / pipe / OFP inject / Loaded vs Due.
  * File: profiles/career/watch-debug.log (repo root).
+ * Inject lines use scope `[inject]` — filter: Select-String '\[inject\]'
  */
 import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';

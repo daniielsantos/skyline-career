@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { AircraftProfile } from '@msfs-compat/shared';
 import type { OfpLiveSources, OfpLoadMethod, OfpStationRoleMap } from '@msfs-compat/shared';
+import { inferSimBriefAirframeMatchFromTitle } from './simbrief-airframes.js';
 import {
   matchHeuristic,
   slugFromAircraftTitle,
@@ -165,7 +166,10 @@ export function buildRolesPackFromProfile(
     },
     liveSources: inferLiveSourcesFromProfile(profile),
     simbriefIcao: icao,
-    simbriefAirframeMatch: opts.simbriefAirframeMatch ?? 'Default',
+    simbriefAirframeMatch:
+      opts.simbriefAirframeMatch ??
+      inferSimBriefAirframeMatchFromTitle(title) ??
+      'Default',
     stationMap,
     tolerances: {
       fuelAbsLb: 50,
@@ -235,6 +239,7 @@ export async function upsertRolesPackFromProfile(
       simbriefIcao: heuristic.simbriefIcao ?? pack.simbriefIcao,
       simbriefAirframeMatch:
         opts.simbriefAirframeMatch ??
+        inferSimBriefAirframeMatchFromTitle(title) ??
         heuristic.simbriefAirframeMatch ??
         pack.simbriefAirframeMatch,
       stationMap: heuristic.stationMap,

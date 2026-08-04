@@ -3,7 +3,9 @@ import type {
   CareerCashflowSnapshot,
   CareerLedgerEntry,
   CareerLedgerSummary,
+  CompanyCreditSnapshot,
 } from './api';
+import { postCreditDraw, postCreditRepay } from './api';
 
 const CASHFLOW_PAGE_SIZE = 20;
 
@@ -18,9 +20,13 @@ const KIND_LABEL: Record<string, string> = {
   aircraft_sell: 'Aircraft sale',
   aircraft_buyout: 'Lease buyout',
   ferry: 'Ferry',
+  pilot_travel: 'Pilot travel',
   fuel: 'Jet-A',
   inspection: 'Inspection',
   repair: 'Repair',
+  credit_draw: 'Credit draw',
+  credit_repay: 'Credit repay',
+  credit_interest: 'Credit interest',
   other: 'Other',
 };
 
@@ -68,9 +74,193 @@ function amountCell(entry: CareerLedgerEntry, formatMoney: (n: number) => string
   );
 }
 
+function CompanyCreditBlock(props: {
+  credit: CompanyCreditSnapshot | null;
+  walletUsd: number;
+  busy: boolean;
+  formatMoney: (n: number) => string;
+  onUpdated: (next: {
+    walletUsd: number;
+    companyCredit: CompanyCreditSnapshot;
+  }) => void;
+  onError: (message: string) => void;
+}) {
+  const { credit, busy, formatMoney } = props;
+  const [drawAmount, setDrawAmount] = useState('');
+  const [repayAmount, setRepayAmount] = useState('');
+  const [localBusy, setLocalBusy] = useState(false);
+  const locked = busy || localBusy;
+
+  if (!credit) {
+    return (
+      <div className="company-credit-block">
+        <p className="aircraft-card-section-label">Company credit</p>
+        <p className="empty">Credit line unavailable until hangar is ready.</p>
+      </div>
+    );
+  }
+
+  const overdue = credit.overdueDays > 0;
+
+  async function runDraw() {
+    const amount = Number(drawAmount);
+    if (!(amount > 0)) {
+      props.onError('Enter a positive draw amount');
+      return;
+    }
+    setLocalBusy(true);
+    try {
+      const result = await postCreditDraw(amount);
+      props.onUpdated({
+        walletUsd: result.walletUsd,
+        companyCredit: result.companyCredit,
+      });
+      setDrawAmount('');
+    } catch (err) {
+      props.onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLocalBusy(false);
+    }
+  }
+
+  async function runRepay() {
+    const amount = Number(repayAmount);
+    if (!(amount > 0)) {
+      props.onError('Enter a positive repay amount');
+      return;
+    }
+    setLocalBusy(true);
+    try {
+      const result = await postCreditRepay(amount);
+      props.onUpdated({
+        walletUsd: result.walletUsd,
+        companyCredit: result.companyCredit,
+      });
+      setRepayAmount('');
+    } catch (err) {
+      props.onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLocalBusy(false);
+    }
+  }
+
+  return (
+    <div className={`company-credit-block${overdue ? ' is-overdue' : ''}`}>
+      <p className="aircraft-card-section-label">Company credit</p>
+      <p className="company-credit-blurb">
+        Revolving line from owned fleet sell-back + Cargo Ops reputation. Daily
+        interest ~{(0.08).toFixed(2)}%/day. Overdue blocks buy, ferry, and accept.
+      </p>
+      {overdue ? (
+        <p className="banner warn">
+          Overdue {credit.overdueDays} day{credit.overdueDays === 1 ? '' : 's'} —
+          repay from wallet to clear interest shortfall before ops.
+        </p>
+      ) : null}
+      <dl className="company-credit-dl">
+        <div>
+          <dt>Limit</dt>
+          <dd>{formatMoney(credit.limitUsd)}</dd>
+        </div>
+        <div>
+          <dt>Drawn</dt>
+          <dd className={credit.principalUsd > 0 ? 'cashflow-neg' : undefined}>
+            {formatMoney(credit.principalUsd)}
+          </dd>
+        </div>
+        <div>
+          <dt>Available</dt>
+          <dd className="cashflow-pos">{formatMoney(credit.availableUsd)}</dd>
+        </div>
+        <div>
+          <dt>Day interest</dt>
+          <dd>{formatMoney(credit.dailyInterestUsd)}</dd>
+        </div>
+        <div>
+          <dt>Collateral</dt>
+          <dd>{formatMoney(credit.collateralUsd)}</dd>
+        </div>
+        <div>
+          <dt>Ops rep</dt>
+          <dd>{Math.round(credit.repScore * 100)}%</dd>
+        </div>
+      </dl>
+      <div className="company-credit-actions">
+        <label>
+          Draw
+          <input
+            type="number"
+            min={0}
+            step={100}
+            value={drawAmount}
+            disabled={locked || overdue || credit.availableUsd <= 0}
+            placeholder={String(Math.floor(credit.availableUsd))}
+            onChange={(e) => setDrawAmount(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="accept"
+          disabled={locked || overdue || credit.availableUsd <= 0}
+          onClick={() => void runDraw()}
+        >
+          Draw
+        </button>
+        <label>
+          Repay
+          <input
+            type="number"
+            min={0}
+            step={100}
+            value={repayAmount}
+            disabled={locked || credit.principalUsd <= 0}
+            placeholder={String(Math.floor(credit.principalUsd))}
+            onChange={(e) => setRepayAmount(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="accept"
+          disabled={locked || credit.principalUsd <= 0}
+          onClick={() => void runRepay()}
+        >
+          Repay
+        </button>
+        {credit.principalUsd > 0 ? (
+          <button
+            type="button"
+            className="ghost"
+            disabled={locked || props.walletUsd <= 0}
+            onClick={() => {
+              setRepayAmount(
+                String(
+                  Math.min(
+                    Math.floor(credit.principalUsd),
+                    Math.floor(props.walletUsd),
+                  ),
+                ),
+              );
+            }}
+          >
+            Max repay
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function HangarCashflowPanel(props: {
   cashflow: CareerCashflowSnapshot | null;
+  companyCredit: CompanyCreditSnapshot | null;
+  walletUsd: number;
+  busy: boolean;
   formatMoney: (n: number) => string;
+  onCreditUpdated: (next: {
+    walletUsd: number;
+    companyCredit: CompanyCreditSnapshot;
+  }) => void;
+  onCreditError: (message: string) => void;
 }) {
   const snap = props.cashflow;
   const [page, setPage] = useState(1);
@@ -88,17 +278,8 @@ export function HangarCashflowPanel(props: {
     return recent.slice(start, start + CASHFLOW_PAGE_SIZE);
   }, [recent, safePage]);
 
-  if (!snap) {
-    return <p className="empty">Loading cashflow…</p>;
-  }
-  if (snap.recent.length === 0 && snap.allTime.entryCount === 0) {
-    return (
-      <p className="empty">
-        No ledger yet — freights, fuel, hangar parking, leases, and shop visits will
-        show up here.
-      </p>
-    );
-  }
+  const emptyLedger =
+    !snap || (snap.recent.length === 0 && snap.allTime.entryCount === 0);
 
   const total = recent.length;
   const rangeLabel =
@@ -111,85 +292,103 @@ export function HangarCashflowPanel(props: {
 
   return (
     <div className="cashflow-panel">
-      <div className="cashflow-summary-grid">
-        <SummaryCard
-          title="This week"
-          summary={snap.week}
-          formatMoney={props.formatMoney}
-        />
-        <SummaryCard
-          title="This month"
-          summary={snap.month}
-          formatMoney={props.formatMoney}
-        />
-        <SummaryCard
-          title="All time"
-          summary={snap.allTime}
-          formatMoney={props.formatMoney}
-        />
-      </div>
+      <CompanyCreditBlock
+        credit={props.companyCredit}
+        walletUsd={props.walletUsd}
+        busy={props.busy}
+        formatMoney={props.formatMoney}
+        onUpdated={props.onCreditUpdated}
+        onError={props.onCreditError}
+      />
 
-      <div className="cashflow-history">
-        <p className="aircraft-card-section-label">Recent activity</p>
-        {total === 0 ? (
-          <p className="empty">No recent ledger rows.</p>
-        ) : (
-          <>
-            <div className="table-wrap">
-              <table className="cashflow-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Day</th>
-                    <th scope="col">Activity</th>
-                    <th scope="col">ICAO</th>
-                    <th scope="col">Note</th>
-                    <th scope="col" className="cashflow-col-amount">
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageEntries.map((entry) => (
-                    <tr key={entry.id}>
-                      <td>{entry.dayIndex}</td>
-                      <td>{kindLabel(entry.kind)}</td>
-                      <td>{entry.icao ?? '—'}</td>
-                      <td className="cashflow-col-note">
-                        {entry.note?.trim() ? entry.note : '—'}
-                      </td>
-                      <td className="cashflow-col-amount">
-                        {amountCell(entry, props.formatMoney)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <nav className="pagination" aria-label="Cashflow activity pages">
-              <p>{rangeLabel}</p>
-              <div>
-                <button
-                  type="button"
-                  disabled={safePage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {safePage} of {pageCount}
-                </span>
-                <button
-                  type="button"
-                  disabled={safePage >= pageCount}
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                >
-                  Next
-                </button>
-              </div>
-            </nav>
-          </>
-        )}
-      </div>
+      {emptyLedger ? (
+        <p className="empty">
+          No ledger yet — freights, fuel, hangar parking, credit, leases, and shop
+          visits will show up here.
+        </p>
+      ) : (
+        <>
+          <div className="cashflow-summary-grid">
+            <SummaryCard
+              title="This week"
+              summary={snap!.week}
+              formatMoney={props.formatMoney}
+            />
+            <SummaryCard
+              title="This month"
+              summary={snap!.month}
+              formatMoney={props.formatMoney}
+            />
+            <SummaryCard
+              title="All time"
+              summary={snap!.allTime}
+              formatMoney={props.formatMoney}
+            />
+          </div>
+
+          <div className="cashflow-history">
+            <p className="aircraft-card-section-label">Recent activity</p>
+            {total === 0 ? (
+              <p className="empty">No recent ledger rows.</p>
+            ) : (
+              <>
+                <div className="table-wrap">
+                  <table className="cashflow-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Day</th>
+                        <th scope="col">Activity</th>
+                        <th scope="col">ICAO</th>
+                        <th scope="col">Note</th>
+                        <th scope="col" className="cashflow-col-amount">
+                          Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageEntries.map((entry) => (
+                        <tr key={entry.id}>
+                          <td>{entry.dayIndex}</td>
+                          <td>{kindLabel(entry.kind)}</td>
+                          <td>{entry.icao ?? '—'}</td>
+                          <td className="cashflow-col-note">
+                            {entry.note?.trim() ? entry.note : '—'}
+                          </td>
+                          <td className="cashflow-col-amount">
+                            {amountCell(entry, props.formatMoney)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <nav className="pagination" aria-label="Cashflow activity pages">
+                  <p>{rangeLabel}</p>
+                  <div>
+                    <button
+                      type="button"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {safePage} of {pageCount}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safePage >= pageCount}
+                      onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </nav>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

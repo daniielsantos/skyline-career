@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
+import { resolveDispatchSimBriefParams } from './dispatch-helpers.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
@@ -108,5 +109,69 @@ describe('resolveMissionRolesPack', () => {
         ),
       );
     }
+  });
+
+  it('picks the matching Bandeirante family pack for each live title', async () => {
+    const cases = [
+      [
+        'NextGenSim EMB-110P Bandeirante',
+        /nextgensim-emb-110p-bandeirante\.json$/,
+        'NextGen Simulations \\(MSFS\\) - EMB-110P$',
+      ],
+      [
+        'NextGenSim EMB-110P1 Bandeirante',
+        /nextgensim-emb-110p1-bandeirante\.json$/,
+        'NextGen Simulations \\(MSFS\\) - EMB-110P1$',
+      ],
+      [
+        'NextGenSim EMB-110P1F Bandeirante',
+        /nextgensim-emb-110p1f-bandeirante\.json$/,
+        'NextGen Simulations \\(MSFS\\) - EMB-110P1F$',
+      ],
+      [
+        'NextGenSim EMB-110P2 Bandeirante',
+        /nextgensim-emb-110p2-bandeirante\.json$/,
+        'NextGen Simulations \\(MSFS\\) - EMB-110P2$',
+      ],
+    ] as const;
+    for (const [liveTitle, pathRe, match] of cases) {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: 'profiles/ofp/nextgensim-emb-110p1f-bandeirante.json',
+        liveTitle,
+        airframeTypeId: 'nextgensim-emb-110p1f-bandeirante',
+        strictAirframeMatch: true,
+      });
+      assert.match(roles.path.replace(/\\/g, '/'), pathRe);
+      assert.equal(roles.pack.simbriefAirframeMatch, match);
+    }
+  });
+});
+
+describe('resolveDispatchSimBriefParams', () => {
+  it('uses P2 pack match when live title is EMB-110P2 under family SKU', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_turboprop',
+      airframeTypeId: 'nextgensim-emb-110p1f-bandeirante',
+      rolesPackRelPath: 'profiles/ofp/nextgensim-emb-110p1f-bandeirante.json',
+      liveTitle: 'NextGenSim EMB-110P2 Bandeirante',
+    });
+    assert.equal(params.simbriefIcao, 'E110');
+    assert.equal(
+      params.simbriefAirframeMatch,
+      'NextGen Simulations \\(MSFS\\) - EMB-110P2$',
+    );
+  });
+
+  it('falls back to default family pack match without live title', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_turboprop',
+      airframeTypeId: 'nextgensim-emb-110p1f-bandeirante',
+      rolesPackRelPath: 'profiles/ofp/nextgensim-emb-110p1f-bandeirante.json',
+    });
+    assert.equal(
+      params.simbriefAirframeMatch,
+      'NextGen Simulations \\(MSFS\\) - EMB-110P1F$',
+    );
   });
 });

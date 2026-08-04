@@ -45,6 +45,33 @@ describe('titlesMatchForCatalog', () => {
   it('rejects unrelated titles', () => {
     assert.equal(titlesMatchForCatalog('C172 Classic', 'Saab 340 Cargo'), false);
   });
+
+  it('does not alias NextGenSim EMB-110P onto EMB-110P1F', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'NextGenSim EMB-110P Bandeirante',
+        'NextGenSim EMB-110P1F Bandeirante',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'NextGenSim EMB-110P1 Bandeirante',
+        'NextGenSim EMB-110P1F Bandeirante',
+      ),
+      false,
+    );
+  });
+
+  it('still matches Commander 114 to itself with TC sibling only via exact tokens', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square Commander 114',
+        'Black Square Commander 114',
+      ),
+      true,
+    );
+  });
 });
 
 describe('fingerprintFromProfile liveTitles', () => {

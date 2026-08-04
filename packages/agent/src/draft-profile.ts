@@ -4,6 +4,7 @@ import type { AircraftProfile } from '@msfs-compat/shared';
 import { inferPublisher, normalizeAircraftTitle } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { cleanIcaoCode } from './promote-profile.js';
+import { STATION_MAX_LOAD_PLACEHOLDER_LB } from './discover-payload-stations.js';
 
 export interface DraftOptions {
   outDir: string;
@@ -18,6 +19,16 @@ export interface DraftOptions {
    * on the classic fallback path (capacity already validated + writable).
    */
   liveTankIds?: string[];
+  /**
+   * When set (from discoverWritablePayloadStations), only these station indexes
+   * are drafted into payload.stations / writePlan (ghost indexes omitted).
+   */
+  liveStationIndexes?: number[];
+  /**
+   * Structural maxLoad (lb) from live clamp probe, keyed by station index.
+   * Missing indexes keep the placeholder 500 until cfg calibrate fills them.
+   */
+  liveStationMaxLoads?: Record<number, number>;
   /**
    * Native SimBrief / tablet-load aircraft: discover read tanks/stations for resolve,
    * but leave write plans empty (no Skyline inject).
@@ -265,21 +276,47 @@ export async function draftProfileFromLive(
   }
 
   let stationCount = 8;
-  try {
-    stationCount = Math.max(1, Math.min(16, Math.round(await bridge.readSimVar({
-      name: 'PAYLOAD STATION COUNT',
-      unit: 'number',
-    }))));
-  } catch {
-    stationCount = 8;
+  let stationIndexes: number[] = [];
+  const fromWritetest =
+    Array.isArray(options.liveStationIndexes) &&
+    options.liveStationIndexes.length > 0;
+  if (fromWritetest) {
+    stationIndexes = [...new Set(options.liveStationIndexes!)]
+      .filter((i) => Number.isFinite(i) && i >= 1)
+      .map((i) => Math.round(i))
+      .sort((a, b) => a - b);
+    stationCount = stationIndexes.length;
+  } else {
+    try {
+      stationCount = Math.max(
+        1,
+        Math.min(
+          16,
+          Math.round(
+            await bridge.readSimVar({
+              name: 'PAYLOAD STATION COUNT',
+              unit: 'number',
+            }),
+          ),
+        ),
+      );
+    } catch {
+      stationCount = 8;
+    }
+    stationIndexes = Array.from({ length: stationCount }, (_, i) => i + 1);
   }
 
   const stations: AircraftProfile['payload']['stations'] = [];
   const payloadPlan: AircraftProfile['payload']['writePlan'] = [];
   const payloadChecks: AircraftProfile['payload']['verify']['checks'] = [];
 
-  for (let i = 1; i <= stationCount; i++) {
-    stations.push({ index: i, name: `Station ${i}`, maxLoad: 500 });
+  for (const i of stationIndexes) {
+    const probed = options.liveStationMaxLoads?.[i];
+    const maxLoad =
+      typeof probed === 'number' && Number.isFinite(probed) && probed > 0
+        ? Math.round(probed)
+        : STATION_MAX_LOAD_PLACEHOLDER_LB;
+    stations.push({ index: i, name: `Station ${i}`, maxLoad });
     if (!monitorOnly) {
       payloadPlan.push({
         op: 'simvar_set',
@@ -289,13 +326,14 @@ export async function draftProfileFromLive(
       });
     }
   }
-  if (!monitorOnly) {
+  if (!monitorOnly && stationIndexes.length > 0) {
     payloadPlan.push({ op: 'delay', ms: 400 });
+    const verifyIndex = stationIndexes[0]!;
     payloadChecks.push({
-      var: 'PAYLOAD STATION WEIGHT:1',
+      var: `PAYLOAD STATION WEIGHT:${verifyIndex}`,
       unit: 'pounds',
       tolerancePct: 1.0,
-      valueExpr: '{station_1}',
+      valueExpr: `{station_${verifyIndex}}`,
     });
   }
 
@@ -365,6 +403,9 @@ export async function draftProfileFromLive(
           preferClassicFromDiscovery
             ? `Fuel via classic slots from discovery writetest: ${options.liveTankIds!.join(', ')}.`
             : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest filter).',
+          fromWritetest
+            ? `Payload stations from writetest: ${stationIndexes.join(', ')}.`
+            : `Payload stations from PAYLOAD STATION COUNT (${stationCount}) — no writetest filter.`,
         ],
   };
 

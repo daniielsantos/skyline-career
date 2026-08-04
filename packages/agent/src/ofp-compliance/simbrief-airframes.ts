@@ -115,6 +115,53 @@ export function airframeMaxCargoKg(airframe: SimBriefAirframe): number | undefin
 }
 
 /**
+ * Map live / profile titles onto SimBrief airframe_comments regex sources.
+ * Longest variant tokens first so EMB-110P1F does not collapse to EMB-110P.
+ */
+export function inferSimBriefAirframeMatchFromTitle(
+  title: string,
+): string | undefined {
+  const t = title.trim();
+  if (!t) return undefined;
+
+  // NextGenSim EMB-110 family (SimBrief E110 comments).
+  const nextGen = [
+    { re: /\bEMB-?110\s*P1F\b/i, suffix: 'EMB-110P1F' },
+    { re: /\bEMB-?110\s*P2\b/i, suffix: 'EMB-110P2' },
+    { re: /\bEMB-?110\s*P1\b/i, suffix: 'EMB-110P1' },
+    { re: /\bEMB-?110\s*P\b/i, suffix: 'EMB-110P' },
+  ] as const;
+  for (const row of nextGen) {
+    if (row.re.test(t)) {
+      return `NextGen Simulations \\(MSFS\\) - ${row.suffix}$`;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Prefer an anchored roles-pack match over Market/class "Default", then title
+ * inference, then catalog/class fallbacks.
+ */
+export function preferSimBriefAirframeMatch(opts: {
+  packMatch?: string | null;
+  inferredFromTitle?: string | null;
+  catalogMatch?: string | null;
+  classMatch?: string | null;
+}): string {
+  const pack = opts.packMatch?.trim();
+  if (pack && pack !== 'Default') return pack;
+  const inferred = opts.inferredFromTitle?.trim();
+  if (inferred) return inferred;
+  if (pack) return pack;
+  const catalog = opts.catalogMatch?.trim();
+  if (catalog) return catalog;
+  const classMatch = opts.classMatch?.trim();
+  if (classMatch) return classMatch;
+  return 'Default';
+}
+
+/**
  * Pick an airframe whose comments match `match` (regex source or plain substring).
  * When several match, prefer ones whose comments also share tokens with `titleHint`
  * (e.g. PW / GE / Dual Class).

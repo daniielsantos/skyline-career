@@ -8,6 +8,8 @@ import {
   registerCareerPlayerAirframe,
   setCareerPlayerAirframeEnabled,
   updateCareerPlayerAirframeBurn,
+  deriveCareerMarketWeights,
+  cargoMaxLoadLbFromStations,
 } from './career-player-airframe-catalog.js';
 import type { OfpRolesPackFile } from './ofp-compliance/scaffold-roles.js';
 
@@ -23,6 +25,36 @@ describe('career player airframe registration', () => {
     assert.equal(inferCareerClassFromIcao('B738'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD1F'), 'wide_freighter');
     assert.equal(inferCareerClassFromIcao('ZZZZ'), 'light_ga');
+  });
+
+  it('derives Market weights from live empty/MTOW and sticky cargo', () => {
+    assert.deepEqual(
+      deriveCareerMarketWeights({
+        emptyWeightLb: 7500,
+        mtowLb: 13250,
+        cargoMaxLoadLb: 2500,
+        fuelCapacityGal: 454.4,
+        lbPerGal: 6.7,
+      }),
+      {
+        oewKg: 3402,
+        mtowKg: 6010,
+        maxCargoKg: 1134,
+        fuelCapacityKg: 1381,
+      },
+    );
+    assert.equal(
+      cargoMaxLoadLbFromStations(
+        [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 500 },
+          { index: 7, maxLoad: 500 },
+        ],
+        [3, 7],
+      ),
+      1000,
+    );
   });
 
   it('upserts a promoted roles pack into the shared market catalog', async () => {
@@ -60,8 +92,14 @@ describe('career player airframe registration', () => {
         rolesPackPath: rolesPath,
         pack,
         aircraftClassId: 'light_ga',
+        oewKg: 740,
+        mtowKg: 1157,
+        maxCargoKg: 220,
+        fuelCapacityKg: 152,
       });
       assert.equal(registered.label, 'Cessna 172SP Test Cargo');
+      assert.equal(registered.oewKg, 740);
+      assert.equal(registered.maxCargoKg, 220);
       assert.equal(
         registered.rolesPackRelPath,
         'profiles/ofp/test-c172.json',

@@ -174,6 +174,82 @@ async function writeCatalogRows(
   }
 }
 
+const LB_TO_KG = 0.45359237;
+const DEFAULT_FUEL_LB_PER_GAL = 6.7;
+
+/** Convert live / profile pounds+gallons into Market catalog kg fields. */
+export function deriveCareerMarketWeights(opts: {
+  emptyWeightLb?: number;
+  mtowLb?: number;
+  /** Operational cargo ceiling (lb) — from careerOperationalCargoMaxLb. */
+  cargoMaxLoadLb?: number;
+  fuelCapacityGal?: number;
+  lbPerGal?: number;
+}): {
+  oewKg?: number;
+  mtowKg?: number;
+  maxCargoKg?: number;
+  fuelCapacityKg?: number;
+} {
+  const out: {
+    oewKg?: number;
+    mtowKg?: number;
+    maxCargoKg?: number;
+    fuelCapacityKg?: number;
+  } = {};
+  if (
+    typeof opts.emptyWeightLb === 'number' &&
+    Number.isFinite(opts.emptyWeightLb) &&
+    opts.emptyWeightLb > 0
+  ) {
+    out.oewKg = Math.round(opts.emptyWeightLb * LB_TO_KG);
+  }
+  if (
+    typeof opts.mtowLb === 'number' &&
+    Number.isFinite(opts.mtowLb) &&
+    opts.mtowLb > 0
+  ) {
+    out.mtowKg = Math.round(opts.mtowLb * LB_TO_KG);
+  }
+  if (
+    typeof opts.cargoMaxLoadLb === 'number' &&
+    Number.isFinite(opts.cargoMaxLoadLb) &&
+    opts.cargoMaxLoadLb > 0
+  ) {
+    out.maxCargoKg = Math.round(opts.cargoMaxLoadLb * LB_TO_KG);
+  }
+  if (
+    typeof opts.fuelCapacityGal === 'number' &&
+    Number.isFinite(opts.fuelCapacityGal) &&
+    opts.fuelCapacityGal > 0
+  ) {
+    const dens =
+      typeof opts.lbPerGal === 'number' &&
+      Number.isFinite(opts.lbPerGal) &&
+      opts.lbPerGal > 0.1
+        ? opts.lbPerGal
+        : DEFAULT_FUEL_LB_PER_GAL;
+    out.fuelCapacityKg = Math.round(opts.fuelCapacityGal * dens * LB_TO_KG);
+  }
+  return out;
+}
+
+/** Sum maxLoad for the given station indexes (Career cargo ceiling). */
+export function cargoMaxLoadLbFromStations(
+  stations: Array<{ index: number; maxLoad?: number }>,
+  cargoIndexes: number[],
+): number {
+  const want = new Set(cargoIndexes);
+  let sum = 0;
+  for (const st of stations) {
+    if (!want.has(st.index)) continue;
+    if (typeof st.maxLoad === 'number' && Number.isFinite(st.maxLoad) && st.maxLoad > 0) {
+      sum += st.maxLoad;
+    }
+  }
+  return sum;
+}
+
 export async function registerCareerPlayerAirframe(opts: {
   repoRoot: string;
   rolesPackPath: string;
@@ -182,6 +258,10 @@ export async function registerCareerPlayerAirframe(opts: {
   title?: string;
   /** Profile id for one-off SKUs; families pass marketTypeId / pack.ofpId. */
   typeId?: string;
+  oewKg?: number;
+  mtowKg?: number;
+  maxCargoKg?: number;
+  fuelCapacityKg?: number;
   maxRangeNm?: number;
   cruiseFuelFlowKgPerHour?: number;
   cruiseSpeedKt?: number;
@@ -248,13 +328,11 @@ export async function registerCareerPlayerAirframe(opts: {
     ...(extras.length > 0 ? { familyRolesPackRelPaths: [primary, ...extras].sort() } : {}),
     simbriefIcao,
     simbriefAirframeMatch,
-    ...(existing?.oewKg != null ? { oewKg: existing.oewKg } : {}),
-    ...(existing?.mtowKg != null ? { mtowKg: existing.mtowKg } : {}),
-    ...(existing?.maxCargoKg != null ? { maxCargoKg: existing.maxCargoKg } : {}),
-    ...(existing?.fuelCapacityKg != null
-      ? { fuelCapacityKg: existing.fuelCapacityKg }
-      : {}),
   };
+  const oewKg = pickNum(opts.oewKg, existing?.oewKg);
+  const mtowKg = pickNum(opts.mtowKg, existing?.mtowKg);
+  const maxCargoKg = pickNum(opts.maxCargoKg, existing?.maxCargoKg);
+  const fuelCapacityKg = pickNum(opts.fuelCapacityKg, existing?.fuelCapacityKg);
   const maxRangeNm = pickNum(opts.maxRangeNm, existing?.maxRangeNm);
   const cruiseFuelFlowKgPerHour = pickNum(
     opts.cruiseFuelFlowKgPerHour,
@@ -262,6 +340,10 @@ export async function registerCareerPlayerAirframe(opts: {
   );
   const cruiseSpeedKt = pickNum(opts.cruiseSpeedKt, existing?.cruiseSpeedKt);
   const fuelBurnKgPerNm = pickNum(opts.fuelBurnKgPerNm, existing?.fuelBurnKgPerNm);
+  if (oewKg != null) row.oewKg = Math.round(oewKg);
+  if (mtowKg != null) row.mtowKg = Math.round(mtowKg);
+  if (maxCargoKg != null) row.maxCargoKg = Math.round(maxCargoKg);
+  if (fuelCapacityKg != null) row.fuelCapacityKg = Math.round(fuelCapacityKg);
   if (maxRangeNm != null) row.maxRangeNm = Math.round(maxRangeNm);
   if (cruiseFuelFlowKgPerHour != null) {
     row.cruiseFuelFlowKgPerHour =

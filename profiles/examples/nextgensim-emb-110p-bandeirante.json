@@ -1,16 +1,16 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "nextgensim-emb-110p1-bandeirante",
-  "profileKey": "nextgensim/emb-110p1-bandeirante",
+  "profileId": "nextgensim-emb-110p-bandeirante",
+  "profileKey": "nextgensim/emb-110p-bandeirante",
   "semver": "1.0.0",
-  "displayName": "NextGenSim EMB-110P1 Bandeirante (MSFS 2024)",
+  "displayName": "NextGenSim EMB-110P Bandeirante (MSFS 2024)",
   "match": {
-    "fingerprint": "a3ef5884b66ddcf84acf29b3a5f825407680a3b73dd9074aa3688521171a506b",
-    "title": "NextGenSim EMB-110P1 Bandeirante",
+    "fingerprint": "768fe4f5f5d616384ef886eec6c8a859eca34d085cea2b8b1add3bb545210ec4",
+    "title": "NextGenSim EMB-110P Bandeirante",
     "publisher": "nextgensim",
     "icao": "E110",
     "liveTitles": [
-      "NextGenSim EMB-110P1 Bandeirante"
+      "NextGenSim EMB-110P Bandeirante"
     ]
   },
   "capabilities": [
@@ -90,122 +90,102 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 500,
-        "arm": 12.491
+        "maxLoad": 500
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 500,
-        "arm": 12.491
+        "maxLoad": 500
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 500,
-        "arm": 7.862
+        "maxLoad": 500
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500,
-        "arm": 7.862
+        "maxLoad": 500
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 500,
-        "arm": 7.862
+        "maxLoad": 500
       },
       {
         "index": 6,
         "name": "Station 6",
-        "maxLoad": 500,
-        "arm": 5.32
+        "maxLoad": 500
       },
       {
         "index": 7,
         "name": "Station 7",
-        "maxLoad": 500,
-        "arm": 5.32
+        "maxLoad": 500
       },
       {
         "index": 8,
         "name": "Station 8",
-        "maxLoad": 500,
-        "arm": 5.32
+        "maxLoad": 500
       },
       {
         "index": 9,
         "name": "Station 9",
-        "maxLoad": 500,
-        "arm": 2.777
+        "maxLoad": 500
       },
       {
         "index": 10,
         "name": "Station 10",
-        "maxLoad": 500,
-        "arm": 2.777
+        "maxLoad": 500
       },
       {
         "index": 11,
         "name": "Station 11",
-        "maxLoad": 500,
-        "arm": 2.777
+        "maxLoad": 500
       },
       {
         "index": 12,
         "name": "Station 12",
-        "maxLoad": 500,
-        "arm": 0.234
+        "maxLoad": 500
       },
       {
         "index": 13,
         "name": "Station 13",
-        "maxLoad": 500,
-        "arm": 0.234
+        "maxLoad": 500
       },
       {
         "index": 14,
         "name": "Station 14",
-        "maxLoad": 500,
-        "arm": 0.234
+        "maxLoad": 500
       },
       {
         "index": 15,
         "name": "Station 15",
-        "maxLoad": 500,
-        "arm": -2.308
+        "maxLoad": 500
       },
       {
         "index": 16,
         "name": "Station 16",
-        "maxLoad": 500,
-        "arm": -2.308
+        "maxLoad": 500
       },
       {
         "index": 17,
         "name": "Station 17",
-        "maxLoad": 500,
-        "arm": -2.308
+        "maxLoad": 500
       },
       {
         "index": 18,
         "name": "Station 18",
-        "maxLoad": 500,
-        "arm": -4.851
+        "maxLoad": 500
       },
       {
         "index": 19,
         "name": "Station 19",
-        "maxLoad": 500,
-        "arm": -4.851
+        "maxLoad": 500
       },
       {
         "index": 20,
         "name": "Station 20",
-        "maxLoad": 500,
-        "arm": -4.851
+        "maxLoad": 500
       }
     ],
     "writePlan": [
@@ -357,18 +337,23 @@
       "maxMac": 32
     },
     "calibration": {
-      "observedMac": 9.492219984531403,
-      "calibratedAtIso": "2026-08-03T23:42:04.073Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\nextgensim-aircraft-bandeirante\\SimObjects\\Airplanes\\NextGen_EMB110\\attachments\\nextgensim\\Function_Exterior_110P1\\config\\flight_model.cfg",
+      "observedMac": 10.313024371862411,
+      "calibratedAtIso": "2026-08-03T23:31:42.838Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\nextgensim-aircraft-bandeirante\\SimObjects\\Airplanes\\NextGen_EMB110\\common\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        0,
+        0,
+        0
+      ],
       "sweep": {
-        "minObservedMac": 11.175043135881424,
-        "maxObservedMac": 14.622417092323303,
+        "minObservedMac": 11.665623635053635,
+        "maxObservedMac": 14.899908006191254,
         "payloadLb": 200,
-        "forwardStation": 2,
-        "aftStation": 18,
-        "usedStationArms": true,
+        "forwardStation": 1,
+        "aftStation": 20,
+        "usedStationArms": false,
         "restored": true,
-        "sampledAtIso": "2026-08-03T23:42:14.150Z"
+        "sampledAtIso": "2026-08-03T23:31:52.852Z"
       }
     }
   },
@@ -378,12 +363,12 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: NextGenSim EMB-110P1 Bandeirante.",
+    "Homologated via wizard: NextGenSim EMB-110P Bandeirante.",
     "ICAO type designator (catalog/SimBrief): E110.",
     "Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/nextgensim-emb-110p1-bandeirante.md"
+    "See profiles/notes/nextgensim-emb-110p-bandeirante.md"
   ]
 }

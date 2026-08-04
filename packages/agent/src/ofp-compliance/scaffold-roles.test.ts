@@ -166,12 +166,21 @@ describe('scaffold-roles Black Square Duke', () => {
   });
 });
 
-describe('scaffold-roles Asobo C172SP Cargo', () => {
-  it('matches Classic and G1000 as one Market family', () => {
+describe('scaffold-roles Asobo C172SP', () => {
+  it('matches Classic/G1000/IFD cargo and passengers as one Market family', () => {
     assert.equal(matchHeuristic('C172SP Classic Cargo')?.id, 'asobo-c172sp-cargo');
     assert.equal(matchHeuristic('C172SP G1000 Cargo N172SP')?.id, 'asobo-c172sp-cargo');
+    assert.equal(
+      matchHeuristic('C172SP Classic Passengers')?.id,
+      'asobo-c172sp-cargo',
+    );
+    assert.equal(
+      matchHeuristic('C172SP G1000 Passengers')?.id,
+      'asobo-c172sp-cargo',
+    );
+    assert.equal(matchHeuristic('C172SP IFD Cargo')?.id, 'asobo-c172sp-cargo');
     const h = matchHeuristic('C172SP G1000 Cargo')!;
-    assert.equal(h.marketLabel, 'Cessna 172SP Cargo');
+    assert.equal(h.marketLabel, 'Cessna 172SP');
     assert.equal(h.familyPackRel, 'asobo-c172sp-cargo.json');
     assert.deepEqual(h.stationRoles.crewStations, [1, 2]);
     assert.deepEqual(h.stationRoles.baggageStations, [3, 4, 5, 6]);

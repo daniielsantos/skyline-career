@@ -34,24 +34,8 @@
   {
     "typeId": "asobo-c172sp-cargo",
     "aircraftClassId": "light_ga",
-    "label": "Cessna 172SP Cargo",
+    "label": "Cessna 172SP",
     "rolesPackRelPath": "profiles/ofp/asobo-c172sp-cargo.json",
-    "simbriefIcao": "C172",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 711,
-    "mtowKg": 1160,
-    "maxCargoKg": 907,
-    "fuelCapacityKg": 152,
-    "maxRangeNm": 640,
-    "cruiseFuelFlowKgPerHour": 24.5,
-    "cruiseSpeedKt": 124,
-    "fuelBurnKgPerNm": 0.198
-  },
-  {
-    "typeId": "asobo-c172sp-classic-passengers",
-    "aircraftClassId": "light_ga",
-    "label": "Cessna 172SP G1000 Passengers",
-    "rolesPackRelPath": "profiles/ofp/asobo-c172sp-classic-passengers.json",
     "simbriefIcao": "C172",
     "simbriefAirframeMatch": "Default",
     "oewKg": 711,
@@ -98,7 +82,7 @@
   {
     "typeId": "flysimware-learjet-35a-cargo",
     "aircraftClassId": "light_jet",
-    "label": "LEARJET 35A CARGO LONG RANGE",
+    "label": "LEARJET 35A",
     "rolesPackRelPath": "profiles/ofp/flysimware-learjet-35a-cargo.json",
     "familyRolesPackRelPaths": [
       "profiles/ofp/flysimware-learjet-35a-cargo.json",

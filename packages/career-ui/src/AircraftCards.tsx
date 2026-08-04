@@ -49,6 +49,53 @@ export function aircraftModelLabel(id: AircraftClass): string {
   return 'Boeing 737-800 BCF';
 }
 
+/**
+ * Card hero art under career-ui/public/airframes/.
+ * Keyed by Market typeId (plus common legacy aliases).
+ */
+const AIRFRAME_CARD_ART: Record<string, string> = {
+  // A2A Piper Aerostar 600
+  'a2a-piper-aerostar-600': '/airframes/aerostar-600.png',
+  // A2A Piper PA-24 Comanche
+  'a2a-piper-pa-24-250-comanche': '/airframes/comanche-pa24.png',
+  // Cessna 152
+  'asobo-cessna-c152': '/airframes/cessna-152.png',
+  // Cessna 172SP family
+  'asobo-c172sp-cargo': '/airframes/cessna-172.png',
+  'asobo-c172sp-classic-cargo': '/airframes/cessna-172.png',
+  'asobo-c172sp-g1000-cargo': '/airframes/cessna-172.png',
+  'asobo-c172sp-classic-passengers': '/airframes/cessna-172.png',
+  'asobo-c172sp-g1000-passengers': '/airframes/cessna-172.png',
+  'asobo-c172sp-ifd-cargo': '/airframes/cessna-172.png',
+  'asobo-c172sp-ifd-passengers': '/airframes/cessna-172.png',
+  // Rockwell Commander 114
+  'blacksquare-commander-114': '/airframes/commander-114.png',
+  'blacksquare-commander-114tc': '/airframes/commander-114.png',
+  // Learjet 35A family
+  'flysimware-learjet-35a-cargo': '/airframes/learjet-35a.png',
+  'flysimware-learjet-35a': '/airframes/learjet-35a.png',
+  'flysimware-learjet-35a-passenger': '/airframes/learjet-35a.png',
+  'flysimware-learjet-35a-passenger-long-range': '/airframes/learjet-35a.png',
+  'flysimware-learjet-35a-cargo-long-range': '/airframes/learjet-35a.png',
+  // F406 Caravan II
+  'inibuilds-f406-caravan-ii-passenger': '/airframes/cessna-406.png',
+  'inibuilds-f406-caravan-ii-cargo': '/airframes/cessna-406.png',
+  // EMB-110 Bandeirante
+  'nextgensim-emb-110p1f-bandeirante': '/airframes/emb-110-bandeirante.png',
+  'nextgensim-emb-110-bandeirante': '/airframes/emb-110-bandeirante.png',
+  // Saab 340
+  'carenado-saab-340-passenger': '/airframes/saab-340.png',
+  'microsoft-saab-340-cargo': '/airframes/saab-340.png',
+};
+
+export function airframeCardArtUrl(
+  airframeTypeId: string | null | undefined,
+): string | undefined {
+  const id = airframeTypeId?.trim();
+  if (!id) return undefined;
+  return AIRFRAME_CARD_ART[id];
+}
+
 function conditionTone(pct: number): 'ok' | 'warn' | 'danger' {
   if (pct < 40) return 'danger';
   if (pct < 55) return 'warn';
@@ -84,17 +131,31 @@ function listingConditionPcts(listing: AircraftListing): {
 
 export function AircraftClassStripe(props: {
   aircraftClassId: AircraftClass | string;
+  /** Optional hero art URL (public/). Falls back to class silhouette. */
+  imageSrc?: string;
+  imageAlt?: string;
   badges?: ReactNode;
 }) {
+  const hasArt = Boolean(props.imageSrc);
   return (
     <div
-      className={`aircraft-card-stripe class-${props.aircraftClassId}`}
-      aria-hidden="true"
+      className={`aircraft-card-stripe class-${props.aircraftClassId}${hasArt ? ' has-art' : ''}`}
+      aria-hidden={hasArt ? undefined : 'true'}
     >
       {props.badges ? (
         <div className="aircraft-card-stripe-badges">{props.badges}</div>
       ) : null}
-      <div className="aircraft-silhouette" />
+      {hasArt ? (
+        <img
+          className="aircraft-card-art"
+          src={props.imageSrc}
+          alt={props.imageAlt ?? ''}
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <div className="aircraft-silhouette" />
+      )}
     </div>
   );
 }
@@ -152,6 +213,8 @@ export function MarketListingCard(props: {
     <article className="aircraft-card">
       <AircraftClassStripe
         aircraftClassId={listing.aircraftClassId}
+        imageSrc={airframeCardArtUrl(listing.airframeTypeId)}
+        imageAlt={listing.label || aircraftModelLabel(listing.aircraftClassId)}
         badges={
           <>
             <span className={`badge badge-kind-${listing.kind}`}>{listing.kind}</span>
@@ -375,6 +438,8 @@ export function HangarAircraftCard(props: {
     <li className="hangar-card">
       <AircraftClassStripe
         aircraftClassId={acf.aircraftClassId}
+        imageSrc={airframeCardArtUrl(acf.airframeTypeId)}
+        imageAlt={acf.label}
         badges={
           <>
             <span className={`status status-${acf.status}`}>{acf.status}</span>

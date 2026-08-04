@@ -144,6 +144,72 @@ function marketLabel(title: string, icao: string): string {
   return clean;
 }
 
+/**
+ * Suggest a short Aircraft Market display name: drop publisher prefixes and
+ * cargo/pax/range cabin suffixes (e.g. "LEARJET 35A CARGO LONG RANGE" → "Learjet 35A").
+ */
+export function suggestShortMarketLabel(label: string): string {
+  let s = label.trim().replace(/\s+/g, ' ');
+  if (!s) return s;
+
+  const publishers = [
+    'black square',
+    'nextgensim',
+    'next gen sim',
+    'inibuilds',
+    'ini builds',
+    'carenado',
+    'flysimware',
+    'fly simware',
+    'microsoft',
+    'asobo',
+    'a2a',
+    'pmdg',
+    'just flight',
+    'fsreborn',
+    'fs reborn',
+    'working title',
+    'workingtitle',
+    'miltech',
+    'hype',
+    'orbx',
+  ];
+  for (const pub of publishers) {
+    const re = new RegExp(`^${pub.replace(/\s+/g, '\\s+')}\\s+`, 'i');
+    s = s.replace(re, '');
+  }
+
+  for (;;) {
+    const next = s
+      .replace(/\s*\((?:cargo|passenger|passengers|pax)\)\s*$/i, '')
+      .replace(/\s+-\s*(?:cargo|passenger|passengers|pax)\s*$/i, '')
+      .replace(/\s+(?:long|short)\s+range\s*$/i, '')
+      .replace(/\s+(?:cargo|passenger|passengers|pax|g1000|classic)\s*$/i, '')
+      .trim();
+    if (next === s) break;
+    s = next;
+  }
+
+  // ALL-CAPS live titles → Title Case, keep model tokens like 35A / EMB-110.
+  const letters = s.replace(/[^A-Za-z]/g, '');
+  if (
+    letters.length >= 4 &&
+    letters === letters.toUpperCase() &&
+    /[A-Z]/.test(letters)
+  ) {
+    s = s
+      .split(/\s+/)
+      .map((word) => {
+        if (/^\d/.test(word) || /[0-9]/.test(word)) return word;
+        if (word.length <= 3 && /^[A-Z]+$/i.test(word)) return word.toUpperCase();
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  }
+
+  return s.trim() || label.trim();
+}
+
 async function readCatalogRows(path: string): Promise<CareerPlayerAirframeRow[]> {
   try {
     return JSON.parse(await readFile(path, 'utf8')) as CareerPlayerAirframeRow[];
@@ -392,6 +458,36 @@ export async function setCareerPlayerAirframeEnabled(opts: {
   return next;
 }
 
+/** Rename the Aircraft Market board title for a registered family SKU. */
+export async function setCareerPlayerAirframeLabel(opts: {
+  repoRoot: string;
+  typeId: string;
+  label: string;
+}): Promise<CareerPlayerAirframeRow> {
+  const typeId = opts.typeId.trim();
+  const label = opts.label.trim().replace(/\s+/g, ' ');
+  if (!typeId) throw new Error('typeId is required');
+  if (!label) throw new Error('label is required');
+  const rows = await readCatalogRows(catalogPath(opts.repoRoot));
+  const idx = rows.findIndex((row) => row.typeId === typeId);
+  if (idx < 0) {
+    throw new Error(`No Skyline player airframe registered as ${typeId}`);
+  }
+  const clash = rows.find(
+    (row, i) =>
+      i !== idx && row.label.toLowerCase() === label.toLowerCase(),
+  );
+  if (clash) {
+    throw new Error(
+      `Market label "${label}" is already used by ${clash.typeId}`,
+    );
+  }
+  const next: CareerPlayerAirframeRow = { ...rows[idx]!, label };
+  rows[idx] = next;
+  await writeCatalogRows(opts.repoRoot, rows);
+  return next;
+}
+
 export type RemoveCareerPlayerAirframeFamilyResult = {
   typeId: string;
   label: string;
@@ -617,6 +713,36 @@ export async function listCareerPlayerAirframeCatalog(
   repoRoot: string,
 ): Promise<CareerPlayerAirframeRow[]> {
   return readCatalogRows(catalogPath(repoRoot));
+}
+
+/** Unique sim titles covered by a Market family's roles packs. */
+export function familyPackRelPaths(row: CareerPlayerAirframeRow): string[] {
+  return [
+    ...new Set([row.rolesPackRelPath, ...(row.familyRolesPackRelPaths ?? [])]),
+  ].sort();
+}
+
+export async function listFamilyMatchTitles(opts: {
+  repoRoot: string;
+  row: CareerPlayerAirframeRow;
+}): Promise<string[]> {
+  const titles = new Set<string>();
+  for (const rel of familyPackRelPaths(opts.row)) {
+    try {
+      const pack = JSON.parse(
+        await readFile(resolve(opts.repoRoot, rel), 'utf8'),
+      ) as OfpRolesPackFile;
+      for (const title of pack.matchTitles ?? []) {
+        const clean = title.trim().replace(/\s+/g, ' ');
+        if (clean) titles.add(clean);
+      }
+    } catch {
+      // Missing pack — still list the stem so the family is not silent.
+      const stem = packStem(rel);
+      if (stem) titles.add(`(missing pack: ${stem})`);
+    }
+  }
+  return [...titles].sort((a, b) => a.localeCompare(b));
 }
 
 /** Patch cruise burn / TAS fields on an already-registered Market airframe. */

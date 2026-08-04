@@ -201,6 +201,10 @@ export const CAREER_PLAYER_AIRFRAMES: readonly CareerPlayerAirframe[] =
 const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
   'asobo-c172sp-classic-cargo': 'asobo-c172sp-cargo',
   'asobo-c172sp-g1000-cargo': 'asobo-c172sp-cargo',
+  'asobo-c172sp-classic-passengers': 'asobo-c172sp-cargo',
+  'asobo-c172sp-g1000-passengers': 'asobo-c172sp-cargo',
+  'asobo-c172sp-ifd-cargo': 'asobo-c172sp-cargo',
+  'asobo-c172sp-ifd-passengers': 'asobo-c172sp-cargo',
   'blacksquare-commander-114tc': 'blacksquare-commander-114',
   'asobo-c208b-cargo': 'c208-caravan-cargo',
   'blacksquare-caravan-cargo-pod': 'c208-caravan-cargo',

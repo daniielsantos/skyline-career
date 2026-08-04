@@ -5,9 +5,12 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   inferCareerClassFromIcao,
+  listFamilyMatchTitles,
   registerCareerPlayerAirframe,
   removeCareerPlayerAirframeFamily,
   setCareerPlayerAirframeEnabled,
+  setCareerPlayerAirframeLabel,
+  suggestShortMarketLabel,
   updateCareerPlayerAirframeBurn,
   deriveCareerMarketWeights,
   cargoMaxLoadLbFromStations,
@@ -26,6 +29,116 @@ describe('career player airframe registration', () => {
     assert.equal(inferCareerClassFromIcao('B738'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD1F'), 'wide_freighter');
     assert.equal(inferCareerClassFromIcao('ZZZZ'), 'light_ga');
+  });
+
+  it('lists unique matchTitles across family packs', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'skyline-family-titles-'));
+    try {
+      const ofpDir = join(repoRoot, 'profiles', 'ofp');
+      await mkdir(ofpDir, { recursive: true });
+      await writeFile(
+        join(ofpDir, 'lj-cargo.json'),
+        JSON.stringify({
+          matchTitles: ['LEARJET 35A CARGO', 'LEARJET 35A CARGO LONG RANGE'],
+        }) + '\n',
+        'utf8',
+      );
+      await writeFile(
+        join(ofpDir, 'lj-pax.json'),
+        JSON.stringify({
+          matchTitles: [
+            'LEARJET 35A PASSENGER',
+            'LEARJET 35A CARGO',
+          ],
+        }) + '\n',
+        'utf8',
+      );
+      const titles = await listFamilyMatchTitles({
+        repoRoot,
+        row: {
+          typeId: 'flysimware-learjet-35a-cargo',
+          aircraftClassId: 'light_jet',
+          label: 'Learjet 35A',
+          rolesPackRelPath: 'profiles/ofp/lj-cargo.json',
+          familyRolesPackRelPaths: [
+            'profiles/ofp/lj-cargo.json',
+            'profiles/ofp/lj-pax.json',
+          ],
+          simbriefIcao: 'LJ35',
+          simbriefAirframeMatch: 'Default',
+        },
+      });
+      assert.deepEqual(titles, [
+        'LEARJET 35A CARGO',
+        'LEARJET 35A CARGO LONG RANGE',
+        'LEARJET 35A PASSENGER',
+      ]);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('suggests short Market board labels', () => {
+    assert.equal(
+      suggestShortMarketLabel('LEARJET 35A CARGO LONG RANGE'),
+      'Learjet 35A',
+    );
+    assert.equal(
+      suggestShortMarketLabel('A2A Piper Aerostar 600'),
+      'Piper Aerostar 600',
+    );
+    assert.equal(
+      suggestShortMarketLabel('iniBuilds F406 Caravan II (Cargo)'),
+      'F406 Caravan II',
+    );
+    assert.equal(
+      suggestShortMarketLabel('Cessna 172SP G1000 Passengers'),
+      'Cessna 172SP',
+    );
+  });
+
+  it('renames Market label on an existing catalog row', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'skyline-rename-'));
+    try {
+      const catalogDir = join(
+        repoRoot,
+        'packages',
+        'shared',
+        'src',
+        'data',
+      );
+      await mkdir(catalogDir, { recursive: true });
+      await writeFile(
+        join(catalogDir, 'career-player-airframes.json'),
+        JSON.stringify(
+          [
+            {
+              typeId: 'flysimware-learjet-35a-cargo',
+              aircraftClassId: 'light_jet',
+              label: 'LEARJET 35A CARGO LONG RANGE',
+              rolesPackRelPath: 'profiles/ofp/flysimware-learjet-35a-cargo.json',
+              simbriefIcao: 'LJ35',
+              simbriefAirframeMatch: 'Default',
+            },
+          ],
+          null,
+          2,
+        ) + '\n',
+        'utf8',
+      );
+      const updated = await setCareerPlayerAirframeLabel({
+        repoRoot,
+        typeId: 'flysimware-learjet-35a-cargo',
+        label: 'Learjet 35A',
+      });
+      assert.equal(updated.label, 'Learjet 35A');
+      const saved = JSON.parse(
+        await readFile(join(catalogDir, 'career-player-airframes.json'), 'utf8'),
+      ) as Array<{ typeId: string; label: string }>;
+      assert.equal(saved[0]?.label, 'Learjet 35A');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 
   it('derives Market weights from live empty/MTOW and sticky cargo', () => {
@@ -126,7 +239,7 @@ describe('career player airframe registration', () => {
         aircraftClassId: 'light_ga',
         title: 'C172SP Classic Cargo',
       });
-      assert.equal(family.label, 'Cessna 172SP Cargo');
+      assert.equal(family.label, 'Cessna 172SP');
       const afterFamily = JSON.parse(
         await readFile(
           join(catalogDir, 'career-player-airframes.json'),
@@ -137,7 +250,7 @@ describe('career player airframe registration', () => {
         afterFamily.some(
           (row) =>
             row.typeId === 'asobo-c172sp-cargo' &&
-            row.label === 'Cessna 172SP Cargo',
+            row.label === 'Cessna 172SP',
         ),
       );
 

@@ -107,7 +107,7 @@ function usage(): never {
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
   msfs-compat-agent sample-burn [--type typeId] [--pipe <name>]
-  msfs-compat-agent career-airframe [wizard]|list|disable|enable|remove [--type typeId] [--keep-files]
+  msfs-compat-agent career-airframe [wizard]|list|disable|enable|rename|remove [--type typeId] [--label name] [--keep-files]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
   msfs-compat-agent probe-payload-stations [--pipe <name>]
@@ -124,7 +124,7 @@ Notes:
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
   sample-burn: live cruise fuel-flow sample → patch career-player-airframes.json burn
-  career-airframe: interactive wizard (or list / disable / enable / remove) for Market models
+  career-airframe: interactive wizard (or list / disable / enable / rename / remove) for Market models
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
@@ -375,15 +375,24 @@ async function main(): Promise<void> {
       listCareerPlayerAirframeCatalog,
       removeCareerPlayerAirframeFamily,
       setCareerPlayerAirframeEnabled,
+      setCareerPlayerAirframeLabel,
+      suggestShortMarketLabel,
     } = await import('./career-player-airframe-catalog.js');
     const typeId = getFlag(rest, '--type') ?? rest[1];
     if (sub === 'list') {
+      const { listFamilyMatchTitles } = await import(
+        './career-player-airframe-catalog.js'
+      );
       const rows = await listCareerPlayerAirframeCatalog(repoRoot);
       for (const row of rows) {
         const flag = row.enabled === false ? 'disabled' : 'enabled';
         console.log(
           `${flag.padEnd(8)}  ${row.typeId.padEnd(36)}  ${row.aircraftClassId.padEnd(16)}  ${row.label}`,
         );
+        const titles = await listFamilyMatchTitles({ repoRoot, row });
+        for (const title of titles) {
+          console.log(`          · ${title}`);
+        }
       }
       if (rows.length === 0) console.log('(no player airframes registered)');
       return;
@@ -419,6 +428,50 @@ async function main(): Promise<void> {
       );
       return;
     }
+    if (sub === 'rename' || sub === 'label') {
+      const labelFlag = getFlag(rest, '--label');
+      if (!typeId) {
+        console.error(
+          'Usage: node packages/agent/dist/cli.js career-airframe rename --type <typeId> --label "Learjet 35A"',
+        );
+        console.error(
+          'Or run the wizard: node packages/agent/dist/cli.js career-airframe',
+        );
+        process.exit(1);
+      }
+      const rows = await listCareerPlayerAirframeCatalog(repoRoot);
+      const current = rows.find((row) => row.typeId === typeId);
+      if (!current) {
+        console.error(`No Skyline player airframe registered as ${typeId}`);
+        process.exit(1);
+      }
+      const label =
+        labelFlag?.trim() || suggestShortMarketLabel(current.label);
+      if (!label) {
+        console.error('label is required (--label "...")');
+        process.exit(1);
+      }
+      const row = await setCareerPlayerAirframeLabel({
+        repoRoot,
+        typeId,
+        label,
+      });
+      console.log(
+        JSON.stringify(
+          {
+            typeId: row.typeId,
+            label: row.label,
+            previousLabel: current.label,
+          },
+          null,
+          2,
+        ),
+      );
+      console.log(
+        'Restart career-ui / rebuild @msfs-compat/shared if the Market board does not refresh.',
+      );
+      return;
+    }
     if (sub === 'remove' || sub === 'delete') {
       if (!typeId) {
         console.error(
@@ -438,7 +491,7 @@ async function main(): Promise<void> {
       return;
     }
     console.error(
-      'Usage: node packages/agent/dist/cli.js career-airframe [wizard]|list|disable|enable|remove [--type typeId]',
+      'Usage: node packages/agent/dist/cli.js career-airframe [wizard]|list|disable|enable|rename|remove [--type typeId] [--label name]',
     );
     process.exit(1);
   }

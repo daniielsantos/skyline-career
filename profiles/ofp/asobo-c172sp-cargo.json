@@ -6,32 +6,31 @@
   "injectCapable": true,
   "matchTitles": [
     "C172SP Classic Cargo",
+    "C172SP Classic Passengers",
     "C172SP G1000 Cargo",
-    "C172SP IFD Passengers",
-    "C172SP IFD Cargo"
+    "C172SP G1000 Passengers",
+    "C172SP IFD Cargo",
+    "C172SP IFD Passengers"
   ],
-  "matchTitlePattern": "C172SP (?:Classic|G1000) Cargo",
+  "matchTitlePattern": "C172SP (?:Classic|G1000|IFD) (?:Cargo|Passengers)",
   "notes": [
-    "Asobo C172SP Cargo family (Classic + G1000) — same 6-station cargo layout",
-    "One Skyline Market SKU; either glass matches the purchased airframe",
+    "Asobo C172SP family (Classic / G1000 / IFD · Cargo + Passengers) — same 6-station layout",
+    "One Skyline Market SKU; any glass/cabin matches the purchased airframe",
     "liveSources: classic fuel tanks + classic stations/weights",
     "SimBrief: Default C172",
     "Homologated profile: asobo/c172sp-classic-cargo@1.0.0",
     "Title: C172SP Classic Cargo",
     "Homologated profile: asobo/c172sp-g1000-cargo@1.0.0",
     "Title: C172SP G1000 Cargo",
-    "C172SP IFD Passengers — auto roles pack from homologated profile",
-    "Profile: asobo/c172sp-ifd-passengers@1.0.0",
-    "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct",
-    "Joined Market family: Cessna 172SP Cargo (asobo-c172sp-cargo)",
+    "Homologated profile: asobo/c172sp-classic-passengers@1.0.0",
+    "Title: C172SP Classic Passengers",
+    "Homologated profile: asobo/c172sp-g1000-passengers@1.0.0",
+    "Title: C172SP G1000 Passengers",
+    "Homologated profile: asobo/c172sp-ifd-cargo@1.0.0",
+    "Title: C172SP IFD Cargo",
     "Homologated profile: asobo/c172sp-ifd-passengers@1.0.0",
     "Title: C172SP IFD Passengers",
-    "C172SP IFD Cargo — auto roles pack from homologated profile",
-    "Profile: asobo/c172sp-ifd-cargo@1.0.0",
-    "Homologated profile: asobo/c172sp-ifd-cargo@1.0.0",
-    "Title: C172SP IFD Cargo"
+    "Merged former Market SKU asobo-c172sp-classic-passengers into this family"
   ],
   "fuel": {
     "unit": "lb"

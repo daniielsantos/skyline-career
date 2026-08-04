@@ -1,5 +1,5 @@
 /**
- * Interactive list / disable / enable / remove for Skyline Career Market airframes.
+ * Interactive list / disable / enable / rename / remove for Skyline Career Market airframes.
  */
 import {
   confirm,
@@ -9,9 +9,13 @@ import {
   type AskFn,
 } from './prompt.js';
 import {
+  familyPackRelPaths,
   listCareerPlayerAirframeCatalog,
+  listFamilyMatchTitles,
   removeCareerPlayerAirframeFamily,
   setCareerPlayerAirframeEnabled,
+  setCareerPlayerAirframeLabel,
+  suggestShortMarketLabel,
 } from './career-player-airframe-catalog.js';
 
 type CatalogRow = Awaited<
@@ -22,39 +26,43 @@ function isEnabled(row: CatalogRow): boolean {
   return row.enabled !== false;
 }
 
-function familyPackCount(row: CatalogRow): number {
-  const packs = new Set([
-    row.rolesPackRelPath,
-    ...(row.familyRolesPackRelPaths ?? []),
-  ]);
-  return packs.size;
-}
-
-function printCatalog(rows: CatalogRow[]): void {
+async function printCatalog(
+  repoRoot: string,
+  rows: CatalogRow[],
+): Promise<void> {
   if (rows.length === 0) {
     console.log('  (no player airframes registered)');
     return;
   }
   for (const [i, row] of rows.entries()) {
     const flag = isEnabled(row) ? 'enabled ' : 'disabled';
-    const family =
-      familyPackCount(row) > 1 ? ` · family×${familyPackCount(row)}` : '';
+    const packCount = familyPackRelPaths(row).length;
+    const family = packCount > 1 ? ` · family×${packCount}` : '';
     console.log(
       `  ${String(i + 1).padStart(2)}. [${flag}]  ${row.label}  (${row.typeId} · ${row.aircraftClassId}${family})`,
     );
+    const titles = await listFamilyMatchTitles({ repoRoot, row });
+    if (titles.length === 0) {
+      console.log('       (no matchTitles in roles packs)');
+      continue;
+    }
+    for (const title of titles) {
+      console.log(`       · ${title}`);
+    }
   }
 }
 
 async function pickRow(
   ask: AskFn,
   question: string,
+  repoRoot: string,
   rows: CatalogRow[],
 ): Promise<CatalogRow | null> {
   if (rows.length === 0) {
     console.log('  Nothing to pick.');
     return null;
   }
-  printCatalog(rows);
+  await printCatalog(repoRoot, rows);
   const raw = (await ask(question, '1')).trim();
   const asNum = Number(raw);
   if (Number.isInteger(asNum) && asNum >= 1 && asNum <= rows.length) {
@@ -76,22 +84,24 @@ export async function runCareerAirframeWizard(opts: {
   await withPrompts(async (ask) => {
     printSection('Skyline Aircraft Market');
     console.log('  Toggle homologated models on/off the buy/lease board.');
-    console.log('  Or remove a Market family for a clean re-homologation.');
+    console.log('  Rename the board title, or remove a family to re-homologate.');
+    console.log('  Nested lines are sim titles covered by each Market family.');
 
     for (;;) {
       const rows = await listCareerPlayerAirframeCatalog(opts.repoRoot);
       console.log('');
-      printCatalog(rows);
+      await printCatalog(opts.repoRoot, rows);
       console.log('');
       console.log('  Actions:');
       console.log('    1. Refresh list');
       console.log('    2. Disable a model (hide from Market)');
       console.log('    3. Enable a model (show on Market)');
-      console.log('    4. Remove family (catalog + packs + profiles)');
-      console.log('    5. Quit');
+      console.log('    4. Rename Market label (board title only)');
+      console.log('    5. Remove family (catalog + packs + profiles)');
+      console.log('    6. Quit');
 
-      const action = (await ask('Choice', '5')).trim().toLowerCase();
-      if (!action || action === '5' || action === 'q' || action === 'quit') {
+      const action = (await ask('Choice', '6')).trim().toLowerCase();
+      if (!action || action === '6' || action === 'q' || action === 'quit') {
         break;
       }
       if (action === '1' || action === 'list' || action === 'refresh') {
@@ -100,6 +110,61 @@ export async function runCareerAirframeWizard(opts: {
 
       if (
         action === '4' ||
+        action === 'rename' ||
+        action === 'label' ||
+        action === 'n'
+      ) {
+        if (rows.length === 0) {
+          console.log('  Catalog is empty.');
+          continue;
+        }
+        const picked = await pickRow(
+          ask,
+          'Rename which Market family',
+          opts.repoRoot,
+          rows,
+        );
+        if (!picked) continue;
+        const suggestion = suggestShortMarketLabel(picked.label);
+        console.log(`  Current label: ${picked.label}`);
+        const nextLabel = (await ask('New Market label', suggestion)).trim();
+        if (!nextLabel) {
+          console.log('  Empty label — cancelled.');
+          continue;
+        }
+        if (nextLabel === picked.label) {
+          console.log('  Unchanged.');
+          continue;
+        }
+        const ok = await confirm(
+          ask,
+          `Rename "${picked.label}" → "${nextLabel}"`,
+          true,
+        );
+        if (!ok) continue;
+        try {
+          const updated = await setCareerPlayerAirframeLabel({
+            repoRoot: opts.repoRoot,
+            typeId: picked.typeId,
+            label: nextLabel,
+          });
+          printKv([
+            ['typeId', updated.typeId],
+            ['label', updated.label],
+          ]);
+          console.log(
+            '  Restart career-ui / rebuild @msfs-compat/shared if the board does not refresh.',
+          );
+        } catch (error) {
+          console.log(
+            `  ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        continue;
+      }
+
+      if (
+        action === '5' ||
         action === 'remove' ||
         action === 'delete' ||
         action === 'r'
@@ -111,16 +176,12 @@ export async function runCareerAirframeWizard(opts: {
         const picked = await pickRow(
           ask,
           'Remove which Market family',
+          opts.repoRoot,
           rows,
         );
         if (!picked) continue;
 
-        const packs = [
-          ...new Set([
-            picked.rolesPackRelPath,
-            ...(picked.familyRolesPackRelPaths ?? []),
-          ]),
-        ];
+        const packs = familyPackRelPaths(picked);
         console.log('');
         console.log(
           `  Will remove Market SKU "${picked.label}" (${picked.typeId})`,
@@ -183,6 +244,7 @@ export async function runCareerAirframeWizard(opts: {
       const picked = await pickRow(
         ask,
         enabling ? 'Enable which model' : 'Disable which model',
+        opts.repoRoot,
         candidates,
       );
       if (!picked) continue;

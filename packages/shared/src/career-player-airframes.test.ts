@@ -113,7 +113,11 @@ describe('career player airframes', () => {
     );
     assert.equal(
       findCareerPlayerAirframe('asobo-c172sp-cargo')?.label,
-      'Cessna 172SP Cargo',
+      'Cessna 172SP',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('asobo-c172sp-classic-passengers')?.typeId,
+      'asobo-c172sp-cargo',
     );
   });
 

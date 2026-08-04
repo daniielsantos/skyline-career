@@ -462,10 +462,10 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
   {
     id: 'asobo-c172sp-cargo',
     icao: 'C172',
-    // Classic steam-gauge and G1000 cargo share stations / SimBrief Default.
-    titlePattern: /C172SP (?:Classic|G1000) Cargo/i,
+    // Classic / G1000 / IFD · Cargo + Passengers share stations / SimBrief Default.
+    titlePattern: /C172SP (?:Classic|G1000|IFD) (?:Cargo|Passengers)/i,
     familyPackRel: 'asobo-c172sp-cargo.json',
-    marketLabel: 'Cessna 172SP Cargo',
+    marketLabel: 'Cessna 172SP',
     stationRoles: {
       passengerStations: [],
       baggageStations: [3, 4, 5, 6],
@@ -485,8 +485,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       { simVarIndex: 6, cfgIndex: 5, name: 'Station 6', role: 'baggage' },
     ],
     notes: [
-      'Asobo C172SP Cargo family (Classic + G1000) — same 6-station cargo layout',
-      'One Skyline Market SKU; either glass matches the purchased airframe',
+      'Asobo C172SP family (Classic / G1000 / IFD · Cargo + Passengers) — same 6-station layout',
+      'One Skyline Market SKU; any glass/cabin matches the purchased airframe',
       'liveSources: classic fuel tanks + classic stations/weights',
       'SimBrief: Default C172',
     ],

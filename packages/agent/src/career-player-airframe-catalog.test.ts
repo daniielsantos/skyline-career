@@ -347,4 +347,106 @@ describe('career player airframe registration', () => {
       await rm(repoRoot, { recursive: true, force: true });
     }
   });
+
+  it('removes sibling example profiles matched by pack matchTitles', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'skyline-remove-sib-'));
+    try {
+      const catalogDir = join(repoRoot, 'packages', 'shared', 'src', 'data');
+      const ofpDir = join(repoRoot, 'profiles', 'ofp');
+      const examplesDir = join(repoRoot, 'profiles', 'examples');
+      await mkdir(catalogDir, { recursive: true });
+      await mkdir(ofpDir, { recursive: true });
+      await mkdir(examplesDir, { recursive: true });
+      await writeFile(
+        join(catalogDir, 'career-player-airframes.json'),
+        JSON.stringify(
+          [
+            {
+              typeId: 'blacksquare-commander-114',
+              aircraftClassId: 'light_ga',
+              label: 'Commander 114',
+              rolesPackRelPath: 'profiles/ofp/blacksquare-commander-114.json',
+              simbriefIcao: 'C182',
+              simbriefAirframeMatch: 'Default',
+            },
+          ],
+          null,
+          2,
+        ) + '\n',
+        'utf8',
+      );
+      await writeFile(
+        join(ofpDir, 'blacksquare-commander-114.json'),
+        JSON.stringify(
+          {
+            ofpId: 'blacksquare-commander-114',
+            matchTitles: [
+              'Black Square Commander 114',
+              'Black Square Commander 114TC',
+            ],
+          },
+          null,
+          2,
+        ) + '\n',
+        'utf8',
+      );
+      await writeFile(
+        join(examplesDir, 'blacksquare-commander-114.json'),
+        JSON.stringify(
+          {
+            profileId: 'blacksquare-commander-114',
+            profileKey: 'blacksquare/commander-114',
+            match: { title: 'Black Square Commander 114' },
+          },
+          null,
+          2,
+        ) + '\n',
+        'utf8',
+      );
+      await writeFile(
+        join(examplesDir, 'blacksquare-commander-114tc.json'),
+        JSON.stringify(
+          {
+            profileId: 'blacksquare-commander-114tc',
+            profileKey: 'blacksquare/commander-114tc',
+            match: { title: 'Black Square Commander 114TC' },
+          },
+          null,
+          2,
+        ) + '\n',
+        'utf8',
+      );
+      await writeFile(
+        join(examplesDir, 'unrelated-keep.json'),
+        JSON.stringify(
+          {
+            profileId: 'unrelated-keep',
+            profileKey: 'other/keep',
+            match: { title: 'Unrelated Keep' },
+          },
+          null,
+          2,
+        ) + '\n',
+        'utf8',
+      );
+
+      const result = await removeCareerPlayerAirframeFamily({
+        repoRoot,
+        typeId: 'blacksquare-commander-114',
+      });
+      assert.ok(
+        result.deletedPaths.some((p) =>
+          p.includes('blacksquare-commander-114tc.json'),
+        ),
+      );
+      assert.ok(
+        result.deletedPaths.some((p) =>
+          p.includes('blacksquare-commander-114.json'),
+        ),
+      );
+      await readFile(join(examplesDir, 'unrelated-keep.json'), 'utf8');
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
+  });
 });

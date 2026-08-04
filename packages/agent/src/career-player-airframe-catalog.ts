@@ -9,9 +9,9 @@
  * Family heuristics register one Market SKU (heuristic.marketTypeId / ofpId).
  * Vendor forks with different stations accumulate familyRolesPackRelPaths.
  */
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
-import type { FreighterClassId } from '@msfs-compat/shared';
+import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { dirname, join, relative, resolve } from 'node:path';
+import type { AircraftProfile, FreighterClassId } from '@msfs-compat/shared';
 import {
   matchHeuristic,
   type OfpRolesPackFile,
@@ -404,6 +404,10 @@ function packStem(relPath: string): string {
   return base.replace(/\.json$/i, '');
 }
 
+function normalizeTitleKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 async function tryUnlink(path: string): Promise<'deleted' | 'missing'> {
   try {
     await unlink(path);
@@ -418,10 +422,132 @@ async function tryUnlink(path: string): Promise<'deleted' | 'missing'> {
   }
 }
 
+async function listJsonFiles(dir: string): Promise<string[]> {
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.json'))
+      .map((e) => join(dir, e.name));
+  } catch {
+    return [];
+  }
+}
+
+async function collectFamilyHomologationPaths(
+  repoRoot: string,
+  opts: {
+    typeId: string;
+    packRels: string[];
+  },
+): Promise<string[]> {
+  const stems = new Set(opts.packRels.map(packStem));
+  stems.add(opts.typeId);
+  const titles = new Set<string>();
+  const profileKeys = new Set<string>();
+  const ofpIds = new Set<string>([opts.typeId]);
+
+  for (const rel of opts.packRels) {
+    const abs = resolve(repoRoot, rel);
+    try {
+      const pack = JSON.parse(await readFile(abs, 'utf8')) as OfpRolesPackFile;
+      if (pack.ofpId?.trim()) {
+        ofpIds.add(pack.ofpId.trim());
+        stems.add(pack.ofpId.trim());
+      }
+      for (const title of pack.matchTitles ?? []) {
+        const key = normalizeTitleKey(title);
+        if (key) titles.add(key);
+      }
+    } catch {
+      // Pack may already be gone; stem delete still covers the path.
+    }
+  }
+
+  const candidates = new Set<string>();
+  for (const rel of opts.packRels) {
+    candidates.add(resolve(repoRoot, rel));
+  }
+  for (const stem of stems) {
+    candidates.add(resolve(repoRoot, 'profiles', 'ofp', `${stem}.json`));
+    candidates.add(resolve(repoRoot, 'profiles', 'examples', `${stem}.json`));
+    candidates.add(resolve(repoRoot, 'profiles', 'drafts', `${stem}.json`));
+    candidates.add(resolve(repoRoot, 'profiles', 'notes', `${stem}.md`));
+  }
+
+  // Sweep examples + drafts: sibling variants often share pack matchTitles but
+  // use a different filename (e.g. commander-114tc vs commander-114 pack).
+  for (const dirName of ['examples', 'drafts'] as const) {
+    const dir = resolve(repoRoot, 'profiles', dirName);
+    for (const file of await listJsonFiles(dir)) {
+      const stem = packStem(file);
+      let hit = stems.has(stem) || ofpIds.has(stem);
+      if (!hit) {
+        try {
+          const profile = JSON.parse(
+            await readFile(file, 'utf8'),
+          ) as AircraftProfile;
+          const id = profile.profileId?.trim();
+          const key = profile.profileKey?.trim();
+          if (id && (stems.has(id) || ofpIds.has(id) || id === opts.typeId)) {
+            hit = true;
+          }
+          if (key && (profileKeys.has(key) || ofpIds.has(key))) {
+            hit = true;
+          }
+          const titleHits = [
+            profile.match?.title,
+            ...(profile.match?.liveTitles ?? []),
+          ]
+            .filter(Boolean)
+            .map((t) => normalizeTitleKey(String(t)));
+          if (titleHits.some((t) => titles.has(t))) {
+            hit = true;
+          }
+          if (hit && key) profileKeys.add(key);
+          if (hit && id) stems.add(id);
+        } catch {
+          // ignore unreadable
+        }
+      }
+      if (hit) {
+        candidates.add(file);
+        candidates.add(
+          resolve(repoRoot, 'profiles', 'notes', `${stem}.md`),
+        );
+        if (dirName === 'examples') {
+          candidates.add(
+            resolve(repoRoot, 'profiles', 'drafts', `${stem}.json`),
+          );
+        }
+      }
+    }
+  }
+
+  // Local catalog cache copies for removed profileKeys / stems.
+  const cacheDir = resolve(repoRoot, 'profiles', 'cache');
+  for (const file of await listJsonFiles(cacheDir)) {
+    const base = packStem(file).toLowerCase();
+    for (const stem of stems) {
+      if (base.includes(stem.toLowerCase().replace(/[\\/]/g, '__'))) {
+        candidates.add(file);
+        break;
+      }
+    }
+    for (const key of profileKeys) {
+      if (base.includes(key.toLowerCase().replace(/[\\/]/g, '__'))) {
+        candidates.add(file);
+        break;
+      }
+    }
+  }
+
+  return [...candidates];
+}
+
 /**
- * Remove a Market SKU and its family homologation artifacts (OFP packs,
- * example/draft profiles, notes). Hangar fleet is left alone — sell those
- * in-game if needed.
+ * Remove a Market SKU and all related homologation artifacts: OFP packs,
+ * example/draft profiles (including sibling variants matched by pack titles),
+ * notes, and local cache copies. Hangar fleet is left alone.
  */
 export async function removeCareerPlayerAirframeFamily(opts: {
   repoRoot: string;
@@ -444,6 +570,14 @@ export async function removeCareerPlayerAirframeFamily(opts: {
     ]),
   ].filter((p) => p.trim().length > 0);
 
+  const candidates =
+    opts.deleteHomologationFiles === false
+      ? []
+      : await collectFamilyHomologationPaths(opts.repoRoot, {
+          typeId: row.typeId,
+          packRels,
+        });
+
   rows.splice(idx, 1);
   await writeCatalogRows(opts.repoRoot, rows);
 
@@ -456,20 +590,6 @@ export async function removeCareerPlayerAirframeFamily(opts: {
       deletedPaths,
       missingPaths,
     };
-  }
-
-  const stems = [...new Set(packRels.map(packStem))];
-  const candidates: string[] = [];
-  for (const rel of packRels) {
-    candidates.push(resolve(opts.repoRoot, rel));
-  }
-  for (const stem of stems) {
-    candidates.push(
-      resolve(opts.repoRoot, 'profiles', 'ofp', `${stem}.json`),
-      resolve(opts.repoRoot, 'profiles', 'examples', `${stem}.json`),
-      resolve(opts.repoRoot, 'profiles', 'drafts', `${stem}.json`),
-      resolve(opts.repoRoot, 'profiles', 'notes', `${stem}.md`),
-    );
   }
 
   const seen = new Set<string>();

@@ -130,7 +130,7 @@ export async function runCareerAirframeWizard(opts: {
           console.log(`    - ${rel}`);
         }
         console.log(
-          '  Also deletes matching profiles/examples, drafts, and notes.',
+          '  Also deletes related examples/drafts/notes (sibling variants by pack titles) and cache.',
         );
         console.log(
           '  Hangar aircraft of this type stay until you sell them in-game.',

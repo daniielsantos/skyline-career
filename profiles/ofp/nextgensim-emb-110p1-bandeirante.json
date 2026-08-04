@@ -1,0 +1,197 @@
+{
+  "source": "simbrief",
+  "icao": "E110",
+  "ofpId": "nextgensim-emb-110p1-bandeirante",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "NextGenSim EMB-110P1 Bandeirante"
+  ],
+  "matchTitlePattern": "NextGenSim EMB-110P1 Bandeirante",
+  "notes": [
+    "NextGenSim EMB-110P1 Bandeirante — auto roles pack from homologated profile",
+    "Profile: nextgensim/emb-110p1-bandeirante@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "E110",
+  "simbriefAirframeMatch": "NextGen Simulations \\(MSFS\\) - EMB-110P1$",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "COPILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "NGSE110V2 PASSENGER 1 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "NGSE110V2 PASSENGER 1 R A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "NGSE110V2 PASSENGER 1 R B",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "NGSE110V2 PASSENGER 2 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "NGSE110V2 PASSENGER 2 R A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "NGSE110V2 PASSENGER 2 R B",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "NGSE110V2 PASSENGER 3 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "NGSE110V2 PASSENGER 3 R A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 11,
+      "cfgIndex": 10,
+      "name": "NGSE110V2 PASSENGER 3 R B",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 12,
+      "cfgIndex": 11,
+      "name": "NGSE110V2 PASSENGER 4 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 13,
+      "cfgIndex": 12,
+      "name": "NGSE110V2 PASSENGER 4 R A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 14,
+      "cfgIndex": 13,
+      "name": "NGSE110V2 PASSENGER 4 R B",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 15,
+      "cfgIndex": 14,
+      "name": "NGSE110V2 PASSENGER 5 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 16,
+      "cfgIndex": 15,
+      "name": "NGSE110V2 PASSENGER 5 R A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 17,
+      "cfgIndex": 16,
+      "name": "NGSE110V2 PASSENGER 5 R B",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 18,
+      "cfgIndex": 17,
+      "name": "NGSE110V2 PASSENGER 6 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 19,
+      "cfgIndex": 18,
+      "name": "NGSE110V2 PASSENGER 6 R A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 20,
+      "cfgIndex": 19,
+      "name": "NGSE110V2 PASSENGER 6 R B",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

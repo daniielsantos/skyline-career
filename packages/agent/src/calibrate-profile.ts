@@ -224,9 +224,11 @@ export async function calibrateProfile(
       }
       const cfgMax = cfg.stationMaxLoads[station.index];
       // Fill placeholder only — live clamp already stamped real ceilings.
+      // station_load's first field is often default seat weight (170), not max —
+      // ignore crew-sized values so smoke/inject are not capped at OEW seat mass.
       if (
         cfgMax !== undefined &&
-        cfgMax > 0 &&
+        cfgMax > STATION_MAX_LOAD_PLACEHOLDER_LB &&
         station.maxLoad === STATION_MAX_LOAD_PLACEHOLDER_LB
       ) {
         station.maxLoad = cfgMax;

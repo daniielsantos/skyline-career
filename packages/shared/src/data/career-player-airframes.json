@@ -1,1 +1,24 @@
-[]
+[
+  {
+    "typeId": "nextgensim-emb-110p1f-bandeirante",
+    "aircraftClassId": "light_turboprop",
+    "label": "NextGenSim EMB-110 Bandeirante",
+    "rolesPackRelPath": "profiles/ofp/nextgensim-emb-110p1f-bandeirante.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/nextgensim-emb-110p-bandeirante.json",
+      "profiles/ofp/nextgensim-emb-110p1-bandeirante.json",
+      "profiles/ofp/nextgensim-emb-110p1f-bandeirante.json",
+      "profiles/ofp/nextgensim-emb-110p2-bandeirante.json"
+    ],
+    "simbriefIcao": "E110",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 3402,
+    "mtowKg": 6010,
+    "maxCargoKg": 1134,
+    "fuelCapacityKg": 1381,
+    "maxRangeNm": 1060,
+    "cruiseFuelFlowKgPerHour": 182.3,
+    "cruiseSpeedKt": 220,
+    "fuelBurnKgPerNm": 0.829
+  }
+]

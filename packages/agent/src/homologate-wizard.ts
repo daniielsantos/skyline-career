@@ -198,7 +198,7 @@ async function calibrateWithCgSources(
   const runCgSweep = await confirm(
     ask,
     'Run empirical CG station sweep now (on ground, engines off; payload is restored)',
-    false,
+    true,
   );
   const sweepPayloadLb = runCgSweep
     ? Number(await ask('Sweep payload (lb)', '200'))
@@ -735,6 +735,18 @@ async function runSmoke(
     }
     if (apply.fuel?.errorCode) {
       console.log(`  fuel errorCode     ${apply.fuel.errorCode}`);
+    }
+  }
+  if (!payloadOk) {
+    if (apply.payload?.errorCode) {
+      console.log(`  payload errorCode  ${apply.payload.errorCode}`);
+    }
+    const details =
+      apply.payload && 'details' in apply.payload
+        ? (apply.payload as { details?: unknown }).details
+        : undefined;
+    if (details !== undefined) {
+      console.log(`  payload details    ${JSON.stringify(details)}`);
     }
   }
 

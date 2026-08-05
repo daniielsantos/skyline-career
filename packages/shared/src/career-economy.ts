@@ -950,6 +950,41 @@ export function isNearAirport(
   return { near: d <= radiusNm, distanceNm: d };
 }
 
+/** Invalidate when hub count changes (array mutated in place). */
+type AirportLookupCache = {
+  len: number;
+  byIcao: Map<string, AirportTerminal>;
+  routeNm: Map<string, number | undefined>;
+};
+
+const airportLookupByList = new WeakMap<
+  CareerEconomyWorld['airports'],
+  AirportLookupCache
+>();
+
+function airportLookup(
+  airports: CareerEconomyWorld['airports'],
+): AirportLookupCache {
+  let cache = airportLookupByList.get(airports);
+  if (!cache || cache.len !== airports.length) {
+    const byIcao = new Map<string, AirportTerminal>();
+    for (const airport of airports) {
+      byIcao.set(airport.icao.toUpperCase(), airport);
+    }
+    cache = { len: airports.length, byIcao, routeNm: new Map() };
+    airportLookupByList.set(airports, cache);
+  }
+  return cache;
+}
+
+/** O(1) hub lookup (cached; refreshes when `airports.length` changes). */
+export function airportByIcao(
+  world: Pick<CareerEconomyWorld, 'airports'>,
+  icao: string,
+): AirportTerminal | undefined {
+  return airportLookup(world.airports).byIcao.get(icao.trim().toUpperCase());
+}
+
 export function routeDistanceNm(
   world: Pick<CareerEconomyWorld, 'airports'>,
   originIcao: string,
@@ -957,14 +992,25 @@ export function routeDistanceNm(
 ): number | undefined {
   const originCode = originIcao.trim().toUpperCase();
   const destCode = destIcao.trim().toUpperCase();
-  const origin = world.airports.find((airport) => airport.icao === originCode);
-  const dest = world.airports.find((airport) => airport.icao === destCode);
+  if (originCode === destCode) return 0;
+  const lookup = airportLookup(world.airports);
+  const key =
+    originCode < destCode
+      ? `${originCode}|${destCode}`
+      : `${destCode}|${originCode}`;
+  if (lookup.routeNm.has(key)) {
+    return lookup.routeNm.get(key);
+  }
+  const origin = lookup.byIcao.get(originCode);
+  const dest = lookup.byIcao.get(destCode);
   const originCoords = resolveAirportCoords(originCode, origin);
   const destCoords = resolveAirportCoords(destCode, dest);
-  if (!originCoords || !destCoords) {
-    return undefined;
-  }
-  return distanceNm(originCoords, destCoords);
+  const nm =
+    originCoords && destCoords
+      ? distanceNm(originCoords, destCoords)
+      : undefined;
+  lookup.routeNm.set(key, nm);
+  return nm;
 }
 
 function pile(stockKg: number, capacityKg: number): StockPile {
@@ -2387,10 +2433,15 @@ export function tickEconomy(
   ensureInternationalLanes(world);
   ensureHomeCountryId(world);
 
-  world.tick += 1;
   const batchNowMs =
     opts.batchNowMs ??
     (world.lastBatchAtMs ?? Date.now()) + MS_PER_TICK;
+  // Land due flights/hauls before production + lot formation so capacity and
+  // bid pressure see the post-arrival board (also avoids a second settle in NPC tick).
+  settleNpcOpsDue(world, batchNowMs);
+  settleFuelHaulsDue(world, batchNowMs);
+
+  world.tick += 1;
   const rng = mulberry32(hashSeed(`${opts.rngSeed ?? world.seed}:t${world.tick}`));
 
   applyProductionConsumption(world, rng);
@@ -2474,8 +2525,6 @@ export function tickEconomyN(
 
   for (let i = 0; i < steps; i++) {
     const batchNowMs = startBatch + (i + 1) * MS_PER_TICK;
-    settleNpcOpsDue(world, batchNowMs);
-    settleFuelHaulsDue(world, batchNowMs);
     tickEconomy(world, { batchNowMs });
   }
 

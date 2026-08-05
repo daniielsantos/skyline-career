@@ -13,6 +13,7 @@ import {
 } from './career-clock.js';
 import {
   applyFreightDelivery,
+  airportByIcao,
   ensureAirportMroInventory,
   getCommodity,
   routeDistanceNm,
@@ -205,7 +206,7 @@ function lotAvailableKg(lot: ShipmentLot): number {
 }
 
 function airportRegion(world: CareerEconomyWorld, icao: string): string | undefined {
-  return world.airports.find((a) => a.icao === icao.toUpperCase())?.region;
+  return airportByIcao(world, icao)?.region;
 }
 
 function flightArrivesAtMs(flight: NpcFlight): number {
@@ -1088,9 +1089,13 @@ function scoreLotForNpc(
   npc: NpcFreighter,
   lot: ShipmentLot,
   rng: () => number,
+  pre?: {
+    aircraft: ReturnType<typeof getAircraftClass>;
+    maxCargoKg: number;
+  },
 ): number | null {
-  const aircraft = getAircraftClass(npc.aircraftClassId);
-  const maxCargoKg = npcMaxCargoKg(npc);
+  const aircraft = pre?.aircraft ?? getAircraftClass(npc.aircraftClassId);
+  const maxCargoKg = pre?.maxCargoKg ?? npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
   if (avail < 500) return null;
 
@@ -1243,6 +1248,15 @@ function npcBidOnMarket(
     world.npcFlights.filter((f) => f.status === 'in_flight').map((f) => f.lotId),
   );
 
+  // One pass over the board — bidding used to re-scan every lot per idle NPC.
+  const candidates: ShipmentLot[] = [];
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+    if (lotAvailableKg(lot) < 500) continue;
+    if (claimedLotIds.has(lot.id)) continue;
+    candidates.push(lot);
+  }
+
   for (const npc of idle) {
     const regionCapacity = npcRegionBidCapacity(world, npc.homeRegion, batchNowMs);
     const wx = regionalWeatherIndex(world, npc.homeRegion);
@@ -1258,15 +1272,20 @@ function npcBidOnMarket(
     // Second gate: slightly more willing to commit once they attempt.
     if (rng() > 0.62 + npc.reliability * 0.4) continue;
 
-    let best: { lot: ShipmentLot; score: number } | undefined;
-    for (const lot of world.lots) {
-      if (lot.status !== 'available' && lot.status !== 'reserved') continue;
-      if (lotAvailableKg(lot) <= 0) continue;
-      if (claimedLotIds.has(lot.id)) continue;
+    const aircraft = getAircraftClass(npc.aircraftClassId);
+    const maxCargoKg = npcMaxCargoKg(npc);
+    const threshold = 0.48 + npc.reliability * 0.28 - npc.aggressiveness * 0.22;
 
-      const score = scoreLotForNpc(world, npc, lot, rng);
+    let best: { lot: ShipmentLot; score: number } | undefined;
+    for (const lot of candidates) {
+      if (claimedLotIds.has(lot.id)) continue;
+      if (lotAvailableKg(lot) <= 0) continue;
+
+      const score = scoreLotForNpc(world, npc, lot, rng, {
+        aircraft,
+        maxCargoKg,
+      });
       if (score === null) continue;
-      const threshold = 0.48 + npc.reliability * 0.28 - npc.aggressiveness * 0.22;
       if (score < threshold) continue;
       if (!best || score > best.score) {
         best = { lot, score };
@@ -1289,9 +1308,8 @@ export function tickNpcFreighters(
   rng: () => number,
   opts: { batchNowMs?: number } = {},
 ): void {
-  ensureNpcFleet(world);
+  // Fleet ensure + settle run at the start of tickEconomy (before lot formation).
   const batchNowMs = opts.batchNowMs ?? world.lastBatchAtMs ?? Date.now();
-  settleNpcOpsDue(world, batchNowMs);
   npcBidOnMarket(world, rng, batchNowMs);
 }
 

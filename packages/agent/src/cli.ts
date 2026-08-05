@@ -1603,7 +1603,7 @@ async function main(): Promise<void> {
         console.log('  commodities:');
         for (const c of pulse.commodities) {
           console.log(
-            `    ${c.commodityId.padEnd(12)} lots=${String(c.availableLots).padStart(3)}  fill p50=${fill(c.fillP50).padStart(4)}  pay p50=${pay(c.payUsdP50).padStart(8)}  avg=${pay(c.payUsdAvg).padStart(8)}  $/kg p50=${money(c.payPerKgP50)}  surplus=${c.hubsSurplus}  shortage=${c.hubsShortage}`,
+            `    ${c.commodityId.padEnd(12)} lots=${String(c.availableLots).padStart(3)}  fill p50=${fill(c.fillP50).padStart(4)}  pay p50=${pay(c.payUsdP50).padStart(8)}  net p50=${pay(c.netPayUsdP50).padStart(8)}  fuel p50=${pay(c.fuelCostUsdP50).padStart(7)}  margin=${fill(c.marginPctP50).padStart(4)}  surplus=${c.hubsSurplus}  shortage=${c.hubsShortage}`,
           );
         }
         for (const c of pulse.countries) {
@@ -1741,7 +1741,7 @@ async function main(): Promise<void> {
         const b = report.last.commodities[i]!;
         const d = report.delta.commodities[i]!;
         console.log(
-          `    ${b.commodityId.padEnd(12)} lots ${String(a.availableLots).padStart(4)}→${String(b.availableLots).padStart(4)} (${signed(d.availableLots).padStart(5)})  pay p50 ${pay(a.payUsdP50)}→${pay(b.payUsdP50)} (${payDelta(d.payUsdP50)})  fill ${fill(a.fillP50)}→${fill(b.fillP50)} (${fillDelta(d.fillP50)})  surplus ${a.hubsSurplus}→${b.hubsSurplus}  shortage ${a.hubsShortage}→${b.hubsShortage}`,
+          `    ${b.commodityId.padEnd(12)} lots ${String(a.availableLots).padStart(4)}→${String(b.availableLots).padStart(4)} (${signed(d.availableLots).padStart(5)})  pay p50 ${pay(a.payUsdP50)}→${pay(b.payUsdP50)} (${payDelta(d.payUsdP50)})  net p50 ${pay(a.netPayUsdP50)}→${pay(b.netPayUsdP50)} (${payDelta(d.netPayUsdP50)})  margin ${fill(a.marginPctP50)}→${fill(b.marginPctP50)} (${fillDelta(d.marginPctP50)})  fill ${fill(a.fillP50)}→${fill(b.fillP50)} (${fillDelta(d.fillP50)})`,
         );
       }
       {

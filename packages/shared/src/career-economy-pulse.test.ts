@@ -62,6 +62,14 @@ describe('computeEconomyPulse', () => {
     if (pulse.availableLots > 0) {
       assert.ok(pulse.payUsdP50 !== null);
       assert.ok(pulse.payUsdAvg !== null);
+      const withNet = pulse.commodities.filter((c) => c.netSampleLots > 0);
+      assert.ok(withNet.length > 0, 'expected net pay samples on some commodities');
+      for (const c of withNet) {
+        assert.ok(c.netPayUsdP50 !== null);
+        assert.ok(c.fuelCostUsdP50 !== null);
+        assert.ok(c.marginPctP50 !== null);
+        assert.ok((c.fuelCostUsdP50 ?? 0) >= 0);
+      }
     }
     assert.equal(
       pulse.lotStatus.available +

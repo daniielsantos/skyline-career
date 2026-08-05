@@ -2,8 +2,15 @@
  * Read-only economy health snapshot for Career debug (CLI / API).
  * Does not mutate the world.
  */
-import { CAREER_CARGO_COMMODITIES, tickEconomyN } from './career-economy.js';
+import {
+  CAREER_CARGO_COMMODITIES,
+  localUnitPriceUsd,
+  routeDistanceNm,
+  tickEconomyN,
+} from './career-economy.js';
 import { TICKS_PER_DAY } from './career-clock.js';
+import { estimateUpliftKg } from './career-fuel.js';
+import { CAREER_AIRCRAFT_CLASSES } from './career-mission.js';
 import {
   describeLotMarketPressure,
   isNpcReadyToBid,
@@ -80,6 +87,18 @@ export interface EconomyPulseCommodity {
   payUsdP50: number | null;
   /** Mean contract value (payUsd) for bookable leftovers. */
   payUsdAvg: number | null;
+  /**
+   * Median estimated net = pro-rata lot pay − origin Jet-A uplift for the
+   * smallest class that can lift the leftover on that OD (fuel only; no MX/hangar).
+   */
+  netPayUsdP50: number | null;
+  netPayUsdAvg: number | null;
+  /** Median fuel uplift quote used in the net estimate. */
+  fuelCostUsdP50: number | null;
+  /** Median net/pay (1 = all margin after fuel; can be negative). */
+  marginPctP50: number | null;
+  /** Lots where distance + fuel stock allowed an estimate. */
+  netSampleLots: number;
   /** Hubs with fill ≥ surplus cutoff (export pressure). */
   hubsSurplus: number;
   /** Hubs with fill ≤ shortage cutoff (import pressure). */
@@ -176,6 +195,82 @@ export function mean(numbers: number[]): number | null {
 function leftoverKg(lot: ShipmentLot): number {
   if (lot.status !== 'available') return 0;
   return Math.max(0, lot.quantityKg - lot.reservedKg);
+}
+
+/**
+ * Smallest class that can lift `cargoKg` within `distanceNm`.
+ * If cargo exceeds every in-range class, use the largest in-range freighter
+ * (optimistic single-leg stand-in for a split).
+ */
+export function pickPulseAircraftForCargo(
+  cargoKg: number,
+  distanceNm: number,
+): (typeof CAREER_AIRCRAFT_CLASSES)[number] | null {
+  const nm = Math.max(0, distanceNm);
+  const kg = Math.max(0, cargoKg);
+  const sorted = [...CAREER_AIRCRAFT_CLASSES].sort(
+    (a, b) => a.maxCargoKg - b.maxCargoKg,
+  );
+  for (const c of sorted) {
+    if (kg <= c.maxCargoKg && nm <= c.maxRangeNm) return c;
+  }
+  const inRange = sorted
+    .filter((c) => nm <= c.maxRangeNm)
+    .sort((a, b) => b.maxCargoKg - a.maxCargoKg);
+  return inRange[0] ?? null;
+}
+
+/** Read-only Jet-A uplift estimate (mirrors quoteFuelUplift math, no stock drain). */
+export function estimatePulseFuelCostUsd(
+  world: CareerEconomyWorld,
+  opts: {
+    originIcao: string;
+    aircraftClassId: FreighterClassId;
+    distanceNm: number;
+  },
+): number | null {
+  const origin = opts.originIcao.trim().toUpperCase();
+  const ap = world.airports.find((a) => a.icao.toUpperCase() === origin);
+  const stock = ap?.inventory?.fuel;
+  if (!stock || stock.capacityKg <= 0) return null;
+  const requestedKg = estimateUpliftKg(opts.aircraftClassId, opts.distanceNm);
+  const unitPriceUsd = localUnitPriceUsd('fuel', stock);
+  const availableKg = Math.max(0, Math.floor(stock.stockKg));
+  const fromTerminal = Math.min(requestedKg, availableKg);
+  const shortfall = requestedKg - fromTerminal;
+  let costUsd = fromTerminal * unitPriceUsd;
+  if (shortfall > 0) {
+    const mult = availableKg <= 0 ? 2 : 1.25;
+    costUsd += shortfall * unitPriceUsd * mult;
+  }
+  return Math.max(0, Math.round(costUsd));
+}
+
+export function estimateLotNetPayUsd(
+  world: CareerEconomyWorld,
+  lot: ShipmentLot,
+): { payUsd: number; fuelCostUsd: number; netPayUsd: number; marginPct: number } | null {
+  const left = leftoverKg(lot);
+  if (left <= 0 || lot.quantityKg <= 0) return null;
+  const distanceNm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+  if (distanceNm === undefined || !Number.isFinite(distanceNm) || distanceNm <= 0) {
+    return null;
+  }
+  const aircraft = pickPulseAircraftForCargo(left, distanceNm);
+  if (!aircraft) return null;
+  const fuelCostUsd = estimatePulseFuelCostUsd(world, {
+    originIcao: lot.originIcao,
+    aircraftClassId: aircraft.id,
+    distanceNm,
+  });
+  if (fuelCostUsd === null) return null;
+  const payUsd = Math.max(
+    0,
+    Math.round((left / lot.quantityKg) * lot.payUsd),
+  );
+  const netPayUsd = payUsd - fuelCostUsd;
+  const marginPct = payUsd > 0 ? netPayUsd / payUsd : netPayUsd < 0 ? -1 : 0;
+  return { payUsd, fuelCostUsd, netPayUsd, marginPct };
 }
 
 function airportMeanFill(ap: AirportTerminal): number {
@@ -591,6 +686,9 @@ export function computeEconomyPulse(
   type CommodityAcc = {
     payPerKg: number[];
     payUsd: number[];
+    netPayUsd: number[];
+    fuelCostUsd: number[];
+    marginPct: number[];
     fills: number[];
     hubsSurplus: number;
     hubsShortage: number;
@@ -600,6 +698,9 @@ export function computeEconomyPulse(
     commodityAcc.set(def.id, {
       payPerKg: [],
       payUsd: [],
+      netPayUsd: [],
+      fuelCostUsd: [],
+      marginPct: [],
       fills: [],
       hubsSurplus: 0,
       hubsShortage: 0,
@@ -659,6 +760,12 @@ export function computeEconomyPulse(
     if (cAcc) {
       cAcc.payUsd.push(lot.payUsd);
       if (qty > 0) cAcc.payPerKg.push(lot.payUsd / qty);
+      const net = estimateLotNetPayUsd(world, lot);
+      if (net) {
+        cAcc.netPayUsd.push(net.netPayUsd);
+        cAcc.fuelCostUsd.push(net.fuelCostUsd);
+        cAcc.marginPct.push(net.marginPct);
+      }
     }
   }
 
@@ -672,6 +779,11 @@ export function computeEconomyPulse(
         payPerKgP50: median(acc.payPerKg),
         payUsdP50: median(acc.payUsd),
         payUsdAvg: mean(acc.payUsd),
+        netPayUsdP50: median(acc.netPayUsd),
+        netPayUsdAvg: mean(acc.netPayUsd),
+        fuelCostUsdP50: median(acc.fuelCostUsd),
+        marginPctP50: median(acc.marginPct),
+        netSampleLots: acc.netPayUsd.length,
         hubsSurplus: acc.hubsSurplus,
         hubsShortage: acc.hubsShortage,
       };
@@ -763,6 +875,9 @@ export type EconomyPulseSweepDelta = {
     availableLots: number;
     payUsdP50: number | null;
     payUsdAvg: number | null;
+    netPayUsdP50: number | null;
+    fuelCostUsdP50: number | null;
+    marginPctP50: number | null;
     fillP50: number | null;
     hubsSurplus: number;
     hubsShortage: number;
@@ -885,6 +1000,12 @@ export function sweepEconomyPulse(
           availableLots: c.availableLots - (prev?.availableLots ?? 0),
           payUsdP50: nullDelta(prev?.payUsdP50 ?? null, c.payUsdP50),
           payUsdAvg: nullDelta(prev?.payUsdAvg ?? null, c.payUsdAvg),
+          netPayUsdP50: nullDelta(prev?.netPayUsdP50 ?? null, c.netPayUsdP50),
+          fuelCostUsdP50: nullDelta(
+            prev?.fuelCostUsdP50 ?? null,
+            c.fuelCostUsdP50,
+          ),
+          marginPctP50: nullDelta(prev?.marginPctP50 ?? null, c.marginPctP50),
           fillP50: nullDelta(prev?.fillP50 ?? null, c.fillP50),
           hubsSurplus: c.hubsSurplus - (prev?.hubsSurplus ?? 0),
           hubsShortage: c.hubsShortage - (prev?.hubsShortage ?? 0),

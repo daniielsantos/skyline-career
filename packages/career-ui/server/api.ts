@@ -1651,8 +1651,12 @@ export function createCareerApiServer(port = 8787) {
           .map((lot) => mapLotSummary(world, lot, nowMs));
 
         const movements = mapAirportMovements(world, icao, missions.missions, nowMs);
-        const fuelInbound = listAirportFuelInbound(world, icao, nowMs).map(mapFuelHaulView);
-        const fuelRecent = listFuelHaulViews(world, { destIcao: icao, nowMs })
+        const simNowMs =
+          typeof world.lastBatchAtMs === 'number' && Number.isFinite(world.lastBatchAtMs)
+            ? world.lastBatchAtMs
+            : nowMs;
+        const fuelInbound = listAirportFuelInbound(world, icao, simNowMs).map(mapFuelHaulView);
+        const fuelRecent = listFuelHaulViews(world, { destIcao: icao, nowMs: simNowMs })
           .filter((h) => h.status === 'completed' || h.phase === 'delivered')
           .slice(-3)
           .map(mapFuelHaulView);

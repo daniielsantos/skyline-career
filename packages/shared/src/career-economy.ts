@@ -1427,7 +1427,17 @@ export function ensureEconomyCaughtUp(
   let settledFlights = settleNpcOpsDue(w, nowMs).settledFlights;
   settledFlights += settleFuelHaulsDue(w, nowMs).settledHauls;
 
-  const last = w.lastBatchAtMs;
+  let last = w.lastBatchAtMs;
+  // Pulse --write / dry sweeps can leave lastBatchAtMs (and haul ETAs) days ahead
+  // of wall clock. Snapping the anchor without shifting ops freezes tankers at 0%
+  // with multi-day ETAs — pull the whole timeline back first.
+  if (Number.isFinite(last) && last > nowMs) {
+    shiftEconomyWallClock(w, nowMs - last);
+    last = nowMs;
+    w.lastBatchAtMs = nowMs;
+    w.lastSyncedAtMs = nowMs;
+  }
+
   const elapsed = Math.max(0, nowMs - last);
   const maxTicks = opts.maxTicks ?? MAX_CATCH_UP_TICKS;
   const hours = Math.min(maxTicks, Math.floor(elapsed / MS_PER_TICK));

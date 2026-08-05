@@ -537,7 +537,12 @@ export function listFuelHaulViews(
   opts: { destIcao?: string; originIcao?: string; nowMs?: number } = {},
 ): FuelHaulView[] {
   ensureFuelTruckFleet(world);
-  const nowMs = opts.nowMs ?? Date.now();
+  // Prefer sim batch clock — wall Date.now() desyncs after long sweeps / catch-up.
+  const nowMs =
+    opts.nowMs ??
+    (typeof world.lastBatchAtMs === 'number' && Number.isFinite(world.lastBatchAtMs)
+      ? world.lastBatchAtMs
+      : Date.now());
   const dest = opts.destIcao?.toUpperCase();
   const origin = opts.originIcao?.toUpperCase();
   const byTruck = new Map(world.fuelTrucks!.map((t) => [t.id, t]));

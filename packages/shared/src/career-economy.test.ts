@@ -17,6 +17,7 @@ import {
   laneDemandShock,
   laneLotCaps,
   listActiveEconomyEvents,
+  listAirportFuelInbound,
   listMarketLots,
   localPriceMultiplier,
   marketQueryTokens,
@@ -946,6 +947,45 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     const { advancedTicks } = ensureEconomyCaughtUp(world, start + 14 * 60 * 1000);
     assert.equal(advancedTicks, 0);
     assert.equal(world.tick, before);
+  });
+
+  it('snaps a future sim clock and shifts fuel haul ETAs back to wall time', () => {
+    const world = createSeedEconomyWorld({ seed: 'future-clock-fuel' });
+    const wallNow = 1_800_000_000_000;
+    const futureAnchor = wallNow + 90 * 24 * 60 * 60 * 1000;
+    world.lastBatchAtMs = futureAnchor;
+    world.lastSyncedAtMs = futureAnchor;
+    world.fuelHauls = [
+      {
+        id: 'fuelh-stuck',
+        truckId: 'truck-0',
+        originIcao: 'KATL',
+        destIcao: 'KMEM',
+        commodityId: 'fuel',
+        cargoKg: 12_000,
+        departedAtMs: futureAnchor,
+        arrivesAtMs: futureAnchor + 12 * 60 * 60 * 1000,
+        status: 'enroute',
+      },
+    ];
+    world.fuelTrucks![0]!.status = 'enroute';
+    world.fuelTrucks![0]!.currentHaulId = 'fuelh-stuck';
+    world.fuelTrucks![0]!.busyUntilMs = futureAnchor + 12 * 60 * 60 * 1000;
+
+    const { advancedTicks } = ensureEconomyCaughtUp(world, wallNow);
+    assert.equal(advancedTicks, 0);
+    assert.ok(world.lastBatchAtMs <= wallNow);
+    const haul = world.fuelHauls!.find((h) => h.id === 'fuelh-stuck');
+    assert.ok(haul);
+    assert.ok(
+      haul!.departedAtMs <= wallNow + 60_000,
+      `departedAtMs should snap near wall, got ${haul!.departedAtMs} vs ${wallNow}`,
+    );
+    const views = listAirportFuelInbound(world, 'KMEM', world.lastBatchAtMs);
+    const view = views.find((h) => h.id === 'fuelh-stuck');
+    if (view) {
+      assert.ok(view.etaHours < 48, `ETA should be hours not days, got ${view.etaHours}h`);
+    }
   });
 
   it('exposes continuous fractional hours between batches', () => {

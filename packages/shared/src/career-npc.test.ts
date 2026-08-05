@@ -22,6 +22,7 @@ import {
   laneInboundKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
+  isNpcReadyToBid,
   routeDistanceNm,
   settleNpcOpsDue,
   tickEconomyN,
@@ -295,7 +296,7 @@ describe('NPC freighter fleet', () => {
     npc.status = 'busy';
     npc.currentFlightId = undefined;
     npc.busyUntilMs = nowMs - 1;
-    npc.dutyHoursAccum = 9.5;
+    npc.dutyHoursAccum = 10.6;
     npc.lastLegDutyHours = 3;
 
     settleNpcOpsDue(world, nowMs);
@@ -339,6 +340,24 @@ describe('NPC freighter fleet', () => {
     assert.equal(roster.find((r) => r.id === npc.id)?.phase, 'idle');
   });
 
+  it('frees turnaround when busyUntilTick is past even if busyUntilMs is far future', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-tick-ms-drift' });
+    const npc = world.npcs[0]!;
+    const nowMs = world.lastBatchAtMs;
+
+    npc.status = 'busy';
+    npc.currentFlightId = undefined;
+    npc.busyUntilTick = Math.max(0, world.tick - 10);
+    npc.busyUntilMs = nowMs + 100 * 3_600_000; // ~100h wall drift
+    npc.dutyHoursAccum = 3;
+    npc.lastLegDutyHours = 2;
+
+    assert.equal(isNpcReadyToBid(npc, nowMs, world.tick), true);
+    settleNpcOpsDue(world, nowMs);
+    assert.notEqual(npc.status, 'busy');
+    assert.equal(npc.busyUntilMs, undefined);
+  });
+
   it('forces rest after a long single leg even under cumulative duty cap', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-rest-longleg' });
     const npc = world.npcs[0]!;
@@ -347,8 +366,8 @@ describe('NPC freighter fleet', () => {
     npc.status = 'busy';
     npc.currentFlightId = undefined;
     npc.busyUntilMs = nowMs - 1;
-    npc.dutyHoursAccum = 6.5;
-    npc.lastLegDutyHours = 6.5;
+    npc.dutyHoursAccum = 7.2;
+    npc.lastLegDutyHours = 7.2;
 
     settleNpcOpsDue(world, nowMs);
     assert.equal(npc.status, 'resting');

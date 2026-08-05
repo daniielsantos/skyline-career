@@ -178,6 +178,7 @@ export {
   laneInboundKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
+  isNpcReadyToBid,
   NPC_AIRFRAME_VARIANTS,
   NPC_FLEET_COMPOSITION,
   NPC_FLEET_SIZE,
@@ -630,6 +631,48 @@ export const CAREER_COMMODITIES: readonly CommodityDef[] = [
 export const CAREER_CARGO_COMMODITIES: readonly CommodityDef[] =
   CAREER_COMMODITIES.filter((c) => c.kind !== 'fuel' && c.kind !== 'mro');
 
+/**
+ * Global cargo flow balance vs hub produce/consume biases (pulse-tuned).
+ * Applied each tick on effective flows so existing saves pick it up without reset.
+ * Seed bases stay raw; do not also bake these into baseProduction (would double-count).
+ * Target: Value/Heavy fill ~30–50%, Dry (general) ~50–60%.
+ */
+export const CARGO_FLOW_BALANCE: Readonly<
+  Partial<Record<CommodityId, { production: number; consumption: number }>>
+> = {
+  // Value/Heavy: typical consumer hub is ~550*0.15 prod vs ~500*0.85 cons
+  // (~5.2× gap). 2.6/0.5 landed elec fill ~52% in 15d from empty — slightly soft.
+  electronics: { production: 2.4, consumption: 0.55 },
+  machinery: { production: 2.45, consumption: 0.54 },
+  // Dry: 0.88/1.08 moved ~5pt/15d; nudge so 50–60% is reachable in ~30d
+  general: { production: 0.84, consumption: 1.12 },
+};
+
+function cargoFlowBalance(commodityId: CommodityId): {
+  production: number;
+  consumption: number;
+} {
+  return CARGO_FLOW_BALANCE[commodityId] ?? { production: 1, consumption: 1 };
+}
+
+/** Default produce bias when a hub omits a cargo commodity. */
+const DEFAULT_CARGO_PROD_BIAS: Readonly<Partial<Record<CommodityId, number>>> = {
+  electronics: 0.38,
+  machinery: 0.36,
+  general: 0.14,
+  perishables: 0.15,
+  supplies: 0.15,
+};
+
+/** Default consume bias when a hub omits a cargo commodity. */
+const DEFAULT_CARGO_CONS_BIAS: Readonly<Partial<Record<CommodityId, number>>> = {
+  electronics: 0.2,
+  machinery: 0.2,
+  general: 0.3,
+  perishables: 0.25,
+  supplies: 0.25,
+};
+
 /** Major Jet-A production hubs (BR + US career anchors). */
 export const FUEL_HUB_ICAOS = new Set([
   // BR producers (~1 per 3 hubs at 60 airports)
@@ -1070,9 +1113,10 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       const cap = Math.round(
         70_000 * capacityBoost * tierProfile.capacityMult * (0.85 + rng() * 0.3),
       );
-      const prodBias = h.produce[c.id] ?? 0.15;
-      const consBias = h.consume[c.id] ?? 0.25;
+      const prodBias = h.produce[c.id] ?? DEFAULT_CARGO_PROD_BIAS[c.id] ?? 0.15;
+      const consBias = h.consume[c.id] ?? DEFAULT_CARGO_CONS_BIAS[c.id] ?? 0.25;
       // kg / 15-min tick — asymmetric by design, scaled by hub tier
+      // (CARGO_FLOW_BALANCE applied later in applyProductionConsumption)
       const prod = Math.round(
         550 * prodBias * tierProfile.flowMult * (0.8 + rng() * 0.4),
       );
@@ -1081,8 +1125,13 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       );
       production[c.id] = prod;
       consumption[c.id] = cons;
-      // Start near mid stock with mild noise
-      const startFill = 0.35 + rng() * 0.35;
+      // Start near mid stock; nudge Value up / Dry down toward equilibrium
+      let startFill = 0.35 + rng() * 0.35;
+      if (c.id === 'electronics' || c.id === 'machinery') {
+        startFill = 0.48 + rng() * 0.22;
+      } else if (c.id === 'general') {
+        startFill = 0.22 + rng() * 0.28;
+      }
       inventory[c.id] = pile(Math.round(cap * startFill), cap);
     }
 
@@ -1669,9 +1718,18 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
       const evCons = eventMultiplier(world, ap, c.id, 'cons');
 
       const health = hubLevelHealthMult(ap);
+      const bal = cargoFlowBalance(c.id);
       const prod = Math.max(
         0,
-        Math.round(baseProd * prodSaturation * season * evProd * noise * health),
+        Math.round(
+          baseProd *
+            prodSaturation *
+            season *
+            evProd *
+            noise *
+            health *
+            bal.production,
+        ),
       );
       const cons = Math.max(
         0,
@@ -1681,7 +1739,8 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
             season *
             evCons *
             (0.9 + rng() * 0.2) *
-            health,
+            health *
+            bal.consumption,
         ),
       );
 

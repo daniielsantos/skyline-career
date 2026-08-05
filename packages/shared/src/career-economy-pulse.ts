@@ -4,7 +4,13 @@
  */
 import { CAREER_CARGO_COMMODITIES, tickEconomyN } from './career-economy.js';
 import { TICKS_PER_DAY } from './career-clock.js';
-import { describeLotMarketPressure } from './career-npc.js';
+import {
+  describeLotMarketPressure,
+  isNpcReadyToBid,
+  NPC_FLEET_COMPOSITION,
+  NPC_FLEET_SIZE,
+  THIN_FLEET_CAPACITY,
+} from './career-npc.js';
 import {
   countryIdFromRegion,
   isDomesticOd,
@@ -14,6 +20,7 @@ import type {
   AirportTerminal,
   CareerEconomyWorld,
   CommodityId,
+  FreighterClassId,
   ShipmentLot,
   StockPile,
 } from './types/career-economy.js';
@@ -28,6 +35,11 @@ const LIVE_HUB_PCT_LOW = 0.25;
 const INTL_SHARE_HIGH = 0.25;
 const LANE_BUSY_HIGH = 0.5;
 const DEAD_HUB_PCT_HIGH = 0.4;
+const NPC_READY_PCT_LOW = 0.25;
+const NPC_UTILIZATION_HIGH = 0.85;
+/** Airborne share that means "hot market" — thin/ready notes are expected noise. */
+const NPC_HOT_MARKET_UTIL = 0.5;
+const NPC_THIN_REGION_SHARE_HIGH = 0.35;
 
 /** Align with market formation surplus/shortage cutoffs. */
 const SURPLUS_FILL = 0.55;
@@ -74,6 +86,58 @@ export interface EconomyPulseCommodity {
   hubsShortage: number;
 }
 
+export interface EconomyPulseNpcRegion {
+  region: string;
+  total: number;
+  ready: number;
+  idle: number;
+  airborne: number;
+  resting: number;
+  maintenance: number;
+  turnaround: number;
+  /** ready / total (0 when empty). */
+  capacity: number;
+  thinFleet: boolean;
+  cargoKgAirborne: number;
+}
+
+export interface EconomyPulseNpcClass {
+  aircraftClassId: FreighterClassId;
+  total: number;
+  /** Target count from NPC_FLEET_COMPOSITION (0 if class not in seed mix). */
+  target: number;
+  airborne: number;
+  ready: number;
+}
+
+export interface EconomyPulseNpc {
+  fleetSize: number;
+  /** Designed seed size (NPC_FLEET_SIZE). */
+  targetFleetSize: number;
+  /** max(0, target − actual). */
+  fleetShortfall: number;
+  airborne: number;
+  idle: number;
+  ready: number;
+  resting: number;
+  maintenance: number;
+  turnaround: number;
+  /** airborne / fleetSize. */
+  utilizationPct: number;
+  /** ready / fleetSize. */
+  readyPct: number;
+  cargoKgAirborne: number;
+  flightsInProgress: number;
+  /** Home regions with capacity below thin threshold. */
+  thinRegions: number;
+  /** Hub regions with zero home NPCs. */
+  emptyHomeRegions: number;
+  hubRegionCount: number;
+  emptyHomeRegionIds: string[];
+  byRegion: EconomyPulseNpcRegion[];
+  byClass: EconomyPulseNpcClass[];
+}
+
 export interface EconomyPulse {
   tick: number;
   homeCountryId: string | null;
@@ -88,6 +152,7 @@ export interface EconomyPulse {
   lotStatus: EconomyPulseLotStatus;
   commodities: EconomyPulseCommodity[];
   countries: EconomyPulseCountry[];
+  npc: EconomyPulseNpc;
   notes: string[];
 }
 
@@ -165,6 +230,189 @@ function emptyLotStatus(): EconomyPulseLotStatus {
   };
 }
 
+/**
+ * Read-only NPC fleet activity snapshot (no ensureNpcFleet — does not mutate).
+ */
+export function computeNpcPulse(
+  world: CareerEconomyWorld,
+  nowMs = Date.now(),
+): EconomyPulseNpc {
+  const npcs = world.npcs ?? [];
+  const flights = (world.npcFlights ?? []).filter((f) => f.status === 'in_flight');
+  const flightByNpc = new Map(flights.map((f) => [f.npcId, f] as const));
+  const worldTick = world.tick ?? 0;
+
+  const hubRegions = [
+    ...new Set(
+      (world.airports ?? [])
+        .map((a) => (a.region ?? '').trim())
+        .filter((r) => r.length > 0),
+    ),
+  ].sort();
+
+  type RegionAcc = {
+    total: number;
+    ready: number;
+    idle: number;
+    airborne: number;
+    resting: number;
+    maintenance: number;
+    turnaround: number;
+    cargoKgAirborne: number;
+  };
+  const regionAcc = new Map<string, RegionAcc>();
+  const ensureRegion = (region: string): RegionAcc => {
+    let acc = regionAcc.get(region);
+    if (!acc) {
+      acc = {
+        total: 0,
+        ready: 0,
+        idle: 0,
+        airborne: 0,
+        resting: 0,
+        maintenance: 0,
+        turnaround: 0,
+        cargoKgAirborne: 0,
+      };
+      regionAcc.set(region, acc);
+    }
+    return acc;
+  };
+  for (const region of hubRegions) ensureRegion(region);
+
+  const targetByClass = new Map<FreighterClassId, number>(
+    NPC_FLEET_COMPOSITION.map((s) => [s.aircraftClassId, s.count]),
+  );
+  type ClassAcc = { total: number; airborne: number; ready: number };
+  const classAcc = new Map<FreighterClassId, ClassAcc>();
+  for (const slot of NPC_FLEET_COMPOSITION) {
+    classAcc.set(slot.aircraftClassId, { total: 0, airborne: 0, ready: 0 });
+  }
+
+  let airborne = 0;
+  let idle = 0;
+  let ready = 0;
+  let resting = 0;
+  let maintenance = 0;
+  let turnaround = 0;
+  let cargoKgAirborne = 0;
+
+  for (const npc of npcs) {
+    const region = (npc.homeRegion ?? '').trim() || 'unknown';
+    const rAcc = ensureRegion(region);
+    rAcc.total += 1;
+
+    let cAcc = classAcc.get(npc.aircraftClassId);
+    if (!cAcc) {
+      cAcc = { total: 0, airborne: 0, ready: 0 };
+      classAcc.set(npc.aircraftClassId, cAcc);
+    }
+    cAcc.total += 1;
+
+    const flight = flightByNpc.get(npc.id);
+    const canBid = isNpcReadyToBid(npc, nowMs, worldTick);
+
+    if (canBid) {
+      ready += 1;
+      rAcc.ready += 1;
+      cAcc.ready += 1;
+    }
+
+    // Classify by effective hold vs now/tick (not stale status alone).
+    if (flight) {
+      airborne += 1;
+      rAcc.airborne += 1;
+      cAcc.airborne += 1;
+      const kg = Math.max(0, Math.floor(flight.cargoKg ?? 0));
+      cargoKgAirborne += kg;
+      rAcc.cargoKgAirborne += kg;
+    } else if (
+      npc.status === 'maintenance' &&
+      !canBid &&
+      (npc.mxUntilMs ?? 0) > nowMs
+    ) {
+      maintenance += 1;
+      rAcc.maintenance += 1;
+    } else if (
+      npc.status === 'resting' &&
+      !canBid &&
+      (npc.restUntilMs ?? 0) > nowMs
+    ) {
+      resting += 1;
+      rAcc.resting += 1;
+    } else if (npc.status === 'busy' && !canBid) {
+      turnaround += 1;
+      rAcc.turnaround += 1;
+    } else {
+      idle += 1;
+      rAcc.idle += 1;
+    }
+  }
+
+  const byRegion: EconomyPulseNpcRegion[] = [...regionAcc.entries()]
+    .map(([region, acc]) => {
+      const capacity = acc.total > 0 ? acc.ready / acc.total : 0;
+      return {
+        region,
+        total: acc.total,
+        ready: acc.ready,
+        idle: acc.idle,
+        airborne: acc.airborne,
+        resting: acc.resting,
+        maintenance: acc.maintenance,
+        turnaround: acc.turnaround,
+        capacity,
+        thinFleet: acc.total > 0 && capacity < THIN_FLEET_CAPACITY,
+        cargoKgAirborne: acc.cargoKgAirborne,
+      };
+    })
+    .sort((a, b) => {
+      // Empty homes first, then thinnest capacity, then name.
+      if (a.total === 0 && b.total > 0) return -1;
+      if (b.total === 0 && a.total > 0) return 1;
+      if (a.capacity !== b.capacity) return a.capacity - b.capacity;
+      return a.region.localeCompare(b.region);
+    });
+
+  const emptyHomeRegionIds = byRegion
+    .filter((r) => hubRegions.includes(r.region) && r.total === 0)
+    .map((r) => r.region);
+  const thinRegions = byRegion.filter((r) => r.thinFleet).length;
+
+  const byClass: EconomyPulseNpcClass[] = [...classAcc.entries()]
+    .map(([aircraftClassId, acc]) => ({
+      aircraftClassId,
+      total: acc.total,
+      target: targetByClass.get(aircraftClassId) ?? 0,
+      airborne: acc.airborne,
+      ready: acc.ready,
+    }))
+    .sort((a, b) => a.aircraftClassId.localeCompare(b.aircraftClassId));
+
+  const fleetSize = npcs.length;
+  return {
+    fleetSize,
+    targetFleetSize: NPC_FLEET_SIZE,
+    fleetShortfall: Math.max(0, NPC_FLEET_SIZE - fleetSize),
+    airborne,
+    idle,
+    ready,
+    resting,
+    maintenance,
+    turnaround,
+    utilizationPct: fleetSize > 0 ? airborne / fleetSize : 0,
+    readyPct: fleetSize > 0 ? ready / fleetSize : 0,
+    cargoKgAirborne,
+    flightsInProgress: flights.length,
+    thinRegions,
+    emptyHomeRegions: emptyHomeRegionIds.length,
+    hubRegionCount: hubRegions.length,
+    emptyHomeRegionIds,
+    byRegion,
+    byClass,
+  };
+}
+
 function buildNotes(
   pulse: Omit<EconomyPulse, 'notes'>,
   countryHubs: Map<string, AirportTerminal[]>,
@@ -231,6 +479,63 @@ function buildNotes(
     notes.push(
       `More reserved/in-transit (${booked}) than bookable leftovers (${liveBoard})`,
     );
+  }
+
+  const npc = pulse.npc;
+  if (npc.fleetSize === 0) {
+    notes.push('No NPC freighter fleet seeded');
+  } else {
+    if (npc.fleetShortfall > 0) {
+      notes.push(
+        `NPC fleet short ${npc.fleetShortfall} vs target ${npc.targetFleetSize} (have ${npc.fleetSize})`,
+      );
+    }
+    const shortClasses = npc.byClass.filter(
+      (c) => c.target > 0 && c.total < c.target,
+    );
+    if (shortClasses.length > 0) {
+      notes.push(
+        `NPC class shortfall: ${shortClasses
+          .map((c) => `${c.aircraftClassId} ${c.total}/${c.target}`)
+          .join(', ')}`,
+      );
+    }
+    if (npc.emptyHomeRegions > 0) {
+      const sample = npc.emptyHomeRegionIds.slice(0, 6).join(', ');
+      const more =
+        npc.emptyHomeRegions > 6
+          ? ` (+${npc.emptyHomeRegions - 6})`
+          : '';
+      notes.push(
+        `${npc.emptyHomeRegions} hub region(s) have zero home NPCs: ${sample}${more}`,
+      );
+    }
+    const hotMarket = npc.utilizationPct >= NPC_HOT_MARKET_UTIL;
+    // Thin/ready warnings are for idle fleets that can't cover the board — not
+    // for a hot market where most NPCs are airborne by design.
+    if (
+      !hotMarket &&
+      npc.hubRegionCount > 0 &&
+      npc.thinRegions / npc.hubRegionCount > NPC_THIN_REGION_SHARE_HIGH
+    ) {
+      notes.push(
+        `${npc.thinRegions}/${npc.hubRegionCount} regions are thin-fleet (ready < ${(THIN_FLEET_CAPACITY * 100).toFixed(0)}%)`,
+      );
+    }
+    if (!hotMarket && npc.readyPct < NPC_READY_PCT_LOW) {
+      notes.push(
+        `Only ${(npc.readyPct * 100).toFixed(0)}% of NPCs are ready to bid`,
+      );
+    }
+    if (npc.utilizationPct > NPC_UTILIZATION_HIGH && npc.fleetShortfall > 0) {
+      notes.push(
+        `NPC utilization is ${(npc.utilizationPct * 100).toFixed(0)}% airborne with fleet short ${npc.fleetShortfall} — consider topping up`,
+      );
+    } else if (hotMarket && npc.utilizationPct > NPC_UTILIZATION_HIGH) {
+      notes.push(
+        `NPC utilization is ${(npc.utilizationPct * 100).toFixed(0)}% airborne (hot market)`,
+      );
+    }
   }
 
   return notes;
@@ -420,6 +725,7 @@ export function computeEconomyPulse(
   });
 
   const intlSharePct = availableLots > 0 ? intlLots / availableLots : 0;
+  const npc = computeNpcPulse(world, nowMs);
   const base: Omit<EconomyPulse, 'notes'> = {
     tick: world.tick,
     homeCountryId: world.homeCountryId ?? null,
@@ -431,6 +737,7 @@ export function computeEconomyPulse(
     lotStatus,
     commodities,
     countries,
+    npc,
   };
 
   return {
@@ -460,6 +767,17 @@ export type EconomyPulseSweepDelta = {
     hubsSurplus: number;
     hubsShortage: number;
   }>;
+  npc: {
+    fleetSize: number;
+    airborne: number;
+    ready: number;
+    readyPct: number;
+    utilizationPct: number;
+    cargoKgAirborne: number;
+    thinRegions: number;
+    emptyHomeRegions: number;
+    fleetShortfall: number;
+  };
 };
 
 export type EconomyPulseSweepResult = {
@@ -496,6 +814,10 @@ function lotStatusDelta(
 /**
  * Advance the economy and sample pulse snapshots for balance / trend reports.
  * Mutates `world` via tickEconomyN.
+ *
+ * NPC readiness uses the simulated batch clock (`world.lastBatchAtMs`), not a
+ * frozen wall `Date.now()` — otherwise multi-day sweeps report every freighter
+ * as permanently in turnaround/rest against real time.
  */
 export function sweepEconomyPulse(
   world: CareerEconomyWorld,
@@ -509,15 +831,20 @@ export function sweepEconomyPulse(
 ): EconomyPulseSweepResult {
   const ticks = Math.max(0, Math.floor(opts.ticks ?? TICKS_PER_DAY * 7));
   const every = Math.max(1, Math.floor(opts.every ?? TICKS_PER_DAY));
-  const nowMs = opts.nowMs ?? Date.now();
+  const wallFallback = opts.nowMs ?? Date.now();
   const startTick = world.tick;
   const samples: EconomyPulseSample[] = [];
+
+  const simNowMs = (): number =>
+    typeof world.lastBatchAtMs === 'number' && Number.isFinite(world.lastBatchAtMs)
+      ? world.lastBatchAtMs
+      : wallFallback;
 
   const pushSample = (sampleIndex: number) => {
     samples.push({
       atTick: world.tick,
       sampleIndex,
-      pulse: computeEconomyPulse(world, nowMs),
+      pulse: computeEconomyPulse(world, simNowMs()),
     });
   };
 
@@ -563,6 +890,17 @@ export function sweepEconomyPulse(
           hubsShortage: c.hubsShortage - (prev?.hubsShortage ?? 0),
         };
       }),
+      npc: {
+        fleetSize: last.npc.fleetSize - first.npc.fleetSize,
+        airborne: last.npc.airborne - first.npc.airborne,
+        ready: last.npc.ready - first.npc.ready,
+        readyPct: last.npc.readyPct - first.npc.readyPct,
+        utilizationPct: last.npc.utilizationPct - first.npc.utilizationPct,
+        cargoKgAirborne: last.npc.cargoKgAirborne - first.npc.cargoKgAirborne,
+        thinRegions: last.npc.thinRegions - first.npc.thinRegions,
+        emptyHomeRegions: last.npc.emptyHomeRegions - first.npc.emptyHomeRegions,
+        fleetShortfall: last.npc.fleetShortfall - first.npc.fleetShortfall,
+      },
     },
   };
 }

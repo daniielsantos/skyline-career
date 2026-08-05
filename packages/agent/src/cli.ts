@@ -1624,6 +1624,41 @@ async function main(): Promise<void> {
             console.log(`         dead: ${c.deadHubIcaos.join(' ')}${more}`);
           }
         }
+        const npc = pulse.npc;
+        const kg = (n: number) =>
+          `${Math.round(n).toLocaleString('en-US')}kg`;
+        console.log(
+          `  npc fleet  ${npc.fleetSize}/${npc.targetFleetSize}${npc.fleetShortfall > 0 ? ` (short ${npc.fleetShortfall})` : ''}  ready=${npc.ready} (${pct(npc.readyPct)})  airborne=${npc.airborne} (${pct(npc.utilizationPct)})  idle=${npc.idle}  rest=${npc.resting}  mx=${npc.maintenance}  turn=${npc.turnaround}  aloft=${kg(npc.cargoKgAirborne)}`,
+        );
+        console.log(
+          `  npc regions  thin=${npc.thinRegions}/${npc.hubRegionCount}  empty home=${npc.emptyHomeRegions}`,
+        );
+        if (npc.byClass.length > 0) {
+          console.log(
+            `  npc classes  ${npc.byClass
+              .map(
+                (c) =>
+                  `${c.aircraftClassId} ${c.total}/${c.target} air=${c.airborne}`,
+              )
+              .join('  ')}`,
+          );
+        }
+        const thinOrEmpty = npc.byRegion.filter(
+          (r) => r.total === 0 || r.thinFleet,
+        );
+        if (thinOrEmpty.length > 0) {
+          console.log(
+            `  npc thin/empty  ${thinOrEmpty
+              .slice(0, 12)
+              .map(
+                (r) =>
+                  r.total === 0
+                    ? `${r.region}=0`
+                    : `${r.region} ready=${r.ready}/${r.total}`,
+              )
+              .join('  ')}${thinOrEmpty.length > 12 ? `  +${thinOrEmpty.length - 12}` : ''}`,
+          );
+        }
         if (pulse.notes.length > 0) {
           console.log('  notes:');
           for (const note of pulse.notes) {
@@ -1709,11 +1744,22 @@ async function main(): Promise<void> {
           `    ${b.commodityId.padEnd(12)} lots ${String(a.availableLots).padStart(4)}→${String(b.availableLots).padStart(4)} (${signed(d.availableLots).padStart(5)})  pay p50 ${pay(a.payUsdP50)}→${pay(b.payUsdP50)} (${payDelta(d.payUsdP50)})  fill ${fill(a.fillP50)}→${fill(b.fillP50)} (${fillDelta(d.fillP50)})  surplus ${a.hubsSurplus}→${b.hubsSurplus}  shortage ${a.hubsShortage}→${b.hubsShortage}`,
         );
       }
+      {
+        const a = report.first.npc;
+        const b = report.last.npc;
+        const d = report.delta.npc;
+        const kg = (n: number) =>
+          `${Math.round(n).toLocaleString('en-US')}kg`;
+        console.log(
+          `  npc  fleet ${a.fleetSize}→${b.fleetSize} (${signed(d.fleetSize)})  airborne ${a.airborne}→${b.airborne} (${signed(d.airborne)})  ready ${pct(a.readyPct)}→${pct(b.readyPct)} (${pctDelta(d.readyPct)})  util ${pct(a.utilizationPct)}→${pct(b.utilizationPct)} (${pctDelta(d.utilizationPct)})  thin ${a.thinRegions}→${b.thinRegions}  empty ${a.emptyHomeRegions}→${b.emptyHomeRegions}  aloft ${kg(a.cargoKgAirborne)}→${kg(b.cargoKgAirborne)}`,
+        );
+      }
       if (report.samples.length > 2) {
         console.log('  samples:');
         for (const s of report.samples) {
+          const n = s.pulse.npc;
           console.log(
-            `    #${s.sampleIndex} tick=${s.atTick}  lots=${s.pulse.availableLots}  pay p50=${pay(s.pulse.payUsdP50)}  avg=${pay(s.pulse.payUsdAvg)}  intl=${pct(s.pulse.intlSharePct)}`,
+            `    #${s.sampleIndex} tick=${s.atTick}  lots=${s.pulse.availableLots}  pay p50=${pay(s.pulse.payUsdP50)}  avg=${pay(s.pulse.payUsdAvg)}  intl=${pct(s.pulse.intlSharePct)}  npc air=${n.airborne} ready=${pct(n.readyPct)} thin=${n.thinRegions}`,
           );
         }
       }

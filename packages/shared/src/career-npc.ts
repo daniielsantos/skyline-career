@@ -55,21 +55,26 @@ export {
   type NpcAirframeVariant,
 } from './career-npc-airframes.js';
 
-/** About one operator per mapped hub; sized for a 160-hub (60 BR + 100 US) world. */
-export const NPC_FLEET_SIZE = 120;
-
-/** Target mix: jets for heavy freight + GA for LTL / short-haul competition. */
+/**
+ * About one operator per mapped hub (60 BR + 100 US).
+ * Pulse 15d @ 120 showed util ~55% with ready stuck ~11–20% — undersized vs board.
+ */
 export const NPC_FLEET_COMPOSITION: ReadonlyArray<{
   aircraftClassId: FreighterClassId;
   count: number;
 }> = [
-  { aircraftClassId: 'narrow_freighter', count: 35 },
-  { aircraftClassId: 'wide_freighter', count: 25 },
-  { aircraftClassId: 'medium_piston', count: 10 },
-  { aircraftClassId: 'light_jet', count: 10 },
-  { aircraftClassId: 'light_turboprop', count: 25 },
-  { aircraftClassId: 'light_ga', count: 15 },
+  { aircraftClassId: 'narrow_freighter', count: 47 },
+  { aircraftClassId: 'wide_freighter', count: 33 },
+  { aircraftClassId: 'medium_piston', count: 13 },
+  { aircraftClassId: 'light_jet', count: 13 },
+  { aircraftClassId: 'light_turboprop', count: 33 },
+  { aircraftClassId: 'light_ga', count: 21 },
 ] as const;
+
+export const NPC_FLEET_SIZE = NPC_FLEET_COMPOSITION.reduce(
+  (n, slot) => n + slot.count,
+  0,
+);
 
 /** Minimum airborne block so ultra-short hops aren't instant. */
 const MIN_BLOCK_HOURS = 1;
@@ -111,12 +116,15 @@ export const NPC_MX_PARTS_KG: Record<FreighterClassId, number> = {
 const DEPART_STAGGER_MS = 25 * 60 * 1000;
 /** Last economy batch of the leg counts as "arriving". */
 const ARRIVING_WINDOW_MS = MS_PER_TICK;
-/** Max flight+turnaround duty before mandatory crew rest. */
-const MAX_DUTY_HOURS = 9;
+/**
+ * Duty / rest — pulse showed ~15–20 resting at 120 fleet was fine, but with
+ * chronic low ready we give slightly longer duty windows and shorter rests.
+ */
+const MAX_DUTY_HOURS = 10.5;
 /** A single long leg also forces rest after its turnaround. */
-const LONG_LEG_DUTY_HOURS = 6;
-const MIN_REST_HOURS = 12;
-const MAX_REST_HOURS = 16;
+const LONG_LEG_DUTY_HOURS = 7;
+const MIN_REST_HOURS = 10;
+const MAX_REST_HOURS = 14;
 const CRUISE_KT: Record<FreighterClassId, number> = {
   narrow_freighter: 430,
   wide_freighter: 480,
@@ -236,12 +244,49 @@ function npcMxUntilMs(npc: NpcFreighter): number {
   return 0;
 }
 
+/**
+ * Ground hold (turnaround / rest / MX) is over when wall-clock says so, OR when
+ * the economy tick has passed the stamped until-tick. Tick wins on drift:
+ * busyUntilTick can be long expired while busyUntilMs was shifted into the future
+ * (pulse sweeps / wall rewinds), which otherwise parks NPCs for days.
+ */
+function groundHoldExpired(
+  untilMs: number,
+  untilTick: number | undefined,
+  nowMs: number,
+  worldTick: number,
+): boolean {
+  if (typeof untilTick === 'number' && Number.isFinite(untilTick) && untilTick <= worldTick) {
+    return true;
+  }
+  return untilMs <= nowMs;
+}
+
 /** True when the NPC could enter the bid pool at nowMs (idle / rest or turnaround done). */
-function isNpcReadyToBid(npc: NpcFreighter, nowMs: number): boolean {
+export function isNpcReadyToBid(
+  npc: NpcFreighter,
+  nowMs: number,
+  worldTick = Number.POSITIVE_INFINITY,
+): boolean {
   if (npc.currentFlightId) return false;
-  if (npc.status === 'maintenance' && npcMxUntilMs(npc) > nowMs) return false;
-  if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) return false;
-  if (npc.status === 'busy' && npcBusyUntilMs(npc) > nowMs) return false;
+  if (
+    npc.status === 'maintenance' &&
+    !groundHoldExpired(npcMxUntilMs(npc), npc.mxUntilTick, nowMs, worldTick)
+  ) {
+    return false;
+  }
+  if (
+    npc.status === 'resting' &&
+    !groundHoldExpired(npcRestUntilMs(npc), npc.restUntilTick, nowMs, worldTick)
+  ) {
+    return false;
+  }
+  if (
+    npc.status === 'busy' &&
+    !groundHoldExpired(npcBusyUntilMs(npc), npc.busyUntilTick, nowMs, worldTick)
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -258,7 +303,7 @@ export function npcRegionBidCapacity(
   if (home.length === 0) return 1;
   let ready = 0;
   for (const npc of home) {
-    if (isNpcReadyToBid(npc, nowMs)) ready += 1;
+    if (isNpcReadyToBid(npc, nowMs, world.tick)) ready += 1;
   }
   return ready / home.length;
 }
@@ -346,7 +391,9 @@ export function npcLaneSaturation(
 }
 
 /** Capacity below this → UI "thin fleet" / richer freight chip. */
-export const THIN_FLEET_CAPACITY = 0.45;
+/** Ready-fraction below this → thin-fleet pressure (pay / UI). Softened from 0.45
+ *  after pulse showed healthy ~55% util rarely leaves ≥45% ready. */
+export const THIN_FLEET_CAPACITY = 0.35;
 /** Saturation at/above this → UI "lane busy" chip (matches scarce-pay threshold). */
 export const LANE_BUSY_SATURATION = 0.35;
 
@@ -439,7 +486,7 @@ export function listRegionMarketPressure(
     for (const npc of home) {
       if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) resting += 1;
       if (npc.status === 'maintenance' && npcMxUntilMs(npc) > nowMs) maintenance += 1;
-      if (isNpcReadyToBid(npc, nowMs)) ready += 1;
+      if (isNpcReadyToBid(npc, nowMs, world.tick)) ready += 1;
     }
     const capacity = home.length === 0 ? 1 : ready / home.length;
     return {
@@ -586,7 +633,9 @@ function finishShopMx(
 function releaseMxIfDue(world: CareerEconomyWorld, nowMs: number): void {
   for (const npc of world.npcs) {
     if (npc.status !== 'maintenance') continue;
-    if (npcMxUntilMs(npc) > nowMs) continue;
+    if (!groundHoldExpired(npcMxUntilMs(npc), npc.mxUntilTick, nowMs, world.tick)) {
+      continue;
+    }
     finishShopMx(world, npc, nowMs);
   }
 }
@@ -614,7 +663,9 @@ function finishTurnaround(
 function releaseRestIfDue(world: CareerEconomyWorld, nowMs: number): void {
   for (const npc of world.npcs) {
     if (npc.status !== 'resting') continue;
-    if (npcRestUntilMs(npc) > nowMs) continue;
+    if (!groundHoldExpired(npcRestUntilMs(npc), npc.restUntilTick, nowMs, world.tick)) {
+      continue;
+    }
     clearCrewRest(npc);
   }
 }
@@ -734,6 +785,10 @@ export function ensureNpcFleet(world: CareerEconomyWorld): void {
   ensureNpcRegionCoverage(world, regions);
   ensureNpcAirframes(world);
   backfillNpcDutyFromFlights(world);
+  // Heal tick/ms drift before cosmetic desync so poisoned far-future holds
+  // cannot fan out across a turnaround cluster.
+  const healNow = world.lastBatchAtMs ?? Date.now();
+  settleNpcOpsDueCore(world, healNow);
   desyncClusteredTurnarounds(world);
 }
 
@@ -839,15 +894,27 @@ export function topUpNpcFleetComposition(
 /**
  * Legacy claims used whole-hour blocks, so several NPCs often share one busyUntilMs.
  * Spread turnaround-only peers so the board doesn't show identical "free in Xm".
+ * Ignores absurd far-future holds (clock drift) so one poisoned stamp cannot fan out.
  */
 function desyncClusteredTurnarounds(world: CareerEconomyWorld): void {
   const BUCKET_MS = 5 * 60 * 1000;
+  const nowMs = world.lastBatchAtMs ?? Date.now();
+  /** Turnaround is ~0.55–1.45h; allow slack before treating as corrupt. */
+  const maxPlausibleBusyMs = nowMs + hoursToMs(3);
   const groups = new Map<number, NpcFreighter[]>();
   for (const npc of world.npcs) {
     if (npc.currentFlightId) continue;
     if (npc.status !== 'busy') continue;
     const until = npcBusyUntilMs(npc);
     if (until <= 0) continue;
+    if (until > maxPlausibleBusyMs) continue;
+    if (
+      typeof npc.busyUntilTick === 'number' &&
+      Number.isFinite(npc.busyUntilTick) &&
+      npc.busyUntilTick <= world.tick
+    ) {
+      continue;
+    }
     const key = Math.floor(until / BUCKET_MS);
     const bucket = groups.get(key) ?? [];
     bucket.push(npc);
@@ -855,7 +922,7 @@ function desyncClusteredTurnarounds(world: CareerEconomyWorld): void {
   }
   for (const [, group] of groups) {
     if (group.length < 2) continue;
-    // Anchor to the group's median busy time, then fan out.
+    // Anchor to the group's median busy time, then fan out (±20 min + small index skew).
     const sorted = group
       .map((n) => npcBusyUntilMs(n))
       .sort((a, b) => a - b);
@@ -864,8 +931,8 @@ function desyncClusteredTurnarounds(world: CareerEconomyWorld): void {
       const npc = group[i]!;
       const rng = mulberry32(hashSeed(`${world.seed}:${npc.id}:turnaround-desync`));
       const skewMs =
-        Math.floor((rng() - 0.5) * 40 * 60 * 1000) + i * 4 * 60 * 1000;
-      npc.busyUntilMs = anchor + skewMs;
+        Math.floor((rng() - 0.5) * 40 * 60 * 1000) + Math.min(i, 12) * 4 * 60 * 1000;
+      npc.busyUntilMs = Math.min(maxPlausibleBusyMs, Math.max(nowMs + 60_000, anchor + skewMs));
     }
   }
 }
@@ -957,7 +1024,7 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
     if (npc.currentFlightId === flight.id) {
       npc.currentFlightId = undefined;
     }
-    if (npcBusyUntilMs(npc) <= nowMs) {
+    if (groundHoldExpired(npcBusyUntilMs(npc), npc.busyUntilTick, nowMs, world.tick)) {
       finishTurnaround(world, npc, nowMs);
     }
   }
@@ -967,7 +1034,9 @@ function releaseTurnaroundIfDue(world: CareerEconomyWorld, nowMs: number): void 
   for (const npc of world.npcs) {
     if (npc.currentFlightId) continue;
     if (npc.status !== 'busy') continue;
-    if (npcBusyUntilMs(npc) > nowMs) continue;
+    if (!groundHoldExpired(npcBusyUntilMs(npc), npc.busyUntilTick, nowMs, world.tick)) {
+      continue;
+    }
     finishTurnaround(world, npc, nowMs);
   }
 }
@@ -975,12 +1044,12 @@ function releaseTurnaroundIfDue(world: CareerEconomyWorld, nowMs: number): void 
 /**
  * Settle NPC flights whose arrivesAtMs <= nowMs and free turnarounds / rest.
  * Idempotent — safe to call on every load / poll.
+ * Does not call ensureNpcFleet (avoid recursion from fleet top-up heal).
  */
-export function settleNpcOpsDue(
+function settleNpcOpsDueCore(
   world: CareerEconomyWorld,
-  nowMs = Date.now(),
+  nowMs: number,
 ): { settledFlights: number } {
-  ensureNpcFleet(world);
   let settledFlights = 0;
 
   releaseMxIfDue(world, nowMs);
@@ -1000,6 +1069,18 @@ export function settleNpcOpsDue(
   releaseMxIfDue(world, nowMs);
   releaseRestIfDue(world, nowMs);
   return { settledFlights };
+}
+
+/**
+ * Settle NPC flights whose arrivesAtMs <= nowMs and free turnarounds / rest.
+ * Idempotent — safe to call on every load / poll.
+ */
+export function settleNpcOpsDue(
+  world: CareerEconomyWorld,
+  nowMs = Date.now(),
+): { settledFlights: number } {
+  ensureNpcFleet(world);
+  return settleNpcOpsDueCore(world, nowMs);
 }
 
 function scoreLotForNpc(
@@ -1127,15 +1208,21 @@ function npcBidOnMarket(
   const idle = world.npcs.filter((n) => {
     if (n.currentFlightId) return false;
     if (n.status === 'maintenance') {
-      if (npcMxUntilMs(n) > batchNowMs) return false;
+      if (!groundHoldExpired(npcMxUntilMs(n), n.mxUntilTick, batchNowMs, world.tick)) {
+        return false;
+      }
       finishShopMx(world, n, batchNowMs);
     }
     if (n.status === 'resting') {
-      if (npcRestUntilMs(n) > batchNowMs) return false;
+      if (!groundHoldExpired(npcRestUntilMs(n), n.restUntilTick, batchNowMs, world.tick)) {
+        return false;
+      }
       clearCrewRest(n);
     }
-    if (n.status === 'busy' && npcBusyUntilMs(n) > batchNowMs) return false;
     if (n.status === 'busy') {
+      if (!groundHoldExpired(npcBusyUntilMs(n), n.busyUntilTick, batchNowMs, world.tick)) {
+        return false;
+      }
       finishTurnaround(world, n, batchNowMs);
     }
     if (n.status === 'resting' || n.status === 'maintenance') return false;
@@ -1160,13 +1247,16 @@ function npcBidOnMarket(
     const regionCapacity = npcRegionBidCapacity(world, npc.homeRegion, batchNowMs);
     const wx = regionalWeatherIndex(world, npc.homeRegion);
     const levelBid = hubLevelNpcBidMult(regionAverageHubLevel(world, npc.homeRegion));
+    // Pulse @160: util ~55% with idle sitting out — raise attempt rate and keep a
+    // higher floor when home-region capacity is thin (was self-starving bids).
     const bidChance =
-      (0.22 + npc.aggressiveness * 0.55) *
-      (0.45 + 0.55 * regionCapacity) *
+      (0.34 + npc.aggressiveness * 0.58) *
+      (0.58 + 0.42 * regionCapacity) *
       regionalWeatherBidMult(wx) *
       levelBid;
     if (rng() > bidChance) continue;
-    if (rng() > 0.55 + npc.reliability * 0.45) continue;
+    // Second gate: slightly more willing to commit once they attempt.
+    if (rng() > 0.62 + npc.reliability * 0.4) continue;
 
     let best: { lot: ShipmentLot; score: number } | undefined;
     for (const lot of world.lots) {
@@ -1176,7 +1266,7 @@ function npcBidOnMarket(
 
       const score = scoreLotForNpc(world, npc, lot, rng);
       if (score === null) continue;
-      const threshold = 0.55 + npc.reliability * 0.28 - npc.aggressiveness * 0.22;
+      const threshold = 0.48 + npc.reliability * 0.28 - npc.aggressiveness * 0.22;
       if (score < threshold) continue;
       if (!best || score > best.score) {
         best = { lot, score };
@@ -1273,13 +1363,22 @@ export function listNpcFleetStatus(
     let mxHoursLeft: number | undefined;
     if (flight && activity) {
       phase = activity.phase;
-    } else if (npc.status === 'maintenance' && npcMxUntilMs(npc) > nowMs) {
+    } else if (
+      npc.status === 'maintenance' &&
+      !groundHoldExpired(npcMxUntilMs(npc), npc.mxUntilTick, nowMs, world.tick)
+    ) {
       phase = 'maintenance';
       mxHoursLeft = Math.max(0, msToHours(npcMxUntilMs(npc) - nowMs));
-    } else if (npc.status === 'resting' && npcRestUntilMs(npc) > nowMs) {
+    } else if (
+      npc.status === 'resting' &&
+      !groundHoldExpired(npcRestUntilMs(npc), npc.restUntilTick, nowMs, world.tick)
+    ) {
       phase = 'resting';
       restHoursLeft = Math.max(0, msToHours(npcRestUntilMs(npc) - nowMs));
-    } else if (npc.status === 'busy' && npcBusyUntilMs(npc) > nowMs) {
+    } else if (
+      npc.status === 'busy' &&
+      !groundHoldExpired(npcBusyUntilMs(npc), npc.busyUntilTick, nowMs, world.tick)
+    ) {
       phase = 'turnaround';
       turnaroundHoursLeft = Math.max(0, msToHours(npcBusyUntilMs(npc) - nowMs));
     }

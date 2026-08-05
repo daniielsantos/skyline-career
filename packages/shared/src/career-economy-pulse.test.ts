@@ -88,6 +88,36 @@ describe('computeEconomyPulse', () => {
         assert.ok(Number.isFinite(c.payPerKgP50));
       }
     }
+
+    assert.ok(pulse.npc);
+    assert.equal(pulse.npc.fleetSize, world.npcs.length);
+    assert.ok(pulse.npc.targetFleetSize > 0);
+    assert.equal(
+      pulse.npc.airborne +
+        pulse.npc.idle +
+        pulse.npc.resting +
+        pulse.npc.maintenance +
+        pulse.npc.turnaround,
+      pulse.npc.fleetSize,
+    );
+    assert.ok(pulse.npc.readyPct >= 0 && pulse.npc.readyPct <= 1);
+    assert.ok(pulse.npc.utilizationPct >= 0 && pulse.npc.utilizationPct <= 1);
+    assert.ok(Array.isArray(pulse.npc.byRegion));
+    assert.ok(Array.isArray(pulse.npc.byClass));
+  });
+
+  it('flags missing NPCs and empty home regions', () => {
+    const world = createSeedEconomyWorld({ seed: 'pulse-npc-gap' });
+    const kept = world.npcs.slice(0, 10);
+    world.npcs = kept;
+    world.npcFlights = [];
+    const pulse = computeEconomyPulse(world);
+    assert.equal(pulse.npc.fleetSize, 10);
+    assert.ok(pulse.npc.fleetShortfall > 0);
+    assert.ok(pulse.npc.emptyHomeRegions > 0);
+    assert.ok(
+      pulse.notes.some((n) => n.includes('NPC fleet short')),
+    );
   });
 
   it('returns zeros when no available lots', () => {

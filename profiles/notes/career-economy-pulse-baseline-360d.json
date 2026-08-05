@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "kind": "career-economy-pulse-baseline",
+  "label": "360d-dry-sweep-2026-08",
+  "archivedAtIso": "2026-08-05T04:30:00.000Z",
+  "notesPath": "profiles/notes/career-economy-pulse-baseline-360d.md",
+  "reproduce": {
+    "command": "node packages/agent/dist/cli.js career pulse --days 360",
+    "ticksPerDay": 96,
+    "sampleEveryTicks": 96,
+    "wroteEconomy": false
+  },
+  "productDecisions": {
+    "physicalFills": "keep",
+    "rewardLadder": "keep-value-jackpot",
+    "hubSpecialization": "soft-biases-only",
+    "newCommodities": "defer",
+    "nextWork": "playtest-early-dry-and-board-legibility"
+  },
+  "run": {
+    "days": 360,
+    "ticksAdvanced": 34560,
+    "sampleCount": 361,
+    "sampleEvery": 96
+  },
+  "board": {
+    "start": { "availableLots": 4637, "payUsdP50": 9066, "payUsdAvg": 35903, "intlSharePct": 0.01 },
+    "end": { "availableLots": 6710, "payUsdP50": 13029, "payUsdAvg": 65770, "intlSharePct": 0.01 },
+    "delta": { "availableLots": 2073, "payUsdP50": 3963, "payUsdAvg": 29867 }
+  },
+  "yearMeans": {
+    "days0to180": {
+      "availableLotsAvg": 5719,
+      "payUsdP50Avg": 17188,
+      "npcUtilizationAvg": 0.37,
+      "npcReadyPctAvg": 0.057,
+      "npcRestingAvg": 72
+    },
+    "days180to360": {
+      "availableLotsAvg": 6801,
+      "payUsdP50Avg": 12477,
+      "npcUtilizationAvg": 0.372,
+      "npcReadyPctAvg": 0.052,
+      "npcRestingAvg": 73
+    }
+  },
+  "npc": {
+    "start": {
+      "fleetSize": 160,
+      "airborne": 78,
+      "readyPct": 0.11,
+      "utilizationPct": 0.49,
+      "thinRegions": 11,
+      "hubRegionCount": 11,
+      "cargoKgAirborne": 551867
+    },
+    "end": {
+      "fleetSize": 160,
+      "airborne": 62,
+      "readyPct": 0.03,
+      "utilizationPct": 0.39,
+      "thinRegions": 11,
+      "hubRegionCount": 11,
+      "cargoKgAirborne": 725433
+    }
+  },
+  "commodities": {
+    "electronics": {
+      "start": { "availableLots": 817, "payUsdP50": 31192, "netPayUsdP50": 28123, "marginPctP50": 0.96, "fillP50": 0.12 },
+      "end": { "availableLots": 1246, "payUsdP50": 49708, "netPayUsdP50": 44812, "marginPctP50": 0.97, "fillP50": 0.38 }
+    },
+    "perishables": {
+      "start": { "availableLots": 1297, "payUsdP50": 6706, "netPayUsdP50": 3923, "marginPctP50": 0.75, "fillP50": 0.53 },
+      "end": { "availableLots": 1424, "payUsdP50": 9548, "netPayUsdP50": 7488, "marginPctP50": 0.85, "fillP50": 0.58 }
+    },
+    "machinery": {
+      "start": { "availableLots": 803, "payUsdP50": 12926, "netPayUsdP50": 10182, "marginPctP50": 0.91, "fillP50": 0.11 },
+      "end": { "availableLots": 1496, "payUsdP50": 16931, "netPayUsdP50": 13510, "marginPctP50": 0.9, "fillP50": 0.43 }
+    },
+    "general": {
+      "start": { "availableLots": 802, "payUsdP50": 3774, "netPayUsdP50": 1023, "marginPctP50": 0.47, "fillP50": 0.62 },
+      "end": { "availableLots": 1172, "payUsdP50": 4393, "netPayUsdP50": 2005, "marginPctP50": 0.5, "fillP50": 0.55 }
+    },
+    "supplies": {
+      "start": { "availableLots": 918, "payUsdP50": 3836, "netPayUsdP50": 1267, "marginPctP50": 0.45, "fillP50": 0.71 },
+      "end": { "availableLots": 1372, "payUsdP50": 6455, "netPayUsdP50": 3976, "marginPctP50": 0.71, "fillP50": 0.65 }
+    }
+  },
+  "checkpoints": [
+    {
+      "day": 0,
+      "availableLots": 4637,
+      "payUsdP50": 9066,
+      "npcReadyPct": 0.11,
+      "npcUtilizationPct": 0.49,
+      "fills": { "electronics": 0.12, "machinery": 0.11, "general": 0.62, "supplies": 0.71, "perishables": 0.53 },
+      "margins": { "electronics": 0.96, "machinery": 0.91, "general": 0.47, "supplies": 0.45, "perishables": 0.75 }
+    },
+    {
+      "day": 90,
+      "availableLots": 5791,
+      "payUsdP50": 19450,
+      "npcReadyPct": 0.06,
+      "npcUtilizationPct": 0.36,
+      "fills": { "electronics": 0.3, "machinery": 0.36, "general": 0.57, "supplies": 0.68, "perishables": 0.63 },
+      "margins": { "electronics": 0.97, "machinery": 0.91, "general": 0.54, "supplies": 0.77, "perishables": 0.87 }
+    },
+    {
+      "day": 180,
+      "availableLots": 6538,
+      "payUsdP50": 13744,
+      "npcReadyPct": 0.03,
+      "npcUtilizationPct": 0.39,
+      "fills": { "electronics": 0.41, "machinery": 0.41, "general": 0.56, "supplies": 0.64, "perishables": 0.59 },
+      "margins": { "electronics": 0.97, "machinery": 0.92, "general": 0.53, "supplies": 0.68, "perishables": 0.81 }
+    },
+    {
+      "day": 270,
+      "availableLots": 6752,
+      "payUsdP50": 11982,
+      "npcReadyPct": 0.06,
+      "npcUtilizationPct": 0.39,
+      "fills": { "electronics": 0.35, "machinery": 0.35, "general": 0.55, "supplies": 0.61, "perishables": 0.58 },
+      "margins": { "electronics": 0.97, "machinery": 0.9, "general": 0.44, "supplies": 0.67, "perishables": 0.84 }
+    },
+    {
+      "day": 360,
+      "availableLots": 6710,
+      "payUsdP50": 13029,
+      "npcReadyPct": 0.03,
+      "npcUtilizationPct": 0.39,
+      "fills": { "electronics": 0.38, "machinery": 0.43, "general": 0.55, "supplies": 0.65, "perishables": 0.58 },
+      "margins": { "electronics": 0.97, "machinery": 0.9, "general": 0.5, "supplies": 0.71, "perishables": 0.85 }
+    }
+  ]
+}

@@ -386,6 +386,104 @@ export function estimateRouteCargoLimit(
   };
 }
 
+/** Board / Freights estimate: lift + Jet-A cost for a chosen class/airframe. */
+export type BoardLotEconomics = {
+  liftKg: number;
+  /** Pro-rated contract pay for `liftKg`. */
+  payUsd: number;
+  fuelCostUsd: number;
+  netUsd: number;
+  marginPct: number;
+  estimatedBlockFuelKg: number;
+  fuelFeasible: boolean;
+  inRange: boolean;
+};
+
+/**
+ * Estimate net (pay − Jet-A) for one market lot on a specific aircraft.
+ * Uses the same route fuel planning as staging (`estimateRouteCargoLimit` + `quoteFuelUplift`).
+ */
+export function estimateBoardLotEconomics(
+  world: CareerEconomyWorld,
+  opts: {
+    originIcao: string;
+    destIcao: string;
+    distanceNm: number;
+    availableKg: number;
+    quantityKg: number;
+    lotPayUsd: number;
+    aircraftClassId: FreighterClassId;
+    structuralMaxCargoKg: number;
+    weights?: {
+      oewKg?: number;
+      mtowKg?: number;
+      fuelCapacityKg?: number;
+      fuelBurnKgPerNm?: number;
+      fuelTaxiKg?: number;
+      fuelReserveKg?: number;
+      fuelRouteFactor?: number;
+      airframeTypeId?: string;
+    };
+    maxRangeNm?: number;
+    costMult?: number;
+  },
+): BoardLotEconomics | null {
+  const distanceNm = opts.distanceNm;
+  if (!Number.isFinite(distanceNm) || distanceNm <= 0) return null;
+  const aircraft = getAircraftClass(opts.aircraftClassId);
+  const maxRangeNm =
+    typeof opts.maxRangeNm === 'number' &&
+    Number.isFinite(opts.maxRangeNm) &&
+    opts.maxRangeNm > 0
+      ? opts.maxRangeNm
+      : aircraft.maxRangeNm;
+  const inRange = distanceNm <= maxRangeNm;
+  const route = estimateRouteCargoLimit(
+    opts.aircraftClassId,
+    distanceNm,
+    opts.structuralMaxCargoKg,
+    opts.weights ?? {},
+  );
+  const liftKg = Math.max(
+    0,
+    Math.min(Math.floor(opts.availableKg), route.operationalMaxCargoKg),
+  );
+  let fuelCostUsd: number;
+  try {
+    fuelCostUsd = quoteFuelUplift(world, {
+      originIcao: opts.originIcao,
+      destIcao: opts.destIcao,
+      aircraftClassId: opts.aircraftClassId,
+      distanceNm,
+      requestedKg: route.estimatedBlockFuelKg,
+      costMult: opts.costMult,
+    }).costUsd;
+  } catch {
+    return null;
+  }
+  const qty =
+    opts.quantityKg > 0
+      ? opts.quantityKg
+      : Math.max(opts.availableKg, 1);
+  const payUsd =
+    liftKg > 0
+      ? Math.max(0, Math.round((liftKg / qty) * opts.lotPayUsd))
+      : 0;
+  const netUsd = payUsd - fuelCostUsd;
+  const marginPct =
+    payUsd > 0 ? netUsd / payUsd : netUsd < 0 ? -1 : 0;
+  return {
+    liftKg,
+    payUsd,
+    fuelCostUsd,
+    netUsd,
+    marginPct,
+    estimatedBlockFuelKg: route.estimatedBlockFuelKg,
+    fuelFeasible: route.fuelFeasible,
+    inRange,
+  };
+}
+
 export function parseFreighterClassId(raw: string | undefined): FreighterClassId | undefined {
   if (!raw) return undefined;
   if (
@@ -1562,6 +1660,8 @@ export function listViableMarketLots(
     query?: string;
     /** Override class max (e.g. live SimBrief maxcargo). */
     maxCargoKg?: number;
+    /** Override class max range (e.g. catalog airframe). */
+    maxRangeNm?: number;
     nowMs?: number;
   } = {},
 ): MarketLotView[] {
@@ -1570,13 +1670,19 @@ export function listViableMarketLots(
     opts.maxCargoKg !== undefined && Number.isFinite(opts.maxCargoKg) && opts.maxCargoKg > 0
       ? Math.floor(opts.maxCargoKg)
       : aircraft.maxCargoKg;
+  const maxRangeNm =
+    opts.maxRangeNm !== undefined &&
+    Number.isFinite(opts.maxRangeNm) &&
+    opts.maxRangeNm > 0
+      ? opts.maxRangeNm
+      : aircraft.maxRangeNm;
   return listMarketLots(world, opts).filter((row) => {
     const distance = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
     return (
       row.availableKg >= 1 &&
       maxCargoKg >= 1 &&
       distance !== undefined &&
-      distance <= aircraft.maxRangeNm
+      distance <= maxRangeNm
     );
   });
 }

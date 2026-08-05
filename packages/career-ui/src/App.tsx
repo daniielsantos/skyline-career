@@ -54,6 +54,7 @@ import {
   postWatchStart,
   postWatchStop,
   type AircraftClass,
+  type AircraftDeliveryQuoteView,
   type AircraftListing,
   type AirportLot,
   type AirportMovement,
@@ -173,6 +174,7 @@ type MarketSortKey =
   | 'load'
   | 'expires'
   | 'pay'
+  | 'net'
   | 'access';
 type SortDirection = 'asc' | 'desc';
 type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
@@ -203,6 +205,17 @@ function compareAirportLot(
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
       return a.payUsd - b.payUsd;
+    case 'net': {
+      const aNet =
+        typeof a.estimatedNetUsd === 'number' && Number.isFinite(a.estimatedNetUsd)
+          ? a.estimatedNetUsd
+          : Number.NEGATIVE_INFINITY;
+      const bNet =
+        typeof b.estimatedNetUsd === 'number' && Number.isFinite(b.estimatedNetUsd)
+          ? b.estimatedNetUsd
+          : Number.NEGATIVE_INFINITY;
+      return aNet - bNet;
+    }
     case 'access':
       return Number(isLocked(a.commodityId)) - Number(isLocked(b.commodityId));
   }
@@ -1599,6 +1612,8 @@ export function App() {
     useState<AccessFilter>('');
   /** When true, terminal Contracts outbound shows only dest ∈ other owned FBOs. */
   const [contractsSisterOnly, setContractsSisterOnly] = useState(false);
+  const [contractsProfitableOnly, setContractsProfitableOnly] = useState(false);
+  const [contractsViableOnly, setContractsViableOnly] = useState(true);
   /** When Hangar was opened to ferry for a contract, Back restores this terminal. */
   const [airportReturn, setAirportReturn] = useState<{
     icao: string;
@@ -1629,6 +1644,10 @@ export function App() {
     minPayUsd: '',
     access: '' as AccessFilter,
     lane: '' as LaneFilter,
+    airframe: '',
+    profitableOnly: false,
+    viableOnly: false,
+    aircraft: undefined as AircraftClass | undefined,
   });
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
@@ -1739,6 +1758,11 @@ export function App() {
   const [minimumPayUsd, setMinimumPayUsd] = useState('');
   const [accessFilter, setAccessFilter] = useState<AccessFilter>('');
   const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
+  const [boardAircraftId, setBoardAircraftId] = useState('');
+  const [profitableOnly, setProfitableOnly] = useState(false);
+  /** Default on: hide locked / OOR / zero-lift when an aircraft is selected. */
+  const [viableOnly, setViableOnly] = useState(true);
+  const boardAircraftInitRef = useRef(false);
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
@@ -1784,6 +1808,9 @@ export function App() {
     }>
   >([]);
   const [aircraftListings, setAircraftListings] = useState<AircraftListing[]>([]);
+  const [aircraftDeliveryQuotes, setAircraftDeliveryQuotes] = useState<
+    Record<string, AircraftDeliveryQuoteView>
+  >({});
   const [aircraftCatalog, setAircraftCatalog] = useState<
     Array<{
       id: AircraftClass;
@@ -1857,7 +1884,7 @@ export function App() {
       if (loc.airportIcao) {
         void (async () => {
           try {
-            const view = await fetchAirport(loc.airportIcao!);
+            const view = await fetchAirportView(loc.airportIcao!);
             setAirportView(view);
             setAirportIcao(loc.airportIcao);
             setTerminalSection('inventory');
@@ -1883,7 +1910,7 @@ export function App() {
     let cancelled = false;
     void (async () => {
       try {
-        const view = await fetchAirport(initialLocation.airportIcao!);
+        const view = await fetchAirportView(initialLocation.airportIcao!);
         if (!cancelled) {
           setAirportView(view);
           setTerminalSection('inventory');
@@ -1908,7 +1935,10 @@ export function App() {
     setError(null);
     const [state, market, missionState, npcState, acMarket] = await Promise.all([
       fetchState(),
-      fetchMarket(undefined, marketFetchOptsRef.current),
+      fetchMarket(
+        marketFetchOptsRef.current.aircraft,
+        marketFetchOptsRef.current,
+      ),
       fetchMissions(),
       fetchNpcFleet(),
       fetchAircraftMarket().catch(() => null),
@@ -1973,6 +2003,7 @@ export function App() {
     if (state.companyCrew) setCompanyCrew(state.companyCrew);
     if (acMarket) {
       setAircraftListings(acMarket.listings);
+      setAircraftDeliveryQuotes(acMarket.deliveryQuotes ?? {});
       setAircraftCatalog(acMarket.catalog);
       setAirframePerf(acMarket.airframePerf ?? {});
       setAircraftMarketDay(acMarket.dayIndex);
@@ -1984,7 +2015,7 @@ export function App() {
       setSignupHub((prev) => prev || firstHub || 'SBGR');
     }
     if (airportIcao) {
-      const view = await fetchAirport(airportIcao);
+      const view = await fetchAirportView(airportIcao);
       setAirportView(view);
     }
   }, [airportIcao]);
@@ -2046,6 +2077,7 @@ export function App() {
 
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
+    const boardAcf = fleet.find((a) => a.id === boardAircraftId);
     const nextOpts = {
       originQuery: originFilter.trim(),
       destQuery: destFilter.trim(),
@@ -2059,6 +2091,10 @@ export function App() {
       minPayUsd: minimumPayUsd,
       access: accessFilter,
       lane: laneFilter,
+      airframe: boardAcf?.airframeTypeId?.trim() ?? '',
+      profitableOnly: Boolean(boardAcf && profitableOnly),
+      viableOnly: Boolean(boardAcf && viableOnly),
+      aircraft: boardAcf?.aircraftClassId,
     };
     const prev = marketFetchOptsRef.current;
     const unchanged =
@@ -2073,12 +2109,16 @@ export function App() {
       prev.expiresWithinHours === nextOpts.expiresWithinHours &&
       prev.minPayUsd === nextOpts.minPayUsd &&
       prev.access === nextOpts.access &&
-      prev.lane === nextOpts.lane;
+      prev.lane === nextOpts.lane &&
+      prev.airframe === nextOpts.airframe &&
+      prev.profitableOnly === nextOpts.profitableOnly &&
+      prev.viableOnly === nextOpts.viableOnly &&
+      prev.aircraft === nextOpts.aircraft;
     if (unchanged) return;
 
     let cancelled = false;
     const timer = setTimeout(() => {
-      void fetchMarket(undefined, nextOpts)
+      void fetchMarket(nextOpts.aircraft, nextOpts)
         .then((market) => {
           if (cancelled) return;
           marketFetchOptsRef.current = nextOpts;
@@ -2104,16 +2144,20 @@ export function App() {
     };
   }, [
     accessFilter,
+    boardAircraftId,
     cargoFilter,
     destFilter,
     distanceMaxNm,
     expiresWithinHours,
+    fleet,
     laneFilter,
     loadMaxKg,
     marketPage,
     marketSorts,
     minimumPayUsd,
     originFilter,
+    profitableOnly,
+    viableOnly,
   ]);
 
   useEffect(() => {
@@ -3184,7 +3228,7 @@ export function App() {
     const next = icao.toUpperCase();
     const section = opts?.section ?? 'inventory';
     await run(async () => {
-      const view = await fetchAirport(next);
+      const view = await fetchAirportView(next);
       setAirportView(view);
       if (view.playerFbos) setPlayerFbos(view.playerFbos);
       if (airportIcao !== next) {
@@ -3192,6 +3236,9 @@ export function App() {
         setContractsLane('outbound');
         setContractsSorts([...DEFAULT_BOARD_SORTS]);
         setContractsAccessFilter('');
+        setContractsSisterOnly(false);
+        setContractsProfitableOnly(false);
+        setContractsViableOnly(true);
         setContractsPage(1);
       } else if (opts?.section) {
         setTerminalSection(opts.section);
@@ -3237,6 +3284,9 @@ export function App() {
     setContractsLane('outbound');
     setContractsSorts([...DEFAULT_BOARD_SORTS]);
     setContractsAccessFilter('');
+    setContractsSisterOnly(false);
+    setContractsProfitableOnly(false);
+    setContractsViableOnly(true);
     setContractsPage(1);
     setAirportReturn(null);
     writeCareerLocation({ tab, airportIcao: null });
@@ -3249,6 +3299,9 @@ export function App() {
     setContractsLane('outbound');
     setContractsSorts([...DEFAULT_BOARD_SORTS]);
     setContractsAccessFilter('');
+    setContractsSisterOnly(false);
+    setContractsProfitableOnly(false);
+    setContractsViableOnly(true);
     setContractsPage(1);
     setTab(next);
     writeCareerLocation({ tab: next, airportIcao: null }, opts);
@@ -3268,7 +3321,7 @@ export function App() {
     setAirportReturn(null);
     setSidebarOpen(false);
     await run(async () => {
-      const view = await fetchAirport(icao);
+      const view = await fetchAirportView(icao);
       setAirportView(view);
       if (view.playerFbos) setPlayerFbos(view.playerFbos);
       setAirportIcao(icao);
@@ -3410,6 +3463,7 @@ export function App() {
   async function refreshAircraftMarket() {
     const acMarket = await fetchAircraftMarket();
     setAircraftListings(acMarket.listings);
+    setAircraftDeliveryQuotes(acMarket.deliveryQuotes ?? {});
     setAircraftCatalog(acMarket.catalog);
     setAirframePerf(acMarket.airframePerf ?? {});
     setAircraftMarketDay(acMarket.dayIndex);
@@ -3430,29 +3484,51 @@ export function App() {
     }
   }
 
-  async function onBuyAircraft(listingId: string) {
+  async function onBuyAircraft(
+    listingId: string,
+    opts?: { deliver?: boolean },
+  ) {
     await run(async () => {
-      const result = await postAircraftBuy({ listingId });
+      const result = await postAircraftBuy({
+        listingId,
+        deliver: opts?.deliver === true,
+      });
       setFleet(result.fleet);
       setWallet(result.walletUsd);
       setAircraftListings(result.listings);
+      setAircraftDeliveryQuotes({});
       setToastKind('ok');
+      const deliveryNote =
+        (result.deliveryFeeUsd ?? 0) > 0
+          ? ` (+${formatMoney(result.deliveryFeeUsd!)} delivery)`
+          : '';
       setToast(
-        `Purchased ${result.aircraft.label} for ${formatMoney(result.debitUsd)} · parked at ${result.aircraft.locationIcao}`,
+        `Purchased ${result.aircraft.label} for ${formatMoney(result.debitUsd)}${deliveryNote} · parked at ${result.aircraft.locationIcao}`,
       );
       goToTab('hangar');
     });
   }
 
-  async function onLeaseAircraft(listingId: string) {
+  async function onLeaseAircraft(
+    listingId: string,
+    opts?: { deliver?: boolean },
+  ) {
     await run(async () => {
-      const result = await postAircraftLease({ listingId });
+      const result = await postAircraftLease({
+        listingId,
+        deliver: opts?.deliver === true,
+      });
       setFleet(result.fleet);
       setWallet(result.walletUsd);
       setAircraftListings(result.listings);
+      setAircraftDeliveryQuotes({});
       setToastKind('ok');
+      const deliveryNote =
+        (result.deliveryFeeUsd ?? 0) > 0
+          ? ` (+${formatMoney(result.deliveryFeeUsd!)} delivery)`
+          : '';
       setToast(
-        `Lease signed · ${result.aircraft.label} · deposit ${formatMoney(result.debitUsd)}`,
+        `Lease signed · ${result.aircraft.label} · due ${formatMoney(result.debitUsd)}${deliveryNote} · parked at ${result.aircraft.locationIcao}`,
       );
       goToTab('hangar');
     });
@@ -3673,7 +3749,7 @@ export function App() {
         `FBO T1 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}${result.companyCrew ? ` · ${result.companyCrew.slotsUnlocked} crew slot(s)` : ''}`,
       );
       if (airportIcao) {
-        const view = await fetchAirport(airportIcao);
+        const view = await fetchAirportView(airportIcao);
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
@@ -3700,7 +3776,7 @@ export function App() {
         `FBO T2 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}${result.companyCrew ? ` · ${result.companyCrew.slotsUnlocked} crew slot(s)` : ''}`,
       );
       if (airportIcao) {
-        const view = await fetchAirport(airportIcao);
+        const view = await fetchAirportView(airportIcao);
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
@@ -3755,7 +3831,7 @@ export function App() {
         `Held at FBO · ${formatTonnes(result.hold.cargoKg)} → ${result.hold.destIcao} (no inbound until Dispatch)`,
       );
       if (airportIcao) {
-        const view = await fetchAirport(airportIcao);
+        const view = await fetchAirportView(airportIcao);
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
@@ -3780,7 +3856,7 @@ export function App() {
       setToastKind('ok');
       setToast(`Hold cancelled · ${formatTonnes(result.releasedKg)} released`);
       if (airportIcao) {
-        const view = await fetchAirport(airportIcao);
+        const view = await fetchAirportView(airportIcao);
         setAirportView(view);
       }
       await refresh();
@@ -3807,7 +3883,7 @@ export function App() {
         `Rerouted ${result.previousDestIcao}→${result.destIcao} · fee ${formatMoney(result.feeUsd)}`,
       );
       if (airportIcao) {
-        const view = await fetchAirport(airportIcao);
+        const view = await fetchAirportView(airportIcao);
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
@@ -3858,11 +3934,11 @@ export function App() {
       setSplitHoldId(null);
       setToastKind('ok');
       setToast(
-        `Split · ${result.missions.length} Accepted mission(s) ready` +
+        `Crew fly · ${result.missions.length} Accepted leg(s) ready` +
           (result.remainingKg > 0
             ? ` · ${formatTonnes(result.remainingKg)} still bonded`
             : '') +
-          ` · Crew fly on FBO (Accepted list) or Hangar → Crew`,
+          ` · Send from Accepted list below or Hangar → Crew`,
       );
       await refresh();
     });
@@ -3887,7 +3963,7 @@ export function App() {
           (result.merged ? ' · merged into existing hold' : ''),
       );
       if (airportIcao) {
-        const view = await fetchAirport(airportIcao);
+        const view = await fetchAirportView(airportIcao);
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
@@ -3915,57 +3991,6 @@ export function App() {
         /* ignore */
       });
     }
-  }
-
-  async function onCrewDispatchHold(holdId: string, crewMemberId?: string) {
-    const hold = playerFbos?.holds.find((h) => h.id === holdId);
-    const outboundFee =
-      hold && companyCrew
-        ? Math.max(50, Math.round(hold.payUsd * companyCrew.feeFrac))
-        : null;
-    const returnFee =
-      outboundFee != null ? Math.max(50, Math.round(outboundFee * 0.5)) : null;
-    const parked = fleet.find(
-      (a) =>
-        a.status === 'parked' &&
-        hold &&
-        a.locationIcao.toUpperCase() === hold.originIcao.toUpperCase(),
-    );
-    const crewName = crewMemberId
-      ? companyCrew?.members?.find((m) => m.id === crewMemberId)?.displayName
-      : undefined;
-    const ok = await confirm({
-      title: 'Send with company crew?',
-      body: hold
-        ? `${crewName ?? 'Crew'} flies ${hold.originIcao}→${hold.destIcao} then empty return to ${hold.originIcao} (wall-clock). Out ~${outboundFee != null ? formatMoney(outboundFee) : '12%'} · return ~${returnFee != null ? formatMoney(returnFee) : '½ fee'}${parked ? ` · ${parked.label}` : ''}. No Watch — settles on ETA.`
-        : 'Crew flies this hold on a parked airframe at origin (round-trip).',
-      confirmLabel: 'Send with crew',
-    });
-    if (!ok) return;
-    await run(
-      async () => {
-        setCrewDispatchBusy(true);
-        try {
-          const result = await postCrewDispatch({
-            holdId,
-            aircraftId: parked?.id,
-            crewMemberId,
-          });
-          setPlayerFbos(result.playerFbos);
-          setCompanyCrew(result.companyCrew);
-          setMissions(result.missions.slice().reverse());
-          setWallet(result.walletUsd);
-          if (result.fleet) setFleet(result.fleet);
-          setToastKind('ok');
-          setToast(
-            `Crew airborne${crewName ? ` · ${crewName}` : ''} · out ${formatMoney(result.crewFeeUsd)} · return ${formatMoney(result.returnFeeUsd)}${result.fuelDebitUsd > 0 ? ` · fuel ${formatMoney(result.fuelDebitUsd)}` : ''}`,
-          );
-        } finally {
-          setCrewDispatchBusy(false);
-        }
-      },
-      { refreshAfter: false, lockUi: false },
-    );
   }
 
   async function onCrewDispatchMission(
@@ -4061,9 +4086,14 @@ export function App() {
     });
   }
 
-  async function onFerry(aircraftId: string, destIcao: string) {
+  async function onFerry(
+    aircraftId: string,
+    destIcao: string,
+    opts?: { finalDest?: string },
+  ) {
     if (!destIcao.trim()) return;
     const dest = destIcao.trim().toUpperCase();
+    const finalDest = opts?.finalDest?.trim().toUpperCase() || dest;
     let quoteRes: Awaited<ReturnType<typeof postFerry>>;
     try {
       setBusy(true);
@@ -4080,10 +4110,14 @@ export function App() {
       setBusy(false);
     }
     const quote = quoteRes.quote;
+    const remainingNote =
+      dest !== finalDest
+        ? ` Next stop toward ${finalDest}.`
+        : '';
     const ok = await confirm({
       title: `Ferry ${quote.originIcao} → ${quote.destIcao}?`,
-      body: `${Math.round(quote.distanceNm)} nm · fee ${formatMoney(quote.ferryFeeUsd)} · fuel ${formatMoney(quote.fuelCostUsd)} · total ${formatMoney(quote.totalCostUsd)} (instant relocation).`,
-      confirmLabel: 'Ferry now',
+      body: `${Math.round(quote.distanceNm)} nm · fee ${formatMoney(quote.ferryFeeUsd)} · fuel ${formatMoney(quote.fuelCostUsd)} · total ${formatMoney(quote.totalCostUsd)} (instant relocation).${remainingNote}`,
+      confirmLabel: dest !== finalDest ? 'Ferry next leg' : 'Ferry now',
       cancelLabel: 'Not now',
       tone: 'warn',
     });
@@ -4095,10 +4129,18 @@ export function App() {
       });
       if (result.fleet) setFleet(result.fleet);
       setWallet(result.walletUsd);
-      setFerryDest('');
+      const arrivedAt =
+        result.aircraft?.locationIcao?.trim().toUpperCase() ?? dest;
+      if (arrivedAt === finalDest) {
+        setFerryDest('');
+      } else {
+        setFerryDest(finalDest);
+      }
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
       setToast(
-        `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}`,
+        arrivedAt === finalDest
+          ? `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}`
+          : `Ferry leg · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)} · continue toward ${finalDest}`,
       );
     });
   }
@@ -4249,9 +4291,18 @@ export function App() {
       goToTab('staging');
       return;
     }
-    const parkedHere = fleet.find(
-      (a) => a.status === 'parked' && a.locationIcao === lot.originIcao,
-    );
+    const parkedHere =
+      (boardAircraftId
+        ? fleet.find(
+            (a) =>
+              a.id === boardAircraftId &&
+              a.status === 'parked' &&
+              a.locationIcao === lot.originIcao,
+          )
+        : undefined) ??
+      fleet.find(
+        (a) => a.status === 'parked' && a.locationIcao === lot.originIcao,
+      );
     if (!parkedHere) {
       const parked = fleet.find((a) => a.status === 'parked');
       setError(
@@ -5035,6 +5086,77 @@ export function App() {
     () => fleet.filter((a) => (a.ownership ?? 'owned') === 'owned').length,
     [fleet],
   );
+  const boardEstimateFleet = useMemo(
+    () =>
+      fleet.filter(
+        (a) =>
+          a.status === 'parked' ||
+          a.status === 'assigned' ||
+          a.status === 'maintenance',
+      ),
+    [fleet],
+  );
+  const boardAircraft = useMemo(
+    () => boardEstimateFleet.find((a) => a.id === boardAircraftId) ?? null,
+    [boardAircraftId, boardEstimateFleet],
+  );
+  const boardEstimateOptsRef = useRef<{
+    aircraft?: AircraftClass;
+    airframe?: string;
+  }>({});
+  boardEstimateOptsRef.current = boardAircraft
+    ? {
+        aircraft: boardAircraft.aircraftClassId,
+        airframe: boardAircraft.airframeTypeId,
+      }
+    : {};
+  function fetchAirportView(icao: string) {
+    return fetchAirport(icao, boardEstimateOptsRef.current);
+  }
+  useEffect(() => {
+    if (!airportIcao) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void fetchAirportView(airportIcao)
+        .then((view) => {
+          if (cancelled) return;
+          setAirportView(view);
+          if (view.playerFbos) setPlayerFbos(view.playerFbos);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setError(err instanceof Error ? err.message : String(err));
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // Refetch terminal lots when the estimate aircraft changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardAircraftId, airportIcao]);
+  useEffect(() => {
+    if (boardEstimateFleet.length === 0) {
+      if (boardAircraftId) setBoardAircraftId('');
+      boardAircraftInitRef.current = false;
+      return;
+    }
+    if (
+      boardAircraftId &&
+      boardEstimateFleet.some((a) => a.id === boardAircraftId)
+    ) {
+      boardAircraftInitRef.current = true;
+      return;
+    }
+    if (!boardAircraftInitRef.current || !boardAircraftId) {
+      const parked = boardEstimateFleet.find((a) => a.status === 'parked');
+      setBoardAircraftId((parked ?? boardEstimateFleet[0]!).id);
+      boardAircraftInitRef.current = true;
+      return;
+    }
+    const parked = boardEstimateFleet.find((a) => a.status === 'parked');
+    setBoardAircraftId((parked ?? boardEstimateFleet[0]!).id);
+  }, [boardAircraftId, boardEstimateFleet]);
   const hasListedAircraft = useMemo(
     () => fleet.some((a) => a.status === 'listed'),
     [fleet],
@@ -5050,7 +5172,9 @@ export function App() {
       expiresWithinHours ||
       minimumPayUsd ||
       accessFilter ||
-      laneFilter,
+      laneFilter ||
+      profitableOnly ||
+      (Boolean(boardAircraft) && !viableOnly),
   );
 
   function updateMarketFilter(setter: (value: string) => void, value: string) {
@@ -5068,7 +5192,43 @@ export function App() {
     setMinimumPayUsd('');
     setAccessFilter('');
     setLaneFilter('');
+    setProfitableOnly(false);
+    setViableOnly(true);
     setMarketPage(1);
+  }
+
+  function focusNearMyAircraft() {
+    const icao = boardAircraft?.locationIcao?.trim().toUpperCase();
+    if (!icao) return;
+    setOriginFilter(icao);
+    setDestFilter('');
+    setViableOnly(true);
+    setProfitableOnly(true);
+    setAccessFilter('open');
+    setMarketPage(1);
+  }
+
+  /** Open Hangar ferry with dest = current terminal (parked board aircraft, else any parked). */
+  function ferryAircraftToCurrentTerminal() {
+    if (!airportView) return;
+    const dest = airportView.airport.icao.trim().toUpperCase();
+    const acf =
+      boardAircraft?.status === 'parked'
+        ? boardAircraft
+        : boardEstimateFleet.find((a) => a.status === 'parked');
+    if (!acf) {
+      setError('No parked aircraft available to ferry');
+      return;
+    }
+    const from = acf.locationIcao.trim().toUpperCase();
+    if (from === dest) return;
+    setAirportReturn({
+      icao: dest,
+      section: terminalSection,
+    });
+    setFerryDest(dest);
+    setHangarPane('aircraft');
+    goToTab('hangar');
   }
 
   function toggleMarketSort(key: MarketSortKey) {
@@ -5268,6 +5428,37 @@ export function App() {
         sisters.has(lot.destIcao.toUpperCase()),
       );
     }
+    if (contractsProfitableOnly) {
+      filtered = filtered.filter(
+        (lot) =>
+          typeof lot.estimatedNetUsd === 'number' &&
+          Number.isFinite(lot.estimatedNetUsd) &&
+          lot.estimatedNetUsd > 0 &&
+          lot.estimatedInRange !== false,
+      );
+    }
+    if (contractsViableOnly && boardAircraft) {
+      filtered = filtered.filter((lot) => {
+        if (isCargoOpsCommodityLocked(lot.commodityId)) return false;
+        if (lot.estimatedInRange === false) return false;
+        if (lot.estimatedFuelFeasible === false) return false;
+        if (
+          typeof lot.estimatedLiftKg === 'number' &&
+          lot.estimatedLiftKg <= 0
+        ) {
+          return false;
+        }
+        if (
+          lot.estimatedLiftKg === null ||
+          lot.estimatedLiftKg === undefined ||
+          lot.estimatedInRange === null ||
+          lot.estimatedInRange === undefined
+        ) {
+          return false;
+        }
+        return true;
+      });
+    }
     return sortAirportLots(
       filtered,
       contractsSorts,
@@ -5278,6 +5469,9 @@ export function App() {
     contractsSorts,
     contractsAccessFilter,
     contractsSisterOnly,
+    contractsProfitableOnly,
+    contractsViableOnly,
+    boardAircraft,
     contractsLane,
     sisterFboIcaos,
     cargoOps,
@@ -6239,24 +6433,11 @@ export function App() {
                                         type="button"
                                         className="action"
                                         disabled={busy}
+                                        title="Assign cargo to parked airframes, then send with company crew from the Accepted list"
                                         onClick={() => onSplitFboHold(hold.id)}
                                       >
-                                        Split
+                                        Crew fly
                                       </button>
-                                      {(companyCrew?.slotsFree ?? 0) > 0 &&
-                                      (companyCrew?.members?.length ?? 0) > 0 ? (
-                                        <button
-                                          type="button"
-                                          className="action"
-                                          disabled={busy}
-                                          title="Sends the whole hold with the first idle crew (pick crew on Accepted legs after Split)"
-                                          onClick={() =>
-                                            void onCrewDispatchHold(hold.id)
-                                          }
-                                        >
-                                          Crew fly
-                                        </button>
-                                      ) : null}
                                       <button
                                         type="button"
                                         className="action ghost"
@@ -6330,9 +6511,10 @@ export function App() {
                                         : ''}
                                 </h3>
                                 <p className="muted">
-                                  Split / Dispatch legs from this FBO. Crew fly
-                                  is a round-trip (cargo out, empty return).
-                                  Return rebond keeps cargo here.
+                                  Crew fly assigns payload to parked airframes;
+                                  Dispatch is your OFP flight. Crew legs are
+                                  round-trips (cargo out, empty return). Return
+                                  rebond keeps cargo here.
                                   {!canCrew && waiting > 0
                                     ? ' Hire or wait for a free crew slot in Hangar → Crew.'
                                     : ''}
@@ -6674,6 +6856,60 @@ export function App() {
                           {airportView.outboundLots.length} outbound ·{' '}
                           {airportView.inboundLots.length} inbound
                         </p>
+                        <div className="board-aircraft">
+                          <label>
+                            <span>Estimate net for</span>
+                            <select
+                              aria-label="Aircraft for Contracts net estimate"
+                              value={boardAircraftId}
+                              disabled={boardEstimateFleet.length === 0}
+                              onChange={(e) => {
+                                setBoardAircraftId(e.target.value);
+                                setContractsPage(1);
+                              }}
+                            >
+                              <option value="">Gross pay only</option>
+                              {boardEstimateFleet.map((acf) => (
+                                <option key={acf.id} value={acf.id}>
+                                  {acf.label}
+                                  {acf.status === 'parked'
+                                    ? ` · ${acf.locationIcao}`
+                                    : ` · ${acf.status}`}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {(() => {
+                            const dest =
+                              airportView.airport.icao.trim().toUpperCase();
+                            const ferryAcf =
+                              boardAircraft?.status === 'parked'
+                                ? boardAircraft
+                                : boardEstimateFleet.find(
+                                    (a) => a.status === 'parked',
+                                  );
+                            if (!ferryAcf) return null;
+                            if (
+                              ferryAcf.locationIcao.trim().toUpperCase() ===
+                              dest
+                            ) {
+                              return null;
+                            }
+                            return (
+                              <button
+                                type="button"
+                                className="linkish board-aircraft-ferry"
+                                disabled={busy}
+                                title={`Open Hangar ferry ${ferryAcf.locationIcao} → ${dest}`}
+                                onClick={() =>
+                                  ferryAircraftToCurrentTerminal()
+                                }
+                              >
+                                Ferry to {dest}
+                              </button>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                     <nav
@@ -6731,7 +6967,9 @@ export function App() {
                       ) : null}
                       {contractsSorts.length > 0 ||
                       contractsAccessFilter ||
-                      contractsSisterOnly ? (
+                      contractsSisterOnly ||
+                      contractsProfitableOnly ||
+                      (Boolean(boardAircraft) && !contractsViableOnly) ? (
                         <button
                           type="button"
                           className="clear-filters contracts-clear-sort"
@@ -6739,6 +6977,8 @@ export function App() {
                             setContractsSorts([...DEFAULT_BOARD_SORTS]);
                             setContractsAccessFilter('');
                             setContractsSisterOnly(false);
+                            setContractsProfitableOnly(false);
+                            setContractsViableOnly(true);
                             setContractsPage(1);
                           }}
                           title={
@@ -6827,6 +7067,21 @@ export function App() {
                                 Pay <span>{contractsSortIndicator('pay')}</span>
                               </button>
                             </th>
+                            <th aria-sort={contractsAriaSort('net')}>
+                              <button
+                                type="button"
+                                className={`sort-header${contractsSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
+                                title={
+                                  boardAircraft
+                                    ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
+                                    : 'Select an aircraft above to estimate net (pay − Jet-A)'
+                                }
+                                onClick={() => toggleContractsSort('net')}
+                                disabled={!boardAircraft}
+                              >
+                                Net <span>{contractsSortIndicator('net')}</span>
+                              </button>
+                            </th>
                             {contractsLane === 'outbound' ? (
                               <th aria-sort={contractsAriaSort('access')}>
                                 <button
@@ -6841,9 +7096,41 @@ export function App() {
                               </th>
                             ) : null}
                           </tr>
-                          {contractsLane === 'outbound' ? (
-                            <tr className="filter-row">
-                              <th colSpan={6} />
+                          <tr className="filter-row">
+                            <th colSpan={6} />
+                            <th>
+                              <div className="contract-net-filters">
+                                <label className="profitable-filter">
+                                  <input
+                                    type="checkbox"
+                                    checked={contractsViableOnly}
+                                    disabled={!boardAircraft}
+                                    onChange={(e) => {
+                                      setContractsViableOnly(e.target.checked);
+                                      setContractsPage(1);
+                                    }}
+                                  />
+                                  <span title="Hide locked, out-of-range, and zero-lift lots for the selected aircraft">
+                                    Viable
+                                  </span>
+                                </label>
+                                <label className="profitable-filter">
+                                  <input
+                                    type="checkbox"
+                                    checked={contractsProfitableOnly}
+                                    disabled={!boardAircraft}
+                                    onChange={(e) => {
+                                      setContractsProfitableOnly(e.target.checked);
+                                      setContractsPage(1);
+                                    }}
+                                  />
+                                  <span title="Show only lots with estimated net &gt; $0 after Jet-A">
+                                    Profit &gt; 0
+                                  </span>
+                                </label>
+                              </div>
+                            </th>
+                            {contractsLane === 'outbound' ? (
                               <th>
                                 <select
                                   aria-label="Filter by Cargo Ops access"
@@ -6860,8 +7147,8 @@ export function App() {
                                   <option value="locked">Locked</option>
                                 </select>
                               </th>
-                            </tr>
-                          ) : null}
+                            ) : null}
+                          </tr>
                         </thead>
                         <tbody>
                           {pagedContractLots.map((lot) => {
@@ -6933,6 +7220,46 @@ export function App() {
                                 ) : null}
                               </td>
                               <td className="pay">{formatMoney(lot.payUsd)}</td>
+                              <td
+                                className={
+                                  typeof lot.estimatedNetUsd === 'number' &&
+                                  lot.estimatedInRange !== false
+                                    ? lot.estimatedNetUsd > 0
+                                      ? 'net net-pos'
+                                      : lot.estimatedNetUsd < 0
+                                        ? 'net net-neg'
+                                        : 'net'
+                                    : 'net'
+                                }
+                              >
+                                {boardAircraft &&
+                                lot.estimatedInRange === false ? (
+                                  <small title="Beyond selected aircraft range">
+                                    OOR
+                                  </small>
+                                ) : boardAircraft &&
+                                  typeof lot.estimatedNetUsd === 'number' ? (
+                                  <>
+                                    {formatMoney(lot.estimatedNetUsd)}
+                                    {typeof lot.estimatedFuelCostUsd ===
+                                    'number' ? (
+                                      <small
+                                        title={
+                                          typeof lot.estimatedLiftKg ===
+                                          'number'
+                                            ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                                            : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                                        }
+                                      >
+                                        −{formatMoney(lot.estimatedFuelCostUsd)}{' '}
+                                        fuel
+                                      </small>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  '—'
+                                )}
+                              </td>
                               {contractsLane === 'outbound' ? (
                                 <td>
                                   <div className="contract-actions">
@@ -6998,12 +7325,65 @@ export function App() {
                           {sortedContractLots.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={contractsLane === 'outbound' ? 7 : 6}
+                                colSpan={contractsLane === 'outbound' ? 8 : 7}
                                 className="empty"
                               >
-                                {contractsLane === 'outbound'
-                                  ? 'No active outbound lots.'
-                                  : 'No active inbound lots.'}
+                                {boardAircraft && contractsViableOnly ? (
+                                  <div className="contracts-empty-next">
+                                    <p>
+                                      {boardAircraft.locationIcao
+                                        .trim()
+                                        .toUpperCase() !==
+                                      airportView.airport.icao
+                                        ? `No viable ${contractsLane} lots here for ${boardAircraft.label}. Your aircraft is at ${boardAircraft.locationIcao}.`
+                                        : `No viable ${contractsLane} lots here for ${boardAircraft.label} right now.`}
+                                    </p>
+                                    <div className="contracts-empty-actions">
+                                      <button
+                                        type="button"
+                                        disabled={busy}
+                                        onClick={() => {
+                                          focusNearMyAircraft();
+                                          selectTab('market');
+                                        }}
+                                      >
+                                        Find work near{' '}
+                                        {boardAircraft.locationIcao}
+                                      </button>
+                                      {boardAircraft.status === 'parked' &&
+                                      boardAircraft.locationIcao
+                                        .trim()
+                                        .toUpperCase() !==
+                                        airportView.airport.icao ? (
+                                        <button
+                                          type="button"
+                                          disabled={busy}
+                                          onClick={() =>
+                                            ferryAircraftToCurrentTerminal()
+                                          }
+                                        >
+                                          Ferry aircraft to{' '}
+                                          {airportView.airport.icao}
+                                        </button>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        className="ghost"
+                                        disabled={busy}
+                                        onClick={() => {
+                                          setContractsViableOnly(false);
+                                          setContractsPage(1);
+                                        }}
+                                      >
+                                        Show all lots
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : contractsLane === 'outbound' ? (
+                                  'No active outbound lots.'
+                                ) : (
+                                  'No active inbound lots.'
+                                )}
                               </td>
                             </tr>
                           ) : null}
@@ -7072,6 +7452,53 @@ export function App() {
                 ? ` · aircraft at ${fleet.find((a) => a.status === 'parked')!.locationIcao}`
                 : ''}
             </p>
+            <label className="board-aircraft">
+              <span>Estimate net for</span>
+              <select
+                aria-label="Aircraft for Freights net estimate"
+                value={boardAircraftId}
+                disabled={boardEstimateFleet.length === 0}
+                onChange={(e) => {
+                  setBoardAircraftId(e.target.value);
+                  setMarketPage(1);
+                }}
+              >
+                <option value="">Gross pay only</option>
+                {boardEstimateFleet.map((acf) => (
+                  <option key={acf.id} value={acf.id}>
+                    {acf.label}
+                    {acf.status === 'parked' ? ` · ${acf.locationIcao}` : ` · ${acf.status}`}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="near-aircraft-btn"
+                disabled={!boardAircraft?.locationIcao || busy}
+                title={
+                  boardAircraft?.locationIcao
+                    ? `Origin ${boardAircraft.locationIcao} · viable · profit > 0`
+                    : 'Select an aircraft first'
+                }
+                onClick={() => focusNearMyAircraft()}
+              >
+                Near aircraft
+              </button>
+              <label className="profitable-filter">
+                <input
+                  type="checkbox"
+                  checked={viableOnly}
+                  disabled={!boardAircraft}
+                  onChange={(e) => {
+                    setViableOnly(e.target.checked);
+                    setMarketPage(1);
+                  }}
+                />
+                <span title="Hide locked, out-of-range, and zero-lift lots">
+                  Viable
+                </span>
+              </label>
+            </label>
             <MarketSignalsLine
               regions={regionPressure}
               focusIcao={signalFocusIcao || undefined}
@@ -7155,6 +7582,21 @@ export function App() {
                       onClick={() => toggleMarketSort('pay')}
                     >
                       Pay <span>{sortIndicator('pay')}</span>
+                    </button>
+                  </th>
+                  <th aria-sort={marketAriaSort('net')}>
+                    <button
+                      type="button"
+                      className={`sort-header${marketSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
+                      title={
+                        boardAircraft
+                          ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
+                          : 'Select an aircraft above to estimate net (pay − Jet-A)'
+                      }
+                      onClick={() => toggleMarketSort('net')}
+                      disabled={!boardAircraft}
+                    >
+                      Net <span>{sortIndicator('net')}</span>
                     </button>
                   </th>
                   <th aria-sort={marketAriaSort('access')}>
@@ -7319,6 +7761,22 @@ export function App() {
                     </select>
                   </th>
                   <th>
+                    <label className="profitable-filter">
+                      <input
+                        type="checkbox"
+                        checked={profitableOnly}
+                        disabled={!boardAircraft}
+                        onChange={(e) => {
+                          setProfitableOnly(e.target.checked);
+                          setMarketPage(1);
+                        }}
+                      />
+                      <span title="Show only lots with estimated net &gt; $0 after Jet-A">
+                        Profit &gt; 0
+                      </span>
+                    </label>
+                  </th>
+                  <th>
                     <div className="access-filter-cell">
                       <select
                         aria-label="Filter by Cargo Ops access"
@@ -7430,6 +7888,37 @@ export function App() {
                         </span>
                       ) : null}
                     </td>
+                    <td
+                      className={
+                        typeof lot.estimatedNetUsd === 'number'
+                          ? lot.estimatedNetUsd > 0
+                            ? 'net net-pos'
+                            : lot.estimatedNetUsd < 0
+                              ? 'net net-neg'
+                              : 'net'
+                          : 'net'
+                      }
+                    >
+                      {boardAircraft &&
+                      typeof lot.estimatedNetUsd === 'number' ? (
+                        <>
+                          {formatMoney(lot.estimatedNetUsd)}
+                          {typeof lot.estimatedFuelCostUsd === 'number' ? (
+                            <small
+                              title={
+                                typeof lot.estimatedLiftKg === 'number'
+                                  ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                                  : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                              }
+                            >
+                              −{formatMoney(lot.estimatedFuelCostUsd)} fuel
+                            </small>
+                          ) : null}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td>
                       <button
                         type="button"
@@ -7466,7 +7955,7 @@ export function App() {
                 })}
                 {pagedLots.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="empty">
+                    <td colSpan={8} className="empty">
                       {marketTotalLots === 0 &&
                       !hasMarketFilters &&
                       marketSorts.length === 0
@@ -8194,7 +8683,7 @@ export function App() {
               <div>
                 <h2>Dispatch</h2>
                 <p className="muted">
-                  No personal flight in progress. Split / crew legs live on the
+                  No personal flight in progress. Crew fly / crew legs live on the
                   FBO — use Crew fly there. Accept a freight or send a hold with
                   Dispatch to start your own OFP here.
                 </p>
@@ -8507,8 +8996,9 @@ export function App() {
                     formatMoney={formatMoney}
                     formatMass={formatTonnes}
                     onOpenAirport={openAirport}
-                    onBuy={(id) => void onBuyAircraft(id)}
-                    onLease={(id) => void onLeaseAircraft(id)}
+                    delivery={aircraftDeliveryQuotes[listing.id] ?? null}
+                    onBuy={(id, opts) => void onBuyAircraft(id, opts)}
+                    onLease={(id, opts) => void onLeaseAircraft(id, opts)}
                   />
                 ))}
               </div>

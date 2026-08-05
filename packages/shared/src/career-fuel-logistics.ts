@@ -82,6 +82,17 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'US-SC': ['US-SE', 'US-MW', 'US-MT', 'US-W'],
   'US-MT': ['US-MW', 'US-SC', 'US-W'],
   'US-W': ['US-MT', 'US-SC'],
+  // Canada domestic only (no US/MX road hauls).
+  'CA-W': ['CA-PR'],
+  'CA-PR': ['CA-W', 'CA-ON'],
+  'CA-ON': ['CA-PR', 'CA-QC'],
+  'CA-QC': ['CA-ON', 'CA-AT'],
+  'CA-AT': ['CA-QC'],
+  // Mexico domestic only (no US road hauls).
+  'MX-N': ['MX-C'],
+  'MX-C': ['MX-N', 'MX-S', 'MX-Y'],
+  'MX-S': ['MX-C', 'MX-Y'],
+  'MX-Y': ['MX-C', 'MX-S'],
 };
 
 const TRUCK_NAME_POOL = [

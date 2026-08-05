@@ -203,4 +203,89 @@ describe('queryMarketBoardPage', () => {
       ],
     );
   });
+
+  it('sorts and filters by estimated net', () => {
+    const mixed = [
+      row({ payUsd: 900, estimatedNetUsd: -200 }),
+      row({ payUsd: 100, estimatedNetUsd: 50 }),
+      row({ payUsd: 400, estimatedNetUsd: 120 }),
+      row({ payUsd: 300, estimatedNetUsd: null }),
+    ];
+    const sorted = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      sorts: [{ key: 'net', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      sorted.rows.map((r) => r.estimatedNetUsd),
+      [120, 50, -200, null],
+    );
+    const profitable = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      profitableOnly: true,
+      sorts: [{ key: 'net', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      profitable.rows.map((r) => r.estimatedNetUsd),
+      [120, 50],
+    );
+  });
+
+  it('filters viable-only lots for a selected aircraft', () => {
+    const mixed = [
+      row({
+        payUsd: 100,
+        commodityId: 'general',
+        cargoLocked: false,
+        estimatedLiftKg: 400,
+        estimatedInRange: true,
+        estimatedFuelFeasible: true,
+      }),
+      row({
+        payUsd: 200,
+        commodityId: 'electronics',
+        cargoLocked: true,
+        estimatedLiftKg: 400,
+        estimatedInRange: true,
+        estimatedFuelFeasible: true,
+      }),
+      row({
+        payUsd: 300,
+        commodityId: 'supplies',
+        cargoLocked: false,
+        estimatedLiftKg: 0,
+        estimatedInRange: true,
+        estimatedFuelFeasible: true,
+      }),
+      row({
+        payUsd: 400,
+        commodityId: 'supplies',
+        cargoLocked: false,
+        estimatedLiftKg: 200,
+        estimatedInRange: false,
+        estimatedFuelFeasible: true,
+      }),
+      row({
+        payUsd: 500,
+        commodityId: 'general',
+        cargoLocked: false,
+        estimatedLiftKg: 100,
+        estimatedInRange: true,
+        estimatedFuelFeasible: false,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      viableOnly: true,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [100],
+    );
+  });
 });

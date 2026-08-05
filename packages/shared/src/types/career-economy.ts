@@ -816,6 +816,11 @@ export interface CareerMissionsState {
   playerFbos?: PlayerFboState;
   /** Company crew roster (AI slots based at an FBO). */
   companyCrew?: CompanyCrewState;
+  /**
+   * Lifetime ferry nm that already consumed the early-career soft fee budget.
+   * First FERRY_SOFT_NM_BUDGET nm of ferry pay a reduced fee.
+   */
+  ferrySoftNmUsed?: number;
 };
 
 /** Player FBO ownership + bonded warehouse holds. */
@@ -975,6 +980,7 @@ export type CareerLedgerKind =
   | 'lease_deposit'
   | 'lease_early_return'
   | 'aircraft_buy'
+  | 'aircraft_delivery'
   | 'aircraft_lease_sign'
   | 'aircraft_sell'
   | 'aircraft_buyout'

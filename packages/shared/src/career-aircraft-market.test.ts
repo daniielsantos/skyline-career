@@ -10,6 +10,7 @@ import {
   listAircraftForLease,
   listAircraftMarket,
   purchaseAircraftListing,
+  quoteAircraftDelivery,
   quoteLeaseEarlyReturnUsd,
   leaseRemainingMonths,
   resolveAircraftMsrpUsd,
@@ -429,5 +430,40 @@ describe('aircraft market', () => {
     state.walletUsd = 100_000;
     clearAircraftMaintenance(state, acf.id);
     assert.equal(acf.status, 'parked');
+  });
+
+  it('optional delivery parks at pilot hub for a capped fee', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-deliver' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'DeliverMe',
+    });
+    state.aircraftMarketDemandDay = economyDayIndex(world.tick);
+    const listings = listAircraftMarket(state, world);
+    const remote = listings.find(
+      (l) =>
+        l.kind === 'used' &&
+        l.basedIcao !== 'SBGR' &&
+        (l.source ?? 'generated') === 'generated',
+    );
+    assert.ok(remote, 'expected a listing based away from SBGR');
+    const quote = quoteAircraftDelivery(world, state, remote!.id);
+    assert.equal(quote.needed, true);
+    assert.equal(quote.deliverToIcao, 'SBGR');
+    assert.ok(quote.deliveryFeeUsd >= 200);
+    assert.ok(quote.deliveryFeeUsd <= 2_500);
+    state.walletUsd = remote!.askingUsd + quote.deliveryFeeUsd;
+    const { aircraft, debitUsd, deliveryFeeUsd } = purchaseAircraftListing(
+      state,
+      world,
+      remote!.id,
+      { deliver: true },
+    );
+    assert.equal(aircraft.locationIcao, 'SBGR');
+    assert.equal(deliveryFeeUsd, quote.deliveryFeeUsd);
+    assert.equal(debitUsd, remote!.askingUsd + quote.deliveryFeeUsd);
+    assert.equal(state.walletUsd, 0);
+    assert.ok(
+      (state.ledger ?? []).some((e) => e.kind === 'aircraft_delivery'),
+    );
   });
 });

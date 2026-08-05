@@ -1,7 +1,13 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
-import type { AircraftClass, AircraftListing, PlayerAircraft } from './api';
+import {
+  fetchFerryPlan,
+  type AircraftClass,
+  type AircraftListing,
+  type FerryPlanView,
+  type PlayerAircraft,
+} from './api';
 
 export type AircraftCatalogEntry = {
   id: AircraftClass;
@@ -200,14 +206,25 @@ export function MarketListingCard(props: {
   formatMoney: (n: number) => string;
   formatMass: (kg: number) => string;
   onOpenAirport: (icao: string) => void;
-  onBuy: (listingId: string) => void;
-  onLease: (listingId: string) => void;
+  delivery?: {
+    deliverToIcao: string;
+    distanceNm: number;
+    deliveryFeeUsd: number;
+    needed: boolean;
+  } | null;
+  onBuy: (listingId: string, opts?: { deliver?: boolean }) => void;
+  onLease: (listingId: string, opts?: { deliver?: boolean }) => void;
 }) {
   const { listing, catalog } = props;
   const pcts = listingConditionPcts(listing);
   const isYourLease = listing.source === 'player_lease';
   const isResale = listing.source === 'player_sale';
-  const canAfford = props.wallet >= listing.askingUsd;
+  const canDeliver = Boolean(props.delivery?.needed);
+  const [deliver, setDeliver] = useState(canDeliver);
+  const deliveryFee =
+    deliver && props.delivery?.needed ? props.delivery.deliveryFeeUsd : 0;
+  const totalDue = listing.askingUsd + deliveryFee;
+  const canAfford = props.wallet >= totalDue;
 
   return (
     <article className="aircraft-card">
@@ -298,15 +315,35 @@ export function MarketListingCard(props: {
             { label: 'Engine', pct: pcts.engine },
           ]}
         />
+        {canDeliver && props.delivery ? (
+          <label className="aircraft-card-deliver">
+            <input
+              type="checkbox"
+              checked={deliver}
+              disabled={props.busy}
+              onChange={(e) => setDeliver(e.target.checked)}
+            />
+            <span>
+              Deliver to {props.delivery.deliverToIcao}
+              <span className="muted">
+                {' '}
+                · {props.delivery.distanceNm.toLocaleString()} nm · +
+                {props.formatMoney(props.delivery.deliveryFeeUsd)}
+              </span>
+            </span>
+          </label>
+        ) : null}
       </div>
       <div className="aircraft-card-price">
         <div className="aircraft-card-price-details">
           <span className="price-main">
-            {props.formatMoney(listing.askingUsd)}
+            {props.formatMoney(totalDue)}
           </span>
           {listing.kind === 'lease' ? (
             <>
-              <span className="price-term">deposit due now</span>
+              <span className="price-term">
+                {deliveryFee > 0 ? 'deposit + delivery' : 'deposit due now'}
+              </span>
               <span className="price-sub">
                 {listing.leaseMonthlyUsd != null
                   ? `${props.formatMoney(listing.leaseMonthlyUsd)} / month`
@@ -320,7 +357,9 @@ export function MarketListingCard(props: {
             </>
           ) : (
             <>
-              <span className="price-term">purchase price</span>
+              <span className="price-term">
+                {deliveryFee > 0 ? 'purchase + delivery' : 'purchase price'}
+              </span>
               <span className="price-sub is-empty" aria-hidden="true">
                 —
               </span>
@@ -337,7 +376,9 @@ export function MarketListingCard(props: {
             type="button"
             className="accept"
             disabled={props.busy || !canAfford}
-            onClick={() => props.onLease(listing.id)}
+            onClick={() =>
+              props.onLease(listing.id, { deliver: deliver && canDeliver })
+            }
           >
             Lease
           </button>
@@ -346,7 +387,9 @@ export function MarketListingCard(props: {
             type="button"
             className="accept"
             disabled={props.busy || !canAfford}
-            onClick={() => props.onBuy(listing.id)}
+            onClick={() =>
+              props.onBuy(listing.id, { deliver: deliver && canDeliver })
+            }
           >
             Buy
           </button>
@@ -414,7 +457,11 @@ export function HangarAircraftCard(props: {
   onReturnLease: (id: string) => void;
   onListForLease: (id: string) => void;
   onSell: (id: string) => void;
-  onFerry: (id: string, dest: string) => void;
+  onFerry: (
+    id: string,
+    dest: string,
+    opts?: { finalDest?: string },
+  ) => void;
   onTravel: (destIcao: string) => void;
 }) {
   const acf = props.aircraft;
@@ -458,10 +505,62 @@ export function HangarAircraftCard(props: {
   const [moveMode, setMoveMode] = useState<'ferry' | 'pilot'>(
     pilotHere ? 'ferry' : 'pilot',
   );
+  const [ferryPlan, setFerryPlan] = useState<FerryPlanView | null>(null);
+  const [ferryPlanError, setFerryPlanError] = useState<string | null>(null);
+  const [ferryPlanLoading, setFerryPlanLoading] = useState(false);
+  const journeyOriginRef = useRef<string | null>(null);
   const showMove =
     acf.status === 'parked' || acf.status === 'maintenance';
   const showManage =
     canRepair || canList || canSell || canBuyout || canReturnLease;
+
+  const ferryFinal = props.ferryDest.trim().toUpperCase();
+  useEffect(() => {
+    if (moveMode !== 'ferry' || acf.status !== 'parked' || !ferryFinal) {
+      setFerryPlan(null);
+      setFerryPlanError(null);
+      setFerryPlanLoading(false);
+      if (!ferryFinal) journeyOriginRef.current = null;
+      return;
+    }
+    const here = acf.locationIcao.trim().toUpperCase();
+    if (here === ferryFinal) {
+      setFerryPlan(null);
+      setFerryPlanError(null);
+      journeyOriginRef.current = null;
+      return;
+    }
+    if (!journeyOriginRef.current) {
+      journeyOriginRef.current = here;
+    }
+    let cancelled = false;
+    setFerryPlanLoading(true);
+    setFerryPlanError(null);
+    const timer = setTimeout(() => {
+      void fetchFerryPlan({
+        aircraftId: acf.id,
+        destIcao: ferryFinal,
+        journeyOrigin: journeyOriginRef.current ?? here,
+      })
+        .then((view) => {
+          if (cancelled) return;
+          setFerryPlan(view);
+          setFerryPlanLoading(false);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setFerryPlan(null);
+          setFerryPlanError(
+            err instanceof Error ? err.message : String(err),
+          );
+          setFerryPlanLoading(false);
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [acf.id, acf.locationIcao, acf.status, ferryFinal, moveMode]);
 
   const primaryAction =
     acf.status === 'maintenance'
@@ -489,7 +588,16 @@ export function HangarAircraftCard(props: {
   const moveValue = moveMode === 'ferry' ? props.ferryDest : props.travelDest;
   const moveOnChange =
     moveMode === 'ferry' ? props.onFerryDestChange : props.onTravelDestChange;
-  const moveReady = Boolean(moveValue?.trim());
+  const nextFerryDest =
+    moveMode === 'ferry' && ferryPlan?.nextLeg
+      ? ferryPlan.nextLeg.to
+      : ferryFinal;
+  const moveReady = Boolean(
+    moveMode === 'ferry'
+      ? nextFerryDest && !ferryPlanLoading && !ferryPlanError && ferryPlan
+      : moveValue?.trim(),
+  );
+  const multiLeg = Boolean(ferryPlan && ferryPlan.legCount > 1);
 
   return (
     <li className="hangar-card">
@@ -701,7 +809,12 @@ export function HangarAircraftCard(props: {
                     hubs={props.hubOptions}
                     excludeIcao={moveExcludeIcao}
                     value={moveValue}
-                    onChange={moveOnChange}
+                    onChange={(icao) => {
+                      if (moveMode === 'ferry') {
+                        journeyOriginRef.current = null;
+                      }
+                      moveOnChange(icao);
+                    }}
                     disabled={
                       props.busy ||
                       (moveMode === 'ferry' && acf.status !== 'parked')
@@ -718,15 +831,69 @@ export function HangarAircraftCard(props: {
                   }
                   onClick={() => {
                     if (moveMode === 'ferry') {
-                      props.onFerry(acf.id, props.ferryDest);
+                      props.onFerry(acf.id, nextFerryDest, {
+                        finalDest: ferryFinal,
+                      });
                     } else {
                       props.onTravel(props.travelDest);
                     }
                   }}
                 >
-                  Go
+                  {moveMode === 'ferry' && multiLeg
+                    ? `Next ${ferryPlan?.nextLeg?.from}→${ferryPlan?.nextLeg?.to}`
+                    : 'Go'}
                 </button>
               </div>
+              {moveMode === 'ferry' && ferryFinal ? (
+                <div className="ferry-plan">
+                  {ferryPlanLoading ? (
+                    <p className="ferry-plan-meta">Planning route…</p>
+                  ) : ferryPlanError ? (
+                    <p className="ferry-plan-error">{ferryPlanError}</p>
+                  ) : ferryPlan && ferryPlan.plan ? (
+                    <>
+                      <p className="ferry-plan-route" title={ferryPlan.plan.hops.join(' → ')}>
+                        {ferryPlan.plan.hops.map((hop, i) => {
+                          const here =
+                            hop === acf.locationIcao.trim().toUpperCase();
+                          const isNext = hop === ferryPlan.nextLeg?.to;
+                          return (
+                            <span key={`${hop}-${i}`}>
+                              {i > 0 ? ' → ' : ''}
+                              <span
+                                className={
+                                  here
+                                    ? 'is-here'
+                                    : isNext
+                                      ? 'is-next'
+                                      : undefined
+                                }
+                              >
+                                {hop}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </p>
+                      <p className="ferry-plan-meta">
+                        Leg {ferryPlan.legIndex}/{ferryPlan.legCount}
+                        {ferryPlan.nextLeg
+                          ? ` · ${Math.round(ferryPlan.nextLeg.distanceNm).toLocaleString()} nm this hop`
+                          : ''}
+                        {` · ${ferryPlan.remainingNm.toLocaleString()} nm left to ${ferryFinal}`}
+                        {` · ${ferryPlan.progressPct}% closer`}
+                        {ferryPlan.nextQuote
+                          ? ` · next ${props.formatMoney(ferryPlan.nextQuote.totalCostUsd)}`
+                          : ''}
+                        {ferryPlan.nextQuote &&
+                        (ferryPlan.nextQuote.softNmApplied ?? 0) > 0
+                          ? ` · early soft ${Math.round(ferryPlan.nextQuote.softNmApplied!).toLocaleString()} nm`
+                          : ''}
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : note ? (
             <p className="hangar-card-note">{note}</p>

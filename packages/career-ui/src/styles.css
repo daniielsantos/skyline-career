@@ -580,6 +580,94 @@ body {
   line-height: 1.4;
 }
 
+.panel-head .board-aircraft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted, #6b7280);
+}
+
+.panel-head .board-aircraft label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.65rem;
+}
+
+.panel-head .board-aircraft select {
+  min-width: 14rem;
+  max-width: min(28rem, 100%);
+}
+
+.panel-head .board-aircraft-ferry {
+  font-size: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  cursor: pointer;
+}
+
+.panel-head .board-aircraft-ferry:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.panel-head .board-aircraft-ferry:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.panel-head .near-aircraft-btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.filter-row .contract-net-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.filter-row .profitable-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filter-row .profitable-filter input:disabled + span {
+  opacity: 0.45;
+}
+
+td.net {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+td.net small {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--muted, #6b7280);
+}
+
+td.net-pos {
+  color: var(--ok, #157347);
+}
+
+td.net-neg {
+  color: var(--fail, #b42318);
+}
+
 .missions-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -2725,6 +2813,38 @@ tr.lot-locked {
   min-width: 3.5rem;
 }
 
+.ferry-plan {
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.ferry-plan-route {
+  margin: 0 0 0.2rem;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.ferry-plan-route .is-here {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ferry-plan-route .is-next {
+  color: var(--accent, #e8a05a);
+  font-weight: 600;
+}
+
+.ferry-plan-meta {
+  margin: 0;
+}
+
+.ferry-plan-error {
+  margin: 0;
+  color: var(--fail, #b42318);
+}
+
 .hangar-manage {
   border-top: 0;
   padding-top: 0;
@@ -3272,6 +3392,20 @@ tr.lot-locked {
   min-height: 9.75rem;
 }
 
+.aircraft-card-deliver {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.aircraft-card-deliver input {
+  margin-top: 0.15rem;
+}
+
 .aircraft-card-price-details {
   display: grid;
   grid-template-rows: 1.55rem repeat(3, 1.15rem);
@@ -3543,6 +3677,28 @@ small {
 .empty {
   color: var(--muted);
   padding: 1.5rem 0.55rem !important;
+}
+
+.contracts-empty-next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 36rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.contracts-empty-next p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.contracts-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .mission-list {

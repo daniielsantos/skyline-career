@@ -13,6 +13,10 @@ import {
   quoteFuelUplift,
   type FuelUpliftQuote,
 } from './career-fuel.js';
+import {
+  hubDistanceNm,
+  isFerryRouteWaypoint,
+} from './career-ferry-route.js';
 import { fboServiceCostMult } from './career-fbo-perks.js';
 import {
   ensureAircraftConditionPcts,
@@ -73,7 +77,16 @@ export function resolvePlayerFuelCapacityKg(
 /** Ferry fee USD per nm before class multiplier. */
 export const FERRY_FEE_USD_PER_NM = 2.5;
 
-const FERRY_CLASS_MULT: Record<FreighterClassId, number> = {
+/**
+ * First this many career ferry nm pay a reduced fee (early soft landing).
+ * After the budget is used, full FERRY_FEE_USD_PER_NM applies.
+ */
+export const FERRY_SOFT_NM_BUDGET = 3_000;
+
+/** Multiplier on the soft-budget portion of ferry fees (0.3 = 70% off). */
+export const FERRY_SOFT_FEE_MULT = 0.3;
+
+export const FERRY_CLASS_MULT: Record<FreighterClassId, number> = {
   light_turboprop: 1,
   light_ga: 0.85,
   light_jet: 1.5,
@@ -81,6 +94,11 @@ const FERRY_CLASS_MULT: Record<FreighterClassId, number> = {
   narrow_freighter: 2.2,
   wide_freighter: 4,
 };
+
+/** Dealer delivery vs self-ferry: $/nm × class mult, capped for early buys. */
+export const AIRCRAFT_DELIVERY_USD_PER_NM = 0.55;
+export const AIRCRAFT_DELIVERY_MIN_USD = 200;
+export const AIRCRAFT_DELIVERY_MAX_USD = 2_500;
 
 export function listCareerHubIcaos(): string[] {
   return Object.keys(CAREER_HUB_COORDS).sort();
@@ -209,6 +227,11 @@ export function normalizeMissionsState(
             : {}),
         }
       : { members: [] };
+  const ferrySoftRaw = (raw as CareerMissionsState).ferrySoftNmUsed;
+  const ferrySoftNmUsed =
+    typeof ferrySoftRaw === 'number' && Number.isFinite(ferrySoftRaw)
+      ? Math.max(0, Math.round(ferrySoftRaw))
+      : 0;
   return {
     version: 2,
     walletUsd,
@@ -226,6 +249,7 @@ export function normalizeMissionsState(
     companyCredit,
     playerFbos,
     companyCrew,
+    ferrySoftNmUsed,
     ...(airframePerfOverrides
       ? { airframePerfOverrides }
       : {}),
@@ -950,11 +974,56 @@ export interface FerryQuote {
   destIcao: string;
   distanceNm: number;
   ferryFeeUsd: number;
+  /** nm of this leg charged at the early soft rate. */
+  softNmApplied: number;
+  /** Soft-budget nm still available after this quote (if executed). */
+  softNmRemaining: number;
+  /** Full-rate fee without soft discount (for UI comparison). */
+  fullRateFeeUsd: number;
   fuelNeededKg: number;
   fuelUpliftKg: number;
   fuelCostUsd: number;
   fuelScarcity: 'ok' | 'partial' | 'dry';
   totalCostUsd: number;
+}
+
+/** Split a ferry distance across the early soft-fee budget. */
+export function computeFerryFeeUsd(opts: {
+  distanceNm: number;
+  aircraftClassId: FreighterClassId;
+  ferrySoftNmUsed?: number;
+}): {
+  ferryFeeUsd: number;
+  softNmApplied: number;
+  softNmRemaining: number;
+  fullRateFeeUsd: number;
+} {
+  const distanceNm = Math.max(0, opts.distanceNm);
+  const used = Math.max(0, opts.ferrySoftNmUsed ?? 0);
+  const softLeft = Math.max(0, FERRY_SOFT_NM_BUDGET - used);
+  const softNmApplied = Math.min(distanceNm, softLeft);
+  const hardNm = Math.max(0, distanceNm - softNmApplied);
+  const rate =
+    FERRY_FEE_USD_PER_NM * FERRY_CLASS_MULT[opts.aircraftClassId];
+  const softPart = softNmApplied * rate * FERRY_SOFT_FEE_MULT;
+  const hardPart = hardNm * rate;
+  const minFee = softNmApplied > 0 && hardNm <= 0 ? 25 : 50;
+  const ferryFeeUsd = Math.max(minFee, Math.round(softPart + hardPart));
+  const fullRateFeeUsd = Math.max(50, Math.round(distanceNm * rate));
+  return {
+    ferryFeeUsd,
+    softNmApplied,
+    softNmRemaining: Math.max(0, softLeft - softNmApplied),
+    fullRateFeeUsd,
+  };
+}
+
+/** Jet-A $/kg when ferrying from a stepping-stone (no terminal inventory). */
+const FERRY_WAYPOINT_FUEL_USD_PER_KG = 1.35;
+
+function isKnownFerryPoint(icao: string): boolean {
+  const code = icao.trim().toUpperCase();
+  return Boolean(CAREER_HUB_COORDS[code]) || isFerryRouteWaypoint(code);
 }
 
 export function quoteFerry(
@@ -968,15 +1037,17 @@ export function quoteFerry(
     throw new Error(`Aircraft ${aircraft.id} is not parked`);
   }
   const dest = opts.destIcao.trim().toUpperCase();
-  if (!CAREER_HUB_COORDS[dest]) {
+  if (!isKnownFerryPoint(dest)) {
     throw new Error(`Unknown career hub: ${dest}`);
   }
   if (dest === aircraft.locationIcao) {
     throw new Error(`Aircraft is already at ${dest}`);
   }
-  const distanceNm = routeDistanceNm(world, aircraft.locationIcao, dest);
+  const origin = aircraft.locationIcao.trim().toUpperCase();
+  const distanceNm =
+    hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);
   if (distanceNm === undefined) {
-    throw new Error(`No route distance for ${aircraft.locationIcao}→${dest}`);
+    throw new Error(`No route distance for ${origin}→${dest}`);
   }
   const maxRangeNm = resolveAirframeMaxRangeNm(
     aircraft.airframeTypeId,
@@ -984,7 +1055,7 @@ export function quoteFerry(
   );
   if (distanceNm > maxRangeNm) {
     throw new Error(
-      `Ferry ${aircraft.locationIcao}→${dest} is ${Math.round(distanceNm)} nm; max range is ${maxRangeNm} nm`,
+      `Ferry ${origin}→${dest} is ${Math.round(distanceNm)} nm; max range is ${maxRangeNm} nm`,
     );
   }
 
@@ -993,33 +1064,48 @@ export function quoteFerry(
   let fuelCostUsd = 0;
   let fuelScarcity: FerryQuote['fuelScarcity'] = 'ok';
   if (fuelUpliftKg > 0) {
-    const quote = quoteFuelUplift(world, {
-      originIcao: aircraft.locationIcao,
-      destIcao: dest,
-      aircraftClassId: aircraft.aircraftClassId,
-      requestedKg: fuelUpliftKg,
-      distanceNm,
-      costMult: fboServiceCostMult(state, aircraft.locationIcao),
-    });
-    fuelCostUsd = quote.costUsd;
-    fuelScarcity = quote.scarcity;
+    if (
+      isFerryRouteWaypoint(origin) ||
+      !world.airports.some((a) => a.icao === origin)
+    ) {
+      fuelCostUsd = Math.max(
+        0,
+        Math.round(fuelUpliftKg * FERRY_WAYPOINT_FUEL_USD_PER_KG),
+      );
+      fuelScarcity = 'ok';
+    } else {
+      const quote = quoteFuelUplift(world, {
+        originIcao: origin,
+        destIcao: dest,
+        aircraftClassId: aircraft.aircraftClassId,
+        requestedKg: fuelUpliftKg,
+        distanceNm,
+        costMult: fboServiceCostMult(state, origin),
+      });
+      fuelCostUsd = quote.costUsd;
+      fuelScarcity = quote.scarcity;
+    }
   }
 
-  const ferryFeeUsd = Math.max(
-    50,
-    Math.round(distanceNm * FERRY_FEE_USD_PER_NM * FERRY_CLASS_MULT[aircraft.aircraftClassId]),
-  );
+  const fee = computeFerryFeeUsd({
+    distanceNm,
+    aircraftClassId: aircraft.aircraftClassId,
+    ferrySoftNmUsed: state.ferrySoftNmUsed,
+  });
   return {
     aircraftId: aircraft.id,
-    originIcao: aircraft.locationIcao,
+    originIcao: origin,
     destIcao: dest,
     distanceNm,
-    ferryFeeUsd,
+    ferryFeeUsd: fee.ferryFeeUsd,
+    softNmApplied: fee.softNmApplied,
+    softNmRemaining: fee.softNmRemaining,
+    fullRateFeeUsd: fee.fullRateFeeUsd,
     fuelNeededKg,
     fuelUpliftKg,
     fuelCostUsd,
     fuelScarcity,
-    totalCostUsd: ferryFeeUsd + fuelCostUsd,
+    totalCostUsd: fee.ferryFeeUsd + fuelCostUsd,
   };
 }
 
@@ -1041,19 +1127,30 @@ export function executeFerry(
   const aircraft = findPlayerAircraft(state, opts.aircraftId)!;
 
   if (quote.fuelUpliftKg > 0) {
-    const fuelQuote = quoteFuelUplift(world, {
-      originIcao: aircraft.locationIcao,
-      destIcao: quote.destIcao,
-      aircraftClassId: aircraft.aircraftClassId,
-      requestedKg: quote.fuelUpliftKg,
-      distanceNm: quote.distanceNm,
-      costMult: fboServiceCostMult(state, aircraft.locationIcao),
-    });
-    const uplift = deliverFuelUplift(world, fuelQuote);
-    aircraft.fuelKg = Math.min(
-      aircraft.fuelCapacityKg,
-      aircraft.fuelKg + uplift.deliveredKg,
-    );
+    if (
+      isFerryRouteWaypoint(aircraft.locationIcao) ||
+      !world.airports.some((a) => a.icao === aircraft.locationIcao)
+    ) {
+      // Stepping-stone: wallet already includes flat fuel in quote; top up tanks.
+      aircraft.fuelKg = Math.min(
+        aircraft.fuelCapacityKg,
+        aircraft.fuelKg + quote.fuelUpliftKg,
+      );
+    } else {
+      const fuelQuote = quoteFuelUplift(world, {
+        originIcao: aircraft.locationIcao,
+        destIcao: quote.destIcao,
+        aircraftClassId: aircraft.aircraftClassId,
+        requestedKg: quote.fuelUpliftKg,
+        distanceNm: quote.distanceNm,
+        costMult: fboServiceCostMult(state, aircraft.locationIcao),
+      });
+      const uplift = deliverFuelUplift(world, fuelQuote);
+      aircraft.fuelKg = Math.min(
+        aircraft.fuelCapacityKg,
+        aircraft.fuelKg + uplift.deliveredKg,
+      );
+    }
   }
 
   aircraft.fuelKg = Math.max(
@@ -1070,8 +1167,17 @@ export function executeFerry(
     atTick: world.tick,
     aircraftId: aircraft.id,
     icao: quote.destIcao,
-    note: `${quote.originIcao}→${quote.destIcao}`,
+    note:
+      quote.softNmApplied > 0
+        ? `${quote.originIcao}→${quote.destIcao} (early soft ${Math.round(quote.softNmApplied)} nm)`
+        : `${quote.originIcao}→${quote.destIcao}`,
   });
+
+  if (quote.softNmApplied > 0) {
+    state.ferrySoftNmUsed =
+      Math.round(((state.ferrySoftNmUsed ?? 0) + quote.softNmApplied) * 100) /
+      100;
+  }
 
   return {
     aircraft,

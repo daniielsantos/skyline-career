@@ -15,7 +15,11 @@ export type FboSplitAircraftOption = {
 
 const PRESETS = [0.25, 0.5, 0.75, 1] as const;
 
-/** Split a bonded hold across parked airframes at origin. */
+function displayFromKg(kg: number, system: WeightSystem): number {
+  return Math.max(0, Math.round(kgToDisplay(kg, system)));
+}
+
+/** Assign cargo across parked airframes for company-crew legs. */
 export function FboSplitDialog(props: {
   hold: PlayerFboHold;
   options: FboSplitAircraftOption[];
@@ -38,6 +42,8 @@ export function FboSplitDialog(props: {
     for (const opt of props.options) init[opt.aircraft.id] = 0;
     return init;
   });
+  /** Raw input text while typing — avoids lb↔kg round-trip mangling. */
+  const [draftById, setDraftById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -94,9 +100,40 @@ export function FboSplitDialog(props: {
   function setAircraftKg(aircraftId: string, nextKg: number, maxCargoKg: number) {
     const capped = Math.max(
       0,
-      Math.min(roomFor(aircraftId, maxCargoKg), Math.floor(nextKg)),
+      Math.min(roomFor(aircraftId, maxCargoKg), Math.round(nextKg)),
     );
     setAllocById((cur) => ({ ...cur, [aircraftId]: capped }));
+    return capped;
+  }
+
+  function clearDraft(aircraftId: string) {
+    setDraftById((cur) => {
+      if (!(aircraftId in cur)) return cur;
+      const next = { ...cur };
+      delete next[aircraftId];
+      return next;
+    });
+  }
+
+  function commitDisplayValue(
+    aircraftId: string,
+    maxCargoKg: number,
+    rawText: string,
+  ) {
+    const trimmed = rawText.trim();
+    if (trimmed === '' || trimmed === '-') {
+      setAircraftKg(aircraftId, 0, maxCargoKg);
+      clearDraft(aircraftId);
+      return;
+    }
+    const raw = Number(trimmed);
+    if (!Number.isFinite(raw) || raw < 0) {
+      clearDraft(aircraftId);
+      return;
+    }
+    const nextKg = displayToKg(raw, props.weightSystem);
+    setAircraftKg(aircraftId, nextKg, maxCargoKg);
+    clearDraft(aircraftId);
   }
 
   function setFraction(
@@ -108,6 +145,7 @@ export function FboSplitDialog(props: {
     const next =
       fraction >= 1 ? room : Math.max(0, Math.round(room * fraction));
     setAllocById((cur) => ({ ...cur, [aircraftId]: next }));
+    clearDraft(aircraftId);
   }
 
   return (
@@ -127,7 +165,7 @@ export function FboSplitDialog(props: {
       >
         <p className="confirm-kicker">Check before continuing</p>
         <h2 id={titleId} className="confirm-title">
-          Split bonded hold?
+          Crew fly — assign cargo?
         </h2>
         <div id={bodyId} className="confirm-body">
           <p>
@@ -140,9 +178,8 @@ export function FboSplitDialog(props: {
           </p>
           <p>
             Assign cargo to parked airframes at origin. Each leg becomes an
-            Accepted mission (soft-fill starts) — stay on FBO and use Crew fly
-            on the Accepted list, or open Dispatch later. Unassigned cargo stays
-            bonded.
+            Accepted mission — then send with Crew fly on the Accepted list
+            below (or Hangar → Crew). Unassigned cargo stays bonded.
           </p>
 
           {props.options.length === 0 ? (
@@ -154,22 +191,13 @@ export function FboSplitDialog(props: {
               {parsed.map((leg) => {
                 const pay = payPreview.find((p) => p.id === leg.aircraft.id);
                 const room = roomFor(leg.aircraft.id, leg.maxCargoKg);
-                const displayMax = Math.max(
-                  0,
-                  Math.floor(kgToDisplay(room, props.weightSystem)),
-                );
+                const draft = draftById[leg.aircraft.id];
                 const displayValue =
-                  leg.cargoKg > 0
-                    ? Math.max(
-                        0,
-                        Math.min(
-                          displayMax,
-                          Math.floor(
-                            kgToDisplay(leg.cargoKg, props.weightSystem),
-                          ),
-                        ),
-                      )
-                    : 0;
+                  draft !== undefined
+                    ? draft
+                    : leg.cargoKg > 0
+                      ? String(displayFromKg(leg.cargoKg, props.weightSystem))
+                      : '';
                 return (
                   <li key={leg.aircraft.id} className="fbo-split-row">
                     <div className="fbo-split-meta">
@@ -204,29 +232,42 @@ export function FboSplitDialog(props: {
                     <label className="fbo-split-kg">
                       <span>{unit}</span>
                       <input
-                        type="number"
-                        min={0}
-                        max={displayMax}
-                        step={props.weightSystem === 'imperial' ? 10 : 100}
+                        type="text"
                         inputMode="numeric"
+                        pattern="[0-9]*"
                         disabled={props.busy || leg.overRange}
-                        value={displayValue || ''}
+                        value={displayValue}
+                        title={`Max ${displayFromKg(room, props.weightSystem).toLocaleString()} ${unit}`}
+                        aria-label={`Cargo ${unit} for ${leg.aircraft.label}`}
                         onChange={(e) => {
-                          const raw = Number(e.target.value);
-                          if (!Number.isFinite(raw) || raw <= 0) {
+                          const text = e.target.value.replace(/[^\d]/g, '');
+                          setDraftById((cur) => ({
+                            ...cur,
+                            [leg.aircraft.id]: text,
+                          }));
+                          if (text === '') {
                             setAllocById((cur) => ({
                               ...cur,
                               [leg.aircraft.id]: 0,
                             }));
                             return;
                           }
-                          const nextKg = displayToKg(raw, props.weightSystem);
+                          const raw = Number(text);
+                          if (!Number.isFinite(raw)) return;
+                          // Live totals for pay/remaining; input text stays as typed.
                           setAircraftKg(
                             leg.aircraft.id,
-                            nextKg,
+                            displayToKg(raw, props.weightSystem),
                             leg.maxCargoKg,
                           );
                         }}
+                        onBlur={(e) =>
+                          commitDisplayValue(
+                            leg.aircraft.id,
+                            leg.maxCargoKg,
+                            e.currentTarget.value,
+                          )
+                        }
                       />
                     </label>
                     {leg.cargoKg > 0 && pay ? (
@@ -274,7 +315,7 @@ export function FboSplitDialog(props: {
               );
             }}
           >
-            Split
+            Crew fly
           </button>
         </div>
       </div>

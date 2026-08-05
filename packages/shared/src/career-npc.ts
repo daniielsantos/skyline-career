@@ -57,7 +57,8 @@ export {
 } from './career-npc-airframes.js';
 
 /**
- * About one operator per mapped hub (60 BR + 100 US).
+ * About one operator per mapped hub at BR+US density (fleet held while CA/MX
+ * land — region coverage still rebalances across all mapped regions).
  * Pulse 15d @ 120 showed util ~55% with ready stuck ~11–20% — undersized vs board.
  */
 export const NPC_FLEET_COMPOSITION: ReadonlyArray<{

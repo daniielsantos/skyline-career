@@ -151,6 +151,9 @@ export type FerryQuote = {
   destIcao: string;
   distanceNm: number;
   ferryFeeUsd: number;
+  softNmApplied?: number;
+  softNmRemaining?: number;
+  fullRateFeeUsd?: number;
   fuelNeededKg: number;
   fuelUpliftKg: number;
   fuelCostUsd: number;
@@ -342,12 +345,22 @@ export type MarketLot = {
   quantityKg?: number;
   availableKg: number;
   payUsd: number;
+  /** Jet-A estimate for the board-selected aircraft (pay − fuel = net). */
+  estimatedFuelCostUsd?: number | null;
+  /** Pro-rated pay minus estimated Jet-A for the selected aircraft. */
+  estimatedNetUsd?: number | null;
+  estimatedLiftKg?: number | null;
+  estimatedMarginPct?: number | null;
+  estimatedFuelFeasible?: boolean | null;
+  estimatedInRange?: boolean | null;
   urgency: 'normal' | 'urgent';
   reason: string;
   createdAtTick?: number;
   expiresAtTick: number;
   ticksRemaining?: number;
   perishable?: boolean;
+  cargoLocked?: boolean;
+  international?: boolean;
   pressure?: LotPressure | null;
   npcClaim?: NpcClaim | null;
 };
@@ -537,6 +550,14 @@ export type AirportLot = {
   quantityKg?: number;
   reservedKg?: number;
   payUsd: number;
+  /** Jet-A estimate for the board-selected aircraft (pay − fuel = net). */
+  estimatedFuelCostUsd?: number | null;
+  /** Pro-rated pay minus estimated Jet-A for the selected aircraft. */
+  estimatedNetUsd?: number | null;
+  estimatedLiftKg?: number | null;
+  estimatedMarginPct?: number | null;
+  estimatedFuelFeasible?: boolean | null;
+  estimatedInRange?: boolean | null;
   urgency: string;
   status: string;
   createdAtTick: number;
@@ -828,6 +849,12 @@ export function fetchMarket(
     loadMaxKg?: number | string;
     expiresWithinHours?: number | string;
     minPayUsd?: number | string;
+    /** Concrete Market airframe for fuel/payload estimates. */
+    airframe?: string;
+    /** Keep lots with estimated net > 0 (requires aircraft). */
+    profitableOnly?: boolean;
+    /** Keep unlocked + in-range + liftable lots (requires aircraft). */
+    viableOnly?: boolean;
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';
     /** Route scope: intl = cross-country, domestic = same country. */
@@ -836,6 +863,10 @@ export function fetchMarket(
 ) {
   const params = new URLSearchParams();
   if (aircraft) params.set('aircraft', aircraft);
+  const airframe = opts.airframe?.trim();
+  if (airframe) params.set('airframe', airframe);
+  if (opts.profitableOnly) params.set('profitableOnly', '1');
+  if (opts.viableOnly) params.set('viableOnly', '1');
   const query = opts.query?.trim();
   if (query) params.set('q', query);
   const originQuery = opts.originQuery?.trim();
@@ -873,6 +904,7 @@ export function fetchMarket(
       maxCargoKg?: number | null;
       maxCargoSource?: string | null;
       airframeLabel?: string | null;
+      airframeTypeId?: string | null;
     }
   >(`/api/market${qs ? `?${qs}` : ''}`);
 }
@@ -936,8 +968,23 @@ export function fetchNpcFleet() {
   >('/api/npc');
 }
 
-export function fetchAirport(icao: string) {
-  return api<AirportView>(`/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}`);
+export function fetchAirport(
+  icao: string,
+  opts: {
+    aircraft?: AircraftClass;
+    airframe?: string;
+  } = {},
+) {
+  const params = new URLSearchParams();
+  if (opts.aircraft) params.set('aircraft', opts.aircraft);
+  const airframe = opts.airframe?.trim();
+  if (airframe) params.set('airframe', airframe);
+  const qs = params.toString();
+  return api<AirportView>(
+    `/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}${
+      qs ? `?${qs}` : ''
+    }`,
+  );
 }
 
 export type NetworkHub = {
@@ -1087,12 +1134,24 @@ export function postSelectHub(opts: {
   });
 }
 
+export type AircraftDeliveryQuoteView = {
+  deliverToIcao: string;
+  basedIcao: string;
+  distanceNm: number;
+  deliveryFeeUsd: number;
+  needed: boolean;
+};
+
 export function fetchAircraftMarket() {
   return api<
     ClockSync & {
       walletUsd: number;
       dayIndex: number;
       listings: AircraftListing[];
+      deliveryTargetIcao?: string;
+      deliveryQuotes?: Record<string, AircraftDeliveryQuoteView>;
+      ferrySoftNmUsed?: number;
+      ferrySoftNmBudget?: number;
       catalog: Array<{
         id: AircraftClass;
         name: string;
@@ -1116,10 +1175,15 @@ export function fetchAircraftMarket() {
   >('/api/aircraft-market');
 }
 
-export function postAircraftBuy(opts: { listingId: string }) {
+export function postAircraftBuy(opts: {
+  listingId: string;
+  deliver?: boolean;
+  deliverToIcao?: string;
+}) {
   return api<{
     walletUsd: number;
     debitUsd: number;
+    deliveryFeeUsd?: number;
     aircraft: PlayerAircraft;
     fleet: PlayerAircraft[];
     listings: AircraftListing[];
@@ -1129,10 +1193,15 @@ export function postAircraftBuy(opts: { listingId: string }) {
   });
 }
 
-export function postAircraftLease(opts: { listingId: string }) {
+export function postAircraftLease(opts: {
+  listingId: string;
+  deliver?: boolean;
+  deliverToIcao?: string;
+}) {
   return api<{
     walletUsd: number;
     debitUsd: number;
+    deliveryFeeUsd?: number;
     aircraft: PlayerAircraft;
     fleet: PlayerAircraft[];
     listings: AircraftListing[];
@@ -1448,6 +1517,50 @@ export function postFerry(opts: {
     method: 'POST',
     body: JSON.stringify(opts),
   });
+}
+
+export type FerryPlanLeg = {
+  from: string;
+  to: string;
+  distanceNm: number;
+};
+
+export type FerryPlanView = {
+  arrived: boolean;
+  plan: {
+    originIcao: string;
+    finalDestIcao: string;
+    hops: string[];
+    legs: FerryPlanLeg[];
+    totalDistanceNm: number;
+    legCount: number;
+    maxRangeNm: number;
+    hopRangeNm: number;
+  } | null;
+  nextLeg: FerryPlanLeg | null;
+  nextQuote: FerryQuote | null;
+  remainingNm: number;
+  initialNm: number;
+  progressPct: number;
+  legIndex: number;
+  legCount: number;
+  maxRangeNm: number;
+  walletUsd: number;
+  aircraftLocationIcao: string;
+};
+
+export function fetchFerryPlan(opts: {
+  aircraftId: string;
+  destIcao: string;
+  journeyOrigin?: string;
+}) {
+  const qs = new URLSearchParams({
+    aircraftId: opts.aircraftId,
+    dest: opts.destIcao.trim().toUpperCase(),
+  });
+  const journey = opts.journeyOrigin?.trim().toUpperCase();
+  if (journey) qs.set('journeyOrigin', journey);
+  return api<FerryPlanView>(`/api/fleet/ferry-plan?${qs.toString()}`);
 }
 
 export function postPilotTravel(opts: {

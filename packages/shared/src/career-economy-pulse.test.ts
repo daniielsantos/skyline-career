@@ -43,6 +43,8 @@ describe('computeEconomyPulse', () => {
     const ids = pulse.countries.map((c) => c.countryId);
     assert.ok(ids.includes('BR'));
     assert.ok(ids.includes('US'));
+    assert.ok(ids.includes('CA'));
+    assert.ok(ids.includes('MX'));
     assert.ok(ids.includes('INTL'));
     assert.equal(pulse.airportCount, world.airports.length);
     assert.equal(pulse.tick, world.tick);

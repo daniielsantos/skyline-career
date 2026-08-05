@@ -23,18 +23,22 @@ describe('career partition', () => {
     assert.equal(countryIdFromRegion('BR-SE'), 'BR');
     assert.equal(countryIdFromRegion('br-n'), 'BR');
     assert.equal(countryIdFromRegion('US-SE'), 'US');
+    assert.equal(countryIdFromRegion('CA-ON'), 'CA');
+    assert.equal(countryIdFromRegion('MX-C'), 'MX');
     assert.equal(countryIdFromRegion('BR'), 'BR');
   });
 
-  it('seeds Brazil home with US partition hubs + international lanes', () => {
+  it('seeds Brazil home with US/CA/MX partition hubs + international lanes', () => {
     const world = createSeedEconomyWorld({ seed: 'partition-seed' });
     assert.equal(world.homeCountryId, 'BR');
     assert.equal(inferHomeCountryId(world), 'BR');
-    assert.deepEqual(listWorldCountryIds(world), ['BR', 'US']);
+    assert.deepEqual(listWorldCountryIds(world), ['BR', 'CA', 'MX', 'US']);
     assert.ok(world.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(world.airports.some((a) => a.icao === 'KLAX'));
     assert.ok(world.airports.some((a) => a.icao === 'KORD'));
-    assert.ok((world.internationalLanes?.length ?? 0) >= 10);
+    assert.ok(world.airports.some((a) => a.icao === 'CYYZ'));
+    assert.ok(world.airports.some((a) => a.icao === 'MMMX'));
+    assert.ok((world.internationalLanes?.length ?? 0) >= 20);
     const usRegions = new Set(
       world.airports
         .filter((a) => countryIdFromRegion(a.region) === 'US')
@@ -78,7 +82,7 @@ describe('career partition', () => {
     assert.ok(findInternationalLane(world, 'SBEG', 'KMIA'));
   });
 
-  it('adds US hubs and lanes to a Brazil-only legacy save', () => {
+  it('adds US/CA/MX hubs and lanes to a Brazil-only legacy save', () => {
     const full = createSeedEconomyWorld({ seed: 'us-coverage' });
     const brOnly = {
       version: 3 as const,
@@ -95,11 +99,13 @@ describe('career partition', () => {
     };
     assert.equal(brOnly.airports.length, 60);
     assert.equal(ensureCareerHubCoverage(brOnly as typeof full), true);
-    assert.equal(brOnly.airports.length, 160);
+    assert.equal(brOnly.airports.length, 255);
     assert.ok(brOnly.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'KSEA'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'KPDX'));
-    assert.ok((brOnly.internationalLanes?.length ?? 0) >= 10);
+    assert.ok(brOnly.airports.some((a) => a.icao === 'CYVR'));
+    assert.ok(brOnly.airports.some((a) => a.icao === 'MMUN'));
+    assert.ok((brOnly.internationalLanes?.length ?? 0) >= 20);
 
     const migrated = migrateEconomyWorld({
       version: 3,
@@ -112,8 +118,8 @@ describe('career partition', () => {
       npcs: [],
       npcFlights: [],
     });
-    assert.equal(migrated.airports.length, 160);
-    assert.ok((migrated.internationalLanes?.length ?? 0) >= 10);
+    assert.equal(migrated.airports.length, 255);
+    assert.ok((migrated.internationalLanes?.length ?? 0) >= 20);
   });
 
   it('forms domestic and international lots; never off-lane cross-country', () => {
@@ -131,13 +137,16 @@ describe('career partition', () => {
     };
     let brDom = 0;
     let usDom = 0;
+    let otherDom = 0;
     let intl = 0;
     for (const lot of active) {
       const oc = byCountry(lot.originIcao);
       const dc = byCountry(lot.destIcao);
-      if (oc === 'BR' && dc === 'BR') brDom += 1;
-      else if (oc === 'US' && dc === 'US') usDom += 1;
-      else {
+      if (oc === dc) {
+        if (oc === 'BR') brDom += 1;
+        else if (oc === 'US') usDom += 1;
+        else otherDom += 1;
+      } else {
         intl += 1;
         assert.equal(
           isInternationalOdAllowed(world, lot.originIcao, lot.destIcao),
@@ -147,7 +156,10 @@ describe('career partition', () => {
       }
     }
     assert.ok(brDom > 0, 'expected BR domestic lots');
-    assert.ok(usDom > 0 || intl > 0, 'expected US domestic or intl lots');
+    assert.ok(
+      usDom > 0 || otherDom > 0 || intl > 0,
+      'expected US/CA/MX domestic or intl lots',
+    );
     assert.equal(
       active.some((l) => l.originIcao === 'KMIA' && l.destIcao === 'SBCT'),
       false,

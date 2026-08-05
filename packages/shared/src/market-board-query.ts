@@ -7,6 +7,7 @@ export type MarketBoardSortKey =
   | 'load'
   | 'expires'
   | 'pay'
+  | 'net'
   | 'access';
 
 export type MarketBoardSortDirection = 'asc' | 'desc';
@@ -24,6 +25,14 @@ export type MarketBoardSortable = {
   availableKg: number;
   expiresAtTick: number;
   payUsd: number;
+  /** Estimated net (pay − Jet-A) for the board-selected aircraft. */
+  estimatedNetUsd?: number | null;
+  /** Kg the selected aircraft can lift from this lot (0 = unusable). */
+  estimatedLiftKg?: number | null;
+  /** False when distance exceeds selected airframe range. */
+  estimatedInRange?: boolean | null;
+  /** False when block fuel exceeds tank. */
+  estimatedFuelFeasible?: boolean | null;
   /** True when Cargo Ops has this commodity locked for the player. */
   cargoLocked?: boolean;
   /** Cross-country lane freight (from lot pressure). */
@@ -45,6 +54,15 @@ export type MarketBoardQueryOpts = {
   expiresWithinHours?: number;
   /** Minimum contract pay (USD). */
   minPayUsd?: number;
+  /** Keep lots with estimated net strictly above this (USD). */
+  minNetUsd?: number;
+  /** Shortcut: keep lots with estimatedNetUsd > 0. */
+  profitableOnly?: boolean;
+  /**
+   * Keep lots the selected aircraft can actually fly now:
+   * unlocked commodity, in range, lift &gt; 0, fuel-feasible.
+   */
+  viableOnly?: boolean;
   /** Cargo Ops lock filter: open = unlocked only, locked = locked only. */
   accessFilter?: MarketBoardAccessFilter;
   /** International vs domestic route filter. */
@@ -63,6 +81,7 @@ const SORT_KEYS = new Set<MarketBoardSortKey>([
   'load',
   'expires',
   'pay',
+  'net',
   'access',
 ]);
 
@@ -147,6 +166,17 @@ function compareBoardRow<T extends MarketBoardSortable>(
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
       return a.payUsd - b.payUsd;
+    case 'net': {
+      const aNet =
+        typeof a.estimatedNetUsd === 'number' && Number.isFinite(a.estimatedNetUsd)
+          ? a.estimatedNetUsd
+          : Number.NEGATIVE_INFINITY;
+      const bNet =
+        typeof b.estimatedNetUsd === 'number' && Number.isFinite(b.estimatedNetUsd)
+          ? b.estimatedNetUsd
+          : Number.NEGATIVE_INFINITY;
+      return aNet - bNet;
+    }
     case 'access':
       // Unlocked (false) before locked (true) when ascending.
       return Number(Boolean(a.cargoLocked)) - Number(Boolean(b.cargoLocked));
@@ -162,6 +192,9 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     | 'loadMaxKg'
     | 'expiresWithinHours'
     | 'minPayUsd'
+    | 'minNetUsd'
+    | 'profitableOnly'
+    | 'viableOnly'
     | 'accessFilter'
     | 'laneFilter'
     | 'currentTick'
@@ -203,6 +236,48 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     row.payUsd < opts.minPayUsd
   ) {
     return false;
+  }
+  if (opts.profitableOnly) {
+    if (
+      typeof row.estimatedNetUsd !== 'number' ||
+      !Number.isFinite(row.estimatedNetUsd) ||
+      row.estimatedNetUsd <= 0
+    ) {
+      return false;
+    }
+  }
+  if (opts.viableOnly) {
+    if (row.cargoLocked) return false;
+    if (row.estimatedInRange === false) return false;
+    if (row.estimatedFuelFeasible === false) return false;
+    if (
+      typeof row.estimatedLiftKg === 'number' &&
+      Number.isFinite(row.estimatedLiftKg) &&
+      row.estimatedLiftKg <= 0
+    ) {
+      return false;
+    }
+    // Estimates missing (no aircraft / failed quote) → not "viable".
+    if (
+      row.estimatedLiftKg === null ||
+      row.estimatedLiftKg === undefined ||
+      row.estimatedInRange === null ||
+      row.estimatedInRange === undefined
+    ) {
+      return false;
+    }
+  }
+  if (
+    opts.minNetUsd !== undefined &&
+    Number.isFinite(opts.minNetUsd)
+  ) {
+    if (
+      typeof row.estimatedNetUsd !== 'number' ||
+      !Number.isFinite(row.estimatedNetUsd) ||
+      row.estimatedNetUsd < opts.minNetUsd
+    ) {
+      return false;
+    }
   }
   if (opts.accessFilter === 'open' && row.cargoLocked) return false;
   if (opts.accessFilter === 'locked' && !row.cargoLocked) return false;

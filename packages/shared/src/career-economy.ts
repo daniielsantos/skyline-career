@@ -4,6 +4,16 @@ import {
   buildBrFeederCorridors,
 } from './career-br-hubs.js';
 import {
+  assertCaCareerHubCatalog,
+  buildCaFeederCorridors,
+  CA_CAREER_HUBS,
+} from './career-ca-hubs.js';
+import {
+  assertMxCareerHubCatalog,
+  buildMxFeederCorridors,
+  MX_CAREER_HUBS,
+} from './career-mx-hubs.js';
+import {
   assertUsCareerHubCatalog,
   buildUsFeederCorridors,
   US_CAREER_HUBS,
@@ -266,10 +276,12 @@ export const HUB_TIER_PROFILE: Record<
   },
 };
 
-/** Curated ICAO → tier map (BR + US catalogs). */
+/** Curated ICAO → tier map (BR + US + CA + MX catalogs). */
 export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(US_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(CA_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(MX_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -295,7 +307,7 @@ export function laneLotCaps(
 }
 
 /**
- * Curated domestic cargo corridors (bidirectional) + auto BR/US feeders.
+ * Curated domestic cargo corridors (bidirectional) + auto BR/US/CA/MX feeders.
  * Weights > 1 favor formation + a mild pay bump.
  */
 const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
@@ -412,6 +424,27 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'KSFO', b: 'KLAX', weight: 1.8 },
   { a: 'KSFO', b: 'KSEA', weight: 1.6 },
   { a: 'KSAN', b: 'KLAX', weight: 1.6 },
+  // Canada domestic trunks
+  { a: 'CYYZ', b: 'CYVR', weight: 2.2 },
+  { a: 'CYYZ', b: 'CYUL', weight: 2.0 },
+  { a: 'CYYZ', b: 'CYYC', weight: 1.9 },
+  { a: 'CYYZ', b: 'CYEG', weight: 1.7 },
+  { a: 'CYVR', b: 'CYYC', weight: 1.8 },
+  { a: 'CYYZ', b: 'CYWG', weight: 1.6 },
+  { a: 'CYYZ', b: 'CYOW', weight: 1.7 },
+  { a: 'CYYZ', b: 'CYHZ', weight: 1.6 },
+  { a: 'CYUL', b: 'CYQB', weight: 1.5 },
+  { a: 'CYVR', b: 'CYYJ', weight: 1.6 },
+  // Mexico domestic trunks
+  { a: 'MMMX', b: 'MMMY', weight: 2.1 },
+  { a: 'MMMX', b: 'MMGL', weight: 2.0 },
+  { a: 'MMMX', b: 'MMUN', weight: 1.9 },
+  { a: 'MMMY', b: 'MMTJ', weight: 1.7 },
+  { a: 'MMMX', b: 'MMTJ', weight: 1.5 },
+  { a: 'MMGL', b: 'MMMY', weight: 1.6 },
+  { a: 'MMMX', b: 'MMVR', weight: 1.5 },
+  { a: 'MMUN', b: 'MMSD', weight: 1.4 },
+  { a: 'MMMX', b: 'MMPR', weight: 1.5 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -422,6 +455,8 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...CAREER_CARGO_CORRIDORS_MANUAL,
   ...buildBrFeederCorridors(BR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildUsFeederCorridors(US_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildCaFeederCorridors(CA_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildMxFeederCorridors(MX_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -436,7 +471,7 @@ const DOMESTIC_OVERFLOW_DEST_FILL = 0.35;
 const DOMESTIC_OVERFLOW_CORRIDOR_WEIGHT = 1.1;
 
 /**
- * Sparse BR↔US hub lanes (stored directed; matching is bidirectional).
+ * Sparse international hub lanes (stored directed; matching is bidirectional).
  * Soft capacityKgPerDay caps active freight on the OD.
  */
 export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
@@ -518,6 +553,137 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destCountryId: 'US',
     originIcao: 'SBEG',
     destIcao: 'KMEM',
+    capacityKgPerDay: 35_000,
+  },
+  // US ↔ Canada gateways
+  {
+    id: 'lane_cyyz_kjfk',
+    originCountryId: 'CA',
+    destCountryId: 'US',
+    originIcao: 'CYYZ',
+    destIcao: 'KJFK',
+    capacityKgPerDay: 70_000,
+  },
+  {
+    id: 'lane_cyyz_kord',
+    originCountryId: 'CA',
+    destCountryId: 'US',
+    originIcao: 'CYYZ',
+    destIcao: 'KORD',
+    capacityKgPerDay: 65_000,
+  },
+  {
+    id: 'lane_cyvr_ksea',
+    originCountryId: 'CA',
+    destCountryId: 'US',
+    originIcao: 'CYVR',
+    destIcao: 'KSEA',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_cyvr_klax',
+    originCountryId: 'CA',
+    destCountryId: 'US',
+    originIcao: 'CYVR',
+    destIcao: 'KLAX',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_cyul_kjfk',
+    originCountryId: 'CA',
+    destCountryId: 'US',
+    originIcao: 'CYUL',
+    destIcao: 'KJFK',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_cyyc_ksea',
+    originCountryId: 'CA',
+    destCountryId: 'US',
+    originIcao: 'CYYC',
+    destIcao: 'KSEA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_cyeg_kden',
+    originCountryId: 'CA',
+    destCountryId: 'US',
+    originIcao: 'CYEG',
+    destIcao: 'KDEN',
+    capacityKgPerDay: 35_000,
+  },
+  // US ↔ Mexico gateways
+  {
+    id: 'lane_mmmx_kiah',
+    originCountryId: 'MX',
+    destCountryId: 'US',
+    originIcao: 'MMMX',
+    destIcao: 'KIAH',
+    capacityKgPerDay: 75_000,
+  },
+  {
+    id: 'lane_mmmx_kdfw',
+    originCountryId: 'MX',
+    destCountryId: 'US',
+    originIcao: 'MMMX',
+    destIcao: 'KDFW',
+    capacityKgPerDay: 65_000,
+  },
+  {
+    id: 'lane_mmmy_kiah',
+    originCountryId: 'MX',
+    destCountryId: 'US',
+    originIcao: 'MMMY',
+    destIcao: 'KIAH',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_mmtj_klax',
+    originCountryId: 'MX',
+    destCountryId: 'US',
+    originIcao: 'MMTJ',
+    destIcao: 'KLAX',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_mmun_kmia',
+    originCountryId: 'MX',
+    destCountryId: 'US',
+    originIcao: 'MMUN',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_mmgl_kiah',
+    originCountryId: 'MX',
+    destCountryId: 'US',
+    originIcao: 'MMGL',
+    destIcao: 'KIAH',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_mmsd_klax',
+    originCountryId: 'MX',
+    destCountryId: 'US',
+    originIcao: 'MMSD',
+    destIcao: 'KLAX',
+    capacityKgPerDay: 30_000,
+  },
+  // Sparse BR ↔ MX / BR ↔ CA
+  {
+    id: 'lane_sbgr_mmmx',
+    originCountryId: 'BR',
+    destCountryId: 'MX',
+    originIcao: 'SBGR',
+    destIcao: 'MMMX',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_sbgr_cyyz',
+    originCountryId: 'BR',
+    destCountryId: 'CA',
+    originIcao: 'SBGR',
+    destIcao: 'CYYZ',
     capacityKgPerDay: 35_000,
   },
 ];
@@ -635,15 +801,15 @@ export const CAREER_CARGO_COMMODITIES: readonly CommodityDef[] =
  * Global cargo flow balance vs hub produce/consume biases (pulse-tuned).
  * Applied each tick on effective flows so existing saves pick it up without reset.
  * Seed bases stay raw; do not also bake these into baseProduction (would double-count).
- * Target: Value/Heavy fill ~30–50%, Dry (general) ~50–60%.
+ * Target: Value/Heavy fill ~30–50% with both surplus and shortage hubs so freights form.
  */
 export const CARGO_FLOW_BALANCE: Readonly<
   Partial<Record<CommodityId, { production: number; consumption: number }>>
 > = {
-  // Value/Heavy: typical consumer hub is ~550*0.15 prod vs ~500*0.85 cons
-  // (~5.2× gap). 2.6/0.5 landed elec fill ~52% in 15d from empty — slightly soft.
-  electronics: { production: 2.4, consumption: 0.55 },
-  machinery: { production: 2.45, consumption: 0.54 },
+  // Value: paired with DEFAULT biases (~0.15 prod / ~0.55 cons) so typical
+  // omit/consumer hubs are slight net sinks; explicit producers stay exporters.
+  electronics: { production: 2.0, consumption: 0.7 },
+  machinery: { production: 2.05, consumption: 0.68 },
   // Dry: 0.88/1.08 moved ~5pt/15d; nudge so 50–60% is reachable in ~30d
   general: { production: 0.84, consumption: 1.12 },
 };
@@ -657,8 +823,8 @@ function cargoFlowBalance(commodityId: CommodityId): {
 
 /** Default produce bias when a hub omits a cargo commodity. */
 const DEFAULT_CARGO_PROD_BIAS: Readonly<Partial<Record<CommodityId, number>>> = {
-  electronics: 0.38,
-  machinery: 0.36,
+  electronics: 0.15,
+  machinery: 0.14,
   general: 0.14,
   perishables: 0.15,
   supplies: 0.15,
@@ -666,14 +832,14 @@ const DEFAULT_CARGO_PROD_BIAS: Readonly<Partial<Record<CommodityId, number>>> = 
 
 /** Default consume bias when a hub omits a cargo commodity. */
 const DEFAULT_CARGO_CONS_BIAS: Readonly<Partial<Record<CommodityId, number>>> = {
-  electronics: 0.2,
-  machinery: 0.2,
+  electronics: 0.55,
+  machinery: 0.55,
   general: 0.3,
   perishables: 0.25,
   supplies: 0.25,
 };
 
-/** Major Jet-A production hubs (BR + US career anchors). */
+/** Major Jet-A production hubs (BR + US + CA + MX career anchors). */
 export const FUEL_HUB_ICAOS = new Set([
   // BR producers (~1 per 3 hubs at 60 airports)
   'SBGR',
@@ -706,6 +872,24 @@ export const FUEL_HUB_ICAOS = new Set([
   'KDEN',
   'KLAX',
   'KSEA',
+  // Canada Jet-A producers
+  'CYVR',
+  'CYYC',
+  'CYEG',
+  'CYYZ',
+  'CYUL',
+  'CYWG',
+  'CYOW',
+  'CYHZ',
+  // Mexico Jet-A producers
+  'MMMX',
+  'MMMY',
+  'MMGL',
+  'MMUN',
+  'MMTJ',
+  'MMHO',
+  'MMVR',
+  'MMSD',
 ]);
 
 /** Seed or repair fuel inventory + baseline flows on a terminal. */
@@ -904,6 +1088,18 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    CA_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    MX_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -1073,8 +1269,8 @@ function ensurePile(
 }
 
 /**
- * Seed the career cargo world: Brazil domestic hubs + US continental map,
- * with asymmetric production/consumption so ticks create explainable lanes.
+ * Seed the career cargo world: BR + US + CA + MX hubs, with asymmetric
+ * production/consumption so ticks create explainable lanes.
  */
 export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEconomyWorld {
   const seed = opts.seed?.trim() || 'skyline-career-br-v1';
@@ -1082,6 +1278,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
 
   assertBrCareerHubCatalog();
   assertUsCareerHubCatalog();
+  assertCaCareerHubCatalog();
+  assertMxCareerHubCatalog();
 
   const hubs: Array<{
     icao: string;
@@ -1102,6 +1300,22 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       consume: h.consume,
     })),
     ...US_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+    })),
+    ...CA_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+    })),
+    ...MX_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,
@@ -1171,10 +1385,10 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       );
       production[c.id] = prod;
       consumption[c.id] = cons;
-      // Start near mid stock; nudge Value up / Dry down toward equilibrium
+      // Start near mid stock; Value below dest cutoff (0.45) so sinks exist on day 0
       let startFill = 0.35 + rng() * 0.35;
       if (c.id === 'electronics' || c.id === 'machinery') {
-        startFill = 0.48 + rng() * 0.22;
+        startFill = 0.18 + rng() * 0.28;
       } else if (c.id === 'general') {
         startFill = 0.22 + rng() * 0.28;
       }

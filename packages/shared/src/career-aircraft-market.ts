@@ -4,7 +4,14 @@ import {
   routeDistanceNm,
   type CareerEconomyWorld,
 } from './career-economy.js';
-import { resolvePlayerFuelCapacityKg } from './career-fleet.js';
+import {
+  AIRCRAFT_DELIVERY_MAX_USD,
+  AIRCRAFT_DELIVERY_MIN_USD,
+  AIRCRAFT_DELIVERY_USD_PER_NM,
+  FERRY_CLASS_MULT,
+  resolvePlayerFuelCapacityKg,
+} from './career-fleet.js';
+import { hubDistanceNm } from './career-ferry-route.js';
 import {
   applyAircraftHoursAfterMission,
   conditionPctsForListing,
@@ -802,11 +809,118 @@ function buildAircraftFromListing(
   return aircraft;
 }
 
+/** Prefer pilot location, else home hub — where dealer delivery parks the airframe. */
+export function resolveAircraftDeliveryIcao(
+  state: CareerMissionsState,
+): string {
+  const pilot = (state.pilotIcao ?? '').trim().toUpperCase();
+  if (pilot) return pilot;
+  return (state.homeHubIcao ?? '').trim().toUpperCase();
+}
+
+export type AircraftDeliveryQuote = {
+  listingId: string;
+  basedIcao: string;
+  deliverToIcao: string;
+  distanceNm: number;
+  deliveryFeeUsd: number;
+  /** True when based ≠ deliver target (fee may still be 0 only if same ICAO). */
+  needed: boolean;
+};
+
+export function computeAircraftDeliveryFeeUsd(opts: {
+  distanceNm: number;
+  aircraftClassId: FreighterClassId;
+}): number {
+  const distanceNm = Math.max(0, opts.distanceNm);
+  if (distanceNm <= 0) return 0;
+  const raw =
+    distanceNm *
+    AIRCRAFT_DELIVERY_USD_PER_NM *
+    FERRY_CLASS_MULT[opts.aircraftClassId];
+  return Math.min(
+    AIRCRAFT_DELIVERY_MAX_USD,
+    Math.max(AIRCRAFT_DELIVERY_MIN_USD, Math.round(raw)),
+  );
+}
+
+export function quoteAircraftDelivery(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  listingId: string,
+  deliverToIcao?: string,
+): AircraftDeliveryQuote {
+  ensureAircraftMarket(state, world);
+  const listing = state.aircraftMarket?.find((l) => l.id === listingId);
+  if (!listing || listing.status !== 'available') {
+    throw new Error(`Listing ${listingId} is not available`);
+  }
+  return quoteAircraftDeliveryForListing(world, state, listing, deliverToIcao);
+}
+
+export function quoteAircraftDeliveryForListing(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  listing: AircraftListing,
+  deliverToIcao?: string,
+): AircraftDeliveryQuote {
+  const to = (
+    deliverToIcao?.trim() ||
+    resolveAircraftDeliveryIcao(state)
+  ).toUpperCase();
+  if (!to) {
+    throw new Error('No delivery destination — select a starter hub first');
+  }
+  if (!CAREER_HUB_COORDS[to] && !world.airports.some((a) => a.icao === to)) {
+    throw new Error(`Unknown delivery airport: ${to}`);
+  }
+  const from = listing.basedIcao.trim().toUpperCase();
+  if (from === to) {
+    return {
+      listingId: listing.id,
+      basedIcao: from,
+      deliverToIcao: to,
+      distanceNm: 0,
+      deliveryFeeUsd: 0,
+      needed: false,
+    };
+  }
+  const distanceNm =
+    hubDistanceNm(from, to) ?? routeDistanceNm(world, from, to);
+  if (distanceNm === undefined) {
+    throw new Error(`No delivery route ${from}→${to}`);
+  }
+  return {
+    listingId: listing.id,
+    basedIcao: from,
+    deliverToIcao: to,
+    distanceNm,
+    deliveryFeeUsd: computeAircraftDeliveryFeeUsd({
+      distanceNm,
+      aircraftClassId: listing.aircraftClassId,
+    }),
+    needed: true,
+  };
+}
+
+export type AircraftAcquireOpts = {
+  /** Park at pilot/home hub for a dealer delivery fee (cheaper than self-ferry). */
+  deliver?: boolean;
+  /** Override delivery destination (defaults to pilotIcao ?? homeHubIcao). */
+  deliverToIcao?: string;
+};
+
 export function purchaseAircraftListing(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
   listingId: string,
-): { state: CareerMissionsState; aircraft: PlayerAircraft; debitUsd: number } {
+  opts?: AircraftAcquireOpts,
+): {
+  state: CareerMissionsState;
+  aircraft: PlayerAircraft;
+  debitUsd: number;
+  deliveryFeeUsd: number;
+} {
   ensureAircraftMarket(state, world);
   const listing = state.aircraftMarket?.find((l) => l.id === listingId);
   if (!listing || listing.status !== 'available') {
@@ -821,12 +935,30 @@ export function purchaseAircraftListing(
   if (!state.hubSelected) {
     throw new Error('Select a starter hub before buying aircraft');
   }
-  if (state.walletUsd < listing.askingUsd) {
+
+  let deliveryFeeUsd = 0;
+  let deliverTo = listing.basedIcao.trim().toUpperCase();
+  if (opts?.deliver) {
+    const dq = quoteAircraftDeliveryForListing(
+      world,
+      state,
+      listing,
+      opts.deliverToIcao,
+    );
+    deliveryFeeUsd = dq.deliveryFeeUsd;
+    deliverTo = dq.deliverToIcao;
+  }
+
+  const debitUsd = listing.askingUsd + deliveryFeeUsd;
+  if (state.walletUsd < debitUsd) {
     throw new Error(
-      `Needs $${listing.askingUsd.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
+      `Needs $${debitUsd.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
     );
   }
   const aircraft = buildAircraftFromListing(state, listing, 'owned', world.tick);
+  if (opts?.deliver && deliverTo !== listing.basedIcao.trim().toUpperCase()) {
+    aircraft.locationIcao = deliverTo;
+  }
   listing.status = 'sold';
   applyWalletDelta(state, {
     amountUsd: -listing.askingUsd,
@@ -836,15 +968,31 @@ export function purchaseAircraftListing(
     icao: listing.basedIcao,
     note: listing.label,
   });
+  if (deliveryFeeUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -deliveryFeeUsd,
+      kind: 'aircraft_delivery',
+      atTick: world.tick,
+      aircraftId: aircraft.id,
+      icao: deliverTo,
+      note: `${listing.basedIcao}→${deliverTo}`,
+    });
+  }
   state.fleet = [...state.fleet, aircraft];
-  return { state, aircraft, debitUsd: listing.askingUsd };
+  return { state, aircraft, debitUsd, deliveryFeeUsd };
 }
 
 export function signAircraftLease(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
   listingId: string,
-): { state: CareerMissionsState; aircraft: PlayerAircraft; debitUsd: number } {
+  opts?: AircraftAcquireOpts,
+): {
+  state: CareerMissionsState;
+  aircraft: PlayerAircraft;
+  debitUsd: number;
+  deliveryFeeUsd: number;
+} {
   ensureAircraftMarket(state, world);
   const listing = state.aircraftMarket?.find((l) => l.id === listingId);
   if (!listing || listing.status !== 'available') {
@@ -859,12 +1007,30 @@ export function signAircraftLease(
   if (!state.hubSelected) {
     throw new Error('Select a starter hub before leasing aircraft');
   }
-  if (state.walletUsd < listing.askingUsd) {
+
+  let deliveryFeeUsd = 0;
+  let deliverTo = listing.basedIcao.trim().toUpperCase();
+  if (opts?.deliver) {
+    const dq = quoteAircraftDeliveryForListing(
+      world,
+      state,
+      listing,
+      opts.deliverToIcao,
+    );
+    deliveryFeeUsd = dq.deliveryFeeUsd;
+    deliverTo = dq.deliverToIcao;
+  }
+
+  const debitUsd = listing.askingUsd + deliveryFeeUsd;
+  if (state.walletUsd < debitUsd) {
     throw new Error(
-      `Lease entry $${listing.askingUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
+      `Lease entry $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
   const aircraft = buildAircraftFromListing(state, listing, 'leased', world.tick);
+  if (opts?.deliver && deliverTo !== listing.basedIcao.trim().toUpperCase()) {
+    aircraft.locationIcao = deliverTo;
+  }
   listing.status = 'sold';
   applyWalletDelta(state, {
     amountUsd: -listing.askingUsd,
@@ -874,8 +1040,18 @@ export function signAircraftLease(
     icao: listing.basedIcao,
     note: listing.label,
   });
+  if (deliveryFeeUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -deliveryFeeUsd,
+      kind: 'aircraft_delivery',
+      atTick: world.tick,
+      aircraftId: aircraft.id,
+      icao: deliverTo,
+      note: `${listing.basedIcao}→${deliverTo}`,
+    });
+  }
   state.fleet = [...state.fleet, aircraft];
-  return { state, aircraft, debitUsd: listing.askingUsd };
+  return { state, aircraft, debitUsd, deliveryFeeUsd };
 }
 
 export function sellPlayerAircraft(

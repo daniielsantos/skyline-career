@@ -169,6 +169,8 @@ describe('career fleet hangar', () => {
     });
     assert.ok(quote.distanceNm > 0);
     assert.ok(quote.totalCostUsd > 0);
+    assert.ok(quote.softNmApplied > 0);
+    assert.ok(quote.ferryFeeUsd < quote.fullRateFeeUsd);
     const result = executeFerry(world, state, {
       aircraftId: state.fleet[0]!.id,
       destIcao: 'SBKP',
@@ -178,6 +180,20 @@ describe('career fleet hangar', () => {
     assert.equal(listParkedAt(state, 'SBGR').length, 0);
     assert.ok(state.walletUsd < 50_000);
     assert.ok(result.aircraft.fuelKg < beforeFuel + quote.fuelUpliftKg);
+    assert.ok((state.ferrySoftNmUsed ?? 0) > 0);
+  });
+
+  it('ferry soft budget expires into full-rate fees', () => {
+    const world = createSeedEconomyWorld({ seed: 'ferry-soft' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    state.walletUsd = 100_000;
+    state.ferrySoftNmUsed = 3_000;
+    const quote = quoteFerry(world, state, {
+      aircraftId: state.fleet[0]!.id,
+      destIcao: 'SBKP',
+    });
+    assert.equal(quote.softNmApplied, 0);
+    assert.equal(quote.ferryFeeUsd, quote.fullRateFeeUsd);
   });
 
   it('settle relocates aircraft to destination; cancel keeps origin', () => {

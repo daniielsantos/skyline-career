@@ -5,7 +5,7 @@ import { access } from 'node:fs/promises';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const pipeName = process.env.MSFS_COMPAT_PIPE ?? `msfs-compat-smoke-${process.pid}`;
-const profile = join(root, 'profiles', 'examples', 'asobo-c172-skyhawk.json');
+const profile = join(root, 'profiles', 'examples', 'asobo-c172sp-classic-cargo.json');
 const agentCli = join(root, 'packages', 'agent', 'dist', 'cli.js');
 const mockHost = join(root, 'packages', 'agent', 'dist', 'mock-host.js');
 const hostProject = join(root, 'native', 'SimBridgeHost', 'SimBridgeHost.csproj');

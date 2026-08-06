@@ -29,6 +29,10 @@ import {
 import { TICKS_PER_DAY } from './career-clock.js';
 import { applyWalletDelta } from './career-ledger.js';
 import {
+  CARGO_OPS_DRY_IDS,
+  normalizeCareerCargoOps,
+} from './career-cargo-ops.js';
+import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
 } from './career-player-airframes.js';
@@ -38,6 +42,7 @@ import type {
   AircraftListingKind,
   AircraftListingSource,
   AirframeCondition,
+  CareerCargoOps,
   CareerMissionsState,
   FreighterClassId,
   NpcFreighter,
@@ -77,6 +82,76 @@ const CLASS_ORDER: FreighterClassId[] = [
 const TICKS_PER_MONTH = TICKS_PER_DAY * 30;
 const LISTING_LIFE_TICKS = TICKS_PER_DAY * 5;
 const PLAYER_LISTING_LIFE_TICKS = TICKS_PER_DAY * 7;
+
+/**
+ * Clean Dry freights (general + supplies settlesOk) required before leasing.
+ * Buy stays cash-only; Market browse stays open.
+ */
+export const LEASE_UNLOCK_CLEAN_DRY_SETTLES = 8;
+
+export type AircraftLeaseUnlockProgress = {
+  current: number;
+  required: number;
+  remaining: number;
+  unlocked: boolean;
+  hint: string;
+};
+
+/** Sum of clean Dry settles (general + supplies) from Cargo Ops. */
+export function dryCleanSettlesOk(
+  cargoOps: CareerCargoOps | undefined | null,
+): number {
+  const ops = normalizeCareerCargoOps(cargoOps ?? undefined);
+  let sum = 0;
+  for (const id of CARGO_OPS_DRY_IDS) {
+    sum += ops.commodities[id]?.settlesOk ?? 0;
+  }
+  return sum;
+}
+
+export function isAircraftLeaseUnlocked(
+  state: Pick<CareerMissionsState, 'cargoOps'>,
+): boolean {
+  return dryCleanSettlesOk(state.cargoOps) >= LEASE_UNLOCK_CLEAN_DRY_SETTLES;
+}
+
+export function aircraftLeaseUnlockProgress(
+  state: Pick<CareerMissionsState, 'cargoOps'>,
+): AircraftLeaseUnlockProgress {
+  const required = LEASE_UNLOCK_CLEAN_DRY_SETTLES;
+  const current = dryCleanSettlesOk(state.cargoOps);
+  const unlocked = current >= required;
+  const remaining = Math.max(0, required - current);
+  const hint = unlocked
+    ? `Lease unlocked (${current}/${required} clean Dry freights).`
+    : `Lease locked — ${current}/${required} clean Dry freights. Finish Crew needed on time (score ≥70). Buy is available anytime if you can afford it.`;
+  return { current, required, remaining, unlocked, hint };
+}
+
+function assertAircraftLeaseUnlocked(
+  state: Pick<CareerMissionsState, 'cargoOps'>,
+): void {
+  const progress = aircraftLeaseUnlockProgress(state);
+  if (progress.unlocked) return;
+  throw new Error(
+    `Lease unlocks after ${progress.required} clean Dry freights (on-time). Progress: ${progress.current}/${progress.required} — fly Crew needed or Dry lots.`,
+  );
+}
+
+/**
+ * Seed Dry settlesOk for tests / debug (does not touch rep).
+ */
+export function seedDryCleanSettlesForTests(
+  state: CareerMissionsState,
+  total: number,
+): void {
+  const ops = normalizeCareerCargoOps(state.cargoOps);
+  const n = Math.max(0, Math.floor(total));
+  const half = Math.floor(n / 2);
+  ops.commodities.general.settlesOk = half;
+  ops.commodities.supplies.settlesOk = n - half;
+  state.cargoOps = ops;
+}
 /**
  * Estimated utilization while a player airframe is wet-leased out.
  * Calibrated so a 12‑mo term wears the asset without wiping it.
@@ -1007,6 +1082,7 @@ export function signAircraftLease(
   if (!state.hubSelected) {
     throw new Error('Select a starter hub before leasing aircraft');
   }
+  assertAircraftLeaseUnlocked(state);
 
   let deliveryFeeUsd = 0;
   let deliverTo = listing.basedIcao.trim().toUpperCase();

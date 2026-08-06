@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   createSeedEconomyWorld,
+  createNpcContractPilotOffer,
+  acceptContractPilotOffer,
+  contractPilotLiftKg,
   describeLotMarketPressure,
   drainNpcMroParts,
   ensureNpcAirframes,
@@ -9,15 +12,25 @@ import {
   estimateNpcBlockHours,
   listActiveNpcFreights,
   listNpcFleetStatus,
+  listMarketLots,
   listRegionMarketPressure,
   migrateEconomyWorld,
   hoursToTicks,
+  listNpcHomeRegions,
+  NPCS_PER_REGION,
+  NPC_FLEET_MIN,
+  resolveNpcFleetComposition,
+  targetNpcFleetSize,
   NPC_FLEET_COMPOSITION,
   NPC_FLEET_SIZE,
   NPC_MX_INTERVAL_HOURS,
   NPC_MX_PARTS_KG,
+  npcAirframeIsHomologated,
+  npcCanOfferContractPilot,
+  npcClaimForLot,
   npcLaneAirborneKg,
   npcMaxCargoKg,
+  quoteContractPilotFeeUsd,
   playerLaneInboundKg,
   laneInboundKg,
   npcLaneSaturation,
@@ -27,20 +40,50 @@ import {
   settleNpcOpsDue,
   tickEconomyN,
 } from './career-economy.js';
-import { getAircraftClass } from './career-mission.js';
+import { cancelMission, getAircraftClass, settleMission } from './career-mission.js';
+import { emptyMissionsStateV2 } from './career-fleet.js';
 import type { NpcFlight } from './types/career-economy.js';
 
-function npcCompositionCount(aircraftClassId: string): number {
+function worldRegionCount(world: { airports: { region: string }[] }): number {
+  return listNpcHomeRegions(world.airports).length;
+}
+
+function worldFleetTarget(world: { airports: { region: string }[] }): number {
+  return targetNpcFleetSize(worldRegionCount(world));
+}
+
+function npcCompositionCount(
+  world: { airports: { region: string }[] },
+  aircraftClassId: string,
+): number {
   return (
-    NPC_FLEET_COMPOSITION.find((slot) => slot.aircraftClassId === aircraftClassId)
-      ?.count ?? 0
+    resolveNpcFleetComposition(worldRegionCount(world)).find(
+      (slot) => slot.aircraftClassId === aircraftClassId,
+    )?.count ?? 0
   );
 }
 
 describe('NPC freighter fleet', () => {
+  it('scales fleet size with mapped region count', () => {
+    assert.equal(targetNpcFleetSize(0), NPC_FLEET_MIN);
+    assert.equal(targetNpcFleetSize(3), Math.max(NPC_FLEET_MIN, 3 * NPCS_PER_REGION));
+    assert.equal(targetNpcFleetSize(20), 20 * NPCS_PER_REGION);
+    const for20 = resolveNpcFleetComposition(20);
+    assert.equal(
+      for20.reduce((n, s) => n + s.count, 0),
+      targetNpcFleetSize(20),
+    );
+    // Legacy aliases stay calibrated to a 20-region reference map.
+    assert.equal(NPC_FLEET_SIZE, targetNpcFleetSize(20));
+    assert.equal(
+      NPC_FLEET_COMPOSITION.reduce((n, s) => n + s.count, 0),
+      NPC_FLEET_SIZE,
+    );
+  });
+
   it('seeds jets plus medium piston, light jet, Caravan and Bonanza GA freighters', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-seed' });
-    assert.equal(world.npcs.length, NPC_FLEET_SIZE);
+    assert.equal(world.npcs.length, worldFleetTarget(world));
     assert.equal(world.npcFlights.length, 0);
     const narrow = world.npcs.filter((n) => n.aircraftClassId === 'narrow_freighter');
     const wide = world.npcs.filter((n) => n.aircraftClassId === 'wide_freighter');
@@ -48,27 +91,168 @@ describe('NPC freighter fleet', () => {
     const lightJet = world.npcs.filter((n) => n.aircraftClassId === 'light_jet');
     const caravan = world.npcs.filter((n) => n.aircraftClassId === 'light_turboprop');
     const bonanza = world.npcs.filter((n) => n.aircraftClassId === 'light_ga');
-    assert.equal(narrow.length, npcCompositionCount('narrow_freighter'));
-    assert.equal(wide.length, npcCompositionCount('wide_freighter'));
-    assert.equal(mediumPiston.length, npcCompositionCount('medium_piston'));
-    assert.equal(lightJet.length, npcCompositionCount('light_jet'));
-    assert.equal(caravan.length, npcCompositionCount('light_turboprop'));
-    assert.equal(bonanza.length, npcCompositionCount('light_ga'));
+    assert.equal(narrow.length, npcCompositionCount(world, 'narrow_freighter'));
+    assert.equal(wide.length, npcCompositionCount(world, 'wide_freighter'));
+    assert.equal(mediumPiston.length, npcCompositionCount(world, 'medium_piston'));
+    assert.equal(lightJet.length, npcCompositionCount(world, 'light_jet'));
+    assert.equal(caravan.length, npcCompositionCount(world, 'light_turboprop'));
+    assert.equal(bonanza.length, npcCompositionCount(world, 'light_ga'));
     assert.ok(world.npcs.every((n) => n.status === 'idle'));
     assert.ok(world.npcs.every((n) => n.reliability > 0 && n.aggressiveness > 0));
   });
 
-  it('assigns abstract airframe variants (FSLTL-derived) on seed', () => {
+  it('grows the fleet when a new region is mapped onto an existing save', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-scale-region' });
+    const before = world.npcs.length;
+    const regionsBefore = worldRegionCount(world);
+    const sample = world.airports[0]!;
+    world.airports.push({
+      ...sample,
+      icao: 'TEST',
+      name: 'Test Expansion Hub',
+      region: 'EU-TEST',
+    });
+    ensureNpcFleet(world);
+    const regionsAfter = worldRegionCount(world);
+    assert.equal(regionsAfter, regionsBefore + 1);
+    assert.equal(world.npcs.length, worldFleetTarget(world));
+    assert.ok(world.npcs.length > before);
+    assert.ok(
+      world.npcs.some((n) => n.homeRegion === 'EU-TEST'),
+      'new region should receive at least one home operator from top-up',
+    );
+  });
+
+  it('prunes idle surplus NPCs back to the region-scaled target', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-prune' });
+    const target = worldFleetTarget(world);
+    assert.equal(world.npcs.length, target);
+    const donor = world.npcs.find((n) => !n.currentFlightId)!;
+    assert.ok(donor);
+    for (let i = 0; i < 22; i++) {
+      world.npcs.push({
+        ...donor,
+        id: `npc-extra-${i}`,
+        name: `Extra Operator ${i}`,
+        currentFlightId: undefined,
+        status: 'idle',
+        busyUntilMs: undefined,
+        busyUntilTick: undefined,
+      });
+    }
+    assert.equal(world.npcs.length, target + 22);
+    ensureNpcFleet(world);
+    assert.equal(world.npcs.length, target);
+    const byRegion = new Map<string, number>();
+    for (const npc of world.npcs) {
+      byRegion.set(npc.homeRegion, (byRegion.get(npc.homeRegion) ?? 0) + 1);
+    }
+    const counts = [...byRegion.values()];
+    assert.equal(Math.max(...counts) - Math.min(...counts) <= 1, true);
+  });
+
+  it('does not prune NPCs that still hold an active flight', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-prune-hold' });
+    const target = worldFleetTarget(world);
+    const carrier = world.npcs.find(
+      (n) => n.aircraftClassId === 'light_ga' && !n.currentFlightId,
+    )!;
+    assert.ok(carrier);
+    const flightId = 'flt_prune_hold';
+    carrier.currentFlightId = flightId;
+    carrier.status = 'busy';
+    world.npcFlights.push({
+      id: flightId,
+      npcId: carrier.id,
+      lotId: 'lot_prune_hold',
+      commodityId: 'general',
+      originIcao: world.airports[0]!.icao,
+      destIcao: world.airports[1]!.icao,
+      cargoKg: 200,
+      payUsd: 500,
+      aircraftClassId: carrier.aircraftClassId,
+      status: 'in_flight',
+      departedAtTick: world.tick,
+      arrivesAtTick: world.tick + 8,
+      departedAtMs: world.lastBatchAtMs,
+      arrivesAtMs: (world.lastBatchAtMs ?? Date.now()) + 2 * 3_600_000,
+    });
+    // Flood light_ga far above target with idle clones of another GA.
+    const gaTarget = npcCompositionCount(world, 'light_ga');
+    const idleGa = world.npcs.find(
+      (n) =>
+        n.aircraftClassId === 'light_ga' &&
+        n.id !== carrier.id &&
+        !n.currentFlightId,
+    )!;
+    assert.ok(idleGa);
+    const extras = gaTarget + 5;
+    for (let i = 0; i < extras; i++) {
+      world.npcs.push({
+        ...idleGa,
+        id: `npc-ga-extra-${i}`,
+        name: `GA Extra ${i}`,
+        currentFlightId: undefined,
+        status: 'idle',
+      });
+    }
+    ensureNpcFleet(world);
+    assert.ok(
+      world.npcs.some((n) => n.id === carrier.id),
+      'in-flight NPC must survive prune',
+    );
+    const gaLeft = world.npcs.filter((n) => n.aircraftClassId === 'light_ga')
+      .length;
+    // Carrier blocked prune of one slot, so light_ga may sit 1 above target.
+    assert.ok(gaLeft <= gaTarget + 1);
+    assert.ok(world.npcs.length <= target + 1);
+  });
+
+  it('assigns homologated player airframes when the class has Market SKUs', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-airframes' });
     assert.ok(world.npcs.every((n) => Boolean(n.airframeTypeId)));
-    const types = new Set(world.npcs.map((n) => n.airframeTypeId));
-    assert.ok(types.size >= 8, `expected variety, got ${[...types].join(',')}`);
-    const withCargoCap = world.npcs.filter(
-      (n) => typeof n.maxCargoKg === 'number' && n.maxCargoKg > 0,
+    const light = world.npcs.filter(
+      (n) =>
+        n.aircraftClassId === 'light_ga' ||
+        n.aircraftClassId === 'light_turboprop' ||
+        n.aircraftClassId === 'light_jet',
     );
-    assert.ok(withCargoCap.length >= 4);
-    for (const npc of withCargoCap) {
+    assert.ok(light.length > 0);
+    for (const npc of light) {
+      assert.ok(
+        npcAirframeIsHomologated(npc.airframeTypeId),
+        `${npc.id} ${npc.airframeTypeId} should be homologated`,
+      );
+    }
+    const heavy = world.npcs.filter(
+      (n) =>
+        n.aircraftClassId === 'narrow_freighter' ||
+        n.aircraftClassId === 'wide_freighter' ||
+        n.aircraftClassId === 'medium_piston',
+    );
+    assert.ok(heavy.every((n) => Boolean(n.airframeTypeId)));
+    // No player SKUs yet — still abstract FSLTL codes.
+    assert.ok(heavy.some((n) => !npcAirframeIsHomologated(n.airframeTypeId)));
+    const types = new Set(world.npcs.map((n) => n.airframeTypeId));
+    assert.ok(types.size >= 5, `expected variety, got ${[...types].join(',')}`);
+    for (const npc of world.npcs) {
       assert.ok(npcMaxCargoKg(npc) <= getAircraftClass(npc.aircraftClassId).maxCargoKg);
+    }
+  });
+
+  it('remigrates abstract light NPCs onto homologated SKUs', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-homo-migrate' });
+    const lightGa = world.npcs.filter((n) => n.aircraftClassId === 'light_ga');
+    assert.ok(lightGa.length > 0);
+    for (const npc of lightGa) {
+      npc.airframeTypeId = 'C172SP';
+      delete npc.maxCargoKg;
+    }
+    const remapped = ensureNpcAirframes(world);
+    assert.ok(remapped >= lightGa.length);
+    for (const npc of lightGa) {
+      assert.ok(npcAirframeIsHomologated(npc.airframeTypeId));
+      assert.notEqual(npc.airframeTypeId, 'C172SP');
     }
   });
 
@@ -94,7 +278,8 @@ describe('NPC freighter fleet', () => {
       .map((n) => ({ ...n }));
     assert.equal(
       jetOnly.length,
-      npcCompositionCount('narrow_freighter') + npcCompositionCount('wide_freighter'),
+      npcCompositionCount(world, 'narrow_freighter') +
+        npcCompositionCount(world, 'wide_freighter'),
     );
     const migrated = migrateEconomyWorld({
       version: 3,
@@ -110,21 +295,21 @@ describe('NPC freighter fleet', () => {
     });
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_turboprop').length,
-      npcCompositionCount('light_turboprop'),
+      npcCompositionCount(migrated, 'light_turboprop'),
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'medium_piston').length,
-      npcCompositionCount('medium_piston'),
+      npcCompositionCount(migrated, 'medium_piston'),
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_jet').length,
-      npcCompositionCount('light_jet'),
+      npcCompositionCount(migrated, 'light_jet'),
     );
     assert.equal(
       migrated.npcs.filter((n) => n.aircraftClassId === 'light_ga').length,
-      npcCompositionCount('light_ga'),
+      npcCompositionCount(migrated, 'light_ga'),
     );
-    assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
+    assert.equal(migrated.npcs.length, worldFleetTarget(migrated));
   });
 
   it('migrates legacy saves without npcs', () => {
@@ -140,7 +325,7 @@ describe('NPC freighter fleet', () => {
     };
     const migrated = migrateEconomyWorld(raw);
     assert.equal(migrated.version, 3);
-    assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
+    assert.equal(migrated.npcs.length, worldFleetTarget(migrated));
     assert.ok(Array.isArray(migrated.npcFlights));
   });
 
@@ -169,7 +354,7 @@ describe('NPC freighter fleet', () => {
         `expected at least one NPC based in ${region}`,
       );
     }
-    assert.equal(migrated.npcs.length, NPC_FLEET_SIZE);
+    assert.equal(migrated.npcs.length, worldFleetTarget(migrated));
   });
 
   it('estimates busy time ≥ flight block hours', () => {
@@ -277,7 +462,7 @@ describe('NPC freighter fleet', () => {
     }
     tickEconomyN(world, 36);
     const roster = listNpcFleetStatus(world, world.lastBatchAtMs);
-    assert.equal(roster.length, NPC_FLEET_SIZE);
+    assert.equal(roster.length, worldFleetTarget(world));
     assert.ok(roster.some((r) => r.phase !== 'idle'), 'expected some busy NPCs');
     const flying = roster.find((r) => r.mission);
     if (flying?.mission) {
@@ -634,5 +819,495 @@ describe('NPC freighter fleet', () => {
     const dry = drainNpcMroParts(world, 'SBGL', 100);
     assert.equal(dry.scarcity, 'dry');
     assert.equal(dry.takenKg, 0);
+  });
+
+  it('creates awaiting_pilot offers for homologated NPCs and surfaces crewNeeded claims', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-offer' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc, 'expected homologated NPC');
+    // Park the operator so the offer path is deterministic.
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot, 'expected a bookable lot');
+    const beforeReserved = lot!.reservedKg;
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.5,
+    });
+    assert.equal(flight.status, 'awaiting_pilot');
+    assert.ok((flight.awaitingPilotUntilMs ?? 0) > nowMs);
+    assert.equal(
+      flight.pilotFeeUsd,
+      quoteContractPilotFeeUsd(flight.payUsd),
+    );
+    assert.ok(lot!.reservedKg > beforeReserved);
+    assert.equal(npc!.status, 'busy');
+    assert.equal(npc!.currentFlightId, flight.id);
+
+    const claim = npcClaimForLot(world, lot!.id, nowMs);
+    assert.ok(claim?.crewNeeded);
+    assert.equal(claim?.pilotFeeUsd, flight.pilotFeeUsd);
+    assert.equal(claim?.npcName, npc!.name);
+    assert.ok(typeof claim?.pilotFeeMinUsd === 'number');
+    assert.ok((claim?.pilotFeeMinUsd ?? 0) <= (claim?.pilotFeeUsd ?? 0));
+
+    const board = listMarketLots(world, { nowMs });
+    const row = board.find((v) => v.lot.id === lot!.id);
+    assert.equal(row?.npcClaim?.crewNeeded, true);
+  });
+
+  it('promotes expired awaiting_pilot offers into in_flight', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-timeout' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.25,
+    });
+    assert.equal(flight.status, 'awaiting_pilot');
+    flight.awaitingPilotUntilMs = nowMs - 1;
+    settleNpcOpsDue(world, nowMs + 60_000);
+    assert.equal(flight.status, 'in_flight');
+    assert.equal(flight.awaitingPilotUntilMs, undefined);
+    assert.ok(flight.arrivesAtMs > flight.departedAtMs);
+    const claim = npcClaimForLot(world, lot!.id, nowMs + 60_000);
+    assert.ok(claim);
+    assert.equal(claim?.crewNeeded, undefined);
+  });
+
+  it('ages crew offer windows when +N hour tick advances the wall clock', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-tick-age' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.25,
+    });
+    assert.equal(flight.status, 'awaiting_pilot');
+    // Hold 30m — UI +1 h (4 ticks) must age the window and auto-depart the NPC.
+    flight.awaitingPilotUntilMs = nowMs + 30 * 60_000;
+    if (typeof flight.arrivesAtMs === 'number') {
+      flight.arrivesAtMs = flight.awaitingPilotUntilMs;
+    }
+    if (npc) {
+      npc.busyUntilMs = flight.awaitingPilotUntilMs;
+    }
+
+    tickEconomyN(world, 4); // +1 hour (UI +1 h)
+    assert.equal(
+      flight.status,
+      'in_flight',
+      'crew offer should promote after simulated +1h',
+    );
+    assert.equal(flight.awaitingPilotUntilMs, undefined);
+  });
+
+  it('rejects contract pilot offers on abstract (non-homologated) NPCs', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-abstract' });
+    tickEconomyN(world, 24);
+    const npc = world.npcs.find(
+      (n) =>
+        n.aircraftClassId === 'narrow_freighter' &&
+        !npcAirframeIsHomologated(n.airframeTypeId),
+    );
+    assert.ok(npc);
+    const lot = world.lots.find(
+      (l) =>
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 500,
+    );
+    assert.ok(lot);
+    assert.throws(
+      () => createNpcContractPilotOffer(world, npc!.id, lot!.id),
+      /homologated/i,
+    );
+  });
+
+  it('accepts a crew offer into a contract-pilot mission without aircraftId', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-accept' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.4,
+    });
+    const reservedBefore = lot!.reservedKg;
+    const state = emptyMissionsStateV2();
+    const accepted = acceptContractPilotOffer(world, state, {
+      lotId: lot!.id,
+      airframeTypeId: npc!.airframeTypeId!,
+      nowMs,
+    });
+    assert.equal(accepted.mission.contractPilot, true);
+    assert.equal(accepted.mission.aircraftId, undefined);
+    assert.equal(accepted.mission.airframeTypeId, npc!.airframeTypeId);
+    assert.equal(accepted.mission.payUsd, accepted.pilotFeeUsd);
+    const dist =
+      routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? undefined;
+    const expectedLift = contractPilotLiftKg(
+      npc!.airframeTypeId!,
+      flight.aircraftClassId,
+      flight.cargoKg,
+      { distanceNm: dist },
+    );
+    assert.equal(accepted.liftedKg, expectedLift);
+    assert.equal(accepted.remainderKg, flight.cargoKg - expectedLift);
+    assert.equal(accepted.npcDepartedWithRemainder, expectedLift < flight.cargoKg);
+    assert.equal(
+      accepted.pilotFeeUsd,
+      Math.max(
+        50,
+        Math.round(
+          (flight.pilotFeeUsd ?? quoteContractPilotFeeUsd(flight.payUsd)) *
+            (expectedLift / flight.cargoKg),
+        ),
+      ),
+    );
+    assert.equal(accepted.mission.operatorNpcName, npc!.name);
+    assert.equal(state.missions.length, 1);
+    if (expectedLift >= flight.cargoKg) {
+      assert.ok(!world.npcFlights.some((f) => f.id === flight.id));
+    } else {
+      assert.ok(world.npcFlights.some((f) => f.id === flight.id && f.status === 'in_flight'));
+    }
+    assert.equal(lot!.reservedKg, reservedBefore);
+    if (expectedLift >= flight.cargoKg) {
+      assert.equal(npcClaimForLot(world, lot!.id, nowMs), undefined);
+    }
+  });
+
+  it('operator covers pilot-to origin on accept and settle moves pilot to dest', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-pilot-to' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200 &&
+        l.originIcao.toUpperCase() !== 'SBGR',
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.35,
+    });
+    const state = emptyMissionsStateV2();
+    state.hubSelected = true;
+    state.pilotName = 'Ada Skyline';
+    state.homeHubIcao = 'SBGR';
+    state.pilotIcao = 'SBGR';
+    state.walletUsd = 1_000;
+    const walletBefore = state.walletUsd;
+    const origin = flight.originIcao.toUpperCase();
+    const dest = flight.destIcao.toUpperCase();
+    assert.notEqual(origin, 'SBGR');
+
+    const accepted = acceptContractPilotOffer(world, state, {
+      lotId: lot!.id,
+      airframeTypeId: npc!.airframeTypeId!,
+      nowMs,
+    });
+    assert.equal(state.pilotIcao, origin);
+    assert.equal(accepted.pilotRelocatedFrom, 'SBGR');
+    assert.equal(state.walletUsd, walletBefore);
+
+    const settled = settleMission(world, accepted.mission, {
+      tick: world.tick,
+      nowMs,
+      skipMinAirborneGate: true,
+      fleet: state,
+    });
+    assert.equal(settled.mission.status, 'settled');
+    assert.equal(state.pilotIcao, dest);
+    assert.equal(state.walletUsd, walletBefore);
+  });
+
+  it('route-limits F406 lift on long hops so SimBrief MTOW matches mission cargo', () => {
+    const typeId = 'inibuilds-f406-caravan-ii-passenger';
+    const offerKg = 1_700; // under structural ~1814 kg, over long-hop payload
+    const structuralLift = contractPilotLiftKg(
+      typeId,
+      'light_turboprop',
+      offerKg,
+    );
+    assert.equal(structuralLift, offerKg);
+    const routeLift = contractPilotLiftKg(typeId, 'light_turboprop', offerKg, {
+      distanceNm: 913,
+    });
+    assert.ok(
+      routeLift < offerKg,
+      `expected route MTOW cap below ${offerKg}, got ${routeLift}`,
+    );
+    assert.ok(routeLift > 400);
+    // Calibrated to SimBrief CYWG→CYYZ (~720 kg cargo / MTOW-limited).
+    assert.ok(
+      routeLift >= 600 && routeLift <= 900,
+      `expected ~720 kg ballpark, got ${routeLift}`,
+    );
+  });
+
+  it('partial lift leaves remainder with NPC who departs immediately', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-partial' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find(
+      (n) =>
+        n.aircraftClassId === 'light_turboprop' && npcCanOfferContractPilot(n),
+    );
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.45,
+    });
+    // Pin a short hop so this test isolates structural partial lift (not route fuel).
+    let shortOrigin = flight.originIcao;
+    let shortDest = flight.destIcao;
+    outer: for (const a of world.airports) {
+      for (const b of world.airports) {
+        if (a.icao === b.icao) continue;
+        const d = routeDistanceNm(world, a.icao, b.icao);
+        if (d != null && d >= 40 && d <= 180) {
+          shortOrigin = a.icao;
+          shortDest = b.icao;
+          break outer;
+        }
+      }
+    }
+    flight.originIcao = shortOrigin;
+    flight.destIcao = shortDest;
+    const originalPay = flight.payUsd;
+    const originalFee = flight.pilotFeeUsd ?? quoteContractPilotFeeUsd(originalPay);
+    // Inflate the hold so the player's SKU cannot cover it alone.
+    const inflatedKg = 50_000;
+    const addKg = inflatedKg - flight.cargoKg;
+    flight.cargoKg = inflatedKg;
+    lot!.reservedKg += addKg;
+    lot!.quantityKg = Math.max(lot!.quantityKg, lot!.reservedKg);
+    const state = emptyMissionsStateV2();
+    const airframeTypeId =
+      'inibuilds-f406-caravan-ii-passenger';
+    const accepted = acceptContractPilotOffer(world, state, {
+      lotId: lot!.id,
+      airframeTypeId,
+      nowMs,
+    });
+    assert.ok(accepted.liftedKg > 0);
+    assert.ok(accepted.liftedKg < inflatedKg);
+    assert.equal(accepted.remainderKg, inflatedKg - accepted.liftedKg);
+    assert.equal(accepted.npcDepartedWithRemainder, true);
+    assert.equal(accepted.mission.cargoKg, accepted.liftedKg);
+    assert.ok(accepted.pilotFeeUsd < originalFee);
+    const rem = world.npcFlights.find((f) => f.id === flight.id);
+    assert.ok(rem);
+    assert.equal(rem!.status, 'in_flight');
+    assert.equal(rem!.cargoKg, accepted.remainderKg);
+    assert.equal(npc!.currentFlightId, flight.id);
+  });
+
+  it('rejects expired crew offers and settles fee with no fuel debit', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-settle' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.3,
+    });
+    flight.awaitingPilotUntilMs = nowMs - 1;
+    assert.throws(
+      () =>
+        acceptContractPilotOffer(world, emptyMissionsStateV2(), {
+          lotId: lot!.id,
+          airframeTypeId: npc!.airframeTypeId!,
+          nowMs,
+        }),
+      /expired/i,
+    );
+
+    // Re-open a valid hold window and accept.
+    flight.awaitingPilotUntilMs = nowMs + 4 * 60 * 60 * 1000;
+    const state = emptyMissionsStateV2();
+    const { mission, pilotFeeUsd } = acceptContractPilotOffer(world, state, {
+      lotId: lot!.id,
+      airframeTypeId: npc!.airframeTypeId!,
+      nowMs,
+    });
+    const settled = settleMission(world, mission, {
+      tick: world.tick,
+      nowMs,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(settled.fuelDebitUsd, 0);
+    assert.equal(settled.walletCreditUsd, pilotFeeUsd);
+    assert.equal(settled.mission.fuelUplift?.costUsd ?? 0, 0);
+    assert.equal(settled.mission.status, 'settled');
+  });
+
+  it('cancel after accept releases the reserved cargo', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-cancel' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.2,
+    });
+    const state = emptyMissionsStateV2();
+    const accepted = acceptContractPilotOffer(world, state, {
+      lotId: lot!.id,
+      airframeTypeId: npc!.airframeTypeId!,
+      nowMs,
+    });
+    const reservedAtAccept = lot!.reservedKg;
+    const cancelled = cancelMission(world, accepted.mission);
+    assert.equal(cancelled.status, 'cancelled');
+    assert.ok(lot!.reservedKg < reservedAtAccept);
   });
 });

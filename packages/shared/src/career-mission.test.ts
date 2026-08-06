@@ -812,16 +812,16 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(check.findings.some((f) => f.code === 'INTENT_OFP_OK'));
   });
 
-  it('accepts K100 OFP ICAO for Kodiak catalog type KODI', () => {
+  it('accepts F406 OFP ICAO for F406 catalog airframe', () => {
     const check = compareMissionIntentToOfp(
       baseMission({
         aircraftClassId: 'light_turboprop',
-        airframeTypeId: 'sws-kodiak-100-cargo',
+        airframeTypeId: 'inibuilds-f406-caravan-ii-passenger',
         cargoKg: 500,
-        rolesPackRelPath: 'profiles/ofp/sws-kodiak-100-cargo.json',
+        rolesPackRelPath: 'profiles/ofp/inibuilds-f406-caravan-ii-passenger.json',
       }),
       matchingOfp({
-        icao: 'K100',
+        icao: 'F406',
         loadSheet: {
           unit: 'kg',
           blockFuel: 600,
@@ -860,6 +860,48 @@ describe('compareMissionIntentToOfp', () => {
     );
     assert.equal(check.verdict, 'fail');
     assert.ok(check.findings.some((f) => f.code === 'INTENT_CARGO_MISMATCH'));
+  });
+
+  it('fails when OFP cargo is cut below mission within the old ±500 kg band', () => {
+    // KTPA→KDFW F406 case: mission ~816 kg, SimBrief MTOW-limited to 591 kg.
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        cargoKg: 816,
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'inibuilds-f406-caravan-ii-passenger',
+      }),
+      matchingOfp({
+        icao: 'F406',
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 1_406,
+          passengerCount: 0,
+          baggage: 591,
+          payload: 591,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'fail');
+    const finding = check.findings.find((f) => f.code === 'INTENT_CARGO_MISMATCH');
+    assert.ok(finding);
+    assert.match(finding!.message, /MTOW|below mission/i);
+  });
+
+  it('still allows small under-load within the tight under-tolerance', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({ cargoKg: 800 }),
+      matchingOfp({
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 1_000,
+          passengerCount: 0,
+          baggage: 760,
+          payload: 760,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_CARGO_MISMATCH'));
   });
 
   it('fails when freighter OFP has passengers', () => {

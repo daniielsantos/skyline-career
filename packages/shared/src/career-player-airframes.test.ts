@@ -20,7 +20,9 @@ describe('career player airframes', () => {
       'asobo-c172sp-cargo',
       'blacksquare-commander-114',
       'blacksquare-bonanza-professional',
-      'c208-caravan-cargo',
+      'blacksquare-b36tp-bonanza-professional',
+      'blacksquare-b60-duke',
+      'blacksquare-turbine-duke',
       'pmdg-738-bcf-family',
       'pmdg-738-pax-family',
       'tfdi-md11f-family',
@@ -30,6 +32,23 @@ describe('career player airframes', () => {
     }
     assert.equal(ids.has('blacksquare-commander-114tc'), false);
     assert.equal(ids.has('asobo-c208b-cargo'), false);
+    assert.equal(
+      findCareerPlayerAirframe('blacksquare-bonanza-professional')?.aircraftClassId,
+      'light_ga',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('blacksquare-b36tp-bonanza-professional')
+        ?.aircraftClassId,
+      'light_turboprop',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('blacksquare-b60-duke')?.aircraftClassId,
+      'light_ga',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('blacksquare-turbine-duke')?.aircraftClassId,
+      'light_turboprop',
+    );
   });
 
   it('treats omitted enabled as market-eligible', () => {
@@ -49,6 +68,14 @@ describe('career player airframes', () => {
       'blacksquare-commander-114',
     );
     assert.equal(
+      findCareerPlayerAirframe('blacksquare-a36tc-bonanza-professional')?.typeId,
+      'blacksquare-bonanza-professional',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('blacksquare-grand-duke')?.typeId,
+      'blacksquare-b60-duke',
+    );
+    assert.equal(
       findCareerPlayerAirframe('asobo-c208b-cargo')?.typeId,
       'c208-caravan-cargo',
     );
@@ -58,12 +85,33 @@ describe('career player airframes', () => {
     );
   });
 
-  it('lists both Caravan OFP packs on the shared Market SKU', () => {
+  it('lists Caravan OFP packs on the shared Market SKU', () => {
     const caravan = findCareerPlayerAirframe('c208-caravan-cargo');
     assert.ok(caravan);
     const paths = careerPlayerAirframePackPaths(caravan!);
-    assert.ok(paths.some((p) => p.includes('asobo-c208b-cargo')));
     assert.ok(paths.some((p) => p.includes('blacksquare-caravan-cargo-pod')));
+    assert.ok(paths.some((p) => p.includes('blacksquare-caravan-professional-gear')));
+    assert.ok(
+      paths.some((p) =>
+        p.includes('blacksquare-caravan-professional-super-cargomaster'),
+      ),
+    );
+    assert.equal(
+      findCareerPlayerAirframe('blacksquare-caravan-professional-gear')?.typeId,
+      'c208-caravan-cargo',
+    );
+    assert.equal(
+      findCareerPlayerAirframe(
+        'blacksquare-caravan-professional-super-cargomaster',
+      )?.typeId,
+      'c208-caravan-cargo',
+    );
+    assert.equal(
+      CAREER_PLAYER_AIRFRAMES.some(
+        (row) => row.typeId === 'blacksquare-caravan-professional-gear',
+      ),
+      false,
+    );
   });
 
   it('offers only C152, C172, and Commander 114 as starter choices', () => {

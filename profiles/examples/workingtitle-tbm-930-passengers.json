@@ -1,0 +1,251 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "workingtitle-tbm-930-passengers",
+  "profileKey": "workingtitle/tbm-930-passengers",
+  "semver": "1.0.0",
+  "displayName": "Asobo TBM 930 Passengers (MSFS 2024)",
+  "match": {
+    "fingerprint": "f2a7feb2426aeca49e61d4e0a6c878b3bc59c7bfe50dc3d3f04cdbe110c2ad58",
+    "title": "Asobo TBM 930 Passengers",
+    "publisher": "workingtitle",
+    "icao": "TBM9",
+    "liveTitles": [
+      "Asobo TBM 930 Passengers"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 150.5,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 150.5,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 500,
+        "arm": -15.42
+      },
+      {
+        "index": 2,
+        "name": "FRONT PAX",
+        "maxLoad": 500,
+        "arm": -15.42
+      },
+      {
+        "index": 3,
+        "name": "MIDDLE PAX LEFT",
+        "maxLoad": 500,
+        "arm": -19.24
+      },
+      {
+        "index": 4,
+        "name": "MIDDLE PAX RIGHT",
+        "maxLoad": 500,
+        "arm": -19.24
+      },
+      {
+        "index": 5,
+        "name": "REAR PAX LEFT",
+        "maxLoad": 500,
+        "arm": -22.89
+      },
+      {
+        "index": 6,
+        "name": "REAR PAX RIGHT",
+        "maxLoad": 500,
+        "arm": -22.89
+      },
+      {
+        "index": 7,
+        "name": "REAR BAGGAGE",
+        "maxLoad": 500,
+        "arm": -25.63
+      },
+      {
+        "index": 8,
+        "name": "FORWARD BAGGAGE",
+        "maxLoad": 500,
+        "arm": -11.16
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:8",
+        "unit": "pounds",
+        "valueExpr": "{station_8}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 14.000000000000002,
+      "maxMac": 36
+    },
+    "calibration": {
+      "observedMac": 20.84520012140274,
+      "calibratedAtIso": "2026-08-05T23:58:49.524Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\asobo_tbm930\\presets\\asobo\\tbm930_passengers\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -16,
+        0,
+        0.5
+      ],
+      "sweep": {
+        "minObservedMac": 17.461951076984406,
+        "maxObservedMac": 27.39129662513733,
+        "payloadLb": 200,
+        "forwardStation": 8,
+        "aftStation": 7,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-05T23:58:57.318Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Asobo TBM 930 Passengers.",
+    "ICAO type designator (catalog/SimBrief): TBM9.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8.",
+    "Station maxLoad: placeholder until cfg or clamp.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/workingtitle-tbm-930-passengers.md"
+  ]
+}

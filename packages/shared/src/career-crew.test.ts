@@ -42,6 +42,7 @@ describe('company crew', () => {
     tickEconomyN(world, 48);
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'CrewBoss',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
@@ -103,6 +104,7 @@ describe('company crew', () => {
     const world = createSeedEconomyWorld({ seed: 'crew-nofbo' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'NoFbo',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     state.missions.push({
       id: 'msn_x',

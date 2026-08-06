@@ -4653,12 +4653,20 @@ small {
   display: inline-block;
   margin-top: 0.35rem;
   margin-right: 0.35rem;
-  padding: 0.12rem 0.45rem;
+  padding: 0.18rem 0.5rem;
   font-size: 0.78rem;
+  font-weight: 600;
   letter-spacing: 0.02em;
-  color: #2f4460;
-  background: rgba(47, 84, 130, 0.12);
-  border: 1px solid rgba(47, 84, 130, 0.22);
+  color: #9eb6d4;
+  background: rgba(106, 168, 216, 0.16);
+  border: 1px solid rgba(106, 168, 216, 0.35);
+}
+
+.npc-badge-crew {
+  color: #b8f0c8;
+  background: rgba(61, 186, 122, 0.28);
+  border-color: rgba(61, 186, 122, 0.65);
+  font-weight: 700;
 }
 
 .npc-head {
@@ -4942,6 +4950,35 @@ button.linkish {
 
 .confirm-body p:last-child {
   margin-bottom: 0;
+}
+
+.contract-pilot-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.contract-pilot-pick .muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.contract-pilot-pick-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.contract-pilot-pick-select {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
 }
 
 .confirm-field {

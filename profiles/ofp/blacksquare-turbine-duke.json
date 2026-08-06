@@ -1,0 +1,58 @@
+{
+  "source": "simbrief",
+  "icao": "B60T",
+  "ofpId": "blacksquare-turbine-duke",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "Black Square Turbine Duke"
+  ],
+  "matchTitlePattern": "Black Square (?:B60T )?Turbine Duke",
+  "notes": [
+    "Black Square Turbine Duke (PT6) — separate Market SKU from piston B60/Grand",
+    "Same 8-station layout as piston Duke; Jet-A / light_turboprop class",
+    "liveSources: classic fuel tanks + classic stations/weights",
+    "SimBrief: Default B60T",
+    "Homologated profile: blacksquare/turbine-duke@1.0.0",
+    "Title: Black Square Turbine Duke"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [1, 4, 5, 6, 7, 8],
+      "crewStations": [2, 3]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "B60T",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Forward baggage", "role": "baggage" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Front pax left (cargo)", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Front pax right (cargo)", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Rear pax left (cargo)", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Rear pax right (cargo)", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Rear baggage", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

@@ -18,21 +18,37 @@ import {
   relocateAircraftOnSettle,
   selectStarterHub,
   STARTER_WALLET_USD,
+  isContractPilotCareer,
   acquireCompanyAircraft,
   listAircraftMarket,
   purchaseAircraftListing,
   settleMission,
 } from './index.js';
 
-const pilot = { pilotName: 'Ada Skyline' };
+const pilot = {
+  pilotName: 'Ada Skyline',
+  airframeTypeId: 'asobo-c172sp-cargo',
+};
 
 describe('career fleet hangar', () => {
-  it('selectStarterHub registers pilot and parks a C172 at the hub', () => {
+  it('selectStarterHub registers a contract pilot with empty hangar', () => {
     let state = emptyMissionsStateV2();
     assert.equal(state.hubSelected, false);
     assert.equal(state.pilotName, '');
     assert.equal(state.homeHubIcao, '');
     assert.equal(state.walletUsd, 0);
+    state = selectStarterHub(state, 'sbgr', { pilotName: 'Ada Skyline' });
+    assert.equal(state.hubSelected, true);
+    assert.equal(state.pilotName, 'Ada Skyline');
+    assert.equal(state.homeHubIcao, 'SBGR');
+    assert.equal(state.pilotIcao, 'SBGR');
+    assert.equal(state.walletUsd, STARTER_WALLET_USD);
+    assert.equal(state.fleet.length, 0);
+    assert.equal(isContractPilotCareer(state), true);
+  });
+
+  it('selectStarterHub can still park a light starter when requested', () => {
+    let state = emptyMissionsStateV2();
     state = selectStarterHub(state, 'sbgr', pilot);
     assert.equal(state.hubSelected, true);
     assert.equal(state.pilotName, 'Ada Skyline');
@@ -48,6 +64,21 @@ describe('career fleet hangar', () => {
     assert.equal(state.fleet[0]!.locationIcao, 'SBGR');
     assert.equal(state.fleet[0]!.status, 'parked');
     assert.ok(state.fleet[0]!.fuelKg > 0);
+    assert.equal(isContractPilotCareer(state), false);
+  });
+
+  it('normalize keeps hubSelected for empty-fleet contract pilots', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'Ada Skyline',
+    });
+    const migrated = normalizeMissionsState({
+      ...state,
+      fleet: [],
+    });
+    assert.equal(migrated.hubSelected, true);
+    assert.equal(migrated.fleet.length, 0);
+    assert.equal(migrated.pilotName, 'Ada Skyline');
+    assert.equal(migrated.homeHubIcao, 'SBGR');
   });
 
   it('selectStarterHub lets the pilot pick a light GA starter', () => {
@@ -285,7 +316,7 @@ describe('career fleet hangar', () => {
     const world = createSeedEconomyWorld({ seed: 'ofp-fuel-purchase' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
     const aircraft = state.fleet[0]!;
-    aircraft.fuelKg = 100;
+    aircraft.fuelKg = 80;
     const mission = {
       id: 'msn_ofp_fuel',
       aircraftId: aircraft.id,
@@ -295,21 +326,25 @@ describe('career fleet hangar', () => {
       status: 'dispatched',
     } as never;
 
+    const requiredBlockFuelKg = Math.min(140, aircraft.fuelCapacityKg);
+    const shortfallKg = requiredBlockFuelKg - 80;
+    assert.ok(shortfallKg > 0);
+
     const quote = quotePlayerMissionOfpFuel(world, state, mission, {
       ofpId: 'ofp-1',
-      requiredBlockFuelKg: 300,
+      requiredBlockFuelKg,
     });
-    assert.equal(quote.currentFuelKg, 100);
-    assert.equal(quote.shortfallKg, 200);
+    assert.equal(quote.currentFuelKg, 80);
+    assert.equal(quote.shortfallKg, shortfallKg);
     assert.ok(quote.uplift.costUsd > 0);
 
     const purchase = purchasePlayerMissionOfpFuel(world, state, mission, {
       ofpId: 'ofp-1',
-      requiredBlockFuelKg: 300,
+      requiredBlockFuelKg,
     });
-    assert.equal(aircraft.fuelKg, 300);
+    assert.equal(aircraft.fuelKg, requiredBlockFuelKg);
     assert.equal(purchase.mission.fuelAuthorizedOfpId, 'ofp-1');
-    assert.equal(purchase.mission.fuelUplift?.requestedKg, 200);
+    assert.equal(purchase.mission.fuelUplift?.requestedKg, shortfallKg);
     assert.ok(purchase.mission.tripFuelBurnKg! > 0);
     assert.ok(purchase.fuelDebitUsd > 0);
 

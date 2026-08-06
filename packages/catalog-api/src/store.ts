@@ -156,10 +156,17 @@ export class FileCatalogStore implements CatalogBackend {
     return this.index.entries.find((e) => e.fingerprint === fingerprint);
   }
 
-  findByLiveTitle(liveTitle: string): CatalogEntry | undefined {
-    const matches = this.index.entries.filter((e) =>
-      profileAcceptsLiveTitle(e.profile, liveTitle),
-    );
+  findByLiveTitle(
+    liveTitle: string,
+    opts?: { structuralHash?: string },
+  ): CatalogEntry | undefined {
+    const wantStruct = opts?.structuralHash?.trim();
+    const matches = this.index.entries.filter((e) => {
+      if (wantStruct && e.structuralHash && e.structuralHash !== wantStruct) {
+        return false;
+      }
+      return profileAcceptsLiveTitle(e.profile, liveTitle);
+    });
     if (matches.length === 0) return undefined;
     matches.sort((a, b) => b.confidenceScore - a.confidenceScore);
     return matches[0];
@@ -193,11 +200,13 @@ export class FileCatalogStore implements CatalogBackend {
 
     const byFp = this.findByFingerprint(fingerprint);
     // Same tank/station hash can serve cargo + passenger; only accept when the
-    // live title matches this profile (or its liveTitles aliases).
+    // live title matches this profile (or its liveTitles aliases). Never alias
+    // across different structural hashes (e.g. Kodiak with/without cargo pod).
     const entry =
       (byFp && profileAcceptsLiveTitle(byFp.profile, request.identity.title)
         ? byFp
-        : undefined) ?? this.findByLiveTitle(request.identity.title);
+        : undefined) ??
+      this.findByLiveTitle(request.identity.title, { structuralHash });
     if (!entry) {
       return {
         fingerprint,
@@ -223,13 +232,17 @@ export class FileCatalogStore implements CatalogBackend {
     if (entry) {
       const seen = this.index.seen[fingerprint];
       if (seen?.title && !profileAcceptsLiveTitle(entry.profile, seen.title)) {
-        entry = this.findByLiveTitle(seen.title);
+        entry = this.findByLiveTitle(seen.title, {
+          structuralHash: seen.structuralHash,
+        });
       }
     }
     if (!entry) {
       const seen = this.index.seen[fingerprint];
       if (seen?.title) {
-        entry = this.findByLiveTitle(seen.title);
+        entry = this.findByLiveTitle(seen.title, {
+          structuralHash: seen.structuralHash,
+        });
       }
     }
     if (!entry) return null;

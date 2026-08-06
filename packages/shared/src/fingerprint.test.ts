@@ -108,6 +108,140 @@ describe('titlesMatchForCatalog', () => {
       true,
     );
   });
+
+  it('does not alias Kodiak Combi onto Commuter (comma titles)', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'Kodiak 100 Combi, Cargopod, Tundra wheels',
+        'Kodiak 100 Commuter, Cargopod, Tundra wheels',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Kodiak 100 Commuter, Cargopod, Tundra wheels',
+        'Kodiak 100 Commuter, Cargopod, Tundra wheels',
+      ),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Kodiak 100 Skydive, Cargopod, Tundra wheels',
+        'Kodiak 100 Commuter, Cargopod, Tundra wheels',
+      ),
+      false,
+    );
+  });
+
+  it('does not alias Kodiak without Cargopod onto Cargopod profile', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'Kodiak 100 Commuter, Tundra wheels',
+        'Kodiak 100 Commuter, Cargopod, Tundra wheels',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Kodiak 100 Commuter, Cargopod, Tundra wheels',
+        'Kodiak 100 Commuter, Tundra wheels',
+      ),
+      false,
+    );
+  });
+
+  it('does not alias short Kodiak Combi onto Combi Tundra wheels', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'Kodiak 100 Combi',
+        'Kodiak 100 Combi, Tundra wheels',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Kodiak 100 Combi, Tundra wheels',
+        'Kodiak 100 Combi, Tundra wheels',
+      ),
+      true,
+    );
+  });
+
+  it('does not alias Bonanza A36TC onto A36 Professional', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square A36TC Bonanza Professional N5172C',
+        'Black Square A36 Bonanza Professional',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square A36 Bonanza Professional',
+        'Black Square A36 Bonanza Professional',
+      ),
+      true,
+    );
+  });
+
+  it('does not alias Duke Grand / Turbine onto base B60', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square Grand Duke N18VK',
+        'Black Square B60 Duke',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square Turbine Duke',
+        'Black Square B60 Duke',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square B60T Turbine Duke',
+        'Black Square B60 Duke',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('Black Square B60 Duke', 'Black Square B60 Duke'),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square Grand Duke',
+        'Black Square Grand Duke',
+      ),
+      true,
+    );
+  });
+
+  it('does not alias Black Square Caravan onto Bonanza via Professional branding', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square Caravan Professional Gear N95EJ',
+        'Black Square A36 Bonanza Professional',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square Caravan Professional Gear',
+        'Black Square B36TP Bonanza Professional',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'Black Square A36 Bonanza Professional',
+        'Black Square A36 Bonanza Professional',
+      ),
+      true,
+    );
+  });
 });
 
 describe('fingerprintFromProfile liveTitles', () => {

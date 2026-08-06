@@ -332,7 +332,8 @@ export function DispatchActivePanel(props: {
         <div className="staging-section">
           <div className="staging-section-head">
             <h3>Cargo</h3>
-            {['accepted', 'dispatched'].includes(mission.status) ? (
+            {['accepted', 'dispatched'].includes(mission.status) &&
+            !mission.contractPilot ? (
               <button
                 type="button"
                 className="action compact"

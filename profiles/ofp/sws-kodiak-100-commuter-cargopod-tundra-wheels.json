@@ -1,0 +1,185 @@
+{
+  "source": "simbrief",
+  "icao": "KODI",
+  "ofpId": "sws-kodiak-100-commuter-cargopod-tundra-wheels",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "Kodiak 100 Commuter, Cargopod, Tundra wheels",
+    "Kodiak 100 Combi, Cargopod, Tundra wheels",
+    "Kodiak 100 Cargo, CargoPod, Tundra wheels",
+    "Kodiak 100 Commuter, Cargopod",
+    "Kodiak 100 Cargo, CargoPod",
+    "Kodiak 100 Combi, Cargopod"
+  ],
+  "matchTitlePattern": "Kodiak 100 Commuter, Cargopod, Tundra wheels",
+  "notes": [
+    "Kodiak 100 Commuter, Cargopod, Tundra wheels — auto roles pack from homologated profile",
+    "Profile: sws/kodiak-100-commuter-cargopod-tundra-wheels@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct",
+    "Kodiak 100 Combi, Cargopod, Tundra wheels — auto roles pack from homologated profile",
+    "Profile: sws/kodiak-100-combi-cargopod-tundra-wheels@1.0.0",
+    "Joined Market family: Kodiak 100 Commuter, Cargopod, Tundra wheels (sws-kodiak-100-commuter-cargopod-tundra-wheels)",
+    "Homologated profile: sws/kodiak-100-combi-cargopod-tundra-wheels@1.0.0",
+    "Title: Kodiak 100 Combi, Cargopod, Tundra wheels",
+    "Kodiak 100 Cargo, CargoPod, Tundra wheels — auto roles pack from homologated profile",
+    "Profile: sws/kodiak-100-cargo-cargopod-tundra-wheels@1.0.0",
+    "Joined Market family: Kodiak 100 Cargo, Tundra wheels (sws-kodiak-100-commuter-cargopod-tundra-wheels)",
+    "Homologated profile: sws/kodiak-100-cargo-cargopod-tundra-wheels@1.0.0",
+    "Title: Kodiak 100 Cargo, CargoPod, Tundra wheels",
+    "Kodiak 100 Commuter, Cargopod — auto roles pack from homologated profile",
+    "Profile: sws/kodiak-100-commuter-cargopod@1.0.0",
+    "Joined Market family: Kodiak 100 Commuter (sws-kodiak-100-commuter-cargopod-tundra-wheels)",
+    "Homologated profile: sws/kodiak-100-commuter-cargopod@1.0.0",
+    "Title: Kodiak 100 Commuter, Cargopod",
+    "Kodiak 100 Cargo, CargoPod — auto roles pack from homologated profile",
+    "Profile: sws/kodiak-100-cargo-cargopod@1.0.0",
+    "Joined Market family: Kodiak 100 Cargo (sws-kodiak-100-commuter-cargopod-tundra-wheels)",
+    "Homologated profile: sws/kodiak-100-cargo-cargopod@1.0.0",
+    "Title: Kodiak 100 Cargo, CargoPod",
+    "Kodiak 100 Combi, Cargopod — auto roles pack from homologated profile",
+    "Profile: sws/kodiak-100-combi-cargopod@1.0.0",
+    "Joined Market family: Kodiak 100 Summit, Tundra wheels (sws-kodiak-100-commuter-cargopod-tundra-wheels)",
+    "Homologated profile: sws/kodiak-100-combi-cargopod@1.0.0",
+    "Title: Kodiak 100 Combi, Cargopod"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "KODI",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Station 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Station 2",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Station 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Station 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Station 5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "Station 6",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "Station 7",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "Station 8",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "Station 9",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "Station 10",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 11,
+      "cfgIndex": 10,
+      "name": "Station 11",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 12,
+      "cfgIndex": 11,
+      "name": "Station 12",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 13,
+      "cfgIndex": 12,
+      "name": "Station 13",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 14,
+      "cfgIndex": 13,
+      "name": "Station 14",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

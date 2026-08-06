@@ -182,6 +182,8 @@ export function fuelAuthorizedForOfp(mission: Mission): boolean {
   const ofp = mission.lastOfpCheck;
   if (!ofp?.ofpId) return false;
   if (!ofpAccepted(mission)) return false;
+  // Contract pilot: operator covers Jet-A — skip the player fuel purchase step.
+  if (mission.contractPilot) return true;
   return mission.fuelAuthorizedOfpId === ofp.ofpId;
 }
 

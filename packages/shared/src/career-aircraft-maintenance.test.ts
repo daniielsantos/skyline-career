@@ -22,6 +22,7 @@ describe('aircraft wear + maintenance', () => {
   it('migrates bucket condition into AF/eng percentages', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'WearMig',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const acf = state.fleet[0]!;
     delete acf.airframeConditionPct;
@@ -37,21 +38,25 @@ describe('aircraft wear + maintenance', () => {
   it('wear reduces condition pct after block hours', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
       pilotName: 'WearFly',
+      airframeTypeId: 'asobo-c172sp-cargo',
+      condition: 'good',
     });
     const acf = state.fleet[0]!;
     ensureAircraftConditionPcts(acf);
     const afBefore = acf.airframeConditionPct!;
     const engBefore = acf.engineConditionPct!;
+    const hoursBefore = acf.hoursAirframe ?? 0;
     applyAircraftHoursAfterMission(acf, 10);
     assert.ok(acf.airframeConditionPct! < afBefore);
     assert.ok(acf.engineConditionPct! < engBefore);
-    assert.equal(acf.hoursAirframe, 50);
+    assert.equal(acf.hoursAirframe, hoursBefore + 10);
     assert.ok((acf.hoursSinceInspection ?? 0) >= 10);
   });
 
   it('inspection gate blocks until paid and costs a fraction of MSRP', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'Inspect',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const acf = state.fleet[0]!;
     ensureAircraftConditionPcts(acf);
@@ -73,6 +78,7 @@ describe('aircraft wear + maintenance', () => {
   it('repair restores pct and can clear critical AOG after inspection', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGL', {
       pilotName: 'Repair',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const acf = state.fleet[0]!;
     ensureAircraftConditionPcts(acf);
@@ -95,6 +101,7 @@ describe('aircraft wear + maintenance', () => {
     const world = createSeedEconomyWorld({ seed: 'inspect-mro' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'InspectMro',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const acf = state.fleet[0]!;
     ensureAircraftConditionPcts(acf);
@@ -122,6 +129,7 @@ describe('aircraft wear + maintenance', () => {
     const world = createSeedEconomyWorld({ seed: 'repair-dry' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBPS', {
       pilotName: 'DryMx',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const acf = state.fleet[0]!;
     ensureAircraftConditionPcts(acf);

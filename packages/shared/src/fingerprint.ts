@@ -176,14 +176,60 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
   if (live === profile) return true;
 
   const stop = new Set(['the', 'and', 'for', 'msfs', 'aircraft', 'airplane', 'default']);
+  // Vendor / product-line chrome shared across unrelated airframes
+  // ("Black Square … Professional" must not alias Caravan ↔ Bonanza).
+  const brandNoise = new Set([
+    'black',
+    'square',
+    'professional',
+    'just',
+    'flight',
+    'asobo',
+    'microsoft',
+    'working',
+    'title',
+  ]);
   const tokens = (s: string) =>
     s
-      .split(/[\s\-_+/]+/)
-      .map((t) => t.trim())
+      // Commas/periods stick to tokens after space→underscore normalize
+      // ("combi,_cargopod" must not become the token "combi,").
+      .split(/[\s\-_+,./|;:]+/)
+      .map((t) => t.trim().replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, ''))
       .filter((t) => t.length >= 2 && !stop.has(t));
   const liveTokens = tokens(live);
   const profileTokenList = tokens(profile);
   const profileTokens = new Set(profileTokenList);
+
+  // Distinct airframe family names — Caravan must not title-alias onto Bonanza.
+  const familyNames = new Set([
+    'bonanza',
+    'caravan',
+    'duke',
+    'baron',
+    'commander',
+    'kodiak',
+    'comanche',
+    'aerostar',
+    'corvalis',
+    'skywagon',
+    'islander',
+    'bandeirante',
+    'otter',
+    'tbm',
+    'phenom',
+    'learjet',
+    'citation',
+    'saab',
+    'king',
+  ]);
+  const liveFamily = liveTokens.filter((t) => familyNames.has(t));
+  const profileFamily = profileTokenList.filter((t) => familyNames.has(t));
+  if (liveFamily.length > 0 && profileFamily.length > 0) {
+    const profileFamilySet = new Set(profileFamily);
+    if (!liveFamily.some((t) => profileFamilySet.has(t))) {
+      return false;
+    }
+  }
 
   // Cargo vs passenger / pax are distinct Market / OFP variants even when the
   // SimConnect tank/station fingerprint is identical (Learjet 35A, Saab 340, …).
@@ -200,8 +246,8 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     return false;
   }
 
-  // Config / range suffixes are first-class variants (Learjet "PASSENGER LONG RANGE"
-  // must not alias onto plain "PASSENGER" via substring or token overlap).
+  // Config / cabin / range suffixes are first-class variants (Learjet "PASSENGER
+  // LONG RANGE" must not alias onto plain "PASSENGER"; Kodiak Combi ≠ Commuter).
   const variantTokens = new Set([
     'long',
     'range',
@@ -214,6 +260,26 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     'exec',
     'executive',
     'combi',
+    'commuter',
+    'skydive',
+    'summit',
+    'amphibian',
+    'floats',
+    // Landing gear / tires — "Kodiak 100 Combi" must not alias onto
+    // "Kodiak 100 Combi, Tundra wheels" (same tank/station hash).
+    'tundra',
+    'wheels',
+    // External cargo pod is a first-class Kodiak (and similar) variant —
+    // "Commuter, Tundra" must not alias onto "Commuter, Cargopod, Tundra".
+    'cargopod',
+    'nocp',
+    // Turbocharged / pressurized cabin markers (Bonanza A36TC ≠ A36).
+    'tc',
+    'turbo',
+    'turbocharged',
+    // Duke / performance packages — Grand ≠ base B60; Turbine ≠ piston.
+    'grand',
+    'turbine',
   ]);
   const liveVariants = new Set(liveTokens.filter((t) => variantTokens.has(t)));
   const profileVariants = new Set(
@@ -229,9 +295,12 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     }
   }
 
-  // Model codes like 110p / 110p1f / c208b must agree. Otherwise
+  // Model codes like 110p / 110p1f / c208b / a36 / a36tc must agree. Otherwise
   // "EMB-110P" token-overlaps "EMB-110P1F" and falsely aliases variants.
-  const isModelToken = (t: string) => /^\d{2,4}[a-z0-9]{0,4}$/i.test(t);
+  // Also catches letter+digits airframe codes (A36 vs A36TC, C90, BE36).
+  const isModelToken = (t: string) =>
+    /^\d{2,4}[a-z0-9]{0,4}$/i.test(t) ||
+    /^[a-z]{1,3}\d{2,4}[a-z0-9]{0,4}$/i.test(t);
   const liveModels = liveTokens.filter(isModelToken);
   const profileModels = profileTokenList.filter(isModelToken);
   if (liveModels.length > 0 && profileModels.length > 0) {
@@ -257,7 +326,9 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     }
   }
 
-  const shared = liveTokens.filter((t) => profileTokens.has(t));
+  const shared = liveTokens.filter(
+    (t) => profileTokens.has(t) && !brandNoise.has(t),
+  );
   // Prefer numeric model tokens (340, 208, 737) — one shared model id + one word is enough.
   const sharedModel = shared.some((t) => isModelToken(t));
   return sharedModel ? shared.length >= 2 : shared.length >= 3;

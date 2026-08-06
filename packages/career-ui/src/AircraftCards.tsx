@@ -212,6 +212,9 @@ export function MarketListingCard(props: {
     deliveryFeeUsd: number;
     needed: boolean;
   } | null;
+  /** When false, Lease is disabled (buy still works). */
+  leaseUnlocked?: boolean;
+  leaseLockReason?: string;
   onBuy: (listingId: string, opts?: { deliver?: boolean }) => void;
   onLease: (listingId: string, opts?: { deliver?: boolean }) => void;
 }) {
@@ -225,6 +228,13 @@ export function MarketListingCard(props: {
     deliver && props.delivery?.needed ? props.delivery.deliveryFeeUsd : 0;
   const totalDue = listing.askingUsd + deliveryFee;
   const canAfford = props.wallet >= totalDue;
+  const leaseUnlocked = props.leaseUnlocked !== false;
+  const leaseDisabled = props.busy || !canAfford || !leaseUnlocked;
+  const leaseTitle = !leaseUnlocked
+    ? (props.leaseLockReason ?? 'Lease locked')
+    : !canAfford
+      ? 'Not enough cash for deposit'
+      : undefined;
 
   return (
     <article className="aircraft-card">
@@ -375,7 +385,8 @@ export function MarketListingCard(props: {
           <button
             type="button"
             className="accept"
-            disabled={props.busy || !canAfford}
+            disabled={leaseDisabled}
+            title={leaseTitle}
             onClick={() =>
               props.onLease(listing.id, { deliver: deliver && canDeliver })
             }

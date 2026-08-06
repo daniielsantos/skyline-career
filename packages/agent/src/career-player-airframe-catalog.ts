@@ -62,6 +62,7 @@ export function inferCareerClassFromIcao(icao: string): FreighterClassId {
       'BE36',
       'BE58',
       'BE60',
+      'BE6G',
       'PA24',
       'PA31',
       'PA32',
@@ -74,7 +75,11 @@ export function inferCareerClassFromIcao(icao: string): FreighterClassId {
   ) {
     return 'light_ga';
   }
-  if (['C208', 'B190', 'E110', 'PC12', 'TBM9'].includes(normalized)) {
+  if (
+    ['C208', 'B190', 'E110', 'PC12', 'TBM9', 'B36T', 'B60T', 'KODI'].includes(
+      normalized,
+    )
+  ) {
     return 'light_turboprop';
   }
   if (['DC6', 'DC6A', 'DC6B', 'DC3', 'DC4', 'C46', 'L188'].includes(normalized)) {

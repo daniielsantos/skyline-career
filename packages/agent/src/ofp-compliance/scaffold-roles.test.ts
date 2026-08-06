@@ -56,17 +56,29 @@ describe('scaffold-roles TFDi MD-11F', () => {
 });
 
 describe('scaffold-roles Black Square Caravan', () => {
-  it('declares direct-injection for Career autoset', () => {
-    const h = matchHeuristic(
+  it('routes Gear / Cargo Pod / Super Cargomaster to one Market SKU', () => {
+    const cargoPod = matchHeuristic(
       'Black Square Caravan Professional Cargo Pod N208BS',
     );
-    assert.equal(h?.id, 'blacksquare-caravan-cargo-pod');
-    assert.equal(h?.marketTypeId, 'c208-caravan-cargo');
-    assert.equal(h?.loadMethod, 'direct-injection');
-    assert.equal(h?.injectCapable, true);
+    assert.equal(cargoPod?.id, 'blacksquare-caravan-cargo-pod');
+    assert.equal(cargoPod?.marketTypeId, 'c208-caravan-cargo');
+    assert.equal(cargoPod?.loadMethod, 'direct-injection');
+    assert.equal(cargoPod?.injectCapable, true);
+
+    const gear = matchHeuristic('Black Square Caravan Professional Gear N95EJ');
+    assert.equal(gear?.id, 'blacksquare-caravan-professional-gear');
+    assert.equal(gear?.marketTypeId, 'c208-caravan-cargo');
+    assert.equal(gear?.familyPackRel, 'blacksquare-caravan-professional-gear.json');
+
+    const superCm = matchHeuristic(
+      'Black Square Caravan Professional Super Cargomaster',
+    );
+    assert.equal(superCm?.id, 'blacksquare-caravan-professional-super-cargomaster');
+    assert.equal(superCm?.marketTypeId, 'c208-caravan-cargo');
+
     const pack = buildRolesPackFromHeuristic(
       'Black Square Caravan Professional Cargo Pod N208BS',
-      h!,
+      cargoPod!,
     );
     assert.equal(pack.loadMethod, 'direct-injection');
     assert.equal(pack.injectCapable, true);
@@ -121,7 +133,7 @@ describe('scaffold-roles Black Square Commander 114', () => {
 });
 
 describe('scaffold-roles Black Square Bonanza', () => {
-  it('matches A36 / A36TC / B36TP as one direct-injection family', () => {
+  it('keeps A36 / A36TC as piston family and B36TP as turboprop SKU', () => {
     assert.equal(
       matchHeuristic('Black Square A36 Bonanza Professional')?.id,
       'blacksquare-bonanza-professional',
@@ -132,37 +144,45 @@ describe('scaffold-roles Black Square Bonanza', () => {
     );
     assert.equal(
       matchHeuristic('Black Square B36TP Bonanza Professional')?.id,
-      'blacksquare-bonanza-professional',
+      'blacksquare-b36tp-bonanza-professional',
     );
-    const h = matchHeuristic('Black Square B36TP Bonanza Professional')!;
-    assert.equal(h.loadMethod, 'direct-injection');
-    assert.equal(h.injectCapable, true);
-    assert.deepEqual(h.stationRoles.crewStations, [1, 2]);
-    assert.deepEqual(h.stationRoles.baggageStations, [3, 4, 5, 6, 7]);
+    const piston = matchHeuristic('Black Square A36 Bonanza Professional')!;
+    assert.equal(piston.loadMethod, 'direct-injection');
+    assert.equal(piston.injectCapable, true);
+    assert.equal(piston.familyPackRel, 'blacksquare-bonanza-professional.json');
+    assert.deepEqual(piston.stationRoles.crewStations, [1, 2]);
+    assert.deepEqual(piston.stationRoles.baggageStations, [3, 4, 5, 6, 7]);
+    const tp = matchHeuristic('Black Square B36TP Bonanza Professional')!;
+    assert.equal(tp.familyPackRel, 'blacksquare-b36tp-bonanza-professional.json');
+    assert.equal(tp.simbriefIcao, 'B36T');
   });
 });
 
 describe('scaffold-roles Black Square Duke', () => {
-  it('matches B60 / Turbine / Grand as one direct-injection family', () => {
+  it('keeps B60 / Grand as piston family and Turbine as turboprop SKU', () => {
     assert.equal(
       matchHeuristic('Black Square B60 Duke')?.id,
-      'blacksquare-b60-duke',
-    );
-    assert.equal(
-      matchHeuristic('Black Square Turbine Duke N6060X')?.id,
       'blacksquare-b60-duke',
     );
     assert.equal(
       matchHeuristic('Black Square Grand Duke')?.id,
       'blacksquare-b60-duke',
     );
-    const h = matchHeuristic('Black Square B60 Duke')!;
-    assert.equal(h.loadMethod, 'direct-injection');
-    assert.equal(h.injectCapable, true);
-    assert.equal(h.marketLabel, 'Beechcraft Duke BE60');
+    assert.equal(
+      matchHeuristic('Black Square Turbine Duke N6060X')?.id,
+      'blacksquare-turbine-duke',
+    );
+    const piston = matchHeuristic('Black Square B60 Duke')!;
+    assert.equal(piston.loadMethod, 'direct-injection');
+    assert.equal(piston.injectCapable, true);
+    assert.equal(piston.marketLabel, 'Beechcraft Duke BE60');
+    assert.equal(piston.familyPackRel, 'blacksquare-b60-duke.json');
     // Station 1 is forward baggage — crew is 2–3, not 1–2.
-    assert.deepEqual(h.stationRoles.crewStations, [2, 3]);
-    assert.deepEqual(h.stationRoles.baggageStations, [1, 4, 5, 6, 7, 8]);
+    assert.deepEqual(piston.stationRoles.crewStations, [2, 3]);
+    assert.deepEqual(piston.stationRoles.baggageStations, [1, 4, 5, 6, 7, 8]);
+    const turbine = matchHeuristic('Black Square Turbine Duke')!;
+    assert.equal(turbine.familyPackRel, 'blacksquare-turbine-duke.json');
+    assert.equal(turbine.simbriefIcao, 'B60T');
   });
 });
 

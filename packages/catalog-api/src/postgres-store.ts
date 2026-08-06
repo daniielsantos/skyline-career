@@ -120,7 +120,10 @@ export class PostgresCatalogStore implements CatalogBackend {
     return rows[0] ?? null;
   }
 
-  private async findBestProfileByTitle(liveTitle: string): Promise<ProfileRow | null> {
+  private async findBestProfileByTitle(
+    liveTitle: string,
+    opts?: { structuralHash?: string },
+  ): Promise<ProfileRow | null> {
     const { rows } = await this.pool.query<ProfileRow>(
       `SELECT af.fingerprint_v2, af.structural_hash,
               ap.profile_key, ap.semver, ap.status, ap.confidence_score,
@@ -131,8 +134,12 @@ export class PostgresCatalogStore implements CatalogBackend {
        ORDER BY CASE ap.status WHEN 'active' THEN 0 ELSE 1 END,
                 ap.confidence_score DESC`,
     );
-    const matched = rows.filter((row) =>
-      profileAcceptsLiveTitle(
+    const wantStruct = opts?.structuralHash?.trim();
+    const matched = rows.filter((row) => {
+      if (wantStruct && row.structural_hash && row.structural_hash !== wantStruct) {
+        return false;
+      }
+      return profileAcceptsLiveTitle(
         {
           match: row.profile_document.match as
             | { title?: string; liveTitles?: string[] }
@@ -140,8 +147,8 @@ export class PostgresCatalogStore implements CatalogBackend {
           displayName: row.profile_document.displayName as string | undefined,
         },
         liveTitle,
-      ),
-    );
+      );
+    });
     return matched[0] ?? null;
   }
 
@@ -261,7 +268,9 @@ export class PostgresCatalogStore implements CatalogBackend {
       : false;
     const best =
       (titleOk ? byFp : null) ??
-      (await this.findBestProfileByTitle(request.identity.title));
+      (await this.findBestProfileByTitle(request.identity.title, {
+        structuralHash,
+      }));
     return this.toFingerprintResponse(fingerprint, best, {
       structurallyKnown: Boolean(byFp),
     });
@@ -296,7 +305,15 @@ export class PostgresCatalogStore implements CatalogBackend {
       best = null;
     }
     if (!best && title) {
-      best = await this.findBestProfileByTitle(title);
+      const struct =
+        released.rows[0]?.structural_hash ??
+        (await this.pool.query<{ structural_hash: string }>(
+          `SELECT structural_hash FROM aircraft_fingerprints WHERE fingerprint_v2 = $1`,
+          [fingerprint],
+        )).rows[0]?.structural_hash;
+      best = await this.findBestProfileByTitle(title, {
+        structuralHash: struct,
+      });
     }
     if (!best) return null;
     return this.toResolveResponse(best);

@@ -9,6 +9,7 @@ import {
 import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './career-aircraft-market.js';
 import { applyPlayerDepartFuel, relocateAircraftOnSettle, releaseAircraftOnCancel } from './career-fleet.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
+import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
   evaluateMinAirborneElapsed,
   resolveExpectedRouteMs,
@@ -177,8 +178,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     id: 'light_ga',
     name: 'Light GA (BE36 Bonanza Professional)',
     /**
-     * Fallback structural payload for BE36 family (A36 / A36TC / B36TP).
-     * B36TP cfg: MTOW 4050 lb − OEW 2355 lb ≈ 769 kg useful; ~450 kg after typical fuel.
+     * Fallback structural payload for piston BE36 family (A36 / A36TC).
+     * B36TP is light_turboprop with its own Market SKU.
      */
     maxCargoKg: 450,
     maxRangeNm: 800,
@@ -189,10 +190,10 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     simbriefAirframeMatch: 'Default',
     fuelBurnKgPerNm: 0.35,
     fuelTaxiKg: 20,
-    /** B36TP mains 62+62 gal Jet-A ≈ 380 kg usable planning capacity. */
-    fuelCapacityKg: 380,
-    oewKg: 1_068,
-    mtowKg: 1_837,
+    /** A36 mains+tips ~110 gal avgas ≈ 299 kg usable planning capacity. */
+    fuelCapacityKg: 299,
+    oewKg: 973,
+    mtowKg: 1_656,
     fuelRouteFactor: 1.8,
     fuelReserveKg: 80,
   },
@@ -518,10 +519,10 @@ export function parseFreighterClassId(raw: string | undefined): FreighterClassId
   ) {
     return 'light_jet';
   }
-  if (raw === 'caravan' || raw === 'c208' || raw === 'light' || raw === 'turboprop') {
+  if (raw === 'caravan' || raw === 'c208' || raw === 'light' || raw === 'turboprop' || raw === 'b36tp') {
     return 'light_turboprop';
   }
-  if (raw === 'bonanza' || raw === 'be36' || raw === 'ga' || raw === 'a36' || raw === 'b36tp') {
+  if (raw === 'bonanza' || raw === 'be36' || raw === 'ga' || raw === 'a36') {
     return 'light_ga';
   }
   return undefined;
@@ -1326,6 +1327,21 @@ export function departMission(
       ...airborneStamp,
     };
     fuelDebitUsd = playerFuel.fuelDebitUsd;
+  } else if (normalized.contractPilot) {
+    // Operator covers Jet-A — drain terminal stock, no player wallet debit.
+    if (!normalized.fuelUplift) {
+      const quote = quoteFuelUplift(world, {
+        originIcao: normalized.originIcao,
+        destIcao: normalized.destIcao,
+        aircraftClassId: normalized.aircraftClassId as FreighterClassId,
+      });
+      const fuelUplift = deliverFuelUplift(world, quote);
+      nextMission = {
+        ...nextMission,
+        fuelUplift: { ...fuelUplift, costUsd: 0 },
+      };
+    }
+    fuelDebitUsd = 0;
   } else if (!normalized.fuelUplift) {
     const quote = quoteFuelUplift(world, {
       originIcao: normalized.originIcao,
@@ -1518,6 +1534,9 @@ export function settleMission(
           ? opts.hoursMult
           : 1;
       applyAircraftHoursAfterMission(aircraft, blockHours * hoursMult);
+    } else if (working.contractPilot) {
+      // No owned airframe — still ride the leg to dest.
+      syncPilotIcaoTo(opts.fleet, working.destIcao);
     }
   }
 
@@ -1706,10 +1725,17 @@ export function formatMissionSummary(mission: MissionIntent): string {
 }
 
 export interface IntentOfpTolerances {
-  /** Absolute cargo tolerance (kg). Default 500. */
+  /** Absolute cargo tolerance when OFP ≥ mission (kg). Default 500. */
   cargoAbsKg: number;
-  /** Relative cargo tolerance vs intent. Default 0.03. */
+  /** Relative cargo tolerance vs intent when OFP ≥ mission. Default 0.03. */
   cargoPct: number;
+  /**
+   * Absolute tolerance when OFP cargo is below mission (kg).
+   * Tighter than over — SimBrief MTOW cuts must not silently pass.
+   */
+  cargoUnderAbsKg: number;
+  /** Relative under-tolerance vs intent. Default 0.05. */
+  cargoUnderPct: number;
   /** Max allowed OFP passenger count when mission.pax is 0. Default 0. */
   maxExtraPax: number;
 }
@@ -1717,6 +1743,8 @@ export interface IntentOfpTolerances {
 export const DEFAULT_INTENT_OFP_TOLERANCES: IntentOfpTolerances = {
   cargoAbsKg: 500,
   cargoPct: 0.03,
+  cargoUnderAbsKg: 100,
+  cargoUnderPct: 0.05,
   maxExtraPax: 0,
 };
 
@@ -1798,7 +1826,17 @@ function ofpAirframeMatchesMission(
   );
 }
 
-function cargoToleranceKg(intentCargoKg: number, tolerances: IntentOfpTolerances): number {
+function cargoToleranceKg(
+  intentCargoKg: number,
+  tolerances: IntentOfpTolerances,
+  direction: 'over' | 'under' = 'over',
+): number {
+  if (direction === 'under') {
+    return Math.max(
+      tolerances.cargoUnderAbsKg,
+      Math.abs(intentCargoKg) * tolerances.cargoUnderPct,
+    );
+  }
   return Math.max(tolerances.cargoAbsKg, Math.abs(intentCargoKg) * tolerances.cargoPct);
 }
 
@@ -1904,13 +1942,17 @@ export function compareMissionIntentToOfp(
       message: 'OFP has no cargo/baggage weight — cannot verify freight load',
     });
   } else {
-    const tol = cargoToleranceKg(mission.cargoKg, tolerances);
     const delta = ofpCargo - mission.cargoKg;
+    const direction = delta < 0 ? 'under' : 'over';
+    const tol = cargoToleranceKg(mission.cargoKg, tolerances, direction);
     if (Math.abs(delta) > tol) {
       findings.push({
         code: 'INTENT_CARGO_MISMATCH',
         severity: 'fail',
-        message: `OFP cargo ${ofpCargo.toFixed(0)} kg vs mission ${mission.cargoKg} kg (tol ±${tol.toFixed(0)} kg)`,
+        message:
+          direction === 'under'
+            ? `OFP cargo ${ofpCargo.toFixed(0)} kg below mission ${mission.cargoKg} kg (tol −${tol.toFixed(0)} kg) — often MTOW/fuel limited on this leg`
+            : `OFP cargo ${ofpCargo.toFixed(0)} kg vs mission ${mission.cargoKg} kg (tol ±${tol.toFixed(0)} kg)`,
         expected: mission.cargoKg,
         actual: ofpCargo,
         delta,

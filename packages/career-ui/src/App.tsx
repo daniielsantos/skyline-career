@@ -48,6 +48,8 @@ import {
   postCrewFire,
   postFerry,
   postPilotTravel,
+  postContractPilotAccept,
+  fetchContractPilotOptions,
   postStagingCommit,
   postTick,
   postDebugCreditWallet,
@@ -55,6 +57,7 @@ import {
   postWatchStop,
   type AircraftClass,
   type AircraftDeliveryQuoteView,
+  type AircraftLeaseUnlock,
   type AircraftListing,
   type AirportLot,
   type AirportMovement,
@@ -69,6 +72,7 @@ import {
   type Mission,
   type NetworkHub,
   type NpcActivity,
+  type NpcClaim,
   type NpcFleetMember,
   type PlayerAircraft,
   type PlayerFboSnapshot,
@@ -1057,7 +1061,40 @@ function LotExpiry(props: {
   lot: MarketLot | AirportLot;
   tick: number;
   continuousHours: number;
+  nowMs?: number;
 }) {
+  const claim = props.lot.npcClaim;
+  // Crew-needed holds stay on the board past market expiry until the pilot
+  // window closes — show that window instead of a misleading "Expired".
+  if (claim?.crewNeeded) {
+    const untilMs = claim.awaitingPilotUntilMs;
+    const nowMs = props.nowMs ?? Date.now();
+    if (typeof untilMs === 'number' && Number.isFinite(untilMs)) {
+      const leftMs = untilMs - nowMs;
+      if (leftMs <= 0) {
+        return (
+          <span className="expiry overdue" title="Crew offer window closed — operator departing">
+            Crew window closed
+          </span>
+        );
+      }
+      const leftHours = leftMs / MS_PER_HOUR;
+      return (
+        <span
+          className={leftHours <= 1 ? 'expiry soon' : 'expiry'}
+          title="Market deadline paused while this crew offer is open"
+        >
+          Crew offer · {formatDuration(leftHours)} left
+        </span>
+      );
+    }
+    return (
+      <span className="expiry" title="Crew offer open — operator waiting for a pilot">
+        Crew offer open
+      </span>
+    );
+  }
+
   const remaining =
     'ticksRemaining' in props.lot && props.lot.ticksRemaining !== undefined
       ? props.lot.ticksRemaining
@@ -1075,12 +1112,49 @@ function LotExpiry(props: {
   );
 }
 
+function formatCrewFeeText(
+  claim: { pilotFeeUsd?: number; pilotFeeMinUsd?: number },
+  formatMoney: (n: number) => string,
+): string | null {
+  if (typeof claim.pilotFeeUsd !== 'number') return null;
+  const max = claim.pilotFeeUsd;
+  const min =
+    typeof claim.pilotFeeMinUsd === 'number' ? claim.pilotFeeMinUsd : max;
+  if (min < max) return `${formatMoney(min)}–${formatMoney(max)}`;
+  return formatMoney(max);
+}
+
 function NpcTakenBadge(props: {
-  claim?: { npcName: string; cargoKg: number; etaHours: number; arrivesAtMs?: number } | null;
+  claim?: NpcClaim | null;
   nowMs: number;
   weightSystem?: WeightSystem;
+  formatMoney?: (n: number) => string;
 }) {
   if (!props.claim) return null;
+  if (props.claim.crewNeeded) {
+    const eta = liveEtaHours({
+      arrivesAtMs: props.claim.awaitingPilotUntilMs ?? props.claim.arrivesAtMs,
+      nowMs: props.nowMs,
+      fallbackHours: props.claim.etaHours,
+    });
+    const feeFmt = props.formatMoney ?? ((n: number) => `$${n.toLocaleString()}`);
+    const fee = formatCrewFeeText(props.claim, feeFmt);
+    const classTag = props.claim.aircraftClassId
+      ? ` · ${aircraftClassLabel(props.claim.aircraftClassId)}`
+      : props.claim.aircraftLabel
+        ? ` · ${props.claim.aircraftLabel}`
+        : '';
+    return (
+      <span
+        className="npc-badge npc-badge-crew"
+        title={`Contract pilot offer — pick any homologated airframe in this class. Fee scales with how much you lift; NPC keeps the rest. Holds ${formatTonnes(props.claim.cargoKg, props.weightSystem)} until accept or window closes.`}
+      >
+        Crew needed · {props.claim.npcName}
+        {classTag}
+        {fee ? ` · fee ${fee}` : ''} · {formatDuration(eta)} left
+      </span>
+    );
+  }
   const eta = liveEtaHours({
     arrivesAtMs: props.claim.arrivesAtMs,
     nowMs: props.nowMs,
@@ -1275,6 +1349,7 @@ function FleetRoster(props: {
   const [query, setQuery] = useState('');
   const [phaseFilter, setPhaseFilter] = useState<FleetPhaseFilter>('');
   const [countryFilter, setCountryFilter] = useState('');
+  const [classFilter, setClassFilter] = useState<'' | AircraftClass>('');
   const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
 
   const enriched = useMemo(
@@ -1303,6 +1378,7 @@ function FleetRoster(props: {
       .filter(Boolean);
     return enriched.filter(({ npc, phase, mission }) => {
       if (phaseFilter && phase !== phaseFilter) return false;
+      if (classFilter && npc.aircraftClassId !== classFilter) return false;
       if (
         countryFilter &&
         countryIdFromRegion(npc.homeRegion) !== countryFilter
@@ -1335,7 +1411,7 @@ function FleetRoster(props: {
         .toLowerCase();
       return tokens.every((token) => hay.includes(token));
     });
-  }, [enriched, phaseFilter, countryFilter, laneFilter, query]);
+  }, [enriched, phaseFilter, classFilter, countryFilter, laneFilter, query]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / FLEET_PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -1350,7 +1426,14 @@ function FleetRoster(props: {
 
   useEffect(() => {
     setPage(1);
-  }, [query, phaseFilter, countryFilter, laneFilter, props.fleet.length]);
+  }, [
+    query,
+    phaseFilter,
+    classFilter,
+    countryFilter,
+    laneFilter,
+    props.fleet.length,
+  ]);
 
   if (props.fleet.length === 0) {
     return (
@@ -1363,6 +1446,7 @@ function FleetRoster(props: {
   const hasFilters =
     query.trim() !== '' ||
     phaseFilter !== '' ||
+    classFilter !== '' ||
     countryFilter !== '' ||
     laneFilter !== '';
 
@@ -1390,7 +1474,21 @@ function FleetRoster(props: {
                   aria-label="Filter rivals"
                 />
               </th>
-              <th />
+              <th>
+                <select
+                  value={classFilter}
+                  onChange={(e) =>
+                    setClassFilter(e.target.value as '' | AircraftClass)
+                  }
+                  aria-label="Filter by aircraft class"
+                >
+                  {AIRCRAFT_CLASS_FILTERS.map((opt) => (
+                    <option key={opt.id || 'all'} value={opt.id}>
+                      {opt.id ? opt.label : 'All classes'}
+                    </option>
+                  ))}
+                </select>
+              </th>
               <th>
                 <select
                   value={countryFilter}
@@ -1446,6 +1544,7 @@ function FleetRoster(props: {
                     onClick={() => {
                       setQuery('');
                       setPhaseFilter('');
+                      setClassFilter('');
                       setCountryFilter('');
                       setLaneFilter('');
                     }}
@@ -1798,19 +1897,11 @@ export function App() {
   const [pilotIcao, setPilotIcao] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupHub, setSignupHub] = useState('');
-  const [signupAirframeId, setSignupAirframeId] = useState('');
-  const [starterAircraftOptions, setStarterAircraftOptions] = useState<
-    Array<{
-      typeId: string;
-      label: string;
-      aircraftClassId: AircraftClass;
-      simbriefIcao: string;
-    }>
-  >([]);
   const [aircraftListings, setAircraftListings] = useState<AircraftListing[]>([]);
   const [aircraftDeliveryQuotes, setAircraftDeliveryQuotes] = useState<
     Record<string, AircraftDeliveryQuoteView>
   >({});
+  const [leaseUnlock, setLeaseUnlock] = useState<AircraftLeaseUnlock | null>(null);
   const [aircraftCatalog, setAircraftCatalog] = useState<
     Array<{
       id: AircraftClass;
@@ -1952,6 +2043,7 @@ export function App() {
     setDisplayNowMs(serverNow);
     setWallet(missionState.walletUsd);
     setCargoOps(state.cargoOps ?? null);
+    if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
     setLots(market.lots);
     setMarketTotalLots(market.totalLots ?? market.lots.length);
     setMarketPageCount(market.pageCount ?? 1);
@@ -1979,24 +2071,12 @@ export function App() {
         : market.regionPressure ?? [],
     );
     setMissions(missionState.missions.slice().reverse());
-    setHubSelected(Boolean(state.hubSelected) && (state.fleet?.length ?? 0) > 0);
+    setHubSelected(Boolean(state.hubSelected));
     setFleet(state.fleet ?? []);
     setHubOptions(normalizeStarterHubs(state.hubs));
     setPilotName(state.pilotName ?? '');
     setHomeHubIcao(state.homeHubIcao ?? '');
     setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
-    if (state.starterAircraft?.length) {
-      setStarterAircraftOptions(state.starterAircraft);
-      setSignupAirframeId((prev) => {
-        if (prev && state.starterAircraft!.some((row) => row.typeId === prev)) {
-          return prev;
-        }
-        const preferred =
-          state.starterAircraft!.find((row) => row.typeId === 'asobo-c172sp-cargo') ??
-          state.starterAircraft![0];
-        return preferred?.typeId ?? '';
-      });
-    }
     if (state.cashflow) setCashflow(state.cashflow);
     if (state.companyCredit) setCompanyCredit(state.companyCredit);
     if (state.playerFbos) setPlayerFbos(state.playerFbos);
@@ -2009,8 +2089,9 @@ export function App() {
       setAircraftMarketDay(acMarket.dayIndex);
       setWallet(acMarket.walletUsd);
       if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
+      if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
     }
-    if (!(state.hubSelected && (state.fleet?.length ?? 0) > 0)) {
+    if (!state.hubSelected) {
       const firstHub = normalizeStarterHubs(state.hubs)[0]?.icao;
       setSignupHub((prev) => prev || firstHub || 'SBGR');
     }
@@ -2802,6 +2883,7 @@ export function App() {
       tab === 'staging' &&
       !airportIcao &&
       mission?.status === 'dispatched' &&
+      !mission.contractPilot &&
       Boolean(ofp?.ofpId) &&
       (ofp?.verdict === 'pass' || ofp?.verdict === 'warn') &&
       typeof ofp?.plannedBlockFuelKg === 'number' &&
@@ -2856,6 +2938,7 @@ export function App() {
   }, [
     activeMission?.id,
     activeMission?.status,
+    activeMission?.contractPilot,
     activeMission?.fuelAuthorizedOfpId,
     activeMission?.lastOfpCheck?.ofpId,
     activeMission?.lastOfpCheck?.plannedBlockFuelKg,
@@ -3339,9 +3422,11 @@ export function App() {
     }, { refreshAfter: false });
   }
 
-  async function onTick() {
+  async function onTick(ticks = 1) {
+    const hoursLabel =
+      ticks === 1 ? '15 min' : ticks === 4 ? '1 hour' : `${ticks * 15} min`;
     await run(async () => {
-      const result = await postTick(1);
+      const result = await postTick(ticks);
       if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
       const leaseNote =
         (result.leasePaidUsd ?? 0) > 0
@@ -3373,7 +3458,7 @@ export function App() {
         hangarShortfall > 0 || creditCompounded > 0 ? 'warn' : 'ok',
       );
       setToast(
-        `Time advanced 15 min → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}${creditNote}`,
+        `Time advanced ${hoursLabel} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}${creditNote}`,
       );
     });
   }
@@ -3406,7 +3491,6 @@ export function App() {
       setPilotIcao('');
       setSignupName('');
       setSignupHub('');
-      setSignupAirframeId('');
       // Force market refetch even if filter/sort opts are unchanged.
       marketFetchOptsRef.current = {
         ...marketFetchOptsRef.current,
@@ -3420,7 +3504,6 @@ export function App() {
   async function onSelectHub() {
     const name = signupName.trim();
     const icao = signupHub.trim().toUpperCase();
-    const airframeTypeId = signupAirframeId.trim();
     if (name.length < 2) {
       setError('Enter a pilot name (at least 2 characters)');
       return;
@@ -3429,31 +3512,21 @@ export function App() {
       setError('Select a home hub ICAO');
       return;
     }
-    if (!airframeTypeId) {
-      setError('Select a starter aircraft');
-      return;
-    }
     await run(async () => {
       const result = await postSelectHub({
         icao,
         pilotName: name,
-        airframeTypeId,
       });
       setHubSelected(result.hubSelected);
       setFleet(result.fleet);
       setHubOptions(normalizeStarterHubs(result.hubs));
       setPilotName(result.pilotName);
       setHomeHubIcao(result.homeHubIcao);
-      setPilotIcao(result.homeHubIcao);
+      setPilotIcao(result.pilotIcao ?? result.homeHubIcao);
       setWallet(result.walletUsd);
-      const starter = result.fleet[0];
-      const starterLabel = starter?.label ?? 'starter aircraft';
-      const conditionLabel = starter?.condition
-        ? ` · ${starter.condition}`
-        : '';
       setToastKind('ok');
       setToast(
-        `${result.pilotName} registered · ${starterLabel}${conditionLabel} parked at ${result.homeHubIcao}`,
+        `${result.pilotName} registered at ${result.homeHubIcao} · fly Crew needed offers until you buy your first aircraft`,
       );
       await refresh();
       goToTab('pilot');
@@ -3469,6 +3542,7 @@ export function App() {
     setAircraftMarketDay(acMarket.dayIndex);
     setWallet(acMarket.walletUsd);
     if (acMarket.fleet) setFleet(acMarket.fleet);
+    if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
     return acMarket;
   }
 
@@ -3522,6 +3596,7 @@ export function App() {
       setWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setAircraftDeliveryQuotes({});
+      if (result.leaseUnlock) setLeaseUnlock(result.leaseUnlock);
       setToastKind('ok');
       const deliveryNote =
         (result.deliveryFeeUsd ?? 0) > 0
@@ -4405,6 +4480,12 @@ export function App() {
   }
 
   async function enterEditManifest(mission: Mission) {
+    if (mission.contractPilot) {
+      setError(
+        'Crew offers lock cargo at accept (route-limited lift). Cancel and re-accept to change airframe/lift.',
+      );
+      return;
+    }
     if (!['accepted', 'dispatched'].includes(mission.status)) {
       setError('Only accepted or dispatched flights can edit the manifest');
       return;
@@ -4667,6 +4748,123 @@ export function App() {
         );
       }
       goToTab('staging');
+    });
+  }
+
+  async function onAcceptContractPilot(lot: {
+    id: string;
+    npcClaim?: {
+      crewNeeded?: boolean;
+      pilotFeeUsd?: number;
+      npcName?: string;
+      cargoKg?: number;
+      aircraftClassId?: string;
+    } | null;
+  }) {
+    if (!lot.npcClaim?.crewNeeded) return;
+    let options;
+    try {
+      options = await fetchContractPilotOptions({ lotId: lot.id });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    const flyable = options.airframes.filter((a) => a.liftKg > 0);
+    if (flyable.length === 0) {
+      setError(
+        `No homologated ${options.offer.aircraftClassId} airframe can lift this offer (${formatTonnes(options.offer.cargoKg)})`,
+      );
+      return;
+    }
+    const preferred =
+      flyable.find((a) => a.coversOffer) ??
+      flyable.slice().sort((a, b) => b.liftKg - a.liftKg)[0]!;
+    const selectedRef = { current: preferred.typeId };
+    const ok = await confirm({
+      title: 'Choose aircraft for crew offer',
+      confirmLabel: 'Accept & dispatch',
+      cancelLabel: 'Cancel',
+      body: (
+        <div className="contract-pilot-pick">
+          <p>
+            {options.offer.originIcao} → {options.offer.destIcao} ·{' '}
+            {formatTonnes(options.offer.cargoKg)} reserved ·{' '}
+            {options.offer.aircraftClassId.replace(/_/g, ' ')}
+          </p>
+          <p className="muted">
+            Pick any homologated airframe of this class. Lift is capped by route
+            fuel/MTOW (same as SimBrief) — if it cannot take the full load, you
+            fly what fits and the operator departs with the rest.
+          </p>
+          <label className="contract-pilot-pick-label">
+            Aircraft
+            <select
+              className="contract-pilot-pick-select"
+              defaultValue={preferred.typeId}
+              onChange={(event) => {
+                selectedRef.current = event.target.value;
+              }}
+            >
+              {flyable.map((a) => (
+                <option key={a.typeId} value={a.typeId}>
+                  {a.label} · lift {formatTonnes(a.liftKg)}
+                  {a.routeLimited ? ' · route-limited' : ''}
+                  {a.remainderKg > 0
+                    ? ` · NPC takes ${formatTonnes(a.remainderKg)}`
+                    : ' · full offer'}
+                  {` · fee ${formatMoney(a.pilotFeeUsd)}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ),
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postContractPilotAccept({
+        lotId: lot.id,
+        airframeTypeId: selectedRef.current,
+        openDispatch: true,
+      });
+      if (result.mission) {
+        setMissions((prev) => {
+          const idx = prev.findIndex((m) => m.id === result.mission.id);
+          if (idx >= 0) {
+            const next = prev.slice();
+            next[idx] = result.mission;
+            return next;
+          }
+          return [result.mission, ...prev];
+        });
+      }
+      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      if (result.pilotIcao) setPilotIcao(result.pilotIcao);
+      setStaging(null);
+      setWatchAutoPaused(false);
+      const fee = formatMoney(result.pilotFeeUsd);
+      const op = result.npcName ?? lot.npcClaim?.npcName ?? 'operator';
+      const air = result.airframeLabel ? ` · ${result.airframeLabel}` : '';
+      const split =
+        (result.remainderKg ?? 0) > 0
+          ? ` · you ${formatTonnes(result.liftedKg ?? 0)}, NPC ${formatTonnes(result.remainderKg ?? 0)}`
+          : ` · ${formatTonnes(result.liftedKg ?? result.mission.cargoKg)}`;
+      const reposition = result.pilotRelocatedFrom
+        ? ` · operator covered travel ${result.pilotRelocatedFrom}→${result.pilotIcao ?? result.mission.originIcao}`
+        : '';
+      if (result.dispatchError) {
+        setToastKind('warn');
+        setToast(
+          `Crew offer accepted · fee ${fee} (${op})${air}${split}${reposition}, but SimBrief failed: ${result.dispatchError}`,
+        );
+      } else {
+        setToastKind('ok');
+        setToast(
+          `Crew offer accepted · fee ${fee} (${op})${air}${split}${reposition} · Dispatch open`,
+        );
+      }
+      goToTab('staging');
+      await refresh();
     });
   }
 
@@ -5141,21 +5339,16 @@ export function App() {
       boardAircraftInitRef.current = false;
       return;
     }
+    // Keep a valid selection if the aircraft is still in the fleet; otherwise
+    // clear. Do not auto-pick — Freights defaults to gross pay so contract-pilot
+    // browsing is not skewed by starter-aircraft fuel nets.
     if (
       boardAircraftId &&
-      boardEstimateFleet.some((a) => a.id === boardAircraftId)
+      !boardEstimateFleet.some((a) => a.id === boardAircraftId)
     ) {
-      boardAircraftInitRef.current = true;
-      return;
+      setBoardAircraftId('');
     }
-    if (!boardAircraftInitRef.current || !boardAircraftId) {
-      const parked = boardEstimateFleet.find((a) => a.status === 'parked');
-      setBoardAircraftId((parked ?? boardEstimateFleet[0]!).id);
-      boardAircraftInitRef.current = true;
-      return;
-    }
-    const parked = boardEstimateFleet.find((a) => a.status === 'parked');
-    setBoardAircraftId((parked ?? boardEstimateFleet[0]!).id);
+    boardAircraftInitRef.current = true;
   }, [boardAircraftId, boardEstimateFleet]);
   const hasListedAircraft = useMemo(
     () => fleet.some((a) => a.status === 'listed'),
@@ -5870,11 +6063,20 @@ export function App() {
             <button
               type="button"
               className="action"
-              onClick={() => void onTick()}
+              onClick={() => void onTick(1)}
               disabled={busy}
               title="Advance economy + crew wall-clock by 15 minutes (1 tick)"
             >
               +15 min
+            </button>
+            <button
+              type="button"
+              className="action"
+              onClick={() => void onTick(4)}
+              disabled={busy}
+              title="Advance economy + crew wall-clock by 1 hour (4 ticks)"
+            >
+              +1 h
             </button>
             <button
               type="button"
@@ -5935,8 +6137,9 @@ export function App() {
             <div>
               <h2 id="hub-picker-title">Create pilot profile</h2>
               <p>
-                Choose a callsign, home hub, and light starter aircraft. Condition
-                rolls good or excellent automatically.
+                Choose a callsign and home hub. You start as a contract pilot —
+                fly Crew needed offers on operator airframes until you buy or
+                lease your first aircraft.
               </p>
             </div>
           </div>
@@ -6024,30 +6227,13 @@ export function App() {
                   ))}
               </select>
             </label>
-            <label className="pilot-field">
-              Starter aircraft
-              <select
-                value={signupAirframeId}
-                onChange={(e) => setSignupAirframeId(e.target.value)}
-                disabled={busy || starterAircraftOptions.length === 0}
-                required
-              >
-                <option value="">Select starter…</option>
-                {starterAircraftOptions.map((airframe) => (
-                  <option key={airframe.typeId} value={airframe.typeId}>
-                    {airframe.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <button
               type="submit"
               className="accept"
               disabled={
                 busy ||
                 signupName.trim().length < 2 ||
-                !signupHub ||
-                !signupAirframeId
+                !signupHub
               }
             >
               Start career
@@ -7188,6 +7374,8 @@ export function App() {
                                 <NpcTakenBadge
                                   claim={lot.npcClaim}
                                   nowMs={displayNowMs}
+                                  weightSystem={weightSystem}
+                                  formatMoney={formatMoney}
                                 />
                               </td>
                               <td className="distance">
@@ -7214,6 +7402,7 @@ export function App() {
                                   lot={lot}
                                   tick={tick}
                                   continuousHours={continuousHours}
+                                  nowMs={displayNowMs}
                                 />
                                 {lot.perishable ? (
                                   <small>Perishable</small>
@@ -7222,18 +7411,39 @@ export function App() {
                               <td className="pay">{formatMoney(lot.payUsd)}</td>
                               <td
                                 className={
-                                  typeof lot.estimatedNetUsd === 'number' &&
-                                  lot.estimatedInRange !== false
-                                    ? lot.estimatedNetUsd > 0
+                                  lot.npcClaim?.crewNeeded &&
+                                  typeof lot.npcClaim.pilotFeeUsd === 'number'
+                                    ? lot.npcClaim.pilotFeeUsd > 0
                                       ? 'net net-pos'
-                                      : lot.estimatedNetUsd < 0
-                                        ? 'net net-neg'
-                                        : 'net'
-                                    : 'net'
+                                      : 'net'
+                                    : typeof lot.estimatedNetUsd === 'number' &&
+                                        lot.estimatedInRange !== false
+                                      ? lot.estimatedNetUsd > 0
+                                        ? 'net net-pos'
+                                        : lot.estimatedNetUsd < 0
+                                          ? 'net net-neg'
+                                          : 'net'
+                                      : 'net'
                                 }
                               >
-                                {boardAircraft &&
-                                lot.estimatedInRange === false ? (
+                                {lot.npcClaim?.crewNeeded &&
+                                typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
+                                  <>
+                                    {formatCrewFeeText(
+                                      lot.npcClaim,
+                                      formatMoney,
+                                    )}
+                                    <small title="Crew fee scales with how much your chosen airframe lifts; fuel/ops covered by the operator">
+                                      {typeof lot.npcClaim.pilotFeeMinUsd ===
+                                        'number' &&
+                                      lot.npcClaim.pilotFeeMinUsd <
+                                        lot.npcClaim.pilotFeeUsd
+                                        ? 'by lift'
+                                        : 'crew fee'}
+                                    </small>
+                                  </>
+                                ) : boardAircraft &&
+                                  lot.estimatedInRange === false ? (
                                   <small title="Beyond selected aircraft range">
                                     OOR
                                   </small>
@@ -7270,28 +7480,43 @@ export function App() {
                                       busy ||
                                       Boolean(playerDispatchMission) ||
                                       cargoLocked ||
-                                      lot.status !== 'available' ||
-                                      lot.availableKg <= 0
+                                      (lot.npcClaim?.crewNeeded
+                                        ? false
+                                        : lot.status !== 'available' ||
+                                          lot.availableKg <= 0)
                                     }
                                     onClick={() =>
-                                      enterStagingFromContract(lot)
+                                      lot.npcClaim?.crewNeeded
+                                        ? void onAcceptContractPilot(lot)
+                                        : enterStagingFromContract(lot)
                                     }
                                     title={
                                       cargoLocked
                                         ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                                         : playerDispatchMission
                                         ? `Finish or cancel ${playerDispatchMission.id} in Dispatch first`
-                                        : lot.status !== 'available' ||
-                                            lot.availableKg <= 0
-                                          ? 'This contract is no longer available'
-                                          : `Prepare ${lot.originIcao} → ${lot.destIcao}`
+                                        : lot.npcClaim?.crewNeeded
+                                          ? `Accept crew offer${
+                                              formatCrewFeeText(
+                                                lot.npcClaim,
+                                                formatMoney,
+                                              )
+                                                ? ` · fee ${formatCrewFeeText(lot.npcClaim, formatMoney)}`
+                                                : ''
+                                            } — pick homologated airframe in class; fee scales with lift`
+                                          : lot.status !== 'available' ||
+                                              lot.availableKg <= 0
+                                            ? 'This contract is no longer available'
+                                            : `Prepare ${lot.originIcao} → ${lot.destIcao}`
                                     }
                                   >
                                     {cargoLocked
                                       ? 'Locked'
                                       : playerDispatchMission
                                         ? 'Flight busy'
-                                        : 'Prepare flight'}
+                                        : lot.npcClaim?.crewNeeded
+                                          ? 'Accept crew offer'
+                                          : 'Prepare flight'}
                                   </button>
                                   {(playerFbos?.fbos.some(
                                     (f) =>
@@ -7299,6 +7524,7 @@ export function App() {
                                       lot.originIcao.toUpperCase(),
                                   ) ??
                                     false) &&
+                                  !lot.npcClaim?.crewNeeded &&
                                   !lot.perishable &&
                                   lot.commodityId !== 'perishables' ? (
                                     <button
@@ -7852,7 +8078,12 @@ export function App() {
                           {meta.text}
                         </small>
                       ) : null}
-                      <NpcTakenBadge claim={lot.npcClaim} nowMs={displayNowMs} />
+                      <NpcTakenBadge
+                        claim={lot.npcClaim}
+                        nowMs={displayNowMs}
+                        weightSystem={weightSystem}
+                        formatMoney={formatMoney}
+                      />
                     </td>
                     <td className="distance">
                       {lot.distanceNm !== undefined
@@ -7874,7 +8105,12 @@ export function App() {
                     </td>
                     <td>{formatTonnes(lot.availableKg)}</td>
                     <td>
-                      <LotExpiry lot={lot} tick={tick} continuousHours={continuousHours} />
+                      <LotExpiry
+                        lot={lot}
+                        tick={tick}
+                        continuousHours={continuousHours}
+                        nowMs={displayNowMs}
+                      />
                       {lot.perishable ? <small>Perishable</small> : null}
                     </td>
                     <td className="pay">
@@ -7890,17 +8126,34 @@ export function App() {
                     </td>
                     <td
                       className={
-                        typeof lot.estimatedNetUsd === 'number'
-                          ? lot.estimatedNetUsd > 0
+                        lot.npcClaim?.crewNeeded &&
+                        typeof lot.npcClaim.pilotFeeUsd === 'number'
+                          ? lot.npcClaim.pilotFeeUsd > 0
                             ? 'net net-pos'
-                            : lot.estimatedNetUsd < 0
-                              ? 'net net-neg'
-                              : 'net'
-                          : 'net'
+                            : 'net'
+                          : typeof lot.estimatedNetUsd === 'number'
+                            ? lot.estimatedNetUsd > 0
+                              ? 'net net-pos'
+                              : lot.estimatedNetUsd < 0
+                                ? 'net net-neg'
+                                : 'net'
+                            : 'net'
                       }
                     >
-                      {boardAircraft &&
-                      typeof lot.estimatedNetUsd === 'number' ? (
+                      {lot.npcClaim?.crewNeeded &&
+                      typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
+                        <>
+                          {formatCrewFeeText(lot.npcClaim, formatMoney)}
+                          <small title="Crew fee scales with how much your chosen airframe lifts; fuel/ops covered by the operator">
+                            {typeof lot.npcClaim.pilotFeeMinUsd === 'number' &&
+                            lot.npcClaim.pilotFeeMinUsd <
+                              lot.npcClaim.pilotFeeUsd
+                              ? 'by lift'
+                              : 'crew fee'}
+                          </small>
+                        </>
+                      ) : boardAircraft &&
+                        typeof lot.estimatedNetUsd === 'number' ? (
                         <>
                           {formatMoney(lot.estimatedNetUsd)}
                           {typeof lot.estimatedFuelCostUsd === 'number' ? (
@@ -7926,28 +8179,40 @@ export function App() {
                         disabled={
                           busy || Boolean(playerDispatchMission) || cargoLocked
                         }
-                        onClick={() => enterStaging(lot)}
+                        onClick={() =>
+                          lot.npcClaim?.crewNeeded
+                            ? void onAcceptContractPilot(lot)
+                            : enterStaging(lot)
+                        }
                         title={
                           cargoLocked
                             ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                             : playerDispatchMission
                             ? `Finish or cancel ${playerDispatchMission.id} in Dispatch first`
-                            : staging &&
-                                staging.originIcao === lot.originIcao &&
-                                staging.destIcao === lot.destIcao
-                              ? 'Replace current staging draft with this lot as the starting line'
-                              : 'Open Dispatch to choose aircraft and payload'
+                            : lot.npcClaim?.crewNeeded
+                              ? `Accept crew offer${
+                                  formatCrewFeeText(lot.npcClaim, formatMoney)
+                                    ? ` · fee ${formatCrewFeeText(lot.npcClaim, formatMoney)}`
+                                    : ''
+                                } — pick homologated airframe in class; fee scales with lift`
+                              : staging &&
+                                  staging.originIcao === lot.originIcao &&
+                                  staging.destIcao === lot.destIcao
+                                ? 'Replace current staging draft with this lot as the starting line'
+                                : 'Open Dispatch to choose aircraft and payload'
                         }
                       >
                         {cargoLocked
                           ? 'Locked'
                           : playerDispatchMission
                           ? 'Flight busy'
-                          : staging &&
-                              staging.originIcao === lot.originIcao &&
-                              staging.destIcao === lot.destIcao
-                            ? 'Restage route'
-                            : 'Prepare flight'}
+                          : lot.npcClaim?.crewNeeded
+                            ? 'Accept crew offer'
+                            : staging &&
+                                staging.originIcao === lot.originIcao &&
+                                staging.destIcao === lot.destIcao
+                              ? 'Restage route'
+                              : 'Prepare flight'}
                       </button>
                     </td>
                   </tr>
@@ -8885,7 +9150,11 @@ export function App() {
               </button>
             </div>
             {fleet.length === 0 ? (
-              <p className="empty">No aircraft yet.</p>
+              <p className="empty">
+                {leaseUnlock && !leaseUnlock.unlocked
+                  ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Fly Crew needed, or buy on the Aircraft Market.`
+                  : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
+              </p>
             ) : (
               <ul className="hangar-list">
                 {fleet.map((acf) => (
@@ -8950,6 +9219,11 @@ export function App() {
                 .join(' · ')}
             </p>
           ) : null}
+          {leaseUnlock && !leaseUnlock.unlocked ? (
+            <p className="banner warn" role="status">
+              {leaseUnlock.hint}
+            </p>
+          ) : null}
           <div className="aircraft-market-toolbar">
             <input
               type="search"
@@ -8997,6 +9271,12 @@ export function App() {
                     formatMass={formatTonnes}
                     onOpenAirport={openAirport}
                     delivery={aircraftDeliveryQuotes[listing.id] ?? null}
+                    leaseUnlocked={leaseUnlock?.unlocked ?? true}
+                    leaseLockReason={
+                      leaseUnlock && !leaseUnlock.unlocked
+                        ? `Lease locked — ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights`
+                        : undefined
+                    }
                     onBuy={(id, opts) => void onBuyAircraft(id, opts)}
                     onLease={(id, opts) => void onLeaseAircraft(id, opts)}
                   />
@@ -9101,7 +9381,14 @@ export function App() {
               }}
             />
           ) : hangarPane === 'cargo' ? (
-            <CargoOpsPanel cargoOps={cargoOps} />
+            <CargoOpsPanel
+              cargoOps={cargoOps}
+              leaseUnlockHint={
+                leaseUnlock && !leaseUnlock.unlocked
+                  ? `Lease unlock: ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights (on-time).`
+                  : null
+              }
+            />
           ) : hangarPane === 'crew' ? (
             <CrewPanel
               companyCrew={companyCrew}
@@ -9141,7 +9428,11 @@ export function App() {
               onReturnToFbo={(m) => void onReturnMissionToFbo(m)}
             />
           ) : fleet.length === 0 ? (
-            <p className="empty">No aircraft yet — pick a starter hub.</p>
+            <p className="empty">
+              {leaseUnlock && !leaseUnlock.unlocked
+                ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Finish Crew needed on time (score ≥70), or buy anytime if you can afford it.`
+                : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
+            </p>
           ) : (
             <ul className="hangar-list">
               {fleet.map((acf) => (

@@ -30,7 +30,7 @@ import {
   routeDistanceNm,
   tickEconomyN,
 } from './career-economy.js';
-import { NPC_FLEET_SIZE } from './career-npc.js';
+import { listNpcHomeRegions, targetNpcFleetSize } from './career-npc.js';
 import { BR_CAREER_HUBS } from './career-br-hubs.js';
 import { CA_CAREER_HUBS } from './career-ca-hubs.js';
 import { MX_CAREER_HUBS } from './career-mx-hubs.js';
@@ -87,7 +87,7 @@ describe('career-economy seed', () => {
     );
     assert.equal(world.tick, 0);
     assert.equal(world.lots.length, 0);
-    assert.equal(world.npcs.length, NPC_FLEET_SIZE);
+    assert.equal(world.npcs.length, targetNpcFleetSize(listNpcHomeRegions(world.airports).length));
     assert.equal(world.npcFlights.length, 0);
     for (const ap of world.airports) {
       assert.ok(ap.inventory.electronics);

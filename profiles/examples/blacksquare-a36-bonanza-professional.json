@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "blacksquare-a36-bonanza-professional",
+  "profileKey": "blacksquare/a36-bonanza-professional",
+  "semver": "1.0.0",
+  "displayName": "Black Square A36 Bonanza Professional (MSFS 2024)",
+  "match": {
+    "fingerprint": "bfaa6446158b80b7240f898540fab2dc0d1e536fb98bd0bc2e92bdf8edff9920",
+    "title": "Black Square A36 Bonanza Professional",
+    "publisher": "blacksquare",
+    "icao": "BE36",
+    "liveTitles": [
+      "Black Square A36 Bonanza Professional",
+      "Black Square A36 Bonanza Professional N6TQ"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 40,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 40,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_TIP",
+        "name": "Left Tip",
+        "capacity": 15,
+        "readVar": "FUEL TANK LEFT TIP QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT TIP QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_TIP",
+        "name": "Right Tip",
+        "capacity": 15,
+        "readVar": "FUEL TANK RIGHT TIP QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT TIP QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT TIP QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_TIP}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT TIP QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_TIP}"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK LEFT TIP QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_TIP}"
+        },
+        {
+          "var": "FUEL TANK RIGHT TIP QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_TIP}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 500,
+        "arm": 0.6
+      },
+      {
+        "index": 2,
+        "name": "COPILOT",
+        "maxLoad": 500,
+        "arm": 0.6
+      },
+      {
+        "index": 3,
+        "name": "FRONT PAX LEFT",
+        "maxLoad": 500,
+        "arm": -2.3
+      },
+      {
+        "index": 4,
+        "name": "FRONT PAX RIGHT",
+        "maxLoad": 500,
+        "arm": -2.3
+      },
+      {
+        "index": 5,
+        "name": "REAR PAX LEFT",
+        "maxLoad": 500,
+        "arm": -5.7
+      },
+      {
+        "index": 6,
+        "name": "REAR PAX RIGHT",
+        "maxLoad": 500,
+        "arm": -5.7
+      },
+      {
+        "index": 7,
+        "name": "BAGGAGE",
+        "maxLoad": 500,
+        "arm": -7.8
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 11,
+      "maxMac": 32
+    },
+    "calibration": {
+      "observedMac": 17.72814691066742,
+      "calibratedAtIso": "2026-08-06T01:39:59.875Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\bksq-aircraft-bonanzapro\\SimObjects\\Airplanes\\bksq-aircraft-bonanzapro\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        0.15,
+        0,
+        0.2
+      ],
+      "sweep": {
+        "minObservedMac": 17.65620857477188,
+        "maxObservedMac": 28.71881127357483,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 7,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-06T01:40:07.446Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Black Square A36 Bonanza Professional.",
+    "ICAO type designator (catalog/SimBrief): BE36.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_TIP, RIGHT_TIP).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.",
+    "Station maxLoad: placeholder until cfg or clamp.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/blacksquare-a36-bonanza-professional.md"
+  ]
+}

@@ -18,6 +18,9 @@ import {
   sellPlayerAircraft,
   settleAircraftMarketOps,
   signAircraftLease,
+  seedDryCleanSettlesForTests,
+  LEASE_UNLOCK_CLEAN_DRY_SETTLES,
+  aircraftLeaseUnlockProgress,
   unlistAircraftForLease,
 } from './career-aircraft-market.js';
 import { createSeedEconomyWorld } from './career-economy.js';
@@ -118,6 +121,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-buy' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'Buyer',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     // Skip demand so a cheap GA remains available for the purchase path.
     state.aircraftMarketDemandDay = economyDayIndex(world.tick);
@@ -147,11 +151,45 @@ describe('aircraft market', () => {
     assert.ok(state.fleet.some((a) => a.id === aircraft.id));
   });
 
+  it('blocks lease until enough clean Dry settles; buy stays cash-only', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-lease-lock' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
+      pilotName: 'ContractOnly',
+    });
+    state.aircraftMarketDemandDay = economyDayIndex(world.tick);
+    const listings = listAircraftMarket(state, world);
+    const lease = listings.find(
+      (l) => l.kind === 'lease' && (l.source ?? 'generated') === 'generated',
+    );
+    const buy = listings.find(
+      (l) => l.kind !== 'lease' && l.aircraftClassId === 'light_ga',
+    );
+    assert.ok(lease);
+    assert.ok(buy);
+
+    const progress = aircraftLeaseUnlockProgress(state);
+    assert.equal(progress.unlocked, false);
+    assert.equal(progress.current, 0);
+    assert.equal(progress.required, LEASE_UNLOCK_CLEAN_DRY_SETTLES);
+
+    state.walletUsd = lease!.askingUsd + 50;
+    assert.throws(
+      () => signAircraftLease(state, world, lease!.id),
+      /Lease unlocks after 8 clean Dry/i,
+    );
+
+    state.walletUsd = buy!.askingUsd;
+    const purchased = purchaseAircraftListing(state, world, buy!.id);
+    assert.equal(purchased.aircraft.ownership, 'owned');
+  });
+
   it('signs a lease with entry payment and monthly terms', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-lease' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
       pilotName: 'Lessee',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
+    seedDryCleanSettlesForTests(state, LEASE_UNLOCK_CLEAN_DRY_SETTLES);
     state.aircraftMarketDemandDay = economyDayIndex(world.tick);
     const listings = listAircraftMarket(state, world);
     const lease = listings.find(
@@ -166,10 +204,30 @@ describe('aircraft market', () => {
     assert.ok(aircraft.lease!.termEndsTick > world.tick);
   });
 
+  it('unlocks lease after seeding Dry settlesOk to the threshold', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-lease-unlock' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'Unlocked',
+    });
+    seedDryCleanSettlesForTests(state, LEASE_UNLOCK_CLEAN_DRY_SETTLES - 1);
+    assert.equal(aircraftLeaseUnlockProgress(state).unlocked, false);
+    seedDryCleanSettlesForTests(state, LEASE_UNLOCK_CLEAN_DRY_SETTLES);
+    assert.equal(aircraftLeaseUnlockProgress(state).unlocked, true);
+    state.aircraftMarketDemandDay = economyDayIndex(world.tick);
+    const lease = listAircraftMarket(state, world).find(
+      (l) => l.kind === 'lease' && (l.source ?? 'generated') === 'generated',
+    );
+    assert.ok(lease);
+    state.walletUsd = lease!.askingUsd + 50;
+    const { aircraft } = signAircraftLease(state, world, lease!.id);
+    assert.equal(aircraft.ownership, 'leased');
+  });
+
   it('early-returns a lease with a remaining-month penalty and drops the airframe', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-early-return' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'EarlyReturn',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     state.aircraftMarketDemandDay = economyDayIndex(world.tick);
     const listings = listAircraftMarket(state, world);
@@ -178,6 +236,7 @@ describe('aircraft market', () => {
     );
     assert.ok(lease);
     state.walletUsd = lease!.askingUsd + 200_000;
+    seedDryCleanSettlesForTests(state, LEASE_UNLOCK_CLEAN_DRY_SETTLES);
     const { aircraft } = signAircraftLease(state, world, lease!.id);
     const monthly = aircraft.lease!.monthlyUsd;
     const remaining = leaseRemainingMonths(aircraft, world.tick);
@@ -202,6 +261,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-early-block' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBRF', {
       pilotName: 'Blocked',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     state.aircraftMarketDemandDay = economyDayIndex(world.tick);
     const listings = listAircraftMarket(state, world);
@@ -210,6 +270,7 @@ describe('aircraft market', () => {
     );
     assert.ok(lease);
     state.walletUsd = lease!.askingUsd + 200_000;
+    seedDryCleanSettlesForTests(state, LEASE_UNLOCK_CLEAN_DRY_SETTLES);
     const { aircraft } = signAircraftLease(state, world, lease!.id);
 
     aircraft.leaseOverdue = true;
@@ -230,6 +291,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-sell' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGL', {
       pilotName: 'Seller',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     state.aircraftMarketDemandDay = economyDayIndex(world.tick);
     const listings = listAircraftMarket(state, world);
@@ -251,6 +313,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-last' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'Solo',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const only = state.fleet[0]!;
     assert.equal(
@@ -268,6 +331,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-preserve' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'Keep',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     state.aircraftMarketDemandDay = economyDayIndex(world.tick);
     listAircraftMarket(state, world);
@@ -297,6 +361,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-list' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'Lessor',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const starter = state.fleet[0]!;
     assert.throws(() => listAircraftForLease(state, starter.id, world.tick));
@@ -327,6 +392,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-npc' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBRF', {
       pilotName: 'NpcTake',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const starter = state.fleet[0]!;
     state.fleet.push({
@@ -372,6 +438,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-wear' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
       pilotName: 'WearLease',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const starter = state.fleet[0]!;
     ensureAircraftConditionPcts(starter);
@@ -420,6 +487,7 @@ describe('aircraft market', () => {
   it('maintenance gate blocks until paid', () => {
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'Mx',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const acf = state.fleet[0]!;
     acf.hoursSinceInspection = 99;
@@ -436,6 +504,7 @@ describe('aircraft market', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-deliver' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'DeliverMe',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     state.aircraftMarketDemandDay = economyDayIndex(world.tick);
     const listings = listAircraftMarket(state, world);

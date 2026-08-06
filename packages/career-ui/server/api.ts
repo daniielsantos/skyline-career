@@ -65,8 +65,11 @@ import {
   MS_PER_TICK,
   msToHours,
   TICKS_PER_DAY,
-  NPC_FLEET_SIZE,
+  listNpcHomeRegions,
+  targetNpcFleetSize,
   npcClaimForLot,
+  acceptContractPilotOffer,
+  listContractPilotPickAirframes,
   parseFreighterClassId,
   purchaseAircraftListing,
   purchasePlayerMissionOfpFuel,
@@ -113,6 +116,7 @@ import {
   assertCompanyCreditAllowsOps,
   settleMission,
   signAircraftLease,
+  aircraftLeaseUnlockProgress,
   resolveHangarParkingUsdPerDay,
   applyWalletDelta,
   summarizeCareerLedger,
@@ -272,6 +276,7 @@ function fleetPayload(
     starterAircraft,
     companyCredit: companyCreditSnapshot(missions),
     playerFbos: playerFboSnapshot(missions, world),
+    leaseUnlock: aircraftLeaseUnlockProgress(missions),
   };
 }
 
@@ -487,6 +492,25 @@ function mapLotSummary(
           etaHours: npcClaim.etaHours,
           etaMs: npcClaim.etaMs,
           arrivesAtMs: npcClaim.arrivesAtMs,
+          ...(npcClaim.crewNeeded
+            ? {
+                crewNeeded: true as const,
+                pilotFeeUsd: npcClaim.pilotFeeUsd,
+                ...(typeof npcClaim.pilotFeeMinUsd === 'number'
+                  ? { pilotFeeMinUsd: npcClaim.pilotFeeMinUsd }
+                  : {}),
+                awaitingPilotUntilMs: npcClaim.awaitingPilotUntilMs,
+              }
+            : {}),
+          ...(npcClaim.airframeTypeId
+            ? { airframeTypeId: npcClaim.airframeTypeId }
+            : {}),
+          ...(npcClaim.aircraftLabel
+            ? { aircraftLabel: npcClaim.aircraftLabel }
+            : {}),
+          ...(npcClaim.aircraftClassId
+            ? { aircraftClassId: npcClaim.aircraftClassId }
+            : {}),
         }
       : null,
   };
@@ -529,6 +553,7 @@ function mapNpcFleet(world: Awaited<ReturnType<typeof loadEconomy>>, nowMs = Dat
     name: row.name,
     aircraftClassId: row.aircraftClassId,
     aircraftLabel: row.aircraftLabel,
+    airframeTypeId: row.airframeTypeId ?? null,
     homeRegion: row.homeRegion,
     reliability: row.reliability,
     aggressiveness: row.aggressiveness,
@@ -745,9 +770,10 @@ export function createCareerApiServer(port = 8787) {
     try {
       if (req.method === 'GET' && path === '/api/health') {
         const world = await loadEconomy();
+        const regionCount = listNpcHomeRegions(world.airports ?? []).length;
         send(res, 200, {
           ok: true,
-          npcFleetTarget: NPC_FLEET_SIZE,
+          npcFleetTarget: targetNpcFleetSize(regionCount),
           sourceStamp: bootSourceStamp,
           store: store.kind,
           homeCountryId: world.homeCountryId ?? null,
@@ -899,21 +925,20 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'pilotName required' });
           return;
         }
-        if (!body.airframeTypeId || !String(body.airframeTypeId).trim()) {
-          send(res, 400, { error: 'airframeTypeId required' });
-          return;
-        }
         try {
           const result = await withCareerWrite((world, missions) => {
             const next = selectStarterHub(missions, body.icao!, {
               pilotName: body.pilotName!,
-              airframeTypeId: body.airframeTypeId!,
+              ...(body.airframeTypeId?.trim()
+                ? { airframeTypeId: body.airframeTypeId.trim() }
+                : {}),
             });
             Object.assign(missions, next);
             syncHomeCountryFromHub(world, missions.homeHubIcao);
             return {
               walletUsd: missions.walletUsd,
               homeCountryId: world.homeCountryId ?? null,
+              contractPilotCareer: missions.fleet.length === 0,
               ...fleetPayload(missions, world),
             };
           });
@@ -1009,6 +1034,7 @@ export function createCareerApiServer(port = 8787) {
             catalog,
             airframePerf,
             fleet: withParkingRates(missions.fleet),
+            leaseUnlock: aircraftLeaseUnlockProgress(missions),
           };
         });
         send(res, 200, payload);
@@ -1087,6 +1113,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
               companyCredit: companyCreditSnapshot(missions),
+              leaseUnlock: aircraftLeaseUnlockProgress(missions),
             };
           });
           send(res, 200, result);
@@ -1715,6 +1742,25 @@ export function createCareerApiServer(port = 8787) {
                   npcName: row.npcClaim.npcName,
                   cargoKg: row.npcClaim.cargoKg,
                   etaHours: row.npcClaim.etaHours,
+                  ...(row.npcClaim.crewNeeded
+                    ? {
+                        crewNeeded: true as const,
+                        pilotFeeUsd: row.npcClaim.pilotFeeUsd,
+                        ...(typeof row.npcClaim.pilotFeeMinUsd === 'number'
+                          ? { pilotFeeMinUsd: row.npcClaim.pilotFeeMinUsd }
+                          : {}),
+                        awaitingPilotUntilMs: row.npcClaim.awaitingPilotUntilMs,
+                      }
+                    : {}),
+                  ...(row.npcClaim.airframeTypeId
+                    ? { airframeTypeId: row.npcClaim.airframeTypeId }
+                    : {}),
+                  ...(row.npcClaim.aircraftLabel
+                    ? { aircraftLabel: row.npcClaim.aircraftLabel }
+                    : {}),
+                  ...(row.npcClaim.aircraftClassId
+                    ? { aircraftClassId: row.npcClaim.aircraftClassId }
+                    : {}),
                 }
               : null,
           };
@@ -2762,6 +2808,161 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/contract-pilot/options') {
+        const lotId = url.searchParams.get('lotId')?.trim();
+        const npcFlightId = url.searchParams.get('npcFlightId')?.trim();
+        if (!lotId && !npcFlightId) {
+          send(res, 400, { error: 'lotId or npcFlightId required' });
+          return;
+        }
+        try {
+          const payload = await withCareerRead((world) => {
+            const flight =
+              (npcFlightId
+                ? world.npcFlights.find((f) => f.id === npcFlightId)
+                : undefined) ??
+              (lotId
+                ? world.npcFlights.find(
+                    (f) => f.lotId === lotId && f.status === 'awaiting_pilot',
+                  )
+                : undefined);
+            if (!flight || flight.status !== 'awaiting_pilot') {
+              return { kind: 'missing' as const };
+            }
+            const distanceNm =
+              routeDistanceNm(world, flight.originIcao, flight.destIcao) ??
+              undefined;
+            const airframes = listContractPilotPickAirframes(flight, {
+              distanceNm,
+            });
+            return {
+              kind: 'ok' as const,
+              offer: {
+                lotId: flight.lotId,
+                npcFlightId: flight.id,
+                originIcao: flight.originIcao,
+                destIcao: flight.destIcao,
+                aircraftClassId: flight.aircraftClassId,
+                cargoKg: flight.cargoKg,
+                payUsd: flight.payUsd,
+                distanceNm: distanceNm ?? null,
+                pilotFeeUsd:
+                  flight.pilotFeeUsd ??
+                  Math.max(50, Math.round(flight.payUsd * 0.4)),
+                awaitingPilotUntilMs: flight.awaitingPilotUntilMs,
+              },
+              airframes,
+            };
+          });
+          if (payload.kind === 'missing') {
+            send(res, 404, { error: 'No open crew-needed offer' });
+            return;
+          }
+          send(res, 200, payload);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/contract-pilot/accept') {
+        const body = (await readBody(req)) as {
+          lotId?: string;
+          npcFlightId?: string;
+          airframeTypeId?: string;
+          openDispatch?: boolean;
+        };
+        if (!body.lotId && !body.npcFlightId) {
+          send(res, 400, { error: 'lotId or npcFlightId required' });
+          return;
+        }
+        if (!body.airframeTypeId?.trim()) {
+          send(res, 400, { error: 'airframeTypeId required' });
+          return;
+        }
+        try {
+          const accepted = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const result = acceptContractPilotOffer(world, missions, {
+              lotId: body.lotId,
+              npcFlightId: body.npcFlightId,
+              airframeTypeId: body.airframeTypeId!,
+              nowMs: Date.now(),
+            });
+            return {
+              ...result,
+              walletUsd: missions.walletUsd,
+            };
+          });
+          let mission = accepted.mission;
+          let dispatch:
+            | {
+                url: string;
+                staticId: string;
+                type: string;
+                airframeLabel: string;
+                opened: boolean;
+              }
+            | undefined;
+          let dispatchError: string | undefined;
+          if (body.openDispatch !== false) {
+            try {
+              const built = await buildMissionDispatch(mission, {
+                liveTitle: getLastProbeAircraftTitle(),
+              });
+              mission = await withCareerWrite((world, missions) => {
+                const idx = missions.missions.findIndex((m) => m.id === mission.id);
+                const dispatched: MissionIntent = {
+                  ...mission,
+                  staticId: built.staticId,
+                  status: 'dispatched',
+                  dispatchedAtTick: world.tick,
+                  lastOfpCheck: undefined,
+                  lastPreflightCheck: undefined,
+                  fuelAuthorizedOfpId: undefined,
+                };
+                if (idx >= 0) missions.missions[idx] = dispatched;
+                else missions.missions.push(dispatched);
+                return dispatched;
+              });
+              openDispatchUrl(built.url);
+              dispatch = {
+                url: built.url,
+                staticId: built.staticId,
+                type: built.type,
+                airframeLabel: built.airframeLabel,
+                opened: true,
+              };
+            } catch (error) {
+              dispatchError =
+                error instanceof Error ? error.message : String(error);
+            }
+          }
+          send(res, 200, {
+            mission,
+            pilotFeeUsd: accepted.pilotFeeUsd,
+            grossPayUsd: accepted.grossPayUsd,
+            npcName: accepted.npcName,
+            airframeLabel: accepted.airframeLabel,
+            liftedKg: accepted.liftedKg,
+            remainderKg: accepted.remainderKg,
+            npcDepartedWithRemainder: accepted.npcDepartedWithRemainder,
+            pilotRelocatedFrom: accepted.pilotRelocatedFrom ?? null,
+            pilotIcao: mission.originIcao,
+            walletUsd: accepted.walletUsd,
+            dispatch: dispatch ?? null,
+            dispatchError: dispatchError ?? null,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/staging/commit') {
         const body = (await readBody(req)) as {
           aircraft?: string;
@@ -2825,7 +3026,10 @@ export function createCareerApiServer(port = 8787) {
           };
         });
         if (peek.kind === 'no_hub') {
-          send(res, 400, { error: 'Select a starter hub before staging a flight' });
+          send(res, 400, {
+            error:
+              'Buy or lease an aircraft before staging owned freights — or accept a Crew needed offer',
+          });
           return;
         }
         if (peek.kind === 'missing_lot') {
@@ -2854,7 +3058,9 @@ export function createCareerApiServer(port = 8787) {
           const committed = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             if (!missions.hubSelected || missions.fleet.length === 0) {
-              throw new Error('Select a starter hub before staging a flight');
+              throw new Error(
+                'Buy or lease an aircraft before staging owned freights — or accept a Crew needed offer',
+              );
             }
             const firstLot = world.lots.find((lot) => lot.id === lines[0]!.lotId);
             if (!firstLot) {
@@ -3369,6 +3575,13 @@ export function createCareerApiServer(port = 8787) {
               ...ofpCheck,
               staticId: mission.staticId,
             };
+            if (
+              mission.contractPilot &&
+              (ofpCheck.verdict === 'pass' || ofpCheck.verdict === 'warn') &&
+              ofpCheck.ofpId
+            ) {
+              mission.fuelAuthorizedOfpId = ofpCheck.ofpId;
+            }
             savedMission = mission;
             return true;
           });
@@ -3759,7 +3972,9 @@ export function createCareerApiServer(port = 8787) {
                 atTick: world.tick,
                 missionId: result.mission.id,
                 icao: result.mission.destIcao,
-                note: `${result.mission.originIcao}→${result.mission.destIcao}`,
+                note: result.mission.contractPilot
+                  ? `Contract pilot · ${result.mission.originIcao}→${result.mission.destIcao}`
+                  : `${result.mission.originIcao}→${result.mission.destIcao}`,
               });
             }
             if (result.fuelDebitUsd > 0) {

@@ -183,6 +183,14 @@ export type NpcClaim = {
   etaHours: number;
   etaMs?: number;
   arrivesAtMs?: number;
+  crewNeeded?: boolean;
+  pilotFeeUsd?: number;
+  /** Min fee when partial lift airframes exist; omit or equal to pilotFeeUsd when fixed. */
+  pilotFeeMinUsd?: number;
+  awaitingPilotUntilMs?: number;
+  airframeTypeId?: string;
+  aircraftLabel?: string;
+  aircraftClassId?: string;
 };
 
 export type NpcActivity = {
@@ -428,6 +436,13 @@ export type Mission = {
   crewOperated?: boolean;
   crewMemberId?: string;
   crewFeeUsd?: number;
+  /** Fly an NPC homologated airframe for a pilot fee (no owned aircraft). */
+  contractPilot?: boolean;
+  contractPilotFeeUsd?: number;
+  contractGrossPayUsd?: number;
+  operatorNpcId?: string;
+  operatorNpcName?: string;
+  npcFlightId?: string;
   /** Empty return fee quoted at dispatch (charged when return starts). */
   crewReturnFeeUsd?: number;
   crewRoundTrip?: boolean;
@@ -789,6 +804,7 @@ export function fetchState() {
       cargoOps?: CareerCargoOps | null;
       playerFbos?: PlayerFboSnapshot | null;
       companyCrew?: CompanyCrewSnapshot | null;
+      leaseUnlock?: AircraftLeaseUnlock;
       starterAircraft?: Array<{
         typeId: string;
         label: string;
@@ -1073,6 +1089,73 @@ export function postAccept(opts: {
   });
 }
 
+export function postContractPilotAccept(opts: {
+  lotId?: string;
+  npcFlightId?: string;
+  airframeTypeId: string;
+  openDispatch?: boolean;
+}) {
+  return api<{
+    mission: Mission;
+    pilotFeeUsd: number;
+    grossPayUsd?: number;
+    npcName?: string;
+    airframeLabel?: string;
+    liftedKg?: number;
+    remainderKg?: number;
+    npcDepartedWithRemainder?: boolean;
+    pilotRelocatedFrom?: string | null;
+    pilotIcao?: string;
+    walletUsd: number;
+    dispatchError?: string | null;
+    dispatch?: {
+      url: string;
+      staticId: string;
+      type: string;
+      airframeLabel: string;
+      opened: boolean;
+    } | null;
+  }>('/api/contract-pilot/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function fetchContractPilotOptions(opts: {
+  lotId?: string;
+  npcFlightId?: string;
+}) {
+  const q = new URLSearchParams();
+  if (opts.lotId) q.set('lotId', opts.lotId);
+  if (opts.npcFlightId) q.set('npcFlightId', opts.npcFlightId);
+  return api<{
+    offer: {
+      lotId: string;
+      npcFlightId: string;
+      originIcao: string;
+      destIcao: string;
+      aircraftClassId: string;
+      cargoKg: number;
+      payUsd: number;
+      distanceNm?: number | null;
+      pilotFeeUsd: number;
+      awaitingPilotUntilMs?: number;
+    };
+    airframes: Array<{
+      typeId: string;
+      label: string;
+      aircraftClassId: string;
+      maxCargoKg: number;
+      operationalMaxCargoKg: number;
+      liftKg: number;
+      remainderKg: number;
+      coversOffer: boolean;
+      routeLimited: boolean;
+      pilotFeeUsd: number;
+    }>;
+  }>(`/api/contract-pilot/options?${q.toString()}`);
+}
+
 export function postStagingCommit(opts: {
   aircraft: AircraftClass;
   aircraftId?: string;
@@ -1112,7 +1195,8 @@ export function postStagingCommit(opts: {
 export function postSelectHub(opts: {
   icao: string;
   pilotName: string;
-  airframeTypeId: string;
+  /** Legacy / optional — omitted for contract-pilot signup (empty hangar). */
+  airframeTypeId?: string;
 }) {
   return api<{
     walletUsd: number;
@@ -1121,7 +1205,9 @@ export function postSelectHub(opts: {
     hubs: StarterHubOption[];
     pilotName: string;
     homeHubIcao: string;
+    pilotIcao?: string;
     homeCountryId: string | null;
+    contractPilotCareer?: boolean;
     starterAircraft: Array<{
       typeId: string;
       label: string;
@@ -1140,6 +1226,14 @@ export type AircraftDeliveryQuoteView = {
   distanceNm: number;
   deliveryFeeUsd: number;
   needed: boolean;
+};
+
+export type AircraftLeaseUnlock = {
+  current: number;
+  required: number;
+  remaining: number;
+  unlocked: boolean;
+  hint: string;
 };
 
 export function fetchAircraftMarket() {
@@ -1171,6 +1265,7 @@ export function fetchAircraftMarket() {
         }
       >;
       fleet: PlayerAircraft[];
+      leaseUnlock?: AircraftLeaseUnlock;
     }
   >('/api/aircraft-market');
 }
@@ -1205,6 +1300,7 @@ export function postAircraftLease(opts: {
     aircraft: PlayerAircraft;
     fleet: PlayerAircraft[];
     listings: AircraftListing[];
+    leaseUnlock?: AircraftLeaseUnlock;
   }>('/api/aircraft-market/lease', {
     method: 'POST',
     body: JSON.stringify(opts),

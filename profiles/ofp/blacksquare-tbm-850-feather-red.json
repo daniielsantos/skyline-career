@@ -1,0 +1,113 @@
+{
+  "source": "simbrief",
+  "icao": "TBM8",
+  "ofpId": "blacksquare-tbm-850-feather-red",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "Black Square TBM 850 Feather Red"
+  ],
+  "matchTitlePattern": "Black Square TBM 850 Feather Red",
+  "notes": [
+    "Black Square TBM 850 Feather Red — auto roles pack from homologated profile",
+    "Profile: blacksquare/tbm-850-feather-red@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        2,
+        3
+      ],
+      "baggageStations": [
+        1,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "TBM8",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "FORWARD BAGGAGE",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "COPILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "FRONT PAX LEFT",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "FRONT PAX RIGHT",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "REAR PAX LEFT",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "REAR PAX RIGHT",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "REAR BAGGAGE",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "source": "simbrief",
+  "icao": "C208",
+  "ofpId": "blacksquare-caravan-professional-super-cargomaster",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "Black Square Caravan Professional Super Cargomaster"
+  ],
+  "matchTitlePattern": "Black Square Caravan Professional Super Cargomaster",
+  "notes": [
+    "Black Square Caravan Professional Super Cargomaster — auto roles pack from homologated profile",
+    "One Market SKU c208-caravan-cargo (Gear / Cargo Pod / Super Cargomaster)",
+    "Profile: blacksquare/caravan-professional-super-cargomaster@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "C208",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "COPILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "ZONE 1",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "ZONE 2",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "ZONE 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "ZONE 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "ZONE 5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "ZONE 6",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "CARGO POD 1",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "CARGO POD 2",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 11,
+      "cfgIndex": 10,
+      "name": "CARGO POD 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 12,
+      "cfgIndex": 11,
+      "name": "CARGO POD 4",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

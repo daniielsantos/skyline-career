@@ -31,7 +31,6 @@ import {
   syncPilotIcaoTo,
 } from './career-pilot-travel.js';
 import {
-  DEFAULT_STARTER_AIRFRAME_TYPE_ID,
   defaultCareerPlayerAirframe,
   findCareerPlayerAirframe,
   isStarterAirframeCondition,
@@ -107,8 +106,13 @@ export function listCareerHubIcaos(): string[] {
 export const PILOT_NAME_MIN_LEN = 2;
 export const PILOT_NAME_MAX_LEN = 40;
 
-/** Wallet credited when a new pilot registers (tight — ferry / fuel matter early). */
+/** Wallet credited when a new pilot registers (tight — early contract fees matter). */
 export const STARTER_WALLET_USD = 1_000;
+
+/** Registered with empty hangar — fly crew offers until first buy/lease. */
+export function isContractPilotCareer(state: CareerMissionsState): boolean {
+  return state.hubSelected === true && state.fleet.length === 0;
+}
 
 export function emptyMissionsStateV2(): CareerMissionsState {
   return {
@@ -159,15 +163,18 @@ export function normalizeMissionsState(
     ? (raw as CareerMissionsState).fleet
     : [];
   const fleet = fleetRaw.map(normalizePlayerAircraft).filter(Boolean) as PlayerAircraft[];
-  const hubSelected = hubSelectedFlag && fleet.length > 0;
   const pilotName = normalizePilotName((raw as CareerMissionsState).pilotName);
   let homeHubIcao =
     typeof (raw as CareerMissionsState).homeHubIcao === 'string'
       ? String((raw as CareerMissionsState).homeHubIcao).trim().toUpperCase()
       : '';
-  if (hubSelected && !homeHubIcao && fleet[0]) {
+  if (hubSelectedFlag && !homeHubIcao && fleet[0]) {
     homeHubIcao = fleet[0].locationIcao;
   }
+  // Contract pilots register with an empty hangar; owners keep fleet.
+  const hubSelected =
+    hubSelectedFlag &&
+    (fleet.length > 0 || (Boolean(pilotName) && Boolean(homeHubIcao)));
   const pilotIcao = resolvePilotIcao(
     (raw as CareerMissionsState).pilotIcao,
     homeHubIcao,
@@ -510,21 +517,22 @@ export function primaryParkedAircraft(
 }
 
 /**
- * First-open: register pilot name and park a chosen light starter at the hub.
- * Condition is good or excellent only (starter fleet is never tired/fair).
+ * First-open: register pilot name + home hub.
+ * Starts as contract pilot with an empty hangar — buy/lease from the Aircraft
+ * Market later. Optional `airframeTypeId` parks a light starter (tests / legacy).
  */
 export function selectStarterHub(
   state: CareerMissionsState,
   icao: string,
   opts: {
     pilotName: string;
-    /** Homologated light_ga / light_turboprop Market typeId. */
+    /** When set, park this light starter (tests / legacy signup). */
     airframeTypeId?: string;
     /** Test override only — production always rolls good/excellent. */
     condition?: StarterAirframeCondition;
   },
 ): CareerMissionsState {
-  if (state.hubSelected && state.fleet.length > 0) {
+  if (state.hubSelected) {
     throw new Error('Starter hub already selected');
   }
   const pilotName = assertValidPilotName(opts.pilotName);
@@ -533,19 +541,28 @@ export function selectStarterHub(
     throw new Error(`Unknown career hub: ${hub}`);
   }
 
-  const starters = listStarterCareerPlayerAirframes();
   const requested = opts.airframeTypeId?.trim();
-  const starterAirframe = requested
-    ? findCareerPlayerAirframe(requested)
-    : findCareerPlayerAirframe(DEFAULT_STARTER_AIRFRAME_TYPE_ID) ?? starters[0];
+  if (!requested) {
+    return {
+      ...state,
+      version: 2,
+      walletUsd: STARTER_WALLET_USD,
+      pilotName,
+      homeHubIcao: hub,
+      pilotIcao: hub,
+      hubSelected: true,
+      fleet: [],
+    };
+  }
+
+  const starters = listStarterCareerPlayerAirframes();
+  const starterAirframe = findCareerPlayerAirframe(requested);
   if (
     !starterAirframe ||
     !starters.some((row) => row.typeId === starterAirframe.typeId)
   ) {
     throw new Error(
-      requested
-        ? `Starter aircraft must be C152, C172, or Commander 114 (got ${requested})`
-        : 'No starter airframes are registered in the player catalog',
+      `Starter aircraft must be C152, C172, or Commander 114 (got ${requested})`,
     );
   }
 
@@ -825,7 +842,7 @@ export function applyPlayerDepartFuel(
 }
 
 export interface PlayerMissionOfpFuelQuote {
-  aircraftId: string;
+  aircraftId?: string;
   originIcao: string;
   ofpId: string;
   requiredBlockFuelKg: number;
@@ -834,6 +851,8 @@ export interface PlayerMissionOfpFuelQuote {
   shortfallKg: number;
   authorized: boolean;
   uplift: FuelUpliftQuote;
+  /** Operator covers Jet-A — no player tank / wallet. */
+  contractPilot?: boolean;
 }
 
 /** Quote the exact tank shortfall against a confirmed SimBrief block-fuel target. */
@@ -843,6 +862,31 @@ export function quotePlayerMissionOfpFuel(
   mission: MissionIntent,
   opts: { ofpId: string; requiredBlockFuelKg: number },
 ): PlayerMissionOfpFuelQuote {
+  if (mission.contractPilot) {
+    const requiredBlockFuelKg = Math.max(0, Math.ceil(opts.requiredBlockFuelKg));
+    const priced = quoteFuelUplift(world, {
+      originIcao: mission.originIcao,
+      destIcao: mission.destIcao,
+      aircraftClassId: mission.aircraftClassId as FreighterClassId,
+      requestedKg: Math.max(1, requiredBlockFuelKg),
+    });
+    return {
+      originIcao: mission.originIcao.toUpperCase(),
+      ofpId: opts.ofpId,
+      requiredBlockFuelKg,
+      currentFuelKg: requiredBlockFuelKg,
+      fuelCapacityKg: requiredBlockFuelKg,
+      shortfallKg: 0,
+      authorized: mission.fuelAuthorizedOfpId === opts.ofpId,
+      contractPilot: true,
+      uplift: {
+        ...priced,
+        requestedKg: 0,
+        costUsd: 0,
+        scarcity: 'ok',
+      },
+    };
+  }
   const aircraft = mission.aircraftId
     ? findPlayerAircraft(state, mission.aircraftId)
     : undefined;
@@ -927,10 +971,25 @@ export function purchasePlayerMissionOfpFuel(
   mission: MissionIntent;
   quote: PlayerMissionOfpFuelQuote;
   fuelDebitUsd: number;
-  aircraft: PlayerAircraft;
+  aircraft?: PlayerAircraft;
 } {
   const quote = quotePlayerMissionOfpFuel(world, state, mission, opts);
-  const aircraft = findPlayerAircraft(state, quote.aircraftId);
+  if (quote.contractPilot || mission.contractPilot) {
+    if (quote.authorized) {
+      return { mission, quote, fuelDebitUsd: 0 };
+    }
+    return {
+      mission: {
+        ...mission,
+        fuelAuthorizedOfpId: opts.ofpId,
+      },
+      quote: { ...quote, authorized: true },
+      fuelDebitUsd: 0,
+    };
+  }
+  const aircraft = quote.aircraftId
+    ? findPlayerAircraft(state, quote.aircraftId)
+    : undefined;
   if (!aircraft) throw new Error(`Unknown player aircraft ${quote.aircraftId}`);
   if (quote.authorized) {
     return { mission, quote, fuelDebitUsd: 0, aircraft };

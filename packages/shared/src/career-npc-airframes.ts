@@ -1,16 +1,25 @@
 /**
- * Abstract NPC airframe variants seeded from FSLTL Traffic-type ICAO codes.
+ * NPC airframe variants for display + cargo ceilings.
  *
- * These are NOT player flight_models. NPCs stay on FreighterClassId economics;
- * variants only vary label + optional cargo ceiling when FSLTL estimates look sane.
- * Regenerate candidates via: node scripts/scrape-fsltl-traffic-catalog.mjs
+ * Prefer homologated player Market SKUs (`career-player-airframes`) whenever
+ * that class has enabled entries — required for future contract-pilot Watch/OFP.
+ * Classes without a player catalog entry fall back to the abstract FSLTL-derived
+ * pool (label + optional cargo only; not a player flight_model).
+ *
+ * Abstract candidates: node scripts/scrape-fsltl-traffic-catalog.mjs
  */
 import type { FreighterClassId } from './types/career-economy.js';
 import type { NpcFreighter } from './types/career-economy.js';
 import { getAircraftClass } from './career-mission.js';
+import {
+  findCareerPlayerAirframe,
+  isCareerPlayerAirframeEnabled,
+  listCareerPlayerAirframes,
+  type CareerPlayerAirframe,
+} from './career-player-airframes.js';
 
 export type NpcAirframeVariant = {
-  /** ICAO-ish type code (B738F, A321F, 208B, …). */
+  /** Player typeId or abstract ICAO-ish code (B738F, 208B, …). */
   typeId: string;
   aircraftClassId: FreighterClassId;
   /** Short board label. */
@@ -22,11 +31,50 @@ export type NpcAirframeVariant = {
    * min(class.maxCargoKg, maxCargoKg). Omitted when FSLTL numbers were junk.
    */
   maxCargoKg?: number;
+  /** True when this variant is a player-homologated Market SKU. */
+  homologated?: boolean;
 };
+
+function playerToNpcVariant(airframe: CareerPlayerAirframe): NpcAirframeVariant {
+  return {
+    typeId: airframe.typeId,
+    aircraftClassId: airframe.aircraftClassId,
+    label: airframe.label,
+    freighter: true,
+    ...(typeof airframe.maxCargoKg === 'number' &&
+    Number.isFinite(airframe.maxCargoKg) &&
+    airframe.maxCargoKg > 0
+      ? { maxCargoKg: Math.floor(airframe.maxCargoKg) }
+      : {}),
+    homologated: true,
+  };
+}
+
+/** Enabled player airframes for this class, as NPC variant rows. */
+export function listHomologatedNpcAirframesForClass(
+  classId: FreighterClassId,
+): NpcAirframeVariant[] {
+  return listCareerPlayerAirframes(classId).map(playerToNpcVariant);
+}
+
+export function npcAirframeIsHomologated(
+  typeId: string | null | undefined,
+): boolean {
+  const airframe = findCareerPlayerAirframe(typeId);
+  return isCareerPlayerAirframeEnabled(airframe);
+}
+
+/** Contract-pilot offers require a flyable homologated SKU. */
+export function npcCanOfferContractPilot(
+  npc: Pick<NpcFreighter, 'airframeTypeId'>,
+): boolean {
+  return npcAirframeIsHomologated(npc.airframeTypeId);
+}
 
 /**
  * Hand-curated from fsltl-traffic-base scrape (71 unique flight_model.cfg).
  * Payload overrides only where MTOW−OEW−fuel looked plausible.
+ * Used only when the player catalog has no enabled SKU for the class.
  */
 export const NPC_AIRFRAME_VARIANTS: readonly NpcAirframeVariant[] = [
   // —— narrow (prefer *F; pax types are label-only or mild cargo) ——
@@ -329,16 +377,23 @@ export function listNpcAirframesForClass(
 
 export function findNpcAirframe(typeId: string | undefined): NpcAirframeVariant | undefined {
   if (!typeId) return undefined;
+  const player = findCareerPlayerAirframe(typeId);
+  if (player) return playerToNpcVariant(player);
   return BY_TYPE.get(typeId);
 }
 
 /**
- * Prefer freighter-coded types ~70% of the time when the class has any.
+ * Prefer homologated player SKUs when the class has any enabled.
+ * Otherwise abstract FSLTL pool (freighter-coded ~70% when available).
  */
 export function pickNpcAirframe(
   classId: FreighterClassId,
   rng: () => number,
 ): NpcAirframeVariant | undefined {
+  const homologated = listHomologatedNpcAirframesForClass(classId);
+  if (homologated.length > 0) {
+    return homologated[Math.floor(rng() * homologated.length)]!;
+  }
   const all = listNpcAirframesForClass(classId);
   if (all.length === 0) return undefined;
   const freighters = all.filter((v) => v.freighter);

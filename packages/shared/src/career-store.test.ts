@@ -421,6 +421,59 @@ describe('career store', () => {
     store.close();
   });
 
+  it('persists awaiting_pilot NPC flights (crew-needed offers) across reload', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-crew-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const { world } = await store.loadEconomy();
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    world.npcFlights = [
+      {
+        id: 'npcf-crew-1',
+        npcId: 'npc-1',
+        lotId: 'lot_crew_1',
+        originIcao: 'SBGR',
+        destIcao: 'SBGL',
+        commodityId: 'general',
+        cargoKg: 400,
+        payUsd: 1_200,
+        aircraftClassId: 'light_ga',
+        departedAtTick: world.tick,
+        arrivesAtTick: world.tick,
+        departedAtMs: nowMs,
+        arrivesAtMs: nowMs + 3 * 60 * 60 * 1000,
+        status: 'awaiting_pilot',
+        awaitingPilotUntilMs: nowMs + 3 * 60 * 60 * 1000,
+        pilotFeeUsd: 480,
+      },
+      {
+        id: 'npcf-air-1',
+        npcId: 'npc-2',
+        lotId: 'lot_air_1',
+        originIcao: 'SBSP',
+        destIcao: 'SBRJ',
+        commodityId: 'supplies',
+        cargoKg: 800,
+        payUsd: 2_000,
+        aircraftClassId: 'light_turboprop',
+        departedAtTick: world.tick,
+        arrivesAtTick: world.tick + 4,
+        departedAtMs: nowMs,
+        arrivesAtMs: nowMs + 4 * 60 * 60 * 1000,
+        status: 'in_flight',
+      },
+    ];
+    await store.saveEconomy(world);
+    const again = await store.loadEconomy();
+    const crew = again.world.npcFlights.find((f) => f.id === 'npcf-crew-1');
+    const air = again.world.npcFlights.find((f) => f.id === 'npcf-air-1');
+    assert.ok(crew);
+    assert.equal(crew!.status, 'awaiting_pilot');
+    assert.equal(crew!.pilotFeeUsd, 480);
+    assert.equal(crew!.awaitingPilotUntilMs, nowMs + 3 * 60 * 60 * 1000);
+    assert.equal(air?.status, 'in_flight');
+    store.close();
+  });
+
   it('supports json backend via CAREER_STORE=json', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-json-'));
     await mkdir(dir, { recursive: true });

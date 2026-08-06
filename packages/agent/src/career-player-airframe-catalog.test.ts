@@ -21,8 +21,11 @@ describe('career player airframe registration', () => {
   it('infers current economic classes', () => {
     assert.equal(inferCareerClassFromIcao('C172'), 'light_ga');
     assert.equal(inferCareerClassFromIcao('BE60'), 'light_ga');
+    assert.equal(inferCareerClassFromIcao('BE6G'), 'light_ga');
     assert.equal(inferCareerClassFromIcao('C404'), 'light_ga');
     assert.equal(inferCareerClassFromIcao('C208'), 'light_turboprop');
+    assert.equal(inferCareerClassFromIcao('B36T'), 'light_turboprop');
+    assert.equal(inferCareerClassFromIcao('B60T'), 'light_turboprop');
     assert.equal(inferCareerClassFromIcao('DC6'), 'medium_piston');
     assert.equal(inferCareerClassFromIcao('LJ35'), 'light_jet');
     assert.equal(inferCareerClassFromIcao('C25B'), 'light_jet');

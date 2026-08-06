@@ -14,8 +14,9 @@ import { CAREER_AIRCRAFT_CLASSES } from './career-mission.js';
 import {
   describeLotMarketPressure,
   isNpcReadyToBid,
-  NPC_FLEET_COMPOSITION,
-  NPC_FLEET_SIZE,
+  listNpcHomeRegions,
+  resolveNpcFleetComposition,
+  targetNpcFleetSize,
   THIN_FLEET_CAPACITY,
 } from './career-npc.js';
 import {
@@ -123,7 +124,7 @@ export interface EconomyPulseNpcRegion {
 export interface EconomyPulseNpcClass {
   aircraftClassId: FreighterClassId;
   total: number;
-  /** Target count from NPC_FLEET_COMPOSITION (0 if class not in seed mix). */
+  /** Target count from region-scaled composition (0 if class not in mix). */
   target: number;
   airborne: number;
   ready: number;
@@ -131,7 +132,7 @@ export interface EconomyPulseNpcClass {
 
 export interface EconomyPulseNpc {
   fleetSize: number;
-  /** Designed seed size (NPC_FLEET_SIZE). */
+  /** Designed seed size for this world's region count. */
   targetFleetSize: number;
   /** max(0, target − actual). */
   fleetShortfall: number;
@@ -337,13 +338,7 @@ export function computeNpcPulse(
   const flightByNpc = new Map(flights.map((f) => [f.npcId, f] as const));
   const worldTick = world.tick ?? 0;
 
-  const hubRegions = [
-    ...new Set(
-      (world.airports ?? [])
-        .map((a) => (a.region ?? '').trim())
-        .filter((r) => r.length > 0),
-    ),
-  ].sort();
+  const hubRegions = listNpcHomeRegions(world.airports ?? []);
 
   type RegionAcc = {
     total: number;
@@ -375,12 +370,14 @@ export function computeNpcPulse(
   };
   for (const region of hubRegions) ensureRegion(region);
 
+  const composition = resolveNpcFleetComposition(hubRegions.length);
+  const targetFleetSize = targetNpcFleetSize(hubRegions.length);
   const targetByClass = new Map<FreighterClassId, number>(
-    NPC_FLEET_COMPOSITION.map((s) => [s.aircraftClassId, s.count]),
+    composition.map((s) => [s.aircraftClassId, s.count]),
   );
   type ClassAcc = { total: number; airborne: number; ready: number };
   const classAcc = new Map<FreighterClassId, ClassAcc>();
-  for (const slot of NPC_FLEET_COMPOSITION) {
+  for (const slot of composition) {
     classAcc.set(slot.aircraftClassId, { total: 0, airborne: 0, ready: 0 });
   }
 
@@ -487,8 +484,8 @@ export function computeNpcPulse(
   const fleetSize = npcs.length;
   return {
     fleetSize,
-    targetFleetSize: NPC_FLEET_SIZE,
-    fleetShortfall: Math.max(0, NPC_FLEET_SIZE - fleetSize),
+    targetFleetSize,
+    fleetShortfall: Math.max(0, targetFleetSize - fleetSize),
     airborne,
     idle,
     ready,

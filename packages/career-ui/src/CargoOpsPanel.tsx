@@ -29,13 +29,20 @@ function payMultHint(rep: number): string {
 }
 
 /** Compact Cargo Ops ladder for Hangar / Career. */
-export function CargoOpsPanel(props: { cargoOps: CareerCargoOps | null | undefined }) {
+export function CargoOpsPanel(props: {
+  cargoOps: CareerCargoOps | null | undefined;
+  /** Optional lease-unlock progress line while still locked. */
+  leaseUnlockHint?: string | null;
+}) {
   const ops = props.cargoOps;
   if (!ops?.commodities) {
     return (
       <section className="cargo-ops-panel" aria-label="Cargo Ops">
         <h3>Cargo Ops</h3>
         <p className="muted">Progression unlocks after your first freight settle.</p>
+        {props.leaseUnlockHint ? (
+          <p className="muted">{props.leaseUnlockHint}</p>
+        ) : null}
       </section>
     );
   }
@@ -46,6 +53,9 @@ export function CargoOpsPanel(props: { cargoOps: CareerCargoOps | null | undefin
       <p className="muted">
         Unlock higher freights with clean settles. Dry is always open.
       </p>
+      {props.leaseUnlockHint ? (
+        <p className="muted">{props.leaseUnlockHint}</p>
+      ) : null}
       <ul className="cargo-ops-tiers">
         {TIER_ROWS.map((tier) => {
           const unlocked = tier.commodityIds.every(

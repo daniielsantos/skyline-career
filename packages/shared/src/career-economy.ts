@@ -169,6 +169,11 @@ export {
 } from './career-fuel-logistics.js';
 
 export {
+  createNpcContractPilotOffer,
+  acceptContractPilotOffer,
+  contractPilotLiftKg,
+  listContractPilotPickAirframes,
+  contractPilotFeeRangeUsd,
   describeLotMarketPressure,
   drainNpcMroParts,
   ensureNpcAirframes,
@@ -176,11 +181,14 @@ export {
   ensureNpcRegionCoverage,
   estimateNpcBlockHours,
   findNpcAirframe,
+  listHomologatedNpcAirframesForClass,
   listNpcAirframesForClass,
   listNpcActivity,
   listNpcFleetStatus,
   listRegionMarketPressure,
+  npcAirframeIsHomologated,
   npcAirframeLabel,
+  npcCanOfferContractPilot,
   npcClaimForLot,
   npcLaneAirborneKg,
   npcMaxCargoKg,
@@ -189,9 +197,23 @@ export {
   npcLaneSaturation,
   npcRegionBidCapacity,
   isNpcReadyToBid,
+  CONTRACT_PILOT_FEE_FRAC,
+  CONTRACT_PILOT_OFFER_CHANCE,
+  AWAITING_PILOT_MIN_HOURS,
+  AWAITING_PILOT_MAX_HOURS,
+  quoteContractPilotFeeUsd,
   NPC_AIRFRAME_VARIANTS,
   NPC_FLEET_COMPOSITION,
   NPC_FLEET_SIZE,
+  NPCS_PER_REGION,
+  NPC_FLEET_MIN,
+  NPC_FLEET_CLASS_SHARES,
+  listNpcHomeRegions,
+  resolveNpcFleetComposition,
+  targetNpcFleetSize,
+  pruneNpcFleetComposition,
+  rebalanceNpcHomeRegions,
+  topUpNpcFleetComposition,
   NPC_MX_INTERVAL_HOURS,
   NPC_MX_PARTS_KG,
   NPC_MX_SHOP_HOURS,
@@ -206,6 +228,7 @@ export {
 export type {
   LotMarketPressure,
   NpcAirframeVariant,
+  NpcFleetCompositionSlot,
   RegionMarketPressure,
 } from './career-npc.js';
 
@@ -2702,6 +2725,12 @@ export function shiftEconomyWallClock(
     if (typeof flight.arrivesAtMs === 'number' && Number.isFinite(flight.arrivesAtMs)) {
       flight.arrivesAtMs += deltaMs;
     }
+    if (
+      typeof flight.awaitingPilotUntilMs === 'number' &&
+      Number.isFinite(flight.awaitingPilotUntilMs)
+    ) {
+      flight.awaitingPilotUntilMs += deltaMs;
+    }
   }
   for (const npc of world.npcs ?? []) {
     if (typeof npc.busyUntilMs === 'number' && Number.isFinite(npc.busyUntilMs)) {
@@ -2838,8 +2867,10 @@ export function listMarketLots(
     if (lot.status !== 'available' && lot.status !== 'reserved') {
       continue;
     }
+    const claim = npcClaimForLot(world, lot.id, nowMs);
     const avail = availableKg(lot);
-    if (avail <= 0) {
+    // Fully reserved crew-needed offers stay visible until accepted or timeout.
+    if (avail <= 0 && !claim?.crewNeeded) {
       continue;
     }
     if (opts.originIcao && lot.originIcao !== opts.originIcao.toUpperCase()) {
@@ -2877,7 +2908,6 @@ export function listMarketLots(
     const oStock = origin ? ensurePile(origin, lot.commodityId) : pile(0, 1);
     const dStock = dest ? ensurePile(dest, lot.commodityId) : pile(0, 1);
     const commodity = getCommodity(lot.commodityId);
-    const claim = npcClaimForLot(world, lot.id, nowMs);
     const pressure = describeLotMarketPressure(world, lot, nowMs);
     const idlePayMult = idleLotPayMult(lot, world.tick);
     pressure.idlePayMult = idlePayMult;
@@ -2912,13 +2942,37 @@ export function listMarketLots(
             npcName: claim.npcName,
             cargoKg: claim.cargoKg,
             etaHours: claim.etaHours,
+            ...(claim.crewNeeded
+              ? {
+                  crewNeeded: true,
+                  pilotFeeUsd: claim.pilotFeeUsd,
+                  ...(typeof claim.pilotFeeMinUsd === 'number'
+                    ? { pilotFeeMinUsd: claim.pilotFeeMinUsd }
+                    : {}),
+                  awaitingPilotUntilMs: claim.awaitingPilotUntilMs,
+                }
+              : {}),
+            ...(claim.airframeTypeId
+              ? { airframeTypeId: claim.airframeTypeId }
+              : {}),
+            ...(claim.aircraftLabel
+              ? { aircraftLabel: claim.aircraftLabel }
+              : {}),
+            ...(claim.aircraftClassId
+              ? { aircraftClassId: claim.aircraftClassId }
+              : {}),
           }
         : undefined,
       pressure,
     });
   }
 
-  views.sort((a, b) => b.lot.payUsd - a.lot.payUsd);
+  views.sort((a, b) => {
+    const aCrew = a.npcClaim?.crewNeeded ? 1 : 0;
+    const bCrew = b.npcClaim?.crewNeeded ? 1 : 0;
+    if (aCrew !== bCrew) return bCrew - aCrew;
+    return b.lot.payUsd - a.lot.payUsd;
+  });
   return views;
 }
 

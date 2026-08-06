@@ -497,6 +497,12 @@ export function readNpcFlights(db: SqliteDb): NpcFlight[] {
     payload_json: string | null;
   }>;
   return rows.map((r) => {
+    const status: NpcFlight['status'] =
+      r.status === 'completed'
+        ? 'completed'
+        : r.status === 'awaiting_pilot'
+          ? 'awaiting_pilot'
+          : 'in_flight';
     const base: NpcFlight = {
       id: r.id,
       npcId: r.npc_id,
@@ -511,12 +517,14 @@ export function readNpcFlights(db: SqliteDb): NpcFlight[] {
       arrivesAtTick: r.arrives_at_tick,
       departedAtMs: r.departed_at_ms,
       arrivesAtMs: r.arrives_at_ms,
-      status: r.status === 'completed' ? 'completed' : 'in_flight',
+      status,
     };
     if (r.payload_json) {
       try {
         const extra = JSON.parse(r.payload_json) as Partial<NpcFlight>;
-        return { ...extra, ...base };
+        // Column status is canonical — do not let payload_json overwrite it.
+        const { status: _ignored, ...payloadRest } = extra;
+        return { ...base, ...payloadRest, status };
       } catch {
         /* ignore */
       }

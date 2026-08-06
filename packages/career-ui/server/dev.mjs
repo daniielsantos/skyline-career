@@ -11,7 +11,7 @@ const viteBin = join(dirname(vitePackage), 'bin', 'vite.js');
 const apiPort = Number(process.env.CAREER_UI_API_PORT ?? 8787);
 const uiPort = Number(process.env.CAREER_UI_PORT ?? 5173);
 
-const { NPC_FLEET_SIZE } = await import('@msfs-compat/shared');
+const { NPCS_PER_REGION } = await import('@msfs-compat/shared');
 
 function killListenersOnPort(port) {
   try {
@@ -150,20 +150,19 @@ const health = await apiHealth();
 const sourceStamp = await serverSourceStamp();
 const apiIsCurrent =
   health?.ok === true &&
-  health?.npcFleetTarget === NPC_FLEET_SIZE &&
+  typeof health?.npcFleetTarget === 'number' &&
+  health.npcFleetTarget > 0 &&
   health?.sourceStamp === sourceStamp;
 
 if (apiIsCurrent) {
   console.log(
-    `Career API already running at http://127.0.0.1:${apiPort} (npcFleetTarget=${NPC_FLEET_SIZE})`,
+    `Career API already running at http://127.0.0.1:${apiPort} (npcFleetTarget=${health.npcFleetTarget}, ${NPCS_PER_REGION}/region)`,
   );
 } else {
   if (health?.ok) {
-    const reason =
-      health.npcFleetTarget !== NPC_FLEET_SIZE
-        ? `npcFleetTarget=${health.npcFleetTarget ?? 'missing'}, want ${NPC_FLEET_SIZE}`
-        : `server sources changed since it booted`;
-    console.log(`Career API on :${apiPort} is stale (${reason}) — restarting`);
+    console.log(
+      `Career API on :${apiPort} is stale (server sources changed since it booted) — restarting`,
+    );
   } else {
     console.log(`Starting Career API on :${apiPort}…`);
   }
@@ -209,8 +208,9 @@ if (apiIsCurrent) {
     }
     process.exit(1);
   }
+  const readyHealth = await apiHealth();
   console.log(
-    `Career API ready at http://127.0.0.1:${apiPort} (npcFleetTarget=${NPC_FLEET_SIZE})`,
+    `Career API ready at http://127.0.0.1:${apiPort} (npcFleetTarget=${readyHealth?.npcFleetTarget ?? '?'}, ${NPCS_PER_REGION}/region)`,
   );
 }
 

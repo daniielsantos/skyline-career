@@ -30,6 +30,9 @@ export function useConfirm() {
     });
   }, []);
 
+  const onConfirm = useCallback(() => close(true), [close]);
+  const onCancel = useCallback(() => close(false), [close]);
+
   const confirmDialog = pending ? (
     <ConfirmDialog
       title={pending.title}
@@ -37,8 +40,8 @@ export function useConfirm() {
       confirmLabel={pending.confirmLabel}
       cancelLabel={pending.cancelLabel}
       tone={pending.tone}
-      onConfirm={() => close(true)}
-      onCancel={() => close(false)}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
     />
   ) : null;
 
@@ -59,23 +62,26 @@ function ConfirmDialog(props: {
   const bodyId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const onCancelRef = useRef(props.onCancel);
+  onCancelRef.current = props.onCancel;
 
-  const onCancel = props.onCancel;
-  const onConfirm = props.onConfirm;
-
+  // Focus once on open — re-running on parent re-renders steals focus from
+  // interactive body controls (e.g. <select>) and closes native dropdowns.
   useEffect(() => {
     const focusTarget = tone === 'danger' ? cancelRef.current : confirmRef.current;
     focusTarget?.focus();
+  }, [tone]);
 
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onCancel();
+        onCancelRef.current();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [tone, onCancel, onConfirm]);
+  }, []);
 
   return (
     <div

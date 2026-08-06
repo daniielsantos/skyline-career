@@ -19,7 +19,10 @@ import {
 import { normalizeCareerLedger } from './career-ledger.js';
 import type { MissionIntent } from './types/career-economy.js';
 
-const pilot = { pilotName: 'Ada Skyline' };
+const pilot = {
+  pilotName: 'Ada Skyline',
+  airframeTypeId: 'asobo-c172sp-cargo',
+};
 
 describe('pilot travel', () => {
   it('selectStarterHub and normalize set pilotIcao to home hub', () => {
@@ -112,6 +115,7 @@ describe('pilot travel', () => {
   it('crew settle relocates aircraft without moving the pilot', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'CrewPilotStay',
+      airframeTypeId: 'asobo-c172sp-cargo',
     });
     const mission = {
       id: 'msn_crew',

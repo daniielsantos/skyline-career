@@ -135,8 +135,9 @@ export interface NpcFreighter {
   name: string;
   aircraftClassId: FreighterClassId;
   /**
-   * Optional ICAO-ish airframe variant (A321F, 208B, …) from the abstract
-   * NPC catalog — display + optional cargo ceiling. Not a player flight_model.
+   * Airframe variant typeId — homologated player Market SKU when available for
+   * the class; otherwise abstract FSLTL-style code (A321F, 208B, …) for label
+   * + optional cargo ceiling only.
    */
   airframeTypeId?: string;
   /** Optional cargo ceiling (kg); clamped to class max when bidding. */
@@ -198,8 +199,16 @@ export interface NpcFlight {
   departedAtMs: number;
   /** Wall-clock arrival / cargo delivery. */
   arrivesAtMs: number;
-  status: 'in_flight' | 'completed';
-  /** Origin fuel taken / billed when the NPC claimed the lot. */
+  /**
+   * `awaiting_pilot` = cargo reserved, offer open for contract pilot;
+   * auto-promotes to `in_flight` when awaitingPilotUntilMs elapses.
+   */
+  status: 'awaiting_pilot' | 'in_flight' | 'completed';
+  /** Wall-clock when an awaiting_pilot offer expires and the NPC departs alone. */
+  awaitingPilotUntilMs?: number;
+  /** Contract-pilot fee preview (fraction of payUsd); set on awaiting_pilot. */
+  pilotFeeUsd?: number;
+  /** Origin fuel taken / billed when the NPC claimed the lot (or promoted). */
   fuelUpliftKg?: number;
   fuelCostUsd?: number;
   fuelScarcity?: MissionFuelUplift['scarcity'];
@@ -444,6 +453,16 @@ export interface MarketLotView {
     npcName: string;
     cargoKg: number;
     etaHours: number;
+    /** True when the NPC is holding for a contract pilot (crew needed). */
+    crewNeeded?: boolean;
+    /** Max crew fee (full offer). Scales down with partial lift. */
+    pilotFeeUsd?: number;
+    /** Min crew fee among flyable homologated airframes. */
+    pilotFeeMinUsd?: number;
+    awaitingPilotUntilMs?: number;
+    airframeTypeId?: string;
+    aircraftLabel?: string;
+    aircraftClassId?: string;
   };
   /** Fatia 1–2 signals for market UI chips. */
   pressure?: {
@@ -613,6 +632,20 @@ export interface MissionIntent {
    * Settles on wall-clock ETA — no Flight Watch required.
    */
   crewOperated?: boolean;
+  /**
+   * Player is flying as a contract pilot on an NPC homologated airframe.
+   * No player fleet aircraftId; operator covers fuel; payUsd is the pilot fee.
+   */
+  contractPilot?: boolean;
+  /** Fee paid to the player on settle (also mirrored in payUsd for contract legs). */
+  contractPilotFeeUsd?: number;
+  /** Full freight value the NPC reserved (display / ledger note). */
+  contractGrossPayUsd?: number;
+  /** NPC operator that posted the crew-needed offer. */
+  operatorNpcId?: string;
+  operatorNpcName?: string;
+  /** Source awaiting_pilot flight id (cleared from npcFlights on accept). */
+  npcFlightId?: string;
   /** Crew fee charged at dispatch (USD). */
   crewFeeUsd?: number;
   /** Roster member flying this leg (company crew). */
@@ -779,9 +812,9 @@ export interface CareerMissionsState {
   /** Company cash from settled freights (Slice 4). */
   walletUsd: number;
   missions: MissionIntent[];
-  /** Owned freighters; empty until starter hub is selected. */
+  /** Owned freighters; empty for contract pilots until first buy/lease. */
   fleet: PlayerAircraft[];
-  /** False until the player picks the starter hub. */
+  /** False until the player registers (name + home hub). */
   hubSelected: boolean;
   /** Display name from pilot signup; empty until registered. */
   pilotName: string;

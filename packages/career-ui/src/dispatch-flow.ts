@@ -2,6 +2,8 @@ import type {
   Mission,
   MissionSettlement,
   FlightScoreSnapshot,
+  WeatherOpsSnapshot,
+  RunwayTouchdownSnapshot,
   CargoOpsDelta,
 } from './api';
 
@@ -52,6 +54,9 @@ export type FlightDebrief = {
   /** Airborne duration (wheels-up → touchdown/settle), ms. */
   flightDurationMs: number | null;
   flightScore: FlightScoreSnapshot | null;
+  weatherBonusUsd: number;
+  weatherOps: WeatherOpsSnapshot | null;
+  runwayTouch: RunwayTouchdownSnapshot | null;
   cargoOpsDeltas: CargoOpsDelta[];
   netUsd: number;
 };
@@ -98,6 +103,66 @@ export function formatFlightDurationMs(ms: number | null | undefined): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
+/** Compact debrief line for live weather-ops bonus. */
+export function formatWeatherOpsDebriefLine(
+  weatherOps: WeatherOpsSnapshot | null | undefined,
+  weatherBonusUsd: number,
+): string {
+  if (!weatherOps || weatherOps.sampleCount <= 0) return '';
+  const pct = Math.round(weatherOps.bonusFrac * 100);
+  const parts: string[] = [];
+  if (weatherBonusUsd > 0 && pct > 0) {
+    parts.push(`Weather ops +${pct}%`);
+  } else if (weatherOps.eligible) {
+    parts.push(`Weather ops score ${Math.round(weatherOps.avgScore)}`);
+  } else {
+    parts.push(
+      `Weather ops score ${Math.round(weatherOps.avgScore)} (not eligible)`,
+    );
+  }
+  if (weatherOps.minApproachVisM != null) {
+    parts.push(`vis ${(weatherOps.minApproachVisM / 1000).toFixed(1)} km app`);
+  } else if (weatherOps.avgVisM != null) {
+    parts.push(`vis ${(weatherOps.avgVisM / 1000).toFixed(1)} km avg`);
+  }
+  if (weatherOps.avgHeadwindKt >= 1) {
+    parts.push(`HW ${Math.round(weatherOps.avgHeadwindKt)} kt`);
+  }
+  if (weatherOps.rainFraction >= 0.05) {
+    parts.push(`rain ${Math.round(weatherOps.rainFraction * 100)}%`);
+  }
+  return parts.join(' · ');
+}
+
+/** Compact debrief line for runway touchdown (catalog projection). */
+export function formatRunwayTouchdownDebriefLine(
+  touch: RunwayTouchdownSnapshot | null | undefined,
+): string {
+  if (!touch) return '';
+  const ident =
+    touch.landingEnd === 'reciprocal' && touch.runwayIdentReciprocal
+      ? touch.runwayIdentReciprocal
+      : touch.runwayIdent;
+  const thrLabel =
+    touch.landingEnd === 'reciprocal' && touch.runwayIdentReciprocal
+      ? Math.max(0, touch.lengthM - touch.pastThresholdM)
+      : Math.max(0, touch.pastThresholdM);
+  const side =
+    Math.abs(touch.lateralM) < 2
+      ? 'centerline'
+      : touch.lateralM > 0
+        ? `${Math.abs(touch.lateralM)} m right`
+        : `${Math.abs(touch.lateralM)} m left`;
+  const pavement = touch.onPavement ? 'on pavement' : 'OFF runway';
+  const light =
+    touch.lighted === true
+      ? ' · lighted'
+      : touch.lighted === false
+        ? ' · unlit'
+        : '';
+  return `RWY ${ident} · ${Math.round(thrLabel)} m past THR · ${side} · ${pavement}${light}`;
+}
+
 export function buildFlightDebrief(opts: {
   mission: Pick<
     Mission,
@@ -109,6 +174,9 @@ export function buildFlightDebrief(opts: {
     | 'settledLandingFpm'
     | 'settledFlightDurationMs'
     | 'settledFlightScore'
+    | 'settledWeatherOps'
+    | 'settledWeatherBonusUsd'
+    | 'settledRunwayTouch'
   >;
   settlement: MissionSettlement;
 }): FlightDebrief {
@@ -131,6 +199,18 @@ export function buildFlightDebrief(opts: {
         : null;
   const flightScore =
     opts.settlement.flightScore ?? opts.mission.settledFlightScore ?? null;
+  const weatherOps =
+    opts.settlement.weatherOps ?? opts.mission.settledWeatherOps ?? null;
+  const weatherBonusUsd =
+    typeof opts.settlement.weatherBonusUsd === 'number' &&
+    Number.isFinite(opts.settlement.weatherBonusUsd)
+      ? Math.round(opts.settlement.weatherBonusUsd)
+      : typeof opts.mission.settledWeatherBonusUsd === 'number' &&
+          Number.isFinite(opts.mission.settledWeatherBonusUsd)
+        ? Math.round(opts.mission.settledWeatherBonusUsd)
+        : 0;
+  const runwayTouch =
+    opts.settlement.runwayTouch ?? opts.mission.settledRunwayTouch ?? null;
   return {
     missionId: opts.mission.id,
     originIcao: opts.mission.originIcao,
@@ -145,6 +225,9 @@ export function buildFlightDebrief(opts: {
     landingFpm,
     flightDurationMs,
     flightScore,
+    weatherBonusUsd,
+    weatherOps,
+    runwayTouch,
     cargoOpsDeltas: opts.settlement.cargoOpsDeltas ?? [],
     netUsd: opts.settlement.payoutUsd - fuelCostUsd,
   };
@@ -176,6 +259,53 @@ export function resolveLoadPath(
 export function ofpAccepted(mission: Mission): boolean {
   const v = mission.lastOfpCheck?.verdict;
   return v === 'pass' || v === 'warn';
+}
+
+/** True when the only OFP fail is SimBrief cargo below the mission load. */
+export function isOfpCargoUnderOnlyFailureUi(
+  check: Mission['lastOfpCheck'] | undefined | null,
+): boolean {
+  if (!check || check.verdict !== 'fail') return false;
+  const fails = check.findings.filter((f) => f.severity === 'fail');
+  if (fails.length !== 1) return false;
+  const f = fails[0]!;
+  if (f.code !== 'INTENT_CARGO_MISMATCH') return false;
+  if (
+    typeof f.expected === 'number' &&
+    typeof f.actual === 'number' &&
+    Number.isFinite(f.expected) &&
+    Number.isFinite(f.actual)
+  ) {
+    return f.actual < f.expected;
+  }
+  if (typeof f.delta === 'number' && Number.isFinite(f.delta)) {
+    return f.delta < 0;
+  }
+  return /\bbelow\b/i.test(f.message);
+}
+
+/** OFP cargo kg from an under-cargo finding (actual), when present. */
+export function ofpCargoKgFromUnderFinding(
+  check: Mission['lastOfpCheck'] | undefined | null,
+): number | undefined {
+  if (!isOfpCargoUnderOnlyFailureUi(check)) return undefined;
+  const f = check!.findings.find(
+    (finding) =>
+      finding.severity === 'fail' && finding.code === 'INTENT_CARGO_MISMATCH',
+  );
+  if (
+    typeof f?.actual === 'number' &&
+    Number.isFinite(f.actual) &&
+    f.actual >= 1
+  ) {
+    return Math.floor(f.actual);
+  }
+  const match = f?.message.match(/OFP cargo\s+([\d.]+)\s*kg/i);
+  if (match) {
+    const kg = Number(match[1]);
+    if (Number.isFinite(kg) && kg >= 1) return Math.floor(kg);
+  }
+  return undefined;
 }
 
 export function fuelAuthorizedForOfp(mission: Mission): boolean {
@@ -299,8 +429,8 @@ export function dispatchStepStatusLine(input: {
       return 'Preflight ready — take off in MSFS when Watch is connected. Manual depart is under Advanced.';
     case 'en_route':
       return input.watchRunning
-        ? 'En route — Watch tracks the flight. Settle unlocks after ≥70% of planned route time (wall clock).'
-        : 'En route — settle from Advanced only after ≥70% of planned route time, or when Watch is running.';
+        ? 'En route — Watch tracks the flight. Settle unlocks after ≥70% of planned route time (≥50% under 100 nm).'
+        : 'En route — settle from Advanced only after ≥70% of planned route time (≥50% under 100 nm), or when Watch is running.';
     case 'debrief':
       return 'Flight complete — review the P&L, then return to Freights.';
     default:

@@ -59,6 +59,34 @@ export function massUnitLong(system: WeightSystem): string {
   return system === 'imperial' ? 'pounds' : 'kilograms';
 }
 
+/** Cruise fuel flow: stored kg/h → kg/h or lb/h. */
+export function formatFuelFlow(
+  kgPerHour: number,
+  system: WeightSystem = 'metric',
+): string {
+  if (!Number.isFinite(kgPerHour) || kgPerHour <= 0) return '—';
+  if (system === 'imperial') {
+    const lbh = kgPerHour * KG_TO_LB;
+    return `${lbh.toLocaleString(undefined, { maximumFractionDigits: 0 })} lb/h`;
+  }
+  return `${kgPerHour.toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+  })} kg/h`;
+}
+
+/** Burn per nm: stored kg/nm → kg/nm or lb/nm. */
+export function formatFuelBurnPerNm(
+  kgPerNm: number,
+  system: WeightSystem = 'metric',
+): string {
+  if (!Number.isFinite(kgPerNm) || kgPerNm <= 0) return '—';
+  if (system === 'imperial') {
+    const lbnm = kgPerNm * KG_TO_LB;
+    return `${lbnm.toLocaleString(undefined, { maximumFractionDigits: 2 })} lb/nm`;
+  }
+  return `${kgPerNm} kg/nm`;
+}
+
 /** Convert weight values embedded in backend diagnostics for presentation. */
 export function formatWeightText(
   text: string,

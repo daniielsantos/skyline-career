@@ -4,7 +4,10 @@ import {
   applyCargoOpsOnSettle,
   cargoOpsIsUnlocked,
   cargoOpsPayMult,
+  cargoOpsUnlockProgress,
   computeCargoOpsRepDelta,
+  CARGO_OPS_VALUE_UNLOCK,
+  dryReady,
   emptyCareerCargoOps,
   normalizeCareerCargoOps,
   refreshCargoOpsUnlocks,
@@ -40,19 +43,100 @@ describe('cargoOps', () => {
     assert.equal(cargoOpsPayMult(ops, 'general'), 1.15);
   });
 
-  it('awards clean settle and unlocks Value after Dry progress', () => {
+  it('does not unlock Value after only 3 Dry cleans', () => {
     let ops = emptyCareerCargoOps();
     for (let i = 0; i < 3; i++) {
       const applied = applyCargoOpsOnSettle(
         ops,
         { commodityId: 'general', lots: [], status: 'settled' },
-        { onTime: true, lateTicks: 0, flightScore: { earned: 40, max: 51, pct: 85, categories: [] } },
+        {
+          onTime: true,
+          lateTicks: 0,
+          flightScore: { earned: 40, max: 51, pct: 85, categories: [] },
+        },
       );
       ops = applied.cargoOps;
       assert.ok(applied.deltas[0]!.clean);
     }
     assert.ok(ops.commodities.general.settlesOk >= 3);
+    assert.equal(ops.commodities.electronics.unlocked, false);
+    assert.equal(dryReady(ops), false);
+  });
+
+  it('unlocks Value after 6 Dry cleans, peak rep 70, and both Dry types', () => {
+    let ops = emptyCareerCargoOps();
+    // 5 general + 1 supplies → both types, 6 cleans; force peak rep.
+    for (let i = 0; i < 5; i++) {
+      const applied = applyCargoOpsOnSettle(
+        ops,
+        { commodityId: 'general', lots: [], status: 'settled' },
+        {
+          onTime: true,
+          lateTicks: 0,
+          flightScore: { earned: 40, max: 51, pct: 85, categories: [] },
+        },
+      );
+      ops = applied.cargoOps;
+    }
+    const last = applyCargoOpsOnSettle(
+      ops,
+      { commodityId: 'supplies', lots: [], status: 'settled' },
+      {
+        onTime: true,
+        lateTicks: 0,
+        flightScore: { earned: 40, max: 51, pct: 85, categories: [] },
+      },
+    );
+    ops = last.cargoOps;
+    assert.equal(
+      ops.commodities.general.settlesOk + ops.commodities.supplies.settlesOk,
+      CARGO_OPS_VALUE_UNLOCK.dryCleansRequired,
+    );
+    assert.ok(
+      Math.max(ops.commodities.general.rep, ops.commodities.supplies.rep) >=
+        CARGO_OPS_VALUE_UNLOCK.peakRepRequired,
+    );
     assert.equal(ops.commodities.electronics.unlocked, true);
+    assert.ok(
+      last.deltas.some((d) => d.commodityId === 'electronics' && d.unlockedNow),
+    );
+  });
+
+  it('keeps sticky Value unlock even when below the new gate', () => {
+    const ops = emptyCareerCargoOps();
+    ops.commodities.general.settlesOk = 2;
+    ops.commodities.general.rep = 63;
+    ops.commodities.supplies.settlesOk = 1;
+    ops.commodities.supplies.rep = 59;
+    ops.commodities.electronics.unlocked = true;
+    assert.equal(dryReady(ops), false);
+    refreshCargoOpsUnlocks(ops);
+    assert.equal(ops.commodities.electronics.unlocked, true);
+    const normalized = normalizeCareerCargoOps(ops);
+    assert.equal(normalized.commodities.electronics.unlocked, true);
+  });
+
+  it('reports unlock progress for locked Value', () => {
+    const ops = emptyCareerCargoOps();
+    ops.commodities.general.settlesOk = 2;
+    ops.commodities.general.rep = 63;
+    ops.commodities.supplies.settlesOk = 1;
+    ops.commodities.supplies.rep = 59;
+    const progress = cargoOpsUnlockProgress(ops, 'value');
+    assert.equal(progress.unlocked, false);
+    assert.equal(progress.ready, false);
+    assert.match(progress.summary, /3\/6 Dry cleans/);
+    assert.match(progress.summary, /need both Dry types|both Dry types/);
+    assert.match(progress.summary, /peak rep 63\/70/);
+  });
+
+  it('hints pay when Value board is open at low Electronics rep', () => {
+    const ops = emptyCareerCargoOps();
+    ops.commodities.electronics.unlocked = true;
+    ops.commodities.electronics.rep = 0;
+    const progress = cargoOpsUnlockProgress(ops, 'value');
+    assert.equal(progress.unlocked, true);
+    assert.match(progress.summary, /build Electronics rep/);
   });
 
   it('punishes late perishables harder in delta table', () => {

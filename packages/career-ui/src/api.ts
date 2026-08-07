@@ -97,6 +97,20 @@ export type FlightScoreSnapshot = {
   categories: FlightScoreCategory[];
 };
 
+/** Live weather-ops score from Watch (mirrors shared WeatherOpsSnapshot). */
+export type WeatherOpsSnapshot = {
+  avgScore: number;
+  bonusFrac: number;
+  sampleCount: number;
+  approachSampleCount: number;
+  airborneMs: number;
+  avgHeadwindKt: number;
+  avgVisM: number | null;
+  rainFraction: number;
+  minApproachVisM: number | null;
+  eligible: boolean;
+};
+
 export type CareerLedgerEntry = {
   id: string;
   atTick: number;
@@ -184,6 +198,8 @@ export type NpcClaim = {
   etaMs?: number;
   arrivesAtMs?: number;
   crewNeeded?: boolean;
+  /** Empty NPC deadhead home — not a freight haul. */
+  crewReposition?: boolean;
   pilotFeeUsd?: number;
   /** Min fee when partial lift airframes exist; omit or equal to pilotFeeUsd when fixed. */
   pilotFeeMinUsd?: number;
@@ -377,6 +393,9 @@ export type OfpCheckFinding = {
   code: string;
   severity: string;
   message: string;
+  expected?: number;
+  actual?: number;
+  delta?: number;
 };
 
 export type OfpBriefing = {
@@ -456,6 +475,13 @@ export type Mission = {
   settledFlightDurationMs?: number;
   /** Watch flight scorecard from the completed leg. */
   settledFlightScore?: FlightScoreSnapshot;
+  /** Live weather-ops score from Watch ambient samples. */
+  settledWeatherOps?: WeatherOpsSnapshot;
+  /** Extra wallet credit from weather-ops bonus (USD). */
+  settledWeatherBonusUsd?: number;
+  settledTouchdownLat?: number;
+  settledTouchdownLon?: number;
+  settledRunwayTouch?: RunwayTouchdownSnapshot;
   staticId?: string;
   lots?: MissionLotLine[];
   shipmentLotId?: string;
@@ -688,6 +714,45 @@ export type CompanyCrewSnapshot = {
   }>;
 };
 
+export type CareerRunwaySurface =
+  | 'asphalt'
+  | 'concrete'
+  | 'grass'
+  | 'gravel'
+  | 'dirt'
+  | 'water'
+  | 'other';
+
+export type CareerRunway = {
+  ident: string;
+  identReciprocal?: string;
+  headingTrueDeg: number;
+  lengthM: number;
+  widthM: number;
+  lat: number;
+  lon: number;
+  surface?: CareerRunwaySurface;
+  lighted?: boolean;
+};
+
+/** Dest runway projection at touchdown (from settle). */
+export type RunwayTouchdownSnapshot = {
+  lat: number;
+  lon: number;
+  icao: string;
+  runwayIdent: string;
+  runwayIdentReciprocal?: string;
+  lengthM: number;
+  widthM: number;
+  headingTrueDeg: number;
+  lighted?: boolean;
+  alongM: number;
+  lateralM: number;
+  pastThresholdM: number;
+  onPavement: boolean;
+  landingEnd: 'primary' | 'reciprocal';
+};
+
 export type AirportView = ClockSync & {
   airport: {
     icao: string;
@@ -724,6 +789,8 @@ export type AirportView = ClockSync & {
   fuelHaulsEnroute?: number;
   playerFbos?: PlayerFboSnapshot | null;
   homeHubIcao?: string | null;
+  /** Curated runway strips for this hub (empty if unknown). */
+  runways?: CareerRunway[];
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -938,10 +1005,15 @@ export function fetchCargoLimit(
   aircraft: AircraftClass,
   distanceNm?: number,
   airframeTypeId?: string,
-  opts: { originIcao?: string; destIcao?: string } = {},
+  opts: {
+    originIcao?: string;
+    destIcao?: string;
+    aircraftId?: string;
+  } = {},
 ) {
   const qs = new URLSearchParams({ aircraft });
   if (airframeTypeId) qs.set('airframe', airframeTypeId);
+  if (opts.aircraftId?.trim()) qs.set('aircraftId', opts.aircraftId.trim());
   if (distanceNm !== undefined && Number.isFinite(distanceNm)) {
     qs.set('distanceNm', String(distanceNm));
   }
@@ -957,6 +1029,7 @@ export function fetchCargoLimit(
     oewKg?: number | null;
     mtowKg?: number | null;
     operationalMaxCargoKg: number;
+    distanceNm?: number | null;
     estimatedBlockFuelKg?: number | null;
     fuelCapacityKg?: number | null;
     fuelDeficitKg?: number | null;
@@ -964,6 +1037,16 @@ export function fetchCargoLimit(
     estimatedFuelCostUsd?: number | null;
     estimatedFuelUnitPriceUsd?: number | null;
     estimatedFuelScarcity?: 'ok' | 'partial' | 'dry' | null;
+    fuelBurnMult?: number;
+    mxFuelBurn?: {
+      mult: number;
+      excessPct: number;
+      conditionPct: number;
+      blockFuelKg?: number;
+      baseBlockFuelKg?: number | null;
+      exceedsTank?: boolean;
+      deficitKg?: number;
+    } | null;
   }>(`/api/cargo-limit?${qs.toString()}`);
 }
 
@@ -1103,6 +1186,7 @@ export function postContractPilotAccept(opts: {
     airframeLabel?: string;
     liftedKg?: number;
     remainderKg?: number;
+    remainderOpenOnBoard?: boolean;
     npcDepartedWithRemainder?: boolean;
     pilotRelocatedFrom?: string | null;
     pilotIcao?: string;
@@ -1138,6 +1222,7 @@ export function fetchContractPilotOptions(opts: {
       cargoKg: number;
       payUsd: number;
       distanceNm?: number | null;
+      crewReposition?: boolean;
       pilotFeeUsd: number;
       awaitingPilotUntilMs?: number;
     };
@@ -1741,6 +1826,34 @@ export function postConfirmOfp(opts: {
   });
 }
 
+export function postAcceptOfpCargo(opts: {
+  missionId: string;
+  simbriefUser?: string;
+  simbriefUserid?: string;
+}) {
+  return api<{
+    mission: Mission;
+    releasedKg: number;
+    payBeforeUsd: number;
+    payAfterUsd: number;
+    summary: string;
+    check: { verdict: 'pass' | 'warn' | 'fail'; findings: OfpCheckFinding[] };
+    ofp: {
+      originIcao?: string;
+      destIcao?: string;
+      icao?: string;
+      cargoKg?: number;
+      passengerCount?: number;
+      blockFuel?: number;
+      ofpId?: string;
+      briefing: OfpBriefing;
+    };
+  }>('/api/accept-ofp-cargo', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
 export type MissionFuelQuote = {
   aircraftId: string;
   originIcao: string;
@@ -1750,6 +1863,12 @@ export type MissionFuelQuote = {
   fuelCapacityKg: number;
   shortfallKg: number;
   authorized: boolean;
+  /** Healthy SimBrief OFP block (before MX pad). */
+  ofpBlockFuelKg?: number;
+  /** Extra kg beyond OFP — always 0; MX wear is warn-only. */
+  mxPadKg?: number;
+  mxExcessPct?: number;
+  mxCappedByTank?: boolean;
   uplift: {
     originIcao: string;
     requestedKg: number;
@@ -1798,6 +1917,12 @@ export type MissionSettlement = {
   flightDurationMs?: number | null;
   /** Flight scorecard from Watch telemetry. */
   flightScore?: FlightScoreSnapshot | null;
+  /** Weather-ops bonus included in payoutUsd. */
+  weatherBonusUsd?: number;
+  /** Weather-ops snapshot from Watch. */
+  weatherOps?: WeatherOpsSnapshot | null;
+  /** Dest runway touchdown projection. */
+  runwayTouch?: RunwayTouchdownSnapshot | null;
   /** Cargo Ops ladder deltas from this settle. */
   cargoOpsDeltas?: CargoOpsDelta[];
 };
@@ -1890,6 +2015,14 @@ export type WatchStatus = {
       durationSec: number;
       committedAtMs: number;
     };
+  } | null;
+  weatherOps?: {
+    avgScore: number;
+    sampleCount: number;
+    eligible: boolean;
+    avgHeadwindKt: number;
+    avgVisM: number | null;
+    rainFraction: number;
   } | null;
 };
 

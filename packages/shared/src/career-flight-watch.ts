@@ -6,6 +6,10 @@ import type { MissionIntent, MissionStatus } from './types/career-economy.js';
 
 /** Minimum airborne wall-clock fraction of planned route time before settle. */
 export const MIN_AIRBORNE_TIME_RATIO = 0.7;
+/** Short hops finish faster than OFP/estimate — lower gate below this distance. */
+export const MIN_AIRBORNE_TIME_RATIO_SHORT = 0.5;
+/** Great-circle / planned distance (nm) under which the short-hop ratio applies. */
+export const SHORT_ROUTE_AIRBORNE_NM = 100;
 
 /** Enter taxi when ground speed reaches this (kt). */
 export const TAXI_GROUND_SPEED_KT = 5;
@@ -22,6 +26,8 @@ export interface FlightGroundSample {
   groundSpeedKt?: number;
   /** Live vertical speed (feet per minute). Negative = descending. */
   verticalSpeedFpm?: number;
+  /** Height above ground (feet) — used to separate bounce vs go-around. */
+  aglFt?: number;
 }
 
 /**
@@ -57,6 +63,8 @@ export interface MissionFlightWatchState {
   airborneEndedAtMs?: number;
   /** Planned route duration in wall-clock ms (OFP air time / distance estimate). */
   expectedRouteMs?: number;
+  /** Route distance (nm) used to pick short-hop vs normal airborne ratio. */
+  routeDistanceNm?: number;
   /** Last vertical speed while airborne (fpm) — used to stamp landing rate. */
   lastAirborneVsFpm?: number;
   /**
@@ -123,6 +131,7 @@ export function createMissionFlightWatchState(
     airborneAtMs: seed.airborneAtMs,
     airborneEndedAtMs: seed.airborneEndedAtMs,
     expectedRouteMs: seed.expectedRouteMs,
+    routeDistanceNm: seed.routeDistanceNm,
     lastAirborneVsFpm: seed.lastAirborneVsFpm,
     landingFpm: seed.landingFpm,
   };
@@ -182,8 +191,26 @@ export function resolveExpectedRouteMs(
   return Math.round(0.2 * 3_600_000);
 }
 
-export function minRequiredAirborneMs(expectedRouteMs: number): number {
-  return Math.round(Math.max(0, expectedRouteMs) * MIN_AIRBORNE_TIME_RATIO);
+/** Airborne fraction required before settle (50% under 100 nm, else 70%). */
+export function minAirborneTimeRatio(distanceNm?: number): number {
+  if (
+    typeof distanceNm === 'number' &&
+    Number.isFinite(distanceNm) &&
+    distanceNm > 0 &&
+    distanceNm < SHORT_ROUTE_AIRBORNE_NM
+  ) {
+    return MIN_AIRBORNE_TIME_RATIO_SHORT;
+  }
+  return MIN_AIRBORNE_TIME_RATIO;
+}
+
+export function minRequiredAirborneMs(
+  expectedRouteMs: number,
+  distanceNm?: number,
+): number {
+  return Math.round(
+    Math.max(0, expectedRouteMs) * minAirborneTimeRatio(distanceNm),
+  );
 }
 
 export function formatFlightDurationMs(ms: number): string {
@@ -200,13 +227,22 @@ export function evaluateMinAirborneElapsed(opts: {
   nowMs: number;
   /** When set (touchdown), freeze elapsed instead of counting taxi-in. */
   airborneEndedAtMs?: number;
+  /** Route distance (nm) — short hops use a lower airborne fraction. */
+  distanceNm?: number;
 }):
-  | { ok: true; elapsedMs: number; requiredMs: number; expectedRouteMs: number }
+  | {
+      ok: true;
+      elapsedMs: number;
+      requiredMs: number;
+      expectedRouteMs: number;
+      ratioRequired: number;
+    }
   | {
       ok: false;
       elapsedMs: number;
       requiredMs: number;
       expectedRouteMs: number;
+      ratioRequired: number;
       message: string;
     } {
   const endMs =
@@ -215,13 +251,18 @@ export function evaluateMinAirborneElapsed(opts: {
       ? opts.airborneEndedAtMs
       : opts.nowMs;
   const elapsedMs = Math.max(0, endMs - opts.airborneAtMs);
-  const requiredMs = minRequiredAirborneMs(opts.expectedRouteMs);
+  const ratioRequired = minAirborneTimeRatio(opts.distanceNm);
+  const requiredMs = minRequiredAirborneMs(
+    opts.expectedRouteMs,
+    opts.distanceNm,
+  );
   if (elapsedMs >= requiredMs) {
     return {
       ok: true,
       elapsedMs,
       requiredMs,
       expectedRouteMs: opts.expectedRouteMs,
+      ratioRequired,
     };
   }
   const pct = Math.round(
@@ -232,7 +273,8 @@ export function evaluateMinAirborneElapsed(opts: {
     elapsedMs,
     requiredMs,
     expectedRouteMs: opts.expectedRouteMs,
-    message: `airborne only ${formatFlightDurationMs(elapsedMs)} (${pct}% of ${formatFlightDurationMs(opts.expectedRouteMs)} planned · need ≥${Math.round(MIN_AIRBORNE_TIME_RATIO * 100)}%)`,
+    ratioRequired,
+    message: `airborne only ${formatFlightDurationMs(elapsedMs)} (${pct}% of ${formatFlightDurationMs(opts.expectedRouteMs)} planned · need ≥${Math.round(ratioRequired * 100)}%)`,
   };
 }
 
@@ -257,6 +299,7 @@ function gateSettleByMinAirborne(
     expectedRouteMs,
     nowMs: opts.nowMs ?? Date.now(),
     airborneEndedAtMs: state.airborneEndedAtMs,
+    distanceNm: opts.distanceNm ?? state.routeDistanceNm,
   });
   if (check.ok) return null;
   return {
@@ -329,6 +372,10 @@ function withAirborneClock(
     ...state,
     airborneAtMs: nowMs,
     expectedRouteMs,
+    routeDistanceNm:
+      typeof opts.distanceNm === 'number' && Number.isFinite(opts.distanceNm)
+        ? opts.distanceNm
+        : state.routeDistanceNm,
   };
 }
 
@@ -351,6 +398,10 @@ export function evaluateMissionFlightTransition(
     airborneAtMs: state.airborneAtMs,
     airborneEndedAtMs: state.airborneEndedAtMs,
     expectedRouteMs: state.expectedRouteMs,
+    routeDistanceNm:
+      typeof opts.distanceNm === 'number' && Number.isFinite(opts.distanceNm)
+        ? opts.distanceNm
+        : state.routeDistanceNm,
     lastAirborneVsFpm: state.lastAirborneVsFpm,
     landingFpm: state.landingFpm,
   };
@@ -383,10 +434,15 @@ export function evaluateMissionFlightTransition(
     };
   }
 
+  // Do NOT clear touchdown on a short bounce (wheels leave briefly after landing).
+  // Only a real go-around / climb-out clears the first-contact stamp below.
+
   if (touchedDown && (state.sawAirborne || nextState.sawAirborne)) {
     const nowMs = opts.nowMs ?? Date.now();
+    // Lock first-contact VS; later bounce touches must not overwrite.
     const landingFpm =
       nextState.landingFpm ??
+      state.landingFpm ??
       state.lastAirborneVsFpm ??
       sample.verticalSpeedFpm;
     nextState = {
@@ -445,7 +501,39 @@ export function evaluateMissionFlightTransition(
     };
   }
 
+  // Go-around: climbing away after a touchdown clears landing lock for phase/settle.
+  // Short landing bounces (low VS / low AGL) keep the first-contact stamp.
+  if (
+    !sample.onGround &&
+    typeof nextState.airborneEndedAtMs === 'number' &&
+    isGoAroundClimb(sample)
+  ) {
+    nextState = {
+      ...nextState,
+      airborneEndedAtMs: undefined,
+      landingFpm: undefined,
+    };
+  }
+
   return { event: { type: 'none' }, nextState };
+}
+
+/** True when airborne after touchdown looks like a go-around, not a bounce. */
+function isGoAroundClimb(sample: FlightGroundSample): boolean {
+  const vs =
+    typeof sample.verticalSpeedFpm === 'number' &&
+    Number.isFinite(sample.verticalSpeedFpm)
+      ? sample.verticalSpeedFpm
+      : undefined;
+  const agl =
+    typeof sample.aglFt === 'number' && Number.isFinite(sample.aglFt)
+      ? sample.aglFt
+      : undefined;
+  // Require a real climb-out: brief bounce hops (~3 m / ~10 ft, mild VS) must
+  // keep the first-contact stamp. Old thresholds (VS≥400 or AGL≥80) false-fired.
+  if (agl != null && agl >= 150) return true;
+  if (vs != null && vs >= 500 && (agl == null || agl >= 40)) return true;
+  return false;
 }
 
 export function pickActiveMission(

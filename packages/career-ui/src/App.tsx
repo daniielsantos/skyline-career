@@ -11,6 +11,7 @@ import {
   fetchSimBridgeStatus,
   postCancel,
   postConfirmOfp,
+  postAcceptOfpCargo,
   postDepart,
   postDispatch,
   postFuelPurchase,
@@ -163,11 +164,15 @@ import {
   formatCargoOpsDebriefLine,
   formatFlightDurationMs,
   formatLandingFpm,
+  formatWeatherOpsDebriefLine,
+  formatRunwayTouchdownDebriefLine,
   resolveLoadPath,
   type FlightDebrief,
 } from './dispatch-flow';
+import { RunwayTouchdownDiagram } from './RunwayTouchdownDiagram';
 import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
 import { WatchStatusFooter } from './WatchStatusFooter';
+import { mxFuelBurnFromAircraft } from './mx-fuel-burn';
 
 type Tab = CareerTab;
 type TerminalSection = 'inventory' | 'contracts' | 'movements' | 'fbo';
@@ -417,6 +422,94 @@ let activeWeightSystem: WeightSystem = loadWeightSystem();
 
 function formatMoney(n: number): string {
   return `$${n.toLocaleString()}`;
+}
+
+/**
+ * Contract/Ferry Load column: show the open claim, not free kg still on the
+ * same lot (which made 3.5 klb Contracts look like 20+ klb monsters).
+ */
+function LotLoadCell(props: {
+  lot: {
+    availableKg: number;
+    quantityKg?: number;
+    payUsd?: number;
+    npcClaim?: {
+      crewNeeded?: boolean;
+      crewReposition?: boolean;
+      cargoKg?: number;
+    } | null;
+  };
+  weightSystem?: WeightSystem;
+}) {
+  const claim = props.lot.npcClaim;
+  const claimKg =
+    claim?.crewNeeded &&
+    typeof claim.cargoKg === 'number' &&
+    claim.cargoKg > 0
+      ? claim.cargoKg
+      : null;
+  if (claimKg == null) {
+    return <>{formatTonnes(props.lot.availableKg, props.weightSystem)}</>;
+  }
+  const freeKg = props.lot.availableKg;
+  const kind = claim?.crewReposition ? 'Ferry' : 'Contract';
+  return (
+    <span
+      title={
+        freeKg > 0
+          ? `${kind} hold ${formatTonnes(claimKg, props.weightSystem)} · ${formatTonnes(freeKg, props.weightSystem)} still open on this lot`
+          : `${kind} hold ${formatTonnes(claimKg, props.weightSystem)}`
+      }
+    >
+      {formatTonnes(claimKg, props.weightSystem)}
+      {freeKg > 0 ? (
+        <small className="muted">
+          {' '}
+          +{formatTonnes(freeKg, props.weightSystem)} open
+        </small>
+      ) : null}
+    </span>
+  );
+}
+
+/** Contract/Ferry Pay: pilot fee (what you earn). Normal lots: freight pay. */
+function LotPayCell(props: {
+  lot: {
+    availableKg: number;
+    quantityKg: number;
+    payUsd: number;
+    npcClaim?: {
+      crewNeeded?: boolean;
+      cargoKg?: number;
+      pilotFeeUsd?: number;
+      pilotFeeMinUsd?: number;
+    } | null;
+  };
+  /** Idle ↑ badge — only for normal freights (Contracts use fee, not lot pay). */
+  idlePct?: number | null;
+}) {
+  const claim = props.lot.npcClaim;
+  if (claim?.crewNeeded && typeof claim.pilotFeeUsd === 'number') {
+    const fee = formatCrewFeeText(claim, formatMoney);
+    return (
+      <span title="Your contract fee (operator freight is higher; you take the crew cut)">
+        {fee ?? formatMoney(claim.pilotFeeUsd)}
+      </span>
+    );
+  }
+  return (
+    <>
+      {formatMoney(props.lot.payUsd)}
+      {props.idlePct != null ? (
+        <span
+          className="idle-uptick"
+          title={`Freight has sat on the board — pay is up ${props.idlePct}% vs formation`}
+        >
+          ↑{props.idlePct}%
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 /** `BR-SE` → `BR`, `US-SC` → `US`. Bare two-letter codes pass through. */
@@ -758,7 +851,7 @@ function MarketEventsSummary(props: {
   );
 }
 
-/** Secondary lot signals as one muted line (not a pill stack). */
+/** Secondary lot signals as one muted line (not a pill stack). Cap at 2. */
 function lotPressureMeta(lot: MarketLot): { text: string; title: string } | null {
   const tokens: string[] = [];
   const titles: string[] = [];
@@ -775,27 +868,31 @@ function lotPressureMeta(lot: MarketLot): { text: string; title: string } | null
     );
   }
   if (p?.laneBusy) {
-    tokens.push('Lane busy');
+    tokens.push('Busy');
     titles.push(
-      `NPC cargo already airborne on this lane (${Math.round((p.laneSaturation || 0) * 100)}% saturated) — remaining slots are scarcer`,
+      `NPC cargo already airborne on this lane (${Math.round((p.laneSaturation || 0) * 100)}% saturated)`,
     );
   }
   if (p?.thinFleet) {
-    tokens.push('Thin fleet');
+    tokens.push('Thin');
     titles.push(
-      `${regionLabel(p.originRegion || 'region')}: local competing fleet is thin — freights from this origin tend to pay more`,
+      `${regionLabel(p.originRegion || 'region')}: local competing fleet is thin`,
     );
   }
   if (p?.demandShock) {
-    for (const label of p.shockLabels ?? ['Shock']) {
-      tokens.push(label);
-    }
+    const label = (p.shockLabels ?? ['Shock'])[0]!;
+    tokens.push(label);
     titles.push(
-      `Regional demand shock on this lane — freight pay ×${(p.shockPayMult ?? 1).toFixed(2)}`,
+      `Regional demand shock — freight pay ×${(p.shockPayMult ?? 1).toFixed(2)}`,
     );
   }
   if (tokens.length === 0) return null;
-  return { text: tokens.join(' · '), title: titles.join(' · ') };
+  const shown = tokens.slice(0, 2);
+  const extra = tokens.length - shown.length;
+  return {
+    text: extra > 0 ? `${shown.join(' · ')} · +${extra}` : shown.join(' · '),
+    title: titles.join(' · '),
+  };
 }
 
 function idleUptickPct(lot: MarketLot): number | null {
@@ -1067,14 +1164,18 @@ function LotExpiry(props: {
   // Crew-needed holds stay on the board past market expiry until the pilot
   // window closes — show that window instead of a misleading "Expired".
   if (claim?.crewNeeded) {
+    const kind = claim.crewReposition ? 'Ferry' : 'Contract';
     const untilMs = claim.awaitingPilotUntilMs;
     const nowMs = props.nowMs ?? Date.now();
     if (typeof untilMs === 'number' && Number.isFinite(untilMs)) {
       const leftMs = untilMs - nowMs;
       if (leftMs <= 0) {
         return (
-          <span className="expiry overdue" title="Crew offer window closed — operator departing">
-            Crew window closed
+          <span
+            className="expiry overdue"
+            title={`${kind} window closed — operator departing`}
+          >
+            {kind} closed
           </span>
         );
       }
@@ -1082,15 +1183,18 @@ function LotExpiry(props: {
       return (
         <span
           className={leftHours <= 1 ? 'expiry soon' : 'expiry'}
-          title="Market deadline paused while this crew offer is open"
+          title={`Market deadline paused while this ${kind.toLowerCase()} is open`}
         >
-          Crew offer · {formatDuration(leftHours)} left
+          {kind} · {formatDuration(leftHours)} left
         </span>
       );
     }
     return (
-      <span className="expiry" title="Crew offer open — operator waiting for a pilot">
-        Crew offer open
+      <span
+        className="expiry"
+        title={`${kind} open — operator waiting for a pilot`}
+      >
+        {kind} open
       </span>
     );
   }
@@ -1139,19 +1243,26 @@ function NpcTakenBadge(props: {
     });
     const feeFmt = props.formatMoney ?? ((n: number) => `$${n.toLocaleString()}`);
     const fee = formatCrewFeeText(props.claim, feeFmt);
-    const classTag = props.claim.aircraftClassId
-      ? ` · ${aircraftClassLabel(props.claim.aircraftClassId)}`
-      : props.claim.aircraftLabel
-        ? ` · ${props.claim.aircraftLabel}`
-        : '';
+    const classLabel = props.claim.aircraftClassId
+      ? aircraftClassLabel(props.claim.aircraftClassId)
+      : props.claim.aircraftLabel;
+    const tipParts = [
+      props.claim.crewReposition ? 'Ferry' : 'Contract',
+      props.claim.npcName,
+      classLabel,
+      fee ? `fee ${fee}` : null,
+      !props.claim.crewReposition && props.claim.cargoKg > 0
+        ? formatTonnes(props.claim.cargoKg, props.weightSystem)
+        : null,
+      `${formatDuration(eta)} left`,
+    ].filter(Boolean);
     return (
       <span
-        className="npc-badge npc-badge-crew"
-        title={`Contract pilot offer — pick any homologated airframe in this class. Fee scales with how much you lift; NPC keeps the rest. Holds ${formatTonnes(props.claim.cargoKg, props.weightSystem)} until accept or window closes.`}
+        className={`npc-badge npc-badge-crew${props.claim.crewReposition ? ' npc-badge-reposition' : ''}`}
+        title={tipParts.join(' · ')}
       >
-        Crew needed · {props.claim.npcName}
-        {classTag}
-        {fee ? ` · fee ${fee}` : ''} · {formatDuration(eta)} left
+        {props.claim.crewReposition ? 'Ferry' : 'Contract'}
+        <span className="npc-badge-eta"> · {formatDuration(eta)}</span>
       </span>
     );
   }
@@ -1163,9 +1274,10 @@ function NpcTakenBadge(props: {
   return (
     <span
       className="npc-badge"
-      title={`${formatTonnes(props.claim.cargoKg, props.weightSystem)} reserved by NPC`}
+      title={`${props.claim.npcName} · ${formatTonnes(props.claim.cargoKg, props.weightSystem)} · ETA ${formatDuration(eta)}`}
     >
-      Taken by {props.claim.npcName} · ETA {formatDuration(eta)}
+      Taken
+      <span className="npc-badge-eta"> · {formatDuration(eta)}</span>
     </span>
   );
 }
@@ -1828,6 +1940,15 @@ export function App() {
     useState<number | null>(null);
   const [estimatedBlockFuelKg, setEstimatedBlockFuelKg] =
     useState<number | null>(null);
+  const [mxFuelBurn, setMxFuelBurn] = useState<{
+    mult: number;
+    excessPct: number;
+    conditionPct: number;
+    blockFuelKg?: number;
+    baseBlockFuelKg?: number | null;
+    exceedsTank?: boolean;
+    deficitKg?: number;
+  } | null>(null);
   const [estimatedFuelCostUsd, setEstimatedFuelCostUsd] =
     useState<number | null>(null);
   const [estimatedFuelUnitPriceUsd, setEstimatedFuelUnitPriceUsd] =
@@ -1841,6 +1962,9 @@ export function App() {
     useState<number | null>(null);
   const [routeFuelFeasible, setRouteFuelFeasible] =
     useState<boolean | null>(null);
+  /** Resolved OD distance from /api/cargo-limit when lot.distanceNm is missing. */
+  const [routeDistanceNmResolved, setRouteDistanceNmResolved] =
+    useState<number | null>(null);
   const [maxCargoSource, setMaxCargoSource] = useState<string | null>(null);
   const [airframeLabel, setAirframeLabel] = useState<string | null>(null);
   const [watch, setWatch] = useState<WatchStatus | null>(null);
@@ -2109,7 +2233,11 @@ export function App() {
       aircraftClass: AircraftClass,
       distanceNm?: number,
       airframeTypeId?: string,
-      route?: { originIcao?: string; destIcao?: string },
+      route?: {
+        originIcao?: string;
+        destIcao?: string;
+        aircraftId?: string;
+      },
     ) => {
       try {
         const limit = await fetchCargoLimit(
@@ -2119,6 +2247,7 @@ export function App() {
           {
             originIcao: route?.originIcao,
             destIcao: route?.destIcao,
+            aircraftId: route?.aircraftId,
           },
         );
         setStructuralMaxCargoKg(limit.maxCargoKg);
@@ -2130,8 +2259,14 @@ export function App() {
         setRouteFuelCapacityKg(limit.fuelCapacityKg ?? null);
         setRouteFuelDeficitKg(limit.fuelDeficitKg ?? null);
         setRouteFuelFeasible(limit.fuelFeasible ?? null);
+        setRouteDistanceNmResolved(
+          typeof limit.distanceNm === 'number' && Number.isFinite(limit.distanceNm)
+            ? limit.distanceNm
+            : null,
+        );
         setMaxCargoSource(limit.maxCargoSource);
         setAirframeLabel(limit.airframeLabel);
+        setMxFuelBurn(limit.mxFuelBurn ?? null);
       } catch {
         const fallback = fallbackMaxCargoKg(aircraftClass);
         setStructuralMaxCargoKg(fallback);
@@ -2143,8 +2278,10 @@ export function App() {
         setRouteFuelCapacityKg(null);
         setRouteFuelDeficitKg(null);
         setRouteFuelFeasible(null);
+        setRouteDistanceNmResolved(null);
         setMaxCargoSource('class-fallback');
         setAirframeLabel(null);
+        setMxFuelBurn(null);
       }
     },
     [],
@@ -2243,17 +2380,6 @@ export function App() {
 
   useEffect(() => {
     if (!staging) {
-      setMaxCargoKg(null);
-      setStructuralMaxCargoKg(null);
-      setEstimatedBlockFuelKg(null);
-      setEstimatedFuelCostUsd(null);
-      setEstimatedFuelUnitPriceUsd(null);
-      setEstimatedFuelScarcity(null);
-      setRouteFuelCapacityKg(null);
-      setRouteFuelDeficitKg(null);
-      setRouteFuelFeasible(null);
-      setMaxCargoSource(null);
-      setAirframeLabel(null);
       return;
     }
     void refreshCargoLimit(
@@ -2264,6 +2390,7 @@ export function App() {
       {
         originIcao: staging.originIcao,
         destIcao: staging.destIcao,
+        aircraftId: staging.aircraftId,
       },
     );
   }, [
@@ -2353,7 +2480,8 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, hubSelected]);
 
-  // Poll MSFS watch session while active (or briefly after settle to catch final status).
+  // Poll MSFS watch session while active. One shot when idle so a mid-flight
+  // reload can still attach; stop interval after settle (no forever /api/watch/status).
   useEffect(() => {
     let cancelled = false;
     async function pollWatch() {
@@ -2648,9 +2776,14 @@ export function App() {
       }
     }
     void pollWatch();
+    if (!watch?.running) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const id = window.setInterval(() => {
       void pollWatch();
-    }, watch?.running ? (watch.onGround === false ? 5_000 : 3_000) : 8_000);
+    }, watch.onGround === false ? 5_000 : 3_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -2742,6 +2875,60 @@ export function App() {
     [missions],
   );
   activeMissionRef.current = activeMission;
+
+  // Route ops cargo ceiling for Active Dispatch "Capacity left" (and staging).
+  useEffect(() => {
+    if (staging) return;
+    if (tab === 'staging' && activeMission) {
+      const typeId =
+        activeMission.airframeTypeId?.trim() ||
+        fleet.find((a) => a.id === activeMission.aircraftId)?.airframeTypeId
+          ?.trim();
+      void refreshCargoLimit(
+        activeMission.aircraftClassId as AircraftClass,
+        undefined,
+        typeId,
+        {
+          originIcao: activeMission.originIcao,
+          destIcao: activeMission.destIcao,
+          aircraftId: activeMission.aircraftId,
+        },
+      );
+      return;
+    }
+    setMaxCargoKg(null);
+    setStructuralMaxCargoKg(null);
+    setEstimatedBlockFuelKg(null);
+    setEstimatedFuelCostUsd(null);
+    setEstimatedFuelUnitPriceUsd(null);
+    setEstimatedFuelScarcity(null);
+    setRouteFuelCapacityKg(null);
+    setRouteFuelDeficitKg(null);
+    setRouteFuelFeasible(null);
+    setRouteDistanceNmResolved(null);
+    setMaxCargoSource(null);
+    setAirframeLabel(null);
+    setMxFuelBurn(null);
+  }, [
+    activeMission?.id,
+    activeMission?.aircraftClassId,
+    activeMission?.aircraftId,
+    activeMission?.airframeTypeId,
+    activeMission?.originIcao,
+    activeMission?.destIcao,
+    fleet,
+    refreshCargoLimit,
+    staging,
+    tab,
+  ]);
+
+  const activeMissionMxFuelBurn = useMemo(
+    () =>
+      mxFuelBurnFromAircraft(
+        fleet.find((a) => a.id === activeMission?.aircraftId),
+      ),
+    [fleet, activeMission?.aircraftId],
+  );
   const playerDispatchMission = useMemo(
     () => findPlayerDispatchMission(missions),
     [missions],
@@ -2799,6 +2986,7 @@ export function App() {
     const eligible =
       tab === 'staging' &&
       !airportIcao &&
+      !staging?.replaceManifest &&
       activeMission?.status === 'dispatched' &&
       Boolean(activeMission.staticId) &&
       (!activeMission.lastOfpCheck ||
@@ -2871,6 +3059,7 @@ export function App() {
     activeMission?.lastOfpCheck?.verdict,
     airportIcao,
     simbriefUser,
+    staging?.replaceManifest,
     tab,
   ]);
 
@@ -4169,35 +4358,9 @@ export function App() {
     if (!destIcao.trim()) return;
     const dest = destIcao.trim().toUpperCase();
     const finalDest = opts?.finalDest?.trim().toUpperCase() || dest;
-    let quoteRes: Awaited<ReturnType<typeof postFerry>>;
+    setBusy(true);
+    setError(null);
     try {
-      setBusy(true);
-      setError(null);
-      quoteRes = await postFerry({
-        aircraftId,
-        destIcao: dest,
-        quoteOnly: true,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      return;
-    } finally {
-      setBusy(false);
-    }
-    const quote = quoteRes.quote;
-    const remainingNote =
-      dest !== finalDest
-        ? ` Next stop toward ${finalDest}.`
-        : '';
-    const ok = await confirm({
-      title: `Ferry ${quote.originIcao} → ${quote.destIcao}?`,
-      body: `${Math.round(quote.distanceNm)} nm · fee ${formatMoney(quote.ferryFeeUsd)} · fuel ${formatMoney(quote.fuelCostUsd)} · total ${formatMoney(quote.totalCostUsd)} (instant relocation).${remainingNote}`,
-      confirmLabel: dest !== finalDest ? 'Ferry next leg' : 'Ferry now',
-      cancelLabel: 'Not now',
-      tone: 'warn',
-    });
-    if (!ok) return;
-    await run(async () => {
       const result = await postFerry({
         aircraftId,
         destIcao: dest,
@@ -4212,12 +4375,20 @@ export function App() {
         setFerryDest(finalDest);
       }
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
+      const fuelNote = ' · tanks usually empty after hop';
       setToast(
         arrivedAt === finalDest
-          ? `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}`
-          : `Ferry leg · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)} · continue toward ${finalDest}`,
+          ? `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}${fuelNote}`
+          : `Ferry leg · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)} · continue toward ${finalDest}${fuelNote}`,
       );
-    });
+      await refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onPilotTravel(destIcao: string) {
@@ -4318,7 +4489,19 @@ export function App() {
       (lot) =>
         lot.originIcao === draft.originIcao && lot.destIcao === draft.destIcao,
     );
-    return marketMatch?.distanceNm;
+    if (
+      typeof marketMatch?.distanceNm === 'number' &&
+      Number.isFinite(marketMatch.distanceNm)
+    ) {
+      return marketMatch.distanceNm;
+    }
+    if (
+      typeof routeDistanceNmResolved === 'number' &&
+      Number.isFinite(routeDistanceNmResolved)
+    ) {
+      return routeDistanceNmResolved;
+    }
+    return undefined;
   }
 
   function stagingRangeOk(draft: StagingDraft): boolean {
@@ -4695,59 +4878,65 @@ export function App() {
   async function onCommitStaging() {
     if (!staging || staging.lines.length === 0) return;
     await run(async () => {
-      const result = await postStagingCommit({
-        aircraft: staging.aircraft,
-        aircraftId: staging.aircraftId,
-        missionId: staging.intoMissionId,
-        openDispatch: true,
-        replace: Boolean(staging.replaceManifest),
-        weightSystem,
-        lines: staging.lines.map((line) => ({
-          lotId: line.lot.id,
-          cargoKg: line.cargoKg,
-        })),
-      });
-      if (result.fleet) setFleet(result.fleet);
-      if (result.mission) {
-        setMissions((prev) => {
-          const idx = prev.findIndex((m) => m.id === result.mission.id);
-          if (idx >= 0) {
-            const next = prev.slice();
-            next[idx] = result.mission;
-            return next;
-          }
-          return [result.mission, ...prev];
+      try {
+        const result = await postStagingCommit({
+          aircraft: staging.aircraft,
+          aircraftId: staging.aircraftId,
+          missionId: staging.intoMissionId,
+          openDispatch: true,
+          replace: Boolean(staging.replaceManifest),
+          weightSystem,
+          lines: staging.lines.map((line) => ({
+            lotId: line.lot.id,
+            cargoKg: line.cargoKg,
+          })),
         });
-      }
-      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
-      setStaging(null);
-      setWatchAutoPaused(false);
-      if (result.dispatchError) {
-        setToastKind('warn');
-        setToast(
-          `Flight ${result.mission.id} accepted, but SimBrief dispatch failed: ${result.dispatchError}`,
-        );
-      } else {
-        setToastKind('ok');
-        const rem =
-          result.remainingKg !== undefined
-            ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
+        if (result.fleet) setFleet(result.fleet);
+        if (result.mission) {
+          setMissions((prev) => {
+            const idx = prev.findIndex((m) => m.id === result.mission.id);
+            if (idx >= 0) {
+              const next = prev.slice();
+              next[idx] = result.mission;
+              return next;
+            }
+            return [result.mission, ...prev];
+          });
+        }
+        if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+        setStaging(null);
+        setWatchAutoPaused(false);
+        if (result.dispatchError) {
+          setToastKind('warn');
+          setToast(
+            `Flight ${result.mission.id} accepted, but SimBrief dispatch failed: ${result.dispatchError}`,
+          );
+        } else {
+          setToastKind('ok');
+          const rem =
+            result.remainingKg !== undefined
+              ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
+              : '';
+          const dispatchNote = result.dispatch
+            ? ` · SimBrief ${result.dispatch.airframeLabel}`
             : '';
-        const dispatchNote = result.dispatch
-          ? ` · SimBrief ${result.dispatch.airframeLabel}`
-          : '';
-        const action = result.replaced
-          ? 'Updated'
-          : result.appended
+          const action = result.replaced
             ? 'Updated'
-            : 'Created';
-        setToast(
-          `${action} ${result.mission.id} · ${
-            result.lineCount ?? staging.lines.length
-          } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem}${dispatchNote}`,
-        );
+            : result.appended
+              ? 'Updated'
+              : 'Created';
+          setToast(
+            `${action} ${result.mission.id} · ${
+              result.lineCount ?? staging.lines.length
+            } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem}${dispatchNote}`,
+          );
+        }
+        goToTab('staging');
+      } catch (err) {
+        setToastKind('fail');
+        setToast(err instanceof Error ? err.message : String(err));
+        throw err;
       }
-      goToTab('staging');
     });
   }
 
@@ -4755,6 +4944,7 @@ export function App() {
     id: string;
     npcClaim?: {
       crewNeeded?: boolean;
+      crewReposition?: boolean;
       pilotFeeUsd?: number;
       npcName?: string;
       cargoKg?: number;
@@ -4766,14 +4956,32 @@ export function App() {
     try {
       options = await fetchContractPilotOptions({ lotId: lot.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setToastKind('fail');
+      setToast(message);
+      void refresh().catch(() => {
+        /* ignore */
+      });
       return;
     }
-    const flyable = options.airframes.filter((a) => a.liftKg > 0);
+    const isRepo = Boolean(
+      lot.npcClaim.crewReposition || options.offer.crewReposition,
+    );
+    const flyable = isRepo
+      ? options.airframes.filter((a) => a.pilotFeeUsd > 0)
+      : options.airframes.filter((a) => a.liftKg > 0);
     if (flyable.length === 0) {
-      setError(
-        `No homologated ${options.offer.aircraftClassId} airframe can lift this offer (${formatTonnes(options.offer.cargoKg)})`,
-      );
+      const classLabel = options.offer.aircraftClassId.replace(/_/g, ' ');
+      const message = isRepo
+        ? `No homologated ${classLabel} airframe for this ferry`
+        : `No homologated ${classLabel} can fly this route with cargo (${formatTonnes(options.offer.cargoKg)} · ${Math.round(options.offer.distanceNm ?? 0)} nm) — fuel/MTOW leaves 0 lift`;
+      setError(message);
+      setToastKind('fail');
+      setToast(message);
+      void refresh().catch(() => {
+        /* ignore */
+      });
       return;
     }
     const preferred =
@@ -4781,20 +4989,22 @@ export function App() {
       flyable.slice().sort((a, b) => b.liftKg - a.liftKg)[0]!;
     const selectedRef = { current: preferred.typeId };
     const ok = await confirm({
-      title: 'Choose aircraft for crew offer',
-      confirmLabel: 'Accept & dispatch',
+      title: isRepo ? 'Choose aircraft for ferry' : 'Choose aircraft for contract',
+      confirmLabel: isRepo ? 'Ferry' : 'Fly',
       cancelLabel: 'Cancel',
       body: (
         <div className="contract-pilot-pick">
           <p>
             {options.offer.originIcao} → {options.offer.destIcao} ·{' '}
-            {formatTonnes(options.offer.cargoKg)} reserved ·{' '}
-            {options.offer.aircraftClassId.replace(/_/g, ' ')}
+            {isRepo
+              ? 'empty ferry'
+              : `${formatTonnes(options.offer.cargoKg)} reserved`}{' '}
+            · {options.offer.aircraftClassId.replace(/_/g, ' ')}
           </p>
           <p className="muted">
-            Pick any homologated airframe of this class. Lift is capped by route
-            fuel/MTOW (same as SimBrief) — if it cannot take the full load, you
-            fly what fits and the operator departs with the rest.
+            {isRepo
+              ? 'Pick any homologated airframe of this class. Operator covers fuel.'
+              : 'Pick any homologated airframe of this class. Lift is capped by route fuel/MTOW — leftover stays on the board for you to claim again until the window closes (then the operator flies what remains).'}
           </p>
           <label className="contract-pilot-pick-label">
             Aircraft
@@ -4810,7 +5020,7 @@ export function App() {
                   {a.label} · lift {formatTonnes(a.liftKg)}
                   {a.routeLimited ? ' · route-limited' : ''}
                   {a.remainderKg > 0
-                    ? ` · NPC takes ${formatTonnes(a.remainderKg)}`
+                    ? ` · ${formatTonnes(a.remainderKg)} left on board`
                     : ' · full offer'}
                   {` · fee ${formatMoney(a.pilotFeeUsd)}`}
                 </option>
@@ -4847,7 +5057,9 @@ export function App() {
       const air = result.airframeLabel ? ` · ${result.airframeLabel}` : '';
       const split =
         (result.remainderKg ?? 0) > 0
-          ? ` · you ${formatTonnes(result.liftedKg ?? 0)}, NPC ${formatTonnes(result.remainderKg ?? 0)}`
+          ? result.remainderOpenOnBoard
+            ? ` · you ${formatTonnes(result.liftedKg ?? 0)}, ${formatTonnes(result.remainderKg ?? 0)} left on board`
+            : ` · you ${formatTonnes(result.liftedKg ?? 0)}, NPC ${formatTonnes(result.remainderKg ?? 0)}`
           : ` · ${formatTonnes(result.liftedKg ?? result.mission.cargoKg)}`;
       const reposition = result.pilotRelocatedFrom
         ? ` · operator covered travel ${result.pilotRelocatedFrom}→${result.pilotIcao ?? result.mission.originIcao}`
@@ -4855,12 +5067,12 @@ export function App() {
       if (result.dispatchError) {
         setToastKind('warn');
         setToast(
-          `Crew offer accepted · fee ${fee} (${op})${air}${split}${reposition}, but SimBrief failed: ${result.dispatchError}`,
+          `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition}, but SimBrief failed: ${result.dispatchError}`,
         );
       } else {
         setToastKind('ok');
         setToast(
-          `Crew offer accepted · fee ${fee} (${op})${air}${split}${reposition} · Dispatch open`,
+          `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition} · Dispatch open`,
         );
       }
       goToTab('staging');
@@ -4914,6 +5126,34 @@ export function App() {
         }`,
       );
     }
+  }
+
+  async function onAcceptOfpCargo(mission: Mission) {
+    const username = simbriefUser.trim();
+    if (!username) {
+      setToastKind('fail');
+      setToast('Enter SimBrief username in Settings first');
+      return;
+    }
+    await run(async () => {
+      const result = await postAcceptOfpCargo({
+        missionId: mission.id,
+        simbriefUser: username,
+      });
+      setMissions((current) =>
+        current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+      );
+      const released = formatTonnes(result.releasedKg);
+      const payDelta = result.payAfterUsd - result.payBeforeUsd;
+      const payBit =
+        payDelta === 0
+          ? 'pay unchanged'
+          : `pay ${formatMoney(result.payAfterUsd)} (${payDelta < 0 ? '−' : '+'}${formatMoney(Math.abs(payDelta))})`;
+      setToastKind(result.check.verdict === 'fail' ? 'warn' : 'ok');
+      setToast(
+        `Accepted OFP cargo · released ${released} to the board · ${payBit} · OFP ${result.check.verdict.toUpperCase()}`,
+      );
+    });
   }
 
   async function onCancel(mission: Mission) {
@@ -5531,6 +5771,7 @@ export function App() {
   const stagingDistanceNm = staging ? stagingRouteDistanceNm(staging) : undefined;
   const stagingInRange = staging ? stagingRangeOk(staging) : true;
   const stagingFuelOk = routeFuelFeasible !== false;
+  const stagingMxFuelWarn = Boolean(mxFuelBurn?.exceedsTank && stagingFuelOk);
   const stagingCandidates = staging
     ? stagingRouteLots.filter(
         (lot) =>
@@ -5635,17 +5876,29 @@ export function App() {
         if (isCargoOpsCommodityLocked(lot.commodityId)) return false;
         if (lot.estimatedInRange === false) return false;
         if (lot.estimatedFuelFeasible === false) return false;
-        if (
+        // Open Contracts are reserved (availableKg often 0). Prefer server
+        // estimate; fall back to claim cargo so remainder stays visible.
+        const claimKg =
+          lot.npcClaim?.crewNeeded &&
+          typeof lot.npcClaim.cargoKg === 'number' &&
+          lot.npcClaim.cargoKg > 0
+            ? lot.npcClaim.cargoKg
+            : undefined;
+        const liftKg =
           typeof lot.estimatedLiftKg === 'number' &&
-          lot.estimatedLiftKg <= 0
-        ) {
+          Number.isFinite(lot.estimatedLiftKg) &&
+          lot.estimatedLiftKg > 0
+            ? lot.estimatedLiftKg
+            : (claimKg ?? lot.estimatedLiftKg);
+        if (typeof liftKg === 'number' && liftKg <= 0) {
           return false;
         }
         if (
-          lot.estimatedLiftKg === null ||
-          lot.estimatedLiftKg === undefined ||
-          lot.estimatedInRange === null ||
-          lot.estimatedInRange === undefined
+          liftKg === null ||
+          liftKg === undefined ||
+          (lot.estimatedInRange === null ||
+            lot.estimatedInRange === undefined) &&
+            claimKg === undefined
         ) {
           return false;
         }
@@ -5728,7 +5981,9 @@ export function App() {
       ? stagingMode === 'active'
         ? 'Guided preflight — flight plan, fuel, load, then fly and settle.'
         : stagingMode === 'draft'
-          ? 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
+          ? staging?.replaceManifest
+            ? 'Adjust payload, then Save & re-dispatch to reopen SimBrief with the new load.'
+            : 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
           : stagingMode === 'debrief'
             ? 'Flight complete — review payout, fuel cost, and net.'
             : 'Prepare a freight from Freights, or resume after settling the last flight.'
@@ -7387,16 +7642,20 @@ export function App() {
                                 <div className="commodity-cell">
                                   <CommodityIcon
                                     commodityId={lot.commodityId}
-                                    size={40}
+                                    size={52}
                                     title={lot.commodityName}
                                   />
-                                  <div>
+                                  <div title={lot.reason || undefined}>
                                     <strong>{lot.commodityName}</strong>
-                                    <small>{lot.reason}</small>
                                   </div>
                                 </div>
                               </td>
-                              <td>{formatTonnes(lot.availableKg)}</td>
+                              <td>
+                                <LotLoadCell
+                                  lot={lot}
+                                  weightSystem={weightSystem}
+                                />
+                              </td>
                               <td>
                                 <LotExpiry
                                   lot={lot}
@@ -7408,7 +7667,9 @@ export function App() {
                                   <small>Perishable</small>
                                 ) : null}
                               </td>
-                              <td className="pay">{formatMoney(lot.payUsd)}</td>
+                              <td className="pay">
+                                <LotPayCell lot={lot} />
+                              </td>
                               <td
                                 className={
                                   lot.npcClaim?.crewNeeded &&
@@ -7428,20 +7689,7 @@ export function App() {
                               >
                                 {lot.npcClaim?.crewNeeded &&
                                 typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                                  <>
-                                    {formatCrewFeeText(
-                                      lot.npcClaim,
-                                      formatMoney,
-                                    )}
-                                    <small title="Crew fee scales with how much your chosen airframe lifts; fuel/ops covered by the operator">
-                                      {typeof lot.npcClaim.pilotFeeMinUsd ===
-                                        'number' &&
-                                      lot.npcClaim.pilotFeeMinUsd <
-                                        lot.npcClaim.pilotFeeUsd
-                                        ? 'by lift'
-                                        : 'crew fee'}
-                                    </small>
-                                  </>
+                                  formatCrewFeeText(lot.npcClaim, formatMoney)
                                 ) : boardAircraft &&
                                   lot.estimatedInRange === false ? (
                                   <small title="Beyond selected aircraft range">
@@ -7449,23 +7697,19 @@ export function App() {
                                   </small>
                                 ) : boardAircraft &&
                                   typeof lot.estimatedNetUsd === 'number' ? (
-                                  <>
-                                    {formatMoney(lot.estimatedNetUsd)}
-                                    {typeof lot.estimatedFuelCostUsd ===
-                                    'number' ? (
-                                      <small
-                                        title={
-                                          typeof lot.estimatedLiftKg ===
+                                  <span
+                                    title={
+                                      typeof lot.estimatedFuelCostUsd ===
+                                      'number'
+                                        ? typeof lot.estimatedLiftKg ===
                                           'number'
-                                            ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
-                                            : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
-                                        }
-                                      >
-                                        −{formatMoney(lot.estimatedFuelCostUsd)}{' '}
-                                        fuel
-                                      </small>
-                                    ) : null}
-                                  </>
+                                          ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                                          : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                                        : undefined
+                                    }
+                                  >
+                                    {formatMoney(lot.estimatedNetUsd)}
+                                  </span>
                                 ) : (
                                   '—'
                                 )}
@@ -7496,14 +7740,9 @@ export function App() {
                                         : playerDispatchMission
                                         ? `Finish or cancel ${playerDispatchMission.id} in Dispatch first`
                                         : lot.npcClaim?.crewNeeded
-                                          ? `Accept crew offer${
-                                              formatCrewFeeText(
-                                                lot.npcClaim,
-                                                formatMoney,
-                                              )
-                                                ? ` · fee ${formatCrewFeeText(lot.npcClaim, formatMoney)}`
-                                                : ''
-                                            } — pick homologated airframe in class; fee scales with lift`
+                                          ? lot.npcClaim.crewReposition
+                                            ? 'Ferry empty aircraft home'
+                                            : 'Fly as contract pilot'
                                           : lot.status !== 'available' ||
                                               lot.availableKg <= 0
                                             ? 'This contract is no longer available'
@@ -7515,8 +7754,10 @@ export function App() {
                                       : playerDispatchMission
                                         ? 'Flight busy'
                                         : lot.npcClaim?.crewNeeded
-                                          ? 'Accept crew offer'
-                                          : 'Prepare flight'}
+                                          ? lot.npcClaim.crewReposition
+                                            ? 'Ferry'
+                                            : 'Fly'
+                                          : 'Prepare'}
                                   </button>
                                   {(playerFbos?.fbos.some(
                                     (f) =>
@@ -8070,9 +8311,6 @@ export function App() {
                           </span>
                         ) : null}
                       </div>
-                      <small>
-                        {lot.originName} → {lot.destName}
-                      </small>
                       {meta ? (
                         <small className="lot-meta" title={meta.title}>
                           {meta.text}
@@ -8094,16 +8332,17 @@ export function App() {
                       <div className="commodity-cell">
                         <CommodityIcon
                           commodityId={lot.commodityId}
-                          size={40}
+                          size={52}
                           title={lot.commodityName}
                         />
-                        <div>
+                        <div title={lot.reason || undefined}>
                           <strong>{lot.commodityName}</strong>
-                          <small>{lot.reason}</small>
                         </div>
                       </div>
                     </td>
-                    <td>{formatTonnes(lot.availableKg)}</td>
+                    <td>
+                      <LotLoadCell lot={lot} weightSystem={weightSystem} />
+                    </td>
                     <td>
                       <LotExpiry
                         lot={lot}
@@ -8114,15 +8353,7 @@ export function App() {
                       {lot.perishable ? <small>Perishable</small> : null}
                     </td>
                     <td className="pay">
-                      {formatMoney(lot.payUsd)}
-                      {idlePct !== null ? (
-                        <span
-                          className="idle-uptick"
-                          title={`Freight has sat on the board — pay is up ${idlePct}% vs formation`}
-                        >
-                          ↑{idlePct}%
-                        </span>
-                      ) : null}
+                      <LotPayCell lot={lot} idlePct={idlePct} />
                     </td>
                     <td
                       className={
@@ -8142,32 +8373,20 @@ export function App() {
                     >
                       {lot.npcClaim?.crewNeeded &&
                       typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                        <>
-                          {formatCrewFeeText(lot.npcClaim, formatMoney)}
-                          <small title="Crew fee scales with how much your chosen airframe lifts; fuel/ops covered by the operator">
-                            {typeof lot.npcClaim.pilotFeeMinUsd === 'number' &&
-                            lot.npcClaim.pilotFeeMinUsd <
-                              lot.npcClaim.pilotFeeUsd
-                              ? 'by lift'
-                              : 'crew fee'}
-                          </small>
-                        </>
+                        formatCrewFeeText(lot.npcClaim, formatMoney)
                       ) : boardAircraft &&
                         typeof lot.estimatedNetUsd === 'number' ? (
-                        <>
+                        <span
+                          title={
+                            typeof lot.estimatedFuelCostUsd === 'number'
+                              ? typeof lot.estimatedLiftKg === 'number'
+                                ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                                : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
+                              : undefined
+                          }
+                        >
                           {formatMoney(lot.estimatedNetUsd)}
-                          {typeof lot.estimatedFuelCostUsd === 'number' ? (
-                            <small
-                              title={
-                                typeof lot.estimatedLiftKg === 'number'
-                                  ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
-                                  : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
-                              }
-                            >
-                              −{formatMoney(lot.estimatedFuelCostUsd)} fuel
-                            </small>
-                          ) : null}
-                        </>
+                        </span>
                       ) : (
                         '—'
                       )}
@@ -8190,16 +8409,14 @@ export function App() {
                             : playerDispatchMission
                             ? `Finish or cancel ${playerDispatchMission.id} in Dispatch first`
                             : lot.npcClaim?.crewNeeded
-                              ? `Accept crew offer${
-                                  formatCrewFeeText(lot.npcClaim, formatMoney)
-                                    ? ` · fee ${formatCrewFeeText(lot.npcClaim, formatMoney)}`
-                                    : ''
-                                } — pick homologated airframe in class; fee scales with lift`
+                              ? lot.npcClaim.crewReposition
+                                ? 'Ferry empty aircraft home'
+                                : 'Fly as contract pilot'
                               : staging &&
                                   staging.originIcao === lot.originIcao &&
                                   staging.destIcao === lot.destIcao
-                                ? 'Replace current staging draft with this lot as the starting line'
-                                : 'Open Dispatch to choose aircraft and payload'
+                                ? 'Replace current staging draft'
+                                : 'Open Dispatch'
                         }
                       >
                         {cargoLocked
@@ -8207,12 +8424,14 @@ export function App() {
                           : playerDispatchMission
                           ? 'Flight busy'
                           : lot.npcClaim?.crewNeeded
-                            ? 'Accept crew offer'
+                            ? lot.npcClaim.crewReposition
+                              ? 'Ferry'
+                              : 'Fly'
                             : staging &&
                                 staging.originIcao === lot.originIcao &&
                                 staging.destIcao === lot.destIcao
-                              ? 'Restage route'
-                              : 'Prepare flight'}
+                              ? 'Restage'
+                              : 'Prepare'}
                       </button>
                     </td>
                   </tr>
@@ -8281,7 +8500,7 @@ export function App() {
                   <p>
                     {flightDebrief.onTime
                       ? 'On time'
-                      : `Late ${flightDebrief.lateTicks}h`}
+                      : `Late ${(flightDebrief.lateTicks / 4).toFixed(1)}h`}
                   </p>
                 </div>
                 <div className="missions-head-spacer" aria-hidden="true" />
@@ -8336,11 +8555,50 @@ export function App() {
                     <dt>Landing</dt>
                     <dd>{formatLandingFpm(flightDebrief.landingFpm)}</dd>
                   </div>
+                  {flightDebrief.weatherBonusUsd > 0 ||
+                  (flightDebrief.weatherOps &&
+                    flightDebrief.weatherOps.sampleCount > 0) ? (
+                    <div>
+                      <dt>Weather ops</dt>
+                      <dd>
+                        {flightDebrief.weatherBonusUsd > 0
+                          ? `+${formatMoney(flightDebrief.weatherBonusUsd)}`
+                          : '—'}
+                      </dd>
+                    </div>
+                  ) : null}
                   <div className="debrief-net">
                     <dt>Net</dt>
                     <dd>{formatMoney(flightDebrief.netUsd)}</dd>
                   </div>
                 </dl>
+                {formatWeatherOpsDebriefLine(
+                  flightDebrief.weatherOps,
+                  flightDebrief.weatherBonusUsd,
+                ) ? (
+                  <p className="debrief-weather-ops">
+                    {formatWeatherOpsDebriefLine(
+                      flightDebrief.weatherOps,
+                      flightDebrief.weatherBonusUsd,
+                    )}
+                  </p>
+                ) : null}
+                {flightDebrief.runwayTouch ? (
+                  <div className="debrief-runway-block">
+                    <RunwayTouchdownDiagram touch={flightDebrief.runwayTouch} />
+                    {formatRunwayTouchdownDebriefLine(flightDebrief.runwayTouch) ? (
+                      <p
+                        className={
+                          flightDebrief.runwayTouch.onPavement
+                            ? 'debrief-runway-line'
+                            : 'debrief-runway-line debrief-runway-line-off'
+                        }
+                      >
+                        {formatRunwayTouchdownDebriefLine(flightDebrief.runwayTouch)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 {flightDebrief.flightScore ? (
                   <div className="flight-score" aria-label="Flight score">
                     <div className="flight-score-head">
@@ -8541,6 +8799,21 @@ export function App() {
                   >
                     Back
                   </button>
+                  <button
+                    type="button"
+                    className="accept"
+                    disabled={busy || !stagingValid}
+                    onClick={() => void onCommitStaging()}
+                    title={
+                      staging.replaceManifest
+                        ? 'Save the edited manifest and reopen SimBrief'
+                        : 'Accept the staged manifest and open SimBrief'
+                    }
+                  >
+                    {staging.replaceManifest
+                      ? 'Save & re-dispatch'
+                      : 'Accept & Dispatch'}
+                  </button>
                 </div>
               </div>
 
@@ -8576,6 +8849,9 @@ export function App() {
                       ? `tank max ${formatTonnes(routeFuelCapacityKg)}`
                       : airframeLabel ?? 'homologated class'}
                     {maxCargoSource ? ` · ${maxCargoSource}` : ''}
+                    {mxFuelBurn
+                      ? ` · MX burn +${mxFuelBurn.excessPct}% (cond ${Math.round(mxFuelBurn.conditionPct)}%)`
+                      : ''}
                   </em>
                 </span>
                 <span>
@@ -8618,7 +8894,11 @@ export function App() {
                     {estimatedFuelCostUsd !== null
                       ? `pay − Jet-A ${formatMoney(estimatedFuelCostUsd)}${
                           estimatedFuelUnitPriceUsd !== null
-                            ? ` · $${estimatedFuelUnitPriceUsd.toFixed(2)}/kg`
+                            ? ` · $${(
+                                weightSystem === 'imperial'
+                                  ? estimatedFuelUnitPriceUsd / KG_TO_LB
+                                  : estimatedFuelUnitPriceUsd
+                              ).toFixed(2)}/${weightSystem === 'imperial' ? 'lb' : 'kg'}`
                             : ''
                         }${
                           estimatedFuelScarcity &&
@@ -8646,17 +8926,36 @@ export function App() {
                   Estimated block fuel exceeds tank capacity
                   {estimatedBlockFuelKg !== null &&
                   routeFuelCapacityKg !== null
-                    ? ` (${Math.round(estimatedBlockFuelKg)} kg required > ${Math.round(routeFuelCapacityKg)} kg max`
+                    ? ` (${formatMassExact(estimatedBlockFuelKg, weightSystem)} required > ${formatMassExact(routeFuelCapacityKg, weightSystem)} max`
                     : ''}
                   {routeFuelDeficitKg !== null && routeFuelDeficitKg >= 1
-                    ? ` · deficit ${Math.round(routeFuelDeficitKg)} kg`
+                    ? ` · deficit ${formatMassExact(routeFuelDeficitKg, weightSystem)}`
                     : ''}
                   {estimatedBlockFuelKg !== null &&
                   routeFuelCapacityKg !== null
                     ? ')'
                     : ''}
-                  . Choose a shorter route or an aircraft with more range before
+                  . Choose a shorter route or an aircraft with more tank before
                   Dispatch.
+                </p>
+              ) : null}
+
+              {stagingMxFuelWarn ? (
+                <p className="banner warn">
+                  MX burn +{mxFuelBurn!.excessPct}% (condition{' '}
+                  {Math.round(mxFuelBurn!.conditionPct)}%) — this airframe may
+                  need more fuel than a healthy plan on this route
+                  {typeof mxFuelBurn!.baseBlockFuelKg === 'number'
+                    ? ` (healthy ~${formatMassExact(mxFuelBurn!.baseBlockFuelKg, weightSystem)}`
+                    : ''}
+                  {typeof mxFuelBurn!.blockFuelKg === 'number' &&
+                  typeof mxFuelBurn!.baseBlockFuelKg === 'number'
+                    ? ` → worn ~${formatMassExact(mxFuelBurn!.blockFuelKg, weightSystem)})`
+                    : typeof mxFuelBurn!.baseBlockFuelKg === 'number'
+                      ? ')'
+                      : ''}
+                  . Dispatch still uses SimBrief OFP for Due — repair before long
+                  legs or Watch may drain the excess burn in flight.
                 </p>
               ) : null}
 
@@ -8708,14 +9007,13 @@ export function App() {
                           <button
                             type="button"
                             className="action ghost danger"
-                            disabled={busy}
-                            onClick={() => {
-                              if (staging.lines.length <= 1) {
-                                setStaging(null);
-                              } else {
-                                removeStagingLine(line.lot.id);
-                              }
-                            }}
+                            disabled={busy || staging.lines.length <= 1}
+                            title={
+                              staging.lines.length <= 1
+                                ? 'Keep at least one lot — cancel the flight to drop the whole manifest'
+                                : undefined
+                            }
+                            onClick={() => removeStagingLine(line.lot.id)}
                           >
                             Remove
                           </button>
@@ -8784,6 +9082,41 @@ export function App() {
                 </ul>
               </div>
 
+              <div className="staging-footer staging-footer-sticky">
+                <div>
+                  <p>
+                    {staging.lines.length} staged · {formatTonnes(stagingTotalKg)} ·{' '}
+                    {formatMoney(stagingPayUsd + (stagingExisting?.payUsd ?? 0))} total
+                  </p>
+                  {!stagingValid ? (
+                    <p className="cargo-dialog-error">
+                      {!stagingInRange
+                        ? 'Route exceeds aircraft range — pick another airframe or shorter hop.'
+                        : !stagingFuelOk
+                          ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
+                          : staging.lines.some((line) => {
+                                const maxKg = lineMaxKg(staging, line.lot);
+                                return line.cargoKg <= 0 || line.cargoKg > maxKg;
+                              })
+                            ? 'Adjust each lot to a valid load before saving.'
+                            : 'Finish the manifest before saving.'}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="cargo-dialog-actions">
+                  <button
+                    type="button"
+                    className="accept"
+                    disabled={busy || !stagingValid}
+                    onClick={() => void onCommitStaging()}
+                  >
+                    {staging.replaceManifest
+                      ? 'Save & re-dispatch'
+                      : 'Accept & Dispatch'}
+                  </button>
+                </div>
+              </div>
+
               <div className="staging-section">
                 <h3>Same-route lots to add</h3>
                 {stagingExistingLots + staging.lines.length >= MAX_STAGING_LOTS ? (
@@ -8849,25 +9182,6 @@ export function App() {
                   </ul>
                 )}
               </div>
-
-              <div className="staging-footer">
-                <p>
-                  {staging.lines.length} staged · {formatTonnes(stagingTotalKg)} ·{' '}
-                  {formatMoney(stagingPayUsd + (stagingExisting?.payUsd ?? 0))} total
-                </p>
-                <div className="cargo-dialog-actions">
-                  <button
-                    type="button"
-                    className="accept"
-                    disabled={busy || !stagingValid}
-                    onClick={() => void onCommitStaging()}
-                  >
-                    {staging.replaceManifest
-                      ? 'Save & re-dispatch'
-                      : 'Accept & Dispatch'}
-                  </button>
-                </div>
-              </div>
             </>
           ) : activeMission ? (
             <DispatchActivePanel
@@ -8890,22 +9204,27 @@ export function App() {
                   fleet.find(
                     (a) => a.aircraftClassId === mission.aircraftClassId,
                   )?.airframeTypeId?.trim();
-                const fromAirframe =
+                const structural =
                   typeId && airframePerf[typeId]?.maxCargoKg
                     ? airframePerf[typeId]!.maxCargoKg
-                    : undefined;
+                    : fallbackMaxCargoKg(
+                        mission.aircraftClassId as AircraftClass,
+                      );
+                // Prefer route MTOW/fuel ops cap when loaded for this Dispatch view.
                 if (
-                  typeof fromAirframe === 'number' &&
-                  Number.isFinite(fromAirframe) &&
-                  fromAirframe > 0
+                  maxCargoKg !== null &&
+                  Number.isFinite(maxCargoKg) &&
+                  maxCargoKg > 0
                 ) {
-                  return fromAirframe;
+                  return Math.min(structural, maxCargoKg);
                 }
-                return fallbackMaxCargoKg(
-                  mission.aircraftClassId as AircraftClass,
-                );
+                return structural;
               }}
-              ofpAutoStatus={ofpAutoStatus}
+              missionOpsCapacityHint={
+                maxCargoKg !== null && Number.isFinite(maxCargoKg)
+                  ? maxCargoKg
+                  : null
+              }              ofpAutoStatus={ofpAutoStatus}
               missionFuelQuote={missionFuelQuote}
               missionFuelQuoteStatus={missionFuelQuoteStatus}
               missionFuelQuoteError={missionFuelQuoteError}
@@ -8916,11 +9235,13 @@ export function App() {
               simBridge={simBridge}
               watch={watch}
               preflightBootstrapError={preflightBootstrapError}
+              mxFuelBurnAlert={activeMissionMxFuelBurn}
               onOpenAirport={openAirport}
               onSelectSettings={() => selectTab('settings')}
               onDispatch={(m) => void onDispatch(m)}
               onCancel={(m) => void onCancel(m)}
               onEditManifest={(m) => void enterEditManifest(m)}
+              onAcceptOfpCargo={(m) => void onAcceptOfpCargo(m)}
               onBuyFuel={(m) => void onBuyMissionFuel(m)}
               onRetryFuelQuote={() =>
                 setMissionFuelQuoteRetryToken((token) => token + 1)
@@ -9269,6 +9590,7 @@ export function App() {
                     busy={busy}
                     formatMoney={formatMoney}
                     formatMass={formatTonnes}
+                    weightSystem={weightSystem}
                     onOpenAirport={openAirport}
                     delivery={aircraftDeliveryQuotes[listing.id] ?? null}
                     leaseUnlocked={leaseUnlock?.unlocked ?? true}
@@ -9452,6 +9774,7 @@ export function App() {
                   hasListed={hasListedAircraft}
                   formatMoney={formatMoney}
                   formatMass={formatTonnes}
+                  weightSystem={weightSystem}
                   onOpenAirport={openAirport}
                   onFerryDestChange={setFerryDest}
                   onTravelDestChange={setTravelDest}
@@ -9462,7 +9785,7 @@ export function App() {
                   onReturnLease={(id) => void onReturnLease(id)}
                   onListForLease={(id) => void onListForLease(id)}
                   onSell={(id) => void onSellAircraft(id)}
-                  onFerry={(id, dest) => void onFerry(id, dest)}
+                  onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
                   onTravel={(dest) => void onPilotTravel(dest)}
                 />
               ))}

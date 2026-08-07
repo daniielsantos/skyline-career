@@ -357,6 +357,37 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(later.elapsedMs, 20 * 60_000);
   });
 
+  it('uses 50% airborne gate for routes under 100 nm', () => {
+    const plannedMs = 40 * 60_000;
+    const airborneAt = 1_000_000;
+    const shortOk = evaluateMinAirborneElapsed({
+      airborneAtMs: airborneAt,
+      expectedRouteMs: plannedMs,
+      nowMs: airborneAt + 20 * 60_000,
+      distanceNm: 80,
+    });
+    assert.equal(shortOk.ok, true);
+    assert.equal(shortOk.ratioRequired, 0.5);
+    assert.equal(shortOk.requiredMs, 20 * 60_000);
+
+    const shortBlocked = evaluateMinAirborneElapsed({
+      airborneAtMs: airborneAt,
+      expectedRouteMs: plannedMs,
+      nowMs: airborneAt + 19 * 60_000,
+      distanceNm: 80,
+    });
+    assert.equal(shortBlocked.ok, false);
+
+    const longBlocked = evaluateMinAirborneElapsed({
+      airborneAtMs: airborneAt,
+      expectedRouteMs: plannedMs,
+      nowMs: airborneAt + 20 * 60_000,
+      distanceNm: 150,
+    });
+    assert.equal(longBlocked.ok, false);
+    assert.equal(longBlocked.ratioRequired, 0.7);
+  });
+
   it('captures landing FPM from last airborne vertical speed', () => {
     const plannedMs = 3_600_000;
     const nowMs = Date.now();
@@ -395,6 +426,124 @@ describe('evaluateMissionFlightTransition', () => {
     );
     assert.equal(taxi.nextState.landingFpm, -212);
     assert.equal(taxi.event.type, 'settle');
+  });
+
+  it('clears premature touchdown stamp on go-around climb', () => {
+    const nowMs = Date.now();
+    const plannedMs = 3_600_000;
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: nowMs - 60_000,
+      expectedRouteMs: plannedMs,
+    });
+
+    const bounce = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        verticalSpeedFpm: -50,
+      },
+      state,
+      { nowMs },
+    );
+    assert.ok(typeof bounce.nextState.airborneEndedAtMs === 'number');
+    state = bounce.nextState;
+
+    const climbOut = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        verticalSpeedFpm: 700,
+      },
+      state,
+      { nowMs: nowMs + 2_000 },
+    );
+    assert.equal(climbOut.nextState.airborneEndedAtMs, undefined);
+    assert.equal(climbOut.nextState.landingFpm, undefined);
+  });
+
+  it('keeps first-contact stamp across a short landing bounce', () => {
+    const nowMs = Date.now();
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: nowMs - 60_000,
+      expectedRouteMs: 3_600_000,
+      lastAirborneVsFpm: -420,
+    });
+
+    const first = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        verticalSpeedFpm: -50,
+      },
+      state,
+      { nowMs },
+    );
+    assert.equal(first.nextState.landingFpm, -420);
+    assert.ok(typeof first.nextState.airborneEndedAtMs === 'number');
+    state = first.nextState;
+
+    const hop = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        verticalSpeedFpm: 180,
+        aglFt: 12,
+      },
+      state,
+      { nowMs: nowMs + 1_000 },
+    );
+    assert.equal(hop.nextState.landingFpm, -420);
+    assert.equal(hop.nextState.airborneEndedAtMs, first.nextState.airborneEndedAtMs);
+    state = hop.nextState;
+
+    const second = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        verticalSpeedFpm: 40,
+      },
+      state,
+      { nowMs: nowMs + 2_000 },
+    );
+    assert.equal(second.nextState.landingFpm, -420);
+    assert.equal(
+      second.nextState.airborneEndedAtMs,
+      first.nextState.airborneEndedAtMs,
+    );
+  });
+
+  it('does not clear first-contact on a ~3 m bounce hop', () => {
+    const nowMs = Date.now();
+    const hop = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        verticalSpeedFpm: 350,
+        aglFt: 18,
+      },
+      createMissionFlightWatchState({
+        sawAirborne: true,
+        lastOnGround: true,
+        airborneAtMs: nowMs - 60_000,
+        airborneEndedAtMs: nowMs,
+        expectedRouteMs: 3_600_000,
+        landingFpm: -500,
+        lastAirborneVsFpm: -500,
+      }),
+      { nowMs: nowMs + 500 },
+    );
+    assert.equal(hop.nextState.landingFpm, -500);
+    assert.equal(hop.nextState.airborneEndedAtMs, nowMs);
   });
 });
 

@@ -17,6 +17,8 @@ import {
   careerOperationalCargoMaxLb,
   cgCounterweightPerSeatLb,
   cgRebalanceStepLb,
+  equalizeLateralStationPairs,
+  findLateralStationGroups,
   fuelTankTargetsForRound,
   FUEL_INJECT_ROUNDS,
   liveFuelMatchesTarget,
@@ -242,8 +244,16 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     assert.deepEqual(ordered.indexes, [4, 5, 3]);
   });
 
-  it('falls back to station index without arms', async () => {
-    const profile = await loadCaravanProfile();
+  it('falls back to station index without arms', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 15, maxLoad: 500 },
+          { index: 3, maxLoad: 500 },
+          { index: 10, maxLoad: 500 },
+        ],
+      },
+    } as AircraftProfile;
     const ordered = orderStationsLongitudinal(profile, [15, 3, 10]);
     assert.equal(ordered.usedArms, false);
     assert.deepEqual(ordered.indexes, [3, 10, 15]);
@@ -259,6 +269,11 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       (sum, idx) => sum + (aftHeavy[idx] ?? 0),
       0,
     );
+    const { indexes: forwardFirst } = orderStationsLongitudinal(
+      profile,
+      CARAVAN_ROLES.baggageStations,
+    );
+    const forwardMost = forwardFirst[0]!;
     const shifted = shiftCargoForCg(
       aftHeavy,
       profile,
@@ -274,7 +289,7 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     );
     assert.equal(afterBag, beforeBag);
     assert.equal(shifted.stations[1], 170);
-    assert.ok((shifted.stations[3] ?? 0) > 0);
+    assert.ok((shifted.stations[forwardMost] ?? 0) > 0);
     assert.ok((shifted.stations[15] ?? 0) < 500);
     for (const station of profile.payload.stations) {
       assert.ok(
@@ -289,7 +304,12 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     const stations: Record<number, number> = { 1: 170, 2: 0 };
     // All cargo already on the forward-most baggage station.
     for (const idx of CARAVAN_ROLES.baggageStations) stations[idx] = 0;
-    stations[3] = 500;
+    const { indexes: forwardFirst } = orderStationsLongitudinal(
+      profile,
+      CARAVAN_ROLES.baggageStations,
+    );
+    const forwardMost = forwardFirst[0]!;
+    stations[forwardMost] = 500;
     const shifted = shiftCargoForCg(
       stations,
       profile,
@@ -298,7 +318,7 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       100,
     );
     assert.equal(shifted.movedLb, 0);
-    assert.equal(shifted.stations[3], 500);
+    assert.equal(shifted.stations[forwardMost], 500);
   });
 
   it('allocateCargoRoundPerSeat adds up to 50 lb on each eligible seat', () => {
@@ -343,12 +363,102 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     assert.equal(forward.stations[3], 0);
   });
 
+  it('equalizes left/right pairs at the same arm after a budget-limited round', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 5, name: 'REAR PAX LEFT', maxLoad: 500, arm: -5.7 },
+          { index: 6, name: 'REAR PAX RIGHT', maxLoad: 500, arm: -5.7 },
+          { index: 7, name: 'BAGGAGE', maxLoad: 500, arm: -7.8 },
+        ],
+      },
+    } as AircraftProfile;
+    const groups = findLateralStationGroups(profile, [5, 6, 7]);
+    assert.deepEqual(groups, [[5, 6]]);
+
+    // Budget only enough for one seat — without lateral equalize, left would get all.
+    const placed = allocateCargoRoundPerSeat(
+      { 5: 0, 6: 0, 7: 0 },
+      profile,
+      [5, 6, 7],
+      100,
+      'aft',
+      100,
+    );
+    assert.equal(placed.movedLb, 100);
+    assert.ok(Math.abs((placed.stations[5] ?? 0) - (placed.stations[6] ?? 0)) <= 1);
+    assert.equal((placed.stations[5] ?? 0) + (placed.stations[6] ?? 0), 100);
+
+    const skewed = equalizeLateralStationPairs(
+      { 5: 390, 6: 129, 7: 80 },
+      profile,
+      [5, 6, 7],
+    );
+    assert.ok(Math.abs((skewed[5] ?? 0) - (skewed[6] ?? 0)) <= 1);
+    assert.equal((skewed[5] ?? 0) + (skewed[6] ?? 0), 390 + 129);
+    assert.equal(skewed[7], 80);
+  });
+
+  it('does not drain right→left at the same arm when shifting CG forward', () => {
+    // Bonanza-like: L/R pairs share arm; index order alone would treat R as "aft".
+    const profile = {
+      payload: {
+        stations: [
+          { index: 3, name: 'FRONT PAX LEFT', maxLoad: 500, arm: -2.3 },
+          { index: 4, name: 'FRONT PAX RIGHT', maxLoad: 500, arm: -2.3 },
+          { index: 5, name: 'REAR PAX LEFT', maxLoad: 500, arm: -5.7 },
+          { index: 6, name: 'REAR PAX RIGHT', maxLoad: 500, arm: -5.7 },
+          { index: 7, name: 'BAGGAGE', maxLoad: 500, arm: -7.8 },
+        ],
+      },
+    } as AircraftProfile;
+    const start = { 3: 100, 4: 100, 5: 250, 6: 250, 7: 100 };
+    const shifted = shiftCargoForCg(
+      start,
+      profile,
+      [3, 4, 5, 6, 7],
+      'forward',
+      150,
+    );
+    assert.ok(shifted.movedLb > 0);
+    assert.ok(
+      Math.abs((shifted.stations[3] ?? 0) - (shifted.stations[4] ?? 0)) <= 1,
+      `front L/R drifted: ${shifted.stations[3]} vs ${shifted.stations[4]}`,
+    );
+    assert.ok(
+      Math.abs((shifted.stations[5] ?? 0) - (shifted.stations[6] ?? 0)) <= 1,
+      `rear L/R drifted: ${shifted.stations[5]} vs ${shifted.stations[6]}`,
+    );
+    const before =
+      (start[3] ?? 0) +
+      (start[4] ?? 0) +
+      (start[5] ?? 0) +
+      (start[6] ?? 0) +
+      (start[7] ?? 0);
+    const after =
+      (shifted.stations[3] ?? 0) +
+      (shifted.stations[4] ?? 0) +
+      (shifted.stations[5] ?? 0) +
+      (shifted.stations[6] ?? 0) +
+      (shifted.stations[7] ?? 0);
+    assert.equal(after, before);
+    // Mass should have left the aft baggage toward the nose row.
+    assert.ok((shifted.stations[7] ?? 0) < (start[7] ?? 0));
+    assert.ok(
+      (shifted.stations[3] ?? 0) + (shifted.stations[4] ?? 0) >
+        (start[3] ?? 0) + (start[4] ?? 0),
+    );
+  });
+
   it('can shift cargo onto crew seats while retaining minimum crew weight', async () => {
     const profile = await loadCaravanProfile();
     const stations: Record<number, number> = { 1: 170, 2: 170 };
+    // Cabin-only movable set: cargo pods sit forward of the pilots on this
+    // airframe's arms, so including them would prefer the pod over seats.
+    const cabinBaggage = [3, 4, 5, 6, 7, 8, 9, 10, 11];
     for (const idx of CARAVAN_ROLES.baggageStations) stations[idx] = 0;
-    stations[15] = 400;
-    const movable = [...CARAVAN_ROLES.crewStations, ...CARAVAN_ROLES.baggageStations];
+    stations[11] = 400;
+    const movable = [...CARAVAN_ROLES.crewStations, ...cabinBaggage];
     const shifted = shiftCargoForCg(
       stations,
       profile,
@@ -364,7 +474,7 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       (shifted.stations[1]! > 170 || shifted.stations[2]! > 170),
       'expected cargo onto at least one crew seat',
     );
-    assert.ok((shifted.stations[15] ?? 0) < 400);
+    assert.ok((shifted.stations[11] ?? 0) < 400);
   });
 
   it('uses a fixed 50 lb CG balance step', () => {

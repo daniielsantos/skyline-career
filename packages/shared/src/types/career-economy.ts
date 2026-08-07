@@ -1,6 +1,8 @@
 /** Skyline Career — local cargo logistics economy (Slice 1). */
 
 import type { FlightScoreSnapshot } from '../career-flight-score.js';
+import type { WeatherOpsSnapshot } from '../career-weather-ops.js';
+import type { RunwayTouchdownSnapshot } from '../career-runways.js';
 import type { OfpBriefingSummary, OfpLoadMethod } from './ofp-compliance.js';
 
 export type { OfpLoadMethod };
@@ -204,6 +206,11 @@ export interface NpcFlight {
    * auto-promotes to `in_flight` when awaitingPilotUntilMs elapses.
    */
   status: 'awaiting_pilot' | 'in_flight' | 'completed';
+  /**
+   * `reposition` = empty deadhead toward home region (Crew needed · reposition).
+   * Omitted / `freight` = normal cargo haul.
+   */
+  kind?: 'freight' | 'reposition';
   /** Wall-clock when an awaiting_pilot offer expires and the NPC departs alone. */
   awaitingPilotUntilMs?: number;
   /** Contract-pilot fee preview (fraction of payUsd); set on awaiting_pilot. */
@@ -455,6 +462,8 @@ export interface MarketLotView {
     etaHours: number;
     /** True when the NPC is holding for a contract pilot (crew needed). */
     crewNeeded?: boolean;
+    /** Empty deadhead home — not a freight haul. */
+    crewReposition?: boolean;
     /** Max crew fee (full offer). Scales down with partial lift. */
     pilotFeeUsd?: number;
     /** Min crew fee among flyable homologated airframes. */
@@ -637,6 +646,11 @@ export interface MissionIntent {
    * No player fleet aircraftId; operator covers fuel; payUsd is the pilot fee.
    */
   contractPilot?: boolean;
+  /**
+   * Contract-pilot empty reposition (NPC deadhead home). Skips Cargo Ops Dry
+   * settles — not a freight haul.
+   */
+  contractPilotReposition?: boolean;
   /** Fee paid to the player on settle (also mirrored in payUsd for contract legs). */
   contractPilotFeeUsd?: number;
   /** Full freight value the NPC reserved (display / ledger note). */
@@ -674,6 +688,16 @@ export interface MissionIntent {
   settledFlightDurationMs?: number;
   /** OnAir-style flight scorecard captured by Watch (envelope / taxi / landing). */
   settledFlightScore?: FlightScoreSnapshot;
+  /** Live weather-ops score from Watch ambient samples. */
+  settledWeatherOps?: WeatherOpsSnapshot;
+  /** Extra wallet credit from weather-ops bonus (USD). */
+  settledWeatherBonusUsd?: number;
+  /** Touchdown WGS84 latitude (degrees). */
+  settledTouchdownLat?: number;
+  /** Touchdown WGS84 longitude (degrees). */
+  settledTouchdownLon?: number;
+  /** Catalog runway projection at dest (when hub runways known). */
+  settledRunwayTouch?: RunwayTouchdownSnapshot;
   /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';
@@ -747,6 +771,10 @@ export interface MissionSettlement {
   originStockAfterKg: number;
   destStockAfterKg: number;
   lines?: MissionSettlementLine[];
+  /** Live weather-ops bonus included in payoutUsd. */
+  weatherBonusUsd?: number;
+  /** Dest runway touchdown projection (catalog). */
+  runwayTouch?: RunwayTouchdownSnapshot;
 }
 
 export type AircraftListingKind = 'new' | 'used' | 'lease';

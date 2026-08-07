@@ -35,10 +35,12 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Map expansion playbook:** `.cursor/rules/career-map-expansion.mdc` — checklist when adding airports/regions (seed constants + auto coverage on migrate).
 - **15-min economy ticks:** `MS_PER_TICK = 900_000`, `TICKS_PER_DAY = 96`; physics (flight/rest/MX/fuel) uses `MS_PER_HOUR`; per-tick flows ÷4 and tick lifetimes ×4 so a career day stays ~24h wall-clock. Old saves need Reset world (no tick-scale migrate).
 - **NPC airframe variants:** curated ICAO types from FSLTL traffic `flight_model.cfg` scrape (A321F, MD11F, 208B, …) — label + optional cargo ceiling only; not player OFP flight models. Legacy fleets backfill via `ensureNpcAirframes`.
+- **NPC ops cargo clamp:** bids use route fuel/MTOW payload (not class maxRange alone); crew offers only when a homologated airframe has lift&gt;0; unflyable awaiting_pilot promotes early and hides Fly.
+- **Ferry journey modal:** Hangar Plan opens multi-leg sheet (all hops, progress, next cost, empty-tank note); hop-by-hop Fly next leg; fixes finalDest dropped on Hangar Go.
 
 ## Near-term priorities (current Brazil career)
 
-1. Polish only if needed — NPC operational cargo ceiling; optional real METAR.
+1. Polish only if needed — optional real METAR.
 2. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.

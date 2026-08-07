@@ -1,16 +1,10 @@
 import type { CareerCargoOps, CargoOpsCommodityId } from './api';
 import { CommodityIcon } from './CommodityIcon';
-
-const TIER_ROWS: {
-  id: string;
-  label: string;
-  commodityIds: CargoOpsCommodityId[];
-}[] = [
-  { id: 'dry', label: 'Dry', commodityIds: ['general', 'supplies'] },
-  { id: 'value', label: 'Value', commodityIds: ['electronics'] },
-  { id: 'time', label: 'Time', commodityIds: ['perishables'] },
-  { id: 'heavy', label: 'Heavy', commodityIds: ['machinery'] },
-];
+import {
+  CARGO_OPS_TIERS,
+  cargoOpsUnlockProgress,
+  type CargoOpsTierId,
+} from './cargo-ops-unlock';
 
 const LABELS: Record<CargoOpsCommodityId, string> = {
   general: 'General',
@@ -51,15 +45,20 @@ export function CargoOpsPanel(props: {
     <section className="cargo-ops-panel" aria-label="Cargo Ops">
       <h3>Cargo Ops</h3>
       <p className="muted">
-        Unlock higher freights with clean settles. Dry is always open.
+        Unlock opens the board for that freight class. Pay rises with that
+        commodity&apos;s own reputation — Dry is always open.
       </p>
       {props.leaseUnlockHint ? (
         <p className="muted">{props.leaseUnlockHint}</p>
       ) : null}
       <ul className="cargo-ops-tiers">
-        {TIER_ROWS.map((tier) => {
+        {CARGO_OPS_TIERS.map((tier) => {
           const unlocked = tier.commodityIds.every(
             (id) => ops.commodities[id]?.unlocked,
+          );
+          const progress = cargoOpsUnlockProgress(
+            ops,
+            tier.id as CargoOpsTierId,
           );
           return (
             <li
@@ -74,6 +73,9 @@ export function CargoOpsPanel(props: {
                 </strong>
                 {!unlocked ? <span className="cargo-ops-lock">Locked</span> : null}
               </div>
+              {progress.summary ? (
+                <p className="cargo-ops-progress muted">{progress.summary}</p>
+              ) : null}
               <ul className="cargo-ops-commodities">
                 {tier.commodityIds.map((id) => {
                   const row = ops.commodities[id];

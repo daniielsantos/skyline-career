@@ -38,12 +38,19 @@ export type FlightScoreSample = {
   sawAirborne: boolean;
   /** True after first touchdown following airborne. */
   postTouchdown: boolean;
+  /**
+   * Optional Watch phase — used so takeoff / landing roll GS is not scored as
+   * taxi speeding.
+   */
+  phase?: string;
   groundSpeedKt?: number;
   bankDeg?: number;
   pitchDeg?: number;
   gForce?: number;
   indicatedAirspeedKt?: number;
   altitudeFt?: number;
+  /** Radio / AGL height (ft) — used when SIM ON GROUND stays sticky on a bounce. */
+  aglFt?: number;
   overspeedWarning?: boolean;
   stallWarning?: boolean;
   gearDown?: boolean;
@@ -67,8 +74,13 @@ export type FlightScoreAccumulator = {
   /** Max ground speed on ground after first touchdown. */
   maxArrTaxiGsKt: number;
   bounceCount: number;
-  /** Previous onGround after we started tracking post-touchdown bounce. */
+  /**
+   * Previous *effective* on-ground after first landing.
+   * Effective = SIM ON GROUND and AGL not lifted above the touchdown baseline.
+   */
   lastOnGroundPostTd?: boolean;
+  /** AGL (ft) latched on first grounded post-touchdown sample. */
+  touchdownAglFt?: number;
   landing?: {
     vsFpm: number;
     gForce?: number;
@@ -88,6 +100,47 @@ export const FLIGHT_SCORE_LIMITS = {
   taxiGsKt: 40,
 } as const;
 
+/**
+ * AGL rise (ft) above the touchdown baseline that counts as wheels-off.
+ * SIM ON GROUND often stays true on light bounces; radio alt still jumps.
+ * Keep this tight — PLANE ALT ABOVE GROUND already sits several feet at rest.
+ */
+export const BOUNCE_LIFT_AGL_DELTA_FT = 2.5;
+
+/**
+ * True when the aircraft is settled on the gear for bounce tracking.
+ * `SIM ON GROUND === false` always means airborne. When it stays sticky-true,
+ * an AGL rise above the touchdown baseline still counts as a bounce arc.
+ */
+export function isEffectivelyOnGroundForBounce(
+  onGround: boolean,
+  aglFt: number | undefined,
+  touchdownAglFt: number | undefined,
+): boolean {
+  // Explicit airborne from the sim — always treat as off the gear.
+  if (!onGround) return false;
+  if (
+    typeof aglFt === 'number' &&
+    Number.isFinite(aglFt) &&
+    typeof touchdownAglFt === 'number' &&
+    Number.isFinite(touchdownAglFt) &&
+    aglFt >= touchdownAglFt + BOUNCE_LIFT_AGL_DELTA_FT
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isTaxiPhaseForScore(phase: string | undefined): boolean {
+  return (
+    phase === 'taxi_out' ||
+    phase === 'taxi_in' ||
+    phase === 'taxi' ||
+    phase === 'ground' ||
+    phase === 'ground+engines'
+  );
+}
+
 export function createFlightScoreAccumulator(): FlightScoreAccumulator {
   return {
     maxAbsBankDeg: 0,
@@ -100,6 +153,37 @@ export function createFlightScoreAccumulator(): FlightScoreAccumulator {
     maxDepTaxiGsKt: 0,
     maxArrTaxiGsKt: 0,
     bounceCount: 0,
+  };
+}
+
+/**
+ * Drop a premature landing snapshot (takeoff bounce / go-around) so the next
+ * real touchdown can stamp VS / gear / flaps / G again.
+ */
+export function clearFlightScoreLanding(
+  state: FlightScoreAccumulator,
+): FlightScoreAccumulator {
+  const {
+    landing: _landing,
+    lastOnGroundPostTd: _og,
+    touchdownAglFt: _agl,
+    ...rest
+  } = state;
+  return {
+    ...rest,
+    bounceCount: 0,
+  };
+}
+
+/** Patch touchdown VS on an existing landing snapshot (settle override). */
+export function patchFlightScoreLandingVs(
+  state: FlightScoreAccumulator,
+  vsFpm: number,
+): FlightScoreAccumulator {
+  if (!state.landing || !Number.isFinite(vsFpm)) return state;
+  return {
+    ...state,
+    landing: { ...state.landing, vsFpm },
   };
 }
 
@@ -151,7 +235,14 @@ export function pushFlightScoreSample(
   if (sample.stallWarning) next.sawStall = true;
 
   const gs = sample.groundSpeedKt;
-  if (sample.onGround && typeof gs === 'number' && Number.isFinite(gs)) {
+  // Taxi speeding only — ignore takeoff / landing roll (phase or high GS).
+  if (
+    sample.onGround &&
+    typeof gs === 'number' &&
+    Number.isFinite(gs) &&
+    (sample.phase == null || isTaxiPhaseForScore(sample.phase)) &&
+    (sample.phase != null || gs <= FLIGHT_SCORE_LIMITS.taxiGsKt + 8)
+  ) {
     if (!sample.sawAirborne) {
       next.maxDepTaxiGsKt = Math.max(next.maxDepTaxiGsKt, gs);
     } else if (sample.postTouchdown) {
@@ -160,20 +251,34 @@ export function pushFlightScoreSample(
   }
 
   // Bounce: wheels leave then touch again after first landing.
-  if (sample.postTouchdown) {
+  // Prefer SIM ON GROUND edges; also treat AGL rise above the TD baseline as
+  // airborne because MSFS often keeps SIM ON GROUND sticky on light bounces.
+  // Keep tracking whenever we already stamped a landing (or postTouchdown), so a
+  // brief go-around-clear flicker cannot drop bounce arcs.
+  const trackBounce =
+    sample.postTouchdown || Boolean(next.landing) || next.bounceCount > 0;
+  if (trackBounce) {
+    let baseline = next.touchdownAglFt;
     if (
-      next.lastOnGroundPostTd === true &&
-      sample.onGround === false
+      baseline === undefined &&
+      sample.onGround &&
+      typeof sample.aglFt === 'number' &&
+      Number.isFinite(sample.aglFt)
     ) {
-      /* airborne bounce arc — wait for next ground */
+      baseline = sample.aglFt;
+      next = { ...next, touchdownAglFt: baseline };
     }
-    if (
-      next.lastOnGroundPostTd === false &&
-      sample.onGround === true
-    ) {
+
+    const effOnGround = isEffectivelyOnGroundForBounce(
+      sample.onGround,
+      sample.aglFt,
+      baseline,
+    );
+
+    if (next.lastOnGroundPostTd === false && effOnGround) {
       next = { ...next, bounceCount: next.bounceCount + 1 };
     }
-    next = { ...next, lastOnGroundPostTd: sample.onGround };
+    next = { ...next, lastOnGroundPostTd: effOnGround };
   }
 
   // Capture landing snapshot once (first touchdown with VS).
@@ -194,6 +299,24 @@ export function pushFlightScoreSample(
         flapsPct: sample.flapsPct,
       },
     };
+  } else if (
+    next.landing &&
+    sample.postTouchdown &&
+    typeof sample.gForce === 'number' &&
+    Number.isFinite(sample.gForce)
+  ) {
+    // Peak G over the first-contact / bounce window (first sample is often ~1.0).
+    const prevG = next.landing.gForce;
+    if (
+      typeof prevG !== 'number' ||
+      !Number.isFinite(prevG) ||
+      sample.gForce > prevG
+    ) {
+      next = {
+        ...next,
+        landing: { ...next.landing, gForce: sample.gForce },
+      };
+    }
   }
 
   return next;
@@ -260,11 +383,12 @@ export function finalizeFlightScore(
   acc: FlightScoreAccumulator,
   opts?: { landingVsFpm?: number | null },
 ): FlightScoreSnapshot {
+  // Explicit settle/override VS wins over a stale accumulator stamp (e.g. after
+  // TOUCHDOWN NORMAL VELOCITY is read, or a takeoff-bounce sample was cleared).
   const landingVs =
-    acc.landing?.vsFpm ??
-    (typeof opts?.landingVsFpm === 'number' && Number.isFinite(opts.landingVsFpm)
+    typeof opts?.landingVsFpm === 'number' && Number.isFinite(opts.landingVsFpm)
       ? opts.landingVsFpm
-      : undefined);
+      : acc.landing?.vsFpm;
 
   const envelope: FlightScoreMetric[] = [
     binaryMetric(
@@ -396,7 +520,7 @@ export function finalizeFlightScore(
     ),
   );
 
-  const gearRetractable = acc.landing?.gearRetractable !== false;
+  const gearRetractable = acc.landing?.gearRetractable === true;
   const gearDown = acc.landing?.gearDown === true;
   const gearOk =
     Boolean(acc.landing) && (!gearRetractable || gearDown);
@@ -409,7 +533,9 @@ export function finalizeFlightScore(
       1,
       acc.landing
         ? !gearRetractable
-          ? 'fixed gear'
+          ? acc.landing.gearRetractable === false
+            ? 'fixed gear'
+            : 'n/a'
           : gearDown
             ? 'down'
             : 'up / unknown'

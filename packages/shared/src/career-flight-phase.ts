@@ -164,25 +164,32 @@ export function advanceFlightPhase(
 
   // --- Post-touchdown (arrival) ---
   if (sample.postTouchdown) {
-    const tdAt = opts.touchdownAtMs;
-    const inLandingHold =
-      typeof tdAt === 'number' &&
-      Number.isFinite(tdAt) &&
-      nowMs - tdAt < landingHoldMs;
+    const vsClimbOut = vs >= VS_CLIMB_ENTER;
+    const aglClimbOut =
+      typeof agl === 'number' && agl > landingAgl + 200;
+    // Go-around / false touchdown: do not stick in landing while climbing away.
+    const climbingOut = !sample.onGround && (vsClimbOut || aglClimbOut);
+    if (!climbingOut) {
+      const tdAt = opts.touchdownAtMs;
+      const inLandingHold =
+        typeof tdAt === 'number' &&
+        Number.isFinite(tdAt) &&
+        nowMs - tdAt < landingHoldMs;
 
-    if (!sample.onGround) {
-      return 'landing'; // bounce arc
+      if (!sample.onGround) {
+        return 'landing'; // bounce arc
+      }
+      if (inLandingHold && (prevPhase === 'landing' || prevPhase === 'approach')) {
+        return 'landing';
+      }
+      if (
+        sample.enginesRunning &&
+        isTaxiMoving(gs, prevPhase ?? 'taxi_in')
+      ) {
+        return 'taxi_in';
+      }
+      return 'ground';
     }
-    if (inLandingHold && (prevPhase === 'landing' || prevPhase === 'approach')) {
-      return 'landing';
-    }
-    if (
-      sample.enginesRunning &&
-      isTaxiMoving(gs, prevPhase ?? 'taxi_in')
-    ) {
-      return 'taxi_in';
-    }
-    return 'ground';
   }
 
   // --- Still on ground, not yet airborne ---
@@ -216,19 +223,28 @@ export function advanceFlightPhase(
       (typeof airborneAgeMs === 'number' &&
         airborneAgeMs < minClimbAfterTakeoffMs) ||
       (typeof agl === 'number' && agl < climbHoldBelowAglFt);
+    const climbingAway = vs >= VS_CLIMB_ENTER;
+    /** Short hops are "near dest" from rotate — don't treat departure as arrival. */
+    const arrivalAllowed =
+      !inTakeoffWindow &&
+      prevPhase !== 'takeoff' &&
+      !climbingAway &&
+      !(holdDepartureClimb && vs > VS_DESCENT_EXIT);
 
     // Landing / flare: low AGL near dest, or very close and descending.
     if (
+      arrivalAllowed &&
       nearDest &&
       (lowAgl ||
         (veryNearDest && vs <= VS_DESCENT_EXIT) ||
-        (prevPhase === 'landing' && (lowAgl || veryNearDest)))
+        (prevPhase === 'landing' && (lowAgl || veryNearDest) && !climbingAway))
     ) {
       return 'landing';
     }
 
     // Approach sticky near destination.
     if (
+      arrivalAllowed &&
       nearDest &&
       (vs <= VS_CRUISE_ABS ||
         lowAgl ||
@@ -240,7 +256,12 @@ export function advanceFlightPhase(
         return 'approach';
       }
     }
-    if (prevPhase === 'approach' && !farFromDest && vs < VS_CLIMB_ENTER) {
+    if (
+      arrivalAllowed &&
+      prevPhase === 'approach' &&
+      !farFromDest &&
+      vs < VS_CLIMB_ENTER
+    ) {
       return 'approach';
     }
 
@@ -255,15 +276,17 @@ export function advanceFlightPhase(
         return 'takeoff';
       }
       if (vs <= VS_DESCENT_ENTER) {
-        return nearDest ? 'approach' : 'descent';
+        return arrivalAllowed && nearDest ? 'approach' : 'descent';
       }
       return 'climb';
     }
 
     // Climb / descent / cruise with hysteresis + departure climb hold.
-    if (prevPhase === 'climb') {
-      if (vs <= VS_DESCENT_ENTER) return nearDest ? 'approach' : 'descent';
-      if (holdDepartureClimb) return 'climb';
+    if (prevPhase === 'climb' || (prevPhase === 'landing' && climbingAway)) {
+      if (vs <= VS_DESCENT_ENTER) {
+        return arrivalAllowed && nearDest ? 'approach' : 'descent';
+      }
+      if (holdDepartureClimb || climbingAway) return 'climb';
       if (vs >= VS_CLIMB_EXIT) return 'climb';
       return 'cruise';
     }
@@ -323,7 +346,9 @@ export function watchIntervalMsForPhase(
   switch (phase) {
     case 'takeoff':
     case 'landing':
-      return 350;
+      // Floor matches Watch scheduleNextTick (≥200). Tight enough to catch
+      // short bounce arcs without hammering SimBridge below that.
+      return 200;
     case 'approach':
       return 1_000;
     case 'climb':

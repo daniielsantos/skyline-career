@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  boardFreightKgForEstimates,
+  boardDisplayPayUsd,
   formatMarketBoardSorts,
   parseMarketBoardSorts,
   queryMarketBoardPage,
@@ -19,6 +21,71 @@ function row(
     ...partial,
   };
 }
+
+describe('boardFreightKgForEstimates', () => {
+  it('uses claim cargo for open Contracts even when availableKg is 0', () => {
+    assert.equal(
+      boardFreightKgForEstimates({
+        availableKg: 0,
+        crewNeeded: true,
+        claimCargoKg: 4200,
+      }),
+      4200,
+    );
+  });
+
+  it('falls back to availableKg for normal freights', () => {
+    assert.equal(
+      boardFreightKgForEstimates({
+        availableKg: 1500,
+        crewNeeded: false,
+        claimCargoKg: 4200,
+      }),
+      1500,
+    );
+    assert.equal(
+      boardFreightKgForEstimates({ availableKg: 800 }),
+      800,
+    );
+  });
+});
+
+describe('boardDisplayPayUsd', () => {
+  it('uses pilot fee for Contracts when present', () => {
+    assert.equal(
+      boardDisplayPayUsd({
+        lotPayUsd: 1_100_000,
+        quantityKg: 22_000,
+        crewNeeded: true,
+        claimCargoKg: 2_000,
+        pilotFeeUsd: 40_000,
+      }),
+      40_000,
+    );
+  });
+
+  it('falls back to claim-slice freight when fee missing', () => {
+    assert.equal(
+      boardDisplayPayUsd({
+        lotPayUsd: 1_100_000,
+        quantityKg: 22_000,
+        crewNeeded: true,
+        claimCargoKg: 2_000,
+      }),
+      100_000,
+    );
+  });
+
+  it('keeps full lot pay for normal freights', () => {
+    assert.equal(
+      boardDisplayPayUsd({
+        lotPayUsd: 50_000,
+        quantityKg: 10_000,
+      }),
+      50_000,
+    );
+  });
+});
 
 describe('parseMarketBoardSorts', () => {
   it('parses multi-level sorts and ignores junk', () => {

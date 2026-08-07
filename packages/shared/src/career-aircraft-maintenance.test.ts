@@ -6,8 +6,11 @@ import {
   conditionBucketFromPct,
   CRITICAL_CONDITION_PCT,
   ensureAircraftConditionPcts,
+  fuelBurnMultFromCondition,
   inspectionCostUsd,
   INSPECTION_INTERVAL_HOURS,
+  MX_FUEL_BURN_MULT_MAX,
+  padOfpBlockFuelKgForMx,
   repairAircraftCondition,
 } from './career-aircraft-maintenance.js';
 import { AIRCRAFT_MSRP_USD } from './career-aircraft-pricing.js';
@@ -150,5 +153,57 @@ describe('aircraft wear + maintenance', () => {
     assert.ok(mro.laborSurcharge > 1);
     assert.ok(debitUsd > 0);
     assert.equal(ap.inventory.mro_parts!.stockKg, 0);
+  });
+
+  it('fuel burn mult is 1 when healthy and ramps toward max near critical', () => {
+    assert.equal(
+      fuelBurnMultFromCondition({
+        airframeConditionPct: 95,
+        engineConditionPct: 95,
+      }).mult,
+      1,
+    );
+    const mid = fuelBurnMultFromCondition({
+      airframeConditionPct: 65,
+      engineConditionPct: 65,
+    });
+    assert.ok(mid.mult > 1 && mid.mult < MX_FUEL_BURN_MULT_MAX);
+    const critical = fuelBurnMultFromCondition({
+      airframeConditionPct: CRITICAL_CONDITION_PCT,
+      engineConditionPct: CRITICAL_CONDITION_PCT,
+    });
+    assert.equal(critical.mult, MX_FUEL_BURN_MULT_MAX);
+    assert.ok(critical.excessFrac > 0);
+  });
+
+  it('keeps OFP block fuel as Due — MX wear is advisory only', () => {
+    const healthy = padOfpBlockFuelKgForMx(500, {
+      airframeConditionPct: 95,
+      engineConditionPct: 95,
+      fuelCapacityKg: 800,
+    });
+    assert.equal(healthy.requiredBlockFuelKg, 500);
+    assert.equal(healthy.mxPadKg, 0);
+    assert.equal(healthy.excessPct, 0);
+
+    const worn = padOfpBlockFuelKgForMx(500, {
+      airframeConditionPct: 40,
+      engineConditionPct: 40,
+      fuelCapacityKg: 800,
+    });
+    assert.equal(worn.requiredBlockFuelKg, 500);
+    assert.equal(worn.mxPadKg, 0);
+    assert.equal(worn.mult, MX_FUEL_BURN_MULT_MAX);
+    assert.ok(worn.excessPct > 0);
+    assert.equal(worn.cappedByTank, false);
+
+    const overTank = padOfpBlockFuelKgForMx(500, {
+      airframeConditionPct: 40,
+      engineConditionPct: 40,
+      fuelCapacityKg: 400,
+    });
+    assert.equal(overTank.requiredBlockFuelKg, 500);
+    assert.equal(overTank.mxPadKg, 0);
+    assert.equal(overTank.cappedByTank, true);
   });
 });

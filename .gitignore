@@ -17,6 +17,9 @@ profiles/career/local-missions.json
 profiles/career/economy-pulse-sweep.json
 artifacts/
 
+# OurAirports download cache (generate:runways)
+packages/shared/.cache/
+
 # .NET build outputs (never commit)
 **/bin/
 **/obj/

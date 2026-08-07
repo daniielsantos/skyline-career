@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
+import { FerryJourneyDialog } from './FerryJourneyDialog';
 import {
   fetchFerryPlan,
   type AircraftClass,
@@ -8,6 +9,12 @@ import {
   type FerryPlanView,
   type PlayerAircraft,
 } from './api';
+import {
+  formatFuelBurnPerNm,
+  formatFuelFlow,
+  formatMassExact,
+  type WeightSystem,
+} from './weight-units';
 
 export type AircraftCatalogEntry = {
   id: AircraftClass;
@@ -205,6 +212,7 @@ export function MarketListingCard(props: {
   busy: boolean;
   formatMoney: (n: number) => string;
   formatMass: (kg: number) => string;
+  weightSystem?: WeightSystem;
   onOpenAirport: (icao: string) => void;
   delivery?: {
     deliverToIcao: string;
@@ -219,6 +227,7 @@ export function MarketListingCard(props: {
   onLease: (listingId: string, opts?: { deliver?: boolean }) => void;
 }) {
   const { listing, catalog } = props;
+  const weightSystem = props.weightSystem ?? 'metric';
   const pcts = listingConditionPcts(listing);
   const isYourLease = listing.source === 'player_lease';
   const isResale = listing.source === 'player_sale';
@@ -310,11 +319,9 @@ export function MarketListingCard(props: {
             <span>Burn</span>
             <strong>
               {catalog?.cruiseFuelFlowKgPerHour != null
-                ? `${catalog.cruiseFuelFlowKgPerHour.toLocaleString(undefined, {
-                    maximumFractionDigits: 1,
-                  })} kg/h`
+                ? formatFuelFlow(catalog.cruiseFuelFlowKgPerHour, weightSystem)
                 : catalog?.fuelBurnKgPerNm != null
-                  ? `${catalog.fuelBurnKgPerNm} kg/nm`
+                  ? formatFuelBurnPerNm(catalog.fuelBurnKgPerNm, weightSystem)
                   : '—'}
             </strong>
           </li>
@@ -458,6 +465,7 @@ export function HangarAircraftCard(props: {
   hasListed: boolean;
   formatMoney: (n: number) => string;
   formatMass: (kg: number) => string;
+  weightSystem?: WeightSystem;
   onOpenAirport: (icao: string) => void;
   onFerryDestChange: (icao: string) => void;
   onTravelDestChange: (icao: string) => void;
@@ -472,11 +480,12 @@ export function HangarAircraftCard(props: {
     id: string,
     dest: string,
     opts?: { finalDest?: string },
-  ) => void;
+  ) => Promise<void>;
   onTravel: (destIcao: string) => void;
 }) {
   const acf = props.aircraft;
   const catalog = props.catalog;
+  const weightSystem = props.weightSystem ?? 'metric';
   const fuelPct =
     (acf.fuelKg / Math.max(1, acf.fuelCapacityKg)) * 100;
   const afPct = acf.airframeConditionPct ?? 100;
@@ -519,6 +528,10 @@ export function HangarAircraftCard(props: {
   const [ferryPlan, setFerryPlan] = useState<FerryPlanView | null>(null);
   const [ferryPlanError, setFerryPlanError] = useState<string | null>(null);
   const [ferryPlanLoading, setFerryPlanLoading] = useState(false);
+  const [ferryJourneyOpen, setFerryJourneyOpen] = useState(false);
+  const [ferryJourneyFinal, setFerryJourneyFinal] = useState<string | null>(
+    null,
+  );
   const journeyOriginRef = useRef<string | null>(null);
   const showMove =
     acf.status === 'parked' || acf.status === 'maintenance';
@@ -682,9 +695,9 @@ export function HangarAircraftCard(props: {
           <ul className="aircraft-card-specs">
             <li>
               <span>Fuel</span>
-              <strong>
-                {props.formatMass(acf.fuelKg)} /{' '}
-                {props.formatMass(acf.fuelCapacityKg)}
+              <strong title={`${formatMassExact(acf.fuelKg, weightSystem)} / ${formatMassExact(acf.fuelCapacityKg, weightSystem)}`}>
+                {formatMassExact(acf.fuelKg, weightSystem)} /{' '}
+                {formatMassExact(acf.fuelCapacityKg, weightSystem)}
               </strong>
             </li>
             <li>
@@ -707,11 +720,9 @@ export function HangarAircraftCard(props: {
               <span>Burn</span>
               <strong>
                 {catalog?.cruiseFuelFlowKgPerHour != null
-                  ? `${catalog.cruiseFuelFlowKgPerHour.toLocaleString(undefined, {
-                      maximumFractionDigits: 1,
-                    })} kg/h`
+                  ? formatFuelFlow(catalog.cruiseFuelFlowKgPerHour, weightSystem)
                   : catalog?.fuelBurnKgPerNm != null
-                    ? `${catalog.fuelBurnKgPerNm} kg/nm`
+                    ? formatFuelBurnPerNm(catalog.fuelBurnKgPerNm, weightSystem)
                     : '—'}
               </strong>
             </li>
@@ -842,16 +853,22 @@ export function HangarAircraftCard(props: {
                   }
                   onClick={() => {
                     if (moveMode === 'ferry') {
-                      props.onFerry(acf.id, nextFerryDest, {
-                        finalDest: ferryFinal,
-                      });
+                      setFerryJourneyFinal(ferryFinal);
+                      setFerryJourneyOpen(true);
                     } else {
                       props.onTravel(props.travelDest);
                     }
                   }}
+                  title={
+                    moveMode === 'ferry' && multiLeg
+                      ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
+                      : undefined
+                  }
                 >
-                  {moveMode === 'ferry' && multiLeg
-                    ? `Next ${ferryPlan?.nextLeg?.from}→${ferryPlan?.nextLeg?.to}`
+                  {moveMode === 'ferry'
+                    ? multiLeg
+                      ? `Plan · ${ferryPlan?.legCount} legs`
+                      : 'Plan ferry'
                     : 'Go'}
                 </button>
               </div>
@@ -887,18 +904,11 @@ export function HangarAircraftCard(props: {
                         })}
                       </p>
                       <p className="ferry-plan-meta">
-                        Leg {ferryPlan.legIndex}/{ferryPlan.legCount}
-                        {ferryPlan.nextLeg
-                          ? ` · ${Math.round(ferryPlan.nextLeg.distanceNm).toLocaleString()} nm this hop`
-                          : ''}
-                        {` · ${ferryPlan.remainingNm.toLocaleString()} nm left to ${ferryFinal}`}
-                        {` · ${ferryPlan.progressPct}% closer`}
+                        {multiLeg
+                          ? `${ferryPlan.legCount} legs · open Plan to fly hop-by-hop`
+                          : `Direct · ${ferryPlan.remainingNm.toLocaleString()} nm`}
                         {ferryPlan.nextQuote
                           ? ` · next ${props.formatMoney(ferryPlan.nextQuote.totalCostUsd)}`
-                          : ''}
-                        {ferryPlan.nextQuote &&
-                        (ferryPlan.nextQuote.softNmApplied ?? 0) > 0
-                          ? ` · early soft ${Math.round(ferryPlan.nextQuote.softNmApplied!).toLocaleString()} nm`
                           : ''}
                       </p>
                     </>
@@ -972,6 +982,23 @@ export function HangarAircraftCard(props: {
           ) : null}
         </div>
       </div>
+      {ferryJourneyOpen && ferryJourneyFinal && acf.status === 'parked' ? (
+        <FerryJourneyDialog
+          aircraft={acf}
+          finalDestIcao={ferryJourneyFinal}
+          formatMoney={props.formatMoney}
+          busy={props.busy}
+          onClose={() => {
+            setFerryJourneyOpen(false);
+            setFerryJourneyFinal(null);
+          }}
+          onFlyLeg={async (legDest) => {
+            await props.onFerry(acf.id, legDest, {
+              finalDest: ferryJourneyFinal,
+            });
+          }}
+        />
+      ) : null}
     </li>
   );
 }

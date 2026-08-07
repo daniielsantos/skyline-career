@@ -7,6 +7,8 @@ import {
   formatCargoOpsDebriefLine,
   formatFlightDurationMs,
   formatLandingFpm,
+  isOfpCargoUnderOnlyFailureUi,
+  ofpCargoKgFromUnderFinding,
   resolveLoadPath,
 } from './dispatch-flow.ts';
 
@@ -234,5 +236,52 @@ describe('formatLandingFpm', () => {
     assert.equal(formatLandingFpm(-220), '-220 fpm');
     assert.equal(formatLandingFpm(40), '+40 fpm');
     assert.equal(formatLandingFpm(null), '—');
+  });
+});
+
+describe('isOfpCargoUnderOnlyFailureUi', () => {
+  it('detects under-cargo from actual/expected', () => {
+    const check = {
+      verdict: 'fail' as const,
+      summary: 'fail',
+      checkedAtIso: new Date().toISOString(),
+      findings: [
+        {
+          code: 'INTENT_CARGO_MISMATCH',
+          severity: 'fail',
+          message: 'OFP cargo 1500 kg below mission 1800 kg',
+          expected: 1800,
+          actual: 1500,
+          delta: -300,
+        },
+      ],
+    };
+    assert.equal(isOfpCargoUnderOnlyFailureUi(check), true);
+    assert.equal(ofpCargoKgFromUnderFinding(check), 1500);
+  });
+
+  it('rejects when another fail is present', () => {
+    assert.equal(
+      isOfpCargoUnderOnlyFailureUi({
+        verdict: 'fail',
+        summary: 'fail',
+        checkedAtIso: new Date().toISOString(),
+        findings: [
+          {
+            code: 'INTENT_CARGO_MISMATCH',
+            severity: 'fail',
+            message: 'OFP cargo 1500 kg below mission 1800 kg',
+            expected: 1800,
+            actual: 1500,
+          },
+          {
+            code: 'INTENT_ORIGIN_MISMATCH',
+            severity: 'fail',
+            message: 'origin mismatch',
+          },
+        ],
+      }),
+      false,
+    );
   });
 });

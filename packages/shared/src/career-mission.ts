@@ -15,6 +15,9 @@ import {
   resolveExpectedRouteMs,
 } from './career-flight-watch.js';
 import type { FlightScoreSnapshot } from './career-flight-score.js';
+import type { WeatherOpsSnapshot } from './career-weather-ops.js';
+import { evaluateRunwayTouchdown } from './career-runways.js';
+import type { RunwayTouchdownSnapshot } from './career-runways.js';
 import {
   applyCargoOpsOnSettle,
   cargoOpsIsUnlocked,
@@ -23,6 +26,7 @@ import {
   cargoOpsValueScorePenaltyFraction,
   type CargoOpsDelta,
 } from './career-cargo-ops.js';
+import { TICKS_PER_HOUR } from './career-clock.js';
 import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
@@ -88,7 +92,7 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelCapacityKg: 20_894,
     oewKg: 42_264,
     mtowKg: 79_333,
-    fuelRouteFactor: 1.3,
+    fuelRouteFactor: 1.2,
     fuelReserveKg: 1_500,
   },
   {
@@ -107,7 +111,7 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelCapacityKg: 117_400,
     oewKg: 112_748,
     mtowKg: 286_000,
-    fuelRouteFactor: 1.25,
+    fuelRouteFactor: 1.15,
     fuelReserveKg: 5_000,
   },
   {
@@ -128,8 +132,13 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     /** Default C208 weights aligned with SimBrief OFP (SBCT→SBGL MTOW case). */
     oewKg: 2_152,
     mtowKg: 3_969,
-    fuelRouteFactor: 1.8,
-    fuelReserveKg: 200,
+    /**
+     * Mild GC→airway + contingency pad. Was 1.8 (and reserve 200 kg), which
+     * blocked KMIA→MMUN (~462 nm) at ~2410 lb vs SimBrief block ~1716 lb.
+     */
+    fuelRouteFactor: 1.15,
+    /** Contingency / alternate-ish; taxi is separate. */
+    fuelReserveKg: 120,
   },
   {
     id: 'light_jet',
@@ -148,8 +157,9 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelCapacityKg: 2_810,
     oewKg: 4_680,
     mtowKg: 8_300,
-    fuelRouteFactor: 1.5,
-    fuelReserveKg: 400,
+    /** Mild GC→airway pad (was 1.5). */
+    fuelRouteFactor: 1.15,
+    fuelReserveKg: 280,
   },
   {
     id: 'medium_piston',
@@ -171,7 +181,7 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelCapacityKg: 8_800,
     oewKg: 25_000,
     mtowKg: 48_500,
-    fuelRouteFactor: 1.35,
+    fuelRouteFactor: 1.2,
     fuelReserveKg: 900,
   },
   {
@@ -194,8 +204,12 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelCapacityKg: 299,
     oewKg: 973,
     mtowKg: 1_656,
-    fuelRouteFactor: 1.8,
-    fuelReserveKg: 80,
+    /**
+     * Same pad family as light_turboprop. Was 1.8 + 80 kg reserve — overstated
+     * block fuel on short GA hops the same way the Caravan did.
+     */
+    fuelRouteFactor: 1.15,
+    fuelReserveKg: 45,
   },
 ] as const;
 
@@ -320,6 +334,11 @@ export function estimateRouteCargoLimit(
     fuelReserveKg?: number;
     fuelRouteFactor?: number;
     airframeTypeId?: string;
+    /**
+     * MX / condition burn multiplier (≥1). Scales cruise burn term only
+     * (taxi + reserve unchanged).
+     */
+    fuelBurnMult?: number;
   } = {},
 ): {
   operationalMaxCargoKg: number;
@@ -330,6 +349,8 @@ export function estimateRouteCargoLimit(
   structuralMaxCargoKg: number;
   oewKg: number;
   mtowKg: number;
+  /** Effective burn mult applied (1 when healthy / omitted). */
+  fuelBurnMult: number;
 } {
   const aircraft = getAircraftClass(aircraftClassId);
   const oewKg = weights.oewKg ?? aircraft.oewKg;
@@ -344,6 +365,12 @@ export function estimateRouteCargoLimit(
     (weights.airframeTypeId
       ? resolveAirframeFuelBurnKgPerNm(weights.airframeTypeId, aircraftClassId)
       : aircraft.fuelBurnKgPerNm);
+  const fuelBurnMult =
+    typeof weights.fuelBurnMult === 'number' &&
+    Number.isFinite(weights.fuelBurnMult) &&
+    weights.fuelBurnMult >= 1
+      ? weights.fuelBurnMult
+      : 1;
   // Scale taxi/reserve when the airframe tank is smaller than the class template
   // (e.g. Commander 190 kg vs Bonanza-class 380 kg planning defaults).
   const capacityRatio =
@@ -365,10 +392,14 @@ export function estimateRouteCargoLimit(
   const nm = Math.max(0, Number.isFinite(distanceNm) ? distanceNm : 0);
   const structural = Math.max(0, Math.floor(structuralMaxCargoKg));
   const estimatedBlockFuelKg = Math.round(
-    fuelTaxiKg + burnKgPerNm * nm * fuelRouteFactor + fuelReserveKg,
+    fuelTaxiKg +
+      burnKgPerNm * nm * fuelRouteFactor * fuelBurnMult +
+      fuelReserveKg,
   );
   const takeoffFuelKg = Math.max(0, estimatedBlockFuelKg - fuelTaxiKg);
-  const marginKg = Math.max(25, Math.round(structural * 0.02));
+  // Extra margin vs SimBrief's often-heavier OEW / contingency so staging
+  // overbooks less often (Accept OFP cargo covers residual cuts).
+  const marginKg = Math.max(50, Math.round(structural * 0.05));
   const mtowPayloadKg = Math.max(
     0,
     Math.floor(mtowKg - oewKg - takeoffFuelKg - marginKg),
@@ -376,7 +407,11 @@ export function estimateRouteCargoLimit(
   // Allow 1 kg float/round slack so equal display values don't hard-block.
   const fuelFeasible = estimatedBlockFuelKg <= fuelCapacityKg + 1;
   return {
-    operationalMaxCargoKg: Math.min(structural, mtowPayloadKg),
+    // No ops cargo when the planned block does not fit the tanks — otherwise
+    // MTOW math can still show leftover payload on an impossible fuel plan.
+    operationalMaxCargoKg: fuelFeasible
+      ? Math.min(structural, mtowPayloadKg)
+      : 0,
     estimatedBlockFuelKg,
     fuelCapacityKg,
     fuelDeficitKg: Math.max(0, estimatedBlockFuelKg - fuelCapacityKg),
@@ -384,6 +419,7 @@ export function estimateRouteCargoLimit(
     structuralMaxCargoKg: structural,
     oewKg,
     mtowKg,
+    fuelBurnMult,
   };
 }
 
@@ -579,6 +615,19 @@ export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
         deadlineTick: mission.deadlineTick,
         urgency: 'normal',
         reason: mission.reason || 'Crew return',
+      };
+    }
+    if (mission.contractPilotReposition) {
+      return {
+        ...mission,
+        lots: [],
+        shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
+        commodityId: mission.commodityId || 'general',
+        cargoKg: 0,
+        payUsd: Math.max(0, mission.payUsd ?? 0),
+        deadlineTick: mission.deadlineTick,
+        urgency: 'normal',
+        reason: mission.reason || 'Reposition',
       };
     }
     throw new Error(`Mission ${mission.id} has no lot lines`);
@@ -1233,7 +1282,7 @@ export function replaceMissionManifest(
 export function cancelMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
-  opts: { fleet?: CareerMissionsState } = {},
+  opts: { fleet?: CareerMissionsState; nowMs?: number } = {},
 ): MissionIntent {
   const normalized = normalizeMissionIntent(mission);
   if (
@@ -1245,10 +1294,21 @@ export function cancelMission(
   }
   // A mission can outlive its shipment lots: expired lots are pruned after a
   // short retention window, and a world reset can leave orphan missions behind.
+  const nowMs = opts.nowMs ?? Date.now();
   for (const line of normalized.lots) {
-    if (world.lots.some((lot) => lot.id === line.shipmentLotId)) {
-      releaseShipmentReservation(world, line.shipmentLotId, line.cargoKg);
+    if (!world.lots.some((lot) => lot.id === line.shipmentLotId)) {
+      continue;
     }
+    // Contract freight: return the slice to the open player-exclusive pool
+    // when the offer window is still live (do not dump kg onto the open market).
+    if (
+      normalized.contractPilot &&
+      !normalized.contractPilotReposition &&
+      returnContractSliceToOpenOffer(world, normalized, line, nowMs)
+    ) {
+      continue;
+    }
+    releaseShipmentReservation(world, line.shipmentLotId, line.cargoKg);
   }
   if (opts.fleet) {
     releaseAircraftOnCancel(opts.fleet, normalized);
@@ -1256,6 +1316,52 @@ export function cancelMission(
   const cancelled = { ...normalized, status: 'cancelled' as const };
   clearPlayerInbound(world, cancelled.id);
   return cancelled;
+}
+
+/**
+ * If a Contract offer is still awaiting_pilot on this lot, fold the cancelled
+ * slice back into that pool. Returns true when handled (skip market release).
+ */
+function returnContractSliceToOpenOffer(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  line: { shipmentLotId: string; cargoKg: number; payUsd: number },
+  nowMs: number,
+): boolean {
+  const flight = world.npcFlights.find(
+    (f) =>
+      f.lotId === line.shipmentLotId &&
+      f.status === 'awaiting_pilot' &&
+      f.kind !== 'reposition',
+  );
+  if (!flight) return false;
+  const until = flight.awaitingPilotUntilMs ?? 0;
+  if (until > 0 && nowMs >= until) return false;
+
+  const addKg = Math.max(0, Math.floor(line.cargoKg));
+  if (addKg <= 0) return true;
+
+  const addPay =
+    mission.lots.length <= 1
+      ? Math.max(1, Math.round(mission.contractGrossPayUsd ?? mission.payUsd))
+      : Math.max(
+          1,
+          Math.round(
+            (mission.contractGrossPayUsd ?? mission.payUsd) *
+              (addKg / Math.max(1, mission.cargoKg)),
+          ),
+        );
+
+  flight.cargoKg += addKg;
+  flight.payUsd = Math.max(1, flight.payUsd + addPay);
+  // Mirror CONTRACT_PILOT_FEE_FRAC without importing career-npc (cycle).
+  flight.pilotFeeUsd = Math.max(50, Math.round(flight.payUsd * 0.4));
+
+  const lot = world.lots.find((l) => l.id === line.shipmentLotId);
+  if (lot && (lot.status === 'in_transit' || lot.status === 'available')) {
+    lot.status = 'reserved';
+  }
+  return true;
 }
 
 /**
@@ -1285,7 +1391,18 @@ export function departMission(
     for (const line of normalized.lots) {
       const lot = findLot(world, line.shipmentLotId);
       if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
-        lot.status = 'in_transit';
+        // Keep Contract remainder visible on the board (awaiting_pilot).
+        const openContract = world.npcFlights.some(
+          (f) =>
+            f.lotId === lot.id &&
+            f.status === 'awaiting_pilot' &&
+            f.kind !== 'reposition',
+        );
+        if (!openContract) {
+          lot.status = 'in_transit';
+        } else if (lot.status === 'in_transit') {
+          lot.status = 'reserved';
+        }
       }
     }
   }
@@ -1385,6 +1502,14 @@ export interface SettleMissionOpts {
   airborneEndedAtMs?: number;
   /** Finalized Watch flight scorecard (envelope / taxi / landing). */
   flightScore?: FlightScoreSnapshot;
+  /** Live weather-ops score from Watch ambient samples. */
+  weatherOps?: WeatherOpsSnapshot;
+  /** Touchdown WGS84 latitude (degrees). */
+  touchdownLat?: number;
+  /** Touchdown WGS84 longitude (degrees). */
+  touchdownLon?: number;
+  /** Precomputed runway projection (optional; settle recomputes when coords given). */
+  runwayTouch?: RunwayTouchdownSnapshot;
   /** Wall-clock now for minimum airborne duration gate. */
   nowMs?: number;
   /**
@@ -1407,7 +1532,7 @@ export interface SettleMissionResult {
   cargoOpsDeltas?: CargoOpsDelta[];
 }
 
-/** Late penalty as a fraction of pay per overdue tick. */
+/** Late penalty as a fraction of pay per overdue wall-clock hour. */
 function latePenaltyRate(
   urgency: MissionIntent['urgency'],
   commodityId: MissionIntent['commodityId'],
@@ -1420,13 +1545,22 @@ function computeSettlementPay(
   mission: MissionIntent,
   settleTick: number,
   flightScorePct?: number | null,
-): { lateTicks: number; penaltyUsd: number; payoutUsd: number; onTime: boolean } {
+  weatherBonusFrac = 0,
+): {
+  lateTicks: number;
+  penaltyUsd: number;
+  payoutUsd: number;
+  onTime: boolean;
+  weatherBonusUsd: number;
+} {
   const lateTicks = Math.max(0, settleTick - mission.deadlineTick);
   const onTime = lateTicks === 0;
+  // Economy ticks are 15 min — scale so the old "12%/h urgent" rate still applies.
+  const lateHours = lateTicks / TICKS_PER_HOUR;
   const rate = latePenaltyRate(mission.urgency, mission.commodityId);
   let penaltyUsd = onTime
     ? 0
-    : Math.min(mission.payUsd, Math.round(mission.payUsd * lateTicks * rate));
+    : Math.min(mission.payUsd, Math.round(mission.payUsd * lateHours * rate));
   const valueCut = cargoOpsValueScorePenaltyFraction(
     mission.commodityId,
     flightScorePct,
@@ -1437,8 +1571,12 @@ function computeSettlementPay(
       penaltyUsd + Math.round(mission.payUsd * valueCut),
     );
   }
-  const payoutUsd = Math.max(0, mission.payUsd - penaltyUsd);
-  return { lateTicks, penaltyUsd, payoutUsd, onTime };
+  const weatherBonusUsd =
+    weatherBonusFrac > 0
+      ? Math.max(0, Math.round(mission.payUsd * weatherBonusFrac))
+      : 0;
+  const payoutUsd = Math.max(0, mission.payUsd - penaltyUsd) + weatherBonusUsd;
+  return { lateTicks, penaltyUsd, payoutUsd, onTime, weatherBonusUsd };
 }
 
 function shrinkDeliveredLot(lot: ShipmentLot, bookKg: number): void {
@@ -1501,10 +1639,16 @@ export function settleMission(
       airborneAtMs: priorAirborneAtMs,
       expectedRouteMs: priorExpectedRouteMs,
       nowMs: opts.nowMs ?? Date.now(),
+      airborneEndedAtMs: opts.airborneEndedAtMs,
+      distanceNm: routeDistanceNm(
+        world,
+        working.originIcao,
+        working.destIcao,
+      ),
     });
     if (!check.ok) {
       throw new Error(
-        `Cannot settle yet — ${check.message}. Keep flying until at least 70% of the planned route time has elapsed.`,
+        `Cannot settle yet — ${check.message}. Keep flying until at least ${Math.round(check.ratioRequired * 100)}% of the planned route time has elapsed.`,
       );
     }
   }
@@ -1546,9 +1690,18 @@ export function settleMission(
   const settlementLines: MissionSettlementLine[] = [];
 
   const scorePct = opts.flightScore?.pct;
+  const weatherOps = opts.weatherOps ?? working.settledWeatherOps;
+  const weatherBonusFrac =
+    weatherOps && weatherOps.eligible ? weatherOps.bonusFrac : 0;
   const pay = working.crewDeadhead
-    ? { lateTicks: 0, penaltyUsd: 0, payoutUsd: 0, onTime: true }
-    : computeSettlementPay(working, settleTick, scorePct);
+    ? {
+        lateTicks: 0,
+        penaltyUsd: 0,
+        payoutUsd: 0,
+        onTime: true,
+        weatherBonusUsd: 0,
+      }
+    : computeSettlementPay(working, settleTick, scorePct, weatherBonusFrac);
   // Allocate penalty across lines proportional to payUsd.
   let penaltyLeft = pay.penaltyUsd;
 
@@ -1617,6 +1770,32 @@ export function settleMission(
         : working.settledLandingFpm,
     settledFlightDurationMs,
     settledFlightScore: opts.flightScore ?? working.settledFlightScore,
+    settledWeatherOps: weatherOps ?? working.settledWeatherOps,
+    settledWeatherBonusUsd: pay.weatherBonusUsd > 0 ? pay.weatherBonusUsd : undefined,
+    settledTouchdownLat:
+      typeof opts.touchdownLat === 'number' && Number.isFinite(opts.touchdownLat)
+        ? opts.touchdownLat
+        : working.settledTouchdownLat,
+    settledTouchdownLon:
+      typeof opts.touchdownLon === 'number' && Number.isFinite(opts.touchdownLon)
+        ? opts.touchdownLon
+        : working.settledTouchdownLon,
+    settledRunwayTouch: (() => {
+      if (opts.runwayTouch) return opts.runwayTouch;
+      const lat =
+        typeof opts.touchdownLat === 'number' && Number.isFinite(opts.touchdownLat)
+          ? opts.touchdownLat
+          : working.settledTouchdownLat;
+      const lon =
+        typeof opts.touchdownLon === 'number' && Number.isFinite(opts.touchdownLon)
+          ? opts.touchdownLon
+          : working.settledTouchdownLon;
+      if (lat == null || lon == null) return working.settledRunwayTouch;
+      return (
+        evaluateRunwayTouchdown(working.destIcao, lat, lon) ??
+        working.settledRunwayTouch
+      );
+    })(),
     payoutUsd: pay.payoutUsd,
     penaltyUsd: pay.penaltyUsd,
     lateTicks: pay.lateTicks,
@@ -1624,7 +1803,11 @@ export function settleMission(
   clearPlayerInbound(world, settled.id);
 
   let cargoOpsDeltas: CargoOpsDelta[] | undefined;
-  if (opts.fleet && !working.crewDeadhead) {
+  if (
+    opts.fleet &&
+    !working.crewDeadhead &&
+    !working.contractPilotReposition
+  ) {
     const applied = applyCargoOpsOnSettle(opts.fleet.cargoOps, settled, {
       onTime: pay.onTime,
       lateTicks: pay.lateTicks,
@@ -1649,6 +1832,12 @@ export function settleMission(
       originStockAfterKg: lastOriginStock,
       destStockAfterKg: lastDestStock,
       lines: settlementLines,
+      ...(pay.weatherBonusUsd > 0
+        ? { weatherBonusUsd: pay.weatherBonusUsd }
+        : {}),
+      ...(settled.settledRunwayTouch
+        ? { runwayTouch: settled.settledRunwayTouch }
+        : {}),
     },
   };
 }
@@ -1996,4 +2185,112 @@ export function formatIntentOfpCheck(check: IntentOfpCheck): string {
     lines.push(`  [${f.severity}] ${f.code}: ${f.message}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * True when OFP confirm failed solely because SimBrief cargo is below the
+ * mission (MTOW/fuel cut) — safe to offer "Accept OFP cargo" trim.
+ */
+export function isOfpCargoUnderOnlyFailure(check: IntentOfpCheck): boolean {
+  if (check.verdict !== 'fail') return false;
+  const fails = check.findings.filter((f) => f.severity === 'fail');
+  if (fails.length !== 1) return false;
+  const f = fails[0]!;
+  if (f.code !== 'INTENT_CARGO_MISMATCH') return false;
+  const expected =
+    typeof f.expected === 'number' && Number.isFinite(f.expected)
+      ? f.expected
+      : undefined;
+  const actual =
+    typeof f.actual === 'number' && Number.isFinite(f.actual)
+      ? f.actual
+      : undefined;
+  if (expected === undefined || actual === undefined) {
+    return typeof f.delta === 'number' && f.delta < 0;
+  }
+  return actual < expected;
+}
+
+export type TrimMissionCargoResult = {
+  mission: MissionIntent;
+  releasedKg: number;
+  payBeforeUsd: number;
+  payAfterUsd: number;
+};
+
+/**
+ * Shrink an open mission's cargo down to `targetCargoKg` (floor).
+ * Releases excess reservations back to the board and scales line pay pro-rata.
+ * Used when SimBrief MTOW/fuel-limits the OFP below the staged manifest.
+ */
+export function trimMissionCargoToKg(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  targetCargoKg: number,
+): TrimMissionCargoResult {
+  const normalized = normalizeMissionIntent(mission);
+  if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
+    throw new Error(`Cannot trim mission in status=${normalized.status}`);
+  }
+  if (normalized.contractPilot) {
+    throw new Error('Cannot trim cargo on a contract-pilot flight');
+  }
+  const target = Math.floor(targetCargoKg);
+  if (!Number.isFinite(target) || target < 1) {
+    throw new Error(`targetCargoKg must be ≥ 1 (got ${targetCargoKg})`);
+  }
+  const payBeforeUsd = normalized.payUsd;
+  if (normalized.cargoKg <= target) {
+    return {
+      mission: normalized,
+      releasedKg: 0,
+      payBeforeUsd,
+      payAfterUsd: payBeforeUsd,
+    };
+  }
+
+  // Trim from the last lot first so earlier lots stay intact when possible.
+  let excess = normalized.cargoKg - target;
+  const working = normalized.lots.map((line) => ({ ...line }));
+  for (let i = working.length - 1; i >= 0 && excess > 0; i--) {
+    const line = working[i]!;
+    const maxDrop =
+      i === 0 && working.filter((l) => l.cargoKg > 0).length <= 1
+        ? Math.max(0, line.cargoKg - 1)
+        : line.cargoKg;
+    const dropKg = Math.min(excess, maxDrop);
+    if (dropKg <= 0) continue;
+    if (world.lots.some((lot) => lot.id === line.shipmentLotId)) {
+      releaseShipmentReservation(world, line.shipmentLotId, dropKg);
+    }
+    const keepKg = line.cargoKg - dropKg;
+    const payUsd =
+      keepKg > 0
+        ? Math.max(1, Math.round((line.payUsd * keepKg) / line.cargoKg))
+        : 0;
+    working[i] = { ...line, cargoKg: keepKg, payUsd };
+    excess -= dropKg;
+  }
+
+  const nextLots = working.filter((line) => line.cargoKg > 0);
+  if (nextLots.length === 0) {
+    throw new Error('Trim would remove all cargo lines');
+  }
+
+  const next = recomputeMissionTotals({
+    ...normalized,
+    lots: nextLots,
+  });
+  if (next.cargoKg > target) {
+    throw new Error(
+      `Trim failed to reach ${target} kg (still ${next.cargoKg} kg)`,
+    );
+  }
+  syncPlayerInbound(world, next);
+  return {
+    mission: next,
+    releasedKg: normalized.cargoKg - next.cargoKg,
+    payBeforeUsd,
+    payAfterUsd: next.payUsd,
+  };
 }

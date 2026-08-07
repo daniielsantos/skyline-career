@@ -61,11 +61,16 @@ export {
 export {
   applyAircraftHoursAfterMission,
   clearAircraftMaintenance,
+  fuelBurnMultFromAircraft,
+  fuelBurnMultFromCondition,
+  padOfpBlockFuelKgForMx,
   inspectionCostUsd,
   maintenanceCostUsd,
   repairAircraftCondition,
   hoursUntilInspection,
   ensureAircraftConditionPcts,
+  CRITICAL_CONDITION_PCT,
+  MX_FUEL_BURN_MULT_MAX,
   INSPECTION_INTERVAL_HOURS,
   INSPECTION_INTERVAL_HOURS as MAINTENANCE_INTERVAL_HOURS,
 } from './career-aircraft-maintenance.js';

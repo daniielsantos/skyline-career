@@ -44,6 +44,64 @@ export type MarketBoardAccessFilter = 'open' | 'locked';
 /** Freights route scope: international lanes vs domestic. */
 export type MarketBoardLaneFilter = 'intl' | 'domestic';
 
+/**
+ * Kg to quote for board lift / viable filters.
+ * Open Contracts are fully reserved (`availableKg` often 0) — use claim cargo.
+ */
+export function boardFreightKgForEstimates(opts: {
+  availableKg: number;
+  crewNeeded?: boolean;
+  claimCargoKg?: number;
+}): number {
+  if (
+    opts.crewNeeded === true &&
+    typeof opts.claimCargoKg === 'number' &&
+    Number.isFinite(opts.claimCargoKg) &&
+    opts.claimCargoKg > 0
+  ) {
+    return Math.floor(opts.claimCargoKg);
+  }
+  return Math.max(0, Math.floor(opts.availableKg));
+}
+
+/**
+ * Pay shown/sorted for a board row.
+ * Contract/Ferry: pilot fee (what you earn) — not operator freight on the whole lot.
+ * Normal freights: full lot payUsd.
+ */
+export function boardDisplayPayUsd(opts: {
+  lotPayUsd: number;
+  quantityKg: number;
+  crewNeeded?: boolean;
+  claimCargoKg?: number;
+  /** Max contract-pilot fee; preferred when present. */
+  pilotFeeUsd?: number;
+}): number {
+  if (
+    opts.crewNeeded === true &&
+    typeof opts.pilotFeeUsd === 'number' &&
+    Number.isFinite(opts.pilotFeeUsd) &&
+    opts.pilotFeeUsd > 0
+  ) {
+    return Math.round(opts.pilotFeeUsd);
+  }
+  const lotPay = Math.max(0, Math.round(opts.lotPayUsd));
+  if (
+    opts.crewNeeded === true &&
+    typeof opts.claimCargoKg === 'number' &&
+    Number.isFinite(opts.claimCargoKg) &&
+    opts.claimCargoKg > 0 &&
+    opts.quantityKg > 0
+  ) {
+    return Math.max(
+      1,
+      Math.round((opts.claimCargoKg / opts.quantityKg) * lotPay),
+    );
+  }
+  return lotPay;
+}
+
+
 export type MarketBoardQueryOpts = {
   /** Max great-circle distance (nm). */
   distanceMaxNm?: number;

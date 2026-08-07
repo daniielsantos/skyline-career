@@ -14,6 +14,8 @@ export * from './career-mx-hubs.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';
 export * from './career-weather.js';
+export * from './career-weather-ops.js';
+export * from './career-runways.js';
 export * from './career-fuel.js';
 export * from './career-fuel-logistics.js';
 export * from './career-hub-level.js';

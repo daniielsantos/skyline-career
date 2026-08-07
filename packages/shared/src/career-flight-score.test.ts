@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   createFlightScoreAccumulator,
+  clearFlightScoreLanding,
   finalizeFlightScore,
+  patchFlightScoreLandingVs,
   pushFlightScoreSample,
   scoreLandingGPoints,
   scoreLandingVsPoints,
@@ -92,18 +94,82 @@ describe('pushFlightScoreSample + finalizeFlightScore', () => {
       gForce: 1.1,
       gearDown: true,
       flapsPct: 20,
+      aglFt: 8,
     });
     acc = pushFlightScoreSample(acc, {
       onGround: false,
       sawAirborne: true,
       postTouchdown: true,
+      aglFt: 20,
     });
     acc = pushFlightScoreSample(acc, {
       onGround: true,
       sawAirborne: true,
       postTouchdown: true,
+      aglFt: 8,
     });
     assert.equal(acc.bounceCount, 1);
+    // First-contact VS must stay locked across the bounce.
+    assert.equal(acc.landing?.vsFpm, -150);
+  });
+
+  it('counts a bounce when SIM ON GROUND stays sticky but AGL lifts', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -220,
+      gForce: 1.2,
+      gearDown: true,
+      flapsPct: 25,
+      aglFt: 7,
+    });
+    // Sticky SIM ON GROUND — only radio alt shows the hop.
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      aglFt: 10,
+    });
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      aglFt: 7,
+      gForce: 1.5,
+    });
+    assert.equal(acc.bounceCount, 1);
+    assert.equal(acc.touchdownAglFt, 7);
+  });
+
+  it('counts multiple bounces while postTouchdown stays sticky', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -400,
+      gForce: 1.6,
+      gearDown: true,
+      flapsPct: 25,
+    });
+    for (let i = 0; i < 2; i++) {
+      acc = pushFlightScoreSample(acc, {
+        onGround: false,
+        sawAirborne: true,
+        postTouchdown: true,
+      });
+      acc = pushFlightScoreSample(acc, {
+        onGround: true,
+        sawAirborne: true,
+        postTouchdown: true,
+        landingVsFpm: -100,
+        gForce: 1.1,
+      });
+    }
+    assert.equal(acc.bounceCount, 2);
+    assert.equal(acc.landing?.vsFpm, -400);
   });
 
   it('auto-passes landing gear for fixed-gear aircraft', () => {
@@ -124,6 +190,43 @@ describe('pushFlightScoreSample + finalizeFlightScore', () => {
       .find((m) => m.id === 'landing_gear');
     assert.equal(gear?.points, 1);
     assert.equal(gear?.detail, 'fixed gear');
+  });
+
+  it('auto-passes landing gear when retractable flag is unknown', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -180,
+      gForce: 1.1,
+      flapsPct: 20,
+    });
+    const score = finalizeFlightScore(acc);
+    const gear = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_gear');
+    assert.equal(gear?.points, 1);
+    assert.equal(gear?.detail, 'n/a');
+  });
+
+  it('ignores takeoff-roll ground speed when scoring departure taxi', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: false,
+      postTouchdown: false,
+      phase: 'taxi_out',
+      groundSpeedKt: 28,
+    });
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: false,
+      postTouchdown: false,
+      phase: 'takeoff',
+      groundSpeedKt: 92,
+    });
+    assert.equal(acc.maxDepTaxiGsKt, 28);
   });
 
   it('awards flaps and gear when percent is in 0–100 points', () => {
@@ -149,5 +252,64 @@ describe('pushFlightScoreSample + finalizeFlightScore', () => {
     assert.equal(flaps?.detail, '33%');
     assert.equal(gear?.points, 1);
     assert.equal(gear?.detail, 'down');
+  });
+
+  it('clears a premature landing stamp so a later touchdown can re-score', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -750,
+      gForce: 1.4,
+      gearDown: false,
+      gearRetractable: true,
+      flapsPct: 0,
+    });
+    assert.ok(acc.landing);
+    acc = clearFlightScoreLanding(acc);
+    assert.equal(acc.landing, undefined);
+    assert.equal(acc.bounceCount, 0);
+
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -180,
+      gForce: 1.05,
+      gearDown: true,
+      gearRetractable: true,
+      flapsPct: 25,
+    });
+    const score = finalizeFlightScore(acc);
+    const landingVs = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_vs');
+    const gear = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_gear');
+    assert.ok((landingVs?.points ?? 0) > 0);
+    assert.match(landingVs?.detail ?? '', /-180/);
+    assert.equal(gear?.points, 1);
+  });
+
+  it('prefers settle override VS over a stale accumulator stamp', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -758,
+      gForce: 1.0,
+      gearDown: true,
+      flapsPct: 20,
+    });
+    acc = patchFlightScoreLandingVs(acc, 81);
+    const score = finalizeFlightScore(acc, { landingVsFpm: 81 });
+    const landingVs = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_vs');
+    assert.equal(landingVs?.points, 12);
+    assert.match(landingVs?.detail ?? '', /\+81/);
   });
 });

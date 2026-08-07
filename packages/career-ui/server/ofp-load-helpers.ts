@@ -30,6 +30,7 @@ import {
   CG_BALANCE_STEP_LB,
   cgCounterweightPerSeatLb,
   equalizeMovableStations,
+  equalizeLateralStationPairs,
   fuelTankTargetsForRound,
   FUEL_INJECT_ROUNDS,
   liveFuelMatchesTarget,
@@ -63,6 +64,7 @@ import { withSimBridgeExclusive, acquireSimBridgeExclusive } from './simbridge-g
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import { watchDebugLog } from './debug-log.ts';
 import type { CareerWatchSession } from './watch-helpers.ts';
+import { applyTargetBlockFuelKg } from './ofp-target-fuel.ts';
 
 export { isOfpLoadActive };
 
@@ -627,6 +629,10 @@ export async function applyMissionOfpLoad(
     pipeName?: string;
     catalogUrl?: string;
     runPreflightAfter?: boolean;
+    /** Appended to fuel-inject progress when airframe burns more than healthy. */
+    mxFuelBurnNote?: string;
+    /** Optional block-fuel override (kg); normally omit so Due matches SimBrief. */
+    targetBlockFuelKg?: number;
   } = {},
 ): Promise<OfpLoadApplyResult> {
   // UI polling must not start a second inject while the first still owns the pipe.
@@ -641,6 +647,8 @@ async function applyMissionOfpLoadExclusive(
     pipeName?: string;
     catalogUrl?: string;
     runPreflightAfter?: boolean;
+    mxFuelBurnNote?: string;
+    targetBlockFuelKg?: number;
   } = {},
 ): Promise<OfpLoadApplyResult> {
   if (!mission.staticId) {
@@ -689,8 +697,8 @@ async function applyMissionOfpLoadExclusive(
     staticId: mission.staticId,
   });
 
-  let ofp = expectation;
-  let stationRoles = expectation.payload?.stationRoles;
+  let ofp = applyTargetBlockFuelKg(expectation, opts.targetBlockFuelKg);
+  let stationRoles = ofp.payload?.stationRoles;
 
   const bridge = new NamedPipeSimBridge({
     ...(opts.pipeName ? { pipeName: opts.pipeName } : {}),
@@ -1192,11 +1200,16 @@ async function applyMissionOfpLoadExclusive(
     };
 
     assertOfpLoadNotCancelled(mission.id);
+    const mxNote = opts.mxFuelBurnNote?.trim();
+    const withMxNote = (message: string) =>
+      mxNote && message.startsWith('Injecting OFP fuel')
+        ? `${message} · ${mxNote}`
+        : message;
     publishLiveProgress(
       'injecting',
       fuelAlreadyOk
         ? `Fuel OK — loading payload +${CG_BALANCE_STEP_LB} lb/seat across ${seatCount} seats…`
-        : `Injecting OFP fuel (1/${FUEL_INJECT_ROUNDS})…`,
+        : withMxNote(`Injecting OFP fuel (1/${FUEL_INJECT_ROUNDS})…`),
     );
 
     if (!fuelAlreadyOk && built.plan.fuel) {
@@ -1213,7 +1226,7 @@ async function applyMissionOfpLoadExclusive(
         );
         publishLiveProgress(
           'injecting',
-          `Injecting OFP fuel (${round}/${FUEL_INJECT_ROUNDS})…`,
+          withMxNote(`Injecting OFP fuel (${round}/${FUEL_INJECT_ROUNDS})…`),
         );
         const fuelApply = await applyFuelRound(tanks);
         applyResult = {
@@ -1562,8 +1575,20 @@ async function applyMissionOfpLoadExclusive(
           break;
         }
 
-        const total = Object.values(nextStations).reduce((a, b) => a + b, 0);
-        workingStations = nextStations;
+        // Belt-and-suspenders: L/R pairs can drift when CG shift uses index order
+        // as a fake longitudinal axis (Bonanza rear L/R share arm).
+        workingStations = equalizeLateralStationPairs(
+          nextStations,
+          resolved.profile,
+          built.movableStations,
+          {
+            softMaxByIndex: {
+              ...seatSoftMaxByIndex,
+              ...baggageSoftMaxByIndex,
+            },
+          },
+        );
+        const total = Object.values(workingStations).reduce((a, b) => a + b, 0);
         built = {
           ...built,
           plan: {
@@ -1656,6 +1681,16 @@ async function applyMissionOfpLoadExclusive(
                 minRetainByIndex: Object.fromEntries(
                   baggageStations.map((idx) => [idx, 0]),
                 ),
+                softMaxByIndex: preferSeatFill
+                  ? baggageSoftMaxByIndex
+                  : undefined,
+              },
+            );
+            workingStations = equalizeLateralStationPairs(
+              workingStations,
+              resolved.profile,
+              baggageStations,
+              {
                 softMaxByIndex: preferSeatFill
                   ? baggageSoftMaxByIndex
                   : undefined,
@@ -2039,6 +2074,7 @@ async function applyMissionOfpLoadExclusive(
           username,
           userid,
           pipeName: opts.pipeName,
+          targetBlockFuelKg: opts.targetBlockFuelKg,
         });
       } catch (preflightError) {
         // Load already succeeded; surface preflight plumbing as soft failure note.

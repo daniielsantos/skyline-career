@@ -47,6 +47,32 @@ export const CARGO_OPS_TIERS: readonly {
   { id: 'heavy', label: 'Heavy', commodityIds: ['machinery'] },
 ];
 
+/** Dry → Value unlock thresholds. */
+export const CARGO_OPS_VALUE_UNLOCK = {
+  dryCleansRequired: 6,
+  peakRepRequired: 70,
+  /** Each Dry commodity must contribute at least this many cleans. */
+  minCleanPerDryCommodity: 1,
+} as const;
+
+/** Value → Time unlock thresholds (electronics progress). */
+export const CARGO_OPS_TIME_UNLOCK = {
+  electronicsRepRequired: 70,
+  electronicsCleansRequired: 5,
+} as const;
+
+/** Time → Heavy unlock thresholds (perishables path). */
+export const CARGO_OPS_HEAVY_UNLOCK = {
+  perishablesRepRequired: 70,
+  perishablesCleansRequired: 4,
+} as const;
+
+/** Value → Heavy shortcut (skip Time). */
+export const CARGO_OPS_HEAVY_SHORTCUT = {
+  electronicsRepRequired: 80,
+  electronicsCleansRequired: 8,
+} as const;
+
 function clampRep(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(100, Math.round(n)));
@@ -102,29 +128,46 @@ export function normalizeCareerCargoOps(raw: unknown): CareerCargoOps {
   return base;
 }
 
-function dryReady(ops: CareerCargoOps): boolean {
+export function dryReady(ops: CareerCargoOps): boolean {
   const g = ops.commodities.general;
   const s = ops.commodities.supplies;
-  if (g.rep >= 60 && g.settlesOk >= 3) return true;
-  if (s.rep >= 60 && s.settlesOk >= 3) return true;
+  const { dryCleansRequired, peakRepRequired, minCleanPerDryCommodity } =
+    CARGO_OPS_VALUE_UNLOCK;
   const settles = g.settlesOk + s.settlesOk;
-  const rep = Math.max(g.rep, s.rep);
-  return settles >= 3 && rep >= 60;
+  const peakRep = Math.max(g.rep, s.rep);
+  return (
+    settles >= dryCleansRequired &&
+    peakRep >= peakRepRequired &&
+    g.settlesOk >= minCleanPerDryCommodity &&
+    s.settlesOk >= minCleanPerDryCommodity
+  );
 }
 
-function valueReady(ops: CareerCargoOps): boolean {
+export function valueReady(ops: CareerCargoOps): boolean {
   const e = ops.commodities.electronics;
-  return e.unlocked && e.rep >= 65 && e.settlesOk >= 4;
+  return (
+    e.unlocked &&
+    e.rep >= CARGO_OPS_TIME_UNLOCK.electronicsRepRequired &&
+    e.settlesOk >= CARGO_OPS_TIME_UNLOCK.electronicsCleansRequired
+  );
 }
 
-function valueHeavyShortcut(ops: CareerCargoOps): boolean {
+export function valueHeavyShortcut(ops: CareerCargoOps): boolean {
   const e = ops.commodities.electronics;
-  return e.unlocked && e.rep >= 75 && e.settlesOk >= 6;
+  return (
+    e.unlocked &&
+    e.rep >= CARGO_OPS_HEAVY_SHORTCUT.electronicsRepRequired &&
+    e.settlesOk >= CARGO_OPS_HEAVY_SHORTCUT.electronicsCleansRequired
+  );
 }
 
-function timeReady(ops: CareerCargoOps): boolean {
+export function timeReady(ops: CareerCargoOps): boolean {
   const p = ops.commodities.perishables;
-  return p.unlocked && p.rep >= 65 && p.settlesOk >= 3;
+  return (
+    p.unlocked &&
+    p.rep >= CARGO_OPS_HEAVY_UNLOCK.perishablesRepRequired &&
+    p.settlesOk >= CARGO_OPS_HEAVY_UNLOCK.perishablesCleansRequired
+  );
 }
 
 /** Recompute sticky unlocks from current rep / settlesOk. */
@@ -137,6 +180,148 @@ export function refreshCargoOpsUnlocks(ops: CareerCargoOps): CareerCargoOps {
     ops.commodities.machinery.unlocked = true;
   }
   return ops;
+}
+
+export type CargoOpsUnlockProgress = {
+  tierId: CargoOpsTierId;
+  /** Tier commodity already unlocked (sticky). */
+  unlocked: boolean;
+  /** Gate met right now (independent of sticky flag). */
+  ready: boolean;
+  /** Short progress line for Hangar UI. */
+  summary: string;
+};
+
+/**
+ * Human-readable progress toward unlocking a locked tier (or status when open).
+ * `dry` is always unlocked — summary is empty.
+ */
+export function cargoOpsUnlockProgress(
+  ops: CareerCargoOps,
+  tierId: CargoOpsTierId,
+): CargoOpsUnlockProgress {
+  const normalized = normalizeCareerCargoOps(ops);
+  if (tierId === 'dry') {
+    return {
+      tierId,
+      unlocked: true,
+      ready: true,
+      summary: '',
+    };
+  }
+
+  if (tierId === 'value') {
+    const g = normalized.commodities.general;
+    const s = normalized.commodities.supplies;
+    const unlocked = normalized.commodities.electronics.unlocked;
+    const ready = dryReady(normalized);
+    const {
+      dryCleansRequired,
+      peakRepRequired,
+      minCleanPerDryCommodity,
+    } = CARGO_OPS_VALUE_UNLOCK;
+    const cleans = g.settlesOk + s.settlesOk;
+    const peak = Math.max(g.rep, s.rep);
+    const bothTypes =
+      g.settlesOk >= minCleanPerDryCommodity &&
+      s.settlesOk >= minCleanPerDryCommodity;
+    if (unlocked) {
+      const elecRep = normalized.commodities.electronics.rep;
+      return {
+        tierId,
+        unlocked: true,
+        ready,
+        summary:
+          elecRep < 30
+            ? 'board open · build Electronics rep for better pay'
+            : '',
+      };
+    }
+    const parts = [
+      `${cleans}/${dryCleansRequired} Dry cleans`,
+      bothTypes ? 'both Dry types' : 'need both Dry types',
+      `peak rep ${peak}/${peakRepRequired}`,
+    ];
+    return {
+      tierId,
+      unlocked: false,
+      ready,
+      summary: parts.join(' · '),
+    };
+  }
+
+  if (tierId === 'time') {
+    const e = normalized.commodities.electronics;
+    const unlocked = normalized.commodities.perishables.unlocked;
+    const ready = valueReady(normalized);
+    const { electronicsRepRequired, electronicsCleansRequired } =
+      CARGO_OPS_TIME_UNLOCK;
+    if (unlocked) {
+      return {
+        tierId,
+        unlocked: true,
+        ready,
+        summary:
+          e.rep < 30
+            ? 'board open · build Perishables rep for better pay'
+            : '',
+      };
+    }
+    if (!e.unlocked) {
+      return {
+        tierId,
+        unlocked: false,
+        ready: false,
+        summary: 'Unlock Value first',
+      };
+    }
+    return {
+      tierId,
+      unlocked: false,
+      ready,
+      summary: `${e.settlesOk}/${electronicsCleansRequired} Electronics cleans · rep ${e.rep}/${electronicsRepRequired}`,
+    };
+  }
+
+  // heavy
+  {
+    const p = normalized.commodities.perishables;
+    const e = normalized.commodities.electronics;
+    const unlocked = normalized.commodities.machinery.unlocked;
+    const ready = timeReady(normalized) || valueHeavyShortcut(normalized);
+    if (unlocked) {
+      return {
+        tierId,
+        unlocked: true,
+        ready,
+        summary:
+          normalized.commodities.machinery.rep < 30
+            ? 'board open · build Machinery rep for better pay'
+            : '',
+      };
+    }
+    if (!p.unlocked && !e.unlocked) {
+      return {
+        tierId,
+        unlocked: false,
+        ready: false,
+        summary: 'Unlock Time (or Value shortcut) first',
+      };
+    }
+    const viaTime = p.unlocked
+      ? `${p.settlesOk}/${CARGO_OPS_HEAVY_UNLOCK.perishablesCleansRequired} Perishables cleans · rep ${p.rep}/${CARGO_OPS_HEAVY_UNLOCK.perishablesRepRequired}`
+      : null;
+    const viaShortcut = e.unlocked
+      ? `or Electronics ${e.settlesOk}/${CARGO_OPS_HEAVY_SHORTCUT.electronicsCleansRequired} cleans · rep ${e.rep}/${CARGO_OPS_HEAVY_SHORTCUT.electronicsRepRequired}`
+      : null;
+    const summary = [viaTime, viaShortcut].filter(Boolean).join(' · ');
+    return {
+      tierId,
+      unlocked: false,
+      ready,
+      summary: summary || 'Unlock Time first',
+    };
+  }
 }
 
 export function cargoOpsIsUnlocked(

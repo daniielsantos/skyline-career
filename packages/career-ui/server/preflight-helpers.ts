@@ -32,6 +32,7 @@ import {
   resolveSchematicCapsFromCatalog,
 } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
+import { applyTargetBlockFuelKg } from './ofp-target-fuel.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
 const ofpCache = new Map<string, Promise<OfpExpectation>>();
@@ -143,7 +144,13 @@ export type MissionPreflightResult = {
 
 export async function runMissionPreflight(
   mission: MissionIntent,
-  opts: { username?: string; userid?: string; pipeName?: string } = {},
+  opts: {
+    username?: string;
+    userid?: string;
+    pipeName?: string;
+    /** Optional block-fuel override (kg); normally omit so Due matches SimBrief. */
+    targetBlockFuelKg?: number;
+  } = {},
 ): Promise<MissionPreflightResult> {
   if (!mission.staticId) {
     throw new Error('Mission has no static_id — Dispatch first');
@@ -157,6 +164,7 @@ export async function runMissionPreflight(
   }
 
   const expectation = await loadPreflightOfp(mission, { username, userid });
+  const ofpBase = applyTargetBlockFuelKg(expectation, opts.targetBlockFuelKg);
 
   const bridge = new NamedPipeSimBridge(
     opts.pipeName ? { pipeName: opts.pipeName } : {},
@@ -166,7 +174,7 @@ export async function runMissionPreflight(
     await bridge.open('Skyline Career UI Preflight');
     const identity = await bridge.getAircraftIdentity();
     const liveTitle = normalizeAircraftTitle(identity.title ?? '');
-    let ofp = expectation;
+    let ofp = ofpBase;
     try {
       const roles = await resolveMissionRolesPack({
         repoRoot,
@@ -175,7 +183,7 @@ export async function runMissionPreflight(
         strictAirframeMatch: Boolean(mission.airframeTypeId),
         liveTitle: liveTitle || identity.title,
       });
-      ofp = applyOfpOverrides(expectation, {
+      ofp = applyOfpOverrides(ofpBase, {
         stationRoles: roles.pack.payload?.stationRoles,
         liveSources: roles.pack.liveSources,
       });

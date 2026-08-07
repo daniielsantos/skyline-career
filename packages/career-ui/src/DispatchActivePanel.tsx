@@ -3,6 +3,8 @@ import { useRef } from 'react';
 import {
   DISPATCH_STEP_LABEL,
   DISPATCH_STEP_ORDER,
+  isOfpCargoUnderOnlyFailureUi,
+  ofpCargoKgFromUnderFinding,
   type DispatchStepId,
   type LoadPath,
 } from './dispatch-flow';
@@ -21,6 +23,7 @@ import {
   pickStableLiveFuelLb,
   stabilizeDisplayedFuel,
 } from './load-verification';
+import { mxFuelBurnAlertText } from './mx-fuel-burn';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
   const currentIndex = DISPATCH_STEP_ORDER.indexOf(props.current);
@@ -77,6 +80,8 @@ export function DispatchActivePanel(props: {
   aircraftClassLabel: (id: string) => string;
   /** Structural/operational cargo ceiling for this mission (kg). */
   missionMaxCargoKg: (mission: Mission) => number;
+  /** Route ops payload ceiling when known (kg) — shown under Capacity left. */
+  missionOpsCapacityHint?: number | null;
   ofpAutoStatus: 'idle' | 'waiting' | 'checking';
   missionFuelQuote: {
     quote: MissionFuelQuote;
@@ -124,11 +129,14 @@ export function DispatchActivePanel(props: {
   watch: WatchStatus | null;
   /** Why the Preflight card has not opened yet (first sample failed). */
   preflightBootstrapError?: string | null;
+  /** Worn airframe: extra fuel burn disclosed at fuel load / preflight. */
+  mxFuelBurnAlert?: { excessPct: number; conditionPct: number } | null;
   onOpenAirport: (icao: string) => void;
   onSelectSettings: () => void;
   onDispatch: (mission: Mission) => void;
   onCancel: (mission: Mission) => void;
   onEditManifest: (mission: Mission) => void;
+  onAcceptOfpCargo?: (mission: Mission) => void;
   onBuyFuel: (mission: Mission) => void;
   onRetryFuelQuote: () => void;
   onToggleSkylineInject: (enabled: boolean) => void;
@@ -324,6 +332,12 @@ export function DispatchActivePanel(props: {
               ),
             )}
           </strong>
+          {typeof props.missionOpsCapacityHint === 'number' &&
+          props.missionOpsCapacityHint > 0 ? (
+            <em>
+              of {props.formatTonnes(props.missionOpsCapacityHint)} ops
+            </em>
+          ) : null}
         </span>
       </div>
 
@@ -444,6 +458,31 @@ export function DispatchActivePanel(props: {
                     </ul>
                   </details>
                 ) : null}
+                {check.verdict === 'fail' &&
+                isOfpCargoUnderOnlyFailureUi(check) &&
+                props.onAcceptOfpCargo &&
+                !mission.contractPilot ? (
+                  <div className="ofp-accept-cargo">
+                    <p>
+                      SimBrief limited payload for this leg — leftover returns to
+                      the board and pay is reduced.
+                    </p>
+                    <button
+                      type="button"
+                      className="action"
+                      disabled={busy}
+                      onClick={() => props.onAcceptOfpCargo?.(mission)}
+                    >
+                      Accept OFP cargo
+                      {(() => {
+                        const kg = ofpCargoKgFromUnderFinding(check);
+                        return kg
+                          ? ` (${formatMassExact(kg, weightSystem)})`
+                          : '';
+                      })()}
+                    </button>
+                  </div>
+                ) : null}
               </section>
             );
           })()
@@ -473,11 +512,16 @@ export function DispatchActivePanel(props: {
               <div>
                 <strong>FUEL PURCHASE REQUIRED</strong>
                 <small>
-                  Persisted fuel is below the confirmed OFP block fuel.
+                  Persisted fuel is below the confirmed SimBrief OFP block fuel.
                 </small>
               </div>
               <span>{props.missionFuelQuote.quote.uplift.scarcity}</span>
             </div>
+            {props.mxFuelBurnAlert ? (
+              <p className="banner warn mx-fuel-burn-alert" role="status">
+                {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
+              </p>
+            ) : null}
             <dl className="fuel-purchase-grid">
               <div>
                 <dt>On aircraft</dt>
@@ -529,11 +573,21 @@ export function DispatchActivePanel(props: {
           <div className="dispatch-step-card fuel-quote-error" aria-live="polite">
             <strong>Could not calculate OFP fuel purchase</strong>
             <p>{props.missionFuelQuoteError}</p>
+            {props.mxFuelBurnAlert ? (
+              <p className="banner warn mx-fuel-burn-alert" role="status">
+                {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="dispatch-step-card" aria-live="polite">
             <strong>Checking persisted aircraft fuel…</strong>
             <p>Comparing the career tank with OFP block fuel.</p>
+            {props.mxFuelBurnAlert ? (
+              <p className="banner warn mx-fuel-burn-alert" role="status">
+                {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
+              </p>
+            ) : null}
           </div>
         )
       ) : null}
@@ -563,6 +617,11 @@ export function DispatchActivePanel(props: {
               ? 'Use Import SimBrief / Load OFP on the aircraft EFB or FMC. Waiting for live preflight…'
               : 'Set fuel and payload in Mass & Balance / EFB. Waiting for live preflight…'}
           </p>
+          {props.mxFuelBurnAlert ? (
+            <p className="banner warn mx-fuel-burn-alert" role="status">
+              {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -582,6 +641,11 @@ export function DispatchActivePanel(props: {
                     ? `Reading “${props.simBridge.aircraftTitle}”… the Preflight card opens when the first sample lands (engines can be off).`
                     : 'SimBridge is up, but no aircraft title yet — load the Bandeirante at the gate (cold & dark is fine; main menu / world map is not).'}
           </p>
+          {props.mxFuelBurnAlert ? (
+            <p className="banner warn mx-fuel-burn-alert" role="status">
+              {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -919,6 +983,15 @@ export function DispatchActivePanel(props: {
                     </span>
                   </div>
                 </div>
+                {props.mxFuelBurnAlert ||
+                check.findings.some((f) => f.code === 'MX_FUEL_BURN') ? (
+                  <p className="banner warn mx-fuel-burn-alert" role="status">
+                    {props.mxFuelBurnAlert
+                      ? mxFuelBurnAlertText(props.mxFuelBurnAlert)
+                      : (check.findings.find((f) => f.code === 'MX_FUEL_BURN')
+                          ?.message ?? '')}
+                  </p>
+                ) : null}
                 {view ? (
                   <div className="preflight-load-grid">
                     <div

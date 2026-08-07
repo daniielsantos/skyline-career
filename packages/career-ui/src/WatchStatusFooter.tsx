@@ -154,7 +154,7 @@ export function WatchStatusFooter(props: Props) {
                 ? 'watch-flight-time ok'
                 : 'watch-flight-time pending'
             }
-            title="Minimum airborne time is 70% of the planned OFP/route block (wall clock)"
+            title="Minimum airborne time: 70% of planned route (≥50% when route is under 100 nm)"
           >
             Airborne {Math.round(props.watch.flightTime.elapsedMs / 60_000)}m /{' '}
             {Math.round(props.watch.flightTime.expectedRouteMs / 60_000)}m air

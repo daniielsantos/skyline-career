@@ -9,16 +9,19 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
 
 describe('resolveMissionRolesPack', () => {
-  it('prefers Asobo C208B Cargo pack over Caravan class fallback', async () => {
+  it('falls back to Caravan class pack when Asobo C208B pack is absent', async () => {
     const roles = await resolveMissionRolesPack({
       repoRoot,
       rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
       liveTitle: 'C208B Cargo N208AS',
     });
-    assert.match(roles.path.replace(/\\/g, '/'), /asobo-c208b-cargo\.json$/);
-    assert.equal(roles.pack.ofpId, 'asobo-c208b-cargo');
-    assert.deepEqual(roles.pack.payload?.stationRoles?.crewStations, [1, 2]);
-    assert.ok((roles.pack.payload?.stationRoles?.baggageStations?.length ?? 0) >= 8);
+    // asobo-c208b-cargo.json is not in profiles/ofp — title does not resolve;
+    // class fallback keeps the Black Square Caravan pack.
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /blacksquare-caravan-cargo-pod\.json$/,
+    );
+    assert.match(roles.via, /mission class/);
   });
 
   it('keeps Black Square pack for BS live title', async () => {
@@ -91,24 +94,33 @@ describe('resolveMissionRolesPack', () => {
     }
   });
 
-  it('accepts Asobo or Black Square Caravan under the shared Market SKU', async () => {
-    for (const liveTitle of [
-      'C208B Cargo',
-      'Black Square Caravan Professional Cargo Pod',
-    ]) {
-      const roles = await resolveMissionRolesPack({
-        repoRoot,
-        rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
-        liveTitle,
-        airframeTypeId: 'c208-caravan-cargo',
-        strictAirframeMatch: true,
-      });
-      assert.ok(
-        /asobo-c208b-cargo|blacksquare-caravan-cargo-pod/.test(
-          roles.path.replace(/\\/g, '/'),
-        ),
-      );
-    }
+  it('accepts Black Square Caravan under the shared Market SKU', async () => {
+    const roles = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
+      liveTitle: 'Black Square Caravan Professional Cargo Pod',
+      airframeTypeId: 'c208-caravan-cargo',
+      strictAirframeMatch: true,
+    });
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /blacksquare-caravan-cargo-pod\.json$/,
+    );
+  });
+
+  it('ignores a mismatched live title when a purchased airframe is set (soft)', async () => {
+    const roles = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
+      liveTitle: 'Black Square Commander 114',
+      airframeTypeId: 'c208-caravan-cargo',
+      strictAirframeMatch: false,
+    });
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /blacksquare-caravan-cargo-pod\.json$/,
+    );
+    assert.match(roles.via, /mission class/);
   });
 
   it('accepts Saab 340 Passenger or Cargo under the shared Market SKU', async () => {
@@ -193,5 +205,16 @@ describe('resolveDispatchSimBriefParams', () => {
       params.simbriefAirframeMatch,
       'NextGen Simulations \\(MSFS\\) - EMB-110P1F$',
     );
+  });
+
+  it('keeps Caravan SimBrief ICAO when live title is a different owned airframe', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_turboprop',
+      airframeTypeId: 'c208-caravan-cargo',
+      rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
+      liveTitle: 'Black Square Commander 114',
+    });
+    assert.equal(params.simbriefIcao, 'C208');
+    assert.match(params.titleHint, /Caravan/i);
   });
 });

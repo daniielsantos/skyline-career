@@ -5,11 +5,9 @@
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "NextGenSim EMB-110P Bandeirante",
-    "NextGenSim EMB-110P1 Bandeirante",
-    "NextGenSim EMB-110P2 Bandeirante"
+    "NextGenSim EMB-110P Bandeirante"
   ],
-  "matchTitlePattern": "NextGenSim EMB-110P Bandeirante",
+  "matchTitlePattern": "^NextGenSim EMB-110P Bandeirante$",
   "notes": [
     "NextGenSim EMB-110P Bandeirante — auto roles pack from homologated profile",
     "Profile: nextgensim/emb-110p-bandeirante@1.0.0",

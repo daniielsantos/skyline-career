@@ -8,6 +8,8 @@ import {
   applyWalletDelta,
   createCruiseSampleState,
   createFlightScoreAccumulator,
+  clearFlightScoreLanding,
+  createWeatherOpsAccumulator,
   cruiseSampleStatus,
   DEFAULT_CRUISE_EMA_ALPHA,
   departMission,
@@ -17,14 +19,18 @@ import {
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
   finalizeFlightScore,
+  finalizeWeatherOpsScore,
   isUsableFuelTankBreakdown,
   loadVerificationDrifted,
   mergeAirframePerfOverride,
   DEFAULT_JET_A_LB_PER_GAL,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
+  patchFlightScoreLandingVs,
+  evaluateRunwayTouchdown,
   pushCruiseTick,
   pushFlightScoreSample,
+  pushWeatherOpsTick,
   resolveLivePayloadLb,
   sanitizeFuelDensityLbPerGal,
   KG_TO_LB,
@@ -34,6 +40,9 @@ import {
   routeDistanceNm,
   settleMission,
   watchIntervalMsForPhase,
+  weatherOpsStatus,
+  fuelBurnMultFromAircraft,
+  findCareerPlayerAirframe,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CargoOpsDelta,
@@ -46,6 +55,9 @@ import {
   type MissionFlightEvent,
   type MissionFlightWatchState,
   type MissionIntent,
+  type RunwayTouchdownSnapshot,
+  type WeatherOpsAccumulator,
+  type WeatherOpsSnapshot,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge, setNamedPipeDebugLog } from '../../agent/src/named-pipe-sim-bridge.ts';
 import {
@@ -128,6 +140,12 @@ export type WatchStatusPayload = {
     flightDurationMs: number | null;
     /** Flight scorecard from Watch telemetry. */
     flightScore: FlightScoreSnapshot | null;
+    /** Weather-ops bonus included in payout. */
+    weatherBonusUsd?: number;
+    /** Weather-ops snapshot from this Watch session. */
+    weatherOps?: WeatherOpsSnapshot | null;
+    /** Dest runway touchdown projection (catalog). */
+    runwayTouch?: RunwayTouchdownSnapshot | null;
     /** Cargo Ops ladder deltas from this settle. */
     cargoOpsDeltas?: CargoOpsDelta[];
   } | null;
@@ -143,6 +161,8 @@ export type WatchStatusPayload = {
   flightTime: WatchFlightTimePayload | null;
   /** Stable-cruise burn/TAS sampler progress for this watch session. */
   cruiseSample: CruiseSampleStatus | null;
+  /** Live weather-ops score progress (headwind / rain / visibility). */
+  weatherOps: ReturnType<typeof weatherOpsStatus> | null;
 };
 
 type WatchCallbacks = {
@@ -336,6 +356,36 @@ export async function sampleLiveFlight(
     flapsPct,
     aglFt,
   };
+}
+
+/** Ambient weather at user aircraft — soft-fail each SimVar independently. */
+async function sampleLiveWeatherAmbient(bridge: NamedPipeSimBridge): Promise<{
+  windKt?: number;
+  windFromDeg?: number;
+  headingTrueDeg?: number;
+  precipMm?: number;
+  visibilityM?: number;
+}> {
+  const readOpt = async (
+    name: string,
+    unit: string,
+  ): Promise<number | undefined> => {
+    try {
+      const v = await bridge.readSimVar({ name, unit });
+      return Number.isFinite(v) ? v : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const [windKt, windFromDeg, headingTrueDeg, precipMm, visibilityM] =
+    await Promise.all([
+      readOpt('AMBIENT WIND VELOCITY', 'knots'),
+      readOpt('AMBIENT WIND DIRECTION', 'degrees'),
+      readOpt('PLANE HEADING DEGREES TRUE', 'degrees'),
+      readOpt('AMBIENT PRECIP RATE', 'millimeters of water'),
+      readOpt('AMBIENT VISIBILITY', 'meters'),
+    ]);
+  return { windKt, windFromDeg, headingTrueDeg, precipMm, visibilityM };
 }
 
 /**
@@ -625,6 +675,34 @@ export async function readLiveLandingFpm(
   return undefined;
 }
 
+/** Best-effort latched touchdown position (degrees). Soft-fail when missing. */
+export async function readLiveTouchdownPosition(
+  bridge: NamedPipeSimBridge,
+): Promise<{ lat: number; lon: number } | undefined> {
+  try {
+    const lat = await bridge.readSimVar({
+      name: 'PLANE TOUCHDOWN LATITUDE',
+      unit: 'degrees',
+    });
+    const lon = await bridge.readSimVar({
+      name: 'PLANE TOUCHDOWN LONGITUDE',
+      unit: 'degrees',
+    });
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      !(lat === 0 && lon === 0) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lon) <= 180
+    ) {
+      return { lat, lon };
+    }
+  } catch {
+    /* soft-fail */
+  }
+  return undefined;
+}
+
 export async function probeLiveLandingFpm(
   pipeName?: string,
 ): Promise<number | undefined> {
@@ -632,6 +710,22 @@ export async function probeLiveLandingFpm(
   try {
     await bridge.open('Skyline Career UI Settle Landing FPM');
     return await readLiveLandingFpm(bridge);
+  } finally {
+    try {
+      await bridge.close({ disconnectHost: false });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+export async function probeLiveTouchdownPosition(
+  pipeName?: string,
+): Promise<{ lat: number; lon: number } | undefined> {
+  const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
+  try {
+    await bridge.open('Skyline Career UI Settle Touchdown Pos');
+    return await readLiveTouchdownPosition(bridge);
   } finally {
     try {
       await bridge.close({ disconnectHost: false });
@@ -707,6 +801,17 @@ export class CareerWatchSession {
   private cruiseStatus: CruiseSampleStatus | null = null;
   private scoreAcc: FlightScoreAccumulator = createFlightScoreAccumulator();
   private lastFlightScore: FlightScoreSnapshot | null = null;
+  private weatherAcc: WeatherOpsAccumulator = createWeatherOpsAccumulator();
+  private weatherStatus: ReturnType<typeof weatherOpsStatus> | null = null;
+  /** Latched touchdown WGS84 from first wheels-down (cleared on go-around). */
+  private touchdownLat: number | null = null;
+  private touchdownLon: number | null = null;
+  /** Last MX excess-burn drain write (airborne only). */
+  private lastMxFuelDrainAtMs = 0;
+  /** Last mx drain skip log (rate-limited). */
+  private lastMxFuelDrainSkipLogAtMs = 0;
+  /** Accumulated MX excess kg waiting to write (GA flows are tiny per tick). */
+  private pendingMxDrainKg = 0;
 
   constructor(private readonly cb: WatchCallbacks) {}
 
@@ -727,6 +832,47 @@ export class CareerWatchSession {
     return this.lastFlightScore;
   }
 
+  /**
+   * Align score VS with the settle landing rate (TOUCHDOWN NORMAL VELOCITY or
+   * Watch stamp) so debrief header and landing card match.
+   */
+  finalizeFlightScoreForSettle(
+    landingFpm?: number | null,
+  ): FlightScoreSnapshot {
+    if (typeof landingFpm === 'number' && Number.isFinite(landingFpm)) {
+      this.scoreAcc = patchFlightScoreLandingVs(this.scoreAcc, landingFpm);
+      this.watchState = { ...this.watchState, landingFpm };
+    }
+    this.lastFlightScore = finalizeFlightScore(this.scoreAcc, {
+      landingVsFpm:
+        typeof landingFpm === 'number' && Number.isFinite(landingFpm)
+          ? landingFpm
+          : this.watchState.landingFpm,
+    });
+    return this.lastFlightScore;
+  }
+
+  /** Finalized weather-ops snapshot from this Watch session. */
+  getCapturedWeatherOps(): WeatherOpsSnapshot | null {
+    if (this.weatherAcc.sampleCount <= 0) return null;
+    return finalizeWeatherOpsScore(this.weatherAcc, {
+      expectedRouteMs: this.watchState.expectedRouteMs,
+    });
+  }
+
+  /** Latched / sim touchdown position for manual settle. */
+  getCapturedTouchdownPosition(): { lat: number; lon: number } | undefined {
+    if (
+      this.touchdownLat != null &&
+      this.touchdownLon != null &&
+      Number.isFinite(this.touchdownLat) &&
+      Number.isFinite(this.touchdownLon)
+    ) {
+      return { lat: this.touchdownLat, lon: this.touchdownLon };
+    }
+    return undefined;
+  }
+
   getStatus(): WatchStatusPayload {
     const nowMs = Date.now();
     const airborneAtMs = this.watchState.airborneAtMs;
@@ -744,6 +890,7 @@ export class CareerWatchSession {
         expectedRouteMs,
         nowMs,
         airborneEndedAtMs: this.watchState.airborneEndedAtMs,
+        distanceNm: this.watchState.routeDistanceNm,
       });
       flightTime = {
         airborneAtMs,
@@ -805,6 +952,7 @@ export class CareerWatchSession {
       allowDepartOverride: this.opts.allowDepartOverride,
       flightTime,
       cruiseSample: this.cruiseStatus,
+      weatherOps: this.weatherStatus,
     };
   }
 
@@ -856,11 +1004,26 @@ export class CareerWatchSession {
     this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
     this.scoreAcc = createFlightScoreAccumulator();
     this.lastFlightScore = finalizeFlightScore(this.scoreAcc);
+    this.weatherAcc = createWeatherOpsAccumulator();
+    this.weatherStatus = weatherOpsStatus(this.weatherAcc);
+    this.touchdownLat = null;
+    this.touchdownLon = null;
+    this.lastMxFuelDrainAtMs = 0;
+    this.lastMxFuelDrainSkipLogAtMs = 0;
+    this.pendingMxDrainKg = 0;
 
-    const loaded = await this.cb.withCareerRead((_world, missions) => {
+    const loaded = await this.cb.withCareerRead((world, missions) => {
       const mission = missions.missions.find((m) => m.id === opts.missionId);
       return mission
-        ? { mission, walletUsd: missions.walletUsd }
+        ? {
+            mission,
+            walletUsd: missions.walletUsd,
+            distanceNm: routeDistanceNm(
+              world,
+              mission.originIcao,
+              mission.destIcao,
+            ),
+          }
         : null;
     });
     if (!loaded) {
@@ -880,8 +1043,11 @@ export class CareerWatchSession {
       expectedRouteMs:
         mission.expectedRouteMs ??
         (mission.status === 'in_flight'
-          ? resolveExpectedRouteMs(mission)
+          ? resolveExpectedRouteMs(mission, {
+              distanceNm: loaded.distanceNm,
+            })
           : undefined),
+      routeDistanceNm: loaded.distanceNm,
     });
 
     const bridge = new NamedPipeSimBridge(
@@ -1260,6 +1426,9 @@ export class CareerWatchSession {
         current.expectedRouteMs ??
         resolveExpectedRouteMs(current, { distanceNm, fallbackHours });
       const nowMs = Date.now();
+      const prevHadTouchdown =
+        typeof this.watchState.airborneEndedAtMs === 'number' ||
+        this.watchState.landingFpm != null;
       const { event, nextState } = evaluateMissionFlightTransition(
         current,
         sample,
@@ -1279,9 +1448,34 @@ export class CareerWatchSession {
       this.lastEvent = event;
       this.lastEventAtIso = new Date().toISOString();
 
+      const touchdownCleared =
+        prevHadTouchdown &&
+        nextState.airborneEndedAtMs == null &&
+        nextState.landingFpm == null &&
+        !sample.onGround;
+      if (touchdownCleared) {
+        // Real go-around: drop landing score so the next touch can re-stamp VS.
+        // Keep first-contact lat/lon for the debrief runway diagram.
+        this.scoreAcc = clearFlightScoreLanding(this.scoreAcc);
+      }
+
+      // First contact only — never overwrite after a bounce further down-runway.
+      if (
+        this.touchdownLat == null &&
+        nextState.landingFpm != null &&
+        sample.onGround &&
+        sample.position &&
+        Number.isFinite(sample.position.lat) &&
+        Number.isFinite(sample.position.lon)
+      ) {
+        this.touchdownLat = sample.position.lat;
+        this.touchdownLon = sample.position.lon;
+      }
+
       const postTouchdown =
         typeof nextState.airborneEndedAtMs === 'number' ||
-        (nextState.sawAirborne && sample.onGround && nextState.landingFpm != null);
+        (nextState.sawAirborne && sample.onGround && nextState.landingFpm != null) ||
+        Boolean(this.scoreAcc.landing);
 
       this.lastPhase = advanceFlightPhase(
         this.lastPhase,
@@ -1303,17 +1497,43 @@ export class CareerWatchSession {
         },
       );
 
+      // Live weather-ops: headwind / rain / visibility while airborne.
+      if (!sample.onGround && this.bridge) {
+        try {
+          const wx = await sampleLiveWeatherAmbient(this.bridge);
+          this.weatherAcc = pushWeatherOpsTick(this.weatherAcc, {
+            atMs: nowMs,
+            onGround: sample.onGround,
+            phase: this.lastPhase ?? undefined,
+            windKt: wx.windKt,
+            windFromDeg: wx.windFromDeg,
+            headingTrueDeg: wx.headingTrueDeg,
+            precipMm: wx.precipMm,
+            visibilityM: wx.visibilityM,
+          });
+          this.weatherStatus = weatherOpsStatus(this.weatherAcc, {
+            expectedRouteMs: nextState.expectedRouteMs,
+          });
+        } catch {
+          this.weatherStatus = weatherOpsStatus(this.weatherAcc, {
+            expectedRouteMs: nextState.expectedRouteMs,
+          });
+        }
+      }
+
       // Flight score: envelope peaks + taxi GS + landing snapshot.
       this.scoreAcc = pushFlightScoreSample(this.scoreAcc, {
         onGround: sample.onGround,
         sawAirborne: nextState.sawAirborne,
         postTouchdown,
+        phase: this.lastPhase ?? undefined,
         groundSpeedKt: sample.groundSpeedKt,
         bankDeg: sample.bankDeg,
         pitchDeg: sample.pitchDeg,
         gForce: sample.gForce,
         indicatedAirspeedKt: sample.indicatedAirspeedKt,
         altitudeFt: sample.altitudeFt,
+        aglFt: sample.aglFt,
         overspeedWarning: sample.overspeedWarning,
         stallWarning: sample.stallWarning,
         gearDown: sample.gearDown,
@@ -1369,6 +1589,20 @@ export class CareerWatchSession {
           committed: this.cruiseState.committed,
         };
         this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+      }
+
+      // Soft MX burn: drain only the excess above healthy (announced at preflight).
+      if (
+        current.status === 'in_flight' &&
+        !sample.onGround &&
+        this.bridge
+      ) {
+        await this.maybeDrainMxFuelExcess(
+          snap.missions,
+          current,
+          sample,
+          nowMs,
+        );
       }
 
       // Persist airborne clock if Watch first saw wheels-up on an already in-flight mission.
@@ -1454,20 +1688,43 @@ export class CareerWatchSession {
         } catch {
           residualFuelKg = undefined;
         }
-        // Prefer sim touchdown-normal velocity when available (more accurate than
-        // the last airborne VERTICAL SPEED sample).
+        // Prefer Watch first-contact VS; sim TOUCHDOWN latch often updates on
+        // later bounce touches and would erase the real landing rate.
         let landingFpm = this.watchState.landingFpm;
-        try {
-          const tdFps = await this.bridge.readSimVar({
-            name: 'PLANE TOUCHDOWN NORMAL VELOCITY',
-            unit: 'feet per second',
-          });
-          if (Number.isFinite(tdFps) && Math.abs(tdFps) > 0.05) {
-            landingFpm = Math.round(tdFps * 60);
-            this.watchState = { ...this.watchState, landingFpm };
+        if (landingFpm == null) {
+          try {
+            const tdFps = await this.bridge.readSimVar({
+              name: 'PLANE TOUCHDOWN NORMAL VELOCITY',
+              unit: 'feet per second',
+            });
+            if (Number.isFinite(tdFps) && Math.abs(tdFps) > 0.05) {
+              landingFpm = Math.round(tdFps * 60);
+              this.watchState = { ...this.watchState, landingFpm };
+            }
+          } catch {
+            /* keep undefined */
           }
-        } catch {
-          /* keep Watch-captured VS */
+        }
+        if (typeof landingFpm === 'number' && Number.isFinite(landingFpm)) {
+          this.watchState = { ...this.watchState, landingFpm };
+        }
+        const flightScore = this.finalizeFlightScoreForSettle(landingFpm);
+        // Prefer first-contact lat/lon latched at wheels-down. Sim TOUCHDOWN
+        // LAT/LON can move to a later bounce farther down the runway.
+        let touchdownLat = this.touchdownLat ?? undefined;
+        let touchdownLon = this.touchdownLon ?? undefined;
+        if (touchdownLat == null || touchdownLon == null) {
+          try {
+            const tdPos = await readLiveTouchdownPosition(this.bridge);
+            if (tdPos) {
+              touchdownLat = tdPos.lat;
+              touchdownLon = tdPos.lon;
+              this.touchdownLat = tdPos.lat;
+              this.touchdownLon = tdPos.lon;
+            }
+          } catch {
+            /* soft-fail */
+          }
         }
         const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
           const openIdx = freshMissions.missions.findIndex(
@@ -1482,17 +1739,29 @@ export class CareerWatchSession {
           ) {
             return false;
           }
+          const weatherOps = finalizeWeatherOpsScore(this.weatherAcc, {
+            expectedRouteMs:
+              openMission.expectedRouteMs ?? this.watchState.expectedRouteMs,
+          });
+          const touch =
+            touchdownLat != null && touchdownLon != null
+              ? evaluateRunwayTouchdown(
+                  openMission.destIcao,
+                  touchdownLat,
+                  touchdownLon,
+                )
+              : undefined;
           const result = settleMission(worldFresh, openMission, {
             fleet: freshMissions,
             residualFuelKg,
             landingFpm,
             airborneEndedAtMs: this.watchState.airborneEndedAtMs,
             nowMs: Date.now(),
-            flightScore:
-              this.lastFlightScore ??
-              finalizeFlightScore(this.scoreAcc, {
-                landingVsFpm: landingFpm,
-              }),
+            flightScore,
+            weatherOps,
+            touchdownLat,
+            touchdownLon,
+            runwayTouch: touch,
           });
           freshMissions.missions[openIdx] = result.mission;
           const cruiseCommit = this.cruiseState.committed;
@@ -1542,6 +1811,9 @@ export class CareerWatchSession {
             landingFpm: result.mission.settledLandingFpm ?? null,
             flightDurationMs: result.mission.settledFlightDurationMs ?? null,
             flightScore: result.mission.settledFlightScore ?? null,
+            weatherBonusUsd: result.settlement.weatherBonusUsd,
+            weatherOps: result.mission.settledWeatherOps ?? null,
+            runwayTouch: result.mission.settledRunwayTouch ?? null,
             cargoOpsDeltas: result.cargoOpsDeltas ?? [],
           };
           return true;
@@ -1594,8 +1866,194 @@ export class CareerWatchSession {
         this.intervalMs = watchIntervalMsForPhase(this.lastPhase, {
           cruiseCapMs: this.opts.intervalSec * 1000,
         });
+        // Short final + post-touchdown hold: tighten poll so first-contact and
+        // bounce arcs are sampled even when phase has already flipped to taxi_in.
+        const agl = this.lastSample?.aglFt;
+        const tdAt = this.watchState.airborneEndedAtMs;
+        const postTdHoldMs =
+          typeof tdAt === 'number' && Number.isFinite(tdAt)
+            ? Date.now() - tdAt
+            : undefined;
+        if (
+          (this.lastPhase === 'approach' || this.lastPhase === 'descent') &&
+          typeof agl === 'number' &&
+          Number.isFinite(agl) &&
+          agl < 400
+        ) {
+          this.intervalMs = Math.min(
+            this.intervalMs,
+            watchIntervalMsForPhase('landing'),
+          );
+        } else if (
+          typeof postTdHoldMs === 'number' &&
+          postTdHoldMs >= 0 &&
+          postTdHoldMs < 20_000
+        ) {
+          this.intervalMs = Math.min(
+            this.intervalMs,
+            watchIntervalMsForPhase('landing'),
+          );
+        }
         this.scheduleNextTick(this.intervalMs);
       }
+    }
+  }
+
+  /**
+   * Drain only MX excess burn (mult−1) while airborne.
+   * Uses classic L/R main tanks; fails soft (logs + backs off) on SimConnect errors.
+   * GA flows are small — accumulate until ≥0.05 gal, and fall back to catalog
+   * cruise flow when the live cruise sampler has not locked yet.
+   */
+  private async maybeDrainMxFuelExcess(
+    missions: CareerMissionsState,
+    mission: MissionIntent,
+    sample: FlightGroundSample,
+    nowMs: number,
+  ): Promise<void> {
+    const MX_DRAIN_INTERVAL_MS = 30_000;
+    const MX_SKIP_LOG_MS = 60_000;
+    const MX_MIN_WRITE_KG = 0.08; // ~0.05 gal Jet-A
+    if (isOfpLoadActive()) return;
+    if (!this.bridge?.isPipeConnected) return;
+    if (!mission.aircraftId) return;
+    if (nowMs - this.lastMxFuelDrainAtMs < MX_DRAIN_INTERVAL_MS) return;
+
+    const logSkip = (reason: string, extra?: Record<string, unknown>) => {
+      if (nowMs - this.lastMxFuelDrainSkipLogAtMs < MX_SKIP_LOG_MS) return;
+      this.lastMxFuelDrainSkipLogAtMs = nowMs;
+      watchDebugLog('watch', 'mx fuel drain skip', {
+        missionId: mission.id,
+        reason,
+        ...extra,
+      });
+    };
+
+    const acf = missions.fleet.find((a) => a.id === mission.aircraftId);
+    if (!acf) {
+      logSkip('no_aircraft');
+      return;
+    }
+    const burn = fuelBurnMultFromAircraft(acf);
+    if (burn.excessFrac < 0.01) {
+      logSkip('healthy_airframe', { conditionPct: burn.conditionPct });
+      return;
+    }
+
+    const catalog = acf.airframeTypeId
+      ? findCareerPlayerAirframe(acf.airframeTypeId)
+      : undefined;
+    const overrideFlow =
+      acf.airframeTypeId &&
+      missions.airframePerfOverrides?.[acf.airframeTypeId]
+        ?.cruiseFuelFlowKgPerHour;
+    const liveFlow =
+      this.cruiseState.committed?.cruiseFuelFlowKgPerHour ??
+      this.cruiseStatus?.fuelFlowKgPerHour;
+    const flowKgPerHour =
+      (typeof liveFlow === 'number' && liveFlow > 0 ? liveFlow : undefined) ??
+      (typeof overrideFlow === 'number' && overrideFlow > 0
+        ? overrideFlow
+        : undefined) ??
+      (typeof catalog?.cruiseFuelFlowKgPerHour === 'number' &&
+      catalog.cruiseFuelFlowKgPerHour > 0
+        ? catalog.cruiseFuelFlowKgPerHour
+        : undefined);
+    if (
+      typeof flowKgPerHour !== 'number' ||
+      !Number.isFinite(flowKgPerHour) ||
+      flowKgPerHour <= 0
+    ) {
+      logSkip('no_fuel_flow', {
+        cruisePhase: this.cruiseStatus?.phase ?? 'idle',
+        excessPct: Math.round(burn.excessFrac * 100),
+      });
+      return;
+    }
+
+    const dtMs =
+      this.lastMxFuelDrainAtMs > 0
+        ? nowMs - this.lastMxFuelDrainAtMs
+        : MX_DRAIN_INTERVAL_MS;
+    const dtHours = Math.min(0.05, Math.max(0, dtMs / 3_600_000));
+    const stepKg = flowKgPerHour * burn.excessFrac * dtHours;
+    this.pendingMxDrainKg += stepKg;
+    // Always advance the interval clock so we accumulate over wall time.
+    this.lastMxFuelDrainAtMs = nowMs;
+
+    if (this.pendingMxDrainKg < MX_MIN_WRITE_KG) {
+      logSkip('accumulating', {
+        pendingKg: Math.round(this.pendingMxDrainKg * 1000) / 1000,
+        stepKg: Math.round(stepKg * 1000) / 1000,
+        flowKgPerHour: Math.round(flowKgPerHour * 10) / 10,
+        excessPct: Math.round(burn.excessFrac * 100),
+        flowSource:
+          typeof liveFlow === 'number' && liveFlow > 0
+            ? 'live'
+            : typeof overrideFlow === 'number' && overrideFlow > 0
+              ? 'override'
+              : 'catalog',
+      });
+      return;
+    }
+
+    const drainKg = this.pendingMxDrainKg;
+    const drainLb = drainKg * KG_TO_LB;
+    const drainGal = drainLb / DEFAULT_JET_A_LB_PER_GAL;
+    if (!(drainGal > 0.02)) {
+      logSkip('drain_too_small_gal', { drainKg, drainGal });
+      return;
+    }
+
+    try {
+      const left = await this.bridge.readSimVar({
+        name: 'FUEL TANK LEFT MAIN QUANTITY',
+        unit: 'gallons',
+      });
+      const right = await this.bridge.readSimVar({
+        name: 'FUEL TANK RIGHT MAIN QUANTITY',
+        unit: 'gallons',
+      });
+      const total = Math.max(0, left) + Math.max(0, right);
+      if (total < 1) {
+        logSkip('tanks_empty', { left, right });
+        return;
+      }
+      const leftShare = Math.max(0, left) / total;
+      const nextLeft = Math.max(0, left - drainGal * leftShare);
+      const nextRight = Math.max(0, right - drainGal * (1 - leftShare));
+      await this.bridge.writeSimVar({
+        name: 'FUEL TANK LEFT MAIN QUANTITY',
+        unit: 'gallons',
+        value: nextLeft,
+      });
+      await this.bridge.writeSimVar({
+        name: 'FUEL TANK RIGHT MAIN QUANTITY',
+        unit: 'gallons',
+        value: nextRight,
+      });
+      this.pendingMxDrainKg = 0;
+      this.lastMxFuelDrainSkipLogAtMs = 0;
+      watchDebugLog('watch', 'mx fuel drain', {
+        missionId: mission.id,
+        excessPct: Math.round(burn.excessFrac * 100),
+        drainKg: Math.round(drainKg * 100) / 100,
+        drainGal: Math.round(drainGal * 100) / 100,
+        flowKgPerHour: Math.round(flowKgPerHour * 10) / 10,
+        flowSource:
+          typeof liveFlow === 'number' && liveFlow > 0
+            ? 'live'
+            : typeof overrideFlow === 'number' && overrideFlow > 0
+              ? 'override'
+              : 'catalog',
+        gsKt: sample.groundSpeedKt,
+      });
+    } catch (err) {
+      watchDebugLog('watch', 'mx fuel drain failed', {
+        missionId: mission.id,
+        error: err instanceof Error ? err.message : String(err),
+        pendingKg: Math.round(this.pendingMxDrainKg * 100) / 100,
+      });
     }
   }
 }

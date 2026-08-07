@@ -93,15 +93,21 @@ export async function resolveDispatchSimBriefParams(opts: {
     }
   }
 
+  // Prefer the purchased airframe label over a mismatched live MSFS title so
+  // SimBrief Default scoring stays on the mission SKU (e.g. Caravan vs Commander).
   const titleHint =
+    airframe?.label ||
     opts.liveTitle?.trim() ||
     packTitle ||
-    airframe?.label ||
     aircraft.name;
-  const inferred =
-    inferSimBriefAirframeMatchFromTitle(opts.liveTitle ?? '') ??
-    inferSimBriefAirframeMatchFromTitle(packTitle ?? '') ??
-    inferSimBriefAirframeMatchFromTitle(airframe?.label ?? '');
+  // With a purchased SKU, SimBrief match comes from the family-resolved roles
+  // pack (live title only applies inside that family). Do not infer from a
+  // mismatched live MSFS title (Commander while planning Caravan).
+  const inferred = opts.airframeTypeId?.trim()
+    ? undefined
+    : inferSimBriefAirframeMatchFromTitle(opts.liveTitle ?? '') ??
+      inferSimBriefAirframeMatchFromTitle(packTitle ?? '') ??
+      inferSimBriefAirframeMatchFromTitle(airframe?.label ?? '');
 
   return {
     simbriefIcao: packIcao || airframe?.simbriefIcao || aircraft.simbriefIcao,

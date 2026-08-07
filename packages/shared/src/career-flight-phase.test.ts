@@ -251,6 +251,8 @@ describe('advanceFlightPhase', () => {
         sample({
           onGround: false,
           enginesRunning: true,
+          verticalSpeedFpm: -200,
+          aglFt: 80,
           sawAirborne: true,
           postTouchdown: true,
         }),
@@ -258,12 +260,49 @@ describe('advanceFlightPhase', () => {
       'landing',
     );
   });
+
+  it('does not mark landing on short-hop rotate with low AGL near dest', () => {
+    const t0 = 4_000_000;
+    const phase = advanceFlightPhase(
+      'takeoff',
+      sample({
+        onGround: false,
+        enginesRunning: true,
+        verticalSpeedFpm: 700,
+        aglFt: 300,
+        distanceToDestNm: 12,
+        sawAirborne: true,
+        postTouchdown: false,
+      }),
+      { nowMs: t0 + 5_000, airborneAtMs: t0 },
+    );
+    assert.equal(phase, 'takeoff');
+  });
+
+  it('leaves false landing while climbing after premature touchdown', () => {
+    const t0 = 5_000_000;
+    const phase = advanceFlightPhase(
+      'landing',
+      sample({
+        onGround: false,
+        enginesRunning: true,
+        verticalSpeedFpm: 800,
+        aglFt: 900,
+        distanceToDestNm: 10,
+        sawAirborne: true,
+        postTouchdown: true,
+      }),
+      { nowMs: t0 + 20_000, airborneAtMs: t0, touchdownAtMs: t0 + 8_000 },
+    );
+    assert.ok(phase === 'climb' || phase === 'takeoff');
+    assert.notEqual(phase, 'landing');
+  });
 });
 
 describe('watchIntervalMsForPhase', () => {
   it('polls landing/takeoff fast and cruise at cap', () => {
-    assert.equal(watchIntervalMsForPhase('landing'), 350);
-    assert.equal(watchIntervalMsForPhase('takeoff'), 350);
+    assert.equal(watchIntervalMsForPhase('landing'), 200);
+    assert.equal(watchIntervalMsForPhase('takeoff'), 200);
     assert.equal(watchIntervalMsForPhase('approach'), 1_000);
     assert.equal(watchIntervalMsForPhase('cruise', { cruiseCapMs: 5_000 }), 5_000);
     assert.equal(watchIntervalMsForPhase('cruise', { cruiseCapMs: 4_000 }), 4_000);

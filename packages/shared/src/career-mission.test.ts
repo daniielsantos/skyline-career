@@ -16,6 +16,7 @@ import {
   findActivePlayerMission,
   getAircraftClass,
   isActiveMissionStatus,
+  isOfpCargoUnderOnlyFailure,
   listActivePlayerMissions,
   listMarketLots,
   listViableMarketLots,
@@ -28,6 +29,7 @@ import {
   settleMission,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
+  trimMissionCargoToKg,
   tickEconomyN,
   withMissionLoadPolicy,
   type MissionIntent,
@@ -129,24 +131,42 @@ describe('estimateRouteCargoLimit', () => {
       1_704,
     );
     assert.equal(result.structuralMaxCargoKg, 1_704);
-    assert.equal(result.estimatedBlockFuelKg, 763);
+    assert.equal(result.estimatedBlockFuelKg, 494);
     assert.equal(result.fuelCapacityKg, 1_027);
     assert.equal(result.fuelFeasible, true);
     assert.equal(result.fuelDeficitKg, 0);
-    assert.equal(result.operationalMaxCargoKg, 1_060);
+    assert.equal(result.operationalMaxCargoKg, 1_278);
     assert.ok(result.operationalMaxCargoKg < result.structuralMaxCargoKg);
   });
 
   it('rejects a nominal-range route when block fuel exceeds the tanks', () => {
     const result = estimateRouteCargoLimit(
       'light_turboprop',
-      786,
+      950,
       1_704,
     );
-    assert.equal(result.estimatedBlockFuelKg, 1_372);
+    assert.equal(result.estimatedBlockFuelKg, 1_034);
     assert.equal(result.fuelCapacityKg, 1_027);
     assert.equal(result.fuelFeasible, false);
-    assert.equal(result.fuelDeficitKg, 345);
+    assert.equal(result.fuelDeficitKg, 7);
+  });
+
+  it('plans KMIA→MMUN Caravan block near SimBrief (not 80% over)', () => {
+    // SimBrief C208 KMIA→MMUN: ~1716 lb block / 545 nm airway.
+    // Career GC is ~462 nm; catalog burn × mild factor must stay near that ballpark.
+    const result = estimateRouteCargoLimit('light_turboprop', 462, 2_948, {
+      oewKg: 1_922,
+      mtowKg: 3_969,
+      fuelCapacityKg: 1_020,
+      fuelBurnKgPerNm: 1.028,
+      airframeTypeId: 'c208-caravan-cargo',
+    });
+    assert.equal(result.fuelFeasible, true);
+    assert.ok(
+      result.estimatedBlockFuelKg >= 650 && result.estimatedBlockFuelKg <= 820,
+      `expected ~700–780 kg block, got ${result.estimatedBlockFuelKg}`,
+    );
+    assert.ok(result.operationalMaxCargoKg > 800);
   });
 
   it('uses Commander airframe burn so short light_ga hops stay feasible', () => {
@@ -172,7 +192,7 @@ describe('estimateRouteCargoLimit', () => {
     );
     assert.equal(result.oewKg, 2_100);
     assert.equal(result.mtowKg, 4_100);
-    assert.ok(result.operationalMaxCargoKg > 1_060);
+    assert.ok(result.operationalMaxCargoKg > 1_009);
   });
 });
 
@@ -312,7 +332,9 @@ describe('acceptMission', () => {
   it('clamps cargo to aircraft max and remaining lot', () => {
     const world = createSeedEconomyWorld({ seed: 'clamp-test' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = listMarketLots(world).find(
+      (entry) => entry.lot.quantityKg - entry.lot.reservedKg > 0,
+    )!.lot;
     const availableKg = lot.quantityKg - lot.reservedKg;
     const mission = acceptMission(world, {
       lotId: lot.id,
@@ -325,7 +347,9 @@ describe('acceptMission', () => {
   it('honors maxCargoKg override from SimBrief', () => {
     const world = createSeedEconomyWorld({ seed: 'simbrief-cap' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = listMarketLots(world).find(
+      (entry) => entry.lot.quantityKg - entry.lot.reservedKg > 0,
+    )!.lot;
     const availableKg = lot.quantityKg - lot.reservedKg;
     const mission = acceptMission(world, {
       lotId: lot.id,
@@ -339,7 +363,9 @@ describe('acceptMission', () => {
   it('cancel releases reservation', () => {
     const world = createSeedEconomyWorld({ seed: 'cancel-test' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = listMarketLots(world).find(
+      (entry) => entry.lot.quantityKg - entry.lot.reservedKg >= 5_000,
+    )!.lot;
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: 5_000,
@@ -357,7 +383,9 @@ describe('acceptMission', () => {
   it('cancels an orphan mission after its shipment lot was pruned', () => {
     const world = createSeedEconomyWorld({ seed: 'cancel-orphan-test' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = listMarketLots(world).find(
+      (entry) => entry.lot.quantityKg - entry.lot.reservedKg >= 5_000,
+    )!.lot;
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: 5_000,
@@ -904,6 +932,45 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(!check.findings.some((f) => f.code === 'INTENT_CARGO_MISMATCH'));
   });
 
+  it('detects cargo-under as the only fail', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({ cargoKg: 1_800 }),
+      matchingOfp({
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 400,
+          passengerCount: 0,
+          baggage: 1_500,
+          payload: 1_500,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'fail');
+    assert.equal(isOfpCargoUnderOnlyFailure(check), true);
+  });
+
+  it('does not treat airframe mismatch as cargo-under-only', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        cargoKg: 1_800,
+        airframeTypeId: 'c208-caravan-cargo',
+        aircraftClassId: 'light_turboprop',
+      }),
+      matchingOfp({
+        icao: 'B738',
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 400,
+          passengerCount: 0,
+          baggage: 1_500,
+          payload: 1_500,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'fail');
+    assert.equal(isOfpCargoUnderOnlyFailure(check), false);
+  });
+
   it('fails when freighter OFP has passengers', () => {
     const check = compareMissionIntentToOfp(
       baseMission(),
@@ -976,6 +1043,43 @@ describe('compareMissionIntentToOfp', () => {
   });
 });
 
+describe('trimMissionCargoToKg', () => {
+  it('releases excess reservation and lowers pay', () => {
+    const world = createSeedEconomyWorld({ seed: 'trim-cargo' });
+    world.lots = [];
+    world.inboundPending = [];
+    const lot = pushTestLot(world, {
+      id: 'lot_trim_1',
+      originIcao: 'KLAX',
+      destIcao: 'KSNA',
+      commodityId: 'general',
+      quantityKg: 2_000,
+      payUsd: 2_000,
+    });
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 1_800,
+      aircraftClassId: 'light_turboprop',
+      missionId: 'msn_trim_1',
+      maxCargoKg: 3_000,
+    });
+    assert.equal(mission.cargoKg, 1_800);
+    assert.equal(lot.reservedKg, 1_800);
+    const payBefore = mission.payUsd;
+
+    const trimmed = trimMissionCargoToKg(world, mission, 1_500);
+    assert.equal(trimmed.mission.cargoKg, 1_500);
+    assert.equal(trimmed.releasedKg, 300);
+    assert.equal(lot.reservedKg, 1_500);
+    assert.ok(trimmed.payAfterUsd < payBefore);
+    assert.equal(trimmed.payAfterUsd, trimmed.mission.payUsd);
+    assert.equal(
+      (world.inboundPending ?? []).find((p) => p.missionId === mission.id)?.cargoKg,
+      1_500,
+    );
+  });
+});
+
 describe('settleMission', () => {
   it('delivers cargo on-time and pays full freight', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-ontime' });
@@ -1030,6 +1134,76 @@ describe('settleMission', () => {
     assert.equal(result.mission.settledLandingFpm, -188);
   });
 
+  it('stamps runway touchdown projection when lat/lon provided', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-rwy' });
+    tickEconomyN(world, 24);
+    const lot = listMarketLots(world).find((v) => v.lot.destIcao === 'SBGR')?.lot
+      ?? listMarketLots(world)[0]!.lot;
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_settle_rwy',
+    });
+    const departed = departMission(world, { ...mission, status: 'dispatched' });
+    // Force dest to SBGR so catalog runways resolve.
+    const inFlight = {
+      ...departed.mission,
+      destIcao: 'SBGR',
+    };
+    const result = settleMission(world, inFlight, {
+      skipMinAirborneGate: true,
+      touchdownLat: -23.429551,
+      touchdownLon: -46.465875,
+    });
+    assert.ok(result.mission.settledRunwayTouch);
+    assert.equal(result.mission.settledRunwayTouch!.icao, 'SBGR');
+    assert.equal(result.settlement.runwayTouch?.icao, 'SBGR');
+    assert.equal(typeof result.mission.settledRunwayTouch!.onPavement, 'boolean');
+  });
+
+  it('adds weather-ops bonus to settle payout', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-wx' });
+    const lot = pushTestLot(world, {
+      id: 'lot_settle_wx',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      commodityId: 'general',
+      quantityKg: 8_000,
+      reservedKg: 0,
+      status: 'available',
+      payUsd: 2_000,
+    });
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_settle_wx',
+    });
+    const departed = departMission(world, { ...mission, status: 'dispatched' });
+    const contractPay = departed.mission.payUsd;
+    const result = settleMission(world, departed.mission, {
+      skipMinAirborneGate: true,
+      weatherOps: {
+        avgScore: 60,
+        bonusFrac: 0.1,
+        sampleCount: 20,
+        approachSampleCount: 4,
+        airborneMs: 600_000,
+        avgHeadwindKt: 14,
+        avgVisM: 2500,
+        rainFraction: 0.4,
+        minApproachVisM: 2000,
+        eligible: true,
+      },
+    });
+    const expectedBonus = Math.round(contractPay * 0.1);
+    assert.equal(result.settlement.weatherBonusUsd, expectedBonus);
+    assert.equal(result.settlement.payoutUsd, contractPay + expectedBonus);
+    assert.equal(result.mission.settledWeatherBonusUsd, expectedBonus);
+    assert.equal(result.mission.settledWeatherOps?.avgScore, 60);
+  });
+
   it('applies late penalty after deadline', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-late' });
     tickEconomyN(world, 24);
@@ -1055,7 +1229,11 @@ describe('settleMission', () => {
     const result = settleMission(world, lateMission);
     assert.equal(result.settlement.lateTicks, 3);
     assert.equal(result.settlement.onTime, false);
-    assert.equal(result.settlement.penaltyUsd, Math.min(1_000, Math.round(1_000 * 3 * 0.12)));
+    // 3 ticks = 0.75 h at 15-min batches; urgent rate 12%/h → 9% of pay.
+    assert.equal(
+      result.settlement.penaltyUsd,
+      Math.min(1_000, Math.round(1_000 * (3 / 4) * 0.12)),
+    );
     assert.equal(result.settlement.payoutUsd, 1_000 - result.settlement.penaltyUsd);
   });
 

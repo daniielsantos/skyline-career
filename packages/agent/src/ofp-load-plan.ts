@@ -511,6 +511,12 @@ export function distributeCargoAcrossStations(
       0,
     );
     Object.assign(stations, afterSeats);
+    Object.assign(
+      stations,
+      equalizeLateralStationPairs(stations, profile, seatStations, {
+        softMaxByIndex: seatSoftMax,
+      }),
+    );
     remainingCargo = Math.max(0, remainingCargo - placedOnSeats);
   }
 
@@ -527,6 +533,12 @@ export function distributeCargoAcrossStations(
       },
     );
     Object.assign(stations, afterBags);
+    Object.assign(
+      stations,
+      equalizeLateralStationPairs(stations, profile, baggageStations, {
+        softMaxByIndex: gaCabin ? baggageSoftMax : undefined,
+      }),
+    );
     remainingCargo = 0;
   } else if (remainingCargo > 0 && seatStations.length > 0) {
     // No baggage mapped — last resort onto seats (still soft-capped).
@@ -670,12 +682,23 @@ export function allocateCargoRoundPerSeat(
 
   const { indexes: forwardFirst } = orderStationsLongitudinal(profile, movableIndexes);
   const half = Math.max(1, Math.ceil(forwardFirst.length / 2));
-  const targets =
+  let targets =
     bias === 'forward'
       ? forwardFirst.slice(0, half)
       : bias === 'aft'
         ? forwardFirst.slice(-half)
         : [...forwardFirst];
+  // Forward/aft half by arm can pick only the left of a L/R row (same arm,
+  // lower index sorts first). Expand so both sides of any selected row get cargo.
+  if (bias === 'forward' || bias === 'aft') {
+    const selected = new Set(targets);
+    for (const group of findLateralStationGroups(profile, movableIndexes)) {
+      if (group.some((idx) => selected.has(idx))) {
+        for (const idx of group) selected.add(idx);
+      }
+    }
+    targets = forwardFirst.filter((idx) => selected.has(idx));
+  }
 
   const softMax = opts?.softMaxByIndex ?? {};
   const maxByIndex = new Map(
@@ -700,7 +723,11 @@ export function allocateCargoRoundPerSeat(
     budget -= take;
     movedLb += take;
   }
-  return { stations: next, movedLb };
+  // Keep L/R (same-arm) pairs even after budget-limited rounds.
+  const balanced = equalizeLateralStationPairs(next, profile, movableIndexes, {
+    softMaxByIndex: softMax,
+  });
+  return { stations: balanced, movedLb };
 }
 
 /** @deprecated Use allocateCargoRoundPerSeat — kept as alias for older call sites. */
@@ -746,6 +773,109 @@ export function orderStationsLongitudinal(
   };
 }
 
+function stationSideFromName(name: string | undefined): 'left' | 'right' | null {
+  const n = String(name ?? '').toUpperCase();
+  if (!n) return null;
+  if (/\bCOPILOT\b/.test(n)) return 'right';
+  if (/\bPILOT\b/.test(n)) return 'left';
+  if (/\bLEFT\b|\bPORT\b/.test(n)) return 'left';
+  if (/\bRIGHT\b|\bSTBD\b|\bSTARBOARD\b/.test(n)) return 'right';
+  return null;
+}
+
+/**
+ * Group movable stations that share a longitudinal arm (L/R seat pairs) or
+ * left/right names when arms are missing. Equalizing within a group keeps CG
+ * (same arm) while fixing lateral imbalance.
+ */
+export function findLateralStationGroups(
+  profile: AircraftProfile,
+  movableIndexes: number[],
+): number[][] {
+  const stations = movableIndexes
+    .map((idx) => profile.payload.stations.find((s) => s.index === idx))
+    .filter((s): s is NonNullable<typeof s> => Boolean(s));
+  if (stations.length < 2) return [];
+
+  const usedArms = stations.every(
+    (s) => typeof s.arm === 'number' && Number.isFinite(s.arm),
+  );
+  if (usedArms) {
+    const byArm = new Map<string, number[]>();
+    for (const s of stations) {
+      const key = (Math.round((s.arm as number) * 100) / 100).toFixed(2);
+      const list = byArm.get(key) ?? [];
+      list.push(s.index);
+      byArm.set(key, list);
+    }
+    // Only true L/R pairs (exactly two stations at the same arm). Larger
+    // same-arm clusters are left alone so CG shifts are not undone.
+    return [...byArm.values()]
+      .map((g) => [...g].sort((a, b) => a - b))
+      .filter((g) => g.length === 2);
+  }
+
+  const lefts: number[] = [];
+  const rights: number[] = [];
+  for (const s of stations) {
+    const side = stationSideFromName(s.name);
+    if (side === 'left') lefts.push(s.index);
+    else if (side === 'right') rights.push(s.index);
+  }
+  lefts.sort((a, b) => a - b);
+  rights.sort((a, b) => a - b);
+  const pairs: number[][] = [];
+  const n = Math.min(lefts.length, rights.length);
+  for (let i = 0; i < n; i++) {
+    pairs.push([lefts[i]!, rights[i]!].sort((a, b) => a - b));
+  }
+  return pairs;
+}
+
+/**
+ * Equalize weight across lateral (same-arm / L-R) groups without changing totals
+ * in each group — longitudinal CG stays put.
+ */
+export function equalizeLateralStationPairs(
+  stations: Record<number, number>,
+  profile: AircraftProfile,
+  movableIndexes: number[],
+  opts?: { softMaxByIndex?: Record<number, number> },
+): Record<number, number> {
+  const next: Record<number, number> = { ...stations };
+  const softMax = opts?.softMaxByIndex ?? {};
+  const maxOf = (idx: number) => {
+    const hard =
+      profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
+    const soft = softMax[idx];
+    return soft !== undefined ? Math.min(hard, soft) : hard;
+  };
+
+  for (const group of findLateralStationGroups(profile, movableIndexes)) {
+    // Water-fill the group total across members (lightest / most room first).
+    let total = 0;
+    for (const idx of group) total += Math.max(0, next[idx] ?? 0);
+    total = roundLb(total);
+    for (const idx of group) next[idx] = 0;
+    let remaining = total;
+    while (remaining > 0) {
+      const open = group
+        .map((idx) => ({
+          idx,
+          room: Math.max(0, maxOf(idx) - (next[idx] ?? 0)),
+          cur: next[idx] ?? 0,
+        }))
+        .filter((c) => c.room > 0)
+        .sort((a, b) => a.cur - b.cur || a.idx - b.idx);
+      if (open.length === 0) break;
+      const take = Math.min(1, remaining, open[0]!.room);
+      next[open[0]!.idx] = (next[open[0]!.idx] ?? 0) + take;
+      remaining -= take;
+    }
+  }
+  return next;
+}
+
 export type ShiftCargoForCgResult = {
   stations: Record<number, number>;
   movedLb: number;
@@ -782,6 +912,12 @@ export function shiftCargoForCg(
       return [s.index, max] as const;
     }),
   );
+  const armByIndex = new Map(
+    profile.payload.stations.map((s) => [
+      s.index,
+      typeof s.arm === 'number' && Number.isFinite(s.arm) ? s.arm : undefined,
+    ]),
+  );
   const movableSet = new Set(forwardFirst);
   const minRetain = opts?.minRetainByIndex ?? {};
 
@@ -799,6 +935,7 @@ export function shiftCargoForCg(
     let available = Math.max(0, (next[src] ?? 0) - floor);
     if (available <= 0) continue;
     const srcPos = forwardFirst.indexOf(src);
+    const srcArm = armByIndex.get(src);
 
     for (const dst of targets) {
       if (remaining <= 0 || available <= 0) break;
@@ -806,6 +943,16 @@ export function shiftCargoForCg(
       const dstPos = forwardFirst.indexOf(dst);
       if (direction === 'forward' && dstPos >= srcPos) continue;
       if (direction === 'aft' && dstPos <= srcPos) continue;
+
+      // Same longitudinal arm = L/R pair. Moving between them is lateral, not CG.
+      const dstArm = armByIndex.get(dst);
+      if (
+        srcArm !== undefined &&
+        dstArm !== undefined &&
+        Math.abs(srcArm - dstArm) < 0.05
+      ) {
+        continue;
+      }
 
       const maxLoad = maxByIndex.get(dst) ?? 0;
       const room = Math.max(0, maxLoad - (next[dst] ?? 0));
@@ -821,7 +968,11 @@ export function shiftCargoForCg(
     }
   }
 
-  return { stations: next, movedLb };
+  // Re-balance any L/R pairs that drifted during earlier placement rounds.
+  const balanced = equalizeLateralStationPairs(next, profile, movableIndexes, {
+    softMaxByIndex: softMax,
+  });
+  return { stations: balanced, movedLb };
 }
 
 /** Step size for iterative CG rebalance (lb) — fixed 50 lb nudges. */

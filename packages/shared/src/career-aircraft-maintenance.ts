@@ -62,6 +62,119 @@ export const REPAIR_PCT_COST_RATE: Record<FreighterClassId, number> = {
 /** Below this %, airframe forces AOG even before inspection is due. */
 export const CRITICAL_CONDITION_PCT = 40;
 
+/**
+ * Max fuel-burn multiplier at/below critical condition (planning + live drain).
+ * Healthy (≥90%) stays 1.0; ramps linearly toward this by CRITICAL_CONDITION_PCT.
+ */
+export const MX_FUEL_BURN_MULT_MAX = 1.2;
+
+/** Condition band where MX burn penalty starts (excellent floor). */
+export const MX_FUEL_BURN_HEALTHY_PCT = 90;
+
+/**
+ * Extra fuel burn from airframe/engine wear.
+ * Engine-weighted (60%) — consumption tracks powerplant more than structure.
+ */
+export function fuelBurnMultFromCondition(opts: {
+  airframeConditionPct?: number;
+  engineConditionPct?: number;
+}): {
+  mult: number;
+  /** Blend used for the curve (0–100). */
+  conditionPct: number;
+  /** mult − 1 (0 when healthy). */
+  excessFrac: number;
+} {
+  const af = clampConditionPct(
+    typeof opts.airframeConditionPct === 'number'
+      ? opts.airframeConditionPct
+      : 100,
+  );
+  const eng = clampConditionPct(
+    typeof opts.engineConditionPct === 'number'
+      ? opts.engineConditionPct
+      : 100,
+  );
+  const conditionPct = Math.round((af * 0.4 + eng * 0.6) * 10) / 10;
+  if (conditionPct >= MX_FUEL_BURN_HEALTHY_PCT) {
+    return { mult: 1, conditionPct, excessFrac: 0 };
+  }
+  const span = MX_FUEL_BURN_HEALTHY_PCT - CRITICAL_CONDITION_PCT;
+  const wear = Math.min(
+    1,
+    Math.max(0, (MX_FUEL_BURN_HEALTHY_PCT - conditionPct) / Math.max(1, span)),
+  );
+  const mult =
+    Math.round((1 + (MX_FUEL_BURN_MULT_MAX - 1) * wear) * 1000) / 1000;
+  return {
+    mult,
+    conditionPct,
+    excessFrac: Math.round((mult - 1) * 1000) / 1000,
+  };
+}
+
+export function fuelBurnMultFromAircraft(
+  aircraft: Pick<
+    PlayerAircraft,
+    'airframeConditionPct' | 'engineConditionPct'
+  >,
+): ReturnType<typeof fuelBurnMultFromCondition> {
+  return fuelBurnMultFromCondition({
+    airframeConditionPct: aircraft.airframeConditionPct,
+    engineConditionPct: aircraft.engineConditionPct,
+  });
+}
+
+/**
+ * Due / purchase / inject always match the SimBrief OFP block fuel.
+ * Wear only surfaces as advisory (`excessPct`); Watch may still drain the
+ * excess burn in flight if the pilot skips repair.
+ */
+export function padOfpBlockFuelKgForMx(
+  ofpBlockFuelKg: number,
+  aircraft:
+    | Pick<
+        PlayerAircraft,
+        'airframeConditionPct' | 'engineConditionPct' | 'fuelCapacityKg'
+      >
+    | null
+    | undefined,
+): {
+  ofpBlockFuelKg: number;
+  /** Always equals OFP — never padded for MX wear. */
+  requiredBlockFuelKg: number;
+  /** Always 0 — MX wear is warn-only, not an uplift target. */
+  mxPadKg: number;
+  mult: number;
+  excessPct: number;
+  conditionPct: number;
+  cappedByTank: boolean;
+} {
+  const ofpKg = Math.max(0, Math.ceil(ofpBlockFuelKg));
+  if (!aircraft) {
+    return {
+      ofpBlockFuelKg: ofpKg,
+      requiredBlockFuelKg: ofpKg,
+      mxPadKg: 0,
+      mult: 1,
+      excessPct: 0,
+      conditionPct: 100,
+      cappedByTank: false,
+    };
+  }
+  const burn = fuelBurnMultFromAircraft(aircraft);
+  const capacity = Math.max(0, Math.floor(aircraft.fuelCapacityKg));
+  return {
+    ofpBlockFuelKg: ofpKg,
+    requiredBlockFuelKg: ofpKg,
+    mxPadKg: 0,
+    mult: burn.mult,
+    excessPct: Math.round(burn.excessFrac * 100),
+    conditionPct: burn.conditionPct,
+    cappedByTank: capacity > 0 && ofpKg > capacity,
+  };
+}
+
 const AF_WEAR_SHARE = 0.7;
 const ENG_WEAR_SHARE = 0.3;
 

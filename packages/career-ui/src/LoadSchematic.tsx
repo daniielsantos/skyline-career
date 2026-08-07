@@ -218,8 +218,10 @@ export function CgEnvelopeSchematic(props: {
   const scaleMin = Math.max(0, Math.min(...extremes) - pad);
   const scaleMax = Math.min(100, Math.max(...extremes) + pad);
   const span = scaleMax - scaleMin || 1;
+  // Black Square / aircraft tablet: nose/FWD at top, tail/AFT at bottom
+  // (higher % MAC is further aft → lower on the rail).
   const fromTop = (mac: number) =>
-    `${((scaleMax - mac) / span) * 100}%`;
+    `${((mac - scaleMin) / span) * 100}%`;
   const bandHeight = ((maxMac - minMac) / span) * 100;
   const liveKnown = liveMac !== undefined && Number.isFinite(liveMac);
   const outOfEnvelope =
@@ -240,7 +242,7 @@ export function CgEnvelopeSchematic(props: {
         <span
           className="cg-schematic-band"
           style={{
-            top: fromTop(maxMac),
+            top: fromTop(minMac),
             height: `${bandHeight}%`,
           }}
         />
@@ -252,7 +254,7 @@ export function CgEnvelopeSchematic(props: {
         ) : null}
       </div>
       <div className="cg-schematic-scale" aria-hidden="true">
-        <span className="cg-schematic-aft">AFT {maxMac}</span>
+        <span className="cg-schematic-fwd">FWD {minMac}</span>
         {liveKnown ? (
           <span
             className="cg-schematic-live"
@@ -261,7 +263,7 @@ export function CgEnvelopeSchematic(props: {
             {liveMac.toFixed(1)}
           </span>
         ) : null}
-        <span className="cg-schematic-fwd">FWD {minMac}</span>
+        <span className="cg-schematic-aft">AFT {maxMac}</span>
       </div>
     </div>
   );

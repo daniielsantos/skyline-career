@@ -58,6 +58,7 @@ import {
   MS_PER_TICK,
   TICKS_PER_DAY,
 } from './career-clock.js';
+import { boardDisplayPayUsd } from './market-board-query.js';
 import {
   activeLaneKg,
   countryIdFromRegion,
@@ -170,10 +171,12 @@ export {
 
 export {
   createNpcContractPilotOffer,
+  createNpcRepositionOffer,
   acceptContractPilotOffer,
   contractPilotLiftKg,
   listContractPilotPickAirframes,
   contractPilotFeeRangeUsd,
+  contractPilotHasFlyableAirframe,
   describeLotMarketPressure,
   drainNpcMroParts,
   ensureNpcAirframes,
@@ -181,6 +184,7 @@ export {
   ensureNpcRegionCoverage,
   estimateNpcBlockHours,
   findNpcAirframe,
+  isNpcRepositionFlight,
   listHomologatedNpcAirframesForClass,
   listNpcAirframesForClass,
   listNpcActivity,
@@ -192,6 +196,7 @@ export {
   npcClaimForLot,
   npcLaneAirborneKg,
   npcMaxCargoKg,
+  pickNpcHomeReturnIcao,
   playerLaneInboundKg,
   laneInboundKg,
   npcLaneSaturation,
@@ -201,7 +206,12 @@ export {
   CONTRACT_PILOT_OFFER_CHANCE,
   AWAITING_PILOT_MIN_HOURS,
   AWAITING_PILOT_MAX_HOURS,
+  REPOSITION_AWAITING_MIN_HOURS,
+  REPOSITION_AWAITING_MAX_HOURS,
+  MAX_OPEN_REPOSITION_OFFERS,
+  REPOSITION_PILOT_FEE_MIN_USD,
   quoteContractPilotFeeUsd,
+  quoteRepositionPilotFeeUsd,
   NPC_AIRFRAME_VARIANTS,
   NPC_FLEET_COMPOSITION,
   NPC_FLEET_SIZE,
@@ -2945,6 +2955,7 @@ export function listMarketLots(
             ...(claim.crewNeeded
               ? {
                   crewNeeded: true,
+                  ...(claim.crewReposition ? { crewReposition: true } : {}),
                   pilotFeeUsd: claim.pilotFeeUsd,
                   ...(typeof claim.pilotFeeMinUsd === 'number'
                     ? { pilotFeeMinUsd: claim.pilotFeeMinUsd }
@@ -2971,7 +2982,21 @@ export function listMarketLots(
     const aCrew = a.npcClaim?.crewNeeded ? 1 : 0;
     const bCrew = b.npcClaim?.crewNeeded ? 1 : 0;
     if (aCrew !== bCrew) return bCrew - aCrew;
-    return b.lot.payUsd - a.lot.payUsd;
+    const aPay = boardDisplayPayUsd({
+      lotPayUsd: a.lot.payUsd,
+      quantityKg: a.lot.quantityKg,
+      crewNeeded: a.npcClaim?.crewNeeded,
+      claimCargoKg: a.npcClaim?.cargoKg,
+      pilotFeeUsd: a.npcClaim?.pilotFeeUsd,
+    });
+    const bPay = boardDisplayPayUsd({
+      lotPayUsd: b.lot.payUsd,
+      quantityKg: b.lot.quantityKg,
+      crewNeeded: b.npcClaim?.crewNeeded,
+      claimCargoKg: b.npcClaim?.cargoKg,
+      pilotFeeUsd: b.npcClaim?.pilotFeeUsd,
+    });
+    return bPay - aPay;
   });
   return views;
 }

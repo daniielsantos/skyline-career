@@ -188,6 +188,47 @@ export function quoteContractPilotFeeUsd(payUsd: number): number {
   return Math.max(50, Math.round(pay * CONTRACT_PILOT_FEE_FRAC));
 }
 
+/** Min wall-clock hours a reposition crew offer stays open. */
+export const REPOSITION_AWAITING_MIN_HOURS = 0.5;
+/** Max wall-clock hours a reposition crew offer stays open. */
+export const REPOSITION_AWAITING_MAX_HOURS = 1.5;
+/** Cap open reposition crew offers so the freight board isn't ferry spam. */
+export const MAX_OPEN_REPOSITION_OFFERS = 4;
+/** Floor for empty-home ferry pilot fee (matches hangar ferry floor band). */
+export const REPOSITION_PILOT_FEE_MIN_USD = 75;
+
+/**
+ * Full-rate Hangar ferry $/nm by class (FERRY_FEE_USD_PER_NM × FERRY_CLASS_MULT).
+ * Mirrored here to avoid a career-npc ↔ career-fleet import cycle.
+ */
+const HANGAR_FERRY_FULL_USD_PER_NM: Record<FreighterClassId, number> = {
+  light_ga: 2.5 * 0.85,
+  light_turboprop: 2.5 * 1,
+  light_jet: 2.5 * 1.5,
+  medium_piston: 2.5 * 1.9,
+  narrow_freighter: 2.5 * 2.2,
+  wide_freighter: 2.5 * 4,
+};
+
+/**
+ * Contract ferry pays the same $/nm as a full-rate Hangar ferry for that class
+ * (no early soft-budget discount — that perk is only for owning/relocating).
+ */
+export function quoteRepositionPilotFeeUsd(
+  distanceNm: number,
+  aircraftClassId: FreighterClassId,
+): number {
+  const dist = Math.max(0, distanceNm);
+  const rate = HANGAR_FERRY_FULL_USD_PER_NM[aircraftClassId] ?? 2.5;
+  return Math.max(REPOSITION_PILOT_FEE_MIN_USD, Math.round(dist * rate));
+}
+
+export function isNpcRepositionFlight(
+  flight: Pick<NpcFlight, 'kind'>,
+): boolean {
+  return flight.kind === 'reposition';
+}
+
 /**
  * Abstract shop interval (block hours) — aligned with player inspection gates,
  * slightly stretched so the board isn't permanently half-MX.
@@ -1304,6 +1345,130 @@ function awaitingPilotHoldHours(rng: () => number): number {
   );
 }
 
+function repositionAwaitingHoldHours(rng: () => number): number {
+  return (
+    REPOSITION_AWAITING_MIN_HOURS +
+    rng() * (REPOSITION_AWAITING_MAX_HOURS - REPOSITION_AWAITING_MIN_HOURS)
+  );
+}
+
+function countOpenRepositionOffers(world: CareerEconomyWorld): number {
+  return world.npcFlights.filter(
+    (f) => f.status === 'awaiting_pilot' && isNpcRepositionFlight(f),
+  ).length;
+}
+
+/** Closest mapped hub in the NPC's home region (for empty return). */
+export function pickNpcHomeReturnIcao(
+  world: CareerEconomyWorld,
+  npc: Pick<NpcFreighter, 'homeRegion' | 'aircraftClassId'>,
+  fromIcao: string,
+  opts?: { maxRangeNm?: number },
+): string | undefined {
+  const home = (npc.homeRegion ?? '').trim();
+  if (!home) return undefined;
+  const from = fromIcao.trim().toUpperCase();
+  const maxRange =
+    typeof opts?.maxRangeNm === 'number' && Number.isFinite(opts.maxRangeNm)
+      ? opts.maxRangeNm
+      : getAircraftClass(npc.aircraftClassId).maxRangeNm;
+  const candidates = world.airports.filter((a) => a.region === home);
+  if (candidates.length === 0) return undefined;
+  let best: (typeof candidates)[number] | undefined;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const ap of candidates) {
+    if (ap.icao === from) return undefined; // already home
+    const dist = routeDistanceNm(world, from, ap.icao);
+    if (dist === undefined || dist <= 0) continue;
+    if (dist > maxRange) continue;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = ap;
+    }
+  }
+  if (!best || !Number.isFinite(bestDist)) return undefined;
+  return best.icao;
+}
+
+/**
+ * After a freight delivery away from home, open a short Crew needed · reposition
+ * hold. Expiry promotes to solo empty return (same awaiting_pilot loop).
+ */
+function tryCreateNpcRepositionOffer(
+  world: CareerEconomyWorld,
+  npc: NpcFreighter,
+  fromIcao: string,
+  nowMs: number,
+  rng: () => number,
+): NpcFlight | undefined {
+  if (!npcCanOfferContractPilot(npc)) return undefined;
+  if (npc.currentFlightId) return undefined;
+  if (needsShopMx(npc)) return undefined;
+  if (countOpenRepositionOffers(world) >= MAX_OPEN_REPOSITION_OFFERS) {
+    return undefined;
+  }
+
+  const origin = fromIcao.trim().toUpperCase();
+  const originRegion = airportRegion(world, origin);
+  if (!originRegion || originRegion === npc.homeRegion) return undefined;
+
+  const destIcao = pickNpcHomeReturnIcao(world, npc, origin);
+  if (!destIcao) return undefined;
+
+  const dist = routeDistanceNm(world, origin, destIcao) ?? 0;
+  if (dist < 40) return undefined;
+
+  const pilotFeeUsd = quoteRepositionPilotFeeUsd(dist, npc.aircraftClassId);
+  const holdHours = repositionAwaitingHoldHours(rng);
+  const awaitingPilotUntilMs = nowMs + hoursToMs(holdHours);
+  const lotId = `npc-repo-${npc.id}-${world.tick}-${Math.floor(rng() * 1e6)}`;
+  const flightId = `npcf-repo-${world.tick}-${npc.id}-${lotId.slice(-8)}`;
+
+  const lot: ShipmentLot = {
+    id: lotId,
+    commodityId: 'general',
+    originIcao: origin,
+    destIcao,
+    quantityKg: 1,
+    reservedKg: 1,
+    createdAtTick: world.tick,
+    expiresAtTick: world.tick + Math.max(1, hoursToTicks(holdHours) + 1),
+    payUsd: pilotFeeUsd,
+    basePayUsd: pilotFeeUsd,
+    urgency: 'normal',
+    reason: `Reposition · ${npc.name} home (${npc.homeRegion})`,
+    status: 'reserved',
+  };
+  world.lots.push(lot);
+
+  const flight: NpcFlight = {
+    id: flightId,
+    npcId: npc.id,
+    lotId,
+    originIcao: origin,
+    destIcao,
+    commodityId: 'general',
+    cargoKg: 0,
+    payUsd: pilotFeeUsd,
+    aircraftClassId: npc.aircraftClassId,
+    departedAtTick: world.tick,
+    arrivesAtTick: world.tick,
+    departedAtMs: nowMs,
+    arrivesAtMs: awaitingPilotUntilMs,
+    status: 'awaiting_pilot',
+    kind: 'reposition',
+    awaitingPilotUntilMs,
+    pilotFeeUsd,
+  };
+
+  npc.status = 'busy';
+  npc.busyUntilTick = world.tick + hoursToTicks(holdHours);
+  npc.busyUntilMs = awaitingPilotUntilMs;
+  npc.currentFlightId = flight.id;
+  world.npcFlights.push(flight);
+  return flight;
+}
+
 function shouldOfferContractPilot(
   npc: NpcFreighter,
   rng: () => number,
@@ -1382,7 +1547,12 @@ function promoteAwaitingPilotsDue(
   for (const flight of world.npcFlights) {
     if (flight.status !== 'awaiting_pilot') continue;
     const until = flight.awaitingPilotUntilMs ?? 0;
-    if (until > 0 && nowMs < until) continue;
+    const distanceNm =
+      routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? undefined;
+    const unflyable =
+      !isNpcRepositionFlight(flight) &&
+      !contractPilotHasFlyableAirframe(flight, { distanceNm });
+    if (!unflyable && until > 0 && nowMs < until) continue;
     promoteAwaitingPilotFlight(world, flight, nowMs, rng);
     promoted += 1;
   }
@@ -1393,28 +1563,36 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
   if (flight.status === 'completed' || flight.status === 'awaiting_pilot') {
     return;
   }
+  const isRepo = isNpcRepositionFlight(flight);
   const lot = findLot(world, flight.lotId);
-  applyFreightDelivery(world, {
-    commodityId: flight.commodityId,
-    originIcao: flight.originIcao,
-    destIcao: flight.destIcao,
-    kg: flight.cargoKg,
-  });
 
-  if (lot) {
-    const bookKg = flight.cargoKg;
-    lot.reservedKg = Math.max(0, lot.reservedKg - bookKg);
-    lot.quantityKg = Math.max(0, lot.quantityKg - bookKg);
-    if (lot.quantityKg <= 0) {
-      lot.quantityKg = 0;
-      lot.reservedKg = 0;
-      lot.status = 'delivered';
-    } else if (lot.reservedKg <= 0) {
-      lot.reservedKg = 0;
-      lot.status = 'available';
-    } else {
-      lot.status = 'reserved';
+  if (!isRepo) {
+    applyFreightDelivery(world, {
+      commodityId: flight.commodityId,
+      originIcao: flight.originIcao,
+      destIcao: flight.destIcao,
+      kg: flight.cargoKg,
+    });
+
+    if (lot) {
+      const bookKg = flight.cargoKg;
+      lot.reservedKg = Math.max(0, lot.reservedKg - bookKg);
+      lot.quantityKg = Math.max(0, lot.quantityKg - bookKg);
+      if (lot.quantityKg <= 0) {
+        lot.quantityKg = 0;
+        lot.reservedKg = 0;
+        lot.status = 'delivered';
+      } else if (lot.reservedKg <= 0) {
+        lot.reservedKg = 0;
+        lot.status = 'available';
+      } else {
+        lot.status = 'reserved';
+      }
     }
+  } else if (lot) {
+    lot.quantityKg = 0;
+    lot.reservedKg = 0;
+    lot.status = 'delivered';
   }
 
   flight.status = 'completed';
@@ -1429,6 +1607,23 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
     if (npc.currentFlightId === flight.id) {
       npc.currentFlightId = undefined;
     }
+
+    if (!isRepo) {
+      const repoRng = mulberry32(
+        hashSeed(`${world.seed}:npc-repo:${npc.id}:${flight.id}:${nowMs}`),
+      );
+      const offered = tryCreateNpcRepositionOffer(
+        world,
+        npc,
+        flight.destIcao,
+        nowMs,
+        repoRng,
+      );
+      if (offered) {
+        return;
+      }
+    }
+
     if (groundHoldExpired(npcBusyUntilMs(npc), npc.busyUntilTick, nowMs, world.tick)) {
       finishTurnaround(world, npc, nowMs);
     }
@@ -1492,6 +1687,49 @@ export function settleNpcOpsDue(
   return settleNpcOpsDueCore(world, nowMs);
 }
 
+/** Route ops cargo ceiling for an NPC (fuel/MTOW), not structural max alone. */
+function npcOperationalMaxCargoKg(
+  npc: Pick<NpcFreighter, 'aircraftClassId' | 'maxCargoKg' | 'airframeTypeId'>,
+  distanceNm: number,
+  structuralMaxCargoKg?: number,
+): number {
+  const structural = Math.max(
+    0,
+    Math.floor(structuralMaxCargoKg ?? npcMaxCargoKg(npc)),
+  );
+  if (!(distanceNm > 0) || structural <= 0) return structural;
+  const catalog = findCareerPlayerAirframe(npc.airframeTypeId);
+  const route = estimateRouteCargoLimit(npc.aircraftClassId, distanceNm, structural, {
+    oewKg: catalog?.oewKg,
+    mtowKg: catalog?.mtowKg,
+    fuelCapacityKg: catalog?.fuelCapacityKg,
+    fuelBurnKgPerNm: catalog?.fuelBurnKgPerNm,
+    airframeTypeId: catalog?.typeId ?? npc.airframeTypeId,
+  });
+  if (!route.fuelFeasible) return 0;
+  return Math.max(0, Math.floor(route.operationalMaxCargoKg));
+}
+
+/** True when at least one homologated player airframe can lift >0 kg on this offer. */
+export function contractPilotHasFlyableAirframe(
+  flight: Pick<
+    NpcFlight,
+    | 'aircraftClassId'
+    | 'cargoKg'
+    | 'payUsd'
+    | 'pilotFeeUsd'
+    | 'originIcao'
+    | 'destIcao'
+    | 'kind'
+  >,
+  opts?: { distanceNm?: number },
+): boolean {
+  if (isNpcRepositionFlight(flight)) {
+    return listContractPilotPickAirframes(flight, opts).some((a) => a.pilotFeeUsd > 0);
+  }
+  return listContractPilotPickAirframes(flight, opts).some((a) => a.liftKg > 0);
+}
+
 function scoreLotForNpc(
   world: CareerEconomyWorld,
   npc: NpcFreighter,
@@ -1502,6 +1740,14 @@ function scoreLotForNpc(
     maxCargoKg: number;
   },
 ): number | null {
+  // Player-exclusive Contract pool — other NPCs never bid while open.
+  if (
+    world.npcFlights.some(
+      (f) => f.lotId === lot.id && f.status === 'awaiting_pilot',
+    )
+  ) {
+    return null;
+  }
   const aircraft = pre?.aircraft ?? getAircraftClass(npc.aircraftClassId);
   const maxCargoKg = pre?.maxCargoKg ?? npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
@@ -1510,12 +1756,17 @@ function scoreLotForNpc(
   const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao);
   if (dist === undefined || dist > aircraft.maxRangeNm) return null;
 
+  // Fuel/MTOW must allow a meaningful payload — class maxRange alone over-claims
+  // long light-jet legs (e.g. KSFO→KCLE) where ops cargo is 0.
+  const opsMax = npcOperationalMaxCargoKg(npc, dist, maxCargoKg);
+  if (opsMax < 500) return null;
+
   const commodity = getCommodity(lot.commodityId);
   const payPerKg = lot.payUsd / Math.max(1, lot.quantityKg);
   const minPay = commodity.basePricePerKg * 0.35 * npc.feeBias;
   if (payPerKg < minPay) return null;
 
-  const cargoKg = Math.min(avail, maxCargoKg);
+  const cargoKg = Math.min(avail, maxCargoKg, opsMax);
   const fillRatio = cargoKg / maxCargoKg;
   const payScore = Math.min(2.2, payPerKg / commodity.basePricePerKg);
   const urgencyScore =
@@ -1549,16 +1800,46 @@ function claimLotForNpc(
 ): NpcFlight | undefined {
   const maxCargoKg = npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
-  const cargoKg = Math.min(avail, maxCargoKg);
+  const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao) ?? 0;
+  const opsMax = npcOperationalMaxCargoKg(npc, dist, maxCargoKg);
+  // Test/force path may book structural cargo; live bids already gated in score.
+  const cargoKg = Math.min(
+    avail,
+    maxCargoKg,
+    opts?.forceAwaitingPilot === true ? maxCargoKg : opsMax,
+  );
   if (cargoKg <= 0) return undefined;
 
-  const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao) ?? 0;
   const { flightHours } = estimateNpcBlockHours(dist, npc.aircraftClassId);
-  const offerPilot = shouldOfferContractPilot(
+  let offerPilot = shouldOfferContractPilot(
     npc,
     rng,
     opts?.forceAwaitingPilot,
   );
+  // Don't open a crew hold no homologated airframe can actually fly.
+  if (offerPilot && opts?.forceAwaitingPilot !== true) {
+    const draft: Pick<
+      NpcFlight,
+      | 'aircraftClassId'
+      | 'cargoKg'
+      | 'payUsd'
+      | 'originIcao'
+      | 'destIcao'
+      | 'kind'
+    > = {
+      aircraftClassId: npc.aircraftClassId,
+      cargoKg,
+      payUsd: Math.max(
+        1,
+        Math.round(lot.payUsd * (cargoKg / Math.max(1, lot.quantityKg))),
+      ),
+      originIcao: lot.originIcao,
+      destIcao: lot.destIcao,
+    };
+    if (!contractPilotHasFlyableAirframe(draft, { distanceNm: dist })) {
+      offerPilot = false;
+    }
+  }
 
   let reserved;
   try {
@@ -1684,10 +1965,50 @@ export function createNpcContractPilotOffer(
 }
 
 /**
+ * Test helper: force an empty home-region reposition crew offer from an ICAO.
+ */
+export function createNpcRepositionOffer(
+  world: CareerEconomyWorld,
+  npcId: string,
+  fromIcao: string,
+  opts?: { nowMs?: number; rng?: () => number },
+): NpcFlight {
+  ensureNpcFleet(world);
+  const npc = world.npcs.find((n) => n.id === npcId);
+  if (!npc) throw new Error(`Unknown NPC ${npcId}`);
+  if (!npcCanOfferContractPilot(npc)) {
+    throw new Error(`NPC ${npcId} has no homologated airframe for contract pilot`);
+  }
+  npc.status = 'idle';
+  npc.currentFlightId = undefined;
+  npc.busyUntilMs = undefined;
+  npc.busyUntilTick = undefined;
+  npc.hoursSinceMx = 0;
+  const nowMs = opts?.nowMs ?? world.lastBatchAtMs ?? Date.now();
+  const rng =
+    opts?.rng ??
+    mulberry32(hashSeed(`${world.seed}:repo-offer:${npcId}:${fromIcao}`));
+  const flight = tryCreateNpcRepositionOffer(
+    world,
+    npc,
+    fromIcao,
+    nowMs,
+    rng,
+  );
+  if (!flight || flight.status !== 'awaiting_pilot') {
+    throw new Error(
+      `Failed to create reposition offer for ${npcId} from ${fromIcao}`,
+    );
+  }
+  return flight;
+}
+
+/**
  * Player accepts a crew-needed offer with a homologated airframe of the same
  * class (not necessarily the NPC's SKU). Lift is capped by that airframe's
- * cargo ceiling: leftover stays with the operator, who departs immediately
- * and delivers the remainder to the destination.
+ * cargo ceiling. Any remainder stays on the board as the same Contract
+ * (player-exclusive) until claimed again or the offer window expires — then
+ * the operator departs alone with what's left.
  * `payUsd` on the player mission is the proportional pilot fee.
  */
 export function acceptContractPilotOffer(
@@ -1709,6 +2030,15 @@ export function acceptContractPilotOffer(
   airframeLabel: string;
   liftedKg: number;
   remainderKg: number;
+  /**
+   * True when leftover cargo stayed on the board as an open Contract
+   * (player may claim again after finishing this mission, until the window).
+   */
+  remainderOpenOnBoard: boolean;
+  /**
+   * @deprecated Always false for freight Contracts — remainder stays claimable
+   * instead of the NPC departing immediately. Kept for API compatibility.
+   */
   npcDepartedWithRemainder: boolean;
   /** Prior pilot hub before operator-covered reposition (if moved). */
   pilotRelocatedFrom?: string;
@@ -1770,7 +2100,10 @@ export function acceptContractPilotOffer(
   if (!lot) {
     throw new Error(`Lot ${flight.lotId} no longer exists`);
   }
-  if (lot.reservedKg < flight.cargoKg) {
+
+  const isRepo = isNpcRepositionFlight(flight);
+
+  if (!isRepo && lot.reservedKg < flight.cargoKg) {
     throw new Error(
       `Lot reservation mismatch (reserved ${lot.reservedKg} kg, offer ${flight.cargoKg} kg)`,
     );
@@ -1779,27 +2112,43 @@ export function acceptContractPilotOffer(
   const offerCargoKg = flight.cargoKg;
   const offerPayUsd = flight.payUsd;
   const offerFeeUsd =
-    flight.pilotFeeUsd ?? quoteContractPilotFeeUsd(offerPayUsd);
+    flight.pilotFeeUsd ??
+    (isRepo
+      ? quoteRepositionPilotFeeUsd(
+          routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? 0,
+          flight.aircraftClassId,
+        )
+      : quoteContractPilotFeeUsd(offerPayUsd));
   const distanceNm =
     routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? undefined;
-  const liftedKg = contractPilotLiftKg(
-    airframe.typeId,
-    flight.aircraftClassId,
-    offerCargoKg,
-    { distanceNm },
-  );
-  if (liftedKg <= 0) {
-    throw new Error(
-      `${airframe.label} cannot lift any of this ${offerCargoKg} kg offer`,
+
+  let liftedKg: number;
+  let remainderKg: number;
+  let pilotFeeUsd: number;
+  let grossPayUsd: number;
+
+  if (isRepo) {
+    liftedKg = 0;
+    remainderKg = 0;
+    pilotFeeUsd = Math.max(REPOSITION_PILOT_FEE_MIN_USD, offerFeeUsd);
+    grossPayUsd = pilotFeeUsd;
+  } else {
+    liftedKg = contractPilotLiftKg(
+      airframe.typeId,
+      flight.aircraftClassId,
+      offerCargoKg,
+      { distanceNm },
     );
+    if (liftedKg <= 0) {
+      throw new Error(
+        `${airframe.label} cannot lift any of this ${offerCargoKg} kg offer`,
+      );
+    }
+    remainderKg = offerCargoKg - liftedKg;
+    const liftFrac = liftedKg / offerCargoKg;
+    pilotFeeUsd = Math.max(50, Math.round(offerFeeUsd * liftFrac));
+    grossPayUsd = Math.max(1, Math.round(offerPayUsd * liftFrac));
   }
-  const remainderKg = offerCargoKg - liftedKg;
-  const liftFrac = liftedKg / offerCargoKg;
-  const pilotFeeUsd = Math.max(
-    50,
-    Math.round(offerFeeUsd * liftFrac),
-  );
-  const grossPayUsd = Math.max(1, Math.round(offerPayUsd * liftFrac));
 
   const missionId =
     opts.missionId?.trim() ||
@@ -1807,18 +2156,20 @@ export function acceptContractPilotOffer(
 
   const mission = recomputeMissionTotals({
     id: missionId,
-    lots: [
-      {
-        shipmentLotId: flight.lotId,
-        commodityId: flight.commodityId,
-        cargoKg: liftedKg,
-        payUsd: pilotFeeUsd,
-        urgency: lot.urgency,
-        reason: `${lot.reason} · contract ${npc.name}`,
-        deadlineTick: lot.expiresAtTick,
-      },
-    ],
-    shipmentLotId: flight.lotId,
+    lots: isRepo
+      ? []
+      : [
+          {
+            shipmentLotId: flight.lotId,
+            commodityId: flight.commodityId,
+            cargoKg: liftedKg,
+            payUsd: pilotFeeUsd,
+            urgency: lot.urgency,
+            reason: `${lot.reason} · contract ${npc.name}`,
+            deadlineTick: lot.expiresAtTick,
+          },
+        ],
+    shipmentLotId: isRepo ? `deadhead_${flight.id}` : flight.lotId,
     commodityId: flight.commodityId,
     originIcao: flight.originIcao,
     destIcao: flight.destIcao,
@@ -1830,10 +2181,13 @@ export function acceptContractPilotOffer(
     deadlineTick: lot.expiresAtTick,
     payUsd: pilotFeeUsd,
     urgency: lot.urgency,
-    reason: `${lot.reason} · contract ${npc.name}`,
+    reason: isRepo
+      ? `Reposition · contract ${npc.name} · ${flight.originIcao}→${flight.destIcao}`
+      : `${lot.reason} · contract ${npc.name}`,
     status: 'accepted',
     acceptedAtTick: world.tick,
     contractPilot: true,
+    ...(isRepo ? { contractPilotReposition: true } : {}),
     contractPilotFeeUsd: pilotFeeUsd,
     contractGrossPayUsd: grossPayUsd,
     operatorNpcId: npc.id,
@@ -1841,17 +2195,18 @@ export function acceptContractPilotOffer(
     npcFlightId: flight.id,
   });
 
-  let npcDepartedWithRemainder = false;
-  if (remainderKg > 0) {
+  let remainderOpenOnBoard = false;
+  if (!isRepo && remainderKg > 0) {
+    // Keep the Contract open for further player claims until the window ends.
     const remFrac = remainderKg / offerCargoKg;
     flight.cargoKg = remainderKg;
     flight.payUsd = Math.max(1, Math.round(offerPayUsd * remFrac));
     flight.pilotFeeUsd = quoteContractPilotFeeUsd(flight.payUsd);
-    const rng = mulberry32(
-      hashSeed(`${world.seed}:cp-remainder:${flight.id}:${nowMs}`),
-    );
-    promoteAwaitingPilotFlight(world, flight, nowMs, rng);
-    npcDepartedWithRemainder = true;
+    // Window / busy hold unchanged — do not promote to in_flight.
+    if (lot.status === 'in_transit') {
+      lot.status = 'reserved';
+    }
+    remainderOpenOnBoard = true;
   } else {
     world.npcFlights = world.npcFlights.filter((f) => f.id !== flight.id);
     if (npc.currentFlightId === flight.id) {
@@ -1860,6 +2215,11 @@ export function acceptContractPilotOffer(
     npc.status = 'idle';
     npc.busyUntilMs = undefined;
     npc.busyUntilTick = undefined;
+    if (isRepo) {
+      lot.quantityKg = 0;
+      lot.reservedKg = 0;
+      lot.status = 'delivered';
+    }
   }
 
   state.missions = [...state.missions, mission];
@@ -1882,7 +2242,8 @@ export function acceptContractPilotOffer(
     airframeLabel: airframe.label,
     liftedKg,
     remainderKg,
-    npcDepartedWithRemainder,
+    remainderOpenOnBoard,
+    npcDepartedWithRemainder: false,
     ...(pilotRelocatedFrom ? { pilotRelocatedFrom } : {}),
   };
 }
@@ -1947,12 +2308,20 @@ export function listContractPilotPickAirframes(
     | 'pilotFeeUsd'
     | 'originIcao'
     | 'destIcao'
+    | 'kind'
   >,
   opts?: { distanceNm?: number },
 ): ContractPilotPickAirframe[] {
+  const isRepo = isNpcRepositionFlight(flight);
   const offerCargoKg = Math.max(0, Math.floor(flight.cargoKg));
   const offerFee =
-    flight.pilotFeeUsd ?? quoteContractPilotFeeUsd(flight.payUsd);
+    flight.pilotFeeUsd ??
+    (isRepo
+      ? quoteRepositionPilotFeeUsd(
+          opts?.distanceNm ?? 0,
+          flight.aircraftClassId,
+        )
+      : quoteContractPilotFeeUsd(flight.payUsd));
   const distanceNm =
     typeof opts?.distanceNm === 'number' && Number.isFinite(opts.distanceNm)
       ? opts.distanceNm
@@ -1981,6 +2350,20 @@ export function listContractPilotPickAirframes(
           airframeTypeId: airframe.typeId,
         },
       ).operationalMaxCargoKg;
+    }
+    if (isRepo) {
+      return {
+        typeId: airframe.typeId,
+        label: airframe.label,
+        aircraftClassId: airframe.aircraftClassId,
+        maxCargoKg: structuralMax,
+        operationalMaxCargoKg,
+        liftKg: 0,
+        remainderKg: 0,
+        coversOffer: true,
+        routeLimited: operationalMaxCargoKg < structuralMax,
+        pilotFeeUsd: Math.max(REPOSITION_PILOT_FEE_MIN_USD, offerFee),
+      };
     }
     const liftKg = Math.max(
       0,
@@ -2014,11 +2397,22 @@ export function contractPilotFeeRangeUsd(
     | 'pilotFeeUsd'
     | 'originIcao'
     | 'destIcao'
+    | 'kind'
   >,
   opts?: { distanceNm?: number },
 ): { minUsd: number; maxUsd: number } {
+  const isRepo = isNpcRepositionFlight(flight);
   const fullFee =
-    flight.pilotFeeUsd ?? quoteContractPilotFeeUsd(flight.payUsd);
+    flight.pilotFeeUsd ??
+    (isRepo
+      ? quoteRepositionPilotFeeUsd(
+          opts?.distanceNm ?? 0,
+          flight.aircraftClassId,
+        )
+      : quoteContractPilotFeeUsd(flight.payUsd));
+  if (isRepo) {
+    return { minUsd: fullFee, maxUsd: fullFee };
+  }
   const fees = listContractPilotPickAirframes(flight, opts)
     .filter((a) => a.liftKg > 0)
     .map((a) => a.pilotFeeUsd);
@@ -2330,6 +2724,8 @@ export function npcClaimForLot(
       etaMs: number;
       arrivesAtMs: number;
       crewNeeded?: boolean;
+      /** Empty deadhead toward home region. */
+      crewReposition?: boolean;
       /** Max crew fee (full offer / best lift). Actual fee scales with chosen airframe lift. */
       pilotFeeUsd?: number;
       /** Min crew fee among flyable homologated airframes in class. */
@@ -2348,6 +2744,22 @@ export function npcClaimForLot(
     const etaMs = Math.max(0, until - nowMs);
     const distanceNm =
       routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? undefined;
+    const isRepo = isNpcRepositionFlight(flight);
+    const flyable = contractPilotHasFlyableAirframe(flight, { distanceNm });
+    // Unflyable holds (ops cargo 0) stay reserved but must not show Fly.
+    if (!flyable) {
+      return {
+        npcId: flight.npcId,
+        npcName: npc?.name ?? flight.npcId,
+        cargoKg: flight.cargoKg,
+        etaHours: msToHours(etaMs),
+        etaMs,
+        arrivesAtMs: until,
+        airframeTypeId: npc?.airframeTypeId,
+        aircraftLabel: npc ? npcAirframeLabel(npc) : undefined,
+        aircraftClassId: flight.aircraftClassId,
+      };
+    }
     const feeRange = contractPilotFeeRangeUsd(flight, { distanceNm });
     return {
       npcId: flight.npcId,
@@ -2357,6 +2769,7 @@ export function npcClaimForLot(
       etaMs,
       arrivesAtMs: until,
       crewNeeded: true,
+      ...(isRepo ? { crewReposition: true } : {}),
       pilotFeeUsd: feeRange.maxUsd,
       pilotFeeMinUsd: feeRange.minUsd,
       awaitingPilotUntilMs: until,

@@ -475,9 +475,9 @@ function LotLoadCell(props: {
 /** Contract/Ferry Pay: pilot fee (what you earn). Normal lots: freight pay. */
 function LotPayCell(props: {
   lot: {
-    availableKg: number;
-    quantityKg: number;
     payUsd: number;
+    quantityKg?: number;
+    availableKg?: number;
     npcClaim?: {
       crewNeeded?: boolean;
       cargoKg?: number;

@@ -4,6 +4,7 @@ import {
   applyAircraftHoursAfterMission,
   clearAircraftMaintenance,
   conditionBucketFromPct,
+  conditionPctsForListing,
   CRITICAL_CONDITION_PCT,
   ensureAircraftConditionPcts,
   fuelBurnMultFromCondition,
@@ -205,5 +206,23 @@ describe('aircraft wear + maintenance', () => {
     assert.equal(overTank.requiredBlockFuelKg, 500);
     assert.equal(overTank.mxPadKg, 0);
     assert.equal(overTank.cappedByTank, true);
+  });
+
+  it('rolls listing condition pcts inside each bucket band', () => {
+    const low = conditionPctsForListing('tired', 'used', () => 0);
+    const high = conditionPctsForListing('tired', 'used', () => 0.999);
+    assert.equal(low.airframeConditionPct, CRITICAL_CONDITION_PCT);
+    assert.ok(high.airframeConditionPct >= 53);
+    assert.ok(high.airframeConditionPct <= 54);
+    assert.notEqual(low.airframeConditionPct, high.airframeConditionPct);
+
+    const fair = conditionPctsForListing('fair', 'used', () => 0.25);
+    assert.ok(fair.airframeConditionPct >= 55);
+    assert.ok(fair.airframeConditionPct < 75);
+    assert.equal(conditionBucketFromPct(fair.airframeConditionPct), 'fair');
+
+    const brandNew = conditionPctsForListing('tired', 'new', () => 0);
+    assert.equal(brandNew.airframeConditionPct, 99);
+    assert.equal(brandNew.engineConditionPct, 100);
   });
 });

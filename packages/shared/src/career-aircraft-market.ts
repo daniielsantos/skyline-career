@@ -453,7 +453,7 @@ export function generateAircraftMarketListings(opts: {
       rng,
       airframe.maxCargoKg,
     );
-    const pcts = conditionPctsForListing(condition, kind);
+    const pcts = conditionPctsForListing(condition, kind, rng);
     listings.push({
       id: `acfl_${opts.dayIndex}_${i}_${airframe.typeId}`,
       kind,

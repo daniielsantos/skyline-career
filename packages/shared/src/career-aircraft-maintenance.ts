@@ -198,6 +198,23 @@ export function midPctForCondition(condition: AirframeCondition): number {
   }
 }
 
+/** Inclusive pct band for a market condition bucket (tired stays ≥ critical). */
+export function conditionPctRange(condition: AirframeCondition): {
+  min: number;
+  max: number;
+} {
+  switch (condition) {
+    case 'excellent':
+      return { min: 90, max: 99 };
+    case 'good':
+      return { min: 75, max: 89 };
+    case 'fair':
+      return { min: 55, max: 74 };
+    case 'tired':
+      return { min: CRITICAL_CONDITION_PCT, max: 54 };
+  }
+}
+
 export function clampConditionPct(n: number): number {
   if (!Number.isFinite(n)) return 100;
   return Math.max(0, Math.min(100, Math.round(n * 10) / 10));
@@ -462,13 +479,23 @@ export function repairAircraftCondition(
 export function conditionPctsForListing(
   condition: AirframeCondition,
   kind: 'new' | 'used' | 'lease',
+  rng?: () => number,
 ): { airframeConditionPct: number; engineConditionPct: number } {
   if (kind === 'new') {
     return { airframeConditionPct: 99, engineConditionPct: 100 };
   }
-  const mid = midPctForCondition(condition);
+  const { min, max } = conditionPctRange(condition);
+  const roll = typeof rng === 'function' ? rng() : 0.5;
+  const span = Math.max(0, max - min);
+  const af = clampConditionPct(min + roll * span);
+  // Engine a touch healthier than structure; small jitter when rng is present.
+  const engBiasBase = condition === 'tired' ? 1 : 2;
+  const engBiasSpan = condition === 'tired' ? 3 : 4;
+  const engBias =
+    engBiasBase +
+    (typeof rng === 'function' ? rng() : 0.5) * engBiasSpan;
   return {
-    airframeConditionPct: mid,
-    engineConditionPct: clampConditionPct(mid + (condition === 'tired' ? 2 : 4)),
+    airframeConditionPct: af,
+    engineConditionPct: clampConditionPct(af + engBias),
   };
 }

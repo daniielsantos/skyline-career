@@ -78,11 +78,11 @@ Unzip, `npm install`, then `.\start.ps1` or `npm run start:simconnect`.
 
 ```powershell
 npm run pack:desktop
-# → artifacts/skyline-desktop/SkylineCareer-*-portable.exe
-# → artifacts/skyline-desktop/win-unpacked/
+# → artifacts/skyline-desktop/SkylineCareer-Setup-<version>.exe
+# → artifacts/skyline-desktop/latest.yml  (GitHub Releases auto-update)
 ```
 
-Player saves live under `%AppData%\Skyline Career\`. See [`packages/desktop/README.md`](packages/desktop/README.md).
+Install once via the Setup EXE. Later versions update from **Settings → Updates** (GitHub Releases, no reinstall). Saves stay in `%AppData%\Skyline Career\`. See [`packages/desktop/README.md`](packages/desktop/README.md).
 
 ### Catalog API (Phase 3)
 

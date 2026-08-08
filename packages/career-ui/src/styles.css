@@ -1904,6 +1904,22 @@ tr.lot-locked {
   font-size: 0.85rem;
 }
 
+.desktop-update-progress {
+  margin-top: 0.65rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.desktop-update-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent, #e8a54b);
+  transition: width 0.2s ease;
+}
+
 .settings-panel .simbrief-field input {
   background: var(--bg-deep);
   border-color: var(--line);

@@ -1,13 +1,28 @@
 /**
  * Skyline Career desktop shell (Electron).
  * Starts Career API (+ optional SimBridgeHost), then opens a BrowserWindow.
+ * Auto-update via electron-updater → GitHub Releases (no code signing yet).
  */
-import { app, BrowserWindow, dialog, shell } from 'electron';
-import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  shell,
+} from 'electron';
+import { spawn, execFileSync } from 'node:child_process';
+import { createWriteStream, appendFileSync, mkdirSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createWriteStream } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createConnection } from 'node:net';
+
+const require = createRequire(import.meta.url);
+const { autoUpdater } = require('electron-updater');
+
+// Branding: userData / Task Manager name (not @msfs-compat/desktop).
+app.setName('Skyline Career');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +36,9 @@ let hostChild = null;
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
 let shuttingDown = false;
+/** @type {string} */
+let desktopLogPath = '';
+let updaterWired = false;
 
 function isPackaged() {
   return app.isPackaged;
@@ -30,12 +48,10 @@ function resourcesRoot() {
   return isPackaged() ? process.resourcesPath : join(__dirname, '..', '..');
 }
 
-/** Read-only app payload (packages + seed profiles). */
 function skylineRoot() {
   if (isPackaged()) {
     return join(resourcesRoot(), 'skyline');
   }
-  // Dev: repo root
   return join(__dirname, '..', '..');
 }
 
@@ -65,6 +81,25 @@ function hostDir() {
   );
 }
 
+function preloadPath() {
+  return join(__dirname, 'preload.cjs');
+}
+
+function logLine(message) {
+  const line = `[${new Date().toISOString()}] ${message}\n`;
+  try {
+    if (desktopLogPath) appendFileSync(desktopLogPath, line, 'utf8');
+  } catch {
+    /* ignore */
+  }
+  console.log(message);
+}
+
+function sendUpdateEvent(payload) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('skyline:update', payload);
+}
+
 async function pathExists(p) {
   try {
     await access(p);
@@ -78,12 +113,61 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function killPidTree(pid) {
+  if (!pid) return;
+  try {
+    if (process.platform === 'win32') {
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+    } else {
+      process.kill(pid, 'SIGTERM');
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function killListenersOnPort(port) {
+  if (process.platform !== 'win32') return;
+  try {
+    const out = execFileSync('netstat', ['-ano'], { encoding: 'utf8' });
+    const pids = new Set();
+    for (const line of out.split(/\r?\n/)) {
+      if (!line.includes(`:${port}`) || !line.includes('LISTENING')) continue;
+      const parts = line.trim().split(/\s+/);
+      const pid = parts[parts.length - 1];
+      if (pid && /^\d+$/.test(pid) && pid !== '0' && Number(pid) !== process.pid) {
+        pids.add(pid);
+      }
+    }
+    for (const pid of pids) {
+      logLine(`[desktop] freeing port ${port} (PID ${pid})`);
+      killPidTree(Number(pid));
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function portFree(port) {
+  return new Promise((resolve) => {
+    const socket = createConnection({ port, host: '127.0.0.1' });
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once('error', () => resolve(true));
+  });
+}
+
 async function waitForApi(timeoutMs = 90_000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (apiChild && apiChild.exitCode != null) {
       throw new Error(
-        `Career API exited early (code ${apiChild.exitCode})`,
+        `Career API exited early (code ${apiChild.exitCode}). See career-api.log`,
       );
     }
     try {
@@ -103,19 +187,103 @@ async function waitForApi(timeoutMs = 90_000) {
 }
 
 function killTree(child) {
-  if (!child?.pid) return;
-  try {
-    if (process.platform === 'win32') {
-      spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-    } else {
-      child.kill('SIGTERM');
+  if (!child) return;
+  if ('kill' in child && typeof child.kill === 'function') {
+    try {
+      if (process.platform === 'win32' && child.pid) {
+        killPidTree(child.pid);
+      } else {
+        child.kill();
+      }
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
   }
+}
+
+function wireAutoUpdater() {
+  if (updaterWired) return;
+  updaterWired = true;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+  // Unsigned builds: allow GitHub Releases without publisher validation issues.
+  autoUpdater.allowDowngrade = false;
+
+  autoUpdater.on('checking-for-update', () => {
+    sendUpdateEvent({ type: 'checking' });
+  });
+  autoUpdater.on('update-available', (info) => {
+    logLine(`[desktop] update available: ${info.version}`);
+    sendUpdateEvent({
+      type: 'available',
+      version: info.version,
+      releaseNotes: info.releaseNotes ?? null,
+    });
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    sendUpdateEvent({ type: 'not-available', version: info.version });
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdateEvent({
+      type: 'progress',
+      percent: progress.percent,
+      transferred: progress.transferred,
+      total: progress.total,
+      bytesPerSecond: progress.bytesPerSecond,
+    });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    logLine(`[desktop] update downloaded: ${info.version}`);
+    sendUpdateEvent({ type: 'downloaded', version: info.version });
+  });
+  autoUpdater.on('error', (err) => {
+    logLine(`[desktop] updater error: ${err.message}`);
+    sendUpdateEvent({ type: 'error', message: err.message });
+  });
+}
+
+function registerIpc() {
+  ipcMain.handle('skyline:get-version', () => app.getVersion());
+
+  ipcMain.handle('skyline:check-updates', async () => {
+    if (!isPackaged()) {
+      return { ok: false, reason: 'dev' };
+    }
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return {
+        ok: true,
+        version: result?.updateInfo?.version ?? null,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, reason: message };
+    }
+  });
+
+  ipcMain.handle('skyline:download-update', async () => {
+    if (!isPackaged()) return { ok: false, reason: 'dev' };
+    try {
+      await autoUpdater.downloadUpdate();
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, reason: message };
+    }
+  });
+
+  ipcMain.handle('skyline:quit-and-install', () => {
+    if (!isPackaged()) return { ok: false, reason: 'dev' };
+    // Let updater replace binaries; kill children first.
+    shuttingDown = true;
+    killTree(apiChild);
+    killTree(hostChild);
+    setImmediate(() => {
+      autoUpdater.quitAndInstall(false, true);
+    });
+    return { ok: true };
+  });
 }
 
 async function startCareerApi() {
@@ -125,12 +293,39 @@ async function startCareerApi() {
     throw new Error(`Career API entry missing: ${apiEntry}`);
   }
 
+  // Prefer absolute tsx loader — packaged installs must ship node_modules/tsx.
+  const tsxCandidates = [
+    join(root, 'node_modules', 'tsx', 'dist', 'esm', 'index.mjs'),
+    join(root, 'node_modules', 'tsx', 'esm.mjs'),
+    join(root, 'node_modules', 'tsx', 'dist', 'loader.mjs'),
+  ];
+  let tsxLoader = '';
+  for (const candidate of tsxCandidates) {
+    if (await pathExists(candidate)) {
+      tsxLoader = candidate;
+      break;
+    }
+  }
+  if (!tsxLoader) {
+    throw new Error(
+      `tsx runtime missing under ${join(root, 'node_modules', 'tsx')}. ` +
+        'Reinstall Skyline Career (pack must include skyline/node_modules).',
+    );
+  }
+
+  killListenersOnPort(API_PORT);
+  await sleep(400);
+  if (!(await portFree(API_PORT))) {
+    killListenersOnPort(API_PORT);
+    await sleep(600);
+  }
+
   const logDir = join(app.getPath('userData'), 'logs');
-  await import('node:fs/promises').then((fs) =>
-    fs.mkdir(logDir, { recursive: true }),
-  );
+  mkdirSync(logDir, { recursive: true });
   const logPath = join(logDir, 'career-api.log');
   const logStream = createWriteStream(logPath, { flags: 'a' });
+  logStream.write(`\n==== API start ${new Date().toISOString()} ====\n`);
+  logStream.write(`tsx=${tsxLoader}\napi=${apiEntry}\nroot=${root}\n`);
 
   const env = {
     ...process.env,
@@ -142,10 +337,11 @@ async function startCareerApi() {
     CAREER_UI_API_PORT: String(API_PORT),
   };
 
-  // Use Electron's Node (Node 22+ in Electron 35) so node:sqlite works.
+  const importSpec = pathToFileURL(tsxLoader).href;
+  logLine(`[desktop] starting API via ELECTRON_RUN_AS_NODE + ${importSpec}`);
   apiChild = spawn(
     process.execPath,
-    ['--import', 'tsx', apiEntry],
+    ['--import', importSpec, apiEntry],
     {
       cwd: root,
       env,
@@ -156,44 +352,58 @@ async function startCareerApi() {
   apiChild.stdout?.pipe(logStream);
   apiChild.stderr?.pipe(logStream);
   apiChild.on('exit', (code) => {
-    if (!shuttingDown) {
-      console.error(`[desktop] Career API exited (${code})`);
-    }
+    if (!shuttingDown) logLine(`[desktop] Career API exited (${code})`);
   });
 
   await waitForApi();
-  console.log(`[desktop] Career API ready → ${API_URL}`);
+  logLine(`[desktop] Career API ready → ${API_URL}`);
 }
 
 async function startSimBridgeHost() {
   const dir = hostDir();
   const exe = join(dir, 'SimBridgeHost.exe');
   if (!(await pathExists(exe))) {
-    console.warn(`[desktop] SimBridgeHost not found at ${exe} — Watch offline`);
+    logLine(`[desktop] SimBridgeHost not found at ${exe} — Watch offline`);
     return;
   }
+
+  const logDir = join(app.getPath('userData'), 'logs');
+  mkdirSync(logDir, { recursive: true });
+  const hostLog = createWriteStream(join(logDir, 'simbridge-host.log'), {
+    flags: 'a',
+  });
+  hostLog.write(`\n==== host start ${new Date().toISOString()} ====\n`);
+
+  const args = ['--mode', 'simconnect'];
+  const sdk =
+    process.env.MSFS_SDK?.trim() ||
+    ((await pathExists('C:\\MSFS 2024 SDK')) ? 'C:\\MSFS 2024 SDK' : '');
+  if (sdk) args.push('--sdk', sdk);
+
   try {
-    hostChild = spawn(exe, ['--mode', 'simconnect'], {
+    hostChild = spawn(exe, args, {
       cwd: dir,
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
-      env: { ...process.env },
+      env: { ...process.env, ...(sdk ? { MSFS_SDK: sdk } : {}) },
     });
+    hostChild.stdout?.pipe(hostLog);
+    hostChild.stderr?.pipe(hostLog);
     hostChild.on('exit', (code) => {
       if (!shuttingDown) {
-        console.warn(`[desktop] SimBridgeHost exited (${code})`);
+        logLine(`[desktop] SimBridgeHost exited (${code})`);
       }
     });
-    console.log('[desktop] SimBridgeHost started');
+    logLine(`[desktop] SimBridgeHost started (${exe})`);
   } catch (err) {
-    console.warn(
-      '[desktop] SimBridgeHost failed to start:',
-      err instanceof Error ? err.message : err,
+    logLine(
+      `[desktop] SimBridgeHost failed: ${err instanceof Error ? err.message : err}`,
     );
   }
 }
 
 async function createWindow() {
+  const iconFile = join(__dirname, 'build', 'icon.ico');
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -201,7 +411,9 @@ async function createWindow() {
     minHeight: 700,
     title: 'Skyline Career',
     backgroundColor: '#0f1419',
+    icon: (await pathExists(iconFile)) ? iconFile : undefined,
     webPreferences: {
+      preload: preloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -227,6 +439,7 @@ async function createWindow() {
 function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
+  logLine('[desktop] shutdown');
   killTree(apiChild);
   killTree(hostChild);
   apiChild = null;
@@ -235,7 +448,13 @@ function shutdown() {
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
-  app.quit();
+  app.whenReady().then(() => {
+    dialog.showErrorBox(
+      'Skyline Career',
+      'Skyline Career is already running (or a previous launch did not exit cleanly).\n\nClose it from Task Manager (Skyline Career / SimBridgeHost), then try again.',
+    );
+    app.quit();
+  });
 } else {
   app.on('second-instance', () => {
     if (mainWindow) {
@@ -244,17 +463,41 @@ if (!gotLock) {
     }
   });
 
+  registerIpc();
+
   app.whenReady().then(async () => {
+    const logDir = join(app.getPath('userData'), 'logs');
+    mkdirSync(logDir, { recursive: true });
+    desktopLogPath = join(logDir, 'desktop.log');
+    logLine(
+      `[desktop] ready packaged=${isPackaged()} version=${app.getVersion()} resources=${resourcesRoot()}`,
+    );
+    logLine(`[desktop] skylineRoot=${skylineRoot()}`);
+    logLine(`[desktop] dataRoot=${careerDataRoot()}`);
+    logLine(`[desktop] hostDir=${hostDir()}`);
+
     try {
       await startCareerApi();
       await startSimBridgeHost();
       await createWindow();
+
+      if (isPackaged()) {
+        wireAutoUpdater();
+        // Silent boot check — UI shows banner / Settings card.
+        setTimeout(() => {
+          void autoUpdater.checkForUpdates().catch((err) => {
+            logLine(
+              `[desktop] boot update check failed: ${err instanceof Error ? err.message : err}`,
+            );
+          });
+        }, 4_000);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('[desktop] startup failed:', message);
+      logLine(`[desktop] startup failed: ${message}`);
       dialog.showErrorBox(
         'Skyline Career',
-        `Failed to start.\n\n${message}\n\nSee logs under:\n${join(app.getPath('userData'), 'logs')}`,
+        `Failed to start.\n\n${message}\n\nSee logs under:\n${logDir}`,
       );
       shutdown();
       app.quit();

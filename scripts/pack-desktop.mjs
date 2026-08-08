@@ -218,6 +218,16 @@ Player saves live under %AppData%\\\\Skyline Career\\\\career\\\\.
     cwd: runtimeOut,
     shell: true,
   });
+
+  const tsxOk = await exists(
+    join(runtimeOut, 'node_modules', 'tsx', 'dist', 'esm', 'index.mjs'),
+  );
+  if (!tsxOk) {
+    throw new Error(
+      'skyline-runtime missing node_modules/tsx after npm install — desktop API cannot start',
+    );
+  }
+  console.log('[pack:desktop] runtime includes tsx ✓');
 }
 
 async function assembleHost() {
@@ -259,11 +269,43 @@ async function buildElectron() {
   console.log('[pack:desktop] installing desktop deps…');
   await run('npm', ['install'], { cwd: desktopPkg, shell: true });
 
-  console.log('[pack:desktop] electron-builder…');
+  const outDir = join(root, 'artifacts', 'skyline-desktop');
+  await mkdir(outDir, { recursive: true });
+  // Remove previous tiny/broken Setup leftovers so we never ship a 185KB stub.
+  try {
+    for (const name of await readdir(outDir)) {
+      if (!/^SkylineCareer.*\.(exe|yml|blockmap)$/i.test(name)) continue;
+      const full = join(outDir, name);
+      try {
+        const { stat } = await import('node:fs/promises');
+        const info = await stat(full);
+        if (name.endsWith('.exe') && info.size < 5_000_000) {
+          console.warn(
+            `[pack:desktop] removing undersized artifact ${name} (${info.size} bytes)`,
+          );
+          await rm(full, { force: true });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    /* empty out dir */
+  }
+
+  console.log('[pack:desktop] electron-builder (NSIS, --publish never)…');
   const candidates = [
     join(desktopPkg, 'node_modules', 'electron-builder', 'cli.js'),
     join(root, 'node_modules', 'electron-builder', 'cli.js'),
-    join(root, 'node_modules', '@msfs-compat', 'desktop', 'node_modules', 'electron-builder', 'cli.js'),
+    join(
+      root,
+      'node_modules',
+      '@msfs-compat',
+      'desktop',
+      'node_modules',
+      'electron-builder',
+      'cli.js',
+    ),
   ];
   let cli = null;
   for (const c of candidates) {
@@ -276,19 +318,49 @@ async function buildElectron() {
     ...process.env,
     CSC_IDENTITY_AUTO_DISCOVERY: 'false',
   };
+  const args = ['--win', '--x64', '--publish', 'never'];
   if (!cli) {
-    await run('npx', ['electron-builder', '--win', '--x64'], {
+    await run('npx', ['electron-builder', ...args], {
       cwd: desktopPkg,
       shell: true,
       env: builderEnv,
     });
-    return;
+  } else {
+    await run(process.execPath, [cli, ...args], {
+      cwd: desktopPkg,
+      shell: false,
+      env: builderEnv,
+    });
   }
-  await run(process.execPath, [cli, '--win', '--x64'], {
-    cwd: desktopPkg,
-    shell: false,
-    env: builderEnv,
-  });
+
+  // Validate NSIS setup is a real installer, not a failed stub.
+  const { stat } = await import('node:fs/promises');
+  const names = await readdir(outDir);
+  const setup = names.find((n) =>
+    /^SkylineCareer-Setup-.*\.exe$/i.test(n),
+  );
+  if (!setup) {
+    throw new Error(
+      'NSIS Setup exe missing after electron-builder. Check builder logs (spawn UNKNOWN / winCodeSign).',
+    );
+  }
+  const setupPath = join(outDir, setup);
+  const setupSize = (await stat(setupPath)).size;
+  if (setupSize < 20_000_000) {
+    throw new Error(
+      `NSIS Setup looks invalid (${setup} is ${setupSize} bytes). Refusing to treat it as a release artifact.`,
+    );
+  }
+  console.log(
+    `[pack:desktop] NSIS OK → ${setup} (${(setupSize / 1_000_000).toFixed(1)} MB)`,
+  );
+  if (names.some((n) => /^latest\.yml$/i.test(n))) {
+    console.log('[pack:desktop] latest.yml present (for GitHub Releases auto-update)');
+  } else {
+    console.warn(
+      '[pack:desktop] latest.yml missing — electron-updater needs it on the GitHub Release',
+    );
+  }
 }
 
 async function main() {

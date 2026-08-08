@@ -10,7 +10,9 @@
     "start": "electron .",
     "pack": "node ../../scripts/pack-desktop.mjs"
   },
-  "dependencies": {},
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
   "devDependencies": {
     "electron": "35.7.5",
     "electron-builder": "26.0.12"
@@ -20,18 +22,23 @@
     "productName": "Skyline Career",
     "copyright": "Copyright © Skyline Career",
     "electronVersion": "35.7.5",
+    "afterPack": "./afterPack.cjs",
     "directories": {
       "output": "../../artifacts/skyline-desktop",
       "buildResources": "build"
     },
     "files": [
       "main.mjs",
-      "package.json"
+      "preload.cjs",
+      "package.json",
+      "build/icon.ico",
+      "build/icon.png"
     ],
     "extraResources": [
       {
         "from": "../../artifacts/skyline-runtime",
-        "to": "skyline"
+        "to": "skyline",
+        "filter": ["**/*"]
       },
       {
         "from": "../../artifacts/skyline-host",
@@ -39,10 +46,17 @@
         "filter": ["**/*"]
       }
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "daniielsantos",
+        "repo": "skyline-career"
+      }
+    ],
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": ["x64"]
         },
         {
@@ -50,16 +64,24 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "SkylineCareer-${version}-${arch}.${ext}",
-      "signAndEditExecutable": false
+      "icon": "build/icon.ico",
+      "artifactName": "SkylineCareer-Setup-${version}.${ext}",
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Skyline Career",
-      "differentialPackage": false
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "differentialPackage": false,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "SkylineCareer-Setup-${version}.${ext}"
     },
     "portable": {
       "artifactName": "SkylineCareer-${version}-portable.exe"

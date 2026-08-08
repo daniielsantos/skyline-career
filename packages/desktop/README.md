@@ -2,24 +2,33 @@
 
 Electron shell around the local Career API + static UI.
 
+## Player install
+
+1. Download **`SkylineCareer-Setup-x.y.z.exe`** from [GitHub Releases](https://github.com/daniielsantos/skyline-career/releases).
+2. Run the installer (Windows may warn — builds are **not code-signed** yet; choose More info → Run anyway).
+3. Launch **Skyline Career** from the Start Menu / desktop shortcut.
+4. Create a profile and play. Saves live under `%AppData%\Skyline Career\`.
+
+### Prerequisites
+
+- Windows x64
+- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (for SimBridgeHost)
+- MSFS 2024 loaded for Watch / live SimConnect
+
+### In-app updates
+
+Settings → **Updates** (desktop only):
+
+1. App checks GitHub Releases on startup (silent).
+2. Banner / card when a newer version exists → **Download** → **Restart to update**.
+3. Player saves in AppData are kept across updates.
+
 ## Dev (from repo)
 
 ```powershell
-# Terminal A — API + Vite as usual
 npm run career:ui
-
-# Or packaged-style API serving Vite dist:
-npm run build -w @msfs-compat/career-ui
-$env:SKYLINE_UI_DIST = "$PWD\packages\career-ui\dist"
-node --import tsx packages/career-ui/server/api.ts
-```
-
-```powershell
-# Terminal B — Electron window pointing at a running API (optional)
 npm run start -w @msfs-compat/desktop
 ```
-
-In unpackaged Electron, `main.mjs` treats the **repo root** as `SKYLINE_REPO_ROOT` and writes saves under Electron `userData` (`%AppData%\Skyline Career\career`).
 
 ## Pack installer
 
@@ -27,26 +36,42 @@ In unpackaged Electron, `main.mjs` treats the **repo root** as `SKYLINE_REPO_ROO
 npm run pack:desktop
 ```
 
-Produces:
+Produces under `artifacts/skyline-desktop/`:
 
-- `artifacts/skyline-runtime/` — API payload + UI + bush PLN seed + example profiles
-- `artifacts/skyline-host/` — SimBridgeHost (or placeholder)
-- `artifacts/skyline-desktop/SkylineCareer-*-portable.exe` — single-file portable app
-- `artifacts/skyline-desktop/win-unpacked/` — unpacked folder (same contents; useful for debugging)
+- `SkylineCareer-Setup-<version>.exe` — **real NSIS installer** (required)
+- `latest.yml` — auto-update metadata for electron-updater
+- `win-unpacked/` — debug folder
 
-Optional NSIS setup can be enabled in `packages/desktop/package.json` (`win.target: nsis`); on some Windows hosts NSIS packaging fails with `spawn UNKNOWN` — portable + `dir` are the supported defaults.
+Pack **fails** if the Setup exe is missing or undersized (avoids shipping a broken stub).
 
-## Smoke checklist (clean PC / fresh userData)
+## Publish a release (maintainers)
 
-1. Run `SkylineCareer-*-portable.exe` (or `win-unpacked/Skyline Career.exe`).
-2. Window opens (no terminal).
-3. Profile gate → **Create** a profile → enter career.
-4. Register pilot / hub; open Freights or Bush trips.
-5. Settings → Dev mode **Off** (default): no +15 min / +$100k / Reset / Dispatch Advanced cheats.
-6. With MSFS running: SimBridge status connected; Watch can start on a mission.
-7. Create a **second** profile; confirm wallet/fleet are isolated.
-8. Quit and relaunch — profile list persists under `%AppData%\Skyline Career\`.
+1. Bump `"version"` in [`package.json`](./package.json) (this is the app version electron-updater compares).
+2. `npm run pack:desktop`
+3. Create the GitHub release and upload artifacts:
 
-Logs: `%AppData%\Skyline Career\logs\career-api.log`
+```powershell
+$ver = (Get-Content packages/desktop/package.json | ConvertFrom-Json).version
+gh release create "v$ver" `
+  --title "Skyline Career $ver" `
+  --notes "Desktop install + auto-update." `
+  "artifacts/skyline-desktop/SkylineCareer-Setup-$ver.exe" `
+  "artifacts/skyline-desktop/latest.yml"
+```
 
-Packaged runtime (API-only) can also be smoke-tested without Electron by pointing `SKYLINE_*` env vars at `artifacts/skyline-runtime` — see `scripts/pack-desktop.mjs` layout.
+Also upload `*.exe.blockmap` if present (speeds differential downloads when enabled later).
+
+### Smoke auto-update
+
+1. Install `v0.1.0` Setup on a clean machine / VM.
+2. Publish `v0.1.1` to GitHub Releases with Setup + `latest.yml`.
+3. Open the installed `0.1.0` app → Settings → Updates should show **0.1.1** → Download → Restart.
+4. Confirm version is `0.1.1` and profiles under `%AppData%\Skyline Career\` survived.
+
+## Logs
+
+`%AppData%\Skyline Career\logs\`
+
+- `desktop.log`
+- `career-api.log`
+- `simbridge-host.log`

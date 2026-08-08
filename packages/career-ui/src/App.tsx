@@ -121,6 +121,10 @@ import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { BushTripMapCard } from './BushTripMapCard';
 import { ProfileGate } from './ProfileGate';
+import {
+  DesktopUpdateBanner,
+  DesktopUpdatesCard,
+} from './DesktopUpdates';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
   AIRCRAFT_CLASS_FILTERS,
@@ -6800,6 +6804,7 @@ export function App() {
           </button>
         </p>
       ) : null}
+      <DesktopUpdateBanner onOpenSettings={() => selectTab('settings')} />
 
       {!hubSelected ? (
         <section className="panel hub-picker" role="dialog" aria-labelledby="hub-picker-title">
@@ -10095,6 +10100,7 @@ export function App() {
                 <strong>{formatMassExact(1_704, weightSystem)}</strong>
               </p>
             </div>
+            <DesktopUpdatesCard />
             <div className="settings-card">
               <h3>Developer</h3>
               <p className="settings-help">

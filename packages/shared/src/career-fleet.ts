@@ -723,13 +723,23 @@ export function assignAircraftToMission(
   return aircraft;
 }
 
+/** Resolve the hangar airframe for a mission — by id, then by assignment. */
+export function findMissionAircraft(
+  state: CareerMissionsState,
+  mission: Pick<MissionIntent, 'id' | 'aircraftId'>,
+): PlayerAircraft | undefined {
+  if (mission.aircraftId) {
+    const byId = findPlayerAircraft(state, mission.aircraftId);
+    if (byId) return byId;
+  }
+  return state.fleet.find((a) => a.assignedMissionId === mission.id);
+}
+
 export function releaseAircraftOnCancel(
   state: CareerMissionsState,
   mission: MissionIntent,
 ): PlayerAircraft | undefined {
-  const aircraft = mission.aircraftId
-    ? findPlayerAircraft(state, mission.aircraftId)
-    : state.fleet.find((a) => a.assignedMissionId === mission.id);
+  const aircraft = findMissionAircraft(state, mission);
   if (!aircraft) return undefined;
   aircraft.status = 'parked';
   aircraft.assignedMissionId = undefined;
@@ -747,9 +757,7 @@ export function relocateAircraftOnSettle(
   world?: CareerEconomyWorld,
   residualFuelKg?: number,
 ): PlayerAircraft | undefined {
-  const aircraft = mission.aircraftId
-    ? findPlayerAircraft(state, mission.aircraftId)
-    : state.fleet.find((a) => a.assignedMissionId === mission.id);
+  const aircraft = findMissionAircraft(state, mission);
   if (!aircraft) return undefined;
 
   if (typeof residualFuelKg === 'number' && Number.isFinite(residualFuelKg)) {

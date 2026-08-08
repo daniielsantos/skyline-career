@@ -3,8 +3,6 @@
  * Reuses agent compare-ofp stack (compareOnce + roles pack).
  */
 
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   KG_TO_LB,
   evaluateLoadVerification,
@@ -33,8 +31,8 @@ import {
 } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 import { applyTargetBlockFuelKg } from './ofp-target-fuel.ts';
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '..', '..', '..');
+import { getRepoRoot } from './skyline-paths.ts';
+const repoRoot = getRepoRoot();
 const ofpCache = new Map<string, Promise<OfpExpectation>>();
 
 async function loadPreflightOfp(

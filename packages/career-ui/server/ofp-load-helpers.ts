@@ -2,8 +2,6 @@
  * Apply confirmed SimBrief OFP fuel/payload into the live aircraft.
  * Mirrors preflight-helpers: short-lived NamedPipeSimBridge + resolveLiveAircraft.
  */
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
   assertRolesPackAllowsDirectInjection,
@@ -65,11 +63,11 @@ import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import { watchDebugLog } from './debug-log.ts';
 import type { CareerWatchSession } from './watch-helpers.ts';
 import { applyTargetBlockFuelKg } from './ofp-target-fuel.ts';
+import { getRepoRoot } from './skyline-paths.ts';
 
 export { isOfpLoadActive };
 
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '..', '..', '..');
+const repoRoot = getRepoRoot();
 
 /** Stay this many %MAC inside the live envelope after inject rebalance. */
 const CG_REBALANCE_MARGIN_MAC = 1;

@@ -65,7 +65,7 @@ node packages/agent/dist/cli.js resolve
 
 PowerShell shortcut: `.\scripts\start-skyline.ps1` (or `-Mode mock`).
 
-### Portable zip
+### Portable zip (SimBridge / catalog)
 
 ```powershell
 npm run pack:portable
@@ -73,6 +73,16 @@ npm run pack:portable
 ```
 
 Unzip, `npm install`, then `.\start.ps1` or `npm run start:simconnect`.
+
+### Desktop app (Skyline Career)
+
+```powershell
+npm run pack:desktop
+# → artifacts/skyline-desktop/SkylineCareer-*-portable.exe
+# → artifacts/skyline-desktop/win-unpacked/
+```
+
+Player saves live under `%AppData%\Skyline Career\`. See [`packages/desktop/README.md`](packages/desktop/README.md).
 
 ### Catalog API (Phase 3)
 

@@ -26,6 +26,8 @@ export type ParsedMsfsBushPln = {
   title: string;
   departureId?: string;
   destinationId?: string;
+  /** Plan-level cruise (ft) from `<CruisingAlt>` — one value for the whole PLN. */
+  cruisingAltFt?: number;
   nodes: ParsedPlnNode[];
   /** Catalog hubs in route order (dep/dest included when catalogued). */
   kAirports: string[];
@@ -86,6 +88,12 @@ export function parseMsfsBushPln(xml: string): ParsedMsfsBushPln {
   const title =
     xml.match(/<Title>([^<]+)<\/Title>/i)?.[1]?.trim() ||
     `${departureId ?? '?'} - ${destinationId ?? '?'}`;
+  const cruisingRaw = xml.match(/<CruisingAlt>([^<]+)<\/CruisingAlt>/i)?.[1]?.trim();
+  const cruisingParsed = cruisingRaw != null ? Number(cruisingRaw) : NaN;
+  const cruisingAltFt =
+    Number.isFinite(cruisingParsed) && cruisingParsed > 0
+      ? Math.round(cruisingParsed)
+      : undefined;
 
   const nodes: ParsedPlnNode[] = [];
   const blockRe = /<ATCWaypoint\s+id="([^"]+)">([\s\S]*?)<\/ATCWaypoint>/gi;
@@ -129,6 +137,7 @@ export function parseMsfsBushPln(xml: string): ParsedMsfsBushPln {
     title,
     ...(departureId ? { departureId: departureId.toUpperCase() } : {}),
     ...(destinationId ? { destinationId: destinationId.toUpperCase() } : {}),
+    ...(cruisingAltFt != null ? { cruisingAltFt } : {}),
     nodes,
     kAirports,
     localAirports,
@@ -210,6 +219,49 @@ export function appendReturnLegToStart(
   ];
 }
 
+function haversineNmWp(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const r = 3440.065;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Drop User WPs that sit on (or next to) a leg endpoint.
+ * Activities PLNs often place a scenic WP on the estimated field before the
+ * Airport node — after MSFS homologation that WP is a false "airport" pin.
+ */
+export function dropWaypointsNearLegHubs(
+  legs: readonly {
+    fromIcao: string;
+    toIcao: string;
+    waypoints: BushWaypoint[];
+  }[],
+  hubCoords: Readonly<Record<string, { lat: number; lon: number }>>,
+  withinNm = 1.5,
+): Array<{ fromIcao: string; toIcao: string; waypoints: BushWaypoint[] }> {
+  return legs.map((leg) => {
+    const from = hubCoords[leg.fromIcao.trim().toUpperCase()];
+    const to = hubCoords[leg.toIcao.trim().toUpperCase()];
+    if (!from && !to) return { ...leg, waypoints: [...leg.waypoints] };
+    const waypoints = leg.waypoints.filter((wp) => {
+      if (from && haversineNmWp(wp, from) <= withinNm) return false;
+      if (to && haversineNmWp(wp, to) <= withinNm) return false;
+      return true;
+    });
+    return { fromIcao: leg.fromIcao, toIcao: leg.toIcao, waypoints };
+  });
+}
+
 export function bushTripDefFromPln(opts: {
   id: string;
   displayTitle: string;
@@ -224,11 +276,16 @@ export function bushTripDefFromPln(opts: {
    */
   appendReturn?: boolean;
   msfsValidated?: boolean;
+  /** Optional hub coords for near-hub WP scrubbing (MSFS overrides preferred). */
+  hubCoords?: Readonly<Record<string, { lat: number; lon: number }>>;
 }): BushTripDef {
   const parsed = parseMsfsBushPln(opts.xml);
   let collapsed = collapsePlnToKLegs(parsed);
   if (opts.appendReturn) {
     collapsed = appendReturnLegToStart(collapsed);
+  }
+  if (opts.hubCoords) {
+    collapsed = dropWaypointsNearLegHubs(collapsed, opts.hubCoords);
   }
   if (collapsed.length < 1) {
     throw new Error(`PLN ${opts.id}: need ≥1 collapsed leg after catalog-hub filter`);
@@ -252,6 +309,9 @@ export function bushTripDefFromPln(opts: {
     aircraftHint: 'light_ga',
     msfsValidated: validated,
     payUsd: opts.payUsd ?? 8_500,
+    ...(parsed.cruisingAltFt != null
+      ? { cruisingAltFt: parsed.cruisingAltFt }
+      : {}),
     legs,
   };
 }

@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 import {
   abandonBushTrip,
   acceptBushTrip,
+  departBushTripLeg,
   isBushTripActive,
+  settleBushTripLeg,
 } from './career-bush-mission.js';
 import {
   getBushTrip,
@@ -98,5 +100,34 @@ describe('bush trip accept / abandon', () => {
     });
     assert.equal(accepted.active.tripId, 'us-appalachian-summits');
     assert.equal(accepted.active.status, 'accepted');
+  });
+
+  it('final leg parks aircraft at dest even when assignment was cleared', () => {
+    const starter = listStarterCareerPlayerAirframes()[0]!;
+    const trip = getBushTrip('br-rio-negro-tapuruquara')!;
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBEG', {
+      pilotName: 'Lost Assign',
+      airframeTypeId: starter.typeId,
+    });
+    acceptBushTrip(state, {
+      tripId: trip.id,
+      aircraftId: state.fleet[0]!.id,
+      tick: 1,
+    });
+    // Simulate assignment dropped mid-trip (normalize/save edge case).
+    state.fleet[0]!.status = 'parked';
+    state.fleet[0]!.assignedMissionId = undefined;
+
+    const lastDest = trip.legs[trip.legs.length - 1]!.toIcao.toUpperCase();
+    let guard = 0;
+    while (state.activeBushTrip?.status !== 'completed') {
+      departBushTripLeg(state, { nowMs: Date.now() + guard });
+      settleBushTripLeg(state, { tick: 2 + guard });
+      guard += 1;
+      assert.ok(guard < 20);
+    }
+    assert.equal(state.fleet[0]!.locationIcao, lastDest);
+    assert.equal(state.pilotIcao, lastDest);
+    assert.equal(state.fleet[0]!.status, 'parked');
   });
 });

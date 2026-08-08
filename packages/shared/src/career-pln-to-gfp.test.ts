@@ -55,6 +55,26 @@ describe('PLN → GFP', () => {
     );
   });
 
+  it('uses MSFS hub coords for 57NC and drops nearby Tuckasegee stand-in', () => {
+    const xml = readFileSync(join(plnDir, 'Appalachian Summits.PLN'), 'utf8');
+    // Old FAA estimate (also the PLN User WP) vs MSFS Facilities.
+    const msfs = { lat: 35.42648322880268, lon: -83.45821380615234 };
+    const result = msfsPlnXmlToGfp(xml, {
+      title: 'Appalachian Summits',
+      coordsByIcao: {
+        '57NC': msfs,
+        '26A': { lat: 33.2842, lon: -85.8086 },
+        KFDK: { lat: 39.4176, lon: -77.3743 },
+      },
+    });
+    const match = result.body.match(/:F:57NC,(N\d{5}W\d{6})/);
+    assert.ok(match, '57NC airport segment present');
+    assert.equal(match![1], toGarminDmm(msfs.lat, msfs.lon));
+    // Old stand-in was ~1.5 nm west — must not appear as a separate user fix.
+    const oldDmm = toGarminDmm(35.4298, -83.4878);
+    assert.ok(!result.body.includes(oldDmm));
+  });
+
   it('thins long lists while keeping endpoints', () => {
     const mk = (i: number): GfpWaypoint => ({
       segment: `N${String(35000 + i).padStart(5, '0')}W118000`,

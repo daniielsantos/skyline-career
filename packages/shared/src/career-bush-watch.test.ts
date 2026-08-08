@@ -89,7 +89,7 @@ describe('evaluateBushTripLegTransition', () => {
     assert.equal(air.event.type, 'depart');
   });
 
-  it('settles when departed, near dest, engines off, after min airborne', () => {
+  it('settles on touchdown near dest with engines still running', () => {
     const { active } = startBrTrip();
     const dest = CAREER_HUB_COORDS.SWTP;
     assert.ok(dest);
@@ -99,16 +99,55 @@ describe('evaluateBushTripLegTransition', () => {
       legStatus: 'departed' as const,
       departedAtMs: 0,
     };
-    // Bootstrap + long airborne clock via expectedRouteMs override path:
-    // seed watch as already airborne for a long time.
-    let watch = createMissionFlightWatchState({
+    const watch = createMissionFlightWatchState({
       sawAirborne: true,
       lastOnGround: false,
       airborneAtMs: 0,
       expectedRouteMs: 60_000,
       routeDistanceNm: 50,
     });
-    // Touchdown near dest
+    const touch = evaluateBushTripLegTransition(
+      departed,
+      {
+        onGround: true,
+        enginesRunning: true,
+        position: { lat: dest.lat, lon: dest.lon },
+      },
+      watch,
+      { nowMs: 50_000 },
+    );
+    assert.equal(touch.event.type, 'settle');
+  });
+
+  it('still requires engines off when explicitly requested', () => {
+    const { active } = startBrTrip();
+    const dest = CAREER_HUB_COORDS.SWTP;
+    assert.ok(dest);
+    const departed = {
+      ...active,
+      status: 'in_progress' as const,
+      legStatus: 'departed' as const,
+      departedAtMs: 0,
+    };
+    const watch = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: 0,
+      expectedRouteMs: 60_000,
+      routeDistanceNm: 50,
+    });
+    const waiting = evaluateBushTripLegTransition(
+      departed,
+      {
+        onGround: true,
+        enginesRunning: true,
+        position: { lat: dest.lat, lon: dest.lon },
+      },
+      watch,
+      { nowMs: 50_000, requireEnginesOff: true },
+    );
+    // Touchdown with engines running: wait for shutdown (not settle yet).
+    assert.equal(waiting.event.type, 'none');
     const touch = evaluateBushTripLegTransition(
       departed,
       {
@@ -116,7 +155,7 @@ describe('evaluateBushTripLegTransition', () => {
         enginesRunning: false,
         position: { lat: dest.lat, lon: dest.lon },
       },
-      watch,
+      waiting.nextState,
       { nowMs: 50_000, requireEnginesOff: true },
     );
     assert.equal(touch.event.type, 'settle');

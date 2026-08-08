@@ -72,6 +72,8 @@ export function DispatchActivePanel(props: {
   loadPath: LoadPath;
   busy: boolean;
   weightSystem: WeightSystem;
+  /** When false, hide Dispatch Advanced cheats (depart/settle without MSFS, etc.). */
+  devMode?: boolean;
   simbriefUser: string;
   continuousHours: number;
   formatMoney: (n: number) => string;
@@ -161,6 +163,7 @@ export function DispatchActivePanel(props: {
     simbriefUser,
     continuousHours,
   } = props;
+  const devMode = props.devMode === true;
 
   const watchRunning = Boolean(
     props.watch?.running && props.watch.missionId === mission.id,
@@ -898,7 +901,7 @@ export function DispatchActivePanel(props: {
                           const injectStatus =
                             props.loadOfpAutoStatus === 'failed'
                               ? (props.loadOfpAutoError ??
-                                'Inject failed — turn on to retry, or continue manually in Advanced.')
+                                'Inject failed — turn on to retry, or continue manually below.')
                               : props.loadOfpAutoStatus === 'loading'
                                 ? (props.loadOfpProgress?.message ??
                                   'Writing fuel + payload and balancing CG. Turn off to stop.')
@@ -1130,91 +1133,101 @@ export function DispatchActivePanel(props: {
         <div className="dispatch-primary-actions">{primaryCta}</div>
       ) : null}
 
-      <details className="dispatch-advanced">
-        <summary>Advanced</summary>
+      {/* Player helpers stay visible; cheats live under Advanced + Dev mode. */}
+      {loadPath === 'inject' && step === 'load' ? (
         <div className="dispatch-advanced-actions">
-          {mission.status === 'dispatched' || mission.status === 'accepted' ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={busy || !simbriefUser.trim()}
-              onClick={() => props.onDispatch(mission)}
-            >
-              Re-open SimBrief
-            </button>
-          ) : null}
-          {loadPath === 'inject' && step === 'load' ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={busy}
-              onClick={props.onContinueManually}
-            >
-              Continue manually
-            </button>
-          ) : null}
-          {['accepted', 'dispatched'].includes(mission.status) &&
-          props.onCrewDispatch &&
-          (props.idleCrew?.length ?? 0) > 0 &&
-          !mission.crewOperated ? (
-            <CrewFlyControls
-              idleCrew={props.idleCrew ?? []}
-              busy={busy}
-              buttonLabel="Send with crew"
-              value={mission.crewMemberId}
-              onSelect={(crewMemberId) =>
-                props.onCrewAssign?.(mission, crewMemberId)
-              }
-              onFly={(crewMemberId) =>
-                props.onCrewDispatch?.(mission, crewMemberId)
-              }
-            />
-          ) : null}
-          {mission.crewOperated && mission.status === 'in_flight' ? (
-            <span className="settings-chip">
-              Crew airborne
-              {typeof mission.airborneAtMs === 'number' &&
-              typeof mission.expectedRouteMs === 'number'
-                ? ` · ETA ${new Date(mission.airborneAtMs + mission.expectedRouteMs).toLocaleTimeString()}`
-                : ''}
-            </span>
-          ) : null}
-          {['accepted', 'dispatched'].includes(mission.status) ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={busy}
-              title="Mark cargo airborne without MSFS"
-              onClick={() => props.onDepart(mission)}
-            >
-              Depart without MSFS
-            </button>
-          ) : null}
-          {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={busy}
-              title="Deliver cargo and credit wallet without MSFS"
-              onClick={() => props.onSettle(mission)}
-            >
-              Settle without MSFS
-            </button>
-          ) : null}
-          {!simbriefUser.trim() ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={busy}
-              onClick={props.onSelectSettings}
-            >
-              Set SimBrief user
-            </button>
-          ) : (
-            <span className="settings-chip">SimBrief · {simbriefUser.trim()}</span>
-          )}
+          <button
+            type="button"
+            className="action ghost"
+            disabled={busy}
+            onClick={props.onContinueManually}
+          >
+            Continue manually
+          </button>
         </div>
-      </details>
+      ) : null}
+      {['accepted', 'dispatched'].includes(mission.status) &&
+      props.onCrewDispatch &&
+      (props.idleCrew?.length ?? 0) > 0 &&
+      !mission.crewOperated ? (
+        <div className="dispatch-advanced-actions">
+          <CrewFlyControls
+            idleCrew={props.idleCrew ?? []}
+            busy={busy}
+            buttonLabel="Send with crew"
+            value={mission.crewMemberId}
+            onSelect={(crewMemberId) =>
+              props.onCrewAssign?.(mission, crewMemberId)
+            }
+            onFly={(crewMemberId) =>
+              props.onCrewDispatch?.(mission, crewMemberId)
+            }
+          />
+        </div>
+      ) : null}
+      {mission.crewOperated && mission.status === 'in_flight' ? (
+        <span className="settings-chip">
+          Crew airborne
+          {typeof mission.airborneAtMs === 'number' &&
+          typeof mission.expectedRouteMs === 'number'
+            ? ` · ETA ${new Date(mission.airborneAtMs + mission.expectedRouteMs).toLocaleTimeString()}`
+            : ''}
+        </span>
+      ) : null}
+
+      {devMode ? (
+        <details className="dispatch-advanced">
+          <summary>Advanced</summary>
+          <div className="dispatch-advanced-actions">
+            {mission.status === 'dispatched' || mission.status === 'accepted' ? (
+              <button
+                type="button"
+                className="action ghost"
+                disabled={busy || !simbriefUser.trim()}
+                onClick={() => props.onDispatch(mission)}
+              >
+                Re-open SimBrief
+              </button>
+            ) : null}
+            {['accepted', 'dispatched'].includes(mission.status) ? (
+              <button
+                type="button"
+                className="action ghost"
+                disabled={busy}
+                title="Mark cargo airborne without MSFS"
+                onClick={() => props.onDepart(mission)}
+              >
+                Depart without MSFS
+              </button>
+            ) : null}
+            {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
+              <button
+                type="button"
+                className="action ghost"
+                disabled={busy}
+                title="Deliver cargo and credit wallet without MSFS"
+                onClick={() => props.onSettle(mission)}
+              >
+                Settle without MSFS
+              </button>
+            ) : null}
+            {!simbriefUser.trim() ? (
+              <button
+                type="button"
+                className="action ghost"
+                disabled={busy}
+                onClick={props.onSelectSettings}
+              >
+                Set SimBrief user
+              </button>
+            ) : (
+              <span className="settings-chip">
+                SimBrief · {simbriefUser.trim()}
+              </span>
+            )}
+          </div>
+        </details>
+      ) : null}
     </>
   );
 }

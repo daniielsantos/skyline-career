@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node server/dev.mjs",
     "build": "vite build",
+    "start:prod": "node --import tsx server/api.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -3,8 +3,6 @@
  * open Dispatch Redirect and fetch OFPs without going through the CLI.
  */
 
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   clampCareerMaxCargoKg,
   compareMissionIntentToOfp,
@@ -36,9 +34,9 @@ import {
   diagnoseSimBriefNavlog,
 } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
+import { getRepoRoot } from './skyline-paths.ts';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '..', '..', '..');
+const repoRoot = getRepoRoot();
 
 export type ClassCargoLimit = {
   maxCargoKg: number;

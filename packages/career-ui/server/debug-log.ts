@@ -1,16 +1,20 @@
 /**
  * Append-only debug log for Watch / pipe / OFP inject / Loaded vs Due.
- * File: profiles/career/watch-debug.log (repo root).
+ * File: <careerRoot>/watch-debug.log
  * Inject lines use scope `[inject]` — filter: Select-String '\[inject\]'
  */
 import { appendFile, mkdir } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
+import { getRepoRoot } from './skyline-paths.ts';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '..', '..', '..');
-const logDir = join(repoRoot, 'profiles', 'career');
-export const WATCH_DEBUG_LOG_PATH = join(logDir, 'watch-debug.log');
+function logDir(): string {
+  if (process.env.SKYLINE_CAREER_DATA?.trim()) {
+    return resolve(process.env.SKYLINE_CAREER_DATA.trim());
+  }
+  return join(getRepoRoot(), 'profiles', 'career');
+}
+
+export const WATCH_DEBUG_LOG_PATH = join(logDir(), 'watch-debug.log');
 
 let chain: Promise<void> = Promise.resolve();
 let ensuredDir = false;
@@ -37,7 +41,7 @@ export function watchDebugLog(
   chain = chain
     .then(async () => {
       if (!ensuredDir) {
-        await mkdir(logDir, { recursive: true });
+        await mkdir(logDir(), { recursive: true });
         ensuredDir = true;
       }
       await appendFile(WATCH_DEBUG_LOG_PATH, line, 'utf8');

@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
-import { readdir, stat } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { createReadStream } from 'node:fs';
+import { access, readdir, stat } from 'node:fs/promises';
+import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   acceptMission,
@@ -65,6 +66,7 @@ import {
   listBushTrips,
   bushTripActivitiesPlnFile,
   gfpDownloadFilename,
+  gfpCoordsByIcao,
   msfsPlnXmlToGfp,
   estimateBoardLotEconomics,
   parseMarketBoardAccessFilter,
@@ -139,6 +141,7 @@ import {
   summarizeCareerLedger,
   LEDGER_KIND_LABEL,
   openCareerStore,
+  applyMsfsBushHubOverrideToTerminal,
   listWorldCountryIds,
   localUnitPriceUsd,
   computeEconomyPulse,
@@ -191,10 +194,26 @@ import {
   loadProfileMsfsBushHubOverrides,
   resolveHomologateCoords,
 } from './bush-hub-homologate.ts';
+import {
+  clearActiveCareerProfile,
+  createCareerProfile,
+  deleteCareerProfile,
+  ensureCareerProfilesLayout,
+  openCareerProfileStore,
+  readProfilesFile,
+  renameCareerProfile,
+  setActiveCareerProfile,
+} from './career-profiles.ts';
 import { createPromiseLock } from './career-write-lock.ts';
+import {
+  getRepoRoot,
+  getUiDist,
+  resolveCareerRoot,
+} from './skyline-paths.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, '..', '..', '..');
+const repoRoot = getRepoRoot();
+const uiDist = getUiDist();
 
 /**
  * Newest mtime across server sources, captured at boot. `dev.mjs` compares it
@@ -249,16 +268,44 @@ export async function serverSourceStamp(dir: string = here): Promise<number> {
 }
 
 const bootSourceStamp = await serverSourceStamp();
-const careerDir = join(repoRoot, 'profiles', 'career');
-const store: CareerStore = await openCareerStore({ careerDir });
-await loadProfileMsfsBushHubOverrides(careerDir);
+/** Shared career assets (PLN, MSFS hub overrides). Per-player saves live under saves/<id>/. */
+const careerRoot = await resolveCareerRoot();
+let store: CareerStore | null = null;
+let activeProfileId: string | null = null;
+
+await ensureCareerProfilesLayout(careerRoot);
+await loadProfileMsfsBushHubOverrides(careerRoot);
+
+async function stampMsfsOverridesOnStore(target: CareerStore): Promise<void> {
+  const { world, dirty } = await target.loadEconomy();
+  let stamped = 0;
+  for (const airport of world.airports) {
+    if (applyMsfsBushHubOverrideToTerminal(airport)) stamped += 1;
+  }
+  if (dirty || stamped > 0) {
+    await target.saveEconomy(world);
+    if (stamped > 0) {
+      console.log(
+        `[career] applied MSFS hub overrides to ${stamped} airport(s) in economy`,
+      );
+    }
+  }
+}
+
+function requireStore(): CareerStore {
+  if (!store) {
+    throw new Error('Select a career profile first');
+  }
+  return store;
+}
+
 /** Row cap for the market board — filters must run server-side to survive it. */
 const MARKET_LOT_LIMIT = 200;
 
 type MissionsFile = CareerMissionsState;
 
 async function loadMissions(): Promise<MissionsFile> {
-  return store.loadMissions();
+  return requireStore().loadMissions();
 }
 
 function withParkingRates(
@@ -365,7 +412,7 @@ function resolveMissionMxBlockFuel(
 }
 
 async function saveMissions(missions: MissionsFile): Promise<void> {
-  await store.saveMissions(missions);
+  await requireStore().saveMissions(missions);
 }
 
 /**
@@ -405,7 +452,8 @@ async function updateOpenMission(
 }
 
 async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
-  const { world: caught, advancedTicks, dirty } = await store.loadEconomy();
+  const activeStore = requireStore();
+  const { world: caught, advancedTicks, dirty } = await activeStore.loadEconomy();
   const missions = await loadMissions();
   let needsSave = dirty;
   // Home partition follows the player's chosen hub (KMIA → US), including legacy saves.
@@ -413,7 +461,7 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     needsSave = true;
   }
   if (needsSave) {
-    await store.saveEconomy(caught);
+    await activeStore.saveEconomy(caught);
   }
   if (advancedTicks > 0) {
     settleAircraftMarketOps(missions, caught.tick, caught);
@@ -438,7 +486,7 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
 
 async function persistEconomyUnlocked(world: CareerEconomyWorld): Promise<void> {
   // Do NOT stomp lastBatchAtMs — fractional hour + continuous ops depend on it.
-  await store.saveEconomy(world);
+  await requireStore().saveEconomy(world);
 }
 
 /** Consistent snapshot of world (+ catch-up) under the career lock. */
@@ -492,6 +540,70 @@ function send(res: import('node:http').ServerResponse, status: number, body: unk
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(json);
+}
+
+const STATIC_MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.map': 'application/json',
+};
+
+async function tryServeStatic(
+  req: import('node:http').IncomingMessage,
+  res: import('node:http').ServerResponse,
+  urlPath: string,
+): Promise<boolean> {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  let uiRootReady = false;
+  try {
+    await access(join(uiDist, 'index.html'));
+    uiRootReady = true;
+  } catch {
+    return false;
+  }
+  if (!uiRootReady) return false;
+
+  const clean = decodeURIComponent(urlPath.split('?')[0] ?? '/');
+  if (clean.includes('..')) {
+    send(res, 400, { error: 'Invalid path' });
+    return true;
+  }
+  const rel = clean === '/' ? 'index.html' : clean.replace(/^\//, '');
+  let filePath = join(uiDist, rel);
+  try {
+    const info = await stat(filePath);
+    if (info.isDirectory()) filePath = join(filePath, 'index.html');
+  } catch {
+    // SPA fallback for client routes (no file extension)
+    if (extname(rel)) return false;
+    filePath = join(uiDist, 'index.html');
+  }
+  try {
+    await access(filePath);
+  } catch {
+    return false;
+  }
+  const type = STATIC_MIME[extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Cache-Control': rel === 'index.html' ? 'no-cache' : 'public, max-age=86400',
+  });
+  if (req.method === 'HEAD') {
+    res.end();
+    return true;
+  }
+  createReadStream(filePath).pipe(res);
+  return true;
 }
 
 function fillPct(stockKg: number, capacityKg: number): number {
@@ -860,10 +972,27 @@ export function createCareerApiServer(port = 8787) {
 
     try {
       if (req.method === 'GET' && path === '/api/health') {
+        if (!store) {
+          send(res, 200, {
+            ok: true,
+            needsProfile: true,
+            activeProfileId: null,
+            // Non-zero so career:ui health check doesn't treat idle boot as stale.
+            npcFleetTarget: 1,
+            sourceStamp: bootSourceStamp,
+            store: null,
+            homeCountryId: null,
+            countries: [],
+            internationalLaneCount: 0,
+          });
+          return;
+        }
         const world = await loadEconomy();
         const regionCount = listNpcHomeRegions(world.airports ?? []).length;
         send(res, 200, {
           ok: true,
+          needsProfile: false,
+          activeProfileId,
           npcFleetTarget: targetNpcFleetSize(regionCount),
           sourceStamp: bootSourceStamp,
           store: store.kind,
@@ -874,11 +1003,167 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/profiles') {
+        const file = await readProfilesFile(careerRoot);
+        send(res, 200, {
+          activeId: activeProfileId ?? file.activeId,
+          profiles: file.profiles,
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/profiles') {
+        const body = (await readBody(req)) as { name?: string };
+        try {
+          const meta = await createCareerProfile(
+            careerRoot,
+            body.name ?? '',
+          );
+          const file = await readProfilesFile(careerRoot);
+          send(res, 200, { profile: meta, profiles: file.profiles });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/profiles/select') {
+        const body = (await readBody(req)) as { id?: string };
+        const id = body.id?.trim() ?? '';
+        if (!id) {
+          send(res, 400, { error: 'id required' });
+          return;
+        }
+        try {
+          if (watchSession.getStatus().running) await watchSession.stop();
+          if (bushWatchSession.getStatus().running) {
+            await bushWatchSession.stop();
+          }
+          await withCareerLock(async () => {
+            if (store) {
+              try {
+                store.close();
+              } catch {
+                /* ignore */
+              }
+              store = null;
+              activeProfileId = null;
+            }
+            const next = await openCareerProfileStore(careerRoot, id);
+            await stampMsfsOverridesOnStore(next);
+            store = next;
+            activeProfileId = id;
+            await setActiveCareerProfile(careerRoot, id);
+          });
+          const file = await readProfilesFile(careerRoot);
+          const profile = file.profiles.find((p) => p.id === id) ?? null;
+          send(res, 200, {
+            activeId: id,
+            profile,
+            profiles: file.profiles,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/profiles/clear') {
+        try {
+          if (watchSession.getStatus().running) await watchSession.stop();
+          if (bushWatchSession.getStatus().running) {
+            await bushWatchSession.stop();
+          }
+          await withCareerLock(async () => {
+            if (store) {
+              try {
+                store.close();
+              } catch {
+                /* ignore */
+              }
+              store = null;
+              activeProfileId = null;
+            }
+            await clearActiveCareerProfile(careerRoot);
+          });
+          const file = await readProfilesFile(careerRoot);
+          send(res, 200, {
+            activeId: null,
+            profiles: file.profiles,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      const profileRenameMatch = path.match(
+        /^\/api\/profiles\/([a-z0-9]+)\/rename$/i,
+      );
+      if (req.method === 'POST' && profileRenameMatch) {
+        const body = (await readBody(req)) as { name?: string };
+        try {
+          const meta = await renameCareerProfile(
+            careerRoot,
+            profileRenameMatch[1]!,
+            body.name ?? '',
+          );
+          send(res, 200, { profile: meta });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      const profileDeleteMatch = path.match(/^\/api\/profiles\/([a-z0-9]+)$/i);
+      if (req.method === 'DELETE' && profileDeleteMatch) {
+        try {
+          if (activeProfileId === profileDeleteMatch[1]) {
+            send(res, 400, {
+              error: 'Switch to another profile before deleting the active one',
+            });
+            return;
+          }
+          const file = await deleteCareerProfile(
+            careerRoot,
+            profileDeleteMatch[1]!,
+          );
+          send(res, 200, { profiles: file.profiles, activeId: file.activeId });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'GET' && path === '/api/state') {
+        if (!store) {
+          send(res, 200, {
+            needsProfile: true,
+            activeProfileId: null,
+            hubSelected: false,
+            fleet: [],
+            hubs: [],
+            walletUsd: 0,
+            tick: 0,
+          });
+          return;
+        }
         const payload = await withCareerRead((world, missions) => {
           const nowMs = Date.now();
           const npcBusy = (world.npcs ?? []).filter((n) => n.status === 'busy').length;
           return {
+            needsProfile: false,
+            activeProfileId,
             ...clockPayload(world, nowMs),
             seed: world.seed,
             airportCount: world.airports.length,
@@ -898,7 +1183,7 @@ export function createCareerApiServer(port = 8787) {
             homeCountryId: world.homeCountryId ?? null,
             countries: listWorldCountryIds(world),
             internationalLaneCount: world.internationalLanes?.length ?? 0,
-            store: store.kind,
+            store: store!.kind,
           };
         });
         send(res, 200, payload);
@@ -936,7 +1221,7 @@ export function createCareerApiServer(port = 8787) {
           ...fleetPayload(missions, world),
           cashflow: summarizeCareerLedger(missions, world.tick),
           homeCountryId: world.homeCountryId ?? null,
-          store: store.kind,
+          store: requireStore().kind,
         }));
         send(res, 200, payload);
         return;
@@ -944,13 +1229,13 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/cashflow') {
         const payload = await withCareerRead(async (world, missions) => {
-          const cashflow = await store.summarizeCashflow(world.tick);
+          const cashflow = await requireStore().summarizeCashflow(world.tick);
           return {
             walletUsd: missions.walletUsd,
             tick: world.tick,
             dayIndex: economyDayIndex(world.tick),
             homeCountryId: world.homeCountryId ?? null,
-            store: store.kind,
+            store: requireStore().kind,
             labels: LEDGER_KIND_LABEL,
             companyCredit: companyCreditSnapshot(missions),
             ...cashflow,
@@ -3569,6 +3854,7 @@ export function createCareerApiServer(port = 8787) {
             startIcao: string;
             endIcao: string;
             hasPln: boolean;
+            cruisingAltFt?: number;
             legStatus: 'ready' | 'departed';
           } | null = null;
           if (active) {
@@ -3589,6 +3875,11 @@ export function createCareerApiServer(port = 8787) {
                 startIcao: trip.legs[0]!.fromIcao.toUpperCase(),
                 endIcao: trip.legs[trip.legs.length - 1]!.toIcao.toUpperCase(),
                 hasPln: Boolean(bushTripActivitiesPlnFile(trip.id)),
+                ...(typeof trip.cruisingAltFt === 'number' &&
+                Number.isFinite(trip.cruisingAltFt) &&
+                trip.cruisingAltFt > 0
+                  ? { cruisingAltFt: Math.round(trip.cruisingAltFt) }
+                  : {}),
                 legStatus: active.legStatus ?? 'ready',
               };
             }
@@ -3614,7 +3905,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 404, { error: 'No Activities PLN for this trip' });
           return;
         }
-        const plnPath = join(careerDir, 'bush_PLN', fileName);
+        const plnPath = join(careerRoot, 'bush_PLN', fileName);
         try {
           const { readFile } = await import('node:fs/promises');
           const xml = await readFile(plnPath, 'utf8');
@@ -3642,13 +3933,15 @@ export function createCareerApiServer(port = 8787) {
           send(res, 404, { error: 'No Activities PLN to convert for this trip' });
           return;
         }
-        const plnPath = join(careerDir, 'bush_PLN', fileName);
+        const plnPath = join(careerRoot, 'bush_PLN', fileName);
         try {
           const { readFile } = await import('node:fs/promises');
           const xml = await readFile(plnPath, 'utf8');
           const trip = getBushTrip(tripId);
           const gfp = msfsPlnXmlToGfp(xml, {
             title: trip?.title,
+            // MSFS homologation overrides win over PLN User-WP stand-ins.
+            coordsByIcao: gfpCoordsByIcao(),
           });
           const safeName = gfpDownloadFilename(
             gfp.title,
@@ -4624,6 +4917,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               fuelDebitUsd: result.fuelDebitUsd,
               fleet: withParkingRates(missions.fleet),
+              pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
               settlement: result.settlement,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
             };
@@ -4637,6 +4931,7 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: settled.walletUsd,
             fuelDebitUsd: settled.fuelDebitUsd,
             fleet: settled.fleet,
+            pilotIcao: settled.pilotIcao,
             settlement: {
               payoutUsd: settled.settlement.payoutUsd,
               penaltyUsd: settled.settlement.penaltyUsd,
@@ -4940,7 +5235,7 @@ export function createCareerApiServer(port = 8787) {
             pipeName: body.pipeName,
           });
           const result = await withCareerWrite(async (world) =>
-            homologateBushHub(careerDir, world, resolved),
+            homologateBushHub(careerRoot, world, resolved),
           );
           send(res, 200, result);
         } catch (error) {
@@ -4960,7 +5255,7 @@ export function createCareerApiServer(port = 8787) {
         try {
           const hasList = Array.isArray(body.icaos) && body.icaos.length > 0;
           const result = await homologateBushHubBatch(
-            careerDir,
+            careerRoot,
             {
               icaos: body.icaos,
               all: hasList ? false : body.all !== false,
@@ -5017,11 +5312,18 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (await tryServeStatic(req, res, path)) {
+        return;
+      }
+
       send(res, 404, { error: `No route ${req.method} ${path}` });
     } catch (error) {
-      send(res, 500, {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      if (/Select a career profile first/i.test(message)) {
+        send(res, 409, { error: message, code: 'needs_profile' });
+        return;
+      }
+      send(res, 500, { error: message });
     }
   });
 
@@ -5032,6 +5334,7 @@ export function createCareerApiServer(port = 8787) {
           // Keep wall-clock economy moving while the API is up (~every minute).
           catchUpTimer = setInterval(() => {
             void (async () => {
+              if (!store) return;
               try {
                 await withCareerWrite(() => undefined);
               } catch {
@@ -5064,4 +5367,10 @@ if (entry && import.meta.url === entry) {
   const api = createCareerApiServer(port);
   await api.listen();
   console.log(`Career API http://127.0.0.1:${port}`);
+  try {
+    await access(join(uiDist, 'index.html'));
+    console.log(`Career UI (static) ${uiDist}`);
+  } catch {
+    console.log('Career UI static dist not found — API-only (use Vite in dev)');
+  }
 }

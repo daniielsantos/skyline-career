@@ -270,24 +270,59 @@ export async function runCareerHubsWizard(
 
   const path = await persistOverrides(opts.repoRoot);
 
-  // Stamp live economy airports when present.
+  // Stamp live economy (SQLite/JSON) — always save so Facilities coords stick
+  // even when migrate already applied them in-memory (dirty flag used to skip).
   const careerDir = join(opts.repoRoot, 'profiles', 'career');
   const store = await openCareerStore({ careerDir });
+  let stampedAirports = 0;
   try {
-    const { world, dirty } = await store.loadEconomy();
-    let changed = dirty;
-    for (const row of rows) {
-      if (!row.ok) continue;
+    const { world } = await store.loadEconomy();
+    const overrides = listMsfsBushHubOverrides();
+    for (const [icao, override] of Object.entries(overrides)) {
       const airport = world.airports.find(
-        (a) => a.icao.toUpperCase() === row.icao,
+        (a) => a.icao.toUpperCase() === icao,
       );
-      if (airport && applyMsfsBushHubOverrideToTerminal(airport, row.override)) {
-        changed = true;
+      if (airport && applyMsfsBushHubOverrideToTerminal(airport, override)) {
+        stampedAirports += 1;
       }
     }
-    if (changed) await store.saveEconomy(world);
+    // Force persist: sqlite previously kept FAA/PLN estimates when dirty=false.
+    await store.saveEconomy(world);
   } finally {
     store.close();
+  }
+
+  // Refresh bushTripOnly catalog + shipped seed from MSFS overrides (no PLN edits).
+  let catalogUpdated = false;
+  try {
+    const { spawnSync } = await import('node:child_process');
+    const genScript = join(
+      opts.repoRoot,
+      'packages',
+      'shared',
+      'scripts',
+      'gen-bush-trip-only-hubs.mjs',
+    );
+    const gen = spawnSync(process.execPath, [genScript], {
+      cwd: opts.repoRoot,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    if (gen.status === 0) {
+      catalogUpdated = true;
+    } else {
+      console.log(
+        `  warn: gen-bush-trip-only-hubs exited ${gen.status}: ${
+          gen.stderr || gen.stdout || ''
+        }`.trim(),
+      );
+    }
+  } catch (error) {
+    console.log(
+      `  warn: could not regen bushTripOnly catalog: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 
   const okCount = rows.filter((r) => r.ok).length;
@@ -295,6 +330,17 @@ export async function runCareerHubsWizard(
   printSection('Done');
   console.log(`  ok=${okCount}  fail=${failCount}`);
   console.log(`  overrides → ${path}`);
+  console.log(
+    `  economy (sqlite) stamped ${stampedAirports} airport(s) and saved`,
+  );
+  if (catalogUpdated) {
+    console.log(
+      '  bushTripOnly catalog regenerated from MSFS overrides (PLN files untouched)',
+    );
+    console.log(
+      '  Rebuild shared if career-ui is running: npm run build -w @msfs-compat/shared',
+    );
+  }
   if (failCount > 0) {
     console.log('  Failures:');
     for (const row of rows) {
@@ -302,8 +348,6 @@ export async function runCareerHubsWizard(
       console.log(`    ${row.icao}: ${row.error}`);
     }
   }
-  console.log(
-    '  Restart career-ui (or reload) so the map picks up overrides. Optional: node packages/shared/scripts/gen-bush-trip-only-hubs.mjs',
-  );
+  console.log('  Restart career-ui so map/GFP pick up the new coords.');
   return { okCount, failCount, path };
 }

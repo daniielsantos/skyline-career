@@ -156,8 +156,8 @@ export function planFerryRoute(opts: {
   }
 
   const hubs = Object.keys(coords).filter((icao) => {
-    // Soft-field / trip-only only as journey origin (or final — gated by assert).
-    // Never use them as intermediate stepping stones.
+    // Soft-field bush never as intermediate. Trip-only / origin / final OK
+    // (final gated by assertFerryNotBush — soft-field blocked, trip-only allowed).
     if (icao === origin || icao === finalDest) return true;
     return !isBushHub(icao) && !isBushTripOnlyHub(icao);
   });

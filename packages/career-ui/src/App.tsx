@@ -7,6 +7,12 @@ import {
   fetchNpcFleet,
   fetchRouteLots,
   fetchState,
+  fetchCareerProfiles,
+  postCareerProfileCreate,
+  postCareerProfileSelect,
+  postCareerProfileClear,
+  postCareerProfileRename,
+  deleteCareerProfile,
   fetchWatchStatus,
   fetchSimBridgeStatus,
   postCancel,
@@ -76,6 +82,7 @@ import {
   type BushTripMapNode,
   type ActiveBushTripView,
   type BushWatchStatus,
+  type CareerProfileMeta,
   type CareerCashflowSnapshot,
   type CompanyCreditSnapshot,
   type EconomyEvent,
@@ -113,6 +120,7 @@ import { FboRerouteDialog } from './FboRerouteDialog';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { BushTripMapCard } from './BushTripMapCard';
+import { ProfileGate } from './ProfileGate';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
   AIRCRAFT_CLASS_FILTERS,
@@ -133,13 +141,21 @@ function normalizeStarterHubs(
   hubs: Array<StarterHubOption | string> | null | undefined,
 ): StarterHubOption[] {
   if (!hubs?.length) return [];
-  return hubs
-    .map((hub) =>
-      typeof hub === 'string'
-        ? { icao: hub, name: hub, region: '', hubTier: 'spoke' as const }
-        : hub,
-    )
-    .filter((hub) => !hub.bush && !hub.bushTripOnly);
+  return hubs.map((hub) =>
+    typeof hub === 'string'
+      ? { icao: hub, name: hub, region: '', hubTier: 'spoke' as const }
+      : hub,
+  );
+}
+
+/** Signup / FBO — network cargo hubs only (no soft-field bush or trip-only). */
+function networkCargoHubs(hubs: StarterHubOption[]): StarterHubOption[] {
+  return hubs.filter((hub) => !hub.bush && !hub.bushTripOnly);
+}
+
+/** Hangar ferry destinations — network + trip-only starts; soft-field bush stays out. */
+function ferryDestinationHubs(hubs: StarterHubOption[]): StarterHubOption[] {
+  return hubs.filter((hub) => !hub.bush);
 }
 
 function hubTierLabel(tier: StarterHubOption['hubTier']): string {
@@ -167,9 +183,11 @@ import {
   formatWeightText,
   KG_TO_LB,
   kgToDisplay,
+  loadDevMode,
   loadWeightSystem,
   massUnitLabel,
   massUnitLong,
+  saveDevMode,
   saveWeightSystem,
   type WeightSystem,
 } from './weight-units';
@@ -1916,6 +1934,7 @@ export function App() {
   }, []);
   const [simbriefUser, setSimbriefUser] = useState(loadSimbriefUser);
   const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
+  const [devMode, setDevMode] = useState(loadDevMode);
   const [ofpAutoStatus, setOfpAutoStatus] =
     useState<'idle' | 'waiting' | 'checking'>('idle');
   const [loadOfpAutoStatus, setLoadOfpAutoStatus] = useState<
@@ -2010,7 +2029,12 @@ export function App() {
   const [activeBushTrip, setActiveBushTrip] =
     useState<ActiveBushTripView | null>(null);
   const [bushWatch, setBushWatch] = useState<BushWatchStatus | null>(null);
-  const bushWatchStartAttemptedRef = useRef<string | null>(null);
+  const [careerProfiles, setCareerProfiles] = useState<CareerProfileMeta[]>([]);
+  const [activeCareerProfile, setActiveCareerProfile] =
+    useState<CareerProfileMeta | null>(null);
+  /** True until the player picks a save this session. */
+  const [showProfileGate, setShowProfileGate] = useState(true);
+  const [profilesLoading, setProfilesLoading] = useState(true);
   const [boardAircraftId, setBoardAircraftId] = useState('');
   const [profitableOnly, setProfitableOnly] = useState(false);
   /** Default on: hide locked / OOR / zero-lift when an aircraft is selected. */
@@ -2189,8 +2213,12 @@ export function App() {
 
   const refresh = useCallback(async () => {
     setError(null);
-    const [state, market, missionState, npcState, acMarket] = await Promise.all([
-      fetchState(),
+    const state = await fetchState();
+    if (state.needsProfile) {
+      setShowProfileGate(true);
+      return;
+    }
+    const [market, missionState, npcState, acMarket] = await Promise.all([
       fetchMarket(
         marketFetchOptsRef.current.aircraft,
         marketFetchOptsRef.current,
@@ -2258,7 +2286,8 @@ export function App() {
       if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
     }
     if (!state.hubSelected) {
-      const firstHub = normalizeStarterHubs(state.hubs)[0]?.icao;
+      const firstHub = networkCargoHubs(normalizeStarterHubs(state.hubs))[0]
+        ?.icao;
       setSignupHub((prev) => prev || firstHub || 'SBGR');
     }
     if (airportIcao) {
@@ -2330,10 +2359,34 @@ export function App() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await fetchCareerProfiles();
+        if (cancelled) return;
+        setCareerProfiles(data.profiles ?? []);
+        const last = data.profiles?.find((p) => p.id === data.activeId) ?? null;
+        setActiveCareerProfile(last);
+        setShowProfileGate(true);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setProfilesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (showProfileGate || !activeCareerProfile) return;
     void refresh().catch((err: unknown) => {
       setError(err instanceof Error ? err.message : String(err));
     });
-  }, [refresh]);
+  }, [refresh, showProfileGate, activeCareerProfile?.id]);
 
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
@@ -2907,6 +2960,10 @@ export function App() {
     activeWeightSystem = weightSystem;
     saveWeightSystem(weightSystem);
   }, [weightSystem]);
+
+  useEffect(() => {
+    saveDevMode(devMode);
+  }, [devMode]);
 
   const activeCount = useMemo(
     () => missions.filter((m) => isActiveMissionStatus(m.status)).length,
@@ -3729,6 +3786,107 @@ export function App() {
       };
       await refresh();
       goToTab('pilot');
+    });
+  }
+
+  async function onSelectCareerProfile(id: string) {
+    await run(async () => {
+      const result = await postCareerProfileSelect(id);
+      setCareerProfiles(result.profiles);
+      setActiveCareerProfile(
+        result.profile ??
+          result.profiles.find((p) => p.id === result.activeId) ??
+          null,
+      );
+      setShowProfileGate(false);
+      setStaging(null);
+      setActiveBushTrip(null);
+      setBushWatch(null);
+      setFlightDebrief(null);
+      await refresh();
+      setToastKind('ok');
+      setToast(
+        `Playing as ${
+          result.profile?.name ??
+          result.profiles.find((p) => p.id === id)?.name ??
+          'profile'
+        }`,
+      );
+    });
+  }
+
+  async function onCreateCareerProfile(name: string) {
+    await run(async () => {
+      const created = await postCareerProfileCreate(name);
+      const result = await postCareerProfileSelect(created.profile.id);
+      setCareerProfiles(result.profiles);
+      setActiveCareerProfile(
+        result.profile ?? created.profile,
+      );
+      setShowProfileGate(false);
+      setStaging(null);
+      setActiveBushTrip(null);
+      setBushWatch(null);
+      setFlightDebrief(null);
+      await refresh();
+      setToastKind('ok');
+      setToast(`Playing as ${created.profile.name}`);
+    });
+  }
+
+  async function onDeleteCareerProfile(id: string) {
+    const profile = careerProfiles.find((p) => p.id === id);
+    const ok = await confirm({
+      title: 'Delete profile?',
+      body: `Permanently delete “${profile?.name ?? id}” and its career save (wallet, fleet, missions).`,
+      confirmLabel: 'Delete profile',
+      cancelLabel: 'Keep',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await deleteCareerProfile(id);
+      setCareerProfiles(result.profiles);
+      setToastKind('ok');
+      setToast('Profile deleted');
+    });
+  }
+
+  async function onRenameCareerProfile(id: string, name: string) {
+    await run(async () => {
+      const result = await postCareerProfileRename(id, name);
+      setCareerProfiles((prev) =>
+        prev.map((p) => (p.id === id ? result.profile : p)),
+      );
+      if (activeCareerProfile?.id === id) {
+        setActiveCareerProfile(result.profile);
+      }
+    });
+  }
+
+  async function onSwitchCareerProfile() {
+    await run(async () => {
+      if (watch?.running) {
+        try {
+          await postWatchStop();
+        } catch {
+          /* ignore */
+        }
+      }
+      if (bushWatch?.running) {
+        try {
+          await postBushWatchStop();
+        } catch {
+          /* ignore */
+        }
+      }
+      await postCareerProfileClear();
+      setActiveCareerProfile(null);
+      setShowProfileGate(true);
+      setStaging(null);
+      setActiveBushTrip(null);
+      setBushWatch(null);
+      setWatch(null);
     });
   }
 
@@ -5330,7 +5488,6 @@ export function App() {
       setWallet(result.walletUsd);
       setActiveBushTrip(null);
       setBushWatch(null);
-      bushWatchStartAttemptedRef.current = null;
       await refreshBushTrips();
       setToastKind('ok');
       setToast('Bush trip abandoned — no payout');
@@ -5561,6 +5718,9 @@ export function App() {
     if (!ok) return;
     await run(async () => {
       const result = await postSettle({ missionId: mission.id });
+      if (Array.isArray(result.fleet)) setFleet(result.fleet);
+      if (result.pilotIcao) setPilotIcao(result.pilotIcao);
+      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
       setWatch((prev) =>
         prev?.missionId === mission.id ? { ...prev, running: false } : prev,
       );
@@ -5912,38 +6072,53 @@ export function App() {
   const showBack = showAirport || airportReturn !== null;
   const showStaging = tab === 'staging';
 
-  // Bush-trip Watch: auto-start on Dispatch + poll for leg progress / live AC.
+  // Bush-trip Watch: auto-start on Dispatch + poll. Like freight Watch, keep
+  // retrying start if the session dies mid-leg (pipe blips reconnect in-tick
+  // while running; full session death needs a new start).
   useEffect(() => {
     if (!hubSelected || !showStaging || !activeBushTrip) {
-      bushWatchStartAttemptedRef.current = null;
       return;
     }
     let cancelled = false;
+    let startInFlight = false;
+    let nextStartAttemptAtMs = 0;
     const tripId = activeBushTrip.tripId;
 
     async function tickBushWatch() {
       try {
         let status = await fetchBushWatchStatus();
         if (cancelled) return;
-        if (
+
+        const needsStart =
           !status.running &&
-          bushWatchStartAttemptedRef.current !== tripId
-        ) {
-          bushWatchStartAttemptedRef.current = tripId;
+          !status.completed &&
+          Date.now() >= nextStartAttemptAtMs &&
+          !startInFlight;
+
+        if (needsStart) {
+          startInFlight = true;
           try {
             status = await postBushWatchStart({ intervalSec: 5 });
+            // Allow another start soon if the session dies after a successful open.
+            nextStartAttemptAtMs = Date.now() + 5_000;
           } catch (err) {
+            // Back off like freight Watch (~15s) when SimBridge is busy/down.
+            nextStartAttemptAtMs = Date.now() + 15_000;
             if (!cancelled) {
               setBushWatch((prev: BushWatchStatus | null) => ({
                 ...(prev ?? status),
                 running: false,
+                tripId,
                 lastError:
                   err instanceof Error ? err.message : String(err),
               }));
             }
             return;
+          } finally {
+            startInFlight = false;
           }
         }
+
         if (cancelled) return;
         setBushWatch(status);
         if (status.completed) {
@@ -5958,7 +6133,6 @@ export function App() {
           }
           setActiveBushTrip(null);
           setBushWatch(null);
-          bushWatchStartAttemptedRef.current = null;
           void refresh().catch(() => undefined);
           void refreshBushTrips().catch(() => undefined);
           return;
@@ -6224,6 +6398,33 @@ export function App() {
     fleet.find((a) => a.status === 'parked')?.locationIcao ?? homeHubIcao;
   const signalFocusIcao = pilotIcao || parkedIcao || homeHubIcao;
 
+  if (profilesLoading) {
+    return (
+      <div className="app-shell profile-gate-shell">
+        <p className="muted" style={{ padding: '2rem' }}>
+          Loading profiles…
+        </p>
+      </div>
+    );
+  }
+
+  if (showProfileGate || !activeCareerProfile) {
+    return (
+      <div className="app-shell profile-gate-shell">
+        <ProfileGate
+          profiles={careerProfiles}
+          lastActiveId={activeCareerProfile?.id ?? null}
+          busy={busy}
+          error={error}
+          onSelect={(id) => void onSelectCareerProfile(id)}
+          onCreate={(name) => void onCreateCareerProfile(name)}
+          onDelete={(id) => void onDeleteCareerProfile(id)}
+          onRename={(id, name) => void onRenameCareerProfile(id, name)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`app-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
       {sidebarOpen ? (
@@ -6318,23 +6519,6 @@ export function App() {
           </button>
           <button
             type="button"
-            className={!showAirport && showStaging ? 'tab active' : 'tab'}
-            onClick={() => selectTab('staging')}
-            disabled={busy}
-            title={
-              playerDispatchMission
-                ? `Live flight ${playerDispatchMission.originIcao}→${playerDispatchMission.destIcao} · ${playerDispatchMission.status}`
-                : crewAirborneMission
-                  ? `Crew airborne ${crewAirborneMission.originIcao}→${crewAirborneMission.destIcao}`
-                : staging
-                  ? `${staging.originIcao}→${staging.destIcao} · ${staging.lines.length} staged lot(s)`
-                  : 'Prepare and operate flights'
-            }
-          >
-            Dispatch
-          </button>
-          <button
-            type="button"
             className={!showAirport && tab === 'fleet' ? 'tab active' : 'tab'}
             onClick={() => selectTab('fleet')}
             disabled={busy}
@@ -6377,14 +6561,6 @@ export function App() {
           >
             Logbook
           </button>
-          <button
-            type="button"
-            className={!showAirport && tab === 'settings' ? 'tab active' : 'tab'}
-            onClick={() => selectTab('settings')}
-            disabled={busy}
-          >
-            Settings
-          </button>
           {showAirport && terminalSection !== 'fbo' ? (
             <span className="tab active">Terminal</span>
           ) : null}
@@ -6405,13 +6581,29 @@ export function App() {
               Open Dispatch
             </button>
           </div>
-        ) : crewAirborneMission ? (
+        ) : activeBushTrip ? (
           <div className="sidebar-active-card">
-            <span className="label">Crew airborne</span>
+            <span className="label">Active bush trip</span>
             <strong>
-              {crewAirborneMission.originIcao}→{crewAirborneMission.destIcao}
+              {activeBushTrip.fromIcao}→{activeBushTrip.toIcao}
             </strong>
-            <p>in flight</p>
+            <p>
+              {activeBushTrip.title} · leg {activeBushTrip.legIndex + 1}/
+              {activeBushTrip.legs}
+              {activeBushTrip.legStatus === 'departed'
+                ? ' · airborne'
+                : activeBushTrip.status === 'in_progress'
+                  ? ' · en route'
+                  : ' · ready'}
+            </p>
+            <button
+              type="button"
+              className="accept"
+              disabled={busy}
+              onClick={() => selectTab('staging')}
+            >
+              Open Dispatch
+            </button>
           </div>
         ) : staging ? (
           <div className="sidebar-active-card">
@@ -6420,6 +6612,22 @@ export function App() {
               {staging.originIcao}→{staging.destIcao}
             </strong>
             <p>{staging.lines.length} lot(s) staged</p>
+            <button
+              type="button"
+              className="accept"
+              disabled={busy}
+              onClick={() => selectTab('staging')}
+            >
+              Open Dispatch
+            </button>
+          </div>
+        ) : crewAirborneMission ? (
+          <div className="sidebar-active-card">
+            <span className="label">Crew airborne</span>
+            <strong>
+              {crewAirborneMission.originIcao}→{crewAirborneMission.destIcao}
+            </strong>
+            <p>in flight</p>
             <button
               type="button"
               className="accept"
@@ -6518,56 +6726,47 @@ export function App() {
               <span className="label">Clock</span>
               <strong>{formatClock(continuousHours)}</strong>
             </div>
-            <div className="metric">
-              <span className="label">Active</span>
-              <strong>{activeCount}</strong>
-            </div>
-            <div
-              className="metric"
-              title="Competing freighters airborne or turning around"
-            >
-              <span className="label">Rivals</span>
-              <strong>{npcBusy}</strong>
-            </div>
           </div>
-          <div className="topbar-actions">
-            <button
-              type="button"
-              className="action"
-              onClick={() => void onTick(1)}
-              disabled={busy}
-              title="Advance economy + crew wall-clock by 15 minutes (1 tick)"
-            >
-              +15 min
-            </button>
-            <button
-              type="button"
-              className="action"
-              onClick={() => void onTick(4)}
-              disabled={busy}
-              title="Advance economy + crew wall-clock by 1 hour (4 ticks)"
-            >
-              +1 h
-            </button>
-            <button
-              type="button"
-              className="action ghost"
-              onClick={() => void onDebugCreditWallet()}
-              disabled={busy}
-              title="Temporary test aid — add $100,000 to the wallet"
-            >
-              +$100k
-            </button>
-            <button
-              type="button"
-              className="action ghost"
-              onClick={() => void onResetWorld()}
-              disabled={busy}
-              title="Clear the prototype save and reseed the full career world (BR + US)"
-            >
-              Reset world
-            </button>
-          </div>
+          {devMode ? (
+            <div className="topbar-actions">
+              <button
+                type="button"
+                className="action"
+                onClick={() => void onTick(1)}
+                disabled={busy}
+                title="Advance economy + crew wall-clock by 15 minutes (1 tick)"
+              >
+                +15 min
+              </button>
+              <button
+                type="button"
+                className="action"
+                onClick={() => void onTick(4)}
+                disabled={busy}
+                title="Advance economy + crew wall-clock by 1 hour (4 ticks)"
+              >
+                +1 h
+              </button>
+              <button
+                type="button"
+                className="action ghost"
+                onClick={() => void onDebugCreditWallet()}
+                disabled={busy}
+                title="Temporary test aid — add $100,000 to the wallet"
+              >
+                +$100k
+              </button>
+              <button
+                type="button"
+                className="action ghost"
+                onClick={() => void onResetWorld()}
+                disabled={busy}
+                title="Clear the prototype save and reseed the full career world (BR + US)"
+              >
+                Reset world
+              </button>
+            </div>
+          ) : null}
         </header>
 
         <div className="main-content">
@@ -6645,7 +6844,7 @@ export function App() {
               >
                 <option value="">Select ICAO…</option>
                 {(hubOptions.length > 0
-                  ? hubOptions
+                  ? networkCargoHubs(hubOptions)
                   : ([
                       {
                         icao: 'SBGR',
@@ -8226,6 +8425,7 @@ export function App() {
                       <th>Route</th>
                       <th>Legs</th>
                       <th>NM</th>
+                      <th>Cruise</th>
                       <th>Pay</th>
                       <th />
                     </tr>
@@ -8233,7 +8433,7 @@ export function App() {
                   <tbody>
                     {bushTrips.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="muted">
+                        <td colSpan={8} className="muted">
                           No bush trips in catalog.
                         </td>
                       </tr>
@@ -8273,6 +8473,17 @@ export function App() {
                             </td>
                             <td>{trip.legs}</td>
                             <td>{Math.round(trip.distanceNm)}</td>
+                            <td
+                              title={
+                                trip.cruisingAltFt
+                                  ? 'Suggested cruise from Activities PLN (whole tour)'
+                                  : undefined
+                              }
+                            >
+                              {trip.cruisingAltFt
+                                ? `${trip.cruisingAltFt.toLocaleString('en-US')} ft`
+                                : '—'}
+                            </td>
                             <td>{formatMoney(trip.payUsd)}</td>
                             <td className="bush-trip-board-actions">
                               {trip.hasPln ? (
@@ -8937,6 +9148,10 @@ export function App() {
                   <code>
                     {activeBushTrip.fromIcao}→{activeBushTrip.toIcao}
                   </code>
+                  {typeof activeBushTrip.cruisingAltFt === 'number' &&
+                  activeBushTrip.cruisingAltFt > 0
+                    ? ` · cruise ${activeBushTrip.cruisingAltFt.toLocaleString('en-US')} ft`
+                    : ''}
                 </p>
                 <p className="muted" role="status">
                   {bushWatch?.running
@@ -8964,50 +9179,6 @@ export function App() {
                   >
                     Abandon trip
                   </button>
-                  {activeBushTrip.hasPln ? (
-                    <>
-                      <button
-                        type="button"
-                        className="action ghost"
-                        disabled={busy}
-                        title="Download the Activities .PLN for MSFS tablet import"
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await downloadBushTripPln(activeBushTrip.tripId);
-                              setError(null);
-                            } catch (err) {
-                              setError(
-                                err instanceof Error ? err.message : String(err),
-                              );
-                            }
-                          })();
-                        }}
-                      >
-                        Copy PLN
-                      </button>
-                      <button
-                        type="button"
-                        className="action ghost"
-                        disabled={busy}
-                        title="Download Garmin/TDS GTNXi .gfp — place in ProgramData\\TDS\\GTNXi\\FPL"
-                        onClick={() => {
-                          void (async () => {
-                            try {
-                              await downloadBushTripGfp(activeBushTrip.tripId);
-                              setError(null);
-                            } catch (err) {
-                              setError(
-                                err instanceof Error ? err.message : String(err),
-                              );
-                            }
-                          })();
-                        }}
-                      >
-                        Copy GFP
-                      </button>
-                    </>
-                  ) : null}
                   <button
                     type="button"
                     className="action ghost"
@@ -9032,6 +9203,7 @@ export function App() {
                 legs={activeBushTrip.legs}
                 mapNodes={activeBushTrip.mapNodes ?? EMPTY_BUSH_MAP_NODES}
                 hasPln={activeBushTrip.hasPln === true}
+                cruisingAltFt={activeBushTrip.cruisingAltFt}
                 aircraftIcao={activeBushTrip.fromIcao}
                 liveAircraft={
                   bushWatch?.running ? (bushWatch.position ?? null) : null
@@ -9748,6 +9920,7 @@ export function App() {
               loadPath={activeLoadPath}
               busy={busy || crewDispatchBusy}
               weightSystem={weightSystem}
+              devMode={devMode}
               simbriefUser={simbriefUser}
               continuousHours={continuousHours}
               formatMoney={formatMoney}
@@ -9847,6 +10020,21 @@ export function App() {
         <section className="panel settings-panel">
           <div className="settings-grid">
             <div className="settings-card">
+              <h3>Career profile</h3>
+              <p className="settings-help">
+                Playing as <strong>{activeCareerProfile.name}</strong>. Switch
+                profiles to load another wallet, fleet, and mission history.
+              </p>
+              <button
+                type="button"
+                className="action"
+                disabled={busy}
+                onClick={() => void onSwitchCareerProfile()}
+              >
+                Switch profile
+              </button>
+            </div>
+            <div className="settings-card">
               <h3>SimBrief</h3>
               <p className="settings-help">
                 Used for Dispatch redirect, automatic OFP confirmation, auto OFP load, and Preflight.
@@ -9906,6 +10094,37 @@ export function App() {
                 {' · '}
                 <strong>{formatMassExact(1_704, weightSystem)}</strong>
               </p>
+            </div>
+            <div className="settings-card">
+              <h3>Developer</h3>
+              <p className="settings-help">
+                Shows time-skip, wallet credit, reset world, and Dispatch Advanced
+                cheats (depart / settle without MSFS). Leave off for normal play.
+              </p>
+              <div className="settings-choice" role="radiogroup" aria-label="Dev mode">
+                <button
+                  type="button"
+                  className={
+                    !devMode ? 'settings-choice-btn active' : 'settings-choice-btn'
+                  }
+                  onClick={() => setDevMode(false)}
+                  disabled={busy}
+                >
+                  Off
+                  <small>Player layout</small>
+                </button>
+                <button
+                  type="button"
+                  className={
+                    devMode ? 'settings-choice-btn active' : 'settings-choice-btn'
+                  }
+                  onClick={() => setDevMode(true)}
+                  disabled={busy}
+                >
+                  Dev mode
+                  <small>Cheats &amp; debug</small>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -10321,12 +10540,10 @@ export function App() {
                   aircraft={acf}
                   catalog={hangarCatalogEntry(acf)}
                   busy={busy}
-                  hubOptions={hubOptions
-                    .filter((hub) => !hub.bush && !hub.bushTripOnly)
-                    .map((hub) => ({
-                      icao: hub.icao,
-                      name: hub.name,
-                    }))}
+                  hubOptions={ferryDestinationHubs(hubOptions).map((hub) => ({
+                    icao: hub.icao,
+                    name: hub.name,
+                  }))}
                   ferryDest={ferryDest}
                   travelDest={travelDest}
                   pilotIcao={pilotIcao}
@@ -10541,7 +10758,7 @@ export function App() {
             return (
               <FboRerouteDialog
                 hold={hold}
-                hubs={hubOptions.map((hub) => ({
+                hubs={networkCargoHubs(hubOptions).map((hub) => ({
                   icao: hub.icao,
                   name: hub.name,
                 }))}

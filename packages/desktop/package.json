@@ -1,0 +1,69 @@
+{
+  "name": "@msfs-compat/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Skyline Career desktop shell (Electron)",
+  "author": "Skyline Career",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "start": "electron .",
+    "pack": "node ../../scripts/pack-desktop.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "35.7.5",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "com.skyline.career",
+    "productName": "Skyline Career",
+    "copyright": "Copyright © Skyline Career",
+    "electronVersion": "35.7.5",
+    "directories": {
+      "output": "../../artifacts/skyline-desktop",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.mjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../../artifacts/skyline-runtime",
+        "to": "skyline"
+      },
+      {
+        "from": "../../artifacts/skyline-host",
+        "to": "host",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "dir",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "SkylineCareer-${version}-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Skyline Career",
+      "differentialPackage": false
+    },
+    "portable": {
+      "artifactName": "SkylineCareer-${version}-portable.exe"
+    },
+    "asar": true
+  }
+}

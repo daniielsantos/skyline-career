@@ -15,6 +15,9 @@ profiles/cache/
 profiles/career/local-economy.json
 profiles/career/local-missions.json
 profiles/career/economy-pulse-sweep.json
+profiles/career/profiles.json
+profiles/career/saves/
+profiles/career/skyline.sqlite*
 artifacts/
 
 # OurAirports download cache (generate:runways)

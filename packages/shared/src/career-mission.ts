@@ -806,7 +806,7 @@ export function listActivePlayerMissions(
 
 /**
  * Accept an empty player reposition (no freight). Flown via Dispatch/Watch.
- * Allowed from bush / trip-only strips — instant ferry stays blocked there.
+ * Allowed from bush / trip-only strips — instant ferry stays blocked on soft-field bush.
  */
 export function acceptEmptyFlight(
   world: CareerEconomyWorld,
@@ -1808,6 +1808,11 @@ export function settleMission(
     } else if (working.contractPilot) {
       // No owned airframe — still ride the leg to dest.
       syncPilotIcaoTo(opts.fleet, working.destIcao);
+    } else if (working.aircraftId) {
+      // Owned mission must move its airframe — do not credit a ghost flight.
+      throw new Error(
+        `Cannot settle ${working.id}: aircraft ${working.aircraftId} is not in the hangar`,
+      );
     }
   }
 

@@ -1841,10 +1841,11 @@ tr.lot-locked {
 
 .settings-card {
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--bg-deep));
   padding: 1rem 1.1rem;
   display: grid;
   gap: 0.75rem;
+  color: var(--ink);
 }
 
 .settings-card h3 {
@@ -1853,6 +1854,7 @@ tr.lot-locked {
   font-size: 1rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  color: var(--ink);
 }
 
 .settings-help {
@@ -1874,7 +1876,7 @@ tr.lot-locked {
   text-align: left;
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--surface-2) 70%, var(--panel));
   color: var(--ink);
   font: inherit;
   cursor: pointer;
@@ -1887,7 +1889,7 @@ tr.lot-locked {
 
 .settings-choice-btn.active {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
   color: var(--ink);
   font-weight: 600;
 }
@@ -1900,6 +1902,12 @@ tr.lot-locked {
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.settings-panel .simbrief-field input {
+  background: var(--bg-deep);
+  border-color: var(--line);
+  color: var(--ink);
 }
 
 .compact-dispatch {
@@ -2501,6 +2509,91 @@ tr.lot-locked {
   display: grid;
   gap: 1rem;
   max-width: 28rem;
+}
+
+.profile-gate-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent),
+    var(--bg);
+}
+
+.profile-gate {
+  width: min(36rem, 100%);
+  display: grid;
+  gap: 1.25rem;
+}
+
+.profile-gate-hero h1 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: clamp(1.75rem, 4vw, 2.35rem);
+  letter-spacing: -0.02em;
+}
+
+.profile-gate-brand {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.profile-gate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.profile-gate-row {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent));
+}
+
+.profile-gate-play {
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.profile-gate-play strong {
+  font-size: 1.05rem;
+}
+
+.profile-gate-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.profile-gate-create,
+.profile-gate-rename {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.profile-gate-rename {
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .profile-gate-rename {
+    grid-template-columns: 1fr;
+  }
 }
 
 .pilot-field {
@@ -4312,9 +4405,10 @@ small {
   display: grid;
   gap: 0.75rem;
   padding: 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
   border-left: 0.35rem solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 5%, white);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--ink);
 }
 
 .fuel-purchase-head,
@@ -4354,8 +4448,8 @@ small {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
-  border: 1px solid var(--line);
-  background: var(--panel);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
 }
 
 .fuel-purchase-grid > div {
@@ -4368,13 +4462,14 @@ small {
 }
 
 .fuel-purchase-grid dt {
-  color: var(--muted);
+  color: color-mix(in srgb, var(--accent) 70%, var(--muted));
   font-size: 0.7rem;
   text-transform: uppercase;
 }
 
 .fuel-purchase-grid dd {
   margin: 0.25rem 0 0;
+  color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 1rem;
   font-weight: 700;
@@ -5554,6 +5649,18 @@ textarea {
 .confirm-dialog,
 .dialog-card {
   background: var(--panel);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.fuel-purchase-card {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.settings-card {
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--bg-deep));
   color: var(--ink);
   border-color: var(--line);
 }

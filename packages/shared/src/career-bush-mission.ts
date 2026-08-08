@@ -66,6 +66,8 @@ export type BushTripBoardRow = {
   playable: boolean;
   /** True when an Activities .PLN can be downloaded for the MSFS tablet. */
   hasPln: boolean;
+  /** Suggested cruise (ft MSL) from Activities PLN when available. */
+  cruisingAltFt?: number;
 };
 
 export function bushTripToBoardRow(trip: BushTripDef): BushTripBoardRow {
@@ -87,6 +89,11 @@ export function bushTripToBoardRow(trip: BushTripDef): BushTripBoardRow {
     aircraftHint: 'light_ga',
     playable: isBushTripPlayable(trip),
     hasPln: Boolean(bushTripActivitiesPlnFile(trip.id)),
+    ...(typeof trip.cruisingAltFt === 'number' &&
+    Number.isFinite(trip.cruisingAltFt) &&
+    trip.cruisingAltFt > 0
+      ? { cruisingAltFt: Math.round(trip.cruisingAltFt) }
+      : {}),
   };
 }
 
@@ -157,7 +164,7 @@ export function abandonBushTrip(
   }
 
   const aircraft = findPlayerAircraft(state, active.aircraftId);
-  if (aircraft && aircraft.assignedMissionId === bushTripAssignmentId(active.tripId)) {
+  if (aircraft) {
     aircraft.status = 'parked';
     aircraft.assignedMissionId = undefined;
   }
@@ -311,7 +318,10 @@ export function settleBushTripLeg(
       icao: dest,
     });
   }
-  if (aircraft && aircraft.assignedMissionId === bushTripAssignmentId(trip.id)) {
+  // Always park at dest by active.aircraftId — do not gate on assignedMissionId.
+  // Assignment can be dropped by normalize/save while the trip is still active;
+  // gating left the airframe at the previous leg while the pilot still moved.
+  if (aircraft) {
     aircraft.status = 'parked';
     aircraft.assignedMissionId = undefined;
     aircraft.locationIcao = dest;
@@ -382,7 +392,8 @@ export function evaluateBushTripLegTransition(
     distanceNm,
     destCoords,
     settleRadiusNm: opts.settleRadiusNm ?? 12,
-    requireEnginesOffToSettle: opts.requireEnginesOff !== false,
+    // Bush hops: touchdown near hub is enough — no engines-off between legs.
+    requireEnginesOffToSettle: opts.requireEnginesOff === true,
     requireDestProximity: true,
     departFrom: ['dispatched'],
   });

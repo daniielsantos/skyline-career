@@ -150,8 +150,8 @@ const health = await apiHealth();
 const sourceStamp = await serverSourceStamp();
 const apiIsCurrent =
   health?.ok === true &&
-  typeof health?.npcFleetTarget === 'number' &&
-  health.npcFleetTarget > 0 &&
+  (health?.needsProfile === true ||
+    (typeof health?.npcFleetTarget === 'number' && health.npcFleetTarget > 0)) &&
   health?.sourceStamp === sourceStamp;
 
 if (apiIsCurrent) {

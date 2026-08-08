@@ -17,6 +17,37 @@ const outPath = join(sharedRoot, 'src', 'career-bush-trips-us-data.json');
 const { bushTripDefFromPln } = await import(
   pathToFileURL(join(sharedRoot, 'dist', 'career-bush-pln.js')).href
 );
+const { listMsfsBushHubOverrides, setRuntimeMsfsBushHubOverrides } = await import(
+  pathToFileURL(join(sharedRoot, 'dist', 'career-msfs-hub-overrides.js')).href
+);
+const { CAREER_HUB_COORDS } = await import(
+  pathToFileURL(join(sharedRoot, 'dist', 'career-economy.js')).href
+);
+
+const profileOverridesPath = join(
+  sharedRoot,
+  '..',
+  '..',
+  'profiles',
+  'career',
+  'msfs-bush-hub-overrides.json',
+);
+try {
+  const raw = JSON.parse(readFileSync(profileOverridesPath, 'utf8'));
+  setRuntimeMsfsBushHubOverrides(raw);
+} catch {
+  /* optional */
+}
+
+const hubCoords = {
+  ...CAREER_HUB_COORDS,
+  ...Object.fromEntries(
+    Object.entries(listMsfsBushHubOverrides()).map(([icao, row]) => [
+      icao,
+      { lat: row.lat, lon: row.lon },
+    ]),
+  ),
+};
 
 const specs = [
   {
@@ -56,6 +87,7 @@ const trips = specs.map((spec) => {
     payUsd: spec.payUsd,
     appendReturn: false,
     msfsValidated: true,
+    hubCoords,
   });
 });
 

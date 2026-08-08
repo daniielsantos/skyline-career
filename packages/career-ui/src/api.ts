@@ -862,6 +862,8 @@ export type StarterHubOption = {
 export function fetchState() {
   return api<
     ClockSync & {
+      needsProfile?: boolean;
+      activeProfileId?: string | null;
       seed: string;
       airportCount: number;
       walletUsd: number;
@@ -889,6 +891,70 @@ export function fetchState() {
       }>;
     }
   >('/api/state');
+}
+
+export type CareerProfileMeta = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function fetchCareerProfiles() {
+  return api<{
+    activeId: string | null;
+    profiles: CareerProfileMeta[];
+  }>('/api/profiles');
+}
+
+export function postCareerProfileCreate(name: string) {
+  return api<{
+    profile: CareerProfileMeta;
+    profiles: CareerProfileMeta[];
+  }>('/api/profiles', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function postCareerProfileSelect(id: string) {
+  return api<{
+    activeId: string;
+    profile: CareerProfileMeta | null;
+    profiles: CareerProfileMeta[];
+  }>('/api/profiles/select', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  });
+}
+
+export function postCareerProfileClear() {
+  return api<{
+    activeId: null;
+    profiles: CareerProfileMeta[];
+  }>('/api/profiles/clear', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function postCareerProfileRename(id: string, name: string) {
+  return api<{ profile: CareerProfileMeta }>(
+    `/api/profiles/${encodeURIComponent(id)}/rename`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    },
+  );
+}
+
+export function deleteCareerProfile(id: string) {
+  return api<{
+    profiles: CareerProfileMeta[];
+    activeId: string | null;
+  }>(`/api/profiles/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 }
 
 export function fetchCashflow() {
@@ -1819,6 +1885,8 @@ export type BushTripBoardRow = {
   aircraftHint: 'light_ga';
   playable: boolean;
   hasPln?: boolean;
+  /** Suggested cruise (ft MSL) from Activities PLN when available. */
+  cruisingAltFt?: number;
 };
 
 export type BushTripMapNode =
@@ -1840,6 +1908,7 @@ export type ActiveBushTripView = {
   startIcao?: string;
   endIcao?: string;
   hasPln?: boolean;
+  cruisingAltFt?: number;
 };
 
 export type BushWatchStatus = {
@@ -2362,6 +2431,8 @@ export function postSettle(opts: { missionId: string }) {
     mission: Mission;
     walletUsd: number;
     settlement: MissionSettlement;
+    fleet?: PlayerAircraft[];
+    pilotIcao?: string;
   }>('/api/settle', {
     method: 'POST',
     body: JSON.stringify(opts),

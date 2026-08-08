@@ -136,11 +136,13 @@ const hubs = new Map();
 function upsert(icao, lat, lon, nameHint) {
   if (!icao || US_ICAO_RE.test(icao)) return;
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-  if (hubs.has(icao)) return;
   const ov = MSFS_OVERRIDES[icao];
   const useLat = ov?.lat ?? lat;
   const useLon = ov?.lon ?? lon;
   const name = ov?.name || DISPLAY_NAMES[icao] || nameHint || icao;
+  const prev = hubs.get(icao);
+  // MSFS override always wins; allow refresh when regenerating after homologation.
+  if (prev && !ov) return;
   hubs.set(icao, {
     icao,
     name,
@@ -191,10 +193,19 @@ for (const file of [
   }
 }
 
-// Ensure every MSFS override appears even if missing from PLN parse.
+// Refresh coords/names for PLN-discovered trip-only locals from MSFS overrides.
+// Do NOT invent new bushTripOnly hubs from network homologation (SB*/CY*/MM*/K*).
 for (const [icao, ov] of Object.entries(MSFS_OVERRIDES)) {
-  if (hubs.has(icao)) continue;
-  upsert(icao, ov.lat, ov.lon, ov.name);
+  const prev = hubs.get(icao);
+  if (!prev) continue;
+  hubs.set(icao, {
+    ...prev,
+    name: ov.name || prev.name,
+    lat: ov.lat,
+    lon: ov.lon,
+    region: regionFromLonLat(ov.lat, ov.lon),
+    msfsValidated: true,
+  });
 }
 
 const rows = [...hubs.values()].sort((a, b) => a.icao.localeCompare(b.icao));
@@ -249,5 +260,48 @@ ${body}
 writeFileSync(outTs, genTs);
 writeFileSync(outSrc, srcTs);
 writeFileSync(join(__dirname, 'bush-trip-only-hubs.json'), JSON.stringify(rows, null, 2) + '\n');
+
+// Keep shipped seed focused on bushTripOnly locals (not the full career homologation).
+const shippedBushOnly = {};
+const profileAll = loadOverridesFile(profileOverridesPath);
+for (const r of rows) {
+  const row = profileAll[r.icao] ?? MSFS_OVERRIDES[r.icao];
+  if (!row) continue;
+  // Prefer full profile row (runways) when present.
+  if (existsSync(profileOverridesPath)) {
+    try {
+      const raw = JSON.parse(readFileSync(profileOverridesPath, 'utf8'));
+      if (raw[r.icao]) shippedBushOnly[r.icao] = raw[r.icao];
+      else
+        shippedBushOnly[r.icao] = {
+          name: row.name,
+          lat: row.lat,
+          lon: row.lon,
+          source: 'msfs_facility',
+          validatedAt: new Date().toISOString().slice(0, 10),
+        };
+    } catch {
+      shippedBushOnly[r.icao] = {
+        name: row.name,
+        lat: row.lat,
+        lon: row.lon,
+        source: 'msfs_facility',
+        validatedAt: new Date().toISOString().slice(0, 10),
+      };
+    }
+  }
+}
+if (Object.keys(shippedBushOnly).length > 0) {
+  writeFileSync(
+    shippedOverridesPath,
+    `${JSON.stringify(shippedBushOnly, null, 2)}\n`,
+  );
+  console.log(
+    'Wrote',
+    shippedOverridesPath,
+    `(${Object.keys(shippedBushOnly).length} bushTripOnly)`,
+  );
+}
+
 console.log('Wrote', outTs);
 console.log('Wrote', outSrc);

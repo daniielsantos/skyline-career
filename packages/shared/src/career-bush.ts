@@ -167,7 +167,8 @@ export function assertBushLightGa(
 /**
  * Instant ferry gate.
  * Soft-field bush: blocked either end (must fly bush trips).
- * Trip-only strips: may ferry OUT to a network hub; cannot ferry INTO trip-only.
+ * Trip-only strips: ferry allowed both ways so light GA can reposition to a
+ * bush-trip start (Accept requires parked GA there). Soft-field bush stays closed.
  */
 export function assertFerryNotBush(
   originIcao: string,
@@ -178,11 +179,6 @@ export function assertFerryNotBush(
   if (isBushHub(origin) || isBushHub(dest)) {
     throw new Error(
       'Bush strips require a flown mission — ferry unavailable (Hangar: Plan empty flight)',
-    );
-  }
-  if (isBushTripOnlyHub(dest)) {
-    throw new Error(
-      'Cannot ferry into a trip-only strip — fly a bush trip or empty Watch flight',
     );
   }
 }

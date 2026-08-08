@@ -59,6 +59,8 @@ export function BushTripMapCard(props: {
   legs: number;
   mapNodes: BushTripMapNode[];
   hasPln?: boolean;
+  /** Suggested cruise (ft MSL) from Activities PLN. */
+  cruisingAltFt?: number;
   /** Parked/assigned aircraft hub — used when live coords are absent. */
   aircraftIcao?: string | null;
   /** Prefer live sim coords when present. */
@@ -272,6 +274,12 @@ export function BushTripMapCard(props: {
   const aircraft: DispatchAircraftPosition | null = liveOk ?? parkedAircraft;
 
   const headline = `${props.currentFromIcao}→${props.currentToIcao} · leg ${props.legIndex + 1}/${props.legs}`;
+  const cruiseLabel =
+    typeof props.cruisingAltFt === 'number' &&
+    Number.isFinite(props.cruisingAltFt) &&
+    props.cruisingAltFt > 0
+      ? ` · cruise ${props.cruisingAltFt.toLocaleString('en-US')} ft`
+      : '';
   const totalNm = hubStops.reduce((sum, s) => sum + (s.nmToNext ?? 0), 0);
   const doneNm = hubStops
     .filter((s) => s.status === 'done')
@@ -343,6 +351,7 @@ export function BushTripMapCard(props: {
           <strong>Route map</strong>
           <small>
             {props.title} · {headline}
+            {cruiseLabel}
             {totalNm > 0 ? ` · ${doneNm}/${totalNm} nm` : ''}
           </small>
         </div>

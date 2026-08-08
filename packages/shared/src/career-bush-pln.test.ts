@@ -43,6 +43,7 @@ describe('MSFS bush PLN parser', () => {
     assert.ok(legs.length >= 6);
     assert.equal(legs[0]!.fromIcao, '26A');
     assert.equal(legs[legs.length - 1]!.toIcao, 'KFDK');
+    assert.equal(parsed.cruisingAltFt, 4000);
     const round = appendReturnLegToStart(legs);
     assert.equal(round[round.length - 1]!.toIcao, '26A');
   });
@@ -63,6 +64,7 @@ describe('MSFS bush PLN parser', () => {
       trip.legs[trip.legs.length - 1]!.toIcao,
     );
     assert.equal(trip.msfsValidated, false);
+    assert.equal(trip.cruisingAltFt, 3500);
     assertBushTripCatalog([
       {
         ...trip,
@@ -71,6 +73,27 @@ describe('MSFS bush PLN parser', () => {
       },
     ]);
   });
+
+  it('drops User WPs that duplicate MSFS hub positions', () => {
+    const xml = readFileSync(join(plnDir, 'Appalachian Summits.PLN'), 'utf8');
+    const trip = bushTripDefFromPln({
+      id: 'test-app-scrub',
+      displayTitle: 'Appalachian',
+      countryId: 'US',
+      xml,
+      payUsd: 1,
+      hubCoords: {
+        '57NC': { lat: 35.42648322880268, lon: -83.45821380615234 },
+        '26A': { lat: 33.2842, lon: -85.8086 },
+        KRMG: { lat: 34.3506, lon: -85.158 },
+        KDZJ: { lat: 34.688, lon: -83.35 },
+        KAVL: { lat: 35.436, lon: -82.542 },
+        KFDK: { lat: 39.4176, lon: -77.3743 },
+      },
+    });
+    const names = trip.legs.flatMap((l) => l.waypoints.map((w) => w.name));
+    assert.equal(names.includes('Tuckasegee River'), false);
+  });
 });
 
 describe('US bush trip stubs + tour spokes', () => {
@@ -78,6 +101,9 @@ describe('US bush trip stubs + tour spokes', () => {
     assertBushTripCatalog();
     assert.ok(getBushTrip('us-appalachian-summits'));
     assert.ok(getBushTrip('us-california-dreams'));
+    assert.equal(getBushTrip('us-appalachian-summits')!.cruisingAltFt, 4000);
+    assert.equal(getBushTrip('us-california-dreams')!.cruisingAltFt, 3500);
+    assert.equal(getBushTrip('us-breckenridge-yosemite')!.cruisingAltFt, 1000);
     assert.ok(getBushTrip('us-breckenridge-yosemite'));
     assert.equal(listPlayableBushTrips().length, 4);
     assert.ok(listBushTrips().length >= 4);

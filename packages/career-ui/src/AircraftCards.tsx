@@ -615,9 +615,7 @@ export function HangarAircraftCard(props: {
   const moveOnChange =
     moveMode === 'ferry' ? props.onFerryDestChange : props.onTravelDestChange;
   const ferryBlockedForBush =
-    /ferry unavailable|flown mission|Cannot ferry into a trip-only/i.test(
-      ferryPlanError ?? '',
-    );
+    /ferry unavailable|flown mission/i.test(ferryPlanError ?? '');
   const destReady =
     Boolean(ferryFinal) &&
     ferryFinal !== acf.locationIcao.trim().toUpperCase();

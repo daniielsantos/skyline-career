@@ -426,11 +426,11 @@ export function dispatchStepStatusLine(input: {
       if (input.watchAutoStatus === 'waiting') {
         return 'Preflight ready · waiting for SimBridge to arm Watch.';
       }
-      return 'Preflight ready — take off in MSFS when Watch is connected. Manual depart is under Advanced.';
+      return 'Preflight ready — take off in MSFS when Watch is connected.';
     case 'en_route':
       return input.watchRunning
         ? 'En route — Watch tracks the flight. Settle unlocks after ≥70% of planned route time (≥50% under 100 nm).'
-        : 'En route — settle from Advanced only after ≥70% of planned route time (≥50% under 100 nm), or when Watch is running.';
+        : 'En route — keep Watch connected so touchdown can settle the flight.';
     case 'debrief':
       return 'Flight complete — review the P&L, then return to Freights.';
     default:

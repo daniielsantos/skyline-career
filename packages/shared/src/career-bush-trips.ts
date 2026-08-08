@@ -49,6 +49,11 @@ export type BushTripDef = {
   msfsValidated: boolean;
   /** Optional fixed payout; otherwise UI/mission may derive from cargo×legs. */
   payUsd?: number;
+  /**
+   * Suggested cruise (ft MSL) from Activities PLN `<CruisingAlt>`.
+   * One value for the whole tour — not per leg.
+   */
+  cruisingAltFt?: number;
 };
 
 const ALL_HUBS = [

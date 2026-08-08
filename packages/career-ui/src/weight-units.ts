@@ -2,6 +2,7 @@
 export type WeightSystem = 'metric' | 'imperial';
 
 export const WEIGHT_SYSTEM_KEY = 'skyline.weightSystem';
+export const DEV_MODE_KEY = 'skyline.devMode';
 export const KG_TO_LB = 2.2046226218;
 
 export function loadWeightSystem(): WeightSystem {
@@ -17,6 +18,23 @@ export function loadWeightSystem(): WeightSystem {
 export function saveWeightSystem(system: WeightSystem): void {
   try {
     localStorage.setItem(WEIGHT_SYSTEM_KEY, system);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Cheat / debug controls (time skip, wallet credit, manual settle, etc.). */
+export function loadDevMode(): boolean {
+  try {
+    return localStorage.getItem(DEV_MODE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function saveDevMode(enabled: boolean): void {
+  try {
+    localStorage.setItem(DEV_MODE_KEY, enabled ? '1' : '0');
   } catch {
     /* ignore */
   }

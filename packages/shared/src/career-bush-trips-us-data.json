@@ -7,6 +7,7 @@
     "aircraftHint": "light_ga",
     "msfsValidated": true,
     "payUsd": 12000,
+    "cruisingAltFt": 4000,
     "legs": [
       {
         "id": "us-appalachian-summits-1",
@@ -125,11 +126,6 @@
             "lat": 35.3969,
             "lon": -83.562,
             "name": "Fontana Lake"
-          },
-          {
-            "lat": 35.4298,
-            "lon": -83.4878,
-            "name": "Tuckasegee River"
           }
         ],
         "cargoKg": 60,
@@ -358,11 +354,6 @@
             "lat": 38.2239,
             "lon": -80.0901,
             "name": "Marlinton"
-          },
-          {
-            "lat": 38.4332,
-            "lon": -79.8402,
-            "name": "Green Bank Telescope"
           }
         ],
         "cargoKg": 60,
@@ -480,6 +471,7 @@
     "aircraftHint": "light_ga",
     "msfsValidated": true,
     "payUsd": 14000,
+    "cruisingAltFt": 3500,
     "legs": [
       {
         "id": "us-california-dreams-1",
@@ -1003,6 +995,7 @@
     "aircraftHint": "light_ga",
     "msfsValidated": true,
     "payUsd": 16000,
+    "cruisingAltFt": 1000,
     "legs": [
       {
         "id": "us-breckenridge-yosemite-1",

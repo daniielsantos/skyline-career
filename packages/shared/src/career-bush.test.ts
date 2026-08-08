@@ -69,7 +69,7 @@ describe('global soft-field bush hubs', () => {
     assert.equal(bushLotPayMult('SBGR', 'SBKP', 'electronics'), 1);
   });
 
-  it('blocks ferry into soft-field bush or trip-only; allows ferry out of trip-only', () => {
+  it('blocks ferry on soft-field bush; allows ferry into trip-only starts', () => {
     assert.throws(
       () =>
         planFerryRoute({
@@ -90,14 +90,8 @@ describe('global soft-field bush hubs', () => {
     );
     assert.throws(() => assertFerryNotBush('SBEG', 'SWTP'), /ferry unavailable/i);
     assert.throws(() => assertFerryNotBush('CYVR', 'CYHE'), /ferry unavailable/i);
-    assert.throws(
-      () => assertFerryNotBush('KRMG', '26A'),
-      /Cannot ferry into a trip-only/i,
-    );
-    assert.throws(
-      () => assertFerryNotBush('O67', 'O56'),
-      /Cannot ferry into a trip-only/i,
-    );
+    assert.doesNotThrow(() => assertFerryNotBush('KRMG', '26A'));
+    assert.doesNotThrow(() => assertFerryNotBush('O67', 'O56'));
     assert.doesNotThrow(() => assertFerryNotBush('O67', 'KHTH'));
     assert.doesNotThrow(() => assertFerryNotBush('26A', 'KRMG'));
   });
@@ -197,13 +191,11 @@ describe('global soft-field bush hubs', () => {
     assert.equal(quote.originIcao, 'O67');
     assert.equal(quote.destIcao, dest);
 
-    assert.throws(
-      () =>
-        quoteFerry(world, state, {
-          aircraftId: aircraft.id,
-          destIcao: 'O56',
-        }),
-      /Cannot ferry into a trip-only/i,
+    assert.doesNotThrow(() =>
+      quoteFerry(world, state, {
+        aircraftId: aircraft.id,
+        destIcao: 'O56',
+      }),
     );
 
     const accepted = acceptEmptyFlight(world, state, {

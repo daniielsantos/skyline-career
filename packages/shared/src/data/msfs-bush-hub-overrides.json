@@ -1,30 +1,670 @@
 {
-  "O64": {
-    "name": "Breckenridge",
-    "lat": 35.3627,
-    "lon": -118.8561,
-    "source": "msfs_panel",
-    "validatedAt": "2026-08-08"
+  "0O2": {
+    "name": "Baker",
+    "lat": 35.286277793347836,
+    "lon": -116.08136102557182,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 165.75311279296875,
+        "lengthM": 952.8892211914062,
+        "widthM": 14.347186088562012,
+        "lat": 35.286306627094746,
+        "lon": -116.08138427138329,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
   },
-  "O67": {
-    "name": "Manzanar",
-    "lat": 36.7372,
-    "lon": -118.145,
-    "source": "msfs_panel",
-    "validatedAt": "2026-08-08"
+  "1Q2": {
+    "name": "Spaulding",
+    "lat": 40.650305561721325,
+    "lon": -120.76850831508636,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 180.6515655517578,
+        "lengthM": 1402,
+        "widthM": 17.53724479675293,
+        "lat": 40.65030857920647,
+        "lon": -120.76852798461914,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
   },
   "26A": {
-    "name": "Ashland / Lineville",
-    "lat": 33.2842,
-    "lon": -85.8086,
-    "source": "msfs_panel",
-    "validatedAt": "2026-08-08"
+    "name": "Ashland-Lineville",
+    "lat": 33.28419718891382,
+    "lon": -85.80896660685539,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 269.7098083496094,
+        "lengthM": 1228.08984375,
+        "widthM": 25.19130516052246,
+        "lat": 33.28423708677292,
+        "lon": -85.80901175737381,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "2G4": {
+    "name": "Garrett County",
+    "lat": 39.58080556243658,
+    "lon": -79.33594465255737,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 78.88162994384766,
+        "lengthM": 1512.551513671875,
+        "widthM": 20.443008422851562,
+        "lat": 39.580800868570805,
+        "lon": -79.33589547872543,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "3Q0": {
+    "name": "Mina",
+    "lat": 38.37986122816801,
+    "lon": -118.09675008058548,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 151.8867645263672,
+        "lengthM": 1417.614990234375,
+        "widthM": 50.2920036315918,
+        "lat": 38.379923924803734,
+        "lon": -118.09673801064491,
+        "identReciprocal": "31",
+        "surface": "grass"
+      }
+    ]
+  },
+  "57NC": {
+    "name": "Sossamon Field",
+    "lat": 35.42648322880268,
+    "lon": -83.45821380615234,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 101.75820922851562,
+        "lengthM": 647.5089721679688,
+        "widthM": 11.674663543701172,
+        "lat": 35.426381304860115,
+        "lon": -83.45788657665253,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "88NV": {
+    "name": "Black Rock City",
+    "lat": 40.75748059898615,
+    "lon": -119.21592235565186,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "5R",
+        "headingTrueDeg": 67.85247039794922,
+        "lengthM": 1855.2293701171875,
+        "widthM": 15.924131393432617,
+        "lat": 40.765916146337986,
+        "lon": -119.19577717781067,
+        "identReciprocal": "23L",
+        "surface": "dirt"
+      },
+      {
+        "ident": "5L",
+        "headingTrueDeg": 64.7613525390625,
+        "lengthM": 2126.08837890625,
+        "widthM": 30.48000144958496,
+        "lat": 40.75911708176136,
+        "lon": -119.2238013446331,
+        "identReciprocal": "23R",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "CA11": {
+    "name": "Bodad Airstrip",
+    "lat": 39.99721381813288,
+    "lon": -120.21685838699341,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "33",
+        "headingTrueDeg": 343.552001953125,
+        "lengthM": 589.6463012695312,
+        "widthM": 16,
+        "lat": 39.996230117976665,
+        "lon": -120.21650299429893,
+        "identReciprocal": "15",
+        "surface": "grass"
+      }
+    ]
+  },
+  "CA35": {
+    "name": "San Rafael",
+    "lat": 38.01686681807041,
+    "lon": -122.52080842852592,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 50.914947509765625,
+        "lengthM": 653.3594970703125,
+        "widthM": 14.338897705078125,
+        "lat": 38.01687251776457,
+        "lon": -122.52089381217957,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
   },
   "CA51": {
-    "name": "Sea Ranch",
-    "lat": 38.7046,
-    "lon": -123.433,
-    "source": "msfs_panel",
-    "validatedAt": "2026-08-08"
+    "name": "The Sea Ranch",
+    "lat": 38.70463348925114,
+    "lon": -123.43250826001167,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 312.421142578125,
+        "lengthM": 794.4688110351562,
+        "widthM": 12.192000389099121,
+        "lat": 38.703850619494915,
+        "lon": -123.43214124441147,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "H37": {
+    "name": "Herlong",
+    "lat": 40.13872213661671,
+    "lon": -120.17997220158577,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 79.4850845336914,
+        "lengthM": 993.6480102539062,
+        "widthM": 12.192000389099121,
+        "lat": 40.138753317296505,
+        "lon": -120.1797978579998,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "L06": {
+    "name": "Furnace Creek",
+    "lat": 36.460499949753284,
+    "lon": -116.8798054754734,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 162.35357666015625,
+        "lengthM": 933.8588256835938,
+        "widthM": 21.209245681762695,
+        "lat": 36.460527777671814,
+        "lon": -116.8798765540123,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "L61": {
+    "name": "Shoshone",
+    "lat": 35.96861097961664,
+    "lon": -116.2692779302597,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 168.64772033691406,
+        "lengthM": 725.404541015625,
+        "widthM": 8.71057415008545,
+        "lat": 35.968606285750866,
+        "lon": -116.26928552985191,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "M45": {
+    "name": "Alpine County",
+    "lat": 38.734750002622604,
+    "lon": -119.76705551147461,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 183.74403381347656,
+        "lengthM": 1354.2259521484375,
+        "widthM": 15.239999771118164,
+        "lat": 38.73474430292845,
+        "lon": -119.7670429944992,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "NC06": {
+    "name": "Elk River",
+    "lat": 36.16040267050266,
+    "lon": -81.8967778980732,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 298.5890808105469,
+        "lengthM": 1387.927490234375,
+        "widthM": 23.259044647216797,
+        "lat": 36.16059344261885,
+        "lon": -81.89493969082832,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "NV16": {
+    "name": "Lackerman Ranch",
+    "lat": 40.998165272176266,
+    "lon": -119.93756800889969,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 112.38572692871094,
+        "lengthM": 603.1311645507812,
+        "widthM": 17.366830825805664,
+        "lat": 40.99821623414755,
+        "lon": -119.9361826479435,
+        "identReciprocal": "28",
+        "surface": "dirt"
+      },
+      {
+        "ident": "20",
+        "headingTrueDeg": 215.42637634277344,
+        "lengthM": 287.2715148925781,
+        "widthM": 20.505111694335938,
+        "lat": 40.99811431020498,
+        "lon": -119.93895336985588,
+        "identReciprocal": "2",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "NV47": {
+    "name": "Palomino",
+    "lat": 39.83238369226456,
+    "lon": -119.68264326453209,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 180.4739227294922,
+        "lengthM": 733.5734252929688,
+        "widthM": 8.880911827087402,
+        "lat": 39.83238369226456,
+        "lon": -119.68264326453209,
+        "identReciprocal": "35",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "O22": {
+    "name": "Columbia",
+    "lat": 38.030416667461395,
+    "lon": -120.41455551981926,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 190.09841918945312,
+        "lengthM": 1422.9158935546875,
+        "widthM": 22.860000610351562,
+        "lat": 38.03036201745272,
+        "lon": -120.41307806968689,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11",
+        "headingTrueDeg": 133.83840942382812,
+        "lengthM": 790.5722045898438,
+        "widthM": 17.511959075927734,
+        "lat": 38.03055111318827,
+        "lon": -120.41725784540176,
+        "identReciprocal": "29",
+        "surface": "grass"
+      }
+    ]
+  },
+  "O24": {
+    "name": "Lee Vining",
+    "lat": 37.95773886144161,
+    "lon": -119.10581097006798,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 162.07339477539062,
+        "lengthM": 1190.4735107421875,
+        "widthM": 18.288000106811523,
+        "lat": 37.9577412083745,
+        "lon": -119.10582169890404,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "O26": {
+    "name": "Lone Pine",
+    "lat": 36.58869445323944,
+    "lon": -118.04938897490501,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 144.72927856445312,
+        "lengthM": 730.8245849609375,
+        "widthM": 25,
+        "lat": 36.58944346010685,
+        "lon": -118.0545549094677,
+        "identReciprocal": "31",
+        "surface": "dirt"
+      },
+      {
+        "ident": "16",
+        "headingTrueDeg": 177.98751831054688,
+        "lengthM": 1214.3365478515625,
+        "widthM": 19.592554092407227,
+        "lat": 36.58823981881142,
+        "lon": -118.04639026522636,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "35",
+        "headingTrueDeg": 351.4356994628906,
+        "lengthM": 689.3143310546875,
+        "widthM": 21.419252395629883,
+        "lat": 36.589754931628704,
+        "lon": -118.05374801158905,
+        "identReciprocal": "17",
+        "surface": "grass"
+      }
+    ]
+  },
+  "O39": {
+    "name": "Ravendale",
+    "lat": 40.803702771663666,
+    "lon": -120.36620825529099,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "35",
+        "headingTrueDeg": 3.686988592147827,
+        "lengthM": 796.3499755859375,
+        "widthM": 18.110000610351562,
+        "lat": 40.80370981246233,
+        "lon": -120.36620512604713,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "O43": {
+    "name": "Yerington Mun",
+    "lat": 39.00541674345732,
+    "lon": -119.15652796626091,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 209.4693145751953,
+        "lengthM": 1770.481689453125,
+        "widthM": 23.69060516357422,
+        "lat": 39.005402997136116,
+        "lon": -119.15654495358467,
+        "identReciprocal": "2",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "O56": {
+    "name": "Madame Airport",
+    "lat": 37.925553023815155,
+    "lon": -118.40886265039444,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 48.17118453979492,
+        "lengthM": 924.64501953125,
+        "widthM": 14.540000915527344,
+        "lat": 37.925553023815155,
+        "lon": -118.40886265039444,
+        "identReciprocal": "22",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "O57": {
+    "name": "Bryant",
+    "lat": 38.26465263962746,
+    "lon": -119.22273069620132,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 179.79257202148438,
+        "lengthM": 1174.698974609375,
+        "widthM": 18.288000106811523,
+        "lat": 38.26469723135233,
+        "lon": -119.2227503657341,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "O64": {
+    "name": "Breckenridge Airport",
+    "lat": 35.36305636167526,
+    "lon": -118.85683804750443,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 118.59873962402344,
+        "lengthM": 485.7795715332031,
+        "widthM": 9.509532928466797,
+        "lat": 35.36305636167526,
+        "lon": -118.85683804750443,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "O67": {
+    "name": "Manzanar Airport",
+    "lat": 36.737086325883865,
+    "lon": -118.14506694674492,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 315.0474853515625,
+        "lengthM": 1515.76171875,
+        "widthM": 40.49229049682617,
+        "lat": 36.737527549266815,
+        "lon": -118.14551308751106,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "35",
+        "headingTrueDeg": 350.1024475097656,
+        "lengthM": 1518.8924560546875,
+        "widthM": 42.6557502746582,
+        "lat": 36.73664476722479,
+        "lon": -118.14462125301361,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "O77": {
+    "name": "Schurtz Airport",
+    "lat": 38.93486391752958,
+    "lon": -118.80559980869293,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 259.5208740234375,
+        "lengthM": 495.17169189453125,
+        "widthM": 15.824201583862305,
+        "lat": 38.93486391752958,
+        "lon": -118.80559980869293,
+        "identReciprocal": "7",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "O79": {
+    "name": "Sierraville Dearwater",
+    "lat": 39.58166655153036,
+    "lon": -120.35402789711952,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 48.944190979003906,
+        "lengthM": 942.0036010742188,
+        "widthM": 15.239999771118164,
+        "lat": 39.58151467144489,
+        "lon": -120.35430416464806,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "O99": {
+    "name": "Olancha Strip Airport",
+    "lat": 36.25604756176472,
+    "lon": -117.9970894753933,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 193.43020629882812,
+        "lengthM": 624.0493774414062,
+        "widthM": 21.417938232421875,
+        "lat": 36.25604756176472,
+        "lon": -117.9970894753933,
+        "identReciprocal": "36",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "WV09": {
+    "name": "Mike Ferrell Field",
+    "lat": 37.55872506648302,
+    "lon": -81.35065823793411,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 94.93232727050781,
+        "lengthM": 573.6139526367188,
+        "widthM": 17.07500457763672,
+        "lat": 37.55883101373911,
+        "lon": -81.35053977370262,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WV30": {
+    "name": "Rainelle",
+    "lat": 37.948727644979954,
+    "lon": -80.71647763252258,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 160.9429931640625,
+        "lengthM": 963.0322265625,
+        "widthM": 25,
+        "lat": 37.9488580673933,
+        "lon": -80.71697071194649,
+        "identReciprocal": "35",
+        "surface": "grass"
+      }
+    ]
+  },
+  "WV52": {
+    "name": "Nrao Green Bank",
+    "lat": 38.4306750074029,
+    "lon": -79.82561409473419,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-08",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 117.47881317138672,
+        "lengthM": 1063.744384765625,
+        "widthM": 14.792102813720703,
+        "lat": 38.43088053166866,
+        "lon": -79.82573166489601,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

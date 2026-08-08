@@ -112,6 +112,28 @@ describe('pilot travel', () => {
     assert.equal(state.pilotIcao, 'SBGL');
   });
 
+  it('settle relocates by aircraftId even when assignment was cleared', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const mission = {
+      id: 'msn_cleared',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      aircraftId: state.fleet[0]!.id,
+      status: 'in_flight',
+      aircraftClassId: state.fleet[0]!.aircraftClassId,
+      lots: [],
+      cargoKg: 100,
+      payUsd: 500,
+      acceptedAtTick: 0,
+    } as unknown as MissionIntent;
+    state.fleet[0]!.status = 'parked';
+    state.fleet[0]!.assignedMissionId = undefined;
+    state.pilotIcao = 'SBGR';
+    relocateAircraftOnSettle(state, mission);
+    assert.equal(state.fleet[0]!.locationIcao, 'SBGL');
+    assert.equal(state.pilotIcao, 'SBGL');
+  });
+
   it('crew settle relocates aircraft without moving the pilot', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'CrewPilotStay',

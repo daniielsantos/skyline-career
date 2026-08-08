@@ -95,7 +95,8 @@ export class BushTripWatchSession {
     intervalSec: 5,
     autoDepart: true,
     autoSettle: true,
-    requireEnginesOff: true,
+    /** Bush legs settle on touchdown near hub — engines may stay running. */
+    requireEnginesOff: false,
     settleRadiusNm: 12,
     pipeName: undefined as string | undefined,
   };
@@ -192,7 +193,7 @@ export class BushTripWatchSession {
       intervalSec: Math.max(1, Math.floor(opts.intervalSec ?? 5)),
       autoDepart: opts.autoDepart !== false,
       autoSettle: opts.autoSettle !== false,
-      requireEnginesOff: opts.requireEnginesOff !== false,
+      requireEnginesOff: opts.requireEnginesOff === true,
       settleRadiusNm: opts.settleRadiusNm ?? 12,
       pipeName: opts.pipeName,
     };
@@ -215,6 +216,9 @@ export class BushTripWatchSession {
     this.watchState = createMissionFlightWatchState({
       sawAirborne: active.legStatus === 'departed',
       airborneAtMs: active.departedAtMs,
+      // Mid-leg restart: next on-ground sample can settle (no need to re-land).
+      // Still airborne: lastOnGround false stays correct until touchdown.
+      ...(active.legStatus === 'departed' ? { lastOnGround: false as const } : {}),
     });
 
     const bridge = new NamedPipeSimBridge(

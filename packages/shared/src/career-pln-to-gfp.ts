@@ -4,10 +4,16 @@
  * Enroute points are emitted as lat/lon user waypoints so obscure FAA locals
  * and Asobo Mission.* POIs do not lock against a mismatched GTN database
  * (e.g. O64 ≠ Port of Catoosa). Named airports keep ICAO + coords when known.
+ *
+ * Source .PLN files under profiles/career/bush_PLN are read-only — this module
+ * never writes them. Airport coords prefer MSFS homologation / catalog over
+ * PLN WorldPosition (Airport nodes often lack position; nearby User WPs were
+ * Asobo stand-ins at rough FAA estimates).
  */
 
 import { parseMsfsBushPln, type ParsedPlnNode } from './career-bush-pln.js';
 import { US_CAREER_HUBS } from './career-us-hubs.js';
+import { listMsfsBushHubOverrides } from './career-msfs-hub-overrides.js';
 
 /** GTN family flight-plan capacity (dep + enroute + dest). */
 export const GFP_MAX_WAYPOINTS = 99;
@@ -16,6 +22,24 @@ const US_HUB_COORDS: Readonly<Record<string, { lat: number; lon: number }>> =
   Object.fromEntries(
     US_CAREER_HUBS.map((h) => [h.icao.toUpperCase(), { lat: h.lat, lon: h.lon }]),
   );
+
+/** Catalog + runtime/shipped MSFS overrides (later wins). */
+export function gfpCoordsByIcao(
+  extra?: Readonly<Record<string, { lat: number; lon: number }>>,
+): Record<string, { lat: number; lon: number }> {
+  const out: Record<string, { lat: number; lon: number }> = {
+    ...US_HUB_COORDS,
+  };
+  for (const [icao, row] of Object.entries(listMsfsBushHubOverrides())) {
+    out[icao] = { lat: row.lat, lon: row.lon };
+  }
+  if (extra) {
+    for (const [icao, row] of Object.entries(extra)) {
+      out[icao.trim().toUpperCase()] = row;
+    }
+  }
+  return out;
+}
 
 export type GfpWaypoint = {
   /** Garmin segment after `:F:` (ident and/or DMM coords). */
@@ -56,10 +80,33 @@ function formatHemisphere(value: number, isLat: boolean): string {
   return `${hemi}${String(deg).padStart(3, '0')}${String(mm).padStart(2, '0')}${t}`;
 }
 
+function haversineNm(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const r = 3440.065;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 function resolveNodeCoords(
   node: ParsedPlnNode,
-  coordsByIcao?: Readonly<Record<string, { lat: number; lon: number }>>,
+  coordsByIcao: Readonly<Record<string, { lat: number; lon: number }>>,
 ): { lat: number; lon: number } | undefined {
+  const icao = node.icao?.trim().toUpperCase();
+  // Airports: Skyline/MSFS homologation wins. PLN Airport nodes usually lack
+  // WorldPosition; Asobo often left a User WP on a rough FAA estimate instead.
+  if (node.type === 'Airport' && icao) {
+    const known = coordsByIcao[icao];
+    if (known) return known;
+  }
   if (
     typeof node.lat === 'number' &&
     typeof node.lon === 'number' &&
@@ -69,9 +116,8 @@ function resolveNodeCoords(
   ) {
     return { lat: node.lat, lon: node.lon };
   }
-  const icao = node.icao?.trim().toUpperCase();
   if (!icao) return undefined;
-  return coordsByIcao?.[icao] ?? US_HUB_COORDS[icao];
+  return coordsByIcao[icao];
 }
 
 function near(
@@ -80,6 +126,22 @@ function near(
   eps = 0.0008,
 ): boolean {
   return Math.abs(a.lat - b.lat) < eps && Math.abs(a.lon - b.lon) < eps;
+}
+
+/**
+ * Drop User WPs that sit on (or next to) an airport already in the plan —
+ * those were typically Asobo stand-ins for the field at wrong coords.
+ */
+export function scrubGfpUserWaypointsNearAirports(
+  points: GfpWaypoint[],
+  withinNm = 1.5,
+): GfpWaypoint[] {
+  const airports = points.filter((p) => p.kind === 'airport');
+  if (airports.length === 0) return points;
+  return points.filter((p) => {
+    if (p.kind === 'airport') return true;
+    return !airports.some((a) => haversineNm(p, a) <= withinNm);
+  });
 }
 
 /**
@@ -94,9 +156,10 @@ export function plnNodesToGfpWaypoints(
     allUserWaypoints?: boolean;
   } = {},
 ): GfpWaypoint[] {
+  const coords = opts.coordsByIcao ?? gfpCoordsByIcao();
   const out: GfpWaypoint[] = [];
   for (const node of nodes) {
-    const pos = resolveNodeCoords(node, opts.coordsByIcao);
+    const pos = resolveNodeCoords(node, coords);
     if (!pos) continue;
     if (out.length && near(out[out.length - 1]!, pos)) continue;
 
@@ -121,7 +184,7 @@ export function plnNodesToGfpWaypoints(
       });
     }
   }
-  return out;
+  return scrubGfpUserWaypointsNearAirports(out);
 }
 
 /** Keep endpoints + evenly sample middle points when over GTN capacity. */
@@ -173,8 +236,12 @@ export function msfsPlnXmlToGfp(
     title?: string;
   } = {},
 ): PlnToGfpResult {
+  const coords = opts.coordsByIcao ?? gfpCoordsByIcao();
   const parsed = parseMsfsBushPln(xml);
-  let points = plnNodesToGfpWaypoints(parsed.nodes, opts);
+  let points = plnNodesToGfpWaypoints(parsed.nodes, {
+    ...opts,
+    coordsByIcao: coords,
+  });
 
   // Departure/destination may be absent as Airport nodes with coords — prepend/append.
   const ensureEnd = (
@@ -183,7 +250,7 @@ export function msfsPlnXmlToGfp(
   ): void => {
     if (!icao) return;
     const code = icao.trim().toUpperCase();
-    const hub = opts.coordsByIcao?.[code] ?? US_HUB_COORDS[code];
+    const hub = coords[code];
     if (!hub) return;
     const dmm = toGarminDmm(hub.lat, hub.lon);
     const segment = opts.allUserWaypoints ? dmm : `${code},${dmm}`;
@@ -201,6 +268,7 @@ export function msfsPlnXmlToGfp(
   };
   ensureEnd(parsed.departureId, 'start');
   ensureEnd(parsed.destinationId, 'end');
+  points = scrubGfpUserWaypointsNearAirports(points);
 
   const max = opts.maxWaypoints ?? GFP_MAX_WAYPOINTS;
   const before = points.length;

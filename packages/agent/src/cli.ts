@@ -111,6 +111,7 @@ function usage(): never {
   msfs-compat-agent career-hubs [all|bush|<ICAO>] [--yes] [--pipe <name>]
   msfs-compat-agent sample-burn [--type typeId] [--pipe <name>]
   msfs-compat-agent career-airframe [wizard]|list|disable|enable|rename|remove [--type typeId] [--label name] [--keep-files]
+  msfs-compat-agent career-payload
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
   msfs-compat-agent probe-payload-stations [--pipe <name>]
@@ -129,6 +130,7 @@ Notes:
   career-hubs: SimConnect Facilities → lat/lon/name for all career hubs (or bush / one ICAO)
   sample-burn: live cruise fuel-flow sample → patch career-player-airframes.json burn
   career-airframe: interactive wizard (or list / disable / enable / rename / remove) for Market models
+  career-payload: SimBrief maxcargo / OEW / MTOW / fuel → career-player-airframes.json (Freights ceiling)
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
   probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
@@ -373,6 +375,14 @@ async function main(): Promise<void> {
         typeId: getFlag(rest, '--type'),
       }),
     );
+    return;
+  }
+
+  if (command === 'career-payload' || command === 'payload-homologate') {
+    const { runCareerPayloadWizard } = await import(
+      './career-payload-wizard.js'
+    );
+    await runCareerPayloadWizard({ repoRoot });
     return;
   }
 

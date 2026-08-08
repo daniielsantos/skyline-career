@@ -969,8 +969,35 @@ export const FUEL_HUB_ICAOS = new Set([
   'MMSD',
 ]);
 
+/** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
+export function freezeBushTripOnlyTerminal(terminal: AirportTerminal): void {
+  if (!isBushTripOnlyHub(terminal.icao) && terminal.bushTripOnly !== true) {
+    return;
+  }
+  terminal.bushTripOnly = true;
+  if (!terminal.baseProduction) terminal.baseProduction = {};
+  if (!terminal.baseConsumption) terminal.baseConsumption = {};
+  for (const c of CAREER_COMMODITIES) {
+    terminal.production[c.id] = 0;
+    terminal.consumption[c.id] = 0;
+    terminal.baseProduction[c.id] = 0;
+    terminal.baseConsumption[c.id] = 0;
+    const existing = terminal.inventory[c.id];
+    if (existing) {
+      existing.stockKg = 0;
+      existing.capacityKg = Math.max(1, existing.capacityKg);
+    } else {
+      terminal.inventory[c.id] = pile(0, 1);
+    }
+  }
+}
+
 /** Seed or repair fuel inventory + baseline flows on a terminal. */
 export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
+  if (isBushTripOnlyHub(terminal.icao) || terminal.bushTripOnly === true) {
+    freezeBushTripOnlyTerminal(terminal);
+    return;
+  }
   const icao = terminal.icao.trim().toUpperCase();
   const hub = FUEL_HUB_ICAOS.has(icao);
   const cap = hub ? 500_000 : 120_000;
@@ -1013,6 +1040,10 @@ export function ensureWorldFuelInventory(world: CareerEconomyWorld): void {
 
 /** Seed or repair aircraft-parts (MRO) inventory + baseline flows on a terminal. */
 export function ensureAirportMroInventory(terminal: AirportTerminal): void {
+  if (isBushTripOnlyHub(terminal.icao) || terminal.bushTripOnly === true) {
+    freezeBushTripOnlyTerminal(terminal);
+    return;
+  }
   const tier = hubTierOf(terminal);
   const cap =
     tier === 'major' ? 80_000 : tier === 'regional' ? 35_000 : 12_000;
@@ -1056,6 +1087,10 @@ export function ensureWorldMroInventory(world: CareerEconomyWorld): void {
  * Backfill Supplies piles on legacy airports (Tier-0 Dry ladder companion to General).
  */
 export function ensureAirportSuppliesInventory(terminal: AirportTerminal): void {
+  if (isBushTripOnlyHub(terminal.icao) || terminal.bushTripOnly === true) {
+    freezeBushTripOnlyTerminal(terminal);
+    return;
+  }
   const tier = hubTierOf(terminal);
   const cap =
     tier === 'major' ? 90_000 : tier === 'regional' ? 45_000 : 22_000;
@@ -1137,6 +1172,7 @@ export function ensureAirportHubTier(terminal: AirportTerminal): void {
   if (alreadyStamped) {
     // Keep map as source of truth if ICAO map was updated.
     terminal.hubTier = HUB_TIER_BY_ICAO[icao] ?? terminal.hubTier;
+    freezeBushTripOnlyTerminal(terminal);
     return;
   }
 
@@ -1157,6 +1193,7 @@ export function ensureAirportHubTier(terminal: AirportTerminal): void {
     terminal.baseProduction[c.id] = Math.round(baseProd * profile.flowMult);
     terminal.baseConsumption[c.id] = Math.round(baseCons * profile.flowMult);
   }
+  freezeBushTripOnlyTerminal(terminal);
 }
 
 export function ensureWorldHubTiers(world: CareerEconomyWorld): void {
@@ -1449,8 +1486,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     const inventory: AirportTerminal['inventory'] = {};
     const production: AirportTerminal['production'] = {};
     const consumption: AirportTerminal['consumption'] = {};
+    const tripOnly = h.bushTripOnly === true;
 
     for (const c of CAREER_COMMODITIES) {
+      if (tripOnly) {
+        production[c.id] = 0;
+        consumption[c.id] = 0;
+        inventory[c.id] = pile(0, 1);
+        continue;
+      }
       if (c.id === 'fuel') {
         const hub = FUEL_HUB_ICAOS.has(h.icao);
         const cap = Math.round((hub ? 500_000 : 120_000) * capacityBoost);
@@ -2083,6 +2127,10 @@ export function applyFreightDelivery(
 
 function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number): void {
   for (const ap of world.airports) {
+    if (ap.bushTripOnly === true || isBushTripOnlyHub(ap.icao)) {
+      freezeBushTripOnlyTerminal(ap);
+      continue;
+    }
     if (!ap.baseProduction) ap.baseProduction = { ...(ap.production ?? {}) };
     if (!ap.baseConsumption) ap.baseConsumption = { ...(ap.consumption ?? {}) };
 

@@ -56,6 +56,7 @@ import {
   postCrewHire,
   postCrewFire,
   postFerry,
+  postEmptyFlight,
   postPilotTravel,
   postContractPilotAccept,
   fetchContractPilotOptions,
@@ -4432,6 +4433,27 @@ export function App() {
     }
   }
 
+  async function onEmptyFlight(aircraftId: string, destIcao: string) {
+    if (!destIcao.trim()) return;
+    const dest = destIcao.trim().toUpperCase();
+    await run(async () => {
+      const result = await postEmptyFlight({ aircraftId, destIcao: dest });
+      if (result.fleet) setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setMissions((prev) => {
+        const others = prev.filter((m) => m.id !== result.mission.id);
+        return [...others, result.mission];
+      });
+      setFerryDest('');
+      setToastKind('ok');
+      setToast(
+        `Empty flight ${result.mission.originIcao}→${result.mission.destIcao} · open Dispatch`,
+      );
+      selectTab('staging');
+      await refresh();
+    });
+  }
+
   async function onPilotTravel(destIcao: string) {
     if (!destIcao.trim()) return;
     const dest = destIcao.trim().toUpperCase();
@@ -6160,7 +6182,13 @@ export function App() {
                     ? 'Settings'
                     : 'Freights';
   const pageLede = showAirport
-    ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'}${airportView.airport.bush ? ' · bush' : ''}`
+    ? `${airportView.airport.name} · ${airportView.airport.region} · ${
+        airportView.airport.bushTripOnly
+          ? 'trip-only'
+          : airportView.airport.bush
+            ? 'bush'
+            : (airportView.airport.hubTier ?? 'spoke')
+      }`
     : showStaging
       ? stagingMode === 'active'
         ? 'Guided preflight — flight plan, fuel, load, then fly and settle.'
@@ -6687,7 +6715,12 @@ export function App() {
 
       {hubSelected && showAirport ? (
         <section className="panel airport-panel">
-          {airportView.airport.bush ? (
+          {airportView.airport.bushTripOnly ? (
+            <p className="banner warn" role="status">
+              Trip-only strip — no cargo terminal, Market freights, or ferry.
+              Used only as a bush-trip endpoint (map / PLN).
+            </p>
+          ) : airportView.airport.bush ? (
             <p className="banner warn" role="status">
               Bush soft-field — no ferry in or out. Market freights do not form
               here; fly light GA bush trips from Freights → Bush trips.
@@ -7367,6 +7400,17 @@ export function App() {
                 ) : null}
 
                 {terminalSection === 'inventory' ? (
+                  airportView.airport.bushTripOnly ? (
+                    <div className="panel-head">
+                      <div>
+                        <h2>Trip-only strip</h2>
+                        <p className="muted">
+                          No warehouse stock or demand here — Skyline keeps this
+                          field for bush-trip routing only.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
                   <>
                     <div className="panel-head">
                       <div>
@@ -7480,6 +7524,7 @@ export function App() {
                       busy={busy}
                     />
                   </>
+                  )
                 ) : null}
 
                 {terminalSection === 'contracts' ? (
@@ -8299,17 +8344,6 @@ export function App() {
           ) : (
             <>
           <div className="panel-head">
-            <p className="panel-stats">
-              {marketTotalLots > 0
-                ? `${marketTotalLots.toLocaleString()} matching lots`
-                : '0 matching lots'}
-              {npcActivity.length > 0
-                ? ` · ${npcActivity.length} NPC airborne`
-                : ''}
-              {fleet.find((a) => a.status === 'parked')
-                ? ` · aircraft at ${fleet.find((a) => a.status === 'parked')!.locationIcao}`
-                : ''}
-            </p>
             <label className="board-aircraft">
               <span>Estimate net for</span>
               <select
@@ -8366,11 +8400,6 @@ export function App() {
               )}
             />
           </div>
-          <MarketEventsSummary
-            events={marketEvents}
-            expanded={marketEventsExpanded}
-            onToggle={() => setMarketEventsExpanded((v) => !v)}
-          />
           {playerDispatchMission ? (
             <p className="banner warn">
               Active flight {playerDispatchMission.id} (
@@ -9888,7 +9917,7 @@ export function App() {
               <p>
                 {networkHubsLoading
                   ? 'Loading hubs…'
-                  : `${networkHubs.length} registered hubs · click a marker to open the terminal`}
+                  : `${networkHubs.length} cargo network hubs · trip-only bush strips are hidden · click a marker to open the terminal`}
               </p>
             </div>
             <button
@@ -10317,6 +10346,7 @@ export function App() {
                   onListForLease={(id) => void onListForLease(id)}
                   onSell={(id) => void onSellAircraft(id)}
                   onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
+                  onEmptyFlight={(id, dest) => onEmptyFlight(id, dest)}
                   onTravel={(dest) => void onPilotTravel(dest)}
                 />
               ))}
@@ -10337,6 +10367,11 @@ export function App() {
                 </span>
               </p>
               <RegionPressureChips regions={regionPressure} />
+              <MarketEventsSummary
+                events={marketEvents}
+                expanded={marketEventsExpanded}
+                onToggle={() => setMarketEventsExpanded((v) => !v)}
+              />
             </div>
           </div>
           <FleetRoster

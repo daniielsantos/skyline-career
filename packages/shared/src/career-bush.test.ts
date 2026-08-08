@@ -20,8 +20,10 @@ import {
   createSeedEconomyWorld,
   migrateEconomyWorld,
 } from './career-economy.js';
-import { planFerryRoute } from './career-ferry-route.js';
-import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
+import { planFerryRoute, hubDistanceNm } from './career-ferry-route.js';
+import { emptyMissionsStateV2, selectStarterHub, quoteFerry } from './career-fleet.js';
+import { acceptEmptyFlight } from './career-mission.js';
+import { resolveAirframeMaxRangeNm } from './career-player-airframes.js';
 
 describe('global soft-field bush hubs', () => {
   it('catalogs bush spokes in BR/US/CA/MX', () => {
@@ -67,7 +69,7 @@ describe('global soft-field bush hubs', () => {
     assert.equal(bushLotPayMult('SBGR', 'SBKP', 'electronics'), 1);
   });
 
-  it('blocks ferry plan to or from bush', () => {
+  it('blocks ferry into soft-field bush or trip-only; allows ferry out of trip-only', () => {
     assert.throws(
       () =>
         planFerryRoute({
@@ -88,7 +90,16 @@ describe('global soft-field bush hubs', () => {
     );
     assert.throws(() => assertFerryNotBush('SBEG', 'SWTP'), /ferry unavailable/i);
     assert.throws(() => assertFerryNotBush('CYVR', 'CYHE'), /ferry unavailable/i);
-    assert.throws(() => assertFerryNotBush('KRMG', '26A'), /ferry unavailable/i);
+    assert.throws(
+      () => assertFerryNotBush('KRMG', '26A'),
+      /Cannot ferry into a trip-only/i,
+    );
+    assert.throws(
+      () => assertFerryNotBush('O67', 'O56'),
+      /Cannot ferry into a trip-only/i,
+    );
+    assert.doesNotThrow(() => assertFerryNotBush('O67', 'KHTH'));
+    assert.doesNotThrow(() => assertFerryNotBush('26A', 'KRMG'));
   });
 
   it('rejects light_ga gate helper for non-GA on bush OD', () => {
@@ -156,5 +167,51 @@ describe('global soft-field bush hubs', () => {
     assert.ok(isBushTripOnlyHub('26A'));
     assert.ok(listBushTripOnlyIcaos().includes('CA51'));
     assert.equal(isBushHub('26A'), false);
+  });
+
+  it('allows ferry out of trip-only to a network hub; empty flight still works', () => {
+    const world = createSeedEconomyWorld({ seed: 'empty-o67' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'KMIA', {
+      pilotName: 'Recovery Pilot',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const aircraft = state.fleet[0]!;
+    aircraft.locationIcao = 'O67';
+    state.pilotIcao = 'O67';
+
+    const maxRangeNm = resolveAirframeMaxRangeNm(
+      aircraft.airframeTypeId,
+      aircraft.aircraftClassId,
+    );
+    const candidates = ['KHTH', 'KBIH', 'KCCR', 'KRNO', 'KSFO'].filter((icao) => {
+      const nm = hubDistanceNm('O67', icao);
+      return nm != null && nm > 0 && nm <= maxRangeNm;
+    });
+    assert.ok(candidates.length > 0, 'expected a network hub within C172 range of O67');
+    const dest = candidates[0]!;
+
+    const quote = quoteFerry(world, state, {
+      aircraftId: aircraft.id,
+      destIcao: dest,
+    });
+    assert.equal(quote.originIcao, 'O67');
+    assert.equal(quote.destIcao, dest);
+
+    assert.throws(
+      () =>
+        quoteFerry(world, state, {
+          aircraftId: aircraft.id,
+          destIcao: 'O56',
+        }),
+      /Cannot ferry into a trip-only/i,
+    );
+
+    const accepted = acceptEmptyFlight(world, state, {
+      aircraftId: aircraft.id,
+      destIcao: dest,
+    });
+    assert.equal(accepted.mission.emptyFlight, true);
+    assert.equal(accepted.mission.originIcao, 'O67');
+    assert.equal(accepted.mission.destIcao, dest);
   });
 });

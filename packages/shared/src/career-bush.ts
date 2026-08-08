@@ -3,6 +3,7 @@
  * Market freights never form on bush ODs (payload rides on bush trips).
  * light_ga + no dealer ferry still apply at bush hubs.
  * US `bushTripOnly` locals: trip endpoints only — also blocked from Market/ferry/home.
+ * Trip-only strips have frozen cargo economy (no warehouse demand) and stay off the Network map.
  */
 
 import { BR_CAREER_HUBS } from './career-br-hubs.js';
@@ -163,13 +164,25 @@ export function assertBushLightGa(
   }
 }
 
+/**
+ * Instant ferry gate.
+ * Soft-field bush: blocked either end (must fly bush trips).
+ * Trip-only strips: may ferry OUT to a network hub; cannot ferry INTO trip-only.
+ */
 export function assertFerryNotBush(
   originIcao: string,
   destIcao: string,
 ): void {
-  if (isOfflineNetworkHub(originIcao) || isOfflineNetworkHub(destIcao)) {
+  const origin = originIcao.trim().toUpperCase();
+  const dest = destIcao.trim().toUpperCase();
+  if (isBushHub(origin) || isBushHub(dest)) {
     throw new Error(
-      'Bush strips require a flown mission — ferry unavailable',
+      'Bush strips require a flown mission — ferry unavailable (Hangar: Plan empty flight)',
+    );
+  }
+  if (isBushTripOnlyHub(dest)) {
+    throw new Error(
+      'Cannot ferry into a trip-only strip — fly a bush trip or empty Watch flight',
     );
   }
 }

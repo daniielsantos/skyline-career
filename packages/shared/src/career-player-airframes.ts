@@ -57,6 +57,42 @@ export interface CareerPlayerAirframe {
   fuelBurnKgPerNm?: number;
 }
 
+/**
+ * Soft freight ceiling for Career: never above zero-fuel / takeoff structural
+ * leftover (MZFW−OEW or MTOW−OEW). Station sums often overstate this.
+ */
+export function clampCareerMaxCargoKg(opts: {
+  maxCargoKg?: number | null;
+  oewKg?: number | null;
+  mtowKg?: number | null;
+  mzfwKg?: number | null;
+}): number | undefined {
+  const raw = opts.maxCargoKg;
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+    return undefined;
+  }
+  let cap = Math.floor(raw);
+  const oew =
+    typeof opts.oewKg === 'number' && Number.isFinite(opts.oewKg) && opts.oewKg > 0
+      ? opts.oewKg
+      : undefined;
+  const mtow =
+    typeof opts.mtowKg === 'number' && Number.isFinite(opts.mtowKg) && opts.mtowKg > 0
+      ? opts.mtowKg
+      : undefined;
+  const mzfw =
+    typeof opts.mzfwKg === 'number' && Number.isFinite(opts.mzfwKg) && opts.mzfwKg > 0
+      ? opts.mzfwKg
+      : undefined;
+  if (oew != null && mtow != null && mtow > oew) {
+    cap = Math.min(cap, Math.floor(mtow - oew));
+  }
+  if (oew != null && mzfw != null && mzfw > oew) {
+    cap = Math.min(cap, Math.floor(mzfw - oew));
+  }
+  return cap > 0 ? cap : undefined;
+}
+
 /** Keep in sync with CAREER_AIRCRAFT_CLASSES (avoid circular import). */
 const CLASS_PERF_FALLBACK: Record<
   FreighterClassId,

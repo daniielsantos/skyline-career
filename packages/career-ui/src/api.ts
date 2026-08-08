@@ -468,6 +468,8 @@ export type Mission = {
   crewReturnFeeUsd?: number;
   crewRoundTrip?: boolean;
   crewDeadhead?: boolean;
+  /** Player empty reposition (no freight) — Hangar → Plan empty flight. */
+  emptyFlight?: boolean;
   crewReturnIcao?: string;
   crewOutboundMissionId?: string;
   settledFuelKg?: number;
@@ -766,6 +768,7 @@ export type AirportView = ClockSync & {
     lon?: number;
     hubTier?: 'major' | 'regional' | 'spoke';
     bush?: boolean;
+    bushTripOnly?: boolean;
   };
   hubLevel?: {
     level: number;
@@ -1703,6 +1706,25 @@ export function postFerry(opts: {
     hubs?: StarterHubOption[];
     pilotIcao?: string;
   }>('/api/fleet/ferry', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+/** Player empty reposition (no cargo) — Dispatch/Watch; works from bush/trip-only. */
+export function postEmptyFlight(opts: {
+  aircraftId: string;
+  destIcao: string;
+}) {
+  return api<{
+    mission: Mission;
+    aircraft: PlayerAircraft;
+    walletUsd: number;
+    fleet?: PlayerAircraft[];
+    hubSelected?: boolean;
+    hubs?: StarterHubOption[];
+    pilotIcao?: string;
+  }>('/api/fleet/empty-flight', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

@@ -1,5 +1,6 @@
 import {
   applyFreightDelivery,
+  CAREER_HUB_COORDS,
   getCommodity,
   listMarketLots,
   routeDistanceNm,
@@ -7,8 +8,15 @@ import {
   type MarketLotView,
 } from './career-economy.js';
 import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './career-aircraft-market.js';
-import { applyPlayerDepartFuel, relocateAircraftOnSettle, releaseAircraftOnCancel } from './career-fleet.js';
+import {
+  applyPlayerDepartFuel,
+  assignAircraftToMission,
+  findPlayerAircraft,
+  relocateAircraftOnSettle,
+  releaseAircraftOnCancel,
+} from './career-fleet.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
+import { hubDistanceNm } from './career-ferry-route.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
   evaluateMinAirborneElapsed,
@@ -27,7 +35,7 @@ import {
   type CargoOpsDelta,
 } from './career-cargo-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
-import { assertBushLightGa } from './career-bush.js';
+import { assertBushLightGa, isOfflineNetworkHub } from './career-bush.js';
 import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
@@ -36,6 +44,7 @@ import {
 } from './career-player-airframes.js';
 import type {
   CareerMissionsState,
+  PlayerAircraft,
 } from './types/career-economy.js';
 import { KG_TO_LB } from './ofp-compliance.js';
 import type {
@@ -601,6 +610,15 @@ function missionLines(mission: MissionIntent): MissionLotLine[] {
   return [];
 }
 
+/** True when the mission carries no freight (crew return, CP reposition, or player empty). */
+export function isEmptyLegMission(mission: MissionIntent): boolean {
+  return (
+    mission.crewDeadhead === true ||
+    mission.contractPilotReposition === true ||
+    mission.emptyFlight === true
+  );
+}
+
 /** Recompute top-level mirrors from `lots` (or legacy single-lot fields). */
 export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
   const lots = missionLines(mission);
@@ -629,6 +647,20 @@ export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
         deadlineTick: mission.deadlineTick,
         urgency: 'normal',
         reason: mission.reason || 'Reposition',
+      };
+    }
+    if (mission.emptyFlight) {
+      return {
+        ...mission,
+        lots: [],
+        shipmentLotId: mission.shipmentLotId || `empty_${mission.id}`,
+        commodityId: mission.commodityId || 'general',
+        cargoKg: 0,
+        payUsd: 0,
+        deadlineTick: mission.deadlineTick,
+        urgency: 'normal',
+        reason: mission.reason || 'Empty flight',
+        emptyFlight: true,
       };
     }
     throw new Error(`Mission ${mission.id} has no lot lines`);
@@ -694,6 +726,7 @@ export function findOpenManifestForRoute(
     .filter(
       (m) =>
         (m.status === 'accepted' || m.status === 'dispatched') &&
+        !isEmptyLegMission(m) &&
         m.aircraftClassId === opts.aircraftClassId &&
         m.originIcao === opts.originIcao &&
         m.destIcao === opts.destIcao,
@@ -769,6 +802,97 @@ export function listActivePlayerMissions(
   return missions
     .map((m) => normalizeMissionIntent(m))
     .filter((m) => isActiveMissionStatus(m.status));
+}
+
+/**
+ * Accept an empty player reposition (no freight). Flown via Dispatch/Watch.
+ * Allowed from bush / trip-only strips — instant ferry stays blocked there.
+ */
+export function acceptEmptyFlight(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  opts: { aircraftId: string; destIcao: string; missionId?: string },
+): { mission: MissionIntent; aircraft: PlayerAircraft } {
+  const bush = state.activeBushTrip;
+  if (bush && (bush.status === 'accepted' || bush.status === 'in_progress')) {
+    throw new Error('Finish or abandon the active bush trip first');
+  }
+  const open = listActivePlayerMissions(state.missions ?? []);
+  if (open.length > 0) {
+    throw new Error(
+      `Finish or cancel ${open[0]!.id} before planning an empty flight`,
+    );
+  }
+
+  const aircraft = findPlayerAircraft(state, opts.aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  if (aircraft.status !== 'parked') {
+    throw new Error(`Aircraft ${aircraft.id} is not parked`);
+  }
+
+  const origin = aircraft.locationIcao.trim().toUpperCase();
+  const dest = opts.destIcao.trim().toUpperCase();
+  if (!CAREER_HUB_COORDS[origin]) {
+    throw new Error(`Unknown origin hub: ${origin}`);
+  }
+  if (!CAREER_HUB_COORDS[dest]) {
+    throw new Error(`Unknown destination hub: ${dest}`);
+  }
+  if (origin === dest) {
+    throw new Error(`Aircraft is already at ${dest}`);
+  }
+
+  assertBushLightGa(origin, dest, aircraft.aircraftClassId);
+
+  const distanceNm =
+    hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);
+  if (distanceNm === undefined) {
+    throw new Error(`No route distance for ${origin}→${dest}`);
+  }
+  const maxRangeNm = resolveAirframeMaxRangeNm(
+    aircraft.airframeTypeId,
+    aircraft.aircraftClassId,
+  );
+  if (distanceNm > maxRangeNm) {
+    throw new Error(
+      `Empty flight ${origin}→${dest} is ${Math.round(distanceNm)} nm; max range is ${maxRangeNm} nm — pick a closer hub`,
+    );
+  }
+
+  const classDef = getAircraftClass(aircraft.aircraftClassId);
+  const missionId =
+    opts.missionId?.trim() ||
+    `msn_empty_${world.tick}_${origin}_${dest}_${Math.floor(Math.random() * 1e6)}`;
+
+  const mission = recomputeMissionTotals({
+    id: missionId,
+    lots: [],
+    shipmentLotId: `empty_${missionId}`,
+    commodityId: 'general',
+    originIcao: origin,
+    destIcao: dest,
+    cargoKg: 0,
+    pax: 0,
+    aircraftClassId: aircraft.aircraftClassId,
+    airframeTypeId: aircraft.airframeTypeId,
+    rolesPackRelPath: classDef.rolesPackRelPath,
+    deadlineTick: world.tick + TICKS_PER_HOUR * 48,
+    payUsd: 0,
+    urgency: 'normal',
+    reason: isOfflineNetworkHub(origin)
+      ? `Empty recovery · ${origin}→${dest}`
+      : `Empty flight · ${origin}→${dest}`,
+    status: 'accepted',
+    acceptedAtTick: world.tick,
+    aircraftId: aircraft.id,
+    emptyFlight: true,
+  });
+
+  assignAircraftToMission(state, aircraft.id, mission.id, origin);
+  state.missions = [...(state.missions ?? []), mission];
+  syncPlayerInbound(world, mission);
+
+  return { mission, aircraft };
 }
 
 /**
@@ -1390,7 +1514,7 @@ export function departMission(
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot depart mission in status=${normalized.status}`);
   }
-  if (!normalized.crewDeadhead) {
+  if (!normalized.crewDeadhead && !normalized.emptyFlight) {
     for (const line of normalized.lots) {
       const lot = findLot(world, line.shipmentLotId);
       if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
@@ -1696,19 +1820,20 @@ export function settleMission(
   const weatherOps = opts.weatherOps ?? working.settledWeatherOps;
   const weatherBonusFrac =
     weatherOps && weatherOps.eligible ? weatherOps.bonusFrac : 0;
-  const pay = working.crewDeadhead
-    ? {
-        lateTicks: 0,
-        penaltyUsd: 0,
-        payoutUsd: 0,
-        onTime: true,
-        weatherBonusUsd: 0,
-      }
-    : computeSettlementPay(working, settleTick, scorePct, weatherBonusFrac);
+  const pay =
+    working.crewDeadhead || working.emptyFlight
+      ? {
+          lateTicks: 0,
+          penaltyUsd: 0,
+          payoutUsd: 0,
+          onTime: true,
+          weatherBonusUsd: 0,
+        }
+      : computeSettlementPay(working, settleTick, scorePct, weatherBonusFrac);
   // Allocate penalty across lines proportional to payUsd.
   let penaltyLeft = pay.penaltyUsd;
 
-  if (!working.crewDeadhead) {
+  if (!working.crewDeadhead && !working.emptyFlight) {
     for (let i = 0; i < working.lots.length; i++) {
       const line = working.lots[i]!;
       const delivery = applyFreightDelivery(world, {
@@ -1809,7 +1934,8 @@ export function settleMission(
   if (
     opts.fleet &&
     !working.crewDeadhead &&
-    !working.contractPilotReposition
+    !working.contractPilotReposition &&
+    !working.emptyFlight
   ) {
     const applied = applyCargoOpsOnSettle(opts.fleet.cargoOps, settled, {
       onTime: pay.onTime,

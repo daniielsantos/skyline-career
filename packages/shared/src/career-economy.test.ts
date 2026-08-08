@@ -62,6 +62,23 @@ describe('career-economy seed', () => {
     assert.equal(br.length, 62);
     assert.equal(us.length, 123);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
+    for (const ap of world.airports.filter((a) => a.bushTripOnly)) {
+      assert.equal(
+        Object.values(ap.production).every((v) => v === 0),
+        true,
+        `${ap.icao} should have zero production`,
+      );
+      assert.equal(
+        Object.values(ap.consumption).every((v) => v === 0),
+        true,
+        `${ap.icao} should have zero consumption`,
+      );
+      assert.equal(
+        Object.values(ap.inventory).every((pile) => pile.stockKg === 0),
+        true,
+        `${ap.icao} should have empty stock`,
+      );
+    }
     assert.equal(ca.length, 53);
     assert.equal(mx.length, 47);
     assert.deepEqual(
@@ -104,6 +121,18 @@ describe('career-economy seed', () => {
       assert.ok(Number.isFinite(ap.lat));
       assert.ok(Number.isFinite(ap.lon));
       assert.ok(ap.hubTier === 'major' || ap.hubTier === 'regional' || ap.hubTier === 'spoke');
+    }
+    tickEconomyN(world, 4, { fromBatchAtMs: world.lastBatchAtMs });
+    assert.equal(world.tick, 4);
+    for (const ap of world.airports.filter((a) => a.bushTripOnly)) {
+      assert.ok(
+        Object.values(ap.production).every((v) => v === 0),
+        `${ap.icao} stayed frozen after tick`,
+      );
+      assert.ok(
+        Object.values(ap.inventory).every((pile) => pile.stockKg === 0),
+        `${ap.icao} stock stayed empty after tick`,
+      );
     }
   });
 

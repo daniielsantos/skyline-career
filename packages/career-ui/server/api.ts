@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   acceptMission,
+  acceptEmptyFlight,
   assignAircraftToMission,
   buyOutAircraftLease,
   returnAircraftLeaseEarly,
@@ -907,7 +908,13 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/hubs') {
         const payload = await withCareerRead((world, missions) => ({
           homeHubIcao: missions.homeHubIcao ?? null,
-          hubs: world.airports.map((airport) => ({
+          hubs: world.airports
+            .filter(
+              (airport) =>
+                airport.bushTripOnly !== true &&
+                !isBushTripOnlyHub(airport.icao),
+            )
+            .map((airport) => ({
             icao: airport.icao,
             name: airport.name,
             region: airport.region,
@@ -1562,6 +1569,38 @@ export function createCareerApiServer(port = 8787) {
               walletDebitUsd: ferried.walletDebitUsd,
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fleet/empty-flight') {
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          destIcao?: string;
+        };
+        if (!body.aircraftId || !body.destIcao) {
+          send(res, 400, { error: 'aircraftId and destIcao required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const accepted = acceptEmptyFlight(world, missions, {
+              aircraftId: body.aircraftId!,
+              destIcao: body.destIcao!,
+            });
+            return {
+              mission: accepted.mission,
+              aircraft: accepted.aircraft,
+              walletUsd: missions.walletUsd,
+              ...fleetPayload(missions, world),
             };
           });
           send(res, 200, result);

@@ -1,5 +1,5 @@
 import { CAREER_HUB_COORDS, distanceNm } from './career-economy.js';
-import { assertFerryNotBush } from './career-bush.js';
+import { assertFerryNotBush, isBushHub, isBushTripOnlyHub } from './career-bush.js';
 
 /** Planning margin vs airframe max range (leave headroom for winds / burn). */
 export const FERRY_ROUTE_RANGE_MARGIN = 0.92;
@@ -155,7 +155,12 @@ export function planFerryRoute(opts: {
     };
   }
 
-  const hubs = Object.keys(coords);
+  const hubs = Object.keys(coords).filter((icao) => {
+    // Soft-field / trip-only only as journey origin (or final — gated by assert).
+    // Never use them as intermediate stepping stones.
+    if (icao === origin || icao === finalDest) return true;
+    return !isBushHub(icao) && !isBushTripOnlyHub(icao);
+  });
 
   // Adjacency: undirected hop ≤ hopRange.
   const adj = new Map<string, Array<{ to: string; nm: number }>>();

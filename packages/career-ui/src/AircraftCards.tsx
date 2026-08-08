@@ -481,6 +481,8 @@ export function HangarAircraftCard(props: {
     dest: string,
     opts?: { finalDest?: string },
   ) => Promise<void>;
+  /** Empty flown reposition (Dispatch/Watch) — recovery from bush/trip-only. */
+  onEmptyFlight: (id: string, dest: string) => Promise<void>;
   onTravel: (destIcao: string) => void;
 }) {
   const acf = props.aircraft;
@@ -612,14 +614,25 @@ export function HangarAircraftCard(props: {
   const moveValue = moveMode === 'ferry' ? props.ferryDest : props.travelDest;
   const moveOnChange =
     moveMode === 'ferry' ? props.onFerryDestChange : props.onTravelDestChange;
-  const nextFerryDest =
-    moveMode === 'ferry' && ferryPlan?.nextLeg
-      ? ferryPlan.nextLeg.to
-      : ferryFinal;
+  const ferryBlockedForBush =
+    /ferry unavailable|flown mission|Cannot ferry into a trip-only/i.test(
+      ferryPlanError ?? '',
+    );
+  const destReady =
+    Boolean(ferryFinal) &&
+    ferryFinal !== acf.locationIcao.trim().toUpperCase();
+  /** Empty Watch reposition — always offered when a dest is picked. */
+  const emptyFlightReady =
+    moveMode === 'ferry' && destReady && acf.status === 'parked';
+  const ferryReady = Boolean(
+    moveMode === 'ferry' &&
+      destReady &&
+      !ferryPlanLoading &&
+      !ferryPlanError &&
+      ferryPlan,
+  );
   const moveReady = Boolean(
-    moveMode === 'ferry'
-      ? nextFerryDest && !ferryPlanLoading && !ferryPlanError && ferryPlan
-      : moveValue?.trim(),
+    moveMode === 'ferry' ? ferryReady || emptyFlightReady : moveValue?.trim(),
   );
   const multiLeg = Boolean(ferryPlan && ferryPlan.legCount > 1);
 
@@ -826,7 +839,7 @@ export function HangarAircraftCard(props: {
               </div>
               <div className="hangar-move-row">
                 <label className="staging-aircraft ferry-hub-label">
-                  {moveMode === 'ferry' ? 'Ferry to' : 'Pilot to'}
+                  {moveMode === 'ferry' ? 'Destination' : 'Travel to'}
                   <FerryHubCombobox
                     hubs={props.hubOptions}
                     excludeIcao={moveExcludeIcao}
@@ -843,41 +856,68 @@ export function HangarAircraftCard(props: {
                     }
                   />
                 </label>
-                <button
-                  type="button"
-                  className="ghost hangar-move-go"
-                  disabled={
-                    props.busy ||
-                    !moveReady ||
-                    (moveMode === 'ferry' && acf.status !== 'parked')
-                  }
-                  onClick={() => {
-                    if (moveMode === 'ferry') {
-                      setFerryJourneyFinal(ferryFinal);
-                      setFerryJourneyOpen(true);
-                    } else {
-                      props.onTravel(props.travelDest);
-                    }
-                  }}
-                  title={
-                    moveMode === 'ferry' && multiLeg
-                      ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
-                      : undefined
-                  }
-                >
-                  {moveMode === 'ferry'
-                    ? multiLeg
-                      ? `Plan · ${ferryPlan?.legCount} legs`
-                      : 'Plan ferry'
-                    : 'Go'}
-                </button>
+                {moveMode === 'ferry' ? (
+                  <>
+                    <button
+                      type="button"
+                      className="ghost hangar-move-go"
+                      disabled={
+                        props.busy || !ferryReady || acf.status !== 'parked'
+                      }
+                      onClick={() => {
+                        setFerryJourneyFinal(ferryFinal);
+                        setFerryJourneyOpen(true);
+                      }}
+                      title={
+                        ferryBlockedForBush
+                          ? ferryPlanError ?? 'Instant ferry unavailable'
+                          : multiLeg
+                            ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
+                            : `Instant ferry ${acf.locationIcao} → ${ferryFinal}`
+                      }
+                    >
+                      {multiLeg && ferryReady
+                        ? `Ferry · ${ferryPlan?.legCount} legs`
+                        : 'Plan ferry'}
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost hangar-move-go"
+                      disabled={
+                        props.busy ||
+                        !emptyFlightReady ||
+                        acf.status !== 'parked'
+                      }
+                      onClick={() =>
+                        void props.onEmptyFlight(acf.id, ferryFinal)
+                      }
+                      title={`Empty Watch flight ${acf.locationIcao} → ${ferryFinal} (no contract)`}
+                    >
+                      Plan empty flight
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="ghost hangar-move-go"
+                    disabled={props.busy || !moveReady}
+                    onClick={() => props.onTravel(props.travelDest)}
+                  >
+                    Go
+                  </button>
+                )}
               </div>
               {moveMode === 'ferry' && ferryFinal ? (
                 <div className="ferry-plan">
                   {ferryPlanLoading ? (
                     <p className="ferry-plan-meta">Planning route…</p>
                   ) : ferryPlanError ? (
-                    <p className="ferry-plan-error">{ferryPlanError}</p>
+                    <p className="ferry-plan-error" role="status">
+                      {ferryPlanError}
+                      {emptyFlightReady
+                        ? ' · Plan empty flight still available.'
+                        : ''}
+                    </p>
                   ) : ferryPlan && ferryPlan.plan ? (
                     <>
                       <p className="ferry-plan-route" title={ferryPlan.plan.hops.join(' → ')}>
@@ -905,10 +945,10 @@ export function HangarAircraftCard(props: {
                       </p>
                       <p className="ferry-plan-meta">
                         {multiLeg
-                          ? `${ferryPlan.legCount} legs · open Plan to fly hop-by-hop`
+                          ? `${ferryPlan.legCount} legs · ferry hops instantly, or fly empty in one Watch leg if in range`
                           : `Direct · ${ferryPlan.remainingNm.toLocaleString()} nm`}
                         {ferryPlan.nextQuote
-                          ? ` · next ${props.formatMoney(ferryPlan.nextQuote.totalCostUsd)}`
+                          ? ` · ferry next ${props.formatMoney(ferryPlan.nextQuote.totalCostUsd)}`
                           : ''}
                       </p>
                     </>

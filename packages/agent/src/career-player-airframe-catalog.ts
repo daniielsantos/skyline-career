@@ -11,7 +11,11 @@
  */
 import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
-import type { AircraftProfile, FreighterClassId } from '@msfs-compat/shared';
+import {
+  clampCareerMaxCargoKg,
+  type AircraftProfile,
+  type FreighterClassId,
+} from '@msfs-compat/shared';
 import {
   matchHeuristic,
   type OfpRolesPackFile,
@@ -36,6 +40,9 @@ type CareerPlayerAirframeRow = {
   cruiseSpeedKt?: number;
   fuelBurnKgPerNm?: number;
 };
+
+/** Public catalog row shape for Market / payload wizards. */
+export type CareerPlayerAirframeCatalogRow = CareerPlayerAirframeRow;
 
 export const CAREER_CLASS_CHOICES: Array<{
   value: FreighterClassId;
@@ -413,7 +420,14 @@ export async function registerCareerPlayerAirframe(opts: {
   const fuelBurnKgPerNm = pickNum(opts.fuelBurnKgPerNm, existing?.fuelBurnKgPerNm);
   if (oewKg != null) row.oewKg = Math.round(oewKg);
   if (mtowKg != null) row.mtowKg = Math.round(mtowKg);
-  if (maxCargoKg != null) row.maxCargoKg = Math.round(maxCargoKg);
+  if (maxCargoKg != null) {
+    row.maxCargoKg =
+      clampCareerMaxCargoKg({
+        maxCargoKg,
+        oewKg: row.oewKg,
+        mtowKg: row.mtowKg,
+      }) ?? Math.round(maxCargoKg);
+  }
   if (fuelCapacityKg != null) row.fuelCapacityKg = Math.round(fuelCapacityKg);
   if (maxRangeNm != null) row.maxRangeNm = Math.round(maxRangeNm);
   if (cruiseFuelFlowKgPerHour != null) {
@@ -488,6 +502,57 @@ export async function setCareerPlayerAirframeLabel(opts: {
     );
   }
   const next: CareerPlayerAirframeRow = { ...rows[idx]!, label };
+  rows[idx] = next;
+  await writeCatalogRows(opts.repoRoot, rows);
+  return next;
+}
+
+/**
+ * Patch OEW / MTOW / fuel / maxcargo for Freights (SimBrief payload wizard).
+ * maxCargo is clamped to MTOW−OEW when both weights are present.
+ */
+export async function setCareerPlayerAirframePayloadWeights(opts: {
+  repoRoot: string;
+  typeId: string;
+  oewKg?: number;
+  mtowKg?: number;
+  maxCargoKg?: number;
+  fuelCapacityKg?: number;
+}): Promise<CareerPlayerAirframeRow> {
+  const typeId = opts.typeId.trim();
+  if (!typeId) throw new Error('typeId is required');
+  const rows = await readCatalogRows(catalogPath(opts.repoRoot));
+  const idx = rows.findIndex((row) => row.typeId === typeId);
+  if (idx < 0) {
+    throw new Error(`No Skyline player airframe registered as ${typeId}`);
+  }
+  const current = rows[idx]!;
+  const next: CareerPlayerAirframeRow = { ...current };
+  if (typeof opts.oewKg === 'number' && Number.isFinite(opts.oewKg) && opts.oewKg > 0) {
+    next.oewKg = Math.round(opts.oewKg);
+  }
+  if (typeof opts.mtowKg === 'number' && Number.isFinite(opts.mtowKg) && opts.mtowKg > 0) {
+    next.mtowKg = Math.round(opts.mtowKg);
+  }
+  if (
+    typeof opts.fuelCapacityKg === 'number' &&
+    Number.isFinite(opts.fuelCapacityKg) &&
+    opts.fuelCapacityKg > 0
+  ) {
+    next.fuelCapacityKg = Math.round(opts.fuelCapacityKg);
+  }
+  if (
+    typeof opts.maxCargoKg === 'number' &&
+    Number.isFinite(opts.maxCargoKg) &&
+    opts.maxCargoKg > 0
+  ) {
+    next.maxCargoKg =
+      clampCareerMaxCargoKg({
+        maxCargoKg: opts.maxCargoKg,
+        oewKg: next.oewKg,
+        mtowKg: next.mtowKg,
+      }) ?? Math.round(opts.maxCargoKg);
+  }
   rows[idx] = next;
   await writeCatalogRows(opts.repoRoot, rows);
   return next;

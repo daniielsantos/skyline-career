@@ -50,8 +50,9 @@ export interface AirportTerminal {
    */
   bush?: boolean;
   /**
-   * Trip-only strip (US FAA locals). On map for bush trips; no Market/ferry/home hub.
-   */
+ * Trip-only strip (US FAA locals). On map for bush trips only — hidden from
+ * Network; no Market/ferry/home hub; frozen cargo economy.
+ */
   bushTripOnly?: boolean;
   /** WGS84 latitude (degrees) — used for live settle proximity. */
   lat: number;
@@ -659,6 +660,11 @@ export interface MissionIntent {
    * settles — not a freight haul.
    */
   contractPilotReposition?: boolean;
+  /**
+   * Player-owned empty reposition (no freight). Flown via Dispatch/Watch —
+   * used to leave bush/trip-only strips and to relocate without a contract.
+   */
+  emptyFlight?: boolean;
   /** Fee paid to the player on settle (also mirrored in payUsd for contract legs). */
   contractPilotFeeUsd?: number;
   /** Full freight value the NPC reserved (display / ledger note). */

@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   CAREER_PLAYER_AIRFRAMES,
   careerPlayerAirframePackPaths,
+  clampCareerMaxCargoKg,
   defaultCareerPlayerAirframe,
   findCareerPlayerAirframe,
   isCareerPlayerAirframeEnabled,
@@ -182,6 +183,26 @@ describe('career player airframes', () => {
     );
     assert.equal(resolveAirframeMaxRangeNm('missing-type', 'light_ga'), 800);
     assert.equal(resolveAirframeCruiseSpeedKt('carenado-404-titan-cargo'), 181);
+  });
+
+  it('clamps maxCargo to MTOW−OEW / MZFW−OEW', () => {
+    assert.equal(
+      clampCareerMaxCargoKg({
+        maxCargoKg: 2948,
+        oewKg: 1922,
+        mtowKg: 3969,
+      }),
+      2047,
+    );
+    assert.equal(
+      clampCareerMaxCargoKg({
+        maxCargoKg: 2948,
+        oewKg: 1922,
+        mtowKg: 3969,
+        mzfwKg: 3550,
+      }),
+      1628,
+    );
   });
 });
 

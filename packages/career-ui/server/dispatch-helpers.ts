@@ -6,6 +6,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  clampCareerMaxCargoKg,
   compareMissionIntentToOfp,
   estimateRouteCargoLimit,
   findCareerPlayerAirframe,
@@ -136,6 +137,19 @@ export async function resolveClassMaxCargoKg(
     airframe?.typeId ?? airframeTypeId,
     aircraftClassId,
   );
+
+  const finish = (value: ClassCargoLimit): ClassCargoLimit => {
+    const clamped =
+      clampCareerMaxCargoKg({
+        maxCargoKg: value.maxCargoKg,
+        oewKg: value.oewKg,
+        mtowKg: value.mtowKg,
+      }) ?? value.maxCargoKg;
+    const next = { ...value, maxCargoKg: clamped };
+    cargoLimitCache.set(cacheKey, next);
+    return next;
+  };
+
   if (
     airframe &&
     typeof airframe.maxCargoKg === 'number' &&
@@ -143,7 +157,7 @@ export async function resolveClassMaxCargoKg(
     typeof airframe.oewKg === 'number' &&
     typeof airframe.mtowKg === 'number'
   ) {
-    const value = {
+    return finish({
       maxCargoKg: Math.floor(airframe.maxCargoKg),
       source: 'airframe-catalog',
       airframeLabel: airframe.label,
@@ -152,9 +166,7 @@ export async function resolveClassMaxCargoKg(
       fuelCapacityKg: airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
       fuelBurnKgPerNm,
       airframeTypeId: airframe.typeId,
-    };
-    cargoLimitCache.set(cacheKey, value);
-    return value;
+    });
   }
   try {
     const params = await resolveDispatchSimBriefParams({
@@ -167,7 +179,7 @@ export async function resolveClassMaxCargoKg(
       typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
         ? Math.floor(airframe.maxCargoKg)
         : undefined;
-    const value = {
+    return finish({
       maxCargoKg: catalogCap
         ? Math.min(resolved.maxCargoKg, catalogCap)
         : resolved.maxCargoKg,
@@ -181,11 +193,9 @@ export async function resolveClassMaxCargoKg(
         aircraft.fuelCapacityKg,
       fuelBurnKgPerNm,
       airframeTypeId: airframe?.typeId ?? airframeTypeId,
-    };
-    cargoLimitCache.set(cacheKey, value);
-    return value;
+    });
   } catch {
-    const value = {
+    return finish({
       maxCargoKg: airframe?.maxCargoKg ?? aircraft.maxCargoKg,
       source: airframe?.maxCargoKg ? 'airframe-catalog' : 'class-fallback',
       airframeLabel: airframe?.label ?? aircraft.name,
@@ -194,9 +204,7 @@ export async function resolveClassMaxCargoKg(
       fuelCapacityKg: airframe?.fuelCapacityKg ?? aircraft.fuelCapacityKg,
       fuelBurnKgPerNm,
       airframeTypeId: airframe?.typeId ?? airframeTypeId,
-    };
-    cargoLimitCache.set(cacheKey, value);
-    return value;
+    });
   }
 }
 

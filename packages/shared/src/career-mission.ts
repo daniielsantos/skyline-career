@@ -27,6 +27,7 @@ import {
   type CargoOpsDelta,
 } from './career-cargo-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
+import { assertBushLightGa } from './career-bush.js';
 import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
@@ -862,6 +863,7 @@ export function acceptMission(
       `Cargo Ops: ${name} is locked — fly Dry freights (General / Supplies) to unlock`,
     );
   }
+  assertBushLightGa(lot.originIcao, lot.destIcao, aircraft.id);
   const avail = lotAvailableKg(lot);
   if (avail <= 0) {
     throw new Error(`Lot ${opts.lotId} has no remaining cargo`);
@@ -1044,6 +1046,7 @@ export function commitStagedManifest(
     if (!originIcao) {
       originIcao = lot.originIcao;
       destIcao = lot.destIcao;
+      assertBushLightGa(originIcao, destIcao!, aircraft.id);
     } else if (lot.originIcao !== originIcao || lot.destIcao !== destIcao) {
       throw new Error(
         `Staging lots must share one route (expected ${originIcao}→${destIcao}, got ${lot.originIcao}→${lot.destIcao})`,

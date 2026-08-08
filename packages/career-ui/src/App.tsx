@@ -12,6 +12,14 @@ import {
   postCancel,
   postConfirmOfp,
   postAcceptOfpCargo,
+  postBushTripAccept,
+  postBushTripAbandon,
+  fetchBushTrips,
+  downloadBushTripPln,
+  downloadBushTripGfp,
+  fetchBushWatchStatus,
+  postBushWatchStart,
+  postBushWatchStop,
   postDepart,
   postDispatch,
   postFuelPurchase,
@@ -63,6 +71,10 @@ import {
   type AirportLot,
   type AirportMovement,
   type AirportView,
+  type BushTripBoardRow,
+  type BushTripMapNode,
+  type ActiveBushTripView,
+  type BushWatchStatus,
   type CareerCashflowSnapshot,
   type CompanyCreditSnapshot,
   type EconomyEvent,
@@ -99,6 +111,7 @@ import { useConfirm } from './ConfirmDialog';
 import { FboRerouteDialog } from './FboRerouteDialog';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
+import { BushTripMapCard } from './BushTripMapCard';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
   AIRCRAFT_CLASS_FILTERS,
@@ -119,11 +132,13 @@ function normalizeStarterHubs(
   hubs: Array<StarterHubOption | string> | null | undefined,
 ): StarterHubOption[] {
   if (!hubs?.length) return [];
-  return hubs.map((hub) =>
-    typeof hub === 'string'
-      ? { icao: hub, name: hub, region: '', hubTier: 'spoke' as const }
-      : hub,
-  );
+  return hubs
+    .map((hub) =>
+      typeof hub === 'string'
+        ? { icao: hub, name: hub, region: '', hubTier: 'spoke' as const }
+        : hub,
+    )
+    .filter((hub) => !hub.bush && !hub.bushTripOnly);
 }
 
 function hubTierLabel(tier: StarterHubOption['hubTier']): string {
@@ -188,11 +203,13 @@ type MarketSortKey =
 type SortDirection = 'asc' | 'desc';
 type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
 type AccessFilter = '' | 'open' | 'locked';
-type LaneFilter = '' | 'intl' | 'domestic';
+type LaneFilter = '' | 'intl' | 'domestic' | 'bush';
 
 const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [
   { key: 'access', direction: 'asc' },
 ];
+
+const EMPTY_BUSH_MAP_NODES: BushTripMapNode[] = [];
 
 function compareAirportLot(
   a: AirportLot,
@@ -1639,7 +1656,11 @@ function FleetRoster(props: {
                   onChange={(e) => {
                     const next = e.target.value;
                     setLaneFilter(
-                      next === 'intl' || next === 'domestic' ? next : '',
+                      next === 'intl' ||
+                        next === 'domestic' ||
+                        next === 'bush'
+                        ? next
+                        : '',
                     );
                   }}
                 >
@@ -1981,6 +2002,14 @@ export function App() {
   const [minimumPayUsd, setMinimumPayUsd] = useState('');
   const [accessFilter, setAccessFilter] = useState<AccessFilter>('');
   const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
+  const [freightsBoard, setFreightsBoard] = useState<'freights' | 'bush'>(
+    'freights',
+  );
+  const [bushTrips, setBushTrips] = useState<BushTripBoardRow[]>([]);
+  const [activeBushTrip, setActiveBushTrip] =
+    useState<ActiveBushTripView | null>(null);
+  const [bushWatch, setBushWatch] = useState<BushWatchStatus | null>(null);
+  const bushWatchStartAttemptedRef = useRef<string | null>(null);
   const [boardAircraftId, setBoardAircraftId] = useState('');
   const [profitableOnly, setProfitableOnly] = useState(false);
   /** Default on: hide locked / OOR / zero-lift when an aircraft is selected. */
@@ -2146,6 +2175,17 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const refreshBushTrips = useCallback(async () => {
+    try {
+      const data = await fetchBushTrips();
+      setBushTrips(data.trips ?? []);
+      setActiveBushTrip(data.active ?? null);
+      if (Array.isArray(data.fleet)) setFleet(data.fleet);
+    } catch {
+      /* board optional until server rebuilt */
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     setError(null);
     const [state, market, missionState, npcState, acMarket] = await Promise.all([
@@ -2158,6 +2198,7 @@ export function App() {
       fetchNpcFleet(),
       fetchAircraftMarket().catch(() => null),
     ]);
+    void refreshBushTrips();
     const clientNow = Date.now();
     const serverNow = state.serverNowMs ?? clientNow;
     setServerOffsetMs(serverNow - clientNow);
@@ -2223,7 +2264,7 @@ export function App() {
       const view = await fetchAirportView(airportIcao);
       setAirportView(view);
     }
-  }, [airportIcao]);
+  }, [airportIcao, refreshBushTrips]);
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
@@ -5211,6 +5252,69 @@ export function App() {
     });
   }
 
+  async function onAcceptBushTrip(trip: BushTripBoardRow) {
+    if (!trip.playable) {
+      setToastKind('warn');
+      setToast('Draft trip — confirm strips in MSFS before Accept');
+      return;
+    }
+    const eligible = fleet.filter(
+      (a) =>
+        a.status === 'parked' &&
+        a.aircraftClassId === 'light_ga' &&
+        a.locationIcao === trip.startIcao,
+    );
+    const aircraftId = eligible[0]?.id;
+    if (!aircraftId) {
+      setToastKind('warn');
+      setToast(
+        `Park a light GA at ${trip.startIcao} (pilot co-located) before accepting`,
+      );
+      return;
+    }
+    await run(async () => {
+      const result = await postBushTripAccept({ tripId: trip.id, aircraftId });
+      if (Array.isArray(result.fleet)) setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      await refreshBushTrips();
+      setToastKind('ok');
+      setToast(`Accepted bush trip ${trip.title} · open Dispatch`);
+      selectTab('staging');
+    });
+  }
+
+  async function onAbandonBushTrip() {
+    if (!activeBushTrip) return;
+    const ok = await confirm({
+      title: 'Abandon this bush trip?',
+      body: (
+        <>
+          <p>
+            <strong>{activeBushTrip.title}</strong> ·{' '}
+            {activeBushTrip.fromIcao}→{activeBushTrip.toIcao} (leg{' '}
+            {activeBushTrip.legIndex + 1}/{activeBushTrip.legs}).
+          </p>
+          <p>No payout in this build. Aircraft returns to parked.</p>
+        </>
+      ),
+      confirmLabel: 'Yes, abandon trip',
+      cancelLabel: 'Keep trip',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postBushTripAbandon();
+      if (Array.isArray(result.fleet)) setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setActiveBushTrip(null);
+      setBushWatch(null);
+      bushWatchStartAttemptedRef.current = null;
+      await refreshBushTrips();
+      setToastKind('ok');
+      setToast('Bush trip abandoned — no payout');
+    });
+  }
+
   function continueManuallyLoad() {
     setPreferManualLoad(true);
     setSkylineInjectEnabled(false);
@@ -5785,6 +5889,86 @@ export function App() {
   const showAirport = airportIcao !== null && airportView !== null;
   const showBack = showAirport || airportReturn !== null;
   const showStaging = tab === 'staging';
+
+  // Bush-trip Watch: auto-start on Dispatch + poll for leg progress / live AC.
+  useEffect(() => {
+    if (!hubSelected || !showStaging || !activeBushTrip) {
+      bushWatchStartAttemptedRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    const tripId = activeBushTrip.tripId;
+
+    async function tickBushWatch() {
+      try {
+        let status = await fetchBushWatchStatus();
+        if (cancelled) return;
+        if (
+          !status.running &&
+          bushWatchStartAttemptedRef.current !== tripId
+        ) {
+          bushWatchStartAttemptedRef.current = tripId;
+          try {
+            status = await postBushWatchStart({ intervalSec: 5 });
+          } catch (err) {
+            if (!cancelled) {
+              setBushWatch((prev: BushWatchStatus | null) => ({
+                ...(prev ?? status),
+                running: false,
+                lastError:
+                  err instanceof Error ? err.message : String(err),
+              }));
+            }
+            return;
+          }
+        }
+        if (cancelled) return;
+        setBushWatch(status);
+        if (status.completed) {
+          setToastKind('ok');
+          setToast(
+            status.payoutUsd != null && status.payoutUsd > 0
+              ? `Bush trip complete · +${formatMoney(status.payoutUsd)}`
+              : 'Bush trip complete',
+          );
+          if (typeof status.walletUsd === 'number') {
+            setWallet(status.walletUsd);
+          }
+          setActiveBushTrip(null);
+          setBushWatch(null);
+          bushWatchStartAttemptedRef.current = null;
+          void refresh().catch(() => undefined);
+          void refreshBushTrips().catch(() => undefined);
+          return;
+        }
+        // Keep Dispatch card in sync when Watch advances a leg.
+        const trip = activeBushTrip;
+        if (
+          trip &&
+          status.running &&
+          status.legIndex != null &&
+          (status.legIndex !== trip.legIndex ||
+            status.legStatus !== trip.legStatus ||
+            status.fromIcao !== trip.fromIcao)
+        ) {
+          void refreshBushTrips().catch(() => undefined);
+        }
+      } catch {
+        /* ignore poll errors */
+      }
+    }
+
+    void tickBushWatch();
+    const id = window.setInterval(() => {
+      void tickBushWatch();
+    }, 3_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubSelected, showStaging, activeBushTrip?.tripId]);
+
   const stagingMode: 'empty' | 'draft' | 'active' | 'debrief' = staging
     ? 'draft'
     : activeMission
@@ -5976,7 +6160,7 @@ export function App() {
                     ? 'Settings'
                     : 'Freights';
   const pageLede = showAirport
-    ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'}`
+    ? `${airportView.airport.name} · ${airportView.airport.region} · ${airportView.airport.hubTier ?? 'spoke'}${airportView.airport.bush ? ' · bush' : ''}`
     : showStaging
       ? stagingMode === 'active'
         ? 'Guided preflight — flight plan, fuel, load, then fly and settle.'
@@ -5986,7 +6170,9 @@ export function App() {
             : 'Build a same-route manifest, adjust each payload, then accept and open SimBrief.'
           : stagingMode === 'debrief'
             ? 'Flight complete — review payout, fuel cost, and net.'
-            : 'Prepare a freight from Freights, or resume after settling the last flight.'
+            : activeBushTrip
+              ? 'Bush trip accepted — full route on the map. Fly/settle comes next.'
+              : 'Prepare a freight from Freights, or resume after settling the last flight.'
       : tab === 'fleet'
         ? 'Competing freighters — idle, airborne, turnaround, shop MX, or crew rest.'
         : tab === 'aircraft'
@@ -6003,7 +6189,9 @@ export function App() {
                   ? 'Historical flights — settled, cancelled, and past operations.'
                   : tab === 'settings'
                     ? 'SimBrief, weight units, and local career preferences.'
-                    : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
+                    : freightsBoard === 'bush'
+                      ? 'Validated bush trip arcs — light GA only, separate from Market freights.'
+                      : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
   const parkedIcao =
     fleet.find((a) => a.status === 'parked')?.locationIcao ?? homeHubIcao;
   const signalFocusIcao = pilotIcao || parkedIcao || homeHubIcao;
@@ -6499,6 +6687,12 @@ export function App() {
 
       {hubSelected && showAirport ? (
         <section className="panel airport-panel">
+          {airportView.airport.bush ? (
+            <p className="banner warn" role="status">
+              Bush soft-field — no ferry in or out. Market freights do not form
+              here; fly light GA bush trips from Freights → Bush trips.
+            </p>
+          ) : null}
           <nav className="terminal-sections" aria-label="Terminal sections">
             <button
               type="button"
@@ -7617,6 +7811,14 @@ export function App() {
                                   {lot.urgency === 'urgent' ? (
                                     <span className="tag">Urgent</span>
                                   ) : null}
+                                  {lot.bush ? (
+                                    <span
+                                      className="tag"
+                                      title="Bush soft-field — light GA only, no ferry"
+                                    >
+                                      bush
+                                    </span>
+                                  ) : null}
                                   {cargoLocked ? (
                                     <span
                                       className="tag"
@@ -7907,6 +8109,195 @@ export function App() {
         </section>
       ) : hubSelected && tab === 'market' ? (
         <section className="panel">
+          <div className="settings-choice" role="tablist" aria-label="Freight boards">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={freightsBoard === 'freights'}
+              className={
+                freightsBoard === 'freights'
+                  ? 'settings-choice-btn active'
+                  : 'settings-choice-btn'
+              }
+              onClick={() => setFreightsBoard('freights')}
+              disabled={busy}
+            >
+              Freights
+              <small>Market lots</small>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={freightsBoard === 'bush'}
+              className={
+                freightsBoard === 'bush'
+                  ? 'settings-choice-btn active'
+                  : 'settings-choice-btn'
+              }
+              onClick={() => {
+                setFreightsBoard('bush');
+                void refreshBushTrips();
+              }}
+              disabled={busy}
+            >
+              Bush trips
+              <small>Fixed arcs · light GA</small>
+            </button>
+          </div>
+          {freightsBoard === 'bush' ? (
+            <>
+              <div className="panel-head">
+                <p className="panel-stats">
+                  {bushTrips.filter((t) => t.playable).length} playable
+                  {bushTrips.some((t) => !t.playable)
+                    ? ` · ${bushTrips.filter((t) => !t.playable).length} draft`
+                    : ''}
+                  {activeBushTrip
+                    ? ` · active ${activeBushTrip.title}`
+                    : ''}
+                </p>
+              </div>
+              {activeBushTrip ? (
+                <p className="banner warn">
+                  Active bush trip {activeBushTrip.title} (
+                  {activeBushTrip.fromIcao}→{activeBushTrip.toIcao}) — finish or{' '}
+                  <button
+                    type="button"
+                    className="linkish"
+                    onClick={() => selectTab('staging')}
+                    disabled={busy}
+                  >
+                    abandon in Dispatch
+                  </button>
+                  .
+                </p>
+              ) : null}
+              <div className="table-wrap">
+                <table className="lots">
+                  <thead>
+                    <tr>
+                      <th>Trip</th>
+                      <th>Country</th>
+                      <th>Route</th>
+                      <th>Legs</th>
+                      <th>NM</th>
+                      <th>Pay</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bushTrips.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="muted">
+                          No bush trips in catalog.
+                        </td>
+                      </tr>
+                    ) : (
+                      bushTrips.map((trip) => {
+                        const canAccept =
+                          trip.playable &&
+                          !activeBushTrip &&
+                          fleet.some(
+                            (a) =>
+                              a.status === 'parked' &&
+                              a.aircraftClassId === 'light_ga' &&
+                              a.locationIcao === trip.startIcao,
+                          );
+                        const routeLabel = trip.viaIcao
+                          ? `${trip.startIcao}→${trip.viaIcao}→…`
+                          : `${trip.startIcao}→…→${trip.endIcao}`;
+                        return (
+                          <tr key={trip.id}>
+                            <td>
+                              <strong>{trip.title}</strong>
+                              {!trip.playable ? (
+                                <span
+                                  className="chip"
+                                  title="Needs MSFS 2024 strip check before Accept"
+                                >
+                                  draft
+                                </span>
+                              ) : null}
+                              {trip.summary ? (
+                                <div className="muted">{trip.summary}</div>
+                              ) : null}
+                            </td>
+                            <td>{trip.countryId}</td>
+                            <td>
+                              <code>{routeLabel}</code>
+                            </td>
+                            <td>{trip.legs}</td>
+                            <td>{Math.round(trip.distanceNm)}</td>
+                            <td>{formatMoney(trip.payUsd)}</td>
+                            <td className="bush-trip-board-actions">
+                              {trip.hasPln ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="action ghost"
+                                    disabled={busy}
+                                    title="Download the Activities .PLN for MSFS tablet import"
+                                    onClick={() => {
+                                      void downloadBushTripPln(trip.id).catch(
+                                        (err) =>
+                                          setError(
+                                            err instanceof Error
+                                              ? err.message
+                                              : String(err),
+                                          ),
+                                      );
+                                    }}
+                                  >
+                                    PLN
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="action ghost"
+                                    disabled={busy}
+                                    title="Download Garmin/TDS GTNXi .gfp — place in ProgramData\\TDS\\GTNXi\\FPL"
+                                    onClick={() => {
+                                      void downloadBushTripGfp(trip.id).catch(
+                                        (err) =>
+                                          setError(
+                                            err instanceof Error
+                                              ? err.message
+                                              : String(err),
+                                          ),
+                                      );
+                                    }}
+                                  >
+                                    GFP
+                                  </button>
+                                </>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="accept"
+                                disabled={busy || !canAccept}
+                                title={
+                                  !trip.playable
+                                    ? 'Draft — confirm in MSFS before Accept'
+                                    : activeBushTrip
+                                      ? 'Abandon the active trip first'
+                                      : canAccept
+                                        ? `Accept with light GA at ${trip.startIcao}`
+                                        : `Need light GA parked at ${trip.startIcao}`
+                                }
+                                onClick={() => void onAcceptBushTrip(trip)}
+                              >
+                                {trip.playable ? 'Accept' : 'Draft'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="panel-head">
             <p className="panel-stats">
               {marketTotalLots > 0
@@ -8139,7 +8530,11 @@ export function App() {
                         onChange={(e) => {
                           const next = e.target.value;
                           setLaneFilter(
-                            next === 'intl' || next === 'domestic' ? next : '',
+                            next === 'intl' ||
+                              next === 'domestic' ||
+                              next === 'bush'
+                              ? next
+                              : '',
                           );
                           setMarketPage(1);
                         }}
@@ -8303,6 +8698,14 @@ export function App() {
                         {lot.pressure?.international ? (
                           <span className="tag" title="International lane freight">
                             intl
+                          </span>
+                        ) : null}
+                        {lot.bush ? (
+                          <span
+                            className="tag"
+                            title="Bush soft-field — light GA only, no ferry"
+                          >
+                            bush
                           </span>
                         ) : null}
                         {cargoLocked ? (
@@ -8482,10 +8885,136 @@ export function App() {
               </button>
             </div>
           </nav>
+            </>
+          )}
         </section>
       ) : hubSelected && showStaging ? (
         <section className="panel staging-panel">
-          {stagingMode === 'debrief' && flightDebrief ? (
+          {activeBushTrip ? (
+            <>
+              <div className="debrief-card">
+                <div className="debrief-card-head">
+                  <strong>BUSH TRIP</strong>
+                  <span className="debrief-ok">
+                    {activeBushTrip.status === 'in_progress' ||
+                    activeBushTrip.legStatus === 'departed'
+                      ? 'In progress'
+                      : 'Accepted'}
+                  </span>
+                </div>
+                <p>
+                  <strong>{activeBushTrip.title}</strong> · leg{' '}
+                  {activeBushTrip.legIndex + 1}/{activeBushTrip.legs} ·{' '}
+                  <code>
+                    {activeBushTrip.fromIcao}→{activeBushTrip.toIcao}
+                  </code>
+                </p>
+                <p className="muted" role="status">
+                  {bushWatch?.running
+                    ? `Watch · ${bushWatch.phase ?? '…'} · ${
+                        bushWatch.onGround === false
+                          ? 'airborne'
+                          : bushWatch.onGround
+                            ? 'ground'
+                            : '…'
+                      }${
+                        bushWatch.pipeConnected === false
+                          ? ' · reconnecting'
+                          : ''
+                      }`
+                    : bushWatch?.lastError
+                      ? `Watch offline — ${bushWatch.lastError}`
+                      : 'Starting bush Watch…'}
+                </p>
+                <div className="debrief-actions">
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={busy}
+                    onClick={() => void onAbandonBushTrip()}
+                  >
+                    Abandon trip
+                  </button>
+                  {activeBushTrip.hasPln ? (
+                    <>
+                      <button
+                        type="button"
+                        className="action ghost"
+                        disabled={busy}
+                        title="Download the Activities .PLN for MSFS tablet import"
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              await downloadBushTripPln(activeBushTrip.tripId);
+                              setError(null);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error ? err.message : String(err),
+                              );
+                            }
+                          })();
+                        }}
+                      >
+                        Copy PLN
+                      </button>
+                      <button
+                        type="button"
+                        className="action ghost"
+                        disabled={busy}
+                        title="Download Garmin/TDS GTNXi .gfp — place in ProgramData\\TDS\\GTNXi\\FPL"
+                        onClick={() => {
+                          void (async () => {
+                            try {
+                              await downloadBushTripGfp(activeBushTrip.tripId);
+                              setError(null);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error ? err.message : String(err),
+                              );
+                            }
+                          })();
+                        }}
+                      >
+                        Copy GFP
+                      </button>
+                    </>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setFreightsBoard('bush');
+                      selectTab('market');
+                    }}
+                  >
+                    Bush board
+                  </button>
+                </div>
+              </div>
+              <BushTripMapCard
+                tripId={activeBushTrip.tripId}
+                title={activeBushTrip.title}
+                startIcao={activeBushTrip.startIcao ?? activeBushTrip.fromIcao}
+                endIcao={activeBushTrip.endIcao ?? activeBushTrip.toIcao}
+                currentFromIcao={activeBushTrip.fromIcao}
+                currentToIcao={activeBushTrip.toIcao}
+                legIndex={activeBushTrip.legIndex}
+                legs={activeBushTrip.legs}
+                mapNodes={activeBushTrip.mapNodes ?? EMPTY_BUSH_MAP_NODES}
+                hasPln={activeBushTrip.hasPln === true}
+                aircraftIcao={activeBushTrip.fromIcao}
+                liveAircraft={
+                  bushWatch?.running ? (bushWatch.position ?? null) : null
+                }
+                aircraftLabel={
+                  fleet.find((a) => a.id === activeBushTrip.aircraftId)?.label ??
+                  'Aircraft'
+                }
+                onOpenAirport={(icao) => void openAirport(icao)}
+              />
+            </>
+          ) : stagingMode === 'debrief' && flightDebrief ? (
             <>
               <DispatchStepper current="debrief" />
               <p className="dispatch-step-status" role="status">
@@ -9763,10 +10292,12 @@ export function App() {
                   aircraft={acf}
                   catalog={hangarCatalogEntry(acf)}
                   busy={busy}
-                  hubOptions={hubOptions.map((hub) => ({
-                    icao: hub.icao,
-                    name: hub.name,
-                  }))}
+                  hubOptions={hubOptions
+                    .filter((hub) => !hub.bush && !hub.bushTripOnly)
+                    .map((hub) => ({
+                      icao: hub.icao,
+                      name: hub.name,
+                    }))}
                   ferryDest={ferryDest}
                   travelDest={travelDest}
                   pilotIcao={pilotIcao}

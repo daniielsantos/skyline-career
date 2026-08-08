@@ -73,6 +73,7 @@ export function ensureV3Ddl(db: SqliteDb): void {
       airframe_perf_json TEXT,
       player_fbos_json TEXT,
       company_crew_json TEXT,
+      active_bush_trip_json TEXT,
       updated_at_ms INTEGER NOT NULL,
       FOREIGN KEY (company_id) REFERENCES companies(id)
     );
@@ -186,6 +187,9 @@ export function ensureV3Ddl(db: SqliteDb): void {
   }
   if (!columnExists(db, 'company_state', 'company_crew_json')) {
     db.exec(`ALTER TABLE company_state ADD COLUMN company_crew_json TEXT`);
+  }
+  if (!columnExists(db, 'company_state', 'active_bush_trip_json')) {
+    db.exec(`ALTER TABLE company_state ADD COLUMN active_bush_trip_json TEXT`);
   }
   db.exec(`
     CREATE INDEX IF NOT EXISTS ledger_company_tick_idx ON ledger(company_id, at_tick);
@@ -991,12 +995,12 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        company_id, wallet_usd, pilot_name, pilot_icao, hub_selected,
        company_credit_json, cargo_ops_json, aircraft_market_json,
        aircraft_market_day, aircraft_market_demand_day, airframe_perf_json,
-       player_fbos_json, company_crew_json, updated_at_ms
+       player_fbos_json, company_crew_json, active_bush_trip_json, updated_at_ms
      ) VALUES (
        @company_id, @wallet_usd, @pilot_name, @pilot_icao, @hub_selected,
        @company_credit_json, @cargo_ops_json, @aircraft_market_json,
        @aircraft_market_day, @aircraft_market_demand_day, @airframe_perf_json,
-       @player_fbos_json, @company_crew_json, @updated_at_ms
+       @player_fbos_json, @company_crew_json, @active_bush_trip_json, @updated_at_ms
      )
      ON CONFLICT(company_id) DO UPDATE SET
        wallet_usd = excluded.wallet_usd,
@@ -1014,6 +1018,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
          excluded.company_crew_json,
          company_state.company_crew_json
        ),
+       active_bush_trip_json = excluded.active_bush_trip_json,
        updated_at_ms = excluded.updated_at_ms`,
   ).run({
     company_id: LOCAL_COMPANY_ID,
@@ -1040,6 +1045,9 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
     company_crew_json: state.companyCrew
       ? JSON.stringify(state.companyCrew)
       : null,
+    active_bush_trip_json: state.activeBushTrip
+      ? JSON.stringify(state.activeBushTrip)
+      : null,
     updated_at_ms: now,
   });
 }
@@ -1053,7 +1061,7 @@ export function readCompanyStateScalars(
       `SELECT wallet_usd, pilot_name, pilot_icao, hub_selected, company_credit_json,
               cargo_ops_json, aircraft_market_json, aircraft_market_day,
               aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
-              company_crew_json
+              company_crew_json, active_bush_trip_json
        FROM company_state WHERE company_id = ?`,
     )
     .get(companyId) as
@@ -1070,6 +1078,7 @@ export function readCompanyStateScalars(
         airframe_perf_json: string | null;
         player_fbos_json: string | null;
         company_crew_json: string | null;
+        active_bush_trip_json: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -1123,6 +1132,13 @@ export function readCompanyStateScalars(
   if (row.company_crew_json) {
     try {
       out.companyCrew = JSON.parse(row.company_crew_json);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (row.active_bush_trip_json) {
+    try {
+      out.activeBushTrip = JSON.parse(row.active_bush_trip_json);
     } catch {
       /* ignore */
     }

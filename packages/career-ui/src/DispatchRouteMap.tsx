@@ -200,13 +200,28 @@ function waypointMarker(waypoint: DispatchRouteWaypoint): HTMLButtonElement {
   return el;
 }
 
+/** Intermediate career hub on a multi-leg route (between DEP and ARR). */
+function hubRouteMarker(waypoint: DispatchRouteWaypoint): HTMLButtonElement {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'dispatch-route-marker dispatch-route-marker-hub';
+  el.title = `HUB ${waypoint.ident}`;
+  el.setAttribute('aria-label', `Hub ${waypoint.ident}`);
+  el.innerHTML = `<span class="dispatch-route-marker-icao">${waypoint.ident}</span><span class="dispatch-route-marker-kind">HUB</span>`;
+  return el;
+}
+
+function isAirportWaypoint(waypoint: DispatchRouteWaypoint): boolean {
+  return String(waypoint.type ?? '').toLowerCase() === 'airport';
+}
+
 function aircraftMarkerEl(): HTMLDivElement {
   const el = document.createElement('div');
   el.className = 'dispatch-route-ac';
   el.title = 'Aircraft';
   el.setAttribute('aria-label', 'Aircraft position');
   el.innerHTML =
-    '<span class="dispatch-route-ac-dot" aria-hidden="true"></span>';
+    '<span class="dispatch-route-ac-dot" aria-hidden="true"></span><span class="dispatch-route-ac-label">AC</span>';
   return el;
 }
 
@@ -279,6 +294,21 @@ function intermediateWaypoints(
   });
 }
 
+function routeCameraKey(
+  origin: DispatchRouteEndpoint,
+  dest: DispatchRouteEndpoint | null | undefined,
+  waypoints: DispatchRouteWaypoint[] | undefined,
+  originRole: string | undefined,
+): string {
+  const w = (waypoints ?? [])
+    .map((p) => `${p.ident}:${p.lat.toFixed(4)},${p.lon.toFixed(4)}`)
+    .join('|');
+  const d = dest
+    ? `${dest.icao}:${dest.lat.toFixed(4)},${dest.lon.toFixed(4)}`
+    : '';
+  return `${originRole ?? 'dep'}|${origin.icao}:${origin.lat.toFixed(4)},${origin.lon.toFixed(4)}|${d}|${w}`;
+}
+
 export function DispatchRouteMap(props: {
   origin: DispatchRouteEndpoint;
   /** When omitted, only the origin/base pin is shown (no route line). */
@@ -290,6 +320,16 @@ export function DispatchRouteMap(props: {
   aircraftLabel?: string | null;
   /** Origin marker role — FBO base vs departure. */
   originRole?: 'dep' | 'fbo';
+  /**
+   * Fly the camera to this point (e.g. hub rail click). Change identity
+   * (new object / token) to re-trigger when focusing the same coords again.
+   */
+  focusTarget?: {
+    lat: number;
+    lon: number;
+    zoom?: number;
+    token?: number | string;
+  } | null;
   onSelectAirport?: (icao: string) => void;
   className?: string;
 }) {
@@ -297,6 +337,7 @@ export function DispatchRouteMap(props: {
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const aircraftMarkerRef = useRef<Marker | null>(null);
+  const fittedRouteKeyRef = useRef<string | null>(null);
   const onSelectRef = useRef(props.onSelectAirport);
   onSelectRef.current = props.onSelectAirport;
 
@@ -311,6 +352,7 @@ export function DispatchRouteMap(props: {
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;
+    fittedRouteKeyRef.current = null;
 
     const resizeObserver =
       typeof ResizeObserver !== 'undefined'
@@ -328,6 +370,7 @@ export function DispatchRouteMap(props: {
       aircraftMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
+      fittedRouteKeyRef.current = null;
     };
     // Map is created once; route updates happen in the paint effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
@@ -394,39 +437,62 @@ export function DispatchRouteMap(props: {
           dest,
           props.waypoints,
         )) {
-          const el = waypointMarker(wpt);
+          const isHub = isAirportWaypoint(wpt);
+          const el = isHub ? hubRouteMarker(wpt) : waypointMarker(wpt);
+          if (isHub) {
+            el.addEventListener('click', (event) => {
+              event.stopPropagation();
+              onSelectRef.current?.(wpt.ident);
+            });
+          }
           const marker = new Marker({ element: el, anchor: 'bottom' })
             .setLngLat([wpt.lon, wpt.lat])
             .setPopup(
               new Popup({
-                offset: 10,
+                offset: isHub ? 14 : 10,
                 closeButton: false,
                 className: 'dispatch-route-popup',
               }).setHTML(
-                `<strong>${wpt.ident}</strong>${
-                  wpt.type ? `<br/>${wpt.type}` : ''
-                }`,
+                isHub
+                  ? `<strong>Hub</strong><br/>${wpt.ident}`
+                  : `<strong>${wpt.ident}</strong>${
+                      wpt.type ? `<br/>${wpt.type}` : ''
+                    }`,
               ),
             )
             .addTo(map);
           markersRef.current.push(marker);
         }
+      }
 
-        const bounds = new LngLatBounds();
-        for (const p of buildRouteTrack(
-          props.origin,
-          dest,
-          props.waypoints,
-        )) {
-          bounds.extend([p.lon, p.lat]);
+      // Only auto-frame when the route geometry actually changes. Polling /
+      // parent re-renders were re-fitting and yanking the camera off the
+      // user's pan/zoom.
+      const cameraKey = routeCameraKey(
+        props.origin,
+        dest,
+        props.waypoints,
+        props.originRole,
+      );
+      if (fittedRouteKeyRef.current !== cameraKey) {
+        fittedRouteKeyRef.current = cameraKey;
+        if (dest) {
+          const bounds = new LngLatBounds();
+          for (const p of buildRouteTrack(
+            props.origin,
+            dest,
+            props.waypoints,
+          )) {
+            bounds.extend([p.lon, p.lat]);
+          }
+          map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
+        } else {
+          map.flyTo({
+            center: [props.origin.lon, props.origin.lat],
+            zoom: 5.5,
+            duration: 500,
+          });
         }
-        map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
-      } else {
-        map.flyTo({
-          center: [props.origin.lon, props.origin.lat],
-          zoom: 5.5,
-          duration: 500,
-        });
       }
       map.resize();
     };
@@ -475,6 +541,28 @@ export function DispatchRouteMap(props: {
     if (map.isStyleLoaded()) sync();
     else map.once('load', sync);
   }, [props.aircraft, props.aircraftLabel]);
+
+  // Hub rail / marker focus — fly without rebuilding the route.
+  useEffect(() => {
+    const map = mapRef.current;
+    const target = props.focusTarget;
+    if (!map || !target) return;
+    if (!Number.isFinite(target.lat) || !Number.isFinite(target.lon)) return;
+    if (target.lat === 0 && target.lon === 0) return;
+    const zoom =
+      typeof target.zoom === 'number' && Number.isFinite(target.zoom)
+        ? target.zoom
+        : 8.5;
+    const fly = () => {
+      map.flyTo({
+        center: [target.lon, target.lat],
+        zoom,
+        duration: 700,
+      });
+    };
+    if (map.isStyleLoaded()) fly();
+    else map.once('load', fly);
+  }, [props.focusTarget]);
 
   return (
     <div className={props.className ?? 'dispatch-route-map'}>

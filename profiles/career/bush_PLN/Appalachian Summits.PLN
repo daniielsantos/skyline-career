@@ -1,0 +1,641 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<SimBase.Document>
+    <FlightPlan.FlightPlan>
+        <DepartureID>26A</DepartureID>
+        <DestinationID>KFDK</DestinationID>
+        <Title>26A - KFDK</Title>
+        <Descr>Flight from 26A to KFDK</Descr>
+        <FPType>VFR</FPType>
+        <CruisingAlt>4000.000</CruisingAlt>
+        <AppVersion>
+            <AppVersionMajor>12</AppVersionMajor>
+            <AppVersionMinor>2</AppVersionMinor>
+            <AppVersionBuild>282174</AppVersionBuild>
+        </AppVersion>
+        <ATCWaypoint id="Cheaha Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N33° 29' 7.0500",W85° 48' 31.5100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Jacksonville">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N33° 48' 48.1900",W85° 46' 13.6900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Piedmont">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N33° 55' 41.7500",W85° 36' 54.4000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Weiss Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 11' 15.5900",W85° 35' 42.1200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="West Rome">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 17' 8.1100",W85° 14' 17.3500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI5</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Richard B Russell Regional - J">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KRMG</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Oostanaula River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 23' 33.1300",W85° 4' 53.0300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI6</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Calhoun">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 30' 5.2700",W84° 56' 36.7800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI7</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Coosawattee River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 32' 58.1200",W84° 48' 1.3900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI8</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Reregulation Reservoir">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 36' 13.0000",W84° 40' 58.0800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI9</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Carters Dam">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 36' 50.8900",W84° 40' 12.8200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI10</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Carters Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 36' 39.1900",W84° 38' 0.1900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI11</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Ellijay River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 43' 31.4000",W84° 27' 40.5600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI12</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Blue Ridge">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 51' 47.2100",W84° 19' 32.7600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI13</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Lake Blue Ridge">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 52' 4.4600",W84° 16' 0.2100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI14</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Blairsville">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KDZJ</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Beasley Knob">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 52' 34.3700",W83° 55' 32.5400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI15</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Brasstown Bald">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 52' 26.7600",W83° 48' 39.7500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI16</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Chatuge Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 59' 15.1200",W83° 47' 22.4900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI17</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Nantahalla Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 10' 57.5300",W83° 39' 56.0100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI18</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Fontana Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 23' 48.8000",W83° 33' 43.3500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI19</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Tuckasegee River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 25' 47.1500",W83° 29' 16.1400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI20</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Sossamon Field">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>57NC</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Great Smoky Mountains National Park">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 27' 4.7000",W83° 28' 42.4600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI21</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Buzzardroost Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 27' 59.0500",W83° 29' 23.8600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI22</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Clingmans Dome">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 33' 45.6300",W83° 29' 53.7600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI23</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Little Bald Knob">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 33' 3.9000",W83° 7' 11.5100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI24</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Canton">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 32' 1.5500",W82° 50' 23.5800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI25</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Asheville Rgnl">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KAVL</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Asheville">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 35' 59.3200",W82° 34' 17.3000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI26</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="North Fork Reservoir">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 40' 4.4400",W82° 20' 16.2100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI27</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Mitchell">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 45' 54.4000",W82° 15' 55.1200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI28</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="South Toe River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 55' 11.2100",W82° 12' 8.0900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI29</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Cloudland Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 6' 16.3000",W82° 7' 50.0800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI30</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Elk River">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>NC06</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Watauga Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 19' 54.2000",W82° 2' 50.9200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI31</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mountain City">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 28' 23.5300",W81° 48' 15.0100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI32</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Rogers">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 39' 35.0800",W81° 32' 41.4700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI33</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="South Fork of Holston River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 42' 15.4000",W81° 45' 35.7900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI34</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="North Fork of Holston River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 42' 58.5000",W81° 48' 54.1700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI35</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Abingdon">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 42' 32.9900",W81° 58' 39.7700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI36</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Virginia Highlands">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KVJI</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Holston River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 44' 6.1100",W82° 13' 32.7700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI37</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Clinch River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 48' 13.3900",W82° 30' 28.1000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI38</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Big Cherry Reservoir">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 50' 39.8100",W82° 39' 59.3600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI39</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Appalachia">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 54' 24.0100",W82° 46' 52.0300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI40</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Black Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 54' 50.2000",W82° 53' 39.8700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI41</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Norton">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 56' 5.7700",W82° 37' 48.8100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI42</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Lonesome Pine">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KLNP</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Pilot Knob">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 4' 4.0100",W82° 22' 9.5400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI43</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="War">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 18' 8.8400",W81° 41' 22.9700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>WAR</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Belcher Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 27' 11.5000",W81° 31' 8.9100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI44</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mike Ferrell Field">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>WV09</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Rich Knob">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 34' 3.7600",W81° 11' 52.6800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI45</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Flat Top Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 37' 9.8400",W81° 6' 18.3400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI46</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Freezeland Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 42' 51.2800",W80° 57' 12.6800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI47</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="New River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 44' 22.1900",W80° 55' 9.6900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI48</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Meadow River Wildlife Management Area">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 50' 35.2900",W80° 43' 26.4300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI49</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Rainelle">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>WV30</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Rupert">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 57' 48.3000",W80° 41' 22.8300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AJ</ICAORegion>
+                <ICAOIdent>POI50</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Falling Spring">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 59' 26.4700",W80° 21' 16.5300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AJ</ICAORegion>
+                <ICAOIdent>POI51</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Marlinton">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 13' 26.0000",W80° 5' 24.2300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AJ</ICAORegion>
+                <ICAOIdent>POI52</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Green Bank Telescope">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 25' 59.3400",W79° 50' 24.7600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AJ</ICAORegion>
+                <ICAOIdent>POI53</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Nrao Green Bank">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>WV52</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Durbin">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 32' 47.3500",W79° 49' 35.7900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI54</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Spruce Knob">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 41' 57.5200",W79° 31' 58.7400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI55</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Harman">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 55' 20.0100",W79° 31' 31.8700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI56</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Hoye-Crest">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 14' 15.0300",W79° 29' 9.4100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI57</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Deep Creek Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 31' 7.9500",W79° 21' 15.1000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI58</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Garrett County">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>2G4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Triple Point - West Virginia -  Pennsylvania and Maryland">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 43' 14.3700",W79° 28' 36.1700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI59</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="High Point Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 46' 43.3000",W79° 12' 41.5200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI60</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Davis">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 47' 8.1100",W79° 10' 32.5400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI61</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Savage">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 41' 41.4200",W78° 52' 49.6100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI62</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Cumberland">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 38' 57.5600",W78° 45' 43.8400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI63</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Greater Cumberland Regl">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KCBE</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Warrior Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 37' 13.8000",W78° 37' 12.3700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI64</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Little Orleans">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 37' 34.7400",W78° 23' 9.4400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI65</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Upper Potomac River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 39' 4.2200",W78° 3' 13.7400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI66</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Hagerstown">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 38' 46.1600",W77° 43' 5.7400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI67</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Catoctin Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 38' 54.6900",W77° 27' 57.8900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI68</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+    </FlightPlan.FlightPlan>
+</SimBase.Document>

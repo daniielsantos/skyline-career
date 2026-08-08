@@ -133,6 +133,86 @@ public sealed class MockSimClient : ISimClient
         });
     }
 
+    public Task<AirportFacilityDto> GetAirportFacilityAsync(string icao, CancellationToken ct = default)
+    {
+        EnsureConnected();
+        var code = (icao ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(code))
+        {
+            throw new SimClientException("INVALID_PARAMS", "icao required");
+        }
+
+        // Seeded MSFS-validated bush hubs for offline homologation tests.
+        if (MockAirports.TryGetValue(code, out var hit))
+        {
+            return Task.FromResult(hit);
+        }
+
+        throw new SimClientException("NOT_FOUND", $"Mock has no airport facility for {code}");
+    }
+
+    private static readonly Dictionary<string, AirportFacilityDto> MockAirports = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["O64"] = new AirportFacilityDto
+        {
+            Icao = "O64",
+            Name = "Breckenridge",
+            Lat = 35.3627,
+            Lon = -118.8561,
+            AltMeters = 215,
+            Runways =
+            {
+                new AirportRunwayDto
+                {
+                    Ident = "12",
+                    IdentReciprocal = "30",
+                    HeadingTrueDeg = 135,
+                    LengthM = 1128,
+                    WidthM = 18,
+                    Lat = 35.3627,
+                    Lon = -118.8561,
+                    Surface = "dirt",
+                },
+            },
+        },
+        ["O67"] = new AirportFacilityDto
+        {
+            Icao = "O67",
+            Name = "Manzanar Airport",
+            Lat = 36.7372,
+            Lon = -118.145,
+            AltMeters = 1166,
+            Runways =
+            {
+                new AirportRunwayDto
+                {
+                    Ident = "15",
+                    IdentReciprocal = "33",
+                    HeadingTrueDeg = 160,
+                    LengthM = 1100,
+                    WidthM = 18,
+                    Lat = 36.7372,
+                    Lon = -118.145,
+                    Surface = "dirt",
+                },
+            },
+        },
+        ["26A"] = new AirportFacilityDto
+        {
+            Icao = "26A",
+            Name = "Ashland/Lineville",
+            Lat = 33.2842,
+            Lon = -85.8086,
+        },
+        ["CA51"] = new AirportFacilityDto
+        {
+            Icao = "CA51",
+            Name = "The Sea Ranch",
+            Lat = 38.7046,
+            Lon = -123.433,
+        },
+    };
+
     public Task<PmdgNg3FuelDto> ReadPmdgNg3FuelAsync(CancellationToken ct = default)
     {
         EnsureConnected();

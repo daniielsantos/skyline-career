@@ -12,6 +12,7 @@ import {
   resolvePlayerFuelCapacityKg,
 } from './career-fleet.js';
 import { hubDistanceNm } from './career-ferry-route.js';
+import { assertFerryNotBush, isBushHub } from './career-bush.js';
 import {
   applyAircraftHoursAfterMission,
   conditionPctsForListing,
@@ -283,6 +284,7 @@ function hubPool(world: CareerEconomyWorld): string[] {
   const regionals: string[] = [];
   const spokes: string[] = [];
   for (const ap of world.airports) {
+    if (isBushHub(ap.icao)) continue;
     const tier = hubTierOf(ap);
     if (tier === 'major') majors.push(ap.icao);
     else if (tier === 'regional') regionals.push(ap.icao);
@@ -299,7 +301,9 @@ function pickBasedIcao(
 ): string {
   const majors = world.airports.filter((a) => hubTierOf(a) === 'major');
   const regionals = world.airports.filter((a) => hubTierOf(a) === 'regional');
-  const spokes = world.airports.filter((a) => hubTierOf(a) === 'spoke');
+  const spokes = world.airports.filter(
+    (a) => hubTierOf(a) === 'spoke' && !isBushHub(a.icao),
+  );
 
   // Jets / large freighters almost always at majors.
   if (
@@ -955,6 +959,7 @@ export function quoteAircraftDeliveryForListing(
     throw new Error(`Unknown delivery airport: ${to}`);
   }
   const from = listing.basedIcao.trim().toUpperCase();
+  assertFerryNotBush(from, to);
   if (from === to) {
     return {
       listingId: listing.id,

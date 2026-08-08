@@ -37,6 +37,7 @@
     "monitor-ofp": "node packages/agent/dist/cli.js monitor-ofp",
     "career": "node packages/agent/dist/cli.js career",
     "career-airframe": "node packages/agent/dist/cli.js career-airframe",
+    "career-hubs": "node packages/agent/dist/cli.js career-hubs",
     "career:ui": "npm run dev -w @msfs-compat/career-ui",
     "test:shared": "npm run test -w @msfs-compat/shared",
     "test:agent": "npm run test -w @msfs-compat/agent",

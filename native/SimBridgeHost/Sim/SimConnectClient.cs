@@ -17,6 +17,15 @@ public sealed class SimConnectClient : ISimClient
     private readonly object _gate = new();
     private readonly AutoResetEvent _messageEvent = new(false);
     private readonly ConcurrentDictionary<uint, TaskCompletionSource<object>> _pending = new();
+    private readonly ConcurrentDictionary<string, AirportFacilityDto> _airportCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _facilityGate = new(1, 1);
+    private readonly object _airportListGate = new();
+    private TaskCompletionSource<bool>? _airportListTcs;
+    private bool _airportFacilityDefReady;
+    private bool _airportListComplete;
+    private string? _facilityRequestIcao;
+    private AirportFacilityDto? _facilityPartial;
+    private readonly List<AirportRunwayDto> _facilityRunways = new();
 
     private SimConnect? _sim;
     private CancellationTokenSource? _recvCts;
@@ -35,6 +44,7 @@ public sealed class SimConnectClient : ISimClient
     {
         Snapshot = 1,
         Identity = 2,
+        AirportFacility = 50,
         // Dynamic ops use allocated IDs starting at DynamicBase.
         DynamicBase = 100,
     }
@@ -43,6 +53,8 @@ public sealed class SimConnectClient : ISimClient
     {
         Snapshot = 1,
         Identity = 2,
+        AirportFacility = 50,
+        AirportList = 51,
         DynamicBase = 100,
     }
 
@@ -137,6 +149,34 @@ public sealed class SimConnectClient : ISimClient
         public string AtcId;
     }
 
+    /// <summary>Facility definition field order must match AddToFacilityDefinition below.</summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    private struct AirportFacilityData
+    {
+        public double Latitude;
+        public double Longitude;
+        public double Altitude;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string Name;
+    }
+
+    /// <summary>Nested RUNWAY child — field order must match AddToFacilityDefinition.</summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct RunwayFacilityData
+    {
+        public double Latitude;
+        public double Longitude;
+        public float Heading;
+        public float Length;
+        public float Width;
+        public int Surface;
+        public int PrimaryNumber;
+        public int PrimaryDesignator;
+        public int SecondaryNumber;
+        public int SecondaryDesignator;
+    }
+
     public string Mode => "simconnect";
     public bool IsConnected => _sim is not null && _openReceived;
 
@@ -165,8 +205,16 @@ public sealed class SimConnectClient : ISimClient
             _sim.OnRecvException += OnRecvException;
             _sim.OnRecvSimobjectData += OnRecvSimobjectData;
             _sim.OnRecvClientData += OnRecvClientData;
+            _sim.OnRecvFacilityData += OnRecvFacilityData;
+            _sim.OnRecvFacilityDataEnd += OnRecvFacilityDataEnd;
+            _sim.OnRecvAirportList += OnRecvAirportList;
 
             RegisterFixedDefinitions(_sim);
+            _airportCache.Clear();
+            _airportListComplete = false;
+            _facilityPartial = null;
+            _facilityRequestIcao = null;
+            _facilityRunways.Clear();
 
             _recvCts = new CancellationTokenSource();
             _recvLoop = Task.Run(() => ReceiveLoop(_recvCts.Token));
@@ -218,6 +266,16 @@ public sealed class SimConnectClient : ISimClient
             lock (_pmdgControlGate)
             {
                 _pmdgControlEventId = 0;
+            }
+            _airportFacilityDefReady = false;
+            _airportListComplete = false;
+            _facilityPartial = null;
+            _facilityRequestIcao = null;
+            _airportCache.Clear();
+            lock (_airportListGate)
+            {
+                _airportListTcs?.TrySetCanceled();
+                _airportListTcs = null;
             }
             _recvCts?.Dispose();
             _recvCts = null;
@@ -478,6 +536,126 @@ public sealed class SimConnectClient : ISimClient
             AtcId = atcId,
             Icao = InferIcao(atcModel, title),
         };
+    }
+
+    public async Task<AirportFacilityDto> GetAirportFacilityAsync(string icao, CancellationToken ct = default)
+    {
+        _ = RequireSim();
+        var code = (icao ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(code))
+        {
+            throw new SimClientException("INVALID_PARAMS", "icao required");
+        }
+
+        if (_airportCache.TryGetValue(code, out var cached))
+        {
+            return cached;
+        }
+
+        await _facilityGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (_airportCache.TryGetValue(code, out cached))
+            {
+                return cached;
+            }
+
+            if (_airportFacilityDefReady)
+            {
+                var viaFacility = await TryRequestFacilityDataAsync(code, ct).ConfigureAwait(false);
+                if (viaFacility is not null)
+                {
+                    _airportCache[code] = viaFacility;
+                    return viaFacility;
+                }
+            }
+
+            await EnsureAirportListCachedAsync(ct).ConfigureAwait(false);
+            if (_airportCache.TryGetValue(code, out cached))
+            {
+                return cached;
+            }
+
+            throw new SimClientException(
+                "NOT_FOUND",
+                $"Airport facility not found in MSFS scenery for {code}");
+        }
+        finally
+        {
+            _facilityGate.Release();
+        }
+    }
+
+    private async Task<AirportFacilityDto?> TryRequestFacilityDataAsync(string code, CancellationToken ct)
+    {
+        var sim = RequireSim();
+        var tcs = NewPending(Requests.AirportFacility);
+        _facilityPartial = null;
+        _facilityRunways.Clear();
+        _facilityRequestIcao = code;
+
+        try
+        {
+            lock (_gate)
+            {
+                sim.RequestFacilityData(Definitions.AirportFacility, Requests.AirportFacility, code, "");
+            }
+
+            var raw = await WaitPending(tcs, ct).ConfigureAwait(false);
+            return raw as AirportFacilityDto;
+        }
+        catch (SimClientException ex) when (ex.Code is "TIMEOUT" or "SIM_ERROR")
+        {
+            Console.Error.WriteLine(
+                $"[simconnect] RequestFacilityData({code}) failed: {ex.Code} {ex.Message}");
+            _pending.TryRemove((uint)Requests.AirportFacility, out _);
+            return null;
+        }
+        finally
+        {
+            _facilityRequestIcao = null;
+            _facilityPartial = null;
+            _facilityRunways.Clear();
+        }
+    }
+
+    private async Task EnsureAirportListCachedAsync(CancellationToken ct)
+    {
+        if (_airportListComplete)
+        {
+            return;
+        }
+
+        TaskCompletionSource<bool> tcs;
+        lock (_airportListGate)
+        {
+            if (_airportListComplete)
+            {
+                return;
+            }
+
+            if (_airportListTcs is null)
+            {
+                _airportListTcs = new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                var sim = RequireSim();
+                lock (_gate)
+                {
+                    sim.RequestFacilitiesList(SIMCONNECT_FACILITY_LIST_TYPE.AIRPORT, Requests.AirportList);
+                }
+            }
+
+            tcs = _airportListTcs;
+        }
+
+        using var timeout = new CancellationTokenSource(15_000);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
+        await using var reg = linked.Token.Register(() =>
+            tcs.TrySetException(new SimClientException(
+                "TIMEOUT",
+                "Timed out waiting for MSFS airport facilities list")));
+
+        await tcs.Task.ConfigureAwait(false);
     }
 
     public async Task<PmdgNg3FuelDto> ReadPmdgNg3FuelAsync(CancellationToken ct = default)
@@ -752,9 +930,10 @@ public sealed class SimConnectClient : ISimClient
     {
         await DisconnectAsync().ConfigureAwait(false);
         _messageEvent.Dispose();
+        _facilityGate.Dispose();
     }
 
-    private static void RegisterFixedDefinitions(SimConnect sim)
+    private void RegisterFixedDefinitions(SimConnect sim)
     {
         // Only reliable SimVars for MSFS 2024 default aircraft.
         // Avoid FUEL TOTAL QUANTITY / TOTAL PAYLOAD WEIGHT — they throw on this airframe.
@@ -793,6 +972,39 @@ public sealed class SimConnectClient : ISimClient
         sim.AddToDataDefinition(Definitions.Identity, "ATC TYPE", "", SIMCONNECT_DATATYPE.STRING256, 0, SimConnect.SIMCONNECT_UNUSED);
         sim.AddToDataDefinition(Definitions.Identity, "ATC ID", "", SIMCONNECT_DATATYPE.STRING256, 0, SimConnect.SIMCONNECT_UNUSED);
         sim.RegisterDataDefineStruct<IdentityData>(Definitions.Identity);
+
+        try
+        {
+            // Nested runway inside airport — CLOSE AIRPORT last.
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "OPEN AIRPORT");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "LATITUDE");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "LONGITUDE");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "ALTITUDE");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "NAME");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "OPEN RUNWAY");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "LATITUDE");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "LONGITUDE");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "HEADING");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "LENGTH");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "WIDTH");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "SURFACE");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "PRIMARY_NUMBER");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "PRIMARY_DESIGNATOR");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "SECONDARY_NUMBER");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "SECONDARY_DESIGNATOR");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "CLOSE RUNWAY");
+            sim.AddToFacilityDefinition(Definitions.AirportFacility, "CLOSE AIRPORT");
+            // Cast key is facility type, not the definition id.
+            sim.RegisterFacilityDataDefineStruct<AirportFacilityData>(SIMCONNECT_FACILITY_DATA_TYPE.AIRPORT);
+            sim.RegisterFacilityDataDefineStruct<RunwayFacilityData>(SIMCONNECT_FACILITY_DATA_TYPE.RUNWAY);
+            _airportFacilityDefReady = true;
+        }
+        catch (Exception ex)
+        {
+            _airportFacilityDefReady = false;
+            Console.Error.WriteLine(
+                $"[simconnect] Airport facility definition unavailable; list cache fallback only: {ex.Message}");
+        }
     }
 
     private static void AddFloat(SimConnect sim, Definitions def, string name, string unit)
@@ -1058,6 +1270,248 @@ public sealed class SimConnectClient : ISimClient
         catch (Exception ex)
         {
             tcs.TrySetException(ex);
+        }
+    }
+
+    private void OnRecvFacilityData(SimConnect sender, SIMCONNECT_RECV_FACILITY_DATA data)
+    {
+        if (data.UserRequestId != (uint)Requests.AirportFacility)
+        {
+            return;
+        }
+
+        try
+        {
+            if (data.Data is null || data.Data.Length == 0)
+            {
+                return;
+            }
+
+            if (data.Type == (uint)SIMCONNECT_FACILITY_DATA_TYPE.AIRPORT)
+            {
+                if (data.Data[0] is not AirportFacilityData raw)
+                {
+                    Console.Error.WriteLine(
+                        $"[simconnect] facility airport unexpected type: {data.Data[0]?.GetType().FullName ?? "null"}");
+                    return;
+                }
+
+                var icao = _facilityRequestIcao ?? "";
+                _facilityPartial = new AirportFacilityDto
+                {
+                    Icao = icao,
+                    Name = EmptyToNull(raw.Name),
+                    Lat = raw.Latitude,
+                    Lon = raw.Longitude,
+                    AltMeters = double.IsFinite(raw.Altitude) ? raw.Altitude : null,
+                };
+                return;
+            }
+
+            if (data.Type == (uint)SIMCONNECT_FACILITY_DATA_TYPE.RUNWAY)
+            {
+                if (data.Data[0] is not RunwayFacilityData raw)
+                {
+                    Console.Error.WriteLine(
+                        $"[simconnect] facility runway unexpected type: {data.Data[0]?.GetType().FullName ?? "null"}");
+                    return;
+                }
+
+                var mapped = MapRunwayFacility(raw);
+                if (mapped is not null)
+                {
+                    _facilityRunways.Add(mapped);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[simconnect] facility data parse error: {ex.Message}");
+        }
+    }
+
+    private void OnRecvFacilityDataEnd(SimConnect sender, SIMCONNECT_RECV_FACILITY_DATA_END data)
+    {
+        if (data.RequestId != (uint)Requests.AirportFacility)
+        {
+            return;
+        }
+
+        if (!_pending.TryRemove(data.RequestId, out var tcs))
+        {
+            return;
+        }
+
+        var dto = _facilityPartial;
+        if (dto is null ||
+            !double.IsFinite(dto.Lat) ||
+            !double.IsFinite(dto.Lon) ||
+            (dto.Lat == 0 && dto.Lon == 0))
+        {
+            tcs.TrySetException(new SimClientException(
+                "NOT_FOUND",
+                $"No facility coords returned for {_facilityRequestIcao ?? "?"}"));
+            return;
+        }
+
+        dto.Runways = _facilityRunways.ToList();
+        tcs.TrySetResult(dto);
+    }
+
+    private static AirportRunwayDto? MapRunwayFacility(RunwayFacilityData raw)
+    {
+        if (!double.IsFinite(raw.Latitude) || !double.IsFinite(raw.Longitude))
+        {
+            return null;
+        }
+
+        if (raw.Latitude == 0 && raw.Longitude == 0)
+        {
+            return null;
+        }
+
+        if (!float.IsFinite(raw.Length) || raw.Length < 5)
+        {
+            return null;
+        }
+
+        if (!float.IsFinite(raw.Width) || raw.Width <= 0)
+        {
+            return null;
+        }
+
+        var ident = FormatRunwayEnd(raw.PrimaryNumber, raw.PrimaryDesignator);
+        if (string.IsNullOrEmpty(ident))
+        {
+            return null;
+        }
+
+        var reciprocal = FormatRunwayEnd(raw.SecondaryNumber, raw.SecondaryDesignator);
+        var heading = float.IsFinite(raw.Heading) ? (double)raw.Heading : 0;
+        while (heading < 0) heading += 360;
+        while (heading >= 360) heading -= 360;
+
+        return new AirportRunwayDto
+        {
+            Ident = ident,
+            IdentReciprocal = reciprocal,
+            HeadingTrueDeg = heading,
+            LengthM = raw.Length,
+            WidthM = raw.Width,
+            Lat = raw.Latitude,
+            Lon = raw.Longitude,
+            Surface = MapSurface(raw.Surface),
+        };
+    }
+
+    private static string? FormatRunwayEnd(int number, int designator)
+    {
+        string? num = number switch
+        {
+            0 => null,
+            >= 1 and <= 36 => number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            37 => "N",
+            38 => "NE",
+            39 => "E",
+            40 => "SE",
+            41 => "S",
+            42 => "SW",
+            43 => "W",
+            44 => "NW",
+            _ => null,
+        };
+        if (num is null)
+        {
+            return null;
+        }
+
+        var des = designator switch
+        {
+            1 => "L",
+            2 => "R",
+            3 => "C",
+            4 => "W",
+            5 => "A",
+            6 => "B",
+            _ => "",
+        };
+        return num + des;
+    }
+
+    private static string MapSurface(int surface) => surface switch
+    {
+        0 or 23 => "concrete", // CONCRETE / TARMAC
+        1 or 5 or 6 or 7 => "grass",
+        4 or 17 => "asphalt", // ASPHALT / BITUMINUS
+        12 or 21 => "dirt", // DIRT / SAND
+        14 or 19 => "gravel", // GRAVEL / MACADAM
+        2 or 26 or 27 or 28 or 29 or 30 => "water",
+        _ => "other",
+    };
+
+    private void OnRecvAirportList(SimConnect sender, SIMCONNECT_RECV_AIRPORT_LIST data)
+    {
+        try
+        {
+            if (data.rgData is not null)
+            {
+                foreach (var item in data.rgData)
+                {
+                    if (item is not SIMCONNECT_DATA_FACILITY_AIRPORT ap)
+                    {
+                        continue;
+                    }
+
+                    var ident = (ap.Ident ?? "").Trim().ToUpperInvariant();
+                    if (string.IsNullOrEmpty(ident))
+                    {
+                        continue;
+                    }
+
+                    if (!double.IsFinite(ap.Latitude) || !double.IsFinite(ap.Longitude))
+                    {
+                        continue;
+                    }
+
+                    if (ap.Latitude == 0 && ap.Longitude == 0)
+                    {
+                        continue;
+                    }
+
+                    // Prefer first hit; RequestFacilityData path overwrites with richer name later.
+                    _airportCache.TryAdd(ident, new AirportFacilityDto
+                    {
+                        Icao = ident,
+                        Region = EmptyToNull(ap.Region),
+                        Lat = ap.Latitude,
+                        Lon = ap.Longitude,
+                        AltMeters = double.IsFinite(ap.Altitude) ? ap.Altitude : null,
+                    });
+                }
+            }
+
+            var received = data.dwEntryNumber + data.dwArraySize;
+            if (received >= data.dwOutOf)
+            {
+                _airportListComplete = true;
+                lock (_airportListGate)
+                {
+                    _airportListTcs?.TrySetResult(true);
+                    _airportListTcs = null;
+                }
+
+                Console.WriteLine($"[simconnect] airport list cached ({_airportCache.Count} entries)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[simconnect] airport list parse error: {ex.Message}");
+            lock (_airportListGate)
+            {
+                _airportListTcs?.TrySetException(
+                    new SimClientException("SIM_ERROR", $"Airport list failed: {ex.Message}"));
+                _airportListTcs = null;
+            }
         }
     }
 

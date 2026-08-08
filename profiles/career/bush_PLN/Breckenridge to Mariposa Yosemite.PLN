@@ -1,0 +1,827 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<SimBase.Document>
+    <FlightPlan.FlightPlan>
+        <DepartureID>O64</DepartureID>
+        <DestinationID>KMPI</DestinationID>
+        <Title>O64 - KMPI</Title>
+        <Descr>Flight from O64 to KMPI</Descr>
+        <FPType>VFR</FPType>
+        <CruisingAlt>1000.000</CruisingAlt>
+        <AppVersion>
+            <AppVersionMajor>12</AppVersionMajor>
+            <AppVersionMinor>2</AppVersionMinor>
+            <AppVersionBuild>282174</AppVersionBuild>
+        </AppVersion>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.175">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 26' 0.5000",W118° 48' 45.9900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.176">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 32' 58.7500",W118° 36' 56.5700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.177">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 35' 16.6000",W118° 31' 34.8400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.178">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 39' 8.7000",W118° 28' 10.0300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.179">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 39' 52.8500",W118° 21' 55.9700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI5</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.180">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 41' 21.2300",W118° 13' 22.5800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI6</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.182">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 44' 37.4100",W118° 5' 32.5000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI7</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.183">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 36' 6.8600",W117° 54' 13.4600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!A</ICAORegion>
+                <ICAOIdent>POI8</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.184">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KIYK</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.185">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 56' 29.0800",W117° 54' 25.4400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!B</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.186">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 9' 17.2300",W117° 57' 38.3300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!B</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.187">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O99</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.188">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 36' 22.4200",W118° 3' 49.9700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!C</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.189">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O67</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.190">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 48' 7.8300",W118° 11' 56.8600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!D</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.191">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 3' 23.8100",W118° 13' 37.9000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!D</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.192">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 9' 37.1400",W118° 17' 25.3200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!D</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.193">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 21' 48.2500",W118° 23' 42.9500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!D</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.194">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 31' 46.6900",W118° 22' 8.4400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!D</ICAORegion>
+                <ICAOIdent>POI5</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.195">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 42' 16.6900",W118° 24' 50.1300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!D</ICAORegion>
+                <ICAOIdent>POI6</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.196">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 49' 8.4100",W118° 28' 37.9900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!D</ICAORegion>
+                <ICAOIdent>POI7</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.197">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O56</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.199">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 0' 39.7600",W118° 16' 31.5400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!E</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.200">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 16' 11.9700",W118° 5' 46.9800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!E</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.201">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>3Q0</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.202">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 30' 17.9100",W118° 10' 39.5700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!F</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.203">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KHTH</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.204">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 38' 54.3100",W118° 45' 18.5100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!G</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.205">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 48' 18.2500",W118° 43' 55.6800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!G</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.206">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O77</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.207">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 1' 51.4300",W119° 2' 6.1200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!H</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.208">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O43</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.209">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 8' 38.5400",W119° 10' 55.0600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!I</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.210">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 17' 36.4500",W119° 15' 6.2300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!I</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.211">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KSPZ</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.213">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 32' 17.1000",W119° 26' 20.6000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!J</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.214">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 33' 51.1700",W119° 30' 22.1900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!J</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.216">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 31' 34.5800",W119° 42' 2.0500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!J</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.217">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 36' 3.3300",W119° 40' 17.9500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!J</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.219">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 46' 8.2700",W119° 41' 7.7800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!J</ICAORegion>
+                <ICAOIdent>POI5</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.220">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>NV47</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.222">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 58' 16.0800",W119° 49' 41.7700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!K</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.224">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 58' 19.6400",W120° 1' 28.3000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!K</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.225">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 1' 41.7700",W120° 6' 14.1100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!K</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.227">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>H37</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.228">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 8' 42.6900",W120° 5' 34.8100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!L</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.230">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 13' 6.7300",W119° 49' 40.0100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!L</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.232">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 29' 20.3900",W119° 49' 48.9400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!L</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.233">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 36' 19.5600",W119° 44' 36.1000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!L</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.234">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 43' 27.7100",W119° 28' 54.7100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!L</ICAORegion>
+                <ICAOIdent>POI5</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.235">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 39' 30.3800",W119° 22' 12.7200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!L</ICAORegion>
+                <ICAOIdent>POI6</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.236">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>88NV</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.238">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 51' 33.3500",W119° 20' 8.8500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!M</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.240">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 54' 54.2000",W119° 24' 56.8300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!M</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.242">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 55' 32.3000",W119° 34' 41.0900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!M</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.245">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 59' 13.4000",W119° 48' 42.4700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!M</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.246">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>NV16</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.248">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N41° 1' 44.6200",W120° 4' 54.3000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!N</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.249">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 54' 29.9700",W120° 9' 17.0100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!N</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.251">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O39</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.252">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 51' 54.2700",W120° 27' 34.0700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!O</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.253">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 50' 34.1600",W120° 37' 36.8400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!O</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.255">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 49' 5.6100",W120° 44' 9.9800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!O</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.256">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 43' 48.9000",W120° 42' 40.1200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!O</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.257">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>1Q2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.258">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 33' 36.5000",W120° 49' 42.1300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!P</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.259">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 25' 12.5800",W120° 42' 13.0900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!P</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.261">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KSVE</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.262">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 15' 20.0000",W120° 27' 35.8900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!Q</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.263">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 10' 13.2600",W120° 22' 12.8900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!Q</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.265">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 5' 28.5700",W120° 20' 21.9300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!Q</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.267">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N40° 3' 11.5500",W120° 15' 22.6300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!Q</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.268">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>CA11</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.270">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 53' 38.2800",W120° 11' 25.5200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!R</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.271">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 47' 51.7400",W120° 8' 22.6000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!R</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.272">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 46' 29.8800",W120° 18' 36.7300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!R</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.273">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O79</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.274">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 30' 8.3500",W120° 16' 40.4400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!S</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.275">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 27' 32.6200",W120° 11' 56.8000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!S</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.276">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 28' 24.5000",W120° 6' 16.3400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!S</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.278">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 23' 25.5800",W120° 5' 40.0800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!S</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.279">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KTRK</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.280">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 14' 16.2200",W120° 1' 54.7000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!T</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.281">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N39° 10' 0.7300",W120° 8' 39.7400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!T</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.282">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 57' 56.3400",W120° 5' 44.7000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!T</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Lake Tahoe Airport">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KTVL</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.284">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 47' 47.6700",W119° 58' 25.1100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!U</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.286">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 46' 32.0200",W119° 49' 25.4600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!U</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.288">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>M45</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.290">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 39' 38.0000",W119° 43' 35.2400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!V</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.291">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 38' 33.6700",W119° 31' 39.4300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!V</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.292">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 30' 37.7900",W119° 26' 54.3900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!V</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.294">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 20' 56.1400",W119° 27' 9.2200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!V</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.295">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O57</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.296">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 11' 45.0500",W119° 13' 8.6800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!W</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.297">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 5' 15.4300",W119° 10' 56.4900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!W</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.298">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O24</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.299">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 56' 8.4100",W119° 13' 56.4400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.300">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 52' 53.6200",W119° 20' 35.0000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.301">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 52' 49.4700",W119° 27' 9.9600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.303">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 47' 13.8500",W119° 29' 14.5200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.304">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 44' 35.8200",W119° 34' 7.5500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI5</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.305">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 40' 34.6100",W119° 46' 31.8200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI6</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.306">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 39' 14.5100",W119° 53' 19.4900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI7</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.307">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 36' 16.7200",W119° 57' 57.9100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI8</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.308">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 31' 21.0900",W119° 55' 14.6600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI9</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="@asobo-bushtrip-nevada,TT:Nevada.Mission.309">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 29' 58.1200",W119° 58' 23.8400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>!X</ICAORegion>
+                <ICAOIdent>POI10</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+    </FlightPlan.FlightPlan>
+</SimBase.Document>

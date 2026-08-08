@@ -108,6 +108,7 @@ function usage(): never {
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
+  msfs-compat-agent career-hubs [all|bush|<ICAO>] [--yes] [--pipe <name>]
   msfs-compat-agent sample-burn [--type typeId] [--pipe <name>]
   msfs-compat-agent career-airframe [wizard]|list|disable|enable|rename|remove [--type typeId] [--label name] [--keep-files]
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
@@ -125,6 +126,7 @@ Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
+  career-hubs: SimConnect Facilities → lat/lon/name for all career hubs (or bush / one ICAO)
   sample-burn: live cruise fuel-flow sample → patch career-player-airframes.json burn
   career-airframe: interactive wizard (or list / disable / enable / rename / remove) for Market models
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
@@ -342,6 +344,21 @@ async function main(): Promise<void> {
         draftsDir: join(repoRoot, 'profiles', 'drafts'),
         examplesDir: join(repoRoot, 'profiles', 'examples'),
         notesDir: join(repoRoot, 'profiles', 'notes'),
+      }),
+    );
+    return;
+  }
+
+  if (command === 'career-hubs' || command === 'homologate-hubs') {
+    const { runCareerHubsWizard } = await import('./career-hubs-wizard.js');
+    const scopeArg = rest.find((a) => !a.startsWith('--'));
+    const yes = hasFlag(rest, '--yes');
+    await withBridge(pipeName, async (bridge) =>
+      runCareerHubsWizard({
+        bridge,
+        repoRoot,
+        scope: scopeArg,
+        yes,
       }),
     );
     return;

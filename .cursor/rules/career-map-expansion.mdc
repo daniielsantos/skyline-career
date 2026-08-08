@@ -52,11 +52,22 @@ On `migrateEconomyWorld` / load, these run — **after** the seed constants are 
 
 **You still must update the seed constants below.** Coverage cannot invent coords, tiers, fuel hubs, corridors, or region neighbors.
 
+## BushTripOnly hubs (MSFS SoT)
+
+FAA locals used only as bush-trip endpoints (`bushTripOnly` in [`career-us-bush-trip-hubs.ts`](packages/shared/src/career-us-bush-trip-hubs.ts)):
+
+- **Do not** use OurAirports as the source of truth for these ICAOs (identifiers collide; scenery differs — e.g. O67 is Manzanar in MSFS, not Independence).
+- **Do** homologate via SimConnect Facilities (`POST /api/bush-hubs/homologate` / `homologate-batch`) while MSFS is running (any location) — writes [`msfs-bush-hub-overrides.json`](packages/shared/src/data/msfs-bush-hub-overrides.json) / `profiles/career/msfs-bush-hub-overrides.json` with `source: "msfs_facility"`. Explicit panel coords still allowed.
+- Do **not** require parking at each strip.
+- Regenerate with `node packages/shared/scripts/gen-bush-trip-only-hubs.mjs` (MSFS override > PLN User-WP estimate).
+- OurAirports remains acceptable only for **network** runway geometry (`career-runways.json`), not bushTripOnly centers.
+- Flag `msfsValidated: true` on hubs that have an override.
+
 ## Manual checklist (required)
 
 Edit in this order in [`career-economy.ts`](packages/shared/src/career-economy.ts) unless noted:
 
-1. **`CAREER_HUB_COORDS`** — lat/lon/name for every new ICAO.
+1. **`CAREER_HUB_COORDS`** — lat/lon/name for every new ICAO (for `bushTripOnly`, prefer MSFS overrides above).
 2. **`HUB_TIER_BY_ICAO`** — `major` / `regional` / `spoke`.
 3. **Seed hubs array** inside `createSeedEconomyWorld` — region (`XX-YY`), tier, produce/consume biases.
 4. **`FUEL_HUB_ICAOS`** — only Jet-A **producers**. Target ~1 fuel hub per 2–3 airports in that country. Majors that are not listed seed as draining spokes.

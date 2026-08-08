@@ -20,6 +20,26 @@ export type MxCareerHubDef = {
   lon: number;
   produce: Partial<Record<CommodityId, number>>;
   consume: Partial<Record<CommodityId, number>>;
+  /** Soft-field bush strip — no ferry; light_ga OD only vs same-country gateways. */
+  bush?: true;
+};
+
+/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
+const bushSpoke = {
+  produce: {
+    electronics: 1.35,
+    general: 0.35,
+    supplies: 0.3,
+    perishables: 0.55,
+    machinery: 0.2,
+  } as Partial<Record<CommodityId, number>>,
+  consume: {
+    supplies: 2.4,
+    general: 2.1,
+    perishables: 1.2,
+    electronics: 0.35,
+    machinery: 0.55,
+  } as Partial<Record<CommodityId, number>>,
 };
 
 const drySpoke = {
@@ -514,16 +534,41 @@ export const MX_CAREER_HUBS: readonly MxCareerHubDef[] = [
     lat: 24.0728,
     lon: -110.3617,
   },
+
+  // ── MX bush soft-fields — OA soft+ICAO is scarce; MMCG gravel + MM68 GRE gps ──
+  {
+    icao: 'MMCG',
+    name: 'Nuevo Casas Grandes Municipal',
+    region: 'MX-N',
+    hubTier: 'spoke',
+    lat: 30.3974,
+    lon: -107.875,
+    bush: true,
+    ...bushSpoke,
+  },
+  {
+    icao: 'MM68',
+    name: 'Mina Hércules',
+    region: 'MX-N',
+    hubTier: 'spoke',
+    lat: 28.0366,
+    lon: -103.771,
+    bush: true,
+    ...bushSpoke,
+  },
 ];
 
-export const MX_CAREER_HUB_COUNT = 45;
+export const MX_CAREER_HUB_COUNT = 47;
 
-/** Auto feeder corridors so every MX hub has ≥2 partners. */
+/** Auto feeder corridors so every non-bush MX hub has ≥2 partners. */
 export function buildMxFeederCorridors(
   hubs: readonly MxCareerHubDef[] = MX_CAREER_HUBS,
   existing: readonly CareerCorridorEdge[] = [],
 ): CareerCorridorEdge[] {
-  return buildCareerFeederCorridors(hubs, existing);
+  return buildCareerFeederCorridors(
+    hubs.filter((h) => h.bush !== true),
+    existing,
+  );
 }
 
 export function assertMxCareerHubCatalog(): void {
@@ -544,7 +589,7 @@ export function assertMxCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<MxCareerRegion, number> = {
-    'MX-N': 14,
+    'MX-N': 16,
     'MX-C': 14,
     'MX-S': 9,
     'MX-Y': 8,

@@ -17,7 +17,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Lot prune: `pruneDeadLots` drops `expired`/`delivered` after 48 ticks (~12h at 15-min batches; tick + migrate/load). Logbook untouched.
 - Player inbound soft-shadow: accept/depart publishes `inboundPending`; soft fill / lane sat = NPC + player.
 - Hub tiers (`major`/`regional`/`spoke`): curated offline from BR cargo roles; capacity/flow scale + lane lot caps; formLots ranks by absolute kg.
-- Brazil map: 60 hubs across BR-N / BR-NE / BR-CO / BR-SE / BR-S (catalog `career-br-hubs.ts`; Manaus major, Brasília redistributor; densified from 28).
+- Brazil map: 62 hubs across BR-N / BR-NE / BR-CO / BR-SE / BR-S (catalog `career-br-hubs.ts`; Manaus major, Brasília redistributor; +2 soft-field bush with official ICAO).
+- **Soft-field bush hubs + unified bush trips:** `bush` flag on BR/US/CA/MX hubs (ferry blocked, light_ga). Market freights no longer form on bush ODs — payload rides on **bush trip** arcs ([`career-bush-trips.ts`](packages/shared/src/career-bush-trips.ts)): BR round-trip or US Activities **one-way** tours, `msfsValidated` gate. US PLNs: `K****` as normal spokes (+20); FAA locals as `bushTripOnly` (+32) — trip endpoints/map only (no Market/ferry/home). Freights → **Bush trips** board: accept/abandon + route map ([`career-bush-mission.ts`](packages/shared/src/career-bush-mission.ts)); fly/settle = later.
 - Cargo corridors: curated OD weights bias `formLots` formation + mild pay; BR+US auto feeders (≥2 partners/hub); legacy saves gain missing hubs via `ensureCareerHubCoverage`.
 - Idle-lot escalation: available lots raise pay from `basePayUsd` after 25% of life (cap +40%); flip urgent late; Market shows Idle +N% chip.
 - Demand shocks: regional events (harvest/outage/congestion/festival/strike) affect prod/cons + freight pay/urgency/life; Market banner + lot chips.
@@ -37,6 +38,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **NPC airframe variants:** curated ICAO types from FSLTL traffic `flight_model.cfg` scrape (A321F, MD11F, 208B, …) — label + optional cargo ceiling only; not player OFP flight models. Legacy fleets backfill via `ensureNpcAirframes`.
 - **NPC ops cargo clamp:** bids use route fuel/MTOW payload (not class maxRange alone); crew offers only when a homologated airframe has lift&gt;0; unflyable awaiting_pilot promotes early and hides Fly.
 - **Ferry journey modal:** Hangar Plan opens multi-leg sheet (all hops, progress, next cost, empty-tank note); hop-by-hop Fly next leg; fixes finalDest dropped on Hangar Go.
+- **Amazon bush hubs (v1 → global + trips):** soft-field spokes in BR/US/CA/MX; draft trip `br-rio-negro-tapuruquara` (unvalidated). Inspection/heat deferred.
 
 ## Near-term priorities (current Brazil career)
 

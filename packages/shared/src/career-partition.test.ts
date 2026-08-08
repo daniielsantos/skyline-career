@@ -97,9 +97,9 @@ describe('career partition', () => {
       npcFlights: [],
       internationalLanes: [],
     };
-    assert.equal(brOnly.airports.length, 60);
+    assert.equal(brOnly.airports.length, 62);
     assert.equal(ensureCareerHubCoverage(brOnly as typeof full), true);
-    assert.equal(brOnly.airports.length, 255);
+    assert.equal(brOnly.airports.length, 317);
     assert.ok(brOnly.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'KSEA'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'KPDX'));
@@ -118,7 +118,7 @@ describe('career partition', () => {
       npcs: [],
       npcFlights: [],
     });
-    assert.equal(migrated.airports.length, 255);
+    assert.equal(migrated.airports.length, 317);
     assert.ok((migrated.internationalLanes?.length ?? 0) >= 20);
   });
 

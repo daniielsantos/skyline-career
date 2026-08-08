@@ -1,9 +1,10 @@
 /**
- * Continental US career hub catalog (100 airports).
+ * Continental US career hub catalog (network + bush + bush-trip-only locals).
  * Consumed by career-economy seed, coords, tiers, and feeder corridor generation.
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { US_BUSH_TRIP_ONLY_HUBS } from './career-us-bush-trip-hubs.js';
 
 export type UsCareerRegion =
   | 'US-W'
@@ -22,6 +23,33 @@ export type UsCareerHubDef = {
   lon: number;
   produce: Partial<Record<CommodityId, number>>;
   consume: Partial<Record<CommodityId, number>>;
+  /** Soft-field bush strip — no ferry; light_ga OD only vs same-country gateways. */
+  bush?: true;
+  /**
+   * FAA local / non-network strip used only as a bush-trip endpoint.
+   * On map + trip legs; never Market freights, ferry, or starter home hub.
+   */
+  bushTripOnly?: true;
+  /** Coords/name confirmed against MSFS (panel or parked sample), not OurAirports. */
+  msfsValidated?: true;
+};
+
+/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
+const bushSpoke = {
+  produce: {
+    electronics: 1.35,
+    general: 0.35,
+    supplies: 0.3,
+    perishables: 0.55,
+    machinery: 0.2,
+  } as Partial<Record<CommodityId, number>>,
+  consume: {
+    supplies: 2.4,
+    general: 2.1,
+    perishables: 1.2,
+    electronics: 0.35,
+    machinery: 0.55,
+  } as Partial<Record<CommodityId, number>>,
 };
 
 export type CareerCorridorEdge = {
@@ -1015,9 +1043,225 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -70.3093,
     ...drySpoke,
   },
+
+  // ── US bush-trip tour spokes (20) — K**** from Activities PLNs; normal spokes ──
+  {
+    icao: 'KRMG',
+    name: 'Richard B Russell / Rome',
+    region: 'US-SE',
+    hubTier: 'spoke',
+    lat: 34.3506,
+    lon: -85.158,
+    ...drySpoke,
+  },
+  {
+    icao: 'KDZJ',
+    name: 'Blairsville',
+    region: 'US-SE',
+    hubTier: 'spoke',
+    lat: 34.8551,
+    lon: -83.9969,
+    ...drySpoke,
+  },
+  {
+    icao: 'KAVL',
+    name: 'Asheville',
+    region: 'US-SE',
+    hubTier: 'spoke',
+    lat: 35.4355,
+    lon: -82.5419,
+    ...drySpoke,
+  },
+  {
+    icao: 'KVJI',
+    name: 'Virginia Highlands / Abingdon',
+    region: 'US-SE',
+    hubTier: 'spoke',
+    lat: 36.6871,
+    lon: -82.0333,
+    ...drySpoke,
+  },
+  {
+    icao: 'KLNP',
+    name: 'Lonesome Pine / Wise',
+    region: 'US-SE',
+    hubTier: 'spoke',
+    lat: 36.9875,
+    lon: -82.53,
+    ...drySpoke,
+  },
+  {
+    icao: 'KCBE',
+    name: 'Greater Cumberland',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 39.6154,
+    lon: -78.7609,
+    ...drySpoke,
+  },
+  {
+    icao: 'KFDK',
+    name: 'Frederick',
+    region: 'US-NE',
+    hubTier: 'spoke',
+    lat: 39.4176,
+    lon: -77.3743,
+    ...drySpoke,
+  },
+  {
+    icao: 'KAVX',
+    name: 'Catalina / Avalon',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 33.4049,
+    lon: -118.416,
+    ...drySpoke,
+  },
+  {
+    icao: 'KPMD',
+    name: 'Palmdale / USAF Plant 42',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 34.6294,
+    lon: -118.085,
+    ...drySpoke,
+  },
+  {
+    icao: 'KDAG',
+    name: 'Barstow Daggett',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 34.8537,
+    lon: -116.787,
+    ...drySpoke,
+  },
+  {
+    icao: 'KBIH',
+    name: 'Eastern Sierra / Bishop',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 37.3731,
+    lon: -118.364,
+    ...drySpoke,
+  },
+  {
+    icao: 'KMMH',
+    name: 'Mammoth Yosemite',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 37.6254,
+    lon: -118.8431,
+    ...drySpoke,
+  },
+  {
+    icao: 'KCCR',
+    name: 'Buchanan Field / Concord',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 37.9897,
+    lon: -122.057,
+    ...drySpoke,
+  },
+  {
+    icao: 'KIYK',
+    name: 'Inyokern',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 35.6588,
+    lon: -117.83,
+    ...drySpoke,
+  },
+  {
+    icao: 'KHTH',
+    name: 'Hawthorne Industrial',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 38.5444,
+    lon: -118.634,
+    ...drySpoke,
+  },
+  {
+    icao: 'KSPZ',
+    name: 'Silver Springs',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 39.403,
+    lon: -119.251,
+    ...drySpoke,
+  },
+  {
+    icao: 'KSVE',
+    name: 'Susanville',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 40.3757,
+    lon: -120.573,
+    ...drySpoke,
+  },
+  {
+    icao: 'KTRK',
+    name: 'Truckee Tahoe',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 39.3186,
+    lon: -120.1406,
+    ...drySpoke,
+  },
+  {
+    icao: 'KTVL',
+    name: 'Lake Tahoe',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 38.8939,
+    lon: -119.995,
+    ...drySpoke,
+  },
+  {
+    icao: 'KMPI',
+    name: 'Mariposa Yosemite',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 37.5109,
+    lon: -120.04,
+    ...drySpoke,
+  },
+
+  // ── US bush soft-fields (3) — official ICAO; ferry blocked; OD vs US gateways ──
+  {
+    icao: 'KESW',
+    name: 'Easton State',
+    region: 'US-W',
+    hubTier: 'spoke',
+    lat: 47.2542,
+    lon: -121.186,
+    bush: true,
+    ...bushSpoke,
+  },
+  {
+    icao: 'KTCS',
+    name: 'Truth or Consequences Municipal',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 33.2369,
+    lon: -107.272,
+    bush: true,
+    ...bushSpoke,
+  },
+  {
+    icao: 'KTAD',
+    name: 'Trinidad / Perry Stokes',
+    region: 'US-MT',
+    hubTier: 'spoke',
+    lat: 37.2594,
+    lon: -104.341,
+    bush: true,
+    ...bushSpoke,
+  },
+  // FAA locals / trip-only endpoints (Activities PLN Airport nodes)
+  ...US_BUSH_TRIP_ONLY_HUBS,
 ];
 
-export const US_CAREER_HUB_COUNT = 100;
+export const US_CAREER_HUB_COUNT = 155;
 
 function haversineNm(
   a: { lat: number; lon: number },
@@ -1147,14 +1391,17 @@ export function buildCareerFeederCorridors(
 }
 
 /**
- * Auto feeder corridors so every US hub has ≥2 partners.
+ * Auto feeder corridors so every non-bush US hub has ≥2 partners.
  * Dedupes against existing manual trunks (caller merges).
  */
 export function buildUsFeederCorridors(
   hubs: readonly UsCareerHubDef[],
   existing: readonly CareerCorridorEdge[] = [],
 ): CareerCorridorEdge[] {
-  return buildCareerFeederCorridors(hubs, existing);
+  return buildCareerFeederCorridors(
+    hubs.filter((h) => h.bush !== true && h.bushTripOnly !== true),
+    existing,
+  );
 }
 
 /** Runtime assert helpers for tests / seed wiring. */

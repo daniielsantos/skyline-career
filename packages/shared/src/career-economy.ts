@@ -4,6 +4,13 @@ import {
   buildBrFeederCorridors,
 } from './career-br-hubs.js';
 import {
+  bushLotPayMult,
+  isBushFreightOdAllowed,
+  isBushHub,
+  isBushTripOnlyHub,
+} from './career-bush.js';
+import { assertBushTripCatalog } from './career-bush-trips.js';
+import {
   assertCaCareerHubCatalog,
   buildCaFeederCorridors,
   CA_CAREER_HUBS,
@@ -18,6 +25,10 @@ import {
   buildUsFeederCorridors,
   US_CAREER_HUBS,
 } from './career-us-hubs.js';
+import {
+  applyMsfsBushHubOverrideToTerminal,
+  lookupMsfsBushHubOverride,
+} from './career-msfs-hub-overrides.js';
 import {
   ensureWorldHubLevels,
   hubLevelHealthMult,
@@ -385,6 +396,39 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'SBEG', b: 'SBBE', weight: 1.6 },
   { a: 'SBEG', b: 'SBPV', weight: 1.4 },
   { a: 'SBEG', b: 'SBMQ', weight: 1.3 },
+  // Amazon bush soft-fields ↔ BR gateways only (formation + mild pay)
+  { a: 'SNYA', b: 'SBEG', weight: 2.2 },
+  { a: 'SNYA', b: 'SBSN', weight: 2.4 },
+  { a: 'SNYA', b: 'SBBE', weight: 2.0 },
+  { a: 'SWTP', b: 'SBEG', weight: 2.4 },
+  { a: 'SWTP', b: 'SBSN', weight: 1.7 },
+  { a: 'SWTP', b: 'SBBE', weight: 1.6 },
+  // US bush soft-fields ↔ US gateways
+  { a: 'KESW', b: 'KSEA', weight: 2.4 },
+  { a: 'KESW', b: 'KPDX', weight: 1.8 },
+  { a: 'KESW', b: 'KBOI', weight: 1.6 },
+  { a: 'KTCS', b: 'KABQ', weight: 2.4 },
+  { a: 'KTCS', b: 'KPHX', weight: 1.9 },
+  { a: 'KTCS', b: 'KDEN', weight: 1.7 },
+  { a: 'KTAD', b: 'KDEN', weight: 2.4 },
+  { a: 'KTAD', b: 'KABQ', weight: 2.0 },
+  { a: 'KTAD', b: 'KPHX', weight: 1.6 },
+  // CA bush soft-fields ↔ CA gateways
+  { a: 'CYHE', b: 'CYVR', weight: 2.4 },
+  { a: 'CYHE', b: 'CYYC', weight: 1.7 },
+  { a: 'CYJA', b: 'CYEG', weight: 2.3 },
+  { a: 'CYJA', b: 'CYYC', weight: 2.1 },
+  { a: 'CYJA', b: 'CYVR', weight: 1.7 },
+  { a: 'CYHH', b: 'CYMT', weight: 2.4 },
+  { a: 'CYHH', b: 'CYWG', weight: 1.8 },
+  { a: 'CYHH', b: 'CYYZ', weight: 1.6 },
+  // MX bush soft-fields ↔ MX gateways
+  { a: 'MMCG', b: 'MMCU', weight: 2.4 },
+  { a: 'MMCG', b: 'MMHO', weight: 2.0 },
+  { a: 'MMCG', b: 'MMMY', weight: 1.8 },
+  { a: 'MM68', b: 'MMCU', weight: 2.3 },
+  { a: 'MM68', b: 'MMMY', weight: 1.9 },
+  { a: 'MM68', b: 'MMGL', weight: 1.6 },
   { a: 'SBBE', b: 'SBGR', weight: 1.6 },
   { a: 'SBBE', b: 'SBRF', weight: 1.4 },
   // Center-West feeders
@@ -1061,14 +1105,38 @@ export function ensureWorldSuppliesInventory(world: CareerEconomyWorld): void {
  * warehouses/flows toward the tier profile so flat ~70t seeds become majors vs spokes.
  */
 export function ensureAirportHubTier(terminal: AirportTerminal): void {
-  const tier = HUB_TIER_BY_ICAO[terminal.icao.toUpperCase()] ?? 'spoke';
+  const icao = terminal.icao.toUpperCase();
+  const tier = HUB_TIER_BY_ICAO[icao] ?? 'spoke';
   const alreadyStamped =
     terminal.hubTier === 'major' ||
     terminal.hubTier === 'regional' ||
     terminal.hubTier === 'spoke';
+  // Keep bush / trip-only flags in sync with catalog (coverage migrate + legacy).
+  if (isBushHub(terminal.icao)) terminal.bush = true;
+  else if (terminal.bush) delete terminal.bush;
+  if (isBushTripOnlyHub(terminal.icao)) terminal.bushTripOnly = true;
+  else if (terminal.bushTripOnly) delete terminal.bushTripOnly;
+  // MSFS homologation overrides win over curated catalog / PLN estimates.
+  if (applyMsfsBushHubOverrideToTerminal(terminal)) {
+    /* lat/lon/name stamped from MSFS override */
+  } else {
+    // Catalog lat/lon wins when no MSFS override — bushTripOnly hubs were once
+    // seeded from PLN User WPs several NM off the field.
+    const catalog = CAREER_HUB_COORDS[icao];
+    if (
+      catalog &&
+      Number.isFinite(catalog.lat) &&
+      Number.isFinite(catalog.lon) &&
+      (Math.abs(terminal.lat - catalog.lat) > 1e-4 ||
+        Math.abs(terminal.lon - catalog.lon) > 1e-4)
+    ) {
+      terminal.lat = catalog.lat;
+      terminal.lon = catalog.lon;
+    }
+  }
   if (alreadyStamped) {
     // Keep map as source of truth if ICAO map was updated.
-    terminal.hubTier = HUB_TIER_BY_ICAO[terminal.icao.toUpperCase()] ?? terminal.hubTier;
+    terminal.hubTier = HUB_TIER_BY_ICAO[icao] ?? terminal.hubTier;
     return;
   }
 
@@ -1139,6 +1207,9 @@ export function resolveAirportCoords(
   icao: string,
   terminal?: Pick<AirportTerminal, 'lat' | 'lon'> | null,
 ): { lat: number; lon: number } | undefined {
+  const code = icao.trim().toUpperCase();
+  const msfs = lookupMsfsBushHubOverride(code);
+  if (msfs) return { lat: msfs.lat, lon: msfs.lon };
   if (
     terminal &&
     Number.isFinite(terminal.lat) &&
@@ -1147,7 +1218,7 @@ export function resolveAirportCoords(
   ) {
     return { lat: terminal.lat, lon: terminal.lon };
   }
-  return CAREER_HUB_COORDS[icao.trim().toUpperCase()];
+  return CAREER_HUB_COORDS[code];
 }
 
 /** Great-circle distance in nautical miles. */
@@ -1313,6 +1384,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertUsCareerHubCatalog();
   assertCaCareerHubCatalog();
   assertMxCareerHubCatalog();
+  assertBushTripCatalog();
 
   const hubs: Array<{
     icao: string;
@@ -1323,6 +1395,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     produce: Partial<Record<CommodityId, number>>;
     /** Relative consumption bias. */
     consume: Partial<Record<CommodityId, number>>;
+    bush?: boolean;
+    bushTripOnly?: boolean;
   }> = [
     ...BR_CAREER_HUBS.map((h) => ({
       icao: h.icao,
@@ -1331,6 +1405,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       hubTier: h.hubTier,
       produce: h.produce,
       consume: h.consume,
+      bush: h.bush === true,
     })),
     ...US_CAREER_HUBS.map((h) => ({
       icao: h.icao,
@@ -1339,6 +1414,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       hubTier: h.hubTier,
       produce: h.produce,
       consume: h.consume,
+      bush: h.bush === true,
+      bushTripOnly: h.bushTripOnly === true,
     })),
     ...CA_CAREER_HUBS.map((h) => ({
       icao: h.icao,
@@ -1347,6 +1424,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       hubTier: h.hubTier,
       produce: h.produce,
       consume: h.consume,
+      bush: h.bush === true,
     })),
     ...MX_CAREER_HUBS.map((h) => ({
       icao: h.icao,
@@ -1355,6 +1433,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       hubTier: h.hubTier,
       produce: h.produce,
       consume: h.consume,
+      bush: h.bush === true,
     })),
   ];
 
@@ -1433,6 +1512,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       name: h.name,
       region: h.region,
       hubTier: tier,
+      ...(h.bush ? { bush: true } : {}),
+      ...(h.bushTripOnly ? { bushTripOnly: true } : {}),
       lat: coords.lat,
       lon: coords.lon,
       level,
@@ -2287,6 +2368,11 @@ function formLotsFromImbalances(
       laneSaturation >= 0.35 ? 1 + laneSaturation * 0.12 : 1;
     const weatherPayMult = regionalWeatherPayMult(laneWeather);
     const originLevelPay = hubLevelOriginPayMult(origin.ap.level ?? 1);
+    const bushPay = bushLotPayMult(
+      origin.ap.icao,
+      dest.ap.icao,
+      commodity.id,
+    );
     const payPerKg = Math.min(
       gap *
         0.55 *
@@ -2297,8 +2383,9 @@ function formLotsFromImbalances(
         weatherPayMult *
         corridorPayMult *
         shock.payMult *
-        originLevelPay,
-      commodity.basePricePerKg * (international ? 2.1 : 1.8),
+        originLevelPay *
+        bushPay,
+      commodity.basePricePerKg * (international ? 2.1 : 1.8) * Math.max(1, bushPay * 0.95),
     );
     const payUsd = Math.round(qty * payPerKg);
     // Lot life in 15-min ticks (legacy hour lives × 4).
@@ -2360,6 +2447,7 @@ function formLotsFromImbalances(
     },
   ): void => {
     if (origin.ap.icao === dest.ap.icao) return;
+    if (!isBushFreightOdAllowed(origin.ap.icao, dest.ap.icao)) return;
     if (!opts.international && !isDomesticOd(origin.ap.region, dest.ap.region)) {
       return;
     }

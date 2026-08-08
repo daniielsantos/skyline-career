@@ -53,6 +53,18 @@ import {
   listNpcFleetStatus,
   listRegionMarketPressure,
   listViableMarketLots,
+  isBushHub,
+  isBushTripOnlyHub,
+  acceptBushTrip,
+  abandonBushTrip,
+  bushTripToBoardRow,
+  bushTripMapNodes,
+  getBushTrip,
+  isBushTripActive,
+  listBushTrips,
+  bushTripActivitiesPlnFile,
+  gfpDownloadFilename,
+  msfsPlnXmlToGfp,
   estimateBoardLotEconomics,
   parseMarketBoardAccessFilter,
   parseMarketBoardLaneFilter,
@@ -171,6 +183,13 @@ import {
   probeLiveTouchdownPosition,
 } from './watch-helpers.ts';
 import { WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
+import { BushTripWatchSession } from './bush-watch-helpers.ts';
+import {
+  homologateBushHub,
+  homologateBushHubBatch,
+  loadProfileMsfsBushHubOverrides,
+  resolveHomologateCoords,
+} from './bush-hub-homologate.ts';
 import { createPromiseLock } from './career-write-lock.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -231,6 +250,7 @@ export async function serverSourceStamp(dir: string = here): Promise<number> {
 const bootSourceStamp = await serverSourceStamp();
 const careerDir = join(repoRoot, 'profiles', 'career');
 const store: CareerStore = await openCareerStore({ careerDir });
+await loadProfileMsfsBushHubOverrides(careerDir);
 /** Row cap for the market board — filters must run server-side to survive it. */
 const MARKET_LOT_LIMIT = 200;
 
@@ -273,6 +293,8 @@ function fleetPayload(
       name: airport?.name ?? icao,
       region: airport?.region ?? '',
       hubTier: (airport?.hubTier ?? 'spoke') as 'major' | 'regional' | 'spoke',
+      bush: Boolean(airport?.bush) || isBushHub(icao),
+      bushTripOnly: Boolean(airport?.bushTripOnly) || isBushTripOnlyHub(icao),
     };
   });
   return {
@@ -286,6 +308,7 @@ function fleetPayload(
     companyCredit: companyCreditSnapshot(missions),
     playerFbos: playerFboSnapshot(missions, world),
     leaseUnlock: aircraftLeaseUnlockProgress(missions),
+    activeBushTrip: missions.activeBushTrip ?? null,
   };
 }
 
@@ -540,6 +563,7 @@ function mapLotSummary(
     ticksRemaining: Math.max(0, lot.expiresAtTick - world.tick),
     expired: world.tick >= lot.expiresAtTick,
     perishable: Boolean(commodity.perishable),
+    bush: isBushHub(lot.originIcao) || isBushHub(lot.destIcao),
     distanceNm: routeDistanceNm(world, lot.originIcao, lot.destIcao),
     npcClaim: npcClaim
       ? {
@@ -817,6 +841,13 @@ export function createCareerApiServer(port = 8787) {
     withCareerWrite,
     updateOpenMission,
   });
+  const bushWatchSession = new BushTripWatchSession({
+    withCareerRead,
+    withCareerWrite,
+    stopMarketWatch: async () => {
+      if (watchSession.getStatus().running) await watchSession.stop();
+    },
+  });
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`);
     const path = url.pathname;
@@ -884,6 +915,8 @@ export function createCareerApiServer(port = 8787) {
             lat: airport.lat,
             lon: airport.lon,
             level: airport.level,
+            bush: airport.bush === true,
+            bushTripOnly: airport.bushTripOnly === true,
           })),
         }));
         send(res, 200, payload);
@@ -1793,6 +1826,7 @@ export function createCareerApiServer(port = 8787) {
           expiresAtTick: number;
           ticksRemaining: number;
           perishable: boolean;
+          bush: boolean;
           cargoLocked: boolean;
           international: boolean;
           pressure: unknown;
@@ -1843,6 +1877,8 @@ export function createCareerApiServer(port = 8787) {
             expiresAtTick: row.lot.expiresAtTick,
             ticksRemaining: Math.max(0, row.lot.expiresAtTick - world.tick),
             perishable: Boolean(getCommodity(row.lot.commodityId).perishable),
+            bush:
+              isBushHub(row.lot.originIcao) || isBushHub(row.lot.destIcao),
             cargoLocked: !cargoOpsIsUnlocked(
               cargoOps ?? undefined,
               row.lot.commodityId,
@@ -2226,6 +2262,8 @@ export function createCareerApiServer(port = 8787) {
             region: airport.region,
             level: levelInfo.level,
             hubTier: hubTierOf(airport),
+            bush: Boolean(airport.bush) || isBushHub(airport.icao),
+            bushTripOnly: Boolean(airport.bushTripOnly) || isBushTripOnlyHub(airport.icao),
             lat: airport.lat,
             lon: airport.lon,
           },
@@ -3474,6 +3512,183 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/bush-trips') {
+        const payload = await withCareerRead((world, missions) => {
+          const trips = listBushTrips().map(bushTripToBoardRow);
+          const active = isBushTripActive(missions);
+          let activeView: {
+            tripId: string;
+            title: string;
+            legIndex: number;
+            fromIcao: string;
+            toIcao: string;
+            legs: number;
+            payUsd: number;
+            aircraftId: string;
+            status: 'accepted' | 'in_progress';
+            mapNodes: ReturnType<typeof bushTripMapNodes>;
+            startIcao: string;
+            endIcao: string;
+            hasPln: boolean;
+            legStatus: 'ready' | 'departed';
+          } | null = null;
+          if (active) {
+            const trip = getBushTrip(active.tripId);
+            const leg = trip?.legs[active.legIndex];
+            if (trip && leg) {
+              activeView = {
+                tripId: trip.id,
+                title: trip.title,
+                legIndex: active.legIndex,
+                fromIcao: leg.fromIcao.toUpperCase(),
+                toIcao: leg.toIcao.toUpperCase(),
+                legs: trip.legs.length,
+                payUsd: typeof trip.payUsd === 'number' ? trip.payUsd : 0,
+                aircraftId: active.aircraftId,
+                status: active.status === 'in_progress' ? 'in_progress' : 'accepted',
+                mapNodes: bushTripMapNodes(trip),
+                startIcao: trip.legs[0]!.fromIcao.toUpperCase(),
+                endIcao: trip.legs[trip.legs.length - 1]!.toIcao.toUpperCase(),
+                hasPln: Boolean(bushTripActivitiesPlnFile(trip.id)),
+                legStatus: active.legStatus ?? 'ready',
+              };
+            }
+          }
+          return {
+            trips,
+            active: activeView,
+            walletUsd: missions.walletUsd,
+            tick: world.tick,
+            ...fleetPayload(missions, world),
+          };
+        });
+        send(res, 200, payload);
+        return;
+      }
+
+
+      const bushPlnMatch = path.match(/^\/api\/bush-trips\/([a-z0-9-]+)\/pln$/i);
+      if (req.method === 'GET' && bushPlnMatch) {
+        const tripId = bushPlnMatch[1]!;
+        const fileName = bushTripActivitiesPlnFile(tripId);
+        if (!fileName) {
+          send(res, 404, { error: 'No Activities PLN for this trip' });
+          return;
+        }
+        const plnPath = join(careerDir, 'bush_PLN', fileName);
+        try {
+          const { readFile } = await import('node:fs/promises');
+          const xml = await readFile(plnPath, 'utf8');
+          const safeName = fileName.replace(/[^\w.\- ]+/g, '_');
+          res.writeHead(200, {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': `attachment; filename="${safeName}"`,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Cache-Control': 'no-store',
+          });
+          res.end(xml);
+        } catch {
+          send(res, 404, { error: `PLN file missing: ${fileName}` });
+        }
+        return;
+      }
+
+      const bushGfpMatch = path.match(/^\/api\/bush-trips\/([a-z0-9-]+)\/gfp$/i);
+      if (req.method === 'GET' && bushGfpMatch) {
+        const tripId = bushGfpMatch[1]!;
+        const fileName = bushTripActivitiesPlnFile(tripId);
+        if (!fileName) {
+          send(res, 404, { error: 'No Activities PLN to convert for this trip' });
+          return;
+        }
+        const plnPath = join(careerDir, 'bush_PLN', fileName);
+        try {
+          const { readFile } = await import('node:fs/promises');
+          const xml = await readFile(plnPath, 'utf8');
+          const trip = getBushTrip(tripId);
+          const gfp = msfsPlnXmlToGfp(xml, {
+            title: trip?.title,
+          });
+          const safeName = gfpDownloadFilename(
+            gfp.title,
+            gfp.departureId,
+            gfp.destinationId,
+          );
+          res.writeHead(200, {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': `attachment; filename="${safeName}"`,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Cache-Control': 'no-store',
+            'X-Skyline-Gfp-Waypoints': String(gfp.waypointCount),
+            'X-Skyline-Gfp-Thinned': gfp.thinned ? '1' : '0',
+          });
+          res.end(gfp.body);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          send(res, 500, { error: `GFP convert failed: ${message}` });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/bush-trips/accept') {
+        const body = (await readBody(req)) as {
+          tripId?: string;
+          aircraftId?: string;
+        };
+        if (!body.tripId || !body.aircraftId) {
+          send(res, 400, { error: 'tripId and aircraftId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const accepted = acceptBushTrip(missions, {
+              tripId: body.tripId!,
+              aircraftId: body.aircraftId!,
+              tick: world.tick,
+            });
+            return {
+              active: accepted.active,
+              trip: bushTripToBoardRow(accepted.trip),
+              walletUsd: missions.walletUsd,
+              ...fleetPayload(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const notFound =
+            message.startsWith('Unknown bush trip') ||
+            message.startsWith('Unknown aircraft');
+          send(res, notFound ? 404 : 400, { error: message });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/bush-trips/abandon') {
+        try {
+          if (bushWatchSession.getStatus().running) {
+            await bushWatchSession.stop();
+          }
+          const result = await withCareerWrite((world, missions) => {
+            const abandoned = abandonBushTrip(missions, { tick: world.tick });
+            return {
+              active: abandoned.active,
+              walletUsd: missions.walletUsd,
+              ...fleetPayload(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, 400, { error: message });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/cancel') {
         const body = (await readBody(req)) as { missionId?: string };
         if (!body.missionId) {
@@ -4495,8 +4710,16 @@ export function createCareerApiServer(port = 8787) {
           // Any Watch pipe client contends with inject — stop regardless of mission.
           // beginOfpLoadActive alone is not enough: a mid-tick sample can still
           // share the Host until stop completes and the exclusive gate drains.
+          let stoppedPipe = false;
           if (watchSession.getStatus().running) {
             await watchSession.stop();
+            stoppedPipe = true;
+          }
+          if (bushWatchSession.getStatus().running) {
+            await bushWatchSession.stop();
+            stoppedPipe = true;
+          }
+          if (stoppedPipe) {
             await new Promise((r) => setTimeout(r, 400));
           }
           const injectFleet = await withCareerRead(
@@ -4620,6 +4843,9 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          if (bushWatchSession.getStatus().running) {
+            await bushWatchSession.stop();
+          }
           const status = await watchSession.start({
             missionId: body.missionId,
             intervalSec: body.intervalSec,
@@ -4642,6 +4868,112 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'POST' && path === '/api/watch/stop') {
         const status = await watchSession.stop();
+        send(res, 200, status);
+        return;
+      }
+
+
+      if (req.method === 'GET' && path === '/api/bush-watch/status') {
+        send(res, 200, bushWatchSession.getStatus());
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/bush-hubs/homologate') {
+        const body = (await readBody(req)) as {
+          icao?: string;
+          name?: string;
+          lat?: number;
+          lon?: number;
+          source?: 'msfs_panel' | 'parked_sample' | 'msfs_facility';
+          pipeName?: string;
+        };
+        if (!body.icao?.trim()) {
+          send(res, 400, { error: 'icao required' });
+          return;
+        }
+        try {
+          const resolved = await resolveHomologateCoords({
+            icao: body.icao,
+            name: body.name,
+            lat: body.lat,
+            lon: body.lon,
+            source: body.source,
+            pipeName: body.pipeName,
+          });
+          const result = await withCareerWrite(async (world) =>
+            homologateBushHub(careerDir, world, resolved),
+          );
+          send(res, 200, result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, 400, { error: message });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/bush-hubs/homologate-batch') {
+        const body = (await readBody(req)) as {
+          icaos?: string[];
+          all?: boolean;
+          bushOnly?: boolean;
+          pipeName?: string;
+        };
+        try {
+          const hasList = Array.isArray(body.icaos) && body.icaos.length > 0;
+          const result = await homologateBushHubBatch(
+            careerDir,
+            {
+              icaos: body.icaos,
+              all: hasList ? false : body.all !== false,
+              bushOnly: body.bushOnly === true,
+              pipeName: body.pipeName,
+            },
+            (fn) => withCareerWrite(fn),
+          );
+          send(res, 200, result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, 400, { error: message });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/bush-watch/start') {
+        const body = (await readBody(req)) as {
+          intervalSec?: number;
+          autoDepart?: boolean;
+          autoSettle?: boolean;
+          requireEnginesOff?: boolean;
+          settleRadiusNm?: number;
+          pipeName?: string;
+        };
+        if (isOfpLoadActive()) {
+          send(res, 409, {
+            error: 'OFP inject in progress — bush Watch start blocked',
+            code: 'ofp_inject_active',
+          });
+          return;
+        }
+        try {
+          const status = await bushWatchSession.start({
+            intervalSec: body.intervalSec,
+            autoDepart: body.autoDepart,
+            autoSettle: body.autoSettle,
+            requireEnginesOff: body.requireEnginesOff,
+            settleRadiusNm: body.settleRadiusNm,
+            pipeName: body.pipeName,
+          });
+          send(res, 200, status);
+        } catch (error) {
+          send(res, 503, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/bush-watch/stop') {
+        const status = await bushWatchSession.stop();
         send(res, 200, status);
         return;
       }
@@ -4678,6 +5010,7 @@ export function createCareerApiServer(port = 8787) {
         catchUpTimer = undefined;
       }
       await watchSession.stop();
+      await bushWatchSession.stop();
       await new Promise<void>((resolveClose, reject) => {
         server.close((err) => (err ? reject(err) : resolveClose()));
       });

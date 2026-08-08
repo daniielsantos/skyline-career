@@ -1,10 +1,11 @@
 /**
  * Career runway catalog (hub ICAOs only).
- * Geometry is curated JSON (OurAirports-derived); not SimConnect Facilities.
+ * Base geometry is curated JSON (OurAirports-derived); MSFS Facilities overrides win when present.
  */
 
 import { distanceNm } from './career-economy.js';
 import { listCareerHubIcaos } from './career-fleet.js';
+import { lookupMsfsBushHubOverride } from './career-msfs-hub-overrides.js';
 import catalogJson from './data/career-runways.json' with { type: 'json' };
 
 export type RunwaySurface =
@@ -71,6 +72,8 @@ export const CAREER_RUNWAYS: Readonly<CatalogFile> = catalog;
 
 export function getAirportRunways(icao: string): CareerRunway[] {
   const key = icao.trim().toUpperCase();
+  const msfs = lookupMsfsBushHubOverride(key)?.runways;
+  if (msfs && msfs.length > 0) return msfs;
   const rows = CAREER_RUNWAYS[key];
   return Array.isArray(rows) ? rows : [];
 }
@@ -124,7 +127,10 @@ export function projectOntoRunway(
 
 /** Hub ICAOs missing runway rows in the committed catalog (for coverage tests). */
 export function listHubsMissingRunways(): string[] {
-  return listCareerHubIcaos().filter((icao) => getAirportRunways(icao).length === 0);
+  return listCareerHubIcaos().filter((icao) => {
+    const rows = CAREER_RUNWAYS[icao];
+    return !Array.isArray(rows) || rows.length === 0;
+  });
 }
 
 /**

@@ -37,12 +37,14 @@ export type MarketBoardSortable = {
   cargoLocked?: boolean;
   /** Cross-country lane freight (from lot pressure). */
   international?: boolean;
+  /** Soft-field Amazon bush OD. */
+  bush?: boolean;
 };
 
 export type MarketBoardAccessFilter = 'open' | 'locked';
 
-/** Freights route scope: international lanes vs domestic. */
-export type MarketBoardLaneFilter = 'intl' | 'domestic';
+/** Freights route scope: international lanes vs domestic vs Amazon bush. */
+export type MarketBoardLaneFilter = 'intl' | 'domestic' | 'bush';
 
 /**
  * Kg to quote for board lift / viable filters.
@@ -201,7 +203,7 @@ export function parseMarketBoardLaneFilter(
   raw: string | null | undefined,
 ): MarketBoardLaneFilter | undefined {
   const v = raw?.trim().toLowerCase();
-  if (v === 'intl' || v === 'domestic') return v;
+  if (v === 'intl' || v === 'domestic' || v === 'bush') return v;
   return undefined;
 }
 
@@ -341,6 +343,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
   if (opts.accessFilter === 'locked' && !row.cargoLocked) return false;
   if (opts.laneFilter === 'intl' && !row.international) return false;
   if (opts.laneFilter === 'domestic' && row.international) return false;
+  if (opts.laneFilter === 'bush' && !row.bush) return false;
   return true;
 }
 

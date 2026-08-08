@@ -67,6 +67,29 @@ export class NamedPipeSimBridge implements SimBridge {
     return this.client.call('getAircraftIdentity');
   }
 
+  /** MSFS scenery airport by ICAO (Facilities) — sim must be connected; no need to be at the field. */
+  async getAirportFacility(icao: string): Promise<{
+    icao: string;
+    region?: string;
+    name?: string;
+    lat: number;
+    lon: number;
+    altMeters?: number;
+    runways?: Array<{
+      ident: string;
+      identReciprocal?: string;
+      headingTrueDeg: number;
+      lengthM: number;
+      widthM: number;
+      lat: number;
+      lon: number;
+      surface?: string;
+    }>;
+  }> {
+    await this.ensureOpen();
+    return this.client.call('getAirportFacility', { icao });
+  }
+
   async readSimVar(request: SimVarReadRequest): Promise<number> {
     await this.ensureOpen();
     const result = await this.client.call<{ value: number }>('readSimVar', {

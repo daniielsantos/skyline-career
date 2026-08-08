@@ -31,6 +31,11 @@ export async function loadNetworkHubsCached(): Promise<NetworkHub[]> {
   return hubsInflight;
 }
 
+export function clearNetworkHubsCache(): void {
+  hubsCache = null;
+  hubsInflight = null;
+}
+
 /** Resolve ICAO → map endpoint via hub list, then airport API. */
 export async function resolveAirportEndpoint(
   icao: string,

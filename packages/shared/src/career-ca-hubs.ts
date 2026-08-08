@@ -20,6 +20,26 @@ export type CaCareerHubDef = {
   lon: number;
   produce: Partial<Record<CommodityId, number>>;
   consume: Partial<Record<CommodityId, number>>;
+  /** Soft-field bush strip — no ferry; light_ga OD only vs same-country gateways. */
+  bush?: true;
+};
+
+/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
+const bushSpoke = {
+  produce: {
+    electronics: 1.35,
+    general: 0.35,
+    supplies: 0.3,
+    perishables: 0.55,
+    machinery: 0.2,
+  } as Partial<Record<CommodityId, number>>,
+  consume: {
+    supplies: 2.4,
+    general: 2.1,
+    perishables: 1.2,
+    electronics: 0.35,
+    machinery: 0.55,
+  } as Partial<Record<CommodityId, number>>,
 };
 
 const drySpoke = {
@@ -565,16 +585,51 @@ export const CA_CAREER_HUBS: readonly CaCareerHubDef[] = [
     lon: -60.0478,
     ...fisherySpoke,
   },
+
+  // ── CA bush soft-fields (3) — official ICAO; ferry blocked; OD vs CA gateways ──
+  {
+    icao: 'CYHE',
+    name: 'Hope / FVRD Regional Airpark',
+    region: 'CA-W',
+    hubTier: 'spoke',
+    lat: 49.3689,
+    lon: -121.495,
+    bush: true,
+    ...bushSpoke,
+  },
+  {
+    icao: 'CYJA',
+    name: 'Jasper',
+    region: 'CA-PR',
+    hubTier: 'spoke',
+    lat: 52.9964,
+    lon: -118.0602,
+    bush: true,
+    ...bushSpoke,
+  },
+  {
+    icao: 'CYHH',
+    name: 'Nemiscau',
+    region: 'CA-QC',
+    hubTier: 'spoke',
+    lat: 51.6911,
+    lon: -76.1356,
+    bush: true,
+    ...bushSpoke,
+  },
 ];
 
-export const CA_CAREER_HUB_COUNT = 50;
+export const CA_CAREER_HUB_COUNT = 53;
 
-/** Auto feeder corridors so every CA hub has ≥2 partners. */
+/** Auto feeder corridors so every non-bush CA hub has ≥2 partners. */
 export function buildCaFeederCorridors(
   hubs: readonly CaCareerHubDef[] = CA_CAREER_HUBS,
   existing: readonly CareerCorridorEdge[] = [],
 ): CareerCorridorEdge[] {
-  return buildCareerFeederCorridors(hubs, existing);
+  return buildCareerFeederCorridors(
+    hubs.filter((h) => h.bush !== true),
+    existing,
+  );
 }
 
 export function assertCaCareerHubCatalog(): void {
@@ -595,10 +650,10 @@ export function assertCaCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<CaCareerRegion, number> = {
-    'CA-W': 12,
-    'CA-PR': 12,
+    'CA-W': 13,
+    'CA-PR': 13,
     'CA-ON': 12,
-    'CA-QC': 8,
+    'CA-QC': 9,
     'CA-AT': 6,
   };
   for (const [region, n] of Object.entries(expected)) {

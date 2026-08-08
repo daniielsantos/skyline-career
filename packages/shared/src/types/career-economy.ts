@@ -45,6 +45,14 @@ export interface AirportTerminal {
    * Drives warehouse scale and how many lots a lane may form.
    */
   hubTier?: HubTier;
+  /**
+   * Soft-field bush strip (Amazon v1). No ferry; light_ga freight vs gateways only.
+   */
+  bush?: boolean;
+  /**
+   * Trip-only strip (US FAA locals). On map for bush trips; no Market/ferry/home hub.
+   */
+  bushTripOnly?: boolean;
   /** WGS84 latitude (degrees) — used for live settle proximity. */
   lat: number;
   /** WGS84 longitude (degrees). */
@@ -835,6 +843,25 @@ export interface AircraftLeaseOutContract {
   lastWearTick: number;
 }
 
+/** In-progress bush trip arc — not a Market MissionIntent. */
+export type ActiveBushTrip = {
+  tripId: string;
+  /** 0-based index into the trip legs catalog. */
+  legIndex: number;
+  /**
+   * Current-leg flight phase for Watch.
+   * ready = on ground awaiting wheels-up; departed = airborne / settling.
+   */
+  legStatus: 'ready' | 'departed';
+  status: 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  aircraftId: string;
+  acceptedAtTick: number;
+  /** Wall-clock when the current leg went wheels-up (Watch restore). */
+  departedAtMs?: number;
+  cancelledAtTick?: number;
+  completedAtTick?: number;
+};
+
 export interface CareerMissionsState {
   version: 2;
   /** Company cash from settled freights (Slice 4). */
@@ -882,6 +909,8 @@ export interface CareerMissionsState {
    * First FERRY_SOFT_NM_BUDGET nm of ferry pay a reduced fee.
    */
   ferrySoftNmUsed?: number;
+  /** Active Activities-style bush trip (parallel to Market missions). */
+  activeBushTrip?: ActiveBushTrip;
 };
 
 /** Player FBO ownership + bonded warehouse holds. */

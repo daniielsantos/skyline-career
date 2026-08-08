@@ -117,3 +117,56 @@ public sealed class AircraftIdentityDto
     [JsonPropertyName("airline")]
     public string? Airline { get; set; }
 }
+
+/// <summary>MSFS scenery airport from SimConnect Facilities (lat/lon of installed field).</summary>
+public sealed class AirportFacilityDto
+{
+    [JsonPropertyName("icao")]
+    public string Icao { get; set; } = "";
+
+    [JsonPropertyName("region")]
+    public string? Region { get; set; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("lat")]
+    public double Lat { get; set; }
+
+    [JsonPropertyName("lon")]
+    public double Lon { get; set; }
+
+    [JsonPropertyName("altMeters")]
+    public double? AltMeters { get; set; }
+
+    [JsonPropertyName("runways")]
+    public List<AirportRunwayDto> Runways { get; set; } = new();
+}
+
+/// <summary>One runway strip from SimConnect Facilities (maps to CareerRunway).</summary>
+public sealed class AirportRunwayDto
+{
+    [JsonPropertyName("ident")]
+    public string Ident { get; set; } = "";
+
+    [JsonPropertyName("identReciprocal")]
+    public string? IdentReciprocal { get; set; }
+
+    [JsonPropertyName("headingTrueDeg")]
+    public double HeadingTrueDeg { get; set; }
+
+    [JsonPropertyName("lengthM")]
+    public double LengthM { get; set; }
+
+    [JsonPropertyName("widthM")]
+    public double WidthM { get; set; }
+
+    [JsonPropertyName("lat")]
+    public double Lat { get; set; }
+
+    [JsonPropertyName("lon")]
+    public double Lon { get; set; }
+
+    [JsonPropertyName("surface")]
+    public string? Surface { get; set; }
+}

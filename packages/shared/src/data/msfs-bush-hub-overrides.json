@@ -1,0 +1,30 @@
+{
+  "O64": {
+    "name": "Breckenridge",
+    "lat": 35.3627,
+    "lon": -118.8561,
+    "source": "msfs_panel",
+    "validatedAt": "2026-08-08"
+  },
+  "O67": {
+    "name": "Manzanar",
+    "lat": 36.7372,
+    "lon": -118.145,
+    "source": "msfs_panel",
+    "validatedAt": "2026-08-08"
+  },
+  "26A": {
+    "name": "Ashland / Lineville",
+    "lat": 33.2842,
+    "lon": -85.8086,
+    "source": "msfs_panel",
+    "validatedAt": "2026-08-08"
+  },
+  "CA51": {
+    "name": "Sea Ranch",
+    "lat": 38.7046,
+    "lon": -123.433,
+    "source": "msfs_panel",
+    "validatedAt": "2026-08-08"
+  }
+}

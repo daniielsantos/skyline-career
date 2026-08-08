@@ -1,4 +1,5 @@
 import { CAREER_HUB_COORDS, distanceNm } from './career-economy.js';
+import { assertFerryNotBush } from './career-bush.js';
 
 /** Planning margin vs airframe max range (leave headroom for winds / burn). */
 export const FERRY_ROUTE_RANGE_MARGIN = 0.92;
@@ -111,6 +112,7 @@ export function planFerryRoute(opts: {
 }): FerryRoutePlan {
   const origin = opts.originIcao.trim().toUpperCase();
   const finalDest = opts.finalDestIcao.trim().toUpperCase();
+  assertFerryNotBush(origin, finalDest);
   const maxRangeNm = Math.max(0, opts.maxRangeNm);
   const margin =
     typeof opts.rangeMargin === 'number' &&

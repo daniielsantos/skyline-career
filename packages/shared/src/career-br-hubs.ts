@@ -1,5 +1,5 @@
 /**
- * Brazil career hub catalog (60 airports).
+ * Brazil career hub catalog (network + soft-field bush spokes).
  * Consumed by career-economy seed, coords, tiers, and feeder corridor generation.
  */
 
@@ -18,6 +18,8 @@ export type BrCareerHubDef = {
   lon: number;
   produce: Partial<Record<CommodityId, number>>;
   consume: Partial<Record<CommodityId, number>>;
+  /** Soft-field bush strip — no ferry; light_ga OD only vs same-country gateways. */
+  bush?: true;
 };
 
 const agriSpoke = {
@@ -38,6 +40,24 @@ const amazonSpoke = {
   >,
 };
 
+/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
+const bushSpoke = {
+  produce: {
+    electronics: 1.35,
+    general: 0.35,
+    supplies: 0.3,
+    perishables: 0.55,
+    machinery: 0.2,
+  } as Partial<Record<CommodityId, number>>,
+  consume: {
+    supplies: 2.4,
+    general: 2.1,
+    perishables: 1.2,
+    electronics: 0.35,
+    machinery: 0.55,
+  } as Partial<Record<CommodityId, number>>,
+};
+
 const dryRegional = {
   produce: { general: 1.25, supplies: 1.1, perishables: 1.05 } as Partial<
     Record<CommodityId, number>
@@ -48,7 +68,8 @@ const dryRegional = {
 };
 
 /**
- * 60 curated BR hubs. Majors preserved (GRU/VCP/GIG/MAO); densifies N/CO/SE/S/NE holes.
+ * Curated BR hubs (network + soft-field bush).
+ * Majors preserved (GRU/VCP/GIG/MAO); densifies N/CO/SE/S/NE holes.
  */
 export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
   // ── BR-SE (13) ───────────────────────────────────────────────────────────
@@ -542,6 +563,28 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     ...amazonSpoke,
   },
 
+  // ── BR-N bush soft-fields (2) — official ICAO; ferry blocked; OD vs BR gateways ──
+  {
+    icao: 'SNYA',
+    name: 'Almeirim',
+    region: 'BR-N',
+    hubTier: 'spoke',
+    lat: -1.4795,
+    lon: -52.5782,
+    bush: true,
+    ...bushSpoke,
+  },
+  {
+    icao: 'SWTP',
+    name: 'Tapuruquara',
+    region: 'BR-N',
+    hubTier: 'spoke',
+    lat: -0.3786,
+    lon: -64.9926,
+    bush: true,
+    ...bushSpoke,
+  },
+
   // ── BR-CO (11) ───────────────────────────────────────────────────────────
   {
     icao: 'SBBR',
@@ -651,14 +694,18 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
   },
 ];
 
-export const BR_CAREER_HUB_COUNT = 60;
+export const BR_CAREER_HUB_COUNT = 62;
 
-/** Auto feeder corridors so every BR hub has ≥2 partners. */
+/** Auto feeder corridors so every non-bush BR hub has ≥2 partners. */
 export function buildBrFeederCorridors(
   hubs: readonly BrCareerHubDef[] = BR_CAREER_HUBS,
   existing: readonly CareerCorridorEdge[] = [],
 ): CareerCorridorEdge[] {
-  return buildCareerFeederCorridors(hubs, existing);
+  // Bush OD is curated manually (gateways only) — exclude from auto feeders.
+  return buildCareerFeederCorridors(
+    hubs.filter((h) => h.bush !== true),
+    existing,
+  );
 }
 
 export function assertBrCareerHubCatalog(): void {
@@ -682,7 +729,7 @@ export function assertBrCareerHubCatalog(): void {
     'BR-SE': 13,
     'BR-S': 11,
     'BR-NE': 14,
-    'BR-N': 11,
+    'BR-N': 13,
     'BR-CO': 11,
   };
   for (const [region, n] of Object.entries(expected)) {
@@ -691,5 +738,9 @@ export function assertBrCareerHubCatalog(): void {
         `BR region ${region} has ${byRegion[region] ?? 0} hubs, expected ${n}`,
       );
     }
+  }
+  const bushN = BR_CAREER_HUBS.filter((h) => h.bush).length;
+  if (bushN !== 2) {
+    throw new Error(`Expected 2 bush hubs, got ${bushN}`);
   }
 }

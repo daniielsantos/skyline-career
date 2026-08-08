@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { isBushTripOnlyHub } from './career-bush.js';
 import { listCareerHubIcaos } from './career-fleet.js';
 import {
   getAirportRunways,
@@ -22,8 +23,9 @@ const SAMPLE: CareerRunway = {
 };
 
 describe('career-runways catalog', () => {
-  it('covers every career hub with at least one runway', () => {
-    const missing = listHubsMissingRunways();
+  it('covers every network career hub with at least one runway', () => {
+    // bushTripOnly strips may be empty in OurAirports JSON — filled via MSFS Facilities overrides.
+    const missing = listHubsMissingRunways().filter((icao) => !isBushTripOnlyHub(icao));
     assert.equal(
       missing.length,
       0,

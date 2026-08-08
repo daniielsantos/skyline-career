@@ -7,6 +7,8 @@ import {
   routeDistanceNm,
   type CareerEconomyWorld,
 } from './career-economy.js';
+import { assertFerryNotBush, isBushHub, isBushTripOnlyHub } from './career-bush.js';
+import { normalizeActiveBushTrip } from './career-bush-mission.js';
 import {
   deliverFuelUplift,
   estimateUpliftKg,
@@ -239,6 +241,9 @@ export function normalizeMissionsState(
     typeof ferrySoftRaw === 'number' && Number.isFinite(ferrySoftRaw)
       ? Math.max(0, Math.round(ferrySoftRaw))
       : 0;
+  const activeBushTrip = normalizeActiveBushTripField(
+    (raw as CareerMissionsState).activeBushTrip,
+  );
   return {
     version: 2,
     walletUsd,
@@ -257,10 +262,17 @@ export function normalizeMissionsState(
     playerFbos,
     companyCrew,
     ferrySoftNmUsed,
+    ...(activeBushTrip ? { activeBushTrip } : {}),
     ...(airframePerfOverrides
       ? { airframePerfOverrides }
       : {}),
   };
+}
+
+function normalizeActiveBushTripField(
+  raw: CareerMissionsState['activeBushTrip'] | unknown,
+): CareerMissionsState['activeBushTrip'] {
+  return normalizeActiveBushTrip(raw);
 }
 
 function normalizeAirframePerfOverrides(
@@ -539,6 +551,11 @@ export function selectStarterHub(
   const hub = icao.trim().toUpperCase();
   if (!CAREER_HUB_COORDS[hub]) {
     throw new Error(`Unknown career hub: ${hub}`);
+  }
+  if (isBushHub(hub) || isBushTripOnlyHub(hub)) {
+    throw new Error(
+      `Bush strip ${hub} cannot be a home hub — pick a network airport`,
+    );
   }
 
   const requested = opts.airframeTypeId?.trim();
@@ -1085,6 +1102,11 @@ function isKnownFerryPoint(icao: string): boolean {
   return Boolean(CAREER_HUB_COORDS[code]) || isFerryRouteWaypoint(code);
 }
 
+export function isCareerHubIcao(icao: string | null | undefined): boolean {
+  if (!icao) return false;
+  return Boolean(CAREER_HUB_COORDS[icao.trim().toUpperCase()]);
+}
+
 export function quoteFerry(
   world: CareerEconomyWorld,
   state: CareerMissionsState,
@@ -1103,6 +1125,7 @@ export function quoteFerry(
     throw new Error(`Aircraft is already at ${dest}`);
   }
   const origin = aircraft.locationIcao.trim().toUpperCase();
+  assertFerryNotBush(origin, dest);
   const distanceNm =
     hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);
   if (distanceNm === undefined) {

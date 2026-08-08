@@ -18,6 +18,11 @@ import {
   getCommodity,
   routeDistanceNm,
 } from './career-economy.js';
+import {
+  bushRequiresLightGa,
+  isBushFreightOdAllowed,
+  isBushHub,
+} from './career-bush.js';
 import { applyNpcFuelUplift } from './career-fuel.js';
 import {
   hubLevelNpcBidMult,
@@ -37,7 +42,7 @@ import {
   listCareerPlayerAirframes,
   resolveAirframePerfForUi,
 } from './career-player-airframes.js';
-import { isDomesticOd } from './career-partition.js';
+import { isDomesticOd, isInternationalOdAllowed } from './career-partition.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
   listHomologatedNpcAirframesForClass,
@@ -702,11 +707,13 @@ function pickNpcMxIcao(world: CareerEconomyWorld, npc: NpcFreighter): string {
     const known = world.airports.find(
       (a) => a.icao === npc.locationIcao!.toUpperCase(),
     );
-    if (known) return known.icao;
+    if (known && !isBushHub(known.icao)) return known.icao;
   }
-  const home = world.airports.find((a) => a.region === npc.homeRegion);
+  const home = world.airports.find(
+    (a) => a.region === npc.homeRegion && !isBushHub(a.icao),
+  );
   if (home) return home.icao;
-  return world.airports[0]?.icao ?? 'SBGR';
+  return world.airports.find((a) => !isBushHub(a.icao))?.icao ?? 'SBGR';
 }
 
 /**
@@ -1372,7 +1379,9 @@ export function pickNpcHomeReturnIcao(
     typeof opts?.maxRangeNm === 'number' && Number.isFinite(opts.maxRangeNm)
       ? opts.maxRangeNm
       : getAircraftClass(npc.aircraftClassId).maxRangeNm;
-  const candidates = world.airports.filter((a) => a.region === home);
+  const candidates = world.airports.filter(
+    (a) => a.region === home && !isBushHub(a.icao),
+  );
   if (candidates.length === 0) return undefined;
   let best: (typeof candidates)[number] | undefined;
   let bestDist = Number.POSITIVE_INFINITY;
@@ -1414,6 +1423,15 @@ function tryCreateNpcRepositionOffer(
 
   const destIcao = pickNpcHomeReturnIcao(world, npc, origin);
   if (!destIcao) return undefined;
+
+  const destRegion = airportRegion(world, destIcao);
+  if (
+    destRegion &&
+    !isDomesticOd(originRegion, destRegion) &&
+    !isInternationalOdAllowed(world, origin, destIcao)
+  ) {
+    return undefined;
+  }
 
   const dist = routeDistanceNm(world, origin, destIcao) ?? 0;
   if (dist < 40) return undefined;
@@ -1752,6 +1770,15 @@ function scoreLotForNpc(
   const maxCargoKg = pre?.maxCargoKg ?? npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
   if (avail < 500) return null;
+
+  if (!isBushFreightOdAllowed(lot.originIcao, lot.destIcao)) return null;
+  if (bushRequiresLightGa(lot.originIcao, lot.destIcao)) {
+    if (npc.aircraftClassId !== 'light_ga') return null;
+    // Player-first: NPCs do not take electronics outbound from bush strips.
+    if (isBushHub(lot.originIcao) && lot.commodityId === 'electronics') {
+      return null;
+    }
+  }
 
   const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao);
   if (dist === undefined || dist > aircraft.maxRangeNm) return null;

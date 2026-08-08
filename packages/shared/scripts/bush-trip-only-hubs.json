@@ -1,0 +1,258 @@
+[
+  {
+    "icao": "0O2",
+    "name": "Baker",
+    "lat": 35.1789,
+    "lon": -116.0785,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "1Q2",
+    "name": "Spalding",
+    "lat": 40.7303,
+    "lon": -120.7111,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "26A",
+    "name": "Ashland / Lineville",
+    "lat": 33.2842,
+    "lon": -85.8086,
+    "region": "US-SE",
+    "msfsValidated": true
+  },
+  {
+    "icao": "2G4",
+    "name": "Garrett County",
+    "lat": 39.5189,
+    "lon": -79.3542,
+    "region": "US-NE",
+    "msfsValidated": false
+  },
+  {
+    "icao": "3Q0",
+    "name": "Mina",
+    "lat": 38.27,
+    "lon": -118.0964,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "57NC",
+    "name": "Sossamon Field",
+    "lat": 35.4298,
+    "lon": -83.4878,
+    "region": "US-NE",
+    "msfsValidated": false
+  },
+  {
+    "icao": "88NV",
+    "name": "Black Rock City",
+    "lat": 40.6584,
+    "lon": -119.3702,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "CA11",
+    "name": "McCloud Airstrip",
+    "lat": 40.0532,
+    "lon": -120.2563,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "CA35",
+    "name": "San Rafael",
+    "lat": 37.8304,
+    "lon": -122.5087,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "CA51",
+    "name": "Sea Ranch",
+    "lat": 38.7046,
+    "lon": -123.433,
+    "region": "US-W",
+    "msfsValidated": true
+  },
+  {
+    "icao": "H37",
+    "name": "Herlong",
+    "lat": 40.0283,
+    "lon": -120.1039,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "L06",
+    "name": "Furnace Creek",
+    "lat": 36.3646,
+    "lon": -116.8093,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "L61",
+    "name": "Shoshone",
+    "lat": 35.8729,
+    "lon": -116.2586,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "M45",
+    "name": "Alpine County",
+    "lat": 38.7756,
+    "lon": -119.8237,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "NC06",
+    "name": "Elk River",
+    "lat": 36.1045,
+    "lon": -82.1306,
+    "region": "US-NE",
+    "msfsValidated": false
+  },
+  {
+    "icao": "NV16",
+    "name": "Gerlach area / local",
+    "lat": 40.9871,
+    "lon": -119.8118,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "NV47",
+    "name": "New Farm / local",
+    "lat": 39.769,
+    "lon": -119.6855,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O22",
+    "name": "Columbia",
+    "lat": 38.1975,
+    "lon": -119.9811,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O24",
+    "name": "Lee Vining",
+    "lat": 38.0876,
+    "lon": -119.1824,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O26",
+    "name": "Lone Pine / Death Valley",
+    "lat": 36.5237,
+    "lon": -117.9752,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O39",
+    "name": "Ravendale",
+    "lat": 40.9083,
+    "lon": -120.1547,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O43",
+    "name": "Yerington Municipal",
+    "lat": 39.031,
+    "lon": -119.035,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O56",
+    "name": "California Pines / local",
+    "lat": 37.819,
+    "lon": -118.4772,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O57",
+    "name": "Bryant Field",
+    "lat": 37.9991,
+    "lon": -119.036,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O64",
+    "name": "Breckenridge",
+    "lat": 35.3627,
+    "lon": -118.8561,
+    "region": "US-W",
+    "msfsValidated": true
+  },
+  {
+    "icao": "O67",
+    "name": "Manzanar",
+    "lat": 36.7372,
+    "lon": -118.145,
+    "region": "US-W",
+    "msfsValidated": true
+  },
+  {
+    "icao": "O77",
+    "name": "Fallon / local",
+    "lat": 38.8051,
+    "lon": -118.7321,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O79",
+    "name": "Sierraville Dearwater",
+    "lat": 39.775,
+    "lon": -120.3102,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "O99",
+    "name": "Olancha / Grant Airpark",
+    "lat": 36.1548,
+    "lon": -117.9606,
+    "region": "US-W",
+    "msfsValidated": false
+  },
+  {
+    "icao": "WV09",
+    "name": "Mike Ferrell Field",
+    "lat": 37.4532,
+    "lon": -81.5191,
+    "region": "US-NE",
+    "msfsValidated": false
+  },
+  {
+    "icao": "WV30",
+    "name": "Rainelle",
+    "lat": 37.8431,
+    "lon": -80.724,
+    "region": "US-NE",
+    "msfsValidated": false
+  },
+  {
+    "icao": "WV52",
+    "name": "Green Bank Observatory",
+    "lat": 38.4332,
+    "lon": -79.8402,
+    "region": "US-NE",
+    "msfsValidated": false
+  }
+]

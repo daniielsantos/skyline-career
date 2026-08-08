@@ -383,6 +383,8 @@ export type MarketLot = {
   expiresAtTick: number;
   ticksRemaining?: number;
   perishable?: boolean;
+  /** Soft-field bush OD (light GA only; no ferry; same-country gateways). */
+  bush?: boolean;
   cargoLocked?: boolean;
   international?: boolean;
   pressure?: LotPressure | null;
@@ -606,6 +608,7 @@ export type AirportLot = {
   ticksRemaining: number;
   expired: boolean;
   perishable: boolean;
+  bush?: boolean;
   distanceNm?: number;
   reason: string;
   npcClaim?: NpcClaim | null;
@@ -762,6 +765,7 @@ export type AirportView = ClockSync & {
     lat?: number;
     lon?: number;
     hubTier?: 'major' | 'regional' | 'spoke';
+    bush?: boolean;
   };
   hubLevel?: {
     level: number;
@@ -848,6 +852,8 @@ export type StarterHubOption = {
   name: string;
   region: string;
   hubTier: 'major' | 'regional' | 'spoke';
+  bush?: boolean;
+  bushTripOnly?: boolean;
 };
 
 export function fetchState() {
@@ -941,7 +947,7 @@ export function fetchMarket(
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';
     /** Route scope: intl = cross-country, domestic = same country. */
-    lane?: 'intl' | 'domestic' | '';
+    lane?: 'intl' | 'domestic' | 'bush' | '';
   } = {},
 ) {
   const params = new URLSearchParams();
@@ -1094,6 +1100,8 @@ export type NetworkHub = {
   lat: number;
   lon: number;
   level?: number;
+  bush?: boolean;
+  bushTripOnly?: boolean;
 };
 
 export function fetchNetworkHubs() {
@@ -1772,6 +1780,252 @@ export function postCancel(opts: { missionId: string }) {
   }>('/api/cancel', {
     method: 'POST',
     body: JSON.stringify(opts),
+  });
+}
+
+export type BushTripBoardRow = {
+  id: string;
+  title: string;
+  countryId: string;
+  summary?: string;
+  legs: number;
+  distanceNm: number;
+  payUsd: number;
+  startIcao: string;
+  endIcao: string;
+  viaIcao?: string;
+  aircraftHint: 'light_ga';
+  playable: boolean;
+  hasPln?: boolean;
+};
+
+export type BushTripMapNode =
+  | { kind: 'hub'; icao: string }
+  | { kind: 'wpt'; ident: string; lat: number; lon: number };
+
+export type ActiveBushTripView = {
+  tripId: string;
+  title: string;
+  legIndex: number;
+  fromIcao: string;
+  toIcao: string;
+  legs: number;
+  payUsd: number;
+  aircraftId: string;
+  status: 'accepted' | 'in_progress';
+  legStatus?: 'ready' | 'departed';
+  mapNodes?: BushTripMapNode[];
+  startIcao?: string;
+  endIcao?: string;
+  hasPln?: boolean;
+};
+
+export type BushWatchStatus = {
+  running: boolean;
+  tripId: string | null;
+  title: string | null;
+  legIndex: number | null;
+  legs: number | null;
+  fromIcao: string | null;
+  toIcao: string | null;
+  legStatus: 'ready' | 'departed' | null;
+  tripStatus: string | null;
+  phase: string | null;
+  onGround: boolean | null;
+  enginesRunning: boolean | null;
+  groundSpeedKt: number | null;
+  position: { lat: number; lon: number } | null;
+  lastEvent: { type: string; reason?: string } | null;
+  lastError: string | null;
+  pipeConnected: boolean;
+  completed: boolean;
+  payoutUsd: number | null;
+  walletUsd: number | null;
+  intervalMs: number;
+};
+
+export function fetchBushWatchStatus() {
+  return api<BushWatchStatus>('/api/bush-watch/status');
+}
+
+export function postBushWatchStart(opts: { intervalSec?: number } = {}) {
+  return api<BushWatchStatus>('/api/bush-watch/start', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postBushWatchStop() {
+  return api<BushWatchStatus>('/api/bush-watch/stop', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function downloadBushTripPln(tripId: string): Promise<string> {
+  const res = await fetch(`/api/bush-trips/${encodeURIComponent(tripId)}/pln`);
+  if (!res.ok) {
+    let message = `PLN download failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get('Content-Disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(cd);
+  const filename = match?.[1] ?? `${tripId}.PLN`;
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  return filename;
+}
+
+/** Garmin/TDS GTNXi .gfp — drop into C:\\ProgramData\\TDS\\GTNXi\\FPL then Import. */
+export async function downloadBushTripGfp(tripId: string): Promise<{
+  filename: string;
+  waypointCount: number | null;
+  thinned: boolean;
+}> {
+  const res = await fetch(`/api/bush-trips/${encodeURIComponent(tripId)}/gfp`);
+  if (!res.ok) {
+    let message = `GFP download failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get('Content-Disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(cd);
+  const filename = match?.[1] ?? `${tripId}.gfp`;
+  const wpRaw = res.headers.get('X-Skyline-Gfp-Waypoints');
+  const waypointCount = wpRaw ? Number(wpRaw) : null;
+  const thinned = res.headers.get('X-Skyline-Gfp-Thinned') === '1';
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+  return {
+    filename,
+    waypointCount: Number.isFinite(waypointCount) ? waypointCount : null,
+    thinned,
+  };
+}
+
+export type HomologateBushHubResult = {
+  icao: string;
+  override: {
+    name: string;
+    lat: number;
+    lon: number;
+    source: 'msfs_panel' | 'parked_sample' | 'msfs_facility';
+    validatedAt: string;
+  };
+  path: string;
+  airport: {
+    icao: string;
+    name: string;
+    lat: number;
+    lon: number;
+  } | null;
+};
+
+/** Stamp MSFS lat/lon/name for a bushTripOnly hub via Facilities (or explicit coords). */
+export function postBushHubHomologate(body: {
+  icao: string;
+  name?: string;
+  lat?: number;
+  lon?: number;
+  source?: 'msfs_panel' | 'parked_sample' | 'msfs_facility';
+  pipeName?: string;
+}) {
+  return api<HomologateBushHubResult>('/api/bush-hubs/homologate', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export type HomologateBushHubBatchResult = {
+  results: Array<
+    | { icao: string; ok: true; result: HomologateBushHubResult }
+    | { icao: string; ok: false; error: string }
+  >;
+  okCount: number;
+  failCount: number;
+};
+
+/** Homologate all bushTripOnly hubs (or a list) via SimConnect Facilities. */
+export function postBushHubHomologateBatch(body?: {
+  icaos?: string[];
+  all?: boolean;
+  pipeName?: string;
+}) {
+  return api<HomologateBushHubBatchResult>('/api/bush-hubs/homologate-batch', {
+    method: 'POST',
+    body: JSON.stringify(body ?? { all: true }),
+  });
+}
+
+export function fetchBushTrips() {
+  return api<{
+    trips: BushTripBoardRow[];
+    active: ActiveBushTripView | null;
+    walletUsd: number;
+    tick: number;
+    fleet: PlayerAircraft[];
+    hubSelected: boolean;
+    pilotIcao?: string;
+    homeHubIcao?: string;
+  }>('/api/bush-trips');
+}
+
+export function postBushTripAccept(opts: {
+  tripId: string;
+  aircraftId: string;
+}) {
+  return api<{
+    active: { tripId: string; legIndex: number; status: string; aircraftId: string };
+    trip: BushTripBoardRow;
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+  }>('/api/bush-trips/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postBushTripAbandon() {
+  return api<{
+    active: { tripId: string; status: string; aircraftId: string };
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+  }>('/api/bush-trips/abandon', {
+    method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 

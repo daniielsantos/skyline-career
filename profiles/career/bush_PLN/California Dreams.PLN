@@ -1,0 +1,721 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<SimBase.Document>
+    <FlightPlan.FlightPlan>
+        <DepartureID>KAVX</DepartureID>
+        <DestinationID>CA51</DestinationID>
+        <Title>KAVX - CA51</Title>
+        <Descr>Flight from KAVX to CA51</Descr>
+        <FPType>VFR</FPType>
+        <CruisingAlt>3500.000</CruisingAlt>
+        <AppVersion>
+            <AppVersionMajor>12</AppVersionMajor>
+            <AppVersionMinor>2</AppVersionMinor>
+            <AppVersionBuild>282174</AppVersionBuild>
+        </AppVersion>
+        <ATCWaypoint id="Long Point">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N33° 44' 11.0500",W118° 23' 52.5300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI1</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Torrance">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N33° 50' 4.1700",W118° 20' 25.5300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Downtown Los Angeles">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 2' 57.2900",W118° 14' 44.9800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI3</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Griffith Park">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 8' 11.5200",W118° 18' 8.9400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI4</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Wilson">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 13' 24.3900",W118° 3' 39.4200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI5</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Blackbird Airpark">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 36' 9.7800",W118° 5' 9.1800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AA</ICAORegion>
+                <ICAOIdent>POI6</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Palmdale Usaf Plant 42">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KPMD</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Rosamond Dry Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 50' 19.9900",W118° 4' 38.9400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI7</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Rogers Dry Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 55' 48.4800",W117° 51' 1.9700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI8</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Helendale Radar Cross Section Facility">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 49' 30.2800",W117° 17' 54.8500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI9</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Site of Solar One">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 52' 19.6600",W116° 50' 1.2200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AB</ICAORegion>
+                <ICAOIdent>POI10</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Barstow-Daggett">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KDAG</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Troy Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 50' 59.0500",W116° 33' 53.5700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI11</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mojave National Preserve">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N34° 54' 18.2800",W116° 9' 29.7800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI12</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Soda Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 10' 43.9000",W116° 4' 42.7300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AC</ICAORegion>
+                <ICAOIdent>POI13</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Baker">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>0O2</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Silver Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 21' 6.5300",W116° 6' 58.6900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI14</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Silurian Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 31' 37.9200",W116° 9' 57.9000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI15</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Ibex Dunes">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 41' 41.3000",W116° 22' 3.4100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI16</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Grimshaw Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 52' 22.4900",W116° 15' 30.9800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AD</ICAORegion>
+                <ICAOIdent>POI17</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Shoshone">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>L61</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Amargosa River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 51' 47.9500",W116° 36' 55.7800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI18</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Shore Line Butte">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N35° 54' 37.1800",W116° 42' 30.7000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI19</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Gold Hill">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 0' 43.3200",W116° 58' 22.4100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI20</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Telescope Peak">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 10' 11.1100",W117° 5' 10.2800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI21</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Hanaupah Canyon">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 11' 3.0000",W117° 1' 34.0400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI22</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Sea Level">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 12' 58.1900",W116° 54' 54.1700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI23</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Badwater Basin">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 14' 25.4300",W116° 49' 44.5500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI24</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Artists Palette">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 21' 52.6600",W116° 48' 33.4900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AE</ICAORegion>
+                <ICAOIdent>POI25</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Furnace Creek">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>L06</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Tucki Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 29' 53.2200",W117° 7' 53.1300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI26</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Panamint Valley">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 26' 44.1300",W117° 24' 33.3200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI27</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Hunter Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 32' 17.9900",W117° 30' 14.4500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI28</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="The Racetrack">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 40' 34.0600",W117° 33' 27.2800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI29</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Cerro Gordo">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 33' 1.1800",W117° 47' 23.4000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI30</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Keeler">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 29' 16.2100",W117° 52' 17.5600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI31</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Owens Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 31' 25.3500",W117° 58' 30.8200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AF</ICAORegion>
+                <ICAOIdent>POI32</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Lone Pine">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O26</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Alabama Hills">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 36' 18.7000",W118° 7' 3.7400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI33</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Whitney Portal">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 35' 19.1400",W118° 13' 50.9800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI34</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Thor Peak">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 34' 33.7500",W118° 15' 54.2700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI35</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Muir">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 33' 35.6800",W118° 17' 37.7900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI36</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Whitney">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 34' 41.4400",W118° 17' 35.7600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI37</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Russell">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 35' 24.8600",W118° 17' 36.8600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI38</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Williamson">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 39' 3.3400",W118° 18' 57.8000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI39</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Tyndall">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 39' 22.1800",W118° 19' 59.6000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI40</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Kearsarge Peak">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 47' 20.1800",W118° 20' 57.0800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI41</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Baxter Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N36° 50' 50.5600",W118° 22' 24.0700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI42</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Split Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 1' 11.8600",W118° 25' 25.2900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI43</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="The Thumb">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 4' 26.6900",W118° 26' 9.9200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI44</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Middle Palisade Glacier">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 4' 25.2100",W118° 27' 35.8300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI45</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Palisade Glacier">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 6' 6.5200",W118° 30' 27.9300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI46</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Coyote Flats Airstrip">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 12' 21.1000",W118° 28' 41.6400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI47</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Owens River">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 19' 32.4000",W118° 18' 54.5600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AG</ICAORegion>
+                <ICAOIdent>POI48</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Bishop">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KBIH</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Chalfant Valley">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 31' 25.0100",W118° 21' 50.4500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI49</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Patriarch Grove">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 31' 39.7200",W118° 11' 54.1100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI50</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Barcroft Field Station">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 34' 59.6000",W118° 14' 12.2100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI51</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="White Mountain Peak">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 37' 57.8000",W118° 15' 28.8400",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI52</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Owens Valley View">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 38' 1.7200",W118° 28' 37.3800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI53</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Lake Crowley">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 36' 18.9200",W118° 43' 26.6700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AH</ICAORegion>
+                <ICAOIdent>POI54</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mammoth Yosemite">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KMMH</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Long Valley Caldera">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 39' 21.9600",W118° 47' 57.9500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI55</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Granite Mountain">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 55' 25.5200",W118° 46' 17.8600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI56</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mono Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 57' 23.9400",W118° 59' 14.0000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI57</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Paoha Island">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 59' 56.9000",W119° 2' 9.5300",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AI</ICAORegion>
+                <ICAOIdent>POI58</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Bryant">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O57</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Marine Corps Mountain Warfare Training Center">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 21' 18.0700",W119° 31' 21.6800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AJ</ICAORegion>
+                <ICAOIdent>POI59</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Sonora Pass">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 20' 9.1000",W119° 39' 7.1700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AJ</ICAORegion>
+                <ICAOIdent>POI60</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Pinecrest Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 11' 50.9400",W119° 58' 52.0000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AJ</ICAORegion>
+                <ICAOIdent>POI61</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Columbia">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>O22</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="New Melones Lake">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 0' 17.3600",W120° 33' 16.0500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI62</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Great Central Valley View">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 57' 49.2800",W120° 51' 6.5600",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI63</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Stockton">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 55' 26.6200",W121° 16' 39.0100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI64</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Sherman Island">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 2' 26.8500",W121° 49' 0.8500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AK</ICAORegion>
+                <ICAOIdent>POI65</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Buchanan Field">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>KCCR</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Mount Diablo">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 52' 52.8800",W121° 54' 53.1000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI66</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="San Francisco - Oakland Bay Bridge">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 49' 21.1200",W122° 19' 27.3000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI67</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Treasure Island">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 49' 22.5600",W122° 22' 16.3200",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI68</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Twin Peaks">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 45' 4.7100",W122° 26' 50.7000",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI69</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Golden Gate Park">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 46' 8.7100",W122° 28' 30.1900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI70</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Golden Gate Bridge">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 49' 3.0500",W122° 28' 59.2500",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI71</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Marin Headlands">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 49' 49.4200",W122° 30' 31.3100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AL</ICAORegion>
+                <ICAOIdent>POI72</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="San Rafael">
+            <ATCWaypointType>Airport</ATCWaypointType>
+            <ICAO>
+                <ICAOIdent>CA35</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Bolinas Bay">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 52' 27.5000",W122° 40' 38.4700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI73</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Point Reyes Lighthouse">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N37° 59' 43.2600",W123° 1' 21.8700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI74</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Tomales Bay">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 10' 34.0900",W122° 54' 54.0900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI75</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Bodega Bay">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 17' 36.3800",W123° 1' 29.8100",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI76</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Bodega Head">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 18' 29.2500",W123° 4' 5.1900",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI77</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Fort Ross">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 30' 42.3800",W123° 14' 41.0700",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI78</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+        <ATCWaypoint id="Kruse Rhodadendron State Natural Reserve">
+            <ATCWaypointType>User</ATCWaypointType>
+            <WorldPosition>N38° 35' 29.9500",W123° 20' 13.8800",+000000.00</WorldPosition>
+            <ICAO>
+                <ICAORegion>AM</ICAORegion>
+                <ICAOIdent>POI79</ICAOIdent>
+            </ICAO>
+        </ATCWaypoint>
+    </FlightPlan.FlightPlan>
+</SimBase.Document>

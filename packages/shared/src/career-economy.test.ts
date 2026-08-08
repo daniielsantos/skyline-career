@@ -35,6 +35,7 @@ import { BR_CAREER_HUBS } from './career-br-hubs.js';
 import { CA_CAREER_HUBS } from './career-ca-hubs.js';
 import { MX_CAREER_HUBS } from './career-mx-hubs.js';
 import { US_CAREER_HUBS } from './career-us-hubs.js';
+import { countryIdFromRegion } from './career-partition.js';
 import type {
   CareerEconomyWorld,
   CommodityId,
@@ -44,22 +45,25 @@ import type {
 } from './types/career-economy.js';
 
 describe('career-economy seed', () => {
-  it('creates 60 BR + 100 US + 50 CA + 45 MX hubs across 20 regions', () => {
+  it('creates 62 BR + 155 US (incl. trip-only) + 53 CA + 47 MX hubs across 20 regions', () => {
     const world = createSeedEconomyWorld({ seed: 'test-a' });
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 255);
+    assert.equal(world.airports.length, 317);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 20);
-    const br = world.airports.filter((a) => a.icao.startsWith('SB'));
+    const br = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'BR',
+    );
     const us = world.airports.filter((a) => a.icao.startsWith('K'));
     const ca = world.airports.filter((a) => a.icao.startsWith('CY'));
     const mx = world.airports.filter((a) => a.icao.startsWith('MM'));
-    assert.equal(br.length, 60);
-    assert.equal(us.length, 100);
-    assert.equal(ca.length, 50);
-    assert.equal(mx.length, 45);
+    assert.equal(br.length, 62);
+    assert.equal(us.length, 123);
+    assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
+    assert.equal(ca.length, 53);
+    assert.equal(mx.length, 47);
     assert.deepEqual(
       new Set(world.airports.map((airport) => airport.region)),
       new Set([
@@ -162,8 +166,9 @@ describe('cargo corridors', () => {
     assert.equal(corridorWeight('SBGR', 'SBPS'), 1);
   });
 
-  it('gives every US hub at least two gateway corridors', () => {
+  it('gives every network US hub at least two gateway corridors', () => {
     for (const hub of US_CAREER_HUBS) {
+      if (hub.bushTripOnly) continue;
       assert.ok(
         corridorPartners(hub.icao).length >= 2,
         `expected ${hub.icao} to have at least two corridor partners`,
@@ -505,7 +510,7 @@ describe('tickEconomyN market formation', () => {
   it('forms shipment lots with surplus→shortage reasons after ticks', () => {
     const world = createSeedEconomyWorld({ seed: 'test-lanes' });
     tickEconomyN(world, 24);
-    const market = listMarketLots(world);
+    const market = listMarketLots(world).filter((row) => row.availableKg > 0);
     assert.ok(market.length > 0, 'expected market lots after ticks');
 
     for (const row of market.slice(0, 5)) {
@@ -930,7 +935,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 38);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 255);
+    assert.equal(migrated.airports.length, 317);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));

@@ -177,6 +177,90 @@ async function dispatch(msg: { id?: string; method?: string; params?: Record<str
         icao: 'C172',
       });
     }
+    case 'getAirportFacility': {
+      const err = ensureConnected(id);
+      if (err) return err;
+      const code = String(params.icao ?? '')
+        .trim()
+        .toUpperCase();
+      if (!code) return fail(id, 'INVALID_PARAMS', 'icao required');
+      const mockAirports: Record<
+        string,
+        {
+          icao: string;
+          name: string;
+          lat: number;
+          lon: number;
+          altMeters?: number;
+          runways?: Array<{
+            ident: string;
+            identReciprocal?: string;
+            headingTrueDeg: number;
+            lengthM: number;
+            widthM: number;
+            lat: number;
+            lon: number;
+            surface?: string;
+          }>;
+        }
+      > = {
+        O64: {
+          icao: 'O64',
+          name: 'Breckenridge',
+          lat: 35.3627,
+          lon: -118.8561,
+          altMeters: 215,
+          runways: [
+            {
+              ident: '12',
+              identReciprocal: '30',
+              headingTrueDeg: 135,
+              lengthM: 1128,
+              widthM: 18,
+              lat: 35.3627,
+              lon: -118.8561,
+              surface: 'dirt',
+            },
+          ],
+        },
+        O67: {
+          icao: 'O67',
+          name: 'Manzanar Airport',
+          lat: 36.7372,
+          lon: -118.145,
+          altMeters: 1166,
+          runways: [
+            {
+              ident: '15',
+              identReciprocal: '33',
+              headingTrueDeg: 160,
+              lengthM: 1100,
+              widthM: 18,
+              lat: 36.7372,
+              lon: -118.145,
+              surface: 'dirt',
+            },
+          ],
+        },
+        '26A': {
+          icao: '26A',
+          name: 'Ashland/Lineville',
+          lat: 33.2842,
+          lon: -85.8086,
+        },
+        CA51: {
+          icao: 'CA51',
+          name: 'The Sea Ranch',
+          lat: 38.7046,
+          lon: -123.433,
+        },
+      };
+      const hit = mockAirports[code];
+      if (!hit) {
+        return fail(id, 'NOT_FOUND', `Mock has no airport facility for ${code}`);
+      }
+      return ok(id, hit);
+    }
     case 'readPmdgNg3Fuel': {
       const err = ensureConnected(id);
       if (err) return err;

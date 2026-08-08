@@ -238,6 +238,13 @@ public sealed class PipeServer : IAsyncDisposable
                     return IpcResponse.Success(request.Id, identity);
                 }
 
+                case "getAirportFacility":
+                {
+                    var icao = RequireString(request.Params, "icao");
+                    var facility = await _sim.GetAirportFacilityAsync(icao, ct).ConfigureAwait(false);
+                    return IpcResponse.Success(request.Id, facility);
+                }
+
                 case "readPmdgNg3Fuel":
                 {
                     var fuel = await _sim.ReadPmdgNg3FuelAsync(ct).ConfigureAwait(false);

@@ -19,6 +19,10 @@ public interface ISimClient : IAsyncDisposable
     Task<SimSnapshotDto> SnapshotAsync(CancellationToken ct = default);
     Task DelayAsync(int ms, CancellationToken ct = default);
     Task<AircraftIdentityDto> GetAircraftIdentityAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Look up an airport in the MSFS scenery database by ICAO (no need to be at the field).
+    /// </summary>
+    Task<AirportFacilityDto> GetAirportFacilityAsync(string icao, CancellationToken ct = default);
     Task<PmdgNg3FuelDto> ReadPmdgNg3FuelAsync(CancellationToken ct = default);
     /// <summary>
     /// Send a PMDG NG3 control. Prefer <c>method=event</c> (TransmitClientEvent <c>#id</c>)

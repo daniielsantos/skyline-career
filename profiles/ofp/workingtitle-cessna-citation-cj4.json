@@ -14,7 +14,7 @@
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct",
-    "S5 (BAGGAGE 01) marked service — SimConnect weight drops after inject; cargo uses S3/S4/S6 then crew hard overflow for full ~2 000 lb."
+    "S5 (BAGGAGE 01) marked service — SimConnect weight drops after inject; cargo uses S3/S4/S6 at 750 lb max (no crew overflow — forward CG)."
   ],
   "fuel": {
     "unit": "lb"

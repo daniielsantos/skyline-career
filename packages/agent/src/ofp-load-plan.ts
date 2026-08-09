@@ -103,14 +103,7 @@ export function careerOperationalCargoMaxLb(opts: {
   }
 
   if (bags.length > 0) {
-    const bagRoom = bags.reduce((sum, idx) => sum + bagCap(idx), 0);
-    // Freighter cabin seats are cargo overflow when baggage stations ghost / fill up.
-    const crewHardSpare = crew.reduce((sum, idx) => {
-      const hard = hardCap(idx);
-      if (hard <= 0) return sum;
-      return sum + Math.max(0, hard - FREIGHTER_PILOT_LB);
-    }, 0);
-    return roundLb(bagRoom + crewHardSpare);
+    return roundLb(bags.reduce((sum, idx) => sum + bagCap(idx), 0));
   }
 
   const crewSet = new Set(crew);
@@ -522,20 +515,8 @@ export function distributeCargoAcrossStations(
   const seatSoftMax = Object.fromEntries(
     seatStations.map((idx) => [idx, seatSoftMaxLb(profile, idx)]),
   );
-  /** Freighter overflow may use full structural seat max (not the 300 lb pax soft-cap). */
-  const freighterSeatHardMax = Object.fromEntries(
-    seatStations.map((idx) => {
-      const hard =
-        profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
-      return [idx, hard > 0 ? hard : seatSoftMax[idx] ?? SEAT_OCCUPANT_SOFT_MAX_LB] as const;
-    }),
-  );
   const seatRoomLb = seatStations.reduce((sum, idx) => {
     const cap = seatSoftMax[idx] ?? SEAT_OCCUPANT_SOFT_MAX_LB;
-    return sum + Math.max(0, cap - (stations[idx] ?? 0));
-  }, 0);
-  const freighterSeatRoomLb = seatStations.reduce((sum, idx) => {
-    const cap = freighterSeatHardMax[idx] ?? 0;
     return sum + Math.max(0, cap - (stations[idx] ?? 0));
   }, 0);
   const baggageHardCapacityLb = baggageStations.reduce((sum, idx) => {
@@ -554,12 +535,13 @@ export function distributeCargoAcrossStations(
     (sum, idx) => sum + (baggageSoftMax[idx] ?? 0),
     0,
   );
-  // GA: seats soft-cap + baggage soft. Freighter: full baggage + crew hard overflow.
+  // Freighter: full baggage only (crew stay at pilot floor — forward seats pull CG).
+  // GA: seats soft-cap + ~50 lb/baggage station.
   const fillCapacityLb = gaCabin
     ? seatRoomLb + baggageFillCapacityLb
     : baggageStations.length > 0
-      ? baggageHardCapacityLb + freighterSeatRoomLb
-      : freighterSeatRoomLb || seatRoomLb;
+      ? baggageHardCapacityLb
+      : seatRoomLb;
   const baggageCapacityLb = gaCabin ? baggageFillCapacityLb : baggageHardCapacityLb;
 
   let requestedCargo = roundLb(cargoLb);
@@ -608,7 +590,6 @@ export function distributeCargoAcrossStations(
 
   if (remainingCargo > 0 && baggageStations.length > 0) {
     // Freighter (no pax) or leftover after seats: cargo on baggage (GA soft-capped).
-    const beforeBags = { ...stations };
     const afterBags = equalizeMovableStations(
       stations,
       profile,
@@ -626,24 +607,15 @@ export function distributeCargoAcrossStations(
         softMaxByIndex: gaCabin ? baggageSoftMax : undefined,
       }),
     );
-    const placedOnBags = baggageStations.reduce(
-      (sum, idx) =>
-        sum + Math.max(0, (afterBags[idx] ?? 0) - (beforeBags[idx] ?? 0)),
-      0,
-    );
-    remainingCargo = Math.max(0, remainingCargo - placedOnBags);
-  }
-
-  if (remainingCargo > 0 && seatStations.length > 0) {
-    // Leftover after baggage (ghost/full bags) or no bags — onto seats.
-    // Freighter uses hard seat max; GA keeps the occupant soft-cap.
-    const seatCap = gaCabin ? seatSoftMax : freighterSeatHardMax;
+    remainingCargo = 0;
+  } else if (remainingCargo > 0 && seatStations.length > 0) {
+    // No baggage mapped — last resort onto seats (still soft-capped).
     const afterSeats = equalizeMovableStations(
       stations,
       profile,
       seatStations,
       remainingCargo,
-      { minRetainByIndex: crewRetain, softMaxByIndex: seatCap },
+      { minRetainByIndex: crewRetain, softMaxByIndex: seatSoftMax },
     );
     Object.assign(stations, afterSeats);
   }

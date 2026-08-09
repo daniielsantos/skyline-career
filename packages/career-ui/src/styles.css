@@ -4692,6 +4692,10 @@ small {
   color: var(--warn, #b7791f);
 }
 
+.preflight-load-live b {
+  color: var(--muted);
+}
+
 .preflight-load-fail b {
   color: var(--danger);
 }
@@ -4813,6 +4817,14 @@ small {
 .preflight-load-ok .load-schematic-tip,
 .preflight-load-ok .load-schematic-aux {
   border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
+}
+
+.preflight-load-live .load-schematic-wing,
+.preflight-load-live .load-schematic-center,
+.preflight-load-live .load-schematic-station,
+.preflight-load-live .load-schematic-tip,
+.preflight-load-live .load-schematic-aux {
+  border-color: color-mix(in srgb, var(--muted) 40%, var(--line));
 }
 
 .preflight-load-fail .load-schematic-wing,

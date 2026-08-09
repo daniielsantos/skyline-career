@@ -858,13 +858,12 @@ export function DispatchActivePanel(props: {
               view.payload.plannedLb === undefined ||
               view.payload.liveLb === undefined ||
               Math.abs(view.payload.liveLb - view.payload.plannedLb) <= 75;
-            // After wheels-up, fuel will (and should) burn below OFP block — that
-            // is not a preflight failure and must not block settle messaging.
+            // After wheels-up, fuel/payload no longer gate departure — but the
+            // tiles must still show honest Sim vs Due (not fake green ✓).
             const enRoute = step === 'en_route';
-            const fuelOk = enRoute ? true : fuelNumbersOk;
-            const payloadOk = enRoute
-              ? true
-              : Boolean(view?.payload.ok) && payloadNumbersOk;
+            const fuelOk = fuelNumbersOk;
+            const payloadOk =
+              Boolean(view?.payload.ok) && payloadNumbersOk;
             const ready =
               view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
             const watchOnGround = props.watch?.onGround === true;
@@ -878,7 +877,17 @@ export function DispatchActivePanel(props: {
               ? watchEngines
                 ? 'Shut down engines in MSFS — Watch settles after engines off at the destination.'
                 : 'Engines off — Watch will settle when destination proximity and airborne time gates pass.'
-              : 'Fuel below OFP departure target is normal in flight. Settle runs after landing + engines off.';
+              : 'Live load only — fuel burn below OFP departure is normal. Settle after landing + engines off.';
+            const loadTileClass = (ok: boolean) =>
+              enRoute
+                ? ok
+                  ? 'preflight-load-ok'
+                  : 'preflight-load-live'
+                : ok
+                  ? 'preflight-load-ok'
+                  : 'preflight-load-fail';
+            const loadTileMark = (ok: boolean) =>
+              enRoute ? (ok ? '✓' : '·') : ok ? '✓' : '✗';
             const noteLabel =
               view?.weightNoteCount &&
               view.weightNoteCount === check.findings.length
@@ -896,7 +905,7 @@ export function DispatchActivePanel(props: {
             return (
               <section
                 className={`ofp-result-card preflight-summary-card ofp-result-${
-                  enRoute || ready ? 'pass' : 'fail'
+                  enRoute ? 'pass' : ready ? 'pass' : 'fail'
                 }`}
                 aria-live="polite"
               >
@@ -1020,13 +1029,7 @@ export function DispatchActivePanel(props: {
                 ) : null}
                 {view ? (
                   <div className="preflight-load-grid">
-                    <div
-                      className={
-                        fuelOk || enRoute
-                          ? 'preflight-load-ok'
-                          : 'preflight-load-fail'
-                      }
-                    >
+                    <div className={loadTileClass(fuelOk)}>
                       <span>Fuel</span>
                       <strong>
                         Sim {massFromLb(view.fuel.liveLb)}
@@ -1035,20 +1038,14 @@ export function DispatchActivePanel(props: {
                         {enRoute ? 'OFP dep' : 'Due'}{' '}
                         {massFromLb(view.fuel.plannedLb)}
                       </small>
-                      <b>{fuelOk || enRoute ? '✓' : '✗'}</b>
+                      <b>{loadTileMark(fuelOk)}</b>
                       <FuelTankSchematic
                         tanks={view.fuel.tanks}
                         tankCapacity={view.fuel.tankCapacity}
                         weightSystem={weightSystem}
                       />
                     </div>
-                    <div
-                      className={
-                        payloadOk || enRoute
-                          ? 'preflight-load-ok'
-                          : 'preflight-load-fail'
-                      }
-                    >
+                    <div className={loadTileClass(payloadOk)}>
                       <span>Payload (stations)</span>
                       <strong>
                         Sim {massFromLb(view.payload.liveLb)}
@@ -1059,7 +1056,7 @@ export function DispatchActivePanel(props: {
                           massFromLb,
                         )}
                       </small>
-                      <b>{payloadOk || enRoute ? '✓' : '✗'}</b>
+                      <b>{loadTileMark(payloadOk)}</b>
                       <PayloadStationSchematic
                         stations={view.payload.stations}
                         stationMax={view.payload.stationMax}
@@ -1123,7 +1120,15 @@ export function DispatchActivePanel(props: {
                             {liveEngines ? 'Engines running' : 'Engines off'}
                           </small>
                           <b>
-                            {liveOnGround && !liveEngines ? 'READY' : 'CHECK'}
+                            {enRoute
+                              ? liveOnGround
+                                ? liveEngines
+                                  ? 'TAXI'
+                                  : 'LANDED'
+                                : 'AIR'
+                              : liveOnGround && !liveEngines
+                                ? 'READY'
+                                : 'CHECK'}
                           </b>
                         </div>
                       );

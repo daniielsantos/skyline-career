@@ -27,7 +27,7 @@ Settings → **Updates** (desktop only):
 
 ```powershell
 npm run career:ui
-npm run start -w @msfs-compat/desktop
+npm run start -w skyline-career-desktop
 ```
 
 ## Pack installer
@@ -43,6 +43,26 @@ Produces under `artifacts/skyline-desktop/`:
 - `win-unpacked/` — debug folder
 
 Pack **fails** if the Setup exe is missing or undersized (avoids shipping a broken stub).
+
+The pack script also:
+
+1. Builds `artifacts/skyline-updater-nm` — complete flat `electron-updater` dependency tree
+2. Ships it as `resources/updater-nm` (not inside `app.asar` — electron-builder drops nested deps there)
+3. `require('electron-updater')` against that tree before and after pack
+
+If either require fails, the pack aborts and prints the missing module name.
+
+### If NSIS fails with `spawn UNKNOWN`
+
+electron-builder runs an unsigned temp installer to extract the uninstaller; Windows Defender (or a corrupt `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign`) often blocks that spawn.
+
+```powershell
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\electron-builder\Cache\winCodeSign" -ErrorAction SilentlyContinue
+# Close Skyline Career if it is running, then:
+npm run pack:desktop
+```
+
+If it still fails, temporarily allow/exclude `artifacts\skyline-desktop` and the electron-builder Cache folder in Defender, then retry.
 
 ## Publish a release (maintainers)
 
@@ -63,10 +83,13 @@ Also upload `*.exe.blockmap` if present (speeds differential downloads when enab
 
 ### Smoke auto-update
 
-1. Install `v0.1.0` Setup on a clean machine / VM.
-2. Publish `v0.1.1` to GitHub Releases with Setup + `latest.yml`.
-3. Open the installed `0.1.0` app → Settings → Updates should show **0.1.1** → Download → Restart.
-4. Confirm version is `0.1.1` and profiles under `%AppData%\Skyline Career\` survived.
+Unsigned builds hit Windows SmartScreen. In-app update opens the downloaded Setup so you can choose **More info → Run anyway** (silent `quitAndInstall` often fails with no recovery).
+
+1. Install an older Setup (e.g. `v0.1.1`) on a clean machine / VM.
+2. Publish a newer release (e.g. `v0.1.2`) with Setup + `latest.yml` as **Assets** (not in release notes).
+3. Open the installed app → Settings → Updates → Download → **Restart to update** / **Install**.
+4. Complete the Windows/SmartScreen + NSIS installer, then launch from Start Menu.
+5. Confirm the new version and that profiles under `%AppData%\Skyline Career\` survived.
 
 ## Logs
 

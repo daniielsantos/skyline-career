@@ -301,7 +301,7 @@ function sortAirportLots(
 }
 
 const MARKET_PAGE_SIZE = 10;
-const CONTRACTS_PAGE_SIZE = 13;
+const CONTRACTS_PAGE_SIZE = 10;
 
 function formatMarketSortParam(sorts: MarketSortLevel[]): string {
   const access = sorts.find((level) => level.key === 'access');
@@ -6647,7 +6647,6 @@ export function App() {
           <span className="wallet">{formatMoney(wallet)}</span>
           <span className="meta">
             {pilotIcao ? `Pilot at ${pilotIcao}` : 'Pilot location —'}
-            {parkedIcao ? ` · aircraft at ${parkedIcao}` : ''}
             {homeHubIcao ? ` · home ${homeHubIcao}` : ''}
           </span>
           <button
@@ -8491,63 +8490,65 @@ export function App() {
                             </td>
                             <td>{formatMoney(trip.payUsd)}</td>
                             <td className="bush-trip-board-actions">
-                              {trip.hasPln ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="action ghost"
-                                    disabled={busy}
-                                    title="Download the Activities .PLN for MSFS tablet import"
-                                    onClick={() => {
-                                      void downloadBushTripPln(trip.id).catch(
-                                        (err) =>
-                                          setError(
-                                            err instanceof Error
-                                              ? err.message
-                                              : String(err),
-                                          ),
-                                      );
-                                    }}
-                                  >
-                                    PLN
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="action ghost"
-                                    disabled={busy}
-                                    title="Download Garmin/TDS GTNXi .gfp — place in ProgramData\\TDS\\GTNXi\\FPL"
-                                    onClick={() => {
-                                      void downloadBushTripGfp(trip.id).catch(
-                                        (err) =>
-                                          setError(
-                                            err instanceof Error
-                                              ? err.message
-                                              : String(err),
-                                          ),
-                                      );
-                                    }}
-                                  >
-                                    GFP
-                                  </button>
-                                </>
-                              ) : null}
-                              <button
-                                type="button"
-                                className="accept"
-                                disabled={busy || !canAccept}
-                                title={
-                                  !trip.playable
-                                    ? 'Draft — confirm in MSFS before Accept'
-                                    : activeBushTrip
-                                      ? 'Abandon the active trip first'
-                                      : canAccept
-                                        ? `Accept with light GA at ${trip.startIcao}`
-                                        : `Need light GA parked at ${trip.startIcao}`
-                                }
-                                onClick={() => void onAcceptBushTrip(trip)}
-                              >
-                                {trip.playable ? 'Accept' : 'Draft'}
-                              </button>
+                              <div className="bush-trip-board-actions-inner">
+                                {trip.hasPln ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="action ghost"
+                                      disabled={busy}
+                                      title="Download the Activities .PLN for MSFS tablet import"
+                                      onClick={() => {
+                                        void downloadBushTripPln(trip.id).catch(
+                                          (err) =>
+                                            setError(
+                                              err instanceof Error
+                                                ? err.message
+                                                : String(err),
+                                            ),
+                                        );
+                                      }}
+                                    >
+                                      PLN
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="action ghost"
+                                      disabled={busy}
+                                      title="Download Garmin/TDS GTNXi .gfp — place in ProgramData\\TDS\\GTNXi\\FPL"
+                                      onClick={() => {
+                                        void downloadBushTripGfp(trip.id).catch(
+                                          (err) =>
+                                            setError(
+                                              err instanceof Error
+                                                ? err.message
+                                                : String(err),
+                                            ),
+                                        );
+                                      }}
+                                    >
+                                      GFP
+                                    </button>
+                                  </>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="accept"
+                                  disabled={busy || !canAccept}
+                                  title={
+                                    !trip.playable
+                                      ? 'Draft — confirm in MSFS before Accept'
+                                      : activeBushTrip
+                                        ? 'Abandon the active trip first'
+                                        : canAccept
+                                          ? `Accept with light GA at ${trip.startIcao}`
+                                          : `Need light GA parked at ${trip.startIcao}`
+                                  }
+                                  onClick={() => void onAcceptBushTrip(trip)}
+                                >
+                                  {trip.playable ? 'Accept' : 'Draft'}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );

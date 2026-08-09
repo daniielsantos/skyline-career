@@ -1,6 +1,6 @@
 {
-  "name": "@msfs-compat/desktop",
-  "version": "0.1.0",
+  "name": "skyline-career-desktop",
+  "version": "0.1.9",
   "private": true,
   "description": "Skyline Career desktop shell (Electron)",
   "author": "Skyline Career",
@@ -10,16 +10,16 @@
     "start": "electron .",
     "pack": "node ../../scripts/pack-desktop.mjs"
   },
-  "dependencies": {
-    "electron-updater": "^6.6.2"
-  },
+  "dependencies": {},
   "devDependencies": {
     "electron": "35.7.5",
-    "electron-builder": "26.0.12"
+    "electron-builder": "26.0.12",
+    "electron-updater": "^6.6.2"
   },
   "build": {
     "appId": "com.skyline.career",
     "productName": "Skyline Career",
+    "executableName": "Skyline Career",
     "copyright": "Copyright © Skyline Career",
     "electronVersion": "35.7.5",
     "afterPack": "./afterPack.cjs",
@@ -32,18 +32,30 @@
       "preload.cjs",
       "package.json",
       "build/icon.ico",
-      "build/icon.png"
+      "build/icon.png",
+      "!**/node_modules/**"
     ],
     "extraResources": [
       {
         "from": "../../artifacts/skyline-runtime",
         "to": "skyline",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../../artifacts/skyline-host",
         "to": "host",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../artifacts/skyline-updater-nm",
+        "to": "updater-nm",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "publish": [
@@ -57,11 +69,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "dir",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",

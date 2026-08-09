@@ -108,6 +108,20 @@ describe('resolveMissionRolesPack', () => {
     );
   });
 
+  it('accepts Caravan Professional Gear under the shared Market SKU', async () => {
+    const roles = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
+      liveTitle: 'Black Square Caravan Professional Gear',
+      airframeTypeId: 'c208-caravan-cargo',
+      strictAirframeMatch: true,
+    });
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /blacksquare-caravan-professional-gear\.json$/,
+    );
+  });
+
   it('ignores a mismatched live title when a purchased airframe is set (soft)', async () => {
     const roles = await resolveMissionRolesPack({
       repoRoot,

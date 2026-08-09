@@ -106,8 +106,16 @@ export function DesktopUpdatesCard() {
 
   async function onRestart() {
     setBusy(true);
+    setError(null);
     try {
-      await desktop!.quitAndInstall();
+      const result = await desktop!.quitAndInstall();
+      if (!result.ok) {
+        setBusy(false);
+        if (result.reason && result.reason !== 'cancelled') {
+          setStatus('error');
+          setError(result.reason);
+        }
+      }
     } catch (err) {
       setBusy(false);
       setStatus('error');
@@ -121,12 +129,12 @@ export function DesktopUpdatesCard() {
       : status === 'downloading'
         ? `Downloading update… ${progressPct.toFixed(0)}%`
         : status === 'ready' && remoteVersion
-          ? `Version ${remoteVersion} downloaded. Restart to install.`
+          ? `Version ${remoteVersion} downloaded. Open the installer — if Windows warns about an unknown publisher, choose More info → Run anyway, then finish setup.`
           : status === 'uptodate'
             ? 'You are on the latest release.'
             : status === 'checking'
               ? 'Checking GitHub Releases…'
-              : 'Checks GitHub Releases for a newer Skyline Career build. No code signing yet — Windows may warn on download.';
+              : 'Checks GitHub Releases for a newer Skyline Career build. Builds are not code-signed yet — Windows SmartScreen may warn when installing updates.';
 
   return (
     <div className="settings-card">
@@ -186,7 +194,7 @@ export function DesktopUpdatesCard() {
             onClick={() => void onRestart()}
           >
             Restart to update
-            <small>Install &amp; relaunch</small>
+            <small>Open installer</small>
           </button>
         ) : null}
       </div>
@@ -210,7 +218,7 @@ export function DesktopUpdateBanner(props: {
         setNotice(`Update ${ev.version} available`);
       } else if (ev.type === 'downloaded') {
         setReady(true);
-        setNotice(`Update ${ev.version} ready — restart to install`);
+        setNotice(`Update ${ev.version} ready — open installer`);
       }
     });
   }, [desktop]);
@@ -231,7 +239,7 @@ export function DesktopUpdateBanner(props: {
           }
         }}
       >
-        {ready ? 'Restart' : 'Settings'}
+        {ready ? 'Install' : 'Settings'}
       </button>
     </p>
   );

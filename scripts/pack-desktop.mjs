@@ -19,11 +19,14 @@ import {
 } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const runtimeOut = join(root, 'artifacts', 'skyline-runtime');
 const hostOut = join(root, 'artifacts', 'skyline-host');
+const updaterNmOut = join(root, 'artifacts', 'skyline-updater-nm');
 const desktopPkg = join(root, 'packages', 'desktop');
+const desktopRequire = createRequire(join(desktopPkg, 'package.json'));
 
 function run(command, args, opts = {}) {
   return new Promise((resolvePromise, reject) => {
@@ -48,6 +51,85 @@ async function exists(p) {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Build a complete flat electron-updater tree under artifacts/skyline-updater-nm.
+ * Packaged main.mjs loads from resources/updater-nm (extraResources) — never
+ * from app.asar, where electron-builder routinely drops transitive deps.
+ */
+async function materializeUpdaterNodeModules() {
+  console.log('[pack:desktop] building artifacts/skyline-updater-nm…');
+
+  const names = new Set();
+  const queue = ['electron-updater'];
+  while (queue.length) {
+    const name = queue.shift();
+    if (!name || names.has(name)) continue;
+    names.add(name);
+    let pkgJsonPath;
+    try {
+      pkgJsonPath = desktopRequire.resolve(`${name}/package.json`);
+    } catch (err) {
+      throw new Error(
+        `Cannot resolve production module "${name}" from packages/desktop: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+    const pkg = JSON.parse(await readFile(pkgJsonPath, 'utf8'));
+    for (const dep of Object.keys(pkg.dependencies || {})) {
+      queue.push(dep);
+    }
+  }
+
+  await rm(updaterNmOut, { recursive: true, force: true });
+  await mkdir(join(updaterNmOut, 'node_modules'), { recursive: true });
+  await writeFile(
+    join(updaterNmOut, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: 'skyline-updater-nm',
+        private: true,
+        description: 'Flat electron-updater tree for packaged Skyline Career',
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  for (const name of [...names].sort()) {
+    const pkgJsonPath = desktopRequire.resolve(`${name}/package.json`);
+    const src = dirname(pkgJsonPath);
+    const dest = join(updaterNmOut, 'node_modules', ...name.split('/'));
+    await mkdir(dirname(dest), { recursive: true });
+    await cp(src, dest, { recursive: true, dereference: true });
+    await rm(join(dest, 'node_modules'), { recursive: true, force: true }).catch(
+      () => {},
+    );
+  }
+  console.log(
+    `[pack:desktop] updater-nm modules (${names.size}): ${[...names].sort().join(', ')}`,
+  );
+
+  // Isolated probe — must not walk into the monorepo root node_modules.
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const probe = await mkdtemp(join(tmpdir(), 'skyline-updater-probe-'));
+  try {
+    await cp(updaterNmOut, probe, { recursive: true, dereference: true });
+    const probeRequire = createRequire(join(probe, 'package.json'));
+    probeRequire('electron-updater');
+    console.log('[pack:desktop] updater-nm isolated require OK ✓');
+  } catch (err) {
+    throw new Error(
+      `updater-nm tree incomplete (isolated require failed): ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  } finally {
+    await rm(probe, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -195,12 +277,28 @@ async function assembleRuntime() {
     );
   }
 
-  // Aircraft profiles for OFP inject / preflight
+  // Aircraft profiles (examples) + OFP roles packs (preflight / inject station maps)
   await cp(
     join(root, 'profiles', 'examples'),
     join(runtimeOut, 'profiles', 'examples'),
     { recursive: true },
   );
+  const ofpSrc = join(root, 'profiles', 'ofp');
+  if (!(await exists(ofpSrc))) {
+    throw new Error('profiles/ofp missing — required for desktop preflight / inject');
+  }
+  await cp(ofpSrc, join(runtimeOut, 'profiles', 'ofp'), { recursive: true });
+  const ofpGear = join(
+    runtimeOut,
+    'profiles',
+    'ofp',
+    'blacksquare-caravan-professional-gear.json',
+  );
+  if (!(await exists(ofpGear))) {
+    throw new Error(
+      'profiles/ofp copy incomplete — missing blacksquare-caravan-professional-gear.json',
+    );
+  }
   await mkdir(join(runtimeOut, 'profiles', 'cache'), { recursive: true });
 
   // README for the runtime payload
@@ -267,8 +365,14 @@ async function assembleHost() {
 
 async function buildElectron() {
   console.log('[pack:desktop] installing desktop deps…');
-  await run('npm', ['install'], { cwd: desktopPkg, shell: true });
-
+  // Install with hoisted layout, then flatten every production transitive dep
+  // into packages/desktop/node_modules (electron-builder skips nested modules).
+  await run(
+    'npm',
+    ['install', '--install-strategy=hoisted', '--no-workspaces', '--ignore-scripts'],
+    { cwd: desktopPkg, shell: true },
+  );
+  await materializeUpdaterNodeModules();
   const outDir = join(root, 'artifacts', 'skyline-desktop');
   await mkdir(outDir, { recursive: true });
   // Remove previous tiny/broken Setup leftovers so we never ship a 185KB stub.
@@ -294,14 +398,32 @@ async function buildElectron() {
   }
 
   console.log('[pack:desktop] electron-builder (NSIS, --publish never)…');
+  // NSIS runs an unsigned stub to extract the uninstaller; Windows Defender /
+  // a corrupt winCodeSign cache often yields `spawn UNKNOWN`. Clear leftovers
+  // and retry once before failing the pack.
+  const winCodeSignCache = join(
+    process.env.LOCALAPPDATA || '',
+    'electron-builder',
+    'Cache',
+    'winCodeSign',
+  );
+  if (winCodeSignCache && (await exists(winCodeSignCache))) {
+    console.log('[pack:desktop] clearing electron-builder winCodeSign cache…');
+    await rm(winCodeSignCache, { recursive: true, force: true });
+  }
+  for (const name of await readdir(outDir).catch(() => [])) {
+    if (/^__uninstaller/i.test(name)) {
+      await rm(join(outDir, name), { force: true }).catch(() => {});
+    }
+  }
+
   const candidates = [
     join(desktopPkg, 'node_modules', 'electron-builder', 'cli.js'),
     join(root, 'node_modules', 'electron-builder', 'cli.js'),
     join(
       root,
       'node_modules',
-      '@msfs-compat',
-      'desktop',
+      'skyline-career-desktop',
       'node_modules',
       'electron-builder',
       'cli.js',
@@ -319,29 +441,74 @@ async function buildElectron() {
     CSC_IDENTITY_AUTO_DISCOVERY: 'false',
   };
   const args = ['--win', '--x64', '--publish', 'never'];
-  if (!cli) {
-    await run('npx', ['electron-builder', ...args], {
-      cwd: desktopPkg,
-      shell: true,
-      env: builderEnv,
-    });
-  } else {
-    await run(process.execPath, [cli, ...args], {
-      cwd: desktopPkg,
-      shell: false,
-      env: builderEnv,
-    });
+
+  async function runBuilder() {
+    if (!cli) {
+      await run('npx', ['electron-builder', ...args], {
+        cwd: desktopPkg,
+        shell: true,
+        env: builderEnv,
+      });
+    } else {
+      await run(process.execPath, [cli, ...args], {
+        cwd: desktopPkg,
+        shell: false,
+        env: builderEnv,
+      });
+    }
+  }
+
+  try {
+    await runBuilder();
+  } catch (err) {
+    // electron-builder prints `spawn UNKNOWN` to the console; our runner only
+    // sees a non-zero exit code. Retry once after clearing the usual causes.
+    console.warn(
+      `[pack:desktop] electron-builder failed (${err instanceof Error ? err.message : String(err)}). Clearing cache and retrying once…`,
+    );
+    if (winCodeSignCache) {
+      await rm(winCodeSignCache, { recursive: true, force: true }).catch(
+        () => {},
+      );
+    }
+    for (const name of await readdir(outDir).catch(() => [])) {
+      if (/^__uninstaller/i.test(name) || /\.exe$/i.test(name)) {
+        const full = join(outDir, name);
+        try {
+          const { stat } = await import('node:fs/promises');
+          const info = await stat(full);
+          if (/^__uninstaller/i.test(name) || info.size < 5_000_000) {
+            await rm(full, { force: true });
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    await runBuilder();
   }
 
   // Validate NSIS setup is a real installer, not a failed stub.
   const { stat } = await import('node:fs/promises');
   const names = await readdir(outDir);
-  const setup = names.find((n) =>
-    /^SkylineCareer-Setup-.*\.exe$/i.test(n),
+  const desktopPkgJson = JSON.parse(
+    await readFile(join(desktopPkg, 'package.json'), 'utf8'),
   );
+  const expectedSetup = `SkylineCareer-Setup-${desktopPkgJson.version}.exe`;
+  const setup =
+    names.find((n) => n.toLowerCase() === expectedSetup.toLowerCase()) ||
+    names
+      .filter((n) => /^SkylineCareer-Setup-.*\.exe$/i.test(n))
+      .sort()
+      .at(-1);
   if (!setup) {
     throw new Error(
       'NSIS Setup exe missing after electron-builder. Check builder logs (spawn UNKNOWN / winCodeSign).',
+    );
+  }
+  if (setup.toLowerCase() !== expectedSetup.toLowerCase()) {
+    console.warn(
+      `[pack:desktop] expected ${expectedSetup}, validating ${setup} instead`,
     );
   }
   const setupPath = join(outDir, setup);
@@ -360,6 +527,73 @@ async function buildElectron() {
     console.warn(
       '[pack:desktop] latest.yml missing — electron-updater needs it on the GitHub Release',
     );
+  }
+
+  // Packaged app loads updater from resources/updater-nm (not asar).
+  // Verify in an isolated temp dir — createRequire inside the repo can walk up
+  // to the monorepo root node_modules and hide a stripped extraResources tree.
+  const packedUpdaterNmDir = join(
+    outDir,
+    'win-unpacked',
+    'resources',
+    'updater-nm',
+  );
+  const packedUpdaterPkg = join(packedUpdaterNmDir, 'package.json');
+  const packedUpdaterMod = join(
+    packedUpdaterNmDir,
+    'node_modules',
+    'electron-updater',
+    'package.json',
+  );
+  if (!(await exists(packedUpdaterPkg)) || !(await exists(packedUpdaterMod))) {
+    throw new Error(
+      `resources/updater-nm incomplete after pack (electron-builder strips node_modules from extraResources — afterPack must restore it)`,
+    );
+  }
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const probe = await mkdtemp(join(tmpdir(), 'skyline-pack-updater-'));
+  try {
+    await cp(packedUpdaterNmDir, probe, { recursive: true, dereference: true });
+    const packedRequire = createRequire(join(probe, 'package.json'));
+    packedRequire('electron-updater');
+  } catch (err) {
+    throw new Error(
+      `packed resources/updater-nm cannot load electron-updater: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  } finally {
+    await rm(probe, { recursive: true, force: true }).catch(() => {});
+  }
+  console.log('[pack:desktop] packed updater-nm electron-updater require OK ✓');
+
+  // asar must NOT carry a broken stub of electron-updater.
+  const asarPath = join(outDir, 'win-unpacked', 'resources', 'app.asar');
+  if (await exists(asarPath)) {
+    const req = createRequire(import.meta.url);
+    let asar;
+    try {
+      asar = req(join(desktopPkg, 'node_modules', '@electron', 'asar'));
+    } catch {
+      try {
+        asar = req('@electron/asar');
+      } catch {
+        asar = null;
+      }
+    }
+    if (asar) {
+      const list = asar.listPackage(asarPath).map(String);
+      const hasUpdater = list.some((p) =>
+        /node_modules[/\\]electron-updater([/\\]|$)/i.test(p),
+      );
+      if (hasUpdater) {
+        throw new Error(
+          'app.asar still contains electron-updater — keep it in devDependencies and exclude node_modules from build.files',
+        );
+      }
+      console.log('[pack:desktop] app.asar has no electron-updater stub ✓');
+    }
   }
 }
 

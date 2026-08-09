@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg: #0b0e13;
   --bg-deep: #07090d;
   --surface: #12171f;
@@ -5827,7 +5827,12 @@ textarea {
   flex-shrink: 0;
 }
 
+/* Flex must not be on the <td> — it breaks table border painting under the cell. */
 .bush-trip-board-actions {
+  white-space: nowrap;
+}
+
+.bush-trip-board-actions-inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

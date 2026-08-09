@@ -9,6 +9,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   shell,
 } from 'electron';
 import { spawn, execFileSync } from 'node:child_process';
@@ -19,10 +20,26 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createConnection } from 'node:net';
 
 const require = createRequire(import.meta.url);
-const { autoUpdater } = require('electron-updater');
 
-// Branding: userData / Task Manager name (not @msfs-compat/desktop).
+/**
+ * Packaged builds load electron-updater from resources/updater-nm (complete
+ * flat tree). Never require it from app.asar — electron-builder only packs a
+ * stub of that package and drops transitive deps (fs-extra, debug, …).
+ */
+function loadElectronUpdater() {
+  if (app.isPackaged) {
+    const probe = join(process.resourcesPath, 'updater-nm', 'package.json');
+    const fromResources = createRequire(probe);
+    return fromResources('electron-updater');
+  }
+  return require('electron-updater');
+}
+
+const { autoUpdater } = loadElectronUpdater();
+
+// Branding: userData / Task Manager name (not scoped npm package name).
 app.setName('Skyline Career');
+Menu.setApplicationMenu(null);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -206,8 +223,8 @@ function wireAutoUpdater() {
   updaterWired = true;
 
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
-  // Unsigned builds: allow GitHub Releases without publisher validation issues.
+  // Unsigned builds: never silent-install on quit (SmartScreen blocks it).
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowDowngrade = false;
 
   autoUpdater.on('checking-for-update', () => {
@@ -273,15 +290,62 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle('skyline:quit-and-install', () => {
+  ipcMain.handle('skyline:quit-and-install', async () => {
     if (!isPackaged()) return { ok: false, reason: 'dev' };
-    // Let updater replace binaries; kill children first.
+
+    // Unsigned NSIS: quitAndInstall() often dies behind SmartScreen with no UI.
+    // Open the downloaded Setup so the user can click More info → Run anyway.
+    const installerPath =
+      typeof autoUpdater.installerPath === 'string'
+        ? autoUpdater.installerPath
+        : autoUpdater.downloadedUpdateHelper?.file ?? null;
+
+    if (!installerPath || !(await pathExists(installerPath))) {
+      return {
+        ok: false,
+        reason:
+          'Downloaded installer not found. Use Check for updates → Download again, or install the Setup from GitHub Releases manually.',
+      };
+    }
+
+    const choice = dialog.showMessageBoxSync({
+      type: 'info',
+      buttons: ['Open installer', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Install Skyline update',
+      message: 'Windows may warn that the publisher is unknown.',
+      detail:
+        'On the next Windows dialog, choose More info → Run anyway.\n\n' +
+        'Finish the installer, then open Skyline Career from the Start Menu.\n\n' +
+        `Installer:\n${installerPath}`,
+    });
+    if (choice !== 0) return { ok: false, reason: 'cancelled' };
+
     shuttingDown = true;
     killTree(apiChild);
     killTree(hostChild);
-    setImmediate(() => {
-      autoUpdater.quitAndInstall(false, true);
-    });
+    apiChild = null;
+    hostChild = null;
+
+    logLine(`[desktop] opening update installer: ${installerPath}`);
+    const openErr = await shell.openPath(installerPath);
+    if (openErr) {
+      logLine(`[desktop] shell.openPath failed: ${openErr}; spawn fallback`);
+      try {
+        spawn(installerPath, [], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: false,
+        }).unref();
+      } catch (err) {
+        shuttingDown = false;
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false, reason: openErr || message };
+      }
+    }
+
+    setTimeout(() => app.quit(), 800);
     return { ok: true };
   });
 }
@@ -411,6 +475,7 @@ async function createWindow() {
     minHeight: 700,
     title: 'Skyline Career',
     backgroundColor: '#0f1419',
+    autoHideMenuBar: true,
     icon: (await pathExists(iconFile)) ? iconFile : undefined,
     webPreferences: {
       preload: preloadPath(),

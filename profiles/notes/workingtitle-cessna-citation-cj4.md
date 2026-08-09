@@ -21,7 +21,9 @@
 - Payload stations from writetest: 1, 2, 3, 4, 5, 6.
 - Station maxLoad: placeholder until flight_model.cfg calibrate.
 - Homologated with interactive wizard.
+- **S5 (BAGGAGE 01)** is a ghost for inject: weight sticks briefly then drops. Roles pack marks it `service`; cargo uses S3/S4/S6 then overflows onto crew seats (hard max) so ~2000 lb still fits.
 
 ## Homologated
 
 - `profiles/examples/workingtitle-cessna-citation-cj4.json`
+- Roles: `profiles/ofp/workingtitle-cessna-citation-cj4.json`

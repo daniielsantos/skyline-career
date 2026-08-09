@@ -93,7 +93,7 @@ describe('careerOperationalCargoMaxLb', () => {
     );
   });
 
-  it('uses full baggage maxLoad for freighter (no pax seats)', () => {
+  it('uses full baggage maxLoad plus crew hard overflow for freighter', () => {
     assert.equal(
       careerOperationalCargoMaxLb({
         stations: [
@@ -108,7 +108,8 @@ describe('careerOperationalCargoMaxLb', () => {
           baggageStations: [3, 7],
         },
       }),
-      1000,
+      // bags 1000 + crew spare 2×(500-170)=660
+      1660,
     );
   });
 
@@ -145,6 +146,7 @@ describe('careerOperationalCargoMaxLb', () => {
           baggageStations: [3, 4],
         },
       }),
+      // bags 680 + crew hard spare 0 (maxLoad == pilot floor)
       680,
     );
   });
@@ -181,6 +183,40 @@ describe('distributeCargoAcrossStations', () => {
     assert.ok(maxBag - minBag <= 1, 'baggage should be nearly equal');
   });
 
+  it('freighter: overflows onto crew hard max when baggage is short', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 1, name: 'Pilot', maxLoad: 500, arm: 12 },
+          { index: 2, name: 'Copilot', maxLoad: 500, arm: 12 },
+          { index: 3, name: 'Bag A', maxLoad: 500, arm: 0 },
+          { index: 4, name: 'Bag B', maxLoad: 500, arm: 0 },
+          { index: 5, name: 'Ghost', maxLoad: 500, arm: 17 },
+          { index: 6, name: 'Bag C', maxLoad: 500, arm: -10 },
+        ],
+      },
+    } as AircraftProfile;
+    const roles = {
+      crewStations: [1, 2],
+      passengerStations: [],
+      baggageStations: [3, 4, 6],
+      serviceStations: [5],
+    };
+    const result = distributeCargoAcrossStations(2000, profile, roles);
+    assert.equal(result.cargoPlacedLb, 2000);
+    assert.equal(result.stations[5], 0);
+    const bags =
+      (result.stations[3] ?? 0) +
+      (result.stations[4] ?? 0) +
+      (result.stations[6] ?? 0);
+    assert.equal(bags, 1500);
+    assert.equal(
+      (result.stations[1] ?? 0) + (result.stations[2] ?? 0),
+      840,
+    ); // 170+250 each
+    assert.equal(result.total, 2340);
+  });
+
   it('GA cabin: fills pax/crew soft-caps before rear baggage', async () => {
     const profile = {
       payload: {
@@ -209,11 +245,18 @@ describe('distributeCargoAcrossStations', () => {
     assert.equal(result.total, 300 * 4 + 50);
   });
 
-  it('clamps cargo over baggage capacity', async () => {
+  it('clamps cargo over freighter bag+crew capacity', async () => {
     const profile = await loadCaravanProfile();
     const result = distributeCargoAcrossStations(50_000, profile, CARAVAN_ROLES);
-    assert.ok(result.cargoPlacedLb <= result.baggageCapacityLb + 0.5);
-    assert.equal(result.cargoPlacedLb, result.baggageCapacityLb);
+    const crewSpare = result.crewStations.reduce((sum, idx) => {
+      const hard =
+        profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
+      return sum + Math.max(0, hard - 170);
+    }, 0);
+    assert.ok(
+      result.cargoPlacedLb <= result.baggageCapacityLb + crewSpare + 0.5,
+    );
+    assert.equal(result.cargoPlacedLb, result.baggageCapacityLb + crewSpare);
   });
 
   it('rejects when no crew, passenger, or baggage stations are mapped', async () => {

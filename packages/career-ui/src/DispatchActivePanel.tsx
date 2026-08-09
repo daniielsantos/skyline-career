@@ -13,6 +13,7 @@ import {
   CgEnvelopeSchematic,
   FuelTankSchematic,
   PayloadStationSchematic,
+  formatMacPct,
 } from './LoadSchematic';
 import { DispatchRouteCard } from './DispatchRouteCard';
 import { CrewFlyControls } from './CrewFlyControls';
@@ -1074,13 +1075,13 @@ export function DispatchActivePanel(props: {
                         <span>CG</span>
                         <strong>
                           {view.cg.liveMac !== undefined
-                            ? `${view.cg.liveMac.toFixed(1)}% MAC`
+                            ? `${formatMacPct(view.cg.liveMac)}% MAC`
                             : 'n/a'}
                         </strong>
                         <small>
                           {view.cg.minMac !== undefined &&
                           view.cg.maxMac !== undefined
-                            ? `envelope ${view.cg.minMac}–${view.cg.maxMac}`
+                            ? `envelope ${formatMacPct(view.cg.minMac)}–${formatMacPct(view.cg.maxMac)}`
                             : 'advisory only'}
                         </small>
                         <b>

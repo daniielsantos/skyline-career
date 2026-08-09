@@ -13,7 +13,8 @@
     "Profile: workingtitle/cessna-citation-cj4@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct"
+    "Fuel strategy: simconnect-direct",
+    "S5 (BAGGAGE 01) marked service — SimConnect weight drops after inject; cargo uses S3/S4/S6 then crew hard overflow for full ~2 000 lb."
   ],
   "fuel": {
     "unit": "lb"
@@ -31,10 +32,12 @@
       "baggageStations": [
         3,
         4,
-        5,
         6
       ],
-      "passengerStations": []
+      "passengerStations": [],
+      "serviceStations": [
+        5
+      ]
     }
   },
   "liveSources": {
@@ -79,7 +82,7 @@
       "simVarIndex": 5,
       "cfgIndex": 4,
       "name": "BAGGAGE 01",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 6,

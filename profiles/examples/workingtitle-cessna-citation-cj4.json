@@ -185,11 +185,11 @@
     "envelopeSource": "simvar",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 14.499999999999998,
-      "maxMac": 28.000000000000004
+      "minMac": 14.5,
+      "maxMac": 28.0
     },
     "calibration": {
-      "observedMac": 22.24365323781967,
+      "observedMac": 22.2,
       "calibratedAtIso": "2026-08-09T14:46:31.641Z",
       "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\asobo_cj4\\presets\\asobo\\cj4\\config\\flight_model.cfg",
       "emptyWeightCgPosition": [

@@ -194,6 +194,12 @@ export function FuelTankSchematic(props: {
   );
 }
 
+/** Format % MAC for UI (avoids float noise like 14.499999999999998). */
+export function formatMacPct(mac: number, digits = 1): string {
+  if (!Number.isFinite(mac)) return '—';
+  return Number(mac.toFixed(digits)).toFixed(digits);
+}
+
 /** Vertical MAC bar: envelope band + live CG marker (aft = top). */
 export function CgEnvelopeSchematic(props: {
   liveMac?: number;
@@ -228,14 +234,16 @@ export function CgEnvelopeSchematic(props: {
     liveKnown && (liveMac < minMac || liveMac > maxMac);
   const tone =
     ok === false || outOfEnvelope ? 'warn' : ok === true ? 'ok' : 'neutral';
+  const minLabel = formatMacPct(minMac);
+  const maxLabel = formatMacPct(maxMac);
 
   return (
     <div
       className={`load-schematic load-schematic-cg load-schematic-cg-${tone}`}
       aria-label={
         liveKnown
-          ? `CG ${liveMac.toFixed(1)}% MAC, envelope ${minMac} to ${maxMac}`
-          : `CG envelope ${minMac} to ${maxMac}`
+          ? `CG ${formatMacPct(liveMac)}% MAC, envelope ${minLabel} to ${maxLabel}`
+          : `CG envelope ${minLabel} to ${maxLabel}`
       }
     >
       <div className="cg-schematic-rail" aria-hidden="true">
@@ -254,16 +262,16 @@ export function CgEnvelopeSchematic(props: {
         ) : null}
       </div>
       <div className="cg-schematic-scale" aria-hidden="true">
-        <span className="cg-schematic-fwd">FWD {minMac}</span>
+        <span className="cg-schematic-fwd">FWD {minLabel}</span>
         {liveKnown ? (
           <span
             className="cg-schematic-live"
             style={{ top: fromTop(liveMac) }}
           >
-            {liveMac.toFixed(1)}
+            {formatMacPct(liveMac)}
           </span>
         ) : null}
-        <span className="cg-schematic-aft">AFT {maxMac}</span>
+        <span className="cg-schematic-aft">AFT {maxLabel}</span>
       </div>
     </div>
   );

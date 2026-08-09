@@ -943,7 +943,17 @@ async function applyMissionOfpLoadExclusive(
     }
     const seatSoftMaxByIndex: Record<number, number> = {};
     for (const idx of seatStations) {
-      seatSoftMaxByIndex[idx] = seatSoftMaxLb(resolved.profile, idx);
+      // Freighter (cabin seats = cargo): allow full structural max when bags
+      // ghost/fill. GA keeps the occupant soft-cap.
+      if (preferSeatFill) {
+        seatSoftMaxByIndex[idx] = seatSoftMaxLb(resolved.profile, idx);
+      } else {
+        const hard =
+          resolved.profile.payload.stations.find((s) => s.index === idx)
+            ?.maxLoad ?? 0;
+        seatSoftMaxByIndex[idx] =
+          hard > 0 ? hard : seatSoftMaxLb(resolved.profile, idx);
+      }
     }
     const preferSeatFill = (built.passengerStations?.length ?? 0) > 0;
     let baggageSoftMaxByIndex: Record<number, number> = {};

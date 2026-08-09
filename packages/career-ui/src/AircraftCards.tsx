@@ -64,16 +64,17 @@ export function aircraftModelLabel(id: AircraftClass): string {
 
 /**
  * Card hero art under career-ui/public/airframes/.
- * Keyed by Market typeId (plus common legacy aliases).
+ * Keyed by Market typeId (plus common family / pack aliases).
  */
 const AIRFRAME_CARD_ART: Record<string, string> = {
-  // A2A Piper Aerostar 600
-  'a2a-piper-aerostar-600': '/airframes/aerostar-600.png',
-  // A2A Piper PA-24 Comanche
-  'a2a-piper-pa-24-250-comanche': '/airframes/comanche-pa24.png',
-  // Cessna 152
-  'asobo-cessna-c152': '/airframes/cessna-152.png',
-  // Cessna 172SP family
+  // --- light_ga ---
+  'blacksquare-baron-58-professional': '/airframes/baron-58.png',
+  'blacksquare-baron-58p-professional': '/airframes/baron-58tc.png',
+  'asobo-beech-baron-g58': '/airframes/baron-g58.png',
+  'blacksquare-bonanza-professional': '/airframes/bonanza-be36.png',
+  'asobo-beechcraft-bonanza': '/airframes/bonanza-g36.png',
+  'blacksquare-b60-duke': '/airframes/duke-be60.png',
+  'blackbox-bn2-islander-specialops-analogue': '/airframes/bn2-islander.png',
   'asobo-c172sp-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-classic-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-g1000-cargo': '/airframes/cessna-172.png',
@@ -81,24 +82,89 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'asobo-c172sp-g1000-passengers': '/airframes/cessna-172.png',
   'asobo-c172sp-ifd-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-ifd-passengers': '/airframes/cessna-172.png',
-  // Rockwell Commander 114
+  'asobo-cessna-c152': '/airframes/cessna-152.png',
+  'skyward-da50': '/airframes/da50.png',
+  'justflight-just-flight-pa28-arrow-iii': '/airframes/pa28-arrow.png',
+  'justflight-just-flight-pa28-warrior-ii': '/airframes/pa28-warrior.png',
+  'a2a-piper-aerostar-600': '/airframes/aerostar-600.png',
+  'a2a-piper-pa-24-250-comanche': '/airframes/comanche-pa24.png',
+  'asobo-piper-pa28-236-dakota-standard': '/airframes/pa28-dakota.png',
+  'asobo-robin-dr400': '/airframes/robin-dr400.png',
   'blacksquare-commander-114': '/airframes/commander-114.png',
   'blacksquare-commander-114tc': '/airframes/commander-114.png',
-  // Learjet 35A family
+  'asobo-savage-norden': '/airframes/savage-norden.png',
+
+  // --- light_jet ---
+  'workingtitle-cessna-citation-longitude-passengers':
+    '/airframes/citation-longitude.png',
+  'flightfx-c750-winglets': '/airframes/citation-c750.png',
+  'workingtitle-cessna-citation-cj4': '/airframes/citation-cj4.png',
+  'skyward-cessna-c680': '/airframes/citation-sovereign.png',
   'flysimware-learjet-35a-cargo': '/airframes/learjet-35a.png',
   'flysimware-learjet-35a': '/airframes/learjet-35a.png',
   'flysimware-learjet-35a-passenger': '/airframes/learjet-35a.png',
   'flysimware-learjet-35a-passenger-long-range': '/airframes/learjet-35a.png',
   'flysimware-learjet-35a-cargo-long-range': '/airframes/learjet-35a.png',
-  // F406 Caravan II
-  'inibuilds-f406-caravan-ii-passenger': '/airframes/cessna-406.png',
-  'inibuilds-f406-caravan-ii-cargo': '/airframes/cessna-406.png',
-  // EMB-110 Bandeirante
+  'workingtitle-microsoft-vision-jet-complete-seating':
+    '/airframes/vision-jet-sf50.png',
+  'microsoft-pc-24-cargo': '/airframes/pc-24.png',
+  'microsoft-pc-24-vip': '/airframes/pc-24.png',
+
+  // --- light_turboprop ---
+  'asobo-beechcraft-king-air-350i': '/airframes/king-air-350i.png',
+  'workingtitle-tbm-930-passengers': '/airframes/tbm-930.png',
+  'blacksquare-b36tp-bonanza-professional': '/airframes/bonanza-b36tp.png',
+  'blacksquare-turbine-duke': '/airframes/turbine-duke.png',
+  'c208-caravan-cargo': '/airframes/c208-caravan.png',
+  'asobo-c208b-cargo': '/airframes/c208-caravan.png',
+  'asobo-c208b-passengers': '/airframes/c208-caravan.png',
+  'blacksquare-caravan-cargo-pod': '/airframes/c208-caravan.png',
+  'blacksquare-caravan-professional-gear': '/airframes/c208-caravan.png',
+  'blacksquare-caravan-professional-super-cargomaster':
+    '/airframes/c208-caravan.png',
+  'microsoft-c408-skycourier-cargo': '/airframes/c408-skycourier.png',
+  'microsoft-c408-skycourier-passenger': '/airframes/c408-skycourier.png',
+  'microsoft-dhc-6-300-twin-otter-wheels': '/airframes/dhc6-twin-otter.png',
   'nextgensim-emb-110p1f-bandeirante': '/airframes/emb-110-bandeirante.png',
   'nextgensim-emb-110-bandeirante': '/airframes/emb-110-bandeirante.png',
-  // Saab 340
+  'nextgensim-emb-110p-bandeirante': '/airframes/emb-110-bandeirante.png',
+  'nextgensim-emb-110p1-bandeirante': '/airframes/emb-110-bandeirante.png',
+  'nextgensim-emb-110p2-bandeirante': '/airframes/emb-110-bandeirante.png',
+  'inibuilds-f406-caravan-ii-passenger': '/airframes/cessna-406.png',
+  'inibuilds-f406-caravan-ii-cargo': '/airframes/cessna-406.png',
+  'microsoft-king-air-c90-gtx-passengers': '/airframes/king-air-c90.png',
+  'sws-kodiak-100-commuter-cargopod-tundra-wheels': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-cargo-tundra-wheels': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-cargo': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-combi-tundra-wheels': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-combi': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-commuter-tundra-wheels': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-commuter': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-summit-cargopod-tundra-wheels': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-summit-cargopod': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-summit-tundra-wheels': '/airframes/kodiak-100.png',
+  'sws-kodiak-100-summit': '/airframes/kodiak-100.png',
+  'microsoft-pc-12-ngx-passengers': '/airframes/pc-12-ngx.png',
+  'microsoft-pc-12-ngx-vip': '/airframes/pc-12-ngx.png',
+  'microsoft-pc-12ngx-cargo': '/airframes/pc-12-ngx.png',
   'carenado-saab-340-passenger': '/airframes/saab-340.png',
   'microsoft-saab-340-cargo': '/airframes/saab-340.png',
+  'blacksquare-tbm-850-feather-red': '/airframes/tbm-850.png',
+
+  // --- medium_piston ---
+  'microsoft-douglas-dc-3-metal-left': '/airframes/dc-3.png',
+  'pmdg-dc6': '/airframes/dc-6.png',
+
+  // --- narrow_freighter ---
+  'leonardo-fly-the-maddog-x-md-82-20th': '/airframes/md-82.png',
+  'leonardo-fly-the-maddog-x-md-83-20th': '/airframes/md-83.png',
+  'leonardo-fly-the-maddog-x-md-88-20th': '/airframes/md-88.png',
+  'pmdg-738-bbj2-family': '/airframes/b738-bbj2.png',
+  'pmdg-738-bcf-family': '/airframes/b738-bcf.png',
+  'pmdg-738-pax-family': '/airframes/b738-pax.png',
+
+  // --- wide_freighter ---
+  'tfdi-md11f-family': '/airframes/md-11f.png',
 };
 
 export function airframeCardArtUrl(

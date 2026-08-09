@@ -8,7 +8,9 @@ import {
   evaluateMissionFlightTransition,
   flightPhaseFromSample,
   isNearAirport,
+  mergeAirborneClockOntoMission,
   parseBlockTimeToMs,
+  resumeAirborneAtMs,
   pickActiveMission,
   resolveExpectedRouteMs,
   type MissionIntent,
@@ -607,5 +609,50 @@ describe('flightPhaseFromSample', () => {
       ),
       'ground+engines',
     );
+  });
+
+  it('mergeAirborneClockOntoMission stamps dispatched legs and keeps max elapsed', () => {
+    const stamped = mergeAirborneClockOntoMission(mission('dispatched'), {
+      airborneAtMs: 1_000_000,
+      airborneElapsedMs: 120_000,
+      expectedRouteMs: 3_600_000,
+    });
+    assert.ok(stamped);
+    assert.equal(stamped!.airborneElapsedMs, 120_000);
+    assert.equal(stamped!.expectedRouteMs, 3_600_000);
+
+    const advanced = mergeAirborneClockOntoMission(stamped!, {
+      airborneAtMs: 2_000_000,
+      airborneElapsedMs: 180_000,
+      expectedRouteMs: 9_999_999,
+    });
+    assert.ok(advanced);
+    assert.equal(advanced!.airborneElapsedMs, 180_000);
+    assert.equal(advanced!.expectedRouteMs, 3_600_000);
+
+    // Smaller elapsed must not rewind progress.
+    assert.equal(
+      mergeAirborneClockOntoMission(advanced!, {
+        airborneElapsedMs: 90_000,
+        expectedRouteMs: 3_600_000,
+      }),
+      null,
+    );
+  });
+
+  it('resumeAirborneAtMs skips offline gap using saved elapsed', () => {
+    const nowMs = 10_000_000;
+    const resumed = resumeAirborneAtMs({
+      nowMs,
+      airborneAtMs: 1_000_000,
+      airborneElapsedMs: 120_000,
+    });
+    assert.equal(resumed, nowMs - 120_000);
+    const check = evaluateMinAirborneElapsed({
+      airborneAtMs: resumed!,
+      expectedRouteMs: 3_600_000,
+      nowMs,
+    });
+    assert.equal(check.elapsedMs, 120_000);
   });
 });

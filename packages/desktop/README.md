@@ -30,6 +30,12 @@ npm run career:ui
 npm run start -w skyline-career-desktop
 ```
 
+## Icons
+
+Windows Start Menu / taskbar / `.exe` icon come from [`build/icon.ico`](./build/icon.ico) (embedded in afterPack via `rcedit`). The window icon uses the same file from the asar.
+
+After installing a build that changed the icon, Windows may keep a cached Electron atom — restart Explorer or sign out/in if the new icon does not show immediately.
+
 ## Pack installer
 
 ```powershell

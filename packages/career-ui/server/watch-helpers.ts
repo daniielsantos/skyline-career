@@ -18,6 +18,8 @@ import {
   evaluateLoadVerification,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
+  mergeAirborneClockOntoMission,
+  resumeAirborneAtMs,
   finalizeFlightScore,
   finalizeWeatherOpsScore,
   isUsableFuelTankBreakdown,
@@ -1037,18 +1039,38 @@ export class CareerWatchSession {
     }
     this.missionStatus = mission.status;
     this.walletUsd = loaded.walletUsd;
-    this.watchState = createMissionFlightWatchState({
-      sawAirborne: mission.status === 'in_flight',
+    const nowMs = Date.now();
+    const resumedAirborneAtMs = resumeAirborneAtMs({
+      nowMs,
       airborneAtMs: mission.airborneAtMs,
+      airborneElapsedMs: mission.airborneElapsedMs,
+    });
+    const hasPersistedAirborne =
+      typeof resumedAirborneAtMs === 'number' &&
+      Number.isFinite(resumedAirborneAtMs);
+    this.watchState = createMissionFlightWatchState({
+      // Resume mid-flight: treat a saved airborne stamp as already wheels-up.
+      sawAirborne: mission.status === 'in_flight' || hasPersistedAirborne,
+      airborneAtMs: resumedAirborneAtMs,
       expectedRouteMs:
         mission.expectedRouteMs ??
-        (mission.status === 'in_flight'
+        (mission.status === 'in_flight' || hasPersistedAirborne
           ? resolveExpectedRouteMs(mission, {
               distanceNm: loaded.distanceNm,
             })
           : undefined),
       routeDistanceNm: loaded.distanceNm,
+      ...(hasPersistedAirborne && mission.status === 'in_flight'
+        ? { lastOnGround: false as const }
+        : {}),
     });
+    // Re-base persisted airborneAtMs so settle gate matches resumed elapsed.
+    if (
+      hasPersistedAirborne &&
+      resumedAirborneAtMs !== mission.airborneAtMs
+    ) {
+      await this.persistAirborneClock();
+    }
 
     const bridge = new NamedPipeSimBridge(
       opts.pipeName ? { pipeName: opts.pipeName } : {},
@@ -1103,6 +1125,8 @@ export class CareerWatchSession {
       clearTimeout(this.timer);
       this.timer = undefined;
     }
+    // Flush airborne clock before tearing down — app quit must not lose %.
+    await this.persistAirborneClock();
     if (this.bridge) {
       try {
         // Keep shared SimConnect alive for inject / preflight.
@@ -1113,6 +1137,53 @@ export class CareerWatchSession {
       this.bridge = null;
     }
     return this.getStatus();
+  }
+
+  /** Write Watch airborne clock onto the open mission save (survives app quit). */
+  private async persistAirborneClock(): Promise<void> {
+    if (!this.missionId) return;
+    const airborneAtMs = this.watchState.airborneAtMs;
+    const expectedRouteMs = this.watchState.expectedRouteMs;
+    if (
+      (typeof airborneAtMs !== 'number' || !Number.isFinite(airborneAtMs)) &&
+      (typeof expectedRouteMs !== 'number' || !Number.isFinite(expectedRouteMs))
+    ) {
+      return;
+    }
+    const nowMs = Date.now();
+    const check =
+      typeof airborneAtMs === 'number' && Number.isFinite(airborneAtMs)
+        ? evaluateMinAirborneElapsed({
+            airborneAtMs,
+            expectedRouteMs:
+              typeof expectedRouteMs === 'number' && expectedRouteMs > 0
+                ? expectedRouteMs
+                : 1,
+            nowMs,
+            airborneEndedAtMs: this.watchState.airborneEndedAtMs,
+            distanceNm: this.watchState.routeDistanceNm,
+          })
+        : null;
+    try {
+      await this.cb.updateOpenMission(
+        this.missionId,
+        async (freshMissions, openMission, openIdx) => {
+          const merged = mergeAirborneClockOntoMission(openMission, {
+            airborneAtMs,
+            airborneElapsedMs: check?.elapsedMs,
+            expectedRouteMs,
+          });
+          if (!merged) return false;
+          freshMissions.missions[openIdx] = merged;
+          return true;
+        },
+      );
+    } catch (err) {
+      watchDebugLog('watch', 'persist airborne clock failed', {
+        missionId: this.missionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   private async tick(): Promise<void> {
@@ -1605,26 +1676,14 @@ export class CareerWatchSession {
         );
       }
 
-      // Persist airborne clock if Watch first saw wheels-up on an already in-flight mission.
+      // Persist airborne clock as soon as Watch stamps it (accepted/dispatched/
+      // in_flight) so closing the app mid-climb does not reset progress to 0%.
       if (
-        current.status === 'in_flight' &&
         nextState.airborneAtMs !== undefined &&
         (current.airborneAtMs !== nextState.airborneAtMs ||
           current.expectedRouteMs !== nextState.expectedRouteMs)
       ) {
-        await this.cb.updateOpenMission(
-          this.missionId,
-          async (freshMissions, openMission, openIdx) => {
-            if (openMission.status !== 'in_flight') return false;
-            freshMissions.missions[openIdx] = {
-              ...openMission,
-              airborneAtMs: openMission.airborneAtMs ?? nextState.airborneAtMs,
-              expectedRouteMs:
-                openMission.expectedRouteMs ?? nextState.expectedRouteMs,
-            };
-            return true;
-          },
-        );
+        await this.persistAirborneClock();
       }
 
       if (event.type === 'depart' && this.opts.autoDepart) {

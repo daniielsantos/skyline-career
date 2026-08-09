@@ -137,6 +137,98 @@ export function createMissionFlightWatchState(
   };
 }
 
+/**
+ * Merge Watch airborne clock onto a persisted mission.
+ * Returns null when nothing new to write (caller skips save).
+ *
+ * Prefers the larger airborneElapsedMs (progress) and keeps expectedRouteMs
+ * once stamped. airborneAtMs is re-based on resume so offline time does not
+ * inflate the settle gate.
+ */
+export function mergeAirborneClockOntoMission(
+  mission: MissionIntent,
+  clock: {
+    airborneAtMs?: number;
+    airborneElapsedMs?: number;
+    expectedRouteMs?: number;
+  },
+): MissionIntent | null {
+  if (
+    mission.status !== 'accepted' &&
+    mission.status !== 'dispatched' &&
+    mission.status !== 'in_flight'
+  ) {
+    return null;
+  }
+  const clockElapsed =
+    typeof clock.airborneElapsedMs === 'number' &&
+    Number.isFinite(clock.airborneElapsedMs)
+      ? Math.max(0, clock.airborneElapsedMs)
+      : typeof clock.airborneAtMs === 'number' &&
+          Number.isFinite(clock.airborneAtMs)
+        ? Math.max(0, Date.now() - clock.airborneAtMs)
+        : undefined;
+  const prevElapsed =
+    typeof mission.airborneElapsedMs === 'number' &&
+    Number.isFinite(mission.airborneElapsedMs)
+      ? Math.max(0, mission.airborneElapsedMs)
+      : undefined;
+  const nextElapsed =
+    clockElapsed != null || prevElapsed != null
+      ? Math.max(clockElapsed ?? 0, prevElapsed ?? 0)
+      : undefined;
+  const nextAirborneAtMs =
+    typeof clock.airborneAtMs === 'number' && Number.isFinite(clock.airborneAtMs)
+      ? clock.airborneAtMs
+      : mission.airborneAtMs;
+  const nextExpectedRouteMs =
+    typeof mission.expectedRouteMs === 'number' &&
+    Number.isFinite(mission.expectedRouteMs) &&
+    mission.expectedRouteMs > 0
+      ? mission.expectedRouteMs
+      : typeof clock.expectedRouteMs === 'number' &&
+          Number.isFinite(clock.expectedRouteMs) &&
+          clock.expectedRouteMs > 0
+        ? clock.expectedRouteMs
+        : mission.expectedRouteMs;
+  if (
+    nextAirborneAtMs === mission.airborneAtMs &&
+    nextElapsed === mission.airborneElapsedMs &&
+    nextExpectedRouteMs === mission.expectedRouteMs
+  ) {
+    return null;
+  }
+  return {
+    ...mission,
+    airborneAtMs: nextAirborneAtMs,
+    ...(nextElapsed != null ? { airborneElapsedMs: nextElapsed } : {}),
+    expectedRouteMs: nextExpectedRouteMs,
+  };
+}
+
+/** Re-base airborneAtMs so elapsed resumes from saved progress (skips offline gap). */
+export function resumeAirborneAtMs(opts: {
+  nowMs: number;
+  airborneAtMs?: number;
+  airborneElapsedMs?: number;
+}): number | undefined {
+  const elapsed =
+    typeof opts.airborneElapsedMs === 'number' &&
+    Number.isFinite(opts.airborneElapsedMs)
+      ? Math.max(0, opts.airborneElapsedMs)
+      : undefined;
+  if (elapsed != null) {
+    return opts.nowMs - elapsed;
+  }
+  if (
+    typeof opts.airborneAtMs === 'number' &&
+    Number.isFinite(opts.airborneAtMs)
+  ) {
+    return opts.airborneAtMs;
+  }
+  return undefined;
+}
+
 /** Parse SimBrief-style `HH:MM` block time into milliseconds. */
 export function parseBlockTimeToMs(blockTime: string | undefined): number | undefined {
   if (!blockTime) return undefined;

@@ -1,6 +1,6 @@
 {
   "name": "skyline-career-desktop",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "description": "Skyline Career desktop shell (Electron)",
   "author": "Skyline Career",
@@ -10,11 +10,11 @@
     "start": "electron .",
     "pack": "node ../../scripts/pack-desktop.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
     "electron": "35.7.5",
     "electron-builder": "26.0.12",
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "rcedit": "^5.0.2"
   },
   "build": {
     "appId": "com.skyline.career",

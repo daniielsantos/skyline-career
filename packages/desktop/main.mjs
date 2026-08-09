@@ -37,8 +37,11 @@ function loadElectronUpdater() {
 
 const { autoUpdater } = loadElectronUpdater();
 
-// Branding: userData / Task Manager name (not scoped npm package name).
+// Branding: userData / Task Manager / Start Menu identity.
 app.setName('Skyline Career');
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.skyline.career');
+}
 Menu.setApplicationMenu(null);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

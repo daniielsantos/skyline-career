@@ -1,12 +1,15 @@
 /**
  * electron-builder strips node_modules from extraResources by default.
  * Re-copy skyline-runtime + updater-nm trees after pack.
+ * Also embed the Windows .exe icon / version strings (signAndEditExecutable is
+ * off to avoid winCodeSign spawn failures, so builder skips rcedit).
  */
 const { cp, access, mkdir, readFile } = require('node:fs/promises');
 const { join } = require('node:path');
 const { createRequire } = require('node:module');
 const { mkdtemp, rm } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
+const { rcedit } = require('rcedit');
 
 async function mustExist(path, label) {
   try {
@@ -16,7 +19,36 @@ async function mustExist(path, label) {
   }
 }
 
+async function embedWindowsExeBranding(context) {
+  if (context.electronPlatformName !== 'win32') return;
+
+  const icon = join(__dirname, 'build', 'icon.ico');
+  await mustExist(icon, 'build/icon.ico');
+
+  const productFilename = context.packager.appInfo.productFilename;
+  const exe = join(context.appOutDir, `${productFilename}.exe`);
+  await mustExist(exe, 'packaged executable');
+
+  const version = String(context.packager.appInfo.version || '0.0.0');
+  console.log(`[afterPack] embedding icon + version into ${exe}`);
+  await rcedit(exe, {
+    icon,
+    'version-string': {
+      CompanyName: 'Skyline Career',
+      FileDescription: 'Skyline Career',
+      ProductName: 'Skyline Career',
+      LegalCopyright: 'Copyright © Skyline Career',
+      OriginalFilename: `${productFilename}.exe`,
+    },
+    'file-version': version,
+    'product-version': version,
+  });
+  console.log('[afterPack] Windows exe branding OK ✓');
+}
+
 exports.default = async function afterPack(context) {
+  await embedWindowsExeBranding(context);
+
   const root = join(__dirname, '..', '..');
   const resources = join(context.appOutDir, 'resources');
 

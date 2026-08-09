@@ -628,8 +628,14 @@ export interface MissionIntent {
   /**
    * Wall-clock when the aircraft left the ground (Watch / depart).
    * Used to enforce a minimum airborne fraction of planned route time.
+   * May be re-based on Watch resume so offline time does not count.
    */
   airborneAtMs?: number;
+  /**
+   * Accumulated airborne elapsed (ms) at last Watch flush / stop.
+   * Lets the airborne % resume after app restart without counting closed time.
+   */
+  airborneElapsedMs?: number;
   /** Planned route duration (ms) stamped at airborne — OFP block or distance estimate. */
   expectedRouteMs?: number;
   /** Economy tick when settle ran. */

@@ -155,14 +155,15 @@ Flags:
 
 async function assertGh() {
   try {
-    await runCapture('gh', ['--version'], { shell: true });
+    // shell:false so argv with spaces (e.g. --title) are not re-split on Windows.
+    await runCapture('gh', ['--version']);
   } catch {
     throw new Error(
       'GitHub CLI (gh) not found on PATH. Install https://cli.github.com/ and run gh auth login.',
     );
   }
   try {
-    await runCapture('gh', ['auth', 'status'], { shell: true });
+    await runCapture('gh', ['auth', 'status']);
   } catch {
     throw new Error('gh is not authenticated. Run: gh auth login');
   }
@@ -401,7 +402,7 @@ async function main() {
 
   // Refuse if remote tag/release already exists.
   try {
-    await runCapture('gh', ['release', 'view', tag], { shell: true });
+    await runCapture('gh', ['release', 'view', tag]);
     throw new Error(`GitHub release ${tag} already exists`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -427,11 +428,12 @@ async function main() {
     notesPath,
   ];
   if (flags.draft) ghArgs.push('--draft');
-  await run('gh', ghArgs, { shell: true });
+  // Never shell:true here — Windows re-tokenizes unquoted spaces in --title.
+  await run('gh', ghArgs);
 
   if (bumped) {
     console.log('[release:desktop] pushing commit…');
-    await run('git', ['push', '-u', 'origin', 'HEAD'], { shell: true });
+    await run('git', ['push', '-u', 'origin', 'HEAD']);
   }
 
   console.log(`[release:desktop] published ${tag}`);

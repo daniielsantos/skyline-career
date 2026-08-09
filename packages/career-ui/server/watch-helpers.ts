@@ -707,6 +707,22 @@ export async function readLiveTouchdownPosition(
   return undefined;
 }
 
+/** Aircraft true heading (degrees). Soft-fail when missing. */
+export async function readLiveHeadingTrueDeg(
+  bridge: NamedPipeSimBridge,
+): Promise<number | undefined> {
+  try {
+    const hdg = await bridge.readSimVar({
+      name: 'PLANE HEADING DEGREES TRUE',
+      unit: 'degrees',
+    });
+    if (Number.isFinite(hdg)) return ((hdg % 360) + 360) % 360;
+  } catch {
+    /* soft-fail */
+  }
+  return undefined;
+}
+
 export async function probeLiveLandingFpm(
   pipeName?: string,
 ): Promise<number | undefined> {
@@ -810,6 +826,10 @@ export class CareerWatchSession {
   /** Latched touchdown WGS84 from first wheels-down (cleared on go-around). */
   private touchdownLat: number | null = null;
   private touchdownLon: number | null = null;
+  /** Aircraft true heading at first wheels-down (for runway approach-end label). */
+  private touchdownHeadingTrueDeg: number | null = null;
+  /** Last airborne true heading (fallback if touchdown read fails). */
+  private lastAirborneHeadingTrueDeg: number | null = null;
   /** Last MX excess-burn drain write (airborne only). */
   private lastMxFuelDrainAtMs = 0;
   /** Last mx drain skip log (rate-limited). */
@@ -865,14 +885,23 @@ export class CareerWatchSession {
   }
 
   /** Latched / sim touchdown position for manual settle. */
-  getCapturedTouchdownPosition(): { lat: number; lon: number } | undefined {
+  getCapturedTouchdownPosition():
+    | { lat: number; lon: number; headingTrueDeg?: number }
+    | undefined {
     if (
       this.touchdownLat != null &&
       this.touchdownLon != null &&
       Number.isFinite(this.touchdownLat) &&
       Number.isFinite(this.touchdownLon)
     ) {
-      return { lat: this.touchdownLat, lon: this.touchdownLon };
+      return {
+        lat: this.touchdownLat,
+        lon: this.touchdownLon,
+        ...(typeof this.touchdownHeadingTrueDeg === 'number' &&
+        Number.isFinite(this.touchdownHeadingTrueDeg)
+          ? { headingTrueDeg: this.touchdownHeadingTrueDeg }
+          : {}),
+      };
     }
     return undefined;
   }
@@ -1016,6 +1045,8 @@ export class CareerWatchSession {
     this.weatherStatus = weatherOpsStatus(this.weatherAcc);
     this.touchdownLat = null;
     this.touchdownLon = null;
+    this.touchdownHeadingTrueDeg = null;
+    this.lastAirborneHeadingTrueDeg = null;
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
     this.pendingMxDrainKg = 0;
@@ -1654,6 +1685,20 @@ export class CareerWatchSession {
       ) {
         this.touchdownLat = sample.position.lat;
         this.touchdownLon = sample.position.lon;
+        let hdg: number | undefined;
+        if (this.bridge) {
+          try {
+            hdg = await readLiveHeadingTrueDeg(this.bridge);
+          } catch {
+            hdg = undefined;
+          }
+        }
+        if (hdg == null && this.lastAirborneHeadingTrueDeg != null) {
+          hdg = this.lastAirborneHeadingTrueDeg;
+        }
+        if (typeof hdg === 'number' && Number.isFinite(hdg)) {
+          this.touchdownHeadingTrueDeg = hdg;
+        }
       }
 
       const postTouchdown =
@@ -1695,6 +1740,13 @@ export class CareerWatchSession {
             precipMm: wx.precipMm,
             visibilityM: wx.visibilityM,
           });
+          if (
+            typeof wx.headingTrueDeg === 'number' &&
+            Number.isFinite(wx.headingTrueDeg)
+          ) {
+            this.lastAirborneHeadingTrueDeg =
+              ((wx.headingTrueDeg % 360) + 360) % 360;
+          }
           this.weatherStatus = weatherOpsStatus(this.weatherAcc, {
             expectedRouteMs: nextState.expectedRouteMs,
           });
@@ -2018,6 +2070,8 @@ export class CareerWatchSession {
         // LAT/LON can move to a later bounce farther down the runway.
         let touchdownLat = this.touchdownLat ?? undefined;
         let touchdownLon = this.touchdownLon ?? undefined;
+        let touchdownHeadingTrueDeg =
+          this.touchdownHeadingTrueDeg ?? undefined;
         if (touchdownLat == null || touchdownLon == null) {
           try {
             const tdPos = await readLiveTouchdownPosition(this.bridge);
@@ -2029,6 +2083,23 @@ export class CareerWatchSession {
             }
           } catch {
             /* soft-fail */
+          }
+        }
+        if (touchdownHeadingTrueDeg == null) {
+          try {
+            const hdg = await readLiveHeadingTrueDeg(this.bridge);
+            if (hdg != null) {
+              touchdownHeadingTrueDeg = hdg;
+              this.touchdownHeadingTrueDeg = hdg;
+            } else if (this.lastAirborneHeadingTrueDeg != null) {
+              touchdownHeadingTrueDeg = this.lastAirborneHeadingTrueDeg;
+              this.touchdownHeadingTrueDeg = this.lastAirborneHeadingTrueDeg;
+            }
+          } catch {
+            if (this.lastAirborneHeadingTrueDeg != null) {
+              touchdownHeadingTrueDeg = this.lastAirborneHeadingTrueDeg;
+              this.touchdownHeadingTrueDeg = this.lastAirborneHeadingTrueDeg;
+            }
           }
         }
         const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
@@ -2054,6 +2125,7 @@ export class CareerWatchSession {
                   openMission.destIcao,
                   touchdownLat,
                   touchdownLon,
+                  touchdownHeadingTrueDeg,
                 )
               : undefined;
           const result = settleMission(worldFresh, openMission, {
@@ -2066,6 +2138,7 @@ export class CareerWatchSession {
             weatherOps,
             touchdownLat,
             touchdownLon,
+            touchdownHeadingTrueDeg,
             runwayTouch: touch,
           });
           freshMissions.missions[openIdx] = result.mission;

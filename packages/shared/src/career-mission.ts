@@ -1642,6 +1642,8 @@ export interface SettleMissionOpts {
   touchdownLat?: number;
   /** Touchdown WGS84 longitude (degrees). */
   touchdownLon?: number;
+  /** Aircraft true heading at touchdown (degrees) — picks runway approach end. */
+  touchdownHeadingTrueDeg?: number;
   /** Precomputed runway projection (optional; settle recomputes when coords given). */
   runwayTouch?: RunwayTouchdownSnapshot;
   /** Wall-clock now for minimum airborne duration gate. */
@@ -1938,8 +1940,13 @@ export function settleMission(
           ? opts.touchdownLon
           : working.settledTouchdownLon;
       if (lat == null || lon == null) return working.settledRunwayTouch;
+      const hdg =
+        typeof opts.touchdownHeadingTrueDeg === 'number' &&
+        Number.isFinite(opts.touchdownHeadingTrueDeg)
+          ? opts.touchdownHeadingTrueDeg
+          : undefined;
       return (
-        evaluateRunwayTouchdown(working.destIcao, lat, lon) ??
+        evaluateRunwayTouchdown(working.destIcao, lat, lon, hdg) ??
         working.settledRunwayTouch
       );
     })(),

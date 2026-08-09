@@ -59,9 +59,41 @@ export type RunwayTouchdownSnapshot = {
   lateralM: number;
   pastThresholdM: number;
   onPavement: boolean;
-  /** Closer to primary (ident) threshold vs reciprocal end. */
+  /**
+   * Approach end used for debrief labeling.
+   * Prefer aircraft true heading at touchdown (±90° of runway heading);
+   * fall back to geometrically closer threshold when heading is missing.
+   */
   landingEnd: 'primary' | 'reciprocal';
 };
+
+/** Smallest absolute difference between two headings (0–180). */
+export function headingDeltaDeg(a: number, b: number): number {
+  const d = ((((a - b) % 360) + 540) % 360) - 180;
+  return Math.abs(d);
+}
+
+/**
+ * Pick which runway end the aircraft was landing on.
+ * When `headingTrueDeg` is finite, align to primary vs reciprocal (±90°).
+ * Otherwise use the geometrically closer threshold.
+ */
+export function pickRunwayLandingEnd(
+  runway: Pick<CareerRunway, 'headingTrueDeg' | 'lengthM'>,
+  pastThresholdM: number,
+  headingTrueDeg?: number,
+): 'primary' | 'reciprocal' {
+  if (typeof headingTrueDeg === 'number' && Number.isFinite(headingTrueDeg)) {
+    const toPrimary = headingDeltaDeg(headingTrueDeg, runway.headingTrueDeg);
+    const toReciprocal = headingDeltaDeg(
+      headingTrueDeg,
+      runway.headingTrueDeg + 180,
+    );
+    return toPrimary <= toReciprocal ? 'primary' : 'reciprocal';
+  }
+  const toReciprocalEnd = runway.lengthM - pastThresholdM;
+  return pastThresholdM <= toReciprocalEnd ? 'primary' : 'reciprocal';
+}
 
 type CatalogFile = Record<string, CareerRunway[]>;
 
@@ -136,20 +168,26 @@ export function listHubsMissingRunways(): string[] {
 /**
  * Map a touchdown lat/lon onto the nearest catalog runway at `icao`.
  * Returns undefined when coords invalid or the hub has no runway rows.
+ * Pass `headingTrueDeg` (aircraft true heading at touchdown) so a deep
+ * landing past midfield is still labeled with the approach end, not the
+ * geometrically closer opposite threshold.
  */
 export function evaluateRunwayTouchdown(
   icao: string,
   lat: number,
   lon: number,
+  headingTrueDeg?: number,
 ): RunwayTouchdownSnapshot | undefined {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return undefined;
   if (lat === 0 && lon === 0) return undefined;
   const runway = pickNearestRunway(icao, lat, lon);
   if (!runway) return undefined;
   const proj = projectOntoRunway(runway, lat, lon);
-  const toReciprocal = runway.lengthM - proj.pastThresholdM;
-  const landingEnd: 'primary' | 'reciprocal' =
-    proj.pastThresholdM <= toReciprocal ? 'primary' : 'reciprocal';
+  const landingEnd = pickRunwayLandingEnd(
+    runway,
+    proj.pastThresholdM,
+    headingTrueDeg,
+  );
   return {
     lat,
     lon,

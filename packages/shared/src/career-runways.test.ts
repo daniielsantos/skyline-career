@@ -93,4 +93,33 @@ describe('evaluateRunwayTouchdown', () => {
   it('returns undefined for unknown ICAO', () => {
     assert.equal(evaluateRunwayTouchdown('ZZZZ', 0.1, 0.1), undefined);
   });
+
+  it('uses aircraft heading for approach end on a deep landing past midfield', () => {
+    const rwy = getAirportRunways('KCLT').find((r) => r.ident === '18L');
+    assert.ok(rwy);
+    // ~1582 m past 18L threshold (past midfield → closer to 36R geometrically).
+    // Debrief previously showed that as ~1062 m past 36R THR.
+    const pastThr = Math.round(rwy!.lengthM * 0.6);
+    const alongM = pastThr - rwy!.lengthM / 2;
+    const latRad = (rwy!.lat * Math.PI) / 180;
+    const mPerDegLat = 111_320;
+    const mPerDegLon = 111_320 * Math.cos(latRad);
+    const hdg = (rwy!.headingTrueDeg * Math.PI) / 180;
+    const lat = rwy!.lat + (alongM * Math.cos(hdg)) / mPerDegLat;
+    const lon = rwy!.lon + (alongM * Math.sin(hdg)) / mPerDegLon;
+
+    const withoutHdg = evaluateRunwayTouchdown('KCLT', lat, lon);
+    assert.ok(withoutHdg);
+    assert.equal(withoutHdg!.runwayIdent, '18L');
+    assert.equal(withoutHdg!.landingEnd, 'reciprocal');
+
+    const landing18 = evaluateRunwayTouchdown('KCLT', lat, lon, 176);
+    assert.ok(landing18);
+    assert.equal(landing18!.landingEnd, 'primary');
+    assert.equal(landing18!.runwayIdent, '18L');
+
+    const landing36 = evaluateRunwayTouchdown('KCLT', lat, lon, 356);
+    assert.ok(landing36);
+    assert.equal(landing36!.landingEnd, 'reciprocal');
+  });
 });

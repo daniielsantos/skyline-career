@@ -4841,11 +4841,13 @@ export function createCareerApiServer(port = 8787) {
               : undefined;
           let touchdownLat: number | undefined;
           let touchdownLon: number | undefined;
+          let touchdownHeadingTrueDeg: number | undefined;
           if (watchSession.getStatus().missionId === body.missionId) {
             const captured = watchSession.getCapturedTouchdownPosition();
             if (captured) {
               touchdownLat = captured.lat;
               touchdownLon = captured.lon;
+              touchdownHeadingTrueDeg = captured.headingTrueDeg;
             }
           }
           if (touchdownLat === undefined || touchdownLon === undefined) {
@@ -4874,6 +4876,7 @@ export function createCareerApiServer(port = 8787) {
                     openMission.destIcao,
                     touchdownLat,
                     touchdownLon,
+                    touchdownHeadingTrueDeg,
                   )
                 : undefined;
             const result = settleMission(world, openMission, {
@@ -4885,6 +4888,7 @@ export function createCareerApiServer(port = 8787) {
               weatherOps,
               touchdownLat,
               touchdownLon,
+              touchdownHeadingTrueDeg,
               runwayTouch,
               nowMs: Date.now(),
             });

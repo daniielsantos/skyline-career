@@ -396,22 +396,6 @@
     "fuelBurnKgPerNm": 1.4
   },
   {
-    "typeId": "asobo-beechcraft-king-air-350i",
-    "aircraftClassId": "light_turboprop",
-    "label": "[Beechcraft King Air 350i",
-    "rolesPackRelPath": "profiles/ofp/asobo-beechcraft-king-air-350i.json",
-    "simbriefIcao": "B350",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 4516,
-    "mtowKg": 7484,
-    "maxCargoKg": 227,
-    "fuelCapacityKg": 1638,
-    "maxRangeNm": 1806,
-    "cruiseFuelFlowKgPerHour": 204.1,
-    "cruiseSpeedKt": 244,
-    "fuelBurnKgPerNm": 0.836
-  },
-  {
     "typeId": "workingtitle-tbm-930-passengers",
     "aircraftClassId": "light_turboprop",
     "label": "Asobo TBM 930 Passengers",
@@ -442,6 +426,22 @@
     "cruiseFuelFlowKgPerHour": 79.4,
     "cruiseSpeedKt": 250,
     "fuelBurnKgPerNm": 0.318
+  },
+  {
+    "typeId": "asobo-beechcraft-king-air-350i",
+    "aircraftClassId": "light_turboprop",
+    "label": "Beechcraft King Air 350i",
+    "rolesPackRelPath": "profiles/ofp/asobo-beechcraft-king-air-350i.json",
+    "simbriefIcao": "B350",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 4516,
+    "mtowKg": 7484,
+    "maxCargoKg": 227,
+    "fuelCapacityKg": 1638,
+    "maxRangeNm": 1806,
+    "cruiseFuelFlowKgPerHour": 204.1,
+    "cruiseSpeedKt": 244,
+    "fuelBurnKgPerNm": 0.836
   },
   {
     "typeId": "blacksquare-turbine-duke",

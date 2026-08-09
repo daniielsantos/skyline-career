@@ -4194,6 +4194,10 @@ small {
   color: var(--danger);
 }
 
+.watch-footer-hint {
+  color: var(--warn, #c9a227);
+}
+
 .watch-flight-time {
   color: var(--muted);
 }

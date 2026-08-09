@@ -1383,6 +1383,46 @@ describe('settleMission', () => {
     assert.equal(lot.reservedKg, 0);
     assert.equal(lot.status, 'available');
   });
+
+  it('departs contract-pilot reposition without a real market lot', () => {
+    const world = createSeedEconomyWorld({ seed: 'cp-repo-depart' });
+    const mission = normalizeMissionIntent({
+      id: 'msn_cp_repo_1',
+      status: 'dispatched',
+      originIcao: 'CYRJ',
+      destIcao: 'CYOW',
+      commodityId: 'general',
+      cargoKg: 0,
+      pax: 0,
+      payUsd: 0,
+      urgency: 'normal',
+      reason: 'CP reposition',
+      aircraftClassId: 'light_turboprop',
+      rolesPackRelPath: 'profiles/ofp/c208.json',
+      deadlineTick: world.tick + 100,
+      shipmentLotId: 'deadhead_npcf-repo-test-1',
+      lots: [
+        {
+          shipmentLotId: 'deadhead_npcf-repo-test-1',
+          commodityId: 'general',
+          cargoKg: 0,
+          payUsd: 0,
+          urgency: 'normal',
+          reason: 'CP reposition',
+          deadlineTick: world.tick + 100,
+        },
+      ],
+      contractPilot: true,
+      contractPilotReposition: true,
+      acceptedAtTick: world.tick,
+    });
+    const departed = departMission(world, mission);
+    assert.equal(departed.mission.status, 'in_flight');
+    const settled = settleMission(world, departed.mission, {
+      skipMinAirborneGate: true,
+    });
+    assert.equal(settled.mission.status, 'settled');
+  });
 });
 
 describe('replaceMissionManifest', () => {

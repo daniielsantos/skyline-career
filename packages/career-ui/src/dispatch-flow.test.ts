@@ -4,6 +4,7 @@ import type { Mission, MissionSettlement } from './api.ts';
 import {
   buildFlightDebrief,
   deriveDispatchStep,
+  dispatchStepStatusLine,
   formatCargoOpsDebriefLine,
   formatFlightDurationMs,
   formatLandingFpm,
@@ -131,6 +132,35 @@ describe('resolveLoadPath', () => {
         false,
       ),
       'efb',
+    );
+  });
+});
+
+describe('dispatchStepStatusLine en_route', () => {
+  const base = {
+    mission: mission({ status: 'in_flight' as const }),
+    simbriefUser: 'pilot',
+    ofpAutoStatus: 'idle' as const,
+    missionFuelQuoteStatus: 'idle' as const,
+    missionFuelQuoteError: null,
+    loadOfpAutoStatus: 'idle' as const,
+    loadOfpAutoError: null,
+    loadPath: 'inject' as const,
+    simBridgeConnected: true,
+    watchRunning: true,
+    watchAutoStatus: 'idle' as const,
+  };
+
+  it('asks for engines off after landing', () => {
+    assert.match(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchOnGround: true,
+        watchEnginesRunning: true,
+        watchSawAirborne: true,
+      }),
+      /shut down engines/i,
     );
   });
 });

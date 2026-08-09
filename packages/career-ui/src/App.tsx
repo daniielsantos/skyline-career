@@ -1980,6 +1980,8 @@ export function App() {
   const [watchAutoPaused, setWatchAutoPaused] = useState(false);
   const [flightDebrief, setFlightDebrief] = useState<FlightDebrief | null>(null);
   const activeMissionRef = useRef<Mission | undefined>(undefined);
+  /** One-shot: reopen mid-flight → Dispatch so settle UI is visible. */
+  const airborneResumeNavDoneRef = useRef(false);
   const [maxCargoKg, setMaxCargoKg] = useState<number | null>(null);
   const [structuralMaxCargoKg, setStructuralMaxCargoKg] =
     useState<number | null>(null);
@@ -2840,6 +2842,32 @@ export function App() {
           }
           return status;
         });
+        // Watch auto-depart/settle updates server mission status — mirror into
+        // local missions so Dispatch step (Ready → En route) advances without
+        // waiting for a full refresh.
+        if (
+          status.running &&
+          status.missionId &&
+          status.missionStatus &&
+          ['in_flight', 'settled', 'failed', 'cancelled'].includes(
+            status.missionStatus,
+          )
+        ) {
+          const missionId = status.missionId;
+          const nextStatus = status.missionStatus;
+          queueMicrotask(() => {
+            setMissions((current) => {
+              let changed = false;
+              const next = current.map((mission) => {
+                if (mission.id !== missionId) return mission;
+                if (mission.status === nextStatus) return mission;
+                changed = true;
+                return { ...mission, status: nextStatus as Mission['status'] };
+              });
+              return changed ? next : current;
+            });
+          });
+        }
         if (status.running) {
           setSimBridge((prev) => {
             const connected = Boolean(status.pipeConnected);
@@ -2978,6 +3006,21 @@ export function App() {
     [missions],
   );
   activeMissionRef.current = activeMission;
+
+  // Reopen with a pilot in_flight mission → land on Dispatch once (Watch resume
+  // also runs off-tab, but settle / progress live here).
+  useEffect(() => {
+    if (!hubSelected || airborneResumeNavDoneRef.current) return;
+    if (missions.length === 0) return;
+    airborneResumeNavDoneRef.current = true;
+    const airborne = findPlayerDispatchMission(missions);
+    if (airborne?.status !== 'in_flight') return;
+    if (tab === 'staging' && !airportIcao) return;
+    setAirportIcao(null);
+    setAirportView(null);
+    setTab('staging');
+    writeCareerLocation({ tab: 'staging', airportIcao: null }, { replace: true });
+  }, [hubSelected, missions, tab, airportIcao]);
 
   // Route ops cargo ceiling for Active Dispatch "Capacity left" (and staging).
   useEffect(() => {
@@ -3427,12 +3470,14 @@ export function App() {
 
   // If Watch started before the first Preflight (stuck Load with no card), stop
   // it once so /api/preflight can bootstrap Loaded vs Due + inject toggle.
+  // Never stop an already airborne mission — reopen mid-flight must keep Watch.
   useEffect(() => {
     if (
       !watch?.running ||
       !activeMission ||
       watch.missionId !== activeMission.id ||
-      activeMission.lastPreflightCheck
+      activeMission.lastPreflightCheck ||
+      activeMission.status === 'in_flight'
     ) {
       return;
     }
@@ -3455,21 +3500,26 @@ export function App() {
   }, [
     activeMission?.id,
     activeMission?.lastPreflightCheck,
+    activeMission?.status,
     watch?.missionId,
     watch?.running,
   ]);
 
   // Keep Watch running after the first Preflight exists; Preflight gates auto-depart.
+  // Mid-flight reopen: resume without requiring Dispatch tab or a Preflight card
+  // (depart already happened; airborne % was persisted separately).
   useEffect(() => {
     const alreadyWatching =
       Boolean(watch?.running) && watch?.missionId === activeMission?.id;
+    const isAirborneResume = activeMission?.status === 'in_flight';
     const eligible =
-      tab === 'staging' &&
-      !airportIcao &&
+      (tab === 'staging' || isAirborneResume) &&
+      (!airportIcao || isAirborneResume) &&
       Boolean(activeMission) &&
       ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
-      // Need an initial Loaded vs Due card before Watch owns the pipe.
-      Boolean(activeMission?.lastPreflightCheck?.loadVerification) &&
+      // Ground Dispatch needs Loaded vs Due before Watch owns the pipe.
+      (isAirborneResume ||
+        Boolean(activeMission?.lastPreflightCheck?.loadVerification)) &&
       !alreadyWatching &&
       !watchAutoPaused &&
       !watch?.settlement &&
@@ -3509,7 +3559,9 @@ export function App() {
           setWatchAutoStatus('idle');
           setToastKind('ok');
           setToast(
-            `Watch started · MSFS connected · auto-depart/settle near ${activeMission.destIcao}`,
+            isAirborneResume
+              ? `Watch resumed · MSFS connected · auto-settle near ${activeMission.destIcao}`
+              : `Watch started · MSFS connected · auto-depart/settle near ${activeMission.destIcao}`,
           );
         }
       } catch {
@@ -6179,7 +6231,14 @@ export function App() {
   const dispatchStep = deriveDispatchStep({
     hasDraft: Boolean(staging),
     hasDebrief: stagingMode === 'debrief',
-    mission: activeMission,
+    mission:
+      activeMission &&
+      watch?.running &&
+      watch.missionId === activeMission.id &&
+      watch.missionStatus === 'in_flight' &&
+      activeMission.status !== 'in_flight'
+        ? { ...activeMission, status: 'in_flight' }
+        : activeMission,
   });
   const activeLoadPath = activeMission
     ? resolveLoadPath(activeMission, preferManualLoad)
@@ -6200,6 +6259,13 @@ export function App() {
       watch?.running && watch.missionId === activeMission?.id,
     ),
     watchAutoStatus,
+    watchOnGround: watch?.onGround,
+    watchEnginesRunning: watch?.enginesRunning,
+    watchSawAirborne: Boolean(watch?.sawAirborne),
+    watchSettleBlockedReason:
+      watch?.lastEvent?.type === 'settle_blocked'
+        ? watch.lastEvent.reason
+        : null,
   });
   const terminalMovementCount = showAirport
     ? (airportView.arrivals?.length ?? 0) + (airportView.departures?.length ?? 0)

@@ -1514,8 +1514,15 @@ export function departMission(
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot depart mission in status=${normalized.status}`);
   }
-  if (!normalized.crewDeadhead && !normalized.emptyFlight) {
+  if (!isEmptyLegMission(normalized)) {
     for (const line of normalized.lots) {
+      // Synthetic deadhead / empty ids are never real market lots.
+      if (
+        line.shipmentLotId.startsWith('deadhead_') ||
+        line.shipmentLotId.startsWith('empty_')
+      ) {
+        continue;
+      }
       const lot = findLot(world, line.shipmentLotId);
       if (lot.reservedKg >= lot.quantityKg && lot.quantityKg > 0) {
         // Keep Contract remainder visible on the board (awaiting_pilot).
@@ -1838,9 +1845,16 @@ export function settleMission(
   // Allocate penalty across lines proportional to payUsd.
   let penaltyLeft = pay.penaltyUsd;
 
-  if (!working.crewDeadhead && !working.emptyFlight) {
+  if (!isEmptyLegMission(working)) {
     for (let i = 0; i < working.lots.length; i++) {
       const line = working.lots[i]!;
+      // Empty / CP reposition legs have no freight to deliver.
+      if (
+        line.shipmentLotId.startsWith('deadhead_') ||
+        line.shipmentLotId.startsWith('empty_')
+      ) {
+        continue;
+      }
       const delivery = applyFreightDelivery(world, {
         commodityId: line.commodityId,
         originIcao: working.originIcao,

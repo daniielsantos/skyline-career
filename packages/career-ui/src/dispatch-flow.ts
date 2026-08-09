@@ -359,6 +359,11 @@ export function dispatchStepStatusLine(input: {
   simBridgeConnected: boolean;
   watchRunning: boolean;
   watchAutoStatus: 'idle' | 'waiting' | 'connecting' | 'blocked';
+  /** Live Watch sample — used for post-landing settle hints. */
+  watchOnGround?: boolean | null;
+  watchEnginesRunning?: boolean | null;
+  watchSawAirborne?: boolean;
+  watchSettleBlockedReason?: string | null;
 }): string {
   const { step, mission } = input;
   switch (step) {
@@ -427,10 +432,24 @@ export function dispatchStepStatusLine(input: {
         return 'Preflight ready · waiting for SimBridge to arm Watch.';
       }
       return 'Preflight ready — take off in MSFS when Watch is connected.';
-    case 'en_route':
+    case 'en_route': {
+      if (input.watchSettleBlockedReason) {
+        return `Landed — settle blocked: ${input.watchSettleBlockedReason}`;
+      }
+      if (
+        input.watchRunning &&
+        input.watchOnGround === true &&
+        input.watchSawAirborne
+      ) {
+        if (input.watchEnginesRunning) {
+          return 'Landed — shut down engines in MSFS to settle the flight.';
+        }
+        return 'Landed · engines off — Watch is settling the flight…';
+      }
       return input.watchRunning
         ? 'En route — Watch tracks the flight. Settle unlocks after ≥70% of planned route time (≥50% under 100 nm).'
         : 'En route — keep Watch connected so touchdown can settle the flight.';
+    }
     case 'debrief':
       return 'Flight complete — review the P&L, then return to Freights.';
     default:

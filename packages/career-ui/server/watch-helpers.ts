@@ -68,7 +68,6 @@ import {
 } from '../../agent/src/sample-cruise-burn.ts';
 import { watchDebugLog, WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import { isOfpLoadActive } from './ofp-load-state.ts';
-import { preflightBlocksDepart } from './preflight-helpers.ts';
 import { pickStationMax, pickTankCapacity, readClassicFuelTankCapacityLb } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 
@@ -1245,7 +1244,8 @@ export class CareerWatchSession {
         await this.stop();
         return;
       }
-      const { world, current } = snap;
+      const { world } = snap;
+      let current = snap.current;
       this.missionStatus = current.status;
       this.walletUsd = snap.missions.walletUsd;
 
@@ -1500,20 +1500,21 @@ export class CareerWatchSession {
       const prevHadTouchdown =
         typeof this.watchState.airborneEndedAtMs === 'number' ||
         this.watchState.landingFpm != null;
-      const { event, nextState } = evaluateMissionFlightTransition(
+      const transitionOpts = {
+        requireEnginesOffToSettle: this.opts.requireEnginesOff,
+        requireDestProximity: this.opts.requireDestProximity,
+        destCoords,
+        settleRadiusNm: this.opts.settleRadiusNm,
+        nowMs,
+        expectedRouteMs,
+        distanceNm,
+        fallbackHours,
+      };
+      let { event, nextState } = evaluateMissionFlightTransition(
         current,
         sample,
         this.watchState,
-        {
-          requireEnginesOffToSettle: this.opts.requireEnginesOff,
-          requireDestProximity: this.opts.requireDestProximity,
-          destCoords,
-          settleRadiusNm: this.opts.settleRadiusNm,
-          nowMs,
-          expectedRouteMs,
-          distanceNm,
-          fallbackHours,
-        },
+        transitionOpts,
       );
       this.watchState = nextState;
       this.lastEvent = event;
@@ -1686,61 +1687,194 @@ export class CareerWatchSession {
         await this.persistAirborneClock();
       }
 
-      if (event.type === 'depart' && this.opts.autoDepart) {
-        if (
-          preflightBlocksDepart(current) &&
-          !this.opts.allowDepartOverride
-        ) {
-          if (!this.preflightDepartBlockedLogged) {
-            this.lastError =
-              'Auto-depart blocked: Preflight not ready — fix load or restart Watch with override';
-            this.preflightDepartBlockedLogged = true;
-          }
-        } else {
-          const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
-            const openIdx = freshMissions.missions.findIndex(
-              (m) => m.id === this.missionId,
-            );
-            if (openIdx < 0) return false;
-            const openMission = freshMissions.missions[openIdx]!;
-            if (
-              openMission.status !== 'accepted' &&
-              openMission.status !== 'dispatched'
-            ) {
-              return false;
-            }
-            const departed = departMission(worldFresh, openMission, {
-              fleet: freshMissions,
-              nowMs: nextState.airborneAtMs ?? nowMs,
-              distanceNm,
-              expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
-            });
-            freshMissions.missions[openIdx] = departed.mission;
-            if (departed.fuelDebitUsd > 0) {
-              applyWalletDelta(freshMissions, {
-                amountUsd: -departed.fuelDebitUsd,
-                kind: 'fuel',
-                atTick: worldFresh.tick,
-                missionId: departed.mission.id,
-                icao: departed.mission.originIcao,
-                note: `${departed.mission.originIcao}→${departed.mission.destIcao}`,
-              });
-            }
-            this.missionStatus = departed.mission.status;
-            this.walletUsd = freshMissions.walletUsd;
-            this.watchState = {
-              ...this.watchState,
-              airborneAtMs: departed.mission.airborneAtMs,
-              expectedRouteMs: departed.mission.expectedRouteMs,
-            };
-            return true;
+      // Preflight is a ground gate only. Once the aircraft has clearly flown,
+      // always depart — blocking on loadVerification.ready after fuel burn (or
+      // when Watch started mid-air / restarted after landing) left missions
+      // stuck on `dispatched` forever so settle never ran.
+      const plannedFuelLb =
+        current.lastPreflightCheck?.loadVerification?.fuel?.plannedLb;
+      const liveFuelLb =
+        this.lastLiveFuelLb ??
+        current.lastPreflightCheck?.loadVerification?.fuel?.liveLb;
+      const fuelBurnedInFlight =
+        typeof plannedFuelLb === 'number' &&
+        typeof liveFuelLb === 'number' &&
+        plannedFuelLb - liveFuelLb >= 100;
+      const nearDestNow =
+        Boolean(destCoords) &&
+        Boolean(sample.position) &&
+        greatCircleDistanceNm(sample.position!, destCoords!) <=
+          (this.opts.settleRadiusNm ?? 12);
+      // Mid-air: saw wheels-up but mission never left dispatched (missed edge /
+      // failed depart). Post-landing: completed the route without an in_flight stamp.
+      const midFlightCatchUp =
+        nextState.sawAirborne && sample.onGround === false;
+      const postLandingCatchUp =
+        sample.onGround === true &&
+        nearDestNow &&
+        (nextState.sawAirborne ||
+          fuelBurnedInFlight ||
+          current.lastPreflightCheck?.phase === 'airborne');
+      const needsDepartCatchUp =
+        this.opts.autoDepart &&
+        (current.status === 'accepted' || current.status === 'dispatched') &&
+        (midFlightCatchUp || postLandingCatchUp) &&
+        event.type !== 'depart';
+      if (
+        this.opts.autoDepart &&
+        (event.type === 'depart' || needsDepartCatchUp)
+      ) {
+        if (needsDepartCatchUp) {
+          watchDebugLog('watch', 'depart catch-up', {
+            missionId: current.id,
+            status: current.status,
+            sawAirborne: nextState.sawAirborne,
+            midFlightCatchUp,
+            postLandingCatchUp,
+            fuelBurnedInFlight,
+            nearDestNow,
           });
-          if (!saved) {
-            await this.stop();
-            return;
+          const routeMs =
+            nextState.expectedRouteMs ??
+            current.expectedRouteMs ??
+            expectedRouteMs;
+          // Never invent "full route already flown" while still airborne — that
+          // immediately unlocks settle mid-climb. Only back-date on post-landing
+          // recovery when the real airborne stamp was never persisted.
+          let recoveredAirborneAtMs =
+            nextState.airborneAtMs ?? current.airborneAtMs;
+          if (recoveredAirborneAtMs == null) {
+            if (
+              postLandingCatchUp &&
+              typeof routeMs === 'number' &&
+              routeMs > 0
+            ) {
+              recoveredAirborneAtMs = nowMs - routeMs;
+            } else {
+              recoveredAirborneAtMs = nowMs;
+            }
+          }
+          this.watchState = {
+            ...this.watchState,
+            sawAirborne: true,
+            lastOnGround: sample.onGround,
+            airborneAtMs: recoveredAirborneAtMs,
+            expectedRouteMs: routeMs,
+            ...(postLandingCatchUp ? { airborneEndedAtMs: nowMs } : {}),
+          };
+          nextState = this.watchState;
+        }
+        const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
+          const openIdx = freshMissions.missions.findIndex(
+            (m) => m.id === this.missionId,
+          );
+          if (openIdx < 0) return false;
+          const openMission = freshMissions.missions[openIdx]!;
+          if (
+            openMission.status !== 'accepted' &&
+            openMission.status !== 'dispatched'
+          ) {
+            return false;
+          }
+          const departed = departMission(worldFresh, openMission, {
+            fleet: freshMissions,
+            nowMs: nextState.airborneAtMs ?? nowMs,
+            distanceNm,
+            expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
+          });
+          freshMissions.missions[openIdx] = departed.mission;
+          if (departed.fuelDebitUsd > 0) {
+            applyWalletDelta(freshMissions, {
+              amountUsd: -departed.fuelDebitUsd,
+              kind: 'fuel',
+              atTick: worldFresh.tick,
+              missionId: departed.mission.id,
+              icao: departed.mission.originIcao,
+              note: `${departed.mission.originIcao}→${departed.mission.destIcao}`,
+            });
+          }
+          this.missionStatus = departed.mission.status;
+          this.walletUsd = freshMissions.walletUsd;
+          this.watchState = {
+            ...this.watchState,
+            sawAirborne: true,
+            airborneAtMs: departed.mission.airborneAtMs,
+            expectedRouteMs: departed.mission.expectedRouteMs,
+          };
+          current = departed.mission;
+          return true;
+        });
+        if (!saved) {
+          await this.stop();
+          return;
+        }
+        this.lastError = null;
+        this.preflightDepartBlockedLogged = false;
+        // Catch-up depart often happens already on the ground — re-run settle
+        // gates now that status is in_flight.
+        if (needsDepartCatchUp) {
+          const again = evaluateMissionFlightTransition(
+            current,
+            sample,
+            this.watchState,
+            transitionOpts,
+          );
+          event = again.event;
+          nextState = again.nextState;
+          this.watchState = nextState;
+          this.lastEvent = event;
+          this.lastEventAtIso = new Date().toISOString();
+        }
+      }
+
+      // Sanity: settle unlocked while still far from dest means the airborne
+      // clock was back-dated (bad catch-up). Rebase from distance flown.
+      if (
+        current.status === 'in_flight' &&
+        sample.onGround === false &&
+        typeof nextState.airborneAtMs === 'number' &&
+        Number.isFinite(nextState.airborneAtMs) &&
+        typeof nextState.expectedRouteMs === 'number' &&
+        nextState.expectedRouteMs > 0 &&
+        typeof liveDistToDestNm === 'number' &&
+        Number.isFinite(liveDistToDestNm) &&
+        typeof distanceNm === 'number' &&
+        distanceNm > 50 &&
+        liveDistToDestNm > Math.max(40, distanceNm * 0.35)
+      ) {
+        const airborneCheck = evaluateMinAirborneElapsed({
+          airborneAtMs: nextState.airborneAtMs,
+          expectedRouteMs: nextState.expectedRouteMs,
+          nowMs,
+          distanceNm,
+        });
+        if (airborneCheck.ok) {
+          const flownFrac = Math.max(
+            0.05,
+            Math.min(0.9, 1 - liveDistToDestNm / distanceNm),
+          );
+          const correctedAtMs =
+            nowMs - Math.round(nextState.expectedRouteMs * flownFrac);
+          if (correctedAtMs > nextState.airborneAtMs + 60_000) {
+            watchDebugLog('watch', 'airborne clock sanity rebase', {
+              missionId: current.id,
+              prevAirborneAtMs: nextState.airborneAtMs,
+              correctedAtMs,
+              liveDistToDestNm,
+              distanceNm,
+              prevElapsedMs: airborneCheck.elapsedMs,
+            });
+            this.watchState = {
+              ...nextState,
+              airborneAtMs: correctedAtMs,
+            };
+            nextState = this.watchState;
+            await this.persistAirborneClock();
           }
         }
-      } else if (event.type === 'settle' && this.opts.autoSettle) {
+      }
+
+      if (event.type === 'settle' && this.opts.autoSettle) {
         let residualFuelKg: number | undefined;
         try {
           residualFuelKg = await readLiveResidualFuelKg(this.bridge);

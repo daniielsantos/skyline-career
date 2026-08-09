@@ -202,6 +202,14 @@ export function WatchStatusFooter(props: Props) {
           <span className="watch-footer-error">
             {props.watch.lastEvent.reason}
           </span>
+        ) : props.watch?.running &&
+          props.missionStatus === 'in_flight' &&
+          props.watch.onGround === true &&
+          props.watch.sawAirborne &&
+          props.watch.enginesRunning ? (
+          <span className="watch-footer-hint">
+            Shut down engines to settle
+          </span>
         ) : null}
         {props.watch?.lastError ? (
           <span className="watch-footer-error">{props.watch.lastError}</span>

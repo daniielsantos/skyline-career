@@ -858,10 +858,27 @@ export function DispatchActivePanel(props: {
               view.payload.plannedLb === undefined ||
               view.payload.liveLb === undefined ||
               Math.abs(view.payload.liveLb - view.payload.plannedLb) <= 75;
-            const fuelOk = fuelNumbersOk;
-            const payloadOk = Boolean(view?.payload.ok) && payloadNumbersOk;
+            // After wheels-up, fuel will (and should) burn below OFP block — that
+            // is not a preflight failure and must not block settle messaging.
+            const enRoute = step === 'en_route';
+            const fuelOk = enRoute ? true : fuelNumbersOk;
+            const payloadOk = enRoute
+              ? true
+              : Boolean(view?.payload.ok) && payloadNumbersOk;
             const ready =
               view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
+            const watchOnGround = props.watch?.onGround === true;
+            const watchEngines = props.watch?.enginesRunning === true;
+            const enRouteHeadline = watchOnGround
+              ? watchEngines
+                ? 'LANDED · AWAITING SHUTDOWN'
+                : 'LANDED · READY TO SETTLE'
+              : 'EN ROUTE · LIVE LOAD';
+            const enRouteSub = watchOnGround
+              ? watchEngines
+                ? 'Shut down engines in MSFS — Watch settles after engines off at the destination.'
+                : 'Engines off — Watch will settle when destination proximity and airborne time gates pass.'
+              : 'Fuel below OFP departure target is normal in flight. Settle runs after landing + engines off.';
             const noteLabel =
               view?.weightNoteCount &&
               view.weightNoteCount === check.findings.length
@@ -879,23 +896,29 @@ export function DispatchActivePanel(props: {
             return (
               <section
                 className={`ofp-result-card preflight-summary-card ofp-result-${
-                  ready ? 'pass' : 'fail'
+                  enRoute || ready ? 'pass' : 'fail'
                 }`}
                 aria-live="polite"
               >
                 <div className="ofp-result-head">
                   <div>
                     <strong>
-                      {ready ? 'PREFLIGHT READY' : 'PREFLIGHT FAILED'}
+                      {enRoute
+                        ? enRouteHeadline
+                        : ready
+                          ? 'PREFLIGHT READY'
+                          : 'PREFLIGHT FAILED'}
                     </strong>
                     <small>
-                      {ready
-                        ? 'Fuel and cargo match the confirmed OFP.'
-                        : 'Fix the mismatched aircraft load before departure.'}
+                      {enRoute
+                        ? enRouteSub
+                        : ready
+                          ? 'Fuel and cargo match the confirmed OFP.'
+                          : 'Fix the mismatched aircraft load before departure.'}
                     </small>
                   </div>
                   <div className="preflight-head-actions">
-                    {loadPath === 'inject' ? (
+                    {loadPath === 'inject' && !enRoute ? (
                       <div className="skyline-inject-row">
                         {(() => {
                           const injectStatus =
@@ -999,7 +1022,9 @@ export function DispatchActivePanel(props: {
                   <div className="preflight-load-grid">
                     <div
                       className={
-                        fuelOk ? 'preflight-load-ok' : 'preflight-load-fail'
+                        fuelOk || enRoute
+                          ? 'preflight-load-ok'
+                          : 'preflight-load-fail'
                       }
                     >
                       <span>Fuel</span>
@@ -1007,9 +1032,10 @@ export function DispatchActivePanel(props: {
                         Sim {massFromLb(view.fuel.liveLb)}
                       </strong>
                       <small>
-                        Due {massFromLb(view.fuel.plannedLb)}
+                        {enRoute ? 'OFP dep' : 'Due'}{' '}
+                        {massFromLb(view.fuel.plannedLb)}
                       </small>
-                      <b>{fuelOk ? '✓' : '✗'}</b>
+                      <b>{fuelOk || enRoute ? '✓' : '✗'}</b>
                       <FuelTankSchematic
                         tanks={view.fuel.tanks}
                         tankCapacity={view.fuel.tankCapacity}
@@ -1018,7 +1044,9 @@ export function DispatchActivePanel(props: {
                     </div>
                     <div
                       className={
-                        payloadOk ? 'preflight-load-ok' : 'preflight-load-fail'
+                        payloadOk || enRoute
+                          ? 'preflight-load-ok'
+                          : 'preflight-load-fail'
                       }
                     >
                       <span>Payload (stations)</span>
@@ -1031,7 +1059,7 @@ export function DispatchActivePanel(props: {
                           massFromLb,
                         )}
                       </small>
-                      <b>{payloadOk ? '✓' : '✗'}</b>
+                      <b>{payloadOk || enRoute ? '✓' : '✗'}</b>
                       <PayloadStationSchematic
                         stations={view.payload.stations}
                         stationMax={view.payload.stationMax}
@@ -1072,25 +1100,34 @@ export function DispatchActivePanel(props: {
                         ) : null}
                       </div>
                     ) : null}
-                    <div className="preflight-aircraft-state">
-                      <span>Aircraft</span>
-                      <strong>
-                        {view.aircraft.onGround
-                          ? 'On ground'
-                          : 'Airborne'}
-                      </strong>
-                      <small>
-                        {view.aircraft.enginesRunning
-                          ? 'Engines running'
-                          : 'Engines off'}
-                      </small>
-                      <b>
-                        {view.aircraft.onGround &&
-                        !view.aircraft.enginesRunning
-                          ? 'READY'
-                          : 'CHECK'}
-                      </b>
-                    </div>
+                    {(() => {
+                      const liveOnGround =
+                        props.watch?.running &&
+                        props.watch.missionId === mission.id &&
+                        props.watch.onGround != null
+                          ? props.watch.onGround
+                          : view.aircraft.onGround;
+                      const liveEngines =
+                        props.watch?.running &&
+                        props.watch.missionId === mission.id &&
+                        props.watch.enginesRunning != null
+                          ? props.watch.enginesRunning
+                          : view.aircraft.enginesRunning;
+                      return (
+                        <div className="preflight-aircraft-state">
+                          <span>Aircraft</span>
+                          <strong>
+                            {liveOnGround ? 'On ground' : 'Airborne'}
+                          </strong>
+                          <small>
+                            {liveEngines ? 'Engines running' : 'Engines off'}
+                          </small>
+                          <b>
+                            {liveOnGround && !liveEngines ? 'READY' : 'CHECK'}
+                          </b>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <p>Waiting for live Loaded vs Due data…</p>

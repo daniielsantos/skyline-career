@@ -4,6 +4,8 @@
   "profileKey": "leonardo/fly-the-maddog-x-md-83-20th",
   "semver": "1.0.0",
   "displayName": "Fly The Maddog X MD-83 20th (MSFS 2024)",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "match": {
     "fingerprint": "c4ed7303dfdda69718fd8d7180cd3a520702655404d4b37f95ed9fddfabea240",
     "title": "Fly The Maddog X MD-83 20th",

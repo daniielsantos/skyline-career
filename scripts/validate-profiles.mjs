@@ -26,6 +26,19 @@ function assert(condition, message) {
 function requiresInjectWritePlans(profile) {
   if (profile.injectCapable === false) return false;
   if (profile.loadMethod === 'native-simbrief') return false;
+  // Monitor-only homologation: tanks are read-only (no writeVar) and write plans stay empty.
+  const tanks = Array.isArray(profile.fuel?.tanks) ? profile.fuel.tanks : [];
+  const readOnlyFuel =
+    tanks.length > 0 && tanks.every((tank) => !tank?.writeVar);
+  if (
+    readOnlyFuel &&
+    Array.isArray(profile.fuel?.writePlan) &&
+    profile.fuel.writePlan.length === 0 &&
+    Array.isArray(profile.payload?.writePlan) &&
+    profile.payload.writePlan.length === 0
+  ) {
+    return false;
+  }
   return true;
 }
 

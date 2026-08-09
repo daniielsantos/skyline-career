@@ -1,0 +1,163 @@
+{
+  "source": "simbrief",
+  "icao": "MD11",
+  "ofpId": "tfdi-md11f",
+  "matchTitles": [
+    "TFDi Design MD-11F PW4462",
+    "TFDi Design MD-11F GE"
+  ],
+  "matchTitlePattern": "TFDi Design MD-11F (?:PW4462|GE)",
+  "notes": [
+    "TFDi Design MD-11F family (PW4462 + GE) — same 15-station layout; engine preset only",
+    "One Skyline Market SKU: tfdi-md11f-family (wide_freighter); publisher tfdi",
+    "liveSources: TFDi EFB LVars (kg→lb); fuel fallback mass-balance",
+    "SimBrief: MD1F freighter airframe matching engines (PW4462 / GE)",
+    "Homologated monitor: tfdi/tfdi-design@1.0.0 — TFDi Design MD-11F PW4462",
+    "Homologated monitor: tfdi/tfdi-design-md-11f-ge@1.0.0 — TFDi Design MD-11F GE"
+  ],
+  "fuel": {
+    "unit": "kg"
+  },
+  "loadSheet": {
+    "unit": "kg"
+  },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "crewStations": [
+        1,
+        2,
+        3
+      ]
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "tfdi-efb",
+      "mass-balance"
+    ],
+    "weights": [
+      "tfdi-efb-lvars"
+    ],
+    "payload": [
+      "tfdi-efb"
+    ]
+  },
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "simbriefIcao": "MD1F",
+  "simbriefAirframeMatch": "TFDi Design \\(MSFS\\) - MD-11F",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Pilot",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "First Officer",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Engineer",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Upper zone 1 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Upper zone 1 R",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "Upper zone 2 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "Upper zone 2 R",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "Upper zone 3 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "Upper zone 3 R",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "Upper zone 4 L",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 11,
+      "cfgIndex": 10,
+      "name": "Upper zone 4 R",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 12,
+      "cfgIndex": 11,
+      "name": "Lower forward cargo",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 13,
+      "cfgIndex": 12,
+      "name": "Lower rear cargo",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 14,
+      "cfgIndex": 13,
+      "name": "Left aux tank",
+      "role": "unused"
+    },
+    {
+      "simVarIndex": 15,
+      "cfgIndex": 14,
+      "name": "Right aux tank",
+      "role": "unused"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

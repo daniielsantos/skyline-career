@@ -29,7 +29,11 @@ describe('career player airframe registration', () => {
     assert.equal(inferCareerClassFromIcao('DC6'), 'medium_piston');
     assert.equal(inferCareerClassFromIcao('LJ35'), 'light_jet');
     assert.equal(inferCareerClassFromIcao('C25B'), 'light_jet');
+    assert.equal(inferCareerClassFromIcao('C680'), 'light_jet');
     assert.equal(inferCareerClassFromIcao('B738'), 'narrow_freighter');
+    assert.equal(inferCareerClassFromIcao('MD82'), 'narrow_freighter');
+    assert.equal(inferCareerClassFromIcao('MD83'), 'narrow_freighter');
+    assert.equal(inferCareerClassFromIcao('MD88'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD1F'), 'wide_freighter');
     assert.equal(inferCareerClassFromIcao('ZZZZ'), 'light_ga');
   });

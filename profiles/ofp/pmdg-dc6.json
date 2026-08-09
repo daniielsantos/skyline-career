@@ -1,0 +1,64 @@
+{
+  "source": "simbrief",
+  "icao": "DC6",
+  "ofpId": "pmdg-dc6",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "DC-6A",
+    "DC-6B",
+    "DC-6BP"
+  ],
+  "matchTitlePattern": "DC-6(?:BP|[AB])",
+  "notes": [
+    "PMDG DC-6 family (DC-6A / DC-6B / DC-6BP) — same 12-station layout",
+    "One Skyline Market SKU: pmdg-dc6 (medium_piston)",
+    "Homologated monitors: pmdg/dc-6a, pmdg/dc-6b, pmdg/dc-6bp @1.0.0",
+    "loadMethod: native-simbrief; injectCapable: false — load via PMDG Fuel/Load Manager",
+    "liveSources: classic tanks + mass-balance (classic stations can ghost on DC-6)",
+    "SimBrief: Default DC6"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      "crewStations": [1, 2]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["mass-balance", "classic-stations"]
+  },
+  "simbriefIcao": "DC6",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Cabin / cargo 1", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Cabin / cargo 2", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Cabin / cargo 3", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Cabin / cargo 4", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Cabin / cargo 5", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Cabin / cargo 6", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Cabin / cargo 7", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Cabin / cargo 8", "role": "baggage" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Cabin / cargo 9", "role": "baggage" },
+    { "simVarIndex": 12, "cfgIndex": 11, "name": "Cabin / cargo 10", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 150,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 200,
+    "weightAbsLb": 400,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

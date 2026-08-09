@@ -1,0 +1,99 @@
+{
+  "source": "simbrief",
+  "icao": "DA42",
+  "ofpId": "skyward-da50",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "DA50"
+  ],
+  "matchTitlePattern": "DA50",
+  "notes": [
+    "DA50 — auto roles pack from homologated profile",
+    "Profile: skyward/da50@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1
+      ],
+      "baggageStations": [
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "DA42",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "FRONT PAX",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "MIDDLE PAX LEFT",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "MIDDLE PAX RIGHT",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "MIDDLE PAX CENTER",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "Baggage Rear",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

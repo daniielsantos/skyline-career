@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "asobo-robin-dr400",
+  "profileKey": "asobo/robin-dr400",
+  "semver": "1.0.0",
+  "displayName": "Robin DR400 (MSFS 2024)",
+  "match": {
+    "fingerprint": "46472532d599b8c39a5bf83e77b4f602b87ade22783544c106b1fb277d3f936f",
+    "title": "Robin DR400",
+    "publisher": "asobo",
+    "icao": "DR40",
+    "liveTitles": [
+      "Robin DR400"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "CENTER",
+        "name": "Center",
+        "capacity": 29,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK CENTER QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK CENTER QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{CENTER} + 1.3"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK CENTER QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{CENTER}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 500,
+        "arm": -4
+      },
+      {
+        "index": 2,
+        "name": "FRONT PAX",
+        "maxLoad": 500,
+        "arm": -4
+      },
+      {
+        "index": 3,
+        "name": "BAGGAGE",
+        "maxLoad": 500,
+        "arm": -5
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 12,
+      "maxMac": 33
+    },
+    "calibration": {
+      "observedMac": 13.947536051273346,
+      "calibratedAtIso": "2026-08-09T16:49:48.207Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\asobo_dr400\\common\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -2.25,
+        0,
+        0
+      ],
+      "sweep": {
+        "minObservedMac": 17.2122985124588,
+        "maxObservedMac": 19.448505342006683,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 3,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-09T16:49:55.056Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Robin DR400.",
+    "ICAO Doc 8643: DR40; SimBrief OFP proxy: C172 (no DR40 airframe).",
+    "Fuel via classic FUEL TANK * from writetest (CENTER).",
+    "Payload stations from writetest: 1, 2, 3.",
+    "See profiles/notes/asobo-robin-dr400.md"
+  ]
+}

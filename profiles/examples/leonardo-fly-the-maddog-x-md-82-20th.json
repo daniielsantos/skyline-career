@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "leonardo-fly-the-maddog-x-md-82-20th",
+  "profileKey": "leonardo/fly-the-maddog-x-md-82-20th",
+  "semver": "1.0.0",
+  "displayName": "Fly The Maddog X MD-82 20th (MSFS 2024)",
+  "match": {
+    "fingerprint": "c8ec5799d0a5c0210d16a76803027aacf7773692d5e0306c9ebd38cfce2b94ec",
+    "title": "Fly The Maddog X MD-82 20th",
+    "publisher": "leonardo",
+    "icao": "MD82",
+    "liveTitles": [
+      "Fly The Maddog X MD-82 20th"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 1384,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 1384,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "CENTER",
+        "name": "Center",
+        "capacity": 3074,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons"
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PAX Area A",
+        "maxLoad": 500,
+        "arm": 30
+      },
+      {
+        "index": 2,
+        "name": "PAX Area B",
+        "maxLoad": 500,
+        "arm": -15
+      },
+      {
+        "index": 3,
+        "name": "FWD Cargo",
+        "maxLoad": 500,
+        "arm": 30
+      },
+      {
+        "index": 4,
+        "name": "AFT Cargo",
+        "maxLoad": 500,
+        "arm": -15
+      },
+      {
+        "index": 5,
+        "name": "Cabin cfg",
+        "maxLoad": 2543,
+        "arm": 0
+      },
+      {
+        "index": 6,
+        "name": "CM1",
+        "maxLoad": 500,
+        "arm": 61
+      },
+      {
+        "index": 7,
+        "name": "CM2",
+        "maxLoad": 500,
+        "arm": 61
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 32
+    },
+    "calibration": {
+      "observedMac": 30.082890391349792,
+      "calibratedAtIso": "2026-08-09T16:28:13.074Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\lsh-maddogx-aircraft\\SimObjects\\Airplanes\\MaddogX20th\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -7.37,
+        0,
+        0
+      ],
+      "sweep": {
+        "minObservedMac": 29.171517491340637,
+        "maxObservedMac": 30.082890391349792,
+        "payloadLb": 200,
+        "forwardStation": 7,
+        "aftStation": 2,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-09T16:28:20.757Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Fly The Maddog X MD-82 20th.",
+    "ICAO type designator (catalog/SimBrief): MD82.",
+    "Publisher: leonardo.",
+    "Load method: native-simbrief (no Skyline inject) — Maddog EFB / SimBrief import.",
+    "Fuel/payload write plans intentionally empty — Classic SimVars sticky in probe but Career uses EFB path.",
+    "Market: leonardo-fly-the-maddog-x-md-82-20th (narrow_freighter).",
+    "Roles pack: profiles/ofp/leonardo-fly-the-maddog-x-md-82-20th.json",
+    "Use compare-ofp + Career Loaded vs Due for validation.",
+    "See profiles/notes/leonardo-fly-the-maddog-x-md-82-20th.md"
+  ]
+}

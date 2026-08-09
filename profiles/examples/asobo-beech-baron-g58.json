@@ -1,0 +1,268 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "asobo-beech-baron-g58",
+  "profileKey": "asobo/beech-baron-g58",
+  "semver": "1.0.0",
+  "displayName": "Beech Baron G58 (MSFS 2024)",
+  "match": {
+    "fingerprint": "5ee3ca0eef12d57f07921e3ffd6bbc159af95a53101fa8e23cc63da6b12eff50",
+    "title": "Beech Baron G58",
+    "publisher": "asobo",
+    "icao": "BE58",
+    "liveTitles": [
+      "Beech Baron G58"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 86,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 86,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 14,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT AUX QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 14,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 3"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 3"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX}"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK LEFT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_AUX}"
+        },
+        {
+          "var": "FUEL TANK RIGHT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_AUX}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 10,
+      "maxMac": 30
+    },
+    "calibration": {
+      "observedMac": 15.01293033361435,
+      "calibratedAtIso": "2026-08-09T14:28:17.618Z",
+      "sweep": {
+        "minObservedMac": 14.995066821575165,
+        "maxObservedMac": 17.142120003700256,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 7,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-08-09T14:28:25.368Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Beech Baron G58.",
+    "ICAO type designator (catalog/SimBrief): BE58.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX).",
+    "AUX/Aft tanks included.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.",
+    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/asobo-beech-baron-g58.md"
+  ]
+}

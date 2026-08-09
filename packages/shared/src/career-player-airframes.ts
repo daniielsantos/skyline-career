@@ -241,6 +241,7 @@ const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
   'asobo-c172sp-g1000-passengers': 'asobo-c172sp-cargo',
   'asobo-c172sp-ifd-cargo': 'asobo-c172sp-cargo',
   'asobo-c172sp-ifd-passengers': 'asobo-c172sp-cargo',
+  'asobo-beechcraft-bonanza-private-charter': 'asobo-beechcraft-bonanza',
   'blacksquare-commander-114tc': 'blacksquare-commander-114',
   'blacksquare-a36-bonanza-professional': 'blacksquare-bonanza-professional',
   'blacksquare-a36tc-bonanza-professional': 'blacksquare-bonanza-professional',

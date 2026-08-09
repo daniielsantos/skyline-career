@@ -102,6 +102,7 @@ export function inferCareerClassFromIcao(icao: string): FreighterClassId {
       'C510',
       'C525',
       'C56X',
+      'C680',
       'E50P',
       'E55P',
       'EA50',
@@ -110,7 +111,11 @@ export function inferCareerClassFromIcao(icao: string): FreighterClassId {
   ) {
     return 'light_jet';
   }
-  if (['B738', 'B737', 'A320', 'A321'].includes(normalized)) {
+  if (
+    ['B738', 'B737', 'A320', 'A321', 'MD82', 'MD83', 'MD88', 'MD80', 'MD81', 'MD87'].includes(
+      normalized,
+    )
+  ) {
     return 'narrow_freighter';
   }
   if (['MD11', 'MD1F', 'B744', 'B748', 'A332', 'A333', 'A339', 'A388'].includes(normalized)) {

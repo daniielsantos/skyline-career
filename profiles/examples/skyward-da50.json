@@ -1,0 +1,227 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "skyward-da50",
+  "profileKey": "skyward/da50",
+  "semver": "1.0.0",
+  "displayName": "DA50 (MSFS 2024)",
+  "match": {
+    "fingerprint": "f9dcdc35afc3ad4cb246160a649cc5a829d3d6a3ac0c179f781cd9e91a917846",
+    "title": "DA50",
+    "publisher": "skyward",
+    "icao": "DA42",
+    "liveTitles": [
+      "DA50 White"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 26,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 25.5,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 500,
+        "arm": -3.34
+      },
+      {
+        "index": 2,
+        "name": "FRONT PAX",
+        "maxLoad": 500,
+        "arm": -3.34
+      },
+      {
+        "index": 3,
+        "name": "MIDDLE PAX LEFT",
+        "maxLoad": 500,
+        "arm": -6.46
+      },
+      {
+        "index": 4,
+        "name": "MIDDLE PAX RIGHT",
+        "maxLoad": 500,
+        "arm": -6.46
+      },
+      {
+        "index": 5,
+        "name": "MIDDLE PAX CENTER",
+        "maxLoad": 500,
+        "arm": -6.46
+      },
+      {
+        "index": 6,
+        "name": "Baggage Rear",
+        "maxLoad": 500,
+        "arm": -8.5
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 10,
+      "maxMac": 27
+    },
+    "calibration": {
+      "observedMac": 12.222391366958618,
+      "calibratedAtIso": "2026-08-09T14:39:51.128Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community\\skyward-aircraft-da50\\SimObjects\\Airplanes\\ST50\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -3.6,
+        0,
+        0.5
+      ],
+      "sweep": {
+        "minObservedMac": 12.522456049919128,
+        "maxObservedMac": 19.372031092643738,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 6,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-09T14:39:58.643Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: DA50.",
+    "ICAO type designator (catalog/SimBrief): DA42.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6.",
+    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/skyward-da50.md"
+  ]
+}

@@ -103,27 +103,34 @@ export class DefaultProfileEngine implements ProfileEngine {
       });
       cg = normalizeMacPercent(cg);
 
-      // Prefer live envelope from CG FWD/AFT LIMIT (Mass & Balance tablet) when readable.
+      // Prefer live envelope from CG FWD/AFT LIMIT (Mass & Balance tablet) when
+      // readable — unless the profile deliberately pinned a manual/cfg envelope
+      // (e.g. addon SimVars report a too-tight aft limit).
       let minMac = this.profile.cg.constraints.minMac;
       let maxMac = this.profile.cg.constraints.maxMac;
-      try {
-        const fwdRaw = await this.bridge.readSimVar({
-          name: 'CG FWD LIMIT',
-          unit: 'Percent over 100',
-        });
-        const aftRaw = await this.bridge.readSimVar({
-          name: 'CG AFT LIMIT',
-          unit: 'Percent over 100',
-        });
-        if (Number.isFinite(fwdRaw) && Number.isFinite(aftRaw)) {
-          let fwd = normalizeMacPercent(fwdRaw);
-          let aft = normalizeMacPercent(aftRaw);
-          if (fwd > aft) [fwd, aft] = [aft, fwd];
-          minMac = fwd;
-          maxMac = aft;
+      const pinnedEnvelope =
+        this.profile.cg.envelopeSource === 'manual' ||
+        this.profile.cg.envelopeSource === 'cfg';
+      if (!pinnedEnvelope) {
+        try {
+          const fwdRaw = await this.bridge.readSimVar({
+            name: 'CG FWD LIMIT',
+            unit: 'Percent over 100',
+          });
+          const aftRaw = await this.bridge.readSimVar({
+            name: 'CG AFT LIMIT',
+            unit: 'Percent over 100',
+          });
+          if (Number.isFinite(fwdRaw) && Number.isFinite(aftRaw)) {
+            let fwd = normalizeMacPercent(fwdRaw);
+            let aft = normalizeMacPercent(aftRaw);
+            if (fwd > aft) [fwd, aft] = [aft, fwd];
+            minMac = fwd;
+            maxMac = aft;
+          }
+        } catch {
+          // Keep profile constraints when live limits are unavailable.
         }
-      } catch {
-        // Keep profile constraints when live limits are unavailable.
       }
 
       const toleranceMac = Math.min(

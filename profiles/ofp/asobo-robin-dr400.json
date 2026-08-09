@@ -1,0 +1,78 @@
+{
+  "source": "simbrief",
+  "icao": "C172",
+  "ofpId": "asobo-robin-dr400",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "Robin DR400"
+  ],
+  "matchTitlePattern": "Robin DR400",
+  "notes": [
+    "Robin DR400 — Asobo default (Doc 8643 DR40; SimBrief proxy C172)",
+    "Profile: asobo/robin-dr400@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1
+      ],
+      "baggageStations": [
+        2,
+        3
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "C172",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "FRONT PAX",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "BAGGAGE",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

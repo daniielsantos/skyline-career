@@ -62,6 +62,8 @@ const TITLE_PUBLISHER_HINTS: Array<{ re: RegExp; publisher: string }> = [
   { re: /\binibuilds\b/i, publisher: 'inibuilds' },
   { re: /\bworking\s*title\b/i, publisher: 'workingtitle' },
   { re: /\bjust\s*flight\b/i, publisher: 'justflight' },
+  { re: /\btfdi\b/i, publisher: 'tfdi' },
+  { re: /\bmaddog\b|\bleonardo\b|\blsh-?maddog/i, publisher: 'leonardo' },
   { re: /\basobo\b/i, publisher: 'asobo' },
 ];
 
@@ -74,8 +76,10 @@ export const KNOWN_PUBLISHERS: readonly string[] = [
     'flightfx',
     'hype',
     'justflight',
+    'leonardo',
     'miltech',
     'orbx',
+    'tfdi',
   ]),
 ].sort((a, b) => a.localeCompare(b));
 

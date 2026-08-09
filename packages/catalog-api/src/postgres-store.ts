@@ -270,7 +270,8 @@ export class PostgresCatalogStore implements CatalogBackend {
       (titleOk ? byFp : null) ??
       (await this.findBestProfileByTitle(request.identity.title, {
         structuralHash,
-      }));
+      })) ??
+      (await this.findBestProfileByTitle(request.identity.title));
     return this.toFingerprintResponse(fingerprint, best, {
       structurallyKnown: Boolean(byFp),
     });
@@ -311,9 +312,11 @@ export class PostgresCatalogStore implements CatalogBackend {
           `SELECT structural_hash FROM aircraft_fingerprints WHERE fingerprint_v2 = $1`,
           [fingerprint],
         )).rows[0]?.structural_hash;
-      best = await this.findBestProfileByTitle(title, {
-        structuralHash: struct,
-      });
+      // Prefer same structural hash, then title-only (matches registerFingerprint).
+      best =
+        (await this.findBestProfileByTitle(title, {
+          structuralHash: struct,
+        })) ?? (await this.findBestProfileByTitle(title));
     }
     if (!best) return null;
     return this.toResolveResponse(best);

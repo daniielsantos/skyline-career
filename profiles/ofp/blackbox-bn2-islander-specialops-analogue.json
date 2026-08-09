@@ -1,0 +1,84 @@
+{
+  "source": "simbrief",
+  "icao": "BN2P",
+  "ofpId": "blackbox-bn2-islander-specialops-analogue",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "BN2 Islander - SpecialOps / Analogue"
+  ],
+  "matchTitlePattern": "BN2 Islander - SpecialOps / Analogue",
+  "notes": [
+    "BN2 Islander - SpecialOps / Analogue — auto roles pack from homologated profile",
+    "Profile: blackbox/bn2-islander-specialops-analogue@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "baggageStations": [],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "BN2P",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "COPILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Crew 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Crew 2",
+      "role": "crew"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

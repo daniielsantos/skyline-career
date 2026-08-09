@@ -32,7 +32,6 @@ import {
 import {
   discoverWritablePayloadStations,
   liveStationIndexes as stickyStationIndexes,
-  probeStationMaxLoads,
 } from './discover-payload-stations.js';
 import {
   ensureAuxTanks,
@@ -1146,30 +1145,6 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         : '  → No payload stations retained weight after writetest.',
     );
 
-    let liveStationMaxLoads: Record<number, number> = {};
-    if (liveStationIndexes.length > 0) {
-      console.log(
-        '  Station maxLoad clamp probe (write high → read ceiling → restore)...',
-      );
-      liveStationMaxLoads = await probeStationMaxLoads(
-        bridge,
-        liveStationIndexes,
-        { writeGapMs: 50, settleMs: 400 },
-      );
-      for (const idx of liveStationIndexes) {
-        const maxLb = liveStationMaxLoads[idx];
-        if (maxLb != null) {
-          console.log(
-            `  ✓ Station ${String(idx).padStart(2)}  maxLoad ${maxLb} lb (clamp)`,
-          );
-        } else {
-          console.log(
-            `  · Station ${String(idx).padStart(2)}  no clamp (placeholder 500 until cfg)`,
-          );
-        }
-      }
-    }
-
     let fsWriteOk = false;
     try {
       const beforeFs = await bridge.readSimVar({ name: 'FUELSYSTEM TANK QUANTITY:1', unit: 'gallons' });
@@ -1478,7 +1453,6 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       publisher: matchPublisher,
       liveTankIds: liveTanks.map((t) => t.id),
       liveStationIndexes,
-      liveStationMaxLoads,
     });
     let profile = drafted.profile;
     // Safety net: if discovery missed AUX but probe capacities said real, still allow ensureAux.
@@ -1601,11 +1575,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
           : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).',
       includeAux ? 'AUX/Aft tanks included.' : 'AUX deferred for v1.',
       `Payload stations from writetest: ${liveStationIndexes.join(', ')}.`,
-      Object.keys(liveStationMaxLoads).length > 0
-        ? `Station maxLoad from live clamp: ${Object.entries(liveStationMaxLoads)
-            .map(([i, lb]) => `S${i}=${lb}`)
-            .join(', ')}.`
-        : 'Station maxLoad: placeholder until cfg or clamp.',
+      'Station maxLoad: placeholder until flight_model.cfg calibrate.',
       'Homologated with interactive wizard.',
     ];
 

@@ -44,6 +44,7 @@
     "test:agent": "npm run test -w @msfs-compat/agent",
     "pack:portable": "node scripts/pack-portable.mjs",
     "pack:desktop": "node scripts/pack-desktop.mjs",
+    "release:desktop": "node scripts/release-desktop.mjs",
     "smoke": "node scripts/smoke.mjs",
     "ci:catalog": "node scripts/ci-catalog.mjs",
     "ci": "npm run build && npm run typecheck && npm run validate:profiles && npm run ci:catalog",

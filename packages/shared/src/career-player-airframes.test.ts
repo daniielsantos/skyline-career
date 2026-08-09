@@ -26,6 +26,8 @@ describe('career player airframes', () => {
       'blacksquare-turbine-duke',
       'pmdg-738-bcf-family',
       'pmdg-738-pax-family',
+      'pmdg-738-bbj2-family',
+      'pmdg-dc6',
       'tfdi-md11f-family',
       'toliss-a346-family',
     ]) {
@@ -63,6 +65,10 @@ describe('career player airframes', () => {
     assert.equal(
       findCareerPlayerAirframe('asobo-c172sp-classic-cargo')?.typeId,
       'asobo-c172sp-cargo',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('asobo-beechcraft-bonanza-private-charter')?.typeId,
+      'asobo-beechcraft-bonanza',
     );
     assert.equal(
       findCareerPlayerAirframe('blacksquare-commander-114tc')?.typeId,

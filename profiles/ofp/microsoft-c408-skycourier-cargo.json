@@ -1,0 +1,70 @@
+{
+  "source": "simbrief",
+  "icao": "C408",
+  "ofpId": "microsoft-c408-skycourier-cargo",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "C408 SkyCourier Cargo"
+  ],
+  "matchTitlePattern": "C408 SkyCourier Cargo",
+  "notes": [
+    "C408 SkyCourier Cargo — auto roles pack from homologated profile",
+    "Profile: microsoft/c408-skycourier-cargo@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "C408",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Station 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Station 2",
+      "role": "crew"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

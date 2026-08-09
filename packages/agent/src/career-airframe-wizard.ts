@@ -26,20 +26,29 @@ function isEnabled(row: CatalogRow): boolean {
   return row.enabled !== false;
 }
 
+function haystackIncludes(haystack: string, needle: string): boolean {
+  return haystack.toLowerCase().includes(needle.toLowerCase());
+}
+
 async function printCatalog(
   repoRoot: string,
   rows: CatalogRow[],
+  opts?: { startIndex?: number },
 ): Promise<void> {
   if (rows.length === 0) {
     console.log('  (no player airframes registered)');
     return;
   }
+  const start = opts?.startIndex ?? 1;
   for (const [i, row] of rows.entries()) {
     const flag = isEnabled(row) ? 'enabled ' : 'disabled';
     const packCount = familyPackRelPaths(row).length;
     const family = packCount > 1 ? ` · family×${packCount}` : '';
     console.log(
-      `  ${String(i + 1).padStart(2)}. [${flag}]  ${row.label}  (${row.typeId} · ${row.aircraftClassId}${family})`,
+      `  ${String(start + i).padStart(2)}. [${flag}]  ${row.label}  (${row.typeId} · ${row.aircraftClassId}${family})`,
+    );
+    console.log(
+      `       simbrief ${row.simbriefIcao}/${row.simbriefAirframeMatch} · ${row.rolesPackRelPath}`,
     );
     const titles = await listFamilyMatchTitles({ repoRoot, row });
     if (titles.length === 0) {
@@ -50,6 +59,37 @@ async function printCatalog(
       console.log(`       · ${title}`);
     }
   }
+}
+
+/** Filter Market families by label, typeId, class, SimBrief ICAO, or sim titles. */
+async function searchCatalog(
+  repoRoot: string,
+  rows: CatalogRow[],
+  query: string,
+): Promise<CatalogRow[]> {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const hits: CatalogRow[] = [];
+  for (const row of rows) {
+    const fields = [
+      row.label,
+      row.typeId,
+      row.aircraftClassId,
+      row.simbriefIcao,
+      row.simbriefAirframeMatch,
+      row.rolesPackRelPath,
+      ...(row.familyRolesPackRelPaths ?? []),
+    ];
+    if (fields.some((f) => haystackIncludes(String(f), q))) {
+      hits.push(row);
+      continue;
+    }
+    const titles = await listFamilyMatchTitles({ repoRoot, row });
+    if (titles.some((t) => haystackIncludes(t, q))) {
+      hits.push(row);
+    }
+  }
+  return hits;
 }
 
 async function pickRow(
@@ -86,6 +126,7 @@ export async function runCareerAirframeWizard(opts: {
     console.log('  Toggle homologated models on/off the buy/lease board.');
     console.log('  Rename the board title, or remove a family to re-homologate.');
     console.log('  Nested lines are sim titles covered by each Market family.');
+    console.log('  Use Search to check whether a title / ICAO is already registered.');
 
     for (;;) {
       const rows = await listCareerPlayerAirframeCatalog(opts.repoRoot);
@@ -98,13 +139,48 @@ export async function runCareerAirframeWizard(opts: {
       console.log('    3. Enable a model (show on Market)');
       console.log('    4. Rename Market label (board title only)');
       console.log('    5. Remove family (catalog + packs + profiles)');
-      console.log('    6. Quit');
+      console.log('    6. Search catalog (label / typeId / ICAO / sim title)');
+      console.log('    7. Quit');
 
-      const action = (await ask('Choice', '6')).trim().toLowerCase();
-      if (!action || action === '6' || action === 'q' || action === 'quit') {
+      const action = (await ask('Choice', '7')).trim().toLowerCase();
+      if (!action || action === '7' || action === 'q' || action === 'quit') {
         break;
       }
       if (action === '1' || action === 'list' || action === 'refresh') {
+        continue;
+      }
+
+      if (
+        action === '6' ||
+        action === 'search' ||
+        action === 'find' ||
+        action === 's' ||
+        action === '/'
+      ) {
+        if (rows.length === 0) {
+          console.log('  Catalog is empty.');
+          continue;
+        }
+        const query = (
+          await ask('Search (label, typeId, ICAO, or sim title)', '')
+        ).trim();
+        if (!query) {
+          console.log('  Empty query — cancelled.');
+          continue;
+        }
+        const hits = await searchCatalog(opts.repoRoot, rows, query);
+        console.log('');
+        if (hits.length === 0) {
+          console.log(`  No Market family matches "${query}".`);
+          console.log(
+            '  Tip: homologate first if this is a new aircraft, or try a shorter token (e.g. DA50, baron).',
+          );
+          continue;
+        }
+        console.log(
+          `  ${hits.length} match${hits.length === 1 ? '' : 'es'} for "${query}":`,
+        );
+        await printCatalog(opts.repoRoot, hits);
         continue;
       }
 

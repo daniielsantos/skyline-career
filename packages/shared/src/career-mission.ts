@@ -180,7 +180,7 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
      */
     maxCargoKg: 10_000,
     maxRangeNm: 2_200,
-    rolesPackRelPath: 'profiles/ofp/medium-piston-class.json',
+    rolesPackRelPath: 'profiles/ofp/pmdg-dc6.json',
     loadMethod: 'native-simbrief',
     injectCapable: false,
     simbriefIcao: 'DC6',
@@ -189,8 +189,8 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
     fuelTaxiKg: 180,
     /** ~19,400 lb avgas usable planning capacity. */
     fuelCapacityKg: 8_800,
-    oewKg: 25_000,
-    mtowKg: 48_500,
+    oewKg: 27_786,
+    mtowKg: 46_628,
     fuelRouteFactor: 1.2,
     fuelReserveKg: 900,
   },

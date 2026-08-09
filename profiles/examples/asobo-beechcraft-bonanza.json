@@ -1,0 +1,239 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "asobo-beechcraft-bonanza",
+  "profileKey": "asobo/beechcraft-bonanza",
+  "semver": "1.0.0",
+  "displayName": "Beechcraft Bonanza (MSFS 2024)",
+  "match": {
+    "fingerprint": "2cc817c9aff9baf4355d212a11b5ec356c2a3a6587811347c5c609444abfd399",
+    "title": "Beechcraft Bonanza",
+    "publisher": "asobo",
+    "icao": "BE36",
+    "liveTitles": [
+      "Beechcraft Bonanza"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 40,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 40,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 3,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 3,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 500,
+        "arm": -3
+      },
+      {
+        "index": 2,
+        "name": "COPILOT",
+        "maxLoad": 500,
+        "arm": -3
+      },
+      {
+        "index": 3,
+        "name": "FRONT PAX LEFT",
+        "maxLoad": 500,
+        "arm": -6.2
+      },
+      {
+        "index": 4,
+        "name": "FRONT PAX RIGHT",
+        "maxLoad": 500,
+        "arm": -6.2
+      },
+      {
+        "index": 5,
+        "name": "BAGGAGE",
+        "maxLoad": 500,
+        "arm": -12
+      },
+      {
+        "index": 6,
+        "name": "REAR PAX LEFT",
+        "maxLoad": 500,
+        "arm": -9.6
+      },
+      {
+        "index": 7,
+        "name": "REAR PAX RIGHT",
+        "maxLoad": 500,
+        "arm": -9.6
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 11,
+      "maxMac": 32
+    },
+    "calibration": {
+      "observedMac": 17.94039011001587,
+      "calibratedAtIso": "2026-08-09T14:04:46.656Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\asobo_bonanza_g36\\common\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -3.5,
+        0,
+        0.2
+      ],
+      "sweep": {
+        "minObservedMac": 17.35982894897461,
+        "maxObservedMac": 27.809911966323853,
+        "payloadLb": 200,
+        "forwardStation": 2,
+        "aftStation": 5,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-08-09T14:04:56.754Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Beechcraft Bonanza.",
+    "ICAO type designator (catalog/SimBrief): BE36.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.",
+    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/asobo-beechcraft-bonanza.md"
+  ]
+}

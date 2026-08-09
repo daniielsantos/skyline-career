@@ -32,6 +32,18 @@ describe('inferPublisher', () => {
     assert.equal(inferPublisher('DC-6A'), 'pmdg');
     assert.equal(inferPublisher('DC-6A', 'asobo'), 'pmdg');
   });
+
+  it('maps TFDi titles to tfdi even when MSFS reports asobo', async () => {
+    const { inferPublisher } = await import('./index.js');
+    assert.equal(inferPublisher('TFDi Design MD-11F GE'), 'tfdi');
+    assert.equal(inferPublisher('TFDi Design MD-11F GE', 'asobo'), 'tfdi');
+  });
+
+  it('maps Maddog / Leonardo titles to leonardo', async () => {
+    const { inferPublisher } = await import('./index.js');
+    assert.equal(inferPublisher('Fly The Maddog X MD-88 20th'), 'leonardo');
+    assert.equal(inferPublisher('Fly The Maddog X MD-82 20th', 'asobo'), 'leonardo');
+  });
 });
 
 describe('titlesMatchForCatalog', () => {

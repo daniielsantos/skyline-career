@@ -6,10 +6,10 @@
   "injectCapable": false,
   "matchTitles": [],
   "notes": [
-    "Class-level fallback for medium_piston (Douglas DC-6 economics).",
-    "Replaced per airframe when a concrete type is homologated (e.g. PMDG DC-6).",
+    "Class-level fallback for medium_piston when no concrete pack matches.",
+    "Preferred PMDG family pack: profiles/ofp/pmdg-dc6.json (DC-6A / B / BP).",
     "SimBrief: Default DC6",
-    "PMDG typically loads via native SimBrief / EFB — injectCapable stays false until a writable profile exists."
+    "PMDG loads via native SimBrief / Fuel-Load Manager — injectCapable false."
   ],
   "fuel": {
     "unit": "lb"

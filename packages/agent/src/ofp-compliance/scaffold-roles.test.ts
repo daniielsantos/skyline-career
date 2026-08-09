@@ -25,7 +25,18 @@ describe('scaffold-roles PMDG 738 PAX', () => {
     assert.match(pack.simbriefAirframeMatch ?? '', /Dual Class/);
     assert.equal(pack.loadMethod, 'native-simbrief');
     assert.equal(pack.injectCapable, false);
+    assert.equal(h.marketTypeId, 'pmdg-738-pax-family');
     assert.equal(slugFromAircraftTitle('737-800 PAX BW TC'), '737-800-pax-bw-tc');
+  });
+});
+
+describe('scaffold-roles PMDG 738 BBJ2', () => {
+  it('matches BBJ2 glass variants to their own family', () => {
+    const h = matchHeuristic('737-800 BBJ2 SSW');
+    assert.equal(h?.id, 'pmdg-738-bbj2');
+    assert.equal(h?.marketTypeId, 'pmdg-738-bbj2-family');
+    assert.equal(h?.familyPackRel, 'pmdg-738-bbj2.json');
+    assert.equal(matchHeuristic('737-800 BBJ2 BW')?.id, 'pmdg-738-bbj2');
   });
 });
 
@@ -33,10 +44,41 @@ describe('scaffold-roles PMDG 738 BCF', () => {
   it('matches freighter titles and maps deck as cargo', () => {
     const h = matchHeuristic('737-800BCF SSW');
     assert.equal(h?.id, 'pmdg-738-bcf');
+    assert.equal(h?.marketTypeId, 'pmdg-738-bcf-family');
     assert.deepEqual(h?.stationRoles.passengerStations, []);
     assert.deepEqual(h?.stationRoles.baggageStations, [1, 2, 3, 4, 5, 6]);
     assert.deepEqual(h?.liveSources.payload, ['pmdg-efb', 'classic-stations']);
     assert.equal(matchHeuristic('737-800BCF BW')?.id, 'pmdg-738-bcf');
+  });
+});
+
+describe('scaffold-roles PMDG 738 BDSF', () => {
+  it('shares Market SKU with BCF but uses BDSF pack', () => {
+    const h = matchHeuristic('737-800BDSF SSW');
+    assert.equal(h?.id, 'pmdg-738-bdsf');
+    assert.equal(h?.marketTypeId, 'pmdg-738-bcf-family');
+    assert.equal(h?.familyPackRel, 'pmdg-738-bdsf.json');
+    assert.deepEqual(h?.stationRoles.baggageStations, [1, 2, 3, 4, 5, 6]);
+    assert.equal(matchHeuristic('737-800BDSF BW')?.id, 'pmdg-738-bdsf');
+  });
+});
+
+describe('scaffold-roles PMDG DC-6', () => {
+  it('matches A / B / BP into one Market family', () => {
+    for (const title of ['DC-6A', 'DC-6B', 'DC-6BP'] as const) {
+      const h = matchHeuristic(title);
+      assert.equal(h?.id, 'pmdg-dc6', title);
+      assert.equal(h?.marketTypeId, 'pmdg-dc6', title);
+      assert.equal(h?.familyPackRel, 'pmdg-dc6.json', title);
+      assert.equal(h?.loadMethod, 'native-simbrief', title);
+    }
+    const h = matchHeuristic('DC-6A')!;
+    assert.deepEqual(h.stationRoles.crewStations, [1, 2]);
+    assert.deepEqual(
+      h.stationRoles.baggageStations,
+      [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    );
+    assert.deepEqual(h.liveSources.fuel, ['classic', 'mass-balance']);
   });
 });
 

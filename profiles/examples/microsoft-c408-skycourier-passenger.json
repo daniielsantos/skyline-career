@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "microsoft-c408-skycourier-passenger",
+  "profileKey": "microsoft/c408-skycourier-passenger",
+  "semver": "1.0.0",
+  "displayName": "C408 SkyCourier Passenger (MSFS 2024)",
+  "match": {
+    "fingerprint": "e5170862e65de65d95253cd1e2fd7969b911fb2cb476dd6ca21f42d698001801",
+    "title": "C408 SkyCourier Passenger",
+    "publisher": "microsoft",
+    "icao": "C408",
+    "liveTitles": [
+      "C408 SkyCourier Passenger"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 360,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 360,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 6.2"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 6.2"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 7.5,
+      "maxMac": 31
+    },
+    "calibration": {
+      "observedMac": 15.792369842529297,
+      "calibratedAtIso": "2026-08-09T17:14:27.007Z",
+      "sweep": {
+        "minObservedMac": 14.243689179420471,
+        "maxObservedMac": 15.450835227966309,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 7,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-08-09T17:14:34.723Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: C408 SkyCourier Passenger.",
+    "ICAO type designator (catalog/SimBrief): C408.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.",
+    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/microsoft-c408-skycourier-passenger.md"
+  ]
+}

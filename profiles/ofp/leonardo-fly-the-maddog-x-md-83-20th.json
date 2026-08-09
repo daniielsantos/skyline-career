@@ -1,0 +1,106 @@
+{
+  "source": "simbrief",
+  "icao": "MD83",
+  "ofpId": "leonardo-fly-the-maddog-x-md-83-20th",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "Fly The Maddog X MD-83 20th"
+  ],
+  "matchTitlePattern": "Fly The Maddog X MD-83 20th",
+  "notes": [
+    "Fly The Maddog X MD-83 20th — Leonardo Maddog X (native SimBrief / EFB)",
+    "Profile: leonardo/fly-the-maddog-x-md-83-20th@1.0.0",
+    "loadMethod: native-simbrief; injectCapable: false",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "One Skyline Market SKU: leonardo-fly-the-maddog-x-md-83-20th (narrow_freighter)"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        6,
+        7
+      ],
+      "baggageStations": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "MD83",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PAX Area A",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "PAX Area B",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "FWD Cargo",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "AFT Cargo",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Cabin cfg",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "CM1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "CM2",
+      "role": "crew"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

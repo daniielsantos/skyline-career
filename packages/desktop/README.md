@@ -72,20 +72,39 @@ If it still fails, temporarily allow/exclude `artifacts\skyline-desktop` and the
 
 ## Publish a release (maintainers)
 
-1. Bump `"version"` in [`package.json`](./package.json) (this is the app version electron-updater compares).
-2. `npm run pack:desktop`
-3. Create the GitHub release and upload artifacts:
+One command (pack + validate + GitHub release):
 
 ```powershell
+# Use the version already in packages/desktop/package.json:
+npm run release:desktop -- --yes
+
+# Or bump first (patch/minor/major), pack, publish, commit+push the bump:
+npm run release:desktop -- --bump patch --yes
+
+# Pack + validate only (no GitHub upload):
+npm run release:desktop -- --dry-run
+```
+
+Guardrails:
+
+- Clean git worktree (or `--allow-dirty`)
+- `gh` installed and authenticated
+- Setup exe present and sized; `latest.yml` version must match `package.json`
+- Refuses if tag/release `vX.Y.Z` already exists
+
+Assets uploaded: `SkylineCareer-Setup-<ver>.exe`, `latest.yml`, and `.blockmap` when present. Release notes are generated from commits since the previous `v*` tag and include a smoke checklist.
+
+### Manual fallback
+
+```powershell
+npm run pack:desktop
 $ver = (Get-Content packages/desktop/package.json | ConvertFrom-Json).version
 gh release create "v$ver" `
   --title "Skyline Career $ver" `
-  --notes "Desktop install + auto-update." `
+  --notes-file "artifacts/skyline-desktop/RELEASE_NOTES_$ver.md" `
   "artifacts/skyline-desktop/SkylineCareer-Setup-$ver.exe" `
   "artifacts/skyline-desktop/latest.yml"
 ```
-
-Also upload `*.exe.blockmap` if present (speeds differential downloads when enabled later).
 
 ### Smoke auto-update
 

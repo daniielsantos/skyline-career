@@ -200,13 +200,15 @@ export class FileCatalogStore implements CatalogBackend {
 
     const byFp = this.findByFingerprint(fingerprint);
     // Same tank/station hash can serve cargo + passenger; only accept when the
-    // live title matches this profile (or its liveTitles aliases). Never alias
-    // across different structural hashes (e.g. Kodiak with/without cargo pod).
+    // live title matches this profile (or its liveTitles aliases). Prefer the
+    // same structural hash, but fall back to title-only when live sampling
+    // drifts (common on multi-tank freighters / EFB-monitor profiles).
     const entry =
       (byFp && profileAcceptsLiveTitle(byFp.profile, request.identity.title)
         ? byFp
         : undefined) ??
-      this.findByLiveTitle(request.identity.title, { structuralHash });
+      this.findByLiveTitle(request.identity.title, { structuralHash }) ??
+      this.findByLiveTitle(request.identity.title);
     if (!entry) {
       return {
         fingerprint,
@@ -240,9 +242,11 @@ export class FileCatalogStore implements CatalogBackend {
     if (!entry) {
       const seen = this.index.seen[fingerprint];
       if (seen?.title) {
-        entry = this.findByLiveTitle(seen.title, {
-          structuralHash: seen.structuralHash,
-        });
+        // Prefer same structural hash, then title-only (matches registerFingerprint).
+        entry =
+          this.findByLiveTitle(seen.title, {
+            structuralHash: seen.structuralHash,
+          }) ?? this.findByLiveTitle(seen.title);
       }
     }
     if (!entry) return null;

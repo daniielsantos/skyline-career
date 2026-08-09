@@ -25,8 +25,9 @@ export interface DraftOptions {
    */
   liveStationIndexes?: number[];
   /**
-   * Structural maxLoad (lb) from live clamp probe, keyed by station index.
-   * Missing indexes keep the placeholder 500 until cfg calibrate fills them.
+   * Optional structural maxLoad (lb) keyed by station index.
+   * Homologate wizard no longer live-probes clamps (usually uncapped in MSFS);
+   * missing indexes keep placeholder 500 until flight_model.cfg calibrate.
    */
   liveStationMaxLoads?: Record<number, number>;
   /**

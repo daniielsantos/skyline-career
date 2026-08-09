@@ -369,6 +369,73 @@ export function plannedStationPayloadLb(opts: {
 }
 
 /**
+ * EFB / SimBrief imports often leave pilot+copilot stations at 0 (crew folded
+ * into BEW/ZFW). If live crew stations are empty, drop the crew floor from Due
+ * so Loaded vs Due matches cargo-only. When those stations have weight (Skyline
+ * inject or EFB set crew), keep the full cargo+crew Due.
+ */
+export function adjustPlannedPayloadForLiveCrewStations(opts: {
+  cargoPlacedLb: number;
+  crewLb: number;
+  crewStations?: number[];
+  liveStations?: Record<number, number> | null;
+  /** Sum on crew stations at/above this → crew is present (default 50 lb). */
+  emptyThresholdLb?: number;
+}): {
+  plannedTotalLb: number;
+  cargoPlacedLb: number;
+  crewLb: number;
+  crewOnStations: boolean;
+} {
+  const cargo = Math.max(0, opts.cargoPlacedLb);
+  const crewFloor = Math.max(0, opts.crewLb);
+  const cargoR = roundLb(cargo);
+  const floorR = roundLb(crewFloor);
+
+  if (crewFloor <= 0) {
+    return {
+      plannedTotalLb: cargoR,
+      cargoPlacedLb: cargoR,
+      crewLb: 0,
+      crewOnStations: false,
+    };
+  }
+
+  // No station map yet — keep full Due (don't drop crew without evidence).
+  if (!opts.liveStations) {
+    return {
+      plannedTotalLb: roundLb(cargo + crewFloor),
+      cargoPlacedLb: cargoR,
+      crewLb: floorR,
+      crewOnStations: true,
+    };
+  }
+
+  let stations = (opts.crewStations ?? []).filter(
+    (idx) => Number.isFinite(idx) && idx > 0,
+  );
+  if (stations.length === 0) {
+    const n = Math.max(1, Math.round(crewFloor / FREIGHTER_PILOT_LB));
+    stations = Array.from({ length: n }, (_, i) => i + 1);
+  }
+
+  const threshold = opts.emptyThresholdLb ?? 50;
+  const crewLive = stations.reduce((sum, idx) => {
+    const lb = opts.liveStations![idx];
+    return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
+  }, 0);
+  const crewOnStations = crewLive >= threshold;
+  const crewLb = crewOnStations ? floorR : 0;
+
+  return {
+    plannedTotalLb: roundLb(cargo + crewLb),
+    cargoPlacedLb: cargoR,
+    crewLb,
+    crewOnStations,
+  };
+}
+
+/**
  * Distribute cargo lb across stations.
  * Priority: passenger seats → crew spare (soft-capped) → baggage last.
  * Freighter packs with no passenger seats keep crew at 170 and put cargo on baggage.

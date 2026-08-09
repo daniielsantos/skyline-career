@@ -12,6 +12,7 @@ import {
 import {
   OfpLoadPlanError,
   allocateCargoRoundPerSeat,
+  adjustPlannedPayloadForLiveCrewStations,
   buildOfpLoadPlan,
   buildRollbackPlan,
   careerOperationalCargoMaxLb,
@@ -26,6 +27,7 @@ import {
   distributeCargoAcrossStations,
   distributeFuelAcrossTanks,
   orderStationsLongitudinal,
+  plannedStationPayloadLb,
   shiftCargoForCg,
 } from './ofp-load-plan.js';
 
@@ -660,6 +662,50 @@ describe('buildOfpLoadPlan', () => {
     // room = 3140 - 1885 - 175 - 340 - 25 = 715 (two crew @ 170)
     assert.equal(built.cargoLb, 715);
     assert.ok(built.cargoLb < 992);
+  });
+});
+
+describe('adjustPlannedPayloadForLiveCrewStations', () => {
+  it('drops crew floor when S1/S2 are empty (EFB cargo-only)', () => {
+    const base = plannedStationPayloadLb({
+      cargoLb: 2000,
+      stationRoles: { crewStations: [1, 2], baggageStations: [12] },
+    });
+    assert.equal(base.crewLb, 340);
+    assert.equal(base.plannedTotalLb, 2340);
+
+    const adj = adjustPlannedPayloadForLiveCrewStations({
+      cargoPlacedLb: base.cargoPlacedLb,
+      crewLb: base.crewLb,
+      crewStations: [1, 2],
+      liveStations: { 1: 0, 2: 0, 12: 2000 },
+    });
+    assert.equal(adj.crewOnStations, false);
+    assert.equal(adj.crewLb, 0);
+    assert.equal(adj.plannedTotalLb, 2000);
+  });
+
+  it('keeps crew floor when pilot/copilot stations have weight', () => {
+    const adj = adjustPlannedPayloadForLiveCrewStations({
+      cargoPlacedLb: 2000,
+      crewLb: 340,
+      crewStations: [1, 2],
+      liveStations: { 1: 170, 2: 170, 12: 2000 },
+    });
+    assert.equal(adj.crewOnStations, true);
+    assert.equal(adj.crewLb, 340);
+    assert.equal(adj.plannedTotalLb, 2340);
+  });
+
+  it('keeps full Due when live stations are unknown', () => {
+    const adj = adjustPlannedPayloadForLiveCrewStations({
+      cargoPlacedLb: 2000,
+      crewLb: 340,
+      crewStations: [1, 2],
+      liveStations: null,
+    });
+    assert.equal(adj.plannedTotalLb, 2340);
+    assert.equal(adj.crewLb, 340);
   });
 });
 

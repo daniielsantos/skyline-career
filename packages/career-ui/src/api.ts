@@ -545,6 +545,8 @@ export type Mission = {
         cargoLb?: number;
         /** Crew floor in Due (n × 170 lb) — cargo soft-capped on crew seats stays in cargoLb. */
         crewLb?: number;
+        /** Nominal crew floor before empty-station adjust. */
+        crewFloorLb?: number;
         liveLb?: number;
         ok: boolean;
         stations?: Record<number, number>;
@@ -2318,6 +2320,7 @@ export type WatchStatus = {
       plannedLb?: number;
       cargoLb?: number;
       crewLb?: number;
+      crewFloorLb?: number;
       liveLb?: number;
       ok: boolean;
       stations?: Record<number, number>;

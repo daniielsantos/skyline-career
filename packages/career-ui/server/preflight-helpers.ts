@@ -20,7 +20,10 @@ import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compliance/run-compare.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
-import { plannedStationPayloadLb } from '../../agent/src/ofp-load-plan.ts';
+import {
+  adjustPlannedPayloadForLiveCrewStations,
+  plannedStationPayloadLb,
+} from '../../agent/src/ofp-load-plan.ts';
 import { readLiveCgState } from '../../agent/src/live-cg.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import {
@@ -96,6 +99,8 @@ export type PreflightCheckResult = {
         cargoLb?: number;
         /** Crew floor in the Due total (n × 170 lb) — not seat fill above that. */
         crewLb?: number;
+        /** Nominal crew floor before empty-station adjust (for Watch re-eval). */
+        crewFloorLb?: number;
         liveLb?: number;
         ok: boolean;
         stations?: Record<number, number>;
@@ -256,16 +261,16 @@ export async function runMissionPreflight(
     // ofpPayloadLb (pax+bags only) made Sim look like ~550 while seats showed 1050.
     const cargoLb =
       cargoKg !== undefined ? cargoKg * KG_TO_LB : undefined;
-    const plannedPayload = cargoLb !== undefined
-      ? plannedStationPayloadLb({
-          cargoLb,
-          stationRoles: ofp.payload?.stationRoles,
-          emptyWeightLb: live.weights?.emptyLb,
-          maxGrossWeightLb: live.weights?.maxGrossLb,
-          blockFuelLb: plannedFuelLb,
-        })
-      : undefined;
-    const plannedPayloadLb = plannedPayload?.plannedTotalLb;
+    const plannedPayloadBase =
+      cargoLb !== undefined
+        ? plannedStationPayloadLb({
+            cargoLb,
+            stationRoles: ofp.payload?.stationRoles,
+            emptyWeightLb: live.weights?.emptyLb,
+            maxGrossWeightLb: live.weights?.maxGrossLb,
+            blockFuelLb: plannedFuelLb,
+          })
+        : undefined;
     const stationSumLb = live.payload?.stations
       ? Object.values(live.payload.stations).reduce(
           (sum, lb) => sum + (Number.isFinite(lb) ? lb : 0),
@@ -281,6 +286,16 @@ export async function runMissionPreflight(
     const livePayloadLb = clearedStations
       ? stationSumLb
       : (live.payload?.total ?? live.payload?.ofpPayloadLb);
+    // EFB imports often leave S1/S2 at 0 — drop crew floor from Due when empty.
+    const plannedPayload = plannedPayloadBase
+      ? adjustPlannedPayloadForLiveCrewStations({
+          cargoPlacedLb: plannedPayloadBase.cargoPlacedLb,
+          crewLb: plannedPayloadBase.crewLb,
+          crewStations: ofp.payload?.stationRoles?.crewStations,
+          liveStations: live.payload?.stations,
+        })
+      : undefined;
+    const plannedPayloadLb = plannedPayload?.plannedTotalLb;
     const fuelTolLb = Math.max(
       ofp.tolerances?.fuelAbsLb ?? 50,
       Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
@@ -299,7 +314,7 @@ export async function runMissionPreflight(
     // Loaded vs Due uses block-fuel total only. Per-tank FUEL_LEFT/RIGHT findings
     // are softened to warn (classic L/R can glitch while TOTAL matches).
     const fuelOk = weights.fuel.ok;
-    const payloadOk = plannedPayload?.gaCabin
+    const payloadOk = plannedPayloadBase?.gaCabin
       ? weights.payload.ok
       : !payloadFailed && weights.payload.ok;
     const ready = fuelOk && payloadOk;
@@ -388,10 +403,12 @@ export async function runMissionPreflight(
           plannedLb: plannedPayloadLb,
           liveLb: livePayloadLb,
           ok: payloadOk,
-          ...(plannedPayload
+          ...(plannedPayload && plannedPayloadBase
             ? {
                 cargoLb: plannedPayload.cargoPlacedLb,
                 crewLb: plannedPayload.crewLb,
+                /** Nominal crew floor before EFB empty-station adjust (n × 170). */
+                crewFloorLb: plannedPayloadBase.crewLb,
               }
             : {}),
           ...(live.payload?.stations

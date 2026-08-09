@@ -1498,6 +1498,26 @@ async function applyMissionOfpLoadExclusive(
           }
           nextStations = shifted.stations;
           movedLb = shifted.movedLb;
+          // Freighter (no pax seats): shift among baggage when crew seats can't move.
+          if (
+            shifted.movedLb <= 0 &&
+            !preferSeatFill &&
+            baggageStations.length > 0
+          ) {
+            shifted = shiftCargoForCg(
+              workingStations,
+              resolved.profile,
+              built.movableStations,
+              direction,
+              shiftBudget,
+              {
+                minRetainByIndex,
+                softMaxByIndex: baggageSoftMaxByIndex,
+              },
+            );
+            nextStations = shifted.stations;
+            movedLb = shifted.movedLb;
+          }
           // GA: CG at limit after soft-capped load is advisory — keep the seats.
           if (
             preferSeatFill &&
@@ -1542,20 +1562,42 @@ async function applyMissionOfpLoadExclusive(
 
         if (movedLb <= 0) {
           if (!stillPlacing && haveEnvelope && !inEnvelope) {
-            applyResult = {
-              ...applyResult,
-              cg: {
-                ok: false,
-                failures: [
-                  {
-                    var: 'CG PERCENT',
-                    expected: (minMac! + maxMac!) / 2,
-                    actual: liveMac!,
-                    tolerancePct: CG_REBALANCE_MARGIN_MAC,
-                  },
-                ],
-              },
-            };
+            // Inside tablet envelope but outside 1% margin → keep load (advisory).
+            // Only hard-fail when truly past min/max MAC.
+            const inAbsolute =
+              liveMac! >= minMac! && liveMac! <= maxMac!;
+            if (inAbsolute || preferSeatFill || cgPolicy !== 'strict') {
+              softCgWarn = true;
+              applyResult = {
+                ...applyResult,
+                cg: {
+                  ok: true,
+                  failures: [
+                    {
+                      var: 'CG PERCENT',
+                      expected: (minMac! + maxMac!) / 2,
+                      actual: liveMac!,
+                      tolerancePct: CG_REBALANCE_MARGIN_MAC,
+                    },
+                  ],
+                },
+              };
+            } else {
+              applyResult = {
+                ...applyResult,
+                cg: {
+                  ok: false,
+                  failures: [
+                    {
+                      var: 'CG PERCENT',
+                      expected: (minMac! + maxMac!) / 2,
+                      actual: liveMac!,
+                      tolerancePct: CG_REBALANCE_MARGIN_MAC,
+                    },
+                  ],
+                },
+              };
+            }
           }
           watchDebugLog('inject', 'balance stop', {
             round: i,
@@ -1810,26 +1852,27 @@ async function applyMissionOfpLoadExclusive(
       ) {
         const lo = minMac + CG_REBALANCE_MARGIN_MAC;
         const hi = maxMac - CG_REBALANCE_MARGIN_MAC;
-        const inEnvelope = liveMac >= lo && liveMac <= hi;
+        const inMargin = liveMac >= lo && liveMac <= hi;
+        const inAbsolute = liveMac >= minMac && liveMac <= maxMac;
         const failure = {
           var: 'CG PERCENT',
           expected: (minMac + maxMac) / 2,
           actual: liveMac,
           tolerancePct: CG_REBALANCE_MARGIN_MAC,
         };
-        if (inEnvelope) {
+        if (inMargin) {
           applyResult = { ...applyResult, cg: { ok: true, failures: [] } };
-        } else if (cgPolicy === 'strict' && !preferSeatFill) {
-          applyResult = {
-            ...applyResult,
-            cg: { ok: false, failures: [failure] },
-          };
-        } else {
-          // Soft / GA seat-first: keep the load; CG at limit is advisory.
+        } else if (inAbsolute || preferSeatFill || cgPolicy !== 'strict') {
+          // Inside tablet envelope (or soft/GA): keep injected load — margin is advisory.
           softCgWarn = true;
           applyResult = {
             ...applyResult,
             cg: { ok: true, failures: [failure] },
+          };
+        } else {
+          applyResult = {
+            ...applyResult,
+            cg: { ok: false, failures: [failure] },
           };
         }
       }
@@ -1995,15 +2038,19 @@ async function applyMissionOfpLoadExclusive(
       if (applyResult.cg && !applyResult.cg.ok) {
         const failure = applyResult.cg.failures[0];
         const limits = resolved.profile.cg?.constraints;
-        const tolerance = failure?.tolerancePct ?? 0;
+        const margin = failure?.tolerancePct ?? CG_REBALANCE_MARGIN_MAC;
+        const minMac = limits?.minMac;
+        const maxMac = limits?.maxMac;
+        const lo =
+          minMac === undefined ? undefined : minMac + margin;
+        const hi =
+          maxMac === undefined ? undefined : maxMac - margin;
         parts.push(
-          failure && limits
-            ? `CG ${failure.actual.toFixed(1)}% outside ${
-                limits.minMac === undefined ? '−∞' : limits.minMac - tolerance
-              }–${
-                limits.maxMac === undefined ? '∞' : limits.maxMac + tolerance
-              }% effective envelope`
-            : 'CG out of envelope',
+          failure && lo !== undefined && hi !== undefined
+            ? `CG ${failure.actual.toFixed(1)}% outside ${lo.toFixed(0)}–${hi.toFixed(0)}% effective envelope (${minMac}–${maxMac}% tablet ±${margin}% margin)`
+            : failure
+              ? `CG ${failure.actual.toFixed(1)}% out of envelope`
+              : 'CG out of envelope',
         );
       }
       error = formatPipeError(

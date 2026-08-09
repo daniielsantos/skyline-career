@@ -62,6 +62,7 @@ import {
   type WeatherOpsSnapshot,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge, setNamedPipeDebugLog } from '../../agent/src/named-pipe-sim-bridge.ts';
+import { adjustPlannedPayloadForLiveCrewStations } from '../../agent/src/ofp-load-plan.ts';
 import {
   readLiveCruiseTasKt,
   sampleLiveCruiseFuelFlowKgPerHour,
@@ -87,6 +88,8 @@ export type WatchLoadVerification = {
     cargoLb?: number;
     /** Crew floor portion of plannedLb (n × 170 lb). */
     crewLb?: number;
+    /** Nominal crew floor before empty-station adjust (Watch re-eval). */
+    crewFloorLb?: number;
     liveLb?: number;
     ok: boolean;
     stations?: Record<number, number>;
@@ -1311,10 +1314,36 @@ export class CareerWatchSession {
             typeof liveFuelLb === 'number' ? liveFuelLb : load.fuelLb;
           this.lastLivePayloadLb =
             typeof livePayloadLb === 'number' ? livePayloadLb : load.payloadLb;
+          const stationsForCrew = load.stations ?? prevWatchPayload.stations;
+          const cargoLb =
+            typeof prevWatchPayload.cargoLb === 'number' &&
+            Number.isFinite(prevWatchPayload.cargoLb)
+              ? prevWatchPayload.cargoLb
+              : undefined;
+          const crewFloorLb =
+            typeof prevWatchPayload.crewFloorLb === 'number' &&
+            Number.isFinite(prevWatchPayload.crewFloorLb)
+              ? prevWatchPayload.crewFloorLb
+              : typeof prevWatchPayload.crewLb === 'number' &&
+                  Number.isFinite(prevWatchPayload.crewLb) &&
+                  prevWatchPayload.crewLb > 0
+                ? prevWatchPayload.crewLb
+                : undefined;
+          const adjustedPayload =
+            cargoLb !== undefined && crewFloorLb !== undefined
+              ? adjustPlannedPayloadForLiveCrewStations({
+                  cargoPlacedLb: cargoLb,
+                  crewLb: crewFloorLb,
+                  liveStations: stationsForCrew,
+                })
+              : undefined;
+          const plannedPayloadLb =
+            adjustedPayload?.plannedTotalLb ??
+            prevVerification.payload.plannedLb;
           const nextWeights = evaluateLoadVerification({
             plannedFuelLb: prevVerification.fuel.plannedLb,
             liveFuelLb,
-            plannedPayloadLb: prevVerification.payload.plannedLb,
+            plannedPayloadLb,
             livePayloadLb,
           });
           const tanks = pickFuelTankBreakdown(
@@ -1348,7 +1377,7 @@ export class CareerWatchSession {
             stationSumLb: load.stationSumLb,
             previousStationSumLb,
             stationSumNow,
-            plannedPayloadLb: prevVerification.payload.plannedLb,
+            plannedPayloadLb,
             prevLivePayloadLb: prevVerification.payload.liveLb,
             prevReady: prevVerification.ready,
             nextReady: nextWeights.ready,
@@ -1367,6 +1396,13 @@ export class CareerWatchSession {
             },
             payload: {
               ...nextWeights.payload,
+              ...(cargoLb !== undefined ? { cargoLb } : {}),
+              ...(adjustedPayload
+                ? { crewLb: adjustedPayload.crewLb }
+                : prevWatchPayload.crewLb !== undefined
+                  ? { crewLb: prevWatchPayload.crewLb }
+                  : {}),
+              ...(crewFloorLb !== undefined ? { crewFloorLb } : {}),
               ...(stations ? { stations } : {}),
               ...(stationMax ? { stationMax } : {}),
             },
@@ -1430,6 +1466,11 @@ export class CareerWatchSession {
                     payload: {
                       ...prev.loadVerification.payload,
                       ...nextWeights.payload,
+                      ...(cargoLb !== undefined ? { cargoLb } : {}),
+                      ...(adjustedPayload
+                        ? { crewLb: adjustedPayload.crewLb }
+                        : {}),
+                      ...(crewFloorLb !== undefined ? { crewFloorLb } : {}),
                       ...(mergedStations ? { stations: mergedStations } : {}),
                       ...(mergedStationMax
                         ? { stationMax: mergedStationMax }
@@ -1457,6 +1498,13 @@ export class CareerWatchSession {
               },
               payload: {
                 ...nextWeights.payload,
+                ...(cargoLb !== undefined ? { cargoLb } : {}),
+                ...(adjustedPayload
+                  ? { crewLb: adjustedPayload.crewLb }
+                  : prevWatchPayload.crewLb !== undefined
+                    ? { crewLb: prevWatchPayload.crewLb }
+                    : {}),
+                ...(crewFloorLb !== undefined ? { crewFloorLb } : {}),
                 ...(stations ? { stations } : {}),
                 ...(stationMax ? { stationMax } : {}),
               },

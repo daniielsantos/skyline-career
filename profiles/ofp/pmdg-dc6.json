@@ -15,7 +15,7 @@
     "One Skyline Market SKU: pmdg-dc6 (medium_piston)",
     "Homologated monitors: pmdg/dc-6a, pmdg/dc-6b, pmdg/dc-6bp @1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via PMDG Fuel/Load Manager",
-    "liveSources: classic tanks + mass-balance (classic stations can ghost on DC-6)",
+    "liveSources: classic tanks + mass-balance fuel; payload classic-stations (MB residual when stations ghost)",
     "SimBrief: Default DC6"
   ],
   "fuel": {
@@ -35,7 +35,7 @@
   "liveSources": {
     "fuel": ["classic", "mass-balance"],
     "weights": ["classic-weights"],
-    "payload": ["mass-balance", "classic-stations"]
+    "payload": ["classic-stations"]
   },
   "simbriefIcao": "DC6",
   "simbriefAirframeMatch": "Default",

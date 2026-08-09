@@ -273,7 +273,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     liveSources: {
       fuel: ['classic', 'mass-balance'],
       weights: ['classic-weights'],
-      payload: ['mass-balance', 'classic-stations'],
+      payload: ['classic-stations'],
     },
     loadMethod: 'native-simbrief',
     injectCapable: false,
@@ -297,7 +297,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'PMDG DC-6 family (DC-6A / DC-6B / DC-6BP) — same 12-station layout',
       'One Skyline Market SKU: pmdg-dc6 (medium_piston)',
       'loadMethod: native-simbrief; injectCapable: false — load via PMDG Fuel/Load Manager',
-      'liveSources: classic tanks + mass-balance (classic stations can ghost on DC-6)',
+      'liveSources: classic tanks + mass-balance fuel; payload classic-stations (MB residual when stations ghost)',
       'SimBrief: Default DC6',
     ],
   },

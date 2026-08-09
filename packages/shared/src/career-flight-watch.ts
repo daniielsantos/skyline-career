@@ -153,11 +153,10 @@ export function mergeAirborneClockOntoMission(
     expectedRouteMs?: number;
   },
 ): MissionIntent | null {
-  if (
-    mission.status !== 'accepted' &&
-    mission.status !== 'dispatched' &&
-    mission.status !== 'in_flight'
-  ) {
+  // Only persist the settle gate onto in-flight legs. Stamping accepted/dispatched
+  // (e.g. SIM ON GROUND flicker while still preparing) left "settle unlocked"
+  // on the ramp after restart.
+  if (mission.status !== 'in_flight') {
     return null;
   }
   const clockElapsed =

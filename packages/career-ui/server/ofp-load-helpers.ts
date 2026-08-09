@@ -959,7 +959,8 @@ async function applyMissionOfpLoadExclusive(
     };
     rebuildBaggageSoftMax();
     /** Stations that ignore SimConnect writes (ghost indexes). */
-    let prunedDeadStations = false;
+    let ghostPrunePasses = 0;
+    const MAX_GHOST_PRUNE_PASSES = 2;
 
     // Start from crew floors; pax/baggage empty. Cargo prefers seats, baggage last.
     let workingStations: Record<number, number> = {};
@@ -1682,121 +1683,137 @@ async function applyMissionOfpLoadExclusive(
           live: stationsSnapshot(afterLive.stations),
         });
 
-        // Ghost stations: SimConnect writePlan "succeeds" but live stays 0 (e.g. Bandeirante S8–S16).
-        // Prune once, clamp cargo to sticky capacity, and rewrite onto stations that stick.
-        if (
-          !prunedDeadStations &&
-          underApplied &&
-          baggageStations.length > 0
-        ) {
-          const dead = baggageStations.filter((idx) => {
-            const want = workingStations[idx] ?? 0;
-            const got = afterLive.stations[idx] ?? 0;
-            return want > 20 && got < 5;
-          });
-          if (dead.length > 0) {
-            prunedDeadStations = true;
-            const originalCargoLb = built.cargoLb;
-            baggageStations = baggageStations.filter((idx) => !dead.includes(idx));
-            rebuildBaggageSoftMax();
-            for (const idx of dead) {
-              workingStations[idx] = 0;
-            }
-            const bagCap = baggageStations.reduce((sum, idx) => {
-              const hard =
-                resolved.profile.payload.stations.find((s) => s.index === idx)
-                  ?.maxLoad ?? 0;
-              return sum + hard;
-            }, 0);
-            const clampedTarget = Math.min(originalCargoLb, bagCap);
-            for (const idx of baggageStations) {
-              workingStations[idx] = 0;
-            }
-            workingStations = equalizeMovableStations(
-              workingStations,
-              resolved.profile,
-              baggageStations,
-              clampedTarget,
-              {
-                minRetainByIndex: Object.fromEntries(
-                  baggageStations.map((idx) => [idx, 0]),
-                ),
-                softMaxByIndex: preferSeatFill
-                  ? baggageSoftMaxByIndex
-                  : undefined,
-              },
-            );
-            workingStations = equalizeLateralStationPairs(
-              workingStations,
-              resolved.profile,
-              baggageStations,
-              {
-                softMaxByIndex: preferSeatFill
-                  ? baggageSoftMaxByIndex
-                  : undefined,
-              },
-            );
-            cargoTargetLb = clampedTarget;
-            cargoPlacedLb = baggageStations.reduce(
-              (sum, idx) => sum + (workingStations[idx] ?? 0),
-              0,
-            );
-            const rewriteTotal = Object.values(workingStations).reduce(
-              (a, b) => a + b,
-              0,
-            );
-            built = {
-              ...built,
-              cargoLb: clampedTarget,
-              baggageStations,
-              plan: {
-                ...built.plan,
-                payload: { stations: workingStations, total: rewriteTotal },
-              },
-            };
-            watchDebugLog('inject', 'dead stations pruned', {
-              dead,
-              stickyBaggage: baggageStations,
-              clampedCargoLb: Math.round(clampedTarget),
-              originalCargoLb: Math.round(originalCargoLb),
-              rewriteTotal: Math.round(rewriteTotal),
-              working: stationsSnapshot(workingStations),
-            });
-            assertOfpLoadNotCancelled(mission.id);
-            const rewriteApply = await applyPayloadRound(
-              workingStations,
-              rewriteTotal,
-            );
-            assertOfpLoadNotCancelled(mission.id);
-            await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
-            applyResult = {
-              ...applyResult,
-              payload: rewriteApply.payload ?? applyResult.payload,
-            };
-            afterLive = {
-              tanks: afterLive.tanks,
-              stations: await readLiveStations(bridge, resolved.profile),
-            };
-            watchDebugLog('inject', 'dead stations rewrite', {
-              writeOk: rewriteApply.payload?.success ?? null,
-              live: stationsSnapshot(afterLive.stations),
-              liveSum: Math.round(sumRecord(afterLive.stations)),
-              workingSum: Math.round(rewriteTotal),
-            });
-            if (rewriteApply.payload && !rewriteApply.payload.success) {
-              watchDebugLog('inject', 'balance stop', {
-                round: i + 1,
-                reason: 'dead_station_rewrite_failed',
-                errorCode: rewriteApply.payload.errorCode,
-              });
-              break;
-            }
-            // Sync cargoPlaced to what actually stuck after rewrite.
-            cargoPlacedLb = baggageStations.reduce(
-              (sum, idx) => sum + (afterLive.stations[idx] ?? 0),
-              0,
-            );
+        // Ghost stations: write "succeeds" but live stays 0 — or sticks briefly then
+        // drops (Learjet S17/S18). Also catch partial ghosts when only ~200 lb is
+        // missing (old gate required live < 70% of working, so mild losses were ignored).
+        const ghostCandidates = baggageStations.filter((idx) => {
+          const want = workingStations[idx] ?? 0;
+          const got = afterLive.stations[idx] ?? 0;
+          return want > 20 && got < 5;
+        });
+        const missingVsLive = workSum - liveSum;
+        const shouldPruneGhosts =
+          ghostCandidates.length > 0 &&
+          missingVsLive > 75 &&
+          ghostPrunePasses < MAX_GHOST_PRUNE_PASSES &&
+          baggageStations.some((idx) => !ghostCandidates.includes(idx));
+        if (shouldPruneGhosts) {
+          ghostPrunePasses += 1;
+          const dead = ghostCandidates;
+          const originalCargoLb = built.cargoLb;
+          baggageStations = baggageStations.filter((idx) => !dead.includes(idx));
+          rebuildBaggageSoftMax();
+          for (const idx of dead) {
+            workingStations[idx] = 0;
           }
+          const bagCap = baggageStations.reduce((sum, idx) => {
+            const hard =
+              resolved.profile.payload.stations.find((s) => s.index === idx)
+                ?.maxLoad ?? 0;
+            return sum + hard;
+          }, 0);
+          const clampedTarget = Math.min(originalCargoLb, bagCap);
+          for (const idx of baggageStations) {
+            workingStations[idx] = 0;
+          }
+          workingStations = equalizeMovableStations(
+            workingStations,
+            resolved.profile,
+            baggageStations,
+            clampedTarget,
+            {
+              minRetainByIndex: Object.fromEntries(
+                baggageStations.map((idx) => [idx, 0]),
+              ),
+              softMaxByIndex: preferSeatFill
+                ? baggageSoftMaxByIndex
+                : undefined,
+            },
+          );
+          workingStations = equalizeLateralStationPairs(
+            workingStations,
+            resolved.profile,
+            baggageStations,
+            {
+              softMaxByIndex: preferSeatFill
+                ? baggageSoftMaxByIndex
+                : undefined,
+            },
+          );
+          cargoTargetLb = clampedTarget;
+          cargoPlacedLb = baggageStations.reduce(
+            (sum, idx) => sum + (workingStations[idx] ?? 0),
+            0,
+          );
+          const rewriteTotal = Object.values(workingStations).reduce(
+            (a, b) => a + b,
+            0,
+          );
+          built = {
+            ...built,
+            cargoLb: clampedTarget,
+            baggageStations,
+            plan: {
+              ...built.plan,
+              payload: { stations: workingStations, total: rewriteTotal },
+            },
+          };
+          watchDebugLog('inject', 'dead stations pruned', {
+            dead,
+            pass: ghostPrunePasses,
+            missingVsLive: Math.round(missingVsLive),
+            underApplied,
+            stickyBaggage: baggageStations,
+            clampedCargoLb: Math.round(clampedTarget),
+            originalCargoLb: Math.round(originalCargoLb),
+            rewriteTotal: Math.round(rewriteTotal),
+            working: stationsSnapshot(workingStations),
+          });
+          assertOfpLoadNotCancelled(mission.id);
+          const rewriteApply = await applyPayloadRound(
+            workingStations,
+            rewriteTotal,
+          );
+          assertOfpLoadNotCancelled(mission.id);
+          await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
+          applyResult = {
+            ...applyResult,
+            payload: rewriteApply.payload ?? applyResult.payload,
+          };
+          afterLive = {
+            tanks: afterLive.tanks,
+            stations: await readLiveStations(bridge, resolved.profile),
+          };
+          watchDebugLog('inject', 'dead stations rewrite', {
+            pass: ghostPrunePasses,
+            writeOk: rewriteApply.payload?.success ?? null,
+            live: stationsSnapshot(afterLive.stations),
+            liveSum: Math.round(sumRecord(afterLive.stations)),
+            workingSum: Math.round(rewriteTotal),
+          });
+          if (rewriteApply.payload && !rewriteApply.payload.success) {
+            watchDebugLog('inject', 'balance stop', {
+              round: i + 1,
+              reason: 'dead_station_rewrite_failed',
+              errorCode: rewriteApply.payload.errorCode,
+            });
+            break;
+          }
+          cargoPlacedLb = baggageStations.reduce(
+            (sum, idx) => sum + (afterLive.stations[idx] ?? 0),
+            0,
+          );
+          continue;
+        }
+        if (
+          ghostCandidates.length > 0 &&
+          missingVsLive > 75 &&
+          !baggageStations.some((idx) => !ghostCandidates.includes(idx))
+        ) {
+          watchDebugLog('inject', 'ghost stations but no sticky baggage', {
+            dead: ghostCandidates,
+            missingVsLive: Math.round(missingVsLive),
+          });
         }
 
         const trendNote =

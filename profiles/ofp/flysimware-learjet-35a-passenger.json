@@ -13,7 +13,8 @@
     "Profile: flysimware/learjet-35a-passenger@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct"
+    "Fuel strategy: simconnect-direct",
+    "S17/S18 (suitcase 5 / briefcases) marked service — SimConnect weight drops after inject; cargo uses S3–S16 only."
   ],
   "fuel": {
     "unit": "lb"
@@ -42,11 +43,13 @@
         13,
         14,
         15,
-        16,
+        16
+      ],
+      "passengerStations": [],
+      "serviceStations": [
         17,
         18
-      ],
-      "passengerStations": []
+      ]
     }
   },
   "liveSources": {
@@ -163,13 +166,13 @@
       "simVarIndex": 17,
       "cfgIndex": 16,
       "name": "SUITCASE 5",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 18,
       "cfgIndex": 17,
       "name": "BRIEFCASES",
-      "role": "baggage"
+      "role": "service"
     }
   ],
   "tolerances": {

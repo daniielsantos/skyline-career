@@ -611,8 +611,17 @@ describe('flightPhaseFromSample', () => {
     );
   });
 
-  it('mergeAirborneClockOntoMission stamps dispatched legs and keeps max elapsed', () => {
-    const stamped = mergeAirborneClockOntoMission(mission('dispatched'), {
+  it('mergeAirborneClockOntoMission only stamps in_flight legs', () => {
+    assert.equal(
+      mergeAirborneClockOntoMission(mission('dispatched'), {
+        airborneAtMs: 1_000_000,
+        airborneElapsedMs: 120_000,
+        expectedRouteMs: 3_600_000,
+      }),
+      null,
+    );
+
+    const stamped = mergeAirborneClockOntoMission(mission('in_flight'), {
       airborneAtMs: 1_000_000,
       airborneElapsedMs: 120_000,
       expectedRouteMs: 3_600_000,

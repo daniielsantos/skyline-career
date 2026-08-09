@@ -882,7 +882,11 @@ export class CareerWatchSession {
     const airborneAtMs = this.watchState.airborneAtMs;
     const expectedRouteMs = this.watchState.expectedRouteMs;
     let flightTime: WatchFlightTimePayload | null = null;
+    // Hide the airborne settle gate until the mission has actually departed —
+    // leftover stamps / SIM ON GROUND flickers must not show "settle unlocked"
+    // while still preparing on the ramp.
     if (
+      this.missionStatus === 'in_flight' &&
       typeof airborneAtMs === 'number' &&
       Number.isFinite(airborneAtMs) &&
       typeof expectedRouteMs === 'number' &&
@@ -1042,16 +1046,20 @@ export class CareerWatchSession {
     this.missionStatus = mission.status;
     this.walletUsd = loaded.walletUsd;
     const nowMs = Date.now();
-    const resumedAirborneAtMs = resumeAirborneAtMs({
-      nowMs,
-      airborneAtMs: mission.airborneAtMs,
-      airborneElapsedMs: mission.airborneElapsedMs,
-    });
+    const resumeClock = mission.status === 'in_flight';
+    const resumedAirborneAtMs = resumeClock
+      ? resumeAirborneAtMs({
+          nowMs,
+          airborneAtMs: mission.airborneAtMs,
+          airborneElapsedMs: mission.airborneElapsedMs,
+        })
+      : undefined;
     const hasPersistedAirborne =
       typeof resumedAirborneAtMs === 'number' &&
       Number.isFinite(resumedAirborneAtMs);
     this.watchState = createMissionFlightWatchState({
       // Resume mid-flight: treat a saved airborne stamp as already wheels-up.
+      // Never inherit leftover stamps from accepted/dispatched (false SIM ON GROUND).
       sawAirborne: mission.status === 'in_flight' || hasPersistedAirborne,
       airborneAtMs: resumedAirborneAtMs,
       expectedRouteMs:
@@ -1066,6 +1074,38 @@ export class CareerWatchSession {
         ? { lastOnGround: false as const }
         : {}),
     });
+    // Scrub stale airborne fields left on accepted/dispatched from a prior session.
+    if (
+      !resumeClock &&
+      (mission.airborneAtMs != null ||
+        mission.airborneElapsedMs != null ||
+        mission.expectedRouteMs != null)
+    ) {
+      await this.cb.updateOpenMission(
+        mission.id,
+        async (freshMissions, openMission, openIdx) => {
+          if (
+            openMission.status !== 'accepted' &&
+            openMission.status !== 'dispatched'
+          ) {
+            return false;
+          }
+          if (
+            openMission.airborneAtMs == null &&
+            openMission.airborneElapsedMs == null &&
+            openMission.expectedRouteMs == null
+          ) {
+            return false;
+          }
+          const cleaned = { ...openMission };
+          delete cleaned.airborneAtMs;
+          delete cleaned.airborneElapsedMs;
+          delete cleaned.expectedRouteMs;
+          freshMissions.missions[openIdx] = cleaned;
+          return true;
+        },
+      );
+    }
     // Re-base persisted airborneAtMs so settle gate matches resumed elapsed.
     if (
       hasPersistedAirborne &&
@@ -1564,6 +1604,30 @@ export class CareerWatchSession {
         this.watchState,
         transitionOpts,
       );
+      // Drop premature airborne stamps while still preparing at origin
+      // (accepted/dispatched on the ground, not near dest). A SIM ON GROUND
+      // flicker must not leave "settle unlocked" on the ramp.
+      const nearDestPrep =
+        Boolean(destCoords) &&
+        Boolean(sample.position) &&
+        greatCircleDistanceNm(sample.position!, destCoords!) <=
+          (this.opts.settleRadiusNm ?? 12);
+      if (
+        sample.onGround &&
+        (current.status === 'accepted' || current.status === 'dispatched') &&
+        !nearDestPrep &&
+        (nextState.airborneAtMs != null || nextState.sawAirborne)
+      ) {
+        nextState = createMissionFlightWatchState({
+          sawAirborne: false,
+          lastOnGround: true,
+          routeDistanceNm: nextState.routeDistanceNm ?? distanceNm,
+        });
+        watchDebugLog('watch', 'cleared premature airborne stamp', {
+          missionId: current.id,
+          status: current.status,
+        });
+      }
       this.watchState = nextState;
       this.lastEvent = event;
       this.lastEventAtIso = new Date().toISOString();

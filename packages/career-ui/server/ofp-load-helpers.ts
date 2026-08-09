@@ -941,6 +941,7 @@ async function applyMissionOfpLoadExclusive(
     for (const idx of built.crewStations) {
       minRetainByIndex[idx] = FREIGHTER_PILOT_LB;
     }
+    const preferSeatFill = (built.passengerStations?.length ?? 0) > 0;
     const seatSoftMaxByIndex: Record<number, number> = {};
     for (const idx of seatStations) {
       // Freighter (cabin seats = cargo): allow full structural max when bags
@@ -955,7 +956,6 @@ async function applyMissionOfpLoadExclusive(
           hard > 0 ? hard : seatSoftMaxLb(resolved.profile, idx);
       }
     }
-    const preferSeatFill = (built.passengerStations?.length ?? 0) > 0;
     let baggageSoftMaxByIndex: Record<number, number> = {};
     const rebuildBaggageSoftMax = () => {
       baggageSoftMaxByIndex = {};

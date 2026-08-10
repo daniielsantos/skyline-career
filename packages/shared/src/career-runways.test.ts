@@ -8,6 +8,7 @@ import {
   pickNearestRunway,
   projectOntoRunway,
   evaluateRunwayTouchdown,
+  pickFirstContactCoords,
   type CareerRunway,
 } from './career-runways.js';
 
@@ -121,5 +122,41 @@ describe('evaluateRunwayTouchdown', () => {
     const landing36 = evaluateRunwayTouchdown('KCLT', lat, lon, 356);
     assert.ok(landing36);
     assert.equal(landing36!.landingEnd, 'reciprocal');
+  });
+});
+
+describe('pickFirstContactCoords', () => {
+  const plane = { lat: -23.43, lon: -46.47 };
+  const earlier = { lat: -23.4305, lon: -46.47 }; // ~55 m south
+
+  it('prefers sim touchdown when near the live aircraft', () => {
+    const picked = pickFirstContactCoords({
+      simTouchdown: earlier,
+      planeNow: plane,
+      lastAirborne: { lat: -23.431, lon: -46.47 },
+    });
+    assert.ok(picked);
+    assert.equal(picked!.source, 'sim_touchdown');
+    assert.equal(picked!.lat, earlier.lat);
+  });
+
+  it('rejects stale sim touchdown far from the aircraft', () => {
+    const picked = pickFirstContactCoords({
+      simTouchdown: { lat: -22.0, lon: -46.47 },
+      planeNow: plane,
+      lastAirborne: earlier,
+    });
+    assert.ok(picked);
+    assert.equal(picked!.source, 'last_airborne');
+    assert.equal(picked!.lat, earlier.lat);
+  });
+
+  it('falls back to plane when nothing else is usable', () => {
+    const picked = pickFirstContactCoords({ planeNow: plane });
+    assert.deepEqual(picked, {
+      lat: plane.lat,
+      lon: plane.lon,
+      source: 'plane',
+    });
   });
 });

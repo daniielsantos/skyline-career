@@ -30,6 +30,7 @@ import {
   pickStableLiveFuelLb,
   patchFlightScoreLandingVs,
   evaluateRunwayTouchdown,
+  pickFirstContactCoords,
   pushCruiseTick,
   pushFlightScoreSample,
   pushWeatherOpsTick,
@@ -875,6 +876,9 @@ export class CareerWatchSession {
   private touchdownHeadingTrueDeg: number | null = null;
   /** Last airborne true heading (fallback if touchdown read fails). */
   private lastAirborneHeadingTrueDeg: number | null = null;
+  /** Last airborne WGS84 — closer to true contact than the first on-ground poll. */
+  private lastAirborneLat: number | null = null;
+  private lastAirborneLon: number | null = null;
   /** Last MX excess-burn drain write (airborne only). */
   private lastMxFuelDrainAtMs = 0;
   /** Last mx drain skip log (rate-limited). */
@@ -1093,6 +1097,8 @@ export class CareerWatchSession {
     this.touchdownLon = null;
     this.touchdownHeadingTrueDeg = null;
     this.lastAirborneHeadingTrueDeg = null;
+    this.lastAirborneLat = null;
+    this.lastAirborneLon = null;
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
     this.pendingMxDrainKg = 0;
@@ -1743,22 +1749,60 @@ export class CareerWatchSession {
         nextState.landingFpm == null &&
         !sample.onGround;
       if (touchdownCleared) {
-        // Real go-around: drop landing score so the next touch can re-stamp VS.
-        // Keep first-contact lat/lon for the debrief runway diagram.
+        // Real go-around: drop landing score + position so the next touch re-stamps.
         this.scoreAcc = clearFlightScoreLanding(this.scoreAcc);
+        this.touchdownLat = null;
+        this.touchdownLon = null;
+        this.touchdownHeadingTrueDeg = null;
       }
 
-      // First contact only — never overwrite after a bounce further down-runway.
       if (
-        this.touchdownLat == null &&
-        nextState.landingFpm != null &&
-        sample.onGround &&
+        !sample.onGround &&
         sample.position &&
         Number.isFinite(sample.position.lat) &&
         Number.isFinite(sample.position.lon)
       ) {
-        this.touchdownLat = sample.position.lat;
-        this.touchdownLon = sample.position.lon;
+        this.lastAirborneLat = sample.position.lat;
+        this.lastAirborneLon = sample.position.lon;
+      }
+
+      // First contact only — prefer Sim TOUCHDOWN latch (true first contact).
+      // Plane-now on the wheels-down poll is already down-runway by poll latency.
+      if (
+        this.touchdownLat == null &&
+        nextState.landingFpm != null &&
+        sample.onGround
+      ) {
+        let simTd: { lat: number; lon: number } | undefined;
+        if (this.bridge) {
+          try {
+            simTd = await readLiveTouchdownPosition(this.bridge);
+          } catch {
+            simTd = undefined;
+          }
+        }
+        const picked = pickFirstContactCoords({
+          simTouchdown: simTd ?? null,
+          planeNow: sample.position ?? null,
+          lastAirborne:
+            this.lastAirborneLat != null && this.lastAirborneLon != null
+              ? { lat: this.lastAirborneLat, lon: this.lastAirborneLon }
+              : null,
+        });
+        if (picked) {
+          this.touchdownLat = picked.lat;
+          this.touchdownLon = picked.lon;
+          watchDebugLog('watch', 'first-contact position', {
+            missionId: current.id,
+            source: picked.source,
+            lat: picked.lat,
+            lon: picked.lon,
+            planeLat: sample.position?.lat ?? null,
+            planeLon: sample.position?.lon ?? null,
+            simLat: simTd?.lat ?? null,
+            simLon: simTd?.lon ?? null,
+          });
+        }
         let hdg: number | undefined;
         if (this.bridge) {
           try {
@@ -2199,11 +2243,23 @@ export class CareerWatchSession {
         if (touchdownLat == null || touchdownLon == null) {
           try {
             const tdPos = await readLiveTouchdownPosition(this.bridge);
-            if (tdPos) {
-              touchdownLat = tdPos.lat;
-              touchdownLon = tdPos.lon;
-              this.touchdownLat = tdPos.lat;
-              this.touchdownLon = tdPos.lon;
+            const picked = pickFirstContactCoords({
+              simTouchdown: tdPos ?? null,
+              planeNow: this.lastSample?.position ?? null,
+              lastAirborne:
+                this.lastAirborneLat != null && this.lastAirborneLon != null
+                  ? { lat: this.lastAirborneLat, lon: this.lastAirborneLon }
+                  : null,
+            });
+            if (picked) {
+              touchdownLat = picked.lat;
+              touchdownLon = picked.lon;
+              this.touchdownLat = picked.lat;
+              this.touchdownLon = picked.lon;
+              watchDebugLog('watch', 'settle touchdown position fallback', {
+                missionId: current.id,
+                source: picked.source,
+              });
             }
           } catch {
             /* soft-fail */
@@ -2368,20 +2424,25 @@ export class CareerWatchSession {
         this.intervalMs = watchIntervalMsForPhase(this.lastPhase, {
           cruiseCapMs: this.opts.intervalSec * 1000,
         });
-        // Short final + post-touchdown hold: tighten poll so first-contact and
-        // bounce arcs are sampled even when phase has already flipped to taxi_in.
+        // Short final / flare / post-touchdown: force landing-rate polls.
+        // Approach alone is 1s — at 140 kt that is ~70 m of runway uncertainty.
+        // Flare often holds VS near 0, so phase may stay "approach" unless AGL
+        // already flipped us to landing; tighten by height, not VS.
         const agl = this.lastSample?.aglFt;
         const tdAt = this.watchState.airborneEndedAtMs;
         const postTdHoldMs =
           typeof tdAt === 'number' && Number.isFinite(tdAt)
             ? Date.now() - tdAt
             : undefined;
-        if (
-          (this.lastPhase === 'approach' || this.lastPhase === 'descent') &&
+        const shortFinal =
           typeof agl === 'number' &&
           Number.isFinite(agl) &&
-          agl < 400
-        ) {
+          agl < 800 &&
+          (this.lastPhase === 'approach' ||
+            this.lastPhase === 'descent' ||
+            this.lastPhase === 'landing' ||
+            this.lastPhase === 'cruise');
+        if (shortFinal) {
           this.intervalMs = Math.min(
             this.intervalMs,
             watchIntervalMsForPhase('landing'),

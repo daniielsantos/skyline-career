@@ -303,7 +303,7 @@ describe('watchIntervalMsForPhase', () => {
   it('polls landing/takeoff fast and cruise at cap', () => {
     assert.equal(watchIntervalMsForPhase('landing'), 200);
     assert.equal(watchIntervalMsForPhase('takeoff'), 200);
-    assert.equal(watchIntervalMsForPhase('approach'), 1_000);
+    assert.equal(watchIntervalMsForPhase('approach'), 500);
     assert.equal(watchIntervalMsForPhase('cruise', { cruiseCapMs: 5_000 }), 5_000);
     assert.equal(watchIntervalMsForPhase('cruise', { cruiseCapMs: 4_000 }), 4_000);
     assert.equal(watchIntervalMsForPhase('taxi_out'), 2_000);

@@ -350,7 +350,9 @@ export function watchIntervalMsForPhase(
       // short bounce arcs without hammering SimBridge below that.
       return 200;
     case 'approach':
-      return 1_000;
+      // Still slower than landing, but short enough that a late AGL sample
+      // before the <800 ft short-final override does not miss the flare window.
+      return 500;
     case 'climb':
     case 'descent':
       return 3_000;

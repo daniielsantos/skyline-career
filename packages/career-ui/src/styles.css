@@ -1168,7 +1168,19 @@ th {
 }
 
 .debrief-runway-block {
-  margin: 0.65rem 0 0.25rem;
+  margin: 0;
+}
+
+.debrief-grid-compact dd {
+  font-size: 1.15rem;
+}
+
+.flight-score-compact {
+  margin-top: 0.15rem;
+}
+
+.flight-score-compact .flight-score-cats {
+  gap: 0.45rem;
 }
 
 .debrief-runway {

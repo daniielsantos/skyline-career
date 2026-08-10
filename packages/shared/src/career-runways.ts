@@ -233,3 +233,60 @@ export function formatRunwayTouchdownLine(
     touch.lighted === true ? ' · lighted' : touch.lighted === false ? ' · unlit' : '';
   return `RWY ${ident} · ${Math.round(thrLabel)} m past THR · ${side} · ${pavement}${light}`;
 }
+
+const MAX_SIM_TOUCHDOWN_NM = 0.45; // ~830 m — reject stale prior-landing latch
+
+function usableCoord(
+  pos: { lat: number; lon: number } | null | undefined,
+): pos is { lat: number; lon: number } {
+  return (
+    pos != null &&
+    Number.isFinite(pos.lat) &&
+    Number.isFinite(pos.lon) &&
+    !(pos.lat === 0 && pos.lon === 0) &&
+    Math.abs(pos.lat) <= 90 &&
+    Math.abs(pos.lon) <= 180
+  );
+}
+
+/**
+ * Pick first-contact WGS84 for the debrief runway marker.
+ * Prefer SimConnect's latched TOUCHDOWN LAT/LON (true first contact) when it
+ * is near the live aircraft — Watch poll alone often samples tens of meters
+ * past the real touch. Fall back to last airborne sample, then plane-now.
+ */
+export function pickFirstContactCoords(opts: {
+  simTouchdown?: { lat: number; lon: number } | null;
+  planeNow?: { lat: number; lon: number } | null;
+  lastAirborne?: { lat: number; lon: number } | null;
+  /** Reject sim latch farther than this from plane-now (nm). */
+  maxSimTouchdownNm?: number;
+}): {
+  lat: number;
+  lon: number;
+  source: 'sim_touchdown' | 'last_airborne' | 'plane';
+} | null {
+  const plane = usableCoord(opts.planeNow) ? opts.planeNow : null;
+  const airborne = usableCoord(opts.lastAirborne) ? opts.lastAirborne : null;
+  const sim = usableCoord(opts.simTouchdown) ? opts.simTouchdown : null;
+  const maxNm = opts.maxSimTouchdownNm ?? MAX_SIM_TOUCHDOWN_NM;
+
+  if (sim && plane) {
+    const d = distanceNm(sim, plane);
+    if (Number.isFinite(d) && d <= maxNm) {
+      return { lat: sim.lat, lon: sim.lon, source: 'sim_touchdown' };
+    }
+  } else if (sim && !plane) {
+    return { lat: sim.lat, lon: sim.lon, source: 'sim_touchdown' };
+  }
+
+  // Just after wheels-down the aircraft has already rolled; last airborne
+  // sample (especially short-final) is closer to true contact than plane-now.
+  if (airborne) {
+    return { lat: airborne.lat, lon: airborne.lon, source: 'last_airborne' };
+  }
+  if (plane) {
+    return { lat: plane.lat, lon: plane.lon, source: 'plane' };
+  }
+  return null;
+}

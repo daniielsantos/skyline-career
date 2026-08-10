@@ -82,13 +82,13 @@
         "op": "simvar_set",
         "var": "FUEL TANK LEFT AUX QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{LEFT_AUX} + 1.5"
+        "valueExpr": "{LEFT_AUX}"
       },
       {
         "op": "simvar_set",
         "var": "FUEL TANK RIGHT AUX QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_AUX} + 1.5"
+        "valueExpr": "{RIGHT_AUX}"
       },
       {
         "op": "delay",

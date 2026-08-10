@@ -130,9 +130,10 @@ describe('mission load method policy', () => {
     assert.equal(careerFuelMatchOk(2039, 2240, 50), false); // -201 beyond tol+taxi
     assert.equal(careerFuelMatchOk(2291, 2240, 50), true); // +51 within unusable slack
     assert.equal(careerFuelMatchOk(2285, 2240, 50), true); // +45 within tol
-    // King Air-style tip residual (~122 lb) must not fail Loaded vs Due.
+    // King Air-style tip residual (~122–168 lb) must not fail Loaded vs Due.
     assert.equal(careerFuelMatchOk(1980, 1858, 50), true);
-    assert.equal(careerFuelMatchOk(2100, 1858, 50), false); // beyond unusable slack
+    assert.equal(careerFuelMatchOk(2026, 1858, 50), true);
+    assert.equal(careerFuelMatchOk(2110, 1858, 50), false); // beyond unusable slack
     assert.equal(careerFuelMatchOk(2291, 2240, 50, 150, 0), false); // no unusable slack
   });
 });

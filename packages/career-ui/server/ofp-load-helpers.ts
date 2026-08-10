@@ -32,7 +32,7 @@ import {
   equalizeLateralStationPairs,
   fuelTankTargetsForRound,
   FUEL_INJECT_ROUNDS,
-  absorbFuelResidualFloors,
+  redistributeAroundResidualFloors,
   liveFuelMatchesTarget,
   FREIGHTER_PILOT_LB,
   GA_BAGGAGE_SOFT_MAX_LB,
@@ -1233,7 +1233,13 @@ async function applyMissionOfpLoadExclusive(
         );
       }
       const startTanks = { ...beforeLive.tanks };
-      let endTanks = built.plan.fuel.tanks ?? {};
+      // If tips/AUX already sit on an unusable floor, bake that into the target
+      // and pull the same qty from mains so the first pass aims at Due total.
+      let endTanks = redistributeAroundResidualFloors(
+        built.plan.fuel.tanks ?? {},
+        startTanks,
+      ).tanks;
+      built.plan.fuel = { ...built.plan.fuel, tanks: endTanks };
       restoreFuelOnRollback = false;
       for (let round = 1; round <= FUEL_INJECT_ROUNDS; round++) {
         assertOfpLoadNotCancelled(mission.id);
@@ -1280,20 +1286,20 @@ async function applyMissionOfpLoadExclusive(
           `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(tanksToFuelLb(afterLive.tanks))} lb live`,
         );
       }
-      // Accept MSFS unusable floors on drained tanks (King Air tip/AUX residual).
+      // After drain attempts: accept remaining AUX/TIP floors and lower mains
+      // so total stays on OFP Due (King Air tips stick ~10–12 gal / ~80 lb each).
       if (!restoreFuelOnRollback) {
         const liveAfter = await readLiveTanks(bridge, resolved.profile);
-        const absorbed = absorbFuelResidualFloors(endTanks, liveAfter);
-        if (absorbed.added > 0.05) {
-          endTanks = absorbed.tanks;
+        const adjusted = redistributeAroundResidualFloors(
+          built.plan.fuel.tanks ?? plannedTanks,
+          liveAfter,
+        );
+        if (adjusted.added > 0.05 || adjusted.reduced > 0.05) {
+          endTanks = adjusted.tanks;
           built.plan.fuel = { ...built.plan.fuel!, tanks: endTanks };
-          const addedLb = tanksToFuelLb(absorbed.tanks) - tanksToFuelLb(plannedTanks);
-          if (addedLb > 0.5) {
-            plannedFuelLb = built.blockFuelLb + addedLb;
-          }
-          watchDebugLog('inject', 'absorbed fuel residual floors', {
-            addedQty: Math.round(absorbed.added * 100) / 100,
-            addedLb: Math.round(addedLb),
+          watchDebugLog('inject', 'redistributed around fuel residual floors', {
+            addedQty: Math.round(adjusted.added * 100) / 100,
+            reducedQty: Math.round(adjusted.reduced * 100) / 100,
             tanks: Object.fromEntries(
               Object.entries(endTanks).map(([k, v]) => [
                 k,
@@ -1303,13 +1309,36 @@ async function applyMissionOfpLoadExclusive(
           });
           publishLiveProgress(
             'injecting',
-            `Fuel residual floors accepted · ${Math.round(tanksToFuelLb(liveAfter))} lb live`,
+            `Balancing tip residual into mains · ${Math.round(tanksToFuelLb(liveAfter))} lb live`,
           );
+          const fuelApply = await applyFuelRound(endTanks);
+          applyResult = {
+            ...(applyResult ?? {}),
+            fuel: fuelApply.fuel ?? applyResult?.fuel,
+          };
+          await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
+          const liveBalanced = await readLiveTanks(bridge, resolved.profile);
+          afterLive = {
+            tanks: preferWrittenFuelTanks(liveBalanced, endTanks),
+            stations: afterLive.stations,
+          };
+          lastGoodSchematicTanks =
+            pickFuelTankBreakdown(
+              schematicTanksFromProfile(afterLive.tanks),
+              lastGoodSchematicTanks,
+              tanksToFuelLb(afterLive.tanks),
+            ) ?? schematicTanksFromProfile(endTanks);
+          lastGoodFuelLb = tanksToFuelLb(afterLive.tanks);
+          publishLiveProgress(
+            'injecting',
+            `Fuel balanced · ${Math.round(lastGoodFuelLb)} lb live`,
+          );
+        } else {
+          afterLive = {
+            tanks: liveAfter,
+            stations: afterLive.stations,
+          };
         }
-        afterLive = {
-          tanks: liveAfter,
-          stations: afterLive.stations,
-        };
       }
       if (!applyResult) applyResult = {};
     } else {

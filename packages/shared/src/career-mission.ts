@@ -308,7 +308,7 @@ export const DEFAULT_FUEL_TAXI_BURN_LB = 150;
  * Extra Sim overshoot vs Due allowed for MSFS AUX/TIP unusable fuel that
  * inject cannot drain (King Air tip pair ~58 lb/side, Baron AUX floors, …).
  */
-export const DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB = 140;
+export const DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB = 200;
 
 /**
  * Fuel Loaded vs Due: allow Sim below Due by tol + taxi burn, and slightly

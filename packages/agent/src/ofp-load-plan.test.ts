@@ -24,6 +24,7 @@ import {
   FUEL_INJECT_ROUNDS,
   liveFuelMatchesTarget,
   absorbFuelResidualFloors,
+  redistributeAroundResidualFloors,
   resolveCgCounterweightBias,
   distributeCargoAcrossStations,
   distributeFuelAcrossTanks,
@@ -775,5 +776,37 @@ describe('absorbFuelResidualFloors', () => {
     );
     assert.equal(tanks.LEFT_MAIN, 50);
     assert.equal(added, 0);
+  });
+});
+
+describe('redistributeAroundResidualFloors', () => {
+  it('keeps OFP total by pulling tip residual out of the mains', () => {
+    const planned = {
+      LEFT_MAIN: 140,
+      RIGHT_MAIN: 140,
+      LEFT_AUX: 0,
+      RIGHT_AUX: 0,
+    };
+    const live = {
+      LEFT_MAIN: 140,
+      RIGHT_MAIN: 140,
+      LEFT_AUX: 11.8,
+      RIGHT_AUX: 11.9,
+    };
+    const { tanks, added, reduced } = redistributeAroundResidualFloors(
+      planned,
+      live,
+    );
+    assert.ok(added > 23);
+    assert.ok(reduced > 23);
+    const plannedTotal =
+      planned.LEFT_MAIN + planned.RIGHT_MAIN + planned.LEFT_AUX + planned.RIGHT_AUX;
+    const nextTotal =
+      tanks.LEFT_MAIN! + tanks.RIGHT_MAIN! + tanks.LEFT_AUX! + tanks.RIGHT_AUX!;
+    assert.ok(Math.abs(nextTotal - plannedTotal) < 0.15);
+    assert.equal(tanks.LEFT_AUX, 11.8);
+    assert.equal(tanks.RIGHT_AUX, 11.9);
+    assert.ok(tanks.LEFT_MAIN! < planned.LEFT_MAIN);
+    assert.ok(tanks.RIGHT_MAIN! < planned.RIGHT_MAIN);
   });
 });

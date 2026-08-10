@@ -1077,13 +1077,13 @@ export function liveFuelMatchesTarget(
 
 /**
  * Max residual (profile fuel units) treated as an unusable floor when draining.
- * ~12 gal ≈ 80 lb Jet-A — covers King Air tip/AUX stuck quantity.
+ * ~15 gal ≈ 100 lb Jet-A — covers King Air tip/AUX stuck quantity with density slack.
  */
-export const FUEL_RESIDUAL_FLOOR_MAX = 12;
+export const FUEL_RESIDUAL_FLOOR_MAX = 15;
 
 /**
  * When inject targets empty outer tanks but MSFS keeps an unusable residual,
- * raise the plan to that floor so we stop fighting the sim and Due can match.
+ * raise the plan to that floor so we stop fighting the sim.
  */
 export function absorbFuelResidualFloors(
   planned: Record<string, number>,
@@ -1103,6 +1103,87 @@ export function absorbFuelResidualFloors(
     }
   }
   return { tanks, added };
+}
+
+const RESIDUAL_DRAIN_PAIRS: Array<[string, string]> = [
+  ['LEFT_MAIN', 'RIGHT_MAIN'],
+  ['CENTER', 'CENTER2'],
+];
+
+function sumTankQty(tanks: Record<string, number>): number {
+  let sum = 0;
+  for (const v of Object.values(tanks)) {
+    if (Number.isFinite(v)) sum += v;
+  }
+  return sum;
+}
+
+/**
+ * Keep OFP total fuel: accept unusable AUX/TIP floors, then pull the same
+ * quantity out of the mains so Loaded vs Due still matches block fuel.
+ */
+export function redistributeAroundResidualFloors(
+  planned: Record<string, number>,
+  live: Record<string, number>,
+  opts?: { maxFloor?: number },
+): { tanks: Record<string, number>; added: number; reduced: number } {
+  const targetTotal = sumTankQty(planned);
+  const absorbed = absorbFuelResidualFloors(planned, live, opts);
+  if (absorbed.added <= 0.05) {
+    return { tanks: { ...planned }, added: 0, reduced: 0 };
+  }
+  const tanks = { ...absorbed.tanks };
+  let excess = sumTankQty(tanks) - targetTotal;
+  let reduced = 0;
+  if (excess <= 0.05) {
+    return { tanks, added: absorbed.added, reduced: 0 };
+  }
+
+  for (const [leftId, rightId] of RESIDUAL_DRAIN_PAIRS) {
+    if (excess <= 0.05) break;
+    const left = Number.isFinite(tanks[leftId]) ? tanks[leftId]! : 0;
+    const right = Number.isFinite(tanks[rightId]) ? tanks[rightId]! : 0;
+    if (left <= 0 && right <= 0 && !(leftId in tanks) && !(rightId in tanks)) {
+      continue;
+    }
+    const pair = left + right;
+    if (pair <= 0.05) continue;
+    const take = Math.min(excess, pair);
+    const half = take / 2;
+    let nextLeft = Math.max(0, left - half);
+    let nextRight = Math.max(0, right - half);
+    // Absorb rounding / odd leftovers on the fuller side.
+    let leftover = take - (left - nextLeft + (right - nextRight));
+    if (leftover > 0.01 && nextLeft >= leftover) {
+      nextLeft -= leftover;
+      leftover = 0;
+    }
+    if (leftover > 0.01 && nextRight >= leftover) {
+      nextRight -= leftover;
+      leftover = 0;
+    }
+    const removed = left - nextLeft + (right - nextRight);
+    tanks[leftId] = Math.round(nextLeft * 100) / 100;
+    tanks[rightId] = Math.round(nextRight * 100) / 100;
+    excess -= removed;
+    reduced += removed;
+  }
+
+  // Unpaired CENTER / other mains last.
+  if (excess > 0.05) {
+    for (const id of Object.keys(tanks)) {
+      if (excess <= 0.05) break;
+      if (/aux|tip/i.test(id)) continue;
+      const cur = tanks[id]!;
+      if (!(cur > 0.05)) continue;
+      const take = Math.min(excess, cur);
+      tanks[id] = Math.round((cur - take) * 100) / 100;
+      excess -= take;
+      reduced += take;
+    }
+  }
+
+  return { tanks, added: absorbed.added, reduced };
 }
 
 /** Default Career OFP fuel inject passes (ramp current → planned). */

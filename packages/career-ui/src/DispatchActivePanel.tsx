@@ -26,6 +26,7 @@ import {
   matchFuelOk,
 } from './load-verification';
 import { mxFuelBurnAlertText } from './mx-fuel-burn';
+import { logbookFlightKind } from './logbook';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
   const currentIndex = DISPATCH_STEP_ORDER.indexOf(props.current);
@@ -201,6 +202,8 @@ export function DispatchActivePanel(props: {
     watchRunning && (watchPos ?? lastAircraftRef.current)
       ? (watchPos ?? lastAircraftRef.current)
       : null;
+  const flightKind = logbookFlightKind(mission);
+  const isFerryLeg = flightKind === 'Ferry';
   const showOfpCard = Boolean(mission.lastOfpCheck);
   const showFuelCard =
     step === 'fuel' ||
@@ -289,7 +292,15 @@ export function DispatchActivePanel(props: {
           </h2>
           <p>
             {props.aircraftClassLabel(mission.aircraftClassId)} ·{' '}
+            <span className="logbook-kind">{flightKind}</span>
+            {' · '}
             <span className={`status status-${mission.status}`}>{mission.status}</span>
+            {mission.operatorNpcName ? (
+              <>
+                {' · '}
+                {mission.operatorNpcName}
+              </>
+            ) : null}
           </p>
         </div>
         <div className="missions-head-actions">
@@ -298,7 +309,11 @@ export function DispatchActivePanel(props: {
               type="button"
               className="action ghost danger missions-head-cancel"
               disabled={busy}
-              title="Abort this flight — no payout; cargo returns to the market"
+              title={
+                isFerryLeg
+                  ? 'Abort this ferry — no payout'
+                  : 'Abort this flight — no payout; cargo returns to the market'
+              }
               onClick={() => props.onCancel(mission)}
             >
               Cancel flight
@@ -308,17 +323,29 @@ export function DispatchActivePanel(props: {
       </div>
 
       <div className="cargo-capacity staging-capacity staging-ops-capacity">
+        {isFerryLeg ? (
+          <span>
+            Load
+            <strong>Empty</strong>
+            <em>ferry / reposition</em>
+          </span>
+        ) : (
+          <span>
+            Cargo
+            <strong>{props.formatTonnes(mission.cargoKg)}</strong>
+            <em>
+              {(mission.lots?.length ?? 1) > 1
+                ? `${mission.lots!.length} lots`
+                : '1 lot'}
+            </em>
+          </span>
+        )}
         <span>
-          Cargo
-          <strong>{props.formatTonnes(mission.cargoKg)}</strong>
-          <em>
-            {(mission.lots?.length ?? 1) > 1
-              ? `${mission.lots!.length} lots`
-              : '1 lot'}
-          </em>
-        </span>
-        <span>
-          Contract
+          {isFerryLeg
+            ? mission.contractPilot
+              ? 'Pilot fee'
+              : 'Payout'
+            : 'Contract'}
           <strong>{props.formatMoney(mission.payUsd)}</strong>
         </span>
         <span>
@@ -327,23 +354,25 @@ export function DispatchActivePanel(props: {
             {props.formatDeadline(mission.deadlineTick, continuousHours)}
           </strong>
         </span>
-        <span>
-          Capacity left
-          <strong>
-            {props.formatTonnes(
-              Math.max(
-                0,
-                props.missionMaxCargoKg(mission) - mission.cargoKg,
-              ),
-            )}
-          </strong>
-          {typeof props.missionOpsCapacityHint === 'number' &&
-          props.missionOpsCapacityHint > 0 ? (
-            <em>
-              of {props.formatTonnes(props.missionOpsCapacityHint)} ops
-            </em>
-          ) : null}
-        </span>
+        {!isFerryLeg ? (
+          <span>
+            Capacity left
+            <strong>
+              {props.formatTonnes(
+                Math.max(
+                  0,
+                  props.missionMaxCargoKg(mission) - mission.cargoKg,
+                ),
+              )}
+            </strong>
+            {typeof props.missionOpsCapacityHint === 'number' &&
+            props.missionOpsCapacityHint > 0 ? (
+              <em>
+                of {props.formatTonnes(props.missionOpsCapacityHint)} ops
+              </em>
+            ) : null}
+          </span>
+        ) : null}
         {mission.fuelUplift &&
         (mission.fuelUplift.costUsd > 0 ||
           mission.fuelUplift.requestedKg > 0.5) ? (
@@ -360,8 +389,9 @@ export function DispatchActivePanel(props: {
         ) : null}
       </div>
 
-      {(mission.lots?.length ?? 0) > 0 ||
-      ['accepted', 'dispatched'].includes(mission.status) ? (
+      {!isFerryLeg &&
+      ((mission.lots?.length ?? 0) > 0 ||
+        ['accepted', 'dispatched'].includes(mission.status)) ? (
         <div className="staging-section">
           <div className="staging-section-head">
             <h3>Cargo</h3>
@@ -391,6 +421,18 @@ export function DispatchActivePanel(props: {
           ) : (
             <p className="empty">No cargo lots on this flight yet.</p>
           )}
+        </div>
+      ) : isFerryLeg ? (
+        <div className="staging-section">
+          <div className="staging-section-head">
+            <h3>Ferry</h3>
+          </div>
+          <p className="empty">
+            {mission.reason?.trim() ||
+              (mission.contractPilot
+                ? 'Empty reposition for the operator — no freight on board.'
+                : 'Empty reposition — no freight on board.')}
+          </p>
         </div>
       ) : null}
 

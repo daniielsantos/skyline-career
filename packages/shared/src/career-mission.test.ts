@@ -1432,6 +1432,46 @@ describe('settleMission', () => {
     });
     assert.equal(settled.mission.status, 'settled');
   });
+
+  it('normalize clears phantom 0 kg lots on contract-pilot ferry', () => {
+    const raw = {
+      id: 'msn_cp_ferry',
+      status: 'in_flight' as const,
+      originIcao: 'KMEM',
+      destIcao: 'KSTL',
+      commodityId: 'general' as const,
+      cargoKg: 0,
+      pax: 0 as const,
+      aircraftClassId: 'light_turboprop' as const,
+      rolesPackRelPath: 'profiles/ofp/c208.json',
+      deadlineTick: 100,
+      payUsd: 558,
+      urgency: 'urgent' as const,
+      reason: 'Reposition · contract Midwest',
+      shipmentLotId: 'deadhead_1',
+      acceptedAtTick: 1,
+      contractPilot: true,
+      contractPilotReposition: true,
+      contractPilotFeeUsd: 558,
+      lots: [
+        {
+          shipmentLotId: 'deadhead_1',
+          commodityId: 'general' as const,
+          cargoKg: 0,
+          payUsd: 558,
+          urgency: 'urgent' as const,
+          reason: 'leftover',
+          deadlineTick: 100,
+        },
+      ],
+    };
+    const normalized = normalizeMissionIntent(raw);
+    assert.equal(normalized.lots.length, 0);
+    assert.equal(normalized.cargoKg, 0);
+    assert.equal(normalized.payUsd, 558);
+    assert.equal(normalized.urgency, 'normal');
+    assert.equal(normalized.contractPilotReposition, true);
+  });
 });
 
 describe('replaceMissionManifest', () => {

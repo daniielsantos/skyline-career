@@ -150,6 +150,7 @@ import {
   stockTrend,
   tickEconomyN,
   withMissionLoadPolicy,
+  normalizeMissionIntent,
   missionLoadPolicy,
   careerAllowsDirectInject,
   economyDayIndex,
@@ -315,18 +316,19 @@ function withMissionClientView(
   missions: MissionsFile,
   mission: MissionIntent,
 ) {
-  const base = withMissionLoadPolicy(mission);
+  const normalized = normalizeMissionIntent(mission);
+  const base = withMissionLoadPolicy(normalized);
   const typeId =
-    mission.airframeTypeId?.trim() ||
-    (mission.aircraftId
-      ? findPlayerAircraft(missions, mission.aircraftId)?.airframeTypeId?.trim()
+    normalized.airframeTypeId?.trim() ||
+    (normalized.aircraftId
+      ? findPlayerAircraft(missions, normalized.aircraftId)?.airframeTypeId?.trim()
       : undefined);
   const airframeLabel =
     findCareerPlayerAirframe(typeId)?.label ??
     findNpcAirframe(typeId)?.label;
   const distanceRaw =
-    routeDistanceNm(world, mission.originIcao, mission.destIcao) ??
-    mission.lastOfpCheck?.briefing?.distanceNm;
+    routeDistanceNm(world, normalized.originIcao, normalized.destIcao) ??
+    normalized.lastOfpCheck?.briefing?.distanceNm;
   const distanceNm =
     typeof distanceRaw === 'number' &&
     Number.isFinite(distanceRaw) &&

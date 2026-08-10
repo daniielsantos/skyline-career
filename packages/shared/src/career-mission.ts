@@ -617,6 +617,15 @@ function missionLines(mission: MissionIntent): MissionLotLine[] {
   if (Array.isArray(mission.lots) && mission.lots.length > 0) {
     return mission.lots;
   }
+  // Empty legs keep shipmentLotId for bookkeeping — do not invent a 0 kg freight
+  // line (that made Ferry Dispatch look like "0.0 klb general · $fee · urgent").
+  if (
+    mission.crewDeadhead === true ||
+    mission.contractPilotReposition === true ||
+    mission.emptyFlight === true
+  ) {
+    return [];
+  }
   // Legacy single-lot saves / test fixtures without `lots`.
   if (mission.shipmentLotId) {
     return [
@@ -645,48 +654,50 @@ export function isEmptyLegMission(mission: MissionIntent): boolean {
 
 /** Recompute top-level mirrors from `lots` (or legacy single-lot fields). */
 export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
+  // Empty legs first — ignore any phantom 0 kg lot left by older missionLines.
+  if (mission.crewDeadhead) {
+    return {
+      ...mission,
+      lots: [],
+      shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
+      commodityId: mission.commodityId || 'general',
+      cargoKg: 0,
+      payUsd: 0,
+      deadlineTick: mission.deadlineTick,
+      urgency: 'normal',
+      reason: mission.reason || 'Crew return',
+    };
+  }
+  if (mission.contractPilotReposition) {
+    return {
+      ...mission,
+      lots: [],
+      shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
+      commodityId: mission.commodityId || 'general',
+      cargoKg: 0,
+      payUsd: Math.max(0, mission.payUsd ?? mission.contractPilotFeeUsd ?? 0),
+      deadlineTick: mission.deadlineTick,
+      urgency: 'normal',
+      reason: mission.reason || 'Reposition',
+    };
+  }
+  if (mission.emptyFlight) {
+    return {
+      ...mission,
+      lots: [],
+      shipmentLotId: mission.shipmentLotId || `empty_${mission.id}`,
+      commodityId: mission.commodityId || 'general',
+      cargoKg: 0,
+      payUsd: 0,
+      deadlineTick: mission.deadlineTick,
+      urgency: 'normal',
+      reason: mission.reason || 'Empty flight',
+      emptyFlight: true,
+    };
+  }
+
   const lots = missionLines(mission);
   if (lots.length === 0) {
-    if (mission.crewDeadhead) {
-      return {
-        ...mission,
-        lots: [],
-        shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
-        commodityId: mission.commodityId || 'general',
-        cargoKg: 0,
-        payUsd: 0,
-        deadlineTick: mission.deadlineTick,
-        urgency: 'normal',
-        reason: mission.reason || 'Crew return',
-      };
-    }
-    if (mission.contractPilotReposition) {
-      return {
-        ...mission,
-        lots: [],
-        shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
-        commodityId: mission.commodityId || 'general',
-        cargoKg: 0,
-        payUsd: Math.max(0, mission.payUsd ?? 0),
-        deadlineTick: mission.deadlineTick,
-        urgency: 'normal',
-        reason: mission.reason || 'Reposition',
-      };
-    }
-    if (mission.emptyFlight) {
-      return {
-        ...mission,
-        lots: [],
-        shipmentLotId: mission.shipmentLotId || `empty_${mission.id}`,
-        commodityId: mission.commodityId || 'general',
-        cargoKg: 0,
-        payUsd: 0,
-        deadlineTick: mission.deadlineTick,
-        urgency: 'normal',
-        reason: mission.reason || 'Empty flight',
-        emptyFlight: true,
-      };
-    }
     throw new Error(`Mission ${mission.id} has no lot lines`);
   }
   const cargoKg = lots.reduce((sum, line) => sum + line.cargoKg, 0);

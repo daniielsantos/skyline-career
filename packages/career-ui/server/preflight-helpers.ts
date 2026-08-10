@@ -283,17 +283,34 @@ export async function runMissionPreflight(
       stationSumLb < 50 &&
       previousStationSumLb !== undefined &&
       previousStationSumLb > 200;
+    // TFDi MD-11 EFB: panel LVars are cargo/fuel truth; classic stations can lag
+    // or omit crew. Prefer ofpPayloadLb over station sum for Loaded vs Due.
+    const tfdiEfbPayload =
+      live.payload?.source === 'tfdi-efb' &&
+      typeof live.payload.ofpPayloadLb === 'number' &&
+      Number.isFinite(live.payload.ofpPayloadLb) &&
+      live.payload.ofpPayloadLb > 0;
     const livePayloadLb = clearedStations
       ? stationSumLb
-      : (live.payload?.total ?? live.payload?.ofpPayloadLb);
+      : tfdiEfbPayload
+        ? live.payload!.ofpPayloadLb
+        : (live.payload?.total ?? live.payload?.ofpPayloadLb);
     // EFB imports often leave S1/S2 at 0 — drop crew floor from Due when empty.
+    // TFDi EFB "Payload" is cargo-only (crew folded into BEW) — never add crew floor.
     const plannedPayload = plannedPayloadBase
-      ? adjustPlannedPayloadForLiveCrewStations({
-          cargoPlacedLb: plannedPayloadBase.cargoPlacedLb,
-          crewLb: plannedPayloadBase.crewLb,
-          crewStations: ofp.payload?.stationRoles?.crewStations,
-          liveStations: live.payload?.stations,
-        })
+      ? tfdiEfbPayload
+        ? {
+            plannedTotalLb: Math.round(plannedPayloadBase.cargoPlacedLb),
+            cargoPlacedLb: plannedPayloadBase.cargoPlacedLb,
+            crewLb: 0,
+            crewOnStations: false,
+          }
+        : adjustPlannedPayloadForLiveCrewStations({
+            cargoPlacedLb: plannedPayloadBase.cargoPlacedLb,
+            crewLb: plannedPayloadBase.crewLb,
+            crewStations: ofp.payload?.stationRoles?.crewStations,
+            liveStations: live.payload?.stations,
+          })
       : undefined;
     const plannedPayloadLb = plannedPayload?.plannedTotalLb;
     const fuelTolLb = Math.max(
@@ -314,9 +331,13 @@ export async function runMissionPreflight(
     // Loaded vs Due uses block-fuel total only. Per-tank FUEL_LEFT/RIGHT findings
     // are softened to warn (classic L/R can glitch while TOTAL matches).
     const fuelOk = weights.fuel.ok;
+    // TFDi EFB path: trust numeric Loaded vs Due — classic station findings can
+    // still read 0 while the EFB panel already matches SimBrief.
     const payloadOk = plannedPayloadBase?.gaCabin
       ? weights.payload.ok
-      : !payloadFailed && weights.payload.ok;
+      : tfdiEfbPayload
+        ? weights.payload.ok
+        : !payloadFailed && weights.payload.ok;
     const ready = fuelOk && payloadOk;
     const careerVerdict = softenCareerPreflightVerdict(ready, snapshot.verdict);
 

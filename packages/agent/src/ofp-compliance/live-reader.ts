@@ -268,10 +268,16 @@ async function readPmdgEfbLvars(
   return { gwLb, zfwLb, lwLb };
 }
 
-async function readTfdiMd11EfbLvars(
+export async function readTfdiMd11EfbLvars(
   bridge: NamedPipeSimBridge,
-): Promise<{ gwLb?: number; zfwLb?: number; payloadLb?: number; fuelLb?: number }> {
+): Promise<{
+  gwLb?: number;
+  zfwLb?: number;
+  payloadLb?: number;
+  fuelLb?: number;
+}> {
   // EFB UI shows ×1000 lb, but L:MD11_EFB_PAYLOAD_* store kilograms.
+  // L:MD11_EFB_PAYLOAD_LOAD is utilization (% of capacity), not a loading progress bar.
   const readKgAsLb = async (name: string): Promise<number | undefined> => {
     try {
       const kg = await bridge.readLVar(name);

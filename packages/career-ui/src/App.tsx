@@ -1234,7 +1234,11 @@ function LotExpiry(props: {
           className={leftHours <= 1 ? 'expiry soon' : 'expiry'}
           title={`Market deadline paused while this ${kind.toLowerCase()} is open`}
         >
-          {kind} · {formatDuration(leftHours)} left
+          {kind}
+          {claim.aircraftClassId
+            ? ` · ${aircraftClassLabel(claim.aircraftClassId)}`
+            : ''}{' '}
+          · {formatDuration(leftHours)} left
         </span>
       );
     }
@@ -1311,6 +1315,9 @@ function NpcTakenBadge(props: {
         title={tipParts.join(' · ')}
       >
         {props.claim.crewReposition ? 'Ferry' : 'Contract'}
+        {classLabel ? (
+          <span className="npc-badge-class"> · {classLabel}</span>
+        ) : null}
         <span className="npc-badge-eta"> · {formatDuration(eta)}</span>
       </span>
     );

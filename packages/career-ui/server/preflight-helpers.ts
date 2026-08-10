@@ -283,36 +283,40 @@ export async function runMissionPreflight(
       stationSumLb < 50 &&
       previousStationSumLb !== undefined &&
       previousStationSumLb > 200;
-    // TFDi MD-11 EFB: panel LVars are cargo/fuel truth; classic stations can lag
-    // or omit crew. Prefer ofpPayloadLb over station sum for Loaded vs Due.
-    const tfdiEfbPayload =
+    // TFDi EFB "Payload" is cargo-only; S1–S3 still hold the three crew members.
+    // Loaded vs Due = EFB cargo + live crew stations, against OFP cargo + crew floor.
+    const tfdiEfbCargoLb =
       live.payload?.source === 'tfdi-efb' &&
       typeof live.payload.ofpPayloadLb === 'number' &&
       Number.isFinite(live.payload.ofpPayloadLb) &&
-      live.payload.ofpPayloadLb > 0;
-    const livePayloadLb = clearedStations
-      ? stationSumLb
-      : tfdiEfbPayload
-        ? live.payload!.ofpPayloadLb
-        : (live.payload?.total ?? live.payload?.ofpPayloadLb);
+      live.payload.ofpPayloadLb > 0
+        ? live.payload.ofpPayloadLb
+        : undefined;
+    const crewStationIdxs =
+      ofp.payload?.stationRoles?.crewStations?.filter(
+        (idx) => Number.isFinite(idx) && idx > 0,
+      ) ?? [];
+    const liveCrewLb = crewStationIdxs.reduce((sum, idx) => {
+      const lb = live.payload?.stations?.[idx];
+      return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
+    }, 0);
     // EFB imports often leave S1/S2 at 0 — drop crew floor from Due when empty.
-    // TFDi EFB "Payload" is cargo-only (crew folded into BEW) — never add crew floor.
+    // When crew is present (MD-11 S1–S3), keep 3 × 170 lb in Due.
     const plannedPayload = plannedPayloadBase
-      ? tfdiEfbPayload
-        ? {
-            plannedTotalLb: Math.round(plannedPayloadBase.cargoPlacedLb),
-            cargoPlacedLb: plannedPayloadBase.cargoPlacedLb,
-            crewLb: 0,
-            crewOnStations: false,
-          }
-        : adjustPlannedPayloadForLiveCrewStations({
-            cargoPlacedLb: plannedPayloadBase.cargoPlacedLb,
-            crewLb: plannedPayloadBase.crewLb,
-            crewStations: ofp.payload?.stationRoles?.crewStations,
-            liveStations: live.payload?.stations,
-          })
+      ? adjustPlannedPayloadForLiveCrewStations({
+          cargoPlacedLb: plannedPayloadBase.cargoPlacedLb,
+          crewLb: plannedPayloadBase.crewLb,
+          crewStations: ofp.payload?.stationRoles?.crewStations,
+          liveStations: live.payload?.stations,
+        })
       : undefined;
     const plannedPayloadLb = plannedPayload?.plannedTotalLb;
+    const livePayloadLb = clearedStations
+      ? stationSumLb
+      : tfdiEfbCargoLb !== undefined
+        ? tfdiEfbCargoLb +
+          (plannedPayload?.crewOnStations ? liveCrewLb : 0)
+        : (live.payload?.total ?? live.payload?.ofpPayloadLb);
     const fuelTolLb = Math.max(
       ofp.tolerances?.fuelAbsLb ?? 50,
       Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
@@ -332,10 +336,10 @@ export async function runMissionPreflight(
     // are softened to warn (classic L/R can glitch while TOTAL matches).
     const fuelOk = weights.fuel.ok;
     // TFDi EFB path: trust numeric Loaded vs Due — classic station findings can
-    // still read 0 while the EFB panel already matches SimBrief.
+    // still under-read cargo while the EFB panel matches SimBrief.
     const payloadOk = plannedPayloadBase?.gaCabin
       ? weights.payload.ok
-      : tfdiEfbPayload
+      : tfdiEfbCargoLb !== undefined
         ? weights.payload.ok
         : !payloadFailed && weights.payload.ok;
     const ready = fuelOk && payloadOk;

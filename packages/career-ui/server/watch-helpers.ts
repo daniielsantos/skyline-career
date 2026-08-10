@@ -62,6 +62,7 @@ import {
   type WeatherOpsSnapshot,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge, setNamedPipeDebugLog } from '../../agent/src/named-pipe-sim-bridge.ts';
+import { readTfdiMd11EfbLvars } from '../../agent/src/ofp-compliance/live-reader.ts';
 import { adjustPlannedPayloadForLiveCrewStations } from '../../agent/src/ofp-load-plan.ts';
 import {
   readLiveCruiseTasKt,
@@ -401,10 +402,11 @@ export async function sampleLiveLoadLb(
   bridge: NamedPipeSimBridge,
   plannedPayloadLb?: number,
   previousStationSumLb?: number,
+  opts: { preferTfdiEfb?: boolean } = {},
 ): Promise<{
   fuelLb: number | null;
   payloadLb: number | null;
-  payloadSource: 'stations' | 'mass-balance' | 'none';
+  payloadSource: 'stations' | 'mass-balance' | 'tfdi-efb' | 'none';
   massBalanceLb?: number | null;
   emptyWeightLb?: number | null;
   grossWeightLb?: number | null;
@@ -412,6 +414,8 @@ export async function sampleLiveLoadLb(
   fuelTanks?: FuelTankBreakdown;
   fuelTankCapacity?: FuelTankBreakdown;
   stations?: Record<number, number>;
+  /** TFDi EFB cargo-only payload (excludes crew stations). */
+  tfdiEfbCargoLb?: number | null;
 }> {
   let density = DEFAULT_JET_A_LB_PER_GAL;
   let totalCapacityGal: number | undefined;
@@ -599,6 +603,24 @@ export async function sampleLiveLoadLb(
     ? fuelTanks
     : undefined;
 
+  let tfdiEfbCargoLb: number | null = null;
+  if (opts.preferTfdiEfb) {
+    try {
+      const tfdi = await readTfdiMd11EfbLvars(bridge);
+      if (typeof tfdi.fuelLb === 'number' && tfdi.fuelLb > 0) {
+        fuelLb = tfdi.fuelLb;
+      }
+      if (typeof tfdi.payloadLb === 'number' && tfdi.payloadLb > 0) {
+        tfdiEfbCargoLb = tfdi.payloadLb;
+        // Caller adds live crew stations on top for Loaded vs Due.
+        payloadLb = tfdi.payloadLb;
+        payloadSource = 'tfdi-efb';
+      }
+    } catch {
+      /* keep classic sample */
+    }
+  }
+
   return {
     fuelLb,
     payloadLb,
@@ -607,6 +629,7 @@ export async function sampleLiveLoadLb(
     emptyWeightLb: emptyWeightLb ?? null,
     grossWeightLb: grossWeightLb ?? null,
     stationSumLb: stationsRead > 0 ? stationSum : null,
+    tfdiEfbCargoLb,
     ...(usableTanks ? { fuelTanks: usableTanks } : {}),
     ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
     ...(stationsRead > 0 ? { stations } : {}),
@@ -1355,10 +1378,14 @@ export class CareerWatchSession {
                 0,
               )
             : undefined;
+          const preferTfdiEfb =
+            /tfdi-md11/i.test(current.rolesPackRelPath ?? '') ||
+            /tfdi-md11/i.test(current.airframeTypeId ?? '');
           const load = await sampleLiveLoadLb(
             this.bridge,
             prevVerification.payload.plannedLb,
             previousStationSumLb,
+            { preferTfdiEfb },
           );
           this.lastLoadSampleAtMs = Date.now();
           // Only keep prior totals when this sample failed to read them (null).
@@ -1377,14 +1404,6 @@ export class CareerWatchSession {
             typeof rawFuelLb === 'number' &&
             typeof liveFuelLb === 'number' &&
             Math.abs(rawFuelLb - liveFuelLb) > 1;
-          const livePayloadLb =
-            load.payloadLb !== null
-              ? load.payloadLb
-              : (prevVerification.payload.liveLb ?? undefined);
-          this.lastLiveFuelLb =
-            typeof liveFuelLb === 'number' ? liveFuelLb : load.fuelLb;
-          this.lastLivePayloadLb =
-            typeof livePayloadLb === 'number' ? livePayloadLb : load.payloadLb;
           const stationsForCrew = load.stations ?? prevWatchPayload.stations;
           const cargoLb =
             typeof prevWatchPayload.cargoLb === 'number' &&
@@ -1411,6 +1430,33 @@ export class CareerWatchSession {
           const plannedPayloadLb =
             adjustedPayload?.plannedTotalLb ??
             prevVerification.payload.plannedLb;
+          const liveCrewLb =
+            adjustedPayload?.crewOnStations && stationsForCrew
+              ? Object.entries(stationsForCrew).reduce((sum, [key, lb]) => {
+                  const idx = Number(key);
+                  // MD-11 / freighter crew is S1–S3 when floor is 3×170; otherwise
+                  // trust whatever adjust decided was "crew present" via stations 1..n.
+                  if (
+                    !Number.isFinite(idx) ||
+                    idx < 1 ||
+                    idx > Math.max(3, Math.round((crewFloorLb ?? 0) / 170))
+                  ) {
+                    return sum;
+                  }
+                  return sum + (Number.isFinite(lb) ? lb : 0);
+                }, 0)
+              : 0;
+          const livePayloadLb =
+            load.payloadSource === 'tfdi-efb' &&
+            typeof load.tfdiEfbCargoLb === 'number'
+              ? load.tfdiEfbCargoLb + liveCrewLb
+              : load.payloadLb !== null
+                ? load.payloadLb
+                : (prevVerification.payload.liveLb ?? undefined);
+          this.lastLiveFuelLb =
+            typeof liveFuelLb === 'number' ? liveFuelLb : load.fuelLb;
+          this.lastLivePayloadLb =
+            typeof livePayloadLb === 'number' ? livePayloadLb : load.payloadLb;
           const nextWeights = evaluateLoadVerification({
             plannedFuelLb: prevVerification.fuel.plannedLb,
             liveFuelLb,

@@ -34,6 +34,45 @@ export const TFDI_MD11_EFB_LVARS = {
   load: 'L:MD11_EFB_PAYLOAD_LOAD',
 } as const;
 
+/**
+ * Normalize TFDi EFB weight LVars to pounds.
+ * Panel shows ×1000 lb; older builds stored kg; some reads already return lb.
+ * L:MD11_EFB_PAYLOAD_LOAD is utilization (% of capacity), not a progress bar.
+ */
+export function interpretTfdiEfbWeightToLb(
+  raw: number,
+  kind: 'fuel' | 'payload' | 'weight',
+): number | undefined {
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return undefined;
+  }
+  // Panel units (Fuel 22.3, Payload 50, ZFW 298.6).
+  if (raw < 1000) {
+    const lb = raw * 1000;
+    return lb >= 500 ? lb : undefined;
+  }
+  if (kind === 'weight') {
+    // MD-11 ZFW/GW: lb ≥ ~220k; kg typically 100k–200k.
+    if (raw >= 220_000) return raw;
+    const lb = toLb(raw, 'kg');
+    return lb >= 1000 ? lb : undefined;
+  }
+  if (kind === 'fuel') {
+    // Short-hop block ~10k kg vs ~22k lb — kg band stays ≤20k raw.
+    if (raw <= 20_000) {
+      const lb = toLb(raw, 'kg');
+      return lb >= 500 ? lb : undefined;
+    }
+    return raw;
+  }
+  // Payload: OFP cargo ~23k kg or ~50k lb.
+  if (raw <= 40_000) {
+    const lb = toLb(raw, 'kg');
+    return lb >= 500 ? lb : undefined;
+  }
+  return raw;
+}
+
 export interface LiveLoadReading {
   fuel: LiveFuelState;
   payload: LivePayloadState;
@@ -268,6 +307,47 @@ async function readPmdgEfbLvars(
   return { gwLb, zfwLb, lwLb };
 }
 
+/**
+ * Interpret raw L:MD11_EFB_PAYLOAD_* values as pounds.
+ * TFDi has shipped these as kilograms, as full pounds, and as the EFB panel
+ * ×1000-lb display number (Fuel 22.3, Payload 50, ZFW 298.6).
+ */
+export function interpretTfdiEfbWeightLvar(
+  raw: number,
+  kind: 'fuel' | 'payload' | 'weight',
+): number | undefined {
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return undefined;
+  }
+  // Panel display units (×1000 lb).
+  if (raw < 1000) {
+    const lb = raw * 1000;
+    return lb >= 500 ? lb : undefined;
+  }
+  if (kind === 'weight') {
+    // ZFW/GW: lb is typically ≥220k on MD-11; below that treat as kg.
+    if (raw >= 220_000) {
+      return raw;
+    }
+    const lb = toLb(raw, 'kg');
+    return lb >= 1000 ? lb : undefined;
+  }
+  if (kind === 'fuel') {
+    // Block fuel: ≤20k → kg (short-hop ~10t); else already lb.
+    if (raw <= 20_000) {
+      const lb = toLb(raw, 'kg');
+      return lb >= 500 ? lb : undefined;
+    }
+    return raw;
+  }
+  // Payload: ≤40k → kg (~23t → ~50k lb); else already lb.
+  if (raw <= 40_000) {
+    const lb = toLb(raw, 'kg');
+    return lb >= 500 ? lb : undefined;
+  }
+  return raw;
+}
+
 export async function readTfdiMd11EfbLvars(
   bridge: NamedPipeSimBridge,
 ): Promise<{
@@ -276,25 +356,23 @@ export async function readTfdiMd11EfbLvars(
   payloadLb?: number;
   fuelLb?: number;
 }> {
-  // EFB UI shows ×1000 lb, but L:MD11_EFB_PAYLOAD_* store kilograms.
-  // L:MD11_EFB_PAYLOAD_LOAD is utilization (% of capacity), not a loading progress bar.
-  const readKgAsLb = async (name: string): Promise<number | undefined> => {
+  // L:MD11_EFB_PAYLOAD_LOAD is utilization (% of capacity), not a progress bar.
+  const readWeight = async (
+    name: string,
+    kind: 'fuel' | 'payload' | 'weight',
+  ): Promise<number | undefined> => {
     try {
-      const kg = await bridge.readLVar(name);
-      if (!Number.isFinite(kg) || kg <= 0) {
-        return undefined;
-      }
-      const lb = toLb(kg, 'kg');
-      return lb >= 1000 ? lb : undefined;
+      const raw = await bridge.readLVar(name);
+      return interpretTfdiEfbWeightLvar(raw, kind);
     } catch {
       return undefined;
     }
   };
   const [gwLb, zfwLb, payloadLb, fuelLb] = await Promise.all([
-    readKgAsLb(TFDI_MD11_EFB_LVARS.grossWeight),
-    readKgAsLb(TFDI_MD11_EFB_LVARS.zfw),
-    readKgAsLb(TFDI_MD11_EFB_LVARS.payload),
-    readKgAsLb(TFDI_MD11_EFB_LVARS.fuel),
+    readWeight(TFDI_MD11_EFB_LVARS.grossWeight, 'weight'),
+    readWeight(TFDI_MD11_EFB_LVARS.zfw, 'weight'),
+    readWeight(TFDI_MD11_EFB_LVARS.payload, 'payload'),
+    readWeight(TFDI_MD11_EFB_LVARS.fuel, 'fuel'),
   ]);
   return { gwLb, zfwLb, payloadLb, fuelLb };
 }

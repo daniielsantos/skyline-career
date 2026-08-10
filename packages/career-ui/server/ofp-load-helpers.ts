@@ -75,6 +75,12 @@ const repoRoot = getRepoRoot();
 const CG_REBALANCE_MARGIN_MAC = 1;
 /** CG nudge passes after the equal payload apply (50 lb each). */
 const CG_REBALANCE_MAX_ITERATIONS = 24;
+/**
+ * Ceiling for CG ballast (lb) added when an empty/ferry cabin sits outside the
+ * envelope and there is no cargo left to shift. Only a safety valve — the live
+ * CG feedback loop stops as soon as the envelope is reached.
+ */
+const CG_BALLAST_MAX_LB = 1_500;
 /** Settle after payload writes before trusting live CG (MSFS lag). */
 const PAYLOAD_CG_SETTLE_MS = 900;
 /** Settle between staged fuel inject rounds (shorter than payload CG settle). */
@@ -160,6 +166,8 @@ export type OfpLoadApplyResult = {
   error: string | null;
   /** How many CG cargo shifts ran (0 if none needed). */
   cgRebalanceMoves: number;
+  /** CG ballast (lb) added on top of OFP cargo to hold the envelope. */
+  ballastLb: number;
 };
 
 export type OfpLoadProgressPhase =
@@ -743,6 +751,7 @@ async function applyMissionOfpLoadExclusive(
   let preflight: MissionPreflightResult | null = null;
   let error: string | null = null;
   let cgRebalanceMoves = 0;
+  let ballastPlacedLb = 0;
   let engine: DefaultProfileEngine | null = null;
   let rollbackPlan: LoadPlanRequest | null = null;
   /** True only when we attempted a fuel write that did not succeed (needs undo). */
@@ -1599,6 +1608,48 @@ async function applyMissionOfpLoadExclusive(
             nextStations = shifted.stations;
             movedLb = shifted.movedLb;
           }
+          // Ferry / empty cabin: cargo target is met (often 0) and crew seats sit
+          // at their floor, so there is nothing left to shift. Add the minimum
+          // ballast that walks CG back into the envelope instead of rolling back.
+          if (
+            shifted.movedLb <= 0 &&
+            !stillPlacing &&
+            !preferSeatFill &&
+            ballastPlacedLb < CG_BALLAST_MAX_LB &&
+            built.movableStations.length > 0
+          ) {
+            const ballasted = allocateCargoRoundPerSeat(
+              workingStations,
+              resolved.profile,
+              built.movableStations,
+              perSeatLb,
+              bias,
+              CG_BALLAST_MAX_LB - ballastPlacedLb,
+              {
+                softMaxByIndex: {
+                  ...seatSoftMaxByIndex,
+                  ...baggageSoftMaxByIndex,
+                },
+              },
+            );
+            if (ballasted.movedLb > 0) {
+              nextStations = ballasted.stations;
+              movedLb = ballasted.movedLb;
+              ballastPlacedLb += ballasted.movedLb;
+              publishLiveProgress(
+                'balancing',
+                `CG ${liveMac!.toFixed(1)}% MAC — adding ${Math.round(ballasted.movedLb)} lb ballast`,
+                { cgAttempt: i + 1, liveMac },
+              );
+              watchDebugLog('inject', 'ballast', {
+                round: i,
+                bias,
+                addedLb: Math.round(ballasted.movedLb),
+                ballastPlacedLb: Math.round(ballastPlacedLb),
+                liveMac,
+              });
+            }
+          }
           // GA: CG at limit after soft-capped load is advisory — keep the seats.
           if (
             preferSeatFill &&
@@ -2136,15 +2187,18 @@ async function applyMissionOfpLoadExclusive(
         const failure = applyResult.cg.failures[0];
         const limits = resolved.profile.cg?.constraints;
         const margin = failure?.tolerancePct ?? CG_REBALANCE_MARGIN_MAC;
-        const minMac = limits?.minMac;
-        const maxMac = limits?.maxMac;
+        // Report the envelope the gate actually used: live (weight-dependent)
+        // first, profile constraints only as fallback. Printing the static
+        // constraints made rejections read as nonsense ("32.9% outside 19–39%").
+        const minMac = lastMinMac ?? limits?.minMac;
+        const maxMac = lastMaxMac ?? limits?.maxMac;
         const lo =
           minMac === undefined ? undefined : minMac + margin;
         const hi =
           maxMac === undefined ? undefined : maxMac - margin;
         parts.push(
           failure && lo !== undefined && hi !== undefined
-            ? `CG ${failure.actual.toFixed(1)}% outside ${lo.toFixed(0)}–${hi.toFixed(0)}% effective envelope (${minMac}–${maxMac}% tablet ±${margin}% margin)`
+            ? `CG ${failure.actual.toFixed(1)}% outside ${lo.toFixed(1)}–${hi.toFixed(1)}% effective envelope (${minMac!.toFixed(1)}–${maxMac!.toFixed(1)}% tablet ±${margin}% margin)`
             : failure
               ? `CG ${failure.actual.toFixed(1)}% out of envelope`
               : 'CG out of envelope',
@@ -2217,6 +2271,7 @@ async function applyMissionOfpLoadExclusive(
           userid,
           pipeName: opts.pipeName,
           targetBlockFuelKg: opts.targetBlockFuelKg,
+          ballastLb: ballastPlacedLb,
         });
       } catch (preflightError) {
         // Load already succeeded; surface preflight plumbing as soft failure note.
@@ -2280,6 +2335,7 @@ async function applyMissionOfpLoadExclusive(
       preflight,
       error,
       cgRebalanceMoves,
+      ballastLb: ballastPlacedLb,
     };
   } catch (err) {
     if (err instanceof OfpLoadCancelledError) {
@@ -2342,6 +2398,7 @@ async function applyMissionOfpLoadExclusive(
         preflight,
         error,
         cgRebalanceMoves,
+        ballastLb: ballastPlacedLb,
       };
     }
     error = formatPipeError(
@@ -2392,6 +2449,7 @@ async function applyMissionOfpLoadExclusive(
       preflight,
       error,
       cgRebalanceMoves,
+      ballastLb: ballastPlacedLb,
     };
   } finally {
     releaseSimBridgeGateOnce();

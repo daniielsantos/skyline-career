@@ -721,6 +721,12 @@ export interface MissionIntent {
   settledTouchdownLon?: number;
   /** Catalog runway projection at dest (when hub runways known). */
   settledRunwayTouch?: RunwayTouchdownSnapshot;
+  /**
+   * CG ballast (lb) the last successful inject placed on top of OFP cargo.
+   * An empty/ferry cabin can sit outside the envelope with nothing to shift;
+   * Loaded vs Due adds this so preflight expects the weight Skyline applied.
+   */
+  injectBallastLb?: number;
   /** Last Intent→OFP result after Confirm OFP (UI/CLI). */
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';

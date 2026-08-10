@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   acceptMission,
+  applyOfpBallastLb,
   assertRolesPackAllowsDirectInjection,
   cancelMission,
   careerAllowsDirectInject,
@@ -19,6 +20,7 @@ import {
   getAircraftClass,
   isActiveMissionStatus,
   isOfpCargoUnderOnlyFailure,
+  KG_TO_LB,
   listActivePlayerMissions,
   listMarketLots,
   listViableMarketLots,
@@ -26,6 +28,7 @@ import {
   missionLoadPolicy,
   normalizeMissionIntent,
   normalizeOfpExpectation,
+  ofpCargoKg,
   replaceMissionManifest,
   routeDistanceNm,
   settleMission,
@@ -1070,6 +1073,44 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(check.verdict, 'warn');
     assert.ok(check.findings.some((f) => f.code === 'INTENT_ORIGIN_MISSING'));
     assert.ok(check.findings.some((f) => f.code === 'INTENT_DEST_MISSING'));
+  });
+});
+
+describe('applyOfpBallastLb', () => {
+  const ferryOfp = (unit: 'kg' | 'lb') =>
+    normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit, total: 6986 },
+      loadSheet: { unit, blockFuel: 6986, baggage: 0, payload: 0 },
+    });
+
+  it('leaves the sheet untouched when no ballast was placed', () => {
+    const ofp = ferryOfp('lb');
+    assert.equal(applyOfpBallastLb(ofp, 0), ofp);
+    assert.equal(applyOfpBallastLb(ofp, -50), ofp);
+  });
+
+  it('adds ballast to a lb load sheet so a ferry Due is no longer zero', () => {
+    const withBallast = applyOfpBallastLb(ferryOfp('lb'), 440);
+    assert.equal(withBallast.loadSheet?.baggage, 440);
+    assert.equal(withBallast.loadSheet?.payload, 440);
+    // Due follows the sheet — this is what stops the empty-cabin preflight fail.
+    assert.equal(Math.round(ofpCargoKg(withBallast)! * KG_TO_LB), 440);
+  });
+
+  it('converts ballast into the sheet unit when the OFP is metric', () => {
+    const withBallast = applyOfpBallastLb(ferryOfp('kg'), 440);
+    assert.ok(Math.abs(withBallast.loadSheet!.baggage! - 440 / KG_TO_LB) < 0.01);
+    assert.ok(Math.abs(ofpCargoKg(withBallast)! - 440 / KG_TO_LB) < 0.01);
+  });
+
+  it('stacks ballast on top of real cargo instead of replacing it', () => {
+    const loaded = normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit: 'lb', total: 6986 },
+      loadSheet: { unit: 'lb', blockFuel: 6986, baggage: 1200 },
+    });
+    assert.equal(applyOfpBallastLb(loaded, 300).loadSheet?.baggage, 1500);
   });
 });
 

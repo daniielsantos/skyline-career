@@ -3487,6 +3487,7 @@ export function createCareerApiServer(port = 8787) {
                   dispatchedAtTick: world.tick,
                   lastOfpCheck: undefined,
                   lastPreflightCheck: undefined,
+                  injectBallastLb: undefined,
                   fuelAuthorizedOfpId: undefined,
                 };
                 if (idx >= 0) missions.missions[idx] = dispatched;
@@ -3855,6 +3856,7 @@ export function createCareerApiServer(port = 8787) {
                   dispatchedAtTick: world.tick,
                   lastOfpCheck: undefined,
                   lastPreflightCheck: undefined,
+                  injectBallastLb: undefined,
                   fuelAuthorizedOfpId: undefined,
                 };
                 if (idx >= 0) missions.missions[idx] = dispatched;
@@ -4265,6 +4267,7 @@ export function createCareerApiServer(port = 8787) {
             dispatchedAtTick: world.tick,
             lastOfpCheck: undefined,
             lastPreflightCheck: undefined,
+            injectBallastLb: undefined,
             fuelAuthorizedOfpId: undefined,
           };
           missions.missions[idx] = dispatched;
@@ -4476,6 +4479,7 @@ export function createCareerApiServer(port = 8787) {
             const trimmed = trimMissionCargoToKg(world, mission, ofpCargoKg);
             Object.assign(mission, trimmed.mission);
             mission.lastPreflightCheck = undefined;
+            mission.injectBallastLb = undefined;
             mission.fuelAuthorizedOfpId = undefined;
             // Keep staticId / same SimBrief OFP — only the mission load changed.
             return {
@@ -5151,6 +5155,15 @@ export function createCareerApiServer(port = 8787) {
             mxFuelBurnNote: mxFuelBurnProgressNote(injectAcf) ?? undefined,
           });
           let savedMission = mission;
+          // A rolled-back inject left nothing on the stations — drop any ballast
+          // from a previous pass so a later Validate does not expect it.
+          const injectBallastLb =
+            result.ok && result.ballastLb > 0
+              ? Math.round(result.ballastLb)
+              : undefined;
+          let lastPreflightCheck:
+            | NonNullable<MissionIntent['lastPreflightCheck']>
+            | undefined;
           if (result.preflight) {
             const mxFinding = mxFuelBurnFindingForAircraft(injectAcf);
             const findings = mxFinding
@@ -5164,7 +5177,7 @@ export function createCareerApiServer(port = 8787) {
             const summary = mxFinding
               ? `${result.preflight.check.summary} · ${mxFinding.message}`
               : result.preflight.check.summary;
-            const lastPreflightCheck = {
+            lastPreflightCheck = {
               verdict: result.preflight.check.verdict,
               summary,
               checkedAtIso: result.preflight.check.checkedAtIso,
@@ -5172,8 +5185,11 @@ export function createCareerApiServer(port = 8787) {
               loadVerification: result.preflight.check.loadVerification,
               findings,
             };
+          }
+          {
             const wrote = await updateOpenMission(body.missionId, (_m, open) => {
-              open.lastPreflightCheck = lastPreflightCheck;
+              if (lastPreflightCheck) open.lastPreflightCheck = lastPreflightCheck;
+              open.injectBallastLb = injectBallastLb;
               savedMission = open;
               return true;
             });

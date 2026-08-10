@@ -2285,6 +2285,35 @@ function cargoToleranceKg(
   return Math.max(tolerances.cargoAbsKg, Math.abs(intentCargoKg) * tolerances.cargoPct);
 }
 
+/**
+ * Fold CG ballast (lb) into the OFP load sheet.
+ *
+ * An empty/ferry cabin can sit aft of the CG envelope with nothing to shift
+ * (crew seats are fixed at their floor), so inject places the minimum weight
+ * that walks CG back in. Loaded vs Due has to expect that weight, otherwise
+ * preflight fails on the very load Skyline just applied.
+ */
+export function applyOfpBallastLb(
+  ofp: OfpExpectation,
+  ballastLb: number,
+): OfpExpectation {
+  if (!Number.isFinite(ballastLb) || ballastLb <= 0) return ofp;
+  const sheet = ofp.loadSheet;
+  if (!sheet) return ofp;
+  const unit = sheet.unit ?? ofp.fuel.unit ?? 'kg';
+  const ballast = unit === 'kg' ? ballastLb / KG_TO_LB : ballastLb;
+  return {
+    ...ofp,
+    loadSheet: {
+      ...sheet,
+      baggage: (sheet.baggage ?? 0) + ballast,
+      ...(sheet.payload !== undefined
+        ? { payload: sheet.payload + ballast }
+        : {}),
+    },
+  };
+}
+
 /** Prefer SimBrief cargo/baggage; if freighter (pax≈0) fall back to payload. */
 export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
   const sheet = ofp.loadSheet;

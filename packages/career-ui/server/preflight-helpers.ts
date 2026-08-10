@@ -5,6 +5,7 @@
 
 import {
   KG_TO_LB,
+  applyOfpBallastLb,
   evaluateLoadVerification,
   isUsableFuelTankBreakdown,
   normalizeAircraftTitle,
@@ -153,6 +154,11 @@ export async function runMissionPreflight(
     pipeName?: string;
     /** Optional block-fuel override (kg); normally omit so Due matches SimBrief. */
     targetBlockFuelKg?: number;
+    /**
+     * CG ballast (lb) just placed by inject. Overrides the mission's stored
+     * value so the post-inject check sees the load that was actually applied.
+     */
+    ballastLb?: number;
   } = {},
 ): Promise<MissionPreflightResult> {
   if (!mission.staticId) {
@@ -198,6 +204,11 @@ export async function runMissionPreflight(
         throw rolesError;
       }
       // Freighter compare still works without roles; classic payload path.
+    }
+
+    const ballastLb = opts.ballastLb ?? mission.injectBallastLb ?? 0;
+    if (ballastLb > 0) {
+      ofp = applyOfpBallastLb(ofp, ballastLb);
     }
 
     const previousStationSumLb = mission.lastPreflightCheck?.loadVerification

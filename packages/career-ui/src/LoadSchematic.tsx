@@ -71,16 +71,25 @@ function outerSum(t: FuelTanks): number {
 /**
  * Hold last non-zero tip/aux while mains stay loaded — stops the Learjet UI flash
  * (TL/TR → 0 lb, Sim 2508 = L+R only) when capacity still shows the tip cells.
+ * Release when FUEL TOTAL already matches mains-only (tips truly drained).
  */
 function stickyOuterTanks(
   tanks: FuelTanks,
   prevSticky: FuelTanks | undefined,
+  totalFuelLb?: number,
 ): FuelTanks {
   const mains = tanks.left + tanks.right + tanks.center;
   if (mains < 50) return tanks;
   const prev = prevSticky;
   if (!prev || outerSum(prev) < 25) return tanks;
   if (outerSum(tanks) > outerSum(prev) * 0.15) return tanks;
+  if (
+    typeof totalFuelLb === 'number' &&
+    Number.isFinite(totalFuelLb) &&
+    Math.abs(totalFuelLb - mains) <= Math.max(40, totalFuelLb * 0.03)
+  ) {
+    return tanks;
+  }
   return {
     ...tanks,
     ...(prev.leftAux != null ? { leftAux: prev.leftAux } : {}),
@@ -94,13 +103,29 @@ function stickyOuterTanks(
 export function FuelTankSchematic(props: {
   tanks?: FuelTanks;
   tankCapacity?: FuelTanks;
+  /** Live FUEL TOTAL — used to release sticky tip/aux after a real drain. */
+  liveFuelLb?: number;
   weightSystem: WeightSystem;
 }) {
   const stickyRef = useRef<FuelTanks | undefined>(undefined);
   const incoming = props.tanks;
   if (!incoming) return null;
-  const tanks = stickyOuterTanks(incoming, stickyRef.current);
-  if (outerSum(tanks) >= 25 || tanks.left + tanks.right + tanks.center < 50) {
+  const tanks = stickyOuterTanks(
+    incoming,
+    stickyRef.current,
+    props.liveFuelLb,
+  );
+  if (
+    outerSum(tanks) >= 25 ||
+    tanks.left + tanks.right + tanks.center < 50 ||
+    // Clear sticky after a trusted empty-outer sample so residue does not stick.
+    (outerSum(incoming) < 25 &&
+      typeof props.liveFuelLb === 'number' &&
+      Math.abs(
+        props.liveFuelLb -
+          (incoming.left + incoming.right + incoming.center),
+      ) <= Math.max(40, props.liveFuelLb * 0.03))
+  ) {
     stickyRef.current = tanks;
   }
   const cap = props.tankCapacity;

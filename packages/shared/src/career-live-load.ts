@@ -165,9 +165,31 @@ export function outerTanksCollapsedWhileMainsStable(
 }
 
 /**
+ * Tip/aux read ~0 while mains stay loaded — trust it when FUEL TOTAL agrees
+ * with mains-only (real drain / M&B clear). Keep sticky when TOTAL still
+ * looks like mains+previous outers (Learjet SimConnect flicker).
+ */
+export function outerTankCollapseIsTrusted(
+  next: FuelTankBreakdown,
+  prev: FuelTankBreakdown,
+  totalFuelLb?: number | null,
+): boolean {
+  if (!outerTanksCollapsedWhileMainsStable(next, prev)) return false;
+  const total =
+    typeof totalFuelLb === 'number' && Number.isFinite(totalFuelLb)
+      ? Math.max(0, totalFuelLb)
+      : undefined;
+  if (total === undefined) return false;
+  const nextMain = mainTankLb(next);
+  const tol = Math.max(40, total * 0.03);
+  return Math.abs(total - nextMain) <= tol;
+}
+
+/**
  * Classic L/R/C SimVars sometimes return all zeros while FUEL TOTAL is still valid.
  * Reject those glitches so UI keeps the previous schematic / omits tanks.
- * Also reject tip/aux-only collapses (Learjet post-inject flicker).
+ * Also reject tip/aux-only collapses (Learjet post-inject flicker) unless
+ * FUEL TOTAL confirms the outers are really empty.
  */
 export function isUsableFuelTankBreakdown(
   tanks: FuelTankBreakdown,
@@ -187,7 +209,7 @@ export function isUsableFuelTankBreakdown(
     return false;
   }
   if (prev && outerTanksCollapsedWhileMainsStable(tanks, prev)) {
-    return false;
+    return outerTankCollapseIsTrusted(tanks, prev, totalFuelLb);
   }
   return true;
 }
@@ -197,7 +219,8 @@ export function isUsableFuelTankBreakdown(
  * Never keep an all-zero glitch when FUEL TOTAL is still high — that froze the
  * Preflight L/R schematic at 0 while Sim total stayed correct.
  * When only tip/aux collapse (mains held or rising), keep fresh mains and
- * hold the previous outer tanks so the tip schematic does not flash empty.
+ * hold the previous outer tanks so the tip schematic does not flash empty —
+ * unless TOTAL already matches mains-only (tips truly drained).
  */
 export function pickFuelTankBreakdown(
   next: FuelTankBreakdown | undefined,
@@ -209,6 +232,7 @@ export function pickFuelTankBreakdown(
     next &&
     prev &&
     outerTanksCollapsedWhileMainsStable(next, prev) &&
+    !outerTankCollapseIsTrusted(next, prev, totalFuelLb) &&
     isUsableFuelTankBreakdown(
       { left: next.left, right: next.right, center: next.center },
       totalFuelLb,

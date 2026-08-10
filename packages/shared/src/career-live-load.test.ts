@@ -105,6 +105,24 @@ describe('isUsableFuelTankBreakdown', () => {
     assert.deepEqual(pickFuelTankBreakdown(glitch, prev, 4000), prev);
   });
 
+  it('pickFuelTankBreakdown trusts tip drain when TOTAL matches mains', () => {
+    const prev = {
+      left: 933,
+      right: 933,
+      center: 0,
+      leftAux: 52,
+      rightAux: 52,
+    };
+    const drained = {
+      left: 975,
+      right: 975,
+      center: 0,
+      leftAux: 0,
+      rightAux: 0,
+    };
+    assert.deepEqual(pickFuelTankBreakdown(drained, prev, 1950), drained);
+  });
+
   it('pickFuelTankBreakdown keeps tips when mains rise mid fuel-inject', () => {
     const prev = {
       left: 800,

@@ -1090,6 +1090,7 @@ export function DispatchActivePanel(props: {
                       <FuelTankSchematic
                         tanks={view.fuel.tanks}
                         tankCapacity={view.fuel.tankCapacity}
+                        liveFuelLb={view.fuel.liveLb}
                         weightSystem={weightSystem}
                       />
                     </div>

@@ -7,6 +7,8 @@ const DEFAULT_FUEL_TOL_LB = 50;
 const DEFAULT_PAYLOAD_TOL_LB = 75;
 /** Sim may sit this far under OFP block after taxi / APU without leaving Ready. */
 const DEFAULT_FUEL_TAXI_BURN_LB = 150;
+/** Unusable tip/aux floors inject cannot clear — mirror shared careerFuelMatchOk. */
+const DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB = 200;
 
 function matchOk(
   liveLb: number | undefined,
@@ -18,19 +20,21 @@ function matchOk(
   return Math.abs(liveLb - plannedLb) <= Math.max(0, toleranceLb);
 }
 
-/** Fuel: allow undershoot for taxi burn; keep overshoot on the tight band. */
+/** Fuel: taxi undershoot + small unusable overshoot (mirror shared). */
 export function matchFuelOk(
   liveLb: number | undefined,
   plannedLb: number | undefined,
   toleranceLb: number,
   taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
+  unusableOvershootLb: number = DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB,
 ): boolean {
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
   if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
   const tol = Math.max(0, toleranceLb);
   const taxi = Math.max(0, taxiBurnLb);
+  const unusable = Math.max(0, unusableOvershootLb);
   const delta = liveLb - plannedLb;
-  if (delta > 0) return delta <= tol;
+  if (delta > 0) return delta <= tol + unusable;
   return -delta <= tol + taxi;
 }
 
@@ -91,6 +95,26 @@ export function outerTanksCollapsedWhileMainsStable(
   return nextMain >= prevMain - mainTol;
 }
 
+/**
+ * Trust tip/aux zero when FUEL TOTAL ≈ mains-only (real drain). Hold sticky
+ * when TOTAL still looks like mains + previous outers (Learjet flicker).
+ */
+export function outerTankCollapseIsTrusted(
+  next: LoadFuelTankBreakdown,
+  prev: LoadFuelTankBreakdown,
+  totalFuelLb?: number | null,
+): boolean {
+  if (!outerTanksCollapsedWhileMainsStable(next, prev)) return false;
+  const total =
+    typeof totalFuelLb === 'number' && Number.isFinite(totalFuelLb)
+      ? Math.max(0, totalFuelLb)
+      : undefined;
+  if (total === undefined) return false;
+  const nextMain = mainTankLb(next);
+  const tol = Math.max(40, total * 0.03);
+  return Math.abs(total - nextMain) <= tol;
+}
+
 /** Classic L/R/C sometimes glitch to zero while FUEL TOTAL is still valid. */
 export function isUsableFuelTankBreakdown(
   tanks: LoadFuelTankBreakdown,
@@ -110,7 +134,7 @@ export function isUsableFuelTankBreakdown(
     return false;
   }
   if (prev && outerTanksCollapsedWhileMainsStable(tanks, prev)) {
-    return false;
+    return outerTankCollapseIsTrusted(tanks, prev, totalFuelLb);
   }
   return true;
 }
@@ -118,7 +142,8 @@ export function isUsableFuelTankBreakdown(
 /**
  * Prefer a usable next tank map; otherwise keep previous *if still usable*.
  * Never keep an all-zero glitch when FUEL TOTAL is still high.
- * Tip/aux-only collapse → keep fresh mains, hold previous outers.
+ * Tip/aux-only collapse → keep fresh mains, hold previous outers — unless
+ * TOTAL already matches mains-only (tips truly drained).
  */
 export function pickFuelTankBreakdown(
   next: LoadFuelTankBreakdown | undefined,
@@ -130,6 +155,7 @@ export function pickFuelTankBreakdown(
     next &&
     prev &&
     outerTanksCollapsedWhileMainsStable(next, prev) &&
+    !outerTankCollapseIsTrusted(next, prev, totalFuelLb) &&
     isUsableFuelTankBreakdown(
       { left: next.left, right: next.right, center: next.center },
       totalFuelLb,

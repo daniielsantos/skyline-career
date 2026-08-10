@@ -5,6 +5,8 @@
 
 const DEFAULT_FUEL_TOL_LB = 50;
 const DEFAULT_PAYLOAD_TOL_LB = 75;
+/** Sim may sit this far under OFP block after taxi / APU without leaving Ready. */
+const DEFAULT_FUEL_TAXI_BURN_LB = 150;
 
 function matchOk(
   liveLb: number | undefined,
@@ -14,6 +16,22 @@ function matchOk(
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
   if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
   return Math.abs(liveLb - plannedLb) <= Math.max(0, toleranceLb);
+}
+
+/** Fuel: allow undershoot for taxi burn; keep overshoot on the tight band. */
+export function matchFuelOk(
+  liveLb: number | undefined,
+  plannedLb: number | undefined,
+  toleranceLb: number,
+  taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
+): boolean {
+  if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
+  if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
+  const tol = Math.max(0, toleranceLb);
+  const taxi = Math.max(0, taxiBurnLb);
+  const delta = liveLb - plannedLb;
+  if (delta > 0) return delta <= tol;
+  return -delta <= tol + taxi;
 }
 
 /** Per-side classic fuel breakdown (aux/tip shown separately when present). */
@@ -407,7 +425,7 @@ export function evaluateLoadVerification(opts: {
       ? opts.livePayloadLb
       : undefined;
 
-  const fuelOk = matchOk(liveFuel, opts.plannedFuelLb, fuelTol);
+  const fuelOk = matchFuelOk(liveFuel, opts.plannedFuelLb, fuelTol);
   const payloadOk = matchOk(livePayload, opts.plannedPayloadLb, payloadTol);
   const ready = fuelOk && payloadOk;
 

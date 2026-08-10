@@ -298,6 +298,30 @@ export function careerLoadWeightMatchOk(
   return Math.abs(liveLb - plannedLb) <= Math.max(0, toleranceLb);
 }
 
+/**
+ * Extra Sim undershoot vs OFP block fuel allowed after a good inject (taxi / APU).
+ * Overshoot stays on the tight `toleranceLb` band.
+ */
+export const DEFAULT_FUEL_TAXI_BURN_LB = 150;
+
+/**
+ * Fuel Loaded vs Due: allow Sim below Due by tol + taxi burn, but not above Due+tol.
+ */
+export function careerFuelMatchOk(
+  liveLb: number | undefined,
+  plannedLb: number | undefined,
+  toleranceLb: number,
+  taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
+): boolean {
+  if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
+  if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
+  const tol = Math.max(0, toleranceLb);
+  const taxi = Math.max(0, taxiBurnLb);
+  const delta = liveLb - plannedLb;
+  if (delta > 0) return delta <= tol;
+  return -delta <= tol + taxi;
+}
+
 export function softenCareerPreflightVerdict(
   ready: boolean,
   snapshotVerdict: 'pass' | 'warn' | 'fail',

@@ -1,4 +1,4 @@
-import { careerLoadWeightMatchOk, careerPreflightReady } from './career-mission.js';
+import { careerFuelMatchOk, careerLoadWeightMatchOk, careerPreflightReady } from './career-mission.js';
 import {
   DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
@@ -7,6 +7,7 @@ import {
 /** Default Loaded vs Due tolerances (lb). */
 export const DEFAULT_FUEL_TOL_LB = 50;
 export const DEFAULT_PAYLOAD_TOL_LB = 75;
+export { DEFAULT_FUEL_TAXI_BURN_LB } from './career-mission.js';
 
 /**
  * Resolve live payload from station SimVars and/or mass-balance.
@@ -343,7 +344,7 @@ export function evaluateLoadVerification(opts: {
       ? opts.livePayloadLb
       : undefined;
 
-  const fuelOk = careerLoadWeightMatchOk(
+  const fuelOk = careerFuelMatchOk(
     liveFuel,
     opts.plannedFuelLb,
     fuelTol,

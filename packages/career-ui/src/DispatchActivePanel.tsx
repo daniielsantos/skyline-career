@@ -23,6 +23,7 @@ import {
   pickLivePayloadLb,
   pickStableLiveFuelLb,
   stabilizeDisplayedFuel,
+  matchFuelOk,
 } from './load-verification';
 import { mxFuelBurnAlertText } from './mx-fuel-burn';
 
@@ -710,13 +711,16 @@ export function DispatchActivePanel(props: {
                       watchPayload.stationMax ??
                       baseVerification.payload.stationMax;
                     // Recompute ok from live numbers so a stale ready flag cannot stick.
+                    // Fuel undershoot (taxi burn) is allowed; overshoot stays tight.
                     const fuelTol = 50;
                     const payloadTol = 75;
                     const fuelOk =
                       baseVerification.fuel.plannedLb === undefined ||
-                      Math.abs(
-                        liveFuelLb - baseVerification.fuel.plannedLb,
-                      ) <= fuelTol;
+                      matchFuelOk(
+                        liveFuelLb,
+                        baseVerification.fuel.plannedLb,
+                        fuelTol,
+                      );
                     const payloadOk =
                       baseVerification.payload.plannedLb === undefined
                         ? true
@@ -853,7 +857,7 @@ export function DispatchActivePanel(props: {
             const fuelNumbersOk =
               !view ||
               view.fuel.plannedLb === undefined ||
-              Math.abs((view.fuel.liveLb ?? 0) - view.fuel.plannedLb) <= 50;
+              matchFuelOk(view.fuel.liveLb ?? 0, view.fuel.plannedLb, 50);
             const payloadNumbersOk =
               !view ||
               view.payload.plannedLb === undefined ||

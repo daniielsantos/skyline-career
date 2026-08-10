@@ -6,6 +6,7 @@ import {
   cancelMission,
   careerAllowsDirectInject,
   careerLoadWeightMatchOk,
+  careerFuelMatchOk,
   careerPreflightReady,
   commitStagedManifest,
   compareMissionIntentToOfp,
@@ -120,6 +121,14 @@ describe('mission load method policy', () => {
     assert.equal(careerLoadWeightMatchOk(174, 174, 50), true);
     assert.equal(careerLoadWeightMatchOk(undefined, 992, 75), false);
     assert.equal(careerLoadWeightMatchOk(0, undefined, 75), true);
+  });
+
+  it('allows fuel taxi burn undershoot but not overshoot beyond tol', () => {
+    assert.equal(careerFuelMatchOk(2240, 2240, 50), true);
+    assert.equal(careerFuelMatchOk(2090, 2240, 50), true); // -150 within taxi
+    assert.equal(careerFuelMatchOk(2039, 2240, 50), false); // -201 beyond tol+taxi
+    assert.equal(careerFuelMatchOk(2291, 2240, 50), false); // +51 over
+    assert.equal(careerFuelMatchOk(2285, 2240, 50), true); // +45 within tol
   });
 });
 

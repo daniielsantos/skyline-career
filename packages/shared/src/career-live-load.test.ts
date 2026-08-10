@@ -276,6 +276,17 @@ describe('evaluateLoadVerification', () => {
     });
     assert.equal(v.ready, true);
   });
+
+  it('keeps fuel ok after taxi burn undershoot', () => {
+    const v = evaluateLoadVerification({
+      plannedFuelLb: 2240,
+      liveFuelLb: 2100,
+      plannedPayloadLb: 900,
+      livePayloadLb: 900,
+    });
+    assert.equal(v.fuel.ok, true);
+    assert.equal(v.ready, true);
+  });
 });
 
 describe('loadVerificationDrifted', () => {

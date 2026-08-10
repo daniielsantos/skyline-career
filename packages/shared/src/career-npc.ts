@@ -838,6 +838,25 @@ export function estimateNpcBlockHours(
   return { flightHours, busyHours: flightHours + TURNAROUND_HOURS };
 }
 
+/**
+ * Delivery SLA for contract-pilot missions.
+ * Lots can sit past `expiresAtTick` while `awaiting_pilot` is still open; copying
+ * that expiry onto the mission made the player start already multi-hour late.
+ * Floor is accept time + block (+ buffer); keep the lot expiry when it is stricter.
+ */
+export function contractPilotMissionDeadlineTick(opts: {
+  worldTick: number;
+  lotExpiresAtTick: number;
+  distanceNm: number | undefined;
+  aircraftClassId: FreighterClassId;
+}): number {
+  const dist = Math.max(0, opts.distanceNm ?? 0);
+  const { flightHours } = estimateNpcBlockHours(dist, opts.aircraftClassId);
+  const minWindowHours = Math.max(2, flightHours + 1.5);
+  const fromAccept = opts.worldTick + hoursToTicks(minWindowHours);
+  return Math.max(opts.lotExpiresAtTick, fromAccept);
+}
+
 function pickThinnestHomeRegion(
   regionList: string[],
   homeCounts: Map<string, number>,
@@ -2181,6 +2200,15 @@ export function acceptContractPilotOffer(
     opts.missionId?.trim() ||
     `msn_cp_${world.tick}_${flight.originIcao}_${flight.destIcao}_${Math.floor(Math.random() * 1e6)}`;
 
+  // Reposition has no cargo SLA; freight uses a fair accept-time floor so an
+  // already-expired lot does not auto-fail the pilot who just claimed the offer.
+  const deadlineTick = contractPilotMissionDeadlineTick({
+    worldTick: world.tick,
+    lotExpiresAtTick: isRepo ? 0 : lot.expiresAtTick,
+    distanceNm,
+    aircraftClassId: flight.aircraftClassId,
+  });
+
   const mission = recomputeMissionTotals({
     id: missionId,
     lots: isRepo
@@ -2193,7 +2221,7 @@ export function acceptContractPilotOffer(
             payUsd: pilotFeeUsd,
             urgency: lot.urgency,
             reason: `${lot.reason} · contract ${npc.name}`,
-            deadlineTick: lot.expiresAtTick,
+            deadlineTick,
           },
         ],
     shipmentLotId: isRepo ? `deadhead_${flight.id}` : flight.lotId,
@@ -2205,7 +2233,7 @@ export function acceptContractPilotOffer(
     aircraftClassId: flight.aircraftClassId,
     airframeTypeId: airframe.typeId,
     rolesPackRelPath: airframe.rolesPackRelPath,
-    deadlineTick: lot.expiresAtTick,
+    deadlineTick,
     payUsd: pilotFeeUsd,
     urgency: lot.urgency,
     reason: isRepo

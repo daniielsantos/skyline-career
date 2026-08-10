@@ -194,6 +194,7 @@ export {
   ensureNpcFleet,
   ensureNpcRegionCoverage,
   estimateNpcBlockHours,
+  contractPilotMissionDeadlineTick,
   findNpcAirframe,
   isNpcRepositionFlight,
   listHomologatedNpcAirframesForClass,

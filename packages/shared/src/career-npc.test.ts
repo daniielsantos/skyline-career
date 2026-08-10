@@ -12,6 +12,7 @@ import {
   ensureNpcAirframes,
   ensureNpcFleet,
   estimateNpcBlockHours,
+  contractPilotMissionDeadlineTick,
   listActiveNpcFreights,
   listNpcFleetStatus,
   listMarketLots,
@@ -1070,6 +1071,89 @@ describe('NPC freighter fleet', () => {
       assert.equal(claim?.crewNeeded, true);
       assert.equal(claim?.cargoKg, offerCargoKg - expectedLift);
     }
+    // SLA must not copy a stale lot expiry onto the mission.
+    assert.ok(
+      accepted.mission.deadlineTick >= world.tick + hoursToTicks(2),
+      `deadline ${accepted.mission.deadlineTick} should be >= accept+2h (${world.tick + hoursToTicks(2)})`,
+    );
+  });
+
+  it('contractPilotMissionDeadlineTick floors past lot expiry to accept+block', () => {
+    const staleExpiry = 168;
+    const acceptTick = 199;
+    const deadline = contractPilotMissionDeadlineTick({
+      worldTick: acceptTick,
+      lotExpiresAtTick: staleExpiry,
+      distanceNm: 280,
+      aircraftClassId: 'light_jet',
+    });
+    assert.ok(deadline > acceptTick);
+    assert.ok(deadline > staleExpiry);
+    assert.equal(
+      deadline,
+      Math.max(
+        staleExpiry,
+        acceptTick +
+          hoursToTicks(
+            Math.max(
+              2,
+              estimateNpcBlockHours(280, 'light_jet').flightHours + 1.5,
+            ),
+          ),
+      ),
+    );
+  });
+
+  it('acceptContractPilotOffer does not start already late when lot expired', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-stale-deadline' });
+    tickEconomyN(world, 24);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter((f) => f.status === 'awaiting_pilot' || f.status === 'in_flight')
+        .map((f) => f.lotId),
+    );
+    const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot = world.lots.find(
+      (l) =>
+        !heldLots.has(l.id) &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 200,
+    );
+    assert.ok(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    createNpcContractPilotOffer(world, npc!.id, lot!.id, {
+      nowMs,
+      rng: () => 0.4,
+    });
+    // Simulate the real bug: cargo lot expired hours ago, crew window still open.
+    lot!.expiresAtTick = world.tick - hoursToTicks(8);
+    const state = emptyMissionsStateV2();
+    const accepted = acceptContractPilotOffer(world, state, {
+      lotId: lot!.id,
+      airframeTypeId: npc!.airframeTypeId!,
+      nowMs,
+    });
+    assert.ok(accepted.mission.deadlineTick > world.tick);
+    assert.ok(accepted.mission.deadlineTick > lot!.expiresAtTick);
+    assert.equal(
+      accepted.mission.deadlineTick,
+      contractPilotMissionDeadlineTick({
+        worldTick: world.tick,
+        lotExpiresAtTick: lot!.expiresAtTick,
+        distanceNm:
+          routeDistanceNm(
+            world,
+            accepted.mission.originIcao,
+            accepted.mission.destIcao,
+          ) ?? undefined,
+        aircraftClassId: accepted.mission.aircraftClassId,
+      }),
+    );
   });
 
   it('operator covers pilot-to origin on accept and settle moves pilot to dest', () => {

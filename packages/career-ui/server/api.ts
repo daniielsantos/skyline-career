@@ -992,7 +992,11 @@ export function createCareerApiServer(port = 8787) {
     withCareerRead,
     withCareerWrite,
     stopMarketWatch: async () => {
-      if (watchSession.getStatus().running) await watchSession.stop();
+      if (watchSession.getStatus().running) {
+        await watchSession.stop({ reset: true });
+      } else if (watchSession.getStatus().missionId) {
+        watchSession.resetSession();
+      }
     },
   });
   const server = createServer(async (req, res) => {
@@ -1922,6 +1926,11 @@ export function createCareerApiServer(port = 8787) {
               ...fleetPayload(missions, world),
             };
           });
+          const watch = watchSession.getStatus();
+          if (watch.missionId && watch.missionId !== result.mission.id) {
+            if (watch.running) await watchSession.stop({ reset: true });
+            else watchSession.resetSession();
+          }
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3333,6 +3342,18 @@ export function createCareerApiServer(port = 8787) {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;
           }
+          // New / different mission must not inherit prior Watch leftovers.
+          const watch = watchSession.getStatus();
+          if (
+            watch.missionId &&
+            watch.missionId !== result.mission.id
+          ) {
+            if (watch.running) {
+              await watchSession.stop({ reset: true });
+            } else {
+              watchSession.resetSession();
+            }
+          }
           send(res, 200, {
             mission: result.mission,
             walletUsd: result.walletUsd,
@@ -3484,6 +3505,11 @@ export function createCareerApiServer(port = 8787) {
               dispatchError =
                 error instanceof Error ? error.message : String(error);
             }
+          }
+          const watch = watchSession.getStatus();
+          if (watch.missionId && watch.missionId !== mission.id) {
+            if (watch.running) await watchSession.stop({ reset: true });
+            else watchSession.resetSession();
           }
           send(res, 200, {
             mission,
@@ -4065,8 +4091,12 @@ export function createCareerApiServer(port = 8787) {
         }
         // Stop live watch first so an in-flight tick cannot rewrite this mission.
         const watch = watchSession.getStatus();
-        if (watch.running && watch.missionId === body.missionId) {
-          await watchSession.stop();
+        if (watch.missionId === body.missionId) {
+          if (watch.running) {
+            await watchSession.stop({ reset: true });
+          } else {
+            watchSession.resetSession();
+          }
         }
         try {
           const result = await withCareerWrite((world, missions) => {
@@ -5241,7 +5271,12 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/watch/stop') {
-        const status = await watchSession.stop();
+        const body = (await readBody(req).catch(() => ({}))) as {
+          reset?: boolean;
+        };
+        const status = await watchSession.stop({
+          reset: body.reset === true,
+        });
         send(res, 200, status);
         return;
       }

@@ -2468,10 +2468,10 @@ export function postWatchStart(opts: {
   });
 }
 
-export function postWatchStop() {
+export function postWatchStop(opts?: { reset?: boolean }) {
   return api<WatchStatus>('/api/watch/stop', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify({ reset: opts?.reset === true }),
   });
 }
 

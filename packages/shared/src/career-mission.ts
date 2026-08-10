@@ -1527,6 +1527,47 @@ function returnContractSliceToOpenOffer(
 }
 
 /**
+ * Undo a false auto-depart (SIM ON GROUND flicker / catch-up at origin).
+ * Restores `dispatched` and clears airborne settle-gate stamps. Does not
+ * refund fuel already charged — prevention is the primary fix.
+ * Soft-reopens lots that were flipped to `in_transit` on the false depart.
+ */
+export function revertFalseDepartMission(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+): MissionIntent {
+  const normalized = normalizeMissionIntent(mission);
+  if (normalized.status !== 'in_flight') {
+    throw new Error(
+      `Cannot revert false depart in status=${normalized.status}`,
+    );
+  }
+  if (!isEmptyLegMission(normalized)) {
+    for (const line of normalized.lots) {
+      if (
+        line.shipmentLotId.startsWith('deadhead_') ||
+        line.shipmentLotId.startsWith('empty_')
+      ) {
+        continue;
+      }
+      const lot = world.lots.find((l) => l.id === line.shipmentLotId);
+      if (lot && lot.status === 'in_transit' && lot.reservedKg > 0) {
+        lot.status = 'reserved';
+      }
+    }
+  }
+  const reverted: MissionIntent = {
+    ...normalized,
+    status: 'dispatched',
+  };
+  delete reverted.airborneAtMs;
+  delete reverted.airborneElapsedMs;
+  delete reverted.expectedRouteMs;
+  delete reverted.departedAtTick;
+  return reverted;
+}
+
+/**
  * Mark cargo airborne. Allowed from accepted or dispatched.
  * Fully-reserved lots flip to in_transit so the market stops offering them.
  * Applies origin Jet-A uplift once (stock drain + mission.fuelUplift).

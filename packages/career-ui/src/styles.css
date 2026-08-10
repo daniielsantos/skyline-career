@@ -1184,7 +1184,7 @@ th {
 }
 
 .debrief-runway {
-  max-width: 22rem;
+  max-width: 40rem;
 }
 
 .debrief-runway-svg {
@@ -1207,11 +1207,22 @@ th {
   stroke-dasharray: 4 3;
 }
 
+.debrief-runway-thr {
+  stroke: #c5ccd4;
+  stroke-width: 2;
+}
+
 .debrief-runway-ident {
   fill: #e8ecf0;
   font-size: 11px;
   font-family: ui-monospace, monospace;
   font-weight: 600;
+}
+
+.debrief-runway-meta {
+  fill: #9aa3ad;
+  font-size: 11px;
+  font-family: var(--font-ui, system-ui, sans-serif);
 }
 
 .debrief-runway-td {

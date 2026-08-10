@@ -13,6 +13,7 @@ import {
   cruiseSampleStatus,
   DEFAULT_CRUISE_EMA_ALPHA,
   departMission,
+  revertFalseDepartMission,
   distanceNm as greatCircleDistanceNm,
   estimateMissionBlockHours,
   evaluateLoadVerification,
@@ -1053,8 +1054,9 @@ export class CareerWatchSession {
       });
       return this.getStatus();
     }
-    if (this.running) {
-      await this.stop();
+    if (this.running || this.missionId != null) {
+      // Always wipe prior identity before binding a (possibly new) mission.
+      await this.stop({ reset: true });
     }
 
     this.opts = {
@@ -1249,14 +1251,18 @@ export class CareerWatchSession {
     }, ms);
   }
 
-  async stop(): Promise<WatchStatusPayload> {
+  async stop(opts: { reset?: boolean } = {}): Promise<WatchStatusPayload> {
     this.running = false;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = undefined;
     }
     // Flush airborne clock before tearing down — app quit must not lose %.
-    await this.persistAirborneClock();
+    // Skip persist when hard-resetting (cancel / mission switch) so flicker
+    // stamps are not written onto a closed leg.
+    if (!opts.reset) {
+      await this.persistAirborneClock();
+    }
     if (this.bridge) {
       try {
         // Keep shared SimConnect alive for inject / preflight.
@@ -1266,7 +1272,52 @@ export class CareerWatchSession {
       }
       this.bridge = null;
     }
+    // Default keeps settlement + missionId so auto-settle clients can read the
+    // payout once. Cancel / accept / switch pass reset:true to wipe leftovers.
+    if (opts.reset) {
+      this.resetSession();
+    }
     return this.getStatus();
+  }
+
+  /**
+   * Drop mission-scoped Watch leftovers (status, settle gate, samples).
+   * Call after stop when switching / cancelling / accepting a new leg.
+   */
+  resetSession(): void {
+    this.missionId = null;
+    this.missionStatus = null;
+    this.watchState = createMissionFlightWatchState();
+    this.lastSample = null;
+    this.lastPhase = null;
+    this.lastLiveFuelLb = null;
+    this.lastLivePayloadLb = null;
+    this.lastLoadVerification = null;
+    this.lastEvent = null;
+    this.lastEventAtIso = null;
+    this.lastError = null;
+    this.settlement = null;
+    this.walletUsd = null;
+    this.lastSuccessfulTickAtMs = 0;
+    this.lastLoadSampleAtMs = 0;
+    this.consecutivePipeErrors = 0;
+    this.preflightDepartBlockedLogged = false;
+    this.cruiseState = createCruiseSampleState();
+    this.cruiseStatus = null;
+    this.ofpExpectedRouteMs = null;
+    this.scoreAcc = createFlightScoreAccumulator();
+    this.lastFlightScore = null;
+    this.weatherAcc = createWeatherOpsAccumulator();
+    this.weatherStatus = null;
+    this.touchdownLat = null;
+    this.touchdownLon = null;
+    this.touchdownHeadingTrueDeg = null;
+    this.lastAirborneHeadingTrueDeg = null;
+    this.lastAirborneLat = null;
+    this.lastAirborneLon = null;
+    this.lastMxFuelDrainAtMs = 0;
+    this.lastMxFuelDrainSkipLogAtMs = 0;
+    this.pendingMxDrainKg = 0;
   }
 
   /** Write Watch airborne clock onto the open mission save (survives app quit). */
@@ -1677,6 +1728,13 @@ export class CareerWatchSession {
 
       const destTerminal = world.airports.find((a) => a.icao === current.destIcao);
       const destCoords = resolveAirportCoords(current.destIcao, destTerminal);
+      const originTerminal = world.airports.find(
+        (a) => a.icao === current.originIcao,
+      );
+      const originCoords = resolveAirportCoords(
+        current.originIcao,
+        originTerminal,
+      );
       const distanceNm = routeDistanceNm(
         world,
         current.originIcao,
@@ -1685,6 +1743,10 @@ export class CareerWatchSession {
       const liveDistToDestNm =
         sample.position && destCoords
           ? greatCircleDistanceNm(sample.position, destCoords)
+          : undefined;
+      const liveDistToOriginNm =
+        sample.position && originCoords
+          ? greatCircleDistanceNm(sample.position, originCoords)
           : undefined;
       const fallbackHours = estimateMissionBlockHours(
         world,
@@ -2039,14 +2101,20 @@ export class CareerWatchSession {
           (this.opts.settleRadiusNm ?? 12);
       // Mid-air: saw wheels-up but mission never left dispatched (missed edge /
       // failed depart). Post-landing: completed the route without an in_flight stamp.
+      // Never catch-up-depart from fuel alone or a stale preflight "airborne"
+      // phase — that falsely marks a brand-new Dispatch as IN_FLIGHT at origin
+      // when tanks are below OFP planned (or leftover phase from a prior leg).
       const midFlightCatchUp =
         nextState.sawAirborne && sample.onGround === false;
       const postLandingCatchUp =
         sample.onGround === true &&
         nearDestNow &&
-        (nextState.sawAirborne ||
-          fuelBurnedInFlight ||
-          current.lastPreflightCheck?.phase === 'airborne');
+        nextState.sawAirborne &&
+        // Must have actually left the origin area (or burned meaningful fuel
+        // while this Watch session saw airborne).
+        (fuelBurnedInFlight ||
+          (typeof liveDistToOriginNm === 'number' &&
+            liveDistToOriginNm > (this.opts.settleRadiusNm ?? 12)));
       const needsDepartCatchUp =
         this.opts.autoDepart &&
         (current.status === 'accepted' || current.status === 'dispatched') &&
@@ -2156,6 +2224,85 @@ export class CareerWatchSession {
           this.watchState = nextState;
           this.lastEvent = event;
           this.lastEventAtIso = new Date().toISOString();
+        }
+      }
+
+      // Undo false auto-depart: still on the origin ramp with almost no airborne
+      // time (SIM ON GROUND flicker / catch-up leftover). Keeps Dispatch from
+      // showing EN ROUTE + "ready to settle" before the real flight starts.
+      const nearOriginNow =
+        typeof liveDistToOriginNm === 'number' &&
+        liveDistToOriginNm <= (this.opts.settleRadiusNm ?? 12);
+      const distinctAirports =
+        current.originIcao.trim().toUpperCase() !==
+        current.destIcao.trim().toUpperCase();
+      if (
+        current.status === 'in_flight' &&
+        sample.onGround === true &&
+        nearOriginNow &&
+        !nearDestNow &&
+        distinctAirports &&
+        !fuelBurnedInFlight
+      ) {
+        const expectedMs =
+          nextState.expectedRouteMs ??
+          current.expectedRouteMs ??
+          expectedRouteMs;
+        const airborneCheck =
+          typeof nextState.airborneAtMs === 'number' &&
+          Number.isFinite(nextState.airborneAtMs) &&
+          typeof expectedMs === 'number' &&
+          expectedMs > 0
+            ? evaluateMinAirborneElapsed({
+                airborneAtMs: nextState.airborneAtMs,
+                expectedRouteMs: expectedMs,
+                nowMs,
+                airborneEndedAtMs: nextState.airborneEndedAtMs,
+                distanceNm,
+              })
+            : null;
+        const maxFalseMs = Math.min(
+          8 * 60_000,
+          typeof expectedMs === 'number' && expectedMs > 0
+            ? expectedMs * 0.2
+            : 8 * 60_000,
+        );
+        const elapsedMs = airborneCheck?.elapsedMs ?? 0;
+        if (elapsedMs < maxFalseMs) {
+          const reverted = await this.cb.withCareerWrite(
+            (_worldFresh, freshMissions) => {
+              const openIdx = freshMissions.missions.findIndex(
+                (m) => m.id === this.missionId,
+              );
+              if (openIdx < 0) return false;
+              const openMission = freshMissions.missions[openIdx]!;
+              if (openMission.status !== 'in_flight') return false;
+              const next = revertFalseDepartMission(_worldFresh, openMission);
+              freshMissions.missions[openIdx] = next;
+              this.missionStatus = next.status;
+              current = next;
+              return true;
+            },
+          );
+          if (reverted) {
+            this.watchState = createMissionFlightWatchState({
+              sawAirborne: false,
+              lastOnGround: true,
+              airborneConfirmTicks: 0,
+              routeDistanceNm: distanceNm,
+            });
+            nextState = this.watchState;
+            this.lastEvent = { type: 'none' };
+            this.touchdownLat = null;
+            this.touchdownLon = null;
+            this.touchdownHeadingTrueDeg = null;
+            watchDebugLog('watch', 'reverted false depart at origin', {
+              missionId: current.id,
+              elapsedMs,
+              maxFalseMs,
+              liveDistToOriginNm,
+            });
+          }
         }
       }
 

@@ -2849,16 +2849,21 @@ export function App() {
           }
           return status;
         });
-        // Watch auto-depart/settle updates server mission status — mirror into
-        // local missions so Dispatch step (Ready → En route) advances without
-        // waiting for a full refresh.
+        // Watch auto-depart/settle (and false-depart revert) updates server
+        // mission status — mirror into local missions so Dispatch step advances
+        // without waiting for a full refresh.
         if (
           status.running &&
           status.missionId &&
           status.missionStatus &&
-          ['in_flight', 'settled', 'failed', 'cancelled'].includes(
-            status.missionStatus,
-          )
+          [
+            'accepted',
+            'dispatched',
+            'in_flight',
+            'settled',
+            'failed',
+            'cancelled',
+          ].includes(status.missionStatus)
         ) {
           const missionId = status.missionId;
           const nextStatus = status.missionStatus;
@@ -3491,7 +3496,7 @@ export function App() {
     let cancelled = false;
     void (async () => {
       try {
-        await postWatchStop();
+        await postWatchStop({ reset: true });
         if (!cancelled) {
           setWatch(null);
           setToastKind('warn');
@@ -3640,7 +3645,7 @@ export function App() {
           nextId &&
           status.missionId !== nextId
         ) {
-          await postWatchStop();
+          await postWatchStop({ reset: true });
         }
       } catch {
         /* soft — auto-start will retry */
@@ -3973,7 +3978,7 @@ export function App() {
     await run(async () => {
       if (watch?.running) {
         try {
-          await postWatchStop();
+          await postWatchStop({ reset: true });
         } catch {
           /* ignore */
         }
@@ -5001,8 +5006,8 @@ export function App() {
     }
     if (watch?.running && watch.missionId === mission.id) {
       try {
-        const status = await postWatchStop();
-        setWatch(status);
+        await postWatchStop({ reset: true });
+        setWatch(null);
         setWatchAutoPaused(true);
         setWatchAutoStatus('idle');
       } catch {
@@ -5517,10 +5522,11 @@ export function App() {
       setFlightDebrief(null);
       setStaging(null);
       try {
-        const stopped = await postWatchStop();
-        setWatch(stopped);
+        await postWatchStop({ reset: true });
+        setWatch(null);
       } catch {
         /* watch may already be idle */
+        setWatch(null);
       }
       const result = await postCancel({ missionId: mission.id });
       setMissions((current) =>

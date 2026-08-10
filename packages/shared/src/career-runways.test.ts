@@ -6,9 +6,11 @@ import {
   getAirportRunways,
   listHubsMissingRunways,
   pickNearestRunway,
+  pickBestRunway,
   projectOntoRunway,
   evaluateRunwayTouchdown,
   pickFirstContactCoords,
+  formatRunwayTouchdownLine,
   type CareerRunway,
 } from './career-runways.js';
 
@@ -140,15 +142,15 @@ describe('pickFirstContactCoords', () => {
     assert.equal(picked!.lat, earlier.lat);
   });
 
-  it('rejects stale sim touchdown far from the aircraft', () => {
+  it('rejects stale sim touchdown and prefers plane over last airborne', () => {
     const picked = pickFirstContactCoords({
       simTouchdown: { lat: -22.0, lon: -46.47 },
       planeNow: plane,
       lastAirborne: earlier,
     });
     assert.ok(picked);
-    assert.equal(picked!.source, 'last_airborne');
-    assert.equal(picked!.lat, earlier.lat);
+    assert.equal(picked!.source, 'plane');
+    assert.equal(picked!.lat, plane.lat);
   });
 
   it('falls back to plane when nothing else is usable', () => {
@@ -158,5 +160,68 @@ describe('pickFirstContactCoords', () => {
       lon: plane.lon,
       source: 'plane',
     });
+  });
+
+  it('uses last airborne only when plane is unavailable', () => {
+    const picked = pickFirstContactCoords({ lastAirborne: earlier });
+    assert.deepEqual(picked, {
+      lat: earlier.lat,
+      lon: earlier.lon,
+      source: 'last_airborne',
+    });
+  });
+});
+
+describe('pickBestRunway parallel strips', () => {
+  it('picks KSTL 30L (12R) over 30R when on the southwest parallel', () => {
+    const rwy30L = getAirportRunways('KSTL').find((r) => r.ident === '12R');
+    assert.ok(rwy30L);
+    // Center of 12R/30L — old center-distance pick can still win here; the
+    // real bug is near thresholds. Offset ~200 m past the 30L threshold
+    // (primary HE) on centerline, approaching ~302°.
+    const past30L = 200;
+    const alongFromCenter = rwy30L!.lengthM / 2 - past30L;
+    const latRad = (rwy30L!.lat * Math.PI) / 180;
+    const mPerDegLat = 111_320;
+    const mPerDegLon = 111_320 * Math.cos(latRad);
+    const hdg = (rwy30L!.headingTrueDeg * Math.PI) / 180;
+    const lat = rwy30L!.lat + (alongFromCenter * Math.cos(hdg)) / mPerDegLat;
+    const lon = rwy30L!.lon + (alongFromCenter * Math.sin(hdg)) / mPerDegLon;
+
+    // Midpoint between the two parallels is closer to neither center alone
+    // for some geometries; ensure lateral pick wins with heading.
+    const best = pickBestRunway('KSTL', lat, lon, 302);
+    assert.ok(best);
+    assert.equal(best!.ident, '12R');
+    assert.equal(best!.identReciprocal, '30L');
+
+    const snap = evaluateRunwayTouchdown('KSTL', lat, lon, 302);
+    assert.ok(snap);
+    assert.equal(snap!.landingEnd, 'reciprocal');
+    assert.equal(snap!.onPavement, true);
+    assert.ok(Math.abs(snap!.lateralM) < 15);
+    const line = formatRunwayTouchdownLine(snap);
+    assert.match(line, /RWY 30L/);
+    assert.match(line, /on pavement/);
+    assert.match(line, /3\.36 km/);
+  });
+
+  it('does not label a 30L touchdown as 30R off-runway (user KMEM→KSTL case)', () => {
+    // Reconstruct: ~392 m lateral from 12L/30R center ≈ sitting on 12R/30L.
+    const rwy30R = getAirportRunways('KSTL').find((r) => r.ident === '12L');
+    const rwy30L = getAirportRunways('KSTL').find((r) => r.ident === '12R');
+    assert.ok(rwy30R && rwy30L);
+    const snapWrongCenter = evaluateRunwayTouchdown(
+      'KSTL',
+      rwy30L!.lat,
+      rwy30L!.lon,
+      302,
+    );
+    assert.ok(snapWrongCenter);
+    assert.equal(snapWrongCenter!.runwayIdent, '12R');
+    assert.equal(snapWrongCenter!.onPavement, true);
+    // From the other strip this would look ~390 m off — confirm we did not pick it.
+    const projWrong = projectOntoRunway(rwy30R!, rwy30L!.lat, rwy30L!.lon);
+    assert.ok(Math.abs(projWrong.lateralM) > 300);
   });
 });

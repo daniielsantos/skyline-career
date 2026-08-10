@@ -16,6 +16,35 @@ export const TAXI_GROUND_SPEED_KT = 5;
 /** Stay in taxi until ground speed drops below this (kt) — hysteresis vs jitter. */
 export const TAXI_GROUND_SPEED_EXIT_KT = 2;
 
+/**
+ * Min ground speed (kt) to treat SIM ON GROUND=false as real wheels-up.
+ * A single onGround flicker at 0 kt must not auto-depart the mission.
+ */
+export const DEPART_MIN_GROUND_SPEED_KT = 30;
+/** Min AGL (ft) that also counts as convincing wheels-up. */
+export const DEPART_MIN_AGL_FT = 40;
+/**
+ * Consecutive airborne samples required when GS/AGL are missing/unreliable.
+ * With short-final poll (~200 ms) this is still under a second.
+ */
+export const DEPART_CONFIRM_TICKS = 2;
+
+/** True when the sample looks like real flight, not a SIM ON GROUND blip. */
+export function isConvincingAirborne(sample: FlightGroundSample): boolean {
+  if (sample.onGround) return false;
+  const gs = sample.groundSpeedKt;
+  const agl = sample.aglFt;
+  const gsOk =
+    typeof gs === 'number' &&
+    Number.isFinite(gs) &&
+    gs >= DEPART_MIN_GROUND_SPEED_KT;
+  const aglOk =
+    typeof agl === 'number' &&
+    Number.isFinite(agl) &&
+    agl >= DEPART_MIN_AGL_FT;
+  return gsOk || aglOk;
+}
+
 /** Minimal live gates used for career auto-depart / auto-settle. */
 export interface FlightGroundSample {
   onGround: boolean;
@@ -54,6 +83,11 @@ export interface MissionFlightWatchState {
   sawAirborne: boolean;
   /** Previous sample onGround; undefined until first sample. */
   lastOnGround?: boolean;
+  /**
+   * Consecutive !onGround samples while still accepted/dispatched.
+   * Used when GS/AGL are missing so a one-tick flicker cannot depart.
+   */
+  airborneConfirmTicks?: number;
   /** Wall-clock when the aircraft first left the ground (or watch saw airborne). */
   airborneAtMs?: number;
   /**
@@ -128,6 +162,7 @@ export function createMissionFlightWatchState(
   return {
     sawAirborne: seed.sawAirborne ?? false,
     lastOnGround: seed.lastOnGround,
+    airborneConfirmTicks: seed.airborneConfirmTicks,
     airborneAtMs: seed.airborneAtMs,
     airborneEndedAtMs: seed.airborneEndedAtMs,
     expectedRouteMs: seed.expectedRouteMs,
@@ -587,9 +622,23 @@ export function evaluateMissionFlightTransition(
   const requireEnginesOff = opts.requireEnginesOffToSettle !== false;
   const departFrom = opts.departFrom ?? DEFAULT_DEPART_FROM;
 
+  const confirmTicks = sample.onGround
+    ? 0
+    : (state.airborneConfirmTicks ?? 0) + 1;
+  const convincing = isConvincingAirborne(sample);
+  const confirmReady =
+    !sample.onGround && confirmTicks >= DEPART_CONFIRM_TICKS;
+  // Do not mark sawAirborne on a lone onGround=false flicker at 0 kt — that
+  // poisoned catch-up depart + "ready to settle" after a fake wheels-up.
+  const sawAirborneNow =
+    state.sawAirborne ||
+    convincing ||
+    (confirmReady && departFrom.includes(mission.status));
+
   let nextState: MissionFlightWatchState = {
-    sawAirborne: state.sawAirborne || !sample.onGround,
+    sawAirborne: sawAirborneNow,
     lastOnGround: sample.onGround,
+    airborneConfirmTicks: confirmTicks,
     airborneAtMs: state.airborneAtMs,
     airborneEndedAtMs: state.airborneEndedAtMs,
     expectedRouteMs: state.expectedRouteMs,
@@ -607,7 +656,12 @@ export function evaluateMissionFlightTransition(
   ) {
     nextState = { ...nextState, lastAirborneVsFpm: sample.verticalSpeedFpm };
   }
-  nextState = withAirborneClock(nextState, mission, opts, !sample.onGround);
+  nextState = withAirborneClock(
+    nextState,
+    mission,
+    opts,
+    sawAirborneNow && !sample.onGround,
+  );
 
   // Bootstrap: record first sample without firing transitions.
   if (state.lastOnGround === undefined) {
@@ -616,14 +670,28 @@ export function evaluateMissionFlightTransition(
 
   const leftGround = state.lastOnGround === true && sample.onGround === false;
   const touchedDown = state.lastOnGround === false && sample.onGround === true;
+  const stayAirborne =
+    state.lastOnGround === false && sample.onGround === false;
 
-  if (leftGround && departFrom.includes(mission.status)) {
+  if (
+    departFrom.includes(mission.status) &&
+    !sample.onGround &&
+    (convincing || confirmReady) &&
+    (leftGround || stayAirborne || state.sawAirborne)
+  ) {
     nextState = withAirborneClock(nextState, mission, opts, true);
-    nextState = { ...nextState, airborneEndedAtMs: undefined, landingFpm: undefined };
+    nextState = {
+      ...nextState,
+      sawAirborne: true,
+      airborneEndedAtMs: undefined,
+      landingFpm: undefined,
+    };
     return {
       event: {
         type: 'depart',
-        reason: 'wheels-up (SIM ON GROUND false)',
+        reason: convincing
+          ? 'wheels-up (convincing airborne)'
+          : 'wheels-up (sustained airborne)',
       },
       nextState,
     };

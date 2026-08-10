@@ -100,11 +100,62 @@ describe('evaluateMissionFlightTransition', () => {
 
     const up = evaluateMissionFlightTransition(
       mission('dispatched'),
-      { onGround: false, enginesRunning: true },
+      { onGround: false, enginesRunning: true, groundSpeedKt: 80 },
       state,
     );
     assert.equal(up.event.type, 'depart');
     assert.equal(up.nextState.sawAirborne, true);
+  });
+
+  it('ignores a lone onGround=false flicker at 0 kt (no false depart)', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: true, groundSpeedKt: 0 },
+      state,
+    ).nextState;
+
+    const flicker = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: false, enginesRunning: true, groundSpeedKt: 0, aglFt: 0 },
+      state,
+    );
+    assert.equal(flicker.event.type, 'none');
+    assert.equal(flicker.nextState.sawAirborne, false);
+
+    const back = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: false, groundSpeedKt: 0 },
+      flicker.nextState,
+    );
+    assert.equal(back.event.type, 'none');
+    assert.equal(back.nextState.sawAirborne, false);
+    assert.equal(back.nextState.airborneConfirmTicks, 0);
+  });
+
+  it('departs after sustained airborne ticks when GS/AGL are missing', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: true },
+      state,
+    ).nextState;
+
+    const first = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: false, enginesRunning: true },
+      state,
+    );
+    assert.equal(first.event.type, 'none');
+    assert.equal(first.nextState.airborneConfirmTicks, 1);
+
+    const second = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: false, enginesRunning: true },
+      first.nextState,
+    );
+    assert.equal(second.event.type, 'depart');
+    assert.equal(second.nextState.sawAirborne, true);
   });
 
   it('does not depart on engines-running while still on ground', () => {
@@ -259,7 +310,7 @@ describe('evaluateMissionFlightTransition', () => {
 
     const up = evaluateMissionFlightTransition(
       mission('dispatched'),
-      { onGround: false, enginesRunning: true },
+      { onGround: false, enginesRunning: true, groundSpeedKt: 90 },
       state,
       { expectedRouteMs: plannedMs, nowMs: 1_000_000 },
     );

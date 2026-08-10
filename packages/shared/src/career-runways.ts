@@ -116,24 +116,85 @@ export function pickNearestRunway(
   lat: number,
   lon: number,
 ): CareerRunway | undefined {
+  return pickBestRunway(icao, lat, lon);
+}
+
+/** Distance from a projected point to the runway segment (meters). */
+export function distanceToRunwaySegmentM(
+  runway: Pick<CareerRunway, 'lengthM'>,
+  proj: Pick<RunwayProjection, 'alongM' | 'lateralM'>,
+): number {
+  const halfLen = runway.lengthM / 2;
+  const alongClamped = Math.max(-halfLen, Math.min(halfLen, proj.alongM));
+  const dAlong = proj.alongM - alongClamped;
+  return Math.hypot(dAlong, proj.lateralM);
+}
+
+/**
+ * Best matching runway for a touchdown: prefer heading-aligned strips, then
+ * on-pavement, then smallest |lateral| to centerline (not distance to center).
+ * Parallel runways (e.g. KSTL 30L/30R) break center-distance picking.
+ */
+export function pickBestRunway(
+  icao: string,
+  lat: number,
+  lon: number,
+  headingTrueDeg?: number,
+): CareerRunway | undefined {
   const runways = getAirportRunways(icao);
   if (runways.length === 0) return undefined;
-  let best: CareerRunway | undefined;
-  let bestNm = Infinity;
-  for (const rwy of runways) {
-    const d = distanceNm({ lat, lon }, { lat: rwy.lat, lon: rwy.lon });
-    if (d < bestNm) {
-      bestNm = d;
-      best = rwy;
+
+  type Cand = {
+    rwy: CareerRunway;
+    proj: RunwayProjection;
+    headingScore: number;
+    segmentM: number;
+  };
+  const cands: Cand[] = runways.map((rwy) => {
+    const proj = projectOntoRunway(rwy, lat, lon);
+    let headingScore = 180;
+    if (typeof headingTrueDeg === 'number' && Number.isFinite(headingTrueDeg)) {
+      const toPrimary = headingDeltaDeg(headingTrueDeg, rwy.headingTrueDeg);
+      const toReciprocal = headingDeltaDeg(
+        headingTrueDeg,
+        rwy.headingTrueDeg + 180,
+      );
+      headingScore = Math.min(toPrimary, toReciprocal);
     }
-  }
-  return best;
+    return {
+      rwy,
+      proj,
+      headingScore,
+      segmentM: distanceToRunwaySegmentM(rwy, proj),
+    };
+  });
+
+  const aligned =
+    typeof headingTrueDeg === 'number' && Number.isFinite(headingTrueDeg)
+      ? cands.filter((c) => c.headingScore <= 40)
+      : cands;
+  const pool = aligned.length > 0 ? aligned : cands;
+  const onPav = pool.filter((c) => c.proj.onPavement);
+  const pool2 = onPav.length > 0 ? onPav : pool;
+
+  pool2.sort((a, b) => {
+    const latDiff = Math.abs(a.proj.lateralM) - Math.abs(b.proj.lateralM);
+    if (Math.abs(latDiff) > 0.5) return latDiff;
+    if (Math.abs(a.segmentM - b.segmentM) > 0.5) return a.segmentM - b.segmentM;
+    return a.headingScore - b.headingScore;
+  });
+  return pool2[0]?.rwy;
 }
 
 /**
  * Project a WGS84 point onto a runway rectangle (local ENU approx).
  * `headingTrueDeg` is the primary-end true heading (LE → HE).
+ *
+ * OurAirports centers can sit a few meters off MSFS pavement — allow a small
+ * lateral cushion before marking OFF runway.
  */
+export const RUNWAY_PAVEMENT_LATERAL_SLACK_M = 12;
+
 export function projectOntoRunway(
   runway: CareerRunway,
   lat: number,
@@ -150,7 +211,7 @@ export function projectOntoRunway(
   const alongM = dNorth * cosH + dEast * sinH;
   const lateralM = -dNorth * sinH + dEast * cosH;
   const halfLen = runway.lengthM / 2;
-  const halfWid = runway.widthM / 2;
+  const halfWid = runway.widthM / 2 + RUNWAY_PAVEMENT_LATERAL_SLACK_M;
   const pastThresholdM = alongM + halfLen;
   const onPavement =
     Math.abs(alongM) <= halfLen + 1e-6 && Math.abs(lateralM) <= halfWid + 1e-6;
@@ -180,7 +241,7 @@ export function evaluateRunwayTouchdown(
 ): RunwayTouchdownSnapshot | undefined {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return undefined;
   if (lat === 0 && lon === 0) return undefined;
-  const runway = pickNearestRunway(icao, lat, lon);
+  const runway = pickBestRunway(icao, lat, lon, headingTrueDeg);
   if (!runway) return undefined;
   const proj = projectOntoRunway(runway, lat, lon);
   const landingEnd = pickRunwayLandingEnd(
@@ -222,16 +283,23 @@ export function formatRunwayTouchdownLine(
     touch.landingEnd === 'reciprocal' && touch.runwayIdentReciprocal
       ? Math.max(0, touch.lengthM - touch.pastThresholdM)
       : thrM;
+  // lateralM is relative to primary heading; flip for reciprocal approach view.
+  const lateralForPilot =
+    touch.landingEnd === 'reciprocal' ? -touch.lateralM : touch.lateralM;
   const side =
-    Math.abs(touch.lateralM) < 2
+    Math.abs(lateralForPilot) < 2
       ? 'centerline'
-      : touch.lateralM > 0
-        ? `${Math.abs(touch.lateralM)} m right`
-        : `${Math.abs(touch.lateralM)} m left`;
+      : lateralForPilot > 0
+        ? `${Math.abs(Math.round(lateralForPilot))} m right`
+        : `${Math.abs(Math.round(lateralForPilot))} m left`;
   const pavement = touch.onPavement ? 'on pavement' : 'OFF runway';
   const light =
     touch.lighted === true ? ' · lighted' : touch.lighted === false ? ' · unlit' : '';
-  return `RWY ${ident} · ${Math.round(thrLabel)} m past THR · ${side} · ${pavement}${light}`;
+  const lenKm =
+    touch.lengthM >= 1000
+      ? `${(touch.lengthM / 1000).toFixed(touch.lengthM >= 10_000 ? 1 : 2)} km`
+      : `${Math.round(touch.lengthM)} m`;
+  return `RWY ${ident} · ${Math.round(thrLabel)} m past THR · ${side} · ${pavement} · ${lenKm}${light}`;
 }
 
 const MAX_SIM_TOUCHDOWN_NM = 0.45; // ~830 m — reject stale prior-landing latch
@@ -280,13 +348,13 @@ export function pickFirstContactCoords(opts: {
     return { lat: sim.lat, lon: sim.lon, source: 'sim_touchdown' };
   }
 
-  // Just after wheels-down the aircraft has already rolled; last airborne
-  // sample (especially short-final) is closer to true contact than plane-now.
-  if (airborne) {
-    return { lat: airborne.lat, lon: airborne.lon, source: 'last_airborne' };
-  }
+  // Prefer live aircraft when already on the ground — last airborne can sit on
+  // short final between parallel strips and pick the wrong runway.
   if (plane) {
     return { lat: plane.lat, lon: plane.lon, source: 'plane' };
+  }
+  if (airborne) {
+    return { lat: airborne.lat, lon: airborne.lon, source: 'last_airborne' };
   }
   return null;
 }

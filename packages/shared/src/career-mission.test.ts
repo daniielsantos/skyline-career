@@ -12,6 +12,7 @@ import {
   compareMissionIntentToOfp,
   createSeedEconomyWorld,
   departMission,
+  revertFalseDepartMission,
   estimateRouteCargoLimit,
   findOpenManifestForRoute,
   findActivePlayerMission,
@@ -1123,6 +1124,27 @@ describe('settleMission', () => {
         .stockKg;
     assert.ok(destAfter > destBefore);
     assert.equal(result.settlement.destStockAfterKg, destAfter);
+  });
+
+  it('reverts a false auto-depart back to dispatched and clears airborne stamps', () => {
+    const world = createSeedEconomyWorld({ seed: 'false-depart-revert' });
+    tickEconomyN(world, 24);
+    const lot = listMarketLots(world)[0]!.lot;
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: Math.min(5_000, lot.quantityKg - lot.reservedKg),
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_false_depart',
+    });
+    const departed = departMission(world, { ...mission, status: 'dispatched' });
+    assert.equal(departed.mission.status, 'in_flight');
+    assert.ok(departed.mission.airborneAtMs);
+
+    const reverted = revertFalseDepartMission(world, departed.mission);
+    assert.equal(reverted.status, 'dispatched');
+    assert.equal(reverted.airborneAtMs, undefined);
+    assert.equal(reverted.expectedRouteMs, undefined);
+    assert.equal(reverted.departedAtTick, undefined);
   });
 
   it('stamps settledLandingFpm when provided', () => {

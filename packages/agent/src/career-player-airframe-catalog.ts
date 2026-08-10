@@ -107,18 +107,20 @@ export function inferCareerClassFromIcao(icao: string): FreighterClassId {
       'E55P',
       'EA50',
       'CL30',
+      'HDJT',
+      'HA420',
     ].includes(normalized)
   ) {
     return 'light_jet';
   }
   if (
-    ['B738', 'B737', 'A320', 'A321', 'MD82', 'MD83', 'MD88', 'MD80', 'MD81', 'MD87'].includes(
+    ['B738', 'B737', 'A320', 'A321', 'MD82', 'MD83', 'MD88', 'MD80', 'MD81', 'MD87', 'F28', 'F28F', 'F70', 'F100'].includes(
       normalized,
     )
   ) {
     return 'narrow_freighter';
   }
-  if (['MD11', 'MD1F', 'B744', 'B748', 'A332', 'A333', 'A339', 'A388'].includes(normalized)) {
+  if (['MD11', 'MD1F', 'B744', 'B748', 'A332', 'A333', 'A339', 'A388', 'B77F', 'B77L', 'B772', 'B77W'].includes(normalized)) {
     return 'wide_freighter';
   }
   // Unknown ICAO — prefer GA over widebody so burn/range fallbacks stay sane.

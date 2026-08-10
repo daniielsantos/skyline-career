@@ -109,12 +109,15 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
     '/airframes/vision-jet-sf50.png',
   'microsoft-pc-24-cargo': '/airframes/pc-24.png',
   'microsoft-pc-24-vip': '/airframes/pc-24.png',
+  'flightfx-mg-hjet-ha420': '/airframes/hondajet-ha420.png',
+  'fsreborn-phenom-300e': '/airframes/phenom-300e.png',
 
   // --- light_turboprop ---
   'asobo-beechcraft-king-air-350i': '/airframes/king-air-350i.png',
   'workingtitle-tbm-930-passengers': '/airframes/tbm-930.png',
   'blacksquare-b36tp-bonanza-professional': '/airframes/bonanza-b36tp.png',
   'blacksquare-turbine-duke': '/airframes/turbine-duke.png',
+  'blacksquare-starship': '/airframes/starship.png',
   'c208-caravan-cargo': '/airframes/c208-caravan.png',
   'asobo-c208b-cargo': '/airframes/c208-caravan.png',
   'asobo-c208b-passengers': '/airframes/c208-caravan.png',
@@ -159,12 +162,20 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'leonardo-fly-the-maddog-x-md-82-20th': '/airframes/md-82.png',
   'leonardo-fly-the-maddog-x-md-83-20th': '/airframes/md-83.png',
   'leonardo-fly-the-maddog-x-md-88-20th': '/airframes/md-88.png',
+  'blackbird-c-130j-long-configuration': '/airframes/c130j-long.png',
+  'justflight-fokker-f28': '/airframes/fokker-f28.png',
+  'justflight-f70': '/airframes/fokker-f70.png',
+  'justflight-f100': '/airframes/fokker-f100.png',
   'pmdg-738-bbj2-family': '/airframes/b738-bbj2.png',
   'pmdg-738-bcf-family': '/airframes/b738-bcf.png',
   'pmdg-738-pax-family': '/airframes/b738-pax.png',
 
   // --- wide_freighter ---
   'tfdi-md11f-family': '/airframes/md-11f.png',
+  'pmdg-777f': '/airframes/b777f.png',
+  'pmdg-777-200lr': '/airframes/b777-200lr.png',
+  'pmdg-777-200er-rr': '/airframes/b777-200er.png',
+  'pmdg-777-300er': '/airframes/b777-300er.png',
 };
 
 export function airframeCardArtUrl(

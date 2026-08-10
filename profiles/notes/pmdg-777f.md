@@ -1,0 +1,27 @@
+# 777F — discovery
+
+**In-sim title (example):** `777F`  
+**Match title:** `777F`  
+**ICAO (SimBrief type):** `B77F`  
+**Publisher:** `pmdg`  
+**Stations:** 16  
+**Profile:** `pmdg/777f@1.0.0`
+
+## Fuel tanks
+
+| Var | Capacity | Id |
+|-----|----------|----|
+| `FUEL TANK LEFT MAIN QUANTITY` | 10300 | LEFT_MAIN |
+| `FUEL TANK RIGHT MAIN QUANTITY` | 10300 | RIGHT_MAIN |
+| `FUEL TANK CENTER QUANTITY` | 27290 | CENTER |
+| `FUEL TANK CENTER2 QUANTITY` | 5625 | CENTER2 |
+
+## Notes
+
+- Load method: native-simbrief (no Skyline inject).
+- Fuel/payload write plans intentionally empty — load via addon EFB/tablet.
+- Use compare-ofp + Career Loaded vs Due for validation.
+
+## Homologated
+
+- `profiles/examples/pmdg-777f.json`

@@ -30,11 +30,20 @@ describe('career player airframe registration', () => {
     assert.equal(inferCareerClassFromIcao('LJ35'), 'light_jet');
     assert.equal(inferCareerClassFromIcao('C25B'), 'light_jet');
     assert.equal(inferCareerClassFromIcao('C680'), 'light_jet');
+    assert.equal(inferCareerClassFromIcao('HDJT'), 'light_jet');
+    assert.equal(inferCareerClassFromIcao('HA420'), 'light_jet');
     assert.equal(inferCareerClassFromIcao('B738'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD82'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD83'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD88'), 'narrow_freighter');
+    assert.equal(inferCareerClassFromIcao('F28'), 'narrow_freighter');
+    assert.equal(inferCareerClassFromIcao('F70'), 'narrow_freighter');
+    assert.equal(inferCareerClassFromIcao('F100'), 'narrow_freighter');
     assert.equal(inferCareerClassFromIcao('MD1F'), 'wide_freighter');
+    assert.equal(inferCareerClassFromIcao('B77F'), 'wide_freighter');
+    assert.equal(inferCareerClassFromIcao('B77L'), 'wide_freighter');
+    assert.equal(inferCareerClassFromIcao('B772'), 'wide_freighter');
+    assert.equal(inferCareerClassFromIcao('B77W'), 'wide_freighter');
     assert.equal(inferCareerClassFromIcao('ZZZZ'), 'light_ga');
   });
 

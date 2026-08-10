@@ -1,0 +1,67 @@
+{
+  "source": "simbrief",
+  "icao": "F28",
+  "ofpId": "justflight-fokker-f28",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "Just Flight Fokker F28-1000",
+    "Just Flight Fokker F28-2000",
+    "Just Flight Fokker F28-3000",
+    "Just Flight Fokker F28-4000"
+  ],
+  "matchTitlePattern": "Just Flight Fokker F28-(?:1000|2000|3000|4000)",
+  "notes": [
+    "Just Flight Fokker F28 family (1000 / 2000 / 3000 / 4000) — same 13-station + tank layout",
+    "One Skyline Market SKU: justflight-fokker-f28 (narrow_freighter)",
+    "Homologated profiles: justflight/just-flight-fokker-f28-{1000,2000,3000,4000}@1.0.0",
+    "loadMethod: native-simbrief; injectCapable: false — load via addon EFB/tablet",
+    "Livery suffixes (Air21, Ansett, …) covered by matchTitlePattern",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "SimBrief: Default F28"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "F28",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "baggage" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Station 11", "role": "baggage" },
+    { "simVarIndex": 12, "cfgIndex": 11, "name": "Station 12", "role": "baggage" },
+    { "simVarIndex": 13, "cfgIndex": 12, "name": "Station 13", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 200,
+    "weightAbsLb": 400,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

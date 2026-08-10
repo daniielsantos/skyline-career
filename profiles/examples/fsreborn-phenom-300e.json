@@ -1,16 +1,17 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "workingtitle-cessna-citation-cj4",
-  "profileKey": "workingtitle/cessna-citation-cj4",
+  "profileId": "fsreborn-phenom-300e",
+  "profileKey": "fsreborn/phenom-300e",
   "semver": "1.0.0",
-  "displayName": "Cessna Citation CJ4 (MSFS 2024)",
+  "displayName": "FSReborn Phenom 300E (MSFS 2024)",
   "match": {
-    "fingerprint": "f47147e115e110a68bfc57dd02f404a2bca6b2e9739d3cdb2817c96f076467f2",
-    "title": "Cessna Citation CJ4",
-    "publisher": "workingtitle",
-    "icao": "C25C",
+    "fingerprint": "d944a12c4477b18d58de176202369c91fbf0530bb24b47456afa430467fdc6f4",
+    "title": "FSReborn Phenom 300E",
+    "publisher": "fsreborn",
+    "icao": "E55P",
     "liveTitles": [
-      "Cessna Citation CJ4"
+      "FSReborn Phenom 300E",
+      "FSReborn Phenom 300E Manchester Interior"
     ]
   },
   "capabilities": [
@@ -31,7 +32,7 @@
       {
         "id": "LEFT_MAIN",
         "name": "Left Main",
-        "capacity": 434.9,
+        "capacity": 406.8,
         "readVar": "FUEL TANK LEFT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
@@ -40,7 +41,7 @@
       {
         "id": "RIGHT_MAIN",
         "name": "Right Main",
-        "capacity": 434.9,
+        "capacity": 406.8,
         "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
@@ -52,13 +53,13 @@
         "op": "simvar_set",
         "var": "FUEL TANK LEFT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN} + 5"
+        "valueExpr": "{LEFT_MAIN} + 3.7"
       },
       {
         "op": "simvar_set",
         "var": "FUEL TANK RIGHT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN} + 5"
+        "valueExpr": "{RIGHT_MAIN} + 3.7"
       },
       {
         "op": "delay",
@@ -89,39 +90,58 @@
     "stations": [
       {
         "index": 1,
-        "name": "PILOT",
-        "maxLoad": 500,
-        "arm": 12.3
+        "name": "Station 1",
+        "maxLoad": 500
       },
       {
         "index": 2,
-        "name": "COPILOT",
-        "maxLoad": 500,
-        "arm": 12.3
+        "name": "Station 2",
+        "maxLoad": 500
       },
       {
         "index": 3,
-        "name": "PASSENGER 01",
-        "maxLoad": 750,
-        "arm": -0.5
+        "name": "Station 3",
+        "maxLoad": 500
       },
       {
         "index": 4,
-        "name": "PASSENGER 02",
-        "maxLoad": 750,
-        "arm": 0
+        "name": "Station 4",
+        "maxLoad": 500
       },
       {
         "index": 5,
-        "name": "BAGGAGE 01",
-        "maxLoad": 500,
-        "arm": 17.26
+        "name": "Station 5",
+        "maxLoad": 500
       },
       {
         "index": 6,
-        "name": "BAGGAGE 02",
-        "maxLoad": 750,
-        "arm": -10.5
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      },
+      {
+        "index": 9,
+        "name": "Station 9",
+        "maxLoad": 500
+      },
+      {
+        "index": 10,
+        "name": "Station 10",
+        "maxLoad": 500
+      },
+      {
+        "index": 11,
+        "name": "Station 11",
+        "maxLoad": 500
       }
     ],
     "writePlan": [
@@ -162,6 +182,36 @@
         "valueExpr": "{station_6}"
       },
       {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:8",
+        "unit": "pounds",
+        "valueExpr": "{station_8}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:9",
+        "unit": "pounds",
+        "valueExpr": "{station_9}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:10",
+        "unit": "pounds",
+        "valueExpr": "{station_10}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:11",
+        "unit": "pounds",
+        "valueExpr": "{station_11}"
+      },
+      {
         "op": "delay",
         "ms": 400
       }
@@ -185,27 +235,21 @@
     "envelopeSource": "simvar",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 14.5,
-      "maxMac": 28
+      "minMac": 19,
+      "maxMac": 42
     },
     "calibration": {
-      "observedMac": 22.2,
-      "calibratedAtIso": "2026-08-09T14:46:31.641Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\VFSProjection\\simobjects\\airplanes\\asobo_cj4\\presets\\asobo\\cj4\\config\\flight_model.cfg",
-      "emptyWeightCgPosition": [
-        -2,
-        0,
-        2.5
-      ],
+      "observedMac": 32.78381824493408,
+      "calibratedAtIso": "2026-08-10T21:02:15.314Z",
       "sweep": {
-        "minObservedMac": 18.17362755537033,
-        "maxObservedMac": 23.922811448574066,
+        "minObservedMac": 31.48576319217682,
+        "maxObservedMac": 32.512855529785156,
         "payloadLb": 200,
-        "forwardStation": 5,
-        "aftStation": 6,
-        "usedStationArms": true,
+        "forwardStation": 1,
+        "aftStation": 11,
+        "usedStationArms": false,
         "restored": true,
-        "sampledAtIso": "2026-08-09T14:46:39.122Z"
+        "sampledAtIso": "2026-08-10T21:02:23.848Z"
       }
     }
   },
@@ -215,13 +259,13 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: Cessna Citation CJ4.",
-    "ICAO type designator (catalog/SimBrief): C25C.",
+    "Homologated via wizard: FSReborn Phenom 300E.",
+    "ICAO type designator (catalog/SimBrief): E55P.",
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
     "AUX deferred for v1.",
-    "Payload stations from writetest: 1, 2, 3, 4, 5, 6.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.",
     "Station maxLoad: placeholder until flight_model.cfg calibrate.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/workingtitle-cessna-citation-cj4.md"
+    "See profiles/notes/fsreborn-phenom-300e.md"
   ]
 }

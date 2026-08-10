@@ -1,26 +1,20 @@
 {
   "source": "simbrief",
-  "icao": "DC6",
-  "ofpId": "pmdg-dc6",
-  "loadMethod": "native-simbrief",
-  "injectCapable": false,
+  "icao": "E55P",
+  "ofpId": "fsreborn-phenom-300e",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
   "matchTitles": [
-    "DC-6A",
-    "DC-6B",
-    "DC-6BP",
-    "777F",
-    "777-200LR",
-    "777-200ER RR",
-    "777-300ER"
+    "FSReborn Phenom 300E",
+    "FSReborn Phenom 300E Manchester Interior"
   ],
-  "matchTitlePattern": "DC-6(?:BP|[AB])",
+  "matchTitlePattern": "FSReborn Phenom 300E",
   "notes": [
-    "PMDG DC-6 family (DC-6A / DC-6B / DC-6BP) — same 12-station layout",
-    "One Skyline Market SKU: pmdg-dc6 (medium_piston)",
-    "Homologated monitors: pmdg/dc-6a, pmdg/dc-6b, pmdg/dc-6bp @1.0.0",
-    "loadMethod: native-simbrief; injectCapable: false — load via PMDG Fuel/Load Manager",
-    "liveSources: classic tanks + mass-balance fuel; payload classic-stations (MB residual when stations ghost)",
-    "SimBrief: Default DC6"
+    "FSReborn Phenom 300E — auto roles pack from homologated profile",
+    "Profile: fsreborn/phenom-300e@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct"
   ],
   "fuel": {
     "unit": "lb"
@@ -31,7 +25,10 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "passengerStations": [],
+      "crewStations": [
+        1,
+        2
+      ],
       "baggageStations": [
         3,
         4,
@@ -41,19 +38,14 @@
         8,
         9,
         10,
-        11,
-        12
+        11
       ],
-      "crewStations": [
-        1,
-        2
-      ]
+      "passengerStations": []
     }
   },
   "liveSources": {
     "fuel": [
-      "classic",
-      "mass-balance"
+      "classic"
     ],
     "weights": [
       "classic-weights"
@@ -62,87 +54,81 @@
       "classic-stations"
     ]
   },
-  "simbriefIcao": "DC6",
+  "simbriefIcao": "E55P",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
     {
       "simVarIndex": 1,
       "cfgIndex": 0,
-      "name": "Pilot",
+      "name": "Station 1",
       "role": "crew"
     },
     {
       "simVarIndex": 2,
       "cfgIndex": 1,
-      "name": "Copilot",
+      "name": "Station 2",
       "role": "crew"
     },
     {
       "simVarIndex": 3,
       "cfgIndex": 2,
-      "name": "Cabin / cargo 1",
+      "name": "Station 3",
       "role": "baggage"
     },
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
-      "name": "Cabin / cargo 2",
+      "name": "Station 4",
       "role": "baggage"
     },
     {
       "simVarIndex": 5,
       "cfgIndex": 4,
-      "name": "Cabin / cargo 3",
+      "name": "Station 5",
       "role": "baggage"
     },
     {
       "simVarIndex": 6,
       "cfgIndex": 5,
-      "name": "Cabin / cargo 4",
+      "name": "Station 6",
       "role": "baggage"
     },
     {
       "simVarIndex": 7,
       "cfgIndex": 6,
-      "name": "Cabin / cargo 5",
+      "name": "Station 7",
       "role": "baggage"
     },
     {
       "simVarIndex": 8,
       "cfgIndex": 7,
-      "name": "Cabin / cargo 6",
+      "name": "Station 8",
       "role": "baggage"
     },
     {
       "simVarIndex": 9,
       "cfgIndex": 8,
-      "name": "Cabin / cargo 7",
+      "name": "Station 9",
       "role": "baggage"
     },
     {
       "simVarIndex": 10,
       "cfgIndex": 9,
-      "name": "Cabin / cargo 8",
+      "name": "Station 10",
       "role": "baggage"
     },
     {
       "simVarIndex": 11,
       "cfgIndex": 10,
-      "name": "Cabin / cargo 9",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 12,
-      "cfgIndex": 11,
-      "name": "Cabin / cargo 10",
+      "name": "Station 11",
       "role": "baggage"
     }
   ],
   "tolerances": {
-    "fuelAbsLb": 150,
+    "fuelAbsLb": 50,
     "fuelPct": 0.03,
-    "payloadAbsLb": 200,
-    "weightAbsLb": 400,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
     "passengerCountAbs": 0,
     "maxFuelIncreaseLb": 0
   }

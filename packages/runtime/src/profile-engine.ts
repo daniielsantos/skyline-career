@@ -110,7 +110,10 @@ export class DefaultProfileEngine implements ProfileEngine {
       let maxMac = this.profile.cg.constraints.maxMac;
       const pinnedEnvelope =
         this.profile.cg.envelopeSource === 'manual' ||
-        this.profile.cg.envelopeSource === 'cfg';
+        this.profile.cg.envelopeSource === 'cfg' ||
+        // Observed CG %MAC disagrees with CG FWD/AFT LIMIT (HondaJet, Starship, …).
+        this.profile.cg.envelopeSource === 'calibrated-live' ||
+        this.profile.cg.envelopeSource === 'live-sweep';
       if (!pinnedEnvelope) {
         try {
           const fwdRaw = await this.bridge.readSimVar({

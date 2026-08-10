@@ -428,6 +428,38 @@ CLASS SCENE KIT — light_jet: Cool slate dusk sky (#6a8a9e / #2f4a5c), polished
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## FlightFX HondaJet HA420
+- **typeId:** `flightfx-mg-hjet-ha420`
+- **file:** `hondajet-ha420.png`
+
+```
+Stylized cartoon / clean vector illustration of a Honda HA-420 HondaJet (HDJT / HA420), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: unique over-wing engine mounts (engines on pylons ABOVE the wing, not under), natural laminar-flow nose, retractable tricycle gear down, sleek very-light-jet fuselage, conventional empennage, HondaJet silhouette is unmistakable. Must read as HondaJet at a glance — overwing engines are essential, not a Phenom, not a Citation Mustang.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_jet: Cool slate dusk sky (#6a8a9e / #2f4a5c), polished concrete FBO apron, glass FBO silhouette, subtle city haze. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## FSReborn Phenom 300E
+- **typeId:** `fsreborn-phenom-300e`
+- **file:** `phenom-300e.png`
+
+```
+Stylized cartoon / clean vector illustration of an Embraer Phenom 300E (E55P), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: light business jet, two aft fuselage-mounted engines, T-tail, retractable gear down, clean Phenom cabin windows, pointed nose, Embraer light-jet proportions. Must read as Phenom 300 at a glance — not a Citation CJ4, not a HondaJet (engines are rear fuselage, not overwing).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_jet: Cool slate dusk sky (#6a8a9e / #2f4a5c), polished concrete FBO apron, glass FBO silhouette, subtle city haze. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ---
 
 # light_turboprop
@@ -540,6 +572,22 @@ Keep the aircraft highly recognizable: high-wing twin turboprop STOL, two engine
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
 CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e), gravel bush strip / short-field ramp, tree line. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Black Square Starship
+- **typeId:** `blacksquare-starship`
+- **file:** `starship.png`
+
+```
+Stylized cartoon / clean vector illustration of a Beechcraft Starship 2000A (STAR), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: futuristic canard business turboprop, twin pusher props on the rear wing, forward canards, distinctive Starship blended composite fuselage and cabin windows, retractable gear down. Must read as Beech Starship at a glance — canards + pusher props are essential, not a King Air, not a conventional twin.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e / #2f5c42), utility or short-field asphalt/gravel ramp, distant tree line. Soft ground shadow.
 
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
@@ -744,6 +792,70 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## Blackbird C-130J Long
+- **typeId:** `blackbird-c-130j-long-configuration`
+- **file:** `c130j-long.png`
+
+```
+Stylized cartoon / clean vector illustration of a Lockheed Martin C-130J Super Hercules (long fuselage) (C130), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: high-wing four-engine military turboprop transport, four six-blade props on the wings, distinctive Hercules fuselage with aft cargo ramp, T-tail, robust main gear pods, long-fuselage C-130J stretch proportions. Must read as C-130J at a glance — four engines + high wing + cargo ramp are essential, not a civilian airliner.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights, military-airlift cargo atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Just Flight Fokker F28
+- **typeId:** `justflight-fokker-f28`
+- **file:** `fokker-f28.png`
+
+```
+Stylized cartoon / clean vector illustration of a Fokker F28 Fellowship (F28), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: classic regional twinjet, two aft fuselage-mounted engines, T-tail, short-to-medium F28 fuselage, distinctive Fokker nose and cabin windows, retractable gear down. Must read as Fokker F28 at a glance — not an MD-80 (shorter / stubbier Fokker look), not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Just Flight F70
+- **typeId:** `justflight-f70`
+- **file:** `fokker-f70.png`
+
+```
+Stylized cartoon / clean vector illustration of a Fokker 70 (F70), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: Fokker 100 family regional twinjet shortened as F70, two aft engines, T-tail, shorter fuselage than F100, classic Fokker nose and window line, retractable gear down. Must read as Fokker 70 at a glance — shorter than F100, not an MD-80.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Just Flight F100
+- **typeId:** `justflight-f100`
+- **file:** `fokker-f100.png`
+
+```
+Stylized cartoon / clean vector illustration of a Fokker 100 (F100), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: Fokker 100 regional twinjet, two aft fuselage engines, T-tail, longer fuselage than F70, classic Fokker nose and dense cabin window row, retractable gear down. Must read as Fokker 100 at a glance — longer than F70, not an MD-80, not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ## PMDG 737-800 BBJ2
 - **typeId:** `pmdg-738-bbj2-family`
 - **file:** `b738-bbj2.png`
@@ -808,6 +920,70 @@ Keep the aircraft highly recognizable: large widebody trijet freighter, two unde
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
 CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp, heavy freighter industrial atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## PMDG 777F
+- **typeId:** `pmdg-777f`
+- **file:** `b777f.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 777F freighter (B77F), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: large widebody twinjet freighter, two huge underwing engines, 777 six-wheel main-gear trucks, distinctive 777 nose and blade antenna, large forward main-deck cargo door, freighter windows plugged / minimal windows, retractable gear down. Must read as 777 Freighter at a glance — cargo door essential, not a 777 passenger, not an MD-11 (only two engines).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp, heavy freighter industrial atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## PMDG 777-200LR
+- **typeId:** `pmdg-777-200lr`
+- **file:** `b777-200lr.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 777-200LR passenger airliner (B77L), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: 777-200 long-range twinjet, two large underwing engines, 777 six-wheel main gear, full passenger window row, raked 777 wingtips / winglet tips as appropriate, retractable gear down, long-range 777-200LR proportions. Must read as passenger 777-200LR at a glance — not freighter (no big cargo door), not a 777-300 (shorter than -300ER).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock / apron scale, oversized ramp atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## PMDG 777-200ER RR
+- **typeId:** `pmdg-777-200er-rr`
+- **file:** `b777-200er.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 777-200ER passenger airliner with Rolls-Royce engines (B772), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: 777-200 twinjet, two large underwing Rolls-Royce Trent nacelles, 777 six-wheel main gear, full passenger window row, conventional 777 wingtips (not raked LR tips), retractable gear down, classic 777-200ER proportions. Must read as passenger 777-200ER at a glance — not freighter (no big cargo door), not a 777-300 (shorter fuselage), not 200LR (no raked wingtip).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock / apron scale, oversized ramp atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## PMDG 777-300ER
+- **typeId:** `pmdg-777-300er`
+- **file:** `b777-300er.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 777-300ER passenger airliner (B77W), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: stretched 777-300 twinjet, two huge underwing engines, 777 six-wheel main gear, long dense passenger window row, raked 777 wingtips, retractable gear down, clearly longer fuselage than a 777-200. Must read as passenger 777-300ER at a glance — stretch length is essential, not freighter (no big cargo door), not a 777-200.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock / apron scale, oversized ramp atmosphere. Soft ground shadow.
 
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```

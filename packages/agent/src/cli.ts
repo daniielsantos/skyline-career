@@ -2576,22 +2576,22 @@ async function main(): Promise<void> {
 
         const engine = new DefaultProfileEngine({ profile, bridge });
 
-        // Use ~80% of first two tank capacities when available (avoids overfill on C185 etc.).
-        const leftCap = profile.fuel.tanks.find((t) => t.id === 'LEFT_MAIN')?.capacity ?? 40;
-        const rightCap = profile.fuel.tanks.find((t) => t.id === 'RIGHT_MAIN')?.capacity ?? 40;
-        const leftTarget = Math.max(5, Math.floor(leftCap * 0.8));
-        const rightTarget = Math.max(5, Math.floor(rightCap * 0.8));
-        const leftAuxCap = profile.fuel.tanks.find((t) => t.id === 'LEFT_AUX')?.capacity;
-        const rightAuxCap = profile.fuel.tanks.find((t) => t.id === 'RIGHT_AUX')?.capacity;
-        const fuelTanks: Record<string, number> = {
-          LEFT_MAIN: leftTarget,
-          RIGHT_MAIN: rightTarget,
-        };
-        if (leftAuxCap !== undefined) {
-          fuelTanks.LEFT_AUX = Math.max(0, Math.floor(leftAuxCap * 0.5));
+        // Target ~80% of every profile tank (wizard smoke does the same).
+        // Omitting CENTER/CENTER2 would write 0 via the profile writePlan and wipe fuel.
+        const fuelTanks: Record<string, number> = {};
+        for (const tank of profile.fuel.tanks) {
+          const cap = tank.capacity ?? 40;
+          const ratio = /TIP|AUX/i.test(tank.id) ? 0.85 : 0.8;
+          const minGal = /TIP|AUX/i.test(tank.id)
+            ? Math.min(10, Math.floor(cap * 0.6))
+            : 5;
+          fuelTanks[tank.id] = Math.max(minGal, Math.floor(cap * ratio));
         }
-        if (rightAuxCap !== undefined) {
-          fuelTanks.RIGHT_AUX = Math.max(0, Math.floor(rightAuxCap * 0.5));
+        if (fuelTanks.LEFT_MAIN === undefined && profile.fuel.tanks[0]) {
+          fuelTanks[profile.fuel.tanks[0].id] = Math.max(
+            5,
+            Math.floor((profile.fuel.tanks[0].capacity ?? 40) * 0.8),
+          );
         }
 
         const stationTargets = buildSmokeStationTargets(profile);

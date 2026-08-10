@@ -1,0 +1,125 @@
+{
+  "source": "simbrief",
+  "icao": "HDJT",
+  "ofpId": "flightfx-mg-hjet-ha420",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "mg hjet ha420",
+    "mg hjet ha420 [Preset Default]"
+  ],
+  "matchTitlePattern": "mg hjet ha420",
+  "notes": [
+    "FlightFX HondaJet HA420 (mg hjet ha420) — presets share stations/tanks",
+    "CG PERCENT scale disagrees with CG FWD/AFT LIMIT (20–31); profile uses calibrated-live",
+    "loadMethod: direct-injection; classic L/R/CENTER/CENTER2",
+    "SimBrief: Default HDJT",
+    "Homologated profile: flightfx/mg-hjet-ha420@1.0.0",
+    "Title: mg hjet ha420",
+    "Joined Market family: FlightFX HondaJet HA420 (flightfx-mg-hjet-ha420)",
+    "Presets (e.g. [Preset Default]) share one OFP pack via matchTitlePattern.",
+    "CG: calibrated-live on inject profile — do not hard-fail on SimVar 20–31% envelope."
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "crewStations": [
+        1,
+        2
+      ]
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "HDJT",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "PILOT",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "PAX0",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "PAX1",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "PAX2",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "PAX3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "PAX4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "PAX5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "CARGO REAR",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "CARGO FRONT",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

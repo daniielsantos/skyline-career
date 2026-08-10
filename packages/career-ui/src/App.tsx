@@ -136,9 +136,11 @@ import {
 } from './AircraftCards';
 import { HangarCashflowPanel } from './CashflowPanel';
 import { CargoOpsPanel } from './CargoOpsPanel';
+import { ClassOpsPanel } from './ClassOpsPanel';
+import { classOpsUnlockProgress } from './class-ops-unlock';
 import { CrewPanel } from './CrewPanel';
 import { CommodityIcon } from './CommodityIcon';
-import type { CareerCargoOps } from './api';
+import type { CareerCargoOps, CareerClassOps } from './api';
 import { HubNetworkMap } from './HubNetworkMap';
 import {
   logbookAircraftLabel,
@@ -2065,6 +2067,7 @@ export function App() {
     'aircraft' | 'cashflow' | 'cargo' | 'crew'
   >('aircraft');
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
+  const [classOps, setClassOps] = useState<CareerClassOps | null>(null);
   const [playerFbos, setPlayerFbos] = useState<PlayerFboSnapshot | null>(null);
   const [rerouteHoldId, setRerouteHoldId] = useState<string | null>(null);
   const [splitHoldId, setSplitHoldId] = useState<string | null>(null);
@@ -2250,6 +2253,7 @@ export function App() {
     setDisplayNowMs(serverNow);
     setWallet(missionState.walletUsd);
     setCargoOps(state.cargoOps ?? null);
+    setClassOps(state.classOps ?? null);
     if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
     setLots(market.lots);
     setMarketTotalLots(market.totalLots ?? market.lots.length);
@@ -10328,7 +10332,7 @@ export function App() {
             {fleet.length === 0 ? (
               <p className="empty">
                 {leaseUnlock && !leaseUnlock.unlocked
-                  ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Fly Crew needed, or buy on the Aircraft Market.`
+                  ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Fly Crew needed, or buy a starter class on the Aircraft Market.`
                   : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
               </p>
             ) : (
@@ -10454,6 +10458,21 @@ export function App() {
                         ? `Lease locked — ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights`
                         : undefined
                     }
+                    classUnlocked={
+                      classOpsUnlockProgress(
+                        classOps,
+                        listing.aircraftClassId,
+                      ).unlocked
+                    }
+                    classLockReason={(() => {
+                      const p = classOpsUnlockProgress(
+                        classOps,
+                        listing.aircraftClassId,
+                      );
+                      return p.unlocked
+                        ? undefined
+                        : `Class locked — ${p.summary}`;
+                    })()}
                     onBuy={(id, opts) => void onBuyAircraft(id, opts)}
                     onLease={(id, opts) => void onLeaseAircraft(id, opts)}
                   />
@@ -10469,7 +10488,7 @@ export function App() {
               {hangarPane === 'aircraft'
                 ? 'Aircraft must be at the mission origin and you must be with it. Travel repositions the pilot; ferry moves the airframe.'
                 : hangarPane === 'cargo'
-                  ? 'Unlock higher freights with clean settles. Dry (General + Supplies) is always open.'
+                  ? 'Unlock freights by commodity and freighter class. Dry and Light starters are open; Medium is optional beside Jet.'
                   : hangarPane === 'crew'
                     ? 'Company crew is based at your FBO. Send them on holds or accepted missions — they settle on wall-clock ETA.'
                     : 'Company income, expenses, and revolving credit — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
@@ -10558,14 +10577,17 @@ export function App() {
               }}
             />
           ) : hangarPane === 'cargo' ? (
-            <CargoOpsPanel
-              cargoOps={cargoOps}
-              leaseUnlockHint={
-                leaseUnlock && !leaseUnlock.unlocked
-                  ? `Lease unlock: ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights (on-time).`
-                  : null
-              }
-            />
+            <>
+              <CargoOpsPanel
+                cargoOps={cargoOps}
+                leaseUnlockHint={
+                  leaseUnlock && !leaseUnlock.unlocked
+                    ? `Lease unlock: ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights (on-time).`
+                    : null
+                }
+              />
+              <ClassOpsPanel classOps={classOps} />
+            </>
           ) : hangarPane === 'crew' ? (
             <CrewPanel
               companyCrew={companyCrew}
@@ -10607,7 +10629,7 @@ export function App() {
           ) : fleet.length === 0 ? (
             <p className="empty">
               {leaseUnlock && !leaseUnlock.unlocked
-                ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Finish Crew needed on time (score ≥70), or buy anytime if you can afford it.`
+                ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Finish Crew needed on time (score ≥70), or buy a starter class if you can afford it.`
                 : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
             </p>
           ) : (

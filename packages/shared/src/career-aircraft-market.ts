@@ -34,6 +34,10 @@ import {
   normalizeCareerCargoOps,
 } from './career-cargo-ops.js';
 import {
+  assertClassOpsUnlocked,
+  syncClassOpsFromFleet,
+} from './career-class-ops.js';
+import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
 } from './career-player-airframes.js';
@@ -130,7 +134,7 @@ export function aircraftLeaseUnlockProgress(
   const remaining = Math.max(0, required - current);
   const hint = unlocked
     ? `Lease unlocked (${current}/${required} clean Dry freights).`
-    : `Lease locked — ${current}/${required} clean Dry freights. Finish Crew needed on time (score ≥70). Buy is available anytime if you can afford it.`;
+    : `Lease locked — ${current}/${required} clean Dry freights. Finish Crew needed on time (score ≥70). Buy still requires the aircraft class to be unlocked.`;
   return { current, required, remaining, unlocked, hint };
 }
 
@@ -1020,6 +1024,7 @@ export function purchaseAircraftListing(
   if (!state.hubSelected) {
     throw new Error('Select a starter hub before buying aircraft');
   }
+  assertClassOpsUnlocked(state.classOps, listing.aircraftClassId);
 
   let deliveryFeeUsd = 0;
   let deliverTo = listing.basedIcao.trim().toUpperCase();
@@ -1064,6 +1069,7 @@ export function purchaseAircraftListing(
     });
   }
   state.fleet = [...state.fleet, aircraft];
+  state.classOps = syncClassOpsFromFleet(state.classOps, state.fleet);
   return { state, aircraft, debitUsd, deliveryFeeUsd };
 }
 
@@ -1093,6 +1099,7 @@ export function signAircraftLease(
     throw new Error('Select a starter hub before leasing aircraft');
   }
   assertAircraftLeaseUnlocked(state);
+  assertClassOpsUnlocked(state.classOps, listing.aircraftClassId);
 
   let deliveryFeeUsd = 0;
   let deliverTo = listing.basedIcao.trim().toUpperCase();
@@ -1137,6 +1144,7 @@ export function signAircraftLease(
     });
   }
   state.fleet = [...state.fleet, aircraft];
+  state.classOps = syncClassOpsFromFleet(state.classOps, state.fleet);
   return { state, aircraft, debitUsd, deliveryFeeUsd };
 }
 

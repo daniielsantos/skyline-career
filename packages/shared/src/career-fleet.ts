@@ -26,6 +26,10 @@ import {
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
+import {
+  normalizeCareerClassOps,
+  syncClassOpsFromFleet,
+} from './career-class-ops.js';
 import { normalizeCompanyCredit } from './career-company-credit.js';
 import {
   assertPilotAtIcao,
@@ -131,6 +135,7 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     aircraftMarketDemandDay: undefined,
     ledger: [],
     cargoOps: normalizeCareerCargoOps(undefined),
+    classOps: normalizeCareerClassOps(undefined),
     companyCredit: normalizeCompanyCredit(undefined),
     playerFbos: { fbos: [], holds: [] },
     companyCrew: { members: [] },
@@ -202,6 +207,10 @@ export function normalizeMissionsState(
   const cargoOps = normalizeCareerCargoOps(
     (raw as CareerMissionsState).cargoOps,
   );
+  const classOps = syncClassOpsFromFleet(
+    normalizeCareerClassOps((raw as CareerMissionsState).classOps),
+    fleet,
+  );
   const companyCredit = normalizeCompanyCredit(
     (raw as CareerMissionsState).companyCredit,
   );
@@ -258,6 +267,7 @@ export function normalizeMissionsState(
     aircraftMarketDemandDay,
     ledger,
     cargoOps,
+    classOps,
     companyCredit,
     playerFbos,
     companyCrew,

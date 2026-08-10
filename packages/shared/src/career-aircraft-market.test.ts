@@ -151,7 +151,7 @@ describe('aircraft market', () => {
     assert.ok(state.fleet.some((a) => a.id === aircraft.id));
   });
 
-  it('blocks lease until enough clean Dry settles; buy stays cash-only', () => {
+  it('blocks lease until enough clean Dry settles; starter buy still cash-only', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-lease-lock' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
       pilotName: 'ContractOnly',
@@ -163,6 +163,9 @@ describe('aircraft market', () => {
     );
     const buy = listings.find(
       (l) => l.kind !== 'lease' && l.aircraftClassId === 'light_ga',
+    );
+    const wideBuy = listings.find(
+      (l) => l.kind !== 'lease' && l.aircraftClassId === 'wide_freighter',
     );
     assert.ok(lease);
     assert.ok(buy);
@@ -177,6 +180,14 @@ describe('aircraft market', () => {
       () => signAircraftLease(state, world, lease!.id),
       /Lease unlocks after 8 clean Dry/i,
     );
+
+    if (wideBuy) {
+      state.walletUsd = wideBuy.askingUsd + 1_000_000;
+      assert.throws(
+        () => purchaseAircraftListing(state, world, wideBuy.id),
+        /Class locked/i,
+      );
+    }
 
     state.walletUsd = buy!.askingUsd;
     const purchased = purchaseAircraftListing(state, world, buy!.id);

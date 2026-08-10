@@ -286,9 +286,12 @@ export function MarketListingCard(props: {
     deliveryFeeUsd: number;
     needed: boolean;
   } | null;
-  /** When false, Lease is disabled (buy still works). */
+  /** When false, Lease is disabled (buy still works unless classUnlocked is false). */
   leaseUnlocked?: boolean;
   leaseLockReason?: string;
+  /** When false, Buy and Lease are disabled for this class. */
+  classUnlocked?: boolean;
+  classLockReason?: string;
   onBuy: (listingId: string, opts?: { deliver?: boolean }) => void;
   onLease: (listingId: string, opts?: { deliver?: boolean }) => void;
 }) {
@@ -303,13 +306,23 @@ export function MarketListingCard(props: {
     deliver && props.delivery?.needed ? props.delivery.deliveryFeeUsd : 0;
   const totalDue = listing.askingUsd + deliveryFee;
   const canAfford = props.wallet >= totalDue;
+  const classUnlocked = props.classUnlocked !== false;
   const leaseUnlocked = props.leaseUnlocked !== false;
-  const leaseDisabled = props.busy || !canAfford || !leaseUnlocked;
-  const leaseTitle = !leaseUnlocked
-    ? (props.leaseLockReason ?? 'Lease locked')
+  const buyDisabled = props.busy || !canAfford || !classUnlocked;
+  const leaseDisabled =
+    props.busy || !canAfford || !leaseUnlocked || !classUnlocked;
+  const buyTitle = !classUnlocked
+    ? (props.classLockReason ?? 'Class locked')
     : !canAfford
-      ? 'Not enough cash for deposit'
+      ? 'Not enough cash'
       : undefined;
+  const leaseTitle = !classUnlocked
+    ? (props.classLockReason ?? 'Class locked')
+    : !leaseUnlocked
+      ? (props.leaseLockReason ?? 'Lease locked')
+      : !canAfford
+        ? 'Not enough cash for deposit'
+        : undefined;
 
   return (
     <article className="aircraft-card">
@@ -470,7 +483,8 @@ export function MarketListingCard(props: {
           <button
             type="button"
             className="accept"
-            disabled={props.busy || !canAfford}
+            disabled={buyDisabled}
+            title={buyTitle}
             onClick={() =>
               props.onBuy(listing.id, { deliver: deliver && canDeliver })
             }

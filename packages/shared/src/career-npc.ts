@@ -24,6 +24,7 @@ import {
   isBushHub,
 } from './career-bush.js';
 import { applyNpcFuelUplift } from './career-fuel.js';
+import { assertClassOpsUnlocked } from './career-class-ops.js';
 import {
   hubLevelNpcBidMult,
   regionAverageHubLevel,
@@ -2104,6 +2105,7 @@ export function acceptContractPilotOffer(
   if (!flight || flight.status !== 'awaiting_pilot') {
     throw new Error('No open crew-needed offer for that lot');
   }
+  assertClassOpsUnlocked(state.classOps, flight.aircraftClassId);
   const until = flight.awaitingPilotUntilMs ?? 0;
   if (until > 0 && nowMs >= until) {
     throw new Error('Crew-needed offer expired — NPC is departing alone');

@@ -34,6 +34,11 @@ import {
   cargoOpsValueScorePenaltyFraction,
   type CargoOpsDelta,
 } from './career-cargo-ops.js';
+import {
+  applyClassOpsOnSettle,
+  assertClassOpsUnlocked,
+  type ClassOpsDelta,
+} from './career-class-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
 import { assertBushLightGa, isOfflineNetworkHub } from './career-bush.js';
 import {
@@ -1033,9 +1038,12 @@ export function acceptMission(
     intoMission?: MissionIntent;
     /** Player cargo ladder — gates unlock + pay mult. */
     cargoOps?: CareerMissionsState['cargoOps'];
+    /** Aircraft class ladder — gates which freighter classes may accept. */
+    classOps?: CareerMissionsState['classOps'];
   },
 ): MissionIntent {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
+  assertClassOpsUnlocked(opts.classOps, aircraft.id);
   const maxCargoKg =
     opts.maxCargoKg !== undefined && Number.isFinite(opts.maxCargoKg) && opts.maxCargoKg > 0
       ? Math.floor(opts.maxCargoKg)
@@ -1168,9 +1176,12 @@ export function commitStagedManifest(
     airframeTypeId?: string;
     /** Player cargo ladder — gates unlock + pay mult. */
     cargoOps?: CareerMissionsState['cargoOps'];
+    /** Aircraft class ladder — gates which freighter classes may accept. */
+    classOps?: CareerMissionsState['classOps'];
   },
 ): { mission: MissionIntent; appended: boolean; lineCount: number } {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
+  assertClassOpsUnlocked(opts.classOps, aircraft.id);
   const maxCargoKg =
     opts.maxCargoKg !== undefined && Number.isFinite(opts.maxCargoKg) && opts.maxCargoKg > 0
       ? Math.floor(opts.maxCargoKg)
@@ -1285,6 +1296,7 @@ export function commitStagedManifest(
         intoMission: mission,
         missionId: i === 0 && !into ? opts.missionId : undefined,
         cargoOps: opts.cargoOps,
+        classOps: opts.classOps,
       });
     }
     if (!mission) {
@@ -1325,9 +1337,14 @@ export function replaceMissionManifest(
     aircraftClassId?: FreighterClassId;
     maxCargoKg?: number;
     cargoOps?: CareerMissionsState['cargoOps'];
+    classOps?: CareerMissionsState['classOps'];
   },
 ): MissionIntent {
   const normalized = normalizeMissionIntent(mission);
+  assertClassOpsUnlocked(
+    opts.classOps,
+    opts.aircraftClassId ?? normalized.aircraftClassId,
+  );
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot edit mission in status=${normalized.status}`);
   }
@@ -1430,6 +1447,7 @@ export function replaceMissionManifest(
         intoMission: next,
         missionId: index === 0 ? normalized.id : undefined,
         cargoOps: opts.cargoOps,
+        classOps: opts.classOps,
       });
     }
     if (!next) {
@@ -1767,6 +1785,8 @@ export interface SettleMissionResult {
   fuelDebitUsd: number;
   /** Cargo Ops ladder deltas from this settle (when fleet provided). */
   cargoOpsDeltas?: CargoOpsDelta[];
+  /** Class Ops ladder deltas from this settle (when fleet provided). */
+  classOpsDeltas?: ClassOpsDelta[];
 }
 
 /** Late penalty as a fraction of pay per overdue wall-clock hour. */
@@ -2058,6 +2078,7 @@ export function settleMission(
   clearPlayerInbound(world, settled.id);
 
   let cargoOpsDeltas: CargoOpsDelta[] | undefined;
+  let classOpsDeltas: ClassOpsDelta[] | undefined;
   if (
     opts.fleet &&
     !working.crewDeadhead &&
@@ -2071,6 +2092,26 @@ export function settleMission(
     });
     opts.fleet.cargoOps = applied.cargoOps;
     cargoOpsDeltas = applied.deltas;
+
+    const blockHours = estimateMissionBlockHours(
+      world,
+      working.originIcao,
+      working.destIcao,
+      working.aircraftClassId,
+    );
+    const hoursMult =
+      typeof opts.hoursMult === 'number' &&
+      Number.isFinite(opts.hoursMult) &&
+      opts.hoursMult > 0
+        ? opts.hoursMult
+        : 1;
+    const classApplied = applyClassOpsOnSettle(opts.fleet.classOps, settled, {
+      onTime: pay.onTime,
+      blockHours: blockHours * hoursMult,
+      flightScore: opts.flightScore ?? settled.settledFlightScore,
+    });
+    opts.fleet.classOps = classApplied.classOps;
+    classOpsDeltas = classApplied.deltas;
   }
 
   return {
@@ -2078,6 +2119,7 @@ export function settleMission(
     walletCreditUsd: pay.payoutUsd,
     fuelDebitUsd,
     cargoOpsDeltas,
+    classOpsDeltas,
     settlement: {
       missionId: settled.id,
       deliveredKg: working.cargoKg,

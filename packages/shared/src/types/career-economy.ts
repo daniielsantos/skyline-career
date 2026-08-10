@@ -919,6 +919,11 @@ export interface CareerMissionsState {
    * Unlocks market freights and scales pay by reputation.
    */
   cargoOps?: CareerCargoOps;
+  /**
+   * Aircraft class unlock ladder (starters → Jet|Medium → Narrow → Wide).
+   * Gates buy/lease, accept, contract-pilot, and Freights board size.
+   */
+  classOps?: CareerClassOps;
   /** Revolving company credit line (Hangar cashflow). */
   companyCredit?: CompanyCreditState;
   /** Player-owned FBOs + bonded contract holds (company assets). */
@@ -1056,6 +1061,23 @@ export interface CargoOpsCommodityState {
 
 export interface CareerCargoOps {
   commodities: Record<CargoOpsCommodityId, CargoOpsCommodityState>;
+}
+
+/** Per-class progress toward the freighter unlock ladder. */
+export interface ClassOpsClassState {
+  unlocked: boolean;
+  /** Accumulated block hours on non-empty freights of this class. */
+  hours: number;
+  /** Clean settles (on-time + score ≥ threshold) on this class. */
+  cleans: number;
+}
+
+/**
+ * Aircraft class ladder — Light starters → Jet | Medium → Narrow → Wide.
+ * Medium is optional (parallel to Light jet).
+ */
+export interface CareerClassOps {
+  classes: Record<FreighterClassId, ClassOpsClassState>;
 }
 
 /** Live-learned cruise burn / TAS for one Market airframe typeId. */

@@ -837,6 +837,16 @@ export type CareerCargoOps = {
   commodities: Record<CargoOpsCommodityId, CargoOpsCommodityState>;
 };
 
+export type ClassOpsClassState = {
+  unlocked: boolean;
+  hours: number;
+  cleans: number;
+};
+
+export type CareerClassOps = {
+  classes: Record<AircraftClass, ClassOpsClassState>;
+};
+
 export type CargoOpsDelta = {
   commodityId: CargoOpsCommodityId;
   deltaRep: number;
@@ -888,6 +898,7 @@ export function fetchState() {
       cashflow?: CareerCashflowSnapshot;
       companyCredit?: CompanyCreditSnapshot;
       cargoOps?: CareerCargoOps | null;
+      classOps?: CareerClassOps | null;
       playerFbos?: PlayerFboSnapshot | null;
       companyCrew?: CompanyCrewSnapshot | null;
       leaseUnlock?: AircraftLeaseUnlock;

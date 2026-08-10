@@ -12,6 +12,8 @@ import {
   CAREER_COMMODITIES,
   cancelMission,
   cargoOpsIsUnlocked,
+  classOpsIsUnlocked,
+  classOpsLotAboveBoard,
   clearAircraftMaintenanceWithParts,
   repairAircraftConditionWithParts,
   hoursUntilInspection,
@@ -390,6 +392,7 @@ function fleetPayload(
     companyCredit: companyCreditSnapshot(missions),
     playerFbos: playerFboSnapshot(missions, world),
     leaseUnlock: aircraftLeaseUnlockProgress(missions),
+    classOps: missions.classOps ?? null,
     activeBushTrip: missions.activeBushTrip ?? null,
   };
 }
@@ -1216,6 +1219,7 @@ export function createCareerApiServer(port = 8787) {
             ...fleetPayload(missions, world),
             cashflow: summarizeCareerLedger(missions, world.tick),
             cargoOps: missions.cargoOps ?? null,
+            classOps: missions.classOps ?? null,
             playerFbos: playerFboSnapshot(missions, world),
             companyCrew: companyCrewSnapshot(missions, world),
             homeCountryId: world.homeCountryId ?? null,
@@ -2125,12 +2129,13 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/market') {
-        const { world, cargoOps, missionsState } = await withCareerWrite(
+        const { world, cargoOps, classOps, missionsState } = await withCareerWrite(
           (w, missions) => {
             reconcilePlayerInbound(w, missions.missions);
             return {
               world: w,
               cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
               missionsState: missions,
             };
           },
@@ -2174,7 +2179,10 @@ export function createCareerApiServer(port = 8787) {
               maxCargoKg: cargoLimit?.maxCargoKg,
               maxRangeNm,
             })
-          : listMarketLots(world, filter);
+          : listMarketLots(world, filter).filter(
+              (row) =>
+                !classOpsLotAboveBoard(classOps, row.availableKg),
+            );
         type MarketBoardRow = {
           id: string;
           originIcao: string;
@@ -3318,6 +3326,7 @@ export function createCareerApiServer(port = 8787) {
               maxCargoKg: cargoLimit.maxCargoKg,
               intoMission: intoMission ?? undefined,
               cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
             });
             const appended = Boolean(intoMission) && mission.lots.length > beforeLots;
             if (intoMission) {
@@ -3381,7 +3390,7 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          const payload = await withCareerRead((world) => {
+          const payload = await withCareerRead((world, missions) => {
             const flight =
               (npcFlightId
                 ? world.npcFlights.find((f) => f.id === npcFlightId)
@@ -3393,6 +3402,15 @@ export function createCareerApiServer(port = 8787) {
                 : undefined);
             if (!flight || flight.status !== 'awaiting_pilot') {
               return { kind: 'missing' as const };
+            }
+            if (
+              missions.classOps &&
+              !classOpsIsUnlocked(missions.classOps, flight.aircraftClassId)
+            ) {
+              return {
+                kind: 'locked' as const,
+                aircraftClassId: flight.aircraftClassId,
+              };
             }
             const distanceNm =
               routeDistanceNm(world, flight.originIcao, flight.destIcao) ??
@@ -3422,6 +3440,12 @@ export function createCareerApiServer(port = 8787) {
           });
           if (payload.kind === 'missing') {
             send(res, 404, { error: 'No open crew-needed offer' });
+            return;
+          }
+          if (payload.kind === 'locked') {
+            send(res, 403, {
+              error: `Class locked: ${payload.aircraftClassId} — unlock this freighter class before taking crew offers`,
+            });
             return;
           }
           send(res, 200, payload);
@@ -3754,6 +3778,7 @@ export function createCareerApiServer(port = 8787) {
                   aircraftClassId: aircraft,
                   maxCargoKg: operationalMaxCargoKg,
                   cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
                 }),
                 aircraftId: playerAircraft.id,
                 airframeTypeId: playerAirframe?.typeId,
@@ -3782,6 +3807,7 @@ export function createCareerApiServer(port = 8787) {
                 intoMission: intoMission ?? undefined,
                 airframeTypeId: playerAirframe?.typeId,
                 cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
               });
               mission = {
                 ...staged.mission,

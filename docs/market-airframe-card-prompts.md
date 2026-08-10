@@ -856,6 +856,86 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## Fenix A319
+- **typeId:** `fenix-a319`
+- **file:** `fenix-a319.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A319 (A319), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: A320-family narrowbody twinjet, two underwing engines, conventional tail, wingtip fences or sharklets, shorter fuselage than A320/A321, retractable gear down, classic Airbus nose and cockpit windows. Must read as A319 at a glance — shorter than A320, much shorter than A321, not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Fenix A320
+- **typeId:** `fenix-a320`
+- **file:** `fenix-a320.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A320 (A320), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: A320-family narrowbody twinjet, two underwing engines, conventional tail, wingtip fences or sharklets, classic A320 fuselage length and cabin window row, retractable gear down, Airbus nose. Must read as A320 at a glance — longer than A319, shorter than A321, not a 737, not an A320neo (classic A320ceo look is fine).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Fenix A321
+- **typeId:** `fenix-a321`
+- **file:** `fenix-a321.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A321 (A321), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: stretched A320-family narrowbody twinjet, two underwing engines, conventional tail, wingtip fences or sharklets, long dense cabin window row, retractable gear down, clearly longer fuselage than A319/A320. Must read as A321 at a glance — stretch length is essential, not an A319/A320, not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Microsoft A320neo V2
+- **typeId:** `microsoft-a320neo-v2`
+- **file:** `a320neo-v2.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A320neo (A20N), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: A320neo narrowbody twinjet, two large modern underwing engines (neo nacelles), sharklets, conventional tail, A320 fuselage length, retractable gear down, Airbus nose. Must read as A320neo at a glance — neo engines + sharklets essential, not a classic A320ceo, not a 737 MAX.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Microsoft A321LR
+- **typeId:** `microsoft-a321lr`
+- **file:** `a321lr.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A321LR / A321neo long-range (A321), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: stretched A321neo-family narrowbody, two large neo underwing engines, sharklets, long fuselage with dense window row, retractable gear down, long-range A321LR proportions. Must read as A321LR / A321neo at a glance — stretch + neo engines essential, not an A320, not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ## PMDG 737-800 BBJ2
 - **typeId:** `pmdg-738-bbj2-family`
 - **file:** `b738-bbj2.png`

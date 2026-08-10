@@ -1,0 +1,188 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "fenix-fenixa319-iae-sl-hd",
+  "profileKey": "fenix/fenixa319-iae-sl-hd",
+  "semver": "1.0.0",
+  "displayName": "FenixA319 IAE SL HD (MSFS 2024)",
+  "match": {
+    "fingerprint": "b8d0d9bdf477365ab0420e58b1acc650025a559454683c782fab73299c7d9f59",
+    "title": "FenixA319 IAE SL HD",
+    "publisher": "fenix",
+    "icao": "A319",
+    "liveTitles": [
+      "FenixA319 IAE SL HD"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 2061,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 2061,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "CENTER",
+        "name": "Center",
+        "capacity": 2180,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 200,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 200,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons"
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      },
+      {
+        "index": 9,
+        "name": "Station 9",
+        "maxLoad": 500
+      },
+      {
+        "index": 10,
+        "name": "Station 10",
+        "maxLoad": 500
+      },
+      {
+        "index": 11,
+        "name": "Station 11",
+        "maxLoad": 500
+      },
+      {
+        "index": 12,
+        "name": "Station 12",
+        "maxLoad": 500
+      },
+      {
+        "index": 13,
+        "name": "Station 13",
+        "maxLoad": 500
+      },
+      {
+        "index": 14,
+        "name": "Station 14",
+        "maxLoad": 500
+      },
+      {
+        "index": 15,
+        "name": "Station 15",
+        "maxLoad": 500
+      },
+      {
+        "index": 16,
+        "name": "Station 16",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "calibrated-live",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 50
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: FenixA319 IAE SL HD.",
+    "ICAO type designator (catalog/SimBrief): A319.",
+    "Load method: native-simbrief (no Skyline inject).",
+    "Fuel/payload write plans intentionally empty — load via addon EFB/tablet.",
+    "Use compare-ofp + Career Loaded vs Due for validation.",
+    "See profiles/notes/fenix-fenixa319-iae-sl-hd.md"
+  ]
+}

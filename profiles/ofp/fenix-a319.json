@@ -1,0 +1,69 @@
+{
+  "source": "simbrief",
+  "icao": "A319",
+  "ofpId": "fenix-a319",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "FenixA319 CFM SL HD",
+    "FenixA319 CFM WF SD",
+    "FenixA319 IAE SL HD",
+    "FenixA319 IAE WF SD"
+  ],
+  "matchTitlePattern": "FenixA319\\s+(?:CFM|IAE)\\s+(?:SL|WF)\\s+(?:HD|SD)\\b",
+  "notes": [
+    "Fenix A319 family (CFM/IAE × SL/WF × HD/SD) — same 16-station + 5-tank layout",
+    "One Skyline Market SKU: fenix-a319 (narrow_freighter)",
+    "Homologated profiles: fenix/fenixa319-{cfm,iae}-{sl-hd,wf-sd}@1.0.0",
+    "loadMethod: native-simbrief; injectCapable: false — load via Fenix EFB",
+    "Cabin stations mapped as baggage for Career cargo (pax=0)",
+    "SimBrief: Default A319"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A319",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "baggage" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Station 11", "role": "baggage" },
+    { "simVarIndex": 12, "cfgIndex": 11, "name": "Station 12", "role": "baggage" },
+    { "simVarIndex": 13, "cfgIndex": 12, "name": "Station 13", "role": "baggage" },
+    { "simVarIndex": 14, "cfgIndex": 13, "name": "Station 14", "role": "baggage" },
+    { "simVarIndex": 15, "cfgIndex": 14, "name": "Station 15", "role": "baggage" },
+    { "simVarIndex": 16, "cfgIndex": 15, "name": "Station 16", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 250,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

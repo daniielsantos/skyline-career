@@ -1,0 +1,58 @@
+{
+  "source": "simbrief",
+  "icao": "A20N",
+  "ofpId": "microsoft-a320neo-v2",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "A320neo V2"
+  ],
+  "matchTitlePattern": "A320neo\\s*V2\\b",
+  "notes": [
+    "Microsoft / Asobo A320neo V2 — 8-station + 5-tank layout",
+    "Market SKU: microsoft-a320neo-v2 (narrow_freighter)",
+    "Homologated profile: microsoft/a320neo-v2@1.0.0",
+    "loadMethod: native-simbrief; injectCapable: false — load via EFB/tablet",
+    "Cabin stations mapped as baggage for Career cargo (pax=0)",
+    "SimBrief: Default A20N"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A20N",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 250,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

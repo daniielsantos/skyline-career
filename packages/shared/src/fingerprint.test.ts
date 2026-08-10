@@ -254,6 +254,29 @@ describe('titlesMatchForCatalog', () => {
       true,
     );
   });
+
+  it('does not alias Fenix A319 engine or pack variants', () => {
+    assert.equal(
+      titlesMatchForCatalog('FenixA319 CFM WF SD', 'FenixA319 IAE WF SD'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('FenixA319 CFM SL HD', 'FenixA319 IAE SL HD'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('FenixA319 CFM WF SD', 'FenixA319 CFM SL HD'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('FenixA319 IAE WF SD', 'FenixA319 IAE WF SD'),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog('FenixA319 CFM WF SD', 'FenixA319 CFM WF SD'),
+      true,
+    );
+  });
 });
 
 describe('fingerprintFromProfile liveTitles', () => {

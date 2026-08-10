@@ -1,0 +1,148 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "microsoft-a320neo-v2",
+  "profileKey": "microsoft/a320neo-v2",
+  "semver": "1.0.0",
+  "displayName": "A320neo V2 (MSFS 2024)",
+  "match": {
+    "fingerprint": "b5f6f765e31e0145061f7ecda601ba129161f94f126404bd1489f7a23fa9652b",
+    "title": "A320neo V2",
+    "publisher": "microsoft",
+    "icao": "A20N",
+    "liveTitles": [
+      "A320neo V2"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 1814.7,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 1814.7,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "CENTER",
+        "name": "Center",
+        "capacity": 2182,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 228.4,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 228.4,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons"
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "calibrated-live",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 50
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: A320neo V2.",
+    "ICAO type designator (catalog/SimBrief): A20N.",
+    "Load method: native-simbrief (no Skyline inject).",
+    "Fuel/payload write plans intentionally empty — load via addon EFB/tablet.",
+    "Use compare-ofp + Career Loaded vs Due for validation.",
+    "See profiles/notes/microsoft-a320neo-v2.md"
+  ]
+}

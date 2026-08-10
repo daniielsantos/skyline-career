@@ -250,6 +250,37 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     return false;
   }
 
+  // Engine options are first-class variants even when tanks/stations match
+  // (Fenix A319 CFM WF SD must not resolve onto Fenix A319 IAE WF SD).
+  const engineTokens = new Set([
+    'cfm',
+    'iae',
+    'leap',
+    'pw',
+    'pw1100',
+    'pratt',
+    'whitney',
+    'trent',
+    'rr',
+    'rolls',
+    'ge',
+    'ge90',
+    'genx',
+    'v2500',
+  ]);
+  const liveEngines = liveTokens.filter((t) => engineTokens.has(t));
+  const profileEngines = profileTokenList.filter((t) => engineTokens.has(t));
+  if (liveEngines.length > 0 && profileEngines.length > 0) {
+    const liveSet = new Set(liveEngines);
+    const profileSet = new Set(profileEngines);
+    if (
+      liveEngines.some((e) => !profileSet.has(e)) ||
+      profileEngines.some((e) => !liveSet.has(e))
+    ) {
+      return false;
+    }
+  }
+
   // Config / cabin / range suffixes are first-class variants (Learjet "PASSENGER
   // LONG RANGE" must not alias onto plain "PASSENGER"; Kodiak Combi ≠ Commuter).
   const variantTokens = new Set([
@@ -284,6 +315,16 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     // Duke / performance packages — Grand ≠ base B60; Turbine ≠ piston.
     'grand',
     'turbine',
+    // Fenix A32x pack codes — wing fence / sharklet / seating density.
+    // "… CFM WF SD" must not alias onto "… CFM SL HD" via shared model tokens.
+    'wf',
+    'sl',
+    'hd',
+    'sd',
+    'sharklet',
+    'sharklets',
+    // Fenix A321 cabin configs (TC / SC).
+    'sc',
   ]);
   const liveVariants = new Set(liveTokens.filter((t) => variantTokens.has(t)));
   const profileVariants = new Set(

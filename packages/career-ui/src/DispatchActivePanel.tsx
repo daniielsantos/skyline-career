@@ -344,6 +344,20 @@ export function DispatchActivePanel(props: {
             </em>
           ) : null}
         </span>
+        {mission.fuelUplift &&
+        (mission.fuelUplift.costUsd > 0 ||
+          mission.fuelUplift.requestedKg > 0.5) ? (
+          <span>
+            Fuel
+            <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
+            <em>
+              {props.formatTonnes(mission.fuelUplift.requestedKg)}
+              {mission.fuelUplift.scarcity !== 'ok'
+                ? ` · ${mission.fuelUplift.scarcity}`
+                : ''}
+            </em>
+          </span>
+        ) : null}
       </div>
 
       {(mission.lots?.length ?? 0) > 0 ||
@@ -595,19 +609,6 @@ export function DispatchActivePanel(props: {
             ) : null}
           </div>
         )
-      ) : null}
-
-      {showFuelCard &&
-      mission.fuelUplift &&
-      step !== 'fuel' &&
-      (mission.fuelUplift.costUsd > 0 || mission.fuelUplift.requestedKg > 0.5) ? (
-        <p className="dispatch-fuel-paid">
-          Fuel paid {props.formatMoney(mission.fuelUplift.costUsd)} ·{' '}
-          {props.formatTonnes(mission.fuelUplift.requestedKg)}
-          {mission.fuelUplift.scarcity !== 'ok'
-            ? ` · ${mission.fuelUplift.scarcity}`
-            : ''}
-        </p>
       ) : null}
 
       {showLoadPanel && loadPath !== 'inject' ? (

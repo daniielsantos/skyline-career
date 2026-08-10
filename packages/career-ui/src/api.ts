@@ -459,6 +459,8 @@ export type Mission = {
   crewFeeUsd?: number;
   /** Fly an NPC homologated airframe for a pilot fee (no owned aircraft). */
   contractPilot?: boolean;
+  /** Contract-pilot empty deadhead (NPC home reposition). */
+  contractPilotReposition?: boolean;
   contractPilotFeeUsd?: number;
   contractGrossPayUsd?: number;
   operatorNpcId?: string;
@@ -470,6 +472,10 @@ export type Mission = {
   crewDeadhead?: boolean;
   /** Player empty reposition (no freight) — Hangar → Plan empty flight. */
   emptyFlight?: boolean;
+  /** Great-circle / network route distance (enriched by /api/missions). */
+  distanceNm?: number;
+  /** Catalog airframe label (enriched by /api/missions). */
+  airframeLabel?: string;
   crewReturnIcao?: string;
   crewOutboundMissionId?: string;
   settledFuelKg?: number;

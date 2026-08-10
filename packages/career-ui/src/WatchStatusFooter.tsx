@@ -151,7 +151,7 @@ export function WatchStatusFooter(props: Props) {
                 ? 'watch-flight-time ok'
                 : 'watch-flight-time pending'
             }
-            title="Minimum airborne time: 70% of planned route (≥50% when route is under 100 nm)"
+            title="Minimum airborne time: 70% of planned route (≥50% when route is under 100 nm). Plan may tighten after stable cruise TAS."
           >
             Airborne {Math.round(props.watch.flightTime.elapsedMs / 60_000)}m /{' '}
             {Math.round(props.watch.flightTime.expectedRouteMs / 60_000)}m air

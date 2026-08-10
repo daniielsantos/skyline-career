@@ -10,6 +10,7 @@ import {
   isNearAirport,
   mergeAirborneClockOntoMission,
   parseBlockTimeToMs,
+  rebaseExpectedRouteMsFromCruise,
   resumeAirborneAtMs,
   pickActiveMission,
   resolveExpectedRouteMs,
@@ -329,6 +330,38 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(resolveExpectedRouteMs(msn), 2 * 3_600_000);
   });
 
+  it('rebases expected air time from cruise TAS without dropping the 70% gate basis below 55% OFP', () => {
+    const plannedMs = 2 * 60 * 60_000; // padded OFP air
+    const distanceNm = 400;
+    const fast = rebaseExpectedRouteMsFromCruise({
+      plannedExpectedRouteMs: plannedMs,
+      distanceNm,
+      cruiseSpeedKt: 450,
+    });
+    assert.ok(fast.estimatedMs != null && fast.estimatedMs < plannedMs);
+    assert.equal(fast.changed, true);
+    assert.ok(fast.expectedRouteMs < plannedMs);
+    assert.ok(fast.expectedRouteMs >= Math.round(plannedMs * 0.55));
+
+    const slow = rebaseExpectedRouteMsFromCruise({
+      plannedExpectedRouteMs: plannedMs,
+      currentExpectedRouteMs: plannedMs,
+      distanceNm,
+      cruiseSpeedKt: 200,
+    });
+    // Slow cruise must not lengthen the settle wait.
+    assert.equal(slow.changed, false);
+    assert.equal(slow.expectedRouteMs, plannedMs);
+
+    const floor = rebaseExpectedRouteMsFromCruise({
+      plannedExpectedRouteMs: plannedMs,
+      distanceNm: 100,
+      cruiseSpeedKt: 900,
+    });
+    assert.equal(floor.expectedRouteMs, Math.round(plannedMs * 0.55));
+    assert.equal(floor.changed, true);
+  });
+
   it('freezes airborne elapsed after touchdown', () => {
     const plannedMs = 31 * 60_000;
     const airborneAt = 1_000_000;
@@ -639,11 +672,19 @@ describe('flightPhaseFromSample', () => {
     assert.equal(advanced!.airborneElapsedMs, 180_000);
     assert.equal(advanced!.expectedRouteMs, 3_600_000);
 
+    // Cruise rebase may tighten a padded OFP plan (shorter wins).
+    const tightened = mergeAirborneClockOntoMission(advanced!, {
+      airborneElapsedMs: 180_000,
+      expectedRouteMs: 2_400_000,
+    });
+    assert.ok(tightened);
+    assert.equal(tightened!.expectedRouteMs, 2_400_000);
+
     // Smaller elapsed must not rewind progress.
     assert.equal(
-      mergeAirborneClockOntoMission(advanced!, {
+      mergeAirborneClockOntoMission(tightened!, {
         airborneElapsedMs: 90_000,
-        expectedRouteMs: 3_600_000,
+        expectedRouteMs: 2_400_000,
       }),
       null,
     );

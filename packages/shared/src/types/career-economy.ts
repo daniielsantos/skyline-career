@@ -636,7 +636,10 @@ export interface MissionIntent {
    * Lets the airborne % resume after app restart without counting closed time.
    */
   airborneElapsedMs?: number;
-  /** Planned route duration (ms) stamped at airborne — OFP block or distance estimate. */
+  /**
+   * Planned route duration (ms) stamped at airborne — OFP air time / distance
+   * estimate. May tighten after stable cruise TAS rebase (floor 55% of OFP).
+   */
   expectedRouteMs?: number;
   /** Economy tick when settle ran. */
   settledAtTick?: number;

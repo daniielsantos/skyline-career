@@ -140,6 +140,14 @@ import { CrewPanel } from './CrewPanel';
 import { CommodityIcon } from './CommodityIcon';
 import type { CareerCargoOps } from './api';
 import { HubNetworkMap } from './HubNetworkMap';
+import {
+  logbookAircraftLabel,
+  logbookCargoLabel,
+  logbookDistanceNm,
+  logbookFlightKind,
+  logbookPayoutUsd,
+  logbookStatusLabel,
+} from './logbook';
 
 function normalizeStarterHubs(
   hubs: Array<StarterHubOption | string> | null | undefined,
@@ -6500,7 +6508,7 @@ export function App() {
               : tab === 'map'
                 ? 'Registered Skyline hubs on OpenFreeMap Dark (free public tiles).'
                 : tab === 'missions'
-                  ? 'Historical flights — settled, cancelled, and past operations.'
+                  ? 'Past flights — aircraft, cargo, distance, and payout.'
                   : tab === 'settings'
                     ? 'SimBrief, weight units, and local career preferences.'
                     : freightsBoard === 'bush'
@@ -10737,114 +10745,58 @@ export function App() {
                   (b.acceptedAtTick ?? 0) - (a.acceptedAtTick ?? 0) ||
                   b.id.localeCompare(a.id),
               )
-              .map((m) => (
-                <li key={m.id} className="mission logbook-entry">
-                  <div className="mission-main">
-                    <div className="route">
-                      <IcaoLink icao={m.originIcao} onOpen={openAirport} disabled={busy} />
-                      <span className="arrow">→</span>
-                      <IcaoLink icao={m.destIcao} onOpen={openAirport} disabled={busy} />
-                      <span className={`status status-${m.status}`}>{m.status}</span>
-                      {isActiveMissionStatus(m.status) ? (
-                        <button
-                          type="button"
-                          className="linkish"
-                          onClick={() => selectTab('staging')}
+              .map((m) => {
+                const kind = logbookFlightKind(m);
+                const distanceNm = logbookDistanceNm(m);
+                const payout = logbookPayoutUsd(m);
+                const fleetLabel = m.aircraftId
+                  ? fleet.find((a) => a.id === m.aircraftId)?.label
+                  : null;
+                return (
+                  <li key={m.id} className="mission logbook-entry">
+                    <div className="mission-main">
+                      <div className="route">
+                        <IcaoLink
+                          icao={m.originIcao}
+                          onOpen={openAirport}
                           disabled={busy}
-                        >
-                          Operate in Dispatch
-                        </button>
-                      ) : null}
-                      {m.lastOfpCheck ? (
-                        <span className={`ofp-verdict ofp-${m.lastOfpCheck.verdict}`}>
-                          OFP {m.lastOfpCheck.verdict}
+                        />
+                        <span className="arrow">→</span>
+                        <IcaoLink
+                          icao={m.destIcao}
+                          onOpen={openAirport}
+                          disabled={busy}
+                        />
+                        <span className={`status status-${m.status}`}>
+                          {logbookStatusLabel(m.status)}
                         </span>
-                      ) : null}
-                      {m.lastPreflightCheck ? (
-                        <span className={`ofp-verdict ofp-${m.lastPreflightCheck.verdict}`}>
-                          Preflight {m.lastPreflightCheck.verdict}
-                        </span>
-                      ) : null}
+                        <span className="logbook-kind">{kind}</span>
+                        {isActiveMissionStatus(m.status) ? (
+                          <button
+                            type="button"
+                            className="linkish"
+                            onClick={() => selectTab('staging')}
+                            disabled={busy}
+                          >
+                            Operate in Dispatch
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="logbook-summary">
+                        {logbookAircraftLabel(m, { fleetLabel })}
+                        {' · '}
+                        {logbookCargoLabel(m, formatTonnes)}
+                        {' · '}
+                        {distanceNm != null
+                          ? `${distanceNm.toLocaleString('en-US')} nm`
+                          : 'Distance —'}
+                        {' · '}
+                        {payout != null ? formatMoney(payout) : '—'}
+                      </p>
                     </div>
-                    <p>
-                      {m.id} · {formatTonnes(m.cargoKg)}
-                      {(m.lots?.length ?? 1) > 1 ? ` · ${m.lots!.length} lots` : ''} ·{' '}
-                      {aircraftClassLabel(m.aircraftClassId)} · deadline{' '}
-                      {formatDeadline(m.deadlineTick, continuousHours)}
-                      {m.acceptedAtTick !== undefined
-                        ? ` · accepted T${m.acceptedAtTick}`
-                        : ''}
-                      {m.dispatchedAtTick !== undefined
-                        ? ` · dispatched T${m.dispatchedAtTick}`
-                        : ''}
-                      {m.departedAtTick !== undefined
-                        ? ` · departed T${m.departedAtTick}`
-                        : ''}
-                      {m.settledAtTick !== undefined
-                        ? ` · settled T${m.settledAtTick}`
-                        : ''}
-                    </p>
-                    <p className="payline">
-                      Contract {formatMoney(m.payUsd)}
-                      {m.payoutUsd !== undefined
-                        ? ` · paid ${formatMoney(m.payoutUsd)}`
-                        : ''}
-                      {m.fuelUplift
-                        ? ` · fuel −${formatMoney(m.fuelUplift.costUsd)} (${formatTonnes(m.fuelUplift.requestedKg)}${m.fuelUplift.scarcity !== 'ok' ? ` · ${m.fuelUplift.scarcity}` : ''})`
-                        : ''}
-                      {m.settledFuelKg !== undefined
-                        ? ` · remaining ${formatTonnes(m.settledFuelKg)}`
-                        : ''}
-                      {m.settledLandingFpm !== undefined
-                        ? ` · landing ${formatLandingFpm(m.settledLandingFpm)}`
-                        : ''}
-                      {m.payoutUsd !== undefined
-                        ? ` · net ${formatMoney(
-                            m.payoutUsd - (m.fuelUplift?.costUsd ?? 0),
-                          )}`
-                        : ''}
-                    </p>
-                    <small>{formatWeightText(m.reason, weightSystem)}</small>
-                    {(m.lots?.length ?? 0) > 0 ? (
-                      <ul className="ofp-findings logbook-lots">
-                        {m.lots!.map((line) => (
-                          <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                            {formatTonnes(line.cargoKg)} {line.commodityId} ·{' '}
-                            {formatMoney(line.payUsd)}
-                            {line.urgency === 'urgent' ? ' · urgent' : ''}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {m.lastOfpCheck ? (
-                      <ul className="ofp-findings">
-                        {m.lastOfpCheck.findings.map((f) => (
-                          <li
-                            key={`ofp-${f.code}-${f.message}`}
-                            className={`finding-${f.severity}`}
-                          >
-                            [OFP {f.severity}]{' '}
-                            {formatWeightText(f.message, weightSystem)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {m.lastPreflightCheck ? (
-                      <ul className="ofp-findings">
-                        {m.lastPreflightCheck.findings.map((f) => (
-                          <li
-                            key={`pre-${f.code}-${f.message}`}
-                            className={`finding-${f.severity}`}
-                          >
-                            [Live {f.severity}]{' '}
-                            {formatWeightText(f.message, weightSystem)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             {missions.length === 0 ? (
               <li className="empty">
                 No flights logged yet — prepare a freight from Freights.

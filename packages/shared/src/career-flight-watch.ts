@@ -61,7 +61,7 @@ export interface MissionFlightWatchState {
    * Freezes the airborne elapsed clock for the settle gate / UI.
    */
   airborneEndedAtMs?: number;
-  /** Planned route duration in wall-clock ms (OFP air time / distance estimate). */
+  /** Planned route duration in wall-clock ms (OFP air time; may tighten after cruise TAS). */
   expectedRouteMs?: number;
   /** Route distance (nm) used to pick short-hop vs normal airborne ratio. */
   routeDistanceNm?: number;
@@ -141,9 +141,10 @@ export function createMissionFlightWatchState(
  * Merge Watch airborne clock onto a persisted mission.
  * Returns null when nothing new to write (caller skips save).
  *
- * Prefers the larger airborneElapsedMs (progress) and keeps expectedRouteMs
- * once stamped. airborneAtMs is re-based on resume so offline time does not
- * inflate the settle gate.
+ * Prefers the larger airborneElapsedMs (progress). expectedRouteMs keeps the
+ * shorter positive stamp so an OFP plan can tighten after cruise TAS rebase
+ * without a later longer estimate stretching the settle gate. airborneAtMs is
+ * re-based on resume so offline time does not inflate the settle gate.
  */
 export function mergeAirborneClockOntoMission(
   mission: MissionIntent,
@@ -180,16 +181,22 @@ export function mergeAirborneClockOntoMission(
     typeof clock.airborneAtMs === 'number' && Number.isFinite(clock.airborneAtMs)
       ? clock.airborneAtMs
       : mission.airborneAtMs;
-  const nextExpectedRouteMs =
+  const clockExpected =
+    typeof clock.expectedRouteMs === 'number' &&
+    Number.isFinite(clock.expectedRouteMs) &&
+    clock.expectedRouteMs > 0
+      ? clock.expectedRouteMs
+      : undefined;
+  const missionExpected =
     typeof mission.expectedRouteMs === 'number' &&
     Number.isFinite(mission.expectedRouteMs) &&
     mission.expectedRouteMs > 0
       ? mission.expectedRouteMs
-      : typeof clock.expectedRouteMs === 'number' &&
-          Number.isFinite(clock.expectedRouteMs) &&
-          clock.expectedRouteMs > 0
-        ? clock.expectedRouteMs
-        : mission.expectedRouteMs;
+      : undefined;
+  const nextExpectedRouteMs =
+    clockExpected != null && missionExpected != null
+      ? Math.min(missionExpected, clockExpected)
+      : (clockExpected ?? missionExpected ?? mission.expectedRouteMs);
   if (
     nextAirborneAtMs === mission.airborneAtMs &&
     nextElapsed === mission.airborneElapsedMs &&
@@ -249,6 +256,103 @@ export function estimateRouteMsFromDistance(
   const padHours = Math.min(0.35, Math.max(0.08, distanceNm / 400));
   const hours = Math.max(0.12, distanceNm / Math.max(1, cruise) + padHours);
   return Math.round(hours * 3_600_000);
+}
+
+/**
+ * Floor when rebasing planned air time from a live cruise TAS sample.
+ * Keeps the ≥70% settle gate from collapsing under a spuriously high TAS.
+ */
+export const CRUISE_REBASE_MIN_FRAC_OF_PLANNED = 0.55;
+
+/** Ignore tiny deltas when deciding whether cruise rebase changed the plan. */
+export const CRUISE_REBASE_MIN_DELTA_MS = 15_000;
+
+/**
+ * Climb/descent pad (hours) for cruise-based air-time estimates — same curve as
+ * {@link estimateRouteMsFromDistance}.
+ */
+export function climbDescentPadHours(distanceNm: number): number {
+  return Math.min(0.35, Math.max(0.08, distanceNm / 400));
+}
+
+/**
+ * Estimate total airborne duration from route distance + observed cruise TAS.
+ * Pure cruise time plus climb/descent pad (not OFP airTime).
+ */
+export function estimateRouteMsFromCruiseSpeed(opts: {
+  distanceNm: number;
+  cruiseSpeedKt: number;
+}): number | null {
+  const distanceNm = opts.distanceNm;
+  const cruiseSpeedKt = opts.cruiseSpeedKt;
+  if (
+    !(typeof distanceNm === 'number' && Number.isFinite(distanceNm) && distanceNm > 0)
+  ) {
+    return null;
+  }
+  if (
+    !(
+      typeof cruiseSpeedKt === 'number' &&
+      Number.isFinite(cruiseSpeedKt) &&
+      cruiseSpeedKt >= 60
+    )
+  ) {
+    return null;
+  }
+  const padHours = climbDescentPadHours(distanceNm);
+  const hours = Math.max(0.12, distanceNm / cruiseSpeedKt + padHours);
+  return Math.round(hours * 3_600_000);
+}
+
+/**
+ * Tighten planned air time once stable cruise TAS is known.
+ * Never lengthens the gate; never drops below {@link CRUISE_REBASE_MIN_FRAC_OF_PLANNED}
+ * of the original OFP/plan. The ≥70% (or 50% short-hop) settle ratio still applies
+ * to the rebased value.
+ */
+export function rebaseExpectedRouteMsFromCruise(opts: {
+  /** Original OFP / distance plan at wheels-up (floor reference). */
+  plannedExpectedRouteMs: number;
+  /** Current gate denominator (may already be rebased). */
+  currentExpectedRouteMs?: number;
+  distanceNm: number;
+  cruiseSpeedKt: number;
+}): {
+  expectedRouteMs: number;
+  estimatedMs: number | null;
+  changed: boolean;
+} {
+  const planned = opts.plannedExpectedRouteMs;
+  const current =
+    typeof opts.currentExpectedRouteMs === 'number' &&
+    Number.isFinite(opts.currentExpectedRouteMs) &&
+    opts.currentExpectedRouteMs > 0
+      ? opts.currentExpectedRouteMs
+      : planned;
+  if (!(typeof planned === 'number' && Number.isFinite(planned) && planned > 0)) {
+    return {
+      expectedRouteMs: current,
+      estimatedMs: null,
+      changed: false,
+    };
+  }
+  const estimatedMs = estimateRouteMsFromCruiseSpeed({
+    distanceNm: opts.distanceNm,
+    cruiseSpeedKt: opts.cruiseSpeedKt,
+  });
+  if (estimatedMs == null) {
+    return { expectedRouteMs: current, estimatedMs: null, changed: false };
+  }
+  const floorMs = Math.round(planned * CRUISE_REBASE_MIN_FRAC_OF_PLANNED);
+  // Only shorten: slow cruise must not inflate the settle wait past OFP.
+  const next = Math.max(floorMs, Math.min(planned, estimatedMs));
+  const expectedRouteMs = Math.min(current, next);
+  const changed = expectedRouteMs <= current - CRUISE_REBASE_MIN_DELTA_MS;
+  return {
+    expectedRouteMs: changed ? expectedRouteMs : current,
+    estimatedMs,
+    changed,
+  };
 }
 
 /**

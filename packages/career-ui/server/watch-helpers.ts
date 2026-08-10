@@ -39,6 +39,7 @@ import {
   normalizeSimPercent,
   resolveAirportCoords,
   resolveExpectedRouteMs,
+  rebaseExpectedRouteMsFromCruise,
   routeDistanceNm,
   settleMission,
   watchIntervalMsForPhase,
@@ -858,6 +859,11 @@ export class CareerWatchSession {
   private preflightDepartBlockedLogged = false;
   private cruiseState: CruiseSampleState = createCruiseSampleState();
   private cruiseStatus: CruiseSampleStatus | null = null;
+  /**
+   * Original OFP / distance planned air time for this Watch session.
+   * Cruise TAS rebase floors against this (never below 55%).
+   */
+  private ofpExpectedRouteMs: number | null = null;
   private scoreAcc: FlightScoreAccumulator = createFlightScoreAccumulator();
   private lastFlightScore: FlightScoreSnapshot | null = null;
   private weatherAcc: WeatherOpsAccumulator = createWeatherOpsAccumulator();
@@ -1078,6 +1084,7 @@ export class CareerWatchSession {
     this.preflightDepartBlockedLogged = false;
     this.cruiseState = createCruiseSampleState();
     this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+    this.ofpExpectedRouteMs = null;
     this.scoreAcc = createFlightScoreAccumulator();
     this.lastFlightScore = finalizeFlightScore(this.scoreAcc);
     this.weatherAcc = createWeatherOpsAccumulator();
@@ -1143,6 +1150,11 @@ export class CareerWatchSession {
       ...(hasPersistedAirborne && mission.status === 'in_flight'
         ? { lastOnGround: false as const }
         : {}),
+    });
+    // Floor for cruise TAS rebase — prefer OFP airTime even if mission already
+    // carries a tightened expectedRouteMs from a prior Watch session.
+    this.ofpExpectedRouteMs = resolveExpectedRouteMs(mission, {
+      distanceNm: loaded.distanceNm,
     });
     // Scrub stale airborne fields left on accepted/dispatched from a prior session.
     if (
@@ -1877,6 +1889,56 @@ export class CareerWatchSession {
           });
           this.cruiseState = pushed.state;
           this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+          const cruiseCommit =
+            pushed.justCommitted ?? this.cruiseState.committed;
+          if (cruiseCommit) {
+            const plannedMs =
+              this.ofpExpectedRouteMs ??
+              nextState.expectedRouteMs ??
+              expectedRouteMs;
+            const routeNm =
+              nextState.routeDistanceNm ??
+              distanceNm ??
+              current.lastOfpCheck?.briefing?.distanceNm;
+            if (
+              typeof plannedMs === 'number' &&
+              plannedMs > 0 &&
+              typeof routeNm === 'number' &&
+              routeNm > 0
+            ) {
+              const rebased = rebaseExpectedRouteMsFromCruise({
+                plannedExpectedRouteMs: plannedMs,
+                currentExpectedRouteMs:
+                  nextState.expectedRouteMs ?? expectedRouteMs,
+                distanceNm: routeNm,
+                cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
+              });
+              if (rebased.changed) {
+                const prevExpected =
+                  nextState.expectedRouteMs ?? expectedRouteMs;
+                if (
+                  prevExpected == null ||
+                  !(prevExpected > 0) ||
+                  rebased.expectedRouteMs < prevExpected
+                ) {
+                  watchDebugLog('watch', 'cruise air-time rebase', {
+                    missionId: current.id,
+                    cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
+                    distanceNm: routeNm,
+                    plannedMs,
+                    estimatedMs: rebased.estimatedMs,
+                    prevExpectedRouteMs: prevExpected ?? null,
+                    nextExpectedRouteMs: rebased.expectedRouteMs,
+                  });
+                  this.watchState = {
+                    ...nextState,
+                    expectedRouteMs: rebased.expectedRouteMs,
+                  };
+                  nextState = this.watchState;
+                }
+              }
+            }
+          }
         } catch {
           this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
         }

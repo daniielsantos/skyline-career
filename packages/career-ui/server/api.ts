@@ -33,6 +33,7 @@ import {
   findCareerPlayerAirframe,
   findOpenManifestForRoute,
   findPlayerAircraft,
+  findNpcAirframe,
   listActivePlayerMissions,
   listAircraftClassCatalog,
   listAircraftMarket,
@@ -306,6 +307,37 @@ type MissionsFile = CareerMissionsState;
 
 async function loadMissions(): Promise<MissionsFile> {
   return requireStore().loadMissions();
+}
+
+/** Enrich mission rows for Logbook (distance + concrete airframe name). */
+function withMissionClientView(
+  world: CareerEconomyWorld,
+  missions: MissionsFile,
+  mission: MissionIntent,
+) {
+  const base = withMissionLoadPolicy(mission);
+  const typeId =
+    mission.airframeTypeId?.trim() ||
+    (mission.aircraftId
+      ? findPlayerAircraft(missions, mission.aircraftId)?.airframeTypeId?.trim()
+      : undefined);
+  const airframeLabel =
+    findCareerPlayerAirframe(typeId)?.label ??
+    findNpcAirframe(typeId)?.label;
+  const distanceRaw =
+    routeDistanceNm(world, mission.originIcao, mission.destIcao) ??
+    mission.lastOfpCheck?.briefing?.distanceNm;
+  const distanceNm =
+    typeof distanceRaw === 'number' &&
+    Number.isFinite(distanceRaw) &&
+    distanceRaw > 0
+      ? Math.round(distanceRaw)
+      : undefined;
+  return {
+    ...base,
+    ...(airframeLabel ? { airframeLabel } : {}),
+    ...(distanceNm !== undefined ? { distanceNm } : {}),
+  };
 }
 
 function withParkingRates(
@@ -3096,11 +3128,13 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/missions') {
-        const missions = await loadMissions();
-        send(res, 200, {
+        const payload = await withCareerRead((world, missions) => ({
           ...missions,
-          missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
-        });
+          missions: missions.missions.map((m) =>
+            withMissionClientView(world, missions, m),
+          ),
+        }));
+        send(res, 200, payload);
         return;
       }
 

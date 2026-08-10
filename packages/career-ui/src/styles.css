@@ -1067,12 +1067,6 @@ th {
   background: rgba(232, 93, 93, 0.08);
 }
 
-.dispatch-fuel-paid {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
 .dispatch-primary-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1949,6 +1943,26 @@ tr.lot-locked {
 
 .logbook-list .logbook-entry {
   grid-template-columns: 1fr;
+}
+
+.logbook-kind {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.logbook-summary {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
 
 .logbook-lots {

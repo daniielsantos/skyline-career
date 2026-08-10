@@ -18,7 +18,7 @@
   ],
   "gating": {
     "requireOnGround": true,
-    "requireEnginesOff": false,
+    "requireEnginesOff": true,
     "blockWhenPaused": true,
     "blockWhenSlew": true,
     "minSimRate": 0.9,

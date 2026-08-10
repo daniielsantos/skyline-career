@@ -5,6 +5,7 @@
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
   assertRolesPackAllowsDirectInjection,
+  careerFuelMatchOk,
   flightPhaseFromSample,
   normalizeAircraftTitle,
   pickFuelTankBreakdown,
@@ -31,6 +32,7 @@ import {
   equalizeLateralStationPairs,
   fuelTankTargetsForRound,
   FUEL_INJECT_ROUNDS,
+  absorbFuelResidualFloors,
   liveFuelMatchesTarget,
   FREIGHTER_PILOT_LB,
   GA_BAGGAGE_SOFT_MAX_LB,
@@ -849,8 +851,21 @@ async function applyMissionOfpLoadExclusive(
         : 'soft';
 
     const plannedTanks = built.plan.fuel?.tanks ?? {};
-    const fuelAlreadyOk = liveFuelMatchesTarget(beforeLive.tanks, plannedTanks);
-    const plannedFuelLb = built.blockFuelLb;
+    // Skip fuel only when weight already matches Due tightly. Do NOT apply the
+    // unusable-overshoot slack here — that would skip draining AUX/tip residuals
+    // (King Air ~58 lb/side) and leave reinject doing payload-only.
+    const beforeFuelLb = (() => {
+      const qty = sumRecord(beforeLive.tanks);
+      const unit = resolved.profile.fuel.unit ?? 'gallons';
+      if (unit === 'pounds') return qty;
+      if (unit === 'kilograms') return qty * 2.20462262185;
+      if (unit === 'liters') return qty * (fuelLbPerGal / 3.785411784);
+      return qty * fuelLbPerGal;
+    })();
+    const fuelAlreadyOk =
+      careerFuelMatchOk(beforeFuelLb, built.blockFuelLb, 50, 150, 0) &&
+      liveFuelMatchesTarget(beforeLive.tanks, plannedTanks);
+    let plannedFuelLb = built.blockFuelLb;
     const plannedPayloadLb =
       built.plan.payload?.total ??
       sumRecord(built.plan.payload?.stations) ??
@@ -1212,8 +1227,13 @@ async function applyMissionOfpLoadExclusive(
     );
 
     if (!fuelAlreadyOk && built.plan.fuel) {
+      if (beforeLive.enginesRunning) {
+        throw new Error(
+          'Shut down engines before fuel inject — MSFS will not drain AUX/tip tanks with engines running',
+        );
+      }
       const startTanks = { ...beforeLive.tanks };
-      const endTanks = built.plan.fuel.tanks ?? {};
+      let endTanks = built.plan.fuel.tanks ?? {};
       restoreFuelOnRollback = false;
       for (let round = 1; round <= FUEL_INJECT_ROUNDS; round++) {
         assertOfpLoadNotCancelled(mission.id);
@@ -1259,6 +1279,37 @@ async function applyMissionOfpLoadExclusive(
           'injecting',
           `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(tanksToFuelLb(afterLive.tanks))} lb live`,
         );
+      }
+      // Accept MSFS unusable floors on drained tanks (King Air tip/AUX residual).
+      if (!restoreFuelOnRollback) {
+        const liveAfter = await readLiveTanks(bridge, resolved.profile);
+        const absorbed = absorbFuelResidualFloors(endTanks, liveAfter);
+        if (absorbed.added > 0.05) {
+          endTanks = absorbed.tanks;
+          built.plan.fuel = { ...built.plan.fuel!, tanks: endTanks };
+          const addedLb = tanksToFuelLb(absorbed.tanks) - tanksToFuelLb(plannedTanks);
+          if (addedLb > 0.5) {
+            plannedFuelLb = built.blockFuelLb + addedLb;
+          }
+          watchDebugLog('inject', 'absorbed fuel residual floors', {
+            addedQty: Math.round(absorbed.added * 100) / 100,
+            addedLb: Math.round(addedLb),
+            tanks: Object.fromEntries(
+              Object.entries(endTanks).map(([k, v]) => [
+                k,
+                Math.round(v * 10) / 10,
+              ]),
+            ),
+          });
+          publishLiveProgress(
+            'injecting',
+            `Fuel residual floors accepted · ${Math.round(tanksToFuelLb(liveAfter))} lb live`,
+          );
+        }
+        afterLive = {
+          tanks: liveAfter,
+          stations: afterLive.stations,
+        };
       }
       if (!applyResult) applyResult = {};
     } else {

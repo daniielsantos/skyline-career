@@ -124,12 +124,16 @@ describe('mission load method policy', () => {
     assert.equal(careerLoadWeightMatchOk(0, undefined, 75), true);
   });
 
-  it('allows fuel taxi burn undershoot but not overshoot beyond tol', () => {
+  it('allows fuel taxi burn undershoot and small unusable overshoot', () => {
     assert.equal(careerFuelMatchOk(2240, 2240, 50), true);
     assert.equal(careerFuelMatchOk(2090, 2240, 50), true); // -150 within taxi
     assert.equal(careerFuelMatchOk(2039, 2240, 50), false); // -201 beyond tol+taxi
-    assert.equal(careerFuelMatchOk(2291, 2240, 50), false); // +51 over
+    assert.equal(careerFuelMatchOk(2291, 2240, 50), true); // +51 within unusable slack
     assert.equal(careerFuelMatchOk(2285, 2240, 50), true); // +45 within tol
+    // King Air-style tip residual (~122 lb) must not fail Loaded vs Due.
+    assert.equal(careerFuelMatchOk(1980, 1858, 50), true);
+    assert.equal(careerFuelMatchOk(2100, 1858, 50), false); // beyond unusable slack
+    assert.equal(careerFuelMatchOk(2291, 2240, 50, 150, 0), false); // no unusable slack
   });
 });
 

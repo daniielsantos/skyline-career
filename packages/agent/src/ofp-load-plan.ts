@@ -1075,6 +1075,36 @@ export function liveFuelMatchesTarget(
   return Math.abs(liveTotal - targetTotal) <= tol;
 }
 
+/**
+ * Max residual (profile fuel units) treated as an unusable floor when draining.
+ * ~12 gal ≈ 80 lb Jet-A — covers King Air tip/AUX stuck quantity.
+ */
+export const FUEL_RESIDUAL_FLOOR_MAX = 12;
+
+/**
+ * When inject targets empty outer tanks but MSFS keeps an unusable residual,
+ * raise the plan to that floor so we stop fighting the sim and Due can match.
+ */
+export function absorbFuelResidualFloors(
+  planned: Record<string, number>,
+  live: Record<string, number>,
+  opts?: { maxFloor?: number },
+): { tanks: Record<string, number>; added: number } {
+  const maxFloor = opts?.maxFloor ?? FUEL_RESIDUAL_FLOOR_MAX;
+  const tanks = { ...planned };
+  let added = 0;
+  for (const [id, liveQty] of Object.entries(live)) {
+    if (!Number.isFinite(liveQty)) continue;
+    const want = Number.isFinite(tanks[id]) ? tanks[id]! : 0;
+    if (liveQty <= want + 0.05) continue;
+    if (want <= 0.5 && liveQty > 0.5 && liveQty <= maxFloor) {
+      added += liveQty - want;
+      tanks[id] = liveQty;
+    }
+  }
+  return { tanks, added };
+}
+
 /** Default Career OFP fuel inject passes (ramp current → planned). */
 export const FUEL_INJECT_ROUNDS = 4;
 

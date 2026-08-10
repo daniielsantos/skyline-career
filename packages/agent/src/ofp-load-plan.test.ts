@@ -23,6 +23,7 @@ import {
   fuelTankTargetsForRound,
   FUEL_INJECT_ROUNDS,
   liveFuelMatchesTarget,
+  absorbFuelResidualFloors,
   resolveCgCounterweightBias,
   distributeCargoAcrossStations,
   distributeFuelAcrossTanks,
@@ -753,5 +754,26 @@ describe('buildRollbackPlan', () => {
     assert.equal(plan.payload?.stations?.[1], 170);
     assert.equal(plan.payload?.stations?.[3], 50);
     assert.equal(plan.payload?.stations?.[2], 0);
+  });
+});
+
+describe('absorbFuelResidualFloors', () => {
+  it('raises empty outer tanks to the live unusable residual', () => {
+    const { tanks, added } = absorbFuelResidualFloors(
+      { LEFT_MAIN: 100, RIGHT_MAIN: 100, LEFT_AUX: 0, RIGHT_AUX: 0 },
+      { LEFT_MAIN: 100, RIGHT_MAIN: 100, LEFT_AUX: 8.7, RIGHT_AUX: 8.7 },
+    );
+    assert.equal(tanks.LEFT_AUX, 8.7);
+    assert.equal(tanks.RIGHT_AUX, 8.7);
+    assert.ok(added > 17);
+  });
+
+  it('does not treat a still-full tank as an unusable floor', () => {
+    const { tanks, added } = absorbFuelResidualFloors(
+      { LEFT_MAIN: 50, RIGHT_MAIN: 50 },
+      { LEFT_MAIN: 100, RIGHT_MAIN: 100 },
+    );
+    assert.equal(tanks.LEFT_MAIN, 50);
+    assert.equal(added, 0);
   });
 });

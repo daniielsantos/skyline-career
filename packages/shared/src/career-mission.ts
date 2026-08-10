@@ -300,25 +300,34 @@ export function careerLoadWeightMatchOk(
 
 /**
  * Extra Sim undershoot vs OFP block fuel allowed after a good inject (taxi / APU).
- * Overshoot stays on the tight `toleranceLb` band.
+ * Overshoot stays on the tight `toleranceLb` band plus unusable-floor slack.
  */
 export const DEFAULT_FUEL_TAXI_BURN_LB = 150;
 
 /**
- * Fuel Loaded vs Due: allow Sim below Due by tol + taxi burn, but not above Due+tol.
+ * Extra Sim overshoot vs Due allowed for MSFS AUX/TIP unusable fuel that
+ * inject cannot drain (King Air tip pair ~58 lb/side, Baron AUX floors, …).
+ */
+export const DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB = 140;
+
+/**
+ * Fuel Loaded vs Due: allow Sim below Due by tol + taxi burn, and slightly
+ * above Due for unusable tank floors inject cannot clear.
  */
 export function careerFuelMatchOk(
   liveLb: number | undefined,
   plannedLb: number | undefined,
   toleranceLb: number,
   taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
+  unusableOvershootLb: number = DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB,
 ): boolean {
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
   if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
   const tol = Math.max(0, toleranceLb);
   const taxi = Math.max(0, taxiBurnLb);
+  const unusable = Math.max(0, unusableOvershootLb);
   const delta = liveLb - plannedLb;
-  if (delta > 0) return delta <= tol;
+  if (delta > 0) return delta <= tol + unusable;
   return -delta <= tol + taxi;
 }
 

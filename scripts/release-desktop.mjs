@@ -18,7 +18,7 @@
  *   --dry-run                 Pack + validate only; do not create GitHub release
  *   --draft                   Create the GitHub release as a draft
  *   --allow-dirty             Allow a dirty worktree (still refuses unknown files
- *                             outside the desktop package.json bump)
+ *                             outside the desktop package.json / lockfile bump)
  *   --yes                     Skip interactive confirmation
  */
 import { spawn } from 'node:child_process';
@@ -35,6 +35,7 @@ import { stdin as input, stdout as output } from 'node:process';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const desktopPkgPath = join(root, 'packages', 'desktop', 'package.json');
+const desktopLockPath = join(root, 'packages', 'desktop', 'package-lock.json');
 const outDir = join(root, 'artifacts', 'skyline-desktop');
 
 function parseArgs(argv) {
@@ -189,6 +190,21 @@ async function writeDesktopVersion(next) {
   const pkg = await readDesktopPkg();
   pkg.version = next;
   await writeFile(desktopPkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+
+  // Keep package-lock.json top-level + packages[""] version in sync so the
+  // release commit does not leave a dirty lockfile after every bump.
+  if (await exists(desktopLockPath)) {
+    const lock = JSON.parse(await readFile(desktopLockPath, 'utf8'));
+    lock.version = next;
+    if (lock.packages && typeof lock.packages === 'object' && lock.packages['']) {
+      lock.packages[''].version = next;
+    }
+    await writeFile(
+      desktopLockPath,
+      `${JSON.stringify(lock, null, 2)}\n`,
+      'utf8',
+    );
+  }
 }
 
 async function lastDesktopTag() {
@@ -412,7 +428,11 @@ async function main() {
 
   if (bumped) {
     console.log('[release:desktop] committing version bump…');
-    await run('git', ['add', 'packages/desktop/package.json']);
+    await run('git', [
+      'add',
+      'packages/desktop/package.json',
+      'packages/desktop/package-lock.json',
+    ]);
     await run('git', ['commit', '-m', `Release desktop ${tag}`]);
   }
 

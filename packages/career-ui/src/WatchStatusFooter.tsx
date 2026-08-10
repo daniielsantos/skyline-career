@@ -142,12 +142,9 @@ export function WatchStatusFooter(props: Props) {
       </div>
       <div className="watch-footer-secondary">
         <span>
-          {bridgePhase ??
-            props.watch?.phase ??
-            props.simBridge?.phase ??
-            'idle'}
+          {bridgePhase ?? props.simBridge?.phase ?? 'idle'}
         </span>
-        {props.watch?.flightTime ? (
+        {watchRunning && props.watch?.flightTime ? (
           <span
             className={
               props.watch.flightTime.met
@@ -171,7 +168,8 @@ export function WatchStatusFooter(props: Props) {
               : ''}
           </span>
         ) : null}
-        {props.watch?.cruiseSample &&
+        {watchRunning &&
+        props.watch?.cruiseSample &&
         props.watch.cruiseSample.phase !== 'idle' ? (
           <span
             className={

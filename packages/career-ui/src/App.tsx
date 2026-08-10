@@ -3512,9 +3512,19 @@ export function App() {
     const alreadyWatching =
       Boolean(watch?.running) && watch?.missionId === activeMission?.id;
     const isAirborneResume = activeMission?.status === 'in_flight';
+    // Settlement / cruise from a *previous* mission must not block Watch on the
+    // next flight — that left PC24 stuck on DISPATCHED while probe showed AIRBORNE.
+    const staleWatchOtherMission =
+      Boolean(watch?.missionId) &&
+      Boolean(activeMission?.id) &&
+      watch?.missionId !== activeMission?.id;
+    const settlementBlocks =
+      Boolean(watch?.settlement) && watch?.missionId === activeMission?.id;
     const eligible =
       (tab === 'staging' || isAirborneResume) &&
-      (!airportIcao || isAirborneResume) &&
+      // Airport panel can stay selected while Dispatch is open — do not block
+      // Watch for an active staged flight (only block when not on staging).
+      (tab === 'staging' || !airportIcao || isAirborneResume) &&
       Boolean(activeMission) &&
       ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
       // Ground Dispatch needs Loaded vs Due before Watch owns the pipe.
@@ -3522,12 +3532,16 @@ export function App() {
         Boolean(activeMission?.lastPreflightCheck?.loadVerification)) &&
       !alreadyWatching &&
       !watchAutoPaused &&
-      !watch?.settlement &&
+      !settlementBlocks &&
       // Inject owns the SimBridge pipe — do not auto-start Watch until inject
       // leaves waiting/loading (Watch tick is the Loaded vs Due owner afterward).
       loadOfpAutoStatus !== 'loading' &&
       loadOfpAutoStatus !== 'waiting' &&
       !ofpInjectInFlightRef.current;
+
+    if (staleWatchOtherMission && !watch?.running) {
+      setWatch(null);
+    }
 
     if (!eligible || !activeMission) {
       if (!alreadyWatching) {
@@ -3598,8 +3612,36 @@ export function App() {
   ]);
 
   // Reset watch auto-pause only when switching missions (not on every live check).
+  // Also drop leftover Watch UI (settlement / cruise / missionId) from the prior leg
+  // so auto-start is not blocked and the footer stops looking like the last flight.
   useEffect(() => {
     setWatchAutoPaused(false);
+    const nextId = activeMission?.id ?? null;
+    setWatch((prev) => {
+      if (!prev) return null;
+      if (nextId && prev.missionId === nextId) return prev;
+      return null;
+    });
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await fetchWatchStatus();
+        if (cancelled) return;
+        if (
+          status.running &&
+          status.missionId &&
+          nextId &&
+          status.missionId !== nextId
+        ) {
+          await postWatchStop();
+        }
+      } catch {
+        /* soft — auto-start will retry */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeMission?.id]);
 
   useEffect(() => {

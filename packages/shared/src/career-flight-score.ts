@@ -299,23 +299,48 @@ export function pushFlightScoreSample(
         flapsPct: sample.flapsPct,
       },
     };
-  } else if (
-    next.landing &&
-    sample.postTouchdown &&
-    typeof sample.gForce === 'number' &&
-    Number.isFinite(sample.gForce)
-  ) {
+  } else if (next.landing && sample.postTouchdown) {
+    let landing = next.landing;
     // Peak G over the first-contact / bounce window (first sample is often ~1.0).
-    const prevG = next.landing.gForce;
     if (
-      typeof prevG !== 'number' ||
-      !Number.isFinite(prevG) ||
-      sample.gForce > prevG
+      typeof sample.gForce === 'number' &&
+      Number.isFinite(sample.gForce)
     ) {
-      next = {
-        ...next,
-        landing: { ...next.landing, gForce: sample.gForce },
-      };
+      const prevG = landing.gForce;
+      if (
+        typeof prevG !== 'number' ||
+        !Number.isFinite(prevG) ||
+        sample.gForce > prevG
+      ) {
+        landing = { ...landing, gForce: sample.gForce };
+      }
+    }
+    // First touchdown tick often misses SimVars — backfill gear/flaps when they
+    // arrive on later post-touchdown samples (do not overwrite a firm "up").
+    if (
+      landing.gearDown !== true &&
+      sample.gearDown === true
+    ) {
+      landing = { ...landing, gearDown: true };
+    }
+    if (
+      landing.gearRetractable === undefined &&
+      typeof sample.gearRetractable === 'boolean'
+    ) {
+      landing = { ...landing, gearRetractable: sample.gearRetractable };
+    }
+    if (
+      (typeof landing.flapsPct !== 'number' ||
+        !Number.isFinite(landing.flapsPct) ||
+        landing.flapsPct <= 5) &&
+      typeof sample.flapsPct === 'number' &&
+      Number.isFinite(sample.flapsPct) &&
+      sample.flapsPct > 5
+    ) {
+      landing = { ...landing, flapsPct: sample.flapsPct };
+    }
+    if (landing !== next.landing) {
+      next = { ...next, landing };
     }
   }
 
@@ -521,9 +546,11 @@ export function finalizeFlightScore(
   );
 
   const gearRetractable = acc.landing?.gearRetractable === true;
-  const gearDown = acc.landing?.gearDown === true;
+  // Only fail when we positively saw gear up. Missing SimVar at the first
+  // touchdown tick used to score as "up / unknown" on every retractable type.
+  const gearState = acc.landing?.gearDown;
   const gearOk =
-    Boolean(acc.landing) && (!gearRetractable || gearDown);
+    Boolean(acc.landing) && (!gearRetractable || gearState !== false);
   landing.push(
     binaryMetric(
       'landing_gear',
@@ -536,9 +563,11 @@ export function finalizeFlightScore(
           ? acc.landing.gearRetractable === false
             ? 'fixed gear'
             : 'n/a'
-          : gearDown
+          : gearState === true
             ? 'down'
-            : 'up / unknown'
+            : gearState === false
+              ? 'up'
+              : 'unknown'
         : 'not captured',
     ),
   );

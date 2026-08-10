@@ -301,6 +301,7 @@ export async function sampleLiveFlight(
     indicatedAirspeedKt,
     altitudeFt,
     gearPctRaw,
+    gearHandleRaw,
     flapsPctRaw,
     aglFt,
     gearRetractableRaw,
@@ -313,6 +314,8 @@ export async function sampleLiveFlight(
     // Native unit is Percent over 100 (0.0–1.0). Requesting "percent" can still
     // return a fraction depending on the host — normalize to 0–100 either way.
     readOpt('GEAR TOTAL PCT EXTENDED', 'Percent over 100'),
+    // 0 = up, 1 = down (handle). Fallback when TOTAL PCT is missing on payware.
+    readOpt('GEAR HANDLE POSITION', 'number'),
     readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'Percent over 100'),
     readOpt('PLANE ALT ABOVE GROUND', 'feet'),
     readOpt('IS GEAR RETRACTABLE', 'bool'),
@@ -341,6 +344,20 @@ export async function sampleLiveFlight(
     typeof gearPctRaw === 'number' ? normalizeSimPercent(gearPctRaw) : undefined;
   const flapsPct =
     typeof flapsPctRaw === 'number' ? normalizeSimPercent(flapsPctRaw) : undefined;
+  const gearFromPct =
+    typeof gearPct === 'number' ? gearPct >= 80 : undefined;
+  const gearFromHandle =
+    typeof gearHandleRaw === 'number' && Number.isFinite(gearHandleRaw)
+      ? gearHandleRaw >= 0.8
+      : undefined;
+  const gearDown =
+    gearFromPct === true || gearFromHandle === true
+      ? true
+      : gearFromPct === false && gearFromHandle !== true
+        ? false
+        : gearFromHandle === false && gearFromPct !== true
+          ? false
+          : undefined;
 
   return {
     onGround: snap.onGround,
@@ -355,8 +372,7 @@ export async function sampleLiveFlight(
     altitudeFt,
     overspeedWarning,
     stallWarning,
-    gearDown:
-      typeof gearPct === 'number' ? gearPct >= 80 : undefined,
+    gearDown,
     gearRetractable,
     flapsPct,
     aglFt,

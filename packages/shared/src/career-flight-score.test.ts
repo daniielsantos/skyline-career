@@ -210,6 +210,73 @@ describe('pushFlightScoreSample + finalizeFlightScore', () => {
     assert.equal(gear?.detail, 'n/a');
   });
 
+  it('does not zero gear when retractable but SimVar was unknown at stamp', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -180,
+      gForce: 1.1,
+      gearRetractable: true,
+      flapsPct: 25,
+    });
+    const score = finalizeFlightScore(acc);
+    const gear = score.categories
+      .flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_gear');
+    assert.equal(gear?.points, 1);
+    assert.equal(gear?.detail, 'unknown');
+  });
+
+  it('backfills gear down on a later post-touchdown sample', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -180,
+      gForce: 1.05,
+      gearRetractable: true,
+      flapsPct: 30,
+    });
+    assert.equal(acc.landing?.gearDown, undefined);
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      gForce: 1.1,
+      gearDown: true,
+      gearRetractable: true,
+      flapsPct: 30,
+    });
+    assert.equal(acc.landing?.gearDown, true);
+    const gear = finalizeFlightScore(acc)
+      .categories.flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_gear');
+    assert.equal(gear?.points, 1);
+    assert.equal(gear?.detail, 'down');
+  });
+
+  it('still fails gear when explicitly up', () => {
+    let acc = createFlightScoreAccumulator();
+    acc = pushFlightScoreSample(acc, {
+      onGround: true,
+      sawAirborne: true,
+      postTouchdown: true,
+      landingVsFpm: -180,
+      gForce: 1.2,
+      gearDown: false,
+      gearRetractable: true,
+      flapsPct: 25,
+    });
+    const gear = finalizeFlightScore(acc)
+      .categories.flatMap((c) => c.metrics)
+      .find((m) => m.id === 'landing_gear');
+    assert.equal(gear?.points, 0);
+    assert.equal(gear?.detail, 'up');
+  });
+
   it('ignores takeoff-roll ground speed when scoring departure taxi', () => {
     let acc = createFlightScoreAccumulator();
     acc = pushFlightScoreSample(acc, {

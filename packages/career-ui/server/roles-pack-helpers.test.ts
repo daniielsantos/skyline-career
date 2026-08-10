@@ -122,6 +122,20 @@ describe('resolveMissionRolesPack', () => {
     );
   });
 
+  it('accepts MSFS short title Beechcraft King Air for the 350i pack', async () => {
+    const roles = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/asobo-beechcraft-king-air-350i.json',
+      liveTitle: 'Beechcraft King Air',
+      airframeTypeId: 'asobo-beechcraft-king-air-350i',
+      strictAirframeMatch: true,
+    });
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /asobo-beechcraft-king-air-350i\.json$/,
+    );
+  });
+
   it('ignores a mismatched live title when a purchased airframe is set (soft)', async () => {
     const roles = await resolveMissionRolesPack({
       repoRoot,

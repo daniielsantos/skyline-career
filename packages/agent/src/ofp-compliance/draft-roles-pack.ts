@@ -140,6 +140,13 @@ export function buildRolesPackFromProfile(
     cabinAsBaggage,
   });
   const ofpId = profile.profileId || slugFromAircraftTitle(title);
+  const matchTitles = [
+    ...new Set(
+      [title, ...(profile.match.liveTitles ?? [])]
+        .map((t) => t?.trim())
+        .filter((t): t is string => Boolean(t)),
+    ),
+  ];
 
   return {
     source: 'simbrief',
@@ -147,7 +154,7 @@ export function buildRolesPackFromProfile(
     ofpId,
     loadMethod,
     injectCapable,
-    matchTitles: [title],
+    matchTitles,
     matchTitlePattern: escapeRegExp(title),
     notes: [
       `${title} — auto roles pack from homologated profile`,

@@ -5,9 +5,11 @@
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "[Beechcraft King Air 350i"
+    "[Beechcraft King Air 350i",
+    "Beechcraft King Air 350i",
+    "Beechcraft King Air"
   ],
-  "matchTitlePattern": "\\[Beechcraft King Air 350i",
+  "matchTitlePattern": "Beechcraft King Air",
   "notes": [
     "[Beechcraft King Air 350i — auto roles pack from homologated profile",
     "Profile: asobo/beechcraft-king-air-350i@1.0.0",

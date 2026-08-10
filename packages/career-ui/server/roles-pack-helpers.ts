@@ -7,9 +7,11 @@ import { resolve } from 'node:path';
 import {
   careerPlayerAirframePackPaths,
   findCareerPlayerAirframe,
+  titlesMatchForCatalog,
 } from '@msfs-compat/shared';
 import {
   loadRolesPackFile,
+  packMatchesTitle,
   resolveRolesPackForTitle,
   type OfpRolesPackFile,
 } from '../../agent/src/ofp-compliance/scaffold-roles.ts';
@@ -22,6 +24,15 @@ export type ResolvedMissionRolesPack = {
 
 function normalizePackPath(path: string): string {
   return resolve(path).replace(/\\/g, '/').toLowerCase();
+}
+
+/** Exact pack match, or catalog alias (shorter MSFS title vs homologated match.title). */
+function packAcceptsLiveTitleAlias(
+  pack: OfpRolesPackFile,
+  title: string,
+): boolean {
+  if (packMatchesTitle(pack, title)) return true;
+  return (pack.matchTitles ?? []).some((t) => titlesMatchForCatalog(title, t));
 }
 
 export async function resolveMissionRolesPack(opts: {
@@ -72,6 +83,16 @@ export async function resolveMissionRolesPack(opts: {
         };
       }
     } else if (opts.strictAirframeMatch) {
+      // Purchased pack may list a longer match.title while MSFS reports a shorter
+      // liveTitles alias (e.g. "Beechcraft King Air" vs "[Beechcraft King Air 350i").
+      const purchased = await loadRolesPackFile(fallbackPath);
+      if (packAcceptsLiveTitleAlias(purchased, title)) {
+        return {
+          path: fallbackPath,
+          pack: purchased,
+          via: `purchased airframe alias (${opts.rolesPackRelPath})`,
+        };
+      }
       throw new Error(
         `Live aircraft "${title}" is not homologated for the purchased airframe (${opts.rolesPackRelPath})`,
       );
@@ -85,4 +106,4 @@ export async function resolveMissionRolesPack(opts: {
     via: `mission class (${opts.rolesPackRelPath})`,
   };
 }
-
+

@@ -8,6 +8,7 @@ import {
   formatCargoOpsDebriefLine,
   formatFlightDurationMs,
   formatLandingFpm,
+  formatRunwayTouchdownDebriefLine,
   isOfpCargoUnderOnlyFailureUi,
   ofpCargoKgFromUnderFinding,
   resolveLoadPath,
@@ -257,6 +258,43 @@ describe('buildFlightDebrief', () => {
     assert.match(
       formatCargoOpsDebriefLine(debrief.cargoOpsDeltas),
       /General \+4→59 · clean/,
+    );
+  });
+});
+
+describe('formatRunwayTouchdownDebriefLine', () => {
+  // KSTL 12R/30L: landing 30L is the reciprocal end, so the stored lateral
+  // (measured against the 12R heading) has to be mirrored for the pilot.
+  const kstl30L = {
+    lat: 38.745,
+    lon: -90.36,
+    icao: 'KSTL',
+    runwayIdent: '12R',
+    runwayIdentReciprocal: '30L',
+    lengthM: 3359,
+    widthM: 61,
+    headingTrueDeg: 122,
+    alongM: -400,
+    lateralM: 12,
+    pastThresholdM: 1280,
+    onPavement: true,
+    landingEnd: 'reciprocal' as const,
+  };
+
+  it('mirrors the lateral side on a reciprocal approach', () => {
+    const line = formatRunwayTouchdownDebriefLine(kstl30L);
+    assert.match(line, /RWY 30L/);
+    assert.match(line, /12 m left/);
+    assert.equal(line.includes('right'), false);
+  });
+
+  it('keeps the stored side on a primary approach', () => {
+    assert.match(
+      formatRunwayTouchdownDebriefLine({
+        ...kstl30L,
+        landingEnd: 'primary' as const,
+      }),
+      /RWY 12R · 1280 m past THR · 12 m right/,
     );
   });
 });

@@ -75,18 +75,49 @@ describe('evaluateBushTripLegTransition', () => {
     let watch = createMissionFlightWatchState();
     const ground = evaluateBushTripLegTransition(
       active,
-      { onGround: true, enginesRunning: true },
+      { onGround: true, enginesRunning: true, groundSpeedKt: 0 },
       watch,
       { nowMs: 1_000 },
     );
     watch = ground.nextState;
     const air = evaluateBushTripLegTransition(
       { ...active, legStatus: 'ready' },
-      { onGround: false, enginesRunning: true },
+      {
+        onGround: false,
+        enginesRunning: true,
+        groundSpeedKt: 78,
+        aglFt: 120,
+      },
       watch,
       { nowMs: 1_100 },
     );
     assert.equal(air.event.type, 'depart');
+  });
+
+  it('ignores a lone onGround flicker at 0 kt on the ramp', () => {
+    const { active } = startBrTrip();
+    let watch = createMissionFlightWatchState();
+    watch = evaluateBushTripLegTransition(
+      active,
+      { onGround: true, enginesRunning: true, groundSpeedKt: 0 },
+      watch,
+      { nowMs: 1_000 },
+    ).nextState;
+    const blip = evaluateBushTripLegTransition(
+      { ...active, legStatus: 'ready' },
+      { onGround: false, enginesRunning: true, groundSpeedKt: 0 },
+      watch,
+      { nowMs: 1_100 },
+    );
+    assert.equal(blip.event.type, 'none');
+    // Sustained airborne without GS/AGL still departs after the confirm ticks.
+    const sustained = evaluateBushTripLegTransition(
+      { ...active, legStatus: 'ready' },
+      { onGround: false, enginesRunning: true, groundSpeedKt: 0 },
+      blip.nextState,
+      { nowMs: 1_200 },
+    );
+    assert.equal(sustained.event.type, 'depart');
   });
 
   it('settles on touchdown near dest with engines still running', () => {

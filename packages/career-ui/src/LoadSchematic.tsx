@@ -69,9 +69,41 @@ function outerSum(t: FuelTanks): number {
 }
 
 /**
+ * True when the empty outers are a real drain rather than a read hole: either
+ * the sim reported them explicitly as zero, or FUEL TOTAL already accounts for
+ * the mains alone. The tolerance is bounded by the vanished outer amount so a
+ * heavy airframe cannot swallow a whole tip pair inside a percentage band.
+ */
+function outerDrainConfirmed(
+  tanks: FuelTanks,
+  prev: FuelTanks,
+  totalFuelLb?: number,
+): boolean {
+  if (
+    tanks.leftAux != null ||
+    tanks.rightAux != null ||
+    tanks.leftTip != null ||
+    tanks.rightTip != null
+  ) {
+    return true;
+  }
+  if (typeof totalFuelLb !== 'number' || !Number.isFinite(totalFuelLb)) {
+    return false;
+  }
+  const mains = tanks.left + tanks.right + tanks.center;
+  const lostOuter = outerSum(prev) - outerSum(tanks);
+  if (lostOuter < 25) return false;
+  const tol = Math.max(
+    20,
+    Math.min(Math.max(40, totalFuelLb * 0.03), lostOuter * 0.5),
+  );
+  return Math.abs(totalFuelLb - mains) <= tol;
+}
+
+/**
  * Hold last non-zero tip/aux while mains stay loaded — stops the Learjet UI flash
  * (TL/TR → 0 lb, Sim 2508 = L+R only) when capacity still shows the tip cells.
- * Release when FUEL TOTAL already matches mains-only (tips truly drained).
+ * Release as soon as the drain is confirmed (tips truly empty).
  */
 function stickyOuterTanks(
   tanks: FuelTanks,
@@ -83,13 +115,7 @@ function stickyOuterTanks(
   const prev = prevSticky;
   if (!prev || outerSum(prev) < 25) return tanks;
   if (outerSum(tanks) > outerSum(prev) * 0.15) return tanks;
-  if (
-    typeof totalFuelLb === 'number' &&
-    Number.isFinite(totalFuelLb) &&
-    Math.abs(totalFuelLb - mains) <= Math.max(40, totalFuelLb * 0.03)
-  ) {
-    return tanks;
-  }
+  if (outerDrainConfirmed(tanks, prev, totalFuelLb)) return tanks;
   return {
     ...tanks,
     ...(prev.leftAux != null ? { leftAux: prev.leftAux } : {}),
@@ -110,21 +136,14 @@ export function FuelTankSchematic(props: {
   const stickyRef = useRef<FuelTanks | undefined>(undefined);
   const incoming = props.tanks;
   if (!incoming) return null;
-  const tanks = stickyOuterTanks(
-    incoming,
-    stickyRef.current,
-    props.liveFuelLb,
-  );
+  const prevSticky = stickyRef.current;
+  const tanks = stickyOuterTanks(incoming, prevSticky, props.liveFuelLb);
   if (
     outerSum(tanks) >= 25 ||
     tanks.left + tanks.right + tanks.center < 50 ||
-    // Clear sticky after a trusted empty-outer sample so residue does not stick.
-    (outerSum(incoming) < 25 &&
-      typeof props.liveFuelLb === 'number' &&
-      Math.abs(
-        props.liveFuelLb -
-          (incoming.left + incoming.right + incoming.center),
-      ) <= Math.max(40, props.liveFuelLb * 0.03))
+    // Commit the empty read once the drain is confirmed, so it stops sticking.
+    (prevSticky !== undefined &&
+      outerDrainConfirmed(incoming, prevSticky, props.liveFuelLb))
   ) {
     stickyRef.current = tanks;
   }

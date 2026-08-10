@@ -184,9 +184,9 @@ import { isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight } from './preflight-helpers.ts';
 import {
   CareerWatchSession,
+  probeFirstContactPosition,
   probeLiveLandingFpm,
   probeLiveResidualFuelKg,
-  probeLiveTouchdownPosition,
 } from './watch-helpers.ts';
 import { WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import { BushTripWatchSession } from './bush-watch-helpers.ts';
@@ -3820,6 +3820,16 @@ export function createCareerApiServer(port = 8787) {
           });
 
           let mission = committed.mission;
+          // Same rule as accept: a different mission must not inherit prior
+          // Watch leftovers, instead of relying on the client to start Watch.
+          const stagingWatch = watchSession.getStatus();
+          if (stagingWatch.missionId && stagingWatch.missionId !== mission.id) {
+            if (stagingWatch.running) {
+              await watchSession.stop({ reset: true });
+            } else {
+              watchSession.resetSession();
+            }
+          }
           let dispatch:
             | {
                 url: string;
@@ -4918,10 +4928,11 @@ export function createCareerApiServer(port = 8787) {
           }
           if (touchdownLat === undefined || touchdownLon === undefined) {
             try {
-              const tdPos = await probeLiveTouchdownPosition();
+              const tdPos = await probeFirstContactPosition();
               if (tdPos) {
                 touchdownLat = tdPos.lat;
                 touchdownLon = tdPos.lon;
+                touchdownHeadingTrueDeg ??= tdPos.headingTrueDeg;
               }
             } catch {
               /* soft-fail */

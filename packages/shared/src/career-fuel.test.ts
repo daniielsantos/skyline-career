@@ -14,7 +14,8 @@ import {
 describe('career fuel commodity', () => {
   it('seeds Jet-A inventory on every hub', () => {
     const world = createSeedEconomyWorld({ seed: 'fuel-seed' });
-    for (const ap of world.airports) {
+    // Trip-only strips run a frozen cargo economy (no production/stock) by design.
+    for (const ap of world.airports.filter((a) => !a.bushTripOnly)) {
       assert.ok(ap.inventory.fuel, `${ap.icao} missing fuel`);
       assert.ok((ap.inventory.fuel?.capacityKg ?? 0) > 0);
       assert.ok((ap.baseProduction?.fuel ?? 0) > 0);

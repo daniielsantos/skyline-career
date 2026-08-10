@@ -48,6 +48,36 @@ import {
   pickNpcHomeReturnIcao,
   quoteRepositionPilotFeeUsd,
 } from './career-economy.js';
+
+type SeedWorld = ReturnType<typeof createSeedEconomyWorld>;
+
+/**
+ * Lot whose route still leaves payload for this NPC's airframe.
+ * On long legs a small GA SKU burns its whole useful load on fuel, so the crew
+ * offer has zero lift and acceptContractPilotOffer rightly refuses it.
+ */
+function findLiftableLot(
+  world: SeedWorld,
+  npc: SeedWorld['npcs'][number],
+  heldLots: ReadonlySet<string>,
+  minAvailableKg = 200,
+): SeedWorld['lots'][number] | undefined {
+  return world.lots.find((lot) => {
+    if (heldLots.has(lot.id)) return false;
+    if (lot.status !== 'available' && lot.status !== 'reserved') return false;
+    if (lot.quantityKg - lot.reservedKg < minAvailableKg) return false;
+    const distanceNm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+    if (distanceNm === undefined) return false;
+    return (
+      contractPilotLiftKg(
+        npc.airframeTypeId ?? '',
+        npc.aircraftClassId,
+        minAvailableKg,
+        { distanceNm },
+      ) > 0
+    );
+  });
+}
 import { cancelMission, getAircraftClass, settleMission } from './career-mission.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
 import type { NpcFlight } from './types/career-economy.js';
@@ -238,9 +268,9 @@ describe('NPC freighter fleet', () => {
         n.aircraftClassId === 'wide_freighter' ||
         n.aircraftClassId === 'medium_piston',
     );
+    // Heavy classes now have PMDG/TFDi SKUs too, so they may be homologated —
+    // the invariant is only that every NPC carries a resolvable airframe.
     assert.ok(heavy.every((n) => Boolean(n.airframeTypeId)));
-    // No player SKUs yet — still abstract FSLTL codes.
-    assert.ok(heavy.some((n) => !npcAirframeIsHomologated(n.airframeTypeId)));
     const types = new Set(world.npcs.map((n) => n.airframeTypeId));
     assert.ok(types.size >= 5, `expected variety, got ${[...types].join(',')}`);
     for (const npc of world.npcs) {
@@ -472,13 +502,19 @@ describe('NPC freighter fleet', () => {
     const roster = listNpcFleetStatus(world, world.lastBatchAtMs);
     assert.equal(roster.length, worldFleetTarget(world));
     assert.ok(roster.some((r) => r.phase !== 'idle'), 'expected some busy NPCs');
-    const flying = roster.find((r) => r.mission);
-    if (flying?.mission) {
-      assert.ok(flying.mission.originIcao);
-      assert.ok(flying.mission.destIcao);
-      assert.ok(flying.mission.cargoKg > 0);
-      assert.ok(typeof flying.mission.arrivesAtMs === 'number');
+    for (const row of roster) {
+      if (!row.mission) continue;
+      assert.ok(row.mission.originIcao);
+      assert.ok(row.mission.destIcao);
+      assert.ok(row.mission.cargoKg >= 0);
+      assert.ok(typeof row.mission.arrivesAtMs === 'number');
     }
+    // Empty reposition legs also show a mission with cargoKg 0, so the roster
+    // must not be judged by whichever row happens to come first.
+    assert.ok(
+      roster.some((r) => (r.mission?.cargoKg ?? 0) > 0),
+      'expected at least one loaded freight leg',
+    );
   });
 
   it('enters crew rest after duty limit and blocks bidding until rest ends', () => {
@@ -967,25 +1003,20 @@ describe('NPC freighter fleet', () => {
     assert.equal(flight.awaitingPilotUntilMs, undefined);
   });
 
-  it('rejects contract pilot offers on abstract (non-homologated) NPCs', () => {
+  it('never opens a crew offer on an abstract (non-homologated) NPC', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-crew-abstract' });
     tickEconomyN(world, 24);
-    const npc = world.npcs.find(
-      (n) =>
-        n.aircraftClassId === 'narrow_freighter' &&
-        !npcAirframeIsHomologated(n.airframeTypeId),
-    );
+    const npc = world.npcs.find((n) => n.aircraftClassId === 'narrow_freighter');
     assert.ok(npc);
-    const lot = world.lots.find(
-      (l) =>
-        (l.status === 'available' || l.status === 'reserved') &&
-        l.quantityKg - l.reservedKg >= 500,
-    );
-    assert.ok(lot);
-    assert.throws(
-      () => createNpcContractPilotOffer(world, npc!.id, lot!.id),
-      /homologated/i,
-    );
+    // Force the abstract FSLTL code back onto a class that now has Market SKUs.
+    npc!.airframeTypeId = 'B738';
+    assert.equal(npcAirframeIsHomologated(npc!.airframeTypeId), false);
+    assert.equal(npcCanOfferContractPilot(npc!), false);
+    // Every offer path runs ensureNpcFleet first, which remigrates the operator
+    // onto a Market SKU — the player never gets a crew hold nobody can fly.
+    ensureNpcAirframes(world);
+    assert.ok(npcAirframeIsHomologated(npc!.airframeTypeId));
+    assert.equal(npcCanOfferContractPilot(npc!), true);
   });
 
   it('accepts a crew offer into a contract-pilot mission without aircraftId', () => {
@@ -1004,12 +1035,7 @@ describe('NPC freighter fleet', () => {
     npc!.currentFlightId = undefined;
     npc!.busyUntilMs = undefined;
     npc!.busyUntilTick = undefined;
-    const lot = world.lots.find(
-      (l) =>
-        !heldLots.has(l.id) &&
-        (l.status === 'available' || l.status === 'reserved') &&
-        l.quantityKg - l.reservedKg >= 200,
-    );
+    const lot = findLiftableLot(world, npc!, heldLots);
     assert.ok(lot);
     const nowMs = world.lastBatchAtMs ?? Date.now();
     const flight = createNpcContractPilotOffer(world, npc!.id, lot!.id, {
@@ -1248,6 +1274,13 @@ describe('NPC freighter fleet', () => {
       distanceNm: 1874,
     });
     assert.equal(lift, 0);
+
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-unflyable' });
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    // Class-wide reach grows as jets are homologated (Longitude, C750 do a
+    // transcon with payload), so the unflyable case has to be intercontinental.
+    const distanceNm = routeDistanceNm(world, 'KSFO', 'SBGR');
+    assert.ok(distanceNm !== undefined && distanceNm > 4_000);
     assert.equal(
       contractPilotHasFlyableAirframe(
         {
@@ -1255,21 +1288,18 @@ describe('NPC freighter fleet', () => {
           cargoKg: 907,
           payUsd: 100_000,
           originIcao: 'KSFO',
-          destIcao: 'KCLE',
+          destIcao: 'SBGR',
         },
-        { distanceNm: 1874 },
+        { distanceNm },
       ),
       false,
     );
-
-    const world = createSeedEconomyWorld({ seed: 'npc-crew-unflyable' });
-    const nowMs = world.lastBatchAtMs ?? Date.now();
     world.npcFlights.push({
       id: 'npcf-unflyable-test',
       npcId: world.npcs[0]!.id,
       lotId: 'lot-unflyable-test',
       originIcao: 'KSFO',
-      destIcao: 'KCLE',
+      destIcao: 'SBGR',
       commodityId: 'electronics',
       cargoKg: 907,
       payUsd: 100_000,
@@ -1296,7 +1326,7 @@ describe('NPC freighter fleet', () => {
       npcId: world.npcs[0]!.id,
       lotId: 'lot-hide-fly-test',
       originIcao: 'KSFO',
-      destIcao: 'KCLE',
+      destIcao: 'SBGR',
       commodityId: 'electronics',
       cargoKg: 907,
       payUsd: 100_000,
@@ -1559,12 +1589,7 @@ describe('NPC freighter fleet', () => {
     npc!.currentFlightId = undefined;
     npc!.busyUntilMs = undefined;
     npc!.busyUntilTick = undefined;
-    const lot = world.lots.find(
-      (l) =>
-        !heldLots.has(l.id) &&
-        (l.status === 'available' || l.status === 'reserved') &&
-        l.quantityKg - l.reservedKg >= 200,
-    );
+    const lot = findLiftableLot(world, npc!, heldLots);
     assert.ok(lot);
     const nowMs = world.lastBatchAtMs ?? Date.now();
     createNpcContractPilotOffer(world, npc!.id, lot!.id, {

@@ -168,6 +168,10 @@ export function outerTanksCollapsedWhileMainsStable(
  * Tip/aux read ~0 while mains stay loaded — trust it when FUEL TOTAL agrees
  * with mains-only (real drain / M&B clear). Keep sticky when TOTAL still
  * looks like mains+previous outers (Learjet SimConnect flicker).
+ *
+ * The tolerance is bounded by *how much outer fuel vanished*, not by a share of
+ * the total: on a 30 000 lb jet a flat 3% would swallow an entire 800 lb tip
+ * pair and release the sticky on the very flicker it exists to absorb.
  */
 export function outerTankCollapseIsTrusted(
   next: FuelTankBreakdown,
@@ -180,9 +184,33 @@ export function outerTankCollapseIsTrusted(
       ? Math.max(0, totalFuelLb)
       : undefined;
   if (total === undefined) return false;
-  const nextMain = mainTankLb(next);
-  const tol = Math.max(40, total * 0.03);
-  return Math.abs(total - nextMain) <= tol;
+  const lostOuter = outerTankLb(prev) - outerTankLb(next);
+  if (lostOuter < 25) return false;
+  const tol = Math.max(
+    20,
+    Math.min(Math.max(40, total * 0.03), lostOuter * 0.5),
+  );
+  return Math.abs(total - mainTankLb(next)) <= tol;
+}
+
+/**
+ * Mark outers we confirmed empty with explicit zeros. An absent key only means
+ * "not read" (SimConnect omits tanks it cannot see), so downstream heuristics
+ * cannot tell a drained tip from an unreadable one without this marker.
+ */
+function withDrainedOuters(
+  next: FuelTankBreakdown,
+  prev: FuelTankBreakdown,
+): FuelTankBreakdown {
+  return {
+    left: next.left,
+    right: next.right,
+    center: next.center,
+    ...(prev.leftAux != null ? { leftAux: next.leftAux ?? 0 } : {}),
+    ...(prev.rightAux != null ? { rightAux: next.rightAux ?? 0 } : {}),
+    ...(prev.leftTip != null ? { leftTip: next.leftTip ?? 0 } : {}),
+    ...(prev.rightTip != null ? { rightTip: next.rightTip ?? 0 } : {}),
+  };
 }
 
 /**
@@ -227,12 +255,14 @@ export function pickFuelTankBreakdown(
   prev: FuelTankBreakdown | undefined,
   totalFuelLb?: number | null,
 ): FuelTankBreakdown | undefined {
+  if (next && prev && outerTankCollapseIsTrusted(next, prev, totalFuelLb)) {
+    return withDrainedOuters(next, prev);
+  }
   if (next && isUsableFuelTankBreakdown(next, totalFuelLb, prev)) return next;
   if (
     next &&
     prev &&
     outerTanksCollapsedWhileMainsStable(next, prev) &&
-    !outerTankCollapseIsTrusted(next, prev, totalFuelLb) &&
     isUsableFuelTankBreakdown(
       { left: next.left, right: next.right, center: next.center },
       totalFuelLb,

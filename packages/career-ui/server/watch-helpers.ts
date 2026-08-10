@@ -797,6 +797,73 @@ export async function probeLiveTouchdownPosition(
   }
 }
 
+/** Live aircraft position (degrees). Soft-fail when missing or unset. */
+async function readLivePlanePosition(
+  bridge: NamedPipeSimBridge,
+): Promise<{ lat: number; lon: number } | undefined> {
+  try {
+    const lat = await bridge.readSimVar({
+      name: 'PLANE LATITUDE',
+      unit: 'degrees',
+    });
+    const lon = await bridge.readSimVar({
+      name: 'PLANE LONGITUDE',
+      unit: 'degrees',
+    });
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      !(lat === 0 && lon === 0)
+    ) {
+      return { lat, lon };
+    }
+  } catch {
+    /* soft-fail */
+  }
+  return undefined;
+}
+
+/**
+ * First-contact position for the manual settle path. MSFS keeps
+ * `PLANE TOUCHDOWN LATITUDE/LONGITUDE` latched from the previous landing, so
+ * the raw read alone can debrief the wrong flight's runway — sanity-check it
+ * against the live position exactly like the Watch settle path does.
+ */
+export async function probeFirstContactPosition(pipeName?: string): Promise<
+  | {
+      lat: number;
+      lon: number;
+      headingTrueDeg?: number;
+    }
+  | undefined
+> {
+  const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
+  try {
+    await bridge.open('Skyline Career UI Settle First Contact');
+    const [simTd, planeNow, headingTrueDeg] = [
+      await readLiveTouchdownPosition(bridge),
+      await readLivePlanePosition(bridge),
+      await readLiveHeadingTrueDeg(bridge),
+    ];
+    const picked = pickFirstContactCoords({
+      simTouchdown: simTd ?? null,
+      planeNow: planeNow ?? null,
+    });
+    if (!picked) return undefined;
+    return {
+      lat: picked.lat,
+      lon: picked.lon,
+      ...(headingTrueDeg != null ? { headingTrueDeg } : {}),
+    };
+  } finally {
+    try {
+      await bridge.close({ disconnectHost: false });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export class CareerWatchSession {
   private bridge: NamedPipeSimBridge | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;

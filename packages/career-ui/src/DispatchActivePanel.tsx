@@ -185,6 +185,13 @@ export function DispatchActivePanel(props: {
       rightTip?: number;
     };
   }>({});
+  // The panel is not remounted between missions, so the sticky fuel of the
+  // previous flight would seed the next one's first frames.
+  const stickyFuelMissionRef = useRef<string | null>(null);
+  if (stickyFuelMissionRef.current !== mission.id) {
+    stickyFuelMissionRef.current = mission.id;
+    stickyFuelRef.current = {};
+  }
   const watchPos = props.watch?.position;
   if (
     watchRunning &&

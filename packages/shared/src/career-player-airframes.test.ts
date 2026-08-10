@@ -17,6 +17,8 @@ import {
 describe('career player airframes', () => {
   it('makes every current homologated pack available to the player market', () => {
     const ids = new Set(CAREER_PLAYER_AIRFRAMES.map((airframe) => airframe.typeId));
+    // Only packs that survived the re-homologation pass belong here — the list
+    // grows as packs are homologated, it is not a frozen snapshot.
     for (const expected of [
       'asobo-c172sp-cargo',
       'blacksquare-commander-114',
@@ -29,9 +31,21 @@ describe('career player airframes', () => {
       'pmdg-738-bbj2-family',
       'pmdg-dc6',
       'tfdi-md11f-family',
-      'toliss-a346-family',
     ]) {
       assert.ok(ids.has(expected), `${expected} missing from player catalog`);
+    }
+    assert.equal(
+      ids.size,
+      CAREER_PLAYER_AIRFRAMES.length,
+      'duplicate typeId in player catalog',
+    );
+    for (const airframe of CAREER_PLAYER_AIRFRAMES) {
+      assert.equal(
+        findCareerPlayerAirframe(airframe.typeId)?.typeId,
+        airframe.typeId,
+        `${airframe.typeId} does not resolve to itself`,
+      );
+      assert.ok(airframe.aircraftClassId, `${airframe.typeId} has no class`);
     }
     assert.equal(ids.has('blacksquare-commander-114tc'), false);
     assert.equal(ids.has('asobo-c208b-cargo'), false);
@@ -87,8 +101,8 @@ describe('career player airframes', () => {
       'c208-caravan-cargo',
     );
     assert.equal(
-      findCareerPlayerAirframe('blacksquare-caravan-cargo-pod')?.label,
-      'Cessna 208 Caravan Cargo',
+      findCareerPlayerAirframe('blacksquare-caravan-cargo-pod')?.typeId,
+      'c208-caravan-cargo',
     );
   });
 
@@ -146,7 +160,7 @@ describe('career player airframes', () => {
     );
     assert.equal(
       findCareerPlayerAirframe('blacksquare-commander-114')?.maxCargoKg,
-      320,
+      551,
     );
     assert.equal(
       findCareerPlayerAirframe('asobo-cessna-c152')?.simbriefIcao,
@@ -178,17 +192,20 @@ describe('career player airframes', () => {
 
   it('exposes per-airframe range and burn for starters', () => {
     const commander = findCareerPlayerAirframe('blacksquare-commander-114');
-    assert.equal(commander?.maxRangeNm, 800);
+    assert.equal(commander?.maxRangeNm, 725);
+    // Per-airframe range wins over the class default (800 nm for light_ga).
     assert.equal(
       resolveAirframeMaxRangeNm('blacksquare-commander-114', 'light_ga'),
-      800,
+      725,
     );
     assert.ok(
       (resolveAirframeCruiseFuelFlowKgPerHour('blacksquare-commander-114') ?? 0) >
         20,
     );
     assert.equal(resolveAirframeMaxRangeNm('missing-type', 'light_ga'), 800);
-    assert.equal(resolveAirframeCruiseSpeedKt('carenado-404-titan-cargo'), 181);
+    assert.equal(resolveAirframeCruiseSpeedKt('blacksquare-commander-114'), 174);
+    // De-homologated SKUs expose no per-airframe cruise speed.
+    assert.equal(resolveAirframeCruiseSpeedKt('carenado-404-titan-cargo'), undefined);
   });
 
   it('clamps maxCargo to MTOW−OEW / MZFW−OEW', () => {

@@ -38,6 +38,22 @@ import {
   type ShipmentLot,
 } from './index.js';
 
+/**
+ * First Market row the player could actually book.
+ * The board also lists fully-reserved NPC crew offers (accepted via
+ * acceptContractPilotOffer), so `listMarketLots(world)[0]` is not bookable.
+ */
+function firstBookableLot(
+  world: ReturnType<typeof createSeedEconomyWorld>,
+  minAvailableKg = 1,
+): ShipmentLot {
+  const view = listMarketLots(world).find(
+    (entry) => !entry.npcClaim?.crewNeeded && entry.availableKg >= minAvailableKg,
+  );
+  assert.ok(view, `no bookable lot with >= ${minAvailableKg} kg`);
+  return view.lot;
+}
+
 describe('mission load method policy', () => {
   it('marks narrow/wide as native-simbrief and Caravan/Bonanza/light jet as direct-injection', () => {
     assert.deepEqual(missionLoadPolicy({ aircraftClassId: 'narrow_freighter' }), {
@@ -275,9 +291,8 @@ describe('acceptMission', () => {
   it('reserves cargo and creates MissionIntent for generate-ofp', () => {
     const world = createSeedEconomyWorld({ seed: 'accept-test' });
     tickEconomyN(world, 24);
-    const market = listMarketLots(world);
-    assert.ok(market.length > 0);
-    const lot = market[0]!.lot;
+    assert.ok(listMarketLots(world).length > 0);
+    const lot = firstBookableLot(world);
     const before = lot.reservedKg;
 
     const mission = acceptMission(world, {
@@ -1099,7 +1114,7 @@ describe('settleMission', () => {
   it('delivers cargo on-time and pays full freight', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-ontime' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = firstBookableLot(world, 5_000);
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: 5_000,
@@ -1134,7 +1149,7 @@ describe('settleMission', () => {
   it('reverts a false auto-depart back to dispatched and clears airborne stamps', () => {
     const world = createSeedEconomyWorld({ seed: 'false-depart-revert' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = firstBookableLot(world);
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: Math.min(5_000, lot.quantityKg - lot.reservedKg),
@@ -1155,7 +1170,7 @@ describe('settleMission', () => {
   it('stamps settledLandingFpm when provided', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-fpm' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = firstBookableLot(world, 5_000);
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: 5_000,
@@ -1173,8 +1188,13 @@ describe('settleMission', () => {
   it('stamps runway touchdown projection when lat/lon provided', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-rwy' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world).find((v) => v.lot.destIcao === 'SBGR')?.lot
-      ?? listMarketLots(world)[0]!.lot;
+    const lot =
+      listMarketLots(world).find(
+        (v) =>
+          v.lot.destIcao === 'SBGR' &&
+          !v.npcClaim?.crewNeeded &&
+          v.availableKg >= 5_000,
+      )?.lot ?? firstBookableLot(world, 5_000);
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: 5_000,
@@ -1243,7 +1263,7 @@ describe('settleMission', () => {
   it('applies late penalty after deadline', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-late' });
     tickEconomyN(world, 24);
-    const lot = listMarketLots(world)[0]!.lot;
+    const lot = firstBookableLot(world, 4_000);
     const mission = acceptMission(world, {
       lotId: lot.id,
       cargoKg: 4_000,

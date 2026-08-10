@@ -147,12 +147,17 @@ export function formatRunwayTouchdownDebriefLine(
     touch.landingEnd === 'reciprocal' && touch.runwayIdentReciprocal
       ? Math.max(0, touch.lengthM - touch.pastThresholdM)
       : Math.max(0, touch.pastThresholdM);
+  // lateralM is stored against the primary heading; facing the end you actually
+  // landed on mirrors it. The diagram already flips, so skipping it here made
+  // the text contradict the marker on every reciprocal approach.
+  const lateralForPilot =
+    touch.landingEnd === 'reciprocal' ? -touch.lateralM : touch.lateralM;
   const side =
-    Math.abs(touch.lateralM) < 2
+    Math.abs(lateralForPilot) < 2
       ? 'centerline'
-      : touch.lateralM > 0
-        ? `${Math.abs(touch.lateralM)} m right`
-        : `${Math.abs(touch.lateralM)} m left`;
+      : lateralForPilot > 0
+        ? `${Math.abs(Math.round(lateralForPilot))} m right`
+        : `${Math.abs(Math.round(lateralForPilot))} m left`;
   const pavement = touch.onPavement ? 'on pavement' : 'OFF runway';
   const light =
     touch.lighted === true

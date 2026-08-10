@@ -16,7 +16,8 @@ import {
 describe('career MRO parts', () => {
   it('seeds aircraft-parts inventory on every hub', () => {
     const world = createSeedEconomyWorld({ seed: 'mro-seed' });
-    for (const ap of world.airports) {
+    // Trip-only strips run a frozen cargo economy (no production/stock) by design.
+    for (const ap of world.airports.filter((a) => !a.bushTripOnly)) {
       assert.ok(ap.inventory.mro_parts, `${ap.icao} missing mro_parts`);
       assert.ok((ap.inventory.mro_parts?.capacityKg ?? 0) > 0);
       assert.ok((ap.baseProduction?.mro_parts ?? 0) > 0);

@@ -9,19 +9,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
 
 describe('resolveMissionRolesPack', () => {
-  it('falls back to Caravan class pack when Asobo C208B pack is absent', async () => {
+  it('resolves the Asobo C208B pack from the live title', async () => {
     const roles = await resolveMissionRolesPack({
       repoRoot,
       rolesPackRelPath: 'profiles/ofp/blacksquare-caravan-cargo-pod.json',
       liveTitle: 'C208B Cargo N208AS',
     });
-    // asobo-c208b-cargo.json is not in profiles/ofp — title does not resolve;
-    // class fallback keeps the Black Square Caravan pack.
-    assert.match(
-      roles.path.replace(/\\/g, '/'),
-      /blacksquare-caravan-cargo-pod\.json$/,
-    );
-    assert.match(roles.via, /mission class/);
+    // Both packs sit on the shared Caravan SKU, so the live title decides which
+    // one loads instead of the mission-class default.
+    assert.match(roles.path.replace(/\\/g, '/'), /asobo-c208b-cargo\.json$/);
   });
 
   it('keeps Black Square pack for BS live title', async () => {
@@ -243,6 +239,7 @@ describe('resolveDispatchSimBriefParams', () => {
       liveTitle: 'Black Square Commander 114',
     });
     assert.equal(params.simbriefIcao, 'C208');
-    assert.match(params.titleHint, /Caravan/i);
+    // The purchased SKU label wins; a mismatched live title must not leak in.
+    assert.doesNotMatch(params.titleHint, /Commander/i);
   });
 });

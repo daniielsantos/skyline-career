@@ -305,10 +305,23 @@ export function careerLoadWeightMatchOk(
 export const DEFAULT_FUEL_TAXI_BURN_LB = 150;
 
 /**
- * Extra Sim overshoot vs Due allowed for MSFS AUX/TIP unusable fuel that
- * inject cannot drain (King Air tip pair ~58 lb/side, Baron AUX floors, …).
+ * Ceiling for the Sim overshoot vs Due allowed for MSFS AUX/TIP unusable fuel
+ * that inject cannot drain (King Air tip pair ~58 lb/side, Baron AUX floors, …).
  */
 export const DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB = 200;
+
+/**
+ * Unusable floors scale with the aircraft, so a flat 200 lb would let a C172
+ * depart with full tanks against a 200 lb OFP block. Keep the King Air-class
+ * proportion (~6% of block) and cap it at the absolute ceiling.
+ */
+export function fuelUnusableOvershootLb(plannedLb: number): number {
+  if (!Number.isFinite(plannedLb) || plannedLb <= 0) return 0;
+  return Math.min(
+    DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB,
+    Math.max(50, plannedLb * 0.07),
+  );
+}
 
 /**
  * Fuel Loaded vs Due: allow Sim below Due by tol + taxi burn, and slightly
@@ -319,13 +332,16 @@ export function careerFuelMatchOk(
   plannedLb: number | undefined,
   toleranceLb: number,
   taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
-  unusableOvershootLb: number = DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB,
+  unusableOvershootLb?: number,
 ): boolean {
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
   if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
   const tol = Math.max(0, toleranceLb);
   const taxi = Math.max(0, taxiBurnLb);
-  const unusable = Math.max(0, unusableOvershootLb);
+  const unusable = Math.max(
+    0,
+    unusableOvershootLb ?? fuelUnusableOvershootLb(plannedLb),
+  );
   const delta = liveLb - plannedLb;
   if (delta > 0) return delta <= tol + unusable;
   return -delta <= tol + taxi;

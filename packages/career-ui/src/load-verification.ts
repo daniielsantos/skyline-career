@@ -7,8 +7,19 @@ const DEFAULT_FUEL_TOL_LB = 50;
 const DEFAULT_PAYLOAD_TOL_LB = 75;
 /** Sim may sit this far under OFP block after taxi / APU without leaving Ready. */
 const DEFAULT_FUEL_TAXI_BURN_LB = 150;
-/** Unusable tip/aux floors inject cannot clear — mirror shared careerFuelMatchOk. */
+/** Ceiling for unusable tip/aux floors inject cannot clear — mirror shared. */
 const DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB = 200;
+/** A gap wider than this is real fuel movement, not a SimConnect flicker. */
+const FUEL_FLICKER_MAX_LB = 150;
+
+/** Mirror of shared fuelUnusableOvershootLb — scales the floor with the block. */
+function fuelUnusableOvershootLb(plannedLb: number): number {
+  if (!Number.isFinite(plannedLb) || plannedLb <= 0) return 0;
+  return Math.min(
+    DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB,
+    Math.max(50, plannedLb * 0.07),
+  );
+}
 
 function matchOk(
   liveLb: number | undefined,
@@ -26,13 +37,16 @@ export function matchFuelOk(
   plannedLb: number | undefined,
   toleranceLb: number,
   taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
-  unusableOvershootLb: number = DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB,
+  unusableOvershootLb?: number,
 ): boolean {
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
   if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
   const tol = Math.max(0, toleranceLb);
   const taxi = Math.max(0, taxiBurnLb);
-  const unusable = Math.max(0, unusableOvershootLb);
+  const unusable = Math.max(
+    0,
+    unusableOvershootLb ?? fuelUnusableOvershootLb(plannedLb),
+  );
   const delta = liveLb - plannedLb;
   if (delta > 0) return delta <= tol + unusable;
   return -delta <= tol + taxi;
@@ -98,6 +112,7 @@ export function outerTanksCollapsedWhileMainsStable(
 /**
  * Trust tip/aux zero when FUEL TOTAL ≈ mains-only (real drain). Hold sticky
  * when TOTAL still looks like mains + previous outers (Learjet flicker).
+ * Tolerance is bounded by the vanished outer amount, not a share of the total.
  */
 export function outerTankCollapseIsTrusted(
   next: LoadFuelTankBreakdown,
@@ -110,9 +125,42 @@ export function outerTankCollapseIsTrusted(
       ? Math.max(0, totalFuelLb)
       : undefined;
   if (total === undefined) return false;
-  const nextMain = mainTankLb(next);
-  const tol = Math.max(40, total * 0.03);
-  return Math.abs(total - nextMain) <= tol;
+  const lostOuter = outerTankLb(prev) - outerTankLb(next);
+  if (lostOuter < 25) return false;
+  const tol = Math.max(
+    20,
+    Math.min(Math.max(40, total * 0.03), lostOuter * 0.5),
+  );
+  return Math.abs(total - mainTankLb(next)) <= tol;
+}
+
+/**
+ * Mark outers we confirmed empty with explicit zeros — an absent key only means
+ * "not read", so `inferMissingOuterTanks` must be able to tell them apart.
+ */
+function withDrainedOuters(
+  next: LoadFuelTankBreakdown,
+  prev: LoadFuelTankBreakdown,
+): LoadFuelTankBreakdown {
+  return {
+    left: next.left,
+    right: next.right,
+    center: next.center,
+    ...(prev.leftAux != null ? { leftAux: next.leftAux ?? 0 } : {}),
+    ...(prev.rightAux != null ? { rightAux: next.rightAux ?? 0 } : {}),
+    ...(prev.leftTip != null ? { leftTip: next.leftTip ?? 0 } : {}),
+    ...(prev.rightTip != null ? { rightTip: next.rightTip ?? 0 } : {}),
+  };
+}
+
+/** True once any outer tank has been read (even as an explicit zero). */
+function hasOuterTankReading(tanks: LoadFuelTankBreakdown): boolean {
+  return (
+    tanks.leftAux != null ||
+    tanks.rightAux != null ||
+    tanks.leftTip != null ||
+    tanks.rightTip != null
+  );
 }
 
 /** Classic L/R/C sometimes glitch to zero while FUEL TOTAL is still valid. */
@@ -150,12 +198,14 @@ export function pickFuelTankBreakdown(
   prev: LoadFuelTankBreakdown | undefined,
   totalFuelLb?: number | null,
 ): LoadFuelTankBreakdown | undefined {
+  if (next && prev && outerTankCollapseIsTrusted(next, prev, totalFuelLb)) {
+    return withDrainedOuters(next, prev);
+  }
   if (next && isUsableFuelTankBreakdown(next, totalFuelLb, prev)) return next;
   if (
     next &&
     prev &&
     outerTanksCollapsedWhileMainsStable(next, prev) &&
-    !outerTankCollapseIsTrusted(next, prev, totalFuelLb) &&
     isUsableFuelTankBreakdown(
       { left: next.left, right: next.right, center: next.center },
       totalFuelLb,
@@ -315,7 +365,10 @@ export function stabilizeDisplayedFuel(opts: {
     if (sum > (liveLb ?? 0) + 40) liveLb = sum;
   }
 
-  // Prefer sticky total when it still matches Due and the new reading does not.
+  // Prefer sticky total when it still matches Due and the new reading does not —
+  // but only for flicker-sized gaps. Without this bound the sticky latches onto
+  // Due forever: once it matched, every later reading is discarded and written
+  // back as the new sticky, so draining fuel in MSFS never reaches the card.
   const planned = opts.plannedLb;
   const sticky = opts.stickyLiveLb;
   if (
@@ -324,7 +377,8 @@ export function stabilizeDisplayedFuel(opts: {
     sticky != null &&
     Number.isFinite(sticky) &&
     Math.abs(sticky - planned) <= DEFAULT_FUEL_TOL_LB &&
-    (liveLb == null || Math.abs(liveLb - planned) > DEFAULT_FUEL_TOL_LB)
+    (liveLb == null || Math.abs(liveLb - planned) > DEFAULT_FUEL_TOL_LB) &&
+    (liveLb == null || Math.abs(liveLb - sticky) <= FUEL_FLICKER_MAX_LB)
   ) {
     liveLb = sticky;
   }
@@ -353,6 +407,10 @@ export function inferMissingOuterTanks(opts: {
     (cap.rightTip ?? 0);
   if (outerCap < 25) return tanks;
   if (outerTankLb(tanks) >= 25) return tanks;
+  // An outer that was actually read as empty is empty. Only infer for tanks the
+  // sim never reported at all, otherwise a drained King Air tip pair gets its
+  // fuel invented back and Preflight passes on fuel that is not in the wing.
+  if (hasOuterTankReading(tanks)) return tanks;
 
   const leftCap = cap.left ?? 0;
   const rightCap = cap.right ?? 0;

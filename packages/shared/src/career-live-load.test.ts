@@ -123,6 +123,39 @@ describe('isUsableFuelTankBreakdown', () => {
     assert.deepEqual(pickFuelTankBreakdown(drained, prev, 1950), drained);
   });
 
+  it('pickFuelTankBreakdown marks a confirmed drain with explicit zeros', () => {
+    const prev = {
+      left: 933,
+      right: 933,
+      center: 0,
+      leftAux: 52,
+      rightAux: 52,
+    };
+    // SimConnect omits tanks it reads as empty — the drain marker must survive.
+    const drained = { left: 975, right: 975, center: 0 };
+    assert.deepEqual(pickFuelTankBreakdown(drained, prev, 1950), {
+      left: 975,
+      right: 975,
+      center: 0,
+      leftAux: 0,
+      rightAux: 0,
+    });
+  });
+
+  it('pickFuelTankBreakdown holds tips when the total still covers them', () => {
+    // Heavy jet: a flat 3% band (900 lb) would swallow the whole 1054 lb tip
+    // pair and release the sticky on the very flicker it absorbs.
+    const prev = {
+      left: 14_000,
+      right: 14_000,
+      center: 1000,
+      leftAux: 527,
+      rightAux: 527,
+    };
+    const glitch = { left: 14_000, right: 14_000, center: 1000 };
+    assert.deepEqual(pickFuelTankBreakdown(glitch, prev, 30_054), prev);
+  });
+
   it('pickFuelTankBreakdown keeps tips when mains rise mid fuel-inject', () => {
     const prev = {
       left: 800,

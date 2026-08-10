@@ -240,6 +240,7 @@ export {
   NPC_MX_PARTS_KG,
   NPC_MX_SHOP_HOURS,
   LANE_BUSY_SATURATION,
+  LANE_SATURATION_KG,
   THIN_FLEET_CAPACITY,
   pickNpcAirframe,
   seedNpcFleet,
@@ -283,6 +284,18 @@ export const MAX_LOTS_PER_LANE = 5;
 export const MAX_LARGE_LOTS_PER_LANE = 3;
 export const MAX_SMALL_LOTS_PER_LANE = 2;
 
+/** Large (Narrow-oriented) freight hard cap — unchanged when XL exists. */
+export const LARGE_LOT_MAX_KG = 28_000;
+/** Wide fill band: rare major↔major (or strong intl) contracts. */
+export const XL_LOT_MIN_KG = 40_000;
+export const XL_LOT_MAX_KG = 90_000;
+/** Domestic corridor weight required for XL (strong trunks only). */
+export const XL_CORRIDOR_MIN_WEIGHT = 1.8;
+/** Intl lanes need at least this daily OD cap to host an XL lot. */
+export const XL_INTL_MIN_CAPACITY_KG_PER_DAY = 70_000;
+/** XL pay/kg vs otherwise-identical large formation (~tonnage without jackpot). */
+export const XL_LOT_PAY_MULT = 0.88;
+
 /**
  * Static cargo-role profile per hub tier.
  * Calibrated offline from BR cargo roles (~2024): GRU/VCP dominate tonnage;
@@ -296,6 +309,8 @@ export const HUB_TIER_PROFILE: Record<
     maxLots: number;
     maxLarge: number;
     maxSmall: number;
+    /** Wide-only band; 1 only on major (lane uses min of OD). */
+    maxXl: number;
   }
 > = {
   major: {
@@ -304,6 +319,7 @@ export const HUB_TIER_PROFILE: Record<
     maxLots: 5,
     maxLarge: 3,
     maxSmall: 2,
+    maxXl: 1,
   },
   regional: {
     capacityMult: 1.0,
@@ -311,6 +327,7 @@ export const HUB_TIER_PROFILE: Record<
     maxLots: 3,
     maxLarge: 2,
     maxSmall: 1,
+    maxXl: 0,
   },
   spoke: {
     capacityMult: 0.45,
@@ -318,6 +335,7 @@ export const HUB_TIER_PROFILE: Record<
     maxLots: 2,
     maxLarge: 1,
     maxSmall: 2,
+    maxXl: 0,
   },
 };
 
@@ -340,7 +358,12 @@ export function laneLotCaps(
   originTier: HubTier,
   destTier: HubTier,
   opts: { originLevel?: number; destLevel?: number } = {},
-): { maxLots: number; maxLarge: number; maxSmall: number } {
+): {
+  maxLots: number;
+  maxLarge: number;
+  maxSmall: number;
+  maxXl: number;
+} {
   const origin = HUB_TIER_PROFILE[originTier];
   const dest = HUB_TIER_PROFILE[destTier];
   const bonus = hubLevelLaneBonus(opts.originLevel ?? 1, opts.destLevel ?? 1);
@@ -348,7 +371,27 @@ export function laneLotCaps(
     maxLots: Math.min(origin.maxLots, dest.maxLots) + bonus,
     maxLarge: Math.min(origin.maxLarge, dest.maxLarge) + Math.min(1, bonus),
     maxSmall: Math.min(origin.maxSmall, dest.maxSmall) + Math.max(0, bonus - 1),
+    // No hub-level XL bonus — keep Wide fills rare.
+    maxXl: Math.min(origin.maxXl, dest.maxXl),
   };
+}
+
+/** True when an OD may form an XL (Wide) lot under corridor / intl gates. */
+export function xlLotOdEligible(
+  originTier: HubTier,
+  destTier: HubTier,
+  corridorW: number,
+  opts: { international?: boolean; capacityKgPerDay?: number } = {},
+): boolean {
+  if (originTier !== 'major' || destTier !== 'major') return false;
+  if (opts.international === true) {
+    const cap = opts.capacityKgPerDay ?? 0;
+    return (
+      corridorW >= XL_CORRIDOR_MIN_WEIGHT ||
+      cap >= XL_INTL_MIN_CAPACITY_KG_PER_DAY
+    );
+  }
+  return corridorW >= XL_CORRIDOR_MIN_WEIGHT;
 }
 
 /**
@@ -2342,6 +2385,7 @@ function formLotsFromImbalances(
   ensureInternationalLanes(world);
 
   const activeCounts = new Map<string, number>();
+  const xlCounts = new Map<string, number>();
   const largeCounts = new Map<string, number>();
   const smallCounts = new Map<string, number>();
   for (const l of world.lots) {
@@ -2350,7 +2394,9 @@ function formLotsFromImbalances(
     }
     const key = laneKey(l.commodityId, l.originIcao, l.destIcao);
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
-    if (l.quantityKg >= 4_000) {
+    if (l.quantityKg >= XL_LOT_MIN_KG) {
+      xlCounts.set(key, (xlCounts.get(key) ?? 0) + 1);
+    } else if (l.quantityKg >= 4_000) {
       largeCounts.set(key, (largeCounts.get(key) ?? 0) + 1);
     } else {
       smallCounts.set(key, (smallCounts.get(key) ?? 0) + 1);
@@ -2368,7 +2414,7 @@ function formLotsFromImbalances(
     origin: RankedAirport,
     dest: RankedAirport,
     qty: number,
-    size: 'large' | 'small',
+    size: 'xl' | 'large' | 'small',
     laneSaturation: number,
     inboundKg: number,
     corridorW: number,
@@ -2422,20 +2468,24 @@ function formLotsFromImbalances(
       dest.ap.icao,
       commodity.id,
     );
-    const payPerKg = Math.min(
-      gap *
-        0.55 *
-        urgencyMult *
-        distanceBias *
-        capacityPayMult *
-        scarcePayMult *
-        weatherPayMult *
-        corridorPayMult *
-        shock.payMult *
-        originLevelPay *
-        bushPay,
-      commodity.basePricePerKg * (international ? 2.1 : 1.8) * Math.max(1, bushPay * 0.95),
-    );
+    const sizePayMult = size === 'xl' ? XL_LOT_PAY_MULT : 1;
+    const payPerKg =
+      Math.min(
+        gap *
+          0.55 *
+          urgencyMult *
+          distanceBias *
+          capacityPayMult *
+          scarcePayMult *
+          weatherPayMult *
+          corridorPayMult *
+          shock.payMult *
+          originLevelPay *
+          bushPay,
+        commodity.basePricePerKg *
+          (international ? 2.1 : 1.8) *
+          Math.max(1, bushPay * 0.95),
+      ) * sizePayMult;
     const payUsd = Math.round(qty * payPerKg);
     // Lot life in 15-min ticks (legacy hour lives × 4).
     const baseLife = commodity.perishable
@@ -2453,6 +2503,8 @@ function formLotsFromImbalances(
 
     const shockNote =
       shock.labels.length > 0 ? ` · ${shock.labels.join('/')}` : '';
+    const sizeNote =
+      size === 'xl' ? ' · XL' : size === 'small' ? ' · LTL' : '';
     const lot: ShipmentLot = {
       id: `lot_${world.tick}_${commodity.id}_${origin.ap.icao}_${dest.ap.icao}_${Math.floor(rng() * 1e6)}`,
       commodityId: commodity.id,
@@ -2465,7 +2517,7 @@ function formLotsFromImbalances(
       payUsd,
       basePayUsd: payUsd,
       urgency: urgent ? 'urgent' : 'normal',
-      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${size === 'small' ? ' · LTL' : ''}${international ? ' · intl' : ''}${shockNote}`,
+      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${sizeNote}${international ? ' · intl' : ''}${shockNote}`,
       status: 'available',
     };
 
@@ -2473,7 +2525,9 @@ function formLotsFromImbalances(
     world.lots.push(lot);
     recordLotFormationActivity(world, origin.ap.icao, dest.ap.icao);
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
-    if (size === 'large') {
+    if (size === 'xl') {
+      xlCounts.set(key, (xlCounts.get(key) ?? 0) + 1);
+    } else if (size === 'large') {
       largeCounts.set(key, (largeCounts.get(key) ?? 0) + 1);
     } else {
       smallCounts.set(key, (smallCounts.get(key) ?? 0) + 1);
@@ -2516,6 +2570,7 @@ function formLotsFromImbalances(
         maxLots: caps.maxLots + 1,
         maxLarge: caps.maxLarge + 1,
         maxSmall: caps.maxSmall,
+        maxXl: caps.maxXl,
       };
     }
     const laneSat = npcLaneSaturation(
@@ -2545,12 +2600,42 @@ function formLotsFromImbalances(
     qty = Math.floor(qty / 100) * 100;
 
     if (
+      qty >= XL_LOT_MIN_KG &&
+      caps.maxXl > 0 &&
+      (xlCounts.get(key) ?? 0) < caps.maxXl &&
+      (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots &&
+      xlLotOdEligible(origin.tier, dest.tier, cw, {
+        international: opts.international,
+        capacityKgPerDay: opts.capacityKgPerDay,
+      })
+    ) {
+      const xlQty = Math.min(qty, XL_LOT_MAX_KG);
+      const formedXl = pushLot(
+        key,
+        commodity,
+        origin,
+        dest,
+        xlQty,
+        'xl',
+        laneSat,
+        inboundKg,
+        cw,
+        opts,
+      );
+      if (formedXl) {
+        const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
+        const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
+        qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
+      }
+    }
+
+    if (
       qty >= 4_000 &&
       caps.maxLarge > 0 &&
       (largeCounts.get(key) ?? 0) < caps.maxLarge &&
       (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
     ) {
-      const largeQty = Math.min(qty, 28_000);
+      const largeQty = Math.min(qty, LARGE_LOT_MAX_KG);
       pushLot(
         key,
         commodity,
@@ -2672,6 +2757,7 @@ function formLotsFromImbalances(
             maxLots: caps.maxLots + 1,
             maxLarge: caps.maxLarge + 1,
             maxSmall: caps.maxSmall,
+            maxXl: caps.maxXl,
           };
         }
         const key = laneKey(commodity.id, o.ap.icao, d.ap.icao);

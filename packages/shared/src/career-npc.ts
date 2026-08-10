@@ -463,8 +463,11 @@ export function npcRegionBidCapacity(
   return ready / home.length;
 }
 
-/** Wide-freighter-ish full load — saturation 1.0 at this airborne kg on a lane. */
-const LANE_SATURATION_KG = 28_000;
+/**
+ * One Wide freighter full load — saturation 1.0 at this inbound kg on a lane.
+ * Was 28 t (Narrow-era); raised so a single Wide fill does not lock the OD.
+ */
+export const LANE_SATURATION_KG = 90_000;
 
 /**
  * kg currently in_flight on a specific origin→dest lane for a commodity.
@@ -534,7 +537,7 @@ export function laneInboundKg(
   );
 }
 
-/** 0..1 lane saturation; 1 ≈ ≥28t inbound (NPC + player) on that OD+commodity. */
+/** 0..1 lane saturation; 1 ≈ ≥90t inbound (NPC + player) on that OD+commodity. */
 export function npcLaneSaturation(
   world: CareerEconomyWorld,
   originIcao: string,

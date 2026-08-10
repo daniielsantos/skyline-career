@@ -37,6 +37,7 @@ import {
   playerLaneInboundKg,
   laneInboundKg,
   npcLaneSaturation,
+  LANE_SATURATION_KG,
   npcRegionBidCapacity,
   isNpcReadyToBid,
   routeDistanceNm,
@@ -717,7 +718,7 @@ describe('NPC freighter fleet', () => {
       originIcao: origin,
       destIcao: dest,
       commodityId: 'general',
-      cargoKg: 14_000,
+      cargoKg: Math.ceil(LANE_SATURATION_KG * 0.4),
       payUsd: 1,
       aircraftClassId: 'narrow_freighter',
       departedAtTick: world.tick,
@@ -763,7 +764,10 @@ describe('NPC freighter fleet', () => {
     assert.equal(npcLaneAirborneKg(world, 'SBGR', 'SBGL', 'electronics'), 14_000);
     assert.equal(npcLaneAirborneKg(world, null, 'SBGL', 'electronics'), 14_000);
     assert.equal(npcLaneAirborneKg(world, 'SBPA', 'SBGL', 'electronics'), 0);
-    assert.ok(Math.abs(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics') - 0.5) < 1e-9);
+    assert.ok(
+      Math.abs(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics') - 14_000 / LANE_SATURATION_KG) <
+        1e-9,
+    );
 
     world.inboundPending = [
       {
@@ -779,9 +783,12 @@ describe('NPC freighter fleet', () => {
     ];
     assert.equal(playerLaneInboundKg(world, 'SBGR', 'SBGL', 'electronics'), 7_000);
     assert.equal(laneInboundKg(world, 'SBGR', 'SBGL', 'electronics'), 21_000);
-    assert.ok(Math.abs(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics') - 0.75) < 1e-9);
+    assert.ok(
+      Math.abs(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics') - 21_000 / LANE_SATURATION_KG) <
+        1e-9,
+    );
 
-    flight.cargoKg = 28_000;
+    flight.cargoKg = LANE_SATURATION_KG;
     assert.equal(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics'), 1);
   });
 

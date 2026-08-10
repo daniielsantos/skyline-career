@@ -8191,6 +8191,14 @@ export function App() {
                                   {lot.urgency === 'urgent' ? (
                                     <span className="tag">Urgent</span>
                                   ) : null}
+                                  {(lot.quantityKg ?? lot.availableKg) >= 40_000 ? (
+                                    <span
+                                      className="tag"
+                                      title="Wide fill · XL lot (40–90 t)"
+                                    >
+                                      XL
+                                    </span>
+                                  ) : null}
                                   {lot.bush ? (
                                     <span
                                       className="tag"
@@ -9073,6 +9081,11 @@ export function App() {
                         <span className="arrow">→</span>
                         <IcaoLink icao={lot.destIcao} onOpen={openAirport} disabled={busy} />
                         {lot.urgency === 'urgent' ? <span className="tag">Urgent</span> : null}
+                        {(lot.quantityKg ?? lot.availableKg) >= 40_000 ? (
+                          <span className="tag" title="Wide fill · XL lot (40–90 t)">
+                            XL
+                          </span>
+                        ) : null}
                         {lot.pressure?.international ? (
                           <span className="tag" title="International lane freight">
                             intl

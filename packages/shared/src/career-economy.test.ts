@@ -29,6 +29,12 @@ import {
   pruneDeadLots,
   routeDistanceNm,
   tickEconomyN,
+  LARGE_LOT_MAX_KG,
+  LANE_SATURATION_KG,
+  XL_CORRIDOR_MIN_WEIGHT,
+  XL_LOT_MAX_KG,
+  XL_LOT_MIN_KG,
+  xlLotOdEligible,
 } from './career-economy.js';
 import { listNpcHomeRegions, targetNpcFleetSize } from './career-npc.js';
 import { BR_CAREER_HUBS } from './career-br-hubs.js';
@@ -153,12 +159,15 @@ describe('career-economy seed', () => {
       maxLots: HUB_TIER_PROFILE.major.maxLots,
       maxLarge: HUB_TIER_PROFILE.major.maxLarge,
       maxSmall: HUB_TIER_PROFILE.major.maxSmall,
+      maxXl: HUB_TIER_PROFILE.major.maxXl,
     });
     assert.deepEqual(laneLotCaps('spoke', 'spoke'), {
       maxLots: 2,
       maxLarge: 1,
       maxSmall: 2,
+      maxXl: 0,
     });
+    assert.equal(laneLotCaps('major', 'spoke').maxXl, 0);
   });
 });
 
@@ -642,13 +651,115 @@ describe('tickEconomyN market formation', () => {
         row.lot.quantityKg <= 2_000 &&
         /LTL/i.test(row.lot.reason),
     );
-    const large = market.filter((row) => row.lot.quantityKg >= 4_000);
+    const large = market.filter(
+      (row) =>
+        row.lot.quantityKg >= 4_000 && row.lot.quantityKg < XL_LOT_MIN_KG,
+    );
     assert.ok(small.length > 0, 'expected LTL lots for light turboprop fills');
     assert.ok(large.length > 0, 'expected large lots to remain');
     for (const row of small) {
       assert.ok(row.lot.quantityKg <= 2_000);
       assert.ok(row.lot.quantityKg >= 400);
     }
+    for (const row of large) {
+      assert.ok(
+        row.lot.quantityKg <= LARGE_LOT_MAX_KG,
+        `large lot should stay ≤ ${LARGE_LOT_MAX_KG} kg`,
+      );
+    }
+  });
+
+  it('forms XL lots on strong major↔major corridors when surplus is deep', () => {
+    const world = createSeedEconomyWorld({ seed: 'xl-major-trunk' });
+    world.lastBatchAtMs = 1;
+    tickEconomyN(world, 24, { fromBatchAtMs: 1 });
+
+    const origin = world.airports.find((a) => a.icao === 'SBGR')!;
+    const dest = world.airports.find((a) => a.icao === 'SBGL')!;
+    assert.equal(hubTierOf(origin), 'major');
+    assert.equal(hubTierOf(dest), 'major');
+    assert.ok(corridorWeight('SBGR', 'SBGL') >= XL_CORRIDOR_MIN_WEIGHT);
+
+    for (const c of ['electronics', 'machinery', 'general', 'perishables'] as const) {
+      const oPile = origin.inventory[c]!;
+      const dPile = dest.inventory[c]!;
+      oPile.stockKg = Math.round(oPile.capacityKg * 0.92);
+      dPile.stockKg = Math.round(dPile.capacityKg * 0.08);
+    }
+    // Free lane slots so the probe tick can form XL.
+    world.lots = world.lots.filter((l) => l.status !== 'available');
+    const before = world.tick;
+    tickEconomyN(world, 1, { fromBatchAtMs: world.lastBatchAtMs });
+
+    const xl = world.lots.filter(
+      (l) =>
+        l.createdAtTick > before &&
+        l.quantityKg >= XL_LOT_MIN_KG &&
+        /· XL/i.test(l.reason),
+    );
+    assert.ok(xl.length > 0, 'expected at least one XL lot on SBGR trunk');
+    for (const lot of xl) {
+      assert.ok(lot.quantityKg <= XL_LOT_MAX_KG);
+      assert.ok(lot.quantityKg >= XL_LOT_MIN_KG);
+      const oTier = hubTierOf(
+        world.airports.find((a) => a.icao === lot.originIcao)!,
+      );
+      const dTier = hubTierOf(
+        world.airports.find((a) => a.icao === lot.destIcao)!,
+      );
+      assert.equal(oTier, 'major');
+      assert.equal(dTier, 'major');
+    }
+  });
+
+  it('does not form XL on spoke ODs even with deep surplus', () => {
+    const world = createSeedEconomyWorld({ seed: 'xl-spoke-blocked' });
+    world.lastBatchAtMs = 1;
+    tickEconomyN(world, 12, { fromBatchAtMs: 1 });
+
+    const spokes = world.airports.filter((a) => hubTierOf(a) === 'spoke');
+    assert.ok(spokes.length >= 2);
+    for (const ap of spokes.slice(0, 8)) {
+      for (const c of ['electronics', 'general'] as const) {
+        const pile = ap.inventory[c];
+        if (!pile || pile.capacityKg < 1_000) continue;
+        pile.stockKg = Math.round(pile.capacityKg * 0.95);
+      }
+    }
+    world.lots = world.lots.filter((l) => l.status !== 'available');
+    const before = world.tick;
+    tickEconomyN(world, 2, { fromBatchAtMs: world.lastBatchAtMs });
+
+    const xlOnSpoke = world.lots.filter((l) => {
+      if (!(l.createdAtTick > before) || l.quantityKg < XL_LOT_MIN_KG) {
+        return false;
+      }
+      const o = world.airports.find((a) => a.icao === l.originIcao);
+      const d = world.airports.find((a) => a.icao === l.destIcao);
+      if (!o || !d) return false;
+      return hubTierOf(o) === 'spoke' || hubTierOf(d) === 'spoke';
+    });
+    assert.equal(xlOnSpoke.length, 0);
+  });
+
+  it('xlLotOdEligible gates major trunks and intl capacity', () => {
+    assert.equal(xlLotOdEligible('major', 'major', 2.2), true);
+    assert.equal(xlLotOdEligible('major', 'major', 1.0), false);
+    assert.equal(xlLotOdEligible('major', 'regional', 2.2), false);
+    assert.equal(
+      xlLotOdEligible('major', 'major', 1.0, {
+        international: true,
+        capacityKgPerDay: 90_000,
+      }),
+      true,
+    );
+    assert.equal(
+      xlLotOdEligible('major', 'major', 1.0, {
+        international: true,
+        capacityKgPerDay: 40_000,
+      }),
+      false,
+    );
   });
 
   it('forms lots involving expanded US spokes (PDX/OMA)', () => {
@@ -914,8 +1025,8 @@ describe('tickEconomyN market formation', () => {
     }
 
     const clear = prepare(0);
-    const full = prepare(28_000);
-    const partial = prepare(14_000);
+    const full = prepare(LANE_SATURATION_KG);
+    const partial = prepare(Math.ceil(LANE_SATURATION_KG * 0.4));
     assert.equal(npcLaneSaturation(full, 'SBGR', 'SBGL', 'general'), 1);
     assert.ok(npcLaneSaturation(partial, 'SBGR', 'SBGL', 'general') >= 0.35);
 

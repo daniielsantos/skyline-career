@@ -2181,7 +2181,11 @@ export function App() {
             setAirportIcao(loc.airportIcao);
             setTerminalSection('inventory');
           } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
+            const message = err instanceof Error ? err.message : String(err);
+            // Gate / no open store — don't scare the profile picker with API noise.
+            if (!/Select a career profile first/i.test(message)) {
+              setError(message);
+            }
             setAirportIcao(null);
             setAirportView(null);
             writeCareerLocation({ tab: loc.tab, airportIcao: null }, { replace: true });
@@ -2197,31 +2201,33 @@ export function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  // Restore deep-linked airport only after a profile is open (requireStore).
   useEffect(() => {
-    if (!initialLocation.airportIcao) return;
+    if (showProfileGate || !activeCareerProfile) return;
+    if (!airportIcao || airportView) return;
     let cancelled = false;
     void (async () => {
       try {
-        const view = await fetchAirportView(initialLocation.airportIcao!);
+        const view = await fetchAirportView(airportIcao);
         if (!cancelled) {
           setAirportView(view);
           setTerminalSection('inventory');
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          if (!/Select a career profile first/i.test(message)) {
+            setError(message);
+          }
           setAirportIcao(null);
-          writeCareerLocation({ tab: initialLocation.tab, airportIcao: null }, {
-            replace: true,
-          });
+          writeCareerLocation({ tab, airportIcao: null }, { replace: true });
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showProfileGate, activeCareerProfile?.id, airportIcao, airportView, tab]);
 
   const refreshBushTrips = useCallback(async () => {
     try {
@@ -2392,6 +2398,9 @@ export function App() {
         const last = data.profiles?.find((p) => p.id === data.activeId) ?? null;
         setActiveCareerProfile(last);
         setShowProfileGate(true);
+        setError((prev) =>
+          prev && /Select a career profile first/i.test(prev) ? null : prev,
+        );
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));

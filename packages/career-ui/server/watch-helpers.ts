@@ -19,6 +19,7 @@ import {
   evaluateLoadVerification,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
+  inferEnginesRunning,
   mergeAirborneClockOntoMission,
   resumeAirborneAtMs,
   finalizeFlightScore,
@@ -308,6 +309,12 @@ export async function sampleLiveFlight(
     flapsPctRaw,
     aglFt,
     gearRetractableRaw,
+    n1Eng1,
+    n1Eng2,
+    rpmEng1,
+    rpmEng2,
+    combEng1,
+    combEng2,
   ] = await Promise.all([
     readOpt('PLANE BANK DEGREES', 'degrees'),
     readOpt('PLANE PITCH DEGREES', 'degrees'),
@@ -322,6 +329,13 @@ export async function sampleLiveFlight(
     readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'Percent over 100'),
     readOpt('PLANE ALT ABOVE GROUND', 'feet'),
     readOpt('IS GEAR RETRACTABLE', 'bool'),
+    // PC-12 / payware: ENG COMBUSTION:1 often sticks after cutoff.
+    readOpt('TURB ENG N1:1', 'percent'),
+    readOpt('TURB ENG N1:2', 'percent'),
+    readOpt('GENERAL ENG RPM:1', 'rpm'),
+    readOpt('GENERAL ENG RPM:2', 'rpm'),
+    readOpt('GENERAL ENG COMBUSTION:1', 'bool'),
+    readOpt('GENERAL ENG COMBUSTION:2', 'bool'),
   ]);
 
   let overspeedWarning: boolean | undefined;
@@ -362,9 +376,26 @@ export async function sampleLiveFlight(
           ? false
           : undefined;
 
+  const n1Pct = [n1Eng1, n1Eng2].filter(
+    (n): n is number => typeof n === 'number',
+  );
+  const rpm = [rpmEng1, rpmEng2].filter(
+    (n): n is number => typeof n === 'number',
+  );
+  const combustion = [combEng1, combEng2]
+    .filter((n): n is number => typeof n === 'number')
+    .map((n) => n > 0.5);
+  const enginesRunning = inferEnginesRunning({
+    snapshotRunning: snap.enginesRunning,
+    n1Pct,
+    rpm,
+    combustion,
+  });
+
   return {
     onGround: snap.onGround,
-    enginesRunning: snap.enginesRunning,
+    enginesRunning,
+    parkingBrake: snap.parkingBrake === true,
     position,
     groundSpeedKt,
     verticalSpeedFpm,

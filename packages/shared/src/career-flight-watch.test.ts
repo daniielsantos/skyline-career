@@ -7,6 +7,7 @@ import {
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
   flightPhaseFromSample,
+  inferEnginesRunning,
   isNearAirport,
   mergeAirborneClockOntoMission,
   parseBlockTimeToMs,
@@ -273,6 +274,64 @@ describe('evaluateMissionFlightTransition', () => {
       { destCoords: SBRF, nowMs },
     );
     assert.equal(shutdown.event.type, 'settle');
+  });
+
+  it('settles when parked after landing even if combustion sticks', () => {
+    const plannedMs = 3_600_000;
+    const nowMs = Date.now();
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: nowMs - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
+
+    const taxi = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        groundSpeedKt: 12,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(taxi.event.type, 'none');
+    state = taxi.nextState;
+
+    const parked = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        parkingBrake: true,
+        groundSpeedKt: 0.4,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(parked.event.type, 'settle');
+  });
+
+  it('inferEnginesRunning treats spooled-down N1 as off', () => {
+    assert.equal(
+      inferEnginesRunning({ snapshotRunning: true, n1Pct: [4] }),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunning({ snapshotRunning: false, n1Pct: [55] }),
+      true,
+    );
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        combustion: [true],
+        rpm: [40],
+      }),
+      false,
+    );
   });
 
   it('can settle on touchdown without engines when near dest', () => {

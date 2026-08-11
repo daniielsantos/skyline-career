@@ -441,15 +441,18 @@ export function dispatchStepStatusLine(input: {
       if (input.watchSettleBlockedReason) {
         return `Landed — settle blocked: ${input.watchSettleBlockedReason}`;
       }
-      if (
-        input.watchRunning &&
-        input.watchOnGround === true &&
-        input.watchSawAirborne
-      ) {
-        if (input.watchEnginesRunning) {
-          return 'Landed — shut down engines in MSFS to settle the flight.';
+      if (input.watchOnGround === true) {
+        if (!input.watchRunning) {
+          return input.watchEnginesRunning
+            ? 'Landed — Watch is reconnecting. Shut down engines (or set parking brake) to settle.'
+            : 'Landed · engines off — Watch is reconnecting to settle the flight…';
         }
-        return 'Landed · engines off — Watch is settling the flight…';
+        if (input.watchSawAirborne) {
+          if (input.watchEnginesRunning) {
+            return 'Landed — shut down engines (or set parking brake) in MSFS to settle the flight.';
+          }
+          return 'Landed · engines off — Watch is settling the flight…';
+        }
       }
       return input.watchRunning
         ? 'En route — Watch tracks the flight. Settle unlocks after ≥70% of planned route time (≥50% under 100 nm).'

@@ -921,17 +921,34 @@ export function DispatchActivePanel(props: {
               Boolean(view?.payload.ok) && payloadNumbersOk;
             const ready =
               view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
-            const watchOnGround = props.watch?.onGround === true;
-            const watchEngines = props.watch?.enginesRunning === true;
-            const enRouteHeadline = watchOnGround
-              ? watchEngines
-                ? 'LANDED · AWAITING SHUTDOWN'
-                : 'LANDED · READY TO SETTLE'
+            const watchLive =
+              Boolean(props.watch?.running) &&
+              props.watch?.missionId === mission.id;
+            const liveOnGroundNow =
+              watchLive && props.watch?.onGround != null
+                ? props.watch.onGround
+                : props.simBridge?.onGround != null
+                  ? props.simBridge.onGround
+                  : false;
+            const liveEnginesNow =
+              watchLive && props.watch?.enginesRunning != null
+                ? props.watch.enginesRunning
+                : props.simBridge?.enginesRunning != null
+                  ? props.simBridge.enginesRunning
+                  : false;
+            const enRouteHeadline = liveOnGroundNow
+              ? !watchLive
+                ? 'LANDED · WATCH RECONNECTING'
+                : liveEnginesNow
+                  ? 'LANDED · AWAITING SHUTDOWN'
+                  : 'LANDED · READY TO SETTLE'
               : 'EN ROUTE · LIVE LOAD';
-            const enRouteSub = watchOnGround
-              ? watchEngines
-                ? 'Shut down engines in MSFS — Watch settles after engines off at the destination.'
-                : 'Engines off — Watch will settle when destination proximity and airborne time gates pass.'
+            const enRouteSub = liveOnGroundNow
+              ? !watchLive
+                ? 'Watch dropped mid-flight — reconnecting so shutdown at the destination can settle.'
+                : liveEnginesNow
+                  ? 'Shut down engines (or set parking brake) in MSFS — Watch settles after engines off at the destination.'
+                  : 'Engines off — Watch will settle when destination proximity and airborne time gates pass.'
               : 'Live load only — fuel burn below OFP departure is normal. Settle after landing + engines off.';
             const loadTileClass = (ok: boolean) =>
               enRoute
@@ -1154,18 +1171,19 @@ export function DispatchActivePanel(props: {
                       </div>
                     ) : null}
                     {(() => {
+                      const watchSample =
+                        props.watch?.running &&
+                        props.watch.missionId === mission.id
+                          ? props.watch
+                          : null;
                       const liveOnGround =
-                        props.watch?.running &&
-                        props.watch.missionId === mission.id &&
-                        props.watch.onGround != null
-                          ? props.watch.onGround
-                          : view.aircraft.onGround;
+                        watchSample?.onGround ??
+                        props.simBridge?.onGround ??
+                        view.aircraft.onGround;
                       const liveEngines =
-                        props.watch?.running &&
-                        props.watch.missionId === mission.id &&
-                        props.watch.enginesRunning != null
-                          ? props.watch.enginesRunning
-                          : view.aircraft.enginesRunning;
+                        watchSample?.enginesRunning ??
+                        props.simBridge?.enginesRunning ??
+                        view.aircraft.enginesRunning;
                       return (
                         <div className="preflight-aircraft-state">
                           <span>Aircraft</span>

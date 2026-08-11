@@ -15,6 +15,15 @@ export const SHORT_ROUTE_AIRBORNE_NM = 100;
 export const TAXI_GROUND_SPEED_KT = 5;
 /** Stay in taxi until ground speed drops below this (kt) — hysteresis vs jitter. */
 export const TAXI_GROUND_SPEED_EXIT_KT = 2;
+/**
+ * Parking-brake settle: treat as shutdown when GS is below this (kt).
+ * Covers payware turboprops (PC-12) where ENG COMBUSTION:1 stays true after cutoff.
+ */
+export const PARKED_GROUND_SPEED_KT = 3;
+/** TURB ENG N1 below this (%) is spooled down — not producing thrust. */
+export const ENGINE_N1_OFF_PCT = 20;
+/** GENERAL ENG RPM below this is stopped (piston / leftover Ng). */
+export const ENGINE_RPM_OFF = 250;
 
 /**
  * Min ground speed (kt) to treat SIM ON GROUND=false as real wheels-up.
@@ -53,10 +62,47 @@ export interface FlightGroundSample {
   position?: { lat: number; lon: number };
   /** Optional ground speed (knots) for taxi phase display. */
   groundSpeedKt?: number;
+  /** Parking brake set — parked settle when combustion simvars stick. */
+  parkingBrake?: boolean;
   /** Live vertical speed (feet per minute). Negative = descending. */
   verticalSpeedFpm?: number;
   /** Height above ground (feet) — used to separate bounce vs go-around. */
   aglFt?: number;
+}
+
+/**
+ * Prefer N1 / RPM / GENERAL ENG COMBUSTION over the snapshot ENG COMBUSTION:1
+ * bit, which stays true after cutoff on several MSFS turboprops (PC-12).
+ */
+export function inferEnginesRunning(input: {
+  snapshotRunning: boolean;
+  n1Pct?: number[];
+  rpm?: number[];
+  combustion?: boolean[];
+}): boolean {
+  const n1 = (input.n1Pct ?? []).filter((n) => Number.isFinite(n));
+  const rpm = (input.rpm ?? []).filter((n) => Number.isFinite(n));
+  const comb = input.combustion ?? [];
+  if (n1.length > 0) {
+    if (n1.every((n) => n < ENGINE_N1_OFF_PCT)) return false;
+    if (n1.some((n) => n >= ENGINE_N1_OFF_PCT)) return true;
+  }
+  if (comb.length > 0 && comb.every((c) => !c)) return false;
+  if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
+  if (comb.length > 0 && comb.some((c) => c)) return true;
+  if (rpm.length > 0 && rpm.some((r) => r >= ENGINE_RPM_OFF)) return true;
+  return input.snapshotRunning;
+}
+
+/** Engines off, or parked (brake + nearly stopped) after a sticky combustion bit. */
+export function isShutdownOrParked(sample: FlightGroundSample): boolean {
+  if (!sample.enginesRunning) return true;
+  if (sample.parkingBrake !== true) return false;
+  const gs = sample.groundSpeedKt;
+  if (typeof gs === 'number' && Number.isFinite(gs) && gs >= PARKED_GROUND_SPEED_KT) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -718,29 +764,35 @@ export function evaluateMissionFlightTransition(
     };
   }
 
+  const shutdownOrParked = isShutdownOrParked(sample);
+
   if (
     touchedDown &&
     mission.status === 'in_flight' &&
     (state.sawAirborne || nextState.sawAirborne) &&
-    (!requireEnginesOff || !sample.enginesRunning)
+    (!requireEnginesOff || shutdownOrParked)
   ) {
     return {
       event: gateSettleByDestination(
         sample,
         nextState,
         opts,
-        requireEnginesOff ? 'touchdown + engines off' : 'touchdown (SIM ON GROUND true)',
+        requireEnginesOff
+          ? shutdownOrParked && sample.enginesRunning
+            ? 'touchdown + parked'
+            : 'touchdown + engines off'
+          : 'touchdown (SIM ON GROUND true)',
       ),
       nextState,
     };
   }
 
-  // Touchdown with engines still running: wait (taxi-in) unless disabled.
+  // Touchdown with engines still running: wait (taxi-in) unless parked.
   if (
     touchedDown &&
     mission.status === 'in_flight' &&
     requireEnginesOff &&
-    sample.enginesRunning
+    !shutdownOrParked
   ) {
     return { event: { type: 'none' }, nextState };
   }
@@ -751,14 +803,14 @@ export function evaluateMissionFlightTransition(
     (state.sawAirborne || nextState.sawAirborne) &&
     requireEnginesOff &&
     state.lastOnGround === true &&
-    sample.enginesRunning === false
+    shutdownOrParked
   ) {
     return {
       event: gateSettleByDestination(
         sample,
         nextState,
         opts,
-        'engines off after landing',
+        sample.enginesRunning ? 'parked after landing' : 'engines off after landing',
       ),
       nextState,
     };

@@ -2935,14 +2935,17 @@ export function App() {
       }
     }
     void pollWatch();
-    if (!watch?.running) {
+    const inFlight = activeMissionRef.current?.status === 'in_flight';
+    // Keep polling while IN_FLIGHT even if the client dropped `running` —
+    // otherwise a dead Watch UI never sees the server session (or a restart).
+    if (!watch?.running && !inFlight) {
       return () => {
         cancelled = true;
       };
     }
     const id = window.setInterval(() => {
       void pollWatch();
-    }, watch.onGround === false ? 5_000 : 3_000);
+    }, watch?.onGround === false ? 5_000 : 3_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -2954,6 +2957,9 @@ export function App() {
   // mirror Watch anyway, and the extra poll re-rendered the status bar).
   useEffect(() => {
     if (watch?.running) return;
+    // Don't open a competing probe pipe on an in-flight leg — that 0xC00000B0
+    // fight with Watch resume left settle dead after landing.
+    if (activeMissionRef.current?.status === 'in_flight') return;
     let cancelled = false;
     let consecutiveFailures = 0;
     async function pollBridge() {
@@ -3622,7 +3628,7 @@ export function App() {
     void tryStartWatch();
     const id = window.setInterval(() => {
       void tryStartWatch();
-    }, 15_000);
+    }, isAirborneResume ? 5_000 : 15_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -6342,8 +6348,14 @@ export function App() {
       watch?.running && watch.missionId === activeMission?.id,
     ),
     watchAutoStatus,
-    watchOnGround: watch?.onGround,
-    watchEnginesRunning: watch?.enginesRunning,
+    watchOnGround:
+      watch?.running && watch.missionId === activeMission?.id
+        ? watch.onGround
+        : (simBridge?.onGround ?? null),
+    watchEnginesRunning:
+      watch?.running && watch.missionId === activeMission?.id
+        ? watch.enginesRunning
+        : (simBridge?.enginesRunning ?? null),
     watchSawAirborne: Boolean(watch?.sawAirborne),
     watchSettleBlockedReason:
       watch?.lastEvent?.type === 'settle_blocked'

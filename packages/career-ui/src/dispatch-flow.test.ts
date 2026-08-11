@@ -164,6 +164,19 @@ describe('dispatchStepStatusLine en_route', () => {
       /shut down engines/i,
     );
   });
+
+  it('says Watch is reconnecting when landed but Watch is down', () => {
+    assert.match(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchRunning: false,
+        watchOnGround: true,
+        watchEnginesRunning: false,
+      }),
+      /reconnecting to settle/i,
+    );
+  });
 });
 
 describe('buildFlightDebrief', () => {

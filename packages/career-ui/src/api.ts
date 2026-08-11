@@ -1037,6 +1037,10 @@ export function fetchMarket(
     profitableOnly?: boolean;
     /** Keep unlocked + in-range + liftable lots. Empty hangar: crew + last-mile. */
     viableOnly?: boolean;
+    /** Focus ICAO for Near me (origins within nearMaxNm). */
+    nearIcao?: string;
+    /** Max nm from nearIcao to lot origin. */
+    nearMaxNm?: number | string;
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';
     /** Route scope: intl = cross-country, domestic = same country. */
@@ -1049,6 +1053,10 @@ export function fetchMarket(
   if (airframe) params.set('airframe', airframe);
   if (opts.profitableOnly) params.set('profitableOnly', '1');
   if (opts.viableOnly) params.set('viableOnly', '1');
+  const nearIcao = opts.nearIcao?.trim().toUpperCase();
+  if (nearIcao) params.set('nearIcao', nearIcao);
+  const nearMaxNm = String(opts.nearMaxNm ?? '').trim();
+  if (nearMaxNm) params.set('nearMaxNm', nearMaxNm);
   const query = opts.query?.trim();
   if (query) params.set('q', query);
   const originQuery = opts.originQuery?.trim();

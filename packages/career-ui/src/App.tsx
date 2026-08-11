@@ -241,6 +241,9 @@ const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [
   { key: 'access', direction: 'asc' },
 ];
 
+/** Origins within this nm of the pilot / parked aircraft (matches LAST_MILE_MAX_NM). */
+const BOARD_NEAR_MAX_NM = 600;
+
 const EMPTY_BUSH_MAP_NODES: BushTripMapNode[] = [];
 
 function compareAirportLot(
@@ -1918,6 +1921,8 @@ export function App() {
     airframe: '',
     profitableOnly: false,
     viableOnly: false,
+    nearIcao: '',
+    nearMaxNm: '' as number | string,
     aircraft: undefined as AircraftClass | undefined,
   });
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
@@ -2062,8 +2067,9 @@ export function App() {
   /** Default on: hide locked / OOR / zero-lift when an aircraft is selected. */
   const [viableOnly, setViableOnly] = useState(true);
   const boardAircraftInitRef = useRef(false);
-  /** Empty hangar: origin seeded to pilot/home once. Clear keeps the global board. */
-  const hangarOriginSeededRef = useRef(false);
+  /** Empty hangar: Near me seeded once. Clear keeps the global board. */
+  const hangarNearSeededRef = useRef(false);
+  const [nearMe, setNearMe] = useState(false);
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
@@ -2424,18 +2430,19 @@ export function App() {
   }, [refresh, showProfileGate, activeCareerProfile?.id]);
 
   useEffect(() => {
-    hangarOriginSeededRef.current = false;
+    hangarNearSeededRef.current = false;
   }, [activeCareerProfile?.id]);
 
-  // Empty hangar: first Freights view is "from where I am", not the world board.
+  // Empty hangar: first Freights view is nearby origins, not the world board.
   useEffect(() => {
-    if (hangarOriginSeededRef.current) return;
+    if (hangarNearSeededRef.current) return;
     if (showProfileGate || !activeCareerProfile) return;
     if (fleet.length > 0) return;
     const icao = (pilotIcao || homeHubIcao).trim().toUpperCase();
     if (!icao) return;
-    hangarOriginSeededRef.current = true;
-    setOriginFilter(icao);
+    hangarNearSeededRef.current = true;
+    setNearMe(true);
+    setOriginFilter('');
     setMarketPage(1);
   }, [
     showProfileGate,
@@ -2448,8 +2455,17 @@ export function App() {
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
     const boardAcf = fleet.find((a) => a.id === boardAircraftId);
+    const originQuery = originFilter.trim();
+    const focusIcao = (
+      boardAcf?.locationIcao ||
+      pilotIcao ||
+      homeHubIcao
+    )
+      .trim()
+      .toUpperCase();
+    const useNear = nearMe && !originQuery && Boolean(focusIcao);
     const nextOpts = {
-      originQuery: originFilter.trim(),
+      originQuery,
       destQuery: destFilter.trim(),
       page: marketPage,
       pageSize: MARKET_PAGE_SIZE,
@@ -2464,6 +2480,8 @@ export function App() {
       airframe: boardAcf?.airframeTypeId?.trim() ?? '',
       profitableOnly: Boolean(boardAcf && profitableOnly),
       viableOnly: Boolean((boardAcf || fleet.length === 0) && viableOnly),
+      nearIcao: useNear ? focusIcao : '',
+      nearMaxNm: useNear ? BOARD_NEAR_MAX_NM : '',
       aircraft: boardAcf?.aircraftClassId,
     };
     const prev = marketFetchOptsRef.current;
@@ -2483,6 +2501,8 @@ export function App() {
       prev.airframe === nextOpts.airframe &&
       prev.profitableOnly === nextOpts.profitableOnly &&
       prev.viableOnly === nextOpts.viableOnly &&
+      prev.nearIcao === nextOpts.nearIcao &&
+      prev.nearMaxNm === nextOpts.nearMaxNm &&
       prev.aircraft === nextOpts.aircraft;
     if (unchanged) return;
 
@@ -2528,6 +2548,9 @@ export function App() {
     originFilter,
     profitableOnly,
     viableOnly,
+    nearMe,
+    pilotIcao,
+    homeHubIcao,
   ]);
 
   useEffect(() => {
@@ -5993,6 +6016,13 @@ export function App() {
     () => boardEstimateFleet.find((a) => a.id === boardAircraftId) ?? null,
     [boardAircraftId, boardEstimateFleet],
   );
+  const boardNearIcao = (
+    boardAircraft?.locationIcao ||
+    pilotIcao ||
+    homeHubIcao
+  )
+    .trim()
+    .toUpperCase();
   const boardEstimateOptsRef = useRef<{
     aircraft?: AircraftClass;
     airframe?: string;
@@ -6062,6 +6092,7 @@ export function App() {
       accessFilter ||
       laneFilter ||
       profitableOnly ||
+      nearMe ||
       ((Boolean(boardAircraft) || fleet.length === 0) && !viableOnly),
   );
 
@@ -6082,6 +6113,7 @@ export function App() {
     setLaneFilter('');
     setProfitableOnly(false);
     setViableOnly(true);
+    setNearMe(false);
     setMarketPage(1);
   }
 
@@ -6094,7 +6126,8 @@ export function App() {
       .trim()
       .toUpperCase();
     if (!icao) return;
-    setOriginFilter(icao);
+    setNearMe(true);
+    setOriginFilter('');
     setDestFilter('');
     setViableOnly(true);
     setProfitableOnly(Boolean(boardAircraft));
@@ -8798,7 +8831,9 @@ export function App() {
               </select>
               <button
                 type="button"
-                className="near-aircraft-btn"
+                className={`near-aircraft-btn${
+                  nearMe && !originFilter.trim() ? ' is-active' : ''
+                }`}
                 disabled={
                   busy ||
                   !(
@@ -8809,10 +8844,10 @@ export function App() {
                 }
                 title={
                   boardAircraft?.locationIcao
-                    ? `Origin ${boardAircraft.locationIcao} · viable · profit > 0`
-                    : `Origin ${
-                        (pilotIcao || homeHubIcao).trim().toUpperCase() || 'home'
-                      } · crew you can fly`
+                    ? `Origins within ${BOARD_NEAR_MAX_NM} nm of ${boardAircraft.locationIcao} · viable · profit > 0`
+                    : `Origins within ${BOARD_NEAR_MAX_NM} nm of ${
+                        boardNearIcao || 'home'
+                      } · crew and last-mile`
                 }
                 onClick={() => focusNearBoard()}
               >
@@ -8831,7 +8866,7 @@ export function App() {
                 <span
                   title={
                     fleet.length === 0 && !boardAircraft
-                      ? 'Crew you can sit, plus last-mile Dry from this origin'
+                      ? 'Crew you can sit, plus last-mile Dry near you'
                       : 'Hide locked, out-of-range, and zero-lift lots'
                   }
                 >
@@ -8957,9 +8992,10 @@ export function App() {
                           aria-label="Filter origin by ICAO or city"
                           placeholder="Origin"
                           value={originFilter}
-                          onChange={(e) =>
-                            updateMarketFilter(setOriginFilter, e.target.value)
-                          }
+                          onChange={(e) => {
+                            if (nearMe) setNearMe(false);
+                            updateMarketFilter(setOriginFilter, e.target.value);
+                          }}
                         />
                         <input
                           type="search"
@@ -8972,6 +9008,19 @@ export function App() {
                           }
                         />
                       </div>
+                      {nearMe && boardNearIcao && !originFilter.trim() ? (
+                        <button
+                          type="button"
+                          className="near-me-chip"
+                          title={`Origins within ${BOARD_NEAR_MAX_NM} nm of ${boardNearIcao}. Click to show the world board.`}
+                          onClick={() => {
+                            setNearMe(false);
+                            setMarketPage(1);
+                          }}
+                        >
+                          ≤{BOARD_NEAR_MAX_NM} nm of {boardNearIcao}
+                        </button>
+                      ) : null}
                       {ownedFboIcaos.length >= 2 ? (
                         <div
                           className="fbo-icao-switcher"

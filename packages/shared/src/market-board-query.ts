@@ -1,6 +1,9 @@
 import { TICKS_PER_HOUR } from './career-clock.js';
 import { CLASS_OPS_STARTER_IDS } from './career-class-ops.js';
 
+/** Origin radius (nm) for Near me / empty-hangar Freights. Keep in lockstep with LAST_MILE_MAX_NM. */
+export const BOARD_NEAR_MAX_NM = 600;
+
 /** Sortable Freights board columns (matches career-ui). */
 export type MarketBoardSortKey =
   | 'distance'
@@ -10,7 +13,8 @@ export type MarketBoardSortKey =
   | 'pay'
   | 'net'
   | 'access'
-  | 'starter';
+  | 'starter'
+  | 'fromFocus';
 
 export type MarketBoardSortDirection = 'asc' | 'desc';
 
@@ -45,6 +49,8 @@ export type MarketBoardSortable = {
   crewClassId?: string;
   /** Last-mile Dry break-bulk from a metro/spoke. */
   lastMile?: boolean;
+  /** Great-circle nm from the Near-me focus ICAO to this lot origin. */
+  originFromFocusNm?: number;
   /** Idle age has raised freight above formation pay. */
   idleEscalated?: boolean;
   /** Cross-country lane freight (from lot pressure). */
@@ -146,6 +152,11 @@ export type MarketBoardQueryOpts = {
    * as an empty hangar, but viable still uses aircraft lift/range/fuel.
    */
   starterSort?: boolean;
+  /**
+   * Keep lots whose origin is within this many nm of the focus ICAO
+   * (`originFromFocusNm`). Near me / empty hangar default is BOARD_NEAR_MAX_NM.
+   */
+  nearMaxNm?: number;
   /** Cargo Ops lock filter: open = unlocked only, locked = locked only. */
   accessFilter?: MarketBoardAccessFilter;
   /** International vs domestic route filter. */
@@ -167,6 +178,7 @@ const SORT_KEYS = new Set<MarketBoardSortKey>([
   'net',
   'access',
   'starter',
+  'fromFocus',
 ]);
 
 const STARTER_CREW_CLASSES = new Set<string>(CLASS_OPS_STARTER_IDS);
@@ -245,6 +257,27 @@ export function ensureHangarEmptySorts(
   ];
 }
 
+/**
+ * After access / starter, prefer origins closer to the Near-me focus
+ * so SBKP crew beats a last-mile 550 nm away.
+ */
+export function ensureNearFocusSorts(
+  sorts: readonly MarketBoardSortLevel[] | null | undefined,
+): MarketBoardSortLevel[] {
+  const levels = sorts?.length ? [...sorts] : [...DEFAULT_MARKET_BOARD_SORTS];
+  if (levels.some((s) => s.key === 'fromFocus')) return levels;
+  const starterIdx = levels.findIndex((s) => s.key === 'starter');
+  const insertAt =
+    starterIdx >= 0
+      ? starterIdx + 1
+      : levels[0]?.key === 'access'
+        ? 1
+        : 0;
+  const next = [...levels];
+  next.splice(insertAt, 0, { key: 'fromFocus', direction: 'asc' });
+  return next;
+}
+
 /** Parse `distance:asc,pay:desc` (or repeated `sort=` values joined). */
 export function parseMarketBoardSorts(
   raw: string | null | undefined,
@@ -321,6 +354,11 @@ function compareBoardRow<T extends MarketBoardSortable>(
       return Number(Boolean(a.cargoLocked)) - Number(Boolean(b.cargoLocked));
     case 'starter':
       return starterBoardFitRank(a) - starterBoardFitRank(b);
+    case 'fromFocus':
+      return (
+        (a.originFromFocusNm ?? Number.POSITIVE_INFINITY) -
+        (b.originFromFocusNm ?? Number.POSITIVE_INFINITY)
+      );
   }
 }
 
@@ -339,9 +377,22 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     | 'hangarEmpty'
     | 'accessFilter'
     | 'laneFilter'
+    | 'nearMaxNm'
     | 'currentTick'
   >,
 ): boolean {
+  if (
+    opts.nearMaxNm !== undefined &&
+    Number.isFinite(opts.nearMaxNm) &&
+    opts.nearMaxNm > 0
+  ) {
+    if (
+      row.originFromFocusNm === undefined ||
+      row.originFromFocusNm > opts.nearMaxNm
+    ) {
+      return false;
+    }
+  }
   if (
     opts.distanceMaxNm !== undefined &&
     Number.isFinite(opts.distanceMaxNm) &&
@@ -454,10 +505,16 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
 } {
   const filtered = rows.filter((row) => marketBoardRowMatchesFilters(row, opts));
   const requested = opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined;
-  const sorts =
+  const baseSorts =
     opts.hangarEmpty || opts.starterSort
       ? ensureHangarEmptySorts(requested)
       : ensureAccessPrimarySort(requested);
+  const sorts =
+    opts.nearMaxNm !== undefined &&
+    Number.isFinite(opts.nearMaxNm) &&
+    opts.nearMaxNm > 0
+      ? ensureNearFocusSorts(baseSorts)
+      : baseSorts;
 
   const sorted = filtered
     .map((row, index) => ({ row, index }))

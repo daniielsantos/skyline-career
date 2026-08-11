@@ -506,4 +506,75 @@ describe('queryMarketBoardPage', () => {
       [4_000, 12_000],
     );
   });
+
+  it('near radius keeps origins around the focus and drops far hubs', () => {
+    const mixed = [
+      row({
+        payUsd: 4_000,
+        crewNeeded: true,
+        crewClassId: 'light_ga',
+        originFromFocusNm: 0,
+        availableKg: 0,
+      }),
+      row({
+        payUsd: 8_000,
+        lastMile: true,
+        originFromFocusNm: 45,
+        availableKg: 260,
+      }),
+      row({
+        payUsd: 20_000,
+        lastMile: true,
+        originFromFocusNm: 900,
+        availableKg: 280,
+      }),
+      row({
+        payUsd: 6_000,
+        crewNeeded: true,
+        crewClassId: 'light_ga',
+        availableKg: 0,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      hangarEmpty: true,
+      nearMaxNm: 600,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [4_000, 8_000],
+    );
+  });
+
+  it('near radius sorts closer origins ahead of equal starter rank', () => {
+    const mixed = [
+      row({
+        payUsd: 9_000,
+        lastMile: true,
+        originFromFocusNm: 420,
+        distanceNm: 80,
+        availableKg: 240,
+      }),
+      row({
+        payUsd: 7_000,
+        lastMile: true,
+        originFromFocusNm: 12,
+        distanceNm: 90,
+        availableKg: 220,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      hangarEmpty: true,
+      nearMaxNm: 600,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [7_000, 9_000],
+    );
+  });
 });

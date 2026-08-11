@@ -15,6 +15,7 @@ import {
   classOpsIsUnlocked,
   classOpsHidesBoardLot,
   CLASS_OPS_STARTER_IDS,
+  BOARD_NEAR_MAX_NM,
   getAircraftClass,
   clearAircraftMaintenanceWithParts,
   repairAircraftConditionWithParts,
@@ -2157,6 +2158,15 @@ export function createCareerApiServer(port = 8787) {
         const query = url.searchParams.get('q') ?? undefined;
         const originQuery = url.searchParams.get('originQ') ?? undefined;
         const destQuery = url.searchParams.get('destQ') ?? undefined;
+        const nearIcaoRaw = url.searchParams.get('nearIcao')?.trim().toUpperCase();
+        const nearIcao =
+          nearIcaoRaw && /^[A-Z0-9]{3,4}$/.test(nearIcaoRaw)
+            ? nearIcaoRaw
+            : undefined;
+        const nearMaxNm = nearIcao
+          ? (parsePositiveNumberParam(url.searchParams.get('nearMaxNm')) ??
+            BOARD_NEAR_MAX_NM)
+          : undefined;
         const pageParam = url.searchParams.get('page');
         const exactRoute = Boolean(origin?.trim() && dest?.trim());
         const commodityParam = url.searchParams.get('commodity') ?? undefined;
@@ -2221,6 +2231,7 @@ export function createCareerApiServer(port = 8787) {
           crewNeeded: boolean;
           crewClassId?: string;
           lastMile: boolean;
+          originFromFocusNm?: number;
           idleEscalated: boolean;
           international: boolean;
           pressure: unknown;
@@ -2290,6 +2301,9 @@ export function createCareerApiServer(port = 8787) {
               ? { crewClassId: row.npcClaim.aircraftClassId }
               : {}),
             lastMile: /last-mile/i.test(row.lot.reason),
+            originFromFocusNm: nearIcao
+              ? routeDistanceNm(world, nearIcao, row.lot.originIcao)
+              : undefined,
             idleEscalated: Boolean(row.pressure?.idleEscalated),
             international: Boolean(row.pressure?.international),
             pressure: row.pressure
@@ -2451,6 +2465,7 @@ export function createCareerApiServer(port = 8787) {
           viableOnly: aircraft || hangarEmpty ? viableOnly : false,
           hangarEmpty,
           starterSort,
+          nearMaxNm,
           accessFilter: parseMarketBoardAccessFilter(
             url.searchParams.get('access'),
           ),

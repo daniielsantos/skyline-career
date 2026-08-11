@@ -244,8 +244,13 @@ export {
   REPOSITION_AWAITING_MIN_HOURS,
   REPOSITION_AWAITING_MAX_HOURS,
   MAX_OPEN_REPOSITION_OFFERS,
+  MAX_OPEN_STARTER_REPOSITION_OFFERS,
   MIN_OPEN_CONTRACT_PILOT_OFFERS,
+  MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS,
   MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION,
+  STARTER_CONTRACT_PILOT_CLASSES,
+  STARTER_CONTRACT_PILOT_OFFERS_PER_REGION,
+  isStarterContractPilotClass,
   countOpenContractPilotOffers,
   maxOpenContractPilotOffers,
   partitionLiftableKgPerDay,
@@ -326,6 +331,29 @@ export const SMALL_LOT_MIN_KG = 80;
 export const SMALL_LOT_MAX_KG = 2_000;
 /** GA-sized LTL band (spoke feeders). */
 export const GA_LTL_MAX_KG = 450;
+/**
+ * Starter Cargo Ops only unlocks general/supplies. Majors are net Dry sinks
+ * after warehouse calibration, so the bulk surplus→shortage pass never
+ * originates Dry from GRU/JFK/etc. Last-mile break-bulk still ships a few
+ * GA lots from those hubs to nearby spokes — the metro consumes Dry AND
+ * redistributes it, which is the first contract a new pilot can actually fly.
+ */
+export const LAST_MILE_DRY_IDS: ReadonlySet<CommodityId> = new Set([
+  'general',
+  'supplies',
+]);
+const LAST_MILE_ORIGIN_TIERS: ReadonlySet<HubTier> = new Set([
+  'major',
+  'regional',
+]);
+/** Comfortable light-GA hop (C172/Bonanza with payload). */
+export const LAST_MILE_MAX_NM = 600;
+const LAST_MILE_MIN_NM = 40;
+/** Open GA Dry lots kept on the board per origin×commodity. */
+export const LAST_MILE_OPEN_LOTS_PER_ORIGIN = 3;
+const LAST_MILE_MIN_ORIGIN_FILL = 0.05;
+const LAST_MILE_MAX_DEST_FILL = 0.62;
+const LAST_MILE_MAX_FORM_PER_TICK = 1;
 /** Classic feeder LTL band min (turboprop fills). */
 export const FEEDER_LTL_MIN_KG = 400;
 
@@ -2542,8 +2570,9 @@ function retireLotToOrigin(
 
   if (reason === 'recycled') {
     noteLotRecycled(world, lot.commodityId, unclaimedKg);
+  } else {
+    noteLotExpired(world, lot.commodityId, unclaimedKg);
   }
-  noteLotExpired(world, lot.commodityId, unclaimedKg);
   return refundKg;
 }
 
@@ -2859,16 +2888,16 @@ function noteAvailableLot(
 /**
  * Days of transport capacity the board is allowed to hold as open freight.
  *
- * The 7d pulse formed ~90,000 t/day against ~6,200 t/day the world could lift —
- * the board held roughly ten days of work, so ~93% of it aged out unclaimed.
- * A few days of cover keeps real choice on the board without stockpiling work
- * nobody can ever fly.
+ * Dry lots live ~18–26h (perishables less). Holding four days of work against
+ * a one-day life guaranteed a cemetery — expire:deliver sat near 7:1 even
+ * after the kg target landed. Cover ≈ lot life so the shelf is what the
+ * fleet can actually fly before the contracts age out.
  */
-export const BOARD_COVER_DAYS = 4;
+export const BOARD_COVER_DAYS = 1.5;
 /** Floor so a thin-fleet partition still shows a board. */
-export const PARTITION_MIN_BOARD_KG = 400_000;
+export const PARTITION_MIN_BOARD_KG = 120_000;
 /** Floor so Narrow/Wide always have something to bid on. */
-export const PARTITION_MIN_HEAVY_BOARD_KG = 250_000;
+export const PARTITION_MIN_HEAVY_BOARD_KG = 80_000;
 
 /**
  * Open kg the board may hold for a partition before formation backs off.
@@ -3063,7 +3092,14 @@ function formLotsFromImbalances(
     laneSaturation: number,
     inboundKg: number,
     corridorW: number,
-    opts: { international: boolean; partitionId: string; capacityKgPerDay?: number },
+    opts: {
+      international: boolean;
+      partitionId: string;
+      capacityKgPerDay?: number;
+      /** Floor on (dest − origin) price used for pay, as a fraction of base. */
+      minPayGapMult?: number;
+      lastMile?: boolean;
+    },
   ): boolean => {
     if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
       const activeKg = activeLaneKg(world, origin.ap.icao, dest.ap.icao);
@@ -3099,8 +3135,13 @@ function formLotsFromImbalances(
         : 1.12;
     const corridorPayMult = 1 + Math.max(0, corridorW - 1) * 0.1;
     const destPile = ensurePile(dest.ap, commodity.id);
-    const gap =
-      localUnitPriceUsd(commodity.id, destPile) - localUnitPriceUsd(commodity.id, origin.stock);
+    const rawGap =
+      localUnitPriceUsd(commodity.id, destPile) -
+      localUnitPriceUsd(commodity.id, origin.stock);
+    const gap = Math.max(
+      rawGap,
+      commodity.basePricePerKg * (opts.minPayGapMult ?? 0),
+    );
     const batchNowMs = world.lastBatchAtMs ?? Date.now();
     const capacity = npcRegionBidCapacity(world, origin.ap.region, batchNowMs);
     const capacityPayMult = 1 + (1 - capacity) * 0.22;
@@ -3150,6 +3191,7 @@ function formLotsFromImbalances(
       shock.labels.length > 0 ? ` · ${shock.labels.join('/')}` : '';
     const sizeNote =
       size === 'xl' ? ' · XL' : size === 'small' ? ' · LTL' : '';
+    const lastMileNote = opts.lastMile === true ? ' · last-mile' : '';
     const lot: ShipmentLot = {
       id: `lot_${world.tick}_${commodity.id}_${origin.ap.icao}_${dest.ap.icao}_${Math.floor(rng() * 1e6)}`,
       commodityId: commodity.id,
@@ -3162,7 +3204,7 @@ function formLotsFromImbalances(
       payUsd,
       basePayUsd: payUsd,
       urgency: urgent ? 'urgent' : 'normal',
-      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${sizeNote}${international ? ' · intl' : ''}${shockNote}`,
+      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${sizeNote}${lastMileNote}${international ? ' · intl' : ''}${shockNote}`,
       status: 'available',
     };
 
@@ -3486,6 +3528,130 @@ function formLotsFromImbalances(
                 originHasOpenCorridor: false,
               },
             );
+          }
+        }
+      }
+    }
+  }
+
+  const countOpenGaDryFrom = (
+    originIcao: string,
+    commodityId: CommodityId,
+  ): number => {
+    const icao = originIcao.toUpperCase();
+    let n = 0;
+    for (const lot of world.lots) {
+      if (lot.originIcao.toUpperCase() !== icao) continue;
+      if (lot.commodityId !== commodityId) continue;
+      if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+      if (lot.quantityKg > GA_LTL_MAX_KG) continue;
+      n += 1;
+    }
+    return n;
+  };
+
+  // Last-mile Dry: metros stay net sinks in the bulk pass, but still break
+  // bulk to nearby spokes so a starter at GRU/JFK has a GA Dry contract.
+  for (const countryId of listWorldCountryIds(world)) {
+    const countryAirports = world.airports.filter(
+      (ap) => countryIdFromRegion(ap.region) === countryId,
+    );
+    for (const commodity of CAREER_CARGO_COMMODITIES) {
+      if (!LAST_MILE_DRY_IDS.has(commodity.id)) continue;
+      const ranked = rankAirports(countryAirports, commodity);
+      for (const origin of ranked) {
+        if (!LAST_MILE_ORIGIN_TIERS.has(origin.tier)) continue;
+        // Surplus majors already export in the bulk pass, but that pass prefers
+        // large lots — keep a GA Dry floor either way so a starter at JFK/LAX
+        // is not staring at 18 t electronics.
+        if (origin.fill < LAST_MILE_MIN_ORIGIN_FILL) continue;
+        if (origin.stock.stockKg < SMALL_LOT_MIN_KG) continue;
+        let open = countOpenGaDryFrom(origin.ap.icao, commodity.id);
+        if (open >= LAST_MILE_OPEN_LOTS_PER_ORIGIN) continue;
+
+        const dests: Array<{
+          row: RankedAirport;
+          nm: number;
+          cw: number;
+        }> = [];
+        for (const dest of ranked) {
+          if (dest.ap.icao === origin.ap.icao) continue;
+          if (dest.tier === 'major') continue;
+          if (dest.fill > LAST_MILE_MAX_DEST_FILL) continue;
+          if (dest.roomKg < SMALL_LOT_MIN_KG) continue;
+          if (!isBushFreightOdAllowed(origin.ap.icao, dest.ap.icao)) continue;
+          const nm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
+          if (
+            nm == null ||
+            nm < LAST_MILE_MIN_NM ||
+            nm > LAST_MILE_MAX_NM
+          ) {
+            continue;
+          }
+          dests.push({
+            row: dest,
+            nm,
+            cw: corridorWeight(origin.ap.icao, dest.ap.icao),
+          });
+        }
+        dests.sort((a, b) => (b.cw !== a.cw ? b.cw - a.cw : a.nm - b.nm));
+
+        let formedThisTick = 0;
+        for (const { row: dest } of dests) {
+          if (open >= LAST_MILE_OPEN_LOTS_PER_ORIGIN) break;
+          if (formedThisTick >= LAST_MILE_MAX_FORM_PER_TICK) break;
+          const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
+          const caps = laneLotCaps(origin.tier, dest.tier, {
+            originLevel: origin.ap.level,
+            destLevel: dest.ap.level,
+          });
+          const laneSat = npcLaneSaturation(
+            world,
+            origin.ap.icao,
+            dest.ap.icao,
+            commodity.id,
+          );
+          if (laneSat >= 1) continue;
+          const satPenalty = laneSat >= 0.5 ? 1 : 0;
+          if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) {
+            continue;
+          }
+          if ((smallCounts.get(key) ?? 0) >= caps.maxSmall) continue;
+
+          const take = Math.min(
+            origin.stock.stockKg * 0.08,
+            dest.roomKg,
+            GA_LTL_MAX_KG,
+          );
+          const qty = Math.floor(take / 10) * 10;
+          if (qty < SMALL_LOT_MIN_KG) continue;
+
+          const inboundKg = laneInboundKg(
+            world,
+            null,
+            dest.ap.icao,
+            commodity.id,
+          );
+          const formed = pushLot(
+            key,
+            commodity,
+            origin,
+            dest,
+            qty,
+            'small',
+            laneSat,
+            inboundKg,
+            Math.max(corridorWeight(origin.ap.icao, dest.ap.icao), 1.15),
+            {
+              international: false,
+              partitionId: countryId,
+              minPayGapMult: 0.2,
+              lastMile: true,
+            },
+          );
+          if (formed) {
+            open += 1;
+            formedThisTick += 1;
           }
         }
       }

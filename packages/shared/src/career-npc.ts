@@ -203,30 +203,68 @@ export const AWAITING_PILOT_MAX_HOURS = 8;
  */
 export const CONTRACT_PILOT_OFFER_CHANCE = 0.9;
 /**
- * Cap concurrent crew-needed freight holds per region.
+ * Classes a brand-new contract pilot can sit (Class Ops starters).
+ * The global crew-needed cap used to be one bucket — Narrow/Wide filled it
+ * and the empty-hangar starter stared at 737s they cannot fly.
+ */
+export const STARTER_CONTRACT_PILOT_CLASSES: ReadonlySet<FreighterClassId> =
+  new Set(['light_ga', 'light_turboprop']);
+
+export function isStarterContractPilotClass(
+  classId: FreighterClassId | undefined,
+): boolean {
+  return classId != null && STARTER_CONTRACT_PILOT_CLASSES.has(classId);
+}
+
+export type ContractPilotOfferBand = 'starter' | 'other' | 'all';
+
+/**
+ * Cap concurrent crew-needed freight holds per region, per band.
  *
  * Each hold parks its NPC *and* its lot for 3–8h before the leg even departs.
- * Uncapped at a 0.9 offer chance this swallowed most of the fleet's duty time,
- * so claim throughput collapsed while the board kept forming lots.
+ * Uncapped at a 0.9 offer chance this swallowed most of the fleet's duty time.
+ * Starter and jet+ bands are counted separately so loosening GA contracts
+ * does not re-park the heavy fleet.
  */
-export const MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION = 0.5;
+export const STARTER_CONTRACT_PILOT_OFFERS_PER_REGION = 0.4;
+export const MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS = 8;
+/** Jet / medium / narrow / wide band. */
+export const MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION = 0.35;
 /** Floor so small maps still show a live crew-needed board. */
 export const MIN_OPEN_CONTRACT_PILOT_OFFERS = 4;
 
-export function maxOpenContractPilotOffers(world: CareerEconomyWorld): number {
-  const regions = new Set(
-    world.airports.map((ap) => ap.region).filter(Boolean),
-  ).size;
-  return Math.max(
+function npcHomeRegionCount(world: CareerEconomyWorld): number {
+  return new Set(world.airports.map((ap) => ap.region).filter(Boolean)).size;
+}
+
+export function maxOpenContractPilotOffers(
+  world: CareerEconomyWorld,
+  band: ContractPilotOfferBand = 'all',
+): number {
+  const regions = npcHomeRegionCount(world);
+  const starter = Math.max(
+    MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS,
+    Math.round(regions * STARTER_CONTRACT_PILOT_OFFERS_PER_REGION),
+  );
+  const other = Math.max(
     MIN_OPEN_CONTRACT_PILOT_OFFERS,
     Math.round(regions * MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION),
   );
+  if (band === 'starter') return starter;
+  if (band === 'other') return other;
+  return starter + other;
 }
 
-export function countOpenContractPilotOffers(world: CareerEconomyWorld): number {
-  return world.npcFlights.filter(
-    (f) => f.status === 'awaiting_pilot' && !isNpcRepositionFlight(f),
-  ).length;
+export function countOpenContractPilotOffers(
+  world: CareerEconomyWorld,
+  band: ContractPilotOfferBand = 'all',
+): number {
+  return world.npcFlights.filter((f) => {
+    if (f.status !== 'awaiting_pilot' || isNpcRepositionFlight(f)) return false;
+    if (band === 'all') return true;
+    const starter = isStarterContractPilotClass(f.aircraftClassId);
+    return band === 'starter' ? starter : !starter;
+  }).length;
 }
 
 export function quoteContractPilotFeeUsd(payUsd: number): number {
@@ -238,8 +276,10 @@ export function quoteContractPilotFeeUsd(payUsd: number): number {
 export const REPOSITION_AWAITING_MIN_HOURS = 0.5;
 /** Max wall-clock hours a reposition crew offer stays open. */
 export const REPOSITION_AWAITING_MAX_HOURS = 1.5;
-/** Cap open reposition crew offers so the freight board isn't ferry spam. */
-export const MAX_OPEN_REPOSITION_OFFERS = 4;
+/** Cap open jet+ reposition crew offers so the freight board isn't ferry spam. */
+export const MAX_OPEN_REPOSITION_OFFERS = 3;
+/** Reserved empty-return holds for light GA / turboprop (starter ferry). */
+export const MAX_OPEN_STARTER_REPOSITION_OFFERS = 3;
 /** Floor for empty-home ferry pilot fee (matches hangar ferry floor band). */
 export const REPOSITION_PILOT_FEE_MIN_USD = 75;
 
@@ -1462,10 +1502,23 @@ function repositionAwaitingHoldHours(rng: () => number): number {
   );
 }
 
-function countOpenRepositionOffers(world: CareerEconomyWorld): number {
-  return world.npcFlights.filter(
-    (f) => f.status === 'awaiting_pilot' && isNpcRepositionFlight(f),
-  ).length;
+function countOpenRepositionOffers(
+  world: CareerEconomyWorld,
+  band: Exclude<ContractPilotOfferBand, 'all'> = 'other',
+): number {
+  return world.npcFlights.filter((f) => {
+    if (f.status !== 'awaiting_pilot' || !isNpcRepositionFlight(f)) return false;
+    const starter = isStarterContractPilotClass(f.aircraftClassId);
+    return band === 'starter' ? starter : !starter;
+  }).length;
+}
+
+function maxOpenRepositionOffers(
+  band: Exclude<ContractPilotOfferBand, 'all'>,
+): number {
+  return band === 'starter'
+    ? MAX_OPEN_STARTER_REPOSITION_OFFERS
+    : MAX_OPEN_REPOSITION_OFFERS;
 }
 
 /** Closest mapped hub in the NPC's home region (for empty return). */
@@ -1516,7 +1569,10 @@ function tryCreateNpcRepositionOffer(
   if (!npcCanOfferContractPilot(npc)) return undefined;
   if (npc.currentFlightId) return undefined;
   if (needsShopMx(npc)) return undefined;
-  if (countOpenRepositionOffers(world) >= MAX_OPEN_REPOSITION_OFFERS) {
+  const repoBand = isStarterContractPilotClass(npc.aircraftClassId)
+    ? 'starter'
+    : 'other';
+  if (countOpenRepositionOffers(world, repoBand) >= maxOpenRepositionOffers(repoBand)) {
     return undefined;
   }
 
@@ -1599,7 +1655,13 @@ function shouldOfferContractPilot(
   if (force === true) return npcCanOfferContractPilot(npc);
   if (force === false) return false;
   if (!npcCanOfferContractPilot(npc)) return false;
-  if (countOpenContractPilotOffers(world) >= maxOpenContractPilotOffers(world)) {
+  const band = isStarterContractPilotClass(npc.aircraftClassId)
+    ? 'starter'
+    : 'other';
+  if (
+    countOpenContractPilotOffers(world, band) >=
+    maxOpenContractPilotOffers(world, band)
+  ) {
     return false;
   }
   return rng() < CONTRACT_PILOT_OFFER_CHANCE;

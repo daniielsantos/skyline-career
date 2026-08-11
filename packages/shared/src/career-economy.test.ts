@@ -19,6 +19,8 @@ import {
   IDLE_LOT_PAY_MAX_MULT_HEAVY,
   IDLE_LOT_PAY_MAX_MULT_BULK,
   GA_LTL_MAX_KG,
+  LAST_MILE_MAX_NM,
+  LAST_MILE_OPEN_LOTS_PER_ORIGIN,
   SMALL_LOT_MIN_KG,
   SMALL_LOT_MAX_KG,
   BOARD_AVAILABLE_SOFT_CAP,
@@ -808,6 +810,8 @@ describe('tickEconomyN market formation', () => {
       });
       planted.push(id);
     }
+    const recycledBefore = world.flow?.recycled.lots ?? 0;
+    const expiredFlowBefore = world.flow?.expired.lots ?? 0;
     tickEconomyN(world, 1);
     const expired = planted.filter(
       (id) => world.lots.find((l) => l.id === id)?.status === 'expired',
@@ -816,6 +820,76 @@ describe('tickEconomyN market formation', () => {
       expired.length >= STALE_LARGE_RECYCLE_MAX_PER_COMMODITY,
       `recycled=${expired.length}`,
     );
+    const recycledDelta = (world.flow?.recycled.lots ?? 0) - recycledBefore;
+    const expiredFlowDelta = (world.flow?.expired.lots ?? 0) - expiredFlowBefore;
+    assert.ok(
+      recycledDelta >= expired.length,
+      `flow recycled ${recycledDelta} vs planted ${expired.length}`,
+    );
+    assert.ok(
+      expiredFlowDelta < recycledDelta,
+      'early recycle must not also count as expiry',
+    );
+  });
+
+  it('keeps GA Dry last-mile lots leaving major hubs', () => {
+    const world = createSeedEconomyWorld({ seed: 'last-mile-dry' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+    }
+    ensureSeedMarketFormed(world);
+
+    const fromMajor = world.lots.filter(
+      (l) =>
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg <= GA_LTL_MAX_KG &&
+        /last-mile/i.test(l.reason) &&
+        hubTierOf(
+          world.airports.find((a) => a.icao === l.originIcao) ?? {
+            icao: l.originIcao,
+            hubTier: 'spoke',
+          },
+        ) === 'major',
+    );
+    assert.ok(
+      fromMajor.length > 0,
+      'expected last-mile Dry originating at majors',
+    );
+    const sbgr = fromMajor.filter((l) => l.originIcao === 'SBGR');
+    assert.ok(sbgr.length > 0, 'SBGR should originate starter Dry');
+    assert.ok(
+      sbgr.length <= LAST_MILE_OPEN_LOTS_PER_ORIGIN * 2,
+      `SBGR last-mile ${sbgr.length} over cap`,
+    );
+    for (const lot of sbgr) {
+      assert.ok(lot.payUsd > 0, `${lot.id} payUsd=${lot.payUsd}`);
+      assert.ok(lot.quantityKg >= SMALL_LOT_MIN_KG);
+      assert.ok(lot.quantityKg <= GA_LTL_MAX_KG);
+      const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+      assert.ok(
+        nm != null && nm >= 40 && nm <= LAST_MILE_MAX_NM,
+        `${lot.originIcao}→${lot.destIcao} ${nm} nm`,
+      );
+    }
+    const usMajorIcaos = new Set(
+      world.airports
+        .filter((a) => a.hubTier === 'major' && a.region.startsWith('US-'))
+        .map((a) => a.icao),
+    );
+    const usGaDry = world.lots.filter(
+      (l) =>
+        usMajorIcaos.has(l.originIcao) &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg <= GA_LTL_MAX_KG,
+    );
+    assert.ok(usGaDry.length > 0, 'US majors should originate GA Dry');
+    const kjfk = fromMajor.filter((l) => l.originIcao === 'KJFK');
+    assert.ok(kjfk.length > 0, 'KJFK should originate last-mile Dry');
   });
 
   it('delivery only draws the share formation did not already commit', () => {

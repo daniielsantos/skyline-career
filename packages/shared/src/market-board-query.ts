@@ -45,6 +45,8 @@ export type MarketBoardSortable = {
   crewClassId?: string;
   /** Last-mile Dry break-bulk from a metro/spoke. */
   lastMile?: boolean;
+  /** Idle age has raised freight above formation pay. */
+  idleEscalated?: boolean;
   /** Cross-country lane freight (from lot pressure). */
   international?: boolean;
   /** Soft-field Amazon bush OD. */
@@ -131,14 +133,19 @@ export type MarketBoardQueryOpts = {
   /**
    * Keep lots the selected aircraft can actually fly now:
    * unlocked commodity, in range, lift &gt; 0, fuel-feasible.
-   * Empty hangar (`hangarEmpty`): crew-needed holds the player can sit.
+   * Empty hangar (`hangarEmpty`): crew you can sit, plus last-mile Dry.
    */
   viableOnly?: boolean;
   /**
    * No player aircraft selected — Freights is a contract-pilot board.
-   * Injects starter-class / last-mile / short-hop sort and viable = crew I can fly.
+   * Injects starter-class / last-mile / short-hop sort.
    */
   hangarEmpty?: boolean;
+  /**
+   * Light GA / turboprop is selected — same starter/last-mile/distance sort
+   * as an empty hangar, but viable still uses aircraft lift/range/fuel.
+   */
+  starterSort?: boolean;
   /** Cargo Ops lock filter: open = unlocked only, locked = locked only. */
   accessFilter?: MarketBoardAccessFilter;
   /** International vs domestic route filter. */
@@ -172,6 +179,7 @@ export function starterBoardFitRank(
     | 'crewNeeded'
     | 'crewClassId'
     | 'lastMile'
+    | 'idleEscalated'
     | 'availableKg'
     | 'distanceNm'
   >,
@@ -184,16 +192,17 @@ export function starterBoardFitRank(
   ) {
     return 0;
   }
-  if (row.lastMile === true) return 1;
+  const idle = row.idleEscalated === true;
+  if (row.lastMile === true) return idle ? 1 : 2;
   const gaSized =
     typeof row.availableKg === 'number' &&
     row.availableKg > 0 &&
     row.availableKg <= 450;
   const shortHop =
     typeof row.distanceNm === 'number' && row.distanceNm <= 600;
-  if (gaSized && shortHop) return 2;
+  if (gaSized && shortHop) return idle ? 3 : 4;
   if (row.crewNeeded === true) return 30;
-  return 10;
+  return idle ? 8 : 10;
 }
 
 /** Default Freights sort: unlocked first (no secondary pay sort). */
@@ -218,8 +227,8 @@ export function ensureAccessPrimarySort(
 }
 
 /**
- * Empty-hangar Freights: after Cargo Ops access, surface starter crew holds
- * and last-mile Dry, then nearer hops — not Wide pay.
+ * Starter Freights (empty hangar or GA/TP selected): after Cargo Ops access,
+ * surface starter crew holds and last-mile Dry, then nearer hops — not Wide pay.
  */
 export function ensureHangarEmptySorts(
   sorts: readonly MarketBoardSortLevel[] | null | undefined,
@@ -383,8 +392,10 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     if (row.cargoLocked) return false;
     if (row.classLocked) return false;
     if (opts.hangarEmpty) {
-      // Empty hangar can only fly Crew needed on an unlocked class.
-      if (row.crewNeeded !== true) return false;
+      // Crew on an unlocked class, or last-mile Dry (needs an aircraft to Prepare).
+      const starterJob =
+        row.crewNeeded === true || row.lastMile === true;
+      if (!starterJob) return false;
       if (row.estimatedInRange === false) return false;
     } else {
       if (row.estimatedInRange === false) return false;
@@ -443,9 +454,10 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
 } {
   const filtered = rows.filter((row) => marketBoardRowMatchesFilters(row, opts));
   const requested = opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined;
-  const sorts = opts.hangarEmpty
-    ? ensureHangarEmptySorts(requested)
-    : ensureAccessPrimarySort(requested);
+  const sorts =
+    opts.hangarEmpty || opts.starterSort
+      ? ensureHangarEmptySorts(requested)
+      : ensureAccessPrimarySort(requested);
 
   const sorted = filtered
     .map((row, index) => ({ row, index }))

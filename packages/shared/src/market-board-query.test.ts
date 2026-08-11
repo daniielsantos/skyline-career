@@ -389,7 +389,7 @@ describe('queryMarketBoardPage', () => {
       starterBoardFitRank(mixed[2]!),
       0,
     );
-    assert.equal(starterBoardFitRank(mixed[1]!), 1);
+    assert.equal(starterBoardFitRank(mixed[1]!), 2);
     const result = queryMarketBoardPage(mixed, {
       currentTick: 0,
       hangarEmpty: true,
@@ -402,7 +402,66 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
-  it('empty hangar viable-only keeps crew the starter can sit', () => {
+  it('starter-class aircraft uses the same last-mile-first sort', () => {
+    const mixed = [
+      row({
+        payUsd: 90_000,
+        distanceNm: 800,
+        availableKg: 18_000,
+      }),
+      row({
+        payUsd: 12_000,
+        distanceNm: 220,
+        lastMile: true,
+        availableKg: 280,
+      }),
+      row({
+        payUsd: 6_000,
+        distanceNm: 90,
+        availableKg: 400,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      starterSort: true,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [12_000, 6_000, 90_000],
+    );
+  });
+
+  it('empty hangar surfaces idle last-mile before fresh last-mile', () => {
+    const mixed = [
+      row({
+        payUsd: 9_000,
+        distanceNm: 180,
+        lastMile: true,
+        availableKg: 280,
+      }),
+      row({
+        payUsd: 8_000,
+        distanceNm: 220,
+        lastMile: true,
+        idleEscalated: true,
+        availableKg: 260,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      hangarEmpty: true,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [8_000, 9_000],
+    );
+  });
+
+  it('empty hangar viable-only keeps crew and last-mile the starter can use', () => {
     const mixed = [
       row({
         payUsd: 4_000,
@@ -444,7 +503,7 @@ describe('queryMarketBoardPage', () => {
     });
     assert.deepEqual(
       result.rows.map((r) => r.payUsd),
-      [4_000],
+      [4_000, 12_000],
     );
   });
 });

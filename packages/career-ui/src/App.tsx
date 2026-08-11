@@ -2062,6 +2062,8 @@ export function App() {
   /** Default on: hide locked / OOR / zero-lift when an aircraft is selected. */
   const [viableOnly, setViableOnly] = useState(true);
   const boardAircraftInitRef = useRef(false);
+  /** Empty hangar: origin seeded to pilot/home once. Clear keeps the global board. */
+  const hangarOriginSeededRef = useRef(false);
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
@@ -2420,6 +2422,28 @@ export function App() {
       setError(err instanceof Error ? err.message : String(err));
     });
   }, [refresh, showProfileGate, activeCareerProfile?.id]);
+
+  useEffect(() => {
+    hangarOriginSeededRef.current = false;
+  }, [activeCareerProfile?.id]);
+
+  // Empty hangar: first Freights view is "from where I am", not the world board.
+  useEffect(() => {
+    if (hangarOriginSeededRef.current) return;
+    if (showProfileGate || !activeCareerProfile) return;
+    if (fleet.length > 0) return;
+    const icao = (pilotIcao || homeHubIcao).trim().toUpperCase();
+    if (!icao) return;
+    hangarOriginSeededRef.current = true;
+    setOriginFilter(icao);
+    setMarketPage(1);
+  }, [
+    showProfileGate,
+    activeCareerProfile,
+    fleet.length,
+    pilotIcao,
+    homeHubIcao,
+  ]);
 
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
@@ -6061,13 +6085,19 @@ export function App() {
     setMarketPage(1);
   }
 
-  function focusNearMyAircraft() {
-    const icao = boardAircraft?.locationIcao?.trim().toUpperCase();
+  function focusNearBoard() {
+    const icao = (
+      boardAircraft?.locationIcao ||
+      pilotIcao ||
+      homeHubIcao
+    )
+      .trim()
+      .toUpperCase();
     if (!icao) return;
     setOriginFilter(icao);
     setDestFilter('');
     setViableOnly(true);
-    setProfitableOnly(true);
+    setProfitableOnly(Boolean(boardAircraft));
     setAccessFilter('open');
     setMarketPage(1);
   }
@@ -8446,7 +8476,7 @@ export function App() {
                                         type="button"
                                         disabled={busy}
                                         onClick={() => {
-                                          focusNearMyAircraft();
+                                          focusNearBoard();
                                           selectTab('market');
                                         }}
                                       >
@@ -8769,15 +8799,24 @@ export function App() {
               <button
                 type="button"
                 className="near-aircraft-btn"
-                disabled={!boardAircraft?.locationIcao || busy}
+                disabled={
+                  busy ||
+                  !(
+                    boardAircraft?.locationIcao ||
+                    pilotIcao ||
+                    homeHubIcao
+                  )
+                }
                 title={
                   boardAircraft?.locationIcao
                     ? `Origin ${boardAircraft.locationIcao} · viable · profit > 0`
-                    : 'Select an aircraft first'
+                    : `Origin ${
+                        (pilotIcao || homeHubIcao).trim().toUpperCase() || 'home'
+                      } · crew you can fly`
                 }
-                onClick={() => focusNearMyAircraft()}
+                onClick={() => focusNearBoard()}
               >
-                Near aircraft
+                {boardAircraft ? 'Near aircraft' : 'Near me'}
               </button>
               <label className="profitable-filter">
                 <input
@@ -8792,12 +8831,12 @@ export function App() {
                 <span
                   title={
                     fleet.length === 0 && !boardAircraft
-                      ? 'Show Crew needed offers on a class you can sit'
+                      ? 'Crew you can sit, plus last-mile Dry from this origin'
                       : 'Hide locked, out-of-range, and zero-lift lots'
                   }
                 >
                   {fleet.length === 0 && !boardAircraft
-                    ? 'Crew I can fly'
+                    ? 'For me'
                     : 'Viable'}
                 </span>
               </label>

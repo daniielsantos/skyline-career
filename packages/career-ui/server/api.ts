@@ -14,6 +14,7 @@ import {
   cargoOpsIsUnlocked,
   classOpsIsUnlocked,
   classOpsHidesBoardLot,
+  CLASS_OPS_STARTER_IDS,
   getAircraftClass,
   clearAircraftMaintenanceWithParts,
   repairAircraftConditionWithParts,
@@ -2146,6 +2147,9 @@ export function createCareerApiServer(port = 8787) {
         const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);
         const hangarEmpty =
           !aircraft && missionsState.fleet.length === 0;
+        const starterSort =
+          hangarEmpty ||
+          (aircraft != null && CLASS_OPS_STARTER_IDS.includes(aircraft));
         const airframeTypeId =
           url.searchParams.get('airframe')?.trim() || undefined;
         const origin = url.searchParams.get('origin') ?? undefined;
@@ -2217,6 +2221,7 @@ export function createCareerApiServer(port = 8787) {
           crewNeeded: boolean;
           crewClassId?: string;
           lastMile: boolean;
+          idleEscalated: boolean;
           international: boolean;
           pressure: unknown;
           npcClaim: unknown;
@@ -2285,6 +2290,7 @@ export function createCareerApiServer(port = 8787) {
               ? { crewClassId: row.npcClaim.aircraftClassId }
               : {}),
             lastMile: /last-mile/i.test(row.lot.reason),
+            idleEscalated: Boolean(row.pressure?.idleEscalated),
             international: Boolean(row.pressure?.international),
             pressure: row.pressure
               ? {
@@ -2444,6 +2450,7 @@ export function createCareerApiServer(port = 8787) {
           profitableOnly: aircraft ? profitableOnly : false,
           viableOnly: aircraft || hangarEmpty ? viableOnly : false,
           hangarEmpty,
+          starterSort,
           accessFilter: parseMarketBoardAccessFilter(
             url.searchParams.get('access'),
           ),

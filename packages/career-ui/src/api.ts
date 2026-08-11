@@ -390,6 +390,7 @@ export type MarketLot = {
   crewNeeded?: boolean;
   crewClassId?: string;
   lastMile?: boolean;
+  idleEscalated?: boolean;
   international?: boolean;
   pressure?: LotPressure | null;
   npcClaim?: NpcClaim | null;
@@ -1034,7 +1035,7 @@ export function fetchMarket(
     airframe?: string;
     /** Keep lots with estimated net > 0 (requires aircraft). */
     profitableOnly?: boolean;
-    /** Keep unlocked + in-range + liftable lots. Empty hangar: crew I can fly. */
+    /** Keep unlocked + in-range + liftable lots. Empty hangar: crew + last-mile. */
     viableOnly?: boolean;
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';

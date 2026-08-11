@@ -577,4 +577,57 @@ describe('queryMarketBoardPage', () => {
       [7_000, 9_000],
     );
   });
+
+  it('non-starter board surfaces idle lots ahead of fresh high pay', () => {
+    const mixed = [
+      row({
+        payUsd: 90_000,
+        distanceNm: 1_800,
+        availableKg: 18_000,
+      }),
+      row({
+        payUsd: 22_000,
+        distanceNm: 1_200,
+        idleEscalated: true,
+        availableKg: 12_000,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      sorts: [{ key: 'pay', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [22_000, 90_000],
+    );
+  });
+
+  it('starter sort still ranks last-mile ahead of idle wide pay', () => {
+    const mixed = [
+      row({
+        payUsd: 90_000,
+        distanceNm: 1_800,
+        idleEscalated: true,
+        availableKg: 18_000,
+      }),
+      row({
+        payUsd: 12_000,
+        distanceNm: 220,
+        lastMile: true,
+        availableKg: 280,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      starterSort: true,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [12_000, 90_000],
+    );
+  });
 });

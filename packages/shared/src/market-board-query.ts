@@ -14,7 +14,8 @@ export type MarketBoardSortKey =
   | 'net'
   | 'access'
   | 'starter'
-  | 'fromFocus';
+  | 'fromFocus'
+  | 'idle';
 
 export type MarketBoardSortDirection = 'asc' | 'desc';
 
@@ -179,6 +180,7 @@ const SORT_KEYS = new Set<MarketBoardSortKey>([
   'access',
   'starter',
   'fromFocus',
+  'idle',
 ]);
 
 const STARTER_CREW_CLASSES = new Set<string>(CLASS_OPS_STARTER_IDS);
@@ -278,6 +280,25 @@ export function ensureNearFocusSorts(
   return next;
 }
 
+/**
+ * Non-starter Freights (jet / heavy selected): after Cargo Ops access, surface
+ * idle-escalated lots so lingering freight is not buried under fresh Wide pay.
+ * Starter / empty-hangar boards already fold idle into `starter` rank.
+ */
+export function ensureIdleEscalatedSorts(
+  sorts: readonly MarketBoardSortLevel[] | null | undefined,
+): MarketBoardSortLevel[] {
+  const levels = sorts?.length ? [...sorts] : [...DEFAULT_MARKET_BOARD_SORTS];
+  if (levels.some((s) => s.key === 'idle' || s.key === 'starter')) {
+    return levels;
+  }
+  const accessIdx = levels.findIndex((s) => s.key === 'access');
+  const insertAt = accessIdx >= 0 ? accessIdx + 1 : 0;
+  const next = [...levels];
+  next.splice(insertAt, 0, { key: 'idle', direction: 'asc' });
+  return next;
+}
+
 /** Parse `distance:asc,pay:desc` (or repeated `sort=` values joined). */
 export function parseMarketBoardSorts(
   raw: string | null | undefined,
@@ -358,6 +379,10 @@ function compareBoardRow<T extends MarketBoardSortable>(
       return (
         (a.originFromFocusNm ?? Number.POSITIVE_INFINITY) -
         (b.originFromFocusNm ?? Number.POSITIVE_INFINITY)
+      );
+    case 'idle':
+      return (
+        Number(a.idleEscalated !== true) - Number(b.idleEscalated !== true)
       );
   }
 }
@@ -508,7 +533,7 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
   const baseSorts =
     opts.hangarEmpty || opts.starterSort
       ? ensureHangarEmptySorts(requested)
-      : ensureAccessPrimarySort(requested);
+      : ensureIdleEscalatedSorts(ensureAccessPrimarySort(requested));
   const sorts =
     opts.nearMaxNm !== undefined &&
     Number.isFinite(opts.nearMaxNm) &&

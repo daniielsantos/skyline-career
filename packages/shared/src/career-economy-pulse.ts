@@ -106,6 +106,12 @@ export interface EconomyPulseCommodity {
   marginPctP50: number | null;
   /** Lots where distance + fuel stock allowed an estimate. */
   netSampleLots: number;
+  /** 10th percentile inventory fill (are the emptiest hubs still buyers?). */
+  fillP10: number | null;
+  /** 90th percentile inventory fill (are the fullest hubs saturating?). */
+  fillP90: number | null;
+  /** Hubs stocking this commodity (surplus + shortage denominator). */
+  hubCount: number;
   /** Hubs with fill ≥ surplus cutoff (export pressure). */
   hubsSurplus: number;
   /** Hubs with fill ≤ shortage cutoff (import pressure). */
@@ -203,6 +209,22 @@ export function median(numbers: number[]): number | null {
 export function mean(numbers: number[]): number | null {
   if (numbers.length === 0) return null;
   return numbers.reduce((a, b) => a + b, 0) / numbers.length;
+}
+
+/** Linear-interpolated percentile (`p` in 0..1); null when empty. */
+export function percentile(numbers: number[], p: number): number | null {
+  if (numbers.length === 0) return null;
+  if (numbers.length === 1) return numbers[0]!;
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const idx = clampNum(p, 0, 1) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo]!;
+  return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (idx - lo);
+}
+
+function clampNum(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
 }
 
 function leftoverKg(lot: ShipmentLot): number {
@@ -810,6 +832,9 @@ export function computeEconomyPulse(
         fuelCostUsdP50: median(acc.fuelCostUsd),
         marginPctP50: median(acc.marginPct),
         netSampleLots: acc.netPayUsd.length,
+        fillP10: percentile(acc.fills, 0.1),
+        fillP90: percentile(acc.fills, 0.9),
+        hubCount: acc.fills.length,
         hubsSurplus: acc.hubsSurplus,
         hubsShortage: acc.hubsShortage,
       };
@@ -908,7 +933,14 @@ export type EconomyPulseSweepDelta = {
     fillP50: number | null;
     hubsSurplus: number;
     hubsShortage: number;
+    /** Warehouse produced / consumed kg per career day over the window. */
+    producedKgPerDay: number;
+    consumedKgPerDay: number;
+    /** producedKg − consumedKg per day; > 0 means the shelf trends toward saturation. */
+    netWarehouseKgPerDay: number;
   }>;
+  /** Per-commodity surplus/shortage hub counts at each sample. */
+  pressureSeries: EconomyPulsePressurePoint[];
   npc: {
     fleetSize: number;
     airborne: number;
@@ -924,6 +956,20 @@ export type EconomyPulseSweepDelta = {
   flow: EconomyFlowStats;
   /** Same flow normalized to a career day. */
   flowPerDay: EconomyFlowRates;
+};
+
+/** One sample's per-commodity fill + surplus/shortage snapshot. */
+export type EconomyPulsePressurePoint = {
+  atTick: number;
+  commodities: Array<{
+    commodityId: CommodityId;
+    fillP10: number | null;
+    fillP50: number | null;
+    fillP90: number | null;
+    hubCount: number;
+    hubsSurplus: number;
+    hubsShortage: number;
+  }>;
 };
 
 /** Throughput rates over one career day, plus the ratios we actually read. */
@@ -1057,6 +1103,19 @@ export function sweepEconomyPulse(
   const last = samples[samples.length - 1]!.pulse;
   const byId = new Map(first.commodities.map((c) => [c.commodityId, c]));
   const sweptFlow = diffFlowStats(first.flow, last.flow);
+  const days = Math.max(1e-9, (world.tick - startTick) / TICKS_PER_DAY);
+  const pressureSeries: EconomyPulsePressurePoint[] = samples.map((s) => ({
+    atTick: s.atTick,
+    commodities: s.pulse.commodities.map((c) => ({
+      commodityId: c.commodityId,
+      fillP10: c.fillP10,
+      fillP50: c.fillP50,
+      fillP90: c.fillP90,
+      hubCount: c.hubCount,
+      hubsSurplus: c.hubsSurplus,
+      hubsShortage: c.hubsShortage,
+    })),
+  }));
 
   return {
     ticksAdvanced: advanced,
@@ -1089,8 +1148,17 @@ export function sweepEconomyPulse(
           fillP50: nullDelta(prev?.fillP50 ?? null, c.fillP50),
           hubsSurplus: c.hubsSurplus - (prev?.hubsSurplus ?? 0),
           hubsShortage: c.hubsShortage - (prev?.hubsShortage ?? 0),
+          producedKgPerDay:
+            (sweptFlow.byCommodity[c.commodityId]?.producedKg ?? 0) / days,
+          consumedKgPerDay:
+            (sweptFlow.byCommodity[c.commodityId]?.consumedKg ?? 0) / days,
+          netWarehouseKgPerDay:
+            ((sweptFlow.byCommodity[c.commodityId]?.producedKg ?? 0) -
+              (sweptFlow.byCommodity[c.commodityId]?.consumedKg ?? 0)) /
+            days,
         };
       }),
+      pressureSeries,
       npc: {
         fleetSize: last.npc.fleetSize - first.npc.fleetSize,
         airborne: last.npc.airborne - first.npc.airborne,

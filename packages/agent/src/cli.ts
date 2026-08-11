@@ -1772,6 +1772,20 @@ async function main(): Promise<void> {
         );
       }
       {
+        const tPerDay = (n: number) =>
+          `${(n / 1000).toFixed(1).padStart(6)}t`;
+        console.log('  warehouse / career day (produced − consumed = net):');
+        for (let i = 0; i < report.last.commodities.length; i++) {
+          const b = report.last.commodities[i]!;
+          const d = report.delta.commodities[i]!;
+          const net = d.netWarehouseKgPerDay;
+          const trend = net > 0 ? '↑fill' : net < 0 ? '↓fill' : 'flat';
+          console.log(
+            `    ${b.commodityId.padEnd(12)} prod ${tPerDay(d.producedKgPerDay)}  cons ${tPerDay(d.consumedKgPerDay)}  net ${tPerDay(net)} ${trend}  fill p10/p50/p90 ${fill(b.fillP10)}/${fill(b.fillP50)}/${fill(b.fillP90)}  surplus/shortage ${b.hubsSurplus}/${b.hubsShortage} of ${b.hubCount}`,
+          );
+        }
+      }
+      {
         const a = report.first.npc;
         const b = report.last.npc;
         const d = report.delta.npc;
@@ -1813,6 +1827,24 @@ async function main(): Promise<void> {
           console.log(
             `    #${s.sampleIndex} tick=${s.atTick}  lots=${s.pulse.availableLots}  pay p50=${pay(s.pulse.payUsdP50)}  avg=${pay(s.pulse.payUsdAvg)}  intl=${pct(s.pulse.intlSharePct)}  npc air=${n.airborne} ready=${pct(n.readyPct)} thin=${n.thinRegions}`,
           );
+        }
+      }
+      if (report.delta.pressureSeries.length > 2) {
+        // fill p50 and surplus:shortage per commodity across the sweep — the
+        // series that tells whether a shelf is drifting to saturation.
+        console.log('  pressure series (fill p50 · surplus:shortage):');
+        const ids = report.last.commodities.map((c) => c.commodityId);
+        for (const id of ids) {
+          const cells = report.delta.pressureSeries.map((p) => {
+            const c = p.commodities.find((x) => x.commodityId === id);
+            if (!c) return '·';
+            const f =
+              c.fillP50 === null ? '--' : `${Math.round(c.fillP50 * 100)}`;
+            return `${f.padStart(3)}%${String(c.hubsSurplus).padStart(3)}:${String(
+              c.hubsShortage,
+            ).padStart(2)}`;
+          });
+          console.log(`    ${id.padEnd(12)} ${cells.join(' ')}`);
         }
       }
       if (report.last.notes.length > 0) {

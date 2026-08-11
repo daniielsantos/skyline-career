@@ -5,7 +5,13 @@ import {
   ensureSeedMarketFormed,
   tickEconomyN,
 } from './career-economy.js';
-import { computeEconomyPulse, mean, median, sweepEconomyPulse } from './career-economy-pulse.js';
+import {
+  computeEconomyPulse,
+  mean,
+  median,
+  percentile,
+  sweepEconomyPulse,
+} from './career-economy-pulse.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 import type { CareerEconomyWorld, ShipmentLot } from './types/career-economy.js';
 
@@ -20,6 +26,22 @@ describe('median', () => {
 
   it('averages middle pair for even length', () => {
     assert.equal(median([1, 2, 3, 4]), 2.5);
+  });
+});
+
+describe('percentile', () => {
+  it('returns null for empty', () => {
+    assert.equal(percentile([], 0.5), null);
+  });
+
+  it('returns endpoints for p0 and p1', () => {
+    assert.equal(percentile([10, 20, 30, 40], 0), 10);
+    assert.equal(percentile([10, 20, 30, 40], 1), 40);
+  });
+
+  it('interpolates between samples', () => {
+    assert.equal(percentile([0, 100], 0.1), 10);
+    assert.equal(percentile([0, 10, 20, 30, 40], 0.5), 20);
   });
 });
 
@@ -289,5 +311,46 @@ describe('sweepEconomyPulse', () => {
       report.last.availableLots - report.first.availableLots,
     );
     assert.equal(report.delta.commodities.length, report.last.commodities.length);
+  });
+
+  it('reports per-commodity warehouse flow and a surplus/shortage series', () => {
+    const world = createSeedEconomyWorld({ seed: 'pulse-warehouse' });
+    ensureSeedMarketFormed(world);
+    const report = sweepEconomyPulse(world, {
+      ticks: TICKS_PER_DAY * 3,
+      every: TICKS_PER_DAY,
+    });
+
+    // Warehouse flow is populated and net = produced − consumed.
+    let sawProduction = false;
+    for (const c of report.delta.commodities) {
+      assert.ok(Number.isFinite(c.producedKgPerDay));
+      assert.ok(Number.isFinite(c.consumedKgPerDay));
+      assert.ok(c.producedKgPerDay >= 0);
+      assert.ok(c.consumedKgPerDay >= 0);
+      assert.ok(
+        Math.abs(
+          c.netWarehouseKgPerDay -
+            (c.producedKgPerDay - c.consumedKgPerDay),
+        ) < 1,
+      );
+      if (c.producedKgPerDay > 0) sawProduction = true;
+    }
+    assert.ok(sawProduction, 'expected warehouse production to be counted');
+
+    // The pressure series has one point per sample with p10/p50/p90 fill.
+    assert.equal(report.delta.pressureSeries.length, report.sampleCount);
+    const firstPoint = report.delta.pressureSeries[0]!;
+    assert.equal(firstPoint.atTick, report.startTick);
+    const dry = firstPoint.commodities.find((c) => c.commodityId === 'general');
+    assert.ok(dry);
+    assert.ok(dry!.hubCount > 0);
+    assert.ok(dry!.hubsSurplus + dry!.hubsShortage <= dry!.hubCount);
+    for (const c of firstPoint.commodities) {
+      if (c.fillP10 !== null && c.fillP90 !== null) {
+        assert.ok(c.fillP10 <= (c.fillP50 ?? c.fillP10));
+        assert.ok((c.fillP50 ?? c.fillP90) <= c.fillP90);
+      }
+    }
   });
 });

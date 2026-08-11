@@ -436,6 +436,14 @@ export interface EconomyFlowStats {
   claimed: FlowCounter;
   /** Formation reserve returned to origin stock on expiry. */
   reserveRefundedKg: number;
+  /** Warehouse produced kg after saturation (all cargo hubs). */
+  producedKg: number;
+  /** Warehouse consumed kg after starvation (all cargo hubs). */
+  consumedKg: number;
+  /** Origin stock actually drawn at delivery settle. */
+  deliveredOriginDrawnKg: number;
+  /** Destination stock actually credited at delivery settle. */
+  deliveredDestCreditedKg: number;
   byCommodity: Partial<
     Record<
       CommodityId,
@@ -444,6 +452,10 @@ export interface EconomyFlowStats {
         expired: FlowCounter;
         delivered: FlowCounter;
         claimed: FlowCounter;
+        /** Warehouse produced kg after saturation. */
+        producedKg: number;
+        /** Warehouse consumed kg after starvation. */
+        consumedKg: number;
       }
     >
   >;

@@ -82,11 +82,13 @@ import {
 } from './career-clock.js';
 import { boardDisplayPayUsd } from './market-board-query.js';
 import {
+  noteDeliveryStock,
   noteLotDelivered,
   noteLotExpired,
   noteLotFormed,
   noteLotRecycled,
   noteReserveRefund,
+  noteWarehouseFlow,
 } from './career-economy-flow.js';
 import {
   activeLaneKg,
@@ -2389,6 +2391,7 @@ export function applyFreightDelivery(
   const room = Math.max(0, dStock.capacityKg - dStock.stockKg);
   const addedToDestKg = Math.min(qty, room);
   dStock.stockKg = clamp(dStock.stockKg + addedToDestKg, 0, dStock.capacityKg);
+  noteDeliveryStock(world, removedFromOriginKg, addedToDestKg);
   if (addedToDestKg > 0 || removedFromOriginKg > 0) {
     recordFreightSettleActivity(world, opts.originIcao, opts.destIcao);
   }
@@ -2453,6 +2456,12 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
 
       ap.production[c.id] = prod;
       ap.consumption[c.id] = cons;
+      // Effective rates (prodSaturation / consStarvation already applied). Kept
+      // separate so the pulse can tell whether a shelf saturates from too much
+      // production or too little consumption — the Dry-saturation diagnostic.
+      if (c.kind !== 'fuel' && c.kind !== 'mro') {
+        noteWarehouseFlow(world, c.id, prod, cons);
+      }
       stock.stockKg = clamp(stock.stockKg + prod - cons, 0, stock.capacityKg);
     }
   }

@@ -38,6 +38,10 @@ export function emptyFlowStats(sinceTick = 0): EconomyFlowStats {
     delivered: emptyCounter(),
     claimed: emptyCounter(),
     reserveRefundedKg: 0,
+    producedKg: 0,
+    consumedKg: 0,
+    deliveredOriginDrawnKg: 0,
+    deliveredDestCreditedKg: 0,
     byCommodity: {},
     formedBySize: emptySizeBands(),
     npc: { legs: 0, flightHours: 0, turnaroundHours: 0, restHours: 0 },
@@ -58,6 +62,10 @@ export function ensureFlowStats(world: CareerEconomyWorld): EconomyFlowStats {
   existing.delivered ??= emptyCounter();
   existing.claimed ??= emptyCounter();
   existing.reserveRefundedKg ??= 0;
+  existing.producedKg ??= 0;
+  existing.consumedKg ??= 0;
+  existing.deliveredOriginDrawnKg ??= 0;
+  existing.deliveredDestCreditedKg ??= 0;
   existing.byCommodity ??= {};
   existing.formedBySize ??= emptySizeBands();
   existing.npc ??= { legs: 0, flightHours: 0, turnaroundHours: 0, restHours: 0 };
@@ -80,14 +88,31 @@ function bump(
   counter.kg += qty;
   if (key === 'recycled') return;
 
-  const perCommodity = (stats.byCommodity[commodityId] ??= {
+  const perCommodity = ensureCommodityFlow(stats, commodityId);
+  perCommodity[key].lots += lots;
+  perCommodity[key].kg += qty;
+}
+
+function ensureCommodityFlow(
+  stats: EconomyFlowStats,
+  commodityId: CommodityId,
+): NonNullable<EconomyFlowStats['byCommodity'][CommodityId]> {
+  const existing = stats.byCommodity[commodityId];
+  if (existing) {
+    existing.producedKg ??= 0;
+    existing.consumedKg ??= 0;
+    return existing;
+  }
+  const fresh = {
     formed: emptyCounter(),
     expired: emptyCounter(),
     delivered: emptyCounter(),
     claimed: emptyCounter(),
-  });
-  perCommodity[key].lots += lots;
-  perCommodity[key].kg += qty;
+    producedKg: 0,
+    consumedKg: 0,
+  };
+  stats.byCommodity[commodityId] = fresh;
+  return fresh;
 }
 
 export function noteLotFormed(
@@ -141,6 +166,38 @@ export function noteReserveRefund(world: CareerEconomyWorld, kg: number): void {
 }
 
 /**
+ * Warehouse production and consumption applied this tick (post saturation /
+ * starvation). This is the real Dry sink — fill alone can't tell whether a hub
+ * saturates because it over-produces or because nothing consumes.
+ */
+export function noteWarehouseFlow(
+  world: CareerEconomyWorld,
+  commodityId: CommodityId,
+  producedKg: number,
+  consumedKg: number,
+): void {
+  const stats = ensureFlowStats(world);
+  const prod = Math.max(0, Math.round(producedKg));
+  const cons = Math.max(0, Math.round(consumedKg));
+  stats.producedKg += prod;
+  stats.consumedKg += cons;
+  const perCommodity = ensureCommodityFlow(stats, commodityId);
+  perCommodity.producedKg += prod;
+  perCommodity.consumedKg += cons;
+}
+
+/** Stock actually moved between warehouses when a delivery settles. */
+export function noteDeliveryStock(
+  world: CareerEconomyWorld,
+  originDrawnKg: number,
+  destCreditedKg: number,
+): void {
+  const stats = ensureFlowStats(world);
+  stats.deliveredOriginDrawnKg += Math.max(0, Math.round(originDrawnKg));
+  stats.deliveredDestCreditedKg += Math.max(0, Math.round(destCreditedKg));
+}
+
+/**
  * Hours committed by one NPC leg. Compared against sampled fleet occupancy this
  * tells us whether the fleet is dwelling longer than the schedule granted it.
  */
@@ -182,6 +239,8 @@ export function diffFlowStats(
       expired: diffCounter(a?.expired ?? zero, b?.expired ?? zero),
       delivered: diffCounter(a?.delivered ?? zero, b?.delivered ?? zero),
       claimed: diffCounter(a?.claimed ?? zero, b?.claimed ?? zero),
+      producedKg: (b?.producedKg ?? 0) - (a?.producedKg ?? 0),
+      consumedKg: (b?.consumedKg ?? 0) - (a?.consumedKg ?? 0),
     };
   }
 
@@ -199,6 +258,12 @@ export function diffFlowStats(
     delivered: diffCounter(from.delivered, to.delivered),
     claimed: diffCounter(from.claimed, to.claimed),
     reserveRefundedKg: to.reserveRefundedKg - from.reserveRefundedKg,
+    producedKg: to.producedKg - from.producedKg,
+    consumedKg: to.consumedKg - from.consumedKg,
+    deliveredOriginDrawnKg:
+      to.deliveredOriginDrawnKg - from.deliveredOriginDrawnKg,
+    deliveredDestCreditedKg:
+      to.deliveredDestCreditedKg - from.deliveredDestCreditedKg,
     byCommodity,
     formedBySize,
     npc: {

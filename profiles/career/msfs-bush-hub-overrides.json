@@ -1,96 +1,10 @@
 {
-  "O64": {
-    "name": "Breckenridge Airport",
-    "lat": 35.36305636167526,
-    "lon": -118.85683804750443,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
-    "runways": [
-      {
-        "ident": "11",
-        "headingTrueDeg": 118.59873962402344,
-        "lengthM": 485.7795715332031,
-        "widthM": 9.509532928466797,
-        "lat": 35.36305636167526,
-        "lon": -118.85683804750443,
-        "identReciprocal": "29",
-        "surface": "asphalt"
-      }
-    ]
-  },
-  "O67": {
-    "name": "Manzanar Airport",
-    "lat": 36.737086325883865,
-    "lon": -118.14506694674492,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
-    "runways": [
-      {
-        "ident": "30",
-        "headingTrueDeg": 315.0474853515625,
-        "lengthM": 1515.76171875,
-        "widthM": 40.49229049682617,
-        "lat": 36.737527549266815,
-        "lon": -118.14551308751106,
-        "identReciprocal": "12",
-        "surface": "asphalt"
-      },
-      {
-        "ident": "35",
-        "headingTrueDeg": 350.1024475097656,
-        "lengthM": 1518.8924560546875,
-        "widthM": 42.6557502746582,
-        "lat": 36.73664476722479,
-        "lon": -118.14462125301361,
-        "identReciprocal": "17",
-        "surface": "asphalt"
-      }
-    ]
-  },
-  "26A": {
-    "name": "Ashland-Lineville",
-    "lat": 33.28419718891382,
-    "lon": -85.80896660685539,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
-    "runways": [
-      {
-        "ident": "27",
-        "headingTrueDeg": 269.7098083496094,
-        "lengthM": 1228.08984375,
-        "widthM": 25.19130516052246,
-        "lat": 33.28423708677292,
-        "lon": -85.80901175737381,
-        "identReciprocal": "9",
-        "surface": "asphalt"
-      }
-    ]
-  },
-  "CA51": {
-    "name": "The Sea Ranch",
-    "lat": 38.70463348925114,
-    "lon": -123.43250826001167,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
-    "runways": [
-      {
-        "ident": "30",
-        "headingTrueDeg": 312.421142578125,
-        "lengthM": 794.4688110351562,
-        "widthM": 12.192000389099121,
-        "lat": 38.703850619494915,
-        "lon": -123.43214124441147,
-        "identReciprocal": "12",
-        "surface": "asphalt"
-      }
-    ]
-  },
   "0O2": {
     "name": "Baker",
     "lat": 35.286277793347836,
     "lon": -116.08136102557182,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -109,7 +23,7 @@
     "lat": 40.650305561721325,
     "lon": -120.76850831508636,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -123,12 +37,31 @@
       }
     ]
   },
+  "26A": {
+    "name": "Ashland-Lineville",
+    "lat": 33.28419718891382,
+    "lon": -85.80896660685539,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 269.7098083496094,
+        "lengthM": 1228.08984375,
+        "widthM": 25.19130516052246,
+        "lat": 33.28423708677292,
+        "lon": -85.80901175737381,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
   "2G4": {
     "name": "Garrett County",
     "lat": 39.58080556243658,
     "lon": -79.33594465255737,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -147,7 +80,7 @@
     "lat": 38.37986122816801,
     "lon": -118.09675008058548,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -166,7 +99,7 @@
     "lat": 35.42648322880268,
     "lon": -83.45821380615234,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -185,7 +118,7 @@
     "lat": 40.75748059898615,
     "lon": -119.21592235565186,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5R",
@@ -214,7 +147,7 @@
     "lat": 39.99721381813288,
     "lon": -120.21685838699341,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "33",
@@ -233,7 +166,7 @@
     "lat": 38.01686681807041,
     "lon": -122.52080842852592,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -247,12 +180,31 @@
       }
     ]
   },
+  "CA51": {
+    "name": "The Sea Ranch",
+    "lat": 38.70463348925114,
+    "lon": -123.43250826001167,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 312.421142578125,
+        "lengthM": 794.4688110351562,
+        "widthM": 12.192000389099121,
+        "lat": 38.703850619494915,
+        "lon": -123.43214124441147,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
   "H37": {
     "name": "Herlong",
     "lat": 40.13872213661671,
     "lon": -120.17997220158577,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -271,7 +223,7 @@
     "lat": 36.460499949753284,
     "lon": -116.8798054754734,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -290,7 +242,7 @@
     "lat": 35.96861097961664,
     "lon": -116.2692779302597,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -309,7 +261,7 @@
     "lat": 38.734750002622604,
     "lon": -119.76705551147461,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -328,7 +280,7 @@
     "lat": 36.16040267050266,
     "lon": -81.8967778980732,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "30",
@@ -347,7 +299,7 @@
     "lat": 40.998165272176266,
     "lon": -119.93756800889969,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -376,7 +328,7 @@
     "lat": 39.83238369226456,
     "lon": -119.68264326453209,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -395,7 +347,7 @@
     "lat": 38.030416667461395,
     "lon": -120.41455551981926,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -424,7 +376,7 @@
     "lat": 37.95773886144161,
     "lon": -119.10581097006798,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -443,7 +395,7 @@
     "lat": 36.58869445323944,
     "lon": -118.04938897490501,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -482,7 +434,7 @@
     "lat": 40.803702771663666,
     "lon": -120.36620825529099,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "35",
@@ -501,7 +453,7 @@
     "lat": 39.00541674345732,
     "lon": -119.15652796626091,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "20",
@@ -520,7 +472,7 @@
     "lat": 37.925553023815155,
     "lon": -118.40886265039444,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -539,7 +491,7 @@
     "lat": 38.26465263962746,
     "lon": -119.22273069620132,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -553,12 +505,60 @@
       }
     ]
   },
+  "O64": {
+    "name": "Breckenridge Airport",
+    "lat": 35.36305636167526,
+    "lon": -118.85683804750443,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 118.59873962402344,
+        "lengthM": 485.7795715332031,
+        "widthM": 9.509532928466797,
+        "lat": 35.36305636167526,
+        "lon": -118.85683804750443,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "O67": {
+    "name": "Manzanar Airport",
+    "lat": 36.737086325883865,
+    "lon": -118.14506694674492,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 315.0474853515625,
+        "lengthM": 1515.76171875,
+        "widthM": 40.49229049682617,
+        "lat": 36.737527549266815,
+        "lon": -118.14551308751106,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "35",
+        "headingTrueDeg": 350.1024475097656,
+        "lengthM": 1518.8924560546875,
+        "widthM": 42.6557502746582,
+        "lat": 36.73664476722479,
+        "lon": -118.14462125301361,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
   "O77": {
     "name": "Schurtz Airport",
     "lat": 38.93486391752958,
     "lon": -118.80559980869293,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "25",
@@ -577,7 +577,7 @@
     "lat": 39.58166655153036,
     "lon": -120.35402789711952,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -596,7 +596,7 @@
     "lat": 36.25604756176472,
     "lon": -117.9970894753933,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -615,7 +615,7 @@
     "lat": 37.55872506648302,
     "lon": -81.35065823793411,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -634,7 +634,7 @@
     "lat": 37.948727644979954,
     "lon": -80.71647763252258,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -653,7 +653,7 @@
     "lat": 38.4306750074029,
     "lon": -79.82561409473419,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -672,7 +672,7 @@
     "lat": 46.48506939411163,
     "lon": -84.50955256819725,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -701,7 +701,7 @@
     "lat": 48.330591805279255,
     "lon": -70.99592238664627,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -730,7 +730,7 @@
     "lat": 49.95194457471371,
     "lon": -125.27305573225021,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -749,7 +749,7 @@
     "lat": 49.05444458127022,
     "lon": -123.86999979615211,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "34",
@@ -768,7 +768,7 @@
     "lat": 53.309999853372574,
     "lon": -113.57944428920746,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2",
@@ -797,7 +797,7 @@
     "lat": 45.86887780576944,
     "lon": -66.53721928596497,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -826,7 +826,7 @@
     "lat": 49.36833344399929,
     "lon": -121.49805575609207,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -845,7 +845,7 @@
     "lat": 51.69104430824518,
     "lon": -76.13555565476418,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -864,7 +864,7 @@
     "lat": 43.17365571856499,
     "lon": -79.93507772684097,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -893,7 +893,7 @@
     "lat": 45.518060959875584,
     "lon": -73.41699466109276,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "24L",
@@ -932,7 +932,7 @@
     "lat": 44.87968347966671,
     "lon": -63.5101917386055,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -961,7 +961,7 @@
     "lat": 52.99666654318571,
     "lon": -118.05944457650185,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "32",
@@ -980,7 +980,7 @@
     "lat": 50.70251114666462,
     "lon": -120.44860571622849,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -1009,7 +1009,7 @@
     "lat": 43.46077211201191,
     "lon": -80.37871107459068,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -1038,7 +1038,7 @@
     "lat": 53.310683481395245,
     "lon": -110.07416099309921,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -1057,7 +1057,7 @@
     "lat": 49.95721109211445,
     "lon": -119.37791928648949,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -1076,7 +1076,7 @@
     "lat": 50.33027786761522,
     "lon": -105.5591668188572,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -1115,7 +1115,7 @@
     "lat": 49.771863743662834,
     "lon": -74.5279723405838,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -1134,7 +1134,7 @@
     "lat": 43.92282787710428,
     "lon": -78.89630824327469,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -1163,7 +1163,7 @@
     "lat": 45.3225027769804,
     "lon": -75.66726922988892,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -1202,7 +1202,7 @@
     "lat": 53.21457792073488,
     "lon": -105.67298322916031,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -1221,7 +1221,7 @@
     "lat": 44.230538941919804,
     "lon": -78.36319729685783,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -1250,7 +1250,7 @@
     "lat": 54.285833425819874,
     "lon": -130.4446779191494,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -1269,7 +1269,7 @@
     "lat": 46.7911946028471,
     "lon": -71.3933140039444,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -1298,7 +1298,7 @@
     "lat": 52.18498885631561,
     "lon": -113.89450013637543,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "30",
@@ -1327,7 +1327,7 @@
     "lat": 42.27586403489113,
     "lon": -82.95764744281769,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -1356,7 +1356,7 @@
     "lat": 46.11611109226942,
     "lon": -64.67861115932465,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "24",
@@ -1385,7 +1385,7 @@
     "lat": 49.71083343029022,
     "lon": -124.88666653633118,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -1414,7 +1414,7 @@
     "lat": 50.432191751897335,
     "lon": -104.6660529077053,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -1443,7 +1443,7 @@
     "lat": 55.18190547823906,
     "lon": -118.88718903064728,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -1472,7 +1472,7 @@
     "lat": 46.161519549787045,
     "lon": -60.04804462194443,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -1501,7 +1501,7 @@
     "lat": 48.519894406199455,
     "lon": -72.26596936583519,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -1520,7 +1520,7 @@
     "lat": 45.3159249946475,
     "lon": -65.89012205600739,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "23",
@@ -1549,7 +1549,7 @@
     "lat": 48.57065822929144,
     "lon": -81.37663900852203,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -1578,7 +1578,7 @@
     "lat": 45.47046381980181,
     "lon": -73.74093353748322,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6L",
@@ -1617,7 +1617,7 @@
     "lat": 48.206188939511776,
     "lon": -78.83558884263039,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -1636,7 +1636,7 @@
     "lat": 58.094869293272495,
     "lon": -68.42219978570938,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -1665,7 +1665,7 @@
     "lat": 49.19469729065895,
     "lon": -123.1839694082737,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "26L",
@@ -1704,7 +1704,7 @@
     "lat": 49.909899942576885,
     "lon": -97.23989993333817,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "31",
@@ -1733,7 +1733,7 @@
     "lat": 52.17096123844385,
     "lon": -106.69995814561844,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -1762,7 +1762,7 @@
     "lat": 50.01889452338219,
     "lon": -110.7206279039383,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -1791,7 +1791,7 @@
     "lat": 53.88403885066509,
     "lon": -122.67755270004272,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1",
@@ -1830,7 +1830,7 @@
     "lat": 54.46854718029499,
     "lon": -128.57838034629822,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -1859,7 +1859,7 @@
     "lat": 43.033055663108826,
     "lon": -81.15111127495766,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -1888,7 +1888,7 @@
     "lat": 49.02527790516615,
     "lon": -122.36000016331673,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1",
@@ -1917,7 +1917,7 @@
     "lat": 47.96685844659805,
     "lon": -84.7863221168518,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -1936,7 +1936,7 @@
     "lat": 46.36383321136236,
     "lon": -79.42416653037071,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -1975,7 +1975,7 @@
     "lat": 51.1225001513958,
     "lon": -114.01333317160606,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -2024,7 +2024,7 @@
     "lat": 49.46250010281801,
     "lon": -119.60216671228409,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -2043,7 +2043,7 @@
     "lat": 48.647222220897675,
     "lon": -123.42583313584328,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -2082,7 +2082,7 @@
     "lat": 50.2925194054842,
     "lon": -107.69088596105576,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -2111,7 +2111,7 @@
     "lat": 47.61861115694046,
     "lon": -52.75250002741814,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -2140,7 +2140,7 @@
     "lat": 43.67607235908508,
     "lon": -79.63047489523888,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15L",
@@ -2199,7 +2199,7 @@
     "lat": 32.41133328527212,
     "lon": -99.68188896775246,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17L",
@@ -2238,7 +2238,7 @@
     "lat": 35.038930512964725,
     "lon": -106.60826101899147,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -2287,7 +2287,7 @@
     "lat": 42.74911668151617,
     "lon": -73.80198061466217,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1",
@@ -2316,7 +2316,7 @@
     "lat": 35.219361037015915,
     "lon": -101.70591652393341,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -2345,7 +2345,7 @@
     "lat": 33.63670013844967,
     "lon": -84.42786410450935,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8L",
@@ -2404,7 +2404,7 @@
     "lat": 30.19452776759863,
     "lon": -97.6698750257492,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18L",
@@ -2433,7 +2433,7 @@
     "lat": 35.43611101806164,
     "lon": -82.54204720258713,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -2452,7 +2452,7 @@
     "lat": 33.40499717742205,
     "lon": -118.41576933860779,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -2471,7 +2471,7 @@
     "lat": 41.9390332326293,
     "lon": -72.68431663513184,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -2500,7 +2500,7 @@
     "lat": 33.563888892531395,
     "lon": -86.75230577588081,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -2529,7 +2529,7 @@
     "lat": 37.37311117351055,
     "lon": -118.36361110210419,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -2568,7 +2568,7 @@
     "lat": 45.80784983932972,
     "lon": -108.54354456067085,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -2607,7 +2607,7 @@
     "lat": 46.77273329347372,
     "lon": -100.74573889374733,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -2636,7 +2636,7 @@
     "lat": 48.79269450902939,
     "lon": -122.53752797842026,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -2655,7 +2655,7 @@
     "lat": 36.12447515130043,
     "lon": -86.67818069458008,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2L",
@@ -2704,7 +2704,7 @@
     "lat": 43.56436103582382,
     "lon": -116.22286096215248,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10L",
@@ -2733,7 +2733,7 @@
     "lat": 42.362944297492504,
     "lon": -71.00638881325722,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4L",
@@ -2802,7 +2802,7 @@
     "lat": 30.532916598021984,
     "lon": -91.14988893270493,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4L",
@@ -2841,7 +2841,7 @@
     "lat": 42.940416522324085,
     "lon": -78.73058348894119,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -2870,7 +2870,7 @@
     "lat": 34.20069459825754,
     "lon": -118.35866644978523,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -2899,7 +2899,7 @@
     "lat": 39.175727628171444,
     "lon": -76.66899159550667,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -2938,7 +2938,7 @@
     "lat": 39.615305475890636,
     "lon": -78.76147761940956,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -2967,7 +2967,7 @@
     "lat": 37.9896554723382,
     "lon": -122.05690294504166,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1L",
@@ -3016,7 +3016,7 @@
     "lat": 32.898639030754566,
     "lon": -80.0405278801918,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -3045,7 +3045,7 @@
     "lat": 41.88468899577856,
     "lon": -91.71080008149147,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -3074,7 +3074,7 @@
     "lat": 41.40940826386213,
     "lon": -81.85469180345535,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6R",
@@ -3113,7 +3113,7 @@
     "lat": 35.21374985575676,
     "lon": -80.9490555524826,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "19L",
@@ -3152,7 +3152,7 @@
     "lat": 38.805813789367676,
     "lon": -104.70077499747276,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -3191,7 +3191,7 @@
     "lat": 42.90586095303297,
     "lon": -106.46363899111748,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -3220,7 +3220,7 @@
     "lat": 27.772194296121597,
     "lon": -97.50241667032242,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -3239,7 +3239,7 @@
     "lat": 39.04883902519941,
     "lon": -84.66782212257385,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18C",
@@ -3288,7 +3288,7 @@
     "lat": 34.85372230410576,
     "lon": -116.78669437766075,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -3317,7 +3317,7 @@
     "lat": 39.90225289016962,
     "lon": -84.21941131353378,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6L",
@@ -3356,7 +3356,7 @@
     "lat": 38.85143883526325,
     "lon": -77.03772202134132,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -3395,7 +3395,7 @@
     "lat": 39.86166670918465,
     "lon": -104.67316657304764,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -3464,7 +3464,7 @@
     "lat": 32.897233217954636,
     "lon": -97.03769445419312,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13L",
@@ -3543,7 +3543,7 @@
     "lat": 41.533972062170506,
     "lon": -93.66307228803635,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -3572,7 +3572,7 @@
     "lat": 42.2124445438385,
     "lon": -83.35338905453682,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3L",
@@ -3641,7 +3641,7 @@
     "lat": 34.85443040728569,
     "lon": -83.99731948971748,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -3660,7 +3660,7 @@
     "lat": 31.807333342731,
     "lon": -106.37636125087738,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8L",
@@ -3699,7 +3699,7 @@
     "lat": 47.25418344140053,
     "lon": -121.18553057312965,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "27",
@@ -3718,7 +3718,7 @@
     "lat": 44.124583303928375,
     "lon": -123.21197211742401,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16L",
@@ -3747,7 +3747,7 @@
     "lat": 40.692480616271496,
     "lon": -74.16868597269058,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4L",
@@ -3786,7 +3786,7 @@
     "lat": 46.920639015734196,
     "lon": -96.81575015187263,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -3825,7 +3825,7 @@
     "lat": 36.77655570209026,
     "lon": -119.71883341670036,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11L",
@@ -3854,7 +3854,7 @@
     "lat": 39.41756933927536,
     "lon": -77.37429723143578,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -3883,7 +3883,7 @@
     "lat": 26.07166673988104,
     "lon": -80.14969423413277,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10L",
@@ -3912,7 +3912,7 @@
     "lat": 43.58201399445534,
     "lon": -96.74191653728485,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -3951,7 +3951,7 @@
     "lat": 35.336585976183414,
     "lon": -94.36744451522827,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -3980,7 +3980,7 @@
     "lat": 47.61902790516615,
     "lon": -117.53522202372551,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -4009,7 +4009,7 @@
     "lat": 39.12241671234369,
     "lon": -108.5267499089241,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -4038,7 +4038,7 @@
     "lat": 42.88083326071501,
     "lon": -85.52280575037003,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8L",
@@ -4077,7 +4077,7 @@
     "lat": 34.895672388374805,
     "lon": -82.21885845065117,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -4096,7 +4096,7 @@
     "lat": 46.60671394318342,
     "lon": -111.98334708809853,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -4135,7 +4135,7 @@
     "lat": 26.227111145853996,
     "lon": -97.65513896942139,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18L",
@@ -4174,7 +4174,7 @@
     "lat": 34.63719729334116,
     "lon": -86.77505537867546,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18L",
@@ -4203,7 +4203,7 @@
     "lat": 38.5450779274106,
     "lon": -118.63240286707878,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -4232,7 +4232,7 @@
     "lat": 38.94744448363781,
     "lon": -77.45994463562965,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1C",
@@ -4281,7 +4281,7 @@
     "lat": 29.98443603515625,
     "lon": -95.34144178032875,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8R",
@@ -4340,7 +4340,7 @@
     "lat": 43.513672314584255,
     "lon": -112.0708192884922,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -4369,7 +4369,7 @@
     "lat": 39.71730552613735,
     "lon": -86.29463911056519,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5L",
@@ -4408,7 +4408,7 @@
     "lat": 35.65874174237251,
     "lon": -117.82953321933746,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -4447,7 +4447,7 @@
     "lat": 43.60733337700367,
     "lon": -110.73774978518486,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1",
@@ -4466,7 +4466,7 @@
     "lat": 30.494044348597527,
     "lon": -81.68784722685814,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -4495,7 +4495,7 @@
     "lat": 40.63992775976658,
     "lon": -73.77869188785553,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4L",
@@ -4544,7 +4544,7 @@
     "lat": 36.080044358968735,
     "lon": -115.15223622322083,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8L",
@@ -4593,7 +4593,7 @@
     "lat": 33.94249711185694,
     "lon": -118.40804994106293,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6L",
@@ -4642,7 +4642,7 @@
     "lat": 33.81793063133955,
     "lon": -118.15189182758331,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8R",
@@ -4701,7 +4701,7 @@
     "lat": 34.729441814124584,
     "lon": -92.22477793693542,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4L",
@@ -4740,7 +4740,7 @@
     "lat": 36.987516805529594,
     "lon": -82.52999737858772,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -4759,7 +4759,7 @@
     "lat": 39.297611229121685,
     "lon": -94.71388891339302,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1L",
@@ -4798,7 +4798,7 @@
     "lat": 28.42938881367445,
     "lon": -81.30899995565414,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17L",
@@ -4847,7 +4847,7 @@
     "lat": 35.042411014437675,
     "lon": -89.97668042778969,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "27",
@@ -4896,7 +4896,7 @@
     "lat": 42.37496394664049,
     "lon": -122.87328869104385,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -4915,7 +4915,7 @@
     "lat": 25.79536098986864,
     "lon": -80.29011681675911,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "26L",
@@ -4964,7 +4964,7 @@
     "lat": 42.946933284401894,
     "lon": -87.89706408977509,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1L",
@@ -5023,7 +5023,7 @@
     "lat": 37.62405563145876,
     "lon": -118.83875012397766,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -5042,7 +5042,7 @@
     "lat": 37.51086104661226,
     "lon": -120.03952771425247,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -5061,7 +5061,7 @@
     "lat": 43.139877654612064,
     "lon": -89.33750554919243,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -5100,7 +5100,7 @@
     "lat": 46.91630557179451,
     "lon": -114.09055575728416,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -5129,7 +5129,7 @@
     "lat": 44.88197207450867,
     "lon": -93.22177782654762,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -5178,7 +5178,7 @@
     "lat": 29.993277937173843,
     "lon": -90.25902763009071,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -5207,7 +5207,7 @@
     "lat": 37.72124983370304,
     "lon": -122.22113907337189,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10L",
@@ -5256,7 +5256,7 @@
     "lat": 35.39307497441769,
     "lon": -97.60076120495796,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -5305,7 +5305,7 @@
     "lat": 41.30316663533449,
     "lon": -95.89405551552773,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14L",
@@ -5344,7 +5344,7 @@
     "lat": 34.05601389706135,
     "lon": -117.60118871927261,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8L",
@@ -5373,7 +5373,7 @@
     "lat": 41.97694156318903,
     "lon": -87.90815010666847,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4L",
@@ -5462,7 +5462,7 @@
     "lat": 36.89460542052984,
     "lon": -76.20123043656349,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -5491,7 +5491,7 @@
     "lat": 45.58870833367109,
     "lon": -122.59686961770058,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -5530,7 +5530,7 @@
     "lat": 39.87208340317011,
     "lon": -75.24066388607025,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -5579,7 +5579,7 @@
     "lat": 33.43427784740925,
     "lon": -112.01158314943314,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "25L",
@@ -5618,7 +5618,7 @@
     "lat": 34.62938904762268,
     "lon": -118.08455273509026,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -5647,7 +5647,7 @@
     "lat": 41.72233320772648,
     "lon": -71.42772227525711,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -5676,7 +5676,7 @@
     "lat": 43.64564437419176,
     "lon": -70.30861660838127,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -5705,7 +5705,7 @@
     "lat": 35.87763883173466,
     "lon": -78.78747224807739,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5L",
@@ -5744,7 +5744,7 @@
     "lat": 37.50518046319485,
     "lon": -77.31973886489868,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2",
@@ -5773,7 +5773,7 @@
     "lat": 34.35077793896198,
     "lon": -85.15866681933403,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -5802,7 +5802,7 @@
     "lat": 39.49911117553711,
     "lon": -119.76811096072197,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -5841,7 +5841,7 @@
     "lat": 26.536166667938232,
     "lon": -81.75516664981842,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -5860,7 +5860,7 @@
     "lat": 32.73355543613434,
     "lon": -117.1896667778492,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -5879,7 +5879,7 @@
     "lat": 29.533958360552788,
     "lon": -98.46905842423439,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -5918,7 +5918,7 @@
     "lat": 32.127583399415016,
     "lon": -81.20213896036148,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1",
@@ -5947,7 +5947,7 @@
     "lat": 41.70822512358427,
     "lon": -86.31733909249306,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9L",
@@ -5986,7 +5986,7 @@
     "lat": 47.448999993503094,
     "lon": -122.30930551886559,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16C",
@@ -6025,7 +6025,7 @@
     "lat": 37.618805542588234,
     "lon": -122.37541660666466,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1L",
@@ -6074,7 +6074,7 @@
     "lat": 32.44651682674885,
     "lon": -93.82603883743286,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -6103,7 +6103,7 @@
     "lat": 37.36299455165863,
     "lon": -121.92861959338188,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12L",
@@ -6132,7 +6132,7 @@
     "lat": 40.78839439898729,
     "lon": -111.97777211666107,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -6181,7 +6181,7 @@
     "lat": 38.69544457644224,
     "lon": -121.59077793359756,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17L",
@@ -6210,7 +6210,7 @@
     "lat": 33.675661236047745,
     "lon": -117.86823347210884,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2L",
@@ -6239,7 +6239,7 @@
     "lat": 39.84422229230404,
     "lon": -89.67808350920677,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -6278,7 +6278,7 @@
     "lat": 39.40305557101965,
     "lon": -119.25119429826736,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "24",
@@ -6297,7 +6297,7 @@
     "lat": 38.74869715422392,
     "lon": -90.37002503871918,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -6346,7 +6346,7 @@
     "lat": 40.375694297254086,
     "lon": -120.5726945400238,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -6375,7 +6375,7 @@
     "lat": 37.25922491401434,
     "lon": -104.34086099267006,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -6404,7 +6404,7 @@
     "lat": 33.23536120355129,
     "lon": -107.2698886692524,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -6463,7 +6463,7 @@
     "lat": 27.97547221183777,
     "lon": -82.53325000405312,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1L",
@@ -6502,7 +6502,7 @@
     "lat": 39.32005561888218,
     "lon": -120.13958349823952,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -6531,7 +6531,7 @@
     "lat": 36.19839448481798,
     "lon": -95.88810548186302,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -6570,7 +6570,7 @@
     "lat": 32.116069346666336,
     "lon": -110.94101384282112,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -6609,7 +6609,7 @@
     "lat": 38.8941090926528,
     "lon": -119.99531909823418,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -6628,7 +6628,7 @@
     "lat": 35.81108886748552,
     "lon": -83.9940695464611,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5R",
@@ -6657,7 +6657,7 @@
     "lat": 36.68710269033909,
     "lon": -82.03332781791687,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -6676,7 +6676,7 @@
     "lat": 28.036776445806026,
     "lon": -103.77187415957451,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -6705,7 +6705,7 @@
     "lat": 16.757097132503986,
     "lon": -99.75381955504417,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -6734,7 +6734,7 @@
     "lat": 21.70548342168331,
     "lon": -102.3178942501545,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -6763,7 +6763,7 @@
     "lat": 18.65196380764246,
     "lon": -91.79954454302788,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "31",
@@ -6782,7 +6782,7 @@
     "lat": 30.397438891232014,
     "lon": -107.87496954202652,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -6811,7 +6811,7 @@
     "lat": 24.765061140060425,
     "lon": -107.4751527607441,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "21",
@@ -6830,7 +6830,7 @@
     "lat": 18.504636101424694,
     "lon": -88.32679733633995,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -6849,7 +6849,7 @@
     "lat": 19.816805608570576,
     "lon": -90.50030842423439,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -6868,7 +6868,7 @@
     "lat": 31.636360958218575,
     "lon": -106.42876133322716,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -6897,7 +6897,7 @@
     "lat": 28.702327720820904,
     "lon": -105.96296399831772,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -6936,7 +6936,7 @@
     "lat": 20.522063970565796,
     "lon": -86.92927792668343,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -6965,7 +6965,7 @@
     "lat": 24.12603322416544,
     "lon": -104.52746093273163,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -6984,7 +6984,7 @@
     "lat": 21.419425159692764,
     "lon": -104.84254986047745,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "20",
@@ -7003,7 +7003,7 @@
     "lat": 20.52183598279953,
     "lon": -103.31114441156387,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "20",
@@ -7032,7 +7032,7 @@
     "lat": 29.09581381827593,
     "lon": -111.04785829782486,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -7061,7 +7061,7 @@
     "lat": 19.277011044323444,
     "lon": -103.57760265469551,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -7080,7 +7080,7 @@
     "lat": 25.54978597909212,
     "lon": -100.92835262417793,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -7099,7 +7099,7 @@
     "lat": 25.685522183775902,
     "lon": -109.0811638534069,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -7118,7 +7118,7 @@
     "lat": 20.993299931287766,
     "lon": -101.48096099495888,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "31",
@@ -7137,7 +7137,7 @@
     "lat": 24.072747118771076,
     "lon": -110.36254182457924,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "36",
@@ -7156,7 +7156,7 @@
     "lat": 25.769947059452534,
     "lon": -97.52523332834244,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -7175,7 +7175,7 @@
     "lat": 20.937022157013416,
     "lon": -89.65769425034523,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -7204,7 +7204,7 @@
     "lat": 32.63056397438049,
     "lon": -115.24164453148842,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -7223,7 +7223,7 @@
     "lat": 19.849869534373283,
     "lon": -101.02537482976913,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -7242,7 +7242,7 @@
     "lat": 18.10334175825119,
     "lon": -94.58061397075653,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "19",
@@ -7261,7 +7261,7 @@
     "lat": 19.435969479382038,
     "lon": -99.07339185476303,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5L",
@@ -7290,7 +7290,7 @@
     "lat": 25.778558291494846,
     "lon": -100.10698601603508,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -7319,7 +7319,7 @@
     "lat": 27.44336385279894,
     "lon": -99.5699192583561,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -7338,7 +7338,7 @@
     "lat": 16.998586133122444,
     "lon": -96.72604188323021,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "19",
@@ -7357,7 +7357,7 @@
     "lat": 19.158138893544674,
     "lon": -98.37150290608406,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -7376,7 +7376,7 @@
     "lat": 20.680072233080864,
     "lon": -105.25420010089874,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -7395,7 +7395,7 @@
     "lat": 20.617377944290638,
     "lon": -100.18569454550743,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -7414,7 +7414,7 @@
     "lat": 26.008586212992668,
     "lon": -98.22825014591217,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -7433,7 +7433,7 @@
     "lat": 23.15207216888666,
     "lon": -109.7207473218441,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -7452,7 +7452,7 @@
     "lat": 22.254261039197445,
     "lon": -100.9307612478733,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "32",
@@ -7481,7 +7481,7 @@
     "lat": 25.56828886270523,
     "lon": -103.41067761182785,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -7510,7 +7510,7 @@
     "lat": 16.561822257936,
     "lon": -93.02608072757721,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "33",
@@ -7529,7 +7529,7 @@
     "lat": 32.5410583242774,
     "lon": -116.96996927261353,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "27",
@@ -7548,7 +7548,7 @@
     "lat": 22.289822101593018,
     "lon": -97.86441385746002,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -7587,7 +7587,7 @@
     "lat": 19.337086156010628,
     "lon": -99.5660363137722,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -7606,7 +7606,7 @@
     "lat": 14.794350117444992,
     "lon": -92.36996948719025,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -7625,7 +7625,7 @@
     "lat": 21.042741760611534,
     "lon": -86.8732000887394,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "30L",
@@ -7654,7 +7654,7 @@
     "lat": 17.997019328176975,
     "lon": -92.81481385231018,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -7673,7 +7673,7 @@
     "lat": 19.145780615508556,
     "lon": -96.18736401200294,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "19",
@@ -7692,7 +7692,7 @@
     "lat": 22.89739441126585,
     "lon": -102.68576949834824,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2",
@@ -7711,7 +7711,7 @@
     "lat": 17.60162215679884,
     "lon": -101.46055296063423,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -7730,7 +7730,7 @@
     "lat": 19.14476104080677,
     "lon": -104.55848067998886,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -7749,7 +7749,7 @@
     "lat": -10.985277704894543,
     "lon": -37.07333341240883,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -7768,7 +7768,7 @@
     "lat": -9.866388849914074,
     "lon": -56.10499978065491,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -7787,7 +7787,7 @@
     "lat": -21.144166812300682,
     "lon": -50.426388680934906,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "5",
@@ -7806,7 +7806,7 @@
     "lat": -1.3847222551703453,
     "lon": -48.478889018297195,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "3",
@@ -7835,7 +7835,7 @@
     "lat": -15.871111191809177,
     "lon": -47.918611317873,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11L",
@@ -7864,7 +7864,7 @@
     "lat": 2.8413887321949005,
     "lon": -60.6922222673893,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "8",
@@ -7883,7 +7883,7 @@
     "lat": -15.860833302140236,
     "lon": -52.38944426178932,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -7902,7 +7902,7 @@
     "lat": -25.002222061157227,
     "lon": -53.50194454193115,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "33",
@@ -7921,7 +7921,7 @@
     "lat": -19.624444283545017,
     "lon": -43.971944600343704,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -7940,7 +7940,7 @@
     "lat": -20.469444394111633,
     "lon": -54.67027768492699,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "24",
@@ -7959,7 +7959,7 @@
     "lat": -27.13388890028,
     "lon": -52.66194462776184,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -7978,7 +7978,7 @@
     "lat": -19.0119444206357,
     "lon": -57.67138883471489,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "27",
@@ -7997,7 +7997,7 @@
     "lat": -25.53166665136814,
     "lon": -49.17611092329025,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -8026,7 +8026,7 @@
     "lat": -29.195555448532104,
     "lon": -51.18972212076187,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -8045,7 +8045,7 @@
     "lat": -15.649999938905239,
     "lon": -56.117500215768814,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "17",
@@ -8064,7 +8064,7 @@
     "lat": -7.599444463849068,
     "lon": -72.7694445848465,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -8083,7 +8083,7 @@
     "lat": -22.178333401679993,
     "lon": -51.418888717889786,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -8102,7 +8102,7 @@
     "lat": -22.200555503368378,
     "lon": -54.92555558681488,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "24",
@@ -8121,7 +8121,7 @@
     "lat": -3.041111044585705,
     "lon": -60.0505556166172,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -8140,7 +8140,7 @@
     "lat": -25.60027789324522,
     "lon": -54.48500007390976,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -8159,7 +8159,7 @@
     "lat": -27.67027772963047,
     "lon": -48.55250000953674,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "14",
@@ -8188,7 +8188,7 @@
     "lat": -3.77583347260952,
     "lon": -38.53222221136093,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -8207,7 +8207,7 @@
     "lat": -22.809999994933605,
     "lon": -43.25055554509163,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -8236,7 +8236,7 @@
     "lat": -16.632500141859055,
     "lon": -49.22111123800278,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "32",
@@ -8255,7 +8255,7 @@
     "lat": -23.435555510222912,
     "lon": -46.473055332899094,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10L",
@@ -8284,7 +8284,7 @@
     "lat": -3.2508333027362823,
     "lon": -52.25222200155258,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "25",
@@ -8303,7 +8303,7 @@
     "lat": -14.815000109374523,
     "lon": -39.033333510160446,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "29",
@@ -8322,7 +8322,7 @@
     "lat": -5.53055539727211,
     "lon": -47.458333522081375,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "25",
@@ -8341,7 +8341,7 @@
     "lat": -7.148333452641964,
     "lon": -34.95027780532837,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "16",
@@ -8360,7 +8360,7 @@
     "lat": -7.219166569411755,
     "lon": -39.26944434642792,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -8379,7 +8379,7 @@
     "lat": -26.22305564582348,
     "lon": -48.797777742147446,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -8398,7 +8398,7 @@
     "lat": -23.00694454461336,
     "lon": -47.13444426655769,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "15",
@@ -8417,7 +8417,7 @@
     "lat": -23.330277800559998,
     "lon": -51.13666668534279,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "13",
@@ -8436,7 +8436,7 @@
     "lat": -5.3680554404854774,
     "lon": -49.13805574178696,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "25",
@@ -8455,7 +8455,7 @@
     "lat": -22.19555553048849,
     "lon": -49.92694437503815,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "21",
@@ -8474,7 +8474,7 @@
     "lat": -9.510833211243153,
     "lon": -35.79166665673256,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -8493,7 +8493,7 @@
     "lat": 0.05083322525024414,
     "lon": -51.070277988910675,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "26",
@@ -8512,7 +8512,7 @@
     "lat": -26.878610998392105,
     "lon": -48.65083336830139,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "26",
@@ -8531,7 +8531,7 @@
     "lat": -29.993888810276985,
     "lon": -51.1711111664772,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "11",
@@ -8550,7 +8550,7 @@
     "lat": -10.289999842643738,
     "lon": -48.35777789354324,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "32",
@@ -8569,7 +8569,7 @@
     "lat": -31.716111078858376,
     "lon": -52.3311111330986,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "7",
@@ -8598,7 +8598,7 @@
     "lat": -9.367499984800816,
     "lon": -40.56361109018326,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "31",
@@ -8617,7 +8617,7 @@
     "lat": -16.43805541098118,
     "lon": -39.08388867974281,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -8636,7 +8636,7 @@
     "lat": -8.713610954582691,
     "lon": -63.90277773141861,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "1",
@@ -8655,7 +8655,7 @@
     "lat": -9.868333451449871,
     "lon": -67.89805546402931,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -8674,7 +8674,7 @@
     "lat": -16.588055603206158,
     "lon": -54.72166657447815,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2",
@@ -8693,7 +8693,7 @@
     "lat": -8.126388899981976,
     "lon": -34.92277756333351,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "36",
@@ -8712,7 +8712,7 @@
     "lat": -21.13638874143362,
     "lon": -47.77666658163071,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "18",
@@ -8731,7 +8731,7 @@
     "lat": -5.768888778984547,
     "lon": -35.36638900637627,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -8750,7 +8750,7 @@
     "lat": -11.884975098073483,
     "lon": -55.586280673742294,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "21",
@@ -8769,7 +8769,7 @@
     "lat": -23.22888895869255,
     "lon": -45.871111303567886,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "34",
@@ -8788,7 +8788,7 @@
     "lat": -2.5869443267583847,
     "lon": -44.236110895872116,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -8817,7 +8817,7 @@
     "lat": -2.4247223138809204,
     "lon": -54.78583350777626,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "28",
@@ -8836,7 +8836,7 @@
     "lat": -20.8161111921072,
     "lon": -49.404722303152084,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "25",
@@ -8855,7 +8855,7 @@
     "lat": -12.908610999584198,
     "lon": -38.322499841451645,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "10",
@@ -8884,7 +8884,7 @@
     "lat": -5.060555599629879,
     "lon": -42.824444621801376,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2",
@@ -8903,7 +8903,7 @@
     "lat": -4.250555634498596,
     "lon": -69.93777796626091,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "12",
@@ -8922,7 +8922,7 @@
     "lat": -18.883611112833023,
     "lon": -48.22527766227722,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "4",
@@ -8941,7 +8941,7 @@
     "lat": -19.764722138643265,
     "lon": -47.96611100435257,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "35",
@@ -8960,7 +8960,7 @@
     "lat": -20.258055478334427,
     "lon": -40.28638869524002,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "2",
@@ -8989,7 +8989,7 @@
     "lat": -1.4791665226221085,
     "lon": -52.578055411577225,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "6",
@@ -9008,7 +9008,7 @@
     "lat": -0.3785840794444084,
     "lon": -64.99252885580063,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-08",
+    "validatedAt": "2026-08-11",
     "runways": [
       {
         "ident": "9",
@@ -9018,6 +9018,1372 @@
         "lat": -0.3785840794444084,
         "lon": -64.99252885580063,
         "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAAJ": {
+    "name": "Junin",
+    "lat": -34.54589892178774,
+    "lon": -60.93052625656128,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "36",
+        "headingTrueDeg": 354.8230285644531,
+        "lengthM": 1503.99951171875,
+        "widthM": 25,
+        "lat": -34.54589892178774,
+        "lon": -60.93052625656128,
+        "identReciprocal": "18",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAAP": {
+    "name": "Gen Urquiza",
+    "lat": -31.794722266495228,
+    "lon": -60.48027768731117,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 8.333771705627441,
+        "lengthM": 2094.54248046875,
+        "widthM": 37.0090446472168,
+        "lat": -31.79476149380207,
+        "lon": -60.4803840816021,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAAR": {
+    "name": "Rosario/Islas Malvinas",
+    "lat": -32.90361117571592,
+    "lon": -60.78444465994835,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 10.79931354522705,
+        "lengthM": 2991.205322265625,
+        "widthM": 38.76970291137695,
+        "lat": -32.90351830422878,
+        "lon": -60.78467667102814,
+        "identReciprocal": "20",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "SAAV": {
+    "name": "Sauce Viejo",
+    "lat": -31.710833497345448,
+    "lon": -60.81138879060745,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 22.770822525024414,
+        "lengthM": 2319.24951171875,
+        "widthM": 31.280010223388672,
+        "lat": -31.710810028016567,
+        "lon": -60.8113007247448,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SABE": {
+    "name": "Jorge Newbery Aeroparque",
+    "lat": -34.55972235649824,
+    "lon": -58.41499999165535,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "31",
+        "headingTrueDeg": 303.9934387207031,
+        "lengthM": 2096.955078125,
+        "widthM": 42,
+        "lat": -34.5592150837183,
+        "lon": -58.415756821632385,
+        "identReciprocal": "13",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SACO": {
+    "name": "Ing Aeron Ambrosio Lv Taravell",
+    "lat": -31.31000015884638,
+    "lon": -64.20833319425583,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 359.2144775390625,
+        "lengthM": 3198.4970703125,
+        "widthM": 40.901405334472656,
+        "lat": -31.31007056683302,
+        "lon": -64.20833677053452,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.000118255615234,
+        "lengthM": 2462.27001953125,
+        "widthM": 43.34885787963867,
+        "lat": -31.316873989999294,
+        "lon": -64.20039743185043,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SADF": {
+    "name": "San Fernando Intl",
+    "lat": -34.45499986410141,
+    "lon": -58.59138876199722,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.0780143737793,
+        "lengthM": 1799.4638671875,
+        "widthM": 28.066253662109375,
+        "lat": -34.454013146460056,
+        "lon": -58.59027788043022,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAEZ": {
+    "name": "Ezeiza Intl Ministro Pistarini",
+    "lat": -34.82222210615873,
+    "lon": -58.53583350777626,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 102.25684356689453,
+        "lengthM": 3293.977783203125,
+        "widthM": 57.68510437011719,
+        "lat": -34.82220433652401,
+        "lon": -58.535860776901245,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 164.06097412109375,
+        "lengthM": 3109.037841796875,
+        "widthM": 43.229244232177734,
+        "lat": -34.82174165546894,
+        "lon": -58.52927774190903,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAMA": {
+    "name": "General Alvear",
+    "lat": -35.059394761919975,
+    "lon": -67.69321292638779,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "35",
+        "headingTrueDeg": 356.98907470703125,
+        "lengthM": 1492.2158203125,
+        "widthM": 31.76584815979004,
+        "lat": -35.059394761919975,
+        "lon": -67.69321292638779,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAME": {
+    "name": "El Plumerillo",
+    "lat": -32.83166661858559,
+    "lon": -68.79277780652046,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 180.7323760986328,
+        "lengthM": 2833.505615234375,
+        "widthM": 52.353492736816406,
+        "lat": -32.83195160329342,
+        "lon": -68.79289492964745,
+        "identReciprocal": "36",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "SANC": {
+    "name": "Catamarca",
+    "lat": -28.59305553138256,
+    "lon": -65.75111120939255,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 11.926630020141602,
+        "lengthM": 2800.875,
+        "widthM": 28.304546356201172,
+        "lat": -28.59308436512947,
+        "lon": -65.75118497014046,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SANL": {
+    "name": "Capitan V. Almandos Almonacid",
+    "lat": -29.38055545091629,
+    "lon": -66.79583340883255,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 208.3000030517578,
+        "lengthM": 2803.433837890625,
+        "widthM": 25,
+        "lat": -29.38044212758541,
+        "lon": -66.79575473070145,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SANR": {
+    "name": "Termas De Rio Hondo",
+    "lat": -27.496666721999645,
+    "lon": -64.9358332157135,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 182.62574768066406,
+        "lengthM": 2499.40869140625,
+        "widthM": 25,
+        "lat": -27.49664694070816,
+        "lon": -64.93599057197571,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SANT": {
+    "name": "Benjamin Matienzo",
+    "lat": -26.838333271443844,
+    "lon": -65.10444447398186,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 189.72430419921875,
+        "lengthM": 2887.404296875,
+        "widthM": 40.252933502197266,
+        "lat": -26.840906850993633,
+        "lon": -65.10479852557182,
+        "identReciprocal": "2",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "SANU": {
+    "name": "San Juan",
+    "lat": -31.57138880342245,
+    "lon": -68.41833338141441,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.48428344726562,
+        "lengthM": 2455.97802734375,
+        "widthM": 40.877113342285156,
+        "lat": -31.57144647091627,
+        "lon": -68.41831818223,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAOC": {
+    "name": "Area De Material",
+    "lat": -33.09222210198641,
+    "lon": -64.26944464445114,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.34652328491211,
+        "lengthM": 2260.201416015625,
+        "widthM": 44.58919143676758,
+        "lat": -33.092187233269215,
+        "lon": -64.26938027143478,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.3579559326172,
+        "lengthM": 2066.33740234375,
+        "widthM": 36.43907928466797,
+        "lat": -33.09302743524313,
+        "lon": -64.26141142845154,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAOD": {
+    "name": "Villa Dolores",
+    "lat": -31.94587379693985,
+    "lon": -65.14740005135536,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 15.446961402893066,
+        "lengthM": 844.56396484375,
+        "widthM": 28.428997039794922,
+        "lat": -31.94657016545534,
+        "lon": -65.14861956238747,
+        "identReciprocal": "19",
+        "surface": "dirt"
+      },
+      {
+        "ident": "35",
+        "headingTrueDeg": 355.731201171875,
+        "lengthM": 1394.8828125,
+        "widthM": 20.879005432128906,
+        "lat": -31.94517709314823,
+        "lon": -65.14618054032326,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAOR": {
+    "name": "Villa Reynolds",
+    "lat": -33.72500013560057,
+    "lon": -65.37805572152138,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 58.414527893066406,
+        "lengthM": 2359.473876953125,
+        "widthM": 48.37218475341797,
+        "lat": -33.72510574758053,
+        "lon": -65.37817597389221,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "10",
+        "headingTrueDeg": 101.21939849853516,
+        "lengthM": 2434.99365234375,
+        "widthM": 55.66948699951172,
+        "lat": -33.73182937502861,
+        "lon": -65.37553980946541,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAOU": {
+    "name": "San Luis",
+    "lat": -33.27333323657513,
+    "lon": -66.35638877749443,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 186.49478149414062,
+        "lengthM": 2949.981689453125,
+        "widthM": 27.1232852935791,
+        "lat": -33.2731669396162,
+        "lon": -66.35653272271156,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SARC": {
+    "name": "Corrientes",
+    "lat": -27.445000000298023,
+    "lon": -58.7616665661335,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 187.8198699951172,
+        "lengthM": 2251.0009765625,
+        "widthM": 43.215911865234375,
+        "lat": -27.444924227893353,
+        "lon": -58.761719316244125,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SARE": {
+    "name": "Resistencia",
+    "lat": -27.44999997317791,
+    "lon": -59.056110978126526,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 200.80963134765625,
+        "lengthM": 2771.75537109375,
+        "widthM": 42.938941955566406,
+        "lat": -27.449924871325493,
+        "lon": -59.05606493353844,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SARF": {
+    "name": "Formosa",
+    "lat": -26.212777756154537,
+    "lon": -58.22805538773537,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 24.90188980102539,
+        "lengthM": 1798.2611083984375,
+        "widthM": 35.11895751953125,
+        "lat": -26.21271774172783,
+        "lon": -58.228145241737366,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SARP": {
+    "name": "Liberador Gral D Jose De San M",
+    "lat": -27.385833486914635,
+    "lon": -55.970555394887924,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 359.12957763671875,
+        "lengthM": 2250.833251953125,
+        "widthM": 27.383373260498047,
+        "lat": -27.38572619855404,
+        "lon": -55.97055360674858,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SASA": {
+    "name": "Gral M M De Guemes",
+    "lat": -24.859722331166267,
+    "lon": -65.4869444668293,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 232.09153747558594,
+        "lengthM": 2385.332763671875,
+        "widthM": 29.074769973754883,
+        "lat": -24.851464480161667,
+        "lon": -65.48019602894783,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "20",
+        "headingTrueDeg": 191.2353973388672,
+        "lengthM": 2977.94140625,
+        "widthM": 43.05923843383789,
+        "lat": -24.85960464924574,
+        "lon": -65.487040579319,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SASJ": {
+    "name": "Gobernador Horacio Guzman Intern",
+    "lat": -24.392777904868126,
+    "lon": -65.09777784347534,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 150.28555297851562,
+        "lengthM": 2941.429931640625,
+        "widthM": 39.11809539794922,
+        "lat": -24.39273566007614,
+        "lon": -65.09777426719666,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAVC": {
+    "name": "Gen. Enrique Mosconi Intl",
+    "lat": -45.78527770936489,
+    "lon": -67.46555551886559,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 79.33358001708984,
+        "lengthM": 2806.74755859375,
+        "widthM": 48.26447296142578,
+        "lat": -45.78524988144636,
+        "lon": -67.46568650007248,
+        "identReciprocal": "25",
+        "surface": "concrete"
+      },
+      {
+        "ident": "30",
+        "headingTrueDeg": 315.84307861328125,
+        "lengthM": 1323.265869140625,
+        "widthM": 50.73631286621094,
+        "lat": -45.78776780515909,
+        "lon": -67.46407717466354,
+        "identReciprocal": "12",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "SAVN": {
+    "name": "Antoine De Saint Exupery",
+    "lat": -40.75112443417311,
+    "lon": -65.03427252173424,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 125.38544464111328,
+        "lengthM": 1805.6968994140625,
+        "widthM": 25,
+        "lat": -40.75112443417311,
+        "lon": -65.03427252173424,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAVT": {
+    "name": "Almirante Zar",
+    "lat": -43.21055553853512,
+    "lon": -65.27027785778046,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 69.06788635253906,
+        "lengthM": 2548.545166015625,
+        "widthM": 42.720245361328125,
+        "lat": -43.21046132594347,
+        "lon": -65.27036592364311,
+        "identReciprocal": "25",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "SAVY": {
+    "name": "El Tehuelche",
+    "lat": -42.759166583418846,
+    "lon": -65.10277792811394,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 238.00527954101562,
+        "lengthM": 2501.24169921875,
+        "widthM": 45,
+        "lat": -42.75922056287527,
+        "lon": -65.10275825858116,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAWC": {
+    "name": "El Calafate",
+    "lat": -50.28027780354023,
+    "lon": -72.05333322286606,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 84.65351104736328,
+        "lengthM": 2546.163330078125,
+        "widthM": 44.38147735595703,
+        "lat": -50.28020404279232,
+        "lon": -72.05320134758949,
+        "identReciprocal": "25",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "SAWE": {
+    "name": "Rio Grande",
+    "lat": -53.77750016748905,
+    "lon": -67.74944454431534,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 87.43197631835938,
+        "lengthM": 1998.1397705078125,
+        "widthM": 40.52870559692383,
+        "lat": -53.77754341810942,
+        "lon": -67.74950176477432,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAWG": {
+    "name": "Norberto Fernandez",
+    "lat": -51.608888916671276,
+    "lon": -69.31277766823769,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 265.56341552734375,
+        "lengthM": 3473.674072265625,
+        "widthM": 43.877017974853516,
+        "lat": -51.60881146788597,
+        "lon": -69.31215092539787,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAWH": {
+    "name": "Ushuaia Intl Malvine Is",
+    "lat": -54.84333325177431,
+    "lon": -68.29555571079254,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 86.17345428466797,
+        "lengthM": 2913.316650390625,
+        "widthM": 45,
+        "lat": -54.84327793121338,
+        "lon": -68.29488158226013,
+        "identReciprocal": "25",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "SAZB": {
+    "name": "Comandante Espora NAS",
+    "lat": -38.72722238302231,
+    "lon": -62.15333327651024,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 60.645450592041016,
+        "lengthM": 1979.534423828125,
+        "widthM": 32.29640579223633,
+        "lat": -38.72313939034939,
+        "lon": -62.17066839337349,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "35L",
+        "headingTrueDeg": 344.2481689453125,
+        "lengthM": 1498.316162109375,
+        "widthM": 29.04114532470703,
+        "lat": -38.72621051967144,
+        "lon": -62.18200385570526,
+        "identReciprocal": "17R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "35R",
+        "headingTrueDeg": 343.7647705078125,
+        "lengthM": 2516.0625,
+        "widthM": 58.43613052368164,
+        "lat": -38.72625108808279,
+        "lon": -62.15383172035217,
+        "identReciprocal": "17L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAZH": {
+    "name": "Tres Arroyos",
+    "lat": -38.38490042835474,
+    "lon": -60.32817542552948,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 44.017433166503906,
+        "lengthM": 635.8953857421875,
+        "widthM": 66.88028717041016,
+        "lat": -38.388288393616676,
+        "lon": -60.325521379709244,
+        "identReciprocal": "22",
+        "surface": "other"
+      },
+      {
+        "ident": "32",
+        "headingTrueDeg": 314.4842834472656,
+        "lengthM": 1056.8636474609375,
+        "widthM": 58.21112060546875,
+        "lat": -38.38289078325033,
+        "lon": -60.32673820853233,
+        "identReciprocal": "14",
+        "surface": "grass"
+      },
+      {
+        "ident": "36",
+        "headingTrueDeg": 355.244873046875,
+        "lengthM": 1286.5079345703125,
+        "widthM": 28.882417678833008,
+        "lat": -38.386867828667164,
+        "lon": -60.329628735780716,
+        "identReciprocal": "18",
+        "surface": "other"
+      }
+    ]
+  },
+  "SAZM": {
+    "name": "ÃƒÂstor Piazzolla International",
+    "lat": -37.934166602790356,
+    "lon": -57.57333353161812,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 122.88068389892578,
+        "lengthM": 2198.25537109375,
+        "widthM": 42.697940826416016,
+        "lat": -37.934203147888184,
+        "lon": -57.573291063308716,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAZR": {
+    "name": "Santa Rosa",
+    "lat": -36.58805541694164,
+    "lon": -64.27555561065674,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 11.206061363220215,
+        "lengthM": 2298.222412109375,
+        "widthM": 28.516143798828125,
+        "lat": -36.58815935254097,
+        "lon": -64.27559673786163,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAZS": {
+    "name": "S C De Bariloche",
+    "lat": -41.15111120045185,
+    "lon": -71.15777760744095,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 114.80770111083984,
+        "lengthM": 2345.144287109375,
+        "widthM": 46.99311447143555,
+        "lat": -41.15109544247389,
+        "lon": -71.15793406963348,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SAZT": {
+    "name": "Tandil",
+    "lat": -37.234444320201874,
+    "lon": -59.22861099243164,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 5.078365802764893,
+        "lengthM": 2544.337646484375,
+        "widthM": 47.914756774902344,
+        "lat": -37.23438732326031,
+        "lon": -59.22859266400337,
+        "identReciprocal": "19",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "SAZV": {
+    "name": "Villa Gesell",
+    "lat": -37.23541393876076,
+    "lon": -57.0288111269474,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "29",
+        "headingTrueDeg": 281.9329528808594,
+        "lengthM": 1815.620361328125,
+        "widthM": 29.634416580200195,
+        "lat": -37.235319055616856,
+        "lon": -57.029368579387665,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCAR": {
+    "name": "Chacalluta Intl",
+    "lat": -18.348610997200012,
+    "lon": -70.33861130475998,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 19.18212127685547,
+        "lengthM": 2169.307861328125,
+        "widthM": 44.023921966552734,
+        "lat": -18.34847889840603,
+        "lon": -70.33874675631523,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCAT": {
+    "name": "Desierto De Atacama",
+    "lat": -27.261666655540466,
+    "lon": -70.7791668176651,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 175.45071411132812,
+        "lengthM": 2198.916748046875,
+        "widthM": 44.06077194213867,
+        "lat": -27.261393405497074,
+        "lon": -70.77924147248268,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCBA": {
+    "name": "Balmaceda",
+    "lat": -45.916388779878616,
+    "lon": -71.6869443655014,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 100.06315612792969,
+        "lengthM": 2504.820556640625,
+        "widthM": 43.26671600341797,
+        "lat": -45.91594822704792,
+        "lon": -71.689423173666,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCCD": {
+    "name": "Castro Airport",
+    "lat": -42.32454679906368,
+    "lon": -73.38871255517006,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "28",
+        "headingTrueDeg": 293.5165100097656,
+        "lengthM": 279.89984130859375,
+        "widthM": 7.204685688018799,
+        "lat": -42.32454679906368,
+        "lon": -73.38871255517006,
+        "identReciprocal": "10",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCCF": {
+    "name": "El Loa",
+    "lat": -22.5,
+    "lon": -68.90305548906326,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 94.26795959472656,
+        "lengthM": 3035.010498046875,
+        "widthM": 44.388206481933594,
+        "lat": -22.50012170523405,
+        "lon": -68.90309751033783,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCCH": {
+    "name": "Gen. Bernardo O'Higgins",
+    "lat": -36.582777835428715,
+    "lon": -72.03166678547859,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 44.829246520996094,
+        "lengthM": 1751.7880859375,
+        "widthM": 30.25394058227539,
+        "lat": -36.582439206540585,
+        "lon": -72.03134447336197,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCCI": {
+    "name": "Carlos Ibanez Del Campo Intl",
+    "lat": -53.003611117601395,
+    "lon": -70.85361108183861,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 268.7149658203125,
+        "lengthM": 2791.225341796875,
+        "widthM": 44.001548767089844,
+        "lat": -53.000886999070644,
+        "lon": -70.85463389754295,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "19",
+        "headingTrueDeg": 208.62283325195312,
+        "lengthM": 1671.7264404296875,
+        "widthM": 42.302101135253906,
+        "lat": -53.00137549638748,
+        "lon": -70.84898695349693,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 138.90899658203125,
+        "lengthM": 2400.015380859375,
+        "widthM": 41.551918029785156,
+        "lat": -53.00567541271448,
+        "lon": -70.85696116089821,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCCY": {
+    "name": "Teniente Vidal",
+    "lat": -45.59361107647419,
+    "lon": -72.10527777671814,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 45.370548248291016,
+        "lengthM": 1549.01416015625,
+        "widthM": 26.874086380004883,
+        "lat": -45.59424005448818,
+        "lon": -72.1061660349369,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCDA": {
+    "name": "Diego Aracena Intl",
+    "lat": -20.535277873277664,
+    "lon": -70.18138870596886,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 2.8845536708831787,
+        "lengthM": 3349.733642578125,
+        "widthM": 41.52976989746094,
+        "lat": -20.535222552716732,
+        "lon": -70.18129974603653,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCEL": {
+    "name": "Arturo Merino Benitez Intl",
+    "lat": -33.394441679120064,
+    "lon": -70.7938027381897,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "17L",
+        "headingTrueDeg": 177.39784240722656,
+        "lengthM": 3330.06298828125,
+        "widthM": 54.66630935668945,
+        "lat": -33.394855074584484,
+        "lon": -70.78571453690529,
+        "identReciprocal": "35R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17R",
+        "headingTrueDeg": 177.44737243652344,
+        "lengthM": 3805.051513671875,
+        "widthM": 44.81875228881836,
+        "lat": -33.38904708623886,
+        "lon": -70.80281764268875,
+        "identReciprocal": "35L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCFA": {
+    "name": "Cerro Moreno Intl",
+    "lat": -23.444444350898266,
+    "lon": -70.44499978423119,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 186.37066650390625,
+        "lengthM": 2607.71533203125,
+        "widthM": 48.693748474121094,
+        "lat": -23.444472178816795,
+        "lon": -70.44506907463074,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCIC": {
+    "name": "General Freire",
+    "lat": -34.96666677296162,
+    "lon": -71.21638879179955,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 192.96607971191406,
+        "lengthM": 829.125,
+        "widthM": 17.29603385925293,
+        "lat": -34.96582992374897,
+        "lon": -71.21613666415215,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCIE": {
+    "name": "Carriel Sur Intl",
+    "lat": -36.7713887616992,
+    "lon": -73.06250005960464,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 24.999893188476562,
+        "lengthM": 2597.590087890625,
+        "widthM": 40.075660705566406,
+        "lat": -36.77142798900604,
+        "lon": -73.06247189640999,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCJO": {
+    "name": "Canal Bajo/Carlos H Siebert",
+    "lat": -40.60976095497608,
+    "lon": -73.06226089596748,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 155.40489196777344,
+        "lengthM": 1696.97607421875,
+        "widthM": 42.467933654785156,
+        "lat": -40.611290484666824,
+        "lon": -73.06064531207085,
+        "identReciprocal": "33",
+        "surface": "other"
+      },
+      {
+        "ident": "15R",
+        "headingTrueDeg": 155.26406860351562,
+        "lengthM": 775.5289916992188,
+        "widthM": 18.972139358520508,
+        "lat": -40.609701946377754,
+        "lon": -73.06227654218674,
+        "identReciprocal": "33L",
+        "surface": "grass"
+      }
+    ]
+  },
+  "SCNT": {
+    "name": "Teniente Julio Gallardo",
+    "lat": -51.67083319276571,
+    "lon": -72.52861127257347,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 119.70321655273438,
+        "lengthM": 1762.28955078125,
+        "widthM": 29.16614532470703,
+        "lat": -51.67068265378475,
+        "lon": -72.52876058220863,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCPQ": {
+    "name": "Mocopulli",
+    "lat": -42.34038893133402,
+    "lon": -73.71569439768791,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 184.63735961914062,
+        "lengthM": 2001.8204345703125,
+        "widthM": 44.13328170776367,
+        "lat": -42.34041575342417,
+        "lon": -73.71568903326988,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCQP": {
+    "name": "La Araucania",
+    "lat": -38.92583325505257,
+    "lon": -72.65166655182838,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 197.09432983398438,
+        "lengthM": 2441.53271484375,
+        "widthM": 42.45805740356445,
+        "lat": -38.925866447389126,
+        "lon": -72.65165850520134,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCRG": {
+    "name": "De La Independencia",
+    "lat": -34.17321939021349,
+    "lon": -70.77569425106049,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 35.87358093261719,
+        "lengthM": 1602.0640869140625,
+        "widthM": 21.961881637573242,
+        "lat": -34.17325560003519,
+        "lon": -70.77579349279404,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCSN": {
+    "name": "Santo Domingo",
+    "lat": -33.65666650235653,
+    "lon": -71.61583319306374,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 236.1426544189453,
+        "lengthM": 799.8325805664062,
+        "widthM": 17.833070755004883,
+        "lat": -33.65662157535553,
+        "lon": -71.61572948098183,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCST": {
+    "name": "Gamboa Apt",
+    "lat": -42.49027781188488,
+    "lon": -73.77277761697769,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 168.04176330566406,
+        "lengthM": 800.726318359375,
+        "widthM": 5.325287342071533,
+        "lat": -42.491146847605705,
+        "lon": -73.77423763275146,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCTC": {
+    "name": "Maquehue",
+    "lat": -38.76694455742836,
+    "lon": -72.63722240924835,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 67.19783020019531,
+        "lengthM": 1699.0321044921875,
+        "widthM": 42.297508239746094,
+        "lat": -38.766831904649734,
+        "lon": -72.63701274991035,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCTE": {
+    "name": "El Tepual Intl",
+    "lat": -41.438888758420944,
+    "lon": -73.09388905763626,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 181.5087127685547,
+        "lengthM": 2648.834716796875,
+        "widthM": 42.388160705566406,
+        "lat": -41.43889144062996,
+        "lon": -73.09395790100098,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCVD": {
+    "name": "Pichoy",
+    "lat": -39.64944429695606,
+    "lon": -73.08638870716095,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 178.27413940429688,
+        "lengthM": 2102.896728515625,
+        "widthM": 47.05073165893555,
+        "lat": -39.64984159916639,
+        "lon": -73.08628141880035,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "SCVM": {
+    "name": "Vina Del Mar",
+    "lat": -32.94972237199545,
+    "lon": -71.478610932827,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-11",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 52.25508117675781,
+        "lengthM": 1752.116943359375,
+        "widthM": 26.900049209594727,
+        "lat": -32.94961575418711,
+        "lon": -71.47858276963234,
+        "identReciprocal": "23",
         "surface": "asphalt"
       }
     ]

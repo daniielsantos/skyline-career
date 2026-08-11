@@ -25,20 +25,31 @@ describe('career partition', () => {
     assert.equal(countryIdFromRegion('US-SE'), 'US');
     assert.equal(countryIdFromRegion('CA-ON'), 'CA');
     assert.equal(countryIdFromRegion('MX-C'), 'MX');
+    assert.equal(countryIdFromRegion('AR-BA'), 'AR');
+    assert.equal(countryIdFromRegion('CL-C'), 'CL');
     assert.equal(countryIdFromRegion('BR'), 'BR');
   });
 
-  it('seeds Brazil home with US/CA/MX partition hubs + international lanes', () => {
+  it('seeds Brazil home with US/CA/MX/AR/CL partition hubs + international lanes', () => {
     const world = createSeedEconomyWorld({ seed: 'partition-seed' });
     assert.equal(world.homeCountryId, 'BR');
     assert.equal(inferHomeCountryId(world), 'BR');
-    assert.deepEqual(listWorldCountryIds(world), ['BR', 'CA', 'MX', 'US']);
+    assert.deepEqual(listWorldCountryIds(world), [
+      'AR',
+      'BR',
+      'CA',
+      'CL',
+      'MX',
+      'US',
+    ]);
     assert.ok(world.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(world.airports.some((a) => a.icao === 'KLAX'));
     assert.ok(world.airports.some((a) => a.icao === 'KORD'));
     assert.ok(world.airports.some((a) => a.icao === 'CYYZ'));
     assert.ok(world.airports.some((a) => a.icao === 'MMMX'));
-    assert.ok((world.internationalLanes?.length ?? 0) >= 20);
+    assert.ok(world.airports.some((a) => a.icao === 'SAEZ'));
+    assert.ok(world.airports.some((a) => a.icao === 'SCEL'));
+    assert.ok((world.internationalLanes?.length ?? 0) >= 30);
     const usRegions = new Set(
       world.airports
         .filter((a) => countryIdFromRegion(a.region) === 'US')
@@ -78,11 +89,14 @@ describe('career partition', () => {
     const world = createSeedEconomyWorld({ seed: 'lane-gate' });
     assert.equal(isInternationalOdAllowed(world, 'SBGR', 'KMIA'), true);
     assert.equal(isInternationalOdAllowed(world, 'KMIA', 'SBGR'), true);
+    assert.equal(isInternationalOdAllowed(world, 'SBGR', 'SAEZ'), true);
+    assert.equal(isInternationalOdAllowed(world, 'SAEZ', 'SCEL'), true);
     assert.equal(isInternationalOdAllowed(world, 'KMIA', 'SBCT'), false);
     assert.ok(findInternationalLane(world, 'SBEG', 'KMIA'));
+    assert.ok(findInternationalLane(world, 'SBGR', 'SCEL'));
   });
 
-  it('adds US/CA/MX hubs and lanes to a Brazil-only legacy save', () => {
+  it('adds US/CA/MX/AR/CL hubs and lanes to a Brazil-only legacy save', () => {
     const full = createSeedEconomyWorld({ seed: 'us-coverage' });
     const brOnly = {
       version: 3 as const,
@@ -99,13 +113,15 @@ describe('career partition', () => {
     };
     assert.equal(brOnly.airports.length, 62);
     assert.equal(ensureCareerHubCoverage(brOnly as typeof full), true);
-    assert.equal(brOnly.airports.length, 317);
+    assert.equal(brOnly.airports.length, full.airports.length);
     assert.ok(brOnly.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'KSEA'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'KPDX'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'CYVR'));
     assert.ok(brOnly.airports.some((a) => a.icao === 'MMUN'));
-    assert.ok((brOnly.internationalLanes?.length ?? 0) >= 20);
+    assert.ok(brOnly.airports.some((a) => a.icao === 'SAEZ'));
+    assert.ok(brOnly.airports.some((a) => a.icao === 'SCEL'));
+    assert.ok((brOnly.internationalLanes?.length ?? 0) >= 30);
 
     const migrated = migrateEconomyWorld({
       version: 3,
@@ -118,8 +134,8 @@ describe('career partition', () => {
       npcs: [],
       npcFlights: [],
     });
-    assert.equal(migrated.airports.length, 317);
-    assert.ok((migrated.internationalLanes?.length ?? 0) >= 20);
+    assert.equal(migrated.airports.length, full.airports.length);
+    assert.ok((migrated.internationalLanes?.length ?? 0) >= 30);
   });
 
   it('forms domestic and international lots; never off-lane cross-country', () => {

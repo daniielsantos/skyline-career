@@ -4,6 +4,11 @@ import {
   buildBrFeederCorridors,
 } from './career-br-hubs.js';
 import {
+  assertArCareerHubCatalog,
+  AR_CAREER_HUBS,
+  buildArFeederCorridors,
+} from './career-ar-hubs.js';
+import {
   bushLotPayMult,
   isBushFreightOdAllowed,
   isBushHub,
@@ -15,6 +20,11 @@ import {
   buildCaFeederCorridors,
   CA_CAREER_HUBS,
 } from './career-ca-hubs.js';
+import {
+  assertClCareerHubCatalog,
+  CL_CAREER_HUBS,
+  buildClFeederCorridors,
+} from './career-cl-hubs.js';
 import {
   assertMxCareerHubCatalog,
   buildMxFeederCorridors,
@@ -339,12 +349,14 @@ export const HUB_TIER_PROFILE: Record<
   },
 };
 
-/** Curated ICAO → tier map (BR + US + CA + MX catalogs). */
+/** Curated ICAO → tier map (BR + US + CA + MX + AR + CL catalogs). */
 export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(US_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(CA_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(MX_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(AR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(CL_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -481,6 +493,22 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'SBCY', b: 'SBGR', weight: 1.4 },
   { a: 'SBCG', b: 'SBGR', weight: 1.4 },
   { a: 'SBCG', b: 'SBPA', weight: 1.3 },
+  // Cone Sul domestic trunks (AR / CL)
+  { a: 'SAEZ', b: 'SABE', weight: 2.0 },
+  { a: 'SAEZ', b: 'SACO', weight: 1.9 },
+  { a: 'SAEZ', b: 'SAME', weight: 1.7 },
+  { a: 'SAEZ', b: 'SAAR', weight: 1.8 },
+  { a: 'SABE', b: 'SAAR', weight: 1.6 },
+  { a: 'SACO', b: 'SAME', weight: 1.5 },
+  { a: 'SAEZ', b: 'SANT', weight: 1.5 },
+  { a: 'SAEZ', b: 'SAZS', weight: 1.6 },
+  { a: 'SAEZ', b: 'SAVN', weight: 1.5 },
+  { a: 'SCEL', b: 'SCTE', weight: 1.8 },
+  { a: 'SCEL', b: 'SCCD', weight: 1.7 },
+  { a: 'SCEL', b: 'SCFA', weight: 1.7 },
+  { a: 'SCEL', b: 'SCDA', weight: 1.6 },
+  { a: 'SCEL', b: 'SCCI', weight: 1.5 },
+  { a: 'SCTE', b: 'SCBA', weight: 1.4 },
   // South / NE regional trunks
   { a: 'SBPA', b: 'SBCT', weight: 1.5 },
   { a: 'SBCT', b: 'SBFL', weight: 1.4 },
@@ -578,6 +606,8 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildUsFeederCorridors(US_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildCaFeederCorridors(CA_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMxFeederCorridors(MX_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildArFeederCorridors(AR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildClFeederCorridors(CL_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -806,6 +836,113 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     originIcao: 'SBGR',
     destIcao: 'CYYZ',
     capacityKgPerDay: 35_000,
+  },
+  // BR ↔ Argentina / Chile
+  {
+    id: 'lane_sbgr_saez',
+    originCountryId: 'BR',
+    destCountryId: 'AR',
+    originIcao: 'SBGR',
+    destIcao: 'SAEZ',
+    capacityKgPerDay: 80_000,
+  },
+  {
+    id: 'lane_sbgl_saez',
+    originCountryId: 'BR',
+    destCountryId: 'AR',
+    originIcao: 'SBGL',
+    destIcao: 'SAEZ',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_sbpa_saez',
+    originCountryId: 'BR',
+    destCountryId: 'AR',
+    originIcao: 'SBPA',
+    destIcao: 'SAEZ',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_sbgr_sabe',
+    originCountryId: 'BR',
+    destCountryId: 'AR',
+    originIcao: 'SBGR',
+    destIcao: 'SABE',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_sbct_saez',
+    originCountryId: 'BR',
+    destCountryId: 'AR',
+    originIcao: 'SBCT',
+    destIcao: 'SAEZ',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_sbgr_scel',
+    originCountryId: 'BR',
+    destCountryId: 'CL',
+    originIcao: 'SBGR',
+    destIcao: 'SCEL',
+    capacityKgPerDay: 60_000,
+  },
+  {
+    id: 'lane_sbgl_scel',
+    originCountryId: 'BR',
+    destCountryId: 'CL',
+    originIcao: 'SBGL',
+    destIcao: 'SCEL',
+    capacityKgPerDay: 40_000,
+  },
+  // Argentina ↔ Chile
+  {
+    id: 'lane_saez_scel',
+    originCountryId: 'AR',
+    destCountryId: 'CL',
+    originIcao: 'SAEZ',
+    destIcao: 'SCEL',
+    capacityKgPerDay: 70_000,
+  },
+  {
+    id: 'lane_same_scel',
+    originCountryId: 'AR',
+    destCountryId: 'CL',
+    originIcao: 'SAME',
+    destIcao: 'SCEL',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_sazs_scte',
+    originCountryId: 'AR',
+    destCountryId: 'CL',
+    originIcao: 'SAZS',
+    destIcao: 'SCTE',
+    capacityKgPerDay: 25_000,
+  },
+  // Sparse Cone Sul ↔ US
+  {
+    id: 'lane_saez_kmia',
+    originCountryId: 'AR',
+    destCountryId: 'US',
+    originIcao: 'SAEZ',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_scel_kmia',
+    originCountryId: 'CL',
+    destCountryId: 'US',
+    originIcao: 'SCEL',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_scel_klax',
+    originCountryId: 'CL',
+    destCountryId: 'US',
+    originIcao: 'SCEL',
+    destIcao: 'KLAX',
+    capacityKgPerDay: 40_000,
   },
 ];
 
@@ -1282,6 +1419,18 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    AR_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    CL_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -1465,6 +1614,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertUsCareerHubCatalog();
   assertCaCareerHubCatalog();
   assertMxCareerHubCatalog();
+  assertArCareerHubCatalog();
+  assertClCareerHubCatalog();
   assertBushTripCatalog();
 
   const hubs: Array<{
@@ -1508,6 +1659,24 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...MX_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...AR_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...CL_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

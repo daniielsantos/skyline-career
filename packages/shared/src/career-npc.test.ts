@@ -48,6 +48,8 @@ import {
   REPOSITION_PILOT_FEE_MIN_USD,
   pickNpcHomeReturnIcao,
   quoteRepositionPilotFeeUsd,
+  isDomesticOd,
+  isInternationalOdAllowed,
 } from './career-economy.js';
 
 type SeedWorld = ReturnType<typeof createSeedEconomyWorld>;
@@ -100,6 +102,50 @@ function npcCompositionCount(
       (slot) => slot.aircraftClassId === aircraftClassId,
     )?.count ?? 0
   );
+}
+
+/** Larger fleets fill the reposition offer cap during tick — clear for unit tests. */
+function clearOpenRepositionOffers(world: SeedWorld): void {
+  const open = world.npcFlights.filter(
+    (f) => f.status === 'awaiting_pilot' && f.kind === 'reposition',
+  );
+  if (open.length === 0) return;
+  const flightIds = new Set(open.map((f) => f.id));
+  const lotIds = new Set(open.map((f) => f.lotId));
+  world.npcFlights = world.npcFlights.filter((f) => !flightIds.has(f.id));
+  world.lots = world.lots.filter((l) => !lotIds.has(l.id));
+  for (const npc of world.npcs) {
+    if (npc.currentFlightId && flightIds.has(npc.currentFlightId)) {
+      npc.currentFlightId = undefined;
+      npc.status = 'idle';
+      npc.busyUntilMs = undefined;
+      npc.busyUntilTick = undefined;
+    }
+  }
+}
+
+/** Away pad with a legal homebound reposition (domestic or on an intl lane). */
+function findReachableAwayPad(
+  world: SeedWorld,
+  npc: SeedWorld['npcs'][number],
+): SeedWorld['airports'][number] | undefined {
+  const maxR = getAircraftClass(npc.aircraftClassId).maxRangeNm;
+  for (const ap of world.airports) {
+    if (ap.region === npc.homeRegion) continue;
+    const dest = pickNpcHomeReturnIcao(world, npc, ap.icao);
+    if (!dest) continue;
+    const destRegion =
+      world.airports.find((a) => a.icao === dest)?.region ?? '';
+    if (
+      !isDomesticOd(ap.region, destRegion) &&
+      !isInternationalOdAllowed(world, ap.icao, dest)
+    ) {
+      continue;
+    }
+    const dist = routeDistanceNm(world, ap.icao, dest);
+    if (dist !== undefined && dist >= 40 && dist <= maxR) return ap;
+  }
+  return undefined;
 }
 
 describe('NPC freighter fleet', () => {
@@ -400,7 +446,7 @@ describe('NPC freighter fleet', () => {
     const { flightHours, busyHours } = estimateNpcBlockHours(2_000, 'narrow_freighter');
     assert.ok(flightHours >= 1);
     assert.ok(busyHours >= flightHours);
-    assert.equal(busyHours, flightHours + 1);
+    assert.equal(busyHours, flightHours + 0.5);
     // Fractional resolution (not whole-hour ceil) for a mid-range hop.
     const short = estimateNpcBlockHours(500, 'narrow_freighter');
     assert.ok(short.flightHours < 2);
@@ -1628,16 +1674,10 @@ describe('NPC freighter fleet', () => {
   it('opens reposition crew offer after freight settles away from home', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-repo-settle' });
     tickEconomyN(world, 12);
+    clearOpenRepositionOffers(world);
     const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
     assert.ok(npc);
-    const maxR = getAircraftClass(npc!.aircraftClassId).maxRangeNm;
-    const away = world.airports.find((a) => {
-      if (a.region === npc!.homeRegion) return false;
-      const dest = pickNpcHomeReturnIcao(world, npc!, a.icao);
-      if (!dest) return false;
-      const d = routeDistanceNm(world, a.icao, dest);
-      return d !== undefined && d >= 40 && d <= maxR;
-    });
+    const away = findReachableAwayPad(world, npc!);
     const homeHub = world.airports.find((a) => a.region === npc!.homeRegion);
     assert.ok(away && homeHub);
 
@@ -1705,16 +1745,10 @@ describe('NPC freighter fleet', () => {
   it('creates reposition offer via helper and surfaces on the board', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-repo-helper' });
     tickEconomyN(world, 12);
+    clearOpenRepositionOffers(world);
     const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
     assert.ok(npc);
-    const maxR = getAircraftClass(npc!.aircraftClassId).maxRangeNm;
-    const away = world.airports.find((a) => {
-      if (a.region === npc!.homeRegion) return false;
-      const dest = pickNpcHomeReturnIcao(world, npc!, a.icao);
-      if (!dest) return false;
-      const d = routeDistanceNm(world, a.icao, dest);
-      return d !== undefined && d >= 40 && d <= maxR;
-    });
+    const away = findReachableAwayPad(world, npc!);
     assert.ok(away);
     const nowMs = world.lastBatchAtMs ?? Date.now();
     const flight = createNpcRepositionOffer(world, npc!.id, away!.icao, {
@@ -1733,16 +1767,10 @@ describe('NPC freighter fleet', () => {
   it('promotes expired reposition offers into solo homebound flight', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-repo-timeout' });
     tickEconomyN(world, 12);
+    clearOpenRepositionOffers(world);
     const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
     assert.ok(npc);
-    const maxR = getAircraftClass(npc!.aircraftClassId).maxRangeNm;
-    const away = world.airports.find((a) => {
-      if (a.region === npc!.homeRegion) return false;
-      const dest = pickNpcHomeReturnIcao(world, npc!, a.icao);
-      if (!dest) return false;
-      const d = routeDistanceNm(world, a.icao, dest);
-      return d !== undefined && d >= 40 && d <= maxR;
-    });
+    const away = findReachableAwayPad(world, npc!);
     assert.ok(away);
     const nowMs = world.lastBatchAtMs ?? Date.now();
     const flight = createNpcRepositionOffer(world, npc!.id, away!.icao, {
@@ -1770,16 +1798,10 @@ describe('NPC freighter fleet', () => {
   it('accepts reposition as empty contract-pilot mission', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-repo-accept' });
     tickEconomyN(world, 12);
+    clearOpenRepositionOffers(world);
     const npc = world.npcs.find((n) => npcCanOfferContractPilot(n));
     assert.ok(npc);
-    const maxR = getAircraftClass(npc!.aircraftClassId).maxRangeNm;
-    const away = world.airports.find((a) => {
-      if (a.region === npc!.homeRegion) return false;
-      const dest = pickNpcHomeReturnIcao(world, npc!, a.icao);
-      if (!dest) return false;
-      const d = routeDistanceNm(world, a.icao, dest);
-      return d !== undefined && d >= 40 && d <= maxR;
-    });
+    const away = findReachableAwayPad(world, npc!);
     assert.ok(away);
     const nowMs = world.lastBatchAtMs ?? Date.now();
     const flight = createNpcRepositionOffer(world, npc!.id, away!.icao, {
@@ -1823,22 +1845,10 @@ describe('NPC freighter fleet', () => {
     assert.ok(homologated.length >= MAX_OPEN_REPOSITION_OFFERS);
     const nowMs = world.lastBatchAtMs ?? Date.now();
 
-    const findReachableAway = (npc: (typeof homologated)[number]) => {
-      const maxR = getAircraftClass(npc.aircraftClassId).maxRangeNm;
-      for (const ap of world.airports) {
-        if (ap.region === npc.homeRegion) continue;
-        const dest = pickNpcHomeReturnIcao(world, npc, ap.icao);
-        if (!dest) continue;
-        const dist = routeDistanceNm(world, ap.icao, dest);
-        if (dist !== undefined && dist >= 40 && dist <= maxR) return ap;
-      }
-      return undefined;
-    };
-
     let created = 0;
     for (const npc of homologated) {
       if (created >= MAX_OPEN_REPOSITION_OFFERS) break;
-      const away = findReachableAway(npc);
+      const away = findReachableAwayPad(world, npc);
       if (!away) continue;
       createNpcRepositionOffer(world, npc.id, away.icao, {
         nowMs,
@@ -1856,7 +1866,7 @@ describe('NPC freighter fleet', () => {
       (n) => !open.some((f) => f.npcId === n.id),
     );
     assert.ok(extra);
-    const away = findReachableAway(extra!);
+    const away = findReachableAwayPad(world, extra!);
     assert.ok(away);
     assert.throws(
       () =>

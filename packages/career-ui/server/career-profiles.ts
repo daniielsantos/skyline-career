@@ -234,11 +234,13 @@ export async function deleteCareerProfile(
   const file = await readProfilesFile(careerRoot);
   const idx = file.profiles.findIndex((p) => p.id === profileId);
   if (idx < 0) throw new Error('Unknown profile');
-  if (file.activeId === profileId) {
-    throw new Error('Switch to another profile before deleting the active one');
-  }
   if (file.profiles.length <= 1) {
     throw new Error('Cannot delete the last profile');
+  }
+  // Last-played marker is not an open session — clear it so gate delete works.
+  // An in-memory open store is still blocked by the API route (activeProfileId).
+  if (file.activeId === profileId) {
+    file.activeId = null;
   }
   file.profiles.splice(idx, 1);
   await writeProfilesFile(careerRoot, file);

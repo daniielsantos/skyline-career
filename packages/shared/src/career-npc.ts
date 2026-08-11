@@ -9,7 +9,6 @@ import {
   hoursToTicks,
   MS_PER_TICK,
   msToHours,
-  TICKS_PER_HOUR,
 } from './career-clock.js';
 import {
   applyFreightDelivery,
@@ -86,21 +85,21 @@ export {
 
 /**
  * Fleet size scales with mapped regions (not a fixed global cap).
- * ~8 ops/region keeps BR+US+CA+MX (~20 regions) near the old ~160 fleet.
+ * ~11 ops/region: ~20 regions ≈ 220; 26 regions (with AR/CL) ≈ 286.
  */
-export const NPCS_PER_REGION = 8;
+export const NPCS_PER_REGION = 11;
 export const NPC_FLEET_MIN = 40;
 
-/** Class mix shares (sum = 1). Slightly light-heavy vs the old absolute table. */
+/** Class mix shares (sum = 1). Leaner light_ga — pulse showed GA idle on a large board. */
 export const NPC_FLEET_CLASS_SHARES: ReadonlyArray<{
   aircraftClassId: FreighterClassId;
   share: number;
 }> = [
-  { aircraftClassId: 'light_ga', share: 0.2 },
-  { aircraftClassId: 'light_turboprop', share: 0.24 },
+  { aircraftClassId: 'light_ga', share: 0.14 },
+  { aircraftClassId: 'light_turboprop', share: 0.26 },
   { aircraftClassId: 'light_jet', share: 0.12 },
   { aircraftClassId: 'medium_piston', share: 0.08 },
-  { aircraftClassId: 'narrow_freighter', share: 0.22 },
+  { aircraftClassId: 'narrow_freighter', share: 0.26 },
   { aircraftClassId: 'wide_freighter', share: 0.14 },
 ] as const;
 
@@ -175,7 +174,13 @@ export const NPC_FLEET_SIZE = targetNpcFleetSize(20);
 
 /** Minimum airborne block so ultra-short hops aren't instant. */
 const MIN_BLOCK_HOURS = 1;
-const TURNAROUND_HOURS = 1;
+/**
+ * Post-arrival ground dwell (jittered ×0.55–1.45 → ~16–43 min).
+ * Shorter than the old 1h base — pulse showed chronic turnaround thin-fleet.
+ */
+const TURNAROUND_HOURS = 0.5;
+/** Economy-tick floor after block time (~30 min = 2 × 15-min batches). */
+const TURNAROUND_MIN_TICKS = 2;
 
 /** Share of reserved freight pay offered to a contract pilot. */
 export const CONTRACT_PILOT_FEE_FRAC = 0.4;
@@ -1542,7 +1547,7 @@ function promoteAwaitingPilotFlight(
   const busyUntilMs = arrivesAtMs + hoursToMs(turnaroundHours);
   const flightTickHours = hoursToTicks(flightHours);
   const busyTickHours = Math.max(
-    flightTickHours + TICKS_PER_HOUR,
+    flightTickHours + TURNAROUND_MIN_TICKS,
     hoursToTicks(flightHours + turnaroundHours),
   );
 
@@ -1945,7 +1950,7 @@ function claimLotForNpc(
   const busyUntilMs = arrivesAtMs + hoursToMs(turnaroundHours);
   const flightTickHours = hoursToTicks(flightHours);
   const busyTickHours = Math.max(
-    flightTickHours + TICKS_PER_HOUR,
+    flightTickHours + TURNAROUND_MIN_TICKS,
     hoursToTicks(flightHours + turnaroundHours),
   );
 

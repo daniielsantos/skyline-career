@@ -144,6 +144,38 @@ export function ProfileGate(props: {
           Create profile
         </button>
       </form>
+
+      {props.busy ? (
+        <div className="profile-gate-busy" role="status" aria-live="polite">
+          <span className="profile-gate-spinner" aria-hidden />
+          <span>Working…</span>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Boot splash while `/api/profiles` (and desktop API bring-up) settle. */
+export function ProfileGateLoading() {
+  return (
+    <section
+      className="panel profile-gate profile-gate-loading"
+      aria-busy="true"
+      aria-label="Loading career profiles"
+    >
+      <div className="profile-gate-hero">
+        <p className="profile-gate-brand">Skyline Career</p>
+        <h1>Loading</h1>
+        <p className="muted">Preparing your profiles…</p>
+      </div>
+      <div className="profile-gate-loading-body">
+        <span className="profile-gate-spinner profile-gate-spinner-lg" aria-hidden />
+        <div className="profile-gate-loading-bars" aria-hidden>
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
     </section>
   );
 }

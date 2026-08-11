@@ -997,7 +997,7 @@
   },
   {
     "typeId": "pmdg-dc6",
-    "aircraftClassId": "wide_freighter",
+    "aircraftClassId": "medium_piston",
     "label": "PMDG DC-6",
     "rolesPackRelPath": "profiles/ofp/pmdg-dc6.json",
     "simbriefIcao": "DC6",

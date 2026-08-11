@@ -2569,15 +2569,127 @@ tr.lot-locked {
   display: grid;
   place-items: center;
   padding: 2rem 1.25rem;
+  position: relative;
   background:
     radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent),
     var(--bg);
+}
+
+.profile-gate-banner {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  width: min(36rem, calc(100% - 2rem));
+  margin: 0;
 }
 
 .profile-gate {
   width: min(36rem, 100%);
   display: grid;
   gap: 1.25rem;
+  position: relative;
+  animation: profile-gate-enter 280ms ease-out;
+}
+
+.profile-gate-loading {
+  justify-items: center;
+  text-align: center;
+}
+
+.profile-gate-loading-body {
+  display: grid;
+  justify-items: center;
+  gap: 1.25rem;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.profile-gate-loading-bars {
+  display: grid;
+  gap: 0.45rem;
+  width: min(16rem, 70vw);
+}
+
+.profile-gate-loading-bars span {
+  display: block;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 70%, var(--accent));
+  opacity: 0.45;
+  animation: profile-gate-shimmer 1.2s ease-in-out infinite;
+}
+
+.profile-gate-loading-bars span:nth-child(1) {
+  width: 100%;
+}
+
+.profile-gate-loading-bars span:nth-child(2) {
+  width: 78%;
+  animation-delay: 0.15s;
+}
+
+.profile-gate-loading-bars span:nth-child(3) {
+  width: 56%;
+  animation-delay: 0.3s;
+}
+
+.profile-gate-busy {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.65rem;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  backdrop-filter: blur(3px);
+  animation: confirm-fade-in 140ms ease-out;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.profile-gate-spinner {
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: profile-gate-spin 0.7s linear infinite;
+}
+
+.profile-gate-spinner-lg {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-width: 3px;
+}
+
+@keyframes profile-gate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes profile-gate-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes profile-gate-shimmer {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .profile-gate-hero h1 {

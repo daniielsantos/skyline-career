@@ -48,6 +48,11 @@ describe('career player airframes', () => {
       assert.ok(airframe.aircraftClassId, `${airframe.typeId} has no class`);
     }
     assert.equal(ids.has('blacksquare-commander-114tc'), false);
+    assert.equal(
+      findCareerPlayerAirframe('pmdg-dc6')?.aircraftClassId,
+      'medium_piston',
+      'PMDG DC-6 is the medium_piston SKU, not wide',
+    );
     assert.equal(ids.has('asobo-c208b-cargo'), false);
     assert.equal(
       findCareerPlayerAirframe('blacksquare-bonanza-professional')?.aircraftClassId,

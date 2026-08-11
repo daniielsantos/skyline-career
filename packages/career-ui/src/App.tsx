@@ -120,7 +120,7 @@ import { FboRerouteDialog } from './FboRerouteDialog';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { BushTripMapCard } from './BushTripMapCard';
-import { ProfileGate } from './ProfileGate';
+import { ProfileGate, ProfileGateLoading } from './ProfileGate';
 import {
   DesktopUpdateBanner,
   DesktopUpdatesCard,
@@ -3965,12 +3965,20 @@ export function App() {
       tone: 'danger',
     });
     if (!ok) return;
-    await run(async () => {
-      const result = await deleteCareerProfile(id);
-      setCareerProfiles(result.profiles);
-      setToastKind('ok');
-      setToast('Profile deleted');
-    });
+    await run(
+      async () => {
+        const result = await deleteCareerProfile(id);
+        setCareerProfiles(result.profiles);
+        if (activeCareerProfile?.id === id) {
+          const nextLast =
+            result.profiles.find((p) => p.id === result.activeId) ?? null;
+          setActiveCareerProfile(nextLast);
+        }
+        setToastKind('ok');
+        setToast('Profile deleted');
+      },
+      { refreshAfter: false },
+    );
   }
 
   async function onRenameCareerProfile(id: string, name: string) {
@@ -6537,9 +6545,8 @@ export function App() {
   if (profilesLoading) {
     return (
       <div className="app-shell profile-gate-shell">
-        <p className="muted" style={{ padding: '2rem' }}>
-          Loading profiles…
-        </p>
+        <ProfileGateLoading />
+        {confirmDialog}
       </div>
     );
   }
@@ -6547,6 +6554,23 @@ export function App() {
   if (showProfileGate || !activeCareerProfile) {
     return (
       <div className="app-shell profile-gate-shell">
+        {toast ? (
+          <p
+            className={`banner profile-gate-banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
+            role="status"
+            aria-live="polite"
+          >
+            <span>{toast}</span>
+            <button
+              type="button"
+              className="banner-close"
+              onClick={() => setToast(null)}
+              aria-label="Dismiss message"
+            >
+              ×
+            </button>
+          </p>
+        ) : null}
         <ProfileGate
           profiles={careerProfiles}
           lastActiveId={activeCareerProfile?.id ?? null}
@@ -6557,6 +6581,7 @@ export function App() {
           onDelete={(id) => void onDeleteCareerProfile(id)}
           onRename={(id, name) => void onRenameCareerProfile(id, name)}
         />
+        {confirmDialog}
       </div>
     );
   }

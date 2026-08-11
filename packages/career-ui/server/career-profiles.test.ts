@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
   createCareerProfile,
+  deleteCareerProfile,
   ensureCareerProfilesLayout,
   readProfilesFile,
   setActiveCareerProfile,
@@ -31,5 +32,17 @@ describe('career profiles', () => {
     assert.equal(activated.activeId, meta.id);
     const again = await readProfilesFile(root);
     assert.ok(again.profiles.some((p) => p.name === 'Bush only'));
+  });
+
+  it('deletes last-played profile by clearing activeId', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'career-prof-del-'));
+    await ensureCareerProfilesLayout(root);
+    const a = await createCareerProfile(root, 'Alpha');
+    const b = await createCareerProfile(root, 'Bravo');
+    await setActiveCareerProfile(root, a.id);
+    const after = await deleteCareerProfile(root, a.id);
+    assert.equal(after.activeId, null);
+    assert.equal(after.profiles.length, 1);
+    assert.equal(after.profiles[0]!.id, b.id);
   });
 });

@@ -314,6 +314,7 @@ export type RegionPressure = {
   region: string;
   capacity: number;
   thinFleet: boolean;
+  laneBusy?: boolean;
   ready: number;
   total: number;
   resting: number;

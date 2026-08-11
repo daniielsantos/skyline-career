@@ -704,6 +704,8 @@ export type RegionMarketPressure = {
   region: string;
   capacity: number;
   thinFleet: boolean;
+  /** Any outbound OD+commodity from this region is at/above LANE_BUSY_SATURATION. */
+  laneBusy: boolean;
   ready: number;
   total: number;
   resting: number;
@@ -711,6 +713,29 @@ export type RegionMarketPressure = {
   maintenance: number;
   weather: RegionalWeather;
 };
+
+/** Home regions whose outbound lanes currently pay/score as busy. */
+function busyOriginRegions(world: CareerEconomyWorld): Set<string> {
+  const busy = new Set<string>();
+  const seen = new Set<string>();
+  for (const flight of world.npcFlights ?? []) {
+    if (flight.status !== 'in_flight') continue;
+    const origin = flight.originIcao.trim().toUpperCase();
+    const dest = flight.destIcao.trim().toUpperCase();
+    const key = `${origin}|${dest}|${flight.commodityId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (
+      npcLaneSaturation(world, origin, dest, flight.commodityId) <
+      LANE_BUSY_SATURATION
+    ) {
+      continue;
+    }
+    const region = airportRegion(world, origin);
+    if (region) busy.add(region);
+  }
+  return busy;
+}
 
 /** Player-facing pressure signals for one market lot (origin region + OD lane). */
 export function describeLotMarketPressure(
@@ -758,6 +783,7 @@ export function listRegionMarketPressure(
   nowMs = Date.now(),
 ): RegionMarketPressure[] {
   ensureNpcFleet(world);
+  const busyRegions = busyOriginRegions(world);
   const regions = [...new Set((world.npcs ?? []).map((n) => n.homeRegion))].sort();
   return regions.map((region) => {
     const home = world.npcs.filter((n) => n.homeRegion === region);
@@ -774,6 +800,7 @@ export function listRegionMarketPressure(
       region,
       capacity,
       thinFleet: capacity < THIN_FLEET_CAPACITY,
+      laneBusy: busyRegions.has(region),
       ready,
       total: home.length,
       resting,

@@ -620,10 +620,11 @@ function RegionPressureChips(props: {
   className?: string;
 }) {
   const thin = props.regions.filter((r) => r.thinFleet);
+  const busy = props.regions.filter((r) => r.laneBusy);
   const wx = props.regions.filter(
     (r) => r.weather === 'marginal' || r.weather === 'poor',
   );
-  if (thin.length === 0 && wx.length === 0) return null;
+  if (thin.length === 0 && busy.length === 0 && wx.length === 0) return null;
   return (
     <div className={props.className ?? 'pressure-chips'}>
       {thin.map((r) => (
@@ -633,6 +634,15 @@ function RegionPressureChips(props: {
           title={`${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting · ${r.maintenance ?? 0} in MX — thinner local fleet tends to raise outbound freights`}
         >
           {r.region} thin fleet
+        </span>
+      ))}
+      {busy.map((r) => (
+        <span
+          key={`busy-${r.region}`}
+          className="tag pressure"
+          title={`${regionLabel(r.region)}: outbound lanes are crowded — freight pays more, NPCs back off`}
+        >
+          {r.region} lane busy
         </span>
       ))}
       {wx.map((r) => (
@@ -668,6 +678,14 @@ function MarketSignalsLine(props: {
         region: r.region,
         text: 'thin fleet',
         title: `${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting · ${r.maintenance ?? 0} in MX — thinner local fleet tends to raise outbound freights`,
+      });
+    }
+    if (r.laneBusy) {
+      tokens.push({
+        key: `busy-${r.region}`,
+        region: r.region,
+        text: 'lane busy',
+        title: `${regionLabel(r.region)}: outbound lanes are crowded — freight pays more, NPCs back off`,
       });
     }
     if (r.weather === 'marginal' || r.weather === 'poor') {

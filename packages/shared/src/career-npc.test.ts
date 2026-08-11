@@ -882,6 +882,11 @@ describe('NPC freighter fleet', () => {
 
     const regions = listRegionMarketPressure(world, nowMs);
     assert.ok(regions.some((r) => r.region === region && r.thinFleet && r.weather));
+    assert.equal(
+      regions.find((r) => r.region === region)?.laneBusy,
+      true,
+      'busy outbound lane should surface on the region climate line',
+    );
   });
 
   it('measures lane airborne kg and saturation from in_flight NPC cargo', () => {

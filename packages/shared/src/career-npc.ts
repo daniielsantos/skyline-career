@@ -673,6 +673,10 @@ export function npcLaneSaturation(
 export const THIN_FLEET_CAPACITY = 0.35;
 /** Saturation at/above this → UI "lane busy" chip (matches scarce-pay threshold). */
 export const LANE_BUSY_SATURATION = 0.35;
+/** Formation pay: `1 + (1 - readyFraction) * slope`. Thin regions must move the wallet. */
+export const THIN_FLEET_PAY_SLOPE = 0.45;
+/** Formation pay on busy lanes: `1 + saturation * slope` once laneBusy. */
+export const LANE_BUSY_PAY_SLOPE = 0.28;
 
 export type LotMarketPressure = {
   originRegion: string;
@@ -1983,6 +1987,15 @@ export function scoreLotForNpc(
   const regionScore =
     originRegion === npc.homeRegion || destRegion === npc.homeRegion ? 0.4 : 0;
   const noise = (rng() - 0.5) * 0.22 * (1.05 - npc.reliability);
+  const laneSat = npcLaneSaturation(
+    world,
+    lot.originIcao,
+    lot.destIcao,
+    lot.commodityId,
+  );
+  // Leave crowded lanes for the player — Busy on the board should be a bid.
+  const busyPenalty =
+    laneSat >= LANE_BUSY_SATURATION ? laneSat * 0.65 : 0;
 
   return (
     fillRatio * 0.85 +
@@ -1990,7 +2003,8 @@ export function scoreLotForNpc(
     urgencyScore +
     expiryScore +
     regionScore +
-    noise
+    noise -
+    busyPenalty
   );
 }
 

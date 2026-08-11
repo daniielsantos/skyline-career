@@ -44,6 +44,7 @@ export function emptyFlowStats(sinceTick = 0): EconomyFlowStats {
     deliveredDestCreditedKg: 0,
     byCommodity: {},
     formedBySize: emptySizeBands(),
+    expiredBySize: emptySizeBands(),
     npc: { legs: 0, flightHours: 0, turnaroundHours: 0, restHours: 0 },
   };
 }
@@ -68,6 +69,7 @@ export function ensureFlowStats(world: CareerEconomyWorld): EconomyFlowStats {
   existing.deliveredDestCreditedKg ??= 0;
   existing.byCommodity ??= {};
   existing.formedBySize ??= emptySizeBands();
+  existing.expiredBySize ??= emptySizeBands();
   existing.npc ??= { legs: 0, flightHours: 0, turnaroundHours: 0, restHours: 0 };
   return existing;
 }
@@ -130,8 +132,10 @@ export function noteLotExpired(
   world: CareerEconomyWorld,
   commodityId: CommodityId,
   kg: number,
+  band?: FlowLotSizeBand,
 ): void {
   bump(world, 'expired', commodityId, kg, 1);
+  if (band) ensureFlowStats(world).expiredBySize[band] += 1;
 }
 
 /** Stale heavy lot pulled early so the shelf turns over. */
@@ -245,9 +249,12 @@ export function diffFlowStats(
   }
 
   const formedBySize = emptySizeBands();
+  const expiredBySize = emptySizeBands();
   for (const band of FLOW_LOT_SIZE_BANDS) {
     formedBySize[band] =
       (to.formedBySize?.[band] ?? 0) - (from.formedBySize?.[band] ?? 0);
+    expiredBySize[band] =
+      (to.expiredBySize?.[band] ?? 0) - (from.expiredBySize?.[band] ?? 0);
   }
 
   return {
@@ -266,6 +273,7 @@ export function diffFlowStats(
       to.deliveredDestCreditedKg - from.deliveredDestCreditedKg,
     byCommodity,
     formedBySize,
+    expiredBySize,
     npc: {
       legs: to.npc.legs - from.npc.legs,
       flightHours: to.npc.flightHours - from.npc.flightHours,

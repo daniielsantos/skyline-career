@@ -67,6 +67,9 @@ import {
   seedNpcFleet,
   settleNpcOpsDue,
   tickNpcFreighters,
+  LANE_BUSY_SATURATION,
+  LANE_BUSY_PAY_SLOPE,
+  THIN_FLEET_PAY_SLOPE,
 } from './career-npc.js';
 import {
   regionalWeatherIndex,
@@ -274,8 +277,10 @@ export {
   NPC_MX_PARTS_KG,
   NPC_MX_SHOP_HOURS,
   LANE_BUSY_SATURATION,
+  LANE_BUSY_PAY_SLOPE,
   LANE_SATURATION_KG,
   THIN_FLEET_CAPACITY,
+  THIN_FLEET_PAY_SLOPE,
   pickNpcAirframe,
   seedNpcFleet,
   settleNpcOpsDue,
@@ -331,6 +336,10 @@ export const SMALL_LOT_MIN_KG = 80;
 export const SMALL_LOT_MAX_KG = 2_000;
 /** GA-sized LTL band (spoke feeders). */
 export const GA_LTL_MAX_KG = 450;
+/** Light GA max range — GA-sized lots beyond this die without lift. */
+export const GA_LTL_MAX_NM = 800;
+/** Light turboprop max range — LTL/small lots beyond this are unliftable. */
+export const SMALL_LOT_MAX_NM = 900;
 /**
  * Starter Cargo Ops only unlocks general/supplies. Majors are net Dry sinks
  * after warehouse calibration, so the bulk surplus→shortage pass never
@@ -345,6 +354,7 @@ export const LAST_MILE_DRY_IDS: ReadonlySet<CommodityId> = new Set([
 const LAST_MILE_ORIGIN_TIERS: ReadonlySet<HubTier> = new Set([
   'major',
   'regional',
+  'spoke',
 ]);
 /** Comfortable light-GA hop (C172/Bonanza with payload). */
 export const LAST_MILE_MAX_NM = 600;
@@ -2571,7 +2581,19 @@ function retireLotToOrigin(
   if (reason === 'recycled') {
     noteLotRecycled(world, lot.commodityId, unclaimedKg);
   } else {
-    noteLotExpired(world, lot.commodityId, unclaimedKg);
+    noteLotExpired(
+      world,
+      lot.commodityId,
+      unclaimedKg,
+      flowSizeBand(
+        lot.quantityKg,
+        lot.quantityKg >= XL_LOT_MIN_KG
+          ? 'xl'
+          : lot.quantityKg >= 4_000
+            ? 'large'
+            : 'small',
+      ),
+    );
   }
   return refundKg;
 }
@@ -2704,9 +2726,11 @@ function sizeSmallLotKg(
   originTier: HubTier,
   destTier: HubTier,
   rng: () => number,
+  nm?: number,
 ): number {
   const spokeOd = originTier === 'spoke' || destTier === 'spoke';
-  const wantGa = spokeOd || rng() < 0.4;
+  const gaInRange = nm == null || nm <= GA_LTL_MAX_NM;
+  const wantGa = gaInRange && (spokeOd || rng() < 0.4);
   if (wantGa) {
     const hi = Math.min(GA_LTL_MAX_KG, Math.max(SMALL_LOT_MIN_KG, qty));
     const steps = Math.max(0, Math.floor((hi - SMALL_LOT_MIN_KG) / 10));
@@ -2715,13 +2739,13 @@ function sizeSmallLotKg(
       Math.min(hi, SMALL_LOT_MIN_KG + Math.floor(rng() * (steps + 1)) * 10),
     );
   }
+  const feederMin = gaInRange
+    ? FEEDER_LTL_MIN_KG
+    : Math.max(FEEDER_LTL_MIN_KG, GA_LTL_MAX_KG + 50);
   const smallQty = Math.min(qty, SMALL_LOT_MAX_KG);
   return Math.max(
-    FEEDER_LTL_MIN_KG,
-    Math.min(
-      smallQty,
-      FEEDER_LTL_MIN_KG + Math.floor(rng() * 17) * 100,
-    ),
+    feederMin,
+    Math.min(smallQty, feederMin + Math.floor(rng() * 17) * 100),
   );
 }
 
@@ -3144,9 +3168,11 @@ function formLotsFromImbalances(
     );
     const batchNowMs = world.lastBatchAtMs ?? Date.now();
     const capacity = npcRegionBidCapacity(world, origin.ap.region, batchNowMs);
-    const capacityPayMult = 1 + (1 - capacity) * 0.22;
+    const capacityPayMult = 1 + (1 - capacity) * THIN_FLEET_PAY_SLOPE;
     const scarcePayMult =
-      laneSaturation >= 0.35 ? 1 + laneSaturation * 0.12 : 1;
+      laneSaturation >= LANE_BUSY_SATURATION
+        ? 1 + laneSaturation * LANE_BUSY_PAY_SLOPE
+        : 1;
     const weatherPayMult = regionalWeatherPayMult(laneWeather);
     const originLevelPay = hubLevelOriginPayMult(origin.ap.level ?? 1);
     const bushPay = bushLotPayMult(
@@ -3354,14 +3380,23 @@ function formLotsFromImbalances(
       qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
     }
 
+    // Small lots need a starter-class hop. Long-haul intl (GRU→MIA) is trunk.
+    const nm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
+    const inSmallRange =
+      nm != null && nm >= LAST_MILE_MIN_NM && nm <= SMALL_LOT_MAX_NM;
+    const canFormGa = nm != null && nm <= GA_LTL_MAX_NM;
+    const minSmallKg = canFormGa
+      ? SMALL_LOT_MIN_KG
+      : Math.max(FEEDER_LTL_MIN_KG, GA_LTL_MAX_KG + 50);
     if (
       !boardPressure.skipAll &&
-      qty >= SMALL_LOT_MIN_KG &&
+      inSmallRange &&
+      qty >= minSmallKg &&
       caps.maxSmall > 0 &&
       (smallCounts.get(key) ?? 0) < caps.maxSmall &&
       (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
     ) {
-      const sized = sizeSmallLotKg(qty, origin.tier, dest.tier, rng);
+      const sized = sizeSmallLotKg(qty, origin.tier, dest.tier, rng, nm);
       pushLot(
         key,
         commodity,
@@ -3563,8 +3598,14 @@ function formLotsFromImbalances(
         if (!LAST_MILE_ORIGIN_TIERS.has(origin.tier)) continue;
         // Surplus majors already export in the bulk pass, but that pass prefers
         // large lots — keep a GA Dry floor either way so a starter at JFK/LAX
-        // is not staring at 18 t electronics.
-        if (origin.fill < LAST_MILE_MIN_ORIGIN_FILL) continue;
+        // is not staring at 18 t electronics. Spoke home hubs may be Dry sinks;
+        // still form a short hop if any stock remains.
+        if (
+          origin.tier !== 'spoke' &&
+          origin.fill < LAST_MILE_MIN_ORIGIN_FILL
+        ) {
+          continue;
+        }
         if (origin.stock.stockKg < SMALL_LOT_MIN_KG) continue;
         let open = countOpenGaDryFrom(origin.ap.icao, commodity.id);
         if (open >= LAST_MILE_OPEN_LOTS_PER_ORIGIN) continue;
@@ -3576,7 +3617,9 @@ function formLotsFromImbalances(
         }> = [];
         for (const dest of ranked) {
           if (dest.ap.icao === origin.ap.icao) continue;
-          if (dest.tier === 'major') continue;
+          // Majors break-bulk to spokes/regionals, not to other majors.
+          // Spokes may still feed a nearby major (the home-hub short hop).
+          if (origin.tier === 'major' && dest.tier === 'major') continue;
           if (dest.fill > LAST_MILE_MAX_DEST_FILL) continue;
           if (dest.roomKg < SMALL_LOT_MIN_KG) continue;
           if (!isBushFreightOdAllowed(origin.ap.icao, dest.ap.icao)) continue;
@@ -3619,7 +3662,7 @@ function formLotsFromImbalances(
           if ((smallCounts.get(key) ?? 0) >= caps.maxSmall) continue;
 
           const take = Math.min(
-            origin.stock.stockKg * 0.08,
+            origin.stock.stockKg * (origin.tier === 'spoke' ? 0.5 : 0.08),
             dest.roomKg,
             GA_LTL_MAX_KG,
           );

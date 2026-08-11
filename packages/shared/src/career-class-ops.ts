@@ -260,6 +260,34 @@ export function classOpsLotAboveBoard(
   return availableKg > ceiling;
 }
 
+/**
+ * Hide board rows a contract-pilot / empty-hangar starter cannot sit:
+ * class-locked crew offers, or lots heavier than the unlocked cargo ceiling.
+ * Crew-needed lots are often fully reserved (`availableKg` 0) — use claim kg.
+ */
+export function classOpsHidesBoardLot(
+  ops: CareerClassOps | undefined,
+  opts: {
+    availableKg: number;
+    crewNeeded?: boolean;
+    claimCargoKg?: number;
+    crewClassId?: string;
+  },
+): boolean {
+  if (opts.crewNeeded) {
+    const crewClass = CLASS_OPS_CLASS_IDS.find((id) => id === opts.crewClassId);
+    if (crewClass && !classOpsIsUnlocked(ops, crewClass)) return true;
+    const kg =
+      typeof opts.claimCargoKg === 'number' &&
+      Number.isFinite(opts.claimCargoKg) &&
+      opts.claimCargoKg > 0
+        ? opts.claimCargoKg
+        : opts.availableKg;
+    return classOpsLotAboveBoard(ops, kg);
+  }
+  return classOpsLotAboveBoard(ops, opts.availableKg);
+}
+
 export type ClassOpsUnlockProgress = {
   classId: FreighterClassId;
   label: string;

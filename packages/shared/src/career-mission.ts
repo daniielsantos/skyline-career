@@ -2183,6 +2183,9 @@ export function listViableMarketLots(
       ? opts.maxRangeNm
       : aircraft.maxRangeNm;
   return listMarketLots(world, opts).filter((row) => {
+    // Crew-needed holds are fully reserved (`availableKg` often 0). The player
+    // sits the NPC airframe, so do not gate them on this aircraft's payload/range.
+    if (row.npcClaim?.crewNeeded) return true;
     const distance = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
     return (
       row.availableKg >= 1 &&

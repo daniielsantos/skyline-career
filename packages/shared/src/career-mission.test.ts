@@ -864,6 +864,22 @@ describe('listViableMarketLots', () => {
       assert.ok(distance !== undefined && distance <= 2_500);
     }
   });
+
+  it('keeps crew-needed holds even when the lot is fully reserved', () => {
+    const world = createSeedEconomyWorld({ seed: 'viable-crew-needed' });
+    tickEconomyN(world, 48);
+    const crew = listMarketLots(world).filter((row) => row.npcClaim?.crewNeeded);
+    assert.ok(crew.length > 0, 'expected crew-needed offers');
+    const viable = new Set(
+      listViableMarketLots(world, 'light_ga').map((row) => row.lot.id),
+    );
+    for (const row of crew) {
+      assert.ok(
+        viable.has(row.lot.id),
+        `${row.lot.id} crew-needed dropped from GA viable`,
+      );
+    }
+  });
 });
 
 describe('compareMissionIntentToOfp', () => {

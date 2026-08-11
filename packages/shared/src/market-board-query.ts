@@ -1,4 +1,5 @@
 import { TICKS_PER_HOUR } from './career-clock.js';
+import { CLASS_OPS_STARTER_IDS } from './career-class-ops.js';
 
 /** Sortable Freights board columns (matches career-ui). */
 export type MarketBoardSortKey =
@@ -8,7 +9,8 @@ export type MarketBoardSortKey =
   | 'expires'
   | 'pay'
   | 'net'
-  | 'access';
+  | 'access'
+  | 'starter';
 
 export type MarketBoardSortDirection = 'asc' | 'desc';
 
@@ -35,6 +37,14 @@ export type MarketBoardSortable = {
   estimatedFuelFeasible?: boolean | null;
   /** True when Cargo Ops has this commodity locked for the player. */
   cargoLocked?: boolean;
+  /** True when Class Ops cannot sit this crew offer (or lot is above ceiling). */
+  classLocked?: boolean;
+  /** Open Crew needed / ferry hold. */
+  crewNeeded?: boolean;
+  /** NPC class on a crew-needed hold. */
+  crewClassId?: string;
+  /** Last-mile Dry break-bulk from a metro/spoke. */
+  lastMile?: boolean;
   /** Cross-country lane freight (from lot pressure). */
   international?: boolean;
   /** Soft-field Amazon bush OD. */
@@ -121,8 +131,14 @@ export type MarketBoardQueryOpts = {
   /**
    * Keep lots the selected aircraft can actually fly now:
    * unlocked commodity, in range, lift &gt; 0, fuel-feasible.
+   * Empty hangar (`hangarEmpty`): crew-needed holds the player can sit.
    */
   viableOnly?: boolean;
+  /**
+   * No player aircraft selected — Freights is a contract-pilot board.
+   * Injects starter-class / last-mile / short-hop sort and viable = crew I can fly.
+   */
+  hangarEmpty?: boolean;
   /** Cargo Ops lock filter: open = unlocked only, locked = locked only. */
   accessFilter?: MarketBoardAccessFilter;
   /** International vs domestic route filter. */
@@ -143,7 +159,42 @@ const SORT_KEYS = new Set<MarketBoardSortKey>([
   'pay',
   'net',
   'access',
+  'starter',
 ]);
+
+const STARTER_CREW_CLASSES = new Set<string>(CLASS_OPS_STARTER_IDS);
+
+/** Lower rank surfaces first on the empty-hangar board. */
+export function starterBoardFitRank(
+  row: Pick<
+    MarketBoardSortable,
+    | 'classLocked'
+    | 'crewNeeded'
+    | 'crewClassId'
+    | 'lastMile'
+    | 'availableKg'
+    | 'distanceNm'
+  >,
+): number {
+  if (row.classLocked) return 50;
+  if (
+    row.crewNeeded === true &&
+    row.crewClassId != null &&
+    STARTER_CREW_CLASSES.has(row.crewClassId)
+  ) {
+    return 0;
+  }
+  if (row.lastMile === true) return 1;
+  const gaSized =
+    typeof row.availableKg === 'number' &&
+    row.availableKg > 0 &&
+    row.availableKg <= 450;
+  const shortHop =
+    typeof row.distanceNm === 'number' && row.distanceNm <= 600;
+  if (gaSized && shortHop) return 2;
+  if (row.crewNeeded === true) return 30;
+  return 10;
+}
 
 /** Default Freights sort: unlocked first (no secondary pay sort). */
 export const DEFAULT_MARKET_BOARD_SORTS: readonly MarketBoardSortLevel[] = [
@@ -162,6 +213,25 @@ export function ensureAccessPrimarySort(
   const rest = levels.filter((s) => s.key !== 'access');
   return [
     access ?? { key: 'access', direction: 'asc' },
+    ...rest,
+  ];
+}
+
+/**
+ * Empty-hangar Freights: after Cargo Ops access, surface starter crew holds
+ * and last-mile Dry, then nearer hops — not Wide pay.
+ */
+export function ensureHangarEmptySorts(
+  sorts: readonly MarketBoardSortLevel[] | null | undefined,
+): MarketBoardSortLevel[] {
+  const levels = ensureAccessPrimarySort(sorts);
+  if (levels.some((s) => s.key === 'starter')) return levels;
+  const access = levels[0] ?? { key: 'access' as const, direction: 'asc' as const };
+  const rest = levels.slice(1).filter((s) => s.key !== 'distance');
+  return [
+    access,
+    { key: 'starter', direction: 'asc' },
+    { key: 'distance', direction: 'asc' },
     ...rest,
   ];
 }
@@ -240,6 +310,8 @@ function compareBoardRow<T extends MarketBoardSortable>(
     case 'access':
       // Unlocked (false) before locked (true) when ascending.
       return Number(Boolean(a.cargoLocked)) - Number(Boolean(b.cargoLocked));
+    case 'starter':
+      return starterBoardFitRank(a) - starterBoardFitRank(b);
   }
 }
 
@@ -255,6 +327,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     | 'minNetUsd'
     | 'profitableOnly'
     | 'viableOnly'
+    | 'hangarEmpty'
     | 'accessFilter'
     | 'laneFilter'
     | 'currentTick'
@@ -308,23 +381,30 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
   }
   if (opts.viableOnly) {
     if (row.cargoLocked) return false;
-    if (row.estimatedInRange === false) return false;
-    if (row.estimatedFuelFeasible === false) return false;
-    if (
-      typeof row.estimatedLiftKg === 'number' &&
-      Number.isFinite(row.estimatedLiftKg) &&
-      row.estimatedLiftKg <= 0
-    ) {
-      return false;
-    }
-    // Estimates missing (no aircraft / failed quote) → not "viable".
-    if (
-      row.estimatedLiftKg === null ||
-      row.estimatedLiftKg === undefined ||
-      row.estimatedInRange === null ||
-      row.estimatedInRange === undefined
-    ) {
-      return false;
+    if (row.classLocked) return false;
+    if (opts.hangarEmpty) {
+      // Empty hangar can only fly Crew needed on an unlocked class.
+      if (row.crewNeeded !== true) return false;
+      if (row.estimatedInRange === false) return false;
+    } else {
+      if (row.estimatedInRange === false) return false;
+      if (row.estimatedFuelFeasible === false) return false;
+      if (
+        typeof row.estimatedLiftKg === 'number' &&
+        Number.isFinite(row.estimatedLiftKg) &&
+        row.estimatedLiftKg <= 0
+      ) {
+        return false;
+      }
+      // Estimates missing (no aircraft / failed quote) → not "viable".
+      if (
+        row.estimatedLiftKg === null ||
+        row.estimatedLiftKg === undefined ||
+        row.estimatedInRange === null ||
+        row.estimatedInRange === undefined
+      ) {
+        return false;
+      }
     }
   }
   if (
@@ -362,9 +442,10 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
   pageCount: number;
 } {
   const filtered = rows.filter((row) => marketBoardRowMatchesFilters(row, opts));
-  const sorts = ensureAccessPrimarySort(
-    opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined,
-  );
+  const requested = opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined;
+  const sorts = opts.hangarEmpty
+    ? ensureHangarEmptySorts(requested)
+    : ensureAccessPrimarySort(requested);
 
   const sorted = filtered
     .map((row, index) => ({ row, index }))

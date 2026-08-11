@@ -6,6 +6,7 @@ import {
   formatMarketBoardSorts,
   parseMarketBoardSorts,
   queryMarketBoardPage,
+  starterBoardFitRank,
   type MarketBoardSortable,
 } from './market-board-query.js';
 
@@ -353,6 +354,97 @@ describe('queryMarketBoardPage', () => {
     assert.deepEqual(
       result.rows.map((r) => r.payUsd),
       [100],
+    );
+  });
+
+  it('empty hangar sorts starter crew and last-mile ahead of wide pay', () => {
+    const mixed = [
+      row({
+        payUsd: 90_000,
+        distanceNm: 800,
+        crewNeeded: true,
+        crewClassId: 'wide_freighter',
+        availableKg: 0,
+      }),
+      row({
+        payUsd: 12_000,
+        distanceNm: 220,
+        lastMile: true,
+        availableKg: 280,
+      }),
+      row({
+        payUsd: 4_000,
+        distanceNm: 180,
+        crewNeeded: true,
+        crewClassId: 'light_ga',
+        availableKg: 0,
+      }),
+      row({
+        payUsd: 40_000,
+        distanceNm: 2_100,
+        availableKg: 18_000,
+      }),
+    ];
+    assert.equal(
+      starterBoardFitRank(mixed[2]!),
+      0,
+    );
+    assert.equal(starterBoardFitRank(mixed[1]!), 1);
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      hangarEmpty: true,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [4_000, 12_000, 40_000, 90_000],
+    );
+  });
+
+  it('empty hangar viable-only keeps crew the starter can sit', () => {
+    const mixed = [
+      row({
+        payUsd: 4_000,
+        crewNeeded: true,
+        crewClassId: 'light_ga',
+        classLocked: false,
+        estimatedInRange: true,
+        availableKg: 0,
+      }),
+      row({
+        payUsd: 80_000,
+        crewNeeded: true,
+        crewClassId: 'narrow_freighter',
+        classLocked: true,
+        estimatedInRange: true,
+        availableKg: 0,
+      }),
+      row({
+        payUsd: 12_000,
+        lastMile: true,
+        availableKg: 280,
+        estimatedInRange: true,
+      }),
+      row({
+        payUsd: 5_000,
+        crewNeeded: true,
+        crewClassId: 'light_turboprop',
+        classLocked: false,
+        estimatedInRange: false,
+        availableKg: 0,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      hangarEmpty: true,
+      viableOnly: true,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [4_000],
     );
   });
 });

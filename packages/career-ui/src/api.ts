@@ -386,6 +386,10 @@ export type MarketLot = {
   /** Soft-field bush OD (light GA only; no ferry; same-country gateways). */
   bush?: boolean;
   cargoLocked?: boolean;
+  classLocked?: boolean;
+  crewNeeded?: boolean;
+  crewClassId?: string;
+  lastMile?: boolean;
   international?: boolean;
   pressure?: LotPressure | null;
   npcClaim?: NpcClaim | null;
@@ -1030,7 +1034,7 @@ export function fetchMarket(
     airframe?: string;
     /** Keep lots with estimated net > 0 (requires aircraft). */
     profitableOnly?: boolean;
-    /** Keep unlocked + in-range + liftable lots (requires aircraft). */
+    /** Keep unlocked + in-range + liftable lots. Empty hangar: crew I can fly. */
     viableOnly?: boolean;
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';

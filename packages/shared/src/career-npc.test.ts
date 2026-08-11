@@ -502,6 +502,57 @@ describe('NPC freighter fleet', () => {
     assert.equal(scoreLotForNpc(world, ga!, heavy, rng), null);
   });
 
+  it('scores busy lanes lower so NPCs leave crowded OD freight for the player', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-busy-penalty' });
+    const npc = world.npcs.find((n) => n.aircraftClassId === 'narrow_freighter');
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.locationIcao = 'SBGR';
+    npc!.feeBias = 0.5;
+    npc!.aggressiveness = 0.5;
+    npc!.reliability = 1;
+    const lot: ShipmentLot = {
+      id: 'lot-busy-od',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 8_000,
+      reservedKg: 0,
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 48,
+      payUsd: 20_000,
+      basePayUsd: 20_000,
+      urgency: 'normal',
+      reason: 'test busy OD',
+      status: 'available',
+    };
+    const rng = () => 0.5;
+    const clear = scoreLotForNpc(world, npc!, lot, rng);
+    assert.ok(clear != null);
+    world.npcFlights.push({
+      id: 'npcf-busy-od',
+      npcId: world.npcs[0]!.id,
+      lotId: 'lot_other',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      commodityId: 'general',
+      cargoKg: Math.ceil(LANE_SATURATION_KG * 0.5),
+      payUsd: 1,
+      aircraftClassId: 'narrow_freighter',
+      departedAtTick: world.tick,
+      arrivesAtTick: world.tick + 4,
+      departedAtMs: world.lastBatchAtMs,
+      arrivesAtMs: world.lastBatchAtMs + 4 * 3_600_000,
+      status: 'in_flight',
+    });
+    const busy = scoreLotForNpc(world, npc!, lot, rng);
+    assert.ok(busy != null);
+    assert.ok(
+      busy! < clear!,
+      `busy score ${busy} should be below clear ${clear}`,
+    );
+  });
+
   it('claims lots with wall-clock ETA and settles mid-hour', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-haul' });
     for (const npc of world.npcs) {

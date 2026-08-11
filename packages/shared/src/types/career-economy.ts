@@ -460,6 +460,8 @@ export interface EconomyFlowStats {
     >
   >;
   formedBySize: Record<FlowLotSizeBand, number>;
+  /** Unclaimed lots that aged out, by size band. */
+  expiredBySize: Record<FlowLotSizeBand, number>;
   /** Hours the schedule granted, to compare against sampled fleet occupancy. */
   npc: {
     legs: number;

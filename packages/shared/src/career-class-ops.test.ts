@@ -8,6 +8,7 @@ import {
   CLASS_OPS_NARROW_UNLOCK,
   CLASS_OPS_WIDE_UNLOCK,
   classOpsIsUnlocked,
+  classOpsHidesBoardLot,
   classOpsLotAboveBoard,
   classOpsUnlockProgress,
   emptyCareerClassOps,
@@ -175,6 +176,37 @@ describe('career-class-ops', () => {
     assert.equal(classOpsLotAboveBoard(ops, 2_000), false);
     assert.equal(classOpsLotAboveBoard(ops, 5_000), true);
     assert.equal(classOpsLotAboveBoard(ops, 28_000), true);
+  });
+
+  it('hides class-locked crew holds even when availableKg is 0', () => {
+    const ops = emptyCareerClassOps();
+    assert.equal(
+      classOpsHidesBoardLot(ops, {
+        availableKg: 0,
+        crewNeeded: true,
+        claimCargoKg: 18_000,
+        crewClassId: 'narrow_freighter',
+      }),
+      true,
+    );
+    assert.equal(
+      classOpsHidesBoardLot(ops, {
+        availableKg: 0,
+        crewNeeded: true,
+        claimCargoKg: 400,
+        crewClassId: 'light_ga',
+      }),
+      false,
+    );
+    assert.equal(
+      classOpsHidesBoardLot(ops, {
+        availableKg: 0,
+        crewNeeded: true,
+        claimCargoKg: 5_000,
+        crewClassId: 'light_turboprop',
+      }),
+      true,
+    );
   });
 
   it('assertClassOpsUnlocked throws with progress summary', () => {

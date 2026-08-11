@@ -20,6 +20,7 @@ import {
   IDLE_LOT_PAY_MAX_MULT_BULK,
   GA_LTL_MAX_KG,
   LAST_MILE_MAX_NM,
+  SMALL_LOT_MAX_NM,
   LAST_MILE_OPEN_LOTS_PER_ORIGIN,
   SMALL_LOT_MIN_KG,
   SMALL_LOT_MAX_KG,
@@ -709,6 +710,17 @@ describe('tickEconomyN market formation', () => {
     for (const row of small) {
       assert.ok(row.lot.quantityKg <= SMALL_LOT_MAX_KG);
       assert.ok(row.lot.quantityKg >= SMALL_LOT_MIN_KG);
+      const nm = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
+      assert.ok(
+        nm != null && nm <= SMALL_LOT_MAX_NM,
+        `${row.lot.originIcao}→${row.lot.destIcao} LTL ${nm} nm over ${SMALL_LOT_MAX_NM}`,
+      );
+      if (/last-mile/i.test(row.lot.reason)) {
+        assert.ok(
+          nm != null && nm <= LAST_MILE_MAX_NM,
+          `${row.lot.originIcao}→${row.lot.destIcao} last-mile ${nm} nm`,
+        );
+      }
     }
     for (const row of large) {
       assert.ok(
@@ -747,6 +759,15 @@ describe('tickEconomyN market formation', () => {
     );
     assert.ok(us.length >= 40, `US lots=${us.length}`);
     assert.ok(br.length >= 20, `BR lots=${br.length}`);
+
+    for (const lot of intl) {
+      const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+      if (nm == null || nm <= SMALL_LOT_MAX_NM) continue;
+      assert.ok(
+        !/LTL|last-mile/i.test(lot.reason),
+        `long-haul INTL ${lot.originIcao}→${lot.destIcao} ${nm}nm ${lot.quantityKg}kg should be trunk`,
+      );
+    }
 
     const intlQuota = partitionAvailableQuota(world, INTL_BOARD_PARTITION);
     for (const commodity of [
@@ -892,6 +913,55 @@ describe('tickEconomyN market formation', () => {
     assert.ok(kjfk.length > 0, 'KJFK should originate last-mile Dry');
   });
 
+  it('keeps GA Dry last-mile lots leaving spoke home hubs', () => {
+    const world = createSeedEconomyWorld({ seed: 'last-mile-spoke' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+    }
+    const spokes = world.airports.filter((a) => hubTierOf(a) === 'spoke');
+    assert.ok(spokes.length > 0, 'expected spoke airports');
+    for (const spoke of spokes) {
+      const pile = spoke.inventory.general;
+      if (!pile) continue;
+      pile.stockKg = Math.max(
+        pile.stockKg,
+        Math.round(pile.capacityKg * 0.35),
+      );
+    }
+    ensureSeedMarketFormed(world);
+
+    const fromSpoke = world.lots.filter(
+      (l) =>
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg <= GA_LTL_MAX_KG &&
+        /last-mile/i.test(l.reason) &&
+        hubTierOf(
+          world.airports.find((a) => a.icao === l.originIcao) ?? {
+            icao: l.originIcao,
+            hubTier: 'spoke',
+          },
+        ) === 'spoke',
+    );
+    assert.ok(
+      fromSpoke.length > 0,
+      'expected last-mile Dry originating at spokes',
+    );
+    for (const lot of fromSpoke) {
+      assert.ok(lot.payUsd > 0, `${lot.id} payUsd=${lot.payUsd}`);
+      assert.ok(lot.quantityKg >= SMALL_LOT_MIN_KG);
+      assert.ok(lot.quantityKg <= GA_LTL_MAX_KG);
+      const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+      assert.ok(
+        nm != null && nm >= 40 && nm <= LAST_MILE_MAX_NM,
+        `${lot.originIcao}→${lot.destIcao} ${nm} nm`,
+      );
+    }
+  });
+
   it('delivery only draws the share formation did not already commit', () => {
     const world = createSeedEconomyWorld({ seed: 'mass-balance-delivery' });
     const origin = world.airports.find((a) => a.icao === 'SBGR')!;
@@ -1001,6 +1071,12 @@ describe('tickEconomyN market formation', () => {
     const total = bands.ga_ltl + bands.ltl + bands.large + bands.xl;
     assert.equal(total, flow!.formed.lots);
     assert.ok(bands.ga_ltl > 0, 'expected GA-sized LTL in the formed mix');
+    const expiredBands = flow!.expiredBySize;
+    assert.ok(expiredBands, 'ticking should count expiry by size');
+    assert.equal(
+      expiredBands.ga_ltl + expiredBands.ltl + expiredBands.large + expiredBands.xl,
+      flow!.expired.lots,
+    );
   });
 
   it('forms XL lots on strong major↔major corridors when surplus is deep', () => {

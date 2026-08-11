@@ -919,13 +919,13 @@ function lotPressureMeta(lot: MarketLot): { text: string; title: string } | null
   if (p?.laneBusy) {
     tokens.push('Busy');
     titles.push(
-      `NPC cargo already airborne on this lane (${Math.round((p.laneSaturation || 0) * 100)}% saturated)`,
+      `Lane is crowded (${Math.round((p.laneSaturation || 0) * 100)}% inbound) — freight pays more, NPCs back off`,
     );
   }
   if (p?.thinFleet) {
     tokens.push('Thin');
     titles.push(
-      `${regionLabel(p.originRegion || 'region')}: local competing fleet is thin`,
+      `${regionLabel(p.originRegion || 'region')}: local fleet is thin — outbound freight pays more`,
     );
   }
   if (p?.demandShock) {
@@ -936,7 +936,7 @@ function lotPressureMeta(lot: MarketLot): { text: string; title: string } | null
     );
   }
   if (tokens.length === 0) return null;
-  const shown = tokens.slice(0, 2);
+  const shown = tokens.slice(0, 3);
   const extra = tokens.length - shown.length;
   return {
     text: extra > 0 ? `${shown.join(' · ')} · +${extra}` : shown.join(' · '),
@@ -2439,7 +2439,7 @@ export function App() {
       lane: laneFilter,
       airframe: boardAcf?.airframeTypeId?.trim() ?? '',
       profitableOnly: Boolean(boardAcf && profitableOnly),
-      viableOnly: Boolean(boardAcf && viableOnly),
+      viableOnly: Boolean((boardAcf || fleet.length === 0) && viableOnly),
       aircraft: boardAcf?.aircraftClassId,
     };
     const prev = marketFetchOptsRef.current;
@@ -6038,7 +6038,7 @@ export function App() {
       accessFilter ||
       laneFilter ||
       profitableOnly ||
-      (Boolean(boardAircraft) && !viableOnly),
+      ((Boolean(boardAircraft) || fleet.length === 0) && !viableOnly),
   );
 
   function updateMarketFilter(setter: (value: string) => void, value: string) {
@@ -8783,14 +8783,22 @@ export function App() {
                 <input
                   type="checkbox"
                   checked={viableOnly}
-                  disabled={!boardAircraft}
+                  disabled={!boardAircraft && fleet.length > 0}
                   onChange={(e) => {
                     setViableOnly(e.target.checked);
                     setMarketPage(1);
                   }}
                 />
-                <span title="Hide locked, out-of-range, and zero-lift lots">
-                  Viable
+                <span
+                  title={
+                    fleet.length === 0 && !boardAircraft
+                      ? 'Show Crew needed offers on a class you can sit'
+                      : 'Hide locked, out-of-range, and zero-lift lots'
+                  }
+                >
+                  {fleet.length === 0 && !boardAircraft
+                    ? 'Crew I can fly'
+                    : 'Viable'}
                 </span>
               </label>
             </label>
@@ -9145,6 +9153,14 @@ export function App() {
                             bush
                           </span>
                         ) : null}
+                        {lot.lastMile ? (
+                          <span
+                            className="tag"
+                            title="Last-mile Dry — short GA hop from a hub"
+                          >
+                            last-mile
+                          </span>
+                        ) : null}
                         {cargoLocked ? (
                           <span className="tag" title="Unlock via Cargo Ops ladder">
                             locked
@@ -9236,7 +9252,10 @@ export function App() {
                         type="button"
                         className="accept"
                         disabled={
-                          busy || Boolean(playerDispatchMission) || cargoLocked
+                          busy ||
+                          Boolean(playerDispatchMission) ||
+                          cargoLocked ||
+                          (fleet.length === 0 && !lot.npcClaim?.crewNeeded)
                         }
                         onClick={() =>
                           lot.npcClaim?.crewNeeded
@@ -9248,6 +9267,8 @@ export function App() {
                             ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                             : playerDispatchMission
                             ? `Finish or cancel ${playerDispatchMission.id} in Dispatch first`
+                            : fleet.length === 0 && !lot.npcClaim?.crewNeeded
+                              ? 'Need an aircraft — fly Crew needed, or buy a starter'
                             : lot.npcClaim?.crewNeeded
                               ? lot.npcClaim.crewReposition
                                 ? 'Ferry empty aircraft home'
@@ -9263,15 +9284,17 @@ export function App() {
                           ? 'Locked'
                           : playerDispatchMission
                           ? 'Flight busy'
-                          : lot.npcClaim?.crewNeeded
-                            ? lot.npcClaim.crewReposition
-                              ? 'Ferry'
-                              : 'Fly'
-                            : staging &&
-                                staging.originIcao === lot.originIcao &&
-                                staging.destIcao === lot.destIcao
-                              ? 'Restage'
-                              : 'Prepare'}
+                          : fleet.length === 0 && !lot.npcClaim?.crewNeeded
+                            ? 'Need aircraft'
+                            : lot.npcClaim?.crewNeeded
+                              ? lot.npcClaim.crewReposition
+                                ? 'Ferry'
+                                : 'Fly'
+                              : staging &&
+                                  staging.originIcao === lot.originIcao &&
+                                  staging.destIcao === lot.destIcao
+                                ? 'Restage'
+                                : 'Prepare'}
                       </button>
                     </td>
                   </tr>

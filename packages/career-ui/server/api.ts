@@ -13,7 +13,8 @@ import {
   cancelMission,
   cargoOpsIsUnlocked,
   classOpsIsUnlocked,
-  classOpsLotAboveBoard,
+  classOpsHidesBoardLot,
+  getAircraftClass,
   clearAircraftMaintenanceWithParts,
   repairAircraftConditionWithParts,
   hoursUntilInspection,
@@ -2143,6 +2144,8 @@ export function createCareerApiServer(port = 8787) {
         const nowMs = Date.now();
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
         const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);
+        const hangarEmpty =
+          !aircraft && missionsState.fleet.length === 0;
         const airframeTypeId =
           url.searchParams.get('airframe')?.trim() || undefined;
         const origin = url.searchParams.get('origin') ?? undefined;
@@ -2173,16 +2176,23 @@ export function createCareerApiServer(port = 8787) {
               aircraft,
             )
           : undefined;
-        const listed = aircraft
-          ? listViableMarketLots(world, aircraft, {
-              ...filter,
-              maxCargoKg: cargoLimit?.maxCargoKg,
-              maxRangeNm,
-            })
-          : listMarketLots(world, filter).filter(
-              (row) =>
-                !classOpsLotAboveBoard(classOps, row.availableKg),
-            );
+        const listed = (
+          aircraft
+            ? listViableMarketLots(world, aircraft, {
+                ...filter,
+                maxCargoKg: cargoLimit?.maxCargoKg,
+                maxRangeNm,
+              })
+            : listMarketLots(world, filter)
+        ).filter(
+          (row) =>
+            !classOpsHidesBoardLot(classOps, {
+              availableKg: row.availableKg,
+              crewNeeded: row.npcClaim?.crewNeeded,
+              claimCargoKg: row.npcClaim?.cargoKg,
+              crewClassId: row.npcClaim?.aircraftClassId,
+            }),
+        );
         type MarketBoardRow = {
           id: string;
           originIcao: string;
@@ -2203,6 +2213,10 @@ export function createCareerApiServer(port = 8787) {
           perishable: boolean;
           bush: boolean;
           cargoLocked: boolean;
+          classLocked: boolean;
+          crewNeeded: boolean;
+          crewClassId?: string;
+          lastMile: boolean;
           international: boolean;
           pressure: unknown;
           npcClaim: unknown;
@@ -2227,6 +2241,9 @@ export function createCareerApiServer(port = 8787) {
             world,
             row.lot.originIcao,
             row.lot.destIcao,
+          );
+          const crewClassId = parseFreighterClassId(
+            row.npcClaim?.aircraftClassId,
           );
           const base: MarketBoardRow = {
             id: row.lot.id,
@@ -2258,6 +2275,16 @@ export function createCareerApiServer(port = 8787) {
               cargoOps ?? undefined,
               row.lot.commodityId,
             ),
+            classLocked: Boolean(
+              row.npcClaim?.crewNeeded &&
+                crewClassId &&
+                !classOpsIsUnlocked(classOps, crewClassId),
+            ),
+            crewNeeded: Boolean(row.npcClaim?.crewNeeded),
+            ...(row.npcClaim?.aircraftClassId
+              ? { crewClassId: row.npcClaim.aircraftClassId }
+              : {}),
+            lastMile: /last-mile/i.test(row.lot.reason),
             international: Boolean(row.pressure?.international),
             pressure: row.pressure
               ? {
@@ -2311,6 +2338,19 @@ export function createCareerApiServer(port = 8787) {
             distanceNm === undefined ||
             !Number.isFinite(distanceNm)
           ) {
+            if (
+              !aircraft &&
+              row.npcClaim?.crewNeeded &&
+              crewClassId &&
+              distanceNm !== undefined &&
+              Number.isFinite(distanceNm)
+            ) {
+              return {
+                ...base,
+                estimatedInRange:
+                  distanceNm <= getAircraftClass(crewClassId).maxRangeNm,
+              };
+            }
             return base;
           }
           const cacheKey = `${row.lot.originIcao}|${Math.round(distanceNm)}`;
@@ -2402,7 +2442,8 @@ export function createCareerApiServer(port = 8787) {
           minPayUsd: parsePositiveNumberParam(url.searchParams.get('minPayUsd')),
           minNetUsd: parsePositiveNumberParam(url.searchParams.get('minNetUsd')),
           profitableOnly: aircraft ? profitableOnly : false,
-          viableOnly: aircraft ? viableOnly : false,
+          viableOnly: aircraft || hangarEmpty ? viableOnly : false,
+          hangarEmpty,
           accessFilter: parseMarketBoardAccessFilter(
             url.searchParams.get('access'),
           ),

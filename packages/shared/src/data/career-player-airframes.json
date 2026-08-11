@@ -522,7 +522,7 @@
       "profiles/ofp/microsoft-c408-skycourier-passenger.json"
     ],
     "simbriefIcao": "C408",
-    "simbriefAirframeMatch": "Default",
+    "simbriefAirframeMatch": "Carenado \\(MSFS\\) - Cessna 408 SkyCourier",
     "oewKg": 5591,
     "mtowKg": 8618,
     "maxCargoKg": 1134,

@@ -180,8 +180,37 @@ export function matchSimBriefAirframe(
     return hits[0];
   }
 
+  return scoreSimBriefAirframes(hits, titleHint)[0]?.a;
+}
+
+/**
+ * When roles/catalog say "Default" but SimBrief only ships a vendor pack
+ * (C408 Carenado, etc.), pick the best available airframe instead of failing.
+ */
+export function fallbackSimBriefAirframeForDefault(
+  airframes: readonly SimBriefAirframe[],
+  titleHint?: string,
+): SimBriefAirframe | undefined {
+  if (airframes.length === 0) return undefined;
+  if (airframes.length === 1) return airframes[0];
+  const msfs = airframes.filter((a) => /\(MSFS\)/i.test(a.comments));
+  const pool = msfs.length > 0 ? msfs : [...airframes];
+  if (titleHint?.trim()) {
+    return scoreSimBriefAirframes(pool, titleHint)[0]?.a ?? pool[0];
+  }
+  return pool[0];
+}
+
+function isDefaultSimBriefMatch(match: string): boolean {
+  return match.trim().toLowerCase() === 'default';
+}
+
+function scoreSimBriefAirframes(
+  airframes: readonly SimBriefAirframe[],
+  titleHint: string,
+): Array<{ a: SimBriefAirframe; score: number }> {
   const hint = titleHint.toUpperCase();
-  const scored = hits.map((a) => {
+  const scored = airframes.map((a) => {
     let score = 0;
     const c = a.comments.toUpperCase();
     for (const token of hintTokens(hint)) {
@@ -196,7 +225,7 @@ export function matchSimBriefAirframe(
     return { a, score };
   });
   scored.sort((x, y) => y.score - x.score);
-  return scored[0]?.a;
+  return scored;
 }
 
 export async function resolveSimBriefDispatchType(opts: {
@@ -214,11 +243,14 @@ export async function resolveSimBriefDispatchType(opts: {
   if (airframes.length === 0) {
     throw new Error(`No SimBrief airframes for ICAO ${opts.simbriefIcao}`);
   }
-  const airframe = matchSimBriefAirframe(
+  let airframe = matchSimBriefAirframe(
     airframes,
     opts.simbriefAirframeMatch,
     opts.titleHint,
   );
+  if (!airframe && isDefaultSimBriefMatch(opts.simbriefAirframeMatch)) {
+    airframe = fallbackSimBriefAirframeForDefault(airframes, opts.titleHint);
+  }
   if (!airframe) {
     const sample = airframes
       .slice(0, 8)

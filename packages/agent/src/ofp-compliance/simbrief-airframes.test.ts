@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  fallbackSimBriefAirframeForDefault,
   inferSimBriefAirframeMatchFromTitle,
   matchSimBriefAirframe,
   preferSimBriefAirframeMatch,
@@ -154,6 +155,77 @@ describe('resolveSimBriefDispatchType', () => {
     });
     assert.equal(type, '746599_dual');
     assert.match(airframe.comments, /Dual Class/);
+  });
+
+  it('falls back from Default when ICAO only has a vendor MSFS airframe', async () => {
+    const { type, airframe } = await resolveSimBriefDispatchType({
+      simbriefIcao: 'C408',
+      simbriefAirframeMatch: 'Default',
+      titleHint: 'C408 SkyCourier Passenger',
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            C408: {
+              airframes: [
+                {
+                  airframe_internal_id: '3_1736658831347',
+                  airframe_list_type: 'C408',
+                  airframe_icao: 'C408',
+                  airframe_comments:
+                    'Carenado (MSFS) - Cessna 408 SkyCourier',
+                  airframe_name: 'Cessna 408 SkyCourier',
+                  airframe_passengers: 0,
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+    assert.equal(type, '3_1736658831347');
+    assert.match(airframe.comments, /Carenado/);
+  });
+});
+
+describe('fallbackSimBriefAirframeForDefault', () => {
+  it('prefers the sole airframe and MSFS vendors when several exist', () => {
+    assert.equal(
+      fallbackSimBriefAirframeForDefault([
+        {
+          internalId: 'only',
+          icao: 'C408',
+          listType: 'C408',
+          comments: 'Carenado (MSFS) - Cessna 408 SkyCourier',
+          name: 'C408',
+          passengers: 0,
+        },
+      ])?.internalId,
+      'only',
+    );
+    assert.equal(
+      fallbackSimBriefAirframeForDefault(
+        [
+          {
+            internalId: 'xplane',
+            icao: 'C408',
+            listType: 'C408',
+            comments: 'Some (X-Plane) - Cessna 408',
+            name: 'C408',
+            passengers: 0,
+          },
+          {
+            internalId: 'msfs',
+            icao: 'C408',
+            listType: 'C408',
+            comments: 'Carenado (MSFS) - Cessna 408 SkyCourier',
+            name: 'C408',
+            passengers: 0,
+          },
+        ],
+        'SkyCourier',
+      )?.internalId,
+      'msfs',
+    );
   });
 });
 

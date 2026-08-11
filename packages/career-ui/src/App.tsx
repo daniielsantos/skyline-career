@@ -1186,6 +1186,23 @@ function loadSimbriefUser(): string {
   }
 }
 
+/** Prefer a real browser tab — server-side OS open often fails from the API process. */
+function openSimBriefDispatchUrl(url: string): void {
+  const href = url.trim();
+  if (!href) return;
+  try {
+    const opened = window.open(href, '_blank', 'noopener,noreferrer');
+    if (opened) return;
+  } catch {
+    // fall through to location assign
+  }
+  try {
+    window.location.assign(href);
+  } catch {
+    // ignore — toast already tells the pilot to open SimBrief
+  }
+}
+
 function readLastFboIcao(): string | null {
   try {
     const value = sessionStorage.getItem(LAST_FBO_ICAO_KEY);
@@ -5342,6 +5359,7 @@ export function App() {
             `Flight ${result.mission.id} accepted, but SimBrief dispatch failed: ${result.dispatchError}`,
           );
         } else {
+          if (result.dispatch?.url) openSimBriefDispatchUrl(result.dispatch.url);
           setToastKind('ok');
           const rem =
             result.remainingKg !== undefined
@@ -5500,6 +5518,7 @@ export function App() {
           `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition}, but SimBrief failed: ${result.dispatchError}`,
         );
       } else {
+        if (result.dispatch?.url) openSimBriefDispatchUrl(result.dispatch.url);
         setToastKind('ok');
         setToast(
           `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition} · Dispatch open`,
@@ -5517,6 +5536,12 @@ export function App() {
         open: true,
         weightSystem,
       });
+      if (result.mission) {
+        setMissions((current) =>
+          current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+        );
+      }
+      if (result.url) openSimBriefDispatchUrl(result.url);
       setToastKind('ok');
       setToast(
         `SimBrief opened · ${result.airframeLabel} · ${result.units ?? 'KGS'} · Generate OFP — auto-confirm runs every 10s`,
@@ -6765,6 +6790,23 @@ export function App() {
           </button>
           <button
             type="button"
+            className={!showAirport && tab === 'staging' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('staging')}
+            disabled={busy}
+            title={
+              activeMission
+                ? `Dispatch · ${activeMission.originIcao}→${activeMission.destIcao}`
+                : activeBushTrip
+                  ? `Dispatch · bush ${activeBushTrip.fromIcao}→${activeBushTrip.toIcao}`
+                  : staging
+                    ? `Dispatch draft · ${staging.originIcao}→${staging.destIcao}`
+                    : 'Guided preflight — OFP, fuel, load, fly'
+            }
+          >
+            Dispatch
+          </button>
+          <button
+            type="button"
             className={
               showAirport && terminalSection === 'fbo' ? 'tab active' : 'tab'
             }
@@ -6828,13 +6870,13 @@ export function App() {
             <span className="tab active">Terminal</span>
           ) : null}
         </nav>
-        {playerDispatchMission ? (
+        {activeMission ? (
           <div className="sidebar-active-card">
             <span className="label">Active flight</span>
             <strong>
-              {playerDispatchMission.originIcao}→{playerDispatchMission.destIcao}
+              {activeMission.originIcao}→{activeMission.destIcao}
             </strong>
-            <p>{playerDispatchMission.status.replace(/_/g, ' ')}</p>
+            <p>{activeMission.status.replace(/_/g, ' ')}</p>
             <button
               type="button"
               className="accept"

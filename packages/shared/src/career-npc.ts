@@ -16,6 +16,7 @@ import {
   ensureAirportMroInventory,
   getCommodity,
   routeDistanceNm,
+  SMALL_LOT_MAX_KG,
 } from './career-economy.js';
 import {
   bushRequiresLightGa,
@@ -171,6 +172,9 @@ export const NPC_FLEET_COMPOSITION: ReadonlyArray<NpcFleetCompositionSlot> =
  * a 20-region map.
  */
 export const NPC_FLEET_SIZE = targetNpcFleetSize(20);
+
+/** Floor so Bonanza-class (450 kg) can bid true LTL; was 500 and excluded GA. */
+export const NPC_MIN_BID_KG = 80;
 
 /** Minimum airborne block so ultra-short hops aren't instant. */
 const MIN_BLOCK_HOURS = 1;
@@ -1776,7 +1780,7 @@ export function contractPilotHasFlyableAirframe(
   return listContractPilotPickAirframes(flight, opts).some((a) => a.liftKg > 0);
 }
 
-function scoreLotForNpc(
+export function scoreLotForNpc(
   world: CareerEconomyWorld,
   npc: NpcFreighter,
   lot: ShipmentLot,
@@ -1797,7 +1801,7 @@ function scoreLotForNpc(
   const aircraft = pre?.aircraft ?? getAircraftClass(npc.aircraftClassId);
   const maxCargoKg = pre?.maxCargoKg ?? npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
-  if (avail < 500) return null;
+  if (avail < NPC_MIN_BID_KG) return null;
 
   if (!isBushFreightOdAllowed(lot.originIcao, lot.destIcao)) return null;
   if (bushRequiresLightGa(lot.originIcao, lot.destIcao)) {
@@ -1814,7 +1818,14 @@ function scoreLotForNpc(
   // Fuel/MTOW must allow a meaningful payload — class maxRange alone over-claims
   // long light-jet legs (e.g. KSFO→KCLE) where ops cargo is 0.
   const opsMax = npcOperationalMaxCargoKg(npc, dist, maxCargoKg);
-  if (opsMax < 500) return null;
+  if (opsMax < NPC_MIN_BID_KG) return null;
+  // Light GA only books feeder LTL — nibbling 28 t electronics was a no-op.
+  if (
+    npc.aircraftClassId === 'light_ga' &&
+    lot.quantityKg > SMALL_LOT_MAX_KG
+  ) {
+    return null;
+  }
 
   const commodity = getCommodity(lot.commodityId);
   const payPerKg = lot.payUsd / Math.max(1, lot.quantityKg);
@@ -2537,7 +2548,7 @@ function npcBidOnMarket(
   const candidates: ShipmentLot[] = [];
   for (const lot of world.lots) {
     if (lot.status !== 'available' && lot.status !== 'reserved') continue;
-    if (lotAvailableKg(lot) < 500) continue;
+    if (lotAvailableKg(lot) < NPC_MIN_BID_KG) continue;
     if (claimedLotIds.has(lot.id)) continue;
     candidates.push(lot);
   }

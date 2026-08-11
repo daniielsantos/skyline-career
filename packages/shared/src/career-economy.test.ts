@@ -13,7 +13,18 @@ import {
   hubTierOf,
   HUB_TIER_PROFILE,
   idleLotPayMult,
+  idleLotPayMaxMultForLot,
   IDLE_LOT_PAY_MAX_MULT,
+  IDLE_LOT_PAY_MAX_MULT_HEAVY,
+  IDLE_LOT_PAY_MAX_MULT_BULK,
+  GA_LTL_MAX_KG,
+  SMALL_LOT_MIN_KG,
+  SMALL_LOT_MAX_KG,
+  BOARD_AVAILABLE_SOFT_CAP,
+  INTL_BOARD_PARTITION,
+  lotBoardPartition,
+  partitionAvailableQuota,
+  STALE_LARGE_RECYCLE_MAX_PER_COMMODITY,
   laneDemandShock,
   laneLotCaps,
   listActiveEconomyEvents,
@@ -41,7 +52,7 @@ import { BR_CAREER_HUBS } from './career-br-hubs.js';
 import { CA_CAREER_HUBS } from './career-ca-hubs.js';
 import { MX_CAREER_HUBS } from './career-mx-hubs.js';
 import { US_CAREER_HUBS } from './career-us-hubs.js';
-import { countryIdFromRegion } from './career-partition.js';
+import { countryIdFromRegion, listWorldCountryIds } from './career-partition.js';
 import type {
   CareerEconomyWorld,
   CommodityId,
@@ -528,16 +539,31 @@ describe('idle lot escalation', () => {
 
   it('ramps pay toward the max multiplier by expiry', () => {
     const lot = makeIdleLot();
+    assert.equal(idleLotPayMaxMultForLot(lot), IDLE_LOT_PAY_MAX_MULT_BULK);
     assert.ok(idleLotPayMult(lot, 12) > 1);
-    assert.equal(idleLotPayMult(lot, 20), IDLE_LOT_PAY_MAX_MULT);
+    assert.equal(idleLotPayMult(lot, 20), IDLE_LOT_PAY_MAX_MULT_BULK);
     const world = createSeedEconomyWorld({ seed: 'idle-ramp' });
     world.npcs = [];
     world.npcFlights = [];
     world.lots = [makeIdleLot()];
     world.tick = 20;
     escalateIdleLots(world);
-    assert.equal(world.lots[0]!.payUsd, Math.round(1_000 * IDLE_LOT_PAY_MAX_MULT));
+    assert.equal(
+      world.lots[0]!.payUsd,
+      Math.round(1_000 * IDLE_LOT_PAY_MAX_MULT_BULK),
+    );
     assert.equal(world.lots[0]!.urgency, 'urgent');
+  });
+
+  it('keeps full idle ramp on LTL and perishables; mutes large electronics', () => {
+    const ltl = makeIdleLot({ quantityKg: 1_200 });
+    const perish = makeIdleLot({ commodityId: 'perishables', quantityKg: 8_000 });
+    const elec = makeIdleLot({ commodityId: 'electronics', quantityKg: 18_000 });
+    assert.equal(idleLotPayMaxMultForLot(ltl), IDLE_LOT_PAY_MAX_MULT);
+    assert.equal(idleLotPayMaxMultForLot(perish), IDLE_LOT_PAY_MAX_MULT);
+    assert.equal(idleLotPayMaxMultForLot(elec), IDLE_LOT_PAY_MAX_MULT_HEAVY);
+    assert.equal(idleLotPayMult(ltl, 20), IDLE_LOT_PAY_MAX_MULT);
+    assert.equal(idleLotPayMult(elec, 20), IDLE_LOT_PAY_MAX_MULT_HEAVY);
   });
 
   it('stamps basePayUsd on legacy lots and escalates from it on ticks', () => {
@@ -654,26 +680,28 @@ describe('tickEconomyN market formation', () => {
       b.lots.map((l) => [l.commodityId, l.originIcao, l.destIcao, l.quantityKg]),
     );
   });
-  it('spawns small LTL lots (400–2000 kg) alongside larger freight', () => {
+  it('spawns small LTL lots (80–2000 kg) alongside larger freight', () => {
     const world = createSeedEconomyWorld({ seed: 'ltl-lots' });
     tickEconomyN(world, 48);
     const market = listMarketLots(world);
     assert.ok(market.length > 0);
     const small = market.filter(
       (row) =>
-        row.lot.quantityKg >= 400 &&
-        row.lot.quantityKg <= 2_000 &&
+        row.lot.quantityKg >= SMALL_LOT_MIN_KG &&
+        row.lot.quantityKg <= SMALL_LOT_MAX_KG &&
         /LTL/i.test(row.lot.reason),
     );
+    const gaSized = small.filter((row) => row.lot.quantityKg <= GA_LTL_MAX_KG);
     const large = market.filter(
       (row) =>
         row.lot.quantityKg >= 4_000 && row.lot.quantityKg < XL_LOT_MIN_KG,
     );
     assert.ok(small.length > 0, 'expected LTL lots for light turboprop fills');
+    assert.ok(gaSized.length > 0, 'expected Bonanza-sized LTL (≤450 kg)');
     assert.ok(large.length > 0, 'expected large lots to remain');
     for (const row of small) {
-      assert.ok(row.lot.quantityKg <= 2_000);
-      assert.ok(row.lot.quantityKg >= 400);
+      assert.ok(row.lot.quantityKg <= SMALL_LOT_MAX_KG);
+      assert.ok(row.lot.quantityKg >= SMALL_LOT_MIN_KG);
     }
     for (const row of large) {
       assert.ok(
@@ -681,6 +709,108 @@ describe('tickEconomyN market formation', () => {
         `large lot should stay ≤ ${LARGE_LOT_MAX_KG} kg`,
       );
     }
+  });
+
+  it('caps available lots per country and keeps US and international alive', () => {
+    const world = createSeedEconomyWorld({ seed: 'board-cap' });
+    tickEconomyN(world, 72);
+    const available = world.lots.filter((l) => l.status === 'available');
+    const countryByIcao = new Map(
+      world.airports.map((a) => [a.icao, countryIdFromRegion(a.region)]),
+    );
+    assert.ok(
+      available.length <= BOARD_AVAILABLE_SOFT_CAP + 80,
+      `available=${available.length}`,
+    );
+
+    const intl = available.filter(
+      (l) => lotBoardPartition(l, countryByIcao) === INTL_BOARD_PARTITION,
+    );
+    assert.ok(intl.length > 0, 'expected international lots on the board');
+
+    const us = available.filter(
+      (l) =>
+        countryByIcao.get(l.originIcao) === 'US' &&
+        lotBoardPartition(l, countryByIcao) !== INTL_BOARD_PARTITION,
+    );
+    const br = available.filter(
+      (l) =>
+        countryByIcao.get(l.originIcao) === 'BR' &&
+        lotBoardPartition(l, countryByIcao) !== INTL_BOARD_PARTITION,
+    );
+    assert.ok(us.length >= 40, `US lots=${us.length}`);
+    assert.ok(br.length >= 20, `BR lots=${br.length}`);
+
+    const intlQuota = partitionAvailableQuota(world, INTL_BOARD_PARTITION);
+    for (const commodity of [
+      'electronics',
+      'machinery',
+      'perishables',
+      'bulk',
+      'general',
+    ] as const) {
+      const intlN = intl.filter((l) => l.commodityId === commodity).length;
+      assert.ok(
+        intlN <= intlQuota + 16,
+        `INTL ${commodity}=${intlN} quota=${intlQuota}`,
+      );
+      for (const country of listWorldCountryIds(world)) {
+        const quota = partitionAvailableQuota(world, country);
+        const n = available.filter(
+          (l) =>
+            l.commodityId === commodity &&
+            lotBoardPartition(l, countryByIcao) === country,
+        ).length;
+        assert.ok(
+          n <= quota + 16,
+          `${country} ${commodity}=${n} quota=${quota}`,
+        );
+      }
+    }
+  });
+
+  it('recycles stale large electronics so the shelf can turn over', () => {
+    const world = createSeedEconomyWorld({ seed: 'recycle-large' });
+    world.npcs = [];
+    world.npcFlights = [];
+    for (const lot of world.lots) {
+      if (
+        lot.status === 'available' &&
+        lot.commodityId === 'electronics' &&
+        lot.quantityKg >= 4_000
+      ) {
+        lot.status = 'expired';
+      }
+    }
+    world.tick = 40;
+    const planted: string[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      const id = `lot_stale_electronics_${i}`;
+      world.lots.push({
+        id,
+        commodityId: 'electronics',
+        originIcao: 'SBGR',
+        destIcao: 'SBGL',
+        quantityKg: 18_000,
+        reservedKg: 0,
+        createdAtTick: 0,
+        expiresAtTick: 48,
+        payUsd: 20_000,
+        basePayUsd: 20_000,
+        urgency: 'normal',
+        reason: 'stale large',
+        status: 'available',
+      });
+      planted.push(id);
+    }
+    tickEconomyN(world, 1);
+    const expired = planted.filter(
+      (id) => world.lots.find((l) => l.id === id)?.status === 'expired',
+    );
+    assert.ok(
+      expired.length >= STALE_LARGE_RECYCLE_MAX_PER_COMMODITY,
+      `recycled=${expired.length}`,
+    );
   });
 
   it('forms XL lots on strong major↔major corridors when surplus is deep', () => {

@@ -38,6 +38,8 @@ import {
   laneInboundKg,
   npcLaneSaturation,
   LANE_SATURATION_KG,
+  NPC_MIN_BID_KG,
+  scoreLotForNpc,
   npcRegionBidCapacity,
   isNpcReadyToBid,
   routeDistanceNm,
@@ -83,7 +85,7 @@ function findLiftableLot(
 }
 import { cancelMission, getAircraftClass, settleMission } from './career-mission.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
-import type { NpcFlight } from './types/career-economy.js';
+import type { NpcFlight, ShipmentLot } from './types/career-economy.js';
 
 function worldRegionCount(world: { airports: { region: string }[] }): number {
   return listNpcHomeRegions(world.airports).length;
@@ -451,6 +453,44 @@ describe('NPC freighter fleet', () => {
     const short = estimateNpcBlockHours(500, 'narrow_freighter');
     assert.ok(short.flightHours < 2);
     assert.ok(Number.isInteger(short.flightHours * 10));
+  });
+
+  it('lets light_ga score GA-sized LTL and skips large electronics', () => {
+    const world = createSeedEconomyWorld({ seed: 'ga-ltl-bid' });
+    const ga = world.npcs.find((n) => n.aircraftClassId === 'light_ga');
+    assert.ok(ga);
+    ga!.status = 'idle';
+    ga!.locationIcao = 'SBGR';
+    ga!.feeBias = 0.5;
+    const ltl: ShipmentLot = {
+        id: 'lot-ga-ltl',
+        commodityId: 'general',
+        originIcao: 'SBGR',
+        destIcao: 'SBKP',
+        quantityKg: 200,
+        reservedKg: 0,
+        createdAtTick: world.tick,
+        expiresAtTick: world.tick + 48,
+        payUsd: 400,
+        basePayUsd: 400,
+        urgency: 'normal',
+        reason: 'test GA LTL',
+        status: 'available',
+      };
+    const heavy: typeof ltl = {
+      ...ltl,
+      id: 'lot-ga-heavy',
+      commodityId: 'electronics',
+      destIcao: 'SBGL',
+      quantityKg: 18_000,
+      payUsd: 40_000,
+      basePayUsd: 40_000,
+      reason: 'test large electronics',
+    };
+    const rng = () => 0.5;
+    assert.ok(NPC_MIN_BID_KG <= 200);
+    assert.ok(scoreLotForNpc(world, ga!, ltl, rng) != null);
+    assert.equal(scoreLotForNpc(world, ga!, heavy, rng), null);
   });
 
   it('claims lots with wall-clock ETA and settles mid-hour', () => {

@@ -224,6 +224,8 @@ export {
   npcLaneSaturation,
   npcRegionBidCapacity,
   isNpcReadyToBid,
+  NPC_MIN_BID_KG,
+  scoreLotForNpc,
   CONTRACT_PILOT_FEE_FRAC,
   CONTRACT_PILOT_OFFER_CHANCE,
   AWAITING_PILOT_MIN_HOURS,
@@ -293,6 +295,40 @@ export const MAX_LOTS_PER_LANE = 5;
 /** Soft caps within a lane so light aircraft see bookable slices. Fallback for major↔major. */
 export const MAX_LARGE_LOTS_PER_LANE = 3;
 export const MAX_SMALL_LOTS_PER_LANE = 2;
+
+/** True LTL floor — Bonanza-class (maxCargo 450 kg) can bid. */
+export const SMALL_LOT_MIN_KG = 80;
+/** Caravan / light-jet LTL ceiling. */
+export const SMALL_LOT_MAX_KG = 2_000;
+/** GA-sized LTL band (spoke feeders). */
+export const GA_LTL_MAX_KG = 450;
+/** Classic feeder LTL band min (turboprop fills). */
+export const FEEDER_LTL_MIN_KG = 400;
+
+/**
+ * Soft board depth. Caps are per partition (country / INTL), not a global
+ * bucket — a global cap starved US + international after AR/CL (pulse 30d).
+ */
+export const BOARD_AVAILABLE_SOFT_CAP = 8_500;
+export const COMMODITY_AVAILABLE_SOFT_CAP = 1_550;
+/** Share of each commodity cap reserved for curated international lanes. */
+export const INTL_AVAILABLE_SHARE = 0.12;
+/** Floor so a small country (CL) still turns over when the board is deep. */
+export const COUNTRY_AVAILABLE_FLOOR = 50;
+/**
+ * Extra brake on large (≥4 t) electronics/machinery that NPCs were not clearing.
+ * Applied per partition (same share as the available quota).
+ */
+export const COMMODITY_LARGE_AVAILABLE_SOFT_CAP: Partial<
+  Record<CommodityId, number>
+> = {
+  electronics: 1_100,
+  machinery: 1_100,
+};
+/** Idle life progress at which an unclaimed large lot can be recycled. */
+export const STALE_LARGE_RECYCLE_PROGRESS = 0.4;
+/** Max stale large lots recycled per commodity per formation pass. */
+export const STALE_LARGE_RECYCLE_MAX_PER_COMMODITY = 4;
 
 /** Large (Narrow-oriented) freight hard cap — unchanged when XL exists. */
 export const LARGE_LOT_MAX_KG = 28_000;
@@ -2458,10 +2494,26 @@ function expireLots(world: CareerEconomyWorld): void {
  * After that, pay ramps linearly to IDLE_LOT_PAY_MAX_MULT at expiry.
  */
 export const IDLE_LOT_ESCALATION_START = 0.25;
-/** Max pay multiplier vs formation base for a fully aged available lot. */
+/** Max pay multiplier vs formation base for LTL + perishables. */
 export const IDLE_LOT_PAY_MAX_MULT = 1.4;
+/** Large electronics/machinery — pulse showed p50 doubling with falling fill. */
+export const IDLE_LOT_PAY_MAX_MULT_HEAVY = 1.15;
+/** Other large bulk (general/supplies). */
+export const IDLE_LOT_PAY_MAX_MULT_BULK = 1.25;
 /** Life progress at which a lingering lot flips to urgent. */
 export const IDLE_LOT_URGENT_PROGRESS = 0.55;
+
+/** Idle ceiling for this lot: full ramp on LTL/perishables only. */
+export function idleLotPayMaxMultForLot(
+  lot: Pick<ShipmentLot, 'commodityId' | 'quantityKg'>,
+): number {
+  if (lot.commodityId === 'perishables') return IDLE_LOT_PAY_MAX_MULT;
+  if (lot.quantityKg <= SMALL_LOT_MAX_KG) return IDLE_LOT_PAY_MAX_MULT;
+  if (lot.commodityId === 'electronics' || lot.commodityId === 'machinery') {
+    return IDLE_LOT_PAY_MAX_MULT_HEAVY;
+  }
+  return IDLE_LOT_PAY_MAX_MULT_BULK;
+}
 
 /** Life progress of a lot at `tick` (0 at create, 1 at expiry). */
 export function idleLotLifeProgress(
@@ -2478,14 +2530,18 @@ export function idleLotLifeProgress(
  * No boost for the first IDLE_LOT_ESCALATION_START of life, then ramps to max.
  */
 export function idleLotPayMult(
-  lot: Pick<ShipmentLot, 'createdAtTick' | 'expiresAtTick'>,
+  lot: Pick<
+    ShipmentLot,
+    'createdAtTick' | 'expiresAtTick' | 'commodityId' | 'quantityKg'
+  >,
   tick: number,
 ): number {
   const progress = idleLotLifeProgress(lot, tick);
   if (progress <= IDLE_LOT_ESCALATION_START) return 1;
   const t =
     (progress - IDLE_LOT_ESCALATION_START) / (1 - IDLE_LOT_ESCALATION_START);
-  return 1 + (IDLE_LOT_PAY_MAX_MULT - 1) * t;
+  const maxMult = idleLotPayMaxMultForLot(lot);
+  return 1 + (maxMult - 1) * t;
 }
 
 /**
@@ -2533,6 +2589,267 @@ function laneKey(commodityId: CommodityId, origin: string, dest: string): string
   return `${commodityId}:${origin}:${dest}`;
 }
 
+function sizeSmallLotKg(
+  qty: number,
+  originTier: HubTier,
+  destTier: HubTier,
+  rng: () => number,
+): number {
+  const spokeOd = originTier === 'spoke' || destTier === 'spoke';
+  const wantGa = spokeOd || rng() < 0.4;
+  if (wantGa) {
+    const hi = Math.min(GA_LTL_MAX_KG, Math.max(SMALL_LOT_MIN_KG, qty));
+    const steps = Math.max(0, Math.floor((hi - SMALL_LOT_MIN_KG) / 10));
+    return Math.max(
+      SMALL_LOT_MIN_KG,
+      Math.min(hi, SMALL_LOT_MIN_KG + Math.floor(rng() * (steps + 1)) * 10),
+    );
+  }
+  const smallQty = Math.min(qty, SMALL_LOT_MAX_KG);
+  return Math.max(
+    FEEDER_LTL_MIN_KG,
+    Math.min(
+      smallQty,
+      FEEDER_LTL_MIN_KG + Math.floor(rng() * 17) * 100,
+    ),
+  );
+}
+
+export const INTL_BOARD_PARTITION = 'INTL';
+
+function countryByIcaoMap(
+  world: CareerEconomyWorld,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const ap of world.airports) {
+    const id = countryIdFromRegion(ap.region ?? '');
+    if (id) map.set(ap.icao.toUpperCase(), id);
+  }
+  return map;
+}
+
+export function lotBoardPartition(
+  lot: Pick<ShipmentLot, 'originIcao' | 'destIcao'>,
+  countryByIcao: ReadonlyMap<string, string>,
+): string {
+  const origin = countryByIcao.get(lot.originIcao.trim().toUpperCase()) ?? '';
+  const dest = countryByIcao.get(lot.destIcao.trim().toUpperCase()) ?? '';
+  if (origin && dest && origin !== dest) return INTL_BOARD_PARTITION;
+  return origin || dest || 'XX';
+}
+
+function partitionKey(commodityId: CommodityId, partitionId: string): string {
+  return `${commodityId}:${partitionId}`;
+}
+
+export function intlCommodityQuota(): number {
+  return Math.max(
+    80,
+    Math.round(COMMODITY_AVAILABLE_SOFT_CAP * INTL_AVAILABLE_SHARE),
+  );
+}
+
+/** Available-lot quota for one commodity in a country or INTL. */
+export function partitionAvailableQuota(
+  world: CareerEconomyWorld,
+  partitionId: string,
+): number {
+  if (partitionId === INTL_BOARD_PARTITION) return intlCommodityQuota();
+  const totalHubs = Math.max(1, world.airports.length);
+  const countryHubs = world.airports.filter(
+    (ap) => countryIdFromRegion(ap.region ?? '') === partitionId,
+  ).length;
+  const pool = Math.max(0, COMMODITY_AVAILABLE_SOFT_CAP - intlCommodityQuota());
+  return Math.max(
+    COUNTRY_AVAILABLE_FLOOR,
+    Math.round((pool * countryHubs) / totalHubs),
+  );
+}
+
+function partitionLargeQuota(
+  world: CareerEconomyWorld,
+  partitionId: string,
+  commodityId: CommodityId,
+): number | undefined {
+  const largeCap = COMMODITY_LARGE_AVAILABLE_SOFT_CAP[commodityId];
+  if (largeCap == null) return undefined;
+  const availCap = partitionAvailableQuota(world, partitionId);
+  return Math.max(
+    20,
+    Math.round((largeCap * availCap) / COMMODITY_AVAILABLE_SOFT_CAP),
+  );
+}
+
+type AvailableLotCounts = {
+  total: number;
+  byCommodity: Map<CommodityId, number>;
+  largeByCommodity: Map<CommodityId, number>;
+  byCommodityPartition: Map<string, number>;
+  largeByCommodityPartition: Map<string, number>;
+};
+
+function countAvailableLots(
+  world: CareerEconomyWorld,
+  countryByIcao: ReadonlyMap<string, string>,
+): AvailableLotCounts {
+  const byCommodity = new Map<CommodityId, number>();
+  const largeByCommodity = new Map<CommodityId, number>();
+  const byCommodityPartition = new Map<string, number>();
+  const largeByCommodityPartition = new Map<string, number>();
+  let total = 0;
+  for (const lot of world.lots) {
+    if (lot.status !== 'available') continue;
+    total += 1;
+    byCommodity.set(lot.commodityId, (byCommodity.get(lot.commodityId) ?? 0) + 1);
+    const pKey = partitionKey(
+      lot.commodityId,
+      lotBoardPartition(lot, countryByIcao),
+    );
+    byCommodityPartition.set(pKey, (byCommodityPartition.get(pKey) ?? 0) + 1);
+    if (lot.quantityKg >= 4_000) {
+      largeByCommodity.set(
+        lot.commodityId,
+        (largeByCommodity.get(lot.commodityId) ?? 0) + 1,
+      );
+      largeByCommodityPartition.set(
+        pKey,
+        (largeByCommodityPartition.get(pKey) ?? 0) + 1,
+      );
+    }
+  }
+  return {
+    total,
+    byCommodity,
+    largeByCommodity,
+    byCommodityPartition,
+    largeByCommodityPartition,
+  };
+}
+
+function noteAvailableLot(
+  counts: AvailableLotCounts,
+  commodityId: CommodityId,
+  partitionId: string,
+  qty: number,
+  delta: 1 | -1,
+): void {
+  counts.total += delta;
+  counts.byCommodity.set(
+    commodityId,
+    Math.max(0, (counts.byCommodity.get(commodityId) ?? 0) + delta),
+  );
+  const pKey = partitionKey(commodityId, partitionId);
+  counts.byCommodityPartition.set(
+    pKey,
+    Math.max(0, (counts.byCommodityPartition.get(pKey) ?? 0) + delta),
+  );
+  if (qty >= 4_000) {
+    counts.largeByCommodity.set(
+      commodityId,
+      Math.max(0, (counts.largeByCommodity.get(commodityId) ?? 0) + delta),
+    );
+    counts.largeByCommodityPartition.set(
+      pKey,
+      Math.max(0, (counts.largeByCommodityPartition.get(pKey) ?? 0) + delta),
+    );
+  }
+}
+
+function commodityBoardBloated(
+  world: CareerEconomyWorld,
+  counts: AvailableLotCounts,
+  commodityId: CommodityId,
+  partitionId: string,
+): { skipHeavy: boolean; skipAll: boolean } {
+  const quota = partitionAvailableQuota(world, partitionId);
+  const n =
+    counts.byCommodityPartition.get(partitionKey(commodityId, partitionId)) ?? 0;
+  const largeQuota = partitionLargeQuota(world, partitionId, commodityId);
+  const largeN =
+    counts.largeByCommodityPartition.get(
+      partitionKey(commodityId, partitionId),
+    ) ?? 0;
+  let skipAll = n >= quota;
+  if (
+    counts.total >= BOARD_AVAILABLE_SOFT_CAP &&
+    n >= Math.ceil(quota * 0.9)
+  ) {
+    skipAll = true;
+  }
+  const skipHeavy =
+    skipAll || (largeQuota != null && largeN >= largeQuota);
+  return { skipHeavy, skipAll };
+}
+
+function recycleStaleLargeLots(
+  world: CareerEconomyWorld,
+  countryByIcao: ReadonlyMap<string, string>,
+  counts: AvailableLotCounts,
+  activeCounts: Map<string, number>,
+  xlCounts: Map<string, number>,
+  largeCounts: Map<string, number>,
+): number {
+  const recycledByCommodity = new Map<CommodityId, number>();
+  const stale: ShipmentLot[] = [];
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' || lot.reservedKg > 0) continue;
+    if (lot.quantityKg < 4_000) continue;
+    // Only the heavy shelf that froze in the 30d pulse (electronics/machinery).
+    // General/bulk keep idle-pay escalation as the living signal.
+    if (COMMODITY_LARGE_AVAILABLE_SOFT_CAP[lot.commodityId] == null) continue;
+    const progress = idleLotLifeProgress(lot, world.tick);
+    if (progress < STALE_LARGE_RECYCLE_PROGRESS) continue;
+    const partitionId = lotBoardPartition(lot, countryByIcao);
+    const largeQuota = partitionLargeQuota(world, partitionId, lot.commodityId);
+    const largeN =
+      counts.largeByCommodityPartition.get(
+        partitionKey(lot.commodityId, partitionId),
+      ) ?? 0;
+    const crowded =
+      largeQuota != null && largeN >= Math.ceil(largeQuota * 0.5);
+    // Crowded shelf turns over from 40% life; thin markets wait until 70%.
+    if (!crowded && progress < 0.7) continue;
+    stale.push(lot);
+  }
+  stale.sort(
+    (a, b) =>
+      idleLotLifeProgress(b, world.tick) - idleLotLifeProgress(a, world.tick),
+  );
+
+  let recycled = 0;
+  for (const lot of stale) {
+    const used = recycledByCommodity.get(lot.commodityId) ?? 0;
+    if (used >= STALE_LARGE_RECYCLE_MAX_PER_COMMODITY) continue;
+    lot.status = 'expired';
+    const origin = airportByIcao(world, lot.originIcao);
+    if (origin) {
+      const pile = ensurePile(origin, lot.commodityId);
+      pile.stockKg = clamp(
+        pile.stockKg + lot.quantityKg * 0.25,
+        0,
+        pile.capacityKg,
+      );
+    }
+    const key = laneKey(lot.commodityId, lot.originIcao, lot.destIcao);
+    activeCounts.set(key, Math.max(0, (activeCounts.get(key) ?? 0) - 1));
+    if (lot.quantityKg >= XL_LOT_MIN_KG) {
+      xlCounts.set(key, Math.max(0, (xlCounts.get(key) ?? 0) - 1));
+    } else {
+      largeCounts.set(key, Math.max(0, (largeCounts.get(key) ?? 0) - 1));
+    }
+    noteAvailableLot(
+      counts,
+      lot.commodityId,
+      lotBoardPartition(lot, countryByIcao),
+      lot.quantityKg,
+      -1,
+    );
+    recycledByCommodity.set(lot.commodityId, used + 1);
+    recycled += 1;
+  }
+  return recycled;
+}
+
 type RankedAirport = {
   ap: AirportTerminal;
   stock: StockPile;
@@ -2553,10 +2870,12 @@ function formLotsFromImbalances(
 ): PartitionTickResult[] {
   ensureInternationalLanes(world);
 
+  const countryByIcao = countryByIcaoMap(world);
   const activeCounts = new Map<string, number>();
   const xlCounts = new Map<string, number>();
   const largeCounts = new Map<string, number>();
   const smallCounts = new Map<string, number>();
+  const availableCounts = countAvailableLots(world, countryByIcao);
   for (const l of world.lots) {
     if (l.status !== 'available' && l.status !== 'reserved' && l.status !== 'in_transit') {
       continue;
@@ -2571,6 +2890,14 @@ function formLotsFromImbalances(
       smallCounts.set(key, (smallCounts.get(key) ?? 0) + 1);
     }
   }
+  recycleStaleLargeLots(
+    world,
+    countryByIcao,
+    availableCounts,
+    activeCounts,
+    xlCounts,
+    largeCounts,
+  );
 
   const formedByPartition = new Map<string, number>();
   const bumpFormed = (partitionId: string, n = 1) => {
@@ -2694,6 +3021,7 @@ function formLotsFromImbalances(
     world.lots.push(lot);
     recordLotFormationActivity(world, origin.ap.icao, dest.ap.icao);
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
+    noteAvailableLot(availableCounts, commodity.id, opts.partitionId, qty, 1);
     if (size === 'xl') {
       xlCounts.set(key, (xlCounts.get(key) ?? 0) + 1);
     } else if (size === 'large') {
@@ -2767,8 +3095,15 @@ function formLotsFromImbalances(
     const roomKg = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
     let qty = Math.min(surplusKg, roomKg);
     qty = Math.floor(qty / 100) * 100;
+    const boardPressure = commodityBoardBloated(
+      world,
+      availableCounts,
+      commodity.id,
+      opts.partitionId,
+    );
 
     if (
+      !boardPressure.skipHeavy &&
       qty >= XL_LOT_MIN_KG &&
       caps.maxXl > 0 &&
       (xlCounts.get(key) ?? 0) < caps.maxXl &&
@@ -2799,6 +3134,7 @@ function formLotsFromImbalances(
     }
 
     if (
+      !boardPressure.skipHeavy &&
       qty >= 4_000 &&
       caps.maxLarge > 0 &&
       (largeCounts.get(key) ?? 0) < caps.maxLarge &&
@@ -2823,19 +3159,19 @@ function formLotsFromImbalances(
     }
 
     if (
-      qty >= 400 &&
+      !boardPressure.skipAll &&
+      qty >= SMALL_LOT_MIN_KG &&
       caps.maxSmall > 0 &&
       (smallCounts.get(key) ?? 0) < caps.maxSmall &&
       (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
     ) {
-      const smallQty = Math.min(qty, 2_000);
-      const sized = Math.max(400, Math.min(smallQty, 400 + Math.floor(rng() * 17) * 100));
+      const sized = sizeSmallLotKg(qty, origin.tier, dest.tier, rng);
       pushLot(
         key,
         commodity,
         origin,
         dest,
-        Math.min(smallQty, sized),
+        sized,
         'small',
         laneSat,
         inboundKg,
@@ -3023,7 +3359,7 @@ function formLotsFromImbalances(
         );
         tryFormPair(commodity, origin, dest, cw, {
           international: true,
-          partitionId: 'INTL',
+          partitionId: INTL_BOARD_PARTITION,
           capacityKgPerDay: lane.capacityKgPerDay,
           allowSpokeFiller: false,
           originHasOpenCorridor: false,

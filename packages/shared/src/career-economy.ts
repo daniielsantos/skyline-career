@@ -391,6 +391,19 @@ export const COMMODITY_LARGE_AVAILABLE_SOFT_CAP: Partial<
 export const STALE_LARGE_RECYCLE_PROGRESS = 0.4;
 /** Max stale large lots recycled per commodity per formation pass. */
 export const STALE_LARGE_RECYCLE_MAX_PER_COMMODITY = 4;
+/**
+ * Unclaimed GA-LTL / LTL recycle after idle-pay has had time to work
+ * (past IDLE_LOT_URGENT_PROGRESS). Earlier than expiry so they do not
+ * count as cemetery; later than large so the living signal still shows.
+ */
+export const STALE_SMALL_RECYCLE_PROGRESS = 0.62;
+/** Thin small shelf waits until this life. */
+export const STALE_SMALL_RECYCLE_THIN_PROGRESS = 0.82;
+/** Last-mile Dry is the starter board — recycle later than feeder LTL. */
+export const STALE_LAST_MILE_RECYCLE_PROGRESS = 0.78;
+export const STALE_LAST_MILE_RECYCLE_THIN_PROGRESS = 0.9;
+/** Max stale small lots recycled per commodity per formation pass. */
+export const STALE_SMALL_RECYCLE_MAX_PER_COMMODITY = 8;
 
 /** Large (Narrow-oriented) freight hard cap — unchanged when XL exists. */
 export const LARGE_LOT_MAX_KG = 28_000;
@@ -3052,6 +3065,89 @@ function recycleStaleLargeLots(
   return recycled;
 }
 
+function isLastMileLot(lot: Pick<ShipmentLot, 'reason'>): boolean {
+  return /last-mile/i.test(lot.reason);
+}
+
+/**
+ * Pull unclaimed GA-LTL / LTL before they expire so expire:deliver is not a
+ * cemetery of hops nobody lifted. Last-mile waits longer than feeder LTL.
+ */
+function recycleStaleSmallLots(
+  world: CareerEconomyWorld,
+  countryByIcao: ReadonlyMap<string, string>,
+  counts: AvailableLotCounts,
+  activeCounts: Map<string, number>,
+  smallCounts: Map<string, number>,
+): number {
+  const recycledByCommodity = new Map<CommodityId, number>();
+  const lastMileOpen = new Map<string, number>();
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' || lot.reservedKg > 0) continue;
+    if (!isLastMileLot(lot)) continue;
+    const originKey = `${lot.originIcao.trim().toUpperCase()}|${lot.commodityId}`;
+    lastMileOpen.set(originKey, (lastMileOpen.get(originKey) ?? 0) + 1);
+  }
+
+  const stale: ShipmentLot[] = [];
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' || lot.reservedKg > 0) continue;
+    if (lot.quantityKg >= 4_000) continue;
+    const progress = idleLotLifeProgress(lot, world.tick);
+    const lastMile = isLastMileLot(lot);
+    const floor = lastMile
+      ? STALE_LAST_MILE_RECYCLE_PROGRESS
+      : STALE_SMALL_RECYCLE_PROGRESS;
+    if (progress < floor) continue;
+    const key = laneKey(lot.commodityId, lot.originIcao, lot.destIcao);
+    const crowded = lastMile
+      ? (lastMileOpen.get(
+          `${lot.originIcao.trim().toUpperCase()}|${lot.commodityId}`,
+        ) ?? 0) >= LAST_MILE_OPEN_LOTS_PER_ORIGIN
+      : (smallCounts.get(key) ?? 0) >= MAX_SMALL_LOTS_PER_LANE;
+    const thinFloor = lastMile
+      ? STALE_LAST_MILE_RECYCLE_THIN_PROGRESS
+      : STALE_SMALL_RECYCLE_THIN_PROGRESS;
+    if (!crowded && progress < thinFloor) continue;
+    stale.push(lot);
+  }
+  stale.sort((a, b) => {
+    const aLast = isLastMileLot(a) ? 1 : 0;
+    const bLast = isLastMileLot(b) ? 1 : 0;
+    if (aLast !== bLast) return aLast - bLast;
+    return (
+      idleLotLifeProgress(b, world.tick) - idleLotLifeProgress(a, world.tick)
+    );
+  });
+
+  let recycled = 0;
+  for (const lot of stale) {
+    const used = recycledByCommodity.get(lot.commodityId) ?? 0;
+    if (used >= STALE_SMALL_RECYCLE_MAX_PER_COMMODITY) continue;
+    retireLotToOrigin(world, lot, 'recycled');
+    const key = laneKey(lot.commodityId, lot.originIcao, lot.destIcao);
+    activeCounts.set(key, Math.max(0, (activeCounts.get(key) ?? 0) - 1));
+    smallCounts.set(key, Math.max(0, (smallCounts.get(key) ?? 0) - 1));
+    if (isLastMileLot(lot)) {
+      const originKey = `${lot.originIcao.trim().toUpperCase()}|${lot.commodityId}`;
+      lastMileOpen.set(
+        originKey,
+        Math.max(0, (lastMileOpen.get(originKey) ?? 0) - 1),
+      );
+    }
+    noteAvailableLot(
+      counts,
+      lot.commodityId,
+      lotBoardPartition(lot, countryByIcao),
+      lot.quantityKg,
+      -1,
+    );
+    recycledByCommodity.set(lot.commodityId, used + 1);
+    recycled += 1;
+  }
+  return recycled;
+}
+
 type RankedAirport = {
   ap: AirportTerminal;
   stock: StockPile;
@@ -3099,6 +3195,13 @@ function formLotsFromImbalances(
     activeCounts,
     xlCounts,
     largeCounts,
+  );
+  recycleStaleSmallLots(
+    world,
+    countryByIcao,
+    availableCounts,
+    activeCounts,
+    smallCounts,
   );
 
   const formedByPartition = new Map<string, number>();

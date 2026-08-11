@@ -13,6 +13,7 @@ import {
   escalateIdleLots,
   hubTierOf,
   HUB_TIER_PROFILE,
+  idleLotLifeProgress,
   idleLotPayMult,
   idleLotPayMaxMultForLot,
   IDLE_LOT_PAY_MAX_MULT,
@@ -32,6 +33,9 @@ import {
   lotBoardPartition,
   partitionAvailableQuota,
   STALE_LARGE_RECYCLE_MAX_PER_COMMODITY,
+  STALE_SMALL_RECYCLE_MAX_PER_COMMODITY,
+  STALE_SMALL_RECYCLE_PROGRESS,
+  STALE_LAST_MILE_RECYCLE_PROGRESS,
   laneDemandShock,
   laneLotCaps,
   listActiveEconomyEvents,
@@ -850,6 +854,152 @@ describe('tickEconomyN market formation', () => {
     assert.ok(
       expiredFlowDelta < recycledDelta,
       'early recycle must not also count as expiry',
+    );
+  });
+
+  it('recycles stale small LTL so GA hops do not die as expiry', () => {
+    const world = createSeedEconomyWorld({ seed: 'recycle-small' });
+    world.npcs = [];
+    world.npcFlights = [];
+    for (const lot of world.lots) {
+      if (lot.status === 'available' && lot.quantityKg < 4_000) {
+        lot.status = 'expired';
+      }
+    }
+    world.tick = 70;
+    const planted: string[] = [];
+    for (let i = 0; i < 10; i += 1) {
+      const id = `lot_stale_small_${i}`;
+      world.lots.push({
+        id,
+        commodityId: 'general',
+        originIcao: 'SBGR',
+        destIcao: 'SBGL',
+        quantityKg: 280,
+        reservedKg: 0,
+        createdAtTick: 0,
+        expiresAtTick: 100,
+        payUsd: 4_000,
+        basePayUsd: 4_000,
+        urgency: 'normal',
+        reason: 'stale LTL',
+        status: 'available',
+      });
+      planted.push(id);
+    }
+    assert.ok(
+      idleLotLifeProgress(
+        { createdAtTick: 0, expiresAtTick: 100 },
+        world.tick,
+      ) >= STALE_SMALL_RECYCLE_PROGRESS,
+    );
+    const recycledBefore = world.flow?.recycled.lots ?? 0;
+    const expiredFlowBefore = world.flow?.expired.lots ?? 0;
+    tickEconomyN(world, 1);
+    const expired = planted.filter(
+      (id) => world.lots.find((l) => l.id === id)?.status === 'expired',
+    );
+    assert.ok(
+      expired.length >= STALE_SMALL_RECYCLE_MAX_PER_COMMODITY,
+      `recycled=${expired.length}`,
+    );
+    const recycledDelta = (world.flow?.recycled.lots ?? 0) - recycledBefore;
+    const expiredFlowDelta = (world.flow?.expired.lots ?? 0) - expiredFlowBefore;
+    assert.ok(
+      recycledDelta >= expired.length,
+      `flow recycled ${recycledDelta} vs planted ${expired.length}`,
+    );
+    assert.ok(
+      expiredFlowDelta < recycledDelta,
+      'small recycle must not also count as expiry',
+    );
+  });
+
+  it('keeps last-mile Dry on the board until late life', () => {
+    const world = createSeedEconomyWorld({ seed: 'recycle-last-mile-wait' });
+    world.npcs = [];
+    world.npcFlights = [];
+    world.tick = 50;
+    const planted: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const id = `lot_last_mile_wait_${i}`;
+      world.lots.push({
+        id,
+        commodityId: 'general',
+        originIcao: 'SBGR',
+        destIcao: 'SBRJ',
+        quantityKg: 220,
+        reservedKg: 0,
+        createdAtTick: 0,
+        expiresAtTick: 100,
+        payUsd: 3_500,
+        basePayUsd: 3_500,
+        urgency: 'normal',
+        reason: 'metro break-bulk · last-mile',
+        status: 'available',
+      });
+      planted.push(id);
+    }
+    assert.ok(
+      idleLotLifeProgress(
+        { createdAtTick: 0, expiresAtTick: 100 },
+        world.tick,
+      ) < STALE_LAST_MILE_RECYCLE_PROGRESS,
+    );
+    tickEconomyN(world, 1);
+    const stillOpen = planted.filter(
+      (id) => world.lots.find((l) => l.id === id)?.status === 'available',
+    );
+    assert.equal(stillOpen.length, planted.length);
+  });
+
+  it('recycles last-mile Dry in late life instead of letting it expire', () => {
+    const world = createSeedEconomyWorld({ seed: 'recycle-last-mile-late' });
+    world.npcs = [];
+    world.npcFlights = [];
+    for (const lot of world.lots) {
+      if (
+        lot.status === 'available' &&
+        lot.commodityId === 'general' &&
+        lot.quantityKg < 4_000
+      ) {
+        lot.status = 'expired';
+      }
+    }
+    world.tick = 92;
+    const planted: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const id = `lot_last_mile_late_${i}`;
+      world.lots.push({
+        id,
+        commodityId: 'general',
+        originIcao: 'SBGR',
+        destIcao: 'SBRJ',
+        quantityKg: 220,
+        reservedKg: 0,
+        createdAtTick: 0,
+        expiresAtTick: 100,
+        payUsd: 3_500,
+        basePayUsd: 3_500,
+        urgency: 'normal',
+        reason: 'metro break-bulk · last-mile',
+        status: 'available',
+      });
+      planted.push(id);
+    }
+    const recycledBefore = world.flow?.recycled.lots ?? 0;
+    const expiredFlowBefore = world.flow?.expired.lots ?? 0;
+    tickEconomyN(world, 1);
+    const expired = planted.filter(
+      (id) => world.lots.find((l) => l.id === id)?.status === 'expired',
+    );
+    assert.ok(expired.length >= 1, `recycled last-mile=${expired.length}`);
+    const recycledDelta = (world.flow?.recycled.lots ?? 0) - recycledBefore;
+    const expiredFlowDelta = (world.flow?.expired.lots ?? 0) - expiredFlowBefore;
+    assert.ok(recycledDelta >= expired.length);
+    assert.ok(
+      expiredFlowDelta < recycledDelta,
+      'late last-mile recycle must not also count as expiry',
     );
   });
 

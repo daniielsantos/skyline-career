@@ -138,7 +138,7 @@ export function noteLotExpired(
   if (band) ensureFlowStats(world).expiredBySize[band] += 1;
 }
 
-/** Stale heavy lot pulled early so the shelf turns over. */
+/** Stale lot pulled early so the shelf turns over (not an expiry). */
 export function noteLotRecycled(
   world: CareerEconomyWorld,
   commodityId: CommodityId,

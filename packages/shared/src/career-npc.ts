@@ -43,7 +43,12 @@ import {
   listCareerPlayerAirframes,
   resolveAirframePerfForUi,
 } from './career-player-airframes.js';
-import { isDomesticOd, isInternationalOdAllowed } from './career-partition.js';
+import { noteLotClaimed, noteNpcLeg, noteNpcRest } from './career-economy-flow.js';
+import {
+  countryIdFromRegion,
+  isDomesticOd,
+  isInternationalOdAllowed,
+} from './career-partition.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
   listHomologatedNpcAirframesForClass,
@@ -197,6 +202,32 @@ export const AWAITING_PILOT_MAX_HOURS = 8;
  * departing immediately. High so early-game contract pilots see a live board.
  */
 export const CONTRACT_PILOT_OFFER_CHANCE = 0.9;
+/**
+ * Cap concurrent crew-needed freight holds per region.
+ *
+ * Each hold parks its NPC *and* its lot for 3–8h before the leg even departs.
+ * Uncapped at a 0.9 offer chance this swallowed most of the fleet's duty time,
+ * so claim throughput collapsed while the board kept forming lots.
+ */
+export const MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION = 0.5;
+/** Floor so small maps still show a live crew-needed board. */
+export const MIN_OPEN_CONTRACT_PILOT_OFFERS = 4;
+
+export function maxOpenContractPilotOffers(world: CareerEconomyWorld): number {
+  const regions = new Set(
+    world.airports.map((ap) => ap.region).filter(Boolean),
+  ).size;
+  return Math.max(
+    MIN_OPEN_CONTRACT_PILOT_OFFERS,
+    Math.round(regions * MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION),
+  );
+}
+
+export function countOpenContractPilotOffers(world: CareerEconomyWorld): number {
+  return world.npcFlights.filter(
+    (f) => f.status === 'awaiting_pilot' && !isNpcRepositionFlight(f),
+  ).length;
+}
 
 export function quoteContractPilotFeeUsd(payUsd: number): number {
   const pay = Math.max(0, payUsd);
@@ -473,6 +504,45 @@ export function npcRegionBidCapacity(
 }
 
 /**
+ * Loaded legs a freighter completes per career day, averaged over duty and rest.
+ * Duty caps at MAX_DUTY_HOURS with a 10–14h rest after, so a freighter is only
+ * productive about half the day. Measured against the 7d pulse (286 NPCs lifting
+ * ~6,200 t/day against ~5,300 t of nominal capacity).
+ */
+export const NPC_LEGS_PER_DAY_EST = 1.2;
+
+/**
+ * Freight one partition's home fleet can lift per career day.
+ * Formation uses this so the board is sized by transport capacity instead of
+ * by how much surplus the map happens to hold.
+ */
+export function partitionLiftableKgPerDay(
+  world: CareerEconomyWorld,
+  countryId: string,
+  opts: { heavyOnly?: boolean } = {},
+): number {
+  let kg = 0;
+  for (const npc of world.npcs ?? []) {
+    if (countryIdFromRegion(npc.homeRegion ?? '') !== countryId) continue;
+    if (opts.heavyOnly === true && !HEAVY_FREIGHTER_CLASSES.has(npc.aircraftClassId)) {
+      continue;
+    }
+    kg += npcMaxCargoKg(npc);
+  }
+  return kg * NPC_LEGS_PER_DAY_EST;
+}
+
+/**
+ * Classes that live on large/XL freight. They are only ~40% of the fleet by
+ * headcount but the overwhelming majority of its lift, so the board needs a
+ * heavy sub-target — a flat backoff starved them into a GA-only market.
+ */
+export const HEAVY_FREIGHTER_CLASSES: ReadonlySet<FreighterClassId> = new Set([
+  'narrow_freighter',
+  'wide_freighter',
+]);
+
+/**
  * One Wide freighter full load — saturation 1.0 at this inbound kg on a lane.
  * Was 28 t (Narrow-era); raised so a single Wide fill does not lock the OD.
  */
@@ -695,6 +765,7 @@ function beginCrewRest(
   npc.busyUntilMs = undefined;
   npc.restUntilMs = nowMs + hoursToMs(restHours);
   npc.restUntilTick = world.tick + hoursToTicks(restHours);
+  noteNpcRest(world, restHours);
 }
 
 function clearCrewRest(npc: NpcFreighter): void {
@@ -1520,6 +1591,7 @@ function tryCreateNpcRepositionOffer(
 }
 
 function shouldOfferContractPilot(
+  world: CareerEconomyWorld,
   npc: NpcFreighter,
   rng: () => number,
   force?: boolean,
@@ -1527,6 +1599,9 @@ function shouldOfferContractPilot(
   if (force === true) return npcCanOfferContractPilot(npc);
   if (force === false) return false;
   if (!npcCanOfferContractPilot(npc)) return false;
+  if (countOpenContractPilotOffers(world) >= maxOpenContractPilotOffers(world)) {
+    return false;
+  }
   return rng() < CONTRACT_PILOT_OFFER_CHANCE;
 }
 
@@ -1585,6 +1660,7 @@ function promoteAwaitingPilotFlight(
     const legDuty = flightHours + turnaroundHours;
     npc.lastLegDutyHours = legDuty;
     npc.dutyHoursAccum = (npc.dutyHoursAccum ?? 0) + legDuty;
+    noteNpcLeg(world, { flightHours, turnaroundHours });
   }
 }
 
@@ -1878,6 +1954,7 @@ function claimLotForNpc(
 
   const { flightHours } = estimateNpcBlockHours(dist, npc.aircraftClassId);
   let offerPilot = shouldOfferContractPilot(
+    world,
     npc,
     rng,
     opts?.forceAwaitingPilot,
@@ -1949,6 +2026,7 @@ function claimLotForNpc(
     npc.busyUntilTick = world.tick + hoursToTicks(holdHours);
     npc.busyUntilMs = awaitingPilotUntilMs;
     npc.currentFlightId = flight.id;
+    noteLotClaimed(world, lot.commodityId, reserved.reservedKg);
     world.npcFlights.push(flight);
     return flight;
   }
@@ -1998,6 +2076,8 @@ function claimLotForNpc(
   const legDuty = flightHours + turnaroundHours;
   npc.lastLegDutyHours = legDuty;
   npc.dutyHoursAccum = (npc.dutyHoursAccum ?? 0) + legDuty;
+  noteLotClaimed(world, lot.commodityId, reserved.reservedKg);
+  noteNpcLeg(world, { flightHours, turnaroundHours });
   world.npcFlights.push(flight);
   return flight;
 }

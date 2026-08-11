@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  applyFreightDelivery,
   continuousEconomyHours,
   corridorPartners,
   corridorWeight,
@@ -21,6 +22,9 @@ import {
   SMALL_LOT_MIN_KG,
   SMALL_LOT_MAX_KG,
   BOARD_AVAILABLE_SOFT_CAP,
+  BOARD_COVER_DAYS,
+  LOT_FORMATION_RESERVE_FRACTION,
+  partitionBoardKgTarget,
   INTL_BOARD_PARTITION,
   lotBoardPartition,
   partitionAvailableQuota,
@@ -35,6 +39,7 @@ import {
   migrateEconomyWorld,
   MS_PER_HOUR,
   MS_PER_TICK,
+  TICKS_PER_DAY,
   npcLaneSaturation,
   npcRegionBidCapacity,
   pruneDeadLots,
@@ -811,6 +816,117 @@ describe('tickEconomyN market formation', () => {
       expired.length >= STALE_LARGE_RECYCLE_MAX_PER_COMMODITY,
       `recycled=${expired.length}`,
     );
+  });
+
+  it('delivery only draws the share formation did not already commit', () => {
+    const world = createSeedEconomyWorld({ seed: 'mass-balance-delivery' });
+    const origin = world.airports.find((a) => a.icao === 'SBGR')!;
+    const dest = world.airports.find((a) => a.icao === 'SBGL')!;
+    const oPile = origin.inventory.general!;
+    const dPile = dest.inventory.general!;
+    oPile.stockKg = Math.round(oPile.capacityKg * 0.8);
+    dPile.stockKg = Math.round(dPile.capacityKg * 0.1);
+    const originBefore = oPile.stockKg;
+    const destBefore = dPile.stockKg;
+
+    const kg = 10_000;
+    const result = applyFreightDelivery(world, {
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      kg,
+    });
+
+    assert.equal(
+      result.removedFromOriginKg,
+      Math.round(kg * (1 - LOT_FORMATION_RESERVE_FRACTION)),
+    );
+    assert.equal(oPile.stockKg, originBefore - result.removedFromOriginKg);
+    assert.equal(dPile.stockKg, destBefore + kg);
+  });
+
+  it('returns the formation reserve to origin when a lot expires', () => {
+    const world = createSeedEconomyWorld({ seed: 'mass-balance-expiry' });
+    world.npcs = [];
+    world.npcFlights = [];
+    const origin = world.airports.find((a) => a.icao === 'SBGR')!;
+    const pile = origin.inventory.general!;
+    pile.stockKg = Math.round(pile.capacityKg * 0.5);
+    const stockBefore = pile.stockKg;
+
+    world.lots.push({
+      id: 'lot_expiring_reserve',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 20_000,
+      reservedKg: 0,
+      createdAtTick: 0,
+      expiresAtTick: world.tick + 1,
+      payUsd: 5_000,
+      basePayUsd: 5_000,
+      urgency: 'normal',
+      reason: 'reserve refund',
+      status: 'available',
+    });
+
+    tickEconomyN(world, 2);
+
+    const lot = world.lots.find((l) => l.id === 'lot_expiring_reserve');
+    assert.ok(lot === undefined || lot.status === 'expired');
+    const refunded = world.flow?.reserveRefundedKg ?? 0;
+    assert.ok(refunded > 0, `expected a reserve refund, got ${refunded}`);
+    // Production/consumption also move the pile, so assert direction not equality.
+    assert.ok(
+      pile.stockKg > stockBefore - 20_000 * LOT_FORMATION_RESERVE_FRACTION,
+      'expiry should give the committed reserve back',
+    );
+  });
+
+  it('sizes the board to what the local fleet can actually lift', () => {
+    const world = createSeedEconomyWorld({ seed: 'board-capacity-target' });
+    tickEconomyN(world, TICKS_PER_DAY * 3);
+
+    const countryByIcao = new Map<string, string>();
+    for (const ap of world.airports) {
+      countryByIcao.set(ap.icao.toUpperCase(), countryIdFromRegion(ap.region));
+    }
+    const openKgByPartition = new Map<string, number>();
+    for (const lot of world.lots) {
+      if (lot.status !== 'available') continue;
+      const partitionId = lotBoardPartition(lot, countryByIcao);
+      openKgByPartition.set(
+        partitionId,
+        (openKgByPartition.get(partitionId) ?? 0) +
+          Math.max(0, lot.quantityKg - lot.reservedKg),
+      );
+    }
+
+    assert.ok(openKgByPartition.size > 0);
+    for (const [partitionId, openKg] of openKgByPartition) {
+      const target = partitionBoardKgTarget(world, partitionId);
+      assert.ok(target > 0, `${partitionId} should have a capacity target`);
+      // Formation checks the target before each push, so a single oversized lot
+      // can cross it — allow one XL of slack.
+      assert.ok(
+        openKg <= target + XL_LOT_MAX_KG,
+        `${partitionId} board ${Math.round(openKg)}kg over target ${Math.round(target)}kg`,
+      );
+    }
+    assert.equal(BOARD_COVER_DAYS > 0, true);
+  });
+
+  it('counts formed lot sizes so GA-LTL supply is measurable', () => {
+    const world = createSeedEconomyWorld({ seed: 'flow-size-mix' });
+    tickEconomyN(world, TICKS_PER_DAY);
+
+    const flow = world.flow;
+    assert.ok(flow, 'ticking should accumulate flow stats');
+    assert.ok(flow!.formed.lots > 0);
+    const bands = flow!.formedBySize;
+    const total = bands.ga_ltl + bands.ltl + bands.large + bands.xl;
+    assert.equal(total, flow!.formed.lots);
+    assert.ok(bands.ga_ltl > 0, 'expected GA-sized LTL in the formed mix');
   });
 
   it('forms XL lots on strong major↔major corridors when surplus is deep', () => {

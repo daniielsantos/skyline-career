@@ -9,6 +9,11 @@ import {
   tickEconomyN,
 } from './career-economy.js';
 import { TICKS_PER_DAY } from './career-clock.js';
+import {
+  cloneFlowStats,
+  diffFlowStats,
+  ensureFlowStats,
+} from './career-economy-flow.js';
 import { estimateUpliftKg } from './career-fuel.js';
 import { CAREER_AIRCRAFT_CLASSES } from './career-mission.js';
 import {
@@ -28,6 +33,7 @@ import type {
   AirportTerminal,
   CareerEconomyWorld,
   CommodityId,
+  EconomyFlowStats,
   FreighterClassId,
   ShipmentLot,
   StockPile,
@@ -115,6 +121,8 @@ export interface EconomyPulseNpcRegion {
   resting: number;
   maintenance: number;
   turnaround: number;
+  /** Parked in a crew-needed hold, waiting on a contract pilot. */
+  awaitingPilot: number;
   /** ready / total (0 when empty). */
   capacity: number;
   thinFleet: boolean;
@@ -142,6 +150,8 @@ export interface EconomyPulseNpc {
   resting: number;
   maintenance: number;
   turnaround: number;
+  /** Parked in a crew-needed hold, waiting on a contract pilot. */
+  awaitingPilot: number;
   /** airborne / fleetSize. */
   utilizationPct: number;
   /** ready / fleetSize. */
@@ -173,6 +183,8 @@ export interface EconomyPulse {
   commodities: EconomyPulseCommodity[];
   countries: EconomyPulseCountry[];
   npc: EconomyPulseNpc;
+  /** Cumulative flow counters — diff two samples to get throughput rates. */
+  flow: EconomyFlowStats;
   notes: string[];
 }
 
@@ -336,6 +348,11 @@ export function computeNpcPulse(
   const npcs = world.npcs ?? [];
   const flights = (world.npcFlights ?? []).filter((f) => f.status === 'in_flight');
   const flightByNpc = new Map(flights.map((f) => [f.npcId, f] as const));
+  const awaitingPilotNpcIds = new Set(
+    (world.npcFlights ?? [])
+      .filter((f) => f.status === 'awaiting_pilot')
+      .map((f) => f.npcId),
+  );
   const worldTick = world.tick ?? 0;
 
   const hubRegions = listNpcHomeRegions(world.airports ?? []);
@@ -348,6 +365,7 @@ export function computeNpcPulse(
     resting: number;
     maintenance: number;
     turnaround: number;
+    awaitingPilot: number;
     cargoKgAirborne: number;
   };
   const regionAcc = new Map<string, RegionAcc>();
@@ -362,6 +380,7 @@ export function computeNpcPulse(
         resting: 0,
         maintenance: 0,
         turnaround: 0,
+        awaitingPilot: 0,
         cargoKgAirborne: 0,
       };
       regionAcc.set(region, acc);
@@ -387,6 +406,7 @@ export function computeNpcPulse(
   let resting = 0;
   let maintenance = 0;
   let turnaround = 0;
+  let awaitingPilot = 0;
   let cargoKgAirborne = 0;
 
   for (const npc of npcs) {
@@ -433,8 +453,15 @@ export function computeNpcPulse(
       resting += 1;
       rAcc.resting += 1;
     } else if (npc.status === 'busy' && !canBid) {
-      turnaround += 1;
-      rAcc.turnaround += 1;
+      // A crew-needed hold also parks the NPC as 'busy' for hours before the
+      // leg departs — counting it as turnaround hid where duty time really goes.
+      if (awaitingPilotNpcIds.has(npc.id)) {
+        awaitingPilot += 1;
+        rAcc.awaitingPilot += 1;
+      } else {
+        turnaround += 1;
+        rAcc.turnaround += 1;
+      }
     } else {
       idle += 1;
       rAcc.idle += 1;
@@ -453,6 +480,7 @@ export function computeNpcPulse(
         resting: acc.resting,
         maintenance: acc.maintenance,
         turnaround: acc.turnaround,
+        awaitingPilot: acc.awaitingPilot,
         capacity,
         thinFleet: acc.total > 0 && capacity < THIN_FLEET_CAPACITY,
         cargoKgAirborne: acc.cargoKgAirborne,
@@ -492,6 +520,7 @@ export function computeNpcPulse(
     resting,
     maintenance,
     turnaround,
+    awaitingPilot,
     utilizationPct: fleetSize > 0 ? airborne / fleetSize : 0,
     readyPct: fleetSize > 0 ? ready / fleetSize : 0,
     cargoKgAirborne,
@@ -847,6 +876,7 @@ export function computeEconomyPulse(
     commodities,
     countries,
     npc,
+    flow: cloneFlowStats(ensureFlowStats(world)),
   };
 
   return {
@@ -890,6 +920,29 @@ export type EconomyPulseSweepDelta = {
     emptyHomeRegions: number;
     fleetShortfall: number;
   };
+  /** Flow that happened across the sweep window. */
+  flow: EconomyFlowStats;
+  /** Same flow normalized to a career day. */
+  flowPerDay: EconomyFlowRates;
+};
+
+/** Throughput rates over one career day, plus the ratios we actually read. */
+export type EconomyFlowRates = {
+  formedLots: number;
+  formedKg: number;
+  claimedLots: number;
+  claimedKg: number;
+  deliveredLots: number;
+  deliveredKg: number;
+  expiredLots: number;
+  expiredKg: number;
+  recycledLots: number;
+  /** claimedKg / formedKg — how much of what we form the world can actually lift. */
+  claimShare: number | null;
+  /** expiredLots / deliveredLots — 1:1 is a market, 60:1 is a shelf. */
+  expiredPerDelivered: number | null;
+  /** Share of formed lots in the GA-bookable band (≤ GA_LTL_MAX_KG). */
+  gaLtlShare: number | null;
 };
 
 export type EconomyPulseSweepResult = {
@@ -907,6 +960,35 @@ export type EconomyPulseSweepResult = {
 function nullDelta(a: number | null, b: number | null): number | null {
   if (a === null || b === null) return null;
   return b - a;
+}
+
+function ratio(numerator: number, denominator: number): number | null {
+  return denominator > 0 ? numerator / denominator : null;
+}
+
+/** Normalize swept flow to a career day so runs of different length compare. */
+export function flowRatesPerDay(
+  flow: EconomyFlowStats,
+  ticks: number,
+): EconomyFlowRates {
+  const days = Math.max(1e-9, ticks / TICKS_PER_DAY);
+  const per = (n: number) => n / days;
+  const formedLots = flow.formed.lots;
+  const gaLtl = flow.formedBySize?.ga_ltl ?? 0;
+  return {
+    formedLots: per(formedLots),
+    formedKg: per(flow.formed.kg),
+    claimedLots: per(flow.claimed.lots),
+    claimedKg: per(flow.claimed.kg),
+    deliveredLots: per(flow.delivered.lots),
+    deliveredKg: per(flow.delivered.kg),
+    expiredLots: per(flow.expired.lots),
+    expiredKg: per(flow.expired.kg),
+    recycledLots: per(flow.recycled.lots),
+    claimShare: ratio(flow.claimed.kg, flow.formed.kg),
+    expiredPerDelivered: ratio(flow.expired.lots, flow.delivered.lots),
+    gaLtlShare: ratio(gaLtl, formedLots),
+  };
 }
 
 function lotStatusDelta(
@@ -974,6 +1056,7 @@ export function sweepEconomyPulse(
   const first = samples[0]!.pulse;
   const last = samples[samples.length - 1]!.pulse;
   const byId = new Map(first.commodities.map((c) => [c.commodityId, c]));
+  const sweptFlow = diffFlowStats(first.flow, last.flow);
 
   return {
     ticksAdvanced: advanced,
@@ -1019,6 +1102,8 @@ export function sweepEconomyPulse(
         emptyHomeRegions: last.npc.emptyHomeRegions - first.npc.emptyHomeRegions,
         fleetShortfall: last.npc.fleetShortfall - first.npc.fleetShortfall,
       },
+      flow: sweptFlow,
+      flowPerDay: flowRatesPerDay(sweptFlow, world.tick - startTick),
     },
   };
 }

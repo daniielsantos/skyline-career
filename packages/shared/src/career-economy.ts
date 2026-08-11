@@ -62,6 +62,7 @@ import {
   laneInboundKg,
   npcLaneSaturation,
   npcRegionBidCapacity,
+  partitionLiftableKgPerDay,
   describeLotMarketPressure,
   seedNpcFleet,
   settleNpcOpsDue,
@@ -81,6 +82,13 @@ import {
 } from './career-clock.js';
 import { boardDisplayPayUsd } from './market-board-query.js';
 import {
+  noteLotDelivered,
+  noteLotExpired,
+  noteLotFormed,
+  noteLotRecycled,
+  noteReserveRefund,
+} from './career-economy-flow.js';
+import {
   activeLaneKg,
   countryIdFromRegion,
   ensureHomeCountryId,
@@ -95,6 +103,7 @@ import type {
   CommodityId,
   EconomyEvent,
   EconomyEventKind,
+  FlowLotSizeBand,
   FuelHaul,
   FuelTruck,
   HubTier,
@@ -233,6 +242,12 @@ export {
   REPOSITION_AWAITING_MIN_HOURS,
   REPOSITION_AWAITING_MAX_HOURS,
   MAX_OPEN_REPOSITION_OFFERS,
+  MIN_OPEN_CONTRACT_PILOT_OFFERS,
+  MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION,
+  countOpenContractPilotOffers,
+  maxOpenContractPilotOffers,
+  partitionLiftableKgPerDay,
+  NPC_LEGS_PER_DAY_EST,
   REPOSITION_PILOT_FEE_MIN_USD,
   quoteContractPilotFeeUsd,
   quoteRepositionPilotFeeUsd,
@@ -295,6 +310,13 @@ export const MAX_LOTS_PER_LANE = 5;
 /** Soft caps within a lane so light aircraft see bookable slices. Fallback for major↔major. */
 export const MAX_LARGE_LOTS_PER_LANE = 3;
 export const MAX_SMALL_LOTS_PER_LANE = 2;
+
+/**
+ * Share of a lot's mass soft-committed out of origin stock at formation.
+ * The rest is drawn on delivery; the reserve is returned if the lot expires.
+ * Together these keep freight mass conserved instead of leaking on every lot.
+ */
+export const LOT_FORMATION_RESERVE_FRACTION = 0.25;
 
 /** True LTL floor — Bonanza-class (maxCargo 450 kg) can bid. */
 export const SMALL_LOT_MIN_KG = 80;
@@ -2333,8 +2355,10 @@ function airportMap(world: CareerEconomyWorld): Map<string, AirportTerminal> {
 
 /**
  * Apply a freight delivery to terminal stocks.
- * Removes up to `kg` from origin; credits full `kg` into dest (capacity-clamped).
- * Dest credit can exceed origin draw because lot formation soft-commits surplus.
+ *
+ * Formation already debited LOT_FORMATION_RESERVE_FRACTION of this cargo from
+ * origin (see `pushLot`), so delivery only draws the remainder. Drawing the
+ * full `kg` here double-charged the origin and made every lot a mass sink.
  */
 export function applyFreightDelivery(
   world: CareerEconomyWorld,
@@ -2358,7 +2382,9 @@ export function applyFreightDelivery(
   const qty = Math.max(0, Math.floor(opts.kg));
   const oStock = ensurePile(origin, opts.commodityId);
   const dStock = ensurePile(dest, opts.commodityId);
-  const removedFromOriginKg = Math.min(qty, oStock.stockKg);
+  const originDrawKg = Math.round(qty * (1 - LOT_FORMATION_RESERVE_FRACTION));
+  const removedFromOriginKg = Math.min(originDrawKg, oStock.stockKg);
+  noteLotDelivered(world, opts.commodityId, qty);
   oStock.stockKg = clamp(oStock.stockKg - removedFromOriginKg, 0, oStock.capacityKg);
   const room = Math.max(0, dStock.capacityKg - dStock.stockKg);
   const addedToDestKg = Math.min(qty, room);
@@ -2476,6 +2502,35 @@ export function pruneDeadLots(
   return { removed: before - world.lots.length, kept: world.lots.length };
 }
 
+/**
+ * Retire an available lot and return its formation reserve to origin stock.
+ * Only the unclaimed remainder is refunded — delivered cargo already drew the
+ * rest at settle. Single transition point so nothing refunds twice.
+ */
+function retireLotToOrigin(
+  world: CareerEconomyWorld,
+  lot: ShipmentLot,
+  reason: 'expired' | 'recycled',
+): number {
+  if (lot.status !== 'available') return 0;
+  const unclaimedKg = Math.max(0, lot.quantityKg - lot.reservedKg);
+  lot.status = 'expired';
+
+  const refundKg = Math.round(unclaimedKg * LOT_FORMATION_RESERVE_FRACTION);
+  const origin = airportByIcao(world, lot.originIcao);
+  if (origin && refundKg > 0) {
+    const pile = ensurePile(origin, lot.commodityId);
+    pile.stockKg = clamp(pile.stockKg + refundKg, 0, pile.capacityKg);
+    noteReserveRefund(world, refundKg);
+  }
+
+  if (reason === 'recycled') {
+    noteLotRecycled(world, lot.commodityId, unclaimedKg);
+  }
+  noteLotExpired(world, lot.commodityId, unclaimedKg);
+  return refundKg;
+}
+
 function expireLots(world: CareerEconomyWorld): void {
   for (const lot of world.lots) {
     // Only unbooked market remainder expires. Reserved / in_transit cargo is
@@ -2483,7 +2538,7 @@ function expireLots(world: CareerEconomyWorld): void {
     if (lot.status !== 'available') continue;
     if (lot.reservedKg > 0) continue;
     if (world.tick >= lot.expiresAtTick) {
-      lot.status = 'expired';
+      retireLotToOrigin(world, lot, 'expired');
     }
   }
   pruneDeadLots(world);
@@ -2513,6 +2568,16 @@ export function idleLotPayMaxMultForLot(
     return IDLE_LOT_PAY_MAX_MULT_HEAVY;
   }
   return IDLE_LOT_PAY_MAX_MULT_BULK;
+}
+
+/** Flow-instrumentation bucket for a formed lot. */
+function flowSizeBand(
+  qty: number,
+  size: 'xl' | 'large' | 'small',
+): FlowLotSizeBand {
+  if (size === 'xl') return 'xl';
+  if (size === 'large') return 'large';
+  return qty <= GA_LTL_MAX_KG ? 'ga_ltl' : 'ltl';
 }
 
 /** Life progress of a lot at `tick` (0 at create, 1 at expiry). */
@@ -2686,6 +2751,10 @@ type AvailableLotCounts = {
   largeByCommodity: Map<CommodityId, number>;
   byCommodityPartition: Map<string, number>;
   largeByCommodityPartition: Map<string, number>;
+  /** Open (unreserved) kg on the board per partition. */
+  kgByPartition: Map<string, number>;
+  /** Open kg from large/XL lots only, per partition. */
+  heavyKgByPartition: Map<string, number>;
 };
 
 function countAvailableLots(
@@ -2696,15 +2765,17 @@ function countAvailableLots(
   const largeByCommodity = new Map<CommodityId, number>();
   const byCommodityPartition = new Map<string, number>();
   const largeByCommodityPartition = new Map<string, number>();
+  const kgByPartition = new Map<string, number>();
+  const heavyKgByPartition = new Map<string, number>();
   let total = 0;
   for (const lot of world.lots) {
     if (lot.status !== 'available') continue;
     total += 1;
     byCommodity.set(lot.commodityId, (byCommodity.get(lot.commodityId) ?? 0) + 1);
-    const pKey = partitionKey(
-      lot.commodityId,
-      lotBoardPartition(lot, countryByIcao),
-    );
+    const partitionId = lotBoardPartition(lot, countryByIcao);
+    const openKg = Math.max(0, lot.quantityKg - lot.reservedKg);
+    kgByPartition.set(partitionId, (kgByPartition.get(partitionId) ?? 0) + openKg);
+    const pKey = partitionKey(lot.commodityId, partitionId);
     byCommodityPartition.set(pKey, (byCommodityPartition.get(pKey) ?? 0) + 1);
     if (lot.quantityKg >= 4_000) {
       largeByCommodity.set(
@@ -2715,6 +2786,10 @@ function countAvailableLots(
         pKey,
         (largeByCommodityPartition.get(pKey) ?? 0) + 1,
       );
+      heavyKgByPartition.set(
+        partitionId,
+        (heavyKgByPartition.get(partitionId) ?? 0) + openKg,
+      );
     }
   }
   return {
@@ -2723,6 +2798,8 @@ function countAvailableLots(
     largeByCommodity,
     byCommodityPartition,
     largeByCommodityPartition,
+    kgByPartition,
+    heavyKgByPartition,
   };
 }
 
@@ -2734,6 +2811,10 @@ function noteAvailableLot(
   delta: 1 | -1,
 ): void {
   counts.total += delta;
+  counts.kgByPartition.set(
+    partitionId,
+    Math.max(0, (counts.kgByPartition.get(partitionId) ?? 0) + delta * qty),
+  );
   counts.byCommodity.set(
     commodityId,
     Math.max(0, (counts.byCommodity.get(commodityId) ?? 0) + delta),
@@ -2752,7 +2833,57 @@ function noteAvailableLot(
       pKey,
       Math.max(0, (counts.largeByCommodityPartition.get(pKey) ?? 0) + delta),
     );
+    counts.heavyKgByPartition.set(
+      partitionId,
+      Math.max(0, (counts.heavyKgByPartition.get(partitionId) ?? 0) + delta * qty),
+    );
   }
+}
+
+/**
+ * Days of transport capacity the board is allowed to hold as open freight.
+ *
+ * The 7d pulse formed ~90,000 t/day against ~6,200 t/day the world could lift —
+ * the board held roughly ten days of work, so ~93% of it aged out unclaimed.
+ * A few days of cover keeps real choice on the board without stockpiling work
+ * nobody can ever fly.
+ */
+export const BOARD_COVER_DAYS = 4;
+/** Floor so a thin-fleet partition still shows a board. */
+export const PARTITION_MIN_BOARD_KG = 400_000;
+/** Floor so Narrow/Wide always have something to bid on. */
+export const PARTITION_MIN_HEAVY_BOARD_KG = 250_000;
+
+/**
+ * Open kg the board may hold for a partition before formation backs off.
+ * `heavyOnly` returns the slice reserved for large/XL freight, sized from the
+ * Narrow/Wide share of local lift so the board mirrors the fleet it feeds.
+ */
+export function partitionBoardKgTarget(
+  world: CareerEconomyWorld,
+  partitionId: string,
+  opts: { heavyOnly?: boolean } = {},
+): number {
+  const heavyOnly = opts.heavyOnly === true;
+  const floor = heavyOnly
+    ? PARTITION_MIN_HEAVY_BOARD_KG
+    : PARTITION_MIN_BOARD_KG;
+  if (partitionId === INTL_BOARD_PARTITION) {
+    // International rides on the same fleets; give it the INTL board share.
+    const domestic = listWorldCountryIds(world).reduce(
+      (sum, id) => sum + partitionLiftableKgPerDay(world, id, { heavyOnly }),
+      0,
+    );
+    return Math.max(
+      floor,
+      domestic * INTL_AVAILABLE_SHARE * BOARD_COVER_DAYS,
+    );
+  }
+  return Math.max(
+    floor,
+    partitionLiftableKgPerDay(world, partitionId, { heavyOnly }) *
+      BOARD_COVER_DAYS,
+  );
 }
 
 function commodityBoardBloated(
@@ -2776,8 +2907,19 @@ function commodityBoardBloated(
   ) {
     skipAll = true;
   }
+
+  // Transport capacity, not shelf space, is the real ceiling. Heavy freight
+  // gets its own slice sized from local Narrow/Wide lift, so LTL cannot crowd
+  // out the trunk market and heavy blocks cannot bury the GA board.
+  const boardKg = counts.kgByPartition.get(partitionId) ?? 0;
+  if (boardKg >= partitionBoardKgTarget(world, partitionId)) skipAll = true;
+
+  const heavyKg = counts.heavyKgByPartition.get(partitionId) ?? 0;
+  const heavyOverCapacity =
+    heavyKg >= partitionBoardKgTarget(world, partitionId, { heavyOnly: true });
+
   const skipHeavy =
-    skipAll || (largeQuota != null && largeN >= largeQuota);
+    skipAll || heavyOverCapacity || (largeQuota != null && largeN >= largeQuota);
   return { skipHeavy, skipAll };
 }
 
@@ -2820,16 +2962,7 @@ function recycleStaleLargeLots(
   for (const lot of stale) {
     const used = recycledByCommodity.get(lot.commodityId) ?? 0;
     if (used >= STALE_LARGE_RECYCLE_MAX_PER_COMMODITY) continue;
-    lot.status = 'expired';
-    const origin = airportByIcao(world, lot.originIcao);
-    if (origin) {
-      const pile = ensurePile(origin, lot.commodityId);
-      pile.stockKg = clamp(
-        pile.stockKg + lot.quantityKg * 0.25,
-        0,
-        pile.capacityKg,
-      );
-    }
+    retireLotToOrigin(world, lot, 'recycled');
     const key = laneKey(lot.commodityId, lot.originIcao, lot.destIcao);
     activeCounts.set(key, Math.max(0, (activeCounts.get(key) ?? 0) - 1));
     if (lot.quantityKg >= XL_LOT_MIN_KG) {
@@ -3017,11 +3150,16 @@ function formLotsFromImbalances(
       status: 'available',
     };
 
-    origin.stock.stockKg = clamp(origin.stock.stockKg - qty * 0.25, 0, origin.stock.capacityKg);
+    origin.stock.stockKg = clamp(
+      origin.stock.stockKg - qty * LOT_FORMATION_RESERVE_FRACTION,
+      0,
+      origin.stock.capacityKg,
+    );
     world.lots.push(lot);
     recordLotFormationActivity(world, origin.ap.icao, dest.ap.icao);
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
     noteAvailableLot(availableCounts, commodity.id, opts.partitionId, qty, 1);
+    noteLotFormed(world, commodity.id, qty, flowSizeBand(qty, size));
     if (size === 'xl') {
       xlCounts.set(key, (xlCounts.get(key) ?? 0) + 1);
     } else if (size === 'large') {
@@ -3206,13 +3344,17 @@ function formLotsFromImbalances(
     );
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       const ranked = rankAirports(countryAirports, commodity);
+      // Rank by fill pressure, not absolute kg. Absolute room/surplus is a proxy
+      // for warehouse size, so the same high-capacity majors won every slot every
+      // tick. Fill is what actually drives the price gap, and it rotates as lots
+      // form and drain the hub.
       const destinations = ranked
         .filter((r) => r.fill <= 0.45 && r.roomKg >= 400)
-        .sort((a, b) => b.roomKg - a.roomKg)
+        .sort((a, b) => a.fill - b.fill)
         .slice(0, 12);
       const origins = ranked
         .filter((r) => r.fill >= 0.55 && r.surplusKg >= 400)
-        .sort((a, b) => b.surplusKg - a.surplusKg)
+        .sort((a, b) => b.fill - a.fill)
         .slice(0, 12);
 
       const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));

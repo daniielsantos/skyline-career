@@ -1780,6 +1780,31 @@ async function main(): Promise<void> {
         console.log(
           `  npc  fleet ${a.fleetSize}→${b.fleetSize} (${signed(d.fleetSize)})  airborne ${a.airborne}→${b.airborne} (${signed(d.airborne)})  ready ${pct(a.readyPct)}→${pct(b.readyPct)} (${pctDelta(d.readyPct)})  util ${pct(a.utilizationPct)}→${pct(b.utilizationPct)} (${pctDelta(d.utilizationPct)})  thin ${a.thinRegions}→${b.thinRegions}  empty ${a.emptyHomeRegions}→${b.emptyHomeRegions}  aloft ${kg(a.cargoKgAirborne)}→${kg(b.cargoKgAirborne)}`,
         );
+        console.log(
+          `  npc  states (end)  airborne ${b.airborne}  crew-hold ${b.awaitingPilot}  turnaround ${b.turnaround}  resting ${b.resting}  mx ${b.maintenance}  ready ${b.ready}`,
+        );
+      }
+      {
+        const f = report.delta.flowPerDay;
+        const t = (n: number) => `${Math.round(n).toLocaleString('en-US')}`;
+        const tons = (n: number) =>
+          `${Math.round(n / 1000).toLocaleString('en-US')}t`;
+        const share = (n: number | null) =>
+          n === null ? 'n/a' : `${(n * 100).toFixed(1)}%`;
+        console.log('  flow / career day:');
+        console.log(
+          `    lots    formed ${t(f.formedLots)}  claimed ${t(f.claimedLots)}  delivered ${t(f.deliveredLots)}  expired ${t(f.expiredLots)}  recycled ${t(f.recycledLots)}`,
+        );
+        console.log(
+          `    mass    formed ${tons(f.formedKg)}  claimed ${tons(f.claimedKg)}  delivered ${tons(f.deliveredKg)}  expired ${tons(f.expiredKg)}`,
+        );
+        console.log(
+          `    ratios  claim share ${share(f.claimShare)}  expired:delivered ${
+            f.expiredPerDelivered === null
+              ? 'n/a'
+              : `${f.expiredPerDelivered.toFixed(1)}:1`
+          }  GA-LTL formed ${share(f.gaLtlShare)}`,
+        );
       }
       if (report.samples.length > 2) {
         console.log('  samples:');

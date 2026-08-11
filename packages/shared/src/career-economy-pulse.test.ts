@@ -107,7 +107,8 @@ describe('computeEconomyPulse', () => {
         pulse.npc.idle +
         pulse.npc.resting +
         pulse.npc.maintenance +
-        pulse.npc.turnaround,
+        pulse.npc.turnaround +
+        pulse.npc.awaitingPilot,
       pulse.npc.fleetSize,
     );
     assert.ok(pulse.npc.readyPct >= 0 && pulse.npc.readyPct <= 1);

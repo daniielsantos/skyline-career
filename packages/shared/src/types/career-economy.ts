@@ -406,6 +406,55 @@ export interface CareerEconomyWorld {
    * Domestic lot formation never crosses countries except via these lanes.
    */
   internationalLanes?: InternationalLane[];
+  /** Monotonic freight flow counters (throughput instrumentation). */
+  flow?: EconomyFlowStats;
+}
+
+/** Lot size buckets used by flow instrumentation. */
+export type FlowLotSizeBand = 'ga_ltl' | 'ltl' | 'large' | 'xl';
+
+export interface FlowCounter {
+  lots: number;
+  kg: number;
+}
+
+/**
+ * Cumulative freight flow since `sinceTick`. Board status counts only survive a
+ * 12h retention window, so throughput has to come from monotonic counters.
+ */
+export interface EconomyFlowStats {
+  sinceTick: number;
+  /** Lots pushed onto the board. */
+  formed: FlowCounter;
+  /** Unclaimed remainder that aged out. */
+  expired: FlowCounter;
+  /** Stale heavy lots pulled early (subset of expired). */
+  recycled: FlowCounter;
+  /** Cargo that landed at the destination. */
+  delivered: FlowCounter;
+  /** Cargo taken off the board into a hold. */
+  claimed: FlowCounter;
+  /** Formation reserve returned to origin stock on expiry. */
+  reserveRefundedKg: number;
+  byCommodity: Partial<
+    Record<
+      CommodityId,
+      {
+        formed: FlowCounter;
+        expired: FlowCounter;
+        delivered: FlowCounter;
+        claimed: FlowCounter;
+      }
+    >
+  >;
+  formedBySize: Record<FlowLotSizeBand, number>;
+  /** Hours the schedule granted, to compare against sampled fleet occupancy. */
+  npc: {
+    legs: number;
+    flightHours: number;
+    turnaroundHours: number;
+    restHours: number;
+  };
 }
 
 /**

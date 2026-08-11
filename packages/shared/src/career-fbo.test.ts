@@ -515,14 +515,21 @@ describe('player FBO', () => {
     });
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
-    const lot = world.lots.find(
-      (l) =>
-        l.originIcao === 'SBGR' &&
-        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
-        (l.status === 'available' || l.status === 'reserved') &&
-        l.quantityKg - l.reservedKg >= 500,
-    );
-    assert.ok(lot);
+    // Take the deepest short-haul Dry lot rather than the first match — how much
+    // NPCs have already claimed varies with the wall clock.
+    const lot = world.lots
+      .filter(
+        (l) =>
+          l.originIcao === 'SBGR' &&
+          (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+          (l.status === 'available' || l.status === 'reserved') &&
+          l.quantityKg - l.reservedKg >= 400 &&
+          (routeDistanceNm(world, l.originIcao, l.destIcao) ?? 9_999) <= 850,
+      )
+      .sort(
+        (a, b) => b.quantityKg - b.reservedKg - (a.quantityKg - a.reservedKg),
+      )[0];
+    assert.ok(lot, 'expected a short-haul Dry lot at SBGR for the split return');
     const cargoKg = Math.min(600, lot!.quantityKg - lot!.reservedKg);
     const { hold } = holdLotAtFbo(state, world, {
       lotId: lot!.id,
@@ -530,6 +537,10 @@ describe('player FBO', () => {
     });
     const reservedBefore = lot!.reservedKg;
     const acf1 = state.fleet[0]!;
+    // Split legs need Caravan range/payload — starter GA is too short-legged.
+    acf1.aircraftClassId = 'light_turboprop';
+    acf1.airframeTypeId = 'c208-caravan-cargo';
+    acf1.label = 'Cessna 208B Grand Caravan';
     acf1.status = 'parked';
     acf1.locationIcao = 'SBGR';
     const acf2 = {

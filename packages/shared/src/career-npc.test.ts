@@ -46,6 +46,10 @@ import {
   settleNpcOpsDue,
   tickEconomyN,
   MAX_OPEN_REPOSITION_OFFERS,
+  MIN_OPEN_CONTRACT_PILOT_OFFERS,
+  countOpenContractPilotOffers,
+  maxOpenContractPilotOffers,
+  TICKS_PER_DAY,
   REPOSITION_AWAITING_MAX_HOURS,
   REPOSITION_PILOT_FEE_MIN_USD,
   pickNpcHomeReturnIcao,
@@ -66,11 +70,13 @@ function findLiftableLot(
   npc: SeedWorld['npcs'][number],
   heldLots: ReadonlySet<string>,
   minAvailableKg = 200,
+  extra?: (lot: SeedWorld['lots'][number]) => boolean,
 ): SeedWorld['lots'][number] | undefined {
   return world.lots.find((lot) => {
     if (heldLots.has(lot.id)) return false;
     if (lot.status !== 'available' && lot.status !== 'reserved') return false;
     if (lot.quantityKg - lot.reservedKg < minAvailableKg) return false;
+    if (extra && !extra(lot)) return false;
     const distanceNm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
     if (distanceNm === undefined) return false;
     return (
@@ -1096,6 +1102,27 @@ describe('NPC freighter fleet', () => {
     assert.equal(flight.awaitingPilotUntilMs, undefined);
   });
 
+  it('caps concurrent crew holds so the fleet keeps flying', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-cap' });
+    tickEconomyN(world, TICKS_PER_DAY * 2);
+
+    const open = countOpenContractPilotOffers(world);
+    const cap = maxOpenContractPilotOffers(world);
+    assert.ok(cap >= MIN_OPEN_CONTRACT_PILOT_OFFERS);
+    assert.ok(
+      open <= cap,
+      `open crew holds ${open} should stay within cap ${cap}`,
+    );
+    // The cap exists to keep freighters flying rather than parked on a hold.
+    const airborne = world.npcFlights.filter(
+      (f) => f.status === 'in_flight',
+    ).length;
+    assert.ok(
+      airborne > open,
+      `expected more airborne (${airborne}) than parked on crew holds (${open})`,
+    );
+  });
+
   it('never opens a crew offer on an abstract (non-homologated) NPC', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-crew-abstract' });
     tickEconomyN(world, 24);
@@ -1291,12 +1318,12 @@ describe('NPC freighter fleet', () => {
     npc!.currentFlightId = undefined;
     npc!.busyUntilMs = undefined;
     npc!.busyUntilTick = undefined;
-    const lot = world.lots.find(
-      (l) =>
-        !heldLots.has(l.id) &&
-        (l.status === 'available' || l.status === 'reserved') &&
-        l.quantityKg - l.reservedKg >= 200 &&
-        l.originIcao.toUpperCase() !== 'SBGR',
+    const lot = findLiftableLot(
+      world,
+      npc!,
+      heldLots,
+      200,
+      (l) => l.originIcao.toUpperCase() !== 'SBGR',
     );
     assert.ok(lot);
     const nowMs = world.lastBatchAtMs ?? Date.now();

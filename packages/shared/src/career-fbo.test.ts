@@ -34,6 +34,36 @@ import {
   routeDistanceNm,
 } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
+import type { CareerEconomyWorld, ShipmentLot } from './types/career-economy.js';
+
+// Post-calibration SBGR is a Value source / Dry sink, so it no longer exports
+// general/supplies naturally. Starter pilots can only lift Dry (heavier cargo is
+// locked), so these FBO tests inject a deterministic short-haul Dry contract at
+// SBGR rather than depending on the equilibrium board. SBGR→SBGL is ~180 nm, so
+// it satisfies every short-haul (≤850 nm) predicate below.
+function primeSbgrDryLot(
+  world: CareerEconomyWorld,
+  overrides: Partial<ShipmentLot> = {},
+): ShipmentLot {
+  const lot: ShipmentLot = {
+    id: `lot_test_dry_${world.lots.length}`,
+    commodityId: 'general',
+    originIcao: 'SBGR',
+    destIcao: 'SBGL',
+    quantityKg: 6_000,
+    reservedKg: 0,
+    createdAtTick: world.tick,
+    expiresAtTick: world.tick + 96,
+    payUsd: 4_000,
+    basePayUsd: 4_000,
+    urgency: 'normal',
+    reason: 'test dry source',
+    status: 'available',
+    ...overrides,
+  };
+  world.lots.push(lot);
+  return lot;
+}
 
 describe('player FBO', () => {
   it('buys T1 only at home hub and rejects a second purchase', () => {
@@ -77,6 +107,7 @@ describe('player FBO', () => {
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
 
+    primeSbgrDryLot(world);
     const lot = world.lots.find(
       (l) =>
         l.originIcao === 'SBGR' &&
@@ -134,6 +165,7 @@ describe('player FBO', () => {
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
 
+    primeSbgrDryLot(world);
     const lot = world.lots.find(
       (l) =>
         l.originIcao === 'SBGR' &&
@@ -163,6 +195,7 @@ describe('player FBO', () => {
     });
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
+    primeSbgrDryLot(world);
     const lot = world.lots.find(
       (l) =>
         l.originIcao === 'SBGR' &&
@@ -192,6 +225,7 @@ describe('player FBO', () => {
     });
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
+    primeSbgrDryLot(world);
     const lot = world.lots.find(
       (l) =>
         l.originIcao === 'SBGR' &&
@@ -331,6 +365,7 @@ describe('player FBO', () => {
     });
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
+    primeSbgrDryLot(world);
     const lot = world.lots.find(
       (l) =>
         l.originIcao === 'SBGR' &&
@@ -339,7 +374,7 @@ describe('player FBO', () => {
         (l.status === 'available' || l.status === 'reserved') &&
         l.quantityKg - l.reservedKg >= 100,
     );
-    assert.ok(lot);
+    assert.ok(lot, 'expected a Dry lot at SBGR to reroute');
     const { hold } = holdLotAtFbo(state, world, {
       lotId: lot!.id,
       cargoKg: Math.min(300, lot!.quantityKg - lot!.reservedKg),
@@ -389,6 +424,7 @@ describe('player FBO', () => {
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
 
+    primeSbgrDryLot(world);
     const lot = world.lots.find(
       (l) =>
         l.originIcao === 'SBGR' &&
@@ -480,6 +516,7 @@ describe('player FBO', () => {
     });
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
+    primeSbgrDryLot(world);
     const lot = world.lots.find(
       (l) =>
         l.originIcao === 'SBGR' &&
@@ -515,6 +552,7 @@ describe('player FBO', () => {
     });
     state.walletUsd = 500_000;
     buyFboTier1(state, world, 'SBGR');
+    primeSbgrDryLot(world);
     // Take the deepest short-haul Dry lot rather than the first match — how much
     // NPCs have already claimed varies with the wall clock.
     const lot = world.lots

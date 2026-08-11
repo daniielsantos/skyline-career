@@ -1128,8 +1128,15 @@ export const CARGO_FLOW_BALANCE: Readonly<
   // omit/consumer hubs are slight net sinks; explicit producers stay exporters.
   electronics: { production: 2.0, consumption: 0.7 },
   machinery: { production: 2.05, consumption: 0.68 },
-  // Dry: 0.88/1.08 moved ~5pt/15d; nudge so 50–60% is reachable in ~30d
-  general: { production: 0.84, consumption: 1.12 },
+  // Dry equilibrium is bistable: hubs pin near cap until prod/cons crosses a knee,
+  // then fill drops sharply into a smooth "flowing" band. These land general,
+  // supplies, and perishables just past their knees at ~45–60% p50 with balanced
+  // surplus/shortage hubs across seeds (see profiles/career calibration sweeps).
+  // General responds to the consumption dial; supplies/perishables plateau on
+  // consumption and need a production cut instead.
+  general: { production: 0.84, consumption: 1.21 },
+  supplies: { production: 0.3, consumption: 1.15 },
+  perishables: { production: 0.45, consumption: 1.2 },
 };
 
 function cargoFlowBalance(commodityId: CommodityId): {

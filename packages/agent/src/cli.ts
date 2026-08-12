@@ -2339,10 +2339,35 @@ async function main(): Promise<void> {
             position = undefined;
           }
 
+          let groundSpeedKt: number | undefined;
+          let indicatedAirspeedKt: number | undefined;
+          try {
+            const gs = await bridge.readSimVar({
+              name: 'GROUND VELOCITY',
+              unit: 'knots',
+            });
+            if (Number.isFinite(gs) && gs >= 0) groundSpeedKt = gs;
+          } catch {
+            groundSpeedKt = undefined;
+          }
+          try {
+            const ias = await bridge.readSimVar({
+              name: 'AIRSPEED INDICATED',
+              unit: 'knots',
+            });
+            if (Number.isFinite(ias) && ias >= 0) indicatedAirspeedKt = ias;
+          } catch {
+            indicatedAirspeedKt = undefined;
+          }
+
           const sample = {
             onGround: snap.onGround,
             enginesRunning: snap.enginesRunning,
+            paused: snap.paused === true,
+            slewActive: snap.slewActive === true,
             position,
+            groundSpeedKt,
+            indicatedAirspeedKt,
           };
 
           const world = await loadOrCreateCareerEconomy(savePath);

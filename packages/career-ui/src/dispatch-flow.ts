@@ -438,6 +438,13 @@ export function dispatchStepStatusLine(input: {
       }
       return 'Preflight ready — take off in MSFS when Watch is connected.';
     case 'en_route': {
+      if (
+        input.watchOnGround === true &&
+        input.watchRunning &&
+        !input.watchSawAirborne
+      ) {
+        return 'Still on the ground — take off in MSFS. Menu / variant swaps are not a departure.';
+      }
       if (input.watchSettleBlockedReason) {
         return `Landed — settle blocked: ${input.watchSettleBlockedReason}`;
       }

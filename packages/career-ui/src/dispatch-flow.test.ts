@@ -177,6 +177,19 @@ describe('dispatchStepStatusLine en_route', () => {
       /reconnecting to settle/i,
     );
   });
+
+  it('does not call a ramp reload a landing', () => {
+    assert.match(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchOnGround: true,
+        watchEnginesRunning: false,
+        watchSawAirborne: false,
+      }),
+      /still on the ground/i,
+    );
+  });
 });
 
 describe('buildFlightDebrief', () => {

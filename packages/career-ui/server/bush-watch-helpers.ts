@@ -308,6 +308,9 @@ export class BushTripWatchSession {
       }
       this.cachedActive = active;
 
+      if (sample.paused === true || sample.slewActive === true) {
+        return;
+      }
       const { event, nextState } = evaluateBushTripLegTransition(
         active,
         sample,

@@ -30,28 +30,61 @@ export const ENGINE_RPM_OFF = 250;
  * A single onGround flicker at 0 kt must not auto-depart the mission.
  */
 export const DEPART_MIN_GROUND_SPEED_KT = 30;
-/** Min AGL (ft) that also counts as convincing wheels-up. */
-export const DEPART_MIN_AGL_FT = 40;
 /**
- * Consecutive airborne samples required when GS/AGL are missing/unreliable.
- * With short-final poll (~200 ms) this is still under a second.
+ * Min IAS (kt) that also counts as wheels-up — covers headwind takeoff where
+ * GS stays below {@link DEPART_MIN_GROUND_SPEED_KT}.
+ */
+export const DEPART_MIN_IAS_KT = 40;
+/** GS/IAS floor to accumulate sustained-airborne confirm ticks. */
+export const DEPART_KINEMATICS_GS_KT = 15;
+export const DEPART_KINEMATICS_IAS_KT = 25;
+/**
+ * Consecutive airborne samples with speed evidence required when GS/IAS are
+ * below the convincing thresholds (e.g. a slow rotate).
  */
 export const DEPART_CONFIRM_TICKS = 2;
 
-/** True when the sample looks like real flight, not a SIM ON GROUND blip. */
+function finitePositive(n: number | undefined, min: number): boolean {
+  return typeof n === 'number' && Number.isFinite(n) && n >= min;
+}
+
+/** Pause / slew / hangar — do not edge-detect depart or touchdown. */
+export function isSimPlaybackFrozen(sample: FlightGroundSample): boolean {
+  return sample.paused === true || sample.slewActive === true;
+}
+
+/**
+ * Real kinematic flight, not a SIM ON GROUND blip.
+ * AGL-only is not enough: MSFS menu / aircraft reload often reports
+ * onGround=false with AGL in the hundreds while GS/IAS stay ~0.
+ */
 export function isConvincingAirborne(sample: FlightGroundSample): boolean {
-  if (sample.onGround) return false;
-  const gs = sample.groundSpeedKt;
-  const agl = sample.aglFt;
-  const gsOk =
-    typeof gs === 'number' &&
-    Number.isFinite(gs) &&
-    gs >= DEPART_MIN_GROUND_SPEED_KT;
-  const aglOk =
-    typeof agl === 'number' &&
-    Number.isFinite(agl) &&
-    agl >= DEPART_MIN_AGL_FT;
-  return gsOk || aglOk;
+  if (sample.onGround || isSimPlaybackFrozen(sample)) return false;
+  return (
+    finitePositive(sample.groundSpeedKt, DEPART_MIN_GROUND_SPEED_KT) ||
+    finitePositive(sample.indicatedAirspeedKt, DEPART_MIN_IAS_KT)
+  );
+}
+
+/**
+ * Enough evidence to count a confirm tick.
+ * Zero-speed "airborne" (menu, spawn drop, variant swap) resets the counter.
+ * When GS and IAS are both missing (CLI host without those simvars), ticks
+ * still accumulate — that is the legacy fallback, not a 0 kt reading.
+ */
+export function hasAirborneKinematics(sample: FlightGroundSample): boolean {
+  if (sample.onGround || isSimPlaybackFrozen(sample)) return false;
+  if (finitePositive(sample.groundSpeedKt, DEPART_KINEMATICS_GS_KT)) return true;
+  if (finitePositive(sample.indicatedAirspeedKt, DEPART_KINEMATICS_IAS_KT)) {
+    return true;
+  }
+  const gsKnown =
+    typeof sample.groundSpeedKt === 'number' &&
+    Number.isFinite(sample.groundSpeedKt);
+  const iasKnown =
+    typeof sample.indicatedAirspeedKt === 'number' &&
+    Number.isFinite(sample.indicatedAirspeedKt);
+  return !gsKnown && !iasKnown;
 }
 
 /** Minimal live gates used for career auto-depart / auto-settle. */
@@ -62,12 +95,18 @@ export interface FlightGroundSample {
   position?: { lat: number; lon: number };
   /** Optional ground speed (knots) for taxi phase display. */
   groundSpeedKt?: number;
+  /** Indicated airspeed (knots) — headwind takeoff still has IAS at rotate. */
+  indicatedAirspeedKt?: number;
   /** Parking brake set — parked settle when combustion simvars stick. */
   parkingBrake?: boolean;
   /** Live vertical speed (feet per minute). Negative = descending. */
   verticalSpeedFpm?: number;
   /** Height above ground (feet) — used to separate bounce vs go-around. */
   aglFt?: number;
+  /** Sim paused (ESC / World Map / aircraft select). */
+  paused?: boolean;
+  /** Slew / slew-to-spawn — GS is meaningless. */
+  slewActive?: boolean;
 }
 
 /**
@@ -668,14 +707,24 @@ export function evaluateMissionFlightTransition(
   const requireEnginesOff = opts.requireEnginesOffToSettle !== false;
   const departFrom = opts.departFrom ?? DEFAULT_DEPART_FROM;
 
+  // Menu / slew: ignore the sample entirely so lastOnGround does not flip
+  // and unpause on the ramp does not look like a touchdown.
+  if (isSimPlaybackFrozen(sample)) {
+    return { event: { type: 'none' }, nextState: state };
+  }
+
   const confirmTicks = sample.onGround
     ? 0
-    : (state.airborneConfirmTicks ?? 0) + 1;
+    : hasAirborneKinematics(sample)
+      ? (state.airborneConfirmTicks ?? 0) + 1
+      : 0;
   const convincing = isConvincingAirborne(sample);
   const confirmReady =
     !sample.onGround && confirmTicks >= DEPART_CONFIRM_TICKS;
   // Do not mark sawAirborne on a lone onGround=false flicker at 0 kt — that
   // poisoned catch-up depart + "ready to settle" after a fake wheels-up.
+  // AGL-only / zero-speed "airborne" (aircraft select, variant reload) also
+  // must not stamp sawAirborne.
   const sawAirborneNow =
     state.sawAirborne ||
     convincing ||

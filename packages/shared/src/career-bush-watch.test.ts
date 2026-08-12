@@ -110,14 +110,15 @@ describe('evaluateBushTripLegTransition', () => {
       { nowMs: 1_100 },
     );
     assert.equal(blip.event.type, 'none');
-    // Sustained airborne without GS/AGL still departs after the confirm ticks.
+    // Menu / reload: sustained onGround=false at 0 kt must not depart.
     const sustained = evaluateBushTripLegTransition(
       { ...active, legStatus: 'ready' },
-      { onGround: false, enginesRunning: true, groundSpeedKt: 0 },
+      { onGround: false, enginesRunning: true, groundSpeedKt: 0, aglFt: 400 },
       blip.nextState,
       { nowMs: 1_200 },
     );
-    assert.equal(sustained.event.type, 'depart');
+    assert.equal(sustained.event.type, 'none');
+    assert.equal(sustained.nextState.sawAirborne, false);
   });
 
   it('settles on touchdown near dest with engines still running', () => {

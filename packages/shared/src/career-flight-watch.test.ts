@@ -134,7 +134,7 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(back.nextState.airborneConfirmTicks, 0);
   });
 
-  it('departs after sustained airborne ticks when GS/AGL are missing', () => {
+  it('departs after sustained airborne ticks when GS/IAS are missing', () => {
     let state = createMissionFlightWatchState();
     state = evaluateMissionFlightTransition(
       mission('dispatched'),
@@ -157,6 +157,111 @@ describe('evaluateMissionFlightTransition', () => {
     );
     assert.equal(second.event.type, 'depart');
     assert.equal(second.nextState.sawAirborne, true);
+  });
+
+  it('does not depart on sustained onGround=false at 0 kt (menu / reload)', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: true, groundSpeedKt: 0 },
+      state,
+    ).nextState;
+
+    let next = state;
+    for (let i = 0; i < 6; i++) {
+      const tick = evaluateMissionFlightTransition(
+        mission('dispatched'),
+        {
+          onGround: false,
+          enginesRunning: false,
+          groundSpeedKt: 0,
+          indicatedAirspeedKt: 0,
+          aglFt: 800,
+        },
+        next,
+      );
+      assert.equal(tick.event.type, 'none');
+      assert.equal(tick.nextState.sawAirborne, false);
+      assert.equal(tick.nextState.airborneConfirmTicks, 0);
+      next = tick.nextState;
+    }
+  });
+
+  it('does not depart on AGL-only spawn drop', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: true, groundSpeedKt: 0 },
+      state,
+    ).nextState;
+
+    const drop = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        groundSpeedKt: 4,
+        indicatedAirspeedKt: 0,
+        aglFt: 120,
+      },
+      state,
+    );
+    assert.equal(drop.event.type, 'none');
+    assert.equal(drop.nextState.sawAirborne, false);
+  });
+
+  it('ignores paused / slew samples so the ramp does not look like a landing', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: true, groundSpeedKt: 0 },
+      state,
+    ).nextState;
+
+    const paused = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      {
+        onGround: false,
+        enginesRunning: false,
+        groundSpeedKt: 0,
+        aglFt: 2000,
+        paused: true,
+      },
+      state,
+    );
+    assert.equal(paused.event.type, 'none');
+    assert.equal(paused.nextState.lastOnGround, true);
+    assert.equal(paused.nextState.sawAirborne, false);
+
+    const back = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: false, groundSpeedKt: 0 },
+      paused.nextState,
+    );
+    assert.equal(back.event.type, 'none');
+    assert.equal(back.nextState.sawAirborne, false);
+  });
+
+  it('departs on IAS when GS is low (headwind rotate)', () => {
+    let state = createMissionFlightWatchState();
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      { onGround: true, enginesRunning: true, groundSpeedKt: 0 },
+      state,
+    ).nextState;
+
+    const up = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        groundSpeedKt: 18,
+        indicatedAirspeedKt: 82,
+      },
+      state,
+    );
+    assert.equal(up.event.type, 'depart');
+    assert.equal(up.nextState.sawAirborne, true);
   });
 
   it('does not depart on engines-running while still on ground', () => {

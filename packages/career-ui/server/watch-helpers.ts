@@ -20,6 +20,7 @@ import {
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
   inferEnginesRunning,
+  isSimPlaybackFrozen,
   mergeAirborneClockOntoMission,
   resumeAirborneAtMs,
   finalizeFlightScore,
@@ -396,6 +397,8 @@ export async function sampleLiveFlight(
     onGround: snap.onGround,
     enginesRunning,
     parkingBrake: snap.parkingBrake === true,
+    paused: snap.paused === true,
+    slewActive: snap.slewActive === true,
     position,
     groundSpeedKt,
     verticalSpeedFpm,
@@ -1984,28 +1987,30 @@ export class CareerWatchSession {
         (nextState.sawAirborne && sample.onGround && nextState.landingFpm != null) ||
         Boolean(this.scoreAcc.landing);
 
-      this.lastPhase = advanceFlightPhase(
-        this.lastPhase,
-        {
-          onGround: sample.onGround,
-          enginesRunning: sample.enginesRunning,
-          groundSpeedKt: sample.groundSpeedKt,
-          verticalSpeedFpm: sample.verticalSpeedFpm,
-          altitudeFt: sample.altitudeFt,
-          aglFt: sample.aglFt,
-          distanceToDestNm: liveDistToDestNm,
-          sawAirborne: nextState.sawAirborne,
-          postTouchdown,
-        },
-        {
-          airborneAtMs: nextState.airborneAtMs,
-          touchdownAtMs: nextState.airborneEndedAtMs,
-          nowMs,
-        },
-      );
+      if (!isSimPlaybackFrozen(sample)) {
+        this.lastPhase = advanceFlightPhase(
+          this.lastPhase,
+          {
+            onGround: sample.onGround,
+            enginesRunning: sample.enginesRunning,
+            groundSpeedKt: sample.groundSpeedKt,
+            verticalSpeedFpm: sample.verticalSpeedFpm,
+            altitudeFt: sample.altitudeFt,
+            aglFt: sample.aglFt,
+            distanceToDestNm: liveDistToDestNm,
+            sawAirborne: nextState.sawAirborne,
+            postTouchdown,
+          },
+          {
+            airborneAtMs: nextState.airborneAtMs,
+            touchdownAtMs: nextState.airborneEndedAtMs,
+            nowMs,
+          },
+        );
+      }
 
       // Live weather-ops: headwind / rain / visibility while airborne.
-      if (!sample.onGround && this.bridge) {
+      if (!sample.onGround && !isSimPlaybackFrozen(sample) && this.bridge) {
         try {
           const wx = await sampleLiveWeatherAmbient(this.bridge);
           this.weatherAcc = pushWeatherOpsTick(this.weatherAcc, {
@@ -2328,6 +2333,8 @@ export class CareerWatchSession {
       // Undo false auto-depart: still on the origin ramp with almost no airborne
       // time (SIM ON GROUND flicker / catch-up leftover). Keeps Dispatch from
       // showing EN ROUTE + "ready to settle" before the real flight starts.
+      // Do NOT veto on fuel delta vs OFP — swapping variants dumps tanks
+      // (looks like a 3k lb burn) while airborne time is still 0.
       const nearOriginNow =
         typeof liveDistToOriginNm === 'number' &&
         liveDistToOriginNm <= (this.opts.settleRadiusNm ?? 12);
@@ -2339,8 +2346,7 @@ export class CareerWatchSession {
         sample.onGround === true &&
         nearOriginNow &&
         !nearDestNow &&
-        distinctAirports &&
-        !fuelBurnedInFlight
+        distinctAirports
       ) {
         const expectedMs =
           nextState.expectedRouteMs ??

@@ -31,6 +31,8 @@ type CareerPlayerAirframeRow = {
   simbriefAirframeMatch: string;
   /** Omitted / true = on Aircraft Market. false = homologated but hidden. */
   enabled?: boolean;
+  /** Omitted / true = class load path. false = native SimBrief / tablet only. */
+  injectCapable?: boolean;
   oewKg?: number;
   mtowKg?: number;
   maxCargoKg?: number;

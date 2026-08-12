@@ -5,13 +5,13 @@
   "semver": "1.0.0",
   "displayName": "C408 SkyCourier Cargo (MSFS 2024)",
   "match": {
-    "fingerprint": "5565fe60d6c72dc3b1215c14f6a79f7c5c46fd7a48244525722126f365636bc1",
+    "fingerprint": "37a004237dce366049292272ac8c8546cf6b368d421d437e818baabbe9e86871",
     "title": "C408 SkyCourier Cargo",
     "publisher": "microsoft",
     "icao": "C408",
     "liveTitles": [
       "C408 SkyCourier Cargo",
-      "C408 SkyCourier Cargo - Loaded"
+      "C408 SkyCourier Cargo - Empty"
     ]
   },
   "capabilities": [
@@ -97,6 +97,21 @@
         "index": 2,
         "name": "Station 2",
         "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Cargo 3",
+        "maxLoad": 1500
+      },
+      {
+        "index": 4,
+        "name": "Cargo 4",
+        "maxLoad": 1500
+      },
+      {
+        "index": 5,
+        "name": "Cargo 5",
+        "maxLoad": 1500
       }
     ],
     "writePlan": [
@@ -111,6 +126,24 @@
         "var": "PAYLOAD STATION WEIGHT:2",
         "unit": "pounds",
         "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
       },
       {
         "op": "delay",
@@ -140,17 +173,17 @@
       "maxMac": 31
     },
     "calibration": {
-      "observedMac": 14.299371838569641,
-      "calibratedAtIso": "2026-08-09T17:11:12.257Z",
+      "observedMac": 18.354956805706024,
+      "calibratedAtIso": "2026-08-12T00:50:19.146Z",
       "sweep": {
         "minObservedMac": 15.856531262397766,
-        "maxObservedMac": 15.856531262397766,
+        "maxObservedMac": 20.1576828956604,
         "payloadLb": 200,
         "forwardStation": 1,
-        "aftStation": 2,
+        "aftStation": 5,
         "usedStationArms": false,
         "restored": true,
-        "sampledAtIso": "2026-08-09T17:11:18.878Z"
+        "sampledAtIso": "2026-08-12T00:50:26.563Z"
       }
     }
   },
@@ -164,8 +197,8 @@
     "ICAO type designator (catalog/SimBrief): C408.",
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
     "AUX deferred for v1.",
-    "Payload stations from writetest: 1, 2.",
-    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5 (Empty livery).",
+    "S3–S5 are cargo holds (CG sweep 15.9–20.2% MAC). maxLoad 1500 so career cargo fits; 500 placeholder capped the board at 680 kg.",
     "Homologated with interactive wizard.",
     "See profiles/notes/microsoft-c408-skycourier-cargo.md"
   ]

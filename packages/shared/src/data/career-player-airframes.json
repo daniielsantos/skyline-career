@@ -515,7 +515,7 @@
   {
     "typeId": "microsoft-c408-skycourier-cargo",
     "aircraftClassId": "light_turboprop",
-    "label": "C408 SkyCourier Passenger",
+    "label": "C408 SkyCourier",
     "rolesPackRelPath": "profiles/ofp/microsoft-c408-skycourier-cargo.json",
     "familyRolesPackRelPaths": [
       "profiles/ofp/microsoft-c408-skycourier-cargo.json",

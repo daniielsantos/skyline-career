@@ -32,6 +32,11 @@ export interface CareerPlayerAirframe {
   simbriefAirframeMatch: string;
   /** When false, omitted from Aircraft Market. Owned fleet still resolves. Default true. */
   enabled?: boolean;
+  /**
+   * When false, Dispatch uses native SimBrief / tablet load even in a
+   * direct-injection class. Default true (follow the economic class).
+   */
+  injectCapable?: boolean;
   /** Optional real-airframe weights — prefer over SimBrief proxy for light GA caps. */
   oewKg?: number;
   mtowKg?: number;

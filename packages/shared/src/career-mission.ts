@@ -239,11 +239,16 @@ export function getAircraftClass(id: FreighterClassId): AircraftClass {
 /** Preferred load path for a mission's aircraft class (manual always allowed in UI). */
 export function missionLoadPolicy(mission: {
   aircraftClassId: FreighterClassId | string;
+  airframeTypeId?: string | null;
 }): {
   loadMethod: AircraftClass['loadMethod'];
   injectCapable: boolean;
 } {
   const aircraft = getAircraftClass(mission.aircraftClassId as FreighterClassId);
+  const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
+  if (airframe?.injectCapable === false) {
+    return { loadMethod: 'native-simbrief', injectCapable: false };
+  }
   return {
     loadMethod: aircraft.loadMethod,
     injectCapable: aircraft.injectCapable,

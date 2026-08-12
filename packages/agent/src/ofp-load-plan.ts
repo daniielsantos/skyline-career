@@ -74,8 +74,14 @@ export function careerOperationalCargoMaxLb(opts: {
       ? st.maxLoad
       : 0;
   };
-  /** Prefer measured maxLoad; else draft placeholder for freighter sums. */
-  const bagCap = (idx: number): number => hardCap(idx) || FALLBACK_MAX_LOAD_LB;
+  /** Prefer measured maxLoad (including 0 = sealed seat). Else draft placeholder. */
+  const bagCap = (idx: number): number => {
+    const st = opts.stations.find((s) => s.index === idx);
+    if (typeof st?.maxLoad === 'number' && Number.isFinite(st.maxLoad)) {
+      return Math.max(0, st.maxLoad);
+    }
+    return FALLBACK_MAX_LOAD_LB;
+  };
 
   if (pax.length > 0) {
     const crewSpare = crew.reduce((sum, idx) => {

@@ -99,28 +99,28 @@
       },
       {
         "index": 3,
-        "name": "Station 3",
-        "maxLoad": 500
+        "name": "Cabin S3",
+        "maxLoad": 0
       },
       {
         "index": 4,
-        "name": "Station 4",
-        "maxLoad": 500
+        "name": "Cabin S4",
+        "maxLoad": 0
       },
       {
         "index": 5,
-        "name": "Station 5",
-        "maxLoad": 1000
+        "name": "Cargo hold",
+        "maxLoad": 2500
       },
       {
         "index": 6,
-        "name": "Station 6",
-        "maxLoad": 1000
+        "name": "Unused 6",
+        "maxLoad": 0
       },
       {
         "index": 7,
-        "name": "Station 7",
-        "maxLoad": 1000
+        "name": "Unused 7",
+        "maxLoad": 0
       }
     ],
     "writePlan": [
@@ -219,8 +219,7 @@
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.",
-    "Aft cabin stations 5–7 maxLoad 1000 so career cargo can sit behind the wing; 500 on S3–S4 pulled CG to ~2% MAC.",
-    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Carenado EFB cargo hold is station 5 (wing box, ~2325 lb at 100%). Seats 3/4/6/7 maxLoad 0 so inject does not dump cargo there (that pulled CG to −10% MAC).",
     "Homologated with interactive wizard.",
     "See profiles/notes/microsoft-c408-skycourier-passenger.md"
   ]

@@ -12,7 +12,8 @@
     "C408 SkyCourier Passenger — auto roles pack from homologated profile",
     "Profile: microsoft/c408-skycourier-passenger@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Carenado EFB: Seats tab → S3+S4 (750+2100 lb at 100%); Cargo tab → S5 wing-box hold. S6/S7 unused — writing them pulls CG to −10% MAC.",
+    "Career cargo (pax=0) injects the hold on S5 only; S3/S4 stay empty.",
     "Fuel strategy: simconnect-direct"
   ],
   "fuel": {
@@ -28,14 +29,10 @@
         1,
         2
       ],
+      "passengerStations": [],
       "baggageStations": [
-        3,
-        4,
-        5,
-        6,
-        7
-      ],
-      "passengerStations": []
+        5
+      ]
     }
   },
   "liveSources": {
@@ -67,32 +64,32 @@
     {
       "simVarIndex": 3,
       "cfgIndex": 2,
-      "name": "Station 3",
-      "role": "baggage"
+      "name": "Seat 3",
+      "role": "passenger"
     },
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
-      "name": "Station 4",
-      "role": "baggage"
+      "name": "Seat 4",
+      "role": "passenger"
     },
     {
       "simVarIndex": 5,
       "cfgIndex": 4,
-      "name": "Station 5",
+      "name": "Cargo hold",
       "role": "baggage"
     },
     {
       "simVarIndex": 6,
       "cfgIndex": 5,
-      "name": "Station 6",
-      "role": "baggage"
+      "name": "Unused 6",
+      "role": "galley"
     },
     {
       "simVarIndex": 7,
       "cfgIndex": 6,
-      "name": "Station 7",
-      "role": "baggage"
+      "name": "Unused 7",
+      "role": "galley"
     }
   ],
   "tolerances": {

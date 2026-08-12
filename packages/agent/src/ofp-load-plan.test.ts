@@ -149,6 +149,23 @@ describe('careerOperationalCargoMaxLb', () => {
       }),
       680,
     );
+    assert.equal(
+      careerOperationalCargoMaxLb({
+        stations: [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 0 },
+          { index: 5, maxLoad: 2500 },
+          { index: 7, maxLoad: 0 },
+        ],
+        stationRoles: {
+          crewStations: [1, 2],
+          passengerStations: [],
+          baggageStations: [3, 5, 7],
+        },
+      }),
+      2500,
+    );
   });
 });
 
@@ -181,6 +198,35 @@ describe('distributeCargoAcrossStations', () => {
     const maxBag = Math.max(...bagWeights);
     const minBag = Math.min(...bagWeights);
     assert.ok(maxBag - minBag <= 1, 'baggage should be nearly equal');
+  });
+
+  it('freighter: dumps all cargo on the only hold with capacity (C408 S5)', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 0 },
+          { index: 4, maxLoad: 0 },
+          { index: 5, maxLoad: 2500 },
+          { index: 6, maxLoad: 0 },
+          { index: 7, maxLoad: 0 },
+        ],
+      },
+    } as AircraftProfile;
+    const result = distributeCargoAcrossStations(2306, profile, {
+      crewStations: [1, 2],
+      passengerStations: [],
+      baggageStations: [5],
+    });
+    assert.equal(result.stations[1], 170);
+    assert.equal(result.stations[2], 170);
+    assert.equal(result.stations[3], 0);
+    assert.equal(result.stations[4], 0);
+    assert.equal(result.stations[5], 2306);
+    assert.equal(result.stations[6], 0);
+    assert.equal(result.stations[7], 0);
+    assert.equal(result.cargoPlacedLb, 2306);
   });
 
   it('freighter: uses raised bag maxLoad when a station is service/ghost', () => {

@@ -322,12 +322,15 @@ function withMissionClientView(
   mission: MissionIntent,
 ) {
   const normalized = normalizeMissionIntent(mission);
-  const base = withMissionLoadPolicy(normalized);
   const typeId =
     normalized.airframeTypeId?.trim() ||
     (normalized.aircraftId
       ? findPlayerAircraft(missions, normalized.aircraftId)?.airframeTypeId?.trim()
       : undefined);
+  const base = withMissionLoadPolicy({
+    ...normalized,
+    ...(typeId ? { airframeTypeId: typeId } : {}),
+  });
   const airframeLabel =
     findCareerPlayerAirframe(typeId)?.label ??
     findNpcAirframe(typeId)?.label;
@@ -5187,7 +5190,15 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const mission = missions.missions[idx]!;
-        const loadPolicy = missionLoadPolicy(mission);
+        const airframeTypeId =
+          mission.airframeTypeId?.trim() ||
+          (mission.aircraftId
+            ? findPlayerAircraft(missions, mission.aircraftId)?.airframeTypeId?.trim()
+            : undefined);
+        const loadPolicy = missionLoadPolicy({
+          ...mission,
+          ...(airframeTypeId ? { airframeTypeId } : {}),
+        });
         if (!careerAllowsDirectInject(loadPolicy)) {
           send(res, 409, {
             error:

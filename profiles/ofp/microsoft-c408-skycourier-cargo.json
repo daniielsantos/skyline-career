@@ -5,14 +5,15 @@
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "C408 SkyCourier Cargo"
+    "C408 SkyCourier Cargo",
+    "C408 SkyCourier Cargo - Empty"
   ],
   "matchTitlePattern": "C408 SkyCourier Cargo",
   "notes": [
     "C408 SkyCourier Cargo — auto roles pack from homologated profile",
     "Profile: microsoft/c408-skycourier-cargo@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "S1–S2 crew; S3–S5 cargo holds (Empty livery). SimBrief: Carenado C408.",
     "Fuel strategy: simconnect-direct"
   ],
   "fuel": {
@@ -28,7 +29,11 @@
         1,
         2
       ],
-      "baggageStations": [],
+      "baggageStations": [
+        3,
+        4,
+        5
+      ],
       "passengerStations": []
     }
   },
@@ -57,6 +62,24 @@
       "cfgIndex": 1,
       "name": "Station 2",
       "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Cargo 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Cargo 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Cargo 5",
+      "role": "baggage"
     }
   ],
   "tolerances": {

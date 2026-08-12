@@ -4,6 +4,12 @@
 
 Skyline inject fica em **Writing…** / "Building fuel…" sem sair. DR400 (e outros) afetados quando SimConnect está doente.
 
+## Bug visual do toggle (0.3.18+)
+
+Durante o inject, live fuel/payload podiam bater Due no meio do ramp → header **PREFLIGHT READY** enquanto ainda Writing; o knob usava só `skylineInjectEnabled` e ia para Off no fim do HTTP parecendo cancel mid-payload.
+
+Fix: enquanto `loadOfpAutoStatus === 'loading'` → header **INJECTING LOAD**; switch On se `enabled || loading`; após sucesso label **Done**.
+
 ## O que os logs mostraram (DR400 KMCO→KMIA)
 
 1. Primeiro inject **completou** (`inject end ok`) — tanque CENTER 29 gal ≈ 174 lb avgas.

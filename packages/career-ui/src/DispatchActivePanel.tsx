@@ -919,8 +919,16 @@ export function DispatchActivePanel(props: {
             const fuelOk = fuelNumbersOk;
             const payloadOk =
               Boolean(view?.payload.ok) && payloadNumbersOk;
-            const ready =
-              view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
+            // While Skyline inject is writing, never show PREFLIGHT READY from
+            // mid-ramp live numbers — the switch also looked "finished" early.
+            const injecting = props.loadOfpAutoStatus === 'loading';
+            const ready = injecting
+              ? false
+              : view != null
+                ? fuelOk && payloadOk
+                : check.verdict !== 'fail';
+            const injectSwitchOn =
+              props.skylineInjectEnabled || injecting;
             const watchLive =
               Boolean(props.watch?.running) &&
               props.watch?.missionId === mission.id;
@@ -991,16 +999,21 @@ export function DispatchActivePanel(props: {
                     <strong>
                       {enRoute
                         ? enRouteHeadline
-                        : ready
-                          ? 'PREFLIGHT READY'
-                          : 'PREFLIGHT FAILED'}
+                        : injecting
+                          ? 'INJECTING LOAD'
+                          : ready
+                            ? 'PREFLIGHT READY'
+                            : 'PREFLIGHT FAILED'}
                     </strong>
                     <small>
                       {enRoute
                         ? enRouteSub
-                        : ready
-                          ? 'Fuel and cargo match the confirmed OFP.'
-                          : 'Fix the mismatched aircraft load before departure.'}
+                        : injecting
+                          ? (props.loadOfpProgress?.message ??
+                            'Writing fuel and payload into the sim…')
+                          : ready
+                            ? 'Fuel and cargo match the confirmed OFP.'
+                            : 'Fix the mismatched aircraft load before departure.'}
                     </small>
                   </div>
                   <div className="preflight-head-actions">
@@ -1041,31 +1054,27 @@ export function DispatchActivePanel(props: {
                           type="button"
                           role="switch"
                           className={`skyline-inject-switch${
-                            props.skylineInjectEnabled
+                            injectSwitchOn
                               ? ' skyline-inject-switch-on'
                               : ''
                           }${
-                            props.loadOfpAutoStatus === 'loading'
-                              ? ' skyline-inject-switch-busy'
-                              : ''
+                            injecting ? ' skyline-inject-switch-busy' : ''
                           }`}
-                          aria-checked={props.skylineInjectEnabled}
+                          aria-checked={injectSwitchOn}
                           disabled={
-                            props.loadOfpAutoStatus === 'loading'
+                            injecting
                               ? false
                               : busy || !props.simBridge?.connected
                           }
                           title={
-                            props.skylineInjectEnabled
-                              ? props.loadOfpAutoStatus === 'loading'
+                            injectSwitchOn
+                              ? injecting
                                 ? 'Turn off to cancel fuel/payload inject'
                                 : 'Skyline inject is on — turn off to leave load as-is'
                               : 'Turn on to write OFP fuel and payload into the sim'
                           }
                           onClick={() =>
-                            props.onToggleSkylineInject(
-                              !props.skylineInjectEnabled,
-                            )
+                            props.onToggleSkylineInject(!injectSwitchOn)
                           }
                         >
                           <span
@@ -1077,13 +1086,15 @@ export function DispatchActivePanel(props: {
                           <span className="skyline-inject-switch-label">
                             <strong>Skyline inject</strong>
                             <small>
-                              {props.loadOfpAutoStatus === 'loading'
+                              {injecting
                                 ? 'Writing…'
                                 : props.loadOfpAutoStatus === 'failed'
                                   ? 'Failed · off'
-                                  : props.skylineInjectEnabled
-                                    ? 'On'
-                                    : 'Off'}
+                                  : props.loadOfpAutoStatus === 'done'
+                                    ? 'Done'
+                                    : props.skylineInjectEnabled
+                                      ? 'On'
+                                      : 'Off'}
                             </small>
                           </span>
                         </button>

@@ -5833,8 +5833,10 @@ export function App() {
           throw new Error(result.error ?? 'Fuel and payload load failed');
         }
         succeeded = true;
-        setSkylineInjectEnabled(false);
+        // Keep the switch looking armed until status flips off loading; then
+        // show Done (not Off) so it does not look like a mid-payload cancel.
         setLoadOfpAutoStatus('done');
+        setSkylineInjectEnabled(false);
         setLoadOfpAutoError(null);
         setLoadOfpProgress(null);
         setToastKind('ok');

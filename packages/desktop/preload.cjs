@@ -7,6 +7,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('skylineDesktop', {
   isDesktop: true,
   getVersion: () => ipcRenderer.invoke('skyline:get-version'),
+  openExternal: (url) => ipcRenderer.invoke('skyline:open-external', url),
   checkForUpdates: () => ipcRenderer.invoke('skyline:check-updates'),
   downloadUpdate: () => ipcRenderer.invoke('skyline:download-update'),
   quitAndInstall: () => ipcRenderer.invoke('skyline:quit-and-install'),

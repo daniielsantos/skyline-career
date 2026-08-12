@@ -993,6 +993,11 @@ function isActiveMissionStatus(status: string): boolean {
   return status === 'accepted' || status === 'dispatched' || status === 'in_flight';
 }
 
+/** API 409 before a save is open — the profile gate already covers this. */
+function isNeedsProfileMessage(message: string): boolean {
+  return /Select a career profile first/i.test(message);
+}
+
 /**
  * True when the player has started (or is flying) the Dispatch / Watch pipeline.
  * Bare Accepted / crew-operated legs do not count — Freights stays open and the
@@ -1186,21 +1191,16 @@ function loadSimbriefUser(): string {
   }
 }
 
-/** Prefer a real browser tab — server-side OS open often fails from the API process. */
+/** Open SimBrief in the OS browser — never navigate the Skyline window. */
 function openSimBriefDispatchUrl(url: string): void {
   const href = url.trim();
-  if (!href) return;
-  try {
-    const opened = window.open(href, '_blank', 'noopener,noreferrer');
-    if (opened) return;
-  } catch {
-    // fall through to location assign
+  if (!href || !/^https?:\/\//i.test(href)) return;
+  const desktop = window.skylineDesktop;
+  if (desktop?.openExternal) {
+    void desktop.openExternal(href);
+    return;
   }
-  try {
-    window.location.assign(href);
-  } catch {
-    // ignore — toast already tells the pilot to open SimBrief
-  }
+  window.open(href, '_blank', 'noopener,noreferrer');
 }
 
 function readLastFboIcao(): string | null {
@@ -2225,8 +2225,7 @@ export function App() {
             setTerminalSection('inventory');
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            // Gate / no open store — don't scare the profile picker with API noise.
-            if (!/Select a career profile first/i.test(message)) {
+            if (!isNeedsProfileMessage(message)) {
               setError(message);
             }
             setAirportIcao(null);
@@ -2259,7 +2258,7 @@ export function App() {
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
-          if (!/Select a career profile first/i.test(message)) {
+          if (!isNeedsProfileMessage(message)) {
             setError(message);
           }
           setAirportIcao(null);
@@ -2442,7 +2441,7 @@ export function App() {
         setActiveCareerProfile(last);
         setShowProfileGate(true);
         setError((prev) =>
-          prev && /Select a career profile first/i.test(prev) ? null : prev,
+          prev && isNeedsProfileMessage(prev) ? null : prev,
         );
       } catch (err) {
         if (!cancelled) {
@@ -2460,7 +2459,8 @@ export function App() {
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
     void refresh().catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (!isNeedsProfileMessage(message)) setError(message);
     });
   }, [refresh, showProfileGate, activeCareerProfile?.id]);
 
@@ -2489,6 +2489,7 @@ export function App() {
 
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
+    if (showProfileGate || !activeCareerProfile) return;
     const boardAcf = fleet.find((a) => a.id === boardAircraftId);
     const originQuery = originFilter.trim();
     const focusIcao = (
@@ -2560,7 +2561,8 @@ export function App() {
         })
         .catch((err: unknown) => {
           if (cancelled) return;
-          setError(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          if (!isNeedsProfileMessage(message)) setError(message);
         });
     }, 250);
     return () => {
@@ -2569,6 +2571,7 @@ export function App() {
     };
   }, [
     accessFilter,
+    activeCareerProfile,
     boardAircraftId,
     cargoFilter,
     destFilter,
@@ -2582,6 +2585,7 @@ export function App() {
     minimumPayUsd,
     originFilter,
     profitableOnly,
+    showProfileGate,
     viableOnly,
     nearMe,
     pilotIcao,
@@ -7074,7 +7078,7 @@ export function App() {
         </header>
 
         <div className="main-content">
-      {error ? (
+      {error && !isNeedsProfileMessage(error) ? (
         <p className="banner error" role="alert">
           <span>{error}</span>
           <button

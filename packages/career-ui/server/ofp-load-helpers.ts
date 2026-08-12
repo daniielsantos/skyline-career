@@ -1523,11 +1523,32 @@ async function applyMissionOfpLoadExclusive(
           );
           // Forward/aft half can be full while other stations still have room —
           // fall back to equal so freighter cargo does not stall mid-cabin.
+          // Never dump the rest on the nose/tail when CG is already on that side.
           if (
             placed.movedLb <= 0 &&
             placeBias !== 'equal' &&
             (roomOnBaggage() || roomUnderSoftCap(seatStations))
           ) {
+            const mid =
+              lo !== undefined && hi !== undefined ? (lo + hi) / 2 : undefined;
+            const equalWouldWorsen =
+              haveEnvelope &&
+              liveMac !== undefined &&
+              mid !== undefined &&
+              ((placeBias === 'aft' && liveMac < mid) ||
+                (placeBias === 'forward' && liveMac > mid));
+            if (equalWouldWorsen) {
+              cargoTargetLb = cargoPlacedLb;
+              watchDebugLog('inject', 'bias half full — stop (equal would worsen CG)', {
+                round: i,
+                placeBias,
+                liveMac,
+                lo,
+                hi,
+                cargoPlacedLb: Math.round(cargoPlacedLb),
+              });
+              continue;
+            }
             watchDebugLog('inject', 'bias half full — fallback equal', {
               round: i,
               placeBias,

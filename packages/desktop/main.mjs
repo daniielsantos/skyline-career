@@ -263,8 +263,33 @@ function wireAutoUpdater() {
   });
 }
 
+function isHttpUrl(url) {
+  try {
+    const protocol = new URL(url).protocol;
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isAppUrl(url) {
+  try {
+    return new URL(url).origin === new URL(API_URL).origin;
+  } catch {
+    return false;
+  }
+}
+
 function registerIpc() {
   ipcMain.handle('skyline:get-version', () => app.getVersion());
+
+  ipcMain.handle('skyline:open-external', async (_event, url) => {
+    if (typeof url !== 'string' || !isHttpUrl(url)) {
+      return { ok: false };
+    }
+    await shell.openExternal(url);
+    return { ok: true };
+  });
 
   ipcMain.handle('skyline:check-updates', async () => {
     if (!isPackaged()) {
@@ -494,8 +519,13 @@ async function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    if (isHttpUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    if (isHttpUrl(url)) void shell.openExternal(url);
   });
 
   await mainWindow.loadURL(API_URL);

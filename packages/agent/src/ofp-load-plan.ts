@@ -687,7 +687,7 @@ export const CG_BALANCE_STEP_LB = 50;
  * Pick load bias from live CG and its movement (counterweight).
  * - Too aft → load forward; if still drifting aft, keep forward.
  * - Too forward → load aft; if still drifting forward, keep aft.
- * - Inside envelope → equal.
+ * - Inside envelope → load toward center (nose-ish already → aft, tail-ish → forward).
  */
 export function resolveCgCounterweightBias(opts: {
   liveMac: number;
@@ -696,9 +696,11 @@ export function resolveCgCounterweightBias(opts: {
   prevMac?: number;
 }): 'equal' | 'forward' | 'aft' {
   const { liveMac, lo, hi } = opts;
-  if (liveMac >= lo && liveMac <= hi) return 'equal';
   if (liveMac > hi) return 'forward';
   if (liveMac < lo) return 'aft';
+  const mid = (lo + hi) / 2;
+  if (liveMac < mid - 1) return 'aft';
+  if (liveMac > mid + 1) return 'forward';
   return 'equal';
 }
 

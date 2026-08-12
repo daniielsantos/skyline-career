@@ -531,6 +531,15 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       resolveCgCounterweightBias({ liveMac: 27, lo: 25, hi: 30 }),
       'equal',
     );
+    // Inside envelope but already nose-ish → keep loading aft (C408 cabin).
+    assert.equal(
+      resolveCgCounterweightBias({ liveMac: 16.4, lo: 8.5, hi: 30 }),
+      'aft',
+    );
+    assert.equal(
+      resolveCgCounterweightBias({ liveMac: 28, lo: 8.5, hi: 30 }),
+      'forward',
+    );
     // Still drifting aft past limit → stronger forward step.
     assert.equal(
       cgCounterweightPerSeatLb({

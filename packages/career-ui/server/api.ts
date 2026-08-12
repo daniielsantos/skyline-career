@@ -148,6 +148,7 @@ import {
   LEDGER_KIND_LABEL,
   openCareerStore,
   applyMsfsBushHubOverrideToTerminal,
+  pruneOrphanCareerHubs,
   listWorldCountryIds,
   localUnitPriceUsd,
   computeEconomyPulse,
@@ -198,6 +199,7 @@ import {
   homologateBushHub,
   homologateBushHubBatch,
   loadProfileMsfsBushHubOverrides,
+  persistProfileMsfsBushHubOverrides,
   resolveHomologateCoords,
 } from './bush-hub-homologate.ts';
 import {
@@ -281,14 +283,16 @@ let activeProfileId: string | null = null;
 
 await ensureCareerProfilesLayout(careerRoot);
 await loadProfileMsfsBushHubOverrides(careerRoot);
+await persistProfileMsfsBushHubOverrides(careerRoot);
 
 async function stampMsfsOverridesOnStore(target: CareerStore): Promise<void> {
   const { world, dirty } = await target.loadEconomy();
   let stamped = 0;
+  const pruned = pruneOrphanCareerHubs(world);
   for (const airport of world.airports) {
     if (applyMsfsBushHubOverrideToTerminal(airport)) stamped += 1;
   }
-  if (dirty || stamped > 0) {
+  if (dirty || stamped > 0 || pruned) {
     await target.saveEconomy(world);
     if (stamped > 0) {
       console.log(

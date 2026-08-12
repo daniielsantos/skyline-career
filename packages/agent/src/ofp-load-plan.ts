@@ -7,6 +7,7 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
   KG_TO_LB,
   ofpCargoKg,
+  sanitizeFuelDensityLbPerGal,
   toLb,
   type AircraftProfile,
   type LoadPlanRequest,
@@ -173,8 +174,9 @@ function roundLb(value: number): number {
 }
 
 /**
- * Pick fuel density for gallon↔lb. Light piston tanks often report Jet-A density
- * in MSFS; prefer avgas (~6.0) when capacity looks GA-sized.
+ * Pick fuel density for gallon↔lb.
+ * Light piston tanks often report Jet-A density in MSFS; prefer avgas (~6.0).
+ * Larger gallon tanks (turboprop/jet) sometimes flicker to ~6.0 — force Jet-A.
  */
 export function resolveFuelDensityLbPerGal(
   profile: AircraftProfile,
@@ -187,20 +189,20 @@ export function resolveFuelDensityLbPerGal(
   );
   const lightPistonGallons =
     unit === 'gallons' && capacityTotal > 0 && capacityTotal <= 120;
-  if (
-    liveLbPerGal !== undefined &&
-    Number.isFinite(liveLbPerGal) &&
-    liveLbPerGal > 4 &&
-    liveLbPerGal < 9
-  ) {
-    if (lightPistonGallons && liveLbPerGal >= 6.45) {
-      return DEFAULT_AVGAS_LB_PER_GAL;
+  if (lightPistonGallons) {
+    if (
+      liveLbPerGal !== undefined &&
+      Number.isFinite(liveLbPerGal) &&
+      liveLbPerGal > 4 &&
+      liveLbPerGal < 6.45
+    ) {
+      return liveLbPerGal;
     }
-    return liveLbPerGal;
+    return DEFAULT_AVGAS_LB_PER_GAL;
   }
-  return lightPistonGallons
-    ? DEFAULT_AVGAS_LB_PER_GAL
-    : DEFAULT_JET_A_LB_PER_GAL;
+  return sanitizeFuelDensityLbPerGal(liveLbPerGal, {
+    totalCapacityGal: unit === 'gallons' ? capacityTotal : undefined,
+  });
 }
 
 /**

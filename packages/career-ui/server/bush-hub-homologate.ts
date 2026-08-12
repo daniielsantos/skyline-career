@@ -7,11 +7,15 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
   applyMsfsBushHubOverrideToTerminal,
+  filterMsfsBushHubOverridesToIcaos,
   isCareerHubIcao,
   listBushTripOnlyIcaos,
   listCareerHubIcaos,
   listMsfsBushHubOverrides,
+  msfsFacilityMatchesCareerHub,
+  pruneRuntimeMsfsBushHubOverrides,
   setRuntimeMsfsBushHubOverrides,
+  SIMBRIEF_DISPATCH_DENY_ICAOS,
   upsertRuntimeMsfsBushHubOverride,
   type CareerEconomyWorld,
   type MsfsBushHubOverride,
@@ -31,11 +35,19 @@ export async function loadProfileMsfsBushHubOverrides(
   const path = profileMsfsBushHubOverridesPath(careerDir);
   try {
     const raw = JSON.parse(await readFile(path, 'utf8')) as unknown;
-    return setRuntimeMsfsBushHubOverrides(raw);
+    setRuntimeMsfsBushHubOverrides(raw);
   } catch {
     setRuntimeMsfsBushHubOverrides({});
-    return {};
   }
+  pruneRuntimeMsfsBushHubOverrides(catalogOverrideKeepIcaos());
+  return listMsfsBushHubOverrides();
+}
+
+function catalogOverrideKeepIcaos(): string[] {
+  const deny = new Set(
+    SIMBRIEF_DISPATCH_DENY_ICAOS.map((icao) => icao.toUpperCase()),
+  );
+  return listCareerHubIcaos().filter((icao) => !deny.has(icao));
 }
 
 export async function persistProfileMsfsBushHubOverrides(
@@ -43,7 +55,12 @@ export async function persistProfileMsfsBushHubOverrides(
 ): Promise<string> {
   const path = profileMsfsBushHubOverridesPath(careerDir);
   await mkdir(dirname(path), { recursive: true });
-  const payload = listMsfsBushHubOverrides();
+  const keep = catalogOverrideKeepIcaos();
+  pruneRuntimeMsfsBushHubOverrides(keep);
+  const payload = filterMsfsBushHubOverridesToIcaos(
+    listMsfsBushHubOverrides(),
+    keep,
+  );
   await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   return path;
 }
@@ -221,6 +238,10 @@ export async function resolveHomologateCoords(
   }
   const fetchFacility = deps?.fetchFacility ?? fetchAirportFacility;
   const facility = await fetchFacility(icao, input.pipeName);
+  const match = msfsFacilityMatchesCareerHub(icao, facility);
+  if (!match.ok) {
+    throw new Error(match.reason);
+  }
   return {
     icao,
     name: input.name?.trim() || facility.name,

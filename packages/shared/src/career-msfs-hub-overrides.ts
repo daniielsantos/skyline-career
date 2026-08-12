@@ -167,6 +167,38 @@ export function setRuntimeMsfsBushHubOverrides(
 }
 
 /** Upsert one ICAO into the runtime overlay (homologate API). */
+export function filterMsfsBushHubOverridesToIcaos(
+  overrides: MsfsBushHubOverridesFile,
+  keepIcaos: Iterable<string>,
+): MsfsBushHubOverridesFile {
+  const keep = new Set(
+    [...keepIcaos].map((icao) => icao.trim().toUpperCase()).filter(Boolean),
+  );
+  const out: MsfsBushHubOverridesFile = {};
+  for (const [icao, row] of Object.entries(overrides)) {
+    const code = icao.trim().toUpperCase();
+    if (!keep.has(code)) continue;
+    out[code] = row;
+  }
+  return out;
+}
+
+/** Drop runtime overlay keys that are no longer career hubs (e.g. SCCD/SCST). */
+export function pruneRuntimeMsfsBushHubOverrides(
+  keepIcaos: Iterable<string>,
+): string[] {
+  const keep = new Set(
+    [...keepIcaos].map((icao) => icao.trim().toUpperCase()).filter(Boolean),
+  );
+  const removed: string[] = [];
+  for (const key of Object.keys(runtimeLayer)) {
+    if (keep.has(key.toUpperCase())) continue;
+    delete runtimeLayer[key];
+    removed.push(key);
+  }
+  return removed;
+}
+
 export function upsertRuntimeMsfsBushHubOverride(
   icao: string,
   override: MsfsBushHubOverride,

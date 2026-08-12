@@ -24,7 +24,9 @@ import {
   assertClCareerHubCatalog,
   CL_CAREER_HUBS,
   buildClFeederCorridors,
+  rewriteCareerIcaoFields,
 } from './career-cl-hubs.js';
+import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
 import {
   assertMxCareerHubCatalog,
   buildMxFeederCorridors,
@@ -615,7 +617,7 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'SAEZ', b: 'SAZS', weight: 1.6 },
   { a: 'SAEZ', b: 'SAVN', weight: 1.5 },
   { a: 'SCEL', b: 'SCTE', weight: 1.8 },
-  { a: 'SCEL', b: 'SCCD', weight: 1.7 },
+  { a: 'SCEL', b: 'SCIE', weight: 1.7 },
   { a: 'SCEL', b: 'SCFA', weight: 1.7 },
   { a: 'SCEL', b: 'SCDA', weight: 1.6 },
   { a: 'SCEL', b: 'SCCI', weight: 1.5 },
@@ -1569,6 +1571,38 @@ export function resolveAirportCoords(
   return CAREER_HUB_COORDS[code];
 }
 
+/** Refuse MSFS Facilities stamps when the sim airport is not the catalog hub. */
+export const MSFS_HUB_MATCH_MAX_NM = 25;
+
+/**
+ * Compare a SimConnect Facilities hit to the curated catalog.
+ * Does not apply CAREER_AIRPORT_ICAO_REMAP to the facility ident — MSFS SCCD
+ * is Castro, not Carriel Sur (SCIE).
+ */
+export function msfsFacilityMatchesCareerHub(
+  requestedIcao: string,
+  facility: { icao?: string; lat: number; lon: number },
+): { ok: true } | { ok: false; reason: string } {
+  const want = requestedIcao.trim().toUpperCase();
+  const catalog = CAREER_HUB_COORDS[want];
+  if (!catalog) {
+    return { ok: false, reason: `${want} is not a career hub` };
+  }
+  const got = (facility.icao ?? '').trim().toUpperCase();
+  if (got && got !== want) {
+    return { ok: false, reason: `MSFS ident ${got} ≠ catalog ${want}` };
+  }
+  const nm = distanceNm(catalog, facility);
+  if (nm > MSFS_HUB_MATCH_MAX_NM) {
+    const label = catalog.name ?? want;
+    return {
+      ok: false,
+      reason: `MSFS ${want} is ${nm.toFixed(0)} nm from catalog ${label}`,
+    };
+  }
+  return { ok: true };
+}
+
 /** Great-circle distance in nautical miles. */
 export function distanceNm(
   a: { lat: number; lon: number },
@@ -1734,6 +1768,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertMxCareerHubCatalog();
   assertArCareerHubCatalog();
   assertClCareerHubCatalog();
+  assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
   const hubs: Array<{
@@ -1996,6 +2031,98 @@ function migrateNpcTimestamps(
  * Merge airports present in the current seed that are missing from a legacy
  * save (e.g. BR-N / BR-CO / US anchors). Returns true when any hub was added.
  */
+const CL_LA_SERENA = { lat: -29.9162, lon: -71.1995 };
+const CL_CARRIEL_SUR = { lat: -36.7727, lon: -73.0631 };
+
+function clHubNear(
+  airport: Pick<AirportTerminal, 'lat' | 'lon'>,
+  point: { lat: number; lon: number },
+  maxNm = 40,
+): boolean {
+  return distanceNm(airport, point) <= maxNm;
+}
+
+function stampClHubFromCatalog(airport: AirportTerminal, icao: string): void {
+  const hub = CL_CAREER_HUBS.find((row) => row.icao === icao);
+  airport.icao = icao;
+  if (!hub) return;
+  airport.name = hub.name;
+  airport.lat = hub.lat;
+  airport.lon = hub.lon;
+  airport.region = hub.region;
+  airport.hubTier = hub.hubTier;
+}
+
+/**
+ * Old CL catalog swapped idents: SCIE was La Serena (real SCSE) and SCCD was
+ * Carriel Sur (real SCIE). Rewrite airports + lots before hub coverage runs.
+ */
+export function remapMislabelledClHubs(world: CareerEconomyWorld): boolean {
+  let changed = false;
+  const scie = world.airports.find((ap) => ap.icao.toUpperCase() === 'SCIE');
+  if (scie && clHubNear(scie, CL_LA_SERENA)) {
+    rewriteCareerIcaoFields(world, 'SCIE', 'SCSE');
+    stampClHubFromCatalog(scie, 'SCSE');
+    changed = true;
+  }
+
+  const sccd = world.airports.find((ap) => ap.icao.toUpperCase() === 'SCCD');
+  const scieAfter = world.airports.find((ap) => ap.icao.toUpperCase() === 'SCIE');
+  if (sccd) {
+    if (clHubNear(sccd, CL_CARRIEL_SUR)) {
+      rewriteCareerIcaoFields(world, 'SCCD', 'SCIE');
+      if (scieAfter) {
+        world.airports = world.airports.filter((ap) => ap !== sccd);
+      } else {
+        stampClHubFromCatalog(sccd, 'SCIE');
+      }
+    } else {
+      world.lots = world.lots.filter(
+        (lot) =>
+          lot.originIcao.toUpperCase() !== 'SCCD' &&
+          lot.destIcao.toUpperCase() !== 'SCCD',
+      );
+      world.airports = world.airports.filter((ap) => ap !== sccd);
+      rewriteCareerIcaoFields(world, 'SCCD', 'SCIE');
+    }
+    changed = true;
+  }
+  return changed;
+}
+
+/**
+ * Drop airports (and their lots) that are no longer in the catalog — e.g.
+ * MSFS-only strips removed because they cannot Dispatch.
+ */
+export function pruneOrphanCareerHubs(world: CareerEconomyWorld): boolean {
+  const keep = new Set(
+    Object.keys(CAREER_HUB_COORDS).map((icao) => icao.toUpperCase()),
+  );
+  const orphan = new Set(
+    world.airports
+      .map((ap) => ap.icao.trim().toUpperCase())
+      .filter((icao) => icao && !keep.has(icao)),
+  );
+  if (orphan.size === 0) return false;
+
+  world.airports = world.airports.filter(
+    (ap) => !orphan.has(ap.icao.trim().toUpperCase()),
+  );
+  world.lots = world.lots.filter(
+    (lot) =>
+      !orphan.has(lot.originIcao.trim().toUpperCase()) &&
+      !orphan.has(lot.destIcao.trim().toUpperCase()),
+  );
+  if (Array.isArray(world.inboundPending) && world.inboundPending.length > 0) {
+    world.inboundPending = world.inboundPending.filter(
+      (pending) =>
+        !orphan.has(pending.originIcao.trim().toUpperCase()) &&
+        !orphan.has(pending.destIcao.trim().toUpperCase()),
+    );
+  }
+  return true;
+}
+
 export function ensureCareerHubCoverage(world: CareerEconomyWorld): boolean {
   const have = new Set(world.airports.map((a) => a.icao.toUpperCase()));
   const fresh = createSeedEconomyWorld({ seed: world.seed });
@@ -2084,6 +2211,8 @@ export function migrateEconomyWorld(
       : [],
   };
 
+  remapMislabelledClHubs(migrated);
+  pruneOrphanCareerHubs(migrated);
   ensureCareerHubCoverage(migrated);
   ensureInternationalLanes(migrated);
   ensureNpcFleet(migrated);

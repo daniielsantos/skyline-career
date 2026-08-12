@@ -8,12 +8,17 @@ import { join } from 'node:path';
 import {
   applyMsfsBushHubOverrideToTerminal,
   CAREER_HUB_COORDS,
+  filterMsfsBushHubOverridesToIcaos,
   isCareerHubIcao,
   listBushTripOnlyIcaos,
   listCareerHubIcaos,
   listMsfsBushHubOverrides,
+  msfsFacilityMatchesCareerHub,
   openCareerStore,
+  pruneOrphanCareerHubs,
+  pruneRuntimeMsfsBushHubOverrides,
   setRuntimeMsfsBushHubOverrides,
+  SIMBRIEF_DISPATCH_DENY_ICAOS,
   upsertRuntimeMsfsBushHubOverride,
   type CareerRunway,
   type MsfsBushHubOverride,
@@ -120,12 +125,25 @@ async function loadRuntimeOverrides(repoRoot: string): Promise<void> {
   } catch {
     setRuntimeMsfsBushHubOverrides({});
   }
+  pruneRuntimeMsfsBushHubOverrides(catalogOverrideKeepIcaos());
+}
+
+function catalogOverrideKeepIcaos(): string[] {
+  const deny = new Set(
+    SIMBRIEF_DISPATCH_DENY_ICAOS.map((icao) => icao.toUpperCase()),
+  );
+  return listCareerHubIcaos().filter((icao) => !deny.has(icao));
 }
 
 async function persistOverrides(repoRoot: string): Promise<string> {
   const path = overridesPath(repoRoot);
   await mkdir(join(repoRoot, 'profiles', 'career'), { recursive: true });
-  const payload: MsfsBushHubOverridesFile = listMsfsBushHubOverrides();
+  const keep = catalogOverrideKeepIcaos();
+  pruneRuntimeMsfsBushHubOverrides(keep);
+  const payload: MsfsBushHubOverridesFile = filterMsfsBushHubOverridesToIcaos(
+    listMsfsBushHubOverrides(),
+    keep,
+  );
   await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   return path;
 }
@@ -242,6 +260,12 @@ export async function runCareerHubsWizard(
     process.stdout.write(`  [${i}/${icaos.length}] ${icao}…`);
     try {
       const hit = await fetchFacility(opts.bridge, icao);
+      const match = msfsFacilityMatchesCareerHub(icao, hit);
+      if (!match.ok) {
+        rows.push({ icao, ok: false, error: match.reason });
+        console.log(` SKIP  ${match.reason}`);
+        continue;
+      }
       const catalogName = CAREER_HUB_COORDS[icao]?.name;
       const override: MsfsBushHubOverride = {
         name: hit.name || catalogName || icao,
@@ -277,7 +301,12 @@ export async function runCareerHubsWizard(
   let stampedAirports = 0;
   try {
     const { world } = await store.loadEconomy();
-    const overrides = listMsfsBushHubOverrides();
+    pruneOrphanCareerHubs(world);
+    const keep = new Set(catalogOverrideKeepIcaos());
+    const overrides = filterMsfsBushHubOverridesToIcaos(
+      listMsfsBushHubOverrides(),
+      keep,
+    );
     for (const [icao, override] of Object.entries(overrides)) {
       const airport = world.airports.find(
         (a) => a.icao.toUpperCase() === icao,

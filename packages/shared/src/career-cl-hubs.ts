@@ -50,20 +50,12 @@ const miningSpoke = {
   >,
 };
 
-const fisherySpoke = {
-  produce: { perishables: 1.45, general: 1.05, supplies: 0.95 } as Partial<
-    Record<CommodityId, number>
-  >,
-  consume: { electronics: 0.9, machinery: 0.9, general: 0.95 } as Partial<
-    Record<CommodityId, number>
-  >,
-};
-
 /**
- * 24 curated Chile hubs — Centro (incl. Norte) + Sur / Austral.
+ * 21 curated Chile hubs — Centro (incl. Norte) + Sur / Austral.
+ * Cargo hubs must exist in SimBrief (no MSFS-only strips: SCCD/SCSN/SCST/SCTC).
  */
 export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
-  // ── CL-C (14) ────────────────────────────────────────────────────────────
+  // ── CL-C (13) ────────────────────────────────────────────────────────────
   {
     icao: 'SCEL',
     name: 'Santiago Arturo Merino Benítez',
@@ -93,7 +85,7 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     ...miningSpoke,
   },
   {
-    icao: 'SCIE',
+    icao: 'SCSE',
     name: 'La Serena La Florida',
     region: 'CL-C',
     hubTier: 'regional',
@@ -102,7 +94,7 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'SCCD',
+    icao: 'SCIE',
     name: 'Concepción Carriel Sur',
     region: 'CL-C',
     hubTier: 'regional',
@@ -184,17 +176,8 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     lon: -72.0314,
     ...agroSpoke,
   },
-  {
-    icao: 'SCSN',
-    name: 'Santo Domingo',
-    region: 'CL-C',
-    hubTier: 'spoke',
-    lat: -33.6564,
-    lon: -71.6139,
-    ...drySpoke,
-  },
 
-  // ── CL-S (10) ────────────────────────────────────────────────────────────
+  // ── CL-S (8) ────────────────────────────────────────────────────────────
   {
     icao: 'SCTE',
     name: 'Puerto Montt El Tepual',
@@ -254,15 +237,6 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'SCTC',
-    name: 'Temuco Maquehue (legacy)',
-    region: 'CL-S',
-    hubTier: 'spoke',
-    lat: -38.7669,
-    lon: -72.6372,
-    ...agroSpoke,
-  },
-  {
     icao: 'SCNT',
     name: 'Puerto Natales Teniente Julio Gallardo',
     region: 'CL-S',
@@ -282,18 +256,85 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     produce: { general: 1.0, supplies: 1.05 },
     consume: { perishables: 1.15, supplies: 1.1, electronics: 0.9 },
   },
-  {
-    icao: 'SCST',
-    name: 'Castro / Gamboa',
-    region: 'CL-S',
-    hubTier: 'spoke',
-    lat: -42.4903,
-    lon: -73.7719,
-    ...fisherySpoke,
-  },
 ];
 
-export const CL_CAREER_HUB_COUNT = 24;
+export const CL_CAREER_HUB_COUNT = 21;
+
+/**
+ * MSFS / a leftover catalog used SCCD for Carriel Sur. Real + SimBrief ident
+ * is SCIE. Do not bring SCCD/SCST/SCSN/SCTC back — they are not Dispatch airports.
+ */
+export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
+  SCCD: 'SCIE',
+};
+
+const CAREER_ICAO_FIELD_KEYS = new Set([
+  'icao',
+  'originIcao',
+  'destIcao',
+  'locationIcao',
+  'homeHubIcao',
+  'pilotIcao',
+  'basedIcao',
+  'hirePoolIcao',
+]);
+
+/** SimBrief / navdata ident for a career airport (SCCD → SCIE). */
+export function canonicalCareerAirportIcao(icao: string): string {
+  const code = icao.trim().toUpperCase();
+  return CAREER_AIRPORT_ICAO_REMAP[code] ?? code;
+}
+
+/** Rewrite known ICAO fields in a missions/economy tree. */
+export function rewriteCareerIcaoFields(
+  value: unknown,
+  fromIcao: string,
+  toIcao: string,
+): void {
+  const from = fromIcao.trim().toUpperCase();
+  const to = toIcao.trim().toUpperCase();
+  if (!from || !to || from === to) return;
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const item of value) rewriteCareerIcaoFields(item, from, to);
+    return;
+  }
+  const rec = value as Record<string, unknown>;
+  for (const [key, child] of Object.entries(rec)) {
+    if (typeof child === 'string' && CAREER_ICAO_FIELD_KEYS.has(key)) {
+      if (child.trim().toUpperCase() === from) rec[key] = to;
+      continue;
+    }
+    if (child && typeof child === 'object') {
+      rewriteCareerIcaoFields(child, from, to);
+    }
+  }
+}
+
+/**
+ * Player-state remaps after a CL hub ident migrate.
+ * Old catalog: La Serena = SCIE, Concepción = SCCD.
+ * New catalog: La Serena = SCSE, Concepción = SCIE.
+ */
+export function clHubIdentRemapsForPlayer(
+  beforeIcaos: Iterable<string>,
+  afterIcaos: Iterable<string>,
+): ReadonlyArray<readonly [string, string]> {
+  const before = new Set(
+    [...beforeIcaos].map((code) => code.trim().toUpperCase()).filter(Boolean),
+  );
+  const after = new Set(
+    [...afterIcaos].map((code) => code.trim().toUpperCase()).filter(Boolean),
+  );
+  const remaps: [string, string][] = [];
+  if (before.has('SCIE') && !before.has('SCSE') && after.has('SCSE')) {
+    remaps.push(['SCIE', 'SCSE']);
+  }
+  if (before.has('SCCD') && !after.has('SCCD')) {
+    remaps.push(['SCCD', 'SCIE']);
+  }
+  return remaps;
+}
 
 export function buildClFeederCorridors(
   hubs: readonly ClCareerHubDef[] = CL_CAREER_HUBS,
@@ -323,8 +364,8 @@ export function assertClCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<ClCareerRegion, number> = {
-    'CL-C': 14,
-    'CL-S': 10,
+    'CL-C': 13,
+    'CL-S': 8,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

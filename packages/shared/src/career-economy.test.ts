@@ -44,6 +44,9 @@ import {
   localPriceMultiplier,
   marketQueryTokens,
   migrateEconomyWorld,
+  msfsFacilityMatchesCareerHub,
+  pruneOrphanCareerHubs,
+  remapMislabelledClHubs,
   MS_PER_HOUR,
   MS_PER_TICK,
   TICKS_PER_DAY,
@@ -79,7 +82,7 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 381);
+    assert.equal(world.airports.length, 378);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 30);
     const br = world.airports.filter(
@@ -117,7 +120,24 @@ describe('career-economy seed', () => {
     assert.equal(ca.length, 53);
     assert.equal(mx.length, 47);
     assert.equal(ar.length, 40);
-    assert.equal(cl.length, 24);
+    assert.equal(cl.length, 21);
+    const laSerena = world.airports.find((airport) => airport.icao === 'SCSE');
+    const carrielSur = world.airports.find((airport) => airport.icao === 'SCIE');
+    assert.ok(laSerena, 'La Serena must use SCSE');
+    assert.match(laSerena.name, /La Serena/i);
+    assert.ok(carrielSur, 'Carriel Sur must use SCIE');
+    assert.match(carrielSur.name, /Carriel|Concepci/i);
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'SCCD'),
+      false,
+    );
+    for (const dropped of ['SCSN', 'SCST', 'SCTC'] as const) {
+      assert.equal(
+        world.airports.some((airport) => airport.icao === dropped),
+        false,
+        `${dropped} is not in SimBrief Dispatch`,
+      );
+    }
     assert.deepEqual(
       new Set(world.airports.map((airport) => airport.region)),
       new Set([
@@ -1635,7 +1655,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 38);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 381);
+    assert.equal(migrated.airports.length, 378);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));
@@ -1650,6 +1670,108 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.ok((migrated.internationalLanes?.length ?? 0) >= 30);
     const again = createSeedEconomyWorld({ seed: 'hub-coverage-idem' });
     assert.equal(ensureCareerHubCoverage(again), false);
+  });
+
+  it('rewrites swapped CL idents: La Serena SCIE→SCSE, Carriel Sur SCCD→SCIE', () => {
+    const world = createSeedEconomyWorld({ seed: 'cl-ident-swap' });
+    const laSerena = world.airports.find((airport) => airport.icao === 'SCSE')!;
+    const carriel = world.airports.find((airport) => airport.icao === 'SCIE')!;
+    laSerena.icao = 'SCIE';
+    laSerena.name = 'La Serena La Florida';
+    carriel.icao = 'SCCD';
+    carriel.name = 'Concepción Carriel Sur';
+    world.lots.push({
+      id: 'lot-sccd',
+      commodityId: 'general',
+      originIcao: 'SCCD',
+      destIcao: 'SCEL',
+      quantityKg: 1_000,
+      reservedKg: 0,
+      createdAtTick: 0,
+      expiresAtTick: 40,
+      payUsd: 800,
+      urgency: 'normal',
+      reason: 'test',
+      status: 'available',
+    });
+    const migrated = migrateEconomyWorld(world);
+    const nextSerena = migrated.airports.find((airport) => airport.icao === 'SCSE');
+    const nextCarriel = migrated.airports.find((airport) => airport.icao === 'SCIE');
+    assert.ok(nextSerena);
+    assert.match(nextSerena.name, /La Serena/i);
+    assert.ok(nextCarriel);
+    assert.match(nextCarriel.name, /Carriel|Concepci/i);
+    assert.equal(
+      migrated.airports.some((airport) => airport.icao === 'SCCD'),
+      false,
+    );
+    assert.equal(
+      migrated.lots.find((lot) => lot.id === 'lot-sccd')?.originIcao,
+      'SCIE',
+    );
+    assert.equal(remapMislabelledClHubs(migrated), false);
+  });
+
+  it('prunes orphan CL strips that are no longer in the catalog', () => {
+    const world = createSeedEconomyWorld({ seed: 'orphan-cl' });
+    const template = world.airports[0]!;
+    world.airports.push({
+      ...structuredClone(template),
+      icao: 'SCST',
+      name: 'Gamboa Apt',
+      region: 'CL-S',
+      hubTier: 'spoke',
+      lat: -42.49,
+      lon: -73.77,
+    });
+    world.lots.push({
+      id: 'lot-scst',
+      commodityId: 'general',
+      originIcao: 'SCST',
+      destIcao: 'SCEL',
+      quantityKg: 500,
+      reservedKg: 0,
+      createdAtTick: 0,
+      expiresAtTick: 40,
+      payUsd: 400,
+      urgency: 'normal',
+      reason: 'test',
+      status: 'available',
+    });
+    assert.equal(pruneOrphanCareerHubs(world), true);
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'SCST'),
+      false,
+    );
+    assert.equal(
+      world.lots.some((lot) => lot.id === 'lot-scst'),
+      false,
+    );
+
+    const legacy = createSeedEconomyWorld({ seed: 'orphan-cl-migrate' });
+    legacy.airports.push({
+      ...structuredClone(legacy.airports[0]!),
+      icao: 'SCSN',
+      name: 'Santo Domingo',
+      region: 'CL-C',
+      hubTier: 'spoke',
+      lat: -33.65,
+      lon: -71.61,
+    });
+    const migrated = migrateEconomyWorld(legacy);
+    assert.equal(
+      migrated.airports.some((airport) => airport.icao === 'SCSN'),
+      false,
+    );
+  });
+
+  it('refuses MSFS Facilities when ident/coords mismatch the catalog', () => {
+    const carriel = { icao: 'SCIE', lat: -36.7727, lon: -73.0631 };
+    assert.equal(msfsFacilityMatchesCareerHub('SCIE', carriel).ok, true);
+    const castro = { icao: 'SCCD', lat: -42.3245, lon: -73.3887 };
+    const bad = msfsFacilityMatchesCareerHub('SCIE', castro);
+    assert.equal(bad.ok, false);
+    if (!bad.ok) assert.match(bad.reason, /≠|nm/i);
   });
 
   it('migrates v1 without retroactive catch-up', () => {

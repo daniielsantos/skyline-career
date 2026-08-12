@@ -30,7 +30,7 @@
     "tanks": [
       {
         "id": "CENTER",
-        "name": "Center",
+        "name": "Center (forward)",
         "capacity": 181,
         "readVar": "FUEL TANK CENTER QUANTITY",
         "readUnit": "gallons",
@@ -39,11 +39,29 @@
       },
       {
         "id": "CENTER2",
-        "name": "Center 2",
+        "name": "Center 2 (aft)",
         "capacity": 197,
         "readVar": "FUEL TANK CENTER2 QUANTITY",
         "readUnit": "gallons",
         "writeVar": "FUEL TANK CENTER2 QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left wing",
+        "capacity": 37,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT AUX QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right wing",
+        "capacity": 37,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT AUX QUANTITY",
         "writeUnit": "gallons"
       }
     ],
@@ -59,6 +77,18 @@
         "var": "FUEL TANK CENTER2 QUANTITY",
         "unit": "gallons",
         "valueExpr": "{CENTER2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX}"
       },
       {
         "op": "delay",
@@ -80,6 +110,18 @@
           "unit": "gallons",
           "tolerancePct": 2,
           "valueExpr": "{CENTER2}"
+        },
+        {
+          "var": "FUEL TANK LEFT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_AUX}"
+        },
+        {
+          "var": "FUEL TANK RIGHT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_AUX}"
         }
       ]
     }

@@ -20,6 +20,7 @@ export * from './career-ca-hubs.js';
 export * from './career-mx-hubs.js';
 export * from './career-ar-hubs.js';
 export * from './career-cl-hubs.js';
+export * from './career-simbrief-airports.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';
 export * from './career-weather.js';

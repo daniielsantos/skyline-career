@@ -12,6 +12,10 @@ import {
   ensureSeedMarketFormed,
   migrateEconomyWorld,
 } from './career-economy.js';
+import {
+  clHubIdentRemapsForPlayer,
+  rewriteCareerIcaoFields,
+} from './career-cl-hubs.js';
 import { emptyMissionsStateV2, normalizeMissionsState } from './career-fleet.js';
 import { normalizeMissionIntent } from './career-mission.js';
 import { readJsonFile, renameJsonAside, writeJsonFileAtomic } from './career-json-io.js';
@@ -140,6 +144,31 @@ function missionsPayloadForBlob(state: CareerMissionsState): CareerMissionsState
   return normalizeMissions(state as unknown as Record<string, unknown>);
 }
 
+function airportIcaoList(raw: { airports?: Array<{ icao?: string }> }): string[] {
+  return (raw.airports ?? [])
+    .map((airport) => String(airport.icao ?? '').trim().toUpperCase())
+    .filter(Boolean);
+}
+
+async function persistClHubIdentRemaps(
+  store: {
+    loadMissions(): Promise<CareerMissionsState>;
+    saveMissions(state: CareerMissionsState): Promise<void>;
+  },
+  beforeIcaos: string[],
+  afterIcaos: string[],
+): Promise<void> {
+  const remaps = clHubIdentRemapsForPlayer(beforeIcaos, afterIcaos);
+  if (remaps.length === 0) return;
+  try {
+    const missions = await store.loadMissions();
+    for (const [from, to] of remaps) rewriteCareerIcaoFields(missions, from, to);
+    await store.saveMissions(missions);
+  } catch {
+    /* missions file may not exist yet on a fresh economy */
+  }
+}
+
 // ─── JSON store ─────────────────────────────────────────────────────────────
 
 class JsonCareerStore implements CareerStore {
@@ -152,11 +181,15 @@ class JsonCareerStore implements CareerStore {
   async loadEconomy(): Promise<EconomyLoadResult> {
     const existing = await readJsonFile<Record<string, unknown>>(this.economyPath);
     if (existing && Array.isArray(existing.airports)) {
+      const beforeIcaos = airportIcaoList(existing);
       const world = migrateEconomyWorld(existing);
       const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
       ensureHomeCountryId(caught);
+      const afterIcaos = airportIcaoList(caught);
       let dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
       if (ensureSeedMarketFormed(caught)) dirty = true;
+      if (clHubIdentRemapsForPlayer(beforeIcaos, afterIcaos).length > 0) dirty = true;
+      await persistClHubIdentRemaps(this, beforeIcaos, afterIcaos);
       return { world: caught, advancedTicks, settledFlights, dirty };
     }
     if (existing) {
@@ -370,13 +403,17 @@ class SqliteCareerStore implements CareerStore {
     if (!Array.isArray(existing.airports)) {
       throw new Error('SQLite economy_json has no airports[]; refusing to reseed');
     }
+    const beforeIcaos = airportIcaoList(existing);
+    // Hydrate lots before CL ident remap so SCCD/SCIE rewrite sees airports + lots.
+    hydrateWorldFromTables(this.db, existing as unknown as CareerEconomyWorld);
     const world = migrateEconomyWorld(existing);
-    // Schema v3: lots / inbound / npcFlights / events are table SoT.
-    hydrateWorldFromTables(this.db, world);
     const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
     ensureHomeCountryId(caught);
+    const afterIcaos = airportIcaoList(caught);
     let dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
     if (ensureSeedMarketFormed(caught)) dirty = true;
+    if (clHubIdentRemapsForPlayer(beforeIcaos, afterIcaos).length > 0) dirty = true;
+    await persistClHubIdentRemaps(this, beforeIcaos, afterIcaos);
     return { world: caught, advancedTicks, settledFlights, dirty };
   }
 

@@ -353,20 +353,12 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
   const airframe =
     findCareerPlayerAirframe(raw.airframeTypeId) ??
     defaultCareerPlayerAirframe(aircraftClassId);
-  const classCap = PLAYER_FUEL_CAPACITY_KG[aircraftClassId];
   const catalogCap = resolvePlayerFuelCapacityKg(
     airframe?.typeId ?? raw.airframeTypeId,
     aircraftClassId,
   );
-  const storedCap =
-    typeof raw.fuelCapacityKg === 'number' && raw.fuelCapacityKg > 0
-      ? raw.fuelCapacityKg
-      : undefined;
-  // Migrate saves that still carry the class-default tank (e.g. Commander as 380 kg).
-  const capacity =
-    storedCap !== undefined && storedCap !== classCap
-      ? storedCap
-      : catalogCap;
+  // Catalog is SoT for known airframes (wing-tank restores, homologation bumps).
+  const capacity = catalogCap;
   const fuelKg = Math.max(
     0,
     Math.min(

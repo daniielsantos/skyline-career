@@ -5,6 +5,7 @@
  */
 
 import {
+  canonicalCareerAirportIcao,
   clampCareerMaxCargoKg,
   compareMissionIntentToOfp,
   estimateRouteCargoLimit,
@@ -246,8 +247,8 @@ export async function buildMissionDispatch(
   const cargoThousands = cargoWeightToThousands(weightInUnit);
   const url = buildDispatchRedirectUrl({
     type: resolved.type,
-    orig: mission.originIcao,
-    dest: mission.destIcao,
+    orig: canonicalCareerAirportIcao(mission.originIcao),
+    dest: canonicalCareerAirportIcao(mission.destIcao),
     pax: 0,
     cargo: cargoThousands,
     units,

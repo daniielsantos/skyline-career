@@ -9,9 +9,13 @@ import {
   normalizeOverridesFile,
   setRuntimeMsfsBushHubOverrides,
   upsertRuntimeMsfsBushHubOverride,
+  filterMsfsBushHubOverridesToIcaos,
+  pruneRuntimeMsfsBushHubOverrides,
 } from './career-msfs-hub-overrides.js';
 import { US_CAREER_HUBS } from './career-us-hubs.js';
 import { resolveAirportCoords } from './career-economy.js';
+import { SIMBRIEF_DISPATCH_DENY_ICAOS } from './career-simbrief-airports.js';
+import { listCareerHubIcaos } from './career-fleet.js';
 
 describe('MSFS bush hub overrides', () => {
   it('ships O64 Breckenridge and O67 Manzanar as validated', () => {
@@ -116,6 +120,54 @@ describe('MSFS bush hub overrides', () => {
     assert.equal(rwys.length, 1);
     assert.equal(rwys[0]!.ident, '15');
     assert.equal(rwys[0]!.lengthM, 1100);
+    setRuntimeMsfsBushHubOverrides({});
+  });
+
+  it('prunes deny-listed ICAOs from runtime overrides', () => {
+    setRuntimeMsfsBushHubOverrides({
+      SCCD: {
+        name: 'Castro Airport',
+        lat: -42.32,
+        lon: -73.39,
+        source: 'msfs_facility',
+        validatedAt: '2026-08-11',
+      },
+      SCIE: {
+        name: 'Carriel Sur Intl',
+        lat: -36.77,
+        lon: -73.06,
+        source: 'msfs_facility',
+        validatedAt: '2026-08-11',
+      },
+    });
+    const keep = listCareerHubIcaos().filter(
+      (icao) => !SIMBRIEF_DISPATCH_DENY_ICAOS.includes(icao),
+    );
+    const removed = pruneRuntimeMsfsBushHubOverrides(keep);
+    assert.ok(removed.includes('SCCD'));
+    assert.equal(listMsfsBushHubOverrides().SCCD, undefined);
+    assert.ok(listMsfsBushHubOverrides().SCIE);
+    const filtered = filterMsfsBushHubOverridesToIcaos(
+      {
+        SCSN: {
+          name: 'Santo Domingo',
+          lat: -33.65,
+          lon: -71.61,
+          source: 'msfs_facility',
+          validatedAt: '2026-08-11',
+        },
+        SCSE: {
+          name: 'La Serena La Florida',
+          lat: -29.91,
+          lon: -71.19,
+          source: 'msfs_facility',
+          validatedAt: '2026-08-11',
+        },
+      },
+      keep,
+    );
+    assert.equal(filtered.SCSN, undefined);
+    assert.ok(filtered.SCSE);
     setRuntimeMsfsBushHubOverrides({});
   });
 });

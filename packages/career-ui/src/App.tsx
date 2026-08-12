@@ -1989,6 +1989,8 @@ export function App() {
       setToastState(null);
       return;
     }
+    // Profile gate already asks the player to pick a save — never toast 409s.
+    if (isNeedsProfileMessage(text)) return;
     toastSeqRef.current += 1;
     setToastState({ id: toastSeqRef.current, text });
   }, []);
@@ -2102,8 +2104,6 @@ export function App() {
   /** Default on: hide locked / OOR / zero-lift when an aircraft is selected. */
   const [viableOnly, setViableOnly] = useState(true);
   const boardAircraftInitRef = useRef(false);
-  /** Empty hangar: Near me seeded once. Clear keeps the global board. */
-  const hangarNearSeededRef = useRef(false);
   const [nearMe, setNearMe] = useState(false);
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
@@ -2464,29 +2464,6 @@ export function App() {
     });
   }, [refresh, showProfileGate, activeCareerProfile?.id]);
 
-  useEffect(() => {
-    hangarNearSeededRef.current = false;
-  }, [activeCareerProfile?.id]);
-
-  // Empty hangar: first Freights view is nearby origins, not the world board.
-  useEffect(() => {
-    if (hangarNearSeededRef.current) return;
-    if (showProfileGate || !activeCareerProfile) return;
-    if (fleet.length > 0) return;
-    const icao = (pilotIcao || homeHubIcao).trim().toUpperCase();
-    if (!icao) return;
-    hangarNearSeededRef.current = true;
-    setNearMe(true);
-    setOriginFilter('');
-    setMarketPage(1);
-  }, [
-    showProfileGate,
-    activeCareerProfile,
-    fleet.length,
-    pilotIcao,
-    homeHubIcao,
-  ]);
-
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
@@ -2685,14 +2662,17 @@ export function App() {
   }, [tab, airportIcao, refresh]);
 
   useEffect(() => {
+    if (showProfileGate || !activeCareerProfile) return;
     if (!hubSelected) return;
     if (tab !== 'map' && tab !== 'market') return;
     void refreshNetworkHubs().catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      if (isNeedsProfileMessage(message)) return;
       setToastKind('fail');
-      setToast(err instanceof Error ? err.message : String(err));
+      setToast(message);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, hubSelected]);
+  }, [tab, hubSelected, showProfileGate, activeCareerProfile?.id]);
 
   // Poll MSFS watch session while active. One shot when idle so a mid-flight
   // reload can still attach; stop interval after settle (no forever /api/watch/status).
@@ -6084,6 +6064,7 @@ export function App() {
     return fetchAirport(icao, boardEstimateOptsRef.current);
   }
   useEffect(() => {
+    if (showProfileGate || !activeCareerProfile) return;
     if (!airportIcao) return;
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -6095,7 +6076,8 @@ export function App() {
         })
         .catch((err: unknown) => {
           if (cancelled) return;
-          setError(err instanceof Error ? err.message : String(err));
+          const message = err instanceof Error ? err.message : String(err);
+          if (!isNeedsProfileMessage(message)) setError(message);
         });
     }, 200);
     return () => {
@@ -6104,7 +6086,7 @@ export function App() {
     };
     // Refetch terminal lots when the estimate aircraft changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardAircraftId, airportIcao]);
+  }, [boardAircraftId, airportIcao, showProfileGate, activeCareerProfile?.id]);
   useEffect(() => {
     if (boardEstimateFleet.length === 0) {
       if (boardAircraftId) setBoardAircraftId('');
@@ -6179,6 +6161,25 @@ export function App() {
     setViableOnly(true);
     setProfitableOnly(Boolean(boardAircraft));
     setAccessFilter('open');
+    setMarketPage(1);
+  }
+
+  function toggleNearBoard() {
+    if (nearMe && !originFilter.trim()) {
+      setNearMe(false);
+      setMarketPage(1);
+      return;
+    }
+    const icao = (
+      boardAircraft?.locationIcao ||
+      pilotIcao ||
+      homeHubIcao
+    )
+      .trim()
+      .toUpperCase();
+    if (!icao) return;
+    setNearMe(true);
+    setOriginFilter('');
     setMarketPage(1);
   }
 
@@ -6685,7 +6686,7 @@ export function App() {
   if (showProfileGate || !activeCareerProfile) {
     return (
       <div className="app-shell profile-gate-shell">
-        {toast ? (
+        {toast && !isNeedsProfileMessage(toast) ? (
           <p
             className={`banner profile-gate-banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
             role="status"
@@ -6706,7 +6707,7 @@ export function App() {
           profiles={careerProfiles}
           lastActiveId={activeCareerProfile?.id ?? null}
           busy={busy}
-          error={error}
+          error={error && !isNeedsProfileMessage(error) ? error : null}
           onSelect={(id) => void onSelectCareerProfile(id)}
           onCreate={(name) => void onCreateCareerProfile(name)}
           onDelete={(id) => void onDeleteCareerProfile(id)}
@@ -8874,72 +8875,87 @@ export function App() {
           ) : (
             <>
           <div className="panel-head">
-            <label className="board-aircraft">
-              <span>Estimate net for</span>
-              <select
-                aria-label="Aircraft for Freights net estimate"
-                value={boardAircraftId}
-                disabled={boardEstimateFleet.length === 0}
-                onChange={(e) => {
-                  setBoardAircraftId(e.target.value);
-                  setMarketPage(1);
-                }}
-              >
-                <option value="">Gross pay only</option>
-                {boardEstimateFleet.map((acf) => (
-                  <option key={acf.id} value={acf.id}>
-                    {acf.label}
-                    {acf.status === 'parked' ? ` · ${acf.locationIcao}` : ` · ${acf.status}`}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className={`near-aircraft-btn${
-                  nearMe && !originFilter.trim() ? ' is-active' : ''
-                }`}
-                disabled={
-                  busy ||
-                  !(
-                    boardAircraft?.locationIcao ||
-                    pilotIcao ||
-                    homeHubIcao
-                  )
-                }
-                title={
-                  boardAircraft?.locationIcao
-                    ? `Origins within ${BOARD_NEAR_MAX_NM} nm of ${boardAircraft.locationIcao} · viable · profit > 0`
-                    : `Origins within ${BOARD_NEAR_MAX_NM} nm of ${
-                        boardNearIcao || 'home'
-                      } · crew and last-mile`
-                }
-                onClick={() => focusNearBoard()}
-              >
-                {boardAircraft ? 'Near aircraft' : 'Near me'}
-              </button>
-              <label className="profitable-filter">
-                <input
-                  type="checkbox"
-                  checked={viableOnly}
-                  disabled={!boardAircraft && fleet.length > 0}
+            <div className="board-aircraft">
+              <label className="board-aircraft-estimate">
+                <span>Estimate net for</span>
+                <select
+                  aria-label="Aircraft for Freights net estimate"
+                  value={boardAircraftId}
+                  disabled={boardEstimateFleet.length === 0}
                   onChange={(e) => {
-                    setViableOnly(e.target.checked);
+                    setBoardAircraftId(e.target.value);
                     setMarketPage(1);
                   }}
-                />
-                <span
+                >
+                  <option value="">Gross pay only</option>
+                  {boardEstimateFleet.map((acf) => (
+                    <option key={acf.id} value={acf.id}>
+                      {acf.label}
+                      {acf.status === 'parked' ? ` · ${acf.locationIcao}` : ` · ${acf.status}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div
+                className="board-aircraft-scope"
+                role="group"
+                aria-label="Freight board scope"
+              >
+                <button
+                  type="button"
+                  className={`near-aircraft-btn${
+                    nearMe && !originFilter.trim() ? ' is-active' : ''
+                  }`}
+                  aria-pressed={nearMe && !originFilter.trim()}
+                  disabled={
+                    busy ||
+                    !(
+                      boardAircraft?.locationIcao ||
+                      pilotIcao ||
+                      homeHubIcao
+                    )
+                  }
+                  title={
+                    nearMe && !originFilter.trim()
+                      ? `Showing origins within ${BOARD_NEAR_MAX_NM} nm of ${
+                          boardNearIcao || 'home'
+                        }. Click again to show the world board.`
+                      : `Limit origins to within ${BOARD_NEAR_MAX_NM} nm of ${
+                          boardAircraft?.locationIcao ||
+                          boardNearIcao ||
+                          'home'
+                        }. Click again to turn off.`
+                  }
+                  onClick={() => toggleNearBoard()}
+                >
+                  <span className="near-aircraft-mark" aria-hidden />
+                  {boardAircraft ? 'Near aircraft' : 'Near me'}
+                </button>
+                <label
+                  className="profitable-filter"
                   title={
                     fleet.length === 0 && !boardAircraft
-                      ? 'Crew you can sit, plus last-mile Dry near you'
-                      : 'Hide locked, out-of-range, and zero-lift lots'
+                      ? 'Without an aircraft: keep jobs you can fly as crew, plus short last-mile Dry hops. Uncheck to show every freight on the board.'
+                      : 'Hide lots this aircraft cannot take — locked cargo, out of range, or no payload left.'
                   }
                 >
-                  {fleet.length === 0 && !boardAircraft
-                    ? 'For me'
-                    : 'Viable'}
-                </span>
-              </label>
-            </label>
+                  <input
+                    type="checkbox"
+                    checked={viableOnly}
+                    disabled={!boardAircraft && fleet.length > 0}
+                    onChange={(e) => {
+                      setViableOnly(e.target.checked);
+                      setMarketPage(1);
+                    }}
+                  />
+                  <span>
+                    {fleet.length === 0 && !boardAircraft
+                      ? 'For me'
+                      : 'Viable'}
+                  </span>
+                </label>
+              </div>
+            </div>
             <MarketSignalsLine
               regions={regionPressure}
               focusIcao={signalFocusIcao || undefined}

@@ -9949,25 +9949,6 @@
       }
     ]
   },
-  "SCCD": {
-    "name": "Castro Airport",
-    "lat": -42.32454679906368,
-    "lon": -73.38871255517006,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "28",
-        "headingTrueDeg": 293.5165100097656,
-        "lengthM": 279.89984130859375,
-        "widthM": 7.204685688018799,
-        "lat": -42.32454679906368,
-        "lon": -73.38871255517006,
-        "identReciprocal": "10",
-        "surface": "asphalt"
-      }
-    ]
-  },
   "SCCF": {
     "name": "El Loa",
     "lat": -22.5,
@@ -10270,63 +10251,6 @@
         "lat": -34.17325560003519,
         "lon": -70.77579349279404,
         "identReciprocal": "21",
-        "surface": "asphalt"
-      }
-    ]
-  },
-  "SCSN": {
-    "name": "Santo Domingo",
-    "lat": -33.65666650235653,
-    "lon": -71.61583319306374,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "23",
-        "headingTrueDeg": 236.1426544189453,
-        "lengthM": 799.8325805664062,
-        "widthM": 17.833070755004883,
-        "lat": -33.65662157535553,
-        "lon": -71.61572948098183,
-        "identReciprocal": "5",
-        "surface": "asphalt"
-      }
-    ]
-  },
-  "SCST": {
-    "name": "Gamboa Apt",
-    "lat": -42.49027781188488,
-    "lon": -73.77277761697769,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "16",
-        "headingTrueDeg": 168.04176330566406,
-        "lengthM": 800.726318359375,
-        "widthM": 5.325287342071533,
-        "lat": -42.491146847605705,
-        "lon": -73.77423763275146,
-        "identReciprocal": "34",
-        "surface": "asphalt"
-      }
-    ]
-  },
-  "SCTC": {
-    "name": "Maquehue",
-    "lat": -38.76694455742836,
-    "lon": -72.63722240924835,
-    "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "6",
-        "headingTrueDeg": 67.19783020019531,
-        "lengthM": 1699.0321044921875,
-        "widthM": 42.297508239746094,
-        "lat": -38.766831904649734,
-        "lon": -72.63701274991035,
-        "identReciprocal": "24",
         "surface": "asphalt"
       }
     ]

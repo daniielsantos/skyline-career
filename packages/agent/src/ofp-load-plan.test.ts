@@ -27,6 +27,7 @@ import {
   absorbFuelResidualFloors,
   redistributeAroundResidualFloors,
   resolveCgCounterweightBias,
+  resolveFuelDensityLbPerGal,
   distributeCargoAcrossStations,
   distributeFuelAcrossTanks,
   orderStationsLongitudinal,
@@ -69,6 +70,29 @@ describe('distributeFuelAcrossTanks', () => {
       () => distributeFuelAcrossTanks(overLb, profile),
       (err: unknown) => err instanceof OfpLoadPlanError && err.code === 'FUEL_OVER_CAPACITY',
     );
+  });
+
+  it('uses Jet-A density for Twin Otter even when live reports avgas 6.0', async () => {
+    const raw = await readFile(
+      join(repoRoot, 'profiles', 'examples', 'microsoft-dhc-6-300-twin-otter-wheels.json'),
+      'utf8',
+    );
+    const profile = JSON.parse(raw) as AircraftProfile;
+    assert.equal(resolveFuelDensityLbPerGal(profile, 6.0), DEFAULT_JET_A_LB_PER_GAL);
+    const blockLb = 2641;
+    const { tanks, capacityTotal } = distributeFuelAcrossTanks(
+      blockLb,
+      profile,
+      resolveFuelDensityLbPerGal(profile, 6.0),
+    );
+    assert.equal(capacityTotal, 452);
+    const placed =
+      (tanks.CENTER ?? 0) +
+      (tanks.CENTER2 ?? 0) +
+      (tanks.LEFT_AUX ?? 0) +
+      (tanks.RIGHT_AUX ?? 0);
+    assert.ok(placed <= capacityTotal + 0.05);
+    assert.ok(Math.abs(placed - blockLb / DEFAULT_JET_A_LB_PER_GAL) < 0.2);
   });
 });
 

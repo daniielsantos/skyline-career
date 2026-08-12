@@ -26,6 +26,11 @@ DR400 profile: 1 tanque CENTER 29 gal; writePlan delay era 1000 ms (agora 400).
 - IPC inject timeout **15s** (era 60s)
 - Budget total inject **180s** → `OfpLoadTimedOutError` com mensagem clara
 - DR400 fuel delay 1000→400 ms
+- **Baron / AUX idle (pós-0.3.19):** fuel rounds pintam a UI com o **target escrito**
+  imediatamente; `readLiveTanks` só no round final. `omitFuelTankWrites` pula AUX/TIP
+  ociosos (live≈0 e target≈0). Payload: se live stations colapsam para 0, confia no
+  write (não entra em ghost-prune). Causa observada: ~20s/round em `readLiveTanks`
+  + `UNRECOGNIZED_ID` após writes AUX=0.
 
 ## Workaround imediato (install atual)
 

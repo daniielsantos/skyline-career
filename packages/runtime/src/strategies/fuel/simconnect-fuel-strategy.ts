@@ -29,13 +29,25 @@ async function executeWritePlan(
   ctx: StrategyContext,
 ): Promise<void> {
   const gapMs = ctx.writeGapMs && ctx.writeGapMs > 0 ? ctx.writeGapMs : 0;
+  const omit = new Set(
+    (ctx.omitFuelTankWrites ?? []).map((id) => id.toUpperCase()),
+  );
+  const tankByWriteVar = new Map(
+    ctx.profile.fuel.tanks
+      .filter((t) => t.writeVar)
+      .map((t) => [t.writeVar!.toUpperCase(), t.id]),
+  );
   const localGap = () =>
     gapMs > 0
       ? new Promise<void>((resolve) => setTimeout(resolve, gapMs))
       : Promise.resolve();
   for (const step of plan) {
     switch (step.op) {
-      case 'simvar_set':
+      case 'simvar_set': {
+        const tankId = tankByWriteVar.get((step.var ?? '').toUpperCase());
+        if (tankId && omit.has(tankId.toUpperCase())) {
+          break;
+        }
         await ctx.bridge.writeSimVar({
           name: step.var!,
           unit: step.unit!,
@@ -43,6 +55,7 @@ async function executeWritePlan(
         });
         await localGap();
         break;
+      }
       case 'lvar_set':
         await ctx.bridge.writeLVar({
           name: step.name!,

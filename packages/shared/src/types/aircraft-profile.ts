@@ -225,6 +225,11 @@ export interface LoadPlanRequest {
    * Applied even when skipVerify/skipSettle skips profile `delay` ops.
    */
   writeGapMs?: number;
+  /**
+   * Profile fuel tank ids to skip in writePlan (e.g. idle AUX/TIP at 0).
+   * Avoids poking unused outer tanks that can stall SimConnect reads.
+   */
+  omitFuelTankWrites?: string[];
 }
 
 export interface OperationResult {

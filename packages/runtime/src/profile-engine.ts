@@ -49,12 +49,18 @@ export class DefaultProfileEngine implements ProfileEngine {
       typeof request.writeGapMs === 'number' && request.writeGapMs > 0
         ? request.writeGapMs
         : undefined;
+    const omitFuelTankWrites =
+      Array.isArray(request.omitFuelTankWrites) &&
+      request.omitFuelTankWrites.length > 0
+        ? request.omitFuelTankWrites
+        : undefined;
     const ctx = {
       profile: this.profile,
       bridge: this.bridge,
       snapshot,
       skipSettle: Boolean(request.skipVerify),
       writeGapMs,
+      omitFuelTankWrites,
     };
     if (!request.skipVerify) {
       await this.capabilityDetector.detect(this.profile, this.bridge);

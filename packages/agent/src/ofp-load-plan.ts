@@ -1256,6 +1256,35 @@ export function redistributeAroundResidualFloors(
 /** Default Career OFP fuel inject passes (ramp current → planned). */
 export const FUEL_INJECT_ROUNDS = 4;
 
+/** True for AUX / TIP tanks that are often unused and expensive to poke. */
+export function isOuterFuelTankId(tankId: string): boolean {
+  return /AUX|TIP/i.test(tankId);
+}
+
+/**
+ * Outer tanks that are empty both live and in the write target — safe to skip
+ * writing (and reading) so idle Baron/King Air AUX does not stall SimConnect.
+ */
+export function idleOuterFuelTankIds(
+  liveOrStart: Record<string, number>,
+  target: Record<string, number>,
+  opts?: { emptyQty?: number },
+): string[] {
+  const emptyQty = opts?.emptyQty ?? 0.05;
+  const ids = new Set([
+    ...Object.keys(liveOrStart),
+    ...Object.keys(target),
+  ]);
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!isOuterFuelTankId(id)) continue;
+    const live = Number.isFinite(liveOrStart[id]) ? liveOrStart[id]! : 0;
+    const want = Number.isFinite(target[id]) ? target[id]! : 0;
+    if (live <= emptyQty && want <= emptyQty) out.push(id);
+  }
+  return out;
+}
+
 /**
  * Interpolate tank quantities from `from` toward `to` for round `round`
  * (1-based). The final round snaps exactly to `to`.

@@ -25,6 +25,7 @@ import {
   FUEL_INJECT_ROUNDS,
   liveFuelMatchesTarget,
   absorbFuelResidualFloors,
+  idleOuterFuelTankIds,
   redistributeAroundResidualFloors,
   resolveCgCounterweightBias,
   resolveFuelDensityLbPerGal,
@@ -716,6 +717,30 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       RIGHT_MAIN: 40,
     });
     assert.deepEqual(fuelTankTargetsForRound(from, to, 4), to);
+  });
+
+  it('idleOuterFuelTankIds skips empty AUX/TIP only', () => {
+    assert.deepEqual(
+      idleOuterFuelTankIds(
+        { LEFT_MAIN: 80, RIGHT_MAIN: 80, LEFT_AUX: 0, RIGHT_AUX: 0 },
+        { LEFT_MAIN: 27, RIGHT_MAIN: 27, LEFT_AUX: 0, RIGHT_AUX: 0 },
+      ),
+      ['LEFT_AUX', 'RIGHT_AUX'],
+    );
+    assert.deepEqual(
+      idleOuterFuelTankIds(
+        { LEFT_MAIN: 80, LEFT_AUX: 10, RIGHT_AUX: 0 },
+        { LEFT_MAIN: 27, LEFT_AUX: 0, RIGHT_AUX: 0 },
+      ),
+      ['RIGHT_AUX'],
+    );
+    assert.deepEqual(
+      idleOuterFuelTankIds(
+        { LEFT_TIP: 12, RIGHT_TIP: 12, LEFT_MAIN: 100 },
+        { LEFT_TIP: 12, RIGHT_TIP: 12, LEFT_MAIN: 80 },
+      ),
+      [],
+    );
   });
 });
 

@@ -34,6 +34,7 @@ import {
   equalizeLateralStationPairs,
   fuelTankTargetsForRound,
   FUEL_INJECT_ROUNDS,
+  idleOuterFuelTankIds,
   redistributeAroundResidualFloors,
   liveFuelMatchesTarget,
   FREIGHTER_PILOT_LB,
@@ -355,9 +356,17 @@ function phaseFromFlags(
 async function readLiveTanks(
   bridge: NamedPipeSimBridge,
   profile: AircraftProfile,
+  opts?: { skipTankIds?: string[] },
 ): Promise<Record<string, number>> {
   const tanks: Record<string, number> = {};
+  const skip = new Set(
+    (opts?.skipTankIds ?? []).map((id) => id.toUpperCase()),
+  );
   for (const tank of profile.fuel.tanks) {
+    if (skip.has(tank.id.toUpperCase())) {
+      tanks[tank.id] = 0;
+      continue;
+    }
     try {
       tanks[tank.id] = await bridge.readSimVar({
         name: tank.readVar,
@@ -1245,15 +1254,23 @@ async function applyMissionOfpLoadExclusive(
       }
     };
 
-    const applyFuelRound = async (tanks: Record<string, number>) => {
+    const applyFuelRound = async (
+      tanks: Record<string, number>,
+      opts?: { omitFuelTankWrites?: string[] },
+    ) => {
       const t0 = Date.now();
       const fuel = { ...built.plan.fuel!, tanks };
+      const omitFuelTankWrites =
+        opts?.omitFuelTankWrites && opts.omitFuelTankWrites.length > 0
+          ? opts.omitFuelTankWrites
+          : undefined;
       const run = () =>
         engine!.applyLoadPlan({
           fuel,
           cgPolicy: 'none',
           skipVerify: true,
           writeGapMs: INJECT_WRITE_GAP_MS,
+          ...(omitFuelTankWrites ? { omitFuelTankWrites } : {}),
         });
       const isSoftPipeFail = (result: Awaited<ReturnType<typeof run>>) => {
         const detail =
@@ -1276,6 +1293,7 @@ async function applyMissionOfpLoadExclusive(
           ms: Date.now() - t0,
           success: result.fuel?.success ?? null,
           errorCode: result.fuel?.errorCode ?? null,
+          omittedOuter: omitFuelTankWrites ?? [],
           tanks: Object.fromEntries(
             Object.entries(tanks).map(([k, v]) => [k, Math.round(v * 10) / 10]),
           ),
@@ -1343,6 +1361,9 @@ async function applyMissionOfpLoadExclusive(
         startTanks,
       ).tanks;
       built.plan.fuel = { ...built.plan.fuel, tanks: endTanks };
+      // Idle AUX/TIP (empty live + empty plan) — skip writes/reads so Baron etc.
+      // do not poke unused outers that stall SimConnect (~15s IPC timeouts).
+      const idleOuterIds = idleOuterFuelTankIds(startTanks, endTanks);
       restoreFuelOnRollback = false;
       for (let round = 1; round <= FUEL_INJECT_ROUNDS; round++) {
         assertOfpLoadWithinBudget(
@@ -1356,11 +1377,14 @@ async function applyMissionOfpLoadExclusive(
           round,
           FUEL_INJECT_ROUNDS,
         );
+        const omitOuter = idleOuterFuelTankIds(startTanks, tanks);
         publishLiveProgress(
           'injecting',
           withMxNote(`Injecting OFP fuel (${round}/${FUEL_INJECT_ROUNDS})…`),
         );
-        const fuelApply = await applyFuelRound(tanks);
+        const fuelApply = await applyFuelRound(tanks, {
+          omitFuelTankWrites: omitOuter,
+        });
         applyResult = {
           ...(applyResult ?? {}),
           fuel: fuelApply.fuel ?? applyResult?.fuel,
@@ -1369,34 +1393,59 @@ async function applyMissionOfpLoadExclusive(
           restoreFuelOnRollback = true;
           break;
         }
-        const settleMs =
-          round < FUEL_INJECT_ROUNDS
-            ? FUEL_ROUND_SETTLE_MS
-            : PAYLOAD_CG_SETTLE_MS;
-        await delayCancellable(mission.id, settleMs);
-        const liveTanks = await readLiveTanks(bridge, resolved.profile);
+        // Paint UI from the write target immediately so Sim/Due move each round
+        // without waiting on slow post-write live reads (Baron AUX hang).
         afterLive = {
-          tanks: preferWrittenFuelTanks(liveTanks, tanks),
+          tanks,
           stations: afterLive.stations,
         };
-        // Seed sticky schematic from the write we just applied so tip holds work
-        // even if beforeLive started with AUX already glitched to 0.
         lastGoodSchematicTanks =
           pickFuelTankBreakdown(
-            schematicTanksFromProfile(afterLive.tanks),
+            schematicTanksFromProfile(tanks),
             lastGoodSchematicTanks,
-            tanksToFuelLb(afterLive.tanks),
+            tanksToFuelLb(tanks),
           ) ?? schematicTanksFromProfile(tanks);
-        lastGoodFuelLb = tanksToFuelLb(afterLive.tanks);
+        lastGoodFuelLb = tanksToFuelLb(tanks);
         publishLiveProgress(
           'injecting',
-          `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(tanksToFuelLb(afterLive.tanks))} lb live`,
+          `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(lastGoodFuelLb)} lb`,
         );
+
+        const isFinalRound = round >= FUEL_INJECT_ROUNDS;
+        const settleMs = isFinalRound
+          ? PAYLOAD_CG_SETTLE_MS
+          : FUEL_ROUND_SETTLE_MS;
+        await delayCancellable(mission.id, settleMs);
+
+        // Live verify only on the last ramp step — intermediate reads were the
+        // ~20s stalls when unused AUX SimVars timed out after each write.
+        if (isFinalRound) {
+          const liveTanks = await readLiveTanks(bridge, resolved.profile, {
+            skipTankIds: idleOuterIds,
+          });
+          afterLive = {
+            tanks: preferWrittenFuelTanks(liveTanks, tanks),
+            stations: afterLive.stations,
+          };
+          lastGoodSchematicTanks =
+            pickFuelTankBreakdown(
+              schematicTanksFromProfile(afterLive.tanks),
+              lastGoodSchematicTanks,
+              tanksToFuelLb(afterLive.tanks),
+            ) ?? schematicTanksFromProfile(tanks);
+          lastGoodFuelLb = tanksToFuelLb(afterLive.tanks);
+          publishLiveProgress(
+            'injecting',
+            `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(lastGoodFuelLb)} lb live`,
+          );
+        }
       }
       // After drain attempts: accept remaining AUX/TIP floors and lower mains
       // so total stays on OFP Due (King Air tips stick ~10–12 gal / ~80 lb each).
       if (!restoreFuelOnRollback) {
-        const liveAfter = await readLiveTanks(bridge, resolved.profile);
+        const liveAfter = await readLiveTanks(bridge, resolved.profile, {
+          skipTankIds: idleOuterIds,
+        });
         const adjusted = redistributeAroundResidualFloors(
           built.plan.fuel.tanks ?? plannedTanks,
           liveAfter,
@@ -1418,13 +1467,33 @@ async function applyMissionOfpLoadExclusive(
             'injecting',
             `Balancing tip residual into mains · ${Math.round(tanksToFuelLb(liveAfter))} lb live`,
           );
-          const fuelApply = await applyFuelRound(endTanks);
+          const fuelApply = await applyFuelRound(endTanks, {
+            omitFuelTankWrites: idleOuterFuelTankIds(liveAfter, endTanks),
+          });
           applyResult = {
             ...(applyResult ?? {}),
             fuel: fuelApply.fuel ?? applyResult?.fuel,
           };
+          // Optimistic UI from balanced target, then one live confirm.
+          afterLive = {
+            tanks: endTanks,
+            stations: afterLive.stations,
+          };
+          lastGoodSchematicTanks =
+            pickFuelTankBreakdown(
+              schematicTanksFromProfile(endTanks),
+              lastGoodSchematicTanks,
+              tanksToFuelLb(endTanks),
+            ) ?? schematicTanksFromProfile(endTanks);
+          lastGoodFuelLb = tanksToFuelLb(endTanks);
+          publishLiveProgress(
+            'injecting',
+            `Fuel balanced · ${Math.round(lastGoodFuelLb)} lb`,
+          );
           await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
-          const liveBalanced = await readLiveTanks(bridge, resolved.profile);
+          const liveBalanced = await readLiveTanks(bridge, resolved.profile, {
+            skipTankIds: idleOuterFuelTankIds(liveAfter, endTanks),
+          });
           afterLive = {
             tanks: preferWrittenFuelTanks(liveBalanced, endTanks),
             stations: afterLive.stations,
@@ -1442,7 +1511,7 @@ async function applyMissionOfpLoadExclusive(
           );
         } else {
           afterLive = {
-            tanks: liveAfter,
+            tanks: preferWrittenFuelTanks(liveAfter, endTanks),
             stations: afterLive.stations,
           };
         }
@@ -1467,11 +1536,31 @@ async function applyMissionOfpLoadExclusive(
         payload: seedApply.payload ?? applyResult.payload,
       };
       assertOfpLoadNotCancelled(mission.id);
-      await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
       afterLive = {
         tanks: afterLive.tanks,
-        stations: await readLiveStations(bridge, resolved.profile),
+        stations: { ...workingStations },
       };
+      publishLiveProgress(
+        'balancing',
+        `Crew seeded — placing cargo +${CG_BALANCE_STEP_LB} lb per seat…`,
+      );
+      await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
+      const seedLive = await readLiveStations(bridge, resolved.profile);
+      const seedLiveSum = sumRecord(seedLive);
+      const seedCollapsed =
+        seedLiveSum < 1 &&
+        seedTotal > 50 &&
+        Object.values(seedLive).every((v) => (v ?? 0) < 1);
+      if (!seedCollapsed) {
+        afterLive = {
+          tanks: afterLive.tanks,
+          stations: seedLive,
+        };
+      } else {
+        watchDebugLog('inject', 'crew seed live read collapsed — trusting write', {
+          seedTotal: Math.round(seedTotal),
+        });
+      }
       publishLiveProgress(
         'balancing',
         `Crew seeded — placing cargo +${CG_BALANCE_STEP_LB} lb per seat…`,
@@ -1893,16 +1982,51 @@ async function applyMissionOfpLoadExclusive(
         assertOfpLoadNotCancelled(mission.id);
         const payloadApply = await applyPayloadRound(workingStations, total);
         assertOfpLoadNotCancelled(mission.id);
+        // Optimistic UI from the write so Sim payload moves every round even when
+        // station SimVars hang (same failure mode as idle Baron AUX fuel reads).
+        afterLive = {
+          tanks: afterLive.tanks,
+          stations: { ...workingStations },
+        };
+        publishLiveProgress(
+          'balancing',
+          stillPlacing
+            ? `Round ${i + 1}: writing ${Math.round(cargoPlacedLb)}/${Math.round(cargoTargetLb)} lb…`
+            : `Round ${i + 1}: writing counterweight…`,
+          { cgAttempt: i + 1, liveMac },
+        );
         await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
         applyResult = {
           ...applyResult,
           payload: payloadApply.payload ?? applyResult.payload,
           cg: payloadApply.cg ?? applyResult.cg,
         };
-        afterLive = {
-          tanks: afterLive.tanks,
-          stations: await readLiveStations(bridge, resolved.profile),
-        };
+        const liveStations = await readLiveStations(bridge, resolved.profile);
+        const liveSumRaw = sumRecord(liveStations);
+        const workSum = sumRecord(workingStations);
+        // Total read collapse (all zeros while we wrote hundreds of lb) means the
+        // pipe/SimConnect read path is sick — do not treat every station as a
+        // "ghost" and thrash prune/rewrite for another minute.
+        const liveReadCollapsed =
+          liveSumRaw < 1 &&
+          workSum > 100 &&
+          Object.values(liveStations).every((v) => (v ?? 0) < 1);
+        if (liveReadCollapsed) {
+          watchDebugLog('inject', 'live station read collapsed — trusting write', {
+            round: i + 1,
+            workingSum: Math.round(workSum),
+            writeOk: payloadApply.payload?.success ?? null,
+          });
+          afterLive = {
+            tanks: afterLive.tanks,
+            stations: { ...workingStations },
+          };
+        } else {
+          afterLive = {
+            tanks: afterLive.tanks,
+            stations: liveStations,
+          };
+        }
         // Re-read CG after settle so the UI sees verified state for this round.
         const verifiedCg = await readLiveCgState(bridge, {
           readVar: resolved.profile.cg?.readVar,
@@ -1912,8 +2036,8 @@ async function applyMissionOfpLoadExclusive(
         lastLiveMac = verifiedMac;
         prevLiveMac = verifiedMac;
         const liveSum = sumRecord(afterLive.stations);
-        const workSum = sumRecord(workingStations);
-        const underApplied = liveSum + 75 < workSum * 0.7;
+        const underApplied =
+          !liveReadCollapsed && liveSum + 75 < workSum * 0.7;
         watchDebugLog('inject', 'balance round', {
           round: i + 1,
           stillPlacing,
@@ -1931,6 +2055,7 @@ async function applyMissionOfpLoadExclusive(
           workingSum: Math.round(workSum),
           liveSum: Math.round(liveSum),
           underApplied,
+          liveReadCollapsed,
           working: stationsSnapshot(workingStations),
           live: stationsSnapshot(afterLive.stations),
         });
@@ -1938,11 +2063,13 @@ async function applyMissionOfpLoadExclusive(
         // Ghost stations: write "succeeds" but live stays 0 — or sticks briefly then
         // drops (Learjet S17/S18). Also catch partial ghosts when only ~200 lb is
         // missing (old gate required live < 70% of working, so mild losses were ignored).
-        const ghostCandidates = baggageStations.filter((idx) => {
-          const want = workingStations[idx] ?? 0;
-          const got = afterLive.stations[idx] ?? 0;
-          return want > 20 && got < 5;
-        });
+        const ghostCandidates = liveReadCollapsed
+          ? []
+          : baggageStations.filter((idx) => {
+              const want = workingStations[idx] ?? 0;
+              const got = afterLive.stations[idx] ?? 0;
+              return want > 20 && got < 5;
+            });
         const missingVsLive = workSum - liveSum;
         const shouldPruneGhosts =
           ghostCandidates.length > 0 &&
@@ -2027,14 +2154,30 @@ async function applyMissionOfpLoadExclusive(
             rewriteTotal,
           );
           assertOfpLoadNotCancelled(mission.id);
+          afterLive = {
+            tanks: afterLive.tanks,
+            stations: { ...workingStations },
+          };
+          publishLiveProgress(
+            'balancing',
+            `Rewrote cargo onto sticky stations · ${Math.round(rewriteTotal)} lb`,
+          );
           await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
           applyResult = {
             ...applyResult,
             payload: rewriteApply.payload ?? applyResult.payload,
           };
+          const rewriteLive = await readLiveStations(bridge, resolved.profile);
+          const rewriteLiveSum = sumRecord(rewriteLive);
+          const rewriteCollapsed =
+            rewriteLiveSum < 1 &&
+            rewriteTotal > 100 &&
+            Object.values(rewriteLive).every((v) => (v ?? 0) < 1);
           afterLive = {
             tanks: afterLive.tanks,
-            stations: await readLiveStations(bridge, resolved.profile),
+            stations: rewriteCollapsed
+              ? { ...workingStations }
+              : rewriteLive,
           };
           watchDebugLog('inject', 'dead stations rewrite', {
             pass: ghostPrunePasses,
@@ -2042,6 +2185,7 @@ async function applyMissionOfpLoadExclusive(
             live: stationsSnapshot(afterLive.stations),
             liveSum: Math.round(sumRecord(afterLive.stations)),
             workingSum: Math.round(rewriteTotal),
+            liveReadCollapsed: rewriteCollapsed,
           });
           if (rewriteApply.payload && !rewriteApply.payload.success) {
             watchDebugLog('inject', 'balance stop', {

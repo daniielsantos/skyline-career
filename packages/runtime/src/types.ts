@@ -64,6 +64,8 @@ export interface StrategyContext {
   skipSettle?: boolean;
   /** Pause after each non-delay writePlan step (see LoadPlanRequest.writeGapMs). */
   writeGapMs?: number;
+  /** Tank ids whose writePlan steps should be skipped (idle AUX/TIP). */
+  omitFuelTankWrites?: string[];
 }
 
 export interface CapabilityScore {

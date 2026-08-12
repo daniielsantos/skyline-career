@@ -19,6 +19,8 @@ public sealed class SimConnectClient : ISimClient
     private readonly ConcurrentDictionary<uint, TaskCompletionSource<object>> _pending = new();
     private readonly ConcurrentDictionary<string, AirportFacilityDto> _airportCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _facilityGate = new(1, 1);
+    /// <summary>Serialize dynamic SimConnect calls across concurrent IPC clients.</summary>
+    private readonly SemaphoreSlim _simOpGate = new(1, 1);
     private readonly object _airportListGate = new();
     private TaskCompletionSource<bool>? _airportListTcs;
     private bool _airportFacilityDefReady;
@@ -182,9 +184,41 @@ public sealed class SimConnectClient : ISimClient
 
     public async Task ConnectAsync(string appName, CancellationToken ct = default)
     {
+        Task? priorRecvLoop = null;
+        CancellationTokenSource? priorRecvCts = null;
+
         lock (_gate)
         {
+            if (_sim is not null && _openReceived)
+            {
+                return;
+            }
+
+            // Join a dead/stale receive loop before opening a new session.
+            priorRecvLoop = _recvLoop;
+            priorRecvCts = _recvCts;
+            _recvLoop = null;
+            _recvCts = null;
+
             if (_sim is not null)
+            {
+                try { _sim.Dispose(); } catch { /* ignore */ }
+                _sim = null;
+                _openReceived = false;
+            }
+        }
+
+        try { priorRecvCts?.Cancel(); } catch { /* ignore */ }
+        if (priorRecvLoop is not null)
+        {
+            try { await priorRecvLoop.ConfigureAwait(false); }
+            catch { /* ignore */ }
+        }
+        try { priorRecvCts?.Dispose(); } catch { /* ignore */ }
+
+        lock (_gate)
+        {
+            if (_sim is not null && _openReceived)
             {
                 return;
             }
@@ -209,12 +243,16 @@ public sealed class SimConnectClient : ISimClient
             _sim.OnRecvFacilityDataEnd += OnRecvFacilityDataEnd;
             _sim.OnRecvAirportList += OnRecvAirportList;
 
+            _nextDefId = (uint)Definitions.DynamicBase;
+            _nextReqId = (uint)Requests.DynamicBase;
             RegisterFixedDefinitions(_sim);
             _airportCache.Clear();
             _airportListComplete = false;
             _facilityPartial = null;
             _facilityRequestIcao = null;
             _facilityRunways.Clear();
+            _pmdgNg3Subscribed = false;
+            _pmdgControlSubscribed = false;
 
             _recvCts = new CancellationTokenSource();
             _recvLoop = Task.Run(() => ReceiveLoop(_recvCts.Token));
@@ -287,79 +325,83 @@ public sealed class SimConnectClient : ISimClient
 
     public async Task<double> ReadSimVarAsync(string name, string unit, CancellationToken ct = default)
     {
-        var sim = RequireSim();
-        uint defId;
-        uint reqId;
-        TaskCompletionSource<object> tcs;
-
-        lock (_gate)
-        {
-            defId = _nextDefId++;
-            reqId = _nextReqId++;
-            tcs = NewPending(reqId);
-
-            // IMPORTANT: do NOT ClearDataDefinition — clearing an unused ID raises async
-            // SIMCONNECT_EXCEPTION_UNRECOGNIZED_ID (3) and races with pending reads.
-            sim.AddToDataDefinition(
-                (Definitions)defId,
-                name,
-                NormalizeUnit(unit),
-                SIMCONNECT_DATATYPE.FLOAT64,
-                0.0f,
-                SimConnect.SIMCONNECT_UNUSED);
-            sim.RegisterDataDefineStruct<DoubleValue>((Definitions)defId);
-            sim.RequestDataOnSimObject(
-                (Requests)reqId,
-                (Definitions)defId,
-                SimConnect.SIMCONNECT_OBJECT_ID_USER,
-                SIMCONNECT_PERIOD.ONCE,
-                SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT,
-                0, 0, 0);
-        }
-
+        await _simOpGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            var sim = RequireSim();
+            uint defId;
+            uint reqId;
+            TaskCompletionSource<object> tcs;
+
+            lock (_gate)
+            {
+                defId = _nextDefId++;
+                reqId = _nextReqId++;
+                tcs = NewPending(reqId);
+
+                // Do NOT ClearDataDefinition after use — it raises async
+                // SIMCONNECT_EXCEPTION_UNRECOGNIZED_ID (3) and races with pending reads.
+                // Dynamic IDs are monotonic until the next ConnectAsync reset.
+                sim.AddToDataDefinition(
+                    (Definitions)defId,
+                    name,
+                    NormalizeUnit(unit),
+                    SIMCONNECT_DATATYPE.FLOAT64,
+                    0.0f,
+                    SimConnect.SIMCONNECT_UNUSED);
+                sim.RegisterDataDefineStruct<DoubleValue>((Definitions)defId);
+                sim.RequestDataOnSimObject(
+                    (Requests)reqId,
+                    (Definitions)defId,
+                    SimConnect.SIMCONNECT_OBJECT_ID_USER,
+                    SIMCONNECT_PERIOD.ONCE,
+                    SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT,
+                    0, 0, 0);
+            }
+
             var result = await WaitPending(tcs, ct).ConfigureAwait(false);
             return result is DoubleValue dv ? dv.Value : Convert.ToDouble(result);
         }
         finally
         {
-            // Best-effort cleanup; ignore unrecognized-id if already gone.
-            try { sim.ClearDataDefinition((Definitions)defId); }
-            catch { /* ignore */ }
+            _simOpGate.Release();
         }
     }
 
     public async Task WriteSimVarAsync(string name, string unit, double value, CancellationToken ct = default)
     {
-        var sim = RequireSim();
-        uint defId;
-
-        lock (_gate)
+        await _simOpGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            defId = _nextDefId++;
-            sim.AddToDataDefinition(
-                (Definitions)defId,
-                name,
-                NormalizeUnit(unit),
-                SIMCONNECT_DATATYPE.FLOAT64,
-                0.0f,
-                SimConnect.SIMCONNECT_UNUSED);
-            sim.RegisterDataDefineStruct<DoubleValue>((Definitions)defId);
+            var sim = RequireSim();
 
-            // Managed wrapper expects the value object (struct) for a single datum.
-            sim.SetDataOnSimObject(
-                (Definitions)defId,
-                SimConnect.SIMCONNECT_OBJECT_ID_USER,
-                SIMCONNECT_DATA_SET_FLAG.DEFAULT,
-                new DoubleValue { Value = value });
+            lock (_gate)
+            {
+                var defId = _nextDefId++;
+                sim.AddToDataDefinition(
+                    (Definitions)defId,
+                    name,
+                    NormalizeUnit(unit),
+                    SIMCONNECT_DATATYPE.FLOAT64,
+                    0.0f,
+                    SimConnect.SIMCONNECT_UNUSED);
+                sim.RegisterDataDefineStruct<DoubleValue>((Definitions)defId);
+
+                // Managed wrapper expects the value object (struct) for a single datum.
+                sim.SetDataOnSimObject(
+                    (Definitions)defId,
+                    SimConnect.SIMCONNECT_OBJECT_ID_USER,
+                    SIMCONNECT_DATA_SET_FLAG.DEFAULT,
+                    new DoubleValue { Value = value });
+            }
+
+            // Give SimConnect a moment to surface async exceptions for this write.
+            await Task.Delay(50, ct).ConfigureAwait(false);
         }
-
-        // Give SimConnect a moment to surface async exceptions for this write.
-        await Task.Delay(50, ct).ConfigureAwait(false);
-
-        try { sim.ClearDataDefinition((Definitions)defId); }
-        catch { /* ignore */ }
+        finally
+        {
+            _simOpGate.Release();
+        }
     }
 
     public Task<double> ReadLVarAsync(string name, CancellationToken ct = default)
@@ -1067,10 +1109,60 @@ public sealed class SimConnectClient : ISimClient
                 }
                 catch (Exception ex)
                 {
+                    // 0xC00000B0 / pipe-broken: session is dead. Tear down here so
+                    // IsConnected flips and the next IPC "connect" can reopen —
+                    // do NOT await DisconnectAsync (it waits for this loop).
                     Console.Error.WriteLine($"[simconnect] ReceiveMessage error: {ex.Message}");
+                    TearDownAfterRecvFailure();
+                    return;
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Drop a dead SimConnect handle without joining the receive loop (we're on it).
+    /// </summary>
+    private void TearDownAfterRecvFailure()
+    {
+        lock (_gate)
+        {
+            if (_sim is not null)
+            {
+                try { _sim.Dispose(); }
+                catch { /* ignore */ }
+                _sim = null;
+            }
+
+            _openReceived = false;
+            _pmdgNg3Subscribed = false;
+            _pmdgControlSubscribed = false;
+            lock (_pmdgFuelGate)
+            {
+                _pmdgRaw = null;
+                _pmdgFuelUtc = null;
+                _pmdgFuelOffset = -1;
+            }
+            lock (_pmdgControlGate)
+            {
+                _pmdgControlEventId = 0;
+            }
+            _airportFacilityDefReady = false;
+            _airportListComplete = false;
+            _facilityPartial = null;
+            _facilityRequestIcao = null;
+            _airportCache.Clear();
+            lock (_airportListGate)
+            {
+                _airportListTcs?.TrySetCanceled();
+                _airportListTcs = null;
+            }
+            try { _recvCts?.Cancel(); }
+            catch { /* ignore */ }
+        }
+
+        FailAllPending("NOT_CONNECTED", "SimConnect receive failed");
+        Console.Error.WriteLine("[simconnect] session dropped — next client connect() will reopen");
     }
 
     private void OnRecvOpen(SimConnect sender, SIMCONNECT_RECV_OPEN data)

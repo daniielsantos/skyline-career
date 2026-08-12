@@ -27,6 +27,7 @@ import {
   buildOfpLoadPlan,
   buildRollbackPlan,
   CG_BALANCE_STEP_LB,
+  cargoPlaceStepLb,
   cgCounterweightPerSeatLb,
   equalizeMovableStations,
   equalizeLateralStationPairs,
@@ -1508,10 +1509,12 @@ async function applyMissionOfpLoadExclusive(
           }
           placeBias =
             placeIndexes === baggageStations || !preferSeatFill ? bias : 'equal';
-          const stepLb =
-            placeIndexes === baggageStations
-              ? Math.min(perSeatLb, GA_BAGGAGE_SOFT_MAX_LB)
-              : perSeatLb;
+          const stepLb = cargoPlaceStepLb({
+            placingOnBaggage: placeIndexes === baggageStations,
+            gaCabin: preferSeatFill,
+            perSeatLb,
+            remainingLb: cargoTargetLb - cargoPlacedLb,
+          });
           let placed = allocateCargoRoundPerSeat(
             workingStations,
             resolved.profile,
@@ -2000,6 +2003,66 @@ async function applyMissionOfpLoadExclusive(
         working: stationsSnapshot(workingStations),
         live: stationsSnapshot(afterLive.stations),
       });
+
+      // One cargo hold (C408 passenger S5): 50 lb/round hit the iteration cap
+      // at 1200 lb. Finish remaining onto baggage while CG is still inside.
+      const catchUpRemaining = cargoTargetLb - cargoPlacedLb;
+      const catchUpAftOk =
+        lastLiveMac === undefined ||
+        lastMaxMac === undefined ||
+        lastLiveMac < lastMaxMac - CG_REBALANCE_MARGIN_MAC;
+      if (
+        catchUpRemaining > 0.5 &&
+        !preferSeatFill &&
+        roomOnBaggage() &&
+        catchUpAftOk
+      ) {
+        const caught = equalizeMovableStations(
+          workingStations,
+          resolved.profile,
+          baggageStations,
+          catchUpRemaining,
+          {
+            minRetainByIndex: Object.fromEntries(
+              baggageStations.map((idx) => [idx, workingStations[idx] ?? 0]),
+            ),
+            softMaxByIndex: baggageSoftMaxByIndex,
+          },
+        );
+        const added = baggageStations.reduce(
+          (sum, idx) => sum + Math.max(0, (caught[idx] ?? 0) - (workingStations[idx] ?? 0)),
+          0,
+        );
+        if (added > 0.5) {
+          workingStations = caught;
+          cargoPlacedLb += added;
+          const total = Object.values(workingStations).reduce((a, b) => a + b, 0);
+          watchDebugLog('inject', 'baggage catch-up', {
+            addedLb: Math.round(added),
+            cargoPlacedLb: Math.round(cargoPlacedLb),
+            cargoTargetLb: Math.round(cargoTargetLb),
+            liveMac: lastLiveMac,
+          });
+          publishLiveProgress(
+            'balancing',
+            `Filling cargo hold · ${Math.round(cargoPlacedLb)}/${Math.round(cargoTargetLb)} lb`,
+            { liveMac: lastLiveMac },
+          );
+          assertOfpLoadNotCancelled(mission.id);
+          const catchApply = await applyPayloadRound(workingStations, total);
+          assertOfpLoadNotCancelled(mission.id);
+          await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
+          applyResult = {
+            ...applyResult,
+            payload: catchApply.payload ?? applyResult.payload,
+          };
+          afterLive = {
+            tanks: afterLive.tanks,
+            stations: await readLiveStations(bridge, resolved.profile),
+          };
+          cgRebalanceMoves += 1;
+        }
+      }
 
       const finalCg = await readLiveCgState(bridge, {
         readVar: resolved.profile.cg?.readVar,

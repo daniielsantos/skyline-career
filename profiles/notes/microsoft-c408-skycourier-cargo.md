@@ -1,11 +1,13 @@
 # C408 SkyCourier Cargo — discovery
 
 **In-sim title (example):** `C408 SkyCourier Cargo - Empty`  
-**Match title:** `C408 SkyCourier Cargo`  
+**Match title:** `C408 SkyCourier Cargo - Empty`  
 **ICAO (SimBrief type):** `C408`  
 **Publisher:** `microsoft`  
 **Stations:** 5  
 **Profile:** `microsoft/c408-skycourier-cargo@1.0.0`
+
+**Not supported:** `C408 SkyCourier Cargo - Loaded` — that livery only exposes S1–S2 crew. Spawn **Empty** for inject.
 
 ## Fuel tanks
 

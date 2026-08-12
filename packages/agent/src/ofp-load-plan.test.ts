@@ -16,6 +16,7 @@ import {
   buildOfpLoadPlan,
   buildRollbackPlan,
   careerOperationalCargoMaxLb,
+  cargoPlaceStepLb,
   cgCounterweightPerSeatLb,
   cgRebalanceStepLb,
   equalizeLateralStationPairs,
@@ -562,6 +563,36 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
   it('uses a fixed 50 lb CG balance step', () => {
     assert.equal(cgRebalanceStepLb({ excessMac: 0.1, cargoLb: 100 }), 50);
     assert.equal(cgRebalanceStepLb({ excessMac: 10, cargoLb: 5000 }), 50);
+  });
+
+  it('fills freighter cargo holds faster than 50 lb/round', () => {
+    assert.equal(
+      cargoPlaceStepLb({
+        placingOnBaggage: true,
+        gaCabin: false,
+        perSeatLb: 50,
+        remainingLb: 2500,
+      }),
+      400,
+    );
+    assert.equal(
+      cargoPlaceStepLb({
+        placingOnBaggage: true,
+        gaCabin: false,
+        perSeatLb: 50,
+        remainingLb: 100,
+      }),
+      100,
+    );
+    assert.equal(
+      cargoPlaceStepLb({
+        placingOnBaggage: true,
+        gaCabin: true,
+        perSeatLb: 50,
+        remainingLb: 2500,
+      }),
+      50,
+    );
   });
 
   it('counterweights CG based on position and drift', () => {

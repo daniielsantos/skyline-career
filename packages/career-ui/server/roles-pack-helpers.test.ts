@@ -58,6 +58,33 @@ describe('resolveMissionRolesPack', () => {
     );
   });
 
+  it('rejects C408 Cargo Loaded (crew-only livery) for the Empty inject pack', async () => {
+    await assert.rejects(
+      resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: 'profiles/ofp/microsoft-c408-skycourier-cargo.json',
+        liveTitle: 'C408 SkyCourier Cargo - Loaded',
+        airframeTypeId: 'microsoft-c408-skycourier-cargo',
+        strictAirframeMatch: true,
+      }),
+      /not homologated for the purchased airframe|does not match the purchased airframe/,
+    );
+  });
+
+  it('accepts C408 Cargo Empty for inject', async () => {
+    const roles = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/microsoft-c408-skycourier-cargo.json',
+      liveTitle: 'C408 SkyCourier Cargo - Empty',
+      airframeTypeId: 'microsoft-c408-skycourier-cargo',
+      strictAirframeMatch: true,
+    });
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /microsoft-c408-skycourier-cargo\.json$/,
+    );
+  });
+
   it('accepts either C172 glass when the purchased family pack matches', async () => {
     for (const liveTitle of ['C172SP Classic Cargo', 'C172SP G1000 Cargo']) {
       const roles = await resolveMissionRolesPack({

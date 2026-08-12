@@ -3,14 +3,13 @@
   "profileId": "microsoft-c408-skycourier-cargo",
   "profileKey": "microsoft/c408-skycourier-cargo",
   "semver": "1.0.0",
-  "displayName": "C408 SkyCourier Cargo (MSFS 2024)",
+  "displayName": "C408 SkyCourier Cargo - Empty",
   "match": {
     "fingerprint": "37a004237dce366049292272ac8c8546cf6b368d421d437e818baabbe9e86871",
-    "title": "C408 SkyCourier Cargo",
+    "title": "C408 SkyCourier Cargo - Empty",
     "publisher": "microsoft",
     "icao": "C408",
     "liveTitles": [
-      "C408 SkyCourier Cargo",
       "C408 SkyCourier Cargo - Empty"
     ]
   },
@@ -193,7 +192,8 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: C408 SkyCourier Cargo.",
+    "Homologated via wizard: C408 SkyCourier Cargo - Empty.",
+    "Cargo - Loaded is a different livery (crew-only stations) and is not matched.",
     "ICAO type designator (catalog/SimBrief): C408.",
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
     "AUX deferred for v1.",

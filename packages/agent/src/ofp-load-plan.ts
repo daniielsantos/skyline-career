@@ -688,6 +688,25 @@ export function equalizeMovableStations(
 
 /** Progressive-load / CG nudge step per seat (lb). */
 export const CG_BALANCE_STEP_LB = 50;
+/**
+ * Per-round add on freighter cargo holds. 50 lb × 24 rounds only reaches
+ * 1200 lb — a single C408 passenger hold (S5, 2500 lb) never filled.
+ */
+export const FREIGHTER_BAGGAGE_STEP_LB = 400;
+
+/** Step size for one inject cargo round. */
+export function cargoPlaceStepLb(opts: {
+  placingOnBaggage: boolean;
+  gaCabin: boolean;
+  perSeatLb: number;
+  remainingLb: number;
+}): number {
+  const perSeat = Math.max(0, opts.perSeatLb);
+  const remaining = Math.max(0, opts.remainingLb);
+  if (!opts.placingOnBaggage) return perSeat;
+  if (opts.gaCabin) return Math.min(perSeat, GA_BAGGAGE_SOFT_MAX_LB);
+  return Math.max(perSeat, Math.min(FREIGHTER_BAGGAGE_STEP_LB, remaining));
+}
 
 /**
  * Pick load bias from live CG and its movement (counterweight).

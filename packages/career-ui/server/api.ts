@@ -174,7 +174,6 @@ import {
   buildMissionDispatch,
   confirmMissionOfp,
   estimateRouteCargoLimit,
-  openDispatchUrl,
   resolveClassMaxCargoKg,
 } from './dispatch-helpers.ts';
 import {
@@ -3586,13 +3585,13 @@ export function createCareerApiServer(port = 8787) {
                 else missions.missions.push(dispatched);
                 return dispatched;
               });
-              openDispatchUrl(built.url);
+              // UI opens the URL once (Electron IPC / window.open).
               dispatch = {
                 url: built.url,
                 staticId: built.staticId,
                 type: built.type,
                 airframeLabel: built.airframeLabel,
-                opened: true,
+                opened: false,
               };
             } catch (error) {
               dispatchError =
@@ -3957,13 +3956,13 @@ export function createCareerApiServer(port = 8787) {
                 else missions.missions.push(dispatched);
                 return dispatched;
               });
-              openDispatchUrl(built.url);
+              // UI opens the URL once (Electron IPC / window.open).
               dispatch = {
                 url: built.url,
                 staticId: built.staticId,
                 type: built.type,
                 airframeLabel: built.airframeLabel,
-                opened: true,
+                opened: false,
               };
             } catch (error) {
               // Cargo is already reserved — don't fail the accept with a dispatch error
@@ -4368,11 +4367,6 @@ export function createCareerApiServer(port = 8787) {
           return dispatched;
         });
 
-        const shouldOpen = body.open !== false;
-        if (shouldOpen) {
-          openDispatchUrl(built.url);
-        }
-
         send(res, 200, {
           mission,
           url: built.url,
@@ -4381,7 +4375,8 @@ export function createCareerApiServer(port = 8787) {
           airframeLabel: built.airframeLabel,
           cargoThousands: built.cargoThousands,
           units: built.units,
-          opened: shouldOpen,
+          // UI opens the URL once — API must not spawn a second browser.
+          opened: false,
         });
         return;
       }

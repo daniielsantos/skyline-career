@@ -172,8 +172,25 @@ export function buildFingerprintRequest(
   };
 }
 
+/**
+ * Payload-state livery suffix. C408 Cargo Loaded vs Empty expose different
+ * station maps — do not alias them. Saab "340 Cargo - Loaded" vs unsuffixed
+ * "Saab 340 Cargo" still matches (same stations, default load only).
+ */
+export function payloadStateSuffix(
+  title: string,
+): 'loaded' | 'empty' | null {
+  const match = title.trim().match(/\b(loaded|unloaded|empty)\s*$/i);
+  if (!match) return null;
+  return match[1]!.toLowerCase() === 'loaded' ? 'loaded' : 'empty';
+}
+
 /** True when live/catalog title should resolve to profile match.title (registration-safe). */
 export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): boolean {
+  const liveState = payloadStateSuffix(liveTitle);
+  const profileState = payloadStateSuffix(profileTitle);
+  if (liveState && profileState && liveState !== profileState) return false;
+
   const live = normalize(normalizeAircraftTitle(liveTitle));
   const profile = normalize(normalizeAircraftTitle(profileTitle));
   if (!live || !profile) return false;
@@ -391,7 +408,6 @@ export function profileAcceptsLiveTitle(
   const candidates = [
     profile.match?.title,
     ...(profile.match?.liveTitles ?? []),
-    profile.displayName,
   ].filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
   if (candidates.length === 0) return false;
   return candidates.some((t) => titlesMatchForCatalog(liveTitle, t));

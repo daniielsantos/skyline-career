@@ -79,6 +79,64 @@ describe('resolveProfile Saab live title', () => {
   });
 });
 
+describe('resolveProfile C408 cargo liveries', () => {
+  function cargoEmptyProfile(): LoadedProfile {
+    const profile = {
+      schemaVersion: '1.0.0' as const,
+      profileId: 'microsoft-c408-skycourier-cargo',
+      profileKey: 'microsoft/c408-skycourier-cargo',
+      semver: '1.0.0',
+      match: {
+        fingerprint: 'c'.repeat(64),
+        title: 'C408 SkyCourier Cargo - Empty',
+        publisher: 'microsoft',
+        icao: 'C408',
+        liveTitles: ['C408 SkyCourier Cargo - Empty'],
+      },
+      capabilities: ['simconnect' as const],
+      gating: {
+        requireOnGround: true,
+        requireEnginesOff: false,
+        blockWhenPaused: true,
+        blockWhenSlew: true,
+        minSimRate: 0.9,
+        maxSimRate: 1.1,
+      },
+      fuel: {
+        strategy: 'simconnect-direct' as const,
+        unit: 'gallons' as const,
+        tanks: [],
+        writePlan: [],
+        verify: { timeoutMs: 1, pollIntervalMs: 1, checks: [] },
+      },
+      payload: {
+        strategy: 'station-writeback' as const,
+        stations: [],
+        writePlan: [],
+        verify: { timeoutMs: 1, pollIntervalMs: 1, checks: [] },
+      },
+    } satisfies AircraftProfile;
+    return {
+      path: 'profiles/examples/microsoft-c408-skycourier-cargo.json',
+      profile,
+    };
+  }
+
+  it('matches Empty and refuses Loaded (different station map)', () => {
+    const catalog = [cargoEmptyProfile()];
+    const empty = resolveProfile(
+      { title: 'C408 SkyCourier Cargo - Empty', icao: 'C408' },
+      catalog,
+    );
+    assert.equal(empty.matched, true);
+    const loaded = resolveProfile(
+      { title: 'C408 SkyCourier Cargo - Loaded', icao: 'C408' },
+      catalog,
+    );
+    assert.equal(loaded.matched, false);
+  });
+});
+
 describe('resolveProfile NextGenSim Bandeirante variants', () => {
   function bandeiranteProfile(
     profileKey: string,

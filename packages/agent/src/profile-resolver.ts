@@ -40,7 +40,8 @@ function profileTitles(profile: AircraftProfile): string[] {
     profile.match.title,
     ...(profile.match.liveTitles ?? []),
   ].filter((t): t is string => Boolean(t?.trim()));
-  return [...new Set(titles.map((t) => normalizeAircraftTitle(t)))];
+  // Keep raw titles so Loaded vs Empty suffixes survive titlesMatchForCatalog.
+  return [...new Set(titles)];
 }
 
 function scoreProfile(
@@ -63,14 +64,16 @@ function scoreProfile(
     }
   }
 
-  const title = normalizeAircraftTitle(identity.title ?? '');
+  const liveTitle = identity.title ?? '';
   const titles = profileTitles(profile);
   const icao = norm(identity.icao ?? identity.atcModel);
   const profileIcao = norm(profile.match.icao);
 
   for (const profileTitle of titles) {
-    if (title && profileTitle && titlesMatchForCatalog(title, profileTitle)) {
-      const exact = norm(title) === norm(profileTitle);
+    if (liveTitle && profileTitle && titlesMatchForCatalog(liveTitle, profileTitle)) {
+      const exact =
+        norm(normalizeAircraftTitle(liveTitle)) ===
+        norm(normalizeAircraftTitle(profileTitle));
       return {
         score: exact ? 1.0 : 0.9,
         reason: exact ? 'exact_title' : 'title_alias',

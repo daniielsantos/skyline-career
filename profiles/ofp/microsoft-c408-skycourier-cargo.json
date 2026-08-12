@@ -5,15 +5,15 @@
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "C408 SkyCourier Cargo",
     "C408 SkyCourier Cargo - Empty"
   ],
-  "matchTitlePattern": "C408 SkyCourier Cargo",
+  "matchTitlePattern": "C408 SkyCourier Cargo\\s*-\\s*Empty",
   "notes": [
-    "C408 SkyCourier Cargo — auto roles pack from homologated profile",
+    "C408 SkyCourier Cargo — Empty livery only (5 stations).",
+    "Do not match Cargo - Loaded: that livery only exposes S1–S2 crew.",
     "Profile: microsoft/c408-skycourier-cargo@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
-    "S1–S2 crew; S3–S5 cargo holds (Empty livery). SimBrief: Carenado C408.",
+    "S1–S2 crew; S3–S5 cargo holds. SimBrief: Carenado C408.",
     "Fuel strategy: simconnect-direct"
   ],
   "fuel": {

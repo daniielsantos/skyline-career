@@ -54,6 +54,23 @@ describe('titlesMatchForCatalog', () => {
     );
   });
 
+  it('does not alias Cargo Loaded onto Cargo Empty (different station maps)', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'C408 SkyCourier Cargo - Loaded',
+        'C408 SkyCourier Cargo - Empty',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'C408 SkyCourier Cargo - Empty',
+        'C408 SkyCourier Cargo - Empty',
+      ),
+      true,
+    );
+  });
+
   it('rejects unrelated titles', () => {
     assert.equal(titlesMatchForCatalog('C172 Classic', 'Saab 340 Cargo'), false);
   });

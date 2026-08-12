@@ -1,6 +1,7 @@
 /**
  * Thin wrappers around agent SimBrief helpers so the career-ui API can
- * open Dispatch Redirect and fetch OFPs without going through the CLI.
+ * build Dispatch Redirect URLs and fetch OFPs without going through the CLI.
+ * The UI opens the URL in the OS browser — this process must not spawn one.
  */
 
 import {
@@ -20,7 +21,6 @@ import {
   buildDispatchRedirectUrl,
   cargoWeightToThousands,
   makeStaticId,
-  openDispatchInBrowser,
 } from '../../agent/src/ofp-compliance/simbrief-dispatch.ts';
 import {
   inferSimBriefAirframeMatchFromTitle,
@@ -261,10 +261,6 @@ export async function buildMissionDispatch(
     cargoThousands,
     units,
   };
-}
-
-export function openDispatchUrl(url: string): void {
-  openDispatchInBrowser(url);
 }
 
 export async function confirmMissionOfp(

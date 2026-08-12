@@ -18,6 +18,8 @@
 
 - Live ATCCOM strings (`ATCCOM.AC_MODEL_DR40…`) are localization keys — catalog ICAO stays `DR40`.
 - Fingerprint may drift if tank/station sampling changes; catalog resolve falls back by title.
+- Full tanks ≈ 29 gal × ~6.0 lb/gal avgas ≈ 174 lb; OFP above that clamps.
+- Fuel writePlan settle delay is 400 ms (keep short — inject ramps fuel in 4 rounds).
 
 ## Homologated
 

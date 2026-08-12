@@ -1,0 +1,17 @@
+---
+description: Handoff — ler docs/agent-context em chats novos (evita transcript gigante)
+alwaysApply: true
+---
+
+# Agent context handoff
+
+Conversas longas neste repo travam o Cursor. **Não** dependa do transcript antigo.
+
+No início de trabalho Skyline Career / SimBridge / Twin Otter / hubs:
+
+1. Leia `docs/agent-context/project-overview.md` (visão geral)
+2. Leia `docs/agent-context/README.md` e **apenas** o arquivo de tópico necessário
+3. Respeite `docs/agent-context/00-constraints.md`
+4. Economy/map detail: `.cursor/rules/career-economy-roadmap.mdc` / `career-map-expansion.mdc` (só se a tarefa for isso)
+
+Atualize esses arquivos ao fechar uma sessão longa (bullets curtos), em vez de deixar o contexto só no chat.

@@ -89,6 +89,10 @@ const PAYLOAD_CG_SETTLE_MS = 900;
 const FUEL_ROUND_SETTLE_MS = 450;
 /** Gap between station/fuel SimVar writes during inject (Host pipe stability). */
 const INJECT_WRITE_GAP_MS = 50;
+/** Hard ceiling for one inject session — prevents infinite "Writing…" on dead SimConnect. */
+const INJECT_TOTAL_BUDGET_MS = 180_000;
+/** Per-IPC timeout during inject (planning reads + writes). Was 60s and felt frozen. */
+const INJECT_IPC_TIMEOUT_MS = 15_000;
 
 /** Compact station map for watch-debug.log (only non-zero, rounded). */
 function stationsSnapshot(stations: Record<number, number>): Record<string, number> {
@@ -306,6 +310,28 @@ class OfpLoadCancelledError extends Error {
 function assertOfpLoadNotCancelled(missionId: string): void {
   if (isOfpLoadCancelled(missionId)) {
     throw new OfpLoadCancelledError();
+  }
+}
+
+class OfpLoadTimedOutError extends Error {
+  constructor(detail: string) {
+    super(`Inject timed out — ${detail}`);
+    this.name = 'OfpLoadTimedOutError';
+  }
+}
+
+function assertOfpLoadWithinBudget(
+  missionId: string,
+  startedAtMs: number,
+  phase: string,
+): void {
+  assertOfpLoadNotCancelled(missionId);
+  const elapsed = Date.now() - startedAtMs;
+  if (elapsed > INJECT_TOTAL_BUDGET_MS) {
+    throw new OfpLoadTimedOutError(
+      `${phase} exceeded ${Math.round(INJECT_TOTAL_BUDGET_MS / 1000)}s. ` +
+        'SimBridge may be stuck — turn inject off, restart SimBridge Host if needed, then retry.',
+    );
   }
 }
 
@@ -681,15 +707,18 @@ async function applyMissionOfpLoadExclusive(
 
   beginOfpLoad(mission.id);
   beginOfpLoadActive();
+  const injectStartedAtMs = Date.now();
   watchDebugLog('inject', 'begin', {
     missionId: mission.id,
     staticId: mission.staticId,
     writeGapMs: INJECT_WRITE_GAP_MS,
+    budgetMs: INJECT_TOTAL_BUDGET_MS,
+    ipcTimeoutMs: INJECT_IPC_TIMEOUT_MS,
   });
   try {
   setOfpLoadProgress(mission.id, {
     phase: 'planning',
-    message: 'Building fuel and payload plan from OFP…',
+    message: 'Fetching OFP from SimBrief…',
   });
 
   const username = opts.username?.trim() || process.env.SIMBRIEF_USERNAME?.trim();
@@ -701,6 +730,7 @@ async function applyMissionOfpLoadExclusive(
     );
   }
 
+  assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'SimBrief fetch');
   const { expectation } = await fetchSimBriefLatestOfp({
     username,
     userid,
@@ -710,15 +740,22 @@ async function applyMissionOfpLoadExclusive(
   let ofp = applyTargetBlockFuelKg(expectation, opts.targetBlockFuelKg);
   let stationRoles = ofp.payload?.stationRoles;
 
+  setOfpLoadProgress(mission.id, {
+    phase: 'planning',
+    message: 'Connecting SimBridge for inject…',
+  });
+
   const bridge = new NamedPipeSimBridge({
     ...(opts.pipeName ? { pipeName: opts.pipeName } : {}),
-    // Multi-step inject can exceed the default 10s IPC budget on slow SimConnect.
-    requestTimeoutMs: 60_000,
+    // Multi-step inject can exceed a short IPC budget, but 60s made dead
+    // SimConnect look like an infinite "Writing…" freeze.
+    requestTimeoutMs: INJECT_IPC_TIMEOUT_MS,
     connectTimeoutMs: 10_000,
   });
 
   // Hold the exclusive gate for the whole write session so probe/preflight/Watch
   // reopen cannot open a second pipe client mid-inject (0xC00000B0).
+  assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'waiting for SimBridge gate');
   const releaseSimBridgeGate = await acquireSimBridgeExclusive();
   let simBridgeGateHeld = true;
   const releaseSimBridgeGateOnce = () => {
@@ -760,10 +797,14 @@ async function applyMissionOfpLoadExclusive(
   let restoreFuelOnRollback = false;
 
   try {
-    assertOfpLoadNotCancelled(mission.id);
+    assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'opening SimBridge');
+    setOfpLoadProgress(mission.id, {
+      phase: 'planning',
+      message: 'Reading live aircraft + building load plan…',
+    });
     await bridge.open('Skyline Career UI OFP Load');
 
-    assertOfpLoadNotCancelled(mission.id);
+    assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'resolving aircraft');
     const localCatalog = await loadProfilesFromDirs(defaultProfileDirs(repoRoot));
     const cache = new ProfileCache(defaultCacheDir(repoRoot));
     const resolved = await resolveLiveAircraft({
@@ -1271,7 +1312,7 @@ async function applyMissionOfpLoadExclusive(
       }
     };
 
-    assertOfpLoadNotCancelled(mission.id);
+    assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'fuel inject');
     const mxNote = opts.mxFuelBurnNote?.trim();
     const withMxNote = (message: string) =>
       mxNote && message.startsWith('Injecting OFP fuel')
@@ -1304,7 +1345,11 @@ async function applyMissionOfpLoadExclusive(
       built.plan.fuel = { ...built.plan.fuel, tanks: endTanks };
       restoreFuelOnRollback = false;
       for (let round = 1; round <= FUEL_INJECT_ROUNDS; round++) {
-        assertOfpLoadNotCancelled(mission.id);
+        assertOfpLoadWithinBudget(
+          mission.id,
+          injectStartedAtMs,
+          `fuel round ${round}/${FUEL_INJECT_ROUNDS}`,
+        );
         const tanks = fuelTankTargetsForRound(
           startTanks,
           endTanks,
@@ -2516,6 +2561,54 @@ async function applyMissionOfpLoadExclusive(
           rolledBack = true;
           rollbackOk = false;
         }
+      }
+      return {
+        ok: false,
+        plan: built,
+        identity,
+        profileKey,
+        profilePath,
+        fingerprint,
+        before: beforeLive,
+        apply: applyResult ?? {},
+        after: afterLive,
+        rolledBack,
+        rollbackOk,
+        compareSummary,
+        compareVerdict,
+        preflight,
+        error,
+        cgRebalanceMoves,
+        ballastLb: ballastPlacedLb,
+      };
+    }
+    if (err instanceof OfpLoadTimedOutError) {
+      error = err.message;
+      watchDebugLog('inject', 'timed out', {
+        missionId: mission.id,
+        elapsedMs: Date.now() - injectStartedAtMs,
+        error,
+        cgRebalanceMoves,
+      });
+      setOfpLoadProgress(mission.id, {
+        phase: 'failed',
+        message: error,
+      });
+      if (!built) {
+        built = {
+          plan: {} as LoadPlanRequest,
+          blockFuelLb: 0,
+          cargoLb: 0,
+          fuelUnit: 'gallons',
+          tankCapacityTotal: 0,
+          baggageCapacityLb: 0,
+          preservedStations: [],
+          baggageStations: [],
+          crewStations: [],
+          passengerStations: [],
+          seatStations: [],
+          movableStations: [],
+        };
       }
       return {
         ok: false,

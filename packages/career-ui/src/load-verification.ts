@@ -21,6 +21,15 @@ function fuelUnusableOvershootLb(plannedLb: number): number {
   );
 }
 
+/** Mirror of shared fuelTaxiBurnAllowanceLb — cap taxi slack on short OFPs. */
+function fuelTaxiBurnAllowanceLb(
+  plannedLb: number,
+  taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
+): number {
+  if (!Number.isFinite(plannedLb) || plannedLb <= 0) return 0;
+  return Math.min(Math.max(0, taxiBurnLb), plannedLb * 0.5);
+}
+
 function matchOk(
   liveLb: number | undefined,
   plannedLb: number | undefined,
@@ -42,7 +51,7 @@ export function matchFuelOk(
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
   if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
   const tol = Math.max(0, toleranceLb);
-  const taxi = Math.max(0, taxiBurnLb);
+  const taxi = fuelTaxiBurnAllowanceLb(plannedLb, taxiBurnLb);
   const unusable = Math.max(
     0,
     unusableOvershootLb ?? fuelUnusableOvershootLb(plannedLb),

@@ -154,6 +154,9 @@ describe('mission load method policy', () => {
     assert.equal(careerFuelMatchOk(2026, 1858, 50), true);
     assert.equal(careerFuelMatchOk(2110, 1858, 50), false); // beyond unusable slack
     assert.equal(careerFuelMatchOk(2291, 2240, 50, 150, 0), false); // no unusable slack
+    // Short OFP: flat 150 lb taxi must not keep READY after EFB drain.
+    assert.equal(careerFuelMatchOk(29, 187, 50), false); // -158 > tol + 50%*187
+    assert.equal(careerFuelMatchOk(120, 187, 50), true); // -67 within tol + capped taxi
   });
 });
 

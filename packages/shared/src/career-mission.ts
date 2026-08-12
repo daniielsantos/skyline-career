@@ -315,6 +315,12 @@ export function careerLoadWeightMatchOk(
 export const DEFAULT_FUEL_TAXI_BURN_LB = 150;
 
 /**
+ * Taxi slack cannot exceed this fraction of Due — otherwise a short OFP
+ * (e.g. 187 lb) stays READY after an EFB drain almost to empty.
+ */
+export const FUEL_TAXI_BURN_MAX_FRACTION_OF_PLANNED = 0.5;
+
+/**
  * Ceiling for the Sim overshoot vs Due allowed for MSFS AUX/TIP unusable fuel
  * that inject cannot drain (King Air tip pair ~58 lb/side, Baron AUX floors, …).
  */
@@ -333,6 +339,18 @@ export function fuelUnusableOvershootLb(plannedLb: number): number {
   );
 }
 
+/** Effective taxi undershoot allowance for a given OFP block. */
+export function fuelTaxiBurnAllowanceLb(
+  plannedLb: number,
+  taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
+): number {
+  if (!Number.isFinite(plannedLb) || plannedLb <= 0) return 0;
+  return Math.min(
+    Math.max(0, taxiBurnLb),
+    plannedLb * FUEL_TAXI_BURN_MAX_FRACTION_OF_PLANNED,
+  );
+}
+
 /**
  * Fuel Loaded vs Due: allow Sim below Due by tol + taxi burn, and slightly
  * above Due for unusable tank floors inject cannot clear.
@@ -347,7 +365,7 @@ export function careerFuelMatchOk(
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) return true;
   if (liveLb === undefined || !Number.isFinite(liveLb)) return false;
   const tol = Math.max(0, toleranceLb);
-  const taxi = Math.max(0, taxiBurnLb);
+  const taxi = fuelTaxiBurnAllowanceLb(plannedLb, taxiBurnLb);
   const unusable = Math.max(
     0,
     unusableOvershootLb ?? fuelUnusableOvershootLb(plannedLb),

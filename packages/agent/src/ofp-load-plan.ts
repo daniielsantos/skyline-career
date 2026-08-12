@@ -135,6 +135,11 @@ export type BuildOfpLoadPlanInput = {
   emptyWeightLb?: number;
   /** Live MAX GROSS WEIGHT (lb) — enables MTOW cargo clamp. */
   maxGrossWeightLb?: number;
+  /**
+   * Career inject: when OFP block fuel exceeds profile tanks, fill to capacity
+   * instead of throwing FUEL_OVER_CAPACITY (Due is rewritten to the clamped amount).
+   */
+  clampFuelToCapacity?: boolean;
 };
 
 export type BuiltOfpLoadPlan = {
@@ -154,6 +159,10 @@ export type BuiltOfpLoadPlan = {
   seatStations: number[];
   /** seatStations + baggageStations — full CG / capacity pool. */
   movableStations: number[];
+  /** True when OFP fuel was reduced to fit tanks. */
+  fuelClamped?: boolean;
+  /** Original OFP block fuel (lb) before clamp. */
+  requestedBlockFuelLb?: number;
 };
 
 const SYMMETRIC_PAIRS: Array<[string, string]> = [
@@ -213,7 +222,18 @@ export function distributeFuelAcrossTanks(
   blockFuelLb: number,
   profile: AircraftProfile,
   lbPerGal = DEFAULT_JET_A_LB_PER_GAL,
-): { tanks: Record<string, number>; unit: NonNullable<AircraftProfile['fuel']['unit']>; capacityTotal: number } {
+  opts?: { clampToCapacity?: boolean },
+): {
+  tanks: Record<string, number>;
+  unit: NonNullable<AircraftProfile['fuel']['unit']>;
+  capacityTotal: number;
+  /** True when OFP fuel was reduced to fit tanks. */
+  clamped: boolean;
+  /** Requested block fuel before clamp (lb). */
+  requestedLb: number;
+  /** Fuel weight actually placed (lb). */
+  placedLb: number;
+} {
   const tanks = profile.fuel.tanks;
   if (!tanks.length) {
     throw new OfpLoadPlanError('NO_TANKS', 'Aircraft profile has no fuel tanks');
@@ -224,25 +244,35 @@ export function distributeFuelAcrossTanks(
     throw new OfpLoadPlanError('NO_TANKS', 'Aircraft profile tanks have no capacity');
   }
 
-  let remaining: number;
-  if (unit === 'gallons') {
-    remaining = blockFuelLb / lbPerGal;
-  } else if (unit === 'pounds') {
-    remaining = blockFuelLb;
-  } else if (unit === 'kilograms') {
-    remaining = blockFuelLb / KG_TO_LB;
-  } else if (unit === 'liters') {
-    // Approx Jet-A: 6.7 lb/gal ÷ 3.785 ≈ 1.77 lb/L
-    remaining = blockFuelLb / (lbPerGal / 3.785411784);
-  } else {
-    remaining = blockFuelLb / lbPerGal;
-  }
+  const qtyFromLb = (lb: number): number => {
+    if (unit === 'gallons') return lb / lbPerGal;
+    if (unit === 'pounds') return lb;
+    if (unit === 'kilograms') return lb / KG_TO_LB;
+    if (unit === 'liters') return lb / (lbPerGal / 3.785411784);
+    return lb / lbPerGal;
+  };
+  const lbFromQty = (qty: number): number => {
+    if (unit === 'gallons') return qty * lbPerGal;
+    if (unit === 'pounds') return qty;
+    if (unit === 'kilograms') return qty * KG_TO_LB;
+    if (unit === 'liters') return qty * (lbPerGal / 3.785411784);
+    return qty * lbPerGal;
+  };
+
+  const requestedLb = blockFuelLb;
+  let remaining = qtyFromLb(blockFuelLb);
+  let clamped = false;
 
   if (remaining > capacityTotal + 0.05) {
-    throw new OfpLoadPlanError(
-      'FUEL_OVER_CAPACITY',
-      `Block fuel ${roundFuel(remaining, unit)} ${unit} exceeds tank capacity ${roundFuel(capacityTotal, unit)} ${unit}`,
-    );
+    if (opts?.clampToCapacity) {
+      remaining = capacityTotal;
+      clamped = true;
+    } else {
+      throw new OfpLoadPlanError(
+        'FUEL_OVER_CAPACITY',
+        `Block fuel ${roundFuel(qtyFromLb(blockFuelLb), unit)} ${unit} exceeds tank capacity ${roundFuel(capacityTotal, unit)} ${unit}`,
+      );
+    }
   }
 
   const tankIds = new Set(tanks.map((t) => t.id));
@@ -302,7 +332,15 @@ export function distributeFuelAcrossTanks(
     );
   }
 
-  return { tanks: result, unit, capacityTotal };
+  const placedQty = Object.values(result).reduce((s, v) => s + v, 0);
+  return {
+    tanks: result,
+    unit,
+    capacityTotal,
+    clamped,
+    requestedLb,
+    placedLb: roundLb(lbFromQty(placedQty)),
+  };
 }
 
 /** Soft max for a seat index (never above structural maxLoad). */
@@ -1251,6 +1289,7 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
     cargoKgFallback,
     emptyWeightLb,
     maxGrossWeightLb,
+    clampFuelToCapacity,
   } = input;
 
   const sheet = ofp.loadSheet;
@@ -1259,19 +1298,22 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
     throw new OfpLoadPlanError('NO_BLOCK_FUEL', 'OFP has no block fuel (plan_ramp)');
   }
   const fuelUnitOfp = sheet?.unit ?? ofp.fuel.unit ?? 'kg';
-  const blockFuelLb = toLb(blockRaw, fuelUnitOfp);
+  const requestedBlockFuelLb = toLb(blockRaw, fuelUnitOfp);
+  const density = resolveFuelDensityLbPerGal(profile, fuelLbPerGal);
+
+  const fuel = distributeFuelAcrossTanks(
+    requestedBlockFuelLb,
+    profile,
+    density,
+    { clampToCapacity: clampFuelToCapacity === true },
+  );
+  const blockFuelLb = fuel.placedLb;
 
   const cargoKg = ofpCargoKg(ofp) ?? cargoKgFallback;
   if (cargoKg === undefined || !Number.isFinite(cargoKg) || cargoKg < 0) {
     throw new OfpLoadPlanError('NO_CARGO', 'OFP has no cargo/baggage weight to load');
   }
   let cargoLb = cargoKg * KG_TO_LB;
-
-  const fuel = distributeFuelAcrossTanks(
-    blockFuelLb,
-    profile,
-    resolveFuelDensityLbPerGal(profile, fuelLbPerGal),
-  );
 
   const crewStations = stationRoles?.crewStations ?? ofp.payload?.stationRoles?.crewStations ?? [];
   let plannedCrewLb = 0;
@@ -1328,6 +1370,12 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
     passengerStations: payload.passengerStations,
     seatStations: payload.seatStations,
     movableStations: payload.movableStations,
+    ...(fuel.clamped
+      ? {
+          fuelClamped: true,
+          requestedBlockFuelLb: fuel.requestedLb,
+        }
+      : {}),
   };
 }
 

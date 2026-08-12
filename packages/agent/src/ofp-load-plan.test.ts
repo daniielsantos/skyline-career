@@ -72,6 +72,26 @@ describe('distributeFuelAcrossTanks', () => {
     );
   });
 
+  it('clamps Twin Otter OFP fuel to fuselage capacity when requested', async () => {
+    const raw = await readFile(
+      join(repoRoot, 'profiles', 'examples', 'microsoft-dhc-6-300-twin-otter-wheels.json'),
+      'utf8',
+    );
+    const profile = JSON.parse(raw) as AircraftProfile;
+    const density = resolveFuelDensityLbPerGal(profile, 6.0);
+    const overLb = 2641;
+    const { tanks, capacityTotal, clamped, placedLb, requestedLb } =
+      distributeFuelAcrossTanks(overLb, profile, density, {
+        clampToCapacity: true,
+      });
+    assert.equal(clamped, true);
+    assert.equal(requestedLb, overLb);
+    assert.equal(capacityTotal, 378);
+    const placedGal = (tanks.CENTER ?? 0) + (tanks.CENTER2 ?? 0);
+    assert.ok(Math.abs(placedGal - 378) < 0.2);
+    assert.ok(Math.abs(placedLb - 378 * density) < 2);
+  });
+
   it('uses Jet-A density for Twin Otter even when live reports avgas 6.0', async () => {
     const raw = await readFile(
       join(repoRoot, 'profiles', 'examples', 'microsoft-dhc-6-300-twin-otter-wheels.json'),

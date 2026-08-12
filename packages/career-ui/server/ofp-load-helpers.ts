@@ -7,6 +7,7 @@ import {
   assertRolesPackAllowsDirectInjection,
   careerFuelMatchOk,
   flightPhaseFromSample,
+  KG_TO_LB,
   normalizeAircraftTitle,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
@@ -825,6 +826,7 @@ async function applyMissionOfpLoadExclusive(
 
     const fuelLbPerGal = await readFuelLbPerGal(bridge);
     const weightLimits = await readLiveWeightLimits(bridge);
+    let clampedFuelTargetKg: number | undefined;
 
     try {
       built = buildOfpLoadPlan({
@@ -836,12 +838,31 @@ async function applyMissionOfpLoadExclusive(
         cargoKgFallback: mission.cargoKg,
         emptyWeightLb: weightLimits.emptyWeightLb,
         maxGrossWeightLb: weightLimits.maxGrossWeightLb,
+        // Career: fill to tank max instead of aborting when SimBrief plans past capacity
+        // (e.g. Twin Otter fuselage-only profile on a 500+ NM leg).
+        clampFuelToCapacity: true,
       });
     } catch (planError) {
       if (planError instanceof OfpLoadPlanError) {
         throw new Error(`${planError.code}: ${planError.message}`);
       }
       throw planError;
+    }
+
+    if (built.fuelClamped && built.blockFuelLb > 0) {
+      clampedFuelTargetKg = built.blockFuelLb / KG_TO_LB;
+      ofp = applyTargetBlockFuelKg(ofp, clampedFuelTargetKg);
+      const shortLb = Math.max(
+        0,
+        Math.round((built.requestedBlockFuelLb ?? built.blockFuelLb) - built.blockFuelLb),
+      );
+      watchDebugLog('inject', 'fuel clamped to tank capacity', {
+        requestedLb: built.requestedBlockFuelLb ?? null,
+        clampedLb: built.blockFuelLb,
+        shortLb,
+        capacity: built.tankCapacityTotal,
+        unit: built.fuelUnit,
+      });
     }
 
     rollbackPlan = buildRollbackPlan(resolved.profile, beforeLive);
@@ -892,6 +913,8 @@ async function applyMissionOfpLoadExclusive(
       seatStations: built.seatStations,
       plannedFuelLb,
       plannedPayloadLb,
+      fuelClamped: built.fuelClamped === true,
+      requestedBlockFuelLb: built.requestedBlockFuelLb ?? null,
       cgPolicy,
       beforeStations: stationsSnapshot(beforeLive.stations),
       beforeFuelLb: sumRecord(beforeLive.tanks),
@@ -1258,7 +1281,11 @@ async function applyMissionOfpLoadExclusive(
       'injecting',
       fuelAlreadyOk
         ? `Fuel OK — loading payload +${CG_BALANCE_STEP_LB} lb/seat across ${seatCount} seats…`
-        : withMxNote(`Injecting OFP fuel (1/${FUEL_INJECT_ROUNDS})…`),
+        : built.fuelClamped
+          ? withMxNote(
+              `OFP over tanks — loading max ${Math.round(built.blockFuelLb)} lb (1/${FUEL_INJECT_ROUNDS})…`,
+            )
+          : withMxNote(`Injecting OFP fuel (1/${FUEL_INJECT_ROUNDS})…`),
     );
 
     if (!fuelAlreadyOk && built.plan.fuel) {
@@ -2379,7 +2406,7 @@ async function applyMissionOfpLoadExclusive(
           username,
           userid,
           pipeName: opts.pipeName,
-          targetBlockFuelKg: opts.targetBlockFuelKg,
+          targetBlockFuelKg: clampedFuelTargetKg ?? opts.targetBlockFuelKg,
           ballastLb: ballastPlacedLb,
         });
       } catch (preflightError) {

@@ -1184,13 +1184,30 @@ async function applyMissionOfpLoadExclusive(
     const applyFuelRound = async (tanks: Record<string, number>) => {
       const t0 = Date.now();
       const fuel = { ...built.plan.fuel!, tanks };
-      try {
-        const result = await engine!.applyLoadPlan({
+      const run = () =>
+        engine!.applyLoadPlan({
           fuel,
           cgPolicy: 'none',
           skipVerify: true,
           writeGapMs: INJECT_WRITE_GAP_MS,
         });
+      const isSoftPipeFail = (result: Awaited<ReturnType<typeof run>>) => {
+        const detail =
+          result.fuel?.details &&
+          typeof result.fuel.details === 'object' &&
+          result.fuel.details !== null &&
+          'message' in result.fuel.details
+            ? String((result.fuel.details as { message?: unknown }).message ?? '')
+            : '';
+        return Boolean(
+          result.fuel &&
+            !result.fuel.success &&
+            (isPipeDisconnectError(detail) ||
+              result.fuel.errorCode === 'FUEL_WRITE_FAILED'),
+        );
+      };
+      try {
+        let result = await run();
         watchDebugLog('inject', 'fuel round ok', {
           ms: Date.now() - t0,
           success: result.fuel?.success ?? null,
@@ -1199,6 +1216,18 @@ async function applyMissionOfpLoadExclusive(
             Object.entries(tanks).map(([k, v]) => [k, Math.round(v * 10) / 10]),
           ),
         });
+        if (isSoftPipeFail(result)) {
+          watchDebugLog('inject', 'fuel round soft pipe fail — reconnect', {
+            errorCode: result.fuel?.errorCode ?? null,
+          });
+          await reconnectBridge();
+          await new Promise((r) => setTimeout(r, 400));
+          result = await run();
+          watchDebugLog('inject', 'fuel round retry result', {
+            success: result.fuel?.success ?? null,
+            errorCode: result.fuel?.errorCode ?? null,
+          });
+        }
         return result;
       } catch (err) {
         watchDebugLog('inject', 'fuel round throw', {
@@ -1208,13 +1237,9 @@ async function applyMissionOfpLoadExclusive(
         });
         if (!isPipeDisconnectError(err)) throw err;
         await reconnectBridge();
+        await new Promise((r) => setTimeout(r, 400));
         watchDebugLog('inject', 'fuel round retry after reconnect', {});
-        const result = await engine!.applyLoadPlan({
-          fuel,
-          cgPolicy: 'none',
-          skipVerify: true,
-          writeGapMs: INJECT_WRITE_GAP_MS,
-        });
+        const result = await run();
         watchDebugLog('inject', 'fuel round retry result', {
           success: result.fuel?.success ?? null,
           errorCode: result.fuel?.errorCode ?? null,

@@ -13,16 +13,18 @@
 |-----|----------|----|
 | `FUEL TANK CENTER QUANTITY` | 181 | CENTER (forward fuselage) |
 | `FUEL TANK CENTER2 QUANTITY` | 197 | CENTER2 (aft fuselage) |
-| `FUEL TANK LEFT AUX QUANTITY` | 37 | LEFT_AUX (wing) |
-| `FUEL TANK RIGHT AUX QUANTITY` | 37 | RIGHT_AUX (wing) |
 
-Total usable: **452 US gal** ≈ **2,712 lb** / **1,231 kg** Jet-A (MSFS AOM).
+Total written by Skyline: **378 US gal** ≈ **2,268 lb** / **1,029 kg** Jet-A.
+
+AOM also lists optional wing tanks (37 gal/side). Do **not** map them to classic
+`LEFT_AUX`/`RIGHT_AUX` without a live writetest — writing unregistered tank
+SimVars triggered SimConnect `UNRECOGNIZED_ID` and killed the Host
+(`ReceiveMessage error: 0xC00000B0`). Re-homologate wing tanks with the correct
+vars before enabling long-range inject.
 
 ## Notes
 
-- Fuel via classic FUEL TANK * (CENTER, CENTER2, LEFT_AUX, RIGHT_AUX).
-- Wing tanks (37 gal/side) were deferred in v1 and caused false `FUEL_OVER_CAPACITY`
-  on ~500+ NM legs — restored from MSFS 2024 Twin Otter AOM.
+- Fuel via classic FUEL TANK * (CENTER, CENTER2 only for now).
 - Payload stations from writetest: 1–11.
 - Station maxLoad: placeholder until flight_model.cfg calibrate.
 - Homologated with interactive wizard.

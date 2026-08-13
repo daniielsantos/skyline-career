@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-13: fill híbrido + inject batch prontos para release.
+Atualizado 2026-08-13: def cache Watch + backoff MSFS-down (ainda sem release). Dual-client IPC de fora.
 
 ## Validar (manual)
 
@@ -22,9 +22,12 @@ Atualizado 2026-08-13: fill híbrido + inject batch prontos para release.
 ## Possível próximo engenharia
 
 1. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-2. Se dual-client IPC ainda estressar: serializar mais ops no Host (snapshot/identity) ou single-client pipe.
-3. Watch: backoff mais agressivo quando Host reporta `NOT_CONNECTED` (opcional UX).
-4. Reusar defs SimConnect fixas para batches Watch (flight/load/cruise) — IDs monotônicos incham em voos longos.
+2. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+
+## Feito (local, sem release)
+
+- Defs SimConnect reusadas para batches Watch/inject idênticos (cache no Host).
+- Watch backoff 8s→15s em queda do MSFS; UI `Simulator closed — retry in Ns`.
 
 ## Não fazer sem pedido
 

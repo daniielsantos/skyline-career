@@ -5,8 +5,13 @@ import {
   formatIpcError,
   ipcErrorCode,
   isIpcTimeout,
+  isSimDownError,
+  nextPipeBackoffMs,
   pingNeedsSessionReset,
+  PIPE_BACKOFF_START_MS,
   shouldReopenSimSession,
+  SIM_DOWN_BACKOFF_MAX_MS,
+  SIM_DOWN_BACKOFF_START_MS,
   simIpcSessionDied,
   simSessionDeadError,
   simSessionUnhealthy,
@@ -143,5 +148,71 @@ describe('shouldReopenSimSession', () => {
   it('does not reopen on unrelated errors', () => {
     assert.equal(shouldReopenSimSession('unknown aircraft', 5), false);
     assert.equal(simIpcSessionDied('unknown aircraft'), false);
+  });
+
+  it('reopens when Host cannot open SimConnect (MSFS down)', () => {
+    assert.equal(
+      shouldReopenSimSession(
+        new IpcClientError(
+          'SIM_ERROR',
+          'Failed to open SimConnect. Is MSFS 2024 running and in a flight? Details: x',
+        ),
+        1,
+      ),
+      true,
+    );
+  });
+});
+
+describe('isSimDownError', () => {
+  it('treats NOT_CONNECTED and MSFS-not-running as sim down', () => {
+    assert.equal(
+      isSimDownError(new IpcClientError('NOT_CONNECTED', 'Simulator quit')),
+      true,
+    );
+    assert.equal(
+      isSimDownError(
+        new IpcClientError(
+          'SIM_ERROR',
+          'Timed out waiting for SimConnect open. Start MSFS 2024, load an aircraft, then retry.',
+        ),
+      ),
+      true,
+    );
+  });
+
+  it('does not treat TIMEOUT or unrelated SIM_ERROR as sim down', () => {
+    assert.equal(
+      isSimDownError(new IpcClientError('TIMEOUT', 'SimConnect request timed out')),
+      false,
+    );
+    assert.equal(
+      isSimDownError(new IpcClientError('SIM_ERROR', 'readSimVars returned unexpected length')),
+      false,
+    );
+  });
+});
+
+describe('nextPipeBackoffMs', () => {
+  it('starts hang-mole TIMEOUT at 2s and doubles', () => {
+    const timeout = new IpcClientError('TIMEOUT', 'SimConnect request timed out');
+    assert.equal(nextPipeBackoffMs(0, timeout), PIPE_BACKOFF_START_MS);
+    assert.equal(nextPipeBackoffMs(2_000, timeout), 4_000);
+    assert.equal(nextPipeBackoffMs(4_000, timeout), 8_000);
+  });
+
+  it('starts MSFS-down at 8s and caps at 15s', () => {
+    const down = new IpcClientError('NOT_CONNECTED', 'Simulator quit');
+    assert.equal(nextPipeBackoffMs(0, down), SIM_DOWN_BACKOFF_START_MS);
+    assert.equal(nextPipeBackoffMs(8_000, down), SIM_DOWN_BACKOFF_MAX_MS);
+    assert.equal(nextPipeBackoffMs(15_000, down), SIM_DOWN_BACKOFF_MAX_MS);
+  });
+
+  it('jumps from a TIMEOUT wait to the sim-down floor', () => {
+    const down = new IpcClientError(
+      'SIM_ERROR',
+      'Failed to open SimConnect. Is MSFS 2024 running and in a flight?',
+    );
+    assert.equal(nextPipeBackoffMs(2_000, down), SIM_DOWN_BACKOFF_START_MS);
   });
 });

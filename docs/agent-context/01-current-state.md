@@ -4,7 +4,9 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.22** (latest) | [v0.3.22](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.22) | Watch `readSimVars` batch + TIMEOUT abort + cruise gates |
+| **0.3.24** (latest) | [v0.3.24](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.24) | Hybrid fill: equal first, then shift; leftover L/R |
+| 0.3.23 | [v0.3.23](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.23) | Inject/preflight `readSimVars` + pack hard-fail |
+| 0.3.22 | [v0.3.22](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.22) | Watch `readSimVars` batch + TIMEOUT abort + cruise gates |
 | 0.3.21 | [v0.3.21](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.21) | Hang mole / ping honesto / TIMEOUT por código IPC |
 | 0.3.19 | [v0.3.19](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.19) | Inject permanece armed até o write terminar |
 | 0.3.18 | [v0.3.18](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.18) | Taxi fuel cap 50% Due; inject timeout 15s/180s + progress; DR400 delay 400ms |
@@ -16,6 +18,12 @@
 `main` — handoff em `docs/agent-context/`.
 
 ## Local (ainda sem release)
+
+- **0.3.24 shipped:** equal-first até limite real do envelope; leftover
+  split L/R (mesmo arm, Δarm ≤2 ft, LEFT/RIGHT, indexes consecutivos).
+  Kodiak/Caravan/Bonanza validados localmente.
+- **Pós-0.3.24 (local):** Host reusa defs de `readSimVars` iguais; quit do
+  MSFS dá tear-down completo; Watch backoff 8–15s até o sim voltar.
 
 - **Inject Caravan flicker / S7–S11 primeiro:** última release boa = **v0.3.9**.
   Quebrou em v0.3.10 (`2d73837`, C408 “CG toward center”). Restaurado:

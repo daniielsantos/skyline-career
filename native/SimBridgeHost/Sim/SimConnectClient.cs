@@ -98,6 +98,14 @@ public sealed class SimConnectClient : ISimClient
 
     private uint _nextDefId = (uint)Definitions.DynamicBase;
     private uint _nextReqId = (uint)Requests.DynamicBase;
+    /// <summary>
+    /// Reuse AddToDataDefinition layouts for identical Watch/inject batches.
+    /// Cleared on ConnectAsync / tear-down — never ClearDataDefinition.
+    /// </summary>
+    private const int MaxCachedBatchDefs = 48;
+    private const int MaxCachedSingleDefs = 64;
+    private readonly Dictionary<string, uint> _batchDefCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, uint> _singleDefCache = new(StringComparer.Ordinal);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     private struct DoubleValue
@@ -280,6 +288,7 @@ public sealed class SimConnectClient : ISimClient
                 try { _sim.Dispose(); } catch { /* ignore */ }
                 _sim = null;
                 _openReceived = false;
+                ClearDynamicDefCache();
             }
         }
 
@@ -320,6 +329,7 @@ public sealed class SimConnectClient : ISimClient
 
             _nextDefId = (uint)Definitions.DynamicBase;
             _nextReqId = (uint)Requests.DynamicBase;
+            ClearDynamicDefCache();
             ResetSessionHealth();
             RegisterFixedDefinitions(_sim);
             _airportCache.Clear();
@@ -369,6 +379,7 @@ public sealed class SimConnectClient : ISimClient
             }
 
             _openReceived = false;
+            ClearDynamicDefCache();
             ResetSessionHealth();
             _pmdgNg3Subscribed = false;
             _pmdgControlSubscribed = false;
@@ -412,21 +423,12 @@ public sealed class SimConnectClient : ISimClient
 
             lock (_gate)
             {
-                defId = _nextDefId++;
-                reqId = _nextReqId++;
-                tcs = NewPending(reqId);
-
                 // Do NOT ClearDataDefinition after use — it raises async
                 // SIMCONNECT_EXCEPTION_UNRECOGNIZED_ID (3) and races with pending reads.
-                // Dynamic IDs are monotonic until the next ConnectAsync reset.
-                sim.AddToDataDefinition(
-                    (Definitions)defId,
-                    name,
-                    NormalizeUnit(unit),
-                    SIMCONNECT_DATATYPE.FLOAT64,
-                    0.0f,
-                    SimConnect.SIMCONNECT_UNUSED);
-                sim.RegisterDataDefineStruct<DoubleValue>((Definitions)defId);
+                // Identical (name, unit) reuse the same def until ConnectAsync reset.
+                defId = EnsureSingleDef(sim, name, unit);
+                reqId = _nextReqId++;
+                tcs = NewPending(reqId);
                 sim.RequestDataOnSimObject(
                     (Requests)reqId,
                     (Definitions)defId,
@@ -472,39 +474,9 @@ public sealed class SimConnectClient : ISimClient
 
             lock (_gate)
             {
-                defId = _nextDefId++;
+                defId = EnsureBatchDef(sim, vars, padded);
                 reqId = _nextReqId++;
                 tcs = NewPending(reqId);
-
-                for (var i = 0; i < padded; i++)
-                {
-                    var name = i < vars.Count ? vars[i].Name : "SIM ON GROUND";
-                    var unit = i < vars.Count ? vars[i].Unit : "Bool";
-                    sim.AddToDataDefinition(
-                        (Definitions)defId,
-                        name,
-                        NormalizeUnit(unit),
-                        SIMCONNECT_DATATYPE.FLOAT64,
-                        0.0f,
-                        SimConnect.SIMCONNECT_UNUSED);
-                }
-
-                switch (padded)
-                {
-                    case 8:
-                        sim.RegisterDataDefineStruct<Batch8>((Definitions)defId);
-                        break;
-                    case 16:
-                        sim.RegisterDataDefineStruct<Batch16>((Definitions)defId);
-                        break;
-                    case 24:
-                        sim.RegisterDataDefineStruct<Batch24>((Definitions)defId);
-                        break;
-                    default:
-                        sim.RegisterDataDefineStruct<Batch32>((Definitions)defId);
-                        break;
-                }
-
                 sim.RequestDataOnSimObject(
                     (Requests)reqId,
                     (Definitions)defId,
@@ -1253,6 +1225,106 @@ public sealed class SimConnectClient : ISimClient
         }
     }
 
+    private void ClearDynamicDefCache()
+    {
+        _batchDefCache.Clear();
+        _singleDefCache.Clear();
+    }
+
+    private static string BatchDefKey(IReadOnlyList<(string Name, string Unit)> vars, int padded)
+    {
+        var parts = new string[padded];
+        for (var i = 0; i < padded; i++)
+        {
+            if (i < vars.Count)
+            {
+                parts[i] = vars[i].Name + "\t" + (NormalizeUnit(vars[i].Unit) ?? "");
+            }
+            else
+            {
+                parts[i] = "SIM ON GROUND\tBool";
+            }
+        }
+
+        return padded + ":" + string.Join("\n", parts);
+    }
+
+    private uint EnsureBatchDef(
+        SimConnect sim,
+        IReadOnlyList<(string Name, string Unit)> vars,
+        int padded)
+    {
+        var key = BatchDefKey(vars, padded);
+        if (_batchDefCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var defId = _nextDefId++;
+        for (var i = 0; i < padded; i++)
+        {
+            var name = i < vars.Count ? vars[i].Name : "SIM ON GROUND";
+            var unit = i < vars.Count ? vars[i].Unit : "Bool";
+            sim.AddToDataDefinition(
+                (Definitions)defId,
+                name,
+                NormalizeUnit(unit),
+                SIMCONNECT_DATATYPE.FLOAT64,
+                0.0f,
+                SimConnect.SIMCONNECT_UNUSED);
+        }
+
+        switch (padded)
+        {
+            case 8:
+                sim.RegisterDataDefineStruct<Batch8>((Definitions)defId);
+                break;
+            case 16:
+                sim.RegisterDataDefineStruct<Batch16>((Definitions)defId);
+                break;
+            case 24:
+                sim.RegisterDataDefineStruct<Batch24>((Definitions)defId);
+                break;
+            default:
+                sim.RegisterDataDefineStruct<Batch32>((Definitions)defId);
+                break;
+        }
+
+        if (_batchDefCache.Count < MaxCachedBatchDefs)
+        {
+            _batchDefCache[key] = defId;
+            Console.WriteLine(
+                $"[simconnect] cached batch def id={defId} pad={padded} vars={vars.Count}");
+        }
+
+        return defId;
+    }
+
+    private uint EnsureSingleDef(SimConnect sim, string name, string unit)
+    {
+        var key = name + "\t" + (NormalizeUnit(unit) ?? "");
+        if (_singleDefCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var defId = _nextDefId++;
+        sim.AddToDataDefinition(
+            (Definitions)defId,
+            name,
+            NormalizeUnit(unit),
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0.0f,
+            SimConnect.SIMCONNECT_UNUSED);
+        sim.RegisterDataDefineStruct<DoubleValue>((Definitions)defId);
+        if (_singleDefCache.Count < MaxCachedSingleDefs)
+        {
+            _singleDefCache[key] = defId;
+        }
+
+        return defId;
+    }
+
     private SimConnect RequireSim()
     {
         if (_sim is null || !_openReceived)
@@ -1373,6 +1445,7 @@ public sealed class SimConnectClient : ISimClient
             }
 
             _openReceived = false;
+            ClearDynamicDefCache();
             ResetSessionHealth();
             _pmdgNg3Subscribed = false;
             _pmdgControlSubscribed = false;
@@ -1568,10 +1641,8 @@ public sealed class SimConnectClient : ISimClient
 
     private void OnRecvQuit(SimConnect sender, SIMCONNECT_RECV data)
     {
-        _openReceived = false;
-        ResetSessionHealth();
-        Console.WriteLine("[simconnect] simulator quit");
-        FailAllPending("NOT_CONNECTED", "Simulator quit");
+        Console.WriteLine("[simconnect] simulator quit — tearing down session");
+        TearDownAfterRecvFailure();
     }
 
     private void OnRecvException(SimConnect sender, SIMCONNECT_RECV_EXCEPTION data)

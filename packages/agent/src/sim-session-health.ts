@@ -14,6 +14,16 @@ export const IPC_NOT_CONNECTED = 'NOT_CONNECTED';
 
 const IPC_SESSION_CODES = new Set([IPC_TIMEOUT, IPC_NOT_CONNECTED]);
 
+/** Hang-mole TIMEOUT: retry soon. */
+export const PIPE_BACKOFF_START_MS = 2_000;
+export const PIPE_BACKOFF_MAX_MS = 20_000;
+/** MSFS quit / not running: do not hammer ConnectAsync. */
+export const SIM_DOWN_BACKOFF_START_MS = 8_000;
+export const SIM_DOWN_BACKOFF_MAX_MS = 15_000;
+
+const SIM_DOWN_MESSAGE =
+  /Failed to open SimConnect|Is MSFS 2024 running|Timed out waiting for SimConnect open|Simulator quit/i;
+
 export type SimBridgeSessionPing = {
   pong?: boolean;
   mode?: string;
@@ -105,7 +115,34 @@ export function formatIpcError(err: unknown): string {
 }
 
 export function simIpcSessionDied(err: unknown): boolean {
-  return isIpcTimeout(err) || isIpcDisconnected(err);
+  return isIpcTimeout(err) || isSimDownError(err);
+}
+
+/** MSFS closed, pipe dead, or Host could not open SimConnect. */
+export function isSimDownError(err: unknown): boolean {
+  if (isIpcDisconnected(err)) return true;
+  if (err instanceof IpcClientError && err.code === 'SIM_ERROR') {
+    return SIM_DOWN_MESSAGE.test(err.message);
+  }
+  const text =
+    typeof err === 'string'
+      ? err
+      : err instanceof Error
+        ? err.message
+        : String(err ?? '');
+  return SIM_DOWN_MESSAGE.test(text);
+}
+
+/**
+ * First wait uses startMs for this error class; later waits double up to max.
+ * Pass 0 after a successful tick / Watch start.
+ */
+export function nextPipeBackoffMs(previousWaitMs: number, err: unknown): number {
+  const simDown = isSimDownError(err) && !isIpcTimeout(err);
+  const startMs = simDown ? SIM_DOWN_BACKOFF_START_MS : PIPE_BACKOFF_START_MS;
+  const maxMs = simDown ? SIM_DOWN_BACKOFF_MAX_MS : PIPE_BACKOFF_MAX_MS;
+  if (!(previousWaitMs >= startMs)) return startMs;
+  return Math.min(maxMs, previousWaitMs * 2);
 }
 
 /** @deprecated Prefer simIpcSessionDied(err). String form only honors `CODE:` prefix. */
@@ -114,13 +151,13 @@ export function simSessionDeadError(message: string): boolean {
 }
 
 /**
- * Pipe-down / NOT_CONNECTED → reopen immediately.
- * Hang-mole TIMEOUT → after 2 consecutive tick errors (not on the first miss).
+ * Pipe-down / MSFS quit / failed ConnectAsync → reopen (Watch still waits
+ * nextPipeBackoffMs). Hang-mole TIMEOUT → after 2 consecutive tick errors.
  */
 export function shouldReopenSimSession(
   err: unknown,
   consecutiveErrors: number,
 ): boolean {
-  if (isIpcDisconnected(err)) return true;
+  if (isSimDownError(err)) return true;
   return isIpcTimeout(err) && consecutiveErrors >= 2;
 }

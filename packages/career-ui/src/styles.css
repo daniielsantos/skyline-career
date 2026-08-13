@@ -4797,16 +4797,17 @@ small {
 
 .skyline-inject-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.55rem;
-  max-width: min(32rem, 100%);
+  max-width: min(36rem, 100%);
 }
 
 .skyline-inject-status {
   margin: 0;
-  flex: 1 1 10rem;
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: 18rem;
   font-size: 0.78rem;
   line-height: 1.3;
@@ -4824,6 +4825,7 @@ small {
 
 .skyline-inject-switch {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0.55rem;
   margin: 0;

@@ -25,6 +25,7 @@ import {
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import {
   formatIpcError,
+  nextPipeBackoffMs,
   pingNeedsSessionReset,
   shouldReopenSimSession,
   simIpcSessionDied,
@@ -94,7 +95,7 @@ export class BushTripWatchSession {
   private walletUsd: number | null = null;
   private tickInFlight = false;
   private pipeRetryAtMs = 0;
-  private pipeBackoffMs = 2_000;
+  private pipeBackoffMs = 0;
   private consecutivePipeErrors = 0;
   private pendingSimConnectReset = false;
   private lastSuccessfulTickAtMs = 0;
@@ -217,7 +218,7 @@ export class BushTripWatchSession {
     this.completed = false;
     this.payoutUsd = null;
     this.pipeRetryAtMs = 0;
-    this.pipeBackoffMs = 2_000;
+    this.pipeBackoffMs = 0;
     this.consecutivePipeErrors = 0;
     this.pendingSimConnectReset = false;
     this.lastSuccessfulTickAtMs = 0;
@@ -334,7 +335,7 @@ export class BushTripWatchSession {
       this.lastSample = sample;
       this.lastSuccessfulTickAtMs = Date.now();
       this.consecutivePipeErrors = 0;
-      this.pipeBackoffMs = 2_000;
+      this.pipeBackoffMs = 0;
       this.lastError = null;
 
       const active = await this.cb.withCareerRead((_w, missions) =>
@@ -430,8 +431,9 @@ export class BushTripWatchSession {
     } catch (error) {
       this.consecutivePipeErrors += 1;
       this.lastError = formatIpcError(error);
-      this.pipeRetryAtMs = Date.now() + this.pipeBackoffMs;
-      this.pipeBackoffMs = Math.min(30_000, this.pipeBackoffMs * 2);
+      const waitMs = nextPipeBackoffMs(this.pipeBackoffMs, error);
+      this.pipeRetryAtMs = Date.now() + waitMs;
+      this.pipeBackoffMs = waitMs;
       watchDebugLog('bush-watch', 'tick error', { error: this.lastError });
       if (simIpcSessionDied(error)) {
         this.pendingSimConnectReset = true;

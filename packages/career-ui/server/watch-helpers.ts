@@ -73,6 +73,8 @@ import { NamedPipeSimBridge, setNamedPipeDebugLog } from '../../agent/src/named-
 import {
   formatIpcError,
   isIpcTimeout,
+  isSimDownError,
+  nextPipeBackoffMs,
   pingNeedsSessionReset,
   shouldReopenSimSession,
   simIpcSessionDied,
@@ -1055,7 +1057,8 @@ export class CareerWatchSession {
   private tickInFlight = false;
   /** Earliest time we may retry SimBridge after a pipe drop. */
   private pipeRetryAtMs = 0;
-  private pipeBackoffMs = 2_000;
+  /** Last wait used after a pipe/sim-down error; 0 = next error uses startMs. */
+  private pipeBackoffMs = 0;
   /** Next tick: IPC disconnect+connect (station TIMEOUT was swallowed). */
   private pendingSimConnectReset = false;
   private preflightDepartBlockedLogged = false;
@@ -1218,7 +1221,7 @@ export class CareerWatchSession {
           Date.now() - this.lastSuccessfulTickAtMs > 12_000;
         const reconnecting =
           typeof this.lastError === 'string' &&
-          /not connected|pipe closed|0xC00000B0|TIMEOUT|session stale|Reconnecting|retry in/i.test(
+          /not connected|pipe closed|0xC00000B0|TIMEOUT|session stale|simulator closed|Reconnecting|retry in/i.test(
             this.lastError,
           ) &&
           this.consecutivePipeErrors >= 2;
@@ -1282,7 +1285,7 @@ export class CareerWatchSession {
     this.lastEventAtIso = null;
     this.lastError = null;
     this.pipeRetryAtMs = 0;
-    this.pipeBackoffMs = 2_000;
+    this.pipeBackoffMs = 0;
     this.lastSuccessfulTickAtMs = 0;
     this.lastLoadSampleAtMs = 0;
     this.consecutivePipeErrors = 0;
@@ -1660,7 +1663,7 @@ export class CareerWatchSession {
       }
       this.lastSample = sample;
       this.lastError = null;
-      this.pipeBackoffMs = 2_000;
+      this.pipeBackoffMs = 0;
       this.pipeRetryAtMs = 0;
       this.consecutivePipeErrors = 0;
       this.lastSuccessfulTickAtMs = Date.now();
@@ -2833,13 +2836,15 @@ export class CareerWatchSession {
         this.bridge &&
         shouldReopenSimSession(error, this.consecutivePipeErrors)
       ) {
-        const waitMs = this.pipeBackoffMs;
+        const waitMs = nextPipeBackoffMs(this.pipeBackoffMs, error);
         this.pipeRetryAtMs = Date.now() + waitMs;
-        this.pipeBackoffMs = Math.min(20_000, this.pipeBackoffMs * 2);
+        this.pipeBackoffMs = waitMs;
         const timeoutHang = isIpcTimeout(error);
         this.lastError = timeoutHang
           ? `SimConnect session stale — retry in ${Math.round(waitMs / 1000)}s`
-          : `Pipe closed — retry in ${Math.round(waitMs / 1000)}s`;
+          : isSimDownError(error)
+            ? `Simulator closed — retry in ${Math.round(waitMs / 1000)}s`
+            : `Pipe closed — retry in ${Math.round(waitMs / 1000)}s`;
         watchDebugLog('watch', 'pipe backoff', { waitMs, timeoutHang });
         try {
           await this.bridge.close({ disconnectHost: false });

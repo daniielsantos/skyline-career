@@ -79,7 +79,10 @@ import {
   shouldReopenSimSession,
   simIpcSessionDied,
 } from '../../agent/src/sim-session-health.ts';
-import { readTfdiMd11EfbLvars } from '../../agent/src/ofp-compliance/live-reader.ts';
+import {
+  readA2aAccusimLvars,
+  readTfdiMd11EfbLvars,
+} from '../../agent/src/ofp-compliance/live-reader.ts';
 import { adjustPlannedPayloadForLiveCrewStations } from '../../agent/src/ofp-load-plan.ts';
 import {
   readLiveCruiseTasKt,
@@ -508,11 +511,16 @@ export async function sampleLiveLoadLb(
   bridge: NamedPipeSimBridge,
   plannedPayloadLb?: number,
   previousStationSumLb?: number,
-  opts: { preferTfdiEfb?: boolean; shouldAbort?: () => boolean } = {},
+  opts: {
+    preferTfdiEfb?: boolean;
+    preferA2aLvars?: boolean;
+    keepStationIndexes?: number[];
+    shouldAbort?: () => boolean;
+  } = {},
 ): Promise<{
   fuelLb: number | null;
   payloadLb: number | null;
-  payloadSource: 'stations' | 'mass-balance' | 'tfdi-efb' | 'none';
+  payloadSource: 'stations' | 'mass-balance' | 'tfdi-efb' | 'a2a-lvars' | 'none';
   massBalanceLb?: number | null;
   emptyWeightLb?: number | null;
   grossWeightLb?: number | null;
@@ -695,8 +703,12 @@ export async function sampleLiveLoadLb(
   // drop in classic stations so Preflight can leave READY after the user empties.
   let payloadLb =
     resolved.payloadLb !== undefined ? resolved.payloadLb : null;
-  let payloadSource: 'stations' | 'mass-balance' | 'tfdi-efb' | 'none' =
-    resolved.source;
+  let payloadSource:
+    | 'stations'
+    | 'mass-balance'
+    | 'tfdi-efb'
+    | 'a2a-lvars'
+    | 'none' = resolved.source;
   if (
     !stationsIncomplete &&
     stationsRead > 0 &&
@@ -737,10 +749,6 @@ export async function sampleLiveLoadLb(
     payloadSource = 'mass-balance';
   }
 
-  const usableTanks = isUsableFuelTankBreakdown(fuelTanks, fuelLb)
-    ? fuelTanks
-    : undefined;
-
   let tfdiEfbCargoLb: number | null = null;
   if (opts.preferTfdiEfb) {
     try {
@@ -759,18 +767,60 @@ export async function sampleLiveLoadLb(
     }
   }
 
+  let a2aStations: Record<number, number> | undefined;
+  if (opts.preferA2aLvars) {
+    try {
+      const a2a = await readA2aAccusimLvars(bridge, density, {
+        keepStationIndexes: opts.keepStationIndexes,
+      });
+      if (typeof a2a.fuelLb === 'number' && a2a.fuelLb > 0) {
+        fuelLb = a2a.fuelLb;
+        Object.assign(fuelTanks, {
+          left: a2a.tanks.left,
+          right: a2a.tanks.right,
+          center: a2a.tanks.center,
+          ...(a2a.tanks.leftTip !== undefined
+            ? { leftTip: a2a.tanks.leftTip }
+            : {}),
+          ...(a2a.tanks.rightTip !== undefined
+            ? { rightTip: a2a.tanks.rightTip }
+            : {}),
+        });
+      }
+      if (typeof a2a.payloadLb === 'number' && a2a.payloadLb > 0) {
+        payloadLb = a2a.payloadLb;
+        payloadSource = 'a2a-lvars';
+        a2aStations = a2a.stations;
+      }
+      if (a2a.emptyLb !== undefined) emptyWeightLb = a2a.emptyLb;
+      if (a2a.grossLb !== undefined) grossWeightLb = a2a.grossLb;
+    } catch {
+      /* keep classic sample */
+    }
+  }
+
+  const vendorLivePayload =
+    payloadSource === 'tfdi-efb' || payloadSource === 'a2a-lvars';
+  const usableTanks = isUsableFuelTankBreakdown(fuelTanks, fuelLb)
+    ? fuelTanks
+    : undefined;
+  const stationsOut = a2aStations
+    ? a2aStations
+    : !stationsIncomplete && stationsRead > 0
+      ? stations
+      : undefined;
   const payloadFromMbOnIncomplete =
     stationsIncomplete &&
     typeof massBalanceLb === 'number' &&
     (payloadSource === 'mass-balance' || mbCollapsed);
   return {
     fuelLb,
-    payloadLb: stationsIncomplete
+    payloadLb: stationsIncomplete && !vendorLivePayload
       ? payloadFromMbOnIncomplete
         ? massBalanceLb!
         : null
       : payloadLb,
-    payloadSource: stationsIncomplete
+    payloadSource: stationsIncomplete && !vendorLivePayload
       ? payloadFromMbOnIncomplete
         ? 'mass-balance'
         : 'none'
@@ -778,12 +828,18 @@ export async function sampleLiveLoadLb(
     massBalanceLb: massBalanceLb ?? null,
     emptyWeightLb: emptyWeightLb ?? null,
     grossWeightLb: grossWeightLb ?? null,
-    stationSumLb: stationsIncomplete || stationsRead === 0 ? null : stationSum,
+    stationSumLb: stationsOut
+      ? Object.values(stationsOut).reduce((s, lb) => s + lb, 0)
+      : stationsIncomplete || stationsRead === 0
+        ? null
+        : stationSum,
     tfdiEfbCargoLb,
     ...(usableTanks ? { fuelTanks: usableTanks } : {}),
     ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
-    ...(!stationsIncomplete && stationsRead > 0 ? { stations } : {}),
-    ...(stationsIncomplete ? { stationsIncomplete: true } : {}),
+    ...(stationsOut ? { stations: stationsOut } : {}),
+    ...(stationsIncomplete && !vendorLivePayload
+      ? { stationsIncomplete: true }
+      : {}),
     ...(capacitySessionDied ? { sessionDied: true } : {}),
   };
 }
@@ -1728,12 +1784,26 @@ export class CareerWatchSession {
           const preferTfdiEfb =
             /tfdi-md11/i.test(current.rolesPackRelPath ?? '') ||
             /tfdi-md11/i.test(current.airframeTypeId ?? '');
+          const preferA2aLvars =
+            /a2a-/i.test(current.rolesPackRelPath ?? '') ||
+            /a2a-/i.test(current.airframeTypeId ?? '');
+          const keepFromMax = prevWatchPayload.stationMax
+            ? Object.keys(prevWatchPayload.stationMax).map(Number)
+            : undefined;
+          const keepFromStations = prevWatchPayload.stations
+            ? Object.keys(prevWatchPayload.stations).map(Number)
+            : undefined;
           const load = await sampleLiveLoadLb(
             this.bridge,
             prevVerification.payload.plannedLb,
             previousStationSumLb,
             {
               preferTfdiEfb,
+              preferA2aLvars,
+              keepStationIndexes:
+                keepFromMax && keepFromMax.length > 0
+                  ? keepFromMax
+                  : keepFromStations,
               shouldAbort: () => !this.running || isOfpLoadActive(),
             },
           );

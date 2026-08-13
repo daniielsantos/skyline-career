@@ -22,6 +22,8 @@
 - Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, CENTER.
 - See profiles/notes/a2a-accusim.md
 - Homologated with interactive wizard (recipe lvar-bridge).
+- CG: `calibrated-live` −15…15% MAC (sweep −6…+13; empty ~−5; crew-only + wing fuel ~−11). Do **not** use SimVar FWD/AFT 0–100 — that made inject strict-fail and roll back payload. Fill must still place Due on the aft half if MAC is past FWD before cargo exists.
+- Preflight/Watch liveSources: `a2a-lvars` (PayloadWeight / Fuel* gallons / Character* + BaggageWeight). Classic `PAYLOAD STATION WEIGHT` is ghost (S1+S7 only) — not an `if (a2a)` in the fill loop.
 
 ## Homologated
 

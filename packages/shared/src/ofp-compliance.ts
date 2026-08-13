@@ -679,7 +679,9 @@ function compareLoadSheetWeights(
   }
 
   const efbWeights =
-    liveWeights?.source === 'pmdg-efb-lvars' || liveWeights?.source === 'tfdi-efb-lvars';
+    liveWeights?.source === 'pmdg-efb-lvars' ||
+    liveWeights?.source === 'tfdi-efb-lvars' ||
+    liveWeights?.source === 'a2a-lvars';
 
   if (sheet.tow !== undefined || (sheet.zfw !== undefined && (sheet.blockFuel !== undefined || ofp.fuel.total !== undefined))) {
     // Prefer ramp = est_zfw + block. SimBrief est_tow is often post-taxi.

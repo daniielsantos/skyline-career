@@ -110,7 +110,14 @@ export function inferStationRolesFromProfile(
 
 export function inferLiveSourcesFromProfile(profile: AircraftProfile): OfpLiveSources {
   const strategy = profile.fuel.strategy;
-  if (strategy === 'lvar-bridge' || strategy === 'hybrid-sync' || strategy === 'vendor-specific') {
+  if (strategy === 'lvar-bridge') {
+    return {
+      fuel: ['a2a-lvars', 'classic'],
+      weights: ['a2a-lvars', 'classic-weights'],
+      payload: ['a2a-lvars'],
+    };
+  }
+  if (strategy === 'hybrid-sync' || strategy === 'vendor-specific') {
     return {
       fuel: ['mass-balance', 'classic'],
       weights: ['classic-weights'],

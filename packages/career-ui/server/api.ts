@@ -5303,6 +5303,31 @@ export function createCareerApiServer(port = 8787) {
           {
             const wrote = await updateOpenMission(body.missionId, (_m, open) => {
               if (lastPreflightCheck) open.lastPreflightCheck = lastPreflightCheck;
+              const painted = result.displayCg;
+              const prevLv = open.lastPreflightCheck?.loadVerification;
+              if (result.ok && painted && prevLv) {
+                const minMac = painted.minMac;
+                const maxMac = painted.maxMac;
+                const liveMac = painted.liveMac;
+                const inEnvelope =
+                  liveMac === undefined ||
+                  minMac === undefined ||
+                  maxMac === undefined ||
+                  (liveMac >= minMac && liveMac <= maxMac);
+                open.lastPreflightCheck = {
+                  ...open.lastPreflightCheck!,
+                  loadVerification: {
+                    ...prevLv,
+                    cg: {
+                      liveMac,
+                      minMac,
+                      maxMac,
+                      ok: inEnvelope,
+                      severity: inEnvelope ? 'info' : 'warn',
+                    },
+                  },
+                };
+              }
               open.injectBallastLb = injectBallastLb;
               savedMission = open;
               return true;

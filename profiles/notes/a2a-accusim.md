@@ -36,7 +36,7 @@ Layouts seen so far:
 | Airframe | Tanks |
 |----------|--------|
 | Aerostar 600 | wing L/R + fuselage (`CENTER`) |
-| PA-24-250 Comanche | wing L/R + tip L/R (`LEFT_TIP` / `RIGHT_TIP`) |
+| PA-24-250 Comanche | wing L/R + tip L/R (`LEFT_TIP` / `RIGHT_TIP`); **4 seats** (do not write Character5/6) |
 
 Recipe lists **all** candidates; `draftProfileFromVendorRecipe` keeps only tanks with classic/usable capacity ≥ 5.
 
@@ -106,6 +106,8 @@ Smoke only fills the first three profile stations (seats), so baggage stays 0 un
 | `CoGmin` / `CoGmax` | Forward / aft limits (same units as `CoG`). |
 
 Do **not** drive apply from these; use them for sanity checks vs EFB.
+
+**Live-read (Preflight/Watch):** pack `liveSources` `a2a-lvars` reads `PayloadWeight`, `Fuel*` (gallons→lb), `Character1–6Weight`, `SeatNCharacter`, `BaggageWeight`. Schematic follows occupancy (Character* linger after the tablet empties a seat). Same pattern as TFDi EFB — not a publisher `if` in inject fill.
 
 ---
 

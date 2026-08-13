@@ -1,8 +1,11 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-13: def cache Watch + backoff MSFS-down (ainda sem release). Dual-client IPC de fora.
+Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). Dual-client IPC de fora.
 
 ## Validar (manual)
+
+- [ ] Aerostar inject: tablet PAYLOAD = Due; Preflight Sim ≈ tablet (não 303 vs 1332)
+- [ ] Aerostar schematic: Character* + BaggageWeight, não só S1/S7 clássicos
 
 - [ ] Hot-swap Host novo (`resources/host`) — log `timeout storm` / `unrecognized_id storm` + `connect() will reopen`
 - [ ] Watch solo: um pedido `readSimVars` (não 16 stations em série)
@@ -28,6 +31,9 @@ Atualizado 2026-08-13: def cache Watch + backoff MSFS-down (ainda sem release). 
 
 - Defs SimConnect reusadas para batches Watch/inject idênticos (cache no Host).
 - Watch backoff 8s→15s em queda do MSFS; UI `Simulator closed — retry in Ns`.
+- A2A Accu-Sim: liveSource `a2a-lvars` (PayloadWeight / Fuel* / Character*) no pack Aerostar/Comanche. Sem `if (a2a)` no fill.
+- Aerostar fill: se CG já passou FWD com só crew, colocar Due na metade aft (não cortar cargo). Envelope calibrado −15…15.
+- CG card: pinta envelope do perfil (calibrated-live), não SimVar FWD/AFT 0–100. Watch ainda não relê CG no tick.
 
 ## Não fazer sem pedido
 

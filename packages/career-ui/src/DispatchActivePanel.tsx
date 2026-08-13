@@ -103,6 +103,8 @@ export function DispatchActivePanel(props: {
     cgAttempt?: number;
     cgMaxAttempts?: number;
     liveMac?: number;
+    minMac?: number;
+    maxMac?: number;
     liveFuelLb?: number;
     livePayloadLb?: number;
   liveTanks?: {
@@ -895,6 +897,7 @@ export function DispatchActivePanel(props: {
                       },
                       cg:
                         injectProgress.liveMac !== undefined ||
+                        injectProgress.minMac !== undefined ||
                         verification.cg
                           ? {
                               ...(verification.cg ?? {
@@ -904,6 +907,12 @@ export function DispatchActivePanel(props: {
                               liveMac:
                                 injectProgress.liveMac ??
                                 verification.cg?.liveMac,
+                              ...(injectProgress.minMac !== undefined
+                                ? { minMac: injectProgress.minMac }
+                                : {}),
+                              ...(injectProgress.maxMac !== undefined
+                                ? { maxMac: injectProgress.maxMac }
+                                : {}),
                             }
                           : verification.cg,
                     };

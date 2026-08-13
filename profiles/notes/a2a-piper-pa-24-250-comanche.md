@@ -23,6 +23,7 @@
 - Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, LEFT_TIP, RIGHT_TIP.
 - See profiles/notes/a2a-accusim.md
 - Homologated with interactive wizard (recipe lvar-bridge).
+- CG: `calibrated-live` −10…30% MAC (empty ~−4.5). Do **not** use SimVar FWD/AFT 0–100. Four-seat cabin: stations 1–4 + baggage 7 (no Character5/6). Tablet `Max. baggage` 200 lb.
 
 ## Homologated
 

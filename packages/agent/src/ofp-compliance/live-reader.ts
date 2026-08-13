@@ -1,4 +1,5 @@
 import {
+  DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
   applyPmdgEfbPayloadCorrection,
   enrichPayloadWithRoles,
@@ -24,6 +25,35 @@ export const PMDG_EFB_LVARS = {
   zfwCg: 'L:CG_ZFW_Lvar',
   landingWeight: 'L:LW_Lvar',
   landingCg: 'L:CG_LW_Lvar',
+} as const;
+
+/** A2A Accu-Sim tablet (Fuel* gallons, Character* + BaggageWeight + PayloadWeight lb). */
+export const A2A_ACCUSIM_LVARS = {
+  payloadWeight: 'PayloadWeight',
+  emptyWeight: 'EmptyWeightLbs',
+  grossWeight: 'GrossWeightLbs',
+  fuelLeft: 'FuelLeftWingTank',
+  fuelRight: 'FuelRightWingTank',
+  fuelCenter: 'FuelFuselageTank',
+  fuelLeftTip: 'FuelLeftTipTank',
+  fuelRightTip: 'FuelRightTipTank',
+  character: [
+    'Character1Weight',
+    'Character2Weight',
+    'Character3Weight',
+    'Character4Weight',
+    'Character5Weight',
+    'Character6Weight',
+  ] as const,
+  occupancy: [
+    'Seat1Character',
+    'Seat2Character',
+    'Seat3Character',
+    'Seat4Character',
+    'Seat5Character',
+    'Seat6Character',
+  ] as const,
+  baggage: 'BaggageWeight',
 } as const;
 
 /** TFDi MD-11 EFB payload panel (efb.js setPayload → L:MD11_EFB_PAYLOAD_*). */
@@ -91,6 +121,7 @@ export interface LiveLoadReading {
     payloadLb?: number;
     fuelLb?: number;
   };
+  a2a?: A2aAccusimLive;
 }
 
 function galToLb(gal: number, densityLbPerGal: number): number {
@@ -349,6 +380,179 @@ export function interpretTfdiEfbWeightLvar(
   return raw;
 }
 
+export type A2aAccusimLive = {
+  payloadLb?: number;
+  fuelLb?: number;
+  emptyLb?: number;
+  grossLb?: number;
+  tanks: {
+    left: number;
+    right: number;
+    center: number;
+    leftTip?: number;
+    rightTip?: number;
+  };
+  stations: Record<number, number>;
+};
+
+async function readLvarNumber(
+  bridge: NamedPipeSimBridge,
+  name: string,
+): Promise<number | undefined> {
+  try {
+    const raw = await bridge.readLVar(name);
+    return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function galToFuelLb(gal: number | undefined, densityLbPerGal: number): number {
+  if (gal === undefined || !Number.isFinite(gal) || gal <= 0) return 0;
+  return gal * densityLbPerGal;
+}
+
+/**
+ * Tablet paint: occupancy owns the seat boxes. Character* often linger after
+ * the EFB empties a seat; PayloadWeight is the header total.
+ */
+export function paintA2aAccusimStations(opts: {
+  characterLb: Array<number | undefined>;
+  occupancy?: Array<number | undefined>;
+  baggageLb?: number;
+  payloadLb?: number;
+  /** Pack station indexes (Comanche 1–4+7). Ghost Character5/6 stay off the schematic. */
+  keepStationIndexes?: number[];
+}): Record<number, number> {
+  const keep = opts.keepStationIndexes?.length
+    ? new Set(opts.keepStationIndexes)
+    : undefined;
+  const stations: Record<number, number> = {};
+  for (let i = 0; i < 6; i += 1) {
+    const index = i + 1;
+    if (keep && !keep.has(index)) continue;
+    const lb = opts.characterLb[i];
+    const weight = typeof lb === 'number' && lb >= 0 ? lb : 0;
+    const occ = opts.occupancy?.[i];
+    if (typeof occ === 'number' && Number.isFinite(occ)) {
+      stations[index] = occ >= 0.5 ? weight : 0;
+    } else {
+      stations[index] = weight;
+    }
+  }
+  const baggage =
+    typeof opts.baggageLb === 'number' && opts.baggageLb >= 0
+      ? opts.baggageLb
+      : 0;
+  if (!keep || keep.has(7)) {
+    stations[7] = baggage;
+  }
+
+  const payloadLb = opts.payloadLb;
+  if (payloadLb === undefined || !Number.isFinite(payloadLb)) {
+    return stations;
+  }
+  let sum = Object.values(stations).reduce((s, lb) => s + lb, 0);
+  if (sum <= payloadLb + 75) {
+    return stations;
+  }
+  const occupied = (index: number): boolean => {
+    if (index === 7) return (stations[7] ?? 0) > 0;
+    const occ = opts.occupancy?.[index - 1];
+    return typeof occ === 'number' && occ >= 0.5;
+  };
+  // Occupancy lagged at 1 while the tablet header already dropped.
+  // Never blank a seat the tablet still shows occupied (Comanche S4 vs ghost S5/S6).
+  for (const index of [6, 5, 4, 3, 2, 7]) {
+    if (sum <= payloadLb + 25) break;
+    const cur = stations[index] ?? 0;
+    if (cur <= 0 || occupied(index)) continue;
+    stations[index] = 0;
+    sum -= cur;
+  }
+  return stations;
+}
+
+/** Accu-Sim tablet LVars — not classic PAYLOAD STATION / FUEL TANK mirrors. */
+export async function readA2aAccusimLvars(
+  bridge: NamedPipeSimBridge,
+  densityLbPerGal = DEFAULT_AVGAS_LB_PER_GAL,
+  opts: { keepStationIndexes?: number[] } = {},
+): Promise<A2aAccusimLive> {
+  const names = [
+    A2A_ACCUSIM_LVARS.payloadWeight,
+    A2A_ACCUSIM_LVARS.emptyWeight,
+    A2A_ACCUSIM_LVARS.grossWeight,
+    A2A_ACCUSIM_LVARS.fuelLeft,
+    A2A_ACCUSIM_LVARS.fuelRight,
+    A2A_ACCUSIM_LVARS.fuelCenter,
+    A2A_ACCUSIM_LVARS.fuelLeftTip,
+    A2A_ACCUSIM_LVARS.fuelRightTip,
+    ...A2A_ACCUSIM_LVARS.character,
+    A2A_ACCUSIM_LVARS.baggage,
+    ...A2A_ACCUSIM_LVARS.occupancy,
+  ];
+  let values: Array<number | undefined> = [];
+  try {
+    const batch = await readSimVarsSoft(
+      bridge,
+      names.map((name) => ({ name: `L:${name}`, unit: 'number' })),
+    );
+    values = batch.map((v) =>
+      typeof v === 'number' && Number.isFinite(v) ? v : undefined,
+    );
+  } catch {
+    values = await Promise.all(names.map((name) => readLvarNumber(bridge, name)));
+  }
+
+  const num = (i: number): number | undefined => values[i];
+  const left = galToFuelLb(num(3), densityLbPerGal);
+  const right = galToFuelLb(num(4), densityLbPerGal);
+  const center = galToFuelLb(num(5), densityLbPerGal);
+  const leftTip = galToFuelLb(num(6), densityLbPerGal);
+  const rightTip = galToFuelLb(num(7), densityLbPerGal);
+  const fuelLb = left + right + center + leftTip + rightTip;
+  const payloadRaw = num(0);
+  const characterLb = A2A_ACCUSIM_LVARS.character.map((_, i) => num(8 + i));
+  const baggage = num(14);
+  const occupancy = A2A_ACCUSIM_LVARS.occupancy.map((_, i) => num(15 + i));
+  const payloadHint =
+    typeof payloadRaw === 'number' && payloadRaw >= 50 ? payloadRaw : undefined;
+  const stations = paintA2aAccusimStations({
+    characterLb,
+    occupancy,
+    baggageLb: baggage,
+    payloadLb: payloadHint,
+    keepStationIndexes: opts.keepStationIndexes,
+  });
+  const stationSum = Object.values(stations).reduce((s, lb) => s + lb, 0);
+  // Prefer painted Character* + baggage (tablet seat boxes). PayloadWeight on
+  // Accu-Sim often caps occupants at 170 lb (Comanche 4×170+200 bag = 880
+  // while seats show 201+201).
+  const payloadLb =
+    stationSum >= 50
+      ? stationSum
+      : payloadHint;
+  const emptyRaw = num(1);
+  const grossRaw = num(2);
+  return {
+    payloadLb,
+    fuelLb: fuelLb >= 20 ? fuelLb : undefined,
+    emptyLb:
+      typeof emptyRaw === 'number' && emptyRaw >= 1000 ? emptyRaw : undefined,
+    grossLb:
+      typeof grossRaw === 'number' && grossRaw >= 1000 ? grossRaw : undefined,
+    tanks: {
+      left,
+      right,
+      center,
+      ...(leftTip > 0.5 ? { leftTip } : {}),
+      ...(rightTip > 0.5 ? { rightTip } : {}),
+    },
+    stations,
+  };
+}
+
 export async function readTfdiMd11EfbLvars(
   bridge: NamedPipeSimBridge,
 ): Promise<{
@@ -383,6 +587,19 @@ function wants(
   ...sources: string[]
 ): boolean {
   return sources.some((s) => prefs.includes(s));
+}
+
+export function stationRoleIndexes(
+  roles: OfpStationRoleMap | undefined,
+): number[] | undefined {
+  if (!roles) return undefined;
+  const ids = [
+    ...(roles.crewStations ?? []),
+    ...(roles.baggageStations ?? []),
+    ...(roles.passengerStations ?? []),
+    ...(roles.serviceStations ?? []),
+  ].filter((n) => Number.isFinite(n) && n > 0);
+  return ids.length > 0 ? [...new Set(ids)] : undefined;
 }
 
 /**
@@ -472,14 +689,24 @@ export async function readLiveLoad(
     wants(prefs.fuel, 'tfdi-efb') ||
     wants(prefs.weights, 'tfdi-efb-lvars') ||
     wants(prefs.payload, 'tfdi-efb');
+  const needA2aLvars =
+    wants(prefs.fuel, 'a2a-lvars') ||
+    wants(prefs.weights, 'a2a-lvars') ||
+    wants(prefs.payload, 'a2a-lvars');
 
   let pmdgEfb: LiveLoadReading['pmdgEfb'];
   let tfdiEfb: LiveLoadReading['tfdiEfb'];
+  let a2a: LiveLoadReading['a2a'];
   if (needPmdgEfb) {
     pmdgEfb = await readPmdgEfbLvars(bridge);
   }
   if (needTfdiEfb) {
     tfdiEfb = await readTfdiMd11EfbLvars(bridge);
+  }
+  if (needA2aLvars) {
+    a2a = await readA2aAccusimLvars(bridge, density, {
+      keepStationIndexes: stationRoleIndexes(opts.stationRoles),
+    });
   }
 
   let fuel: LiveFuelState | undefined;
@@ -528,6 +755,19 @@ export async function readLiveLoad(
         break;
       }
     }
+    if (src === 'a2a-lvars' && a2a?.fuelLb !== undefined) {
+      fuel = {
+        source: 'a2a-lvars',
+        unit: 'lb',
+        left: a2a.tanks.left,
+        right: a2a.tanks.right,
+        center: a2a.tanks.center,
+        ...(a2a.tanks.leftTip !== undefined ? { leftTip: a2a.tanks.leftTip } : {}),
+        ...(a2a.tanks.rightTip !== undefined ? { rightTip: a2a.tanks.rightTip } : {}),
+        total: a2a.fuelLb,
+      };
+      break;
+    }
     if (src === 'tfdi-efb' && tfdiEfb?.fuelLb !== undefined) {
       fuel = {
         source: 'tfdi-efb',
@@ -546,24 +786,27 @@ export async function readLiveLoad(
 
   // Accu-Sim / some GA: station SimVars read 0 while gross weight includes the load.
   // Also: stations cleared while TOTAL WEIGHT still lags → trust stations vs planned.
-  const mbPayloadLb = payloadLbFromMassBalance(snapshot, fuel.total);
-  const resolvedPayload = resolveLivePayloadLb({
-    stationSumLb: payload.total,
-    massBalanceLb: mbPayloadLb,
-    previousStationSumLb: opts.previousStationSumLb,
-  });
-  if (
-    resolvedPayload.source === 'mass-balance' &&
-    resolvedPayload.payloadLb !== undefined
-  ) {
-    payload = {
-      ...payload,
-      source: 'mass-balance',
-      total: resolvedPayload.payloadLb,
-      // Prefer MB for OFP compare too — station role sums can be ghost weights (PMDG DC-6).
-      ofpPayloadLb: resolvedPayload.payloadLb,
-      baggageLb: resolvedPayload.payloadLb,
-    };
+  // Skip when the pack already has Accu-Sim tablet payload — classic stations are ghosts.
+  if (a2a?.payloadLb === undefined) {
+    const mbPayloadLb = payloadLbFromMassBalance(snapshot, fuel.total);
+    const resolvedPayload = resolveLivePayloadLb({
+      stationSumLb: payload.total,
+      massBalanceLb: mbPayloadLb,
+      previousStationSumLb: opts.previousStationSumLb,
+    });
+    if (
+      resolvedPayload.source === 'mass-balance' &&
+      resolvedPayload.payloadLb !== undefined
+    ) {
+      payload = {
+        ...payload,
+        source: 'mass-balance',
+        total: resolvedPayload.payloadLb,
+        // Prefer MB for OFP compare too — station role sums can be ghost weights (PMDG DC-6).
+        ofpPayloadLb: resolvedPayload.payloadLb,
+        baggageLb: resolvedPayload.payloadLb,
+      };
+    }
   }
 
   let weights = weightsFromSnapshot(snapshot, fuel.total, payload.ofpPayloadLb ?? payload.total);
@@ -599,6 +842,23 @@ export async function readLiveLoad(
       };
       break;
     }
+    if (
+      src === 'a2a-lvars' &&
+      a2a &&
+      (a2a.emptyLb !== undefined ||
+        a2a.grossLb !== undefined ||
+        a2a.payloadLb !== undefined)
+    ) {
+      weights = {
+        ...weights,
+        source: 'a2a-lvars',
+        emptyLb: a2a.emptyLb ?? weights.emptyLb,
+        grossLb: a2a.grossLb ?? weights.grossLb,
+        fuelLb: fuel.total,
+        payloadLb: a2a.payloadLb ?? weights.payloadLb,
+      };
+      break;
+    }
     if (src === 'classic-weights') {
       break;
     }
@@ -621,6 +881,20 @@ export async function readLiveLoad(
       weights = { ...weights, payloadLb: tfdiEfb.payloadLb };
       break;
     }
+    if (src === 'a2a-lvars' && a2a?.payloadLb !== undefined) {
+      payload = enrichPayloadWithRoles(
+        {
+          source: 'a2a-lvars',
+          unit: 'lb',
+          stations: a2a.stations,
+          total: a2a.payloadLb,
+        },
+        opts.stationRoles,
+        opts.roleWeightUnit ?? 'lb',
+      );
+      weights = { ...weights, payloadLb: a2a.payloadLb };
+      break;
+    }
     if (src === 'classic-stations') {
       break;
     }
@@ -634,5 +908,6 @@ export async function readLiveLoad(
     enginesRunning: snapshot.enginesRunning,
     pmdgEfb,
     tfdiEfb,
+    a2a,
   };
 }

@@ -42,6 +42,7 @@ import {
   GA_BAGGAGE_SOFT_MAX_LB,
   resolveCgCounterweightBias,
   resolveCgFillAction,
+  resolveInjectCgEnvelope,
   longitudinalHalfIndexes,
   seatSoftMaxLb,
   shiftCargoForCg,
@@ -182,6 +183,12 @@ export type OfpLoadApplyResult = {
   cgRebalanceMoves: number;
   /** CG ballast (lb) added on top of OFP cargo to hold the envelope. */
   ballastLb: number;
+  /** Envelope painted on the Dispatch CG card (same pin as the inject gate). */
+  displayCg?: {
+    liveMac?: number;
+    minMac?: number;
+    maxMac?: number;
+  };
 };
 
 export type OfpLoadProgressPhase =
@@ -199,6 +206,8 @@ export type OfpLoadProgress = {
   cgAttempt?: number;
   cgMaxAttempts?: number;
   liveMac?: number;
+  minMac?: number;
+  maxMac?: number;
   /** Live totals while inject runs (UI Loaded vs Due overlay). */
   liveFuelLb?: number;
   livePayloadLb?: number;
@@ -1199,11 +1208,19 @@ async function applyMissionOfpLoadExclusive(
     let lastGoodSchematicTanks: FuelTankBreakdown | undefined =
       schematicTanksFromProfile(beforeLive.tanks);
     let lastGoodFuelLb: number | undefined = tanksToFuelLb(beforeLive.tanks);
+    let lastLiveMac: number | undefined;
+    let lastMinMac: number | undefined;
+    let lastMaxMac: number | undefined;
 
     const publishLiveProgress = (
       phase: OfpLoadProgressPhase,
       message: string,
-      extra?: { cgAttempt?: number; liveMac?: number },
+      extra?: {
+        cgAttempt?: number;
+        liveMac?: number;
+        minMac?: number;
+        maxMac?: number;
+      },
     ) => {
       const liveStationSum = sumRecord(afterLive.stations);
       const workingSum = sumRecord(workingStations);
@@ -1274,7 +1291,9 @@ async function applyMissionOfpLoadExclusive(
         message,
         cgAttempt: extra?.cgAttempt,
         cgMaxAttempts: CG_REBALANCE_MAX_ITERATIONS,
-        liveMac: extra?.liveMac,
+        liveMac: extra?.liveMac ?? lastLiveMac,
+        minMac: extra?.minMac ?? lastMinMac,
+        maxMac: extra?.maxMac ?? lastMaxMac,
         liveFuelLb,
         // Prefer working plan when station SimVars under-read mid-inject.
         livePayloadLb: Math.max(liveStationSum, workingSum),
@@ -1296,10 +1315,7 @@ async function applyMissionOfpLoadExclusive(
       : Math.max(1, baggageStations.length || built.movableStations.length);
     let bias: 'equal' | 'forward' | 'aft' = 'equal';
     let softCgWarn = false;
-    let lastLiveMac: number | undefined;
     let prevLiveMac: number | undefined;
-    let lastMinMac: number | undefined;
-    let lastMaxMac: number | undefined;
     let aftLimited = false;
     let fwdLimited = false;
     let perSeatLb = CG_BALANCE_STEP_LB;
@@ -1685,10 +1701,6 @@ async function applyMissionOfpLoadExclusive(
         // Caravan). At a limit → shift and keep Due; leftover then stays
         // on the helping side. Never toward-center (v0.3.10 C408).
         let liveMac = lastLiveMac;
-        let minMac =
-          lastMinMac ?? resolved.profile.cg?.constraints?.minMac;
-        let maxMac =
-          lastMaxMac ?? resolved.profile.cg?.constraints?.maxMac;
         const liveCg = await readLiveCgStateBestEffort(
           bridge,
           {
@@ -1698,8 +1710,15 @@ async function applyMissionOfpLoadExclusive(
           { liveMac: lastLiveMac, minMac: lastMinMac, maxMac: lastMaxMac },
         );
         liveMac = liveCg.liveMac;
-        minMac = liveCg.minMac ?? minMac;
-        maxMac = liveCg.maxMac ?? maxMac;
+        const envelope = resolveInjectCgEnvelope({
+          envelopeSource: resolved.profile.cg?.envelopeSource,
+          profileMinMac: resolved.profile.cg?.constraints?.minMac,
+          profileMaxMac: resolved.profile.cg?.constraints?.maxMac,
+          liveMinMac: liveCg.minMac ?? lastMinMac,
+          liveMaxMac: liveCg.maxMac ?? lastMaxMac,
+        });
+        const minMac = envelope.minMac;
+        const maxMac = envelope.maxMac;
         lastMinMac = minMac;
         lastMaxMac = maxMac;
 
@@ -1788,7 +1807,58 @@ async function applyMissionOfpLoadExclusive(
         let movedLb = 0;
         let placeIndexes: number[] = [];
         let placeBias: 'equal' | 'forward' | 'aft' = bias;
-        if (stillPlacing && !blockedByLimit) {
+        if (
+          stillPlacing &&
+          blockedByLimit &&
+          !preferSeatFill &&
+          roomOnBaggage()
+        ) {
+          // Crew-only CG can sit past FWD before any cargo exists (Aerostar
+          // −10.8% after S1/S2 seed). Shift has nothing to move — place Due
+          // on the helping half instead of cutting cargo to 0.
+          const side = fillAction === 'shift-aft' ? 'aft' : 'forward';
+          const helping = longitudinalHalfIndexes(
+            resolved.profile,
+            baggageStations,
+            side,
+          );
+          placeIndexes = helping.length > 0 ? helping : baggageStations;
+          placeBias = 'equal';
+          const holdMaxLoadLb = placeIndexes.reduce((max, idx) => {
+            const hard =
+              resolved.profile.payload.stations.find((s) => s.index === idx)
+                ?.maxLoad ?? 0;
+            return Math.max(max, hard);
+          }, 0);
+          const stepLb = cargoPlaceStepLb({
+            placingOnBaggage: true,
+            gaCabin: false,
+            perSeatLb,
+            remainingLb: cargoTargetLb - cargoPlacedLb,
+            holdMaxLoadLb,
+          });
+          const placed = allocateCargoRoundPerSeat(
+            workingStations,
+            resolved.profile,
+            placeIndexes,
+            stepLb,
+            'equal',
+            cargoTargetLb - cargoPlacedLb,
+            { softMaxByIndex: baggageSoftMaxByIndex },
+          );
+          nextStations = placed.stations;
+          movedLb = placed.movedLb;
+          cargoPlacedLb += movedLb;
+          watchDebugLog('inject', 'limit_place', {
+            round: i,
+            fillAction,
+            side,
+            placeIndexes,
+            movedLb: Math.round(movedLb),
+            cargoPlacedLb: Math.round(cargoPlacedLb),
+            liveMac,
+          });
+        } else if (stillPlacing && !blockedByLimit) {
           // Seats first (soft-capped). Baggage only when seats are full or freighter.
           let softMax: Record<number, number> | undefined;
           if (preferSeatFill && roomUnderSoftCap(seatStations)) {
@@ -2496,14 +2566,15 @@ async function applyMissionOfpLoadExclusive(
         },
         { liveMac: lastLiveMac, minMac: lastMinMac, maxMac: lastMaxMac },
       );
-      const minMac =
-        finalCg.minMac ??
-        lastMinMac ??
-        resolved.profile.cg?.constraints?.minMac;
-      const maxMac =
-        finalCg.maxMac ??
-        lastMaxMac ??
-        resolved.profile.cg?.constraints?.maxMac;
+      const finalEnvelope = resolveInjectCgEnvelope({
+        envelopeSource: resolved.profile.cg?.envelopeSource,
+        profileMinMac: resolved.profile.cg?.constraints?.minMac,
+        profileMaxMac: resolved.profile.cg?.constraints?.maxMac,
+        liveMinMac: finalCg.minMac ?? lastMinMac,
+        liveMaxMac: finalCg.maxMac ?? lastMaxMac,
+      });
+      const minMac = finalEnvelope.minMac;
+      const maxMac = finalEnvelope.maxMac;
       const liveMac = finalCg.liveMac ?? lastLiveMac;
       if (
         liveMac !== undefined &&
@@ -2807,6 +2878,16 @@ async function applyMissionOfpLoadExclusive(
       error,
       cgRebalanceMoves,
       ballastLb: ballastPlacedLb,
+      displayCg: {
+        liveMac: lastLiveMac,
+        ...resolveInjectCgEnvelope({
+          envelopeSource: resolved.profile.cg?.envelopeSource,
+          profileMinMac: resolved.profile.cg?.constraints?.minMac,
+          profileMaxMac: resolved.profile.cg?.constraints?.maxMac,
+          liveMinMac: lastMinMac,
+          liveMaxMac: lastMaxMac,
+        }),
+      },
     };
   } catch (err) {
     if (err instanceof OfpLoadCancelledError) {

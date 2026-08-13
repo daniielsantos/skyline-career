@@ -2584,6 +2584,8 @@ export type OfpLoadProgress = {
   cgAttempt?: number;
   cgMaxAttempts?: number;
   liveMac?: number;
+  minMac?: number;
+  maxMac?: number;
   liveFuelLb?: number;
   livePayloadLb?: number;
   liveTanks?: {

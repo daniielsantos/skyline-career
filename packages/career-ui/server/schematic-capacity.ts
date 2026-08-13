@@ -15,6 +15,7 @@ import {
   type LoadedProfile,
 } from '../../agent/src/profile-registry.ts';
 import { resolveProfile } from '../../agent/src/profile-resolver.ts';
+import { resolveInjectCgEnvelope } from '../../agent/src/ofp-load-plan.ts';
 
 let catalogCache: { repoRoot: string; loaded: LoadedProfile[] } | null = null;
 
@@ -203,5 +204,44 @@ export async function resolveSchematicCapsFromCatalog(opts: {
     };
   } catch {
     return {};
+  }
+}
+
+/**
+ * Envelope painted on the Dispatch CG card — same pin as inject
+ * (calibrated-live/cfg/manual → profile min/max, not SimVar 0–100).
+ */
+export async function resolveCatalogCgEnvelope(opts: {
+  repoRoot: string;
+  title?: string;
+  icao?: string;
+  publisher?: string;
+  liveMinMac?: number;
+  liveMaxMac?: number;
+}): Promise<{ minMac?: number; maxMac?: number }> {
+  const live = { minMac: opts.liveMinMac, maxMac: opts.liveMaxMac };
+  const title = (opts.title ?? '').trim();
+  if (!title) return live;
+  try {
+    const catalog = await loadCatalog(opts.repoRoot);
+    const resolved = resolveProfile(
+      {
+        title,
+        icao: opts.icao,
+        publisher: opts.publisher,
+      },
+      catalog,
+      { minConfidence: 0.7 },
+    );
+    if (!resolved.matched || !resolved.profile) return live;
+    return resolveInjectCgEnvelope({
+      envelopeSource: resolved.profile.cg?.envelopeSource,
+      profileMinMac: resolved.profile.cg?.constraints?.minMac,
+      profileMaxMac: resolved.profile.cg?.constraints?.maxMac,
+      liveMinMac: opts.liveMinMac,
+      liveMaxMac: opts.liveMaxMac,
+    });
+  } catch {
+    return live;
   }
 }

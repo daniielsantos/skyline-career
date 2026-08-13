@@ -123,11 +123,24 @@ export interface OfpTolerances {
   maxBurnRateLbPerMin?: number;
 }
 
-export type LiveFuelSource = 'pmdg-ng3' | 'classic' | 'mass-balance' | 'tfdi-efb';
+export type LiveFuelSource =
+  | 'pmdg-ng3'
+  | 'classic'
+  | 'mass-balance'
+  | 'tfdi-efb'
+  | 'a2a-lvars';
 
-export type LiveWeightSourcePref = 'classic-weights' | 'pmdg-efb-lvars' | 'tfdi-efb-lvars';
+export type LiveWeightSourcePref =
+  | 'classic-weights'
+  | 'pmdg-efb-lvars'
+  | 'tfdi-efb-lvars'
+  | 'a2a-lvars';
 
-export type LivePayloadSourcePref = 'classic-stations' | 'pmdg-efb' | 'tfdi-efb';
+export type LivePayloadSourcePref =
+  | 'classic-stations'
+  | 'pmdg-efb'
+  | 'tfdi-efb'
+  | 'a2a-lvars';
 
 /**
  * Declared live read path for a homologated aircraft family.
@@ -173,7 +186,12 @@ export interface LiveFuelState {
 }
 
 export interface LivePayloadState {
-  source: 'classic-stations' | 'pmdg-efb' | 'tfdi-efb' | 'mass-balance';
+  source:
+    | 'classic-stations'
+    | 'pmdg-efb'
+    | 'tfdi-efb'
+    | 'a2a-lvars'
+    | 'mass-balance';
   unit: 'lb';
   stations: Record<number, number>;
   /** Sum of all stations (includes crew/galley). */
@@ -193,7 +211,11 @@ export interface LivePayloadState {
 
 /** Gross / empty / derived ZFW — prefer vendor EFB LVars when present. */
 export interface LiveWeightState {
-  source: 'classic-weights' | 'pmdg-efb-lvars' | 'tfdi-efb-lvars';
+  source:
+    | 'classic-weights'
+    | 'pmdg-efb-lvars'
+    | 'tfdi-efb-lvars'
+    | 'a2a-lvars';
   unit: 'lb';
   emptyLb?: number;
   grossLb?: number;

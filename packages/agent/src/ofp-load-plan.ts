@@ -784,6 +784,33 @@ export function resolveCgCounterweightBias(opts: {
  */
 export type CgFillAction = 'equal' | 'forward' | 'shift-forward' | 'shift-aft';
 
+/** Profile-pinned envelopes must not be replaced by CG FWD/AFT LIMIT (Accu-Sim 0–100 vs live MAC −5). */
+const PINNED_CG_ENVELOPE_SOURCES = new Set([
+  'cfg',
+  'manual',
+  'calibrated-live',
+  'live-sweep',
+]);
+
+export function resolveInjectCgEnvelope(opts: {
+  envelopeSource?: string;
+  profileMinMac?: number;
+  profileMaxMac?: number;
+  liveMinMac?: number;
+  liveMaxMac?: number;
+}): { minMac?: number; maxMac?: number } {
+  if (PINNED_CG_ENVELOPE_SOURCES.has(opts.envelopeSource ?? '')) {
+    return {
+      minMac: opts.profileMinMac,
+      maxMac: opts.profileMaxMac,
+    };
+  }
+  return {
+    minMac: opts.liveMinMac ?? opts.profileMinMac,
+    maxMac: opts.liveMaxMac ?? opts.profileMaxMac,
+  };
+}
+
 export function resolveCgFillAction(opts: {
   liveMac: number;
   lo: number;

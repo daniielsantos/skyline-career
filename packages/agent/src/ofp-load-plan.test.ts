@@ -30,6 +30,7 @@ import {
   resolveCgCounterweightBias,
   resolveCgFillBias,
   resolveCgFillAction,
+  resolveInjectCgEnvelope,
   forwardMostOpenStationGroup,
   longitudinalHalfIndexes,
   resolveFuelDensityLbPerGal,
@@ -742,6 +743,29 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     );
   });
 
+  it('resolveInjectCgEnvelope pins calibrated-live over SimVar FWD/AFT 0–100', () => {
+    assert.deepEqual(
+      resolveInjectCgEnvelope({
+        envelopeSource: 'calibrated-live',
+        profileMinMac: -10,
+        profileMaxMac: 15,
+        liveMinMac: 0,
+        liveMaxMac: 100,
+      }),
+      { minMac: -10, maxMac: 15 },
+    );
+    assert.deepEqual(
+      resolveInjectCgEnvelope({
+        envelopeSource: 'simvar',
+        profileMinMac: 0,
+        profileMaxMac: 100,
+        liveMinMac: 12,
+        liveMaxMac: 31,
+      }),
+      { minMac: 12, maxMac: 31 },
+    );
+  });
+
   it('hybrid fill: equal first, nose only after aft limit, shift at limits', () => {
     // Kodiak empty CG ~31 of 15–39: still inside → spread all stations.
     assert.equal(
@@ -772,6 +796,24 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     assert.equal(
       resolveCgFillBias({ liveMac: 28, lo: 12, hi: 31 }),
       'equal',
+    );
+  });
+
+  it('Aerostar aft helping-side is S5–S7 when CG is past FWD', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 3, name: 'Character3Weight', maxLoad: 300, arm: 2.6 },
+          { index: 4, name: 'Character4Weight', maxLoad: 300, arm: 2.6 },
+          { index: 5, name: 'Character5Weight', maxLoad: 300, arm: 0 },
+          { index: 6, name: 'Character6Weight', maxLoad: 300, arm: 0 },
+          { index: 7, name: 'baggage', maxLoad: 400, arm: -8.3 },
+        ],
+      },
+    } as AircraftProfile;
+    assert.deepEqual(
+      longitudinalHalfIndexes(profile, [3, 4, 5, 6, 7], 'aft'),
+      [5, 6, 7],
     );
   });
 

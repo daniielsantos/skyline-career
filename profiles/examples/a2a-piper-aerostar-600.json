@@ -236,11 +236,11 @@
   "cg": {
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
-    "envelopeSource": "simvar",
+    "envelopeSource": "calibrated-live",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 0,
-      "maxMac": 100
+      "minMac": -15,
+      "maxMac": 15
     },
     "calibration": {
       "observedMac": -5.2146729081869125,
@@ -276,6 +276,7 @@
     "Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, CENTER.",
     "See profiles/notes/a2a-accusim.md",
     "Homologated with interactive wizard (recipe lvar-bridge).",
+    "CG envelope calibrated-live (-10..15% MAC): CG PERCENT is negative empty (~-5) and disagrees with SimVar FWD/AFT 0–100%.",
     "See profiles/notes/a2a-piper-aerostar-600.md"
   ]
 }

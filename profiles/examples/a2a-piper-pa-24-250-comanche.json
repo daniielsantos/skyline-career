@@ -151,21 +151,9 @@
         "arm": -2.5
       },
       {
-        "index": 5,
-        "name": "Character5Weight",
-        "maxLoad": 300,
-        "arm": -4.45
-      },
-      {
-        "index": 6,
-        "name": "Character6Weight",
-        "maxLoad": 300,
-        "arm": -4.5
-      },
-      {
         "index": 7,
         "name": "baggage",
-        "maxLoad": 400,
+        "maxLoad": 200,
         "arm": 0
       }
     ],
@@ -213,22 +201,22 @@
       {
         "op": "lvar_set",
         "name": "Character5Weight",
-        "valueExpr": "{station_5}"
+        "valueExpr": "0"
       },
       {
         "op": "lvar_set",
         "name": "Seat5Character",
-        "valueExpr": "{station_5} / ({station_5} + 0.001)"
+        "valueExpr": "0"
       },
       {
         "op": "lvar_set",
         "name": "Character6Weight",
-        "valueExpr": "{station_6}"
+        "valueExpr": "0"
       },
       {
         "op": "lvar_set",
         "name": "Seat6Character",
-        "valueExpr": "{station_6} / ({station_6} + 0.001)"
+        "valueExpr": "0"
       },
       {
         "op": "lvar_set",
@@ -256,11 +244,11 @@
   "cg": {
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
-    "envelopeSource": "simvar",
+    "envelopeSource": "calibrated-live",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 0,
-      "maxMac": 100
+      "minMac": -10,
+      "maxMac": 30
     },
     "calibration": {
       "observedMac": -4.541464149951935,
@@ -296,6 +284,7 @@
     "Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, LEFT_TIP, RIGHT_TIP.",
     "See profiles/notes/a2a-accusim.md",
     "Homologated with interactive wizard (recipe lvar-bridge).",
+    "CG envelope calibrated-live (-10..30% MAC): CG PERCENT is negative empty (~-4.5) and disagrees with SimVar FWD/AFT 0–100%. Four-seat cabin (no Character5/6); baggage max 200 lb (tablet).",
     "See profiles/notes/a2a-piper-pa-24-250-comanche.md"
   ]
 }

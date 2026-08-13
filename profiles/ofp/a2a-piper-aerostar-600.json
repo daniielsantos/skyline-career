@@ -13,7 +13,9 @@
     "Profile: a2a/piper-aerostar-600@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: lvar-bridge"
+    "Fuel strategy: lvar-bridge",
+    "CG: calibrated-live −15…15% MAC (not SimVar 0–100; crew-only sits ~−11)",
+    "liveSources: Accu-Sim LVars (PayloadWeight / Fuel* / Character*)"
   ],
   "fuel": {
     "unit": "lb"
@@ -40,14 +42,15 @@
   },
   "liveSources": {
     "fuel": [
-      "mass-balance",
+      "a2a-lvars",
       "classic"
     ],
     "weights": [
+      "a2a-lvars",
       "classic-weights"
     ],
     "payload": [
-      "classic-stations"
+      "a2a-lvars"
     ]
   },
   "simbriefIcao": "AEST",

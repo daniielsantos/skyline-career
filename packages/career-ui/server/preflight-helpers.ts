@@ -31,6 +31,7 @@ import {
   pickStationMax,
   pickTankCapacity,
   readClassicFuelTankCapacityLb,
+  resolveCatalogCgEnvelope,
   resolveSchematicCapsFromCatalog,
 } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
@@ -239,9 +240,17 @@ export async function runMissionPreflight(
     const cargoKg = ofpCargoKg(ofp);
 
     // CG is advisory in Career preflight (OnAir-style Loaded vs Due).
+    // Paint the same envelope inject uses (calibrated-live JSON), not SimVar 0–100.
+    const painted = await resolveCatalogCgEnvelope({
+      repoRoot,
+      title: identity.title,
+      icao: identity.icao,
+      liveMinMac: liveCg.minMac,
+      liveMaxMac: liveCg.maxMac,
+    });
     const cgLiveMac = liveCg.liveMac;
-    const cgMinMac = liveCg.minMac;
-    const cgMaxMac = liveCg.maxMac;
+    const cgMinMac = painted.minMac;
+    const cgMaxMac = painted.maxMac;
     const cgInEnvelope =
       cgLiveMac === undefined ||
       cgMinMac === undefined ||
@@ -305,6 +314,13 @@ export async function runMissionPreflight(
       live.payload.ofpPayloadLb > 0
         ? live.payload.ofpPayloadLb
         : undefined;
+    const a2aPayloadLb =
+      live.payload?.source === 'a2a-lvars' &&
+      typeof live.payload.total === 'number' &&
+      Number.isFinite(live.payload.total) &&
+      live.payload.total > 0
+        ? live.payload.total
+        : undefined;
     const crewStationIdxs =
       ofp.payload?.stationRoles?.crewStations?.filter(
         (idx) => Number.isFinite(idx) && idx > 0,
@@ -329,7 +345,9 @@ export async function runMissionPreflight(
       : tfdiEfbCargoLb !== undefined
         ? tfdiEfbCargoLb +
           (plannedPayload?.crewOnStations ? liveCrewLb : 0)
-        : (live.payload?.total ?? live.payload?.ofpPayloadLb);
+        : a2aPayloadLb !== undefined
+          ? a2aPayloadLb
+          : (live.payload?.total ?? live.payload?.ofpPayloadLb);
     const fuelTolLb = Math.max(
       ofp.tolerances?.fuelAbsLb ?? 50,
       Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
@@ -348,11 +366,11 @@ export async function runMissionPreflight(
     // Loaded vs Due uses block-fuel total only. Per-tank FUEL_LEFT/RIGHT findings
     // are softened to warn (classic L/R can glitch while TOTAL matches).
     const fuelOk = weights.fuel.ok;
-    // TFDi EFB path: trust numeric Loaded vs Due — classic station findings can
-    // still under-read cargo while the EFB panel matches SimBrief.
+    // Vendor tablet path: trust numeric Loaded vs Due — classic station findings
+    // under-read Accu-Sim / TFDi cargo while the tablet matches Due.
     const payloadOk = plannedPayloadBase?.gaCabin
       ? weights.payload.ok
-      : tfdiEfbCargoLb !== undefined
+      : tfdiEfbCargoLb !== undefined || a2aPayloadLb !== undefined
         ? weights.payload.ok
         : !payloadFailed && weights.payload.ok;
     const ready = fuelOk && payloadOk;

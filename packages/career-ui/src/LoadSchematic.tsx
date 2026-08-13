@@ -244,6 +244,21 @@ export function formatMacPct(mac: number, digits = 1): string {
   return Number(mac.toFixed(digits)).toFixed(digits);
 }
 
+/** Rail span for the CG schematic — must include negative %MAC (Accu-Sim). */
+export function cgEnvelopeScale(
+  minMac: number,
+  maxMac: number,
+  liveMac?: number,
+): { scaleMin: number; scaleMax: number } {
+  const pad = Math.max(4, (maxMac - minMac) * 0.15);
+  const extremes = [minMac, maxMac];
+  if (liveMac !== undefined && Number.isFinite(liveMac)) extremes.push(liveMac);
+  return {
+    scaleMin: Math.min(...extremes) - pad,
+    scaleMax: Math.max(...extremes) + pad,
+  };
+}
+
 /** Vertical MAC bar: envelope band + live CG marker (aft = top). */
 export function CgEnvelopeSchematic(props: {
   liveMac?: number;
@@ -262,11 +277,7 @@ export function CgEnvelopeSchematic(props: {
     return null;
   }
 
-  const pad = Math.max(5, (maxMac - minMac) * 0.35);
-  const extremes = [minMac, maxMac];
-  if (liveMac !== undefined && Number.isFinite(liveMac)) extremes.push(liveMac);
-  const scaleMin = Math.max(0, Math.min(...extremes) - pad);
-  const scaleMax = Math.min(100, Math.max(...extremes) + pad);
+  const { scaleMin, scaleMax } = cgEnvelopeScale(minMac, maxMac, liveMac);
   const span = scaleMax - scaleMin || 1;
   // Black Square / aircraft tablet: nose/FWD at top, tail/AFT at bottom
   // (higher % MAC is further aft → lower on the rail).

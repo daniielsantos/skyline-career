@@ -13,7 +13,10 @@
     "Profile: a2a/piper-pa-24-250-comanche@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: lvar-bridge"
+    "Four-seat Accu-Sim cabin: stations 1–4 + baggage 7 (no Character5/6)",
+    "Fuel strategy: lvar-bridge",
+    "CG: calibrated-live −10…30% MAC (not SimVar 0–100)",
+    "liveSources: Accu-Sim LVars (PayloadWeight / Fuel* / Character*)"
   ],
   "fuel": {
     "unit": "lb"
@@ -31,8 +34,6 @@
       "baggageStations": [
         3,
         4,
-        5,
-        6,
         7
       ],
       "passengerStations": []
@@ -40,14 +41,15 @@
   },
   "liveSources": {
     "fuel": [
-      "mass-balance",
+      "a2a-lvars",
       "classic"
     ],
     "weights": [
+      "a2a-lvars",
       "classic-weights"
     ],
     "payload": [
-      "classic-stations"
+      "a2a-lvars"
     ]
   },
   "simbriefIcao": "PA24",
@@ -75,18 +77,6 @@
       "simVarIndex": 4,
       "cfgIndex": 3,
       "name": "Character4Weight",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 5,
-      "cfgIndex": 4,
-      "name": "Character5Weight",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 6,
-      "cfgIndex": 5,
-      "name": "Character6Weight",
       "role": "baggage"
     },
     {

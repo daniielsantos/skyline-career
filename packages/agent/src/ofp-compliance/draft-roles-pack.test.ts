@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import type { AircraftProfile } from '@msfs-compat/shared';
 import {
   buildRolesPackFromProfile,
+  inferLiveSourcesFromProfile,
   inferStationRolesFromProfile,
   upsertRolesPackFromProfile,
 } from './draft-roles-pack.js';
@@ -97,6 +98,16 @@ describe('buildRolesPackFromProfile', () => {
     assert.equal(pack.icao, 'BE36');
     assert.deepEqual(pack.liveSources?.fuel, ['classic']);
     assert.ok(pack.matchTitles?.includes('Test GA Aircraft'));
+  });
+
+  it('maps lvar-bridge to Accu-Sim a2a-lvars liveSources', () => {
+    const profile = minimalProfile();
+    profile.fuel.strategy = 'lvar-bridge';
+    assert.deepEqual(inferLiveSourcesFromProfile(profile), {
+      fuel: ['a2a-lvars', 'classic'],
+      weights: ['a2a-lvars', 'classic-weights'],
+      payload: ['a2a-lvars'],
+    });
   });
 
   it('infers anchored SimBrief match for NextGen EMB-110 titles', () => {

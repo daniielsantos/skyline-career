@@ -3480,7 +3480,9 @@ export function App() {
                         : {}),
                     },
                     cg:
-                      progress.liveMac !== undefined || verification.cg
+                      progress.liveMac !== undefined ||
+                      progress.minMac !== undefined ||
+                      verification.cg
                         ? {
                             ...(verification.cg ?? {
                               ok: true,
@@ -3488,6 +3490,12 @@ export function App() {
                             }),
                             liveMac:
                               progress.liveMac ?? verification.cg?.liveMac,
+                            ...(progress.minMac !== undefined
+                              ? { minMac: progress.minMac }
+                              : {}),
+                            ...(progress.maxMac !== undefined
+                              ? { maxMac: progress.maxMac }
+                              : {}),
                           }
                         : verification.cg,
                   },

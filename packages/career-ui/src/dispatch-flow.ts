@@ -326,6 +326,13 @@ export function loadVerificationReady(mission: Mission): boolean {
   return Boolean(mission.lastPreflightCheck?.loadVerification?.ready);
 }
 
+/** Live MSFS must be near mission origin (or legacy check without location). */
+export function originLocationAllowsDepart(mission: Mission): boolean {
+  const loc = mission.lastPreflightCheck?.location;
+  if (!loc) return true;
+  return loc.ok !== false;
+}
+
 export function deriveDispatchStep(input: {
   hasDraft: boolean;
   hasDebrief: boolean;
@@ -336,7 +343,11 @@ export function deriveDispatchStep(input: {
   const mission = input.mission;
   if (!mission) return 'manifest';
   if (mission.status === 'in_flight') return 'en_route';
-  if (fuelAuthorizedForOfp(mission) && loadVerificationReady(mission)) {
+  if (
+    fuelAuthorizedForOfp(mission) &&
+    loadVerificationReady(mission) &&
+    originLocationAllowsDepart(mission)
+  ) {
     return 'ready';
   }
   if (fuelAuthorizedForOfp(mission)) return 'load';
@@ -401,6 +412,17 @@ export function dispatchStepStatusLine(input: {
       }
       return 'Buy Jet-A to cover the OFP shortfall, then continue to load.';
     case 'load':
+      if (
+        input.mission &&
+        loadVerificationReady(input.mission) &&
+        !originLocationAllowsDepart(input.mission)
+      ) {
+        const loc = input.mission.lastPreflightCheck!.location!;
+        if (loc.distanceNm !== undefined) {
+          return `Not at origin — aircraft is ${loc.distanceNm.toFixed(1)} nm from ${loc.originIcao} (need ≤${loc.radiusNm} nm). Relocate before takeoff; Watch will not auto-depart.`;
+        }
+        return `Not at origin ${loc.originIcao} — relocate within ${loc.radiusNm} nm before takeoff. Watch will not auto-depart.`;
+      }
       if (input.loadPath === 'inject') {
         if (input.loadOfpAutoStatus === 'failed') {
           return (

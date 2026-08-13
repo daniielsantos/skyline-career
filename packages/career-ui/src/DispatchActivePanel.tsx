@@ -983,11 +983,12 @@ export function DispatchActivePanel(props: {
             // While Skyline inject is writing, never show PREFLIGHT READY from
             // mid-ramp live numbers — the switch also looked "finished" early.
             const injecting = props.loadOfpAutoStatus === 'loading';
+            const locationOk = check.location?.ok !== false;
+            const loadReady =
+              view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
             const ready = injecting
               ? false
-              : view != null
-                ? fuelOk && payloadOk
-                : check.verdict !== 'fail';
+              : loadReady && locationOk;
             const injectSwitchOn =
               props.skylineInjectEnabled || injecting;
             const watchLive =
@@ -1064,7 +1065,9 @@ export function DispatchActivePanel(props: {
                           ? 'INJECTING LOAD'
                           : ready
                             ? 'PREFLIGHT READY'
-                            : 'PREFLIGHT FAILED'}
+                            : loadReady && !locationOk
+                              ? 'NOT AT ORIGIN'
+                              : 'PREFLIGHT FAILED'}
                     </strong>
                     <small>
                       {enRoute
@@ -1073,7 +1076,13 @@ export function DispatchActivePanel(props: {
                           ? (props.loadOfpProgress?.message ??
                             'Writing fuel and payload into the sim…')
                           : ready
-                            ? 'Fuel and cargo match the confirmed OFP.'
+                            ? 'Fuel and cargo match the confirmed OFP. Take off when Watch is connected.'
+                            : loadReady && !locationOk
+                              ? check.location
+                                ? check.location.distanceNm !== undefined
+                                  ? `Aircraft is ${check.location.distanceNm.toFixed(1)} nm from ${check.location.originIcao} (need ≤${check.location.radiusNm} nm). Relocate before takeoff — Watch will not auto-depart.`
+                                  : `Not verified at ${check.location.originIcao}. Relocate before takeoff — Watch will not auto-depart.`
+                                : 'Relocate to the mission origin before takeoff — Watch will not auto-depart.'
                             : 'Fix the mismatched aircraft load before departure.'}
                     </small>
                   </div>
@@ -1265,28 +1274,65 @@ export function DispatchActivePanel(props: {
                         watchSample?.enginesRunning ??
                         props.simBridge?.enginesRunning ??
                         view.aircraft.enginesRunning;
+                      const loc = check.location;
                       return (
-                        <div className="preflight-aircraft-state">
-                          <span>Aircraft</span>
-                          <strong>
-                            {liveOnGround ? 'On ground' : 'Airborne'}
-                          </strong>
-                          <small>
-                            {liveEngines ? 'Engines running' : 'Engines off'}
-                          </small>
-                          <b>
-                            {enRoute
-                              ? liveOnGround
-                                ? !props.watch?.sawAirborne
-                                  ? 'RAMP'
-                                  : liveEngines
-                                    ? 'TAXI'
-                                    : 'LANDED'
-                                : 'AIR'
-                              : liveOnGround && !liveEngines
-                                ? 'READY'
-                                : 'CHECK'}
-                          </b>
+                        <div className="preflight-aircraft-stack">
+                          <div className="preflight-aircraft-state">
+                            <span>Aircraft</span>
+                            <strong>
+                              {liveOnGround ? 'On ground' : 'Airborne'}
+                            </strong>
+                            <small>
+                              {liveEngines
+                                ? 'Engines running'
+                                : 'Engines off'}
+                            </small>
+                            <b>
+                              {enRoute
+                                ? liveOnGround
+                                  ? !props.watch?.sawAirborne
+                                    ? 'RAMP'
+                                    : liveEngines
+                                      ? 'TAXI'
+                                      : 'LANDED'
+                                  : 'AIR'
+                                : liveOnGround && !liveEngines
+                                  ? 'READY'
+                                  : 'CHECK'}
+                            </b>
+                          </div>
+                          {loc ? (
+                            <div
+                              className={
+                                loc.ok
+                                  ? 'preflight-load-ok'
+                                  : 'preflight-load-fail'
+                              }
+                              role="status"
+                            >
+                              <span>Origin</span>
+                              <strong>
+                                {loc.ok
+                                  ? `At ${loc.originIcao}`
+                                  : loc.distanceNm !== undefined
+                                    ? `${loc.distanceNm.toFixed(1)} nm`
+                                    : loc.originIcao}
+                              </strong>
+                              <small>
+                                {loc.ok
+                                  ? loc.distanceNm !== undefined
+                                    ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
+                                    : `≤${loc.radiusNm} nm`
+                                  : loc.distanceNm !== undefined
+                                    ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
+                                    : (check.findings.find(
+                                        (f) => f.code === loc.code,
+                                      )?.message ??
+                                      `need ≤${loc.radiusNm} nm at ${loc.originIcao}`)}
+                              </small>
+                              <b>{loc.ok ? '✓' : '✕'}</b>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })()}

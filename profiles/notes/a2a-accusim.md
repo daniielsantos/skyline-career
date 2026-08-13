@@ -83,6 +83,16 @@ Soft-bool in write plans (expr engine has no `?:`):
 SeatNCharacter = {station_N} / ({station_N} + 0.001)   // ~0 empty, ~1 when weight > 0
 ```
 
+Do **not** write Character5/6 on four-seat airframes (Comanche).
+
+### CTRL+E / auto-start (Accu-Sim)
+
+After Skyline OFP inject, **CTRL+E** (MSFS auto-start engines) can wipe tablet payload — especially `Character1Weight` / Seat 1 (green seat, blank lb on the EFB; Preflight S1 → 0). **Manual engine start keeps the injected load.**
+
+- Not a Skyline Watch rewrite: Watch does not write Character*/payload on engines-on (only airborne MX fuel drain on classic tanks).
+- Reproduced on Comanche: inject → CTRL+E → S1 gone; inject → manual start → S1 stays.
+- Workaround for the pilot: start engines with the checklist / switches, not CTRL+E, after inject (or re-inject / re-set seats on the tablet if CTRL+E was used).
+
 ### Payload — baggage (writable)
 
 | LVar | What it does | Profile station (Aerostar) |
@@ -132,6 +142,7 @@ BaggageWeight      = {station_7}          # baggage station index on drafted pro
 3. Verify only on `PAYLOAD STATION WEIGHT:1` does not prove seats/baggage UI — use `L:Character*` / `L:BaggageWeight` (and career `a2a-lvars` post-inject gate).
 4. Baggage is **`BaggageWeight`**, not a classic `PAYLOAD STATION WEIGHT` index that matches the orange BAGGAGE box.
 5. Do not assume every Accu-Sim airframe has a fuselage tank — Comanche uses tip tanks; a readable `FuelFuselageTank` without CENTER capacity is a **ghost**.
+6. **CTRL+E after inject** can clear Seat 1 / `Character1Weight` on the EFB. Use manual engine start (or re-inject). See “CTRL+E / auto-start” above.
 
 ---
 

@@ -5956,10 +5956,25 @@ export function App() {
     let override = false;
     const preflightReady =
       mission.lastPreflightCheck?.loadVerification?.ready === true;
-    if (!mission.lastPreflightCheck || !preflightReady) {
+    const locationOk = mission.lastPreflightCheck?.location?.ok !== false;
+    if (!mission.lastPreflightCheck || !preflightReady || !locationOk) {
+      const loc = mission.lastPreflightCheck?.location;
+      const locationLine =
+        loc && loc.ok === false
+          ? loc.distanceNm !== undefined
+            ? `Aircraft is ${loc.distanceNm.toFixed(1)} nm from ${loc.originIcao} (need ≤${loc.radiusNm} nm). `
+            : `${loc.code}: not verified at ${loc.originIcao}. `
+          : '';
+      const body = !mission.lastPreflightCheck
+        ? `No Preflight check for ${mission.id}. Depart anyway?`
+        : !locationOk && preflightReady
+          ? `${locationLine}Fuel/payload are ready. Depart anyway?`
+          : !locationOk
+            ? `${locationLine}Preflight is not ready for ${mission.id}. Depart anyway without fixing fuel/payload/location?`
+            : `Preflight is not ready for ${mission.id}. Depart anyway without fixing fuel/payload?`;
       const ok = await confirm({
         title: 'Depart with failed Preflight?',
-        body: `Preflight is not ready for ${mission.id}. Depart anyway without fixing fuel/payload?`,
+        body,
         confirmLabel: 'Depart anyway',
         cancelLabel: 'Stay on ground',
         tone: 'warn',

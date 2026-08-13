@@ -7,10 +7,12 @@ import {
   KG_TO_LB,
   applyOfpBallastLb,
   evaluateLoadVerification,
+  evaluateOriginProximity,
   isUsableFuelTankBreakdown,
   normalizeAircraftTitle,
   ofpCargoKg,
   ofpFuelToLb,
+  resolveAirportCoords,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
   type FuelTankBreakdown,
@@ -26,6 +28,7 @@ import {
   plannedStationPayloadLb,
 } from '../../agent/src/ofp-load-plan.ts';
 import { readLiveCgState } from '../../agent/src/live-cg.ts';
+import { readSimVarsSoft } from '../../agent/src/read-simvars-soft.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import {
   pickStationMax,
@@ -118,6 +121,13 @@ export type PreflightCheckResult = {
     };
     weightNoteCount: number;
   };
+  location?: {
+    ok: boolean;
+    originIcao: string;
+    distanceNm?: number;
+    radiusNm: number;
+    code: string;
+  };
   findings: Array<{ code: string; severity: string; message: string }>;
 };
 
@@ -160,6 +170,11 @@ export async function runMissionPreflight(
      * value so the post-inject check sees the load that was actually applied.
      */
     ballastLb?: number;
+    /**
+     * Origin airport coords (from world terminal). When omitted, resolved from
+     * hub catalog / bush overrides via ICAO alone.
+     */
+    originCoords?: { lat: number; lon: number };
   } = {},
 ): Promise<MissionPreflightResult> {
   if (!mission.staticId) {
@@ -274,6 +289,49 @@ export async function runMissionPreflight(
       });
     }
 
+    let planePosition: { lat: number; lon: number } | undefined;
+    try {
+      const [latRaw, lonRaw] = await readSimVarsSoft(
+        bridge,
+        [
+          { name: 'PLANE LATITUDE', unit: 'degrees' },
+          { name: 'PLANE LONGITUDE', unit: 'degrees' },
+        ],
+        2_000,
+      );
+      if (
+        Number.isFinite(latRaw) &&
+        Number.isFinite(lonRaw) &&
+        !(latRaw === 0 && lonRaw === 0)
+      ) {
+        planePosition = { lat: latRaw, lon: lonRaw };
+      }
+    } catch {
+      planePosition = undefined;
+    }
+    const originCoords =
+      opts.originCoords ?? resolveAirportCoords(mission.originIcao);
+    const originProx = evaluateOriginProximity({
+      originIcao: mission.originIcao,
+      position: planePosition,
+      onGround: live.onGround,
+      originCoords: originCoords ?? null,
+    });
+    findings.push({
+      code: originProx.code,
+      severity: originProx.severity,
+      message: originProx.message,
+    });
+    const location = {
+      ok: originProx.ok,
+      originIcao: originProx.originIcao,
+      ...(originProx.distanceNm !== undefined
+        ? { distanceNm: originProx.distanceNm }
+        : {}),
+      radiusNm: originProx.radiusNm,
+      code: originProx.code,
+    };
+
     // Ready = fuel + payload OK. CG / empty-weight notes never block Depart alone.
     // Always gate on numeric Loaded vs Due — finding codes alone can miss freighter
     // baggage-only OFPs and show ✓ with Sim 0 / Due 992.
@@ -374,7 +432,10 @@ export async function runMissionPreflight(
         ? weights.payload.ok
         : !payloadFailed && weights.payload.ok;
     const ready = fuelOk && payloadOk;
-    const careerVerdict = softenCareerPreflightVerdict(ready, snapshot.verdict);
+    let careerVerdict = softenCareerPreflightVerdict(ready, snapshot.verdict);
+    if (!location.ok) {
+      careerVerdict = 'fail';
+    }
 
     const catalogCaps = await resolveSchematicCapsFromCatalog({
       repoRoot,
@@ -489,6 +550,7 @@ export async function runMissionPreflight(
             : undefined,
         weightNoteCount,
       },
+      location,
       findings,
     };
     return {
@@ -531,6 +593,7 @@ export async function runMissionPreflight(
 /** True when mission must not auto/manual depart without override. */
 export function preflightBlocksDepart(mission: MissionIntent): boolean {
   if (!mission.lastPreflightCheck) return true;
+  if (mission.lastPreflightCheck.location?.ok === false) return true;
   const ready = mission.lastPreflightCheck?.loadVerification?.ready;
   if (typeof ready === 'boolean') return !ready;
   return mission.lastPreflightCheck?.verdict === 'fail';

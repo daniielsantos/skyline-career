@@ -164,6 +164,8 @@ import {
   padOfpBlockFuelKgForMx,
   isOfpCargoUnderOnlyFailure,
   trimMissionCargoToKg,
+  airportByIcao,
+  resolveAirportCoords,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CareerStore,
@@ -4838,10 +4840,15 @@ export function createCareerApiServer(port = 8787) {
           const fleetAcf = probeMission.aircraftId
             ? probe.fleet?.find((a) => a.id === probeMission.aircraftId)
             : undefined;
+          const originCoords = await withCareerRead((world) => {
+            const terminal = airportByIcao(world, probeMission.originIcao);
+            return resolveAirportCoords(probeMission.originIcao, terminal);
+          });
           const result = await runMissionPreflight(probeMission, {
             username: body.simbriefUser,
             userid: body.simbriefUserid,
             pipeName: body.pipeName,
+            ...(originCoords ? { originCoords } : {}),
           });
           const mxFinding = mxFuelBurnFindingForAircraft(fleetAcf);
           const findings = mxFinding
@@ -4859,6 +4866,9 @@ export function createCareerApiServer(port = 8787) {
             checkedAtIso: result.check.checkedAtIso,
             phase: result.check.phase,
             loadVerification: result.check.loadVerification,
+            ...(result.check.location
+              ? { location: result.check.location }
+              : {}),
             findings,
           };
           let savedMission: MissionIntent | null = null;

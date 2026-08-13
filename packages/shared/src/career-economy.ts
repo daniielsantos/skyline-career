@@ -1632,6 +1632,104 @@ export function isNearAirport(
   return { near: d <= radiusNm, distanceNm: d };
 }
 
+export type OriginProximityCode =
+  | 'ORIGIN_OK'
+  | 'ORIGIN_TOO_FAR'
+  | 'ORIGIN_NOT_ON_GROUND'
+  | 'ORIGIN_POSITION_UNKNOWN'
+  | 'ORIGIN_COORDS_UNRESOLVED';
+
+export type OriginProximityResult = {
+  ok: boolean;
+  code: OriginProximityCode;
+  severity: 'info' | 'warn' | 'fail';
+  message: string;
+  originIcao: string;
+  distanceNm?: number;
+  radiusNm: number;
+};
+
+/**
+ * Preflight gate: live MSFS position must be on the ground near mission origin.
+ * Missing hub coords → warn (cannot prove). Same default radius as settle.
+ */
+export function evaluateOriginProximity(opts: {
+  originIcao: string;
+  position?: { lat: number; lon: number } | null;
+  onGround?: boolean | null;
+  originCoords?: { lat: number; lon: number } | null;
+  radiusNm?: number;
+}): OriginProximityResult {
+  const originIcao = opts.originIcao.trim().toUpperCase();
+  const radiusNm = opts.radiusNm ?? DEFAULT_SETTLE_RADIUS_NM;
+
+  if (!opts.originCoords) {
+    return {
+      ok: true,
+      code: 'ORIGIN_COORDS_UNRESOLVED',
+      severity: 'warn',
+      message: `Origin ${originIcao} has no catalog coordinates — cannot verify aircraft location`,
+      originIcao,
+      radiusNm,
+    };
+  }
+
+  if (
+    !opts.position ||
+    !Number.isFinite(opts.position.lat) ||
+    !Number.isFinite(opts.position.lon)
+  ) {
+    return {
+      ok: false,
+      code: 'ORIGIN_POSITION_UNKNOWN',
+      severity: 'fail',
+      message: `Live aircraft position unavailable — cannot verify at ${originIcao}`,
+      originIcao,
+      radiusNm,
+    };
+  }
+
+  const { near, distanceNm: dist } = isNearAirport(
+    opts.position,
+    opts.originCoords,
+    radiusNm,
+  );
+
+  if (opts.onGround === false) {
+    return {
+      ok: false,
+      code: 'ORIGIN_NOT_ON_GROUND',
+      severity: 'fail',
+      message: `Aircraft airborne ${dist.toFixed(1)} nm from ${originIcao} (need on ground ≤${radiusNm} nm)`,
+      originIcao,
+      distanceNm: dist,
+      radiusNm,
+    };
+  }
+
+  if (!near) {
+    return {
+      ok: false,
+      code: 'ORIGIN_TOO_FAR',
+      severity: 'fail',
+      message: `Aircraft ${dist.toFixed(1)} nm from ${originIcao} (need ≤${radiusNm} nm)`,
+      originIcao,
+      distanceNm: dist,
+      radiusNm,
+    };
+  }
+
+  return {
+    ok: true,
+    code: 'ORIGIN_OK',
+    severity: 'info',
+    message: `At ${originIcao} · ${dist.toFixed(1)} nm (≤${radiusNm} nm)`,
+    originIcao,
+    distanceNm: dist,
+    radiusNm,
+  };
+}
+
 /** Invalidate when hub count changes (array mutated in place). */
 type AirportLookupCache = {
   len: number;

@@ -17,6 +17,7 @@ import {
   distanceNm as greatCircleDistanceNm,
   estimateMissionBlockHours,
   evaluateLoadVerification,
+  evaluateOriginProximity,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
   inferEnginesRunning,
@@ -1129,6 +1130,11 @@ export class CareerWatchSession {
   /** Next tick: IPC disconnect+connect (station TIMEOUT was swallowed). */
   private pendingSimConnectReset = false;
   private preflightDepartBlockedLogged = false;
+  /**
+   * Set while on ground within settle radius of mission origin (or Validate ok).
+   * Kept across wheels-up so auto-depart can fire; cleared when on ground far away.
+   */
+  private originClearedForDepart = false;
   private cruiseState: CruiseSampleState = createCruiseSampleState();
   private cruiseStatus: CruiseSampleStatus | null = null;
   /**
@@ -1360,6 +1366,7 @@ export class CareerWatchSession {
     this.pendingSimConnectReset = false;
     this.settlement = null;
     this.preflightDepartBlockedLogged = false;
+    this.originClearedForDepart = false;
     this.cruiseState = createCruiseSampleState();
     this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
     this.ofpExpectedRouteMs = null;
@@ -1402,6 +1409,9 @@ export class CareerWatchSession {
     }
     this.missionStatus = mission.status;
     this.walletUsd = loaded.walletUsd;
+    // Seed from last Validate; Watch re-evaluates on the ground each tick.
+    this.originClearedForDepart =
+      mission.lastPreflightCheck?.location?.ok === true;
     const nowMs = Date.now();
     const resumeClock = mission.status === 'in_flight';
     const resumedAirborneAtMs = resumeClock
@@ -1588,6 +1598,7 @@ export class CareerWatchSession {
     this.consecutivePipeErrors = 0;
     this.pendingSimConnectReset = false;
     this.preflightDepartBlockedLogged = false;
+    this.originClearedForDepart = false;
     this.cruiseState = createCruiseSampleState();
     this.cruiseStatus = null;
     this.ofpExpectedRouteMs = null;
@@ -2196,6 +2207,82 @@ export class CareerWatchSession {
         sample.position && originCoords
           ? greatCircleDistanceNm(sample.position, originCoords)
           : undefined;
+      const settleRadiusNm = this.opts.settleRadiusNm ?? 12;
+      // On the ramp: re-check origin so relocating hubs clears the gate without
+      // a fresh Validate. Latch sticks through wheels-up for auto-depart.
+      if (
+        sample.onGround === true &&
+        typeof liveDistToOriginNm === 'number' &&
+        originCoords
+      ) {
+        const nearOrigin = liveDistToOriginNm <= settleRadiusNm;
+        const wasCleared = this.originClearedForDepart;
+        this.originClearedForDepart = nearOrigin;
+        if (nearOrigin !== wasCleared || current.lastPreflightCheck?.location) {
+          const prox = evaluateOriginProximity({
+            originIcao: current.originIcao,
+            position: sample.position,
+            onGround: true,
+            originCoords,
+            radiusNm: settleRadiusNm,
+          });
+          const nextLocation = {
+            ok: prox.ok,
+            originIcao: prox.originIcao,
+            ...(prox.distanceNm !== undefined
+              ? { distanceNm: prox.distanceNm }
+              : {}),
+            radiusNm: prox.radiusNm,
+            code: prox.code,
+          };
+          const prevLoc = current.lastPreflightCheck?.location;
+          const locDrifted =
+            !prevLoc ||
+            prevLoc.ok !== nextLocation.ok ||
+            prevLoc.code !== nextLocation.code ||
+            (typeof prevLoc.distanceNm === 'number' &&
+            typeof nextLocation.distanceNm === 'number'
+              ? Math.abs(prevLoc.distanceNm - nextLocation.distanceNm) >= 0.5
+              : prevLoc.distanceNm !== nextLocation.distanceNm);
+          if (locDrifted && current.lastPreflightCheck) {
+            await this.cb.updateOpenMission(
+              this.missionId,
+              (_missions, openMission) => {
+                const prev = openMission.lastPreflightCheck;
+                if (!prev) return false;
+                const nextVerdict =
+                  nextLocation.ok === false
+                    ? 'fail'
+                    : prev.loadVerification?.ready
+                      ? prev.verdict === 'fail'
+                        ? 'pass'
+                        : prev.verdict
+                      : prev.verdict;
+                openMission.lastPreflightCheck = {
+                  ...prev,
+                  location: nextLocation,
+                  verdict: nextVerdict,
+                };
+                current.lastPreflightCheck = openMission.lastPreflightCheck;
+                return true;
+              },
+            );
+            if (nearOrigin !== wasCleared) {
+              watchDebugLog('watch', 'origin latch', {
+                cleared: nearOrigin,
+                distanceNm: liveDistToOriginNm,
+                originIcao: current.originIcao,
+              });
+              if (nearOrigin) {
+                this.preflightDepartBlockedLogged = false;
+                if (this.lastError?.startsWith('Not at origin')) {
+                  this.lastError = null;
+                }
+              }
+            }
+          }
+        }
+      }
       const fallbackHours = estimateMissionBlockHours(
         world,
         current.originIcao,
@@ -2573,7 +2660,25 @@ export class CareerWatchSession {
         this.opts.autoDepart &&
         (event.type === 'depart' || needsDepartCatchUp)
       ) {
-        if (needsDepartCatchUp) {
+        if (!this.originClearedForDepart) {
+          if (!this.preflightDepartBlockedLogged) {
+            this.preflightDepartBlockedLogged = true;
+            const distNote =
+              typeof liveDistToOriginNm === 'number'
+                ? ` (${liveDistToOriginNm.toFixed(1)} nm from ${current.originIcao})`
+                : ` (${current.originIcao})`;
+            this.lastError = `Not at origin${distNote} — relocate before takeoff`;
+            watchDebugLog('watch', 'depart blocked — not at origin', {
+              missionId: current.id,
+              liveDistToOriginNm: liveDistToOriginNm ?? null,
+              originIcao: current.originIcao,
+              settleRadiusNm,
+              eventType: event.type,
+              needsDepartCatchUp,
+            });
+          }
+        } else {
+          if (needsDepartCatchUp) {
           watchDebugLog('watch', 'depart catch-up', {
             missionId: current.id,
             status: current.status,
@@ -2612,8 +2717,8 @@ export class CareerWatchSession {
             ...(postLandingCatchUp ? { airborneEndedAtMs: nowMs } : {}),
           };
           nextState = this.watchState;
-        }
-        const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
+          }
+          const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
           const openIdx = freshMissions.missions.findIndex(
             (m) => m.id === this.missionId,
           );
@@ -2653,26 +2758,27 @@ export class CareerWatchSession {
           current = departed.mission;
           return true;
         });
-        if (!saved) {
-          await this.stop();
-          return;
-        }
-        this.lastError = null;
-        this.preflightDepartBlockedLogged = false;
-        // Catch-up depart often happens already on the ground — re-run settle
-        // gates now that status is in_flight.
-        if (needsDepartCatchUp) {
-          const again = evaluateMissionFlightTransition(
-            current,
-            sample,
-            this.watchState,
-            transitionOpts,
-          );
-          event = again.event;
-          nextState = again.nextState;
-          this.watchState = nextState;
-          this.lastEvent = event;
-          this.lastEventAtIso = new Date().toISOString();
+          if (!saved) {
+            await this.stop();
+            return;
+          }
+          this.lastError = null;
+          this.preflightDepartBlockedLogged = false;
+          // Catch-up depart often happens already on the ground — re-run settle
+          // gates now that status is in_flight.
+          if (needsDepartCatchUp) {
+            const again = evaluateMissionFlightTransition(
+              current,
+              sample,
+              this.watchState,
+              transitionOpts,
+            );
+            event = again.event;
+            nextState = again.nextState;
+            this.watchState = nextState;
+            this.lastEvent = event;
+            this.lastEventAtIso = new Date().toISOString();
+          }
         }
       }
 

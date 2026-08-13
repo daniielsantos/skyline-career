@@ -836,6 +836,17 @@ export interface MissionIntent {
       };
       weightNoteCount: number;
     };
+    /**
+     * Live MSFS vs mission origin (same 12 nm settle radius).
+     * `ok: false` blocks manual Depart unless override.
+     */
+    location?: {
+      ok: boolean;
+      originIcao: string;
+      distanceNm?: number;
+      radiusNm: number;
+      code: string;
+    };
     findings: Array<{
       code: string;
       severity: string;

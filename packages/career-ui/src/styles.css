@@ -4920,21 +4920,42 @@ small {
   align-content: start;
 }
 
+.preflight-load-grid > .preflight-aircraft-stack {
+  padding: 0;
+  border: none;
+  background: transparent;
+  gap: 0.65rem;
+}
+
+.preflight-aircraft-stack > div {
+  position: relative;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  align-content: start;
+}
+
 .preflight-load-grid > div:has(.load-schematic) {
   min-width: min(100%, 11rem);
 }
 
 .preflight-load-grid span,
-.preflight-load-grid small {
+.preflight-load-grid small,
+.preflight-aircraft-stack span,
+.preflight-aircraft-stack small {
   color: var(--muted);
   font-size: 0.76rem;
 }
 
-.preflight-load-grid strong {
+.preflight-load-grid strong,
+.preflight-aircraft-stack strong {
   font-size: 1rem;
 }
 
-.preflight-load-grid b {
+.preflight-load-grid b,
+.preflight-aircraft-stack b {
   position: absolute;
   top: 0.55rem;
   right: 0.6rem;

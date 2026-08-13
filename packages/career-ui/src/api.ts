@@ -577,6 +577,17 @@ export type Mission = {
       };
       weightNoteCount: number;
     };
+    /**
+     * Live MSFS vs mission origin (settle radius). Blocks Depart when ok=false
+     * unless override.
+     */
+    location?: {
+      ok: boolean;
+      originIcao: string;
+      distanceNm?: number;
+      radiusNm: number;
+      code: string;
+    };
     findings: OfpCheckFinding[];
   };
 };

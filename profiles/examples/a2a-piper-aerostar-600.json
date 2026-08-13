@@ -283,6 +283,7 @@
     "See profiles/notes/a2a-accusim.md",
     "Homologated with interactive wizard (recipe lvar-bridge).",
     "CG envelope calibrated-live (-10..15% MAC): CG PERCENT is negative empty (~-5) and disagrees with SimVar FWD/AFT 0–100%.",
+    "CTRL+E after inject can wipe Seat 1 / Character1Weight on the Accu-Sim EFB; use manual engine start (or re-inject). See profiles/notes/a2a-accusim.md.",
     "See profiles/notes/a2a-piper-aerostar-600.md"
   ]
 }

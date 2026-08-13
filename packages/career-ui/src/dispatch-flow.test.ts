@@ -113,6 +113,37 @@ describe('deriveDispatchStep', () => {
       deriveDispatchStep({
         hasDraft: false,
         hasDebrief: false,
+        mission: mission({
+          fuelAuthorizedOfpId: 'ofp1',
+          lastOfpCheck: {
+            verdict: 'pass',
+            summary: 'ok',
+            checkedAtIso: new Date().toISOString(),
+            ofpId: 'ofp1',
+            findings: [],
+          },
+          lastPreflightCheck: {
+            verdict: 'fail',
+            summary: 'far',
+            checkedAtIso: new Date().toISOString(),
+            findings: [],
+            loadVerification: { ready: true },
+            location: {
+              ok: false,
+              originIcao: 'SBGR',
+              distanceNm: 40,
+              radiusNm: 12,
+              code: 'ORIGIN_TOO_FAR',
+            },
+          } as Mission['lastPreflightCheck'],
+        }),
+      }),
+      'load',
+    );
+    assert.equal(
+      deriveDispatchStep({
+        hasDraft: false,
+        hasDebrief: false,
         mission: mission({ status: 'in_flight' }),
       }),
       'en_route',

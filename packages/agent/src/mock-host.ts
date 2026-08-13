@@ -137,6 +137,16 @@ async function dispatch(msg: { id?: string; method?: string; params?: Record<str
       if (err) return err;
       return ok(id, { value: get(String(params.name), String(params.unit)) });
     }
+    case 'readSimVars': {
+      const err = ensureConnected(id);
+      if (err) return err;
+      const list = Array.isArray(params.vars) ? params.vars : [];
+      const values = list.map((item) => {
+        const row = item as { name?: string; unit?: string };
+        return get(String(row.name ?? ''), String(row.unit ?? ''));
+      });
+      return ok(id, { values });
+    }
     case 'writeSimVar': {
       const err = ensureConnected(id);
       if (err) return err;

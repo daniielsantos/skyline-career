@@ -78,7 +78,9 @@ Pipe up + SimConnect morto: ping antigo dizia `connected=true`, Watch nunca cham
 
 Timeout é o **código IPC `TIMEOUT`** (Host `SimClientException` +
 `IpcClientError.code`), nunca regex na message. lastError persiste
-`TIMEOUT: …`. 1º miss aborta o loop de stations; next tick `resetSession`.
+`TIMEOUT: …`. 1º miss aborta o sample (flight ou load batch); next tick `resetSession`.
+Solo: um `readSimVars` para density/tanks/weights/stations 1–16 (não 16 round-trips).
+No ar: cruise TAS+fuel-flow também é um batch; 1º TIMEOUT aborta (antes: 4×7 reads engolidos → tick ~45s).
 
 ## Idle Watch: TIMEOUT mata detect de payload
 

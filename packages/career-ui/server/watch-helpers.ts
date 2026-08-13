@@ -85,7 +85,7 @@ import {
 } from '../../agent/src/sample-cruise-burn.ts';
 import { watchDebugLog, WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import { isOfpLoadActive } from './ofp-load-state.ts';
-import { pickStationMax, pickTankCapacity, readClassicFuelTankCapacityLb } from './schematic-capacity.ts';
+import { pickStationMax, pickTankCapacity } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 
 export type WatchLoadVerification = {
@@ -235,6 +235,40 @@ type WatchOptions = {
   allowDepartOverride?: boolean;
 };
 
+function finiteNum(value: number | undefined): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function galOrZero(value: number | undefined): number {
+  const n = finiteNum(value);
+  return n !== undefined && n > 0 ? n : 0;
+}
+
+const FLIGHT_SAMPLE_VARS = [
+  { name: 'PLANE LATITUDE', unit: 'degrees' },
+  { name: 'PLANE LONGITUDE', unit: 'degrees' },
+  { name: 'GROUND VELOCITY', unit: 'knots' },
+  { name: 'VERTICAL SPEED', unit: 'feet per minute' },
+  { name: 'PLANE BANK DEGREES', unit: 'degrees' },
+  { name: 'PLANE PITCH DEGREES', unit: 'degrees' },
+  { name: 'G FORCE', unit: 'Gforce' },
+  { name: 'AIRSPEED INDICATED', unit: 'knots' },
+  { name: 'PLANE ALTITUDE', unit: 'feet' },
+  { name: 'GEAR TOTAL PCT EXTENDED', unit: 'Percent over 100' },
+  { name: 'GEAR HANDLE POSITION', unit: 'number' },
+  { name: 'TRAILING EDGE FLAPS LEFT PERCENT', unit: 'Percent over 100' },
+  { name: 'PLANE ALT ABOVE GROUND', unit: 'feet' },
+  { name: 'IS GEAR RETRACTABLE', unit: 'bool' },
+  { name: 'TURB ENG N1:1', unit: 'percent' },
+  { name: 'TURB ENG N1:2', unit: 'percent' },
+  { name: 'GENERAL ENG RPM:1', unit: 'rpm' },
+  { name: 'GENERAL ENG RPM:2', unit: 'rpm' },
+  { name: 'GENERAL ENG COMBUSTION:1', unit: 'bool' },
+  { name: 'GENERAL ENG COMBUSTION:2', unit: 'bool' },
+  { name: 'OVERSPEED WARNING', unit: 'bool' },
+  { name: 'STALL WARNING', unit: 'bool' },
+] as const;
+
 export async function sampleLiveFlight(
   bridge: NamedPipeSimBridge,
   opts?: {
@@ -257,20 +291,17 @@ export async function sampleLiveFlight(
   }
 > {
   const snap = await bridge.snapshot();
+  // One SimConnect request. TIMEOUT/NOT_CONNECTED throws — Watch resets next tick.
+  const v = await bridge.readSimVars([...FLIGHT_SAMPLE_VARS]);
+  const lat = finiteNum(v[0]);
+  const lon = finiteNum(v[1]);
   let position: { lat: number; lon: number } | undefined;
-  let groundSpeedKt: number | undefined;
-  try {
-    const lat = await bridge.readSimVar({ name: 'PLANE LATITUDE', unit: 'degrees' });
-    const lon = await bridge.readSimVar({ name: 'PLANE LONGITUDE', unit: 'degrees' });
-    if (
-      Number.isFinite(lat) &&
-      Number.isFinite(lon) &&
-      !(lat === 0 && lon === 0)
-    ) {
-      position = { lat, lon };
-    }
-  } catch {
-    position = undefined;
+  if (
+    lat !== undefined &&
+    lon !== undefined &&
+    !(lat === 0 && lon === 0)
+  ) {
+    position = { lat, lon };
   }
   if (!position && opts?.previousPosition) {
     const prev = opts.previousPosition;
@@ -282,94 +313,31 @@ export async function sampleLiveFlight(
       position = { lat: prev.lat, lon: prev.lon };
     }
   }
-  try {
-    const gs = await bridge.readSimVar({
-      name: 'GROUND VELOCITY',
-      unit: 'knots',
-    });
-    if (Number.isFinite(gs) && gs >= 0) {
-      groundSpeedKt = gs;
-    }
-  } catch {
-    groundSpeedKt = undefined;
-  }
-  let verticalSpeedFpm: number | undefined;
-  try {
-    const vs = await bridge.readSimVar({
-      name: 'VERTICAL SPEED',
-      unit: 'feet per minute',
-    });
-    if (Number.isFinite(vs)) verticalSpeedFpm = vs;
-  } catch {
-    verticalSpeedFpm = undefined;
-  }
-
-  const readOpt = async (
-    name: string,
-    unit: string,
-  ): Promise<number | undefined> => {
-    try {
-      const v = await bridge.readSimVar({ name, unit });
-      return Number.isFinite(v) ? v : undefined;
-    } catch {
-      return undefined;
-    }
-  };
-
-  const [
-    bankDeg,
-    pitchDeg,
-    gForce,
-    indicatedAirspeedKt,
-    altitudeFt,
-    gearPctRaw,
-    gearHandleRaw,
-    flapsPctRaw,
-    aglFt,
-    gearRetractableRaw,
-    n1Eng1,
-    n1Eng2,
-    rpmEng1,
-    rpmEng2,
-    combEng1,
-    combEng2,
-  ] = await Promise.all([
-    readOpt('PLANE BANK DEGREES', 'degrees'),
-    readOpt('PLANE PITCH DEGREES', 'degrees'),
-    readOpt('G FORCE', 'Gforce'),
-    readOpt('AIRSPEED INDICATED', 'knots'),
-    readOpt('PLANE ALTITUDE', 'feet'),
-    // Native unit is Percent over 100 (0.0–1.0). Requesting "percent" can still
-    // return a fraction depending on the host — normalize to 0–100 either way.
-    readOpt('GEAR TOTAL PCT EXTENDED', 'Percent over 100'),
-    // 0 = up, 1 = down (handle). Fallback when TOTAL PCT is missing on payware.
-    readOpt('GEAR HANDLE POSITION', 'number'),
-    readOpt('TRAILING EDGE FLAPS LEFT PERCENT', 'Percent over 100'),
-    readOpt('PLANE ALT ABOVE GROUND', 'feet'),
-    readOpt('IS GEAR RETRACTABLE', 'bool'),
-    // PC-12 / payware: ENG COMBUSTION:1 often sticks after cutoff.
-    readOpt('TURB ENG N1:1', 'percent'),
-    readOpt('TURB ENG N1:2', 'percent'),
-    readOpt('GENERAL ENG RPM:1', 'rpm'),
-    readOpt('GENERAL ENG RPM:2', 'rpm'),
-    readOpt('GENERAL ENG COMBUSTION:1', 'bool'),
-    readOpt('GENERAL ENG COMBUSTION:2', 'bool'),
-  ]);
-
-  let overspeedWarning: boolean | undefined;
-  let stallWarning: boolean | undefined;
-  try {
-    const o = await bridge.readSimVar({ name: 'OVERSPEED WARNING', unit: 'bool' });
-    if (Number.isFinite(o)) overspeedWarning = o > 0.5;
-  } catch {
-    overspeedWarning = undefined;
-  }
-  try {
-    const s = await bridge.readSimVar({ name: 'STALL WARNING', unit: 'bool' });
-    if (Number.isFinite(s)) stallWarning = s > 0.5;
-  } catch {
-    stallWarning = undefined;
-  }
+  const gs = finiteNum(v[2]);
+  const groundSpeedKt =
+    gs !== undefined && gs >= 0 ? gs : undefined;
+  const verticalSpeedFpm = finiteNum(v[3]);
+  const bankDeg = finiteNum(v[4]);
+  const pitchDeg = finiteNum(v[5]);
+  const gForce = finiteNum(v[6]);
+  const indicatedAirspeedKt = finiteNum(v[7]);
+  const altitudeFt = finiteNum(v[8]);
+  const gearPctRaw = finiteNum(v[9]);
+  const gearHandleRaw = finiteNum(v[10]);
+  const flapsPctRaw = finiteNum(v[11]);
+  const aglFt = finiteNum(v[12]);
+  const gearRetractableRaw = finiteNum(v[13]);
+  const n1Eng1 = finiteNum(v[14]);
+  const n1Eng2 = finiteNum(v[15]);
+  const rpmEng1 = finiteNum(v[16]);
+  const rpmEng2 = finiteNum(v[17]);
+  const combEng1 = finiteNum(v[18]);
+  const combEng2 = finiteNum(v[19]);
+  const overspeedRaw = finiteNum(v[20]);
+  const stallRaw = finiteNum(v[21]);
+  const overspeedWarning =
+    overspeedRaw !== undefined ? overspeedRaw > 0.5 : undefined;
+  const stallWarning = stallRaw !== undefined ? stallRaw > 0.5 : undefined;
 
   const gearRetractable =
     typeof gearRetractableRaw === 'number'
@@ -433,7 +401,15 @@ export async function sampleLiveFlight(
   };
 }
 
-/** Ambient weather at user aircraft — soft-fail each SimVar independently. */
+const WEATHER_SAMPLE_VARS = [
+  { name: 'AMBIENT WIND VELOCITY', unit: 'knots' },
+  { name: 'AMBIENT WIND DIRECTION', unit: 'degrees' },
+  { name: 'PLANE HEADING DEGREES TRUE', unit: 'degrees' },
+  { name: 'AMBIENT PRECIP RATE', unit: 'millimeters of water' },
+  { name: 'AMBIENT VISIBILITY', unit: 'meters' },
+] as const;
+
+/** Ambient weather at user aircraft — one SimConnect batch; TIMEOUT throws. */
 async function sampleLiveWeatherAmbient(bridge: NamedPipeSimBridge): Promise<{
   windKt?: number;
   windFromDeg?: number;
@@ -441,26 +417,84 @@ async function sampleLiveWeatherAmbient(bridge: NamedPipeSimBridge): Promise<{
   precipMm?: number;
   visibilityM?: number;
 }> {
-  const readOpt = async (
-    name: string,
-    unit: string,
-  ): Promise<number | undefined> => {
-    try {
-      const v = await bridge.readSimVar({ name, unit });
-      return Number.isFinite(v) ? v : undefined;
-    } catch {
-      return undefined;
-    }
+  const v = await bridge.readSimVars([...WEATHER_SAMPLE_VARS]);
+  return {
+    windKt: finiteNum(v[0]),
+    windFromDeg: finiteNum(v[1]),
+    headingTrueDeg: finiteNum(v[2]),
+    precipMm: finiteNum(v[3]),
+    visibilityM: finiteNum(v[4]),
   };
-  const [windKt, windFromDeg, headingTrueDeg, precipMm, visibilityM] =
-    await Promise.all([
-      readOpt('AMBIENT WIND VELOCITY', 'knots'),
-      readOpt('AMBIENT WIND DIRECTION', 'degrees'),
-      readOpt('PLANE HEADING DEGREES TRUE', 'degrees'),
-      readOpt('AMBIENT PRECIP RATE', 'millimeters of water'),
-      readOpt('AMBIENT VISIBILITY', 'meters'),
-    ]);
-  return { windKt, windFromDeg, headingTrueDeg, precipMm, visibilityM };
+}
+
+/** Density, tanks, totals, empty/gross, stations 1–16 — one Host batch (≤32). */
+const LOAD_SAMPLE_VARS = [
+  { name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' },
+  { name: 'FUEL TOTAL CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT MAIN QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT MAIN QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK CENTER QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK CENTER2 QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT AUX QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT AUX QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT TIP QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT TIP QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TOTAL QUANTITY WEIGHT', unit: 'pounds' },
+  { name: 'FUEL TOTAL QUANTITY', unit: 'gallons' },
+  { name: 'EMPTY WEIGHT', unit: 'pounds' },
+  { name: 'TOTAL WEIGHT', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:1', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:2', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:3', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:4', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:5', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:6', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:7', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:8', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:9', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:10', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:11', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:12', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:13', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:14', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:15', unit: 'pounds' },
+  { name: 'PAYLOAD STATION WEIGHT:16', unit: 'pounds' },
+] as const;
+
+const LOAD_CAPACITY_VARS = [
+  { name: 'FUEL TANK LEFT MAIN CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT MAIN CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK CENTER CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK CENTER2 CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT AUX CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT AUX CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT TIP CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT TIP CAPACITY', unit: 'gallons' },
+] as const;
+
+function classicFuelCapacityFromGals(
+  gals: number[],
+  densityLbPerGal: number,
+): FuelTankBreakdown | undefined {
+  const left = (gals[0] ?? 0) * densityLbPerGal;
+  const right = (gals[1] ?? 0) * densityLbPerGal;
+  const center = ((gals[2] ?? 0) + (gals[3] ?? 0)) * densityLbPerGal;
+  const leftAux = (gals[4] ?? 0) * densityLbPerGal;
+  const rightAux = (gals[5] ?? 0) * densityLbPerGal;
+  const leftTip = (gals[6] ?? 0) * densityLbPerGal;
+  const rightTip = (gals[7] ?? 0) * densityLbPerGal;
+  if (left + right + center + leftAux + rightAux + leftTip + rightTip < 1) {
+    return undefined;
+  }
+  return {
+    left,
+    right,
+    center,
+    ...(leftAux > 0.5 ? { leftAux } : {}),
+    ...(rightAux > 0.5 ? { rightAux } : {}),
+    ...(leftTip > 0.5 ? { leftTip } : {}),
+    ...(rightTip > 0.5 ? { rightTip } : {}),
+  };
 }
 
 /**
@@ -491,30 +525,6 @@ export async function sampleLiveLoadLb(
   /** Station IPC died (TIMEOUT/NOT_CONNECTED). Caller must reset SimConnect. */
   sessionDied?: boolean;
 }> {
-  let density = DEFAULT_JET_A_LB_PER_GAL;
-  let totalCapacityGal: number | undefined;
-  try {
-    const dens = await bridge.readSimVar({
-      name: 'FUEL WEIGHT PER GALLON',
-      unit: 'pounds',
-    });
-    try {
-      const cap = await bridge.readSimVar({
-        name: 'FUEL TOTAL CAPACITY',
-        unit: 'gallons',
-      });
-      if (Number.isFinite(cap) && cap > 0) totalCapacityGal = cap;
-    } catch {
-      /* capacity optional — density sanitize still applies defaults */
-    }
-    density = sanitizeFuelDensityLbPerGal(
-      Number.isFinite(dens) && dens > 0.1 ? dens : undefined,
-      { totalCapacityGal },
-    );
-  } catch {
-    density = sanitizeFuelDensityLbPerGal(undefined, { totalCapacityGal });
-  }
-
   const aborted = () => opts.shouldAbort?.() === true;
   if (aborted()) {
     return {
@@ -523,25 +533,48 @@ export async function sampleLiveLoadLb(
       payloadSource: 'none',
     };
   }
-  const readGal = async (name: string): Promise<number> => {
-    if (aborted()) return 0;
-    try {
-      const gal = await bridge.readSimVar({ name, unit: 'gallons' });
-      return Number.isFinite(gal) && gal > 0 ? gal : 0;
-    } catch {
-      return 0;
-    }
-  };
 
-  const leftMain = await readGal('FUEL TANK LEFT MAIN QUANTITY');
-  const rightMain = await readGal('FUEL TANK RIGHT MAIN QUANTITY');
-  const centerGal =
-    (await readGal('FUEL TANK CENTER QUANTITY')) +
-    (await readGal('FUEL TANK CENTER2 QUANTITY'));
-  const leftAux = await readGal('FUEL TANK LEFT AUX QUANTITY');
-  const rightAux = await readGal('FUEL TANK RIGHT AUX QUANTITY');
-  const leftTip = await readGal('FUEL TANK LEFT TIP QUANTITY');
-  const rightTip = await readGal('FUEL TANK RIGHT TIP QUANTITY');
+  let v: number[];
+  try {
+    v = await bridge.readSimVars([...LOAD_SAMPLE_VARS]);
+  } catch (err) {
+    if (simIpcSessionDied(err)) {
+      return {
+        fuelLb: null,
+        payloadLb: null,
+        payloadSource: 'none',
+        stationsIncomplete: true,
+        sessionDied: true,
+      };
+    }
+    throw err;
+  }
+  if (aborted()) {
+    return {
+      fuelLb: null,
+      payloadLb: null,
+      payloadSource: 'none',
+    };
+  }
+
+  const densRaw = finiteNum(v[0]);
+  const totalCapacityGalRaw = finiteNum(v[1]);
+  const totalCapacityGal =
+    totalCapacityGalRaw !== undefined && totalCapacityGalRaw > 0
+      ? totalCapacityGalRaw
+      : undefined;
+  const density = sanitizeFuelDensityLbPerGal(
+    densRaw !== undefined && densRaw > 0.1 ? densRaw : undefined,
+    { totalCapacityGal },
+  );
+
+  const leftMain = galOrZero(v[2]);
+  const rightMain = galOrZero(v[3]);
+  const centerGal = galOrZero(v[4]) + galOrZero(v[5]);
+  const leftAux = galOrZero(v[6]);
+  const rightAux = galOrZero(v[7]);
+  const leftTip = galOrZero(v[8]);
+  const rightTip = galOrZero(v[9]);
 
   const leftLb = leftMain * density;
   const rightLb = rightMain * density;
@@ -567,106 +600,73 @@ export async function sampleLiveLoadLb(
     ...(leftTipLb > 0.5 ? { leftTip: leftTipLb } : {}),
     ...(rightTipLb > 0.5 ? { rightTip: rightTipLb } : {}),
   };
-  const fuelTankCapacity = aborted()
-    ? undefined
-    : await readClassicFuelTankCapacityLb(bridge, density);
 
   let fuelLb: number | null = tankTotalLb > 0 ? tankTotalLb : null;
-  if (aborted()) {
-    return {
-      fuelLb,
-      payloadLb: null,
-      payloadSource: 'none',
-      fuelTanks,
-      ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
-    };
-  }
-  try {
-    const fuel = await bridge.readSimVar({
-      name: 'FUEL TOTAL QUANTITY WEIGHT',
-      unit: 'pounds',
-    });
-    if (Number.isFinite(fuel) && fuel >= 0) {
-      // Prefer total when it is meaningfully larger (collector / unmapped tanks).
-      fuelLb =
-        fuel > tankTotalLb * 1.02 + 1 ? fuel : Math.max(tankTotalLb, fuel);
-    }
-  } catch {
-    try {
-      const gal = await bridge.readSimVar({
-        name: 'FUEL TOTAL QUANTITY',
-        unit: 'gallons',
-      });
+  const fuelWeight = finiteNum(v[10]);
+  if (fuelWeight !== undefined && fuelWeight >= 0) {
+    fuelLb =
+      fuelWeight > tankTotalLb * 1.02 + 1
+        ? fuelWeight
+        : Math.max(tankTotalLb, fuelWeight);
+  } else {
+    const gal = finiteNum(v[11]);
+    if (gal !== undefined) {
       const fuel = gal * density;
       if (Number.isFinite(fuel) && fuel >= 0) {
         fuelLb =
           fuel > tankTotalLb * 1.02 + 1 ? fuel : Math.max(tankTotalLb, fuel);
       }
-    } catch {
-      /* keep tank sum */
     }
   }
 
-  // Gross−empty−fuel before the 16-station loop. PAYLOAD STATION WEIGHT can
-  // TIMEOUT after idle while EMPTY/TOTAL still work (same as fuel tanks).
   let massBalanceLb: number | undefined;
   let emptyWeightLb: number | undefined;
   let grossWeightLb: number | undefined;
-  if (fuelLb !== null && !aborted()) {
-    try {
-      const empty = await bridge.readSimVar({
-        name: 'EMPTY WEIGHT',
-        unit: 'pounds',
-      });
-      const gross = await bridge.readSimVar({
-        name: 'TOTAL WEIGHT',
-        unit: 'pounds',
-      });
-      if (Number.isFinite(empty) && empty > 0) emptyWeightLb = empty;
-      if (Number.isFinite(gross) && gross > 0) grossWeightLb = gross;
-      if (
-        emptyWeightLb !== undefined &&
-        grossWeightLb !== undefined &&
-        grossWeightLb > emptyWeightLb
-      ) {
-        massBalanceLb = Math.max(
-          0,
-          grossWeightLb - emptyWeightLb - Math.max(0, fuelLb),
-        );
-      }
-    } catch {
-      massBalanceLb = undefined;
-    }
+  const empty = finiteNum(v[12]);
+  const gross = finiteNum(v[13]);
+  if (empty !== undefined && empty > 0) emptyWeightLb = empty;
+  if (gross !== undefined && gross > 0) grossWeightLb = gross;
+  if (
+    fuelLb !== null &&
+    emptyWeightLb !== undefined &&
+    grossWeightLb !== undefined &&
+    grossWeightLb > emptyWeightLb
+  ) {
+    massBalanceLb = Math.max(
+      0,
+      grossWeightLb - emptyWeightLb - Math.max(0, fuelLb),
+    );
   }
 
   const stations: Record<number, number> = {};
   let stationSum = 0;
   let stationsRead = 0;
-  let stationSessionDied = false;
   for (let index = 1; index <= 16; index += 1) {
-    if (aborted()) break;
+    const w = finiteNum(v[13 + index]);
+    if (w !== undefined && w >= 0) {
+      stations[index] = w;
+      stationSum += w;
+      stationsRead += 1;
+    }
+  }
+
+  let fuelTankCapacity: FuelTankBreakdown | undefined;
+  let capacitySessionDied = false;
+  if (!aborted()) {
     try {
-      const w = await bridge.readSimVar({
-        name: `PAYLOAD STATION WEIGHT:${index}`,
-        unit: 'pounds',
-      });
-      if (Number.isFinite(w) && w >= 0) {
-        stations[index] = w;
-        stationSum += w;
-        stationsRead += 1;
-      }
+      const cap = await bridge.readSimVars([...LOAD_CAPACITY_VARS]);
+      fuelTankCapacity = classicFuelCapacityFromGals(
+        cap.map(galOrZero),
+        density,
+      );
     } catch (err) {
-      // IPC code TIMEOUT / NOT_CONNECTED — do not regex the message.
       if (simIpcSessionDied(err)) {
-        stationSessionDied = true;
-        break;
+        capacitySessionDied = true;
       }
-      if (stationsRead === 0 && index >= 8) break;
     }
   }
   const stationsIncomplete =
     aborted() ||
-    stationSessionDied ||
     (typeof previousStationSumLb === 'number' &&
       previousStationSumLb > 200 &&
       stationsRead > 0 &&
@@ -693,7 +693,8 @@ export async function sampleLiveLoadLb(
   // drop in classic stations so Preflight can leave READY after the user empties.
   let payloadLb =
     resolved.payloadLb !== undefined ? resolved.payloadLb : null;
-  let payloadSource = resolved.source;
+  let payloadSource: 'stations' | 'mass-balance' | 'tfdi-efb' | 'none' =
+    resolved.source;
   if (
     !stationsIncomplete &&
     stationsRead > 0 &&
@@ -781,7 +782,7 @@ export async function sampleLiveLoadLb(
     ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
     ...(!stationsIncomplete && stationsRead > 0 ? { stations } : {}),
     ...(stationsIncomplete ? { stationsIncomplete: true } : {}),
-    ...(stationSessionDied ? { sessionDied: true } : {}),
+    ...(capacitySessionDied ? { sessionDied: true } : {}),
   };
 }
 
@@ -2214,7 +2215,10 @@ export class CareerWatchSession {
           this.weatherStatus = weatherOpsStatus(this.weatherAcc, {
             expectedRouteMs: nextState.expectedRouteMs,
           });
-        } catch {
+        } catch (wxErr) {
+          if (simIpcSessionDied(wxErr)) {
+            this.pendingSimConnectReset = true;
+          }
           this.weatherStatus = weatherOpsStatus(this.weatherAcc, {
             expectedRouteMs: nextState.expectedRouteMs,
           });
@@ -2249,30 +2253,22 @@ export class CareerWatchSession {
       });
 
       // Stable-cruise burn/TAS sample while airborne on an active freighter leg.
+      // Skip if weather/flight already marked the SimConnect session dead.
       if (
         current.status === 'in_flight' &&
         !sample.onGround &&
-        this.bridge
+        this.bridge &&
+        !this.pendingSimConnectReset
       ) {
         try {
-          let altFt: number | undefined;
-          try {
-            const alt = await this.bridge.readSimVar({
-              name: 'PLANE ALTITUDE',
-              unit: 'feet',
-            });
-            if (Number.isFinite(alt)) altFt = alt;
-          } catch {
-            altFt = undefined;
-          }
-          const [tasKt, fuelFlowKgPerHour] = await Promise.all([
-            readLiveCruiseTasKt(this.bridge),
-            sampleLiveCruiseFuelFlowKgPerHour(this.bridge),
-          ]);
+          const tasKt = await readLiveCruiseTasKt(this.bridge);
+          const fuelFlowKgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+            this.bridge,
+          );
           const pushed = pushCruiseTick(this.cruiseState, {
             atMs: nowMs,
             onGround: sample.onGround,
-            altFt,
+            altFt: sample.altitudeFt,
             vsFpm: sample.verticalSpeedFpm,
             tasKt,
             fuelFlowKgPerHour,
@@ -2329,7 +2325,10 @@ export class CareerWatchSession {
               }
             }
           }
-        } catch {
+        } catch (cruiseErr) {
+          if (simIpcSessionDied(cruiseErr)) {
+            this.pendingSimConnectReset = true;
+          }
           this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
         }
       } else if (sample.onGround && this.cruiseState.window.length > 0) {
@@ -2345,7 +2344,8 @@ export class CareerWatchSession {
       if (
         current.status === 'in_flight' &&
         !sample.onGround &&
-        this.bridge
+        this.bridge &&
+        !this.pendingSimConnectReset
       ) {
         await this.maybeDrainMxFuelExcess(
           snap.missions,
@@ -2823,6 +2823,10 @@ export class CareerWatchSession {
         consecutivePipeErrors: this.consecutivePipeErrors,
         ms: Date.now() - tickStarted,
       });
+      // First TIMEOUT/NOT_CONNECTED: reset SimConnect next tick (same as stations).
+      if (simIpcSessionDied(error)) {
+        this.pendingSimConnectReset = true;
+      }
       // Close + schedule reopen on next tick. Immediate open here raced probes
       // and ignored waitMs (connect/close storm → host 0xC00000B0).
       if (

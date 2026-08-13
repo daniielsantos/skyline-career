@@ -188,7 +188,10 @@ export function WatchStatusFooter(props: Props) {
             {props.watch.cruiseSample.tasKt != null
               ? ` · ${props.watch.cruiseSample.tasKt} kt`
               : ''}
-            {props.watch.cruiseSample.fuelFlowKgPerHour != null
+            {typeof props.watch.cruiseSample.fuelFlowKgPerHour === 'number' &&
+            Number.isFinite(props.watch.cruiseSample.fuelFlowKgPerHour) &&
+            props.watch.cruiseSample.fuelFlowKgPerHour > 0 &&
+            props.watch.cruiseSample.fuelFlowKgPerHour < 50_000
               ? ` · ${props.watch.cruiseSample.fuelFlowKgPerHour.toLocaleString(
                   undefined,
                   { maximumFractionDigits: 1 },

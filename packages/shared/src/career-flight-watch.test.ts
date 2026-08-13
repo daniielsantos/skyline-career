@@ -439,6 +439,18 @@ describe('evaluateMissionFlightTransition', () => {
     );
   });
 
+  it('inferEnginesRunning ignores missing TURB N1 zeros on a running piston', () => {
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: false,
+        n1Pct: [0, 0],
+        rpm: [2400, 2380],
+        combustion: [true, true],
+      }),
+      true,
+    );
+  });
+
   it('can settle on touchdown without engines when near dest', () => {
     const plannedMs = 3_600_000;
     const nowMs = Date.now();

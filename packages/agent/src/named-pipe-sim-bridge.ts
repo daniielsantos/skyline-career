@@ -11,7 +11,11 @@ import {
   setNamedPipeDebugLog,
   type NamedPipeClientOptions,
 } from './ipc/named-pipe-client.js';
-import type { SimBridgeSessionPing } from './sim-session-health.js';
+import { IpcClientError } from './ipc/types.js';
+import {
+  simIpcSessionDied,
+  type SimBridgeSessionPing,
+} from './sim-session-health.js';
 
 export { setNamedPipeDebugLog };
 
@@ -119,6 +123,51 @@ export class NamedPipeSimBridge implements SimBridge {
       timeoutMs,
     );
     return result.value;
+  }
+
+  /**
+   * One Host SimConnect definition for many FLOAT64 vars (≤32).
+   * Old hosts without readSimVars fall back to sequential reads; TIMEOUT still throws.
+   */
+  async readSimVars(requests: SimVarReadRequest[]): Promise<number[]> {
+    await this.ensureOpen();
+    if (requests.length === 0) return [];
+    try {
+      const result = await this.client.call<{ values: number[] }>('readSimVars', {
+        vars: requests.map((r) => ({ name: r.name, unit: r.unit })),
+      });
+      if (!Array.isArray(result.values) || result.values.length !== requests.length) {
+        throw new IpcClientError(
+          'SIM_ERROR',
+          'readSimVars returned unexpected length',
+        );
+      }
+      return result.values;
+    } catch (err) {
+      if (
+        err instanceof IpcClientError &&
+        (err.code === 'UNSUPPORTED' ||
+          /Unknown method:\s*readSimVars/i.test(err.message))
+      ) {
+        return this.readSimVarsSequential(requests);
+      }
+      throw err;
+    }
+  }
+
+  private async readSimVarsSequential(
+    requests: SimVarReadRequest[],
+  ): Promise<number[]> {
+    const values: number[] = [];
+    for (const request of requests) {
+      try {
+        values.push(await this.readSimVar(request));
+      } catch (err) {
+        if (simIpcSessionDied(err)) throw err;
+        values.push(Number.NaN);
+      }
+    }
+    return values;
   }
 
   async writeSimVar(request: SimVarWriteRequest): Promise<void> {

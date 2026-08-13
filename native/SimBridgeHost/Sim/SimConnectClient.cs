@@ -105,6 +105,36 @@ public sealed class SimConnectClient : ISimClient
         public double Value;
     }
 
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct Batch8
+    {
+        public double V0, V1, V2, V3, V4, V5, V6, V7;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct Batch16
+    {
+        public double V0, V1, V2, V3, V4, V5, V6, V7;
+        public double V8, V9, V10, V11, V12, V13, V14, V15;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct Batch24
+    {
+        public double V0, V1, V2, V3, V4, V5, V6, V7;
+        public double V8, V9, V10, V11, V12, V13, V14, V15;
+        public double V16, V17, V18, V19, V20, V21, V22, V23;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    private struct Batch32
+    {
+        public double V0, V1, V2, V3, V4, V5, V6, V7;
+        public double V8, V9, V10, V11, V12, V13, V14, V15;
+        public double V16, V17, V18, V19, V20, V21, V22, V23;
+        public double V24, V25, V26, V27, V28, V29, V30, V31;
+    }
+
     /// <summary>
     /// Fixed snapshot layout — field order must match AddToDataDefinition order below.
     /// Paused/Slew are best-effort (0 when unavailable).
@@ -413,6 +443,115 @@ public sealed class SimConnectClient : ISimClient
         {
             _simOpGate.Release();
         }
+    }
+
+    public async Task<double[]> ReadSimVarsAsync(
+        IReadOnlyList<(string Name, string Unit)> vars,
+        CancellationToken ct = default)
+    {
+        if (vars is null || vars.Count == 0)
+        {
+            return Array.Empty<double>();
+        }
+
+        if (vars.Count > 32)
+        {
+            throw new SimClientException(
+                "INVALID_ARGUMENT",
+                "readSimVars supports at most 32 FLOAT64 SimVars");
+        }
+
+        var padded = vars.Count <= 8 ? 8 : vars.Count <= 16 ? 16 : vars.Count <= 24 ? 24 : 32;
+        await _simOpGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var sim = RequireSim();
+            uint defId;
+            uint reqId;
+            TaskCompletionSource<object> tcs;
+
+            lock (_gate)
+            {
+                defId = _nextDefId++;
+                reqId = _nextReqId++;
+                tcs = NewPending(reqId);
+
+                for (var i = 0; i < padded; i++)
+                {
+                    var name = i < vars.Count ? vars[i].Name : "SIM ON GROUND";
+                    var unit = i < vars.Count ? vars[i].Unit : "Bool";
+                    sim.AddToDataDefinition(
+                        (Definitions)defId,
+                        name,
+                        NormalizeUnit(unit),
+                        SIMCONNECT_DATATYPE.FLOAT64,
+                        0.0f,
+                        SimConnect.SIMCONNECT_UNUSED);
+                }
+
+                switch (padded)
+                {
+                    case 8:
+                        sim.RegisterDataDefineStruct<Batch8>((Definitions)defId);
+                        break;
+                    case 16:
+                        sim.RegisterDataDefineStruct<Batch16>((Definitions)defId);
+                        break;
+                    case 24:
+                        sim.RegisterDataDefineStruct<Batch24>((Definitions)defId);
+                        break;
+                    default:
+                        sim.RegisterDataDefineStruct<Batch32>((Definitions)defId);
+                        break;
+                }
+
+                sim.RequestDataOnSimObject(
+                    (Requests)reqId,
+                    (Definitions)defId,
+                    SimConnect.SIMCONNECT_OBJECT_ID_USER,
+                    SIMCONNECT_PERIOD.ONCE,
+                    SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT,
+                    0, 0, 0);
+            }
+
+            var result = await WaitPending(tcs, ct).ConfigureAwait(false);
+            var unpacked = UnpackBatch(result, padded);
+            var take = new double[vars.Count];
+            Array.Copy(unpacked, take, vars.Count);
+            return take;
+        }
+        finally
+        {
+            _simOpGate.Release();
+        }
+    }
+
+    private static double[] UnpackBatch(object raw, int padded)
+    {
+        return padded switch
+        {
+            8 when raw is Batch8 b8 =>
+                [b8.V0, b8.V1, b8.V2, b8.V3, b8.V4, b8.V5, b8.V6, b8.V7],
+            16 when raw is Batch16 b16 =>
+            [
+                b16.V0, b16.V1, b16.V2, b16.V3, b16.V4, b16.V5, b16.V6, b16.V7,
+                b16.V8, b16.V9, b16.V10, b16.V11, b16.V12, b16.V13, b16.V14, b16.V15,
+            ],
+            24 when raw is Batch24 b24 =>
+            [
+                b24.V0, b24.V1, b24.V2, b24.V3, b24.V4, b24.V5, b24.V6, b24.V7,
+                b24.V8, b24.V9, b24.V10, b24.V11, b24.V12, b24.V13, b24.V14, b24.V15,
+                b24.V16, b24.V17, b24.V18, b24.V19, b24.V20, b24.V21, b24.V22, b24.V23,
+            ],
+            32 when raw is Batch32 b32 =>
+            [
+                b32.V0, b32.V1, b32.V2, b32.V3, b32.V4, b32.V5, b32.V6, b32.V7,
+                b32.V8, b32.V9, b32.V10, b32.V11, b32.V12, b32.V13, b32.V14, b32.V15,
+                b32.V16, b32.V17, b32.V18, b32.V19, b32.V20, b32.V21, b32.V22, b32.V23,
+                b32.V24, b32.V25, b32.V26, b32.V27, b32.V28, b32.V29, b32.V30, b32.V31,
+            ],
+            _ => throw new SimClientException("SIM_ERROR", "Unexpected batch payload type"),
+        };
     }
 
     public async Task WriteSimVarAsync(string name, string unit, double value, CancellationToken ct = default)

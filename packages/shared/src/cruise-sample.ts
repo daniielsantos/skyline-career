@@ -6,11 +6,14 @@
 import type { AirframePerfOverride } from './types/career-economy.js';
 
 export const DEFAULT_CRUISE_MIN_STABLE_MS = 180_000; // 3 min
-export const DEFAULT_CRUISE_MAX_VS_FPM = 150;
+/** Light turbulence / tiny step-climbs; real climb is still ~800+ fpm. */
+export const DEFAULT_CRUISE_MAX_VS_FPM = 400;
 export const DEFAULT_CRUISE_MIN_TAS_KT = 60;
-export const DEFAULT_CRUISE_TAS_SPREAD = 0.05;
-export const DEFAULT_CRUISE_FLOW_SPREAD = 0.1;
-export const DEFAULT_CRUISE_MAX_ALT_SPREAD_FT = 500;
+/** ~17 kt at 167 TAS — was 5% and reset on autopilot wander. */
+export const DEFAULT_CRUISE_TAS_SPREAD = 0.1;
+/** Was 10%; SimVar family jitter on GA was wiping the window. */
+export const DEFAULT_CRUISE_FLOW_SPREAD = 0.2;
+export const DEFAULT_CRUISE_MAX_ALT_SPREAD_FT = 1_200;
 export const DEFAULT_CRUISE_EMA_ALPHA = 0.3;
 
 export type CruiseTick = {

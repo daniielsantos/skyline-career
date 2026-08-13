@@ -194,6 +194,13 @@ public sealed class PipeServer : IAsyncDisposable
                     return IpcResponse.Success(request.Id, new { value });
                 }
 
+                case "readSimVars":
+                {
+                    var list = RequireSimVarList(request.Params, "vars");
+                    var values = await _sim.ReadSimVarsAsync(list, ct).ConfigureAwait(false);
+                    return IpcResponse.Success(request.Id, new { values });
+                }
+
                 case "writeSimVar":
                 {
                     var name = RequireString(request.Params, "name");
@@ -375,6 +382,36 @@ public sealed class PipeServer : IAsyncDisposable
 
     private static double RequireNumber(JsonElement? map, string key)
         => GetNumber(map, key) ?? throw new ArgumentException($"Missing number param: {key}");
+
+    private static List<(string Name, string Unit)> RequireSimVarList(JsonElement? map, string key)
+    {
+        if (map is null || map.Value.ValueKind != JsonValueKind.Object
+            || !map.Value.TryGetProperty(key, out var arr)
+            || arr.ValueKind != JsonValueKind.Array)
+        {
+            throw new ArgumentException($"Missing array param: {key}");
+        }
+
+        var list = new List<(string Name, string Unit)>(arr.GetArrayLength());
+        foreach (var item in arr.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object)
+            {
+                throw new ArgumentException("readSimVars vars entries must be objects");
+            }
+
+            var name = item.TryGetProperty("name", out var n) ? n.GetString() : null;
+            var unit = item.TryGetProperty("unit", out var u) ? u.GetString() : null;
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(unit))
+            {
+                throw new ArgumentException("readSimVars vars entries need name and unit");
+            }
+
+            list.Add((name, unit));
+        }
+
+        return list;
+    }
 
     private static bool? GetBool(JsonElement? map, string key)
     {

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { IpcClientError } from './ipc/types.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { sampleLiveCruiseFuelFlowKgPerHour } from './sample-cruise-burn.js';
 
@@ -13,6 +14,12 @@ function mockBridge(
         throw new Error(`unknown ${request.name}`);
       }
       return values[key] ?? values[request.name]!;
+    },
+    async readSimVars(requests: Array<{ name: string; unit: string }>) {
+      return requests.map((request) => {
+        const key = `${request.name}|${request.unit}`;
+        return values[key] ?? values[request.name] ?? 0;
+      });
     },
   } as NamedPipeSimBridge;
 }
@@ -37,5 +44,28 @@ describe('sampleLiveCruiseFuelFlowKgPerHour', () => {
       }),
     );
     assert.equal(kgPerHour, 31.8);
+  });
+
+  it('ignores insane batch garbage instead of painting a huge kg/h', async () => {
+    const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+      mockBridge({
+        'ENG FUEL FLOW PPH:1|pounds per hour': 1e15,
+        'ENG FUEL FLOW PPH:2|pounds per hour': 1e15,
+      }),
+    );
+    assert.equal(kgPerHour, undefined);
+  });
+
+  it('throws on the first TIMEOUT instead of probing 28 SimVars', async () => {
+    await assert.rejects(
+      () =>
+        sampleLiveCruiseFuelFlowKgPerHour({
+          async readSimVars() {
+            throw new IpcClientError('TIMEOUT', 'SimConnect request timed out');
+          },
+        } as unknown as NamedPipeSimBridge),
+      (err: unknown) =>
+        err instanceof IpcClientError && err.code === 'TIMEOUT',
+    );
   });
 });

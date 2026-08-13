@@ -49,6 +49,19 @@ public sealed class MockSimClient : ISimClient
         return Task.FromResult(_simVars.TryGetValue(key, out var value) ? value : 0);
     }
 
+    public async Task<double[]> ReadSimVarsAsync(
+        IReadOnlyList<(string Name, string Unit)> vars,
+        CancellationToken ct = default)
+    {
+        var values = new double[vars.Count];
+        for (var i = 0; i < vars.Count; i++)
+        {
+            values[i] = await ReadSimVarAsync(vars[i].Name, vars[i].Unit, ct).ConfigureAwait(false);
+        }
+
+        return values;
+    }
+
     public Task WriteSimVarAsync(string name, string unit, double value, CancellationToken ct = default)
     {
         EnsureConnected();

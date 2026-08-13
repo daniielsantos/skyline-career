@@ -27,6 +27,7 @@ import {
   formatIpcError,
   pingNeedsSessionReset,
   shouldReopenSimSession,
+  simIpcSessionDied,
 } from '../../agent/src/sim-session-health.ts';
 import { isOfpLoadActive } from './ofp-load-state.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
@@ -95,6 +96,7 @@ export class BushTripWatchSession {
   private pipeRetryAtMs = 0;
   private pipeBackoffMs = 2_000;
   private consecutivePipeErrors = 0;
+  private pendingSimConnectReset = false;
   private lastSuccessfulTickAtMs = 0;
   private opts = {
     intervalSec: 5,
@@ -217,6 +219,7 @@ export class BushTripWatchSession {
     this.pipeRetryAtMs = 0;
     this.pipeBackoffMs = 2_000;
     this.consecutivePipeErrors = 0;
+    this.pendingSimConnectReset = false;
     this.lastSuccessfulTickAtMs = 0;
     this.watchState = createMissionFlightWatchState({
       sawAirborne: active.legStatus === 'departed',
@@ -289,9 +292,23 @@ export class BushTripWatchSession {
     }
     this.tickInFlight = true;
     try {
+      const forceSimConnectReset = this.pendingSimConnectReset;
+      this.pendingSimConnectReset = false;
       if (!this.bridge.isPipeConnected) {
         await withSimBridgeExclusive(async () => {
-          await this.bridge!.open('Skyline Career UI Bush Watch');
+          await this.bridge!.open(
+            'Skyline Career UI Bush Watch',
+            forceSimConnectReset ? { resetSession: true } : {},
+          );
+        });
+      } else if (forceSimConnectReset) {
+        watchDebugLog('bush-watch', 'simconnect reset — disconnect+connect', {
+          force: true,
+        });
+        await withSimBridgeExclusive(async () => {
+          await this.bridge!.open('Skyline Career UI Bush Watch', {
+            resetSession: true,
+          });
         });
       } else {
         try {
@@ -416,6 +433,9 @@ export class BushTripWatchSession {
       this.pipeRetryAtMs = Date.now() + this.pipeBackoffMs;
       this.pipeBackoffMs = Math.min(30_000, this.pipeBackoffMs * 2);
       watchDebugLog('bush-watch', 'tick error', { error: this.lastError });
+      if (simIpcSessionDied(error)) {
+        this.pendingSimConnectReset = true;
+      }
       if (
         this.bridge &&
         shouldReopenSimSession(error, this.consecutivePipeErrors)

@@ -4,6 +4,7 @@ export type IpcMethod =
   | 'disconnect'
   | 'status'
   | 'readSimVar'
+  | 'readSimVars'
   | 'writeSimVar'
   | 'readLVar'
   | 'writeLVar'

@@ -1,5 +1,6 @@
 namespace SimBridgeHost.Sim;
 
+using System.Collections.Generic;
 using SimBridgeHost.Ipc;
 using SimBridgeHost.Sim.Pmdg;
 
@@ -12,6 +13,10 @@ public interface ISimClient : IAsyncDisposable
     Task ConnectAsync(string appName, CancellationToken ct = default);
     Task DisconnectAsync(CancellationToken ct = default);
     Task<double> ReadSimVarAsync(string name, string unit, CancellationToken ct = default);
+    /// <summary>One SimConnect data definition / one pending wait for many FLOAT64 vars.</summary>
+    Task<double[]> ReadSimVarsAsync(
+        IReadOnlyList<(string Name, string Unit)> vars,
+        CancellationToken ct = default);
     Task WriteSimVarAsync(string name, string unit, double value, CancellationToken ct = default);
     Task<double> ReadLVarAsync(string name, CancellationToken ct = default);
     Task WriteLVarAsync(string name, double value, CancellationToken ct = default);

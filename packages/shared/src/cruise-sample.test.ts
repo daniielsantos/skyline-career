@@ -32,7 +32,7 @@ describe('pushCruiseTick', () => {
 
     const climb = pushCruiseTick(
       ground.state,
-      tick(5_000, { vsFpm: 800 }),
+      tick(5_000, { vsFpm: 900 }),
     );
     assert.equal(climb.state.window.length, 0);
   });

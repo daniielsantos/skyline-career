@@ -119,13 +119,12 @@ export function inferEnginesRunning(input: {
   rpm?: number[];
   combustion?: boolean[];
 }): boolean {
-  const n1 = (input.n1Pct ?? []).filter((n) => Number.isFinite(n));
+  // 0 = missing SimVar (batch FLOAT64), not a spooled-down turbine.
+  const n1 = (input.n1Pct ?? []).filter((n) => Number.isFinite(n) && n > 0);
   const rpm = (input.rpm ?? []).filter((n) => Number.isFinite(n));
   const comb = input.combustion ?? [];
-  if (n1.length > 0) {
-    if (n1.every((n) => n < ENGINE_N1_OFF_PCT)) return false;
-    if (n1.some((n) => n >= ENGINE_N1_OFF_PCT)) return true;
-  }
+  if (n1.some((n) => n >= ENGINE_N1_OFF_PCT)) return true;
+  if (n1.length > 0 && n1.every((n) => n < ENGINE_N1_OFF_PCT)) return false;
   if (comb.length > 0 && comb.every((c) => !c)) return false;
   if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
   if (comb.length > 0 && comb.some((c) => c)) return true;

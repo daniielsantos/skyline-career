@@ -1021,9 +1021,9 @@ function stationSideFromName(name: string | undefined): 'left' | 'right' | null 
   return null;
 }
 
-function stationHasArm(
-  station: { arm?: number },
-): station is { arm: number } {
+function stationHasArm<T extends { arm?: number }>(
+  station: T,
+): station is T & { arm: number } {
   return typeof station.arm === 'number' && Number.isFinite(station.arm);
 }
 

@@ -48,9 +48,11 @@ sample). Planning tank/station reads use 2.5s IPC. Watch `stop` waits 25s
 and `sampleLiveLoadLb` aborts mid-loop when stop starts.
 
 Reinject then froze on **Crew seeded — placing cargo +50 lb per seat…**:
-each cargo round started with `readLiveCgState` + `readLiveStations`
-(15s IPC). While cargo remains, fill is **equal +50** with no live CG/station
-reads (trust the write). CG is read only after cargo is placed.
+each cargo round started with sequential CG + 16 stations (15s IPC).
+CG is one `readSimVars` batch **during** fill. Hybrid:
+equal while MAC is forward of envelope midpoint (Caravan);
+aft of mid → remaining on the nose; at a limit → shift and
+**keep the Due**. Never “toward center” (v0.3.10 C408).
 
 ## Verify hang after reinject
 
@@ -81,6 +83,8 @@ Timeout é o **código IPC `TIMEOUT`** (Host `SimClientException` +
 `TIMEOUT: …`. 1º miss aborta o sample (flight ou load batch); next tick `resetSession`.
 Solo: um `readSimVars` para density/tanks/weights/stations 1–16 (não 16 round-trips).
 No ar: cruise TAS+fuel-flow também é um batch; 1º TIMEOUT aborta (antes: 4×7 reads engolidos → tick ~45s).
+Inject/preflight (local): `readLiveTanks` / stations / CG / density / compare
+também são batch. TIMEOUT não vira zero. Planejamento: 1 retry `resetSession`.
 
 ## Idle Watch: TIMEOUT mata detect de payload
 

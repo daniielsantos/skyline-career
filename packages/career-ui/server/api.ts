@@ -354,6 +354,12 @@ function withMissionClientView(
   };
 }
 
+async function toClientMission(mission: MissionIntent) {
+  return withCareerRead((world, missions) =>
+    withMissionClientView(world, missions, mission),
+  );
+}
+
 function withParkingRates(
   fleet: PlayerAircraft[],
   world?: Pick<CareerEconomyWorld, 'airports'>,
@@ -3609,7 +3615,7 @@ export function createCareerApiServer(port = 8787) {
             else watchSession.resetSession();
           }
           send(res, 200, {
-            mission,
+            mission: await toClientMission(mission),
             pilotFeeUsd: accepted.pilotFeeUsd,
             grossPayUsd: accepted.grossPayUsd,
             npcName: accepted.npcName,
@@ -4464,7 +4470,7 @@ export function createCareerApiServer(port = 8787) {
               return;
             }
             send(res, 200, {
-              mission: current,
+              mission: await toClientMission(current),
               check: result.check,
               summary: result.summary,
               ofp: result.ofp,
@@ -4475,7 +4481,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, {
-            mission: savedMission,
+            mission: await toClientMission(savedMission),
             check: result.check,
             summary: result.summary,
             ofp: result.ofp,
@@ -4627,7 +4633,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, {
-            mission: savedMission,
+            mission: await toClientMission(savedMission),
             releasedKg: trimmedWrite.releasedKg,
             payBeforeUsd: trimmedWrite.payBeforeUsd,
             payAfterUsd: trimmedWrite.payAfterUsd,
@@ -4872,7 +4878,7 @@ export function createCareerApiServer(port = 8787) {
               return;
             }
             send(res, 200, {
-              mission: current,
+              mission: await toClientMission(current),
               check: result.check,
               summary: result.summary,
               ofp: result.ofp,
@@ -4884,7 +4890,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, {
-            mission: savedMission,
+            mission: await toClientMission(savedMission),
             check: result.check,
             summary: result.summary,
             ofp: result.ofp,

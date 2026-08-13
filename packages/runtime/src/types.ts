@@ -44,6 +44,11 @@ export interface SimSnapshot {
 
 export interface SimBridge {
   readSimVar(request: SimVarReadRequest): Promise<number>;
+  /**
+   * Optional: one SimConnect request for many FLOAT64 vars (Host max 32).
+   * NamedPipeSimBridge implements this; mocks may omit it.
+   */
+  readSimVars?(requests: SimVarReadRequest[]): Promise<number[]>;
   writeSimVar(request: SimVarWriteRequest): Promise<void>;
   readLVar(name: string): Promise<number>;
   writeLVar(request: LVarWriteRequest): Promise<void>;

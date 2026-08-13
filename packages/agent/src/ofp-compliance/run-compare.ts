@@ -12,6 +12,7 @@ import {
   type OfpExpectation,
 } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from '../named-pipe-sim-bridge.js';
+import { readSimVarsSoft } from '../read-simvars-soft.js';
 import { readLiveLoad } from './live-reader.js';
 
 export interface CompareOnceOptions {
@@ -28,34 +29,19 @@ export interface CompareOnceOptions {
 export async function resolveLiveFuelDensityLbPerGal(
   bridge: NamedPipeSimBridge,
 ): Promise<number> {
-  let dens: number | undefined;
-  try {
-    dens = await bridge.readSimVar({
-      name: 'FUEL WEIGHT PER GALLON',
-      unit: 'pounds',
-    });
-  } catch {
-    dens = undefined;
-  }
-  let quantityGal = 0;
-  let capacityGal: number | undefined;
-  try {
-    const [left, right, center, cap] = await Promise.all([
-      bridge.readSimVar({ name: 'FUEL TANK LEFT MAIN QUANTITY', unit: 'gallons' }),
-      bridge.readSimVar({ name: 'FUEL TANK RIGHT MAIN QUANTITY', unit: 'gallons' }),
-      bridge.readSimVar({ name: 'FUEL TANK CENTER QUANTITY', unit: 'gallons' }),
-      bridge
-        .readSimVar({ name: 'FUEL TOTAL CAPACITY', unit: 'gallons' })
-        .catch(() => Number.NaN),
-    ]);
-    quantityGal =
-      (Number.isFinite(left) ? left : 0) +
-      (Number.isFinite(right) ? right : 0) +
-      (Number.isFinite(center) ? center : 0);
-    if (Number.isFinite(cap) && cap > 0) capacityGal = cap;
-  } catch {
-    quantityGal = 0;
-  }
+  const [dens, left, right, center, cap] = await readSimVarsSoft(bridge, [
+    { name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' },
+    { name: 'FUEL TANK LEFT MAIN QUANTITY', unit: 'gallons' },
+    { name: 'FUEL TANK RIGHT MAIN QUANTITY', unit: 'gallons' },
+    { name: 'FUEL TANK CENTER QUANTITY', unit: 'gallons' },
+    { name: 'FUEL TOTAL CAPACITY', unit: 'gallons' },
+  ]);
+  const quantityGal =
+    (Number.isFinite(left) ? left! : 0) +
+    (Number.isFinite(right) ? right! : 0) +
+    (Number.isFinite(center) ? center! : 0);
+  const capacityGal =
+    Number.isFinite(cap) && cap! > 0 ? cap : undefined;
   // Use tank capacity (not quantity aboard) so a half-full Kodiak is not treated as GA.
   const sizeGal = capacityGal ?? quantityGal;
   const lightPiston = sizeGal > 0 && sizeGal <= 120;

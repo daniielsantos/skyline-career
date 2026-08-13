@@ -32,7 +32,8 @@
 - Watch: código IPC `TIMEOUT` / `sessionHealthy===false` → backoff + `open()` no tick seguinte (IPC `connect()`). Não reabrir no handler de erro. Host velho sem os campos = comportamento anterior.
 - Inject **manda** na sessão: `open({ resetSession: true })` faz IPC `disconnect` + `connect` (SimConnect novo, IDs zerados). Pipe e `SimBridgeHost.exe` ficam vivos.
 - **Não** matar `SimBridgeHost.exe` no caminho quente. **Não** voltar probe `FUELSYSTEM TANK CAPACITY` no inject.
-- IPC `readSimVars` (pós-0.3.21, ainda sem release): um `RequestDataOnSimObject` para ≤32 FLOAT64 (pad 8/16/24/32, slots extra = `SIM ON GROUND`). Sem `ClearDataDefinition`. Watch solo usa isso para tanks+stations. Host antigo responde `UNSUPPORTED` → Node lê sequential.
+- IPC `readSimVars` (0.3.22+): um `RequestDataOnSimObject` para ≤32 FLOAT64 (pad 8/16/24/32, slots extra = `SIM ON GROUND`). Sem `ClearDataDefinition`. Watch **e** inject/preflight usam isso. Host antigo responde `UNSUPPORTED` → Node lê sequential. TIMEOUT ainda throw. Listas >32 são fatiadas.
+- **Pack:** `pack-desktop` **falha** se `dotnet build` do Host falhar (exe locked / bin stale). Não copia `bin/Release` velho. Feche `start:local` antes de `release:desktop`.
 
 Arquivo: `native/SimBridgeHost/Sim/SimConnectClient.cs`
 

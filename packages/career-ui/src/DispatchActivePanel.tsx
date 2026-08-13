@@ -26,7 +26,7 @@ import {
   matchFuelOk,
 } from './load-verification';
 import { mxFuelBurnAlertText } from './mx-fuel-burn';
-import { logbookFlightKind } from './logbook';
+import { logbookAircraftLabel, logbookFlightKind } from './logbook';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
   const currentIndex = DISPATCH_STEP_ORDER.indexOf(props.current);
@@ -218,6 +218,12 @@ export function DispatchActivePanel(props: {
       ? (watchPos ?? lastAircraftRef.current)
       : null;
   const flightKind = logbookFlightKind(mission);
+  const assignedAircraft = logbookAircraftLabel(mission);
+  const liveAircraftTitle = props.simBridge?.aircraftTitle?.trim() || null;
+  const airframeMismatch = Boolean(
+    props.preflightBootstrapError &&
+      /purchased airframe|does not match/i.test(props.preflightBootstrapError),
+  );
   const isFerryLeg = flightKind === 'Ferry';
   const showOfpCard = Boolean(mission.lastOfpCheck);
   const showFuelCard =
@@ -306,7 +312,11 @@ export function DispatchActivePanel(props: {
             />
           </h2>
           <p>
-            {props.aircraftClassLabel(mission.aircraftClassId)} ·{' '}
+            {assignedAircraft}
+            {assignedAircraft !== props.aircraftClassLabel(mission.aircraftClassId)
+              ? ` · ${props.aircraftClassLabel(mission.aircraftClassId)}`
+              : null}
+            {' · '}
             <span className="logbook-kind">{flightKind}</span>
             {' · '}
             <span className={`status status-${mission.status}`}>{mission.status}</span>
@@ -467,7 +477,8 @@ export function DispatchActivePanel(props: {
                   : `${Math.round(briefing.cruiseAltitudeFt).toLocaleString('en-US')} FT`
                 : undefined;
             const briefingItems = [
-              briefing?.aircraftIcao ? ['Aircraft', briefing.aircraftIcao] : null,
+              assignedAircraft ? ['Hangar', assignedAircraft] : null,
+              briefing?.aircraftIcao ? ['OFP type', briefing.aircraftIcao] : null,
               briefing?.tailNumber ? ['Tail number', briefing.tailNumber] : null,
               briefing?.distanceNm !== undefined
                 ? ['Distance', `${Math.round(briefing.distanceNm)} NM`]
@@ -677,8 +688,8 @@ export function DispatchActivePanel(props: {
           </strong>
           <p>
             {loadPath === 'efb'
-              ? 'Use Import SimBrief / Load OFP on the aircraft EFB or FMC. Waiting for live preflight…'
-              : 'Set fuel and payload in Mass & Balance / EFB. Waiting for live preflight…'}
+              ? `Use Import SimBrief / Load OFP on the ${assignedAircraft} EFB or FMC. Waiting for live preflight…`
+              : `Set fuel and payload on the ${assignedAircraft} in Mass & Balance / EFB. Waiting for live preflight…`}
           </p>
           {props.mxFuelBurnAlert ? (
             <p className="banner warn mx-fuel-burn-alert" role="status">
@@ -691,18 +702,33 @@ export function DispatchActivePanel(props: {
       {showLoadPanel &&
       loadPath === 'inject' &&
       !mission.lastPreflightCheck ? (
-        <div className="dispatch-step-card" aria-live="polite">
+        <div
+          className={`dispatch-step-card${airframeMismatch ? ' dispatch-step-card-fail' : ''}`}
+          aria-live="polite"
+        >
           <strong>Waiting for Preflight</strong>
+          <dl className="dispatch-aircraft-pair">
+            <div>
+              <dt>Selected</dt>
+              <dd>{assignedAircraft}</dd>
+            </div>
+            {liveAircraftTitle ? (
+              <div>
+                <dt>In simulator</dt>
+                <dd>{liveAircraftTitle}</dd>
+              </div>
+            ) : null}
+          </dl>
           <p>
             {props.preflightBootstrapError
               ? props.preflightBootstrapError
               : !props.simBridge?.connected
-                ? 'SimBridge is offline — start the bridge, then stay in the Bandeirante cockpit at the origin.'
+                ? `SimBridge is offline — start the bridge, then load the ${assignedAircraft} at the origin.`
                 : props.simBridge.onGround === false
                   ? 'MSFS reports airborne — Preflight only runs on the ground.'
-                  : props.simBridge.aircraftTitle
-                    ? `Reading “${props.simBridge.aircraftTitle}”… the Preflight card opens when the first sample lands (engines can be off).`
-                    : 'SimBridge is up, but no aircraft title yet — load the Bandeirante at the gate (cold & dark is fine; main menu / world map is not).'}
+                  : liveAircraftTitle
+                    ? `Reading “${liveAircraftTitle}”… the Preflight card opens when the first sample lands (engines can be off).`
+                    : `SimBridge is up, but no aircraft title yet — load the ${assignedAircraft} at the gate (cold & dark is fine; main menu / world map is not).`}
           </p>
           {props.mxFuelBurnAlert ? (
             <p className="banner warn mx-fuel-burn-alert" role="status">

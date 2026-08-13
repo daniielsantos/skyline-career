@@ -32,6 +32,7 @@ import {
   cgCounterweightPerSeatLb,
   equalizeMovableStations,
   equalizeLateralStationPairs,
+  forwardMostOpenStationGroup,
   fuelTankTargetsForRound,
   FUEL_INJECT_ROUNDS,
   idleOuterFuelTankIds,
@@ -40,11 +41,17 @@ import {
   FREIGHTER_PILOT_LB,
   GA_BAGGAGE_SOFT_MAX_LB,
   resolveCgCounterweightBias,
+  resolveCgFillAction,
+  longitudinalHalfIndexes,
   seatSoftMaxLb,
   shiftCargoForCg,
   type BuiltOfpLoadPlan,
 } from '../../agent/src/ofp-load-plan.ts';
-import { readLiveCgState } from '../../agent/src/live-cg.ts';
+import { readLiveCgStateBestEffort } from '../../agent/src/live-cg.ts';
+import {
+  finiteOrZero,
+  readSimVarsSoft,
+} from '../../agent/src/read-simvars-soft.ts';
 import { ProfileCache } from '../../agent/src/profile-cache.ts';
 import {
   defaultCacheDir,
@@ -374,22 +381,22 @@ async function readLiveTanks(
   const skip = new Set(
     (opts?.skipTankIds ?? []).map((id) => id.toUpperCase()),
   );
+  const requests: Array<{ name: string; unit: string }> = [];
+  const ids: string[] = [];
   for (const tank of profile.fuel.tanks) {
     if (skip.has(tank.id.toUpperCase())) {
       tanks[tank.id] = 0;
       continue;
     }
-    try {
-      tanks[tank.id] = await bridge.readSimVar(
-        {
-          name: tank.readVar,
-          unit: tank.readUnit || profile.fuel.unit || 'gallons',
-        },
-        opts?.readTimeoutMs,
-      );
-    } catch {
-      tanks[tank.id] = 0;
-    }
+    requests.push({
+      name: tank.readVar,
+      unit: tank.readUnit || profile.fuel.unit || 'gallons',
+    });
+    ids.push(tank.id);
+  }
+  const values = await readSimVarsSoft(bridge, requests, opts?.readTimeoutMs);
+  for (let i = 0; i < ids.length; i += 1) {
+    tanks[ids[i]!] = finiteOrZero(values[i]);
   }
   return tanks;
 }
@@ -399,6 +406,46 @@ async function readLiveTanks(
  * show the new quantity (Learjet → Sim 2508 = L+R only, tips flash empty).
  * Prefer the written target when live collapsed relative to what we just applied.
  */
+async function readLiveTanksTrustingWrite(
+  bridge: NamedPipeSimBridge,
+  profile: AircraftProfile,
+  written: Record<string, number>,
+  opts?: { skipTankIds?: string[]; readTimeoutMs?: number },
+): Promise<Record<string, number>> {
+  try {
+    return preferWrittenFuelTanks(
+      await readLiveTanks(bridge, profile, opts),
+      written,
+    );
+  } catch (err) {
+    if (simIpcSessionDied(err)) return written;
+    throw err;
+  }
+}
+
+async function readLiveStationsTrustingWrite(
+  bridge: NamedPipeSimBridge,
+  profile: AircraftProfile,
+  written: Record<number, number>,
+): Promise<Record<number, number>> {
+  try {
+    const live = await readLiveStations(bridge, profile);
+    const liveSum = sumRecord(live);
+    const workSum = sumRecord(written);
+    if (
+      liveSum < 1 &&
+      workSum > 100 &&
+      Object.values(live).every((v) => (v ?? 0) < 1)
+    ) {
+      return { ...written };
+    }
+    return live;
+  } catch (err) {
+    if (simIpcSessionDied(err)) return { ...written };
+    throw err;
+  }
+}
+
 function preferWrittenFuelTanks(
   live: Record<string, number>,
   written: Record<string, number>,
@@ -422,16 +469,13 @@ async function readLiveStations(
   readTimeoutMs?: number,
 ): Promise<Record<number, number>> {
   const stations: Record<number, number> = {};
-  for (const station of profile.payload.stations) {
-    const name = station.readVar ?? `PAYLOAD STATION WEIGHT:${station.index}`;
-    try {
-      stations[station.index] = await bridge.readSimVar(
-        { name, unit: 'pounds' },
-        readTimeoutMs,
-      );
-    } catch {
-      stations[station.index] = 0;
-    }
+  const requests = profile.payload.stations.map((station) => ({
+    name: station.readVar ?? `PAYLOAD STATION WEIGHT:${station.index}`,
+    unit: 'pounds',
+  }));
+  const values = await readSimVarsSoft(bridge, requests, readTimeoutMs);
+  for (let i = 0; i < profile.payload.stations.length; i += 1) {
+    stations[profile.payload.stations[i]!.index] = finiteOrZero(values[i]);
   }
   return stations;
 }
@@ -441,79 +485,98 @@ async function readLivePayloadTotalLb(
   bridge: NamedPipeSimBridge,
   profile: AircraftProfile,
   stations?: Record<number, number>,
-): Promise<number> {
+): Promise<{ payloadLb: number; massBalanceLb?: number }> {
   const liveStations = stations ?? (await readLiveStations(bridge, profile));
   const stationSum = sumRecord(liveStations);
   let massBalanceLb: number | undefined;
   try {
-    const empty = await bridge.readSimVar({ name: 'EMPTY WEIGHT', unit: 'pounds' });
-    const gross = await bridge.readSimVar({ name: 'TOTAL WEIGHT', unit: 'pounds' });
-    let fuelLb: number;
-    try {
-      fuelLb = await bridge.readSimVar({
-        name: 'FUEL TOTAL QUANTITY WEIGHT',
-        unit: 'pounds',
-      });
-    } catch {
-      const gal = await bridge.readSimVar({
-        name: 'FUEL TOTAL QUANTITY',
-        unit: 'gallons',
-      });
-      const dens = await bridge.readSimVar({
-        name: 'FUEL WEIGHT PER GALLON',
-        unit: 'pounds',
-      });
-      fuelLb = gal * dens;
+    const [empty, gross, fuelWeight, gal, dens] = await readSimVarsSoft(bridge, [
+      { name: 'EMPTY WEIGHT', unit: 'pounds' },
+      { name: 'TOTAL WEIGHT', unit: 'pounds' },
+      { name: 'FUEL TOTAL QUANTITY WEIGHT', unit: 'pounds' },
+      { name: 'FUEL TOTAL QUANTITY', unit: 'gallons' },
+      { name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' },
+    ]);
+    let fuelLb = fuelWeight;
+    if (!(typeof fuelLb === 'number' && Number.isFinite(fuelLb) && fuelLb > 0)) {
+      fuelLb =
+        (Number.isFinite(gal) ? gal : 0) * (Number.isFinite(dens) ? dens : 0);
     }
     if (
       Number.isFinite(empty) &&
       Number.isFinite(gross) &&
       Number.isFinite(fuelLb) &&
-      empty > 0 &&
-      gross > empty
+      (empty ?? 0) > 0 &&
+      (gross ?? 0) > (empty ?? 0)
     ) {
-      massBalanceLb = Math.max(0, gross - empty - Math.max(0, fuelLb));
+      massBalanceLb = Math.max(0, (gross ?? 0) - (empty ?? 0) - Math.max(0, fuelLb));
     }
-  } catch {
+  } catch (err) {
+    if (simIpcSessionDied(err)) throw err;
     /* keep station sum */
   }
   const resolved = resolveLivePayloadLb({
     stationSumLb: stationSum,
     massBalanceLb,
   });
-  return resolved.payloadLb ?? stationSum;
+  return { payloadLb: resolved.payloadLb ?? stationSum, massBalanceLb };
 }
 
-async function readFuelLbPerGal(bridge: NamedPipeSimBridge): Promise<number | undefined> {
-  try {
-    const dens = await bridge.readSimVar({
-      name: 'FUEL WEIGHT PER GALLON',
-      unit: 'pounds',
-    });
-    return Number.isFinite(dens) && dens > 4 && dens < 9 ? dens : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function readLiveWeightLimits(bridge: NamedPipeSimBridge): Promise<{
+/** One batch: profile tanks + stations + density + empty + MTOW. TIMEOUT throws. */
+async function readLivePlanningSample(
+  bridge: NamedPipeSimBridge,
+  profile: AircraftProfile,
+  timeoutMs = 2_500,
+): Promise<{
+  tanks: Record<string, number>;
+  stations: Record<number, number>;
+  fuelLbPerGal?: number;
   emptyWeightLb?: number;
   maxGrossWeightLb?: number;
 }> {
-  const out: { emptyWeightLb?: number; maxGrossWeightLb?: number } = {};
-  try {
-    const empty = await bridge.readSimVar({ name: 'EMPTY WEIGHT', unit: 'pounds' });
-    if (Number.isFinite(empty) && empty > 0) out.emptyWeightLb = empty;
-  } catch {
-    /* optional */
+  const tankReqs = profile.fuel.tanks.map((tank) => ({
+    name: tank.readVar,
+    unit: tank.readUnit || profile.fuel.unit || 'gallons',
+  }));
+  const stationReqs = profile.payload.stations.map((station) => ({
+    name: station.readVar ?? `PAYLOAD STATION WEIGHT:${station.index}`,
+    unit: 'pounds',
+  }));
+  const extraReqs = [
+    { name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' },
+    { name: 'EMPTY WEIGHT', unit: 'pounds' },
+    { name: 'MAX GROSS WEIGHT', unit: 'pounds' },
+  ];
+  const values = await readSimVarsSoft(
+    bridge,
+    [...tankReqs, ...stationReqs, ...extraReqs],
+    timeoutMs,
+  );
+  const tanks: Record<string, number> = {};
+  for (let i = 0; i < profile.fuel.tanks.length; i += 1) {
+    tanks[profile.fuel.tanks[i]!.id] = finiteOrZero(values[i]);
   }
-  try {
-    const mtow = await bridge.readSimVar({ name: 'MAX GROSS WEIGHT', unit: 'pounds' });
-    if (Number.isFinite(mtow) && mtow > 0) out.maxGrossWeightLb = mtow;
-  } catch {
-    /* optional */
+  const stations: Record<number, number> = {};
+  const stationBase = tankReqs.length;
+  for (let i = 0; i < profile.payload.stations.length; i += 1) {
+    stations[profile.payload.stations[i]!.index] = finiteOrZero(
+      values[stationBase + i],
+    );
   }
-  return out;
+  const extraBase = stationBase + stationReqs.length;
+  const dens = values[extraBase];
+  const empty = values[extraBase + 1];
+  const mtow = values[extraBase + 2];
+  return {
+    tanks,
+    stations,
+    fuelLbPerGal:
+      Number.isFinite(dens) && dens! > 4 && dens! < 9 ? dens : undefined,
+    emptyWeightLb:
+      Number.isFinite(empty) && empty! > 0 ? empty : undefined,
+    maxGrossWeightLb:
+      Number.isFinite(mtow) && mtow! > 0 ? mtow : undefined,
+  };
 }
 
 function applySucceeded(
@@ -911,17 +974,31 @@ async function applyMissionOfpLoadExclusive(
       message: 'Reading current fuel and payload…',
     });
     const snap = await bridge.snapshot();
+    const readPlanningLive = () =>
+      readLivePlanningSample(bridge, resolved.profile, 2_500);
+    let planningLive: Awaited<ReturnType<typeof readPlanningLive>>;
+    try {
+      planningLive = await readPlanningLive();
+    } catch (planErr) {
+      if (!simIpcSessionDied(planErr)) throw planErr;
+      watchDebugLog('inject', 'planning read failed — reset SimConnect session', {
+        error: planErr instanceof Error ? planErr.message : String(planErr),
+      });
+      await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
+      planningLive = await readPlanningLive();
+    }
     beforeLive = {
-      tanks: await readLiveTanks(bridge, resolved.profile, {
-        readTimeoutMs: 2_500,
-      }),
-      stations: await readLiveStations(bridge, resolved.profile, 2_500),
+      tanks: planningLive.tanks,
+      stations: planningLive.stations,
       onGround: snap.onGround,
       enginesRunning: snap.enginesRunning,
     };
 
-    const fuelLbPerGal = await readFuelLbPerGal(bridge);
-    const weightLimits = await readLiveWeightLimits(bridge);
+    const fuelLbPerGal = planningLive.fuelLbPerGal;
+    const weightLimits = {
+      emptyWeightLb: planningLive.emptyWeightLb,
+      maxGrossWeightLb: planningLive.maxGrossWeightLb,
+    };
     let clampedFuelTargetKg: number | undefined;
 
     try {
@@ -1461,11 +1538,13 @@ async function applyMissionOfpLoadExclusive(
         // Live verify only on the last ramp step — intermediate reads were the
         // ~20s stalls when unused AUX SimVars timed out after each write.
         if (isFinalRound) {
-          const liveTanks = await readLiveTanks(bridge, resolved.profile, {
-            skipTankIds: idleOuterIds,
-          });
           afterLive = {
-            tanks: preferWrittenFuelTanks(liveTanks, tanks),
+            tanks: await readLiveTanksTrustingWrite(
+              bridge,
+              resolved.profile,
+              tanks,
+              { skipTankIds: idleOuterIds },
+            ),
             stations: afterLive.stations,
           };
           lastGoodSchematicTanks =
@@ -1484,9 +1563,12 @@ async function applyMissionOfpLoadExclusive(
       // After drain attempts: accept remaining AUX/TIP floors and lower mains
       // so total stays on OFP Due (King Air tips stick ~10–12 gal / ~80 lb each).
       if (!restoreFuelOnRollback) {
-        const liveAfter = await readLiveTanks(bridge, resolved.profile, {
-          skipTankIds: idleOuterIds,
-        });
+        const liveAfter = await readLiveTanksTrustingWrite(
+          bridge,
+          resolved.profile,
+          endTanks,
+          { skipTankIds: idleOuterIds },
+        );
         const adjusted = redistributeAroundResidualFloors(
           built.plan.fuel.tanks ?? plannedTanks,
           liveAfter,
@@ -1532,11 +1614,13 @@ async function applyMissionOfpLoadExclusive(
             `Fuel balanced · ${Math.round(lastGoodFuelLb)} lb`,
           );
           await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
-          const liveBalanced = await readLiveTanks(bridge, resolved.profile, {
-            skipTankIds: idleOuterFuelTankIds(liveAfter, endTanks),
-          });
           afterLive = {
-            tanks: preferWrittenFuelTanks(liveBalanced, endTanks),
+            tanks: await readLiveTanksTrustingWrite(
+              bridge,
+              resolved.profile,
+              endTanks,
+              { skipTankIds: idleOuterFuelTankIds(liveAfter, endTanks) },
+            ),
             stations: afterLive.stations,
           };
           lastGoodSchematicTanks =
@@ -1585,8 +1669,8 @@ async function applyMissionOfpLoadExclusive(
         'balancing',
         `Crew seeded — placing cargo +${CG_BALANCE_STEP_LB} lb per seat…`,
       );
-      // Trust the crew write. readLiveStations + CG PERCENT after fuel+crew
-      // were hanging reinject on "placing cargo +50 lb per seat…".
+      // Trust the crew write for stations. CG is sampled each fill round
+      // (one readSimVars batch) so the aft-limit stop can fire.
     }
 
     const fuelOk =
@@ -1595,22 +1679,25 @@ async function applyMissionOfpLoadExclusive(
       for (let i = 0; i < CG_REBALANCE_MAX_ITERATIONS; i++) {
         assertOfpLoadNotCancelled(mission.id);
         const stillPlacing = cargoPlacedLb < cargoTargetLb - 0.5;
-        // v0.3.9: fill seats equally while cargo remains. Live CG reads every
-        // round (3 SimVars × 15s) froze reinject before the first +50 lb write.
+        // Hybrid fill: equal while MAC is forward of envelope midpoint
+        // (Caravan). Aft of mid → remaining on the nose. At a limit → shift
+        // and keep Due. Never toward-center (v0.3.10 C408).
         let liveMac = lastLiveMac;
         let minMac =
           lastMinMac ?? resolved.profile.cg?.constraints?.minMac;
         let maxMac =
           lastMaxMac ?? resolved.profile.cg?.constraints?.maxMac;
-        if (!stillPlacing) {
-          const liveCg = await readLiveCgState(bridge, {
+        const liveCg = await readLiveCgStateBestEffort(
+          bridge,
+          {
             readVar: resolved.profile.cg?.readVar,
             readUnit: resolved.profile.cg?.readUnit,
-          });
-          liveMac = liveCg.liveMac;
-          minMac = liveCg.minMac ?? minMac;
-          maxMac = liveCg.maxMac ?? maxMac;
-        }
+          },
+          { liveMac: lastLiveMac, minMac: lastMinMac, maxMac: lastMaxMac },
+        );
+        liveMac = liveCg.liveMac;
+        minMac = liveCg.minMac ?? minMac;
+        maxMac = liveCg.maxMac ?? maxMac;
         lastMinMac = minMac;
         lastMaxMac = maxMac;
 
@@ -1623,8 +1710,16 @@ async function applyMissionOfpLoadExclusive(
         const inEnvelope =
           haveEnvelope && liveMac! >= lo! && liveMac! <= hi!;
 
+        const fillAction = haveEnvelope
+          ? resolveCgFillAction({ liveMac: liveMac!, lo: lo!, hi: hi! })
+          : 'equal';
         if (stillPlacing) {
-          bias = 'equal';
+          bias =
+            fillAction === 'shift-aft'
+              ? 'aft'
+              : fillAction === 'shift-forward' || fillAction === 'forward'
+                ? 'forward'
+                : 'equal';
           perSeatLb = CG_BALANCE_STEP_LB;
         } else if (haveEnvelope) {
           bias = resolveCgCounterweightBias({
@@ -1675,41 +1770,50 @@ async function applyMissionOfpLoadExclusive(
           break;
         }
 
+        const blockedByLimit =
+          stillPlacing &&
+          (fillAction === 'shift-forward' || fillAction === 'shift-aft');
+
         let nextStations = workingStations;
         let movedLb = 0;
         let placeIndexes: number[] = [];
         let placeBias: 'equal' | 'forward' | 'aft' = bias;
-        if (stillPlacing) {
+        if (stillPlacing && !blockedByLimit) {
           // Seats first (soft-capped). Baggage only when seats are full or freighter.
           let softMax: Record<number, number> | undefined;
           if (preferSeatFill && roomUnderSoftCap(seatStations)) {
             placeIndexes = seatStations;
             softMax = seatSoftMaxByIndex;
           } else if (roomOnBaggage()) {
-            // Already on/aft of aft limit → more baggage would only push further aft.
-            if (
-              preferSeatFill &&
-              haveEnvelope &&
-              liveMac !== undefined &&
-              hi !== undefined &&
-              liveMac >= hi
-            ) {
-              cargoTargetLb = cargoPlacedLb;
-              publishLiveProgress(
-                'balancing',
-                `CG at aft limit (${liveMac.toFixed(1)}% MAC) — stopping baggage add at ${cargoPlacedLb} lb`,
-                { cgAttempt: i + 1, liveMac },
+            if (!preferSeatFill && fillAction === 'forward') {
+              // CG already aft of mid: remaining Due on the nose, not S7.
+              const helping = longitudinalHalfIndexes(
+                resolved.profile,
+                baggageStations,
+                'forward',
               );
+              placeIndexes = forwardMostOpenStationGroup(
+                workingStations,
+                resolved.profile,
+                helping.length > 0 ? helping : baggageStations,
+                { softMaxByIndex: baggageSoftMaxByIndex },
+              );
+            } else {
+              placeIndexes = baggageStations;
+            }
+            softMax = baggageSoftMaxByIndex;
+            if (placeIndexes.length === 0) {
+              cargoTargetLb = cargoPlacedLb;
               watchDebugLog('inject', 'balance stop', {
                 round: i,
-                reason: 'aft_limit',
+                reason: 'soft_caps_full',
                 cargoPlacedLb: Math.round(cargoPlacedLb),
-                liveMac,
+                cargoTargetLb: Math.round(cargoTargetLb),
+                fillAction,
+                working: stationsSnapshot(workingStations),
               });
               break;
             }
-            placeIndexes = baggageStations;
-            softMax = baggageSoftMaxByIndex;
           } else if (roomUnderSoftCap(seatStations)) {
             placeIndexes = seatStations;
             softMax = seatSoftMaxByIndex;
@@ -1725,8 +1829,13 @@ async function applyMissionOfpLoadExclusive(
             });
             break;
           }
-          placeBias =
-            placeIndexes === baggageStations || !preferSeatFill ? bias : 'equal';
+          // Equal within chosen indexes. GA seats stay equal; GA baggage may
+          // use fill bias. Cabin-as-baggage helping-side is already the nose group.
+          placeBias = !preferSeatFill
+            ? 'equal'
+            : placeIndexes === baggageStations
+              ? bias
+              : 'equal';
           const holdMaxLoadLb = placeIndexes.reduce((max, idx) => {
             const hard =
               resolved.profile.payload.stations.find((s) => s.index === idx)
@@ -1751,9 +1860,18 @@ async function applyMissionOfpLoadExclusive(
           );
           // Forward/aft half can be full while other stations still have room —
           // fall back to equal so freighter cargo does not stall mid-cabin.
+          // Do not spill onto the tail when MAC is already aft of midpoint
+          // (Bonanza +50×S7 overshoot).
+          const aftOfMid =
+            haveEnvelope &&
+            liveMac !== undefined &&
+            lo !== undefined &&
+            hi !== undefined &&
+            liveMac > (lo + hi) / 2;
           if (
             placed.movedLb <= 0 &&
             placeBias !== 'equal' &&
+            !aftOfMid &&
             (roomOnBaggage() || roomUnderSoftCap(seatStations))
           ) {
             watchDebugLog('inject', 'bias half full — fallback equal', {
@@ -1778,6 +1896,23 @@ async function applyMissionOfpLoadExclusive(
           cargoPlacedLb += movedLb;
         } else if (haveEnvelope && !inEnvelope) {
           // Counterweight among seats first. Never dump more onto baggage when already aft.
+          // If cargo Due remains, shift first then keep placing on the helping
+          // side — do not cut Due.
+          if (blockedByLimit) {
+            const side = fillAction === 'shift-aft' ? 'aft' : 'forward';
+            publishLiveProgress(
+              'balancing',
+              `CG at ${side} limit (${liveMac!.toFixed(1)}% MAC) — shifting ${side === 'aft' ? 'aft' : 'forward'} to keep loading Due`,
+              { cgAttempt: i + 1, liveMac },
+            );
+            watchDebugLog('inject', 'limit_shift', {
+              round: i,
+              fillAction,
+              cargoPlacedLb: Math.round(cargoPlacedLb),
+              cargoTargetLb: Math.round(cargoTargetLb),
+              liveMac,
+            });
+          }
           const direction = bias === 'aft' ? 'aft' : 'forward';
           const half = Math.max(1, Math.ceil(seatCount / 2));
           const shiftBudget = perSeatLb * half;
@@ -1921,6 +2056,9 @@ async function applyMissionOfpLoadExclusive(
         }
 
         if (movedLb <= 0) {
+          if (stillPlacing) {
+            cargoTargetLb = cargoPlacedLb;
+          }
           if (!stillPlacing && haveEnvelope && !inEnvelope) {
             // Inside tablet envelope but outside 1% margin → keep load (advisory).
             // Only hard-fail when truly past min/max MAC.
@@ -2019,16 +2157,18 @@ async function applyMissionOfpLoadExclusive(
           cg: payloadApply.cg ?? applyResult.cg,
         };
         if (stillPlacing) {
-          // More cargo rounds to go — don't block on 16 station reads + CG.
+          // More cargo rounds to go — don't block on 16 station reads.
+          // Next loop samples CG in one batch before the next +50 write.
           continue;
         }
         await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
-        const liveStations = await readLiveStations(bridge, resolved.profile);
+        const liveStations = await readLiveStationsTrustingWrite(
+          bridge,
+          resolved.profile,
+          workingStations,
+        );
         const liveSumRaw = sumRecord(liveStations);
         const workSum = sumRecord(workingStations);
-        // Total read collapse (all zeros while we wrote hundreds of lb) means the
-        // pipe/SimConnect read path is sick — do not treat every station as a
-        // "ghost" and thrash prune/rewrite for another minute.
         const liveReadCollapsed =
           liveSumRaw < 1 &&
           workSum > 100 &&
@@ -2039,21 +2179,20 @@ async function applyMissionOfpLoadExclusive(
             workingSum: Math.round(workSum),
             writeOk: payloadApply.payload?.success ?? null,
           });
-          afterLive = {
-            tanks: afterLive.tanks,
-            stations: { ...workingStations },
-          };
-        } else {
-          afterLive = {
-            tanks: afterLive.tanks,
-            stations: liveStations,
-          };
         }
+        afterLive = {
+          tanks: afterLive.tanks,
+          stations: liveReadCollapsed ? { ...workingStations } : liveStations,
+        };
         // Re-read CG after settle so the UI sees verified state for this round.
-        const verifiedCg = await readLiveCgState(bridge, {
-          readVar: resolved.profile.cg?.readVar,
-          readUnit: resolved.profile.cg?.readUnit,
-        });
+        const verifiedCg = await readLiveCgStateBestEffort(
+          bridge,
+          {
+            readVar: resolved.profile.cg?.readVar,
+            readUnit: resolved.profile.cg?.readUnit,
+          },
+          { liveMac: lastLiveMac, minMac: lastMinMac, maxMac: lastMaxMac },
+        );
         const verifiedMac = verifiedCg.liveMac ?? liveMac;
         lastLiveMac = verifiedMac;
         prevLiveMac = verifiedMac;
@@ -2189,7 +2328,11 @@ async function applyMissionOfpLoadExclusive(
             ...applyResult,
             payload: rewriteApply.payload ?? applyResult.payload,
           };
-          const rewriteLive = await readLiveStations(bridge, resolved.profile);
+          const rewriteLive = await readLiveStationsTrustingWrite(
+            bridge,
+            resolved.profile,
+            workingStations,
+          );
           const rewriteLiveSum = sumRecord(rewriteLive);
           const rewriteCollapsed =
             rewriteLiveSum < 1 &&
@@ -2270,10 +2413,14 @@ async function applyMissionOfpLoadExclusive(
       // One cargo hold (C408 passenger S5): 50 lb/round hit the iteration cap
       // at 1200 lb. Finish remaining onto baggage while CG is still inside.
       const catchUpRemaining = cargoTargetLb - cargoPlacedLb;
+      const catchUpMid =
+        lastMinMac !== undefined && lastMaxMac !== undefined
+          ? (lastMinMac + lastMaxMac) / 2
+          : undefined;
       const catchUpAftOk =
         lastLiveMac === undefined ||
-        lastMaxMac === undefined ||
-        lastLiveMac < lastMaxMac - CG_REBALANCE_MARGIN_MAC;
+        catchUpMid === undefined ||
+        lastLiveMac < catchUpMid;
       if (
         catchUpRemaining > 0.5 &&
         !preferSeatFill &&
@@ -2321,16 +2468,24 @@ async function applyMissionOfpLoadExclusive(
           };
           afterLive = {
             tanks: afterLive.tanks,
-            stations: await readLiveStations(bridge, resolved.profile),
+            stations: await readLiveStationsTrustingWrite(
+              bridge,
+              resolved.profile,
+              workingStations,
+            ),
           };
           cgRebalanceMoves += 1;
         }
       }
 
-      const finalCg = await readLiveCgState(bridge, {
-        readVar: resolved.profile.cg?.readVar,
-        readUnit: resolved.profile.cg?.readUnit,
-      });
+      const finalCg = await readLiveCgStateBestEffort(
+        bridge,
+        {
+          readVar: resolved.profile.cg?.readVar,
+          readUnit: resolved.profile.cg?.readUnit,
+        },
+        { liveMac: lastLiveMac, minMac: lastMinMac, maxMac: lastMaxMac },
+      );
       const minMac =
         finalCg.minMac ??
         lastMinMac ??
@@ -2374,8 +2529,16 @@ async function applyMissionOfpLoadExclusive(
     }
 
     afterLive = {
-      tanks: await readLiveTanks(bridge, resolved.profile),
-      stations: await readLiveStations(bridge, resolved.profile),
+      tanks: await readLiveTanksTrustingWrite(
+        bridge,
+        resolved.profile,
+        afterLive.tanks,
+      ),
+      stations: await readLiveStationsTrustingWrite(
+        bridge,
+        resolved.profile,
+        workingStations,
+      ),
     };
 
     // Station SimVars can under-read on Accu-Sim while gross weight shows the load.
@@ -2386,32 +2549,20 @@ async function applyMissionOfpLoadExclusive(
       sumRecord(built.plan.payload?.stations) ??
       plannedPayloadLb;
     const workingSumLb = sumRecord(workingStations);
-    let livePayloadSumLb = await readLivePayloadTotalLb(
-      bridge,
-      resolved.profile,
-      afterLive.stations,
-    );
-    const stationSumLb = sumRecord(afterLive.stations);
+    let livePayloadSumLb = workingSumLb;
     let massBalanceLb: number | undefined;
     try {
-      const empty = await bridge.readSimVar({ name: 'EMPTY WEIGHT', unit: 'pounds' });
-      const gross = await bridge.readSimVar({ name: 'TOTAL WEIGHT', unit: 'pounds' });
-      const fuelLb = await bridge.readSimVar({
-        name: 'FUEL TOTAL QUANTITY WEIGHT',
-        unit: 'pounds',
-      });
-      if (
-        Number.isFinite(empty) &&
-        Number.isFinite(gross) &&
-        Number.isFinite(fuelLb) &&
-        empty > 0 &&
-        gross > empty
-      ) {
-        massBalanceLb = Math.max(0, gross - empty - Math.max(0, fuelLb));
-      }
-    } catch {
-      /* optional */
+      const livePayload = await readLivePayloadTotalLb(
+        bridge,
+        resolved.profile,
+        afterLive.stations,
+      );
+      livePayloadSumLb = livePayload.payloadLb;
+      massBalanceLb = livePayload.massBalanceLb;
+    } catch (err) {
+      if (!simIpcSessionDied(err)) throw err;
     }
+    const stationSumLb = sumRecord(afterLive.stations);
     const massConfirmsWorking =
       massBalanceLb !== undefined &&
       massBalanceLb + 100 >= workingSumLb * 0.7;
@@ -2478,9 +2629,17 @@ async function applyMissionOfpLoadExclusive(
 
     if (!applySucceeded(applyResult)) {
       // Never wipe a load that mass-balance / working plan still shows as present.
-      const mbStillLoaded =
-        (await readLivePayloadTotalLb(bridge, resolved.profile)) >=
-        Math.max(100, plannedPayloadSumLb * 0.45);
+      let mbStillLoaded = false;
+      try {
+        const livePayload = await readLivePayloadTotalLb(
+          bridge,
+          resolved.profile,
+        );
+        mbStillLoaded =
+          livePayload.payloadLb >= Math.max(100, plannedPayloadSumLb * 0.45);
+      } catch (err) {
+        if (!simIpcSessionDied(err)) throw err;
+      }
       if (
         applyResult.payload?.errorCode === 'PAYLOAD_NOT_APPLIED' &&
         (mbStillLoaded || workingSumLb >= plannedPayloadSumLb * 0.45)
@@ -2509,10 +2668,14 @@ async function applyMissionOfpLoadExclusive(
         fuel: restore.fuel,
         payload: restore.payload,
       });
-      afterLive = {
-        tanks: await readLiveTanks(bridge, resolved.profile),
-        stations: await readLiveStations(bridge, resolved.profile),
-      };
+      try {
+        afterLive = {
+          tanks: await readLiveTanks(bridge, resolved.profile),
+          stations: await readLiveStations(bridge, resolved.profile),
+        };
+      } catch (err) {
+        if (!simIpcSessionDied(err)) throw err;
+      }
       const parts: string[] = [];
       if (applyResult.fuel && !applyResult.fuel.success) {
         parts.push(`fuel ${applyResult.fuel.errorCode ?? 'failed'}`);

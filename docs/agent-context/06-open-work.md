@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-13 após cruise `readSimVars` abort (ainda sem release).
+Atualizado 2026-08-13: fill híbrido + inject batch prontos para release.
 
 ## Validar (manual)
 
@@ -10,6 +10,7 @@ Atualizado 2026-08-13 após cruise `readSimVars` abort (ainda sem release).
 - [ ] Cruise sample 180s: VS 400 fpm / TAS 10% / flow 20% / alt 1200 ft — não zerar em bump mínimo
 - [ ] Watch: TIMEOUT não fica em loop com pipe “up”; após backoff, sample volta
 - [ ] Reinject no solo após editar EFB: matching profile → fuel/cargo sem freeze em “Reading live aircraft…”
+- [ ] Híbrido (Bonanza OK no local): Caravan equal espalhado; Due completo no envelope
 - [ ] Install &lt; 0.3.17: warning atual; Node não piora sem `sessionHealthy`
 - [ ] Host antigo sem `readSimVars`: fallback sequential ainda throw no 1º TIMEOUT
 - [ ] Idle no solo + editar EFB: schematic **não** colapsa para só Crew (S1/S2)
@@ -23,7 +24,7 @@ Atualizado 2026-08-13 após cruise `readSimVars` abort (ainda sem release).
 1. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
 2. Se dual-client IPC ainda estressar: serializar mais ops no Host (snapshot/identity) ou single-client pipe.
 3. Watch: backoff mais agressivo quando Host reporta `NOT_CONNECTED` (opcional UX).
-4. Ship release (0.3.22) com batch `readSimVars` + flight abort.
+4. Reusar defs SimConnect fixas para batches Watch (flight/load/cruise) — IDs monotônicos incham em voos longos.
 
 ## Não fazer sem pedido
 

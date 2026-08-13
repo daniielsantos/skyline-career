@@ -14,6 +14,7 @@ import {
 } from '@msfs-compat/shared';
 import type { SimSnapshot } from '@msfs-compat/runtime';
 import type { NamedPipeSimBridge } from '../named-pipe-sim-bridge.js';
+import { readSimVarsSoft } from '../read-simvars-soft.js';
 
 /** PMDG EFB Weight & Balance LVars (see PMDGTablet.js wb_update_interval). */
 export const PMDG_EFB_LVARS = {
@@ -410,16 +411,22 @@ export async function readLiveLoad(
     ...(opts.stationRoles?.crewStations ?? []),
     ...(opts.stationRoles?.serviceStations ?? []),
   ]);
-  for (const index of mappedStations) {
-    const key = `PAYLOAD STATION WEIGHT:${index}`;
-    if (snapshot.vars[key] !== undefined) continue;
-    try {
-      snapshot.vars[key] = await bridge.readSimVar({
-        name: key,
+  const missingStations = [...mappedStations].filter(
+    (index) => snapshot.vars[`PAYLOAD STATION WEIGHT:${index}`] === undefined,
+  );
+  if (missingStations.length > 0) {
+    const weights = await readSimVarsSoft(
+      bridge,
+      missingStations.map((index) => ({
+        name: `PAYLOAD STATION WEIGHT:${index}`,
         unit: 'pounds',
-      });
-    } catch {
-      // Keep partial snapshot; compare will surface an unavailable/mismatch finding.
+      })),
+    );
+    for (let i = 0; i < missingStations.length; i += 1) {
+      const raw = weights[i];
+      if (typeof raw === 'number' && Number.isFinite(raw)) {
+        snapshot.vars[`PAYLOAD STATION WEIGHT:${missingStations[i]!}`] = raw;
+      }
     }
   }
 
@@ -440,12 +447,19 @@ export async function readLiveLoad(
       'FUEL TANK RIGHT TIP QUANTITY',
       'FUEL TANK CENTER2 QUANTITY',
     ] as const;
-    for (const name of classicFuelVars) {
-      if (snapshot.vars[name] !== undefined) continue;
-      try {
-        snapshot.vars[name] = await bridge.readSimVar({ name, unit: 'gallons' });
-      } catch {
-        // optional slot
+    const extraNames = classicFuelVars.filter(
+      (name) => snapshot.vars[name] === undefined,
+    );
+    if (extraNames.length > 0) {
+      const extra = await readSimVarsSoft(
+        bridge,
+        extraNames.map((name) => ({ name, unit: 'gallons' })),
+      );
+      for (let i = 0; i < extraNames.length; i += 1) {
+        const raw = extra[i];
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+          snapshot.vars[extraNames[i]!] = raw;
+        }
       }
     }
   }

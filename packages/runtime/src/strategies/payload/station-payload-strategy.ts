@@ -5,6 +5,7 @@ import type {
   StrategyContext,
   VerificationResult,
 } from '../../types.js';
+import { readBridgeSimVars } from '../../read-simvars.js';
 
 function evaluateExpr(expr: string, vars: Record<string, number>): number {
   const replaced = expr.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key: string) => {
@@ -157,18 +158,23 @@ export class StationWritebackPayloadStrategy implements PayloadStrategy {
     while (Date.now() - started <= timeoutMs) {
       failures.length = 0;
 
-      for (const check of verify.checks) {
+      const actuals = await readBridgeSimVars(
+        ctx.bridge,
+        verify.checks.map((check) => ({ name: check.var, unit: check.unit })),
+      );
+      for (let i = 0; i < verify.checks.length; i += 1) {
+        const check = verify.checks[i]!;
         const expected = check.valueExpr
           ? evaluateExpr(check.valueExpr, vars)
           : (target.total ?? 0);
-        const actual = await ctx.bridge.readSimVar({ name: check.var, unit: check.unit });
+        const actual = actuals[i] ?? Number.NaN;
         const tolerance = Math.max(Math.abs(expected) * (check.tolerancePct / 100), 1);
 
-        if (Math.abs(actual - expected) > tolerance) {
+        if (!Number.isFinite(actual) || Math.abs(actual - expected) > tolerance) {
           failures.push({
             var: check.var,
             expected,
-            actual,
+            actual: Number.isFinite(actual) ? actual : 0,
             tolerancePct: check.tolerancePct,
           });
         }

@@ -1,4 +1,5 @@
 export * from './types.js';
+export * from './read-simvars.js';
 export * from './gating/default-gating-evaluator.js';
 export * from './capability/default-capability-detector.js';
 export * from './strategies/fuel/simconnect-fuel-strategy.js';

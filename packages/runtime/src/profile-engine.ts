@@ -6,6 +6,7 @@ import { StrategyRegistry } from './registry/strategy-registry.js';
 import { HybridSyncFuelStrategy, LvarBridgeFuelStrategy, SimConnectDirectFuelStrategy } from './strategies/fuel/simconnect-fuel-strategy.js';
 import { StationWritebackPayloadStrategy } from './strategies/payload/station-payload-strategy.js';
 import type { ProfileEngine, SimBridge } from './types.js';
+import { readBridgeSimVars } from './read-simvars.js';
 
 export interface ProfileEngineOptions {
   profile: AircraftProfile;
@@ -103,11 +104,16 @@ export class DefaultProfileEngine implements ProfileEngine {
       // lag behind. Reading it too early can reject a valid load or falsely
       // report that a rollback failed.
       await new Promise((resolve) => setTimeout(resolve, 1200));
-      let cg = await this.bridge.readSimVar({
-        name: this.profile.cg.readVar ?? 'CG PERCENT',
-        unit: this.profile.cg.readUnit ?? 'Percent over 100',
-      });
-      cg = normalizeMacPercent(cg);
+      const cgUnit = this.profile.cg.readUnit ?? 'Percent over 100';
+      const [cgRaw, fwdRaw, aftRaw] = await readBridgeSimVars(this.bridge, [
+        {
+          name: this.profile.cg.readVar ?? 'CG PERCENT',
+          unit: cgUnit,
+        },
+        { name: 'CG FWD LIMIT', unit: 'Percent over 100' },
+        { name: 'CG AFT LIMIT', unit: 'Percent over 100' },
+      ]);
+      let cg = normalizeMacPercent(cgRaw ?? Number.NaN);
 
       // Prefer live envelope from CG FWD/AFT LIMIT (Mass & Balance tablet) when
       // readable — unless the profile deliberately pinned a manual/cfg envelope
@@ -120,26 +126,16 @@ export class DefaultProfileEngine implements ProfileEngine {
         // Observed CG %MAC disagrees with CG FWD/AFT LIMIT (HondaJet, Starship, …).
         this.profile.cg.envelopeSource === 'calibrated-live' ||
         this.profile.cg.envelopeSource === 'live-sweep';
-      if (!pinnedEnvelope) {
-        try {
-          const fwdRaw = await this.bridge.readSimVar({
-            name: 'CG FWD LIMIT',
-            unit: 'Percent over 100',
-          });
-          const aftRaw = await this.bridge.readSimVar({
-            name: 'CG AFT LIMIT',
-            unit: 'Percent over 100',
-          });
-          if (Number.isFinite(fwdRaw) && Number.isFinite(aftRaw)) {
-            let fwd = normalizeMacPercent(fwdRaw);
-            let aft = normalizeMacPercent(aftRaw);
-            if (fwd > aft) [fwd, aft] = [aft, fwd];
-            minMac = fwd;
-            maxMac = aft;
-          }
-        } catch {
-          // Keep profile constraints when live limits are unavailable.
-        }
+      if (
+        !pinnedEnvelope &&
+        Number.isFinite(fwdRaw) &&
+        Number.isFinite(aftRaw)
+      ) {
+        let fwd = normalizeMacPercent(fwdRaw!);
+        let aft = normalizeMacPercent(aftRaw!);
+        if (fwd > aft) [fwd, aft] = [aft, fwd];
+        minMac = fwd;
+        maxMac = aft;
       }
 
       const toleranceMac = Math.min(

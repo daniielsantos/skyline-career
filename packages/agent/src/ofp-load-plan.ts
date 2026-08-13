@@ -776,6 +776,37 @@ export function resolveCgCounterweightBias(opts: {
 }
 
 /**
+ * Hybrid cargo fill (not post-fill counterweight, not C408 toward-center):
+ * - MAC at/past aft limit → shift forward, keep Due
+ * - MAC at/past forward limit → shift aft, keep Due
+ * - Aft of envelope midpoint (still inside) → remaining cargo on the nose
+ * - Forward of / at midpoint → equal across all cargo stations (Caravan)
+ */
+export type CgFillAction = 'equal' | 'forward' | 'shift-forward' | 'shift-aft';
+
+export function resolveCgFillAction(opts: {
+  liveMac: number;
+  lo: number;
+  hi: number;
+}): CgFillAction {
+  const { liveMac, lo, hi } = opts;
+  if (!(hi > lo)) return 'equal';
+  if (liveMac >= hi) return 'shift-forward';
+  if (liveMac <= lo) return 'shift-aft';
+  return liveMac > (lo + hi) / 2 ? 'forward' : 'equal';
+}
+
+/** @deprecated Prefer resolveCgFillAction — maps shift-forward/forward → forward. */
+export function resolveCgFillBias(opts: {
+  liveMac: number;
+  lo: number;
+  hi: number;
+}): 'equal' | 'forward' {
+  const action = resolveCgFillAction(opts);
+  return action === 'forward' || action === 'shift-forward' ? 'forward' : 'equal';
+}
+
+/**
  * Per-seat step size: larger when CG is still drifting the wrong way,
  * smaller when it is already correcting (avoid overshoot).
  */
@@ -888,6 +919,68 @@ export function allocateCargoStep(
     bias,
     stepLb,
   );
+}
+
+/**
+ * Forward-most lateral group that still has room (Bonanza S3/S4 before S5/S6
+ * before S7). Cabin-as-baggage must not equal-fill the tail.
+ */
+export function forwardMostOpenStationGroup(
+  stations: Record<number, number>,
+  profile: AircraftProfile,
+  indexes: number[],
+  opts?: { softMaxByIndex?: Record<number, number> },
+): number[] {
+  if (indexes.length === 0) return [];
+  const { indexes: forwardFirst } = orderStationsLongitudinal(profile, indexes);
+  const laterals = findLateralStationGroups(profile, indexes);
+  const softMax = opts?.softMaxByIndex ?? {};
+  const maxOf = (idx: number): number => {
+    const hard =
+      profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
+    const soft = softMax[idx];
+    return soft !== undefined ? Math.min(hard, soft) : hard;
+  };
+  const assigned = new Set<number>();
+  for (const idx of forwardFirst) {
+    if (assigned.has(idx)) continue;
+    const pair = laterals.find((g) => g.includes(idx));
+    const group = pair
+      ? forwardFirst.filter((i) => pair.includes(i))
+      : [idx];
+    for (const g of group) assigned.add(g);
+    const room = group.reduce(
+      (sum, i) => sum + Math.max(0, maxOf(i) - (stations[i] ?? 0)),
+      0,
+    );
+    if (room > 0.5) return group;
+  }
+  return [];
+}
+
+/**
+ * Forward or aft half of stations (by arm), expanding L/R pairs so a row
+ * is never split. Used when hybrid fill has left the calm/mid band.
+ */
+export function longitudinalHalfIndexes(
+  profile: AircraftProfile,
+  indexes: number[],
+  side: 'forward' | 'aft',
+): number[] {
+  if (indexes.length === 0) return [];
+  const { indexes: forwardFirst } = orderStationsLongitudinal(profile, indexes);
+  const half = Math.max(1, Math.ceil(forwardFirst.length / 2));
+  const raw =
+    side === 'forward'
+      ? forwardFirst.slice(0, half)
+      : forwardFirst.slice(-half);
+  const selected = new Set(raw);
+  for (const group of findLateralStationGroups(profile, indexes)) {
+    if (group.some((idx) => selected.has(idx))) {
+      for (const idx of group) selected.add(idx);
+    }
+  }
+  return forwardFirst.filter((idx) => selected.has(idx));
 }
 
 /**

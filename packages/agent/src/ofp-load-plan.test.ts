@@ -28,6 +28,10 @@ import {
   idleOuterFuelTankIds,
   redistributeAroundResidualFloors,
   resolveCgCounterweightBias,
+  resolveCgFillBias,
+  resolveCgFillAction,
+  forwardMostOpenStationGroup,
+  longitudinalHalfIndexes,
   resolveFuelDensityLbPerGal,
   distributeCargoAcrossStations,
   distributeFuelAcrossTanks,
@@ -647,6 +651,121 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       }),
       50,
     );
+  });
+
+  it('hybrid fill: equal while calm, nose when aft of mid, shift at limits', () => {
+    // Bonanza effective 12–31: 28% is aft of mid → remaining on the nose.
+    assert.equal(
+      resolveCgFillAction({ liveMac: 28, lo: 12, hi: 31 }),
+      'forward',
+    );
+    assert.equal(
+      resolveCgFillAction({ liveMac: 35.7, lo: 12, hi: 31 }),
+      'shift-forward',
+    );
+    assert.equal(
+      resolveCgFillAction({ liveMac: 11, lo: 12, hi: 31 }),
+      'shift-aft',
+    );
+    // Caravan 16.4 of 8.5–30 is forward of mid → equal (all stations).
+    assert.equal(
+      resolveCgFillAction({ liveMac: 16.4, lo: 8.5, hi: 30 }),
+      'equal',
+    );
+    assert.equal(
+      resolveCgFillAction({ liveMac: 21, lo: 12, hi: 31 }),
+      'equal',
+    );
+    assert.equal(
+      resolveCgFillBias({ liveMac: 28, lo: 12, hi: 31 }),
+      'forward',
+    );
+  });
+
+  it('Bonanza helping-side half is S3–S6 (skips S7)', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 3, name: 'Front pax left', maxLoad: 500, arm: -2.3 },
+          { index: 4, name: 'Front pax right', maxLoad: 500, arm: -2.3 },
+          { index: 5, name: 'Rear pax left', maxLoad: 500, arm: -5.7 },
+          { index: 6, name: 'Rear pax right', maxLoad: 500, arm: -5.7 },
+          { index: 7, name: 'Baggage', maxLoad: 500, arm: -7.8 },
+        ],
+      },
+    } as AircraftProfile;
+    assert.deepEqual(
+      longitudinalHalfIndexes(profile, [3, 4, 5, 6, 7], 'forward'),
+      [3, 4, 5, 6],
+    );
+  });
+
+  it('Bonanza nose-first fill walks S3/S4 then S5/S6 then S7', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 3, name: 'Front pax left', maxLoad: 500, arm: -2.3 },
+          { index: 4, name: 'Front pax right', maxLoad: 500, arm: -2.3 },
+          { index: 5, name: 'Rear pax left', maxLoad: 500, arm: -5.7 },
+          { index: 6, name: 'Rear pax right', maxLoad: 500, arm: -5.7 },
+          { index: 7, name: 'Baggage', maxLoad: 500, arm: -7.8 },
+        ],
+      },
+    } as AircraftProfile;
+    const bags = [3, 4, 5, 6, 7];
+    assert.deepEqual(
+      forwardMostOpenStationGroup({ 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 }, profile, bags),
+      [3, 4],
+    );
+    assert.deepEqual(
+      forwardMostOpenStationGroup(
+        { 3: 500, 4: 500, 5: 0, 6: 0, 7: 0 },
+        profile,
+        bags,
+      ),
+      [5, 6],
+    );
+    assert.deepEqual(
+      forwardMostOpenStationGroup(
+        { 3: 500, 4: 500, 5: 500, 6: 500, 7: 0 },
+        profile,
+        bags,
+      ),
+      [7],
+    );
+    assert.deepEqual(
+      forwardMostOpenStationGroup(
+        { 3: 500, 4: 500, 5: 500, 6: 500, 7: 500 },
+        profile,
+        bags,
+      ),
+      [],
+    );
+  });
+
+  it('Bonanza forward fill skips the aft baggage station', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 3, name: 'Front pax left', maxLoad: 500, arm: -2.3 },
+          { index: 4, name: 'Front pax right', maxLoad: 500, arm: -2.3 },
+          { index: 5, name: 'Rear pax left', maxLoad: 500, arm: -5.7 },
+          { index: 6, name: 'Rear pax right', maxLoad: 500, arm: -5.7 },
+          { index: 7, name: 'Baggage', maxLoad: 500, arm: -7.8 },
+        ],
+      },
+    } as AircraftProfile;
+    const placed = allocateCargoRoundPerSeat(
+      { 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 },
+      profile,
+      [3, 4, 5, 6, 7],
+      50,
+      'forward',
+      10_000,
+    );
+    assert.equal(placed.stations[7], 0);
+    assert.ok((placed.stations[3] ?? 0) > 0);
+    assert.ok((placed.stations[4] ?? 0) > 0);
   });
 
   it('counterweights CG based on position and drift', () => {

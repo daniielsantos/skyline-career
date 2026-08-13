@@ -46,10 +46,25 @@ describe('logbookFlightKind', () => {
 });
 
 describe('logbookAircraftLabel', () => {
-  it('prefers catalog, then OFP ICAO, then fleet, then class', () => {
+  it('prefers catalog hangar name, then fleet, then class — never OFP ICAO', () => {
     assert.equal(
       logbookAircraftLabel(mission({ airframeLabel: 'Pilatus PC-24' })),
       'Pilatus PC-24',
+    );
+    assert.equal(
+      logbookAircraftLabel(
+        mission({
+          airframeLabel: 'Cessna 172SP',
+          lastOfpCheck: {
+            verdict: 'pass',
+            summary: 'ok',
+            checkedAtIso: '2026-01-01T00:00:00.000Z',
+            findings: [],
+            briefing: { aircraftIcao: 'c172' },
+          },
+        }),
+      ),
+      'Cessna 172SP',
     );
     assert.equal(
       logbookAircraftLabel(
@@ -59,11 +74,11 @@ describe('logbookAircraftLabel', () => {
             summary: 'ok',
             checkedAtIso: '2026-01-01T00:00:00.000Z',
             findings: [],
-            briefing: { aircraftIcao: 'pc24' },
+            briefing: { aircraftIcao: 'c172' },
           },
         }),
       ),
-      'PC24',
+      'Light jet',
     );
     assert.equal(
       logbookAircraftLabel(mission(), { fleetLabel: 'N024SB' }),

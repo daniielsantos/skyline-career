@@ -19,6 +19,9 @@ import {
 
 export { setNamedPipeDebugLog };
 
+/** Host ReadSimVarsAsync pads to 8/16/24/32 FLOAT64. */
+export const READ_SIMVARS_MAX = 32;
+
 /**
  * SimBridge implementation that talks to the C# SimBridgeHost over Named Pipe IPC.
  */
@@ -126,16 +129,43 @@ export class NamedPipeSimBridge implements SimBridge {
   }
 
   /**
-   * One Host SimConnect definition for many FLOAT64 vars (≤32).
-   * Old hosts without readSimVars fall back to sequential reads; TIMEOUT still throws.
+   * One Host SimConnect definition for many FLOAT64 vars (≤32 per request).
+   * Longer lists are chunked. Old hosts without readSimVars fall back to
+   * sequential reads; TIMEOUT still throws.
    */
-  async readSimVars(requests: SimVarReadRequest[]): Promise<number[]> {
+  async readSimVars(
+    requests: SimVarReadRequest[],
+    timeoutMs?: number,
+  ): Promise<number[]> {
     await this.ensureOpen();
     if (requests.length === 0) return [];
+    if (requests.length > READ_SIMVARS_MAX) {
+      const out: number[] = [];
+      for (let i = 0; i < requests.length; i += READ_SIMVARS_MAX) {
+        out.push(
+          ...(await this.readSimVarsChunk(
+            requests.slice(i, i + READ_SIMVARS_MAX),
+            timeoutMs,
+          )),
+        );
+      }
+      return out;
+    }
+    return this.readSimVarsChunk(requests, timeoutMs);
+  }
+
+  private async readSimVarsChunk(
+    requests: SimVarReadRequest[],
+    timeoutMs?: number,
+  ): Promise<number[]> {
     try {
-      const result = await this.client.call<{ values: number[] }>('readSimVars', {
-        vars: requests.map((r) => ({ name: r.name, unit: r.unit })),
-      });
+      const result = await this.client.call<{ values: number[] }>(
+        'readSimVars',
+        {
+          vars: requests.map((r) => ({ name: r.name, unit: r.unit })),
+        },
+        timeoutMs,
+      );
       if (!Array.isArray(result.values) || result.values.length !== requests.length) {
         throw new IpcClientError(
           'SIM_ERROR',
@@ -149,7 +179,7 @@ export class NamedPipeSimBridge implements SimBridge {
         (err.code === 'UNSUPPORTED' ||
           /Unknown method:\s*readSimVars/i.test(err.message))
       ) {
-        return this.readSimVarsSequential(requests);
+        return this.readSimVarsSequential(requests, timeoutMs);
       }
       throw err;
     }
@@ -157,11 +187,12 @@ export class NamedPipeSimBridge implements SimBridge {
 
   private async readSimVarsSequential(
     requests: SimVarReadRequest[],
+    timeoutMs?: number,
   ): Promise<number[]> {
     const values: number[] = [];
     for (const request of requests) {
       try {
-        values.push(await this.readSimVar(request));
+        values.push(await this.readSimVar(request, timeoutMs));
       } catch (err) {
         if (simIpcSessionDied(err)) throw err;
         values.push(Number.NaN);

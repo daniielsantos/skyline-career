@@ -26,7 +26,10 @@ export function logbookStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');
 }
 
-/** Prefer concrete model (OFP ICAO / catalog label), not just class. */
+/**
+ * Hangar / combo airframe name. Never SimBrief ICAO — C172/BE36/C208 are
+ * shared by several addons, including ones not homologated on that OFP type.
+ */
 export function logbookAircraftLabel(
   mission: Mission,
   opts?: {
@@ -35,8 +38,6 @@ export function logbookAircraftLabel(
 ): string {
   const catalog = mission.airframeLabel?.trim();
   if (catalog) return catalog;
-  const ofpIcao = mission.lastOfpCheck?.briefing?.aircraftIcao?.trim();
-  if (ofpIcao) return ofpIcao.toUpperCase();
   const fleet = opts?.fleetLabel?.trim();
   if (fleet) return fleet;
   return aircraftClassLabel(mission.aircraftClassId);

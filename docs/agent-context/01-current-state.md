@@ -4,7 +4,8 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.21** (latest) | [v0.3.21](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.21) | Hang mole / ping honesto / TIMEOUT por código IPC |
+| **0.3.22** (latest) | [v0.3.22](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.22) | Watch `readSimVars` batch + TIMEOUT abort + cruise gates |
+| 0.3.21 | [v0.3.21](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.21) | Hang mole / ping honesto / TIMEOUT por código IPC |
 | 0.3.19 | [v0.3.19](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.19) | Inject permanece armed até o write terminar |
 | 0.3.18 | [v0.3.18](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.18) | Taxi fuel cap 50% Due; inject timeout 15s/180s + progress; DR400 delay 400ms |
 | 0.3.17 | [v0.3.17](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.17) | Host: recovery após `0xC00000B0`, sem ClearDataDefinition dinâmico, serialize ops |
@@ -37,7 +38,10 @@
   → inject travava em "Reading live aircraft…". Agora espera o tick. No solo
   L/R vêm do sample cru (EFB tank edits).
 - **Reinject freeze em "placing cargo +50":** round lia CG + 16 stations
-  antes do 1º write. Cargo fill agora é equal sem essas reads; CG só no fim.
+  sequenciais antes do 1º write. Fill continua equal +50 (sem 16 station
+  reads). CG é **um** `readSimVars` batch por round. Fill híbrido:
+  equal enquanto MAC ≤ meio do envelope (Caravan); aft do meio → resto
+  no nariz; no limite → shift e **continua o Due**.
 - **Reinject freeze em "Reading live aircraft…":** fingerprint probe 8×
   FUELSYSTEM 15s + Watch tick ainda vivo. Inject resolve por título local;
   stop 25s + abort do sample.
@@ -59,15 +63,17 @@
   stations ficam no inject (ghost). Watch forçava station sum por cima do
   mass-balance. Agora MB (gross−empty−fuel) ganha quando o gross despenca;
   MB é lido **antes** do loop de 16 stations (sobrevive TIMEOUT).
-- **WIP pós-0.3.21 (ainda sem release):** `sampleLiveFlight` não engole
-  TIMEOUT — 1º miss marca `pendingSimConnectReset`. Solo: um IPC
-  `readSimVars` (tanks + empty/gross + stations 1–16). Host velho
-  (`UNSUPPORTED`) cai em sequential e ainda throw no 1º TIMEOUT.
-  Precisa Host novo (hot-swap) para o batch.
+- **0.3.22 Watch batch:** `sampleLiveFlight` / load / cruise usam `readSimVars`.
+  1º TIMEOUT marca `pendingSimConnectReset`. Host velho (`UNSUPPORTED`) cai
+  em sequential e ainda throw no 1º TIMEOUT.
+- **Inject/preflight batch + fill híbrido:** tanks/stations/CG em `readSimVars`.
+  Fill equal enquanto MAC ≤ meio do envelope (Caravan); aft do meio → resto
+  no nariz; no limite → shift e continua o Due. Pack recusa Host stale.
 
-## O que validar após 0.3.21
+## O que validar após 0.3.22
 
-1. Inject não desarma cedo demais enquanto o write ainda corre.
-2. Drenar fuel no EFB com OFP curto → Preflight **não** fica READY (taxi cap).
+1. Watch solo/ar: um `readSimVars` por tick; TIMEOUT ~5s + reset, não ~45s.
+2. Inject não desarma cedo demais enquanto o write ainda corre.
 3. Inject com Host doente → falha ≤ ~3 min com mensagem, não Writing infinito.
-4. Host **0.3.21+** (health ping) para recovery de hang mole / TIMEOUT; 0.3.17+ ainda cobre PIPE CLOSED.
+4. Host **0.3.22+** para batch; 0.3.21+ health ping; 0.3.17+ PIPE CLOSED.
+5. `release:desktop` falha se SimBridgeHost.exe estiver locked (`start:local`).

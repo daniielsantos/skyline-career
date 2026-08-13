@@ -8,6 +8,7 @@ import {
   type FuelTankBreakdown,
 } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import { finiteOrZero, readSimVarsSoft } from '../../agent/src/read-simvars-soft.ts';
 import {
   defaultProfileDirs,
   loadProfilesFromDirs,
@@ -29,23 +30,28 @@ export async function readClassicFuelTankCapacityLb(
   bridge: NamedPipeSimBridge,
   densityLbPerGal = DEFAULT_JET_A_LB_PER_GAL,
 ): Promise<FuelTankBreakdown | undefined> {
-  const readGal = async (name: string): Promise<number> => {
-    try {
-      const gal = await bridge.readSimVar({ name, unit: 'gallons' });
-      return Number.isFinite(gal) && gal > 0 ? gal : 0;
-    } catch {
-      return 0;
-    }
-  };
-  const leftMainCap = await readGal('FUEL TANK LEFT MAIN CAPACITY');
-  const rightMainCap = await readGal('FUEL TANK RIGHT MAIN CAPACITY');
-  const centerCapGal =
-    (await readGal('FUEL TANK CENTER CAPACITY')) +
-    (await readGal('FUEL TANK CENTER2 CAPACITY'));
-  const leftAuxCap = await readGal('FUEL TANK LEFT AUX CAPACITY');
-  const rightAuxCap = await readGal('FUEL TANK RIGHT AUX CAPACITY');
-  const leftTipCap = await readGal('FUEL TANK LEFT TIP CAPACITY');
-  const rightTipCap = await readGal('FUEL TANK RIGHT TIP CAPACITY');
+  const gals = (
+    await readSimVarsSoft(bridge, [
+      { name: 'FUEL TANK LEFT MAIN CAPACITY', unit: 'gallons' },
+      { name: 'FUEL TANK RIGHT MAIN CAPACITY', unit: 'gallons' },
+      { name: 'FUEL TANK CENTER CAPACITY', unit: 'gallons' },
+      { name: 'FUEL TANK CENTER2 CAPACITY', unit: 'gallons' },
+      { name: 'FUEL TANK LEFT AUX CAPACITY', unit: 'gallons' },
+      { name: 'FUEL TANK RIGHT AUX CAPACITY', unit: 'gallons' },
+      { name: 'FUEL TANK LEFT TIP CAPACITY', unit: 'gallons' },
+      { name: 'FUEL TANK RIGHT TIP CAPACITY', unit: 'gallons' },
+    ])
+  ).map((gal) => {
+    const n = finiteOrZero(gal);
+    return n > 0 ? n : 0;
+  });
+  const leftMainCap = gals[0] ?? 0;
+  const rightMainCap = gals[1] ?? 0;
+  const centerCapGal = (gals[2] ?? 0) + (gals[3] ?? 0);
+  const leftAuxCap = gals[4] ?? 0;
+  const rightAuxCap = gals[5] ?? 0;
+  const leftTipCap = gals[6] ?? 0;
+  const rightTipCap = gals[7] ?? 0;
   const left = leftMainCap * densityLbPerGal;
   const right = rightMainCap * densityLbPerGal;
   const center = centerCapGal * densityLbPerGal;

@@ -4,7 +4,7 @@
  *
  * Outputs:
  *   artifacts/skyline-runtime/   — Node app payload (API + UI + content seed)
- *   artifacts/skyline-host/      — SimBridgeHost Release (optional)
+ *   artifacts/skyline-host/      — SimBridgeHost Release (required; pack fails if rebuild fails)
  *   artifacts/skyline-desktop/   — NSIS + portable from electron-builder
  */
 import { spawn } from 'node:child_process';
@@ -341,26 +341,35 @@ async function assembleHost() {
     'net8.0-windows',
   );
 
+  console.log('[pack:desktop] building SimBridgeHost…');
   try {
-    console.log('[pack:desktop] building SimBridgeHost…');
     await run('npm', ['run', 'build:native'], { shell: true });
   } catch (error) {
-    console.warn(
-      '[pack:desktop] native rebuild skipped/failed (will use existing bin if present):',
-      error instanceof Error ? error.message : error,
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `SimBridgeHost rebuild failed (${detail}). ` +
+        'Close start:local / Skyline Career so SimBridgeHost.exe is unlocked, then retry. ' +
+        'Refusing to pack a stale Host.',
     );
   }
 
-  if (await exists(join(hostBin, 'SimBridgeHost.exe'))) {
-    await cp(hostBin, hostOut, { recursive: true });
-    console.log('[pack:desktop] SimBridgeHost copied →', hostOut);
-  } else {
-    await writeFile(
-      join(hostOut, 'README.txt'),
-      'SimBridgeHost binaries were not available at pack time.\n',
+  const hostExe = join(hostBin, 'SimBridgeHost.exe');
+  const hostDll = join(hostBin, 'SimBridgeHost.dll');
+  if (!(await exists(hostExe)) || !(await exists(hostDll))) {
+    throw new Error(
+      'SimBridgeHost rebuild did not produce exe + dll — refusing to pack.',
     );
-    console.warn('[pack:desktop] host placeholder written (Watch will be offline)');
   }
+
+  const dll = await readFile(hostDll);
+  if (!dll.toString('latin1').includes('ReadSimVarsAsync')) {
+    throw new Error(
+      'SimBridgeHost.dll is missing ReadSimVarsAsync after rebuild — refusing to pack a stale Host.',
+    );
+  }
+
+  await cp(hostBin, hostOut, { recursive: true });
+  console.log('[pack:desktop] SimBridgeHost copied →', hostOut);
 }
 
 async function buildElectron() {

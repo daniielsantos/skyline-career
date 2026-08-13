@@ -68,8 +68,9 @@ export async function resolveMissionRolesPack(opts: {
         };
       }
       if (opts.strictAirframeMatch) {
+        const purchased = airframe?.label?.trim() || opts.rolesPackRelPath;
         throw new Error(
-          `Live aircraft "${title}" does not match the purchased airframe (${opts.rolesPackRelPath})`,
+          `Live aircraft "${title}" does not match the purchased airframe (${purchased})`,
         );
       }
       // Purchased SKU set: ignore a live title from a different Market airframe
@@ -93,8 +94,9 @@ export async function resolveMissionRolesPack(opts: {
           via: `purchased airframe alias (${opts.rolesPackRelPath})`,
         };
       }
+      const purchasedLabel = airframe?.label?.trim() || opts.rolesPackRelPath;
       throw new Error(
-        `Live aircraft "${title}" is not homologated for the purchased airframe (${opts.rolesPackRelPath})`,
+        `Live aircraft "${title}" is not homologated for the purchased airframe (${purchasedLabel})`,
       );
     }
   }

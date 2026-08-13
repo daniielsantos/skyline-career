@@ -107,7 +107,7 @@ Smoke only fills the first three profile stations (seats), so baggage stays 0 un
 
 Do **not** drive apply from these; use them for sanity checks vs EFB.
 
-**Live-read (Preflight/Watch):** pack `liveSources` `a2a-lvars` reads `PayloadWeight`, `Fuel*` (gallons→lb), `Character1–6Weight`, `SeatNCharacter`, `BaggageWeight`. Schematic follows occupancy (Character* linger after the tablet empties a seat). Same pattern as TFDi EFB — not a publisher `if` in inject fill.
+**Live-read (Preflight/Watch/post-inject):** pack `liveSources` `a2a-lvars` reads `PayloadWeight`, `Fuel*` (gallons→lb), `Character1–6Weight`, `SeatNCharacter`, `BaggageWeight`. Schematic follows occupancy (Character* linger after the tablet empties a seat). Career inject verify uses the same reader — not classic `PAYLOAD STATION WEIGHT` / mass-balance. Same pattern as TFDi EFB — not a publisher `if` in inject fill.
 
 ---
 
@@ -129,7 +129,7 @@ BaggageWeight      = {station_7}          # baggage station index on drafted pro
 
 1. Weight without occupancy → seats 2–6 invisible on EFB.
 2. Classic dump `1=180 … 9=13.7 10=13.7` → ghost stations; smoke must use **profile stations** / LVars.
-3. Verify only on `PAYLOAD STATION WEIGHT:1` does not prove seats/baggage UI — always check tablet.
+3. Verify only on `PAYLOAD STATION WEIGHT:1` does not prove seats/baggage UI — use `L:Character*` / `L:BaggageWeight` (and career `a2a-lvars` post-inject gate).
 4. Baggage is **`BaggageWeight`**, not a classic `PAYLOAD STATION WEIGHT` index that matches the orange BAGGAGE box.
 5. Do not assume every Accu-Sim airframe has a fuselage tank — Comanche uses tip tanks; a readable `FuelFuselageTank` without CENTER capacity is a **ghost**.
 

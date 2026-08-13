@@ -811,6 +811,61 @@ export function resolveInjectCgEnvelope(opts: {
   };
 }
 
+/**
+ * Post-inject payload gate. Accu-Sim classic stations / mass-balance under-read;
+ * prefer tablet Character* sum when available and never fake success from the
+ * in-memory working plan alone.
+ */
+export function resolvePostInjectPayloadLive(opts: {
+  plannedLb: number;
+  workingLb: number;
+  classicLb: number;
+  massBalanceLb?: number;
+  /** Accu-Sim tablet sum (Character* + baggage), when liveSources say a2a-lvars. */
+  a2aLb?: number;
+}): {
+  liveLb: number;
+  stuck: boolean;
+  /** Paint afterLive from working stations (classic under-read with MB confirm). */
+  paintWorking: boolean;
+  source: 'a2a' | 'mass-balance-trust' | 'classic' | 'working-plan';
+} {
+  const planned = opts.plannedLb;
+  const working = opts.workingLb;
+  if (opts.a2aLb !== undefined && Number.isFinite(opts.a2aLb)) {
+    const liveLb = Math.max(0, opts.a2aLb);
+    return {
+      liveLb,
+      stuck: planned > 75 && liveLb + 75 < planned * 0.5,
+      paintWorking: false,
+      source: 'a2a',
+    };
+  }
+  let liveLb = opts.classicLb;
+  const massConfirmsWorking =
+    opts.massBalanceLb !== undefined &&
+    opts.massBalanceLb + 100 >= working * 0.7;
+  let paintWorking = false;
+  let source: 'mass-balance-trust' | 'classic' | 'working-plan' = 'classic';
+  if (
+    liveLb + 75 < planned * 0.5 &&
+    working >= planned * 0.5 &&
+    massConfirmsWorking
+  ) {
+    liveLb = working;
+    paintWorking = true;
+    source = 'mass-balance-trust';
+  } else if (liveLb + 75 < planned * 0.5 && working >= planned * 0.5) {
+    source = 'working-plan';
+  }
+  return {
+    liveLb,
+    stuck: planned > 75 && liveLb + 75 < planned * 0.5,
+    paintWorking,
+    source,
+  };
+}
+
 export function resolveCgFillAction(opts: {
   liveMac: number;
   lo: number;

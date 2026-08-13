@@ -43,3 +43,15 @@ test('readLiveCgStateBestEffort returns fallback on TIMEOUT', async () => {
   const cg = await readLiveCgStateBestEffort(bridge, {}, { liveMac: 22 });
   assert.equal(cg.liveMac, 22);
 });
+
+test('readLiveCgState passes timeoutMs to readSimVars', async () => {
+  let seenTimeout: number | undefined;
+  const bridge = {
+    async readSimVars(_requests: unknown, timeoutMs?: number) {
+      seenTimeout = timeoutMs;
+      return [0.2, 0.1, 0.3];
+    },
+  } as unknown as NamedPipeSimBridge;
+  await readLiveCgState(bridge, { timeoutMs: 1_200 });
+  assert.equal(seenTimeout, 1_200);
+});

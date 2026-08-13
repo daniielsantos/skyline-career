@@ -4,6 +4,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 ## Validar (manual)
 
+- [ ] Watch CG card: após editar EFB, `% MAC` atualiza (não congela no Validate); Loaded vs Due não trava
 - [ ] Aerostar inject: tablet PAYLOAD = Due; Preflight Sim ≈ tablet (não 303 vs 1332)
 - [ ] Aerostar schematic: Character* + BaggageWeight, não só S1/S7 clássicos
 
@@ -33,7 +34,8 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 - Watch backoff 8s→15s em queda do MSFS; UI `Simulator closed — retry in Ns`.
 - A2A Accu-Sim: liveSource `a2a-lvars` (PayloadWeight / Fuel* / Character*) no pack Aerostar/Comanche. Sem `if (a2a)` no fill.
 - Aerostar fill: se CG já passou FWD com só crew, colocar Due na metade aft (não cortar cargo). Envelope calibrado −15…15.
-- CG card: pinta envelope do perfil (calibrated-live), não SimVar FWD/AFT 0–100. Watch ainda não relê CG no tick.
+- CG card: pinta envelope do perfil (calibrated-live), não SimVar FWD/AFT 0–100. Watch soft-refresh de `liveMac` (cap ~1.2s); envelope pinned do Validate.
+- Post-inject A2A: gate `PAYLOAD_NOT_APPLIED` lê `a2a-lvars` (não classic/MB); working plan sozinho não finge sucesso. Profile verify → `L:Character1Weight` + `L:BaggageWeight`.
 
 ## Não fazer sem pedido
 

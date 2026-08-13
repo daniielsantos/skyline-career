@@ -225,10 +225,16 @@
       "pollIntervalMs": 250,
       "checks": [
         {
-          "var": "PAYLOAD STATION WEIGHT:1",
-          "unit": "pounds",
-          "tolerancePct": 2,
+          "var": "L:Character1Weight",
+          "unit": "number",
+          "tolerancePct": 5,
           "valueExpr": "{station_1}"
+        },
+        {
+          "var": "L:BaggageWeight",
+          "unit": "number",
+          "tolerancePct": 5,
+          "valueExpr": "{station_7}"
         }
       ]
     }

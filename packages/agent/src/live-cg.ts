@@ -23,16 +23,25 @@ function macFromRaw(raw: number | undefined): number | undefined {
  */
 export async function readLiveCgState(
   bridge: NamedPipeSimBridge,
-  opts: { readVar?: string; readUnit?: string } = {},
+  opts: {
+    readVar?: string;
+    readUnit?: string;
+    /** Soft deadline for the batch (Watch uses a short cap so fuel/payload ticks stay snappy). */
+    timeoutMs?: number;
+  } = {},
 ): Promise<LiveCgState> {
-  const [liveRaw, fwdRaw, aftRaw] = await readSimVarsSoft(bridge, [
-    {
-      name: opts.readVar ?? 'CG PERCENT',
-      unit: opts.readUnit ?? 'Percent over 100',
-    },
-    { name: 'CG FWD LIMIT', unit: 'Percent over 100' },
-    { name: 'CG AFT LIMIT', unit: 'Percent over 100' },
-  ]);
+  const [liveRaw, fwdRaw, aftRaw] = await readSimVarsSoft(
+    bridge,
+    [
+      {
+        name: opts.readVar ?? 'CG PERCENT',
+        unit: opts.readUnit ?? 'Percent over 100',
+      },
+      { name: 'CG FWD LIMIT', unit: 'Percent over 100' },
+      { name: 'CG AFT LIMIT', unit: 'Percent over 100' },
+    ],
+    opts.timeoutMs,
+  );
   const liveMac = macFromRaw(liveRaw);
   let forward = macFromRaw(fwdRaw);
   let aft = macFromRaw(aftRaw);
@@ -45,7 +54,11 @@ export async function readLiveCgState(
 /** Same as readLiveCgState, but hang-mole returns `fallback` instead of throwing. */
 export async function readLiveCgStateBestEffort(
   bridge: NamedPipeSimBridge,
-  opts: { readVar?: string; readUnit?: string } = {},
+  opts: {
+    readVar?: string;
+    readUnit?: string;
+    timeoutMs?: number;
+  } = {},
   fallback: LiveCgState = {},
 ): Promise<LiveCgState> {
   try {

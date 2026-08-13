@@ -24,6 +24,7 @@
 - Homologated with interactive wizard (recipe lvar-bridge).
 - CG: `calibrated-live` −15…15% MAC (sweep −6…+13; empty ~−5; crew-only + wing fuel ~−11). Do **not** use SimVar FWD/AFT 0–100 — that made inject strict-fail and roll back payload. Fill must still place Due on the aft half if MAC is past FWD before cargo exists.
 - Preflight/Watch liveSources: `a2a-lvars` (PayloadWeight / Fuel* gallons / Character* + BaggageWeight). Classic `PAYLOAD STATION WEIGHT` is ghost (S1+S7 only) — not an `if (a2a)` in the fill loop.
+- Post-inject verify: career gate re-reads Accu-Sim LVars (same as Watch). Profile `payload.verify` checks `L:Character1Weight` + `L:BaggageWeight`, not classic station mirrors.
 
 ## Homologated
 

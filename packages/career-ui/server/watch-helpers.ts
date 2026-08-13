@@ -84,14 +84,20 @@ import {
   readTfdiMd11EfbLvars,
 } from '../../agent/src/ofp-compliance/live-reader.ts';
 import { adjustPlannedPayloadForLiveCrewStations } from '../../agent/src/ofp-load-plan.ts';
+import { readLiveCgStateBestEffort } from '../../agent/src/live-cg.ts';
 import {
   readLiveCruiseTasKt,
   sampleLiveCruiseFuelFlowKgPerHour,
 } from '../../agent/src/sample-cruise-burn.ts';
 import { watchDebugLog, WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import { isOfpLoadActive } from './ofp-load-state.ts';
-import { pickStationMax, pickTankCapacity } from './schematic-capacity.ts';
+import {
+  pickStationMax,
+  pickTankCapacity,
+  resolveCatalogCgEnvelope,
+} from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
+import { getRepoRoot } from './skyline-paths.ts';
 
 export type WatchLoadVerification = {
   ready: boolean;
@@ -1080,6 +1086,11 @@ export class CareerWatchSession {
   private lastLiveFuelLb: number | null = null;
   private lastLivePayloadLb: number | null = null;
   private lastLoadVerification: WatchLoadVerification | null = null;
+  /**
+   * Envelope painted at Validate/inject (profile calibrated-live). Soft Watch
+   * CG reads refresh liveMac only — never overwrite with SimVar FWD/AFT.
+   */
+  private pinnedCgEnvelope: { minMac?: number; maxMac?: number } | null = null;
   private lastEvent: MissionFlightEvent | null = null;
   private lastEventAtIso: string | null = null;
   private lastError: string | null = null;
@@ -1337,6 +1348,7 @@ export class CareerWatchSession {
     this.lastLiveFuelLb = null;
     this.lastLivePayloadLb = null;
     this.lastLoadVerification = null;
+    this.pinnedCgEnvelope = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
     this.lastError = null;
@@ -1565,6 +1577,7 @@ export class CareerWatchSession {
     this.lastLiveFuelLb = null;
     this.lastLivePayloadLb = null;
     this.lastLoadVerification = null;
+    this.pinnedCgEnvelope = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
     this.lastError = null;
@@ -1953,8 +1966,18 @@ export class CareerWatchSession {
           const prevCg = (
             prevVerification as { cg?: WatchLoadVerification['cg'] }
           ).cg;
-          // Publish fuel/payload before CG reads — a slow CG PERCENT must not
-          // freeze Loaded vs Due after inject.
+          if (
+            !this.pinnedCgEnvelope &&
+            prevCg &&
+            (prevCg.minMac !== undefined || prevCg.maxMac !== undefined)
+          ) {
+            this.pinnedCgEnvelope = {
+              ...(prevCg.minMac !== undefined ? { minMac: prevCg.minMac } : {}),
+              ...(prevCg.maxMac !== undefined ? { maxMac: prevCg.maxMac } : {}),
+            };
+          }
+          // Publish fuel/payload first — soft CG below is capped so it cannot
+          // freeze Loaded vs Due, and keeps Validate painted envelope.
           this.lastLoadVerification = {
             ...nextWeights,
             fuel: {
@@ -1976,6 +1999,74 @@ export class CareerWatchSession {
             },
             ...(prevCg ? { cg: prevCg } : {}),
           };
+          let nextCg = prevCg;
+          if (!isOfpLoadActive()) {
+            try {
+              const softCg = await readLiveCgStateBestEffort(
+                this.bridge!,
+                { timeoutMs: 1_200 },
+                {},
+              );
+              if (softCg.liveMac !== undefined) {
+                if (!this.pinnedCgEnvelope) {
+                  try {
+                    const identity = await this.bridge!.getAircraftIdentity();
+                    const catalogEnv = await resolveCatalogCgEnvelope({
+                      repoRoot: getRepoRoot(),
+                      title: identity.title,
+                      icao: identity.icao,
+                      liveMinMac: softCg.minMac,
+                      liveMaxMac: softCg.maxMac,
+                    });
+                    if (
+                      catalogEnv.minMac !== undefined ||
+                      catalogEnv.maxMac !== undefined
+                    ) {
+                      this.pinnedCgEnvelope = catalogEnv;
+                    }
+                  } catch {
+                    /* catalog/identity soft-fail — liveMac still useful */
+                  }
+                }
+                const minMac =
+                  this.pinnedCgEnvelope?.minMac ?? prevCg?.minMac;
+                const maxMac =
+                  this.pinnedCgEnvelope?.maxMac ?? prevCg?.maxMac;
+                const ok =
+                  minMac === undefined ||
+                  maxMac === undefined ||
+                  (softCg.liveMac >= minMac && softCg.liveMac <= maxMac);
+                nextCg = {
+                  liveMac: softCg.liveMac,
+                  ...(minMac !== undefined ? { minMac } : {}),
+                  ...(maxMac !== undefined ? { maxMac } : {}),
+                  ok,
+                  severity: ok ? 'info' : 'warn',
+                };
+                this.lastLoadVerification = {
+                  ...this.lastLoadVerification,
+                  cg: nextCg,
+                };
+                watchDebugLog('load', 'cg soft refresh', {
+                  liveMac: softCg.liveMac,
+                  minMac: minMac ?? null,
+                  maxMac: maxMac ?? null,
+                  ok,
+                });
+              }
+            } catch (cgErr) {
+              watchDebugLog('load', 'cg soft refresh skipped', {
+                error: formatIpcError(cgErr),
+              });
+            }
+          }
+          const prevLiveMac = prevCg?.liveMac;
+          const nextLiveMac = nextCg?.liveMac;
+          const cgDrifted =
+            nextLiveMac !== undefined &&
+            (prevLiveMac === undefined ||
+              Math.abs(nextLiveMac - prevLiveMac) >= 0.25 ||
+              prevCg?.ok !== nextCg?.ok);
           const tanksDrifted =
             Boolean(tanks) &&
             Boolean(prevWatchFuel.tanks) &&
@@ -1996,12 +2087,15 @@ export class CareerWatchSession {
               nextWeights,
             ) ||
             stationWeightsDrifted(prevWatchPayload.stations, stations, 5) ||
-            tanksDrifted;
+            tanksDrifted ||
+            cgDrifted;
           if (persistLoad) {
             watchDebugLog('load', 'persist drift', {
               ready: nextWeights.ready,
               liveFuelLb: nextWeights.fuel.liveLb,
               livePayloadLb: nextWeights.payload.liveLb,
+              cgLiveMac: nextLiveMac ?? null,
+              cgDrifted,
             });
             await this.cb.updateOpenMission(
               this.missionId,
@@ -2055,7 +2149,7 @@ export class CareerWatchSession {
                       onGround: sample.onGround,
                       enginesRunning: sample.enginesRunning,
                     },
-                    ...(prevCg ? { cg: prevCg } : {}),
+                    ...(nextCg ? { cg: nextCg } : {}),
                   },
                 };
                 // Keep local mission snapshot in sync for depart gate below.
@@ -2064,8 +2158,6 @@ export class CareerWatchSession {
               },
             );
           }
-          // Do not read CG here. Three extra SimVars after the first EFB
-          // persist held tickInFlight and the next edits never sampled.
         } catch (loadErr) {
           this.lastError = formatIpcError(loadErr);
           watchDebugLog('load', 'sample failed', { error: this.lastError });

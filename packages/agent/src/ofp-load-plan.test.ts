@@ -31,6 +31,7 @@ import {
   resolveCgFillBias,
   resolveCgFillAction,
   resolveInjectCgEnvelope,
+  resolvePostInjectPayloadLive,
   forwardMostOpenStationGroup,
   longitudinalHalfIndexes,
   resolveFuelDensityLbPerGal,
@@ -764,6 +765,42 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       }),
       { minMac: 12, maxMac: 31 },
     );
+  });
+
+  it('resolvePostInjectPayloadLive prefers Accu-Sim tablet over classic ghosts', () => {
+    const a2a = resolvePostInjectPayloadLive({
+      plannedLb: 1332,
+      workingLb: 1332,
+      classicLb: 270,
+      massBalanceLb: 303,
+      a2aLb: 1332,
+    });
+    assert.equal(a2a.source, 'a2a');
+    assert.equal(a2a.liveLb, 1332);
+    assert.equal(a2a.stuck, false);
+    assert.equal(a2a.paintWorking, false);
+
+    const ignored = resolvePostInjectPayloadLive({
+      plannedLb: 1332,
+      workingLb: 1332,
+      classicLb: 270,
+      massBalanceLb: 303,
+      a2aLb: 340,
+    });
+    assert.equal(ignored.source, 'a2a');
+    assert.equal(ignored.stuck, true);
+    assert.equal(ignored.paintWorking, false);
+
+    const classicTrust = resolvePostInjectPayloadLive({
+      plannedLb: 1000,
+      workingLb: 1000,
+      classicLb: 200,
+      massBalanceLb: 850,
+    });
+    assert.equal(classicTrust.source, 'mass-balance-trust');
+    assert.equal(classicTrust.liveLb, 1000);
+    assert.equal(classicTrust.stuck, false);
+    assert.equal(classicTrust.paintWorking, true);
   });
 
   it('hybrid fill: equal first, nose only after aft limit, shift at limits', () => {

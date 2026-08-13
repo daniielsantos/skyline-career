@@ -43,12 +43,15 @@ import {
   resolveCgCounterweightBias,
   resolveCgFillAction,
   resolveInjectCgEnvelope,
+  resolvePostInjectPayloadLive,
   longitudinalHalfIndexes,
   seatSoftMaxLb,
   shiftCargoForCg,
+  resolveFuelDensityLbPerGal,
   type BuiltOfpLoadPlan,
 } from '../../agent/src/ofp-load-plan.ts';
 import { readLiveCgStateBestEffort } from '../../agent/src/live-cg.ts';
+import { readA2aAccusimLvars } from '../../agent/src/ofp-compliance/live-reader.ts';
 import {
   finiteOrZero,
   readSimVarsSoft,
@@ -2622,15 +2625,18 @@ async function applyMissionOfpLoadExclusive(
       ),
     };
 
-    // Station SimVars can under-read on Accu-Sim while gross weight shows the load.
-    // Only trust in-memory workingStations when mass-balance also shows the mass
-    // (ghost stations that ignore writes must NOT fake a successful inject).
+    // Station SimVars can under-read on Accu-Sim while the tablet LVars hold the load.
+    // Prefer a2a-lvars (same reader as Watch/Preflight); only then fall back to
+    // classic stations + mass-balance trust for non-Accu-Sim airframes.
     const plannedPayloadSumLb =
       built.plan.payload?.total ??
       sumRecord(built.plan.payload?.stations) ??
       plannedPayloadLb;
     const workingSumLb = sumRecord(workingStations);
-    let livePayloadSumLb = workingSumLb;
+    const preferA2aVerify =
+      ofp.liveSources?.payload?.includes('a2a-lvars') === true ||
+      resolved.profile.payload.strategy === 'lvar-bridge';
+    let classicPayloadLb = workingSumLb;
     let massBalanceLb: number | undefined;
     try {
       const livePayload = await readLivePayloadTotalLb(
@@ -2638,50 +2644,81 @@ async function applyMissionOfpLoadExclusive(
         resolved.profile,
         afterLive.stations,
       );
-      livePayloadSumLb = livePayload.payloadLb;
+      classicPayloadLb = livePayload.payloadLb;
       massBalanceLb = livePayload.massBalanceLb;
     } catch (err) {
       if (!simIpcSessionDied(err)) throw err;
     }
     const stationSumLb = sumRecord(afterLive.stations);
-    const massConfirmsWorking =
-      massBalanceLb !== undefined &&
-      massBalanceLb + 100 >= workingSumLb * 0.7;
-    if (
-      livePayloadSumLb + 75 < plannedPayloadSumLb * 0.5 &&
-      workingSumLb >= plannedPayloadSumLb * 0.5 &&
-      massConfirmsWorking
-    ) {
+    let a2aPayloadLb: number | undefined;
+    let a2aStations: Record<number, number> | undefined;
+    if (preferA2aVerify) {
+      try {
+        await bridge.delay(400);
+        const density = resolveFuelDensityLbPerGal(
+          resolved.profile,
+          fuelLbPerGal,
+        );
+        const a2a = await readA2aAccusimLvars(bridge, density, {
+          keepStationIndexes: resolved.profile.payload.stations.map(
+            (s) => s.index,
+          ),
+        });
+        if (typeof a2a.payloadLb === 'number' && Number.isFinite(a2a.payloadLb)) {
+          a2aPayloadLb = a2a.payloadLb;
+          a2aStations = a2a.stations;
+        }
+      } catch (err) {
+        if (!simIpcSessionDied(err)) throw err;
+      }
+    }
+    const resolvedLive = resolvePostInjectPayloadLive({
+      plannedLb: plannedPayloadSumLb,
+      workingLb: workingSumLb,
+      classicLb: classicPayloadLb,
+      massBalanceLb,
+      a2aLb: a2aPayloadLb,
+    });
+    let livePayloadSumLb = resolvedLive.liveLb;
+    if (resolvedLive.source === 'a2a' && a2aStations) {
+      afterLive = { ...afterLive, stations: { ...a2aStations } };
+      watchDebugLog('inject', 'verify via a2a-lvars', {
+        livePayloadSumLb: Math.round(livePayloadSumLb),
+        plannedPayloadSumLb: Math.round(plannedPayloadSumLb),
+        workingSumLb: Math.round(workingSumLb),
+        classicLb: Math.round(classicPayloadLb),
+        massBalanceLb:
+          massBalanceLb !== undefined ? Math.round(massBalanceLb) : null,
+        live: stationsSnapshot(afterLive.stations),
+      });
+    } else if (resolvedLive.paintWorking) {
       watchDebugLog('inject', 'trust working (mass-balance confirms)', {
         livePayloadSumLb: Math.round(livePayloadSumLb),
         workingSumLb: Math.round(workingSumLb),
-        massBalanceLb: massBalanceLb !== undefined ? Math.round(massBalanceLb) : null,
+        massBalanceLb:
+          massBalanceLb !== undefined ? Math.round(massBalanceLb) : null,
         stationSumLb: Math.round(stationSumLb),
       });
-      livePayloadSumLb = workingSumLb;
       afterLive = { ...afterLive, stations: { ...workingStations } };
-    } else if (
-      livePayloadSumLb + 75 < plannedPayloadSumLb * 0.5 &&
-      workingSumLb >= plannedPayloadSumLb * 0.5
-    ) {
+    } else if (resolvedLive.source === 'working-plan') {
       watchDebugLog('inject', 'refuse trust working (mass under-read)', {
         livePayloadSumLb: Math.round(livePayloadSumLb),
         workingSumLb: Math.round(workingSumLb),
-        massBalanceLb: massBalanceLb !== undefined ? Math.round(massBalanceLb) : null,
+        massBalanceLb:
+          massBalanceLb !== undefined ? Math.round(massBalanceLb) : null,
         stationSumLb: Math.round(stationSumLb),
         live: stationsSnapshot(afterLive.stations),
       });
     }
 
     const payloadInjectStuck =
-      applySucceeded(applyResult) &&
-      plannedPayloadSumLb > 75 &&
-      livePayloadSumLb + 75 < plannedPayloadSumLb * 0.5;
+      applySucceeded(applyResult) && resolvedLive.stuck;
     if (payloadInjectStuck && applyResult) {
       watchDebugLog('inject', 'payload stuck vs plan', {
         livePayloadSumLb: Math.round(livePayloadSumLb),
         plannedPayloadSumLb: Math.round(plannedPayloadSumLb),
         workingSumLb: Math.round(workingSumLb),
+        source: resolvedLive.source,
         live: stationsSnapshot(afterLive.stations),
         working: stationsSnapshot(workingStations),
       });
@@ -2709,21 +2746,55 @@ async function applyMissionOfpLoadExclusive(
     );
 
     if (!applySucceeded(applyResult)) {
-      // Never wipe a load that mass-balance / working plan still shows as present.
-      let mbStillLoaded = false;
-      try {
-        const livePayload = await readLivePayloadTotalLb(
-          bridge,
-          resolved.profile,
-        );
-        mbStillLoaded =
-          livePayload.payloadLb >= Math.max(100, plannedPayloadSumLb * 0.45);
-      } catch (err) {
-        if (!simIpcSessionDied(err)) throw err;
+      // Never wipe a load that Accu-Sim / mass-balance still shows as present.
+      // Accu-Sim: only the tablet LVar sum may clear PAYLOAD_NOT_APPLIED — the
+      // in-memory working plan alone must not fake success when Character* stayed empty.
+      let stillLoaded = false;
+      if (preferA2aVerify) {
+        stillLoaded =
+          a2aPayloadLb !== undefined &&
+          a2aPayloadLb >= Math.max(100, plannedPayloadSumLb * 0.45);
+        if (!stillLoaded) {
+          try {
+            await bridge.delay(250);
+            const density = resolveFuelDensityLbPerGal(
+              resolved.profile,
+              fuelLbPerGal,
+            );
+            const a2a = await readA2aAccusimLvars(bridge, density, {
+              keepStationIndexes: resolved.profile.payload.stations.map(
+                (s) => s.index,
+              ),
+            });
+            if (
+              typeof a2a.payloadLb === 'number' &&
+              a2a.payloadLb >= Math.max(100, plannedPayloadSumLb * 0.45)
+            ) {
+              stillLoaded = true;
+              livePayloadSumLb = a2a.payloadLb;
+              afterLive = { ...afterLive, stations: { ...a2a.stations } };
+            }
+          } catch (err) {
+            if (!simIpcSessionDied(err)) throw err;
+          }
+        }
+      } else {
+        try {
+          const livePayload = await readLivePayloadTotalLb(
+            bridge,
+            resolved.profile,
+          );
+          stillLoaded =
+            livePayload.payloadLb >= Math.max(100, plannedPayloadSumLb * 0.45) ||
+            workingSumLb >= plannedPayloadSumLb * 0.45;
+        } catch (err) {
+          if (!simIpcSessionDied(err)) throw err;
+          stillLoaded = workingSumLb >= plannedPayloadSumLb * 0.45;
+        }
       }
       if (
         applyResult.payload?.errorCode === 'PAYLOAD_NOT_APPLIED' &&
-        (mbStillLoaded || workingSumLb >= plannedPayloadSumLb * 0.45)
+        stillLoaded
       ) {
         applyResult = {
           ...applyResult,
@@ -2732,8 +2803,9 @@ async function applyMissionOfpLoadExclusive(
             success: true,
             errorCode: undefined,
             details: {
-              message:
-                'Station SimVars under-read; kept injected load (mass-balance / plan trust)',
+              message: preferA2aVerify
+                ? 'Accu-Sim tablet confirmed injected load'
+                : 'Station SimVars under-read; kept injected load (mass-balance / plan trust)',
             },
           },
         };

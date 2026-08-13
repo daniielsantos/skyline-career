@@ -2357,6 +2357,13 @@ export type WatchStatus = {
       stations?: Record<number, number>;
       stationMax?: Record<number, number>;
     };
+    cg?: {
+      liveMac?: number;
+      minMac?: number;
+      maxMac?: number;
+      ok: boolean;
+      severity: 'info' | 'warn';
+    };
   } | null;
   sawAirborne: boolean;
   lastEvent: WatchEvent | null;

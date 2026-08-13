@@ -112,7 +112,11 @@ export class NamedPipeClient {
     }
   }
 
-  async call<T = unknown>(method: IpcMethod, params: Record<string, unknown> = {}): Promise<T> {
+  async call<T = unknown>(
+    method: IpcMethod,
+    params: Record<string, unknown> = {},
+    timeoutMs?: number,
+  ): Promise<T> {
     const run = async (): Promise<T> => {
       if (!this.isConnected || !this.socket) {
         dbg('call: NOT_CONNECTED', { method });
@@ -121,12 +125,13 @@ export class NamedPipeClient {
 
       const id = randomUUID();
       const request: IpcRequest = { id, type: 'request', method, params };
+      const waitMs = timeoutMs ?? this.requestTimeoutMs;
 
       const response = await new Promise<IpcResponse>((resolve, reject) => {
         const timer = setTimeout(() => {
           this.pending.delete(id);
           reject(new IpcClientError('TIMEOUT', `Request timed out: ${method}`));
-        }, this.requestTimeoutMs);
+        }, waitMs);
 
         this.pending.set(id, { resolve, reject, timer });
         this.socket!.write(`${JSON.stringify(request)}\n`);

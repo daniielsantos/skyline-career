@@ -1,13 +1,21 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-12 após release **0.3.17**.
+Atualizado 2026-08-13 após Host health / Watch reopen (ainda sem release).
 
 ## Validar (manual)
 
-- [ ] Instalar/atualizar para 0.3.17
-- [ ] MSFS + Twin Otter no solo; Watch conecta sem storm `PIPE CLOSED`
+- [ ] Hot-swap Host novo (`resources/host`) — log `timeout storm` / `unrecognized_id storm` + `connect() will reopen`
+- [ ] Watch: TIMEOUT não fica em loop com pipe “up”; após backoff, sample volta
+- [ ] Reinject no solo após editar EFB: matching profile → fuel/cargo sem freeze em “Reading live aircraft…”
+- [ ] Install &lt; 0.3.17: warning atual; Node não piora sem `sessionHealthy`
 - [ ] Re-dispatch / re-inject: Due fuel não fica preso em 2641 se OFP > tanques (clamp)
 - [ ] Preflight payload ainda pode falhar se sim ≠ OFP — esperado até inject payload OK
+- [ ] Idle no solo + editar EFB: schematic **não** colapsa para só Crew (S1/S2);
+  sample incompleto (TIMEOUT mid-loop) mantém o mapa anterior
+- [ ] Depois de um TIMEOUT de station, o tick seguinte faz disconnect+connect
+  e volta a detectar mudança de payload (não gruda no mapa anterior)
+- [ ] Black Square Accu-Sim: cargo no tablet (Pax/pods) **não** aparece nas
+  stations clássicas — esperado, não é bug de detect via layout
 
 ## Possível próximo engenharia
 

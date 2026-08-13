@@ -13,6 +13,9 @@ using SimBridgeHost.Sim.Pmdg;
 public sealed class SimConnectClient : ISimClient
 {
     private const int RequestTimeoutMs = 5000;
+    private const int HealthyRecvMaxAgeMs = 8000;
+    private const int UnrecognizedIdStormLimit = 5;
+    private const int TimeoutStormLimit = 3;
 
     private readonly object _gate = new();
     private readonly AutoResetEvent _messageEvent = new(false);
@@ -33,6 +36,10 @@ public sealed class SimConnectClient : ISimClient
     private CancellationTokenSource? _recvCts;
     private Task? _recvLoop;
     private bool _openReceived;
+    private long _lastHealthyRecvUtcTicks;
+    private int _consecutiveUnrecognizedId;
+    private int _consecutiveTimeouts;
+    private int _pendingSessionTearDown;
     private bool _pmdgNg3Subscribed;
     private bool _pmdgControlSubscribed;
     private readonly object _pmdgFuelGate = new();
@@ -182,6 +189,44 @@ public sealed class SimConnectClient : ISimClient
     public string Mode => "simconnect";
     public bool IsConnected => _sim is not null && _openReceived;
 
+    public SimSessionHealthDto GetSessionHealth()
+    {
+        var open = _sim is not null && _openReceived;
+        var ticks = Interlocked.Read(ref _lastHealthyRecvUtcTicks);
+        int? ageMs = ticks == 0
+            ? null
+            : (int)Math.Max(0, (DateTime.UtcNow - new DateTime(ticks, DateTimeKind.Utc)).TotalMilliseconds);
+        var timeouts = Volatile.Read(ref _consecutiveTimeouts);
+        var unrecognized = Volatile.Read(ref _consecutiveUnrecognizedId);
+        var pendingTear = Volatile.Read(ref _pendingSessionTearDown) != 0;
+        // Idle (no timeouts) is healthy even if nobody has read for >8s.
+        // The 8s window only applies once TIMEOUTs are accumulating (hang mole).
+        var recvFreshEnough = timeouts == 0
+            || (ageMs is int age && age < HealthyRecvMaxAgeMs);
+        var healthy = open
+            && !pendingTear
+            && recvFreshEnough
+            && timeouts < TimeoutStormLimit
+            && unrecognized < UnrecognizedIdStormLimit;
+        return new SimSessionHealthDto
+        {
+            Connected = healthy,
+            SessionHealthy = healthy,
+            LastRecvAgeMs = ageMs,
+            ConsecutiveTimeouts = timeouts,
+        };
+    }
+
+    /// <summary>
+    /// Reuse the handle only when recv is healthy and no TIMEOUT has fired.
+    /// One hang-mole timeout must not early-return — next IPC connect() reopens.
+    /// </summary>
+    private bool CanReuseOpenSession()
+        => _sim is not null
+           && _openReceived
+           && Volatile.Read(ref _consecutiveTimeouts) == 0
+           && GetSessionHealth().SessionHealthy;
+
     public async Task ConnectAsync(string appName, CancellationToken ct = default)
     {
         Task? priorRecvLoop = null;
@@ -189,7 +234,7 @@ public sealed class SimConnectClient : ISimClient
 
         lock (_gate)
         {
-            if (_sim is not null && _openReceived)
+            if (CanReuseOpenSession())
             {
                 return;
             }
@@ -218,7 +263,7 @@ public sealed class SimConnectClient : ISimClient
 
         lock (_gate)
         {
-            if (_sim is not null && _openReceived)
+            if (CanReuseOpenSession())
             {
                 return;
             }
@@ -245,6 +290,7 @@ public sealed class SimConnectClient : ISimClient
 
             _nextDefId = (uint)Definitions.DynamicBase;
             _nextReqId = (uint)Requests.DynamicBase;
+            ResetSessionHealth();
             RegisterFixedDefinitions(_sim);
             _airportCache.Clear();
             _airportListComplete = false;
@@ -293,6 +339,7 @@ public sealed class SimConnectClient : ISimClient
             }
 
             _openReceived = false;
+            ResetSessionHealth();
             _pmdgNg3Subscribed = false;
             _pmdgControlSubscribed = false;
             lock (_pmdgFuelGate)
@@ -1087,14 +1134,25 @@ public sealed class SimConnectClient : ISimClient
     private TaskCompletionSource<object> NewPending(Requests request)
         => NewPending((uint)request);
 
-    private static async Task<object> WaitPending(TaskCompletionSource<object> tcs, CancellationToken ct)
+    private async Task<object> WaitPending(TaskCompletionSource<object> tcs, CancellationToken ct)
     {
         using var timeout = new CancellationTokenSource(RequestTimeoutMs);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
         await using var reg = linked.Token.Register(() =>
             tcs.TrySetException(new SimClientException("TIMEOUT", "SimConnect request timed out")));
 
-        return await tcs.Task.ConfigureAwait(false);
+        try
+        {
+            return await tcs.Task.ConfigureAwait(false);
+        }
+        catch
+        {
+            if (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
+            {
+                NoteTimeout();
+            }
+            throw;
+        }
     }
 
     private void ReceiveLoop(CancellationToken ct)
@@ -1117,12 +1175,53 @@ public sealed class SimConnectClient : ISimClient
                     return;
                 }
             }
+
+            if (Volatile.Read(ref _pendingSessionTearDown) != 0)
+            {
+                TearDownAfterRecvFailure();
+                return;
+            }
         }
     }
 
     /// <summary>
     /// Drop a dead SimConnect handle without joining the receive loop (we're on it).
     /// </summary>
+    private void ResetSessionHealth()
+    {
+        Interlocked.Exchange(ref _lastHealthyRecvUtcTicks, 0);
+        Interlocked.Exchange(ref _consecutiveUnrecognizedId, 0);
+        Interlocked.Exchange(ref _consecutiveTimeouts, 0);
+        Interlocked.Exchange(ref _pendingSessionTearDown, 0);
+    }
+
+    private void NoteHealthyRecv()
+    {
+        Interlocked.Exchange(ref _lastHealthyRecvUtcTicks, DateTime.UtcNow.Ticks);
+        Interlocked.Exchange(ref _consecutiveUnrecognizedId, 0);
+        Interlocked.Exchange(ref _consecutiveTimeouts, 0);
+    }
+
+    private void NoteTimeout()
+    {
+        var n = Interlocked.Increment(ref _consecutiveTimeouts);
+        if (n >= TimeoutStormLimit)
+        {
+            Console.Error.WriteLine($"[simconnect] timeout storm ({n}) — tearing down session");
+            TearDownAfterRecvFailure();
+        }
+    }
+
+    private void RequestSessionTearDown(string reason)
+    {
+        if (Interlocked.Exchange(ref _pendingSessionTearDown, 1) != 0)
+        {
+            return;
+        }
+
+        Console.Error.WriteLine($"[simconnect] {reason} — tearing down session");
+    }
+
     private void TearDownAfterRecvFailure()
     {
         lock (_gate)
@@ -1135,6 +1234,7 @@ public sealed class SimConnectClient : ISimClient
             }
 
             _openReceived = false;
+            ResetSessionHealth();
             _pmdgNg3Subscribed = false;
             _pmdgControlSubscribed = false;
             lock (_pmdgFuelGate)
@@ -1168,6 +1268,7 @@ public sealed class SimConnectClient : ISimClient
     private void OnRecvOpen(SimConnect sender, SIMCONNECT_RECV_OPEN data)
     {
         _openReceived = true;
+        NoteHealthyRecv();
         Console.WriteLine($"[simconnect] connected app={data.szApplicationName}");
     }
 
@@ -1256,6 +1357,7 @@ public sealed class SimConnectClient : ISimClient
 
     private void OnRecvClientData(SimConnect sender, SIMCONNECT_RECV_CLIENT_DATA data)
     {
+        NoteHealthyRecv();
         if (data.dwRequestID == (uint)ClientDataRequests.PmdgNg3Control)
         {
             try
@@ -1328,6 +1430,7 @@ public sealed class SimConnectClient : ISimClient
     private void OnRecvQuit(SimConnect sender, SIMCONNECT_RECV data)
     {
         _openReceived = false;
+        ResetSessionHealth();
         Console.WriteLine("[simconnect] simulator quit");
         FailAllPending("NOT_CONNECTED", "Simulator quit");
     }
@@ -1345,11 +1448,20 @@ public sealed class SimConnectClient : ISimClient
         };
         Console.Error.WriteLine(
             $"[simconnect] exception={data.dwException}{hint} sendId={data.dwSendID} index={data.dwIndex}");
-        // Intentionally do not cancel pending reads here; write-path noise was stealing verifies.
+        // Do not cancel pending on a single exception 3 — write-path noise was stealing verifies.
+        if (data.dwException == 3)
+        {
+            var n = Interlocked.Increment(ref _consecutiveUnrecognizedId);
+            if (n >= UnrecognizedIdStormLimit)
+            {
+                RequestSessionTearDown($"unrecognized_id storm ({n})");
+            }
+        }
     }
 
     private void OnRecvSimobjectData(SimConnect sender, SIMCONNECT_RECV_SIMOBJECT_DATA data)
     {
+        NoteHealthyRecv();
         if (!_pending.TryRemove(data.dwRequestID, out var tcs))
         {
             return;
@@ -1367,6 +1479,7 @@ public sealed class SimConnectClient : ISimClient
 
     private void OnRecvFacilityData(SimConnect sender, SIMCONNECT_RECV_FACILITY_DATA data)
     {
+        NoteHealthyRecv();
         if (data.UserRequestId != (uint)Requests.AirportFacility)
         {
             return;
@@ -1543,6 +1656,7 @@ public sealed class SimConnectClient : ISimClient
 
     private void OnRecvAirportList(SimConnect sender, SIMCONNECT_RECV_AIRPORT_LIST data)
     {
+        NoteHealthyRecv();
         try
         {
             if (data.rgData is not null)

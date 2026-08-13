@@ -17,6 +17,14 @@ public sealed class MockSimClient : ISimClient
     public string Mode => "mock";
     public bool IsConnected => _connected;
 
+    public SimSessionHealthDto GetSessionHealth() => new()
+    {
+        Connected = _connected,
+        SessionHealthy = _connected,
+        LastRecvAgeMs = _connected ? 0 : null,
+        ConsecutiveTimeouts = 0,
+    };
+
     public MockSimClient()
     {
         SeedDefaults();

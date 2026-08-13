@@ -7,6 +7,8 @@ import {
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
   resolveLivePayloadLb,
+  stationSampleIncomplete,
+  stationWeightsDrifted,
 } from './career-live-load.js';
 import {
   DEFAULT_JET_A_LB_PER_GAL,
@@ -59,6 +61,39 @@ describe('resolveLivePayloadLb', () => {
     assert.equal(r.payloadLb, 0);
   });
 
+  it('trusts a partial EFB unload even when mass-balance still looks heavy', () => {
+    const r = resolveLivePayloadLb({
+      stationSumLb: 340,
+      massBalanceLb: 1332,
+      plannedLb: 1332,
+      previousStationSumLb: 1332,
+    });
+    assert.equal(r.source, 'stations');
+    assert.equal(r.payloadLb, 340);
+  });
+
+  it('keeps tracking a later EFB step instead of reverting to mass-balance', () => {
+    const r = resolveLivePayloadLb({
+      stationSumLb: 290,
+      massBalanceLb: 1332,
+      plannedLb: 1332,
+      previousStationSumLb: 340,
+    });
+    assert.equal(r.source, 'stations');
+    assert.equal(r.payloadLb, 290);
+  });
+
+  it('does not revert to mass-balance on the next tick when stations are unchanged', () => {
+    const r = resolveLivePayloadLb({
+      stationSumLb: 340,
+      massBalanceLb: 1332,
+      plannedLb: 1332,
+      previousStationSumLb: 340,
+    });
+    assert.equal(r.source, 'stations');
+    assert.equal(r.payloadLb, 340);
+  });
+
   it('trusts mass-balance when stations stuck at planned but gross dropped', () => {
     const r = resolveLivePayloadLb({
       stationSumLb: 1279,
@@ -67,6 +102,17 @@ describe('resolveLivePayloadLb', () => {
     });
     assert.equal(r.source, 'mass-balance');
     assert.equal(r.payloadLb, 40);
+  });
+
+  it('trusts mass-balance when Accu-Sim emptied but classic stations only twitched', () => {
+    const r = resolveLivePayloadLb({
+      stationSumLb: 1032,
+      massBalanceLb: 186,
+      plannedLb: 1332,
+      previousStationSumLb: 1332,
+    });
+    assert.equal(r.source, 'mass-balance');
+    assert.equal(r.payloadLb, 186);
   });
 });
 
@@ -262,6 +308,19 @@ describe('pickStableLiveFuelLb', () => {
     );
   });
 
+  it('accepts a density-sized drop when the tank map also dropped', () => {
+    assert.equal(
+      pickStableLiveFuelLb({
+        next: 605,
+        prev: 674,
+        plannedLb: 678,
+        nextTanks: { left: 300, right: 305, center: 0 },
+        prevTanks: { left: 337, right: 337, center: 0 },
+      }),
+      605,
+    );
+  });
+
   it('accepts a real fuel drop larger than the density ratio', () => {
     assert.equal(
       pickStableLiveFuelLb({
@@ -337,6 +396,38 @@ describe('evaluateLoadVerification', () => {
     });
     assert.equal(v.fuel.ok, true);
     assert.equal(v.ready, true);
+  });
+});
+
+describe('stationSampleIncomplete', () => {
+  it('rejects a crew-only map after a full 16-station inject', () => {
+    const prev: Record<number, number> = {};
+    for (let i = 1; i <= 16; i += 1) prev[i] = i <= 2 ? 170 : 200;
+    assert.equal(stationSampleIncomplete(prev, { 1: 170, 2: 170 }), true);
+    assert.equal(
+      stationWeightsDrifted(prev, { 1: 170, 2: 170 }, 5),
+      false,
+    );
+  });
+
+  it('allows a full 16-key unload (explicit zeros)', () => {
+    const prev: Record<number, number> = {};
+    const next: Record<number, number> = {};
+    for (let i = 1; i <= 16; i += 1) {
+      prev[i] = i <= 2 ? 170 : 200;
+      next[i] = i <= 2 ? 170 : 0;
+    }
+    assert.equal(stationSampleIncomplete(prev, next), false);
+    assert.equal(stationWeightsDrifted(prev, next, 5), true);
+  });
+});
+
+describe('stationWeightsDrifted', () => {
+  it('detects a station unload', () => {
+    assert.equal(
+      stationWeightsDrifted({ 1: 170, 3: 400 }, { 1: 170, 3: 0 }, 5),
+      true,
+    );
   });
 });
 

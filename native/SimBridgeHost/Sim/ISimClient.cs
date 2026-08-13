@@ -7,6 +7,7 @@ public interface ISimClient : IAsyncDisposable
 {
     string Mode { get; }
     bool IsConnected { get; }
+    SimSessionHealthDto GetSessionHealth();
 
     Task ConnectAsync(string appName, CancellationToken ct = default);
     Task DisconnectAsync(CancellationToken ct = default);

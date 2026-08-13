@@ -330,10 +330,16 @@ export function PayloadStationSchematic(props: {
   const stations = props.stations;
   if (!stations) return null;
   const maxMap = props.stationMax;
-  const indexes = new Set<number>([
-    ...Object.keys(stations).map(Number),
-    ...(maxMap ? Object.keys(maxMap).map(Number) : []),
-  ]);
+  const maxKeys = maxMap
+    ? Object.keys(maxMap)
+        .map(Number)
+        .filter((index) => Number.isFinite(index) && (maxMap[index] ?? 0) > 0)
+    : [];
+  const indexes = new Set<number>(
+    maxKeys.length > 0
+      ? maxKeys
+      : Object.keys(stations).map(Number),
+  );
   const entries = [...indexes]
     .filter((index) => Number.isFinite(index))
     .map((index) => ({

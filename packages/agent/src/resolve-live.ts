@@ -3,6 +3,7 @@ import {
   computeFingerprintV2,
   inferPublisher,
   profileAcceptsLiveTitle,
+  structureFromProfile,
 } from '@msfs-compat/shared';
 import { CatalogClient } from './catalog-client.js';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
@@ -20,6 +21,12 @@ export interface LiveResolveOptions {
   simVersion?: string;
   publisher?: string;
   register?: boolean;
+  /**
+   * Career inject: match the homologated local profile by title and skip
+   * sampleAircraftStructure + catalog HTTP. Those probes (8× FUELSYSTEM
+   * capacity at 15s each) froze reinject on "Reading live aircraft…".
+   */
+  skipStructureSample?: boolean;
 }
 
 export interface LiveResolveResult extends ResolveResult {
@@ -59,6 +66,26 @@ export async function resolveLiveAircraft(options: LiveResolveOptions): Promise<
     atcType: liveIdentity.atcType,
     icao: liveIdentity.icao ?? liveIdentity.atcModel,
   };
+
+  if (options.skipStructureSample) {
+    const local = resolveProfile(identity, localCatalog);
+    if (local.matched && local.profile) {
+      const structure = structureFromProfile(local.profile);
+      const { fingerprint, structuralHash } = computeFingerprintV2({
+        identity,
+        structure,
+      });
+      return {
+        ...local,
+        fingerprint,
+        structuralHash,
+        identity,
+        structure,
+        source: 'local',
+        catalog: { reachable: false },
+      };
+    }
+  }
 
   const { structure } = await sampleAircraftStructure(bridge);
   const { fingerprint, structuralHash } = computeFingerprintV2({ identity, structure });

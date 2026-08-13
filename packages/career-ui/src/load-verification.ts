@@ -293,6 +293,19 @@ export function pickStableLiveFuelLb(opts: {
 
   const densityRatio = CLIENT_AVGAS_LB_PER_GAL / CLIENT_JET_A_LB_PER_GAL;
   if (Math.abs(next - prev * densityRatio) <= Math.max(15, tol * 0.4)) {
+    const nextSum = opts.nextTanks
+      ? fuelTankBreakdownSum(opts.nextTanks)
+      : undefined;
+    const prevSum = opts.prevTanks
+      ? fuelTankBreakdownSum(opts.prevTanks)
+      : undefined;
+    if (
+      nextSum !== undefined &&
+      prevSum !== undefined &&
+      Math.abs(prevSum - nextSum) >= 15
+    ) {
+      return liveFuelLbCoherentWithTanks(next, opts.nextTanks);
+    }
     return liveFuelLbCoherentWithTanks(prev, opts.prevTanks);
   }
 

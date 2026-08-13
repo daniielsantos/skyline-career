@@ -11,6 +11,7 @@ import {
   setNamedPipeDebugLog,
   type NamedPipeClientOptions,
 } from './ipc/named-pipe-client.js';
+import type { SimBridgeSessionPing } from './sim-session-health.js';
 
 export { setNamedPipeDebugLog };
 
@@ -25,8 +26,20 @@ export class NamedPipeSimBridge implements SimBridge {
     this.client = new NamedPipeClient(options);
   }
 
-  async open(appName = 'MSFS Compat Agent'): Promise<void> {
+  async open(
+    appName = 'MSFS Compat Agent',
+    options: { resetSession?: boolean } = {},
+  ): Promise<void> {
     await this.client.connect();
+    if (options.resetSession) {
+      // Drop the shared SimConnect handle and open a new one (IDs, recv loop,
+      // pending). Pipe stays up — do not kill SimBridgeHost.exe.
+      try {
+        await this.client.call('disconnect');
+      } catch {
+        /* no live session */
+      }
+    }
     await this.client.call('connect', { appName });
     this.autoConnected = true;
   }
@@ -47,12 +60,14 @@ export class NamedPipeSimBridge implements SimBridge {
     this.autoConnected = false;
   }
 
-  async ping(): Promise<{ pong: boolean; mode: string; connected: boolean }> {
+  async ping(
+    timeoutMs?: number,
+  ): Promise<SimBridgeSessionPing & { pong: boolean; mode: string }> {
     await this.ensureOpen();
-    return this.client.call('ping');
+    return this.client.call('ping', {}, timeoutMs);
   }
 
-  async status(): Promise<{ mode: string; connected: boolean; aircraftTitle?: string }> {
+  async status(): Promise<SimBridgeSessionPing> {
     await this.ensureOpen();
     return this.client.call('status');
   }
@@ -90,12 +105,19 @@ export class NamedPipeSimBridge implements SimBridge {
     return this.client.call('getAirportFacility', { icao });
   }
 
-  async readSimVar(request: SimVarReadRequest): Promise<number> {
+  async readSimVar(
+    request: SimVarReadRequest,
+    timeoutMs?: number,
+  ): Promise<number> {
     await this.ensureOpen();
-    const result = await this.client.call<{ value: number }>('readSimVar', {
-      name: request.name,
-      unit: request.unit,
-    });
+    const result = await this.client.call<{ value: number }>(
+      'readSimVar',
+      {
+        name: request.name,
+        unit: request.unit,
+      },
+      timeoutMs,
+    );
     return result.value;
   }
 

@@ -217,6 +217,9 @@ export async function runMissionPreflight(
           mission.lastPreflightCheck.loadVerification.payload.stations,
         ).reduce((sum, lb) => sum + (Number.isFinite(lb) ? lb : 0), 0)
       : undefined;
+    // CG first (3 SimVars). compareOnce is heavy — if it runs first, CG PERCENT
+    // often times out and the Dispatch CG card never appears on first open.
+    const liveCg = await readLiveCgState(bridge);
     const { snapshot, live } = await compareOnce(bridge, {
       ofp,
       locked: false,
@@ -236,7 +239,6 @@ export async function runMissionPreflight(
     const cargoKg = ofpCargoKg(ofp);
 
     // CG is advisory in Career preflight (OnAir-style Loaded vs Due).
-    const liveCg = await readLiveCgState(bridge);
     const cgLiveMac = liveCg.liveMac;
     const cgMinMac = liveCg.minMac;
     const cgMaxMac = liveCg.maxMac;
@@ -457,7 +459,8 @@ export async function runMissionPreflight(
           enginesRunning: live.enginesRunning,
         },
         cg:
-          cgLiveMac !== undefined
+          cgLiveMac !== undefined ||
+          (cgMinMac !== undefined && cgMaxMac !== undefined)
             ? {
                 liveMac: cgLiveMac,
                 minMac: cgMinMac,

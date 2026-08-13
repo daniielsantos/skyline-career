@@ -178,6 +178,7 @@ import {
   resolveClassMaxCargoKg,
 } from './dispatch-helpers.ts';
 import {
+  announceOfpLoadStarting,
   applyMissionOfpLoad,
   getLastProbeAircraftTitle,
   getOfpLoadProgress,
@@ -185,7 +186,7 @@ import {
   probeSimBridgeStatus,
   requestOfpLoadCancel,
 } from './ofp-load-helpers.ts';
-import { isOfpLoadActive } from './ofp-load-state.ts';
+import { beginOfpLoadActive, endOfpLoadActive, isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight } from './preflight-helpers.ts';
 import {
   CareerWatchSession,
@@ -5226,10 +5227,15 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        let handedToApply = false;
         try {
-          // Any Watch pipe client contends with inject — stop regardless of mission.
-          // beginOfpLoadActive alone is not enough: a mid-tick sample can still
-          // share the Host until stop completes and the exclusive gate drains.
+          // Abort Watch ticks before stop() so sampleLiveLoadLb bails out.
+          // Progress first — otherwise the UI sits on a blank INJECTING LOAD.
+          beginOfpLoadActive();
+          announceOfpLoadStarting(
+            mission.id,
+            'Stopping Watch so inject can own SimBridge…',
+          );
           let stoppedPipe = false;
           if (watchSession.getStatus().running) {
             await watchSession.stop();
@@ -5240,7 +5246,7 @@ export function createCareerApiServer(port = 8787) {
             stoppedPipe = true;
           }
           if (stoppedPipe) {
-            await new Promise((r) => setTimeout(r, 400));
+            await new Promise((r) => setTimeout(r, 150));
           }
           const injectFleet = await withCareerRead(
             async (_world, missions) => missions.fleet ?? [],
@@ -5248,6 +5254,7 @@ export function createCareerApiServer(port = 8787) {
           const injectAcf = mission.aircraftId
             ? injectFleet.find((a) => a.id === mission.aircraftId)
             : undefined;
+          handedToApply = true;
           const result = await applyMissionOfpLoad(mission, {
             username: body.simbriefUser,
             userid: body.simbriefUserid,
@@ -5321,6 +5328,10 @@ export function createCareerApiServer(port = 8787) {
           const unavailable =
             /ENOENT|pipe|connect|SimBridge|ECONNREFUSED/i.test(message);
           send(res, unavailable ? 503 : 400, { error: message });
+        } finally {
+          if (!handedToApply) {
+            endOfpLoadActive();
+          }
         }
         return;
       }

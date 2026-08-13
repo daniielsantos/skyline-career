@@ -23,6 +23,11 @@ import {
   type MissionFlightWatchState,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import {
+  formatIpcError,
+  pingNeedsSessionReset,
+  shouldReopenSimSession,
+} from '../../agent/src/sim-session-health.ts';
 import { isOfpLoadActive } from './ofp-load-state.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 import { sampleLiveFlight } from './watch-helpers.ts';
@@ -288,6 +293,23 @@ export class BushTripWatchSession {
         await withSimBridgeExclusive(async () => {
           await this.bridge!.open('Skyline Career UI Bush Watch');
         });
+      } else {
+        try {
+          const ping = await this.bridge.ping(1_500);
+          if (pingNeedsSessionReset(ping)) {
+            watchDebugLog('bush-watch', 'simconnect reset — disconnect+connect', {
+              lastRecvAgeMs: ping.lastRecvAgeMs ?? null,
+              consecutiveTimeouts: ping.consecutiveTimeouts ?? null,
+            });
+            await withSimBridgeExclusive(async () => {
+              await this.bridge!.open('Skyline Career UI Bush Watch', {
+                resetSession: true,
+              });
+            });
+          }
+        } catch {
+          // sample() surfaces the error
+        }
       }
       const sample = await sampleLiveFlight(this.bridge, {
         previousPosition: this.lastSample?.position ?? null,
@@ -390,10 +412,20 @@ export class BushTripWatchSession {
       }
     } catch (error) {
       this.consecutivePipeErrors += 1;
-      this.lastError = error instanceof Error ? error.message : String(error);
+      this.lastError = formatIpcError(error);
       this.pipeRetryAtMs = Date.now() + this.pipeBackoffMs;
       this.pipeBackoffMs = Math.min(30_000, this.pipeBackoffMs * 2);
       watchDebugLog('bush-watch', 'tick error', { error: this.lastError });
+      if (
+        this.bridge &&
+        shouldReopenSimSession(error, this.consecutivePipeErrors)
+      ) {
+        try {
+          await this.bridge.close({ disconnectHost: false });
+        } catch {
+          /* ignore */
+        }
+      }
     } finally {
       this.tickInFlight = false;
       if (this.running) this.scheduleNextTick(this.intervalMs);

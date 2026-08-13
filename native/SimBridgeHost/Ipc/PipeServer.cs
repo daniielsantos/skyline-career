@@ -133,30 +133,41 @@ public sealed class PipeServer : IAsyncDisposable
             switch (request.Method)
             {
                 case "ping":
+                {
+                    var health = _sim.GetSessionHealth();
                     return IpcResponse.Success(request.Id, new
                     {
                         pong = true,
                         mode = _sim.Mode,
-                        connected = _sim.IsConnected
+                        connected = health.Connected,
+                        sessionHealthy = health.SessionHealthy,
+                        lastRecvAgeMs = health.LastRecvAgeMs,
+                        consecutiveTimeouts = health.ConsecutiveTimeouts
                     });
+                }
 
                 case "connect":
                 {
                     var appName = GetString(request.Params, "appName") ?? "MSFS Compat Layer";
                     await _sim.ConnectAsync(appName, ct).ConfigureAwait(false);
+                    var health = _sim.GetSessionHealth();
                     return IpcResponse.Success(request.Id, new
                     {
-                        connected = _sim.IsConnected,
+                        connected = health.Connected,
+                        sessionHealthy = health.SessionHealthy,
+                        lastRecvAgeMs = health.LastRecvAgeMs,
+                        consecutiveTimeouts = health.ConsecutiveTimeouts,
                         mode = _sim.Mode
                     });
                 }
 
                 case "disconnect":
                     await _sim.DisconnectAsync(ct).ConfigureAwait(false);
-                    return IpcResponse.Success(request.Id, new { connected = false });
+                    return IpcResponse.Success(request.Id, new { connected = false, sessionHealthy = false });
 
                 case "status":
                 {
+                    var health = _sim.GetSessionHealth();
                     AircraftIdentityDto? identity = null;
                     if (_sim.IsConnected)
                     {
@@ -167,7 +178,10 @@ public sealed class PipeServer : IAsyncDisposable
                     return IpcResponse.Success(request.Id, new
                     {
                         mode = _sim.Mode,
-                        connected = _sim.IsConnected,
+                        connected = health.Connected,
+                        sessionHealthy = health.SessionHealthy,
+                        lastRecvAgeMs = health.LastRecvAgeMs,
+                        consecutiveTimeouts = health.ConsecutiveTimeouts,
                         aircraftTitle = identity?.Title
                     });
                 }

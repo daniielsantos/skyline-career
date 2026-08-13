@@ -2726,16 +2726,36 @@ export function App() {
           const livePayloadDelta = Math.abs(
             (prev?.livePayloadLb ?? 0) - (status.livePayloadLb ?? 0),
           );
+          const prevTanks = prev?.loadVerification?.fuel.tanks;
+          const nextTanks = status.loadVerification?.fuel.tanks;
+          const tanksChanged =
+            Boolean(nextTanks) &&
+            (!prevTanks ||
+              Math.abs(prevTanks.left - nextTanks!.left) >= 5 ||
+              Math.abs(prevTanks.right - nextTanks!.right) >= 5 ||
+              Math.abs(prevTanks.center - nextTanks!.center) >= 5);
+          const onRamp = status.onGround !== false;
+          const weightPaintTol = onRamp ? 5 : 15;
           const verificationChanged =
             prev?.loadVerification?.ready !== status.loadVerification?.ready ||
+            prev?.loadVerification?.fuel.ok !==
+              status.loadVerification?.fuel.ok ||
+            prev?.loadVerification?.payload.ok !==
+              status.loadVerification?.payload.ok ||
             Math.abs(
               (prev?.loadVerification?.payload.liveLb ?? 0) -
                 (status.loadVerification?.payload.liveLb ?? 0),
-            ) >= 15 ||
+            ) >= weightPaintTol ||
             Math.abs(
               (prev?.loadVerification?.fuel.liveLb ?? 0) -
                 (status.loadVerification?.fuel.liveLb ?? 0),
-            ) >= 15;
+            ) >= weightPaintTol ||
+            stationMapDrifted(
+              prev?.loadVerification?.payload.stations,
+              status.loadVerification?.payload.stations,
+              5,
+            ) ||
+            tanksChanged;
           // ~0.0005° ≈ 55 m — keep Dispatch route aircraft marker moving in cruise.
           const positionStable =
             (prev?.position == null && status.position == null) ||
@@ -2759,8 +2779,8 @@ export function App() {
             prev.flightTime?.met === status.flightTime?.met &&
             Math.round((prev.flightTime?.elapsedMs ?? 0) / 60_000) ===
               Math.round((status.flightTime?.elapsedMs ?? 0) / 60_000) &&
-            liveFuelDelta < 25 &&
-            livePayloadDelta < 25 &&
+            liveFuelDelta < (onRamp ? 5 : 25) &&
+            livePayloadDelta < (onRamp ? 5 : 25) &&
             !verificationChanged &&
             positionStable
           ) {
@@ -3459,12 +3479,17 @@ export function App() {
                         ? { stationMax: progress.stationMax }
                         : {}),
                     },
-                    cg: verification.cg
-                      ? {
-                          ...verification.cg,
-                          liveMac: progress.liveMac ?? verification.cg.liveMac,
-                        }
-                      : verification.cg,
+                    cg:
+                      progress.liveMac !== undefined || verification.cg
+                        ? {
+                            ...(verification.cg ?? {
+                              ok: true,
+                              severity: 'info' as const,
+                            }),
+                            liveMac:
+                              progress.liveMac ?? verification.cg?.liveMac,
+                          }
+                        : verification.cg,
                   },
                 },
               };
@@ -3484,6 +3509,14 @@ export function App() {
       window.clearInterval(id);
     };
   }, [loadOfpAutoStatus, activeMission?.id]);
+
+  // Done was only to avoid looking like a mid-write cancel. Once Watch is
+  // live, the switch is Off again so the user can unload + reinject.
+  useEffect(() => {
+    if (loadOfpAutoStatus === 'done' && watch?.running) {
+      setLoadOfpAutoStatus('idle');
+    }
+  }, [loadOfpAutoStatus, watch?.running]);
 
   // Continuously refresh Loaded vs Due while staging on the ground.
   // Full /api/preflight opens its own pipe — pause while Watch owns SimBridge
@@ -3694,7 +3727,11 @@ export function App() {
     void tryStartWatch();
     const id = window.setInterval(() => {
       void tryStartWatch();
-    }, isAirborneResume ? 5_000 : 15_000);
+    }, isAirborneResume
+      ? 5_000
+      : loadOfpAutoStatus === 'done' || loadOfpAutoStatus === 'failed'
+        ? 2_000
+        : 15_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -5811,7 +5848,8 @@ export function App() {
     let succeeded = false;
     let failureMessage: string | null = null;
     let userCancelled = false;
-    await run(async () => {
+    await run(
+      async () => {
       try {
         const result = await postLoadOfp(
           {
@@ -5860,7 +5898,9 @@ export function App() {
           loadOfpControlRef.current = null;
         }
       }
-    });
+      },
+      { refreshAfter: false },
+    );
     if (userCancelled) {
       setSkylineInjectEnabled(false);
       setLoadOfpAutoStatus('failed');
@@ -5873,6 +5913,17 @@ export function App() {
       setLoadOfpAutoStatus('failed');
       setLoadOfpAutoError(failureMessage ?? 'Fuel and payload load failed');
       setLoadOfpProgress(null);
+      return;
+    }
+    try {
+      const status = await postWatchStart({
+        missionId: mission.id,
+        intervalSec: 5,
+      });
+      setWatch(status);
+      setLoadOfpAutoStatus('idle');
+    } catch {
+      /* auto-start effect retries; leave Done until Watch is up */
     }
   }
 

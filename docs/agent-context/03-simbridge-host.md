@@ -22,6 +22,17 @@
 - Em falha de `ReceiveMessage`: `TearDownAfterRecvFailure()` — dispose, `IsConnected=false`, pending → `NOT_CONNECTED`.
 - `ConnectAsync` junta loop antigo e **reabre** sessão se handle estiver morto; reset `_nextDefId` / `_nextReqId`.
 
+## Hang mole + ping honesto (Host 0.3.21+)
+
+`ReceiveMessage` às vezes **não throwa** — pending cai em `TIMEOUT`, pipe continua up, `IsConnected` interno ainda true. Watch só reabria o pipe, nunca `connect()`.
+
+- `_lastHealthyRecvUtc` em `OnRecvOpen` / dados úteis. Idle sem TIMEOUT continua healthy; recv &gt;8s só conta se já há TIMEOUTs (hang mole).
+- 5× `UNRECOGNIZED_ID` seguidos ou 3× `TIMEOUT` sem recv → `TearDownAfterRecvFailure` (log `unrecognized_id storm` / `timeout storm`).
+- IPC ping/status: `sessionHealthy`, `lastRecvAgeMs`, `consecutiveTimeouts`. `ConnectAsync` **não** early-return se a sessão estiver doente.
+- Watch: código IPC `TIMEOUT` / `sessionHealthy===false` → backoff + `open()` no tick seguinte (IPC `connect()`). Não reabrir no handler de erro. Host velho sem os campos = comportamento anterior.
+- Inject **manda** na sessão: `open({ resetSession: true })` faz IPC `disconnect` + `connect` (SimConnect novo, IDs zerados). Pipe e `SimBridgeHost.exe` ficam vivos.
+- **Não** matar `SimBridgeHost.exe` no caminho quente. **Não** voltar probe `FUELSYSTEM TANK CAPACITY` no inject.
+
 Arquivo: `native/SimBridgeHost/Sim/SimConnectClient.cs`
 
 ## Diagnóstico rápido
@@ -35,7 +46,8 @@ Sinais:
 
 - `UNRECOGNIZED_ID` + `0xC00000B0` → sessão SimConnect morta.
 - Após 0.3.17 deve aparecer algo como `session dropped — next client connect() will reopen`.
-- Watch tick error `0xC00000B0` com pipe “ok” = Host zumbi (pré-fix) ou MSFS/sair do voo.
+- `timeout storm` / `unrecognized_id storm` → tear-down do hang mole (0.3.21+).
+- Watch tick error `0xC00000B0` ou `TIMEOUT` com pipe “ok” = Host zumbi; ping deve mostrar `sessionHealthy=false`.
 
 ## Hot-swap (dev)
 

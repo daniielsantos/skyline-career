@@ -25,8 +25,11 @@ import {
   resumeAirborneAtMs,
   finalizeFlightScore,
   finalizeWeatherOpsScore,
+  fuelTankBreakdownSum,
   isUsableFuelTankBreakdown,
   loadVerificationDrifted,
+  stationSampleIncomplete,
+  stationWeightsDrifted,
   mergeAirframePerfOverride,
   DEFAULT_JET_A_LB_PER_GAL,
   pickFuelTankBreakdown,
@@ -67,6 +70,13 @@ import {
   type WeatherOpsSnapshot,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge, setNamedPipeDebugLog } from '../../agent/src/named-pipe-sim-bridge.ts';
+import {
+  formatIpcError,
+  isIpcTimeout,
+  pingNeedsSessionReset,
+  shouldReopenSimSession,
+  simIpcSessionDied,
+} from '../../agent/src/sim-session-health.ts';
 import { readTfdiMd11EfbLvars } from '../../agent/src/ofp-compliance/live-reader.ts';
 import { adjustPlannedPayloadForLiveCrewStations } from '../../agent/src/ofp-load-plan.ts';
 import {
@@ -101,6 +111,13 @@ export type WatchLoadVerification = {
     stations?: Record<number, number>;
     /** Profile maxLoad (lb) keyed by station index. */
     stationMax?: Record<number, number>;
+  };
+  cg?: {
+    liveMac?: number;
+    minMac?: number;
+    maxMac?: number;
+    ok: boolean;
+    severity: 'info' | 'warn';
   };
 };
 
@@ -455,7 +472,7 @@ export async function sampleLiveLoadLb(
   bridge: NamedPipeSimBridge,
   plannedPayloadLb?: number,
   previousStationSumLb?: number,
-  opts: { preferTfdiEfb?: boolean } = {},
+  opts: { preferTfdiEfb?: boolean; shouldAbort?: () => boolean } = {},
 ): Promise<{
   fuelLb: number | null;
   payloadLb: number | null;
@@ -469,6 +486,10 @@ export async function sampleLiveLoadLb(
   stations?: Record<number, number>;
   /** TFDi EFB cargo-only payload (excludes crew stations). */
   tfdiEfbCargoLb?: number | null;
+  /** Truncated station loop (TIMEOUT mid-16). Caller must keep previous map. */
+  stationsIncomplete?: boolean;
+  /** Station IPC died (TIMEOUT/NOT_CONNECTED). Caller must reset SimConnect. */
+  sessionDied?: boolean;
 }> {
   let density = DEFAULT_JET_A_LB_PER_GAL;
   let totalCapacityGal: number | undefined;
@@ -494,7 +515,16 @@ export async function sampleLiveLoadLb(
     density = sanitizeFuelDensityLbPerGal(undefined, { totalCapacityGal });
   }
 
+  const aborted = () => opts.shouldAbort?.() === true;
+  if (aborted()) {
+    return {
+      fuelLb: null,
+      payloadLb: null,
+      payloadSource: 'none',
+    };
+  }
   const readGal = async (name: string): Promise<number> => {
+    if (aborted()) return 0;
     try {
       const gal = await bridge.readSimVar({ name, unit: 'gallons' });
       return Number.isFinite(gal) && gal > 0 ? gal : 0;
@@ -537,9 +567,20 @@ export async function sampleLiveLoadLb(
     ...(leftTipLb > 0.5 ? { leftTip: leftTipLb } : {}),
     ...(rightTipLb > 0.5 ? { rightTip: rightTipLb } : {}),
   };
-  const fuelTankCapacity = await readClassicFuelTankCapacityLb(bridge, density);
+  const fuelTankCapacity = aborted()
+    ? undefined
+    : await readClassicFuelTankCapacityLb(bridge, density);
 
   let fuelLb: number | null = tankTotalLb > 0 ? tankTotalLb : null;
+  if (aborted()) {
+    return {
+      fuelLb,
+      payloadLb: null,
+      payloadSource: 'none',
+      fuelTanks,
+      ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
+    };
+  }
   try {
     const fuel = await bridge.readSimVar({
       name: 'FUEL TOTAL QUANTITY WEIGHT',
@@ -566,30 +607,12 @@ export async function sampleLiveLoadLb(
     }
   }
 
-  const stations: Record<number, number> = {};
-  let stationSum = 0;
-  let stationsRead = 0;
-  for (let index = 1; index <= 16; index += 1) {
-    try {
-      const w = await bridge.readSimVar({
-        name: `PAYLOAD STATION WEIGHT:${index}`,
-        unit: 'pounds',
-      });
-      if (Number.isFinite(w) && w >= 0) {
-        stations[index] = w;
-        stationSum += w;
-        stationsRead += 1;
-      }
-    } catch {
-      /* station missing — stop after a gap of failures at the start */
-      if (stationsRead === 0 && index >= 8) break;
-    }
-  }
-
+  // Gross−empty−fuel before the 16-station loop. PAYLOAD STATION WEIGHT can
+  // TIMEOUT after idle while EMPTY/TOTAL still work (same as fuel tanks).
   let massBalanceLb: number | undefined;
   let emptyWeightLb: number | undefined;
   let grossWeightLb: number | undefined;
-  if (fuelLb !== null) {
+  if (fuelLb !== null && !aborted()) {
     try {
       const empty = await bridge.readSimVar({
         name: 'EMPTY WEIGHT',
@@ -616,8 +639,51 @@ export async function sampleLiveLoadLb(
     }
   }
 
+  const stations: Record<number, number> = {};
+  let stationSum = 0;
+  let stationsRead = 0;
+  let stationSessionDied = false;
+  for (let index = 1; index <= 16; index += 1) {
+    if (aborted()) break;
+    try {
+      const w = await bridge.readSimVar({
+        name: `PAYLOAD STATION WEIGHT:${index}`,
+        unit: 'pounds',
+      });
+      if (Number.isFinite(w) && w >= 0) {
+        stations[index] = w;
+        stationSum += w;
+        stationsRead += 1;
+      }
+    } catch (err) {
+      // IPC code TIMEOUT / NOT_CONNECTED — do not regex the message.
+      if (simIpcSessionDied(err)) {
+        stationSessionDied = true;
+        break;
+      }
+      if (stationsRead === 0 && index >= 8) break;
+    }
+  }
+  const stationsIncomplete =
+    aborted() ||
+    stationSessionDied ||
+    (typeof previousStationSumLb === 'number' &&
+      previousStationSumLb > 200 &&
+      stationsRead > 0 &&
+      stationsRead < 8);
+  const mbCollapsed =
+    typeof massBalanceLb === 'number' &&
+    (stationsIncomplete
+      ? typeof previousStationSumLb === 'number' &&
+        previousStationSumLb > massBalanceLb * 2 + 200 &&
+        previousStationSumLb - massBalanceLb > 400
+      : stationsRead > 0 &&
+        stationSum > massBalanceLb * 2 + 200 &&
+        stationSum - massBalanceLb > 400);
+
   const resolved = resolveLivePayloadLb({
-    stationSumLb: stationsRead > 0 ? stationSum : undefined,
+    stationSumLb:
+      stationsIncomplete || stationsRead === 0 ? undefined : stationSum,
     massBalanceLb,
     plannedLb: plannedPayloadLb,
     previousStationSumLb,
@@ -629,6 +695,7 @@ export async function sampleLiveLoadLb(
     resolved.payloadLb !== undefined ? resolved.payloadLb : null;
   let payloadSource = resolved.source;
   if (
+    !stationsIncomplete &&
     stationsRead > 0 &&
     stationSum < 50 &&
     typeof previousStationSumLb === 'number' &&
@@ -638,14 +705,29 @@ export async function sampleLiveLoadLb(
     payloadLb = stationSum;
     payloadSource = 'stations';
   }
-  // Stations stuck near planned while mass-balance collapsed (tablet empty).
+  // Once we have a prior classic station sample, keep tracking it. Otherwise
+  // a lagging TOTAL WEIGHT reverts the first EFB edit on the next tick.
+  // Do not override when Accu-Sim/tablet dumped gross (ghost stations).
+  if (
+    !stationsIncomplete &&
+    !mbCollapsed &&
+    stationsRead > 0 &&
+    typeof previousStationSumLb === 'number' &&
+    (payloadLb === null || Math.abs(payloadLb - stationSum) >= 15)
+  ) {
+    payloadLb = stationSum;
+    payloadSource = 'stations';
+  }
+  // Stations stuck near planned — or inflated vs gross — while tablet emptied.
   if (
     typeof massBalanceLb === 'number' &&
-    stationsRead > 0 &&
-    typeof plannedPayloadLb === 'number' &&
-    plannedPayloadLb > 200 &&
-    Math.abs(stationSum - plannedPayloadLb) <= 150 &&
-    massBalanceLb + 75 < plannedPayloadLb * 0.5 &&
+    (mbCollapsed ||
+      (!stationsIncomplete &&
+        stationsRead > 0 &&
+        typeof plannedPayloadLb === 'number' &&
+        plannedPayloadLb > 200 &&
+        Math.abs(stationSum - plannedPayloadLb) <= 150 &&
+        massBalanceLb + 75 < plannedPayloadLb * 0.5)) &&
     (payloadLb === null || payloadLb > massBalanceLb + 100)
   ) {
     payloadLb = massBalanceLb;
@@ -674,18 +756,32 @@ export async function sampleLiveLoadLb(
     }
   }
 
+  const payloadFromMbOnIncomplete =
+    stationsIncomplete &&
+    typeof massBalanceLb === 'number' &&
+    (payloadSource === 'mass-balance' || mbCollapsed);
   return {
     fuelLb,
-    payloadLb,
-    payloadSource,
+    payloadLb: stationsIncomplete
+      ? payloadFromMbOnIncomplete
+        ? massBalanceLb!
+        : null
+      : payloadLb,
+    payloadSource: stationsIncomplete
+      ? payloadFromMbOnIncomplete
+        ? 'mass-balance'
+        : 'none'
+      : payloadSource,
     massBalanceLb: massBalanceLb ?? null,
     emptyWeightLb: emptyWeightLb ?? null,
     grossWeightLb: grossWeightLb ?? null,
-    stationSumLb: stationsRead > 0 ? stationSum : null,
+    stationSumLb: stationsIncomplete || stationsRead === 0 ? null : stationSum,
     tfdiEfbCargoLb,
     ...(usableTanks ? { fuelTanks: usableTanks } : {}),
     ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
-    ...(stationsRead > 0 ? { stations } : {}),
+    ...(!stationsIncomplete && stationsRead > 0 ? { stations } : {}),
+    ...(stationsIncomplete ? { stationsIncomplete: true } : {}),
+    ...(stationSessionDied ? { sessionDied: true } : {}),
   };
 }
 
@@ -959,6 +1055,8 @@ export class CareerWatchSession {
   /** Earliest time we may retry SimBridge after a pipe drop. */
   private pipeRetryAtMs = 0;
   private pipeBackoffMs = 2_000;
+  /** Next tick: IPC disconnect+connect (station TIMEOUT was swallowed). */
+  private pendingSimConnectReset = false;
   private preflightDepartBlockedLogged = false;
   private cruiseState: CruiseSampleState = createCruiseSampleState();
   private cruiseStatus: CruiseSampleStatus | null = null;
@@ -1119,7 +1217,7 @@ export class CareerWatchSession {
           Date.now() - this.lastSuccessfulTickAtMs > 12_000;
         const reconnecting =
           typeof this.lastError === 'string' &&
-          /not connected|pipe closed|0xC00000B0|Reconnecting|retry in/i.test(
+          /not connected|pipe closed|0xC00000B0|TIMEOUT|session stale|Reconnecting|retry in/i.test(
             this.lastError,
           ) &&
           this.consecutivePipeErrors >= 2;
@@ -1187,6 +1285,7 @@ export class CareerWatchSession {
     this.lastSuccessfulTickAtMs = 0;
     this.lastLoadSampleAtMs = 0;
     this.consecutivePipeErrors = 0;
+    this.pendingSimConnectReset = false;
     this.settlement = null;
     this.preflightDepartBlockedLogged = false;
     this.cruiseState = createCruiseSampleState();
@@ -1323,7 +1422,7 @@ export class CareerWatchSession {
     } catch (error) {
       this.missionId = null;
       this.missionStatus = null;
-      this.lastError = error instanceof Error ? error.message : String(error);
+      this.lastError = formatIpcError(error);
       watchDebugLog('watch', 'start failed', { error: this.lastError });
       throw error;
     }
@@ -1357,6 +1456,18 @@ export class CareerWatchSession {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = undefined;
+    }
+    // Abort the in-flight tick, then close the pipe so a hung SimVar
+    // (10s IPC) cannot freeze reinject. shouldAbort sees running=false.
+    // Waiting 25s here left POST /api/load-ofp with no progress message.
+    const tickWaitStarted = Date.now();
+    while (this.tickInFlight && Date.now() - tickWaitStarted < 1_500) {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    if (this.tickInFlight) {
+      watchDebugLog('watch', 'stop — closing pipe under in-flight tick', {
+        waitedMs: Date.now() - tickWaitStarted,
+      });
     }
     // Flush airborne clock before tearing down — app quit must not lose %.
     // Skip persist when hard-resetting (cancel / mission switch) so flicker
@@ -1402,6 +1513,7 @@ export class CareerWatchSession {
     this.lastSuccessfulTickAtMs = 0;
     this.lastLoadSampleAtMs = 0;
     this.consecutivePipeErrors = 0;
+    this.pendingSimConnectReset = false;
     this.preflightDepartBlockedLogged = false;
     this.cruiseState = createCruiseSampleState();
     this.cruiseStatus = null;
@@ -1491,13 +1603,49 @@ export class CareerWatchSession {
     const tickStarted = Date.now();
     try {
       // Reopen only after backoff — never in the error handler (that ignored waitMs).
+      const forceSimConnectReset = this.pendingSimConnectReset;
+      this.pendingSimConnectReset = false;
       if (!this.bridge.isPipeConnected) {
         watchDebugLog('watch', 'pipe reopen after backoff', {
           missionId: this.missionId,
+          resetSession: forceSimConnectReset,
         });
         await withSimBridgeExclusive(async () => {
-          await this.bridge!.open('Skyline Career UI Watch');
+          await this.bridge!.open(
+            'Skyline Career UI Watch',
+            forceSimConnectReset ? { resetSession: true } : {},
+          );
         });
+      } else if (forceSimConnectReset) {
+        watchDebugLog('watch', 'simconnect reset — disconnect+connect', {
+          missionId: this.missionId,
+          force: true,
+        });
+        await withSimBridgeExclusive(async () => {
+          await this.bridge!.open('Skyline Career UI Watch', {
+            resetSession: true,
+          });
+        });
+      } else {
+        try {
+          const ping = await this.bridge.ping(1_500);
+          if (pingNeedsSessionReset(ping)) {
+            watchDebugLog('watch', 'simconnect reset — disconnect+connect', {
+              missionId: this.missionId,
+              force: false,
+              lastRecvAgeMs: ping.lastRecvAgeMs ?? null,
+              consecutiveTimeouts: ping.consecutiveTimeouts ?? null,
+              sessionHealthy: ping.sessionHealthy ?? null,
+            });
+            await withSimBridgeExclusive(async () => {
+              await this.bridge!.open('Skyline Career UI Watch', {
+                resetSession: true,
+              });
+            });
+          }
+        } catch {
+          // ping failed; sample() surfaces the error
+        }
       }
       watchDebugLog('watch', 'tick begin', {
         missionId: this.missionId,
@@ -1506,6 +1654,9 @@ export class CareerWatchSession {
       const sample = await sampleLiveFlight(this.bridge, {
         previousPosition: this.lastSample?.position ?? null,
       });
+      if (!this.running || isOfpLoadActive()) {
+        return;
+      }
       this.lastSample = sample;
       this.lastError = null;
       this.pipeBackoffMs = 2_000;
@@ -1541,13 +1692,19 @@ export class CareerWatchSession {
       }
 
       // Loaded vs Due: Watch owns the pipe — sample + persist (single source of truth).
-      // Heavy tank/station reads every tick were thrashing SimBridge (status + map blink).
-      // When already READY, refresh load at most every 10s; always sample when not ready.
-      const prevVerification = current.lastPreflightCheck?.loadVerification;
-      const loadDue =
-        !prevVerification?.ready ||
-        this.lastLoadSampleAtMs === 0 ||
-        Date.now() - this.lastLoadSampleAtMs >= 10_000;
+      // v0.3.9 on the ramp: every tick (EFB payload/fuel edits). Airborne READY: 10s
+      // so cruise ticks do not thrash SimBridge with 16 station reads.
+      if (!this.running || isOfpLoadActive()) {
+        return;
+      }
+      const prevVerification =
+        this.lastLoadVerification ??
+        current.lastPreflightCheck?.loadVerification;
+      const loadDue = sample.onGround
+        ? true
+        : !prevVerification?.ready ||
+          this.lastLoadSampleAtMs === 0 ||
+          Date.now() - this.lastLoadSampleAtMs >= 10_000;
       if (
         prevVerification &&
         current.status === 'dispatched' &&
@@ -1571,22 +1728,41 @@ export class CareerWatchSession {
             this.bridge,
             prevVerification.payload.plannedLb,
             previousStationSumLb,
-            { preferTfdiEfb },
+            {
+              preferTfdiEfb,
+              shouldAbort: () => !this.running || isOfpLoadActive(),
+            },
           );
           this.lastLoadSampleAtMs = Date.now();
+          if (load.sessionDied) {
+            this.pendingSimConnectReset = true;
+            watchDebugLog('load', 'station sample TIMEOUT — reset SimConnect next tick', {
+              stationKeys: load.stations
+                ? Object.keys(load.stations).length
+                : 0,
+            });
+          }
           // Only keep prior totals when this sample failed to read them (null).
           // Zero is a real reading (user emptied fuel/payload) and must update READY.
           // Density flicker (Jet-A↔avgas) is rejected via pickStableLiveFuelLb.
           const rawFuelLb =
             load.fuelLb !== null ? load.fuelLb : undefined;
-          const liveFuelLb = pickStableLiveFuelLb({
-            next: rawFuelLb,
-            prev: prevVerification.fuel.liveLb,
-            plannedLb: prevVerification.fuel.plannedLb,
-            nextTanks: load.fuelTanks,
-            prevTanks: prevWatchFuel.tanks,
-          });
+          // On the ramp, EFB tank edits are the source of truth. pickStable /
+          // pickFuelTankBreakdown were built for Learjet density flicker and
+          // latched L/R at the inject snapshot after the first sample.
+          const liveFuelLb = sample.onGround
+            ? (typeof rawFuelLb === 'number'
+                ? rawFuelLb
+                : prevVerification.fuel.liveLb)
+            : pickStableLiveFuelLb({
+                next: rawFuelLb,
+                prev: prevVerification.fuel.liveLb,
+                plannedLb: prevVerification.fuel.plannedLb,
+                nextTanks: load.fuelTanks,
+                prevTanks: prevWatchFuel.tanks,
+              });
           const fuelSampleRejected =
+            !sample.onGround &&
             typeof rawFuelLb === 'number' &&
             typeof liveFuelLb === 'number' &&
             Math.abs(rawFuelLb - liveFuelLb) > 1;
@@ -1649,17 +1825,25 @@ export class CareerWatchSession {
             plannedPayloadLb,
             livePayloadLb,
           });
-          const tanks = pickFuelTankBreakdown(
-            fuelSampleRejected ? undefined : load.fuelTanks,
-            prevWatchFuel.tanks,
-            liveFuelLb,
-          );
+          const tanks = sample.onGround
+            ? (load.fuelTanks ?? prevWatchFuel.tanks)
+            : pickFuelTankBreakdown(
+                fuelSampleRejected ? undefined : load.fuelTanks,
+                prevWatchFuel.tanks,
+                liveFuelLb,
+              );
           const tankCapacity = pickTankCapacity(
             load.fuelTankCapacity,
             prevWatchFuel.tankCapacity,
           );
-          // Prefer fresh station map (including all-zero) over a stale schematic.
-          const stations = load.stations ?? prevWatchPayload.stations;
+          // Prefer fresh station map (including explicit zeros) over a stale
+          // schematic — but never a truncated IPC pass (S1/S2 only).
+          const stations = stationSampleIncomplete(
+            prevWatchPayload.stations,
+            load.stations,
+          )
+            ? prevWatchPayload.stations
+            : (load.stations ?? prevWatchPayload.stations);
           const stationMax = pickStationMax(
             undefined,
             prevWatchPayload.stationMax,
@@ -1689,7 +1873,14 @@ export class CareerWatchSession {
             tanks: load.fuelTanks ?? null,
             tankCapacity: load.fuelTankCapacity ?? null,
             stationKeys: load.stations ? Object.keys(load.stations).length : 0,
+            stationsIncomplete: load.stationsIncomplete === true,
+            sessionDied: load.sessionDied === true,
           });
+          const prevCg = (
+            prevVerification as { cg?: WatchLoadVerification['cg'] }
+          ).cg;
+          // Publish fuel/payload before CG reads — a slow CG PERCENT must not
+          // freeze Loaded vs Due after inject.
           this.lastLoadVerification = {
             ...nextWeights,
             fuel: {
@@ -1709,8 +1900,19 @@ export class CareerWatchSession {
               ...(stations ? { stations } : {}),
               ...(stationMax ? { stationMax } : {}),
             },
+            ...(prevCg ? { cg: prevCg } : {}),
           };
-          if (
+          const tanksDrifted =
+            Boolean(tanks) &&
+            Boolean(prevWatchFuel.tanks) &&
+            (Math.abs(
+              fuelTankBreakdownSum(tanks!) -
+                fuelTankBreakdownSum(prevWatchFuel.tanks!),
+            ) >= 15 ||
+              Math.abs(tanks!.left - prevWatchFuel.tanks!.left) >= 5 ||
+              Math.abs(tanks!.right - prevWatchFuel.tanks!.right) >= 5 ||
+              Math.abs(tanks!.center - prevWatchFuel.tanks!.center) >= 5);
+          const persistLoad =
             loadVerificationDrifted(
               {
                 ready: prevVerification.ready,
@@ -1718,8 +1920,10 @@ export class CareerWatchSession {
                 payload: prevVerification.payload,
               },
               nextWeights,
-            )
-          ) {
+            ) ||
+            stationWeightsDrifted(prevWatchPayload.stations, stations, 5) ||
+            tanksDrifted;
+          if (persistLoad) {
             watchDebugLog('load', 'persist drift', {
               ready: nextWeights.ready,
               liveFuelLb: nextWeights.fuel.liveLb,
@@ -1731,16 +1935,10 @@ export class CareerWatchSession {
                 const prev = openMission.lastPreflightCheck;
                 if (!prev?.loadVerification) return false;
                 const prevLv = prev.loadVerification as WatchLoadVerification;
-                const mergedTanks = pickFuelTankBreakdown(
-                  load.fuelTanks,
-                  prevLv.fuel.tanks,
-                  liveFuelLb,
-                );
                 const mergedTankCapacity = pickTankCapacity(
                   load.fuelTankCapacity,
                   prevLv.fuel.tankCapacity,
                 );
-                const mergedStations = load.stations ?? prevLv.payload.stations;
                 const mergedStationMax = pickStationMax(
                   undefined,
                   prevLv.payload.stationMax,
@@ -1761,7 +1959,7 @@ export class CareerWatchSession {
                     fuel: {
                       ...prevFuelRest,
                       ...nextWeights.fuel,
-                      ...(mergedTanks ? { tanks: mergedTanks } : {}),
+                      ...(tanks ? { tanks } : {}),
                       ...(mergedTankCapacity
                         ? { tankCapacity: mergedTankCapacity }
                         : {}),
@@ -1774,7 +1972,7 @@ export class CareerWatchSession {
                         ? { crewLb: adjustedPayload.crewLb }
                         : {}),
                       ...(crewFloorLb !== undefined ? { crewFloorLb } : {}),
-                      ...(mergedStations ? { stations: mergedStations } : {}),
+                      ...(stations ? { stations } : {}),
                       ...(mergedStationMax
                         ? { stationMax: mergedStationMax }
                         : {}),
@@ -1783,6 +1981,7 @@ export class CareerWatchSession {
                       onGround: sample.onGround,
                       enginesRunning: sample.enginesRunning,
                     },
+                    ...(prevCg ? { cg: prevCg } : {}),
                   },
                 };
                 // Keep local mission snapshot in sync for depart gate below.
@@ -1790,40 +1989,22 @@ export class CareerWatchSession {
                 return true;
               },
             );
-          } else {
-            // Totals stable — still refresh schematic + ok flags from this sample.
-            this.lastLoadVerification = {
-              ...nextWeights,
-              fuel: {
-                ...nextWeights.fuel,
-                ...(tanks ? { tanks } : {}),
-                ...(tankCapacity ? { tankCapacity } : {}),
-              },
-              payload: {
-                ...nextWeights.payload,
-                ...(cargoLb !== undefined ? { cargoLb } : {}),
-                ...(adjustedPayload
-                  ? { crewLb: adjustedPayload.crewLb }
-                  : prevWatchPayload.crewLb !== undefined
-                    ? { crewLb: prevWatchPayload.crewLb }
-                    : {}),
-                ...(crewFloorLb !== undefined ? { crewFloorLb } : {}),
-                ...(stations ? { stations } : {}),
-                ...(stationMax ? { stationMax } : {}),
-              },
-            };
           }
+          // Do not read CG here. Three extra SimVars after the first EFB
+          // persist held tickInFlight and the next edits never sampled.
         } catch (loadErr) {
-          const msg =
-            loadErr instanceof Error ? loadErr.message : String(loadErr);
-          this.lastError = msg;
-          watchDebugLog('load', 'sample failed', { error: msg });
+          this.lastError = formatIpcError(loadErr);
+          watchDebugLog('load', 'sample failed', { error: this.lastError });
+          if (simIpcSessionDied(loadErr)) {
+            this.pendingSimConnectReset = true;
+          }
         }
       } else {
         watchDebugLog('load', 'sample skipped', {
           hasPrevVerification: Boolean(prevVerification),
           status: current.status,
           onGround: sample.onGround,
+          loadDue,
         });
       }
 
@@ -2634,7 +2815,7 @@ export class CareerWatchSession {
         await this.stop();
       }
     } catch (error) {
-      this.lastError = error instanceof Error ? error.message : String(error);
+      this.lastError = formatIpcError(error);
       this.consecutivePipeErrors += 1;
       watchDebugLog('watch', 'tick error', {
         error: this.lastError,
@@ -2646,13 +2827,16 @@ export class CareerWatchSession {
       // and ignored waitMs (connect/close storm → host 0xC00000B0).
       if (
         this.bridge &&
-        /not connected|pipe closed|0xC00000B0|EPIPE|ENOENT/i.test(this.lastError)
+        shouldReopenSimSession(error, this.consecutivePipeErrors)
       ) {
         const waitMs = this.pipeBackoffMs;
         this.pipeRetryAtMs = Date.now() + waitMs;
         this.pipeBackoffMs = Math.min(20_000, this.pipeBackoffMs * 2);
-        this.lastError = `Pipe closed — retry in ${Math.round(waitMs / 1000)}s`;
-        watchDebugLog('watch', 'pipe backoff', { waitMs });
+        const timeoutHang = isIpcTimeout(error);
+        this.lastError = timeoutHang
+          ? `SimConnect session stale — retry in ${Math.round(waitMs / 1000)}s`
+          : `Pipe closed — retry in ${Math.round(waitMs / 1000)}s`;
+        watchDebugLog('watch', 'pipe backoff', { waitMs, timeoutHang });
         try {
           await this.bridge.close({ disconnectHost: false });
         } catch {

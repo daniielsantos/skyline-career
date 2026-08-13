@@ -729,10 +729,13 @@ export function equalizeMovableStations(
 /** Progressive-load / CG nudge step per seat (lb). */
 export const CG_BALANCE_STEP_LB = 50;
 /**
- * Per-round add on freighter cargo holds. 50 lb × 24 rounds only reaches
- * 1200 lb — a single C408 passenger hold (S5, 2500 lb) never filled.
+ * Per-round add on huge freighter cargo holds (e.g. C408 S5 @ 2500 lb).
+ * Caravan / Baron cargo cabins stay on 50 lb/station (v0.3.9) so weight
+ * spreads across zones instead of dumping 400 lb onto S3/S4 in one round.
  */
 export const FREIGHTER_BAGGAGE_STEP_LB = 400;
+/** Single-hold maxLoad at/above this → fat freighter steps. */
+export const FREIGHTER_LARGE_HOLD_MAX_LB = 1500;
 
 /** Step size for one inject cargo round. */
 export function cargoPlaceStepLb(opts: {
@@ -740,19 +743,24 @@ export function cargoPlaceStepLb(opts: {
   gaCabin: boolean;
   perSeatLb: number;
   remainingLb: number;
+  /** Highest maxLoad among stations filled this round. */
+  holdMaxLoadLb?: number;
 }): number {
   const perSeat = Math.max(0, opts.perSeatLb);
   const remaining = Math.max(0, opts.remainingLb);
   if (!opts.placingOnBaggage) return perSeat;
   if (opts.gaCabin) return Math.min(perSeat, GA_BAGGAGE_SOFT_MAX_LB);
-  return Math.max(perSeat, Math.min(FREIGHTER_BAGGAGE_STEP_LB, remaining));
+  if ((opts.holdMaxLoadLb ?? 0) >= FREIGHTER_LARGE_HOLD_MAX_LB) {
+    return Math.max(perSeat, Math.min(FREIGHTER_BAGGAGE_STEP_LB, remaining));
+  }
+  return perSeat;
 }
 
 /**
- * Pick load bias from live CG and its movement (counterweight).
- * - Too aft → load forward; if still drifting aft, keep forward.
- * - Too forward → load aft; if still drifting forward, keep aft.
- * - Inside envelope → load toward center (nose-ish already → aft, tail-ish → forward).
+ * Pick load bias from live CG (v0.3.9).
+ * - Too aft → load forward.
+ * - Too forward → load aft.
+ * - Inside envelope → equal (all cargo stations fill together).
  */
 export function resolveCgCounterweightBias(opts: {
   liveMac: number;
@@ -761,11 +769,9 @@ export function resolveCgCounterweightBias(opts: {
   prevMac?: number;
 }): 'equal' | 'forward' | 'aft' {
   const { liveMac, lo, hi } = opts;
+  if (liveMac >= lo && liveMac <= hi) return 'equal';
   if (liveMac > hi) return 'forward';
   if (liveMac < lo) return 'aft';
-  const mid = (lo + hi) / 2;
-  if (liveMac < mid - 1) return 'aft';
-  if (liveMac > mid + 1) return 'forward';
   return 'equal';
 }
 

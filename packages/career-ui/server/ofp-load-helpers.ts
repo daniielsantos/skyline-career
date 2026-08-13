@@ -19,8 +19,8 @@ import {
   type MissionIntent,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import { simIpcSessionDied } from '../../agent/src/sim-session-health.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
-import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compliance/run-compare.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 import {
   OfpLoadPlanError,
@@ -52,7 +52,7 @@ import {
   loadProfilesFromDirs,
 } from '../../agent/src/profile-registry.ts';
 import { resolveLiveAircraft } from '../../agent/src/resolve-live.ts';
-import { runMissionPreflight, type MissionPreflightResult } from './preflight-helpers.ts';
+import { type MissionPreflightResult } from './preflight-helpers.ts';
 import {
   beginOfpLoadActive,
   endOfpLoadActive,
@@ -245,6 +245,18 @@ export function getOfpLoadProgress(missionId: string): OfpLoadProgress | null {
   return ofpLoadProgressByMission.get(missionId) ?? null;
 }
 
+/** UI poll can show a message while Watch.stop() drains the in-flight tick. */
+export function announceOfpLoadStarting(
+  missionId: string,
+  message: string,
+): void {
+  beginOfpLoad(missionId);
+  setOfpLoadProgress(missionId, {
+    phase: 'planning',
+    message,
+  });
+}
+
 /** True while a mission inject is actively planning/writing/verifying. */
 export function isOfpLoadBusy(missionId: string): boolean {
   const phase = ofpLoadProgressByMission.get(missionId.trim())?.phase;
@@ -356,7 +368,7 @@ function phaseFromFlags(
 async function readLiveTanks(
   bridge: NamedPipeSimBridge,
   profile: AircraftProfile,
-  opts?: { skipTankIds?: string[] },
+  opts?: { skipTankIds?: string[]; readTimeoutMs?: number },
 ): Promise<Record<string, number>> {
   const tanks: Record<string, number> = {};
   const skip = new Set(
@@ -368,10 +380,13 @@ async function readLiveTanks(
       continue;
     }
     try {
-      tanks[tank.id] = await bridge.readSimVar({
-        name: tank.readVar,
-        unit: tank.readUnit || profile.fuel.unit || 'gallons',
-      });
+      tanks[tank.id] = await bridge.readSimVar(
+        {
+          name: tank.readVar,
+          unit: tank.readUnit || profile.fuel.unit || 'gallons',
+        },
+        opts?.readTimeoutMs,
+      );
     } catch {
       tanks[tank.id] = 0;
     }
@@ -404,15 +419,16 @@ function preferWrittenFuelTanks(
 async function readLiveStations(
   bridge: NamedPipeSimBridge,
   profile: AircraftProfile,
+  readTimeoutMs?: number,
 ): Promise<Record<number, number>> {
   const stations: Record<number, number> = {};
   for (const station of profile.payload.stations) {
     const name = station.readVar ?? `PAYLOAD STATION WEIGHT:${station.index}`;
     try {
-      stations[station.index] = await bridge.readSimVar({
-        name,
-        unit: 'pounds',
-      });
+      stations[station.index] = await bridge.readSimVar(
+        { name, unit: 'pounds' },
+        readTimeoutMs,
+      );
     } catch {
       stations[station.index] = 0;
     }
@@ -715,7 +731,9 @@ async function applyMissionOfpLoadExclusive(
   }
 
   beginOfpLoad(mission.id);
-  beginOfpLoadActive();
+  if (!isOfpLoadActive()) {
+    beginOfpLoadActive();
+  }
   const injectStartedAtMs = Date.now();
   watchDebugLog('inject', 'begin', {
     missionId: mission.id,
@@ -809,19 +827,41 @@ async function applyMissionOfpLoadExclusive(
     assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'opening SimBridge');
     setOfpLoadProgress(mission.id, {
       phase: 'planning',
-      message: 'Reading live aircraft + building load plan…',
+      message: 'Opening a fresh SimConnect session…',
     });
-    await bridge.open('Skyline Career UI OFP Load');
+    await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
+    watchDebugLog('inject', 'simconnect session reset', {
+      missionId: mission.id,
+    });
 
     assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'resolving aircraft');
+    setOfpLoadProgress(mission.id, {
+      phase: 'planning',
+      message: 'Matching aircraft profile…',
+    });
     const localCatalog = await loadProfilesFromDirs(defaultProfileDirs(repoRoot));
     const cache = new ProfileCache(defaultCacheDir(repoRoot));
-    const resolved = await resolveLiveAircraft({
-      bridge,
-      localCatalog,
-      cache,
-      catalogUrl: opts.catalogUrl,
-    });
+    const resolveInjectAircraft = () =>
+      resolveLiveAircraft({
+        bridge,
+        localCatalog,
+        cache,
+        catalogUrl: opts.catalogUrl,
+        skipStructureSample: true,
+      });
+    let resolved: Awaited<ReturnType<typeof resolveLiveAircraft>>;
+    try {
+      resolved = await resolveInjectAircraft();
+    } catch (resolveErr) {
+      if (!simIpcSessionDied(resolveErr)) {
+        throw resolveErr;
+      }
+      watchDebugLog('inject', 'first read failed — reset SimConnect session', {
+        error: resolveErr instanceof Error ? resolveErr.message : String(resolveErr),
+      });
+      await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
+      resolved = await resolveInjectAircraft();
+    }
 
     if (!resolved.matched || !resolved.profile) {
       throw new Error(
@@ -866,10 +906,16 @@ async function applyMissionOfpLoadExclusive(
       // Freighter may still load if OFP already carries stationRoles.
     }
 
+    setOfpLoadProgress(mission.id, {
+      phase: 'planning',
+      message: 'Reading current fuel and payload…',
+    });
     const snap = await bridge.snapshot();
     beforeLive = {
-      tanks: await readLiveTanks(bridge, resolved.profile),
-      stations: await readLiveStations(bridge, resolved.profile),
+      tanks: await readLiveTanks(bridge, resolved.profile, {
+        readTimeoutMs: 2_500,
+      }),
+      stations: await readLiveStations(bridge, resolved.profile, 2_500),
       onGround: snap.onGround,
       enginesRunning: snap.enginesRunning,
     };
@@ -1195,12 +1241,7 @@ async function applyMissionOfpLoadExclusive(
       });
 
     const reconnectBridge = async (): Promise<void> => {
-      try {
-        await bridge.close({ disconnectHost: false });
-      } catch {
-        /* ignore */
-      }
-      await bridge.open('Skyline Career UI OFP Load');
+      await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
       engine = new DefaultProfileEngine({
         profile: resolved.profile,
         bridge,
@@ -1544,27 +1585,8 @@ async function applyMissionOfpLoadExclusive(
         'balancing',
         `Crew seeded — placing cargo +${CG_BALANCE_STEP_LB} lb per seat…`,
       );
-      await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
-      const seedLive = await readLiveStations(bridge, resolved.profile);
-      const seedLiveSum = sumRecord(seedLive);
-      const seedCollapsed =
-        seedLiveSum < 1 &&
-        seedTotal > 50 &&
-        Object.values(seedLive).every((v) => (v ?? 0) < 1);
-      if (!seedCollapsed) {
-        afterLive = {
-          tanks: afterLive.tanks,
-          stations: seedLive,
-        };
-      } else {
-        watchDebugLog('inject', 'crew seed live read collapsed — trusting write', {
-          seedTotal: Math.round(seedTotal),
-        });
-      }
-      publishLiveProgress(
-        'balancing',
-        `Crew seeded — placing cargo +${CG_BALANCE_STEP_LB} lb per seat…`,
-      );
+      // Trust the crew write. readLiveStations + CG PERCENT after fuel+crew
+      // were hanging reinject on "placing cargo +50 lb per seat…".
     }
 
     const fuelOk =
@@ -1572,15 +1594,23 @@ async function applyMissionOfpLoadExclusive(
     if (fuelOk) {
       for (let i = 0; i < CG_REBALANCE_MAX_ITERATIONS; i++) {
         assertOfpLoadNotCancelled(mission.id);
-        const liveCg = await readLiveCgState(bridge, {
-          readVar: resolved.profile.cg?.readVar,
-          readUnit: resolved.profile.cg?.readUnit,
-        });
-        const minMac =
-          liveCg.minMac ?? resolved.profile.cg?.constraints?.minMac;
-        const maxMac =
-          liveCg.maxMac ?? resolved.profile.cg?.constraints?.maxMac;
-        const liveMac = liveCg.liveMac;
+        const stillPlacing = cargoPlacedLb < cargoTargetLb - 0.5;
+        // v0.3.9: fill seats equally while cargo remains. Live CG reads every
+        // round (3 SimVars × 15s) froze reinject before the first +50 lb write.
+        let liveMac = lastLiveMac;
+        let minMac =
+          lastMinMac ?? resolved.profile.cg?.constraints?.minMac;
+        let maxMac =
+          lastMaxMac ?? resolved.profile.cg?.constraints?.maxMac;
+        if (!stillPlacing) {
+          const liveCg = await readLiveCgState(bridge, {
+            readVar: resolved.profile.cg?.readVar,
+            readUnit: resolved.profile.cg?.readUnit,
+          });
+          liveMac = liveCg.liveMac;
+          minMac = liveCg.minMac ?? minMac;
+          maxMac = liveCg.maxMac ?? maxMac;
+        }
         lastMinMac = minMac;
         lastMaxMac = maxMac;
 
@@ -1593,7 +1623,10 @@ async function applyMissionOfpLoadExclusive(
         const inEnvelope =
           haveEnvelope && liveMac! >= lo! && liveMac! <= hi!;
 
-        if (haveEnvelope) {
+        if (stillPlacing) {
+          bias = 'equal';
+          perSeatLb = CG_BALANCE_STEP_LB;
+        } else if (haveEnvelope) {
           bias = resolveCgCounterweightBias({
             liveMac: liveMac!,
             lo: lo!,
@@ -1619,7 +1652,6 @@ async function applyMissionOfpLoadExclusive(
         lastLiveMac = liveMac;
         prevLiveMac = liveMac;
 
-        const stillPlacing = cargoPlacedLb < cargoTargetLb - 0.5;
         if (!stillPlacing && (!haveEnvelope || inEnvelope)) {
           applyResult = {
             ...applyResult,
@@ -1695,11 +1727,18 @@ async function applyMissionOfpLoadExclusive(
           }
           placeBias =
             placeIndexes === baggageStations || !preferSeatFill ? bias : 'equal';
+          const holdMaxLoadLb = placeIndexes.reduce((max, idx) => {
+            const hard =
+              resolved.profile.payload.stations.find((s) => s.index === idx)
+                ?.maxLoad ?? 0;
+            return Math.max(max, hard);
+          }, 0);
           const stepLb = cargoPlaceStepLb({
             placingOnBaggage: placeIndexes === baggageStations,
             gaCabin: preferSeatFill,
             perSeatLb,
             remainingLb: cargoTargetLb - cargoPlacedLb,
+            holdMaxLoadLb,
           });
           let placed = allocateCargoRoundPerSeat(
             workingStations,
@@ -1712,32 +1751,11 @@ async function applyMissionOfpLoadExclusive(
           );
           // Forward/aft half can be full while other stations still have room —
           // fall back to equal so freighter cargo does not stall mid-cabin.
-          // Never dump the rest on the nose/tail when CG is already on that side.
           if (
             placed.movedLb <= 0 &&
             placeBias !== 'equal' &&
             (roomOnBaggage() || roomUnderSoftCap(seatStations))
           ) {
-            const mid =
-              lo !== undefined && hi !== undefined ? (lo + hi) / 2 : undefined;
-            const equalWouldWorsen =
-              haveEnvelope &&
-              liveMac !== undefined &&
-              mid !== undefined &&
-              ((placeBias === 'aft' && liveMac < mid) ||
-                (placeBias === 'forward' && liveMac > mid));
-            if (equalWouldWorsen) {
-              cargoTargetLb = cargoPlacedLb;
-              watchDebugLog('inject', 'bias half full — stop (equal would worsen CG)', {
-                round: i,
-                placeBias,
-                liveMac,
-                lo,
-                hi,
-                cargoPlacedLb: Math.round(cargoPlacedLb),
-              });
-              continue;
-            }
             watchDebugLog('inject', 'bias half full — fallback equal', {
               round: i,
               placeBias,
@@ -1995,12 +2013,16 @@ async function applyMissionOfpLoadExclusive(
             : `Round ${i + 1}: writing counterweight…`,
           { cgAttempt: i + 1, liveMac },
         );
-        await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
         applyResult = {
           ...applyResult,
           payload: payloadApply.payload ?? applyResult.payload,
           cg: payloadApply.cg ?? applyResult.cg,
         };
+        if (stillPlacing) {
+          // More cargo rounds to go — don't block on 16 station reads + CG.
+          continue;
+        }
+        await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
         const liveStations = await readLiveStations(bridge, resolved.profile);
         const liveSumRaw = sumRecord(liveStations);
         const workSum = sumRecord(workingStations);
@@ -2540,74 +2562,25 @@ async function applyMissionOfpLoadExclusive(
           : ' — restored previous payload (fuel left as-is)';
       }
     } else {
-      // Real acceptance: OFP compare (Caravan payload verify only checks station 1).
-      try {
-        setOfpLoadProgress(mission.id, {
-          phase: 'verifying',
-          message:
-            cgRebalanceMoves > 0
-              ? `Verifying load after ${cgRebalanceMoves} CG shift(s)…`
-              : 'Verifying injected load against OFP…',
-          cgAttempt: cgRebalanceMoves || undefined,
-          cgMaxAttempts: CG_REBALANCE_MAX_ITERATIONS,
-        });
-        const { snapshot } = await compareOnce(bridge, { ofp, locked: false });
-        compareVerdict = snapshot.verdict;
-        compareSummary = formatComplianceSummary(snapshot);
-        if (cgRebalanceMoves > 0) {
-          compareSummary =
-            `${compareSummary}\n  [info] CG_REBALANCE: shifted cargo ${cgRebalanceMoves} time(s) to fit envelope`;
-        }
-        if (softCgWarn && applyResult.cg?.failures[0]) {
-          const failure = applyResult.cg.failures[0];
-          compareSummary =
-            `${compareSummary}\n  [warn] CG_SOFT: live ${failure.actual.toFixed(1)}% MAC outside provisional envelope (apply kept)`;
-        }
-        if (snapshot.verdict === 'fail') {
-          // Do NOT rollback a successful station/fuel write because OFP semantics
-          // disagree (e.g. SimBrief "baggage" cargo sitting on GA cabin seats, or
-          // soft-cap/CG stopped short of OFP lbs). Career Loaded vs Due is the
-          // Depart gate — wiping the inject left Sim at 0 with Due still full.
-          compareSummary =
-            `${compareSummary}\n  [warn] OFP_COMPARE_SOFT: injected load kept — fix Loaded vs Due or re-inject before depart`;
-          if (compareVerdict === 'fail') {
-            compareVerdict = 'warn';
-          }
-        }
-      } catch (compareError) {
+      // Fuel/payload writes already succeeded (UI Sim=Due). compareOnce +
+      // runMissionPreflight open another pipe full of CG PERCENT / station
+      // reads — after a few reinjects SimConnect times out 15s each and the
+      // POST freezes on "Verifying load after N CG shift(s)…". Watch owns
+      // Loaded vs Due after HTTP returns.
+      compareVerdict = 'warn';
+      compareSummary =
+        cgRebalanceMoves > 0
+          ? `Inject applied after ${cgRebalanceMoves} CG shift(s) — Watch will confirm Loaded vs Due`
+          : 'Inject applied — Watch will confirm Loaded vs Due';
+      if (softCgWarn && applyResult.cg?.failures[0]) {
+        const failure = applyResult.cg.failures[0];
         compareSummary =
-          compareError instanceof Error ? compareError.message : String(compareError);
-        // Soft: apply succeeded; compare plumbing failed — still run optional preflight.
+          `${compareSummary}\n  [warn] CG_SOFT: live ${failure.actual.toFixed(1)}% MAC outside provisional envelope (apply kept)`;
       }
-    }
-
-    if (!error && opts.runPreflightAfter !== false) {
-      // Release only this pipe client; the host's SimConnect session is shared.
-      try {
-        await bridge.close({ disconnectHost: false });
-      } catch {
-        /* ignore */
-      }
-      // Let post-inject preflight take the exclusive gate.
-      releaseSimBridgeGateOnce();
-      try {
-        preflight = await runMissionPreflight(mission, {
-          username,
-          userid,
-          pipeName: opts.pipeName,
-          targetBlockFuelKg: clampedFuelTargetKg ?? opts.targetBlockFuelKg,
-          ballastLb: ballastPlacedLb,
-        });
-      } catch (preflightError) {
-        // Load already succeeded; surface preflight plumbing as soft failure note.
-        const msg =
-          preflightError instanceof Error
-            ? preflightError.message
-            : String(preflightError);
-        compareSummary = compareSummary
-          ? `${compareSummary} · Preflight follow-up failed: ${msg}`
-          : `Preflight follow-up failed: ${msg}`;
-      }
+      watchDebugLog('inject', 'skip sync verify/preflight', {
+        missionId: mission.id,
+        cgRebalanceMoves,
+      });
     }
 
     if (error) {

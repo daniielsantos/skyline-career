@@ -607,13 +607,14 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     assert.equal(cgRebalanceStepLb({ excessMac: 10, cargoLb: 5000 }), 50);
   });
 
-  it('fills freighter cargo holds faster than 50 lb/round', () => {
+  it('fills huge freighter holds faster; Caravan-style cargo stays gradual', () => {
     assert.equal(
       cargoPlaceStepLb({
         placingOnBaggage: true,
         gaCabin: false,
         perSeatLb: 50,
         remainingLb: 2500,
+        holdMaxLoadLb: 2500,
       }),
       400,
     );
@@ -622,7 +623,18 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
         placingOnBaggage: true,
         gaCabin: false,
         perSeatLb: 50,
+        remainingLb: 992,
+        holdMaxLoadLb: 500,
+      }),
+      50,
+    );
+    assert.equal(
+      cargoPlaceStepLb({
+        placingOnBaggage: true,
+        gaCabin: false,
+        perSeatLb: 50,
         remainingLb: 100,
+        holdMaxLoadLb: 2500,
       }),
       100,
     );
@@ -650,14 +662,14 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       resolveCgCounterweightBias({ liveMac: 27, lo: 25, hi: 30 }),
       'equal',
     );
-    // Inside envelope but already nose-ish → keep loading aft (C408 cabin).
+    // v0.3.9: inside envelope → equal (Caravan fills all stations together).
     assert.equal(
       resolveCgCounterweightBias({ liveMac: 16.4, lo: 8.5, hi: 30 }),
-      'aft',
+      'equal',
     );
     assert.equal(
       resolveCgCounterweightBias({ liveMac: 28, lo: 8.5, hi: 30 }),
-      'forward',
+      'equal',
     );
     // Still drifting aft past limit → stronger forward step.
     assert.equal(

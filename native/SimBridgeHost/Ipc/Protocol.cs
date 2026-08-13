@@ -170,3 +170,22 @@ public sealed class AirportRunwayDto
     [JsonPropertyName("surface")]
     public string? Surface { get; set; }
 }
+
+/// <summary>
+/// Honest SimConnect session health for IPC ping/status.
+/// <see cref="Connected"/> is false when the handle is open but recv has gone stale.
+/// </summary>
+public sealed class SimSessionHealthDto
+{
+    [JsonPropertyName("connected")]
+    public bool Connected { get; set; }
+
+    [JsonPropertyName("sessionHealthy")]
+    public bool SessionHealthy { get; set; }
+
+    [JsonPropertyName("lastRecvAgeMs")]
+    public int? LastRecvAgeMs { get; set; }
+
+    [JsonPropertyName("consecutiveTimeouts")]
+    public int ConsecutiveTimeouts { get; set; }
+}

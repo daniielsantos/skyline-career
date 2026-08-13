@@ -45,6 +45,25 @@ export function resolveLivePayloadLb(opts: {
       ? Math.max(0, opts.previousStationSumLb)
       : undefined;
 
+  // Classic stations moved vs last good sample → user edited EFB/tablet.
+  // 15 lb (not the 75 lb READY tol) so the 2nd/3rd cargo step still counts.
+  // Exception: Accu-Sim/tablet dumped real mass while PAYLOAD STATION WEIGHT
+  // barely twitched — trust gross−empty−fuel, not the ghost station sum.
+  if (
+    station !== undefined &&
+    prevStations !== undefined &&
+    Math.abs(station - prevStations) >= 15
+  ) {
+    if (
+      mb !== undefined &&
+      station > mb * 2 + 200 &&
+      station - mb > 400
+    ) {
+      return { payloadLb: mb, source: 'mass-balance' };
+    }
+    return { payloadLb: station, source: 'stations' };
+  }
+
   if (
     mb !== undefined &&
     mb >= 50 &&
@@ -58,6 +77,11 @@ export function resolveLivePayloadLb(opts: {
       prevStations !== undefined &&
       prevStations > 200
     ) {
+      return { payloadLb: station, source: 'stations' };
+    }
+    // Already tracking classic stations (post-inject). A lagging TOTAL WEIGHT
+    // must not revert the first EFB edit on the next Watch tick.
+    if (station !== undefined && prevStations !== undefined) {
       return { payloadLb: station, source: 'stations' };
     }
     return { payloadLb: mb, source: 'mass-balance' };
@@ -344,6 +368,20 @@ export function pickStableLiveFuelLb(opts: {
   // Density flicker: live weight scales by avgas/Jet-A when gallons are unchanged.
   const densityRatio = DEFAULT_AVGAS_LB_PER_GAL / DEFAULT_JET_A_LB_PER_GAL;
   if (Math.abs(next - prev * densityRatio) <= Math.max(15, tol * 0.4)) {
+    const nextSum = opts.nextTanks
+      ? fuelTankBreakdownSum(opts.nextTanks)
+      : undefined;
+    const prevSum = opts.prevTanks
+      ? fuelTankBreakdownSum(opts.prevTanks)
+      : undefined;
+    // Tanks dropped with the total → real EFB/M&B drain, not a density blip.
+    if (
+      nextSum !== undefined &&
+      prevSum !== undefined &&
+      Math.abs(prevSum - nextSum) >= 15
+    ) {
+      return liveFuelLbCoherentWithTanks(next, opts.nextTanks);
+    }
     return liveFuelLbCoherentWithTanks(prev, opts.prevTanks);
   }
 
@@ -446,6 +484,45 @@ export function loadVerificationDrifted(
     Math.abs((prev.payload.liveLb ?? 0) - (next.payload.liveLb ?? 0)) >= minDeltaLb
   ) {
     return true;
+  }
+  return false;
+}
+
+/**
+ * True when a new station map looks like a truncated IPC pass (timeouts
+ * mid-loop) rather than a real EFB unload. UI paints missing keys as 0, so
+ * persisting {1:170,2:170} after a 16-station inject wipes S3+.
+ */
+export function stationSampleIncomplete(
+  prev: Record<number, number> | undefined | null,
+  next: Record<number, number> | undefined | null,
+): boolean {
+  if (!next) return true;
+  if (!prev) return false;
+  const prevKeys = Object.keys(prev).length;
+  const nextKeys = Object.keys(next).length;
+  if (prevKeys >= 8 && nextKeys > 0 && nextKeys < 8) return true;
+  if (prevKeys >= 12 && nextKeys <= prevKeys - 6) return true;
+  return false;
+}
+
+/** True when classic station weights moved enough to persist / paint. */
+export function stationWeightsDrifted(
+  prev: Record<number, number> | undefined | null,
+  next: Record<number, number> | undefined | null,
+  minDeltaLb = 5,
+): boolean {
+  if (!next) return false;
+  if (stationSampleIncomplete(prev, next)) return false;
+  if (!prev) return true;
+  const keys = new Set([
+    ...Object.keys(prev).map(Number),
+    ...Object.keys(next).map(Number),
+  ]);
+  for (const key of keys) {
+    if (Math.abs((prev[key] ?? 0) - (next[key] ?? 0)) >= minDeltaLb) {
+      return true;
+    }
   }
   return false;
 }

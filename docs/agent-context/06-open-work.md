@@ -10,7 +10,7 @@ Atualizado 2026-08-13: fill híbrido + inject batch prontos para release.
 - [ ] Cruise sample 180s: VS 400 fpm / TAS 10% / flow 20% / alt 1200 ft — não zerar em bump mínimo
 - [ ] Watch: TIMEOUT não fica em loop com pipe “up”; após backoff, sample volta
 - [ ] Reinject no solo após editar EFB: matching profile → fuel/cargo sem freeze em “Reading live aircraft…”
-- [ ] Híbrido (Bonanza OK no local): Caravan equal espalhado; Due completo no envelope
+- [ ] Caravan: leftover do Due divide L/R da fileira (não 192 num assento e 100 no outro)
 - [ ] Install &lt; 0.3.17: warning atual; Node não piora sem `sessionHealthy`
 - [ ] Host antigo sem `readSimVars`: fallback sequential ainda throw no 1º TIMEOUT
 - [ ] Idle no solo + editar EFB: schematic **não** colapsa para só Crew (S1/S2)

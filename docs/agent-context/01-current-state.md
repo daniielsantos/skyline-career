@@ -40,8 +40,8 @@
 - **Reinject freeze em "placing cargo +50":** round lia CG + 16 stations
   sequenciais antes do 1º write. Fill continua equal +50 (sem 16 station
   reads). CG é **um** `readSimVars` batch por round. Fill híbrido:
-  equal enquanto MAC ≤ meio do envelope (Caravan); aft do meio → resto
-  no nariz; no limite → shift e **continua o Due**.
+  equal primeiro em todas as stations (Kodiak/Caravan); no limite →
+  shift e **continua o Due**; leftover no lado que ajuda.
 - **Reinject freeze em "Reading live aircraft…":** fingerprint probe 8×
   FUELSYSTEM 15s + Watch tick ainda vivo. Inject resolve por título local;
   stop 25s + abort do sample.
@@ -67,8 +67,8 @@
   1º TIMEOUT marca `pendingSimConnectReset`. Host velho (`UNSUPPORTED`) cai
   em sequential e ainda throw no 1º TIMEOUT.
 - **Inject/preflight batch + fill híbrido:** tanks/stations/CG em `readSimVars`.
-  Fill equal enquanto MAC ≤ meio do envelope (Caravan); aft do meio → resto
-  no nariz; no limite → shift e continua o Due. Pack recusa Host stale.
+  Fill equal primeiro em todas as stations; no limite → shift e continua
+  o Due. Pack recusa Host stale.
 
 ## O que validar após 0.3.22
 

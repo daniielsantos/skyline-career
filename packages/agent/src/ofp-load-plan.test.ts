@@ -528,6 +528,95 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     assert.equal(skewed[7], 80);
   });
 
+  it('pairs Caravan staggered cabin rows and splits leftover across the row', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 3, name: 'PASSENGER 03', maxLoad: 500, arm: -11.95 },
+          { index: 4, name: 'PASSENGER 04', maxLoad: 500, arm: -13.22 },
+          { index: 5, name: 'PASSENGER 05', maxLoad: 500, arm: -14.63 },
+          { index: 6, name: 'PASSENGER 06', maxLoad: 500, arm: -15.93 },
+          { index: 7, name: 'PASSENGER 07', maxLoad: 500, arm: -17.35 },
+          { index: 8, name: 'PASSENGER 08', maxLoad: 500, arm: -18.53 },
+          { index: 9, name: 'PASSENGER 09', maxLoad: 500, arm: -19.92 },
+          { index: 10, name: 'PASSENGER 10', maxLoad: 500, arm: -21.2 },
+          { index: 11, name: 'CARGO CABIN', maxLoad: 500, arm: -26 },
+          { index: 12, name: 'CARGO POD 1', maxLoad: 500, arm: -8.32 },
+          { index: 13, name: 'CARGO POD 2', maxLoad: 500, arm: -12.63 },
+        ],
+      },
+    } as AircraftProfile;
+    const cabin = [3, 4, 5, 6, 7, 8, 9, 10, 11];
+    const groups = findLateralStationGroups(profile, cabin);
+    assert.deepEqual(groups, [
+      [3, 4],
+      [5, 6],
+      [7, 8],
+      [9, 10],
+    ]);
+    const pods = findLateralStationGroups(profile, [12, 13]);
+    assert.deepEqual(pods, []);
+
+    const start = Object.fromEntries(cabin.map((i) => [i, 100]));
+    const placed = allocateCargoRoundPerSeat(
+      start,
+      profile,
+      cabin,
+      50,
+      'equal',
+      92,
+    );
+    assert.equal(placed.movedLb, 92);
+    assert.ok(Math.abs((placed.stations[3] ?? 0) - (placed.stations[4] ?? 0)) <= 1);
+    assert.equal((placed.stations[3] ?? 0) + (placed.stations[4] ?? 0), 292);
+    assert.equal(placed.stations[5], 100);
+  });
+
+  it('pairs cabin rows by consecutive index when stations have no arm', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 3, name: 'PASSENGER 03', maxLoad: 500 },
+          { index: 4, name: 'PASSENGER 04', maxLoad: 500 },
+          { index: 5, name: 'PASSENGER 05', maxLoad: 500 },
+          { index: 6, name: 'PASSENGER 06', maxLoad: 500 },
+          { index: 7, name: 'PASSENGER 07', maxLoad: 500 },
+          { index: 11, name: 'CARGO CABIN', maxLoad: 500 },
+          { index: 12, name: 'CARGO POD 1', maxLoad: 500 },
+          { index: 13, name: 'CARGO POD 2', maxLoad: 500 },
+        ],
+      },
+    } as AircraftProfile;
+    assert.deepEqual(findLateralStationGroups(profile, [3, 4, 5, 6, 7, 11]), [
+      [3, 4],
+      [5, 6],
+    ]);
+    assert.deepEqual(findLateralStationGroups(profile, [12, 13]), []);
+
+    const named = {
+      payload: {
+        stations: [
+          { index: 3, name: 'PAX LEFT', maxLoad: 500 },
+          { index: 4, name: 'PAX RIGHT', maxLoad: 500 },
+          { index: 5, name: 'BAGGAGE', maxLoad: 500 },
+        ],
+      },
+    } as AircraftProfile;
+    assert.deepEqual(findLateralStationGroups(named, [3, 4, 5]), [[3, 4]]);
+
+    const placed = allocateCargoRoundPerSeat(
+      { 3: 100, 4: 100, 5: 100, 6: 100, 7: 100 },
+      profile,
+      [3, 4, 5, 6, 7],
+      50,
+      'equal',
+      92,
+    );
+    assert.equal(placed.movedLb, 92);
+    assert.ok(Math.abs((placed.stations[3] ?? 0) - (placed.stations[4] ?? 0)) <= 1);
+    assert.equal((placed.stations[3] ?? 0) + (placed.stations[4] ?? 0), 292);
+  });
+
   it('does not drain right→left at the same arm when shifting CG forward', () => {
     // Bonanza-like: L/R pairs share arm; index order alone would treat R as "aft".
     const profile = {
@@ -653,11 +742,15 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     );
   });
 
-  it('hybrid fill: equal while calm, nose when aft of mid, shift at limits', () => {
-    // Bonanza effective 12–31: 28% is aft of mid → remaining on the nose.
+  it('hybrid fill: equal first, nose only after aft limit, shift at limits', () => {
+    // Kodiak empty CG ~31 of 15–39: still inside → spread all stations.
+    assert.equal(
+      resolveCgFillAction({ liveMac: 31, lo: 15, hi: 39 }),
+      'equal',
+    );
     assert.equal(
       resolveCgFillAction({ liveMac: 28, lo: 12, hi: 31 }),
-      'forward',
+      'equal',
     );
     assert.equal(
       resolveCgFillAction({ liveMac: 35.7, lo: 12, hi: 31 }),
@@ -667,18 +760,18 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
       resolveCgFillAction({ liveMac: 11, lo: 12, hi: 31 }),
       'shift-aft',
     );
-    // Caravan 16.4 of 8.5–30 is forward of mid → equal (all stations).
     assert.equal(
       resolveCgFillAction({ liveMac: 16.4, lo: 8.5, hi: 30 }),
       'equal',
     );
+    // After the aft limit fired, leftover stays on the nose.
     assert.equal(
-      resolveCgFillAction({ liveMac: 21, lo: 12, hi: 31 }),
-      'equal',
+      resolveCgFillAction({ liveMac: 28, lo: 12, hi: 31, aftLimited: true }),
+      'forward',
     );
     assert.equal(
       resolveCgFillBias({ liveMac: 28, lo: 12, hi: 31 }),
-      'forward',
+      'equal',
     );
   });
 

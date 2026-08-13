@@ -50,9 +50,11 @@ and `sampleLiveLoadLb` aborts mid-loop when stop starts.
 Reinject then froze on **Crew seeded — placing cargo +50 lb per seat…**:
 each cargo round started with sequential CG + 16 stations (15s IPC).
 CG is one `readSimVars` batch **during** fill. Hybrid:
-equal while MAC is forward of envelope midpoint (Caravan);
-aft of mid → remaining on the nose; at a limit → shift and
-**keep the Due**. Never “toward center” (v0.3.10 C408).
+**equal first** across all cargo stations (Kodiak / Caravan), even if
+empty CG is already aft of midpoint. At a limit → shift and
+**keep the Due**; leftover then stays on the helping side. Lateral: same arm, staggered cabin (~1.3 ft),
+LEFT/RIGHT names, or consecutive indexes when there is no arm
+(skips cargo pods/holds). Never “toward center” (v0.3.10 C408).
 
 ## Verify hang after reinject
 

@@ -777,10 +777,10 @@ export function resolveCgCounterweightBias(opts: {
 
 /**
  * Hybrid cargo fill (not post-fill counterweight, not C408 toward-center):
- * - MAC at/past aft limit → shift forward, keep Due
- * - MAC at/past forward limit → shift aft, keep Due
- * - Aft of envelope midpoint (still inside) → remaining cargo on the nose
- * - Forward of / at midpoint → equal across all cargo stations (Caravan)
+ * Spread equally across all cargo stations first (Kodiak / Caravan), even when
+ * empty CG already sits aft of envelope midpoint. Only leave equal when the
+ * live MAC is at a limit (shift, keep Due) or after that limit fired
+ * (`aftLimited` / `fwdLimited`) so leftover cargo stays on the helping side.
  */
 export type CgFillAction = 'equal' | 'forward' | 'shift-forward' | 'shift-aft';
 
@@ -788,12 +788,16 @@ export function resolveCgFillAction(opts: {
   liveMac: number;
   lo: number;
   hi: number;
+  aftLimited?: boolean;
+  fwdLimited?: boolean;
 }): CgFillAction {
   const { liveMac, lo, hi } = opts;
   if (!(hi > lo)) return 'equal';
   if (liveMac >= hi) return 'shift-forward';
   if (liveMac <= lo) return 'shift-aft';
-  return liveMac > (lo + hi) / 2 ? 'forward' : 'equal';
+  if (opts.aftLimited) return 'forward';
+  if (opts.fwdLimited) return 'equal';
+  return 'equal';
 }
 
 /** @deprecated Prefer resolveCgFillAction — maps shift-forward/forward → forward. */
@@ -1017,10 +1021,33 @@ function stationSideFromName(name: string | undefined): 'left' | 'right' | null 
   return null;
 }
 
+function stationHasArm(
+  station: { arm?: number },
+): station is { arm: number } {
+  return typeof station.arm === 'number' && Number.isFinite(station.arm);
+}
+
+/** Belly pods / aft holds — do not treat as a cabin L/R row. */
+function looksLikeCenterlineHold(name: string | undefined): boolean {
+  const n = String(name ?? '').toUpperCase();
+  if (/\b(PASSENGER|PAX|SEAT|PILOT|COPILOT)\b/.test(n)) return false;
+  return /\b(CARGO|POD|HOLD|BAGGAGE|BELLY|ZONE)\b/.test(n);
+}
+
 /**
- * Group movable stations that share a longitudinal arm (L/R seat pairs) or
- * left/right names when arms are missing. Equalizing within a group keeps CG
- * (same arm) while fixing lateral imbalance.
+ * Caravan cabin L/R seats are staggered in cfg (~1.2–1.4 ft), not the same
+ * arm. Pair consecutive unmatched stations within this delta so leftover
+ * cargo splits across the row instead of piling on the forward-most seat.
+ * Cargo pods / next row are farther apart and stay unpaired.
+ */
+export const LATERAL_PAIR_MAX_ARM_DELTA_FT = 2;
+
+/**
+ * Group movable stations into L/R rows:
+ * 1. Same longitudinal arm (Bonanza)
+ * 2. Nearby arms (Caravan staggered cabin)
+ * 3. LEFT/RIGHT (or pilot/copilot) in the station name
+ * 4. Consecutive indexes when there is no arm (S3+S4, S5+S6…) — skips pods/holds
  */
 export function findLateralStationGroups(
   profile: AircraftProfile,
@@ -1031,38 +1058,70 @@ export function findLateralStationGroups(
     .filter((s): s is NonNullable<typeof s> => Boolean(s));
   if (stations.length < 2) return [];
 
-  const usedArms = stations.every(
-    (s) => typeof s.arm === 'number' && Number.isFinite(s.arm),
-  );
-  if (usedArms) {
+  const pairs: number[][] = [];
+  const paired = new Set<number>();
+  const addPair = (a: number, b: number) => {
+    if (a === b || paired.has(a) || paired.has(b)) return;
+    pairs.push([a, b].sort((x, y) => x - y));
+    paired.add(a);
+    paired.add(b);
+  };
+
+  const withArm = stations.filter(stationHasArm);
+  if (withArm.length >= 2) {
     const byArm = new Map<string, number[]>();
-    for (const s of stations) {
-      const key = (Math.round((s.arm as number) * 100) / 100).toFixed(2);
+    for (const s of withArm) {
+      const key = (Math.round(s.arm * 100) / 100).toFixed(2);
       const list = byArm.get(key) ?? [];
       list.push(s.index);
       byArm.set(key, list);
     }
-    // Only true L/R pairs (exactly two stations at the same arm). Larger
-    // same-arm clusters are left alone so CG shifts are not undone.
-    return [...byArm.values()]
-      .map((g) => [...g].sort((a, b) => a - b))
-      .filter((g) => g.length === 2);
+    for (const group of byArm.values()) {
+      if (group.length === 2) addPair(group[0]!, group[1]!);
+    }
+    const leftoverArm = withArm
+      .filter((s) => !paired.has(s.index))
+      .sort((a, b) => b.arm - a.arm);
+    for (let i = 0; i < leftoverArm.length - 1; ) {
+      const a = leftoverArm[i]!;
+      const b = leftoverArm[i + 1]!;
+      const delta = Math.abs(a.arm - b.arm);
+      if (delta > 0.05 && delta <= LATERAL_PAIR_MAX_ARM_DELTA_FT) {
+        addPair(a.index, b.index);
+        i += 2;
+        continue;
+      }
+      i += 1;
+    }
   }
 
   const lefts: number[] = [];
   const rights: number[] = [];
   for (const s of stations) {
+    if (paired.has(s.index)) continue;
     const side = stationSideFromName(s.name);
     if (side === 'left') lefts.push(s.index);
     else if (side === 'right') rights.push(s.index);
   }
   lefts.sort((a, b) => a - b);
   rights.sort((a, b) => a - b);
-  const pairs: number[][] = [];
-  const n = Math.min(lefts.length, rights.length);
-  for (let i = 0; i < n; i++) {
-    pairs.push([lefts[i]!, rights[i]!].sort((a, b) => a - b));
+  const named = Math.min(lefts.length, rights.length);
+  for (let i = 0; i < named; i++) addPair(lefts[i]!, rights[i]!);
+
+  const consecutive = stations
+    .filter((s) => !paired.has(s.index) && !looksLikeCenterlineHold(s.name))
+    .sort((a, b) => a.index - b.index);
+  for (let i = 0; i < consecutive.length - 1; ) {
+    const a = consecutive[i]!;
+    const b = consecutive[i + 1]!;
+    if (b.index === a.index + 1) {
+      addPair(a.index, b.index);
+      i += 2;
+      continue;
+    }
+    i += 1;
   }
+
   return pairs;
 }
 

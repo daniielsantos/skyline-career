@@ -1300,6 +1300,8 @@ async function applyMissionOfpLoadExclusive(
     let prevLiveMac: number | undefined;
     let lastMinMac: number | undefined;
     let lastMaxMac: number | undefined;
+    let aftLimited = false;
+    let fwdLimited = false;
     let perSeatLb = CG_BALANCE_STEP_LB;
 
     const roomUnderSoftCap = (indexes: number[]): boolean =>
@@ -1679,9 +1681,9 @@ async function applyMissionOfpLoadExclusive(
       for (let i = 0; i < CG_REBALANCE_MAX_ITERATIONS; i++) {
         assertOfpLoadNotCancelled(mission.id);
         const stillPlacing = cargoPlacedLb < cargoTargetLb - 0.5;
-        // Hybrid fill: equal while MAC is forward of envelope midpoint
-        // (Caravan). Aft of mid → remaining on the nose. At a limit → shift
-        // and keep Due. Never toward-center (v0.3.10 C408).
+        // Hybrid fill: equal across all cargo stations first (Kodiak /
+        // Caravan). At a limit → shift and keep Due; leftover then stays
+        // on the helping side. Never toward-center (v0.3.10 C408).
         let liveMac = lastLiveMac;
         let minMac =
           lastMinMac ?? resolved.profile.cg?.constraints?.minMac;
@@ -1711,8 +1713,16 @@ async function applyMissionOfpLoadExclusive(
           haveEnvelope && liveMac! >= lo! && liveMac! <= hi!;
 
         const fillAction = haveEnvelope
-          ? resolveCgFillAction({ liveMac: liveMac!, lo: lo!, hi: hi! })
+          ? resolveCgFillAction({
+              liveMac: liveMac!,
+              lo: lo!,
+              hi: hi!,
+              aftLimited,
+              fwdLimited,
+            })
           : 'equal';
+        if (fillAction === 'shift-forward') aftLimited = true;
+        if (fillAction === 'shift-aft') fwdLimited = true;
         if (stillPlacing) {
           bias =
             fillAction === 'shift-aft'
@@ -1786,7 +1796,7 @@ async function applyMissionOfpLoadExclusive(
             softMax = seatSoftMaxByIndex;
           } else if (roomOnBaggage()) {
             if (!preferSeatFill && fillAction === 'forward') {
-              // CG already aft of mid: remaining Due on the nose, not S7.
+              // Aft limit already fired: leftover Due on the nose, not S7.
               const helping = longitudinalHalfIndexes(
                 resolved.profile,
                 baggageStations,
@@ -2413,14 +2423,14 @@ async function applyMissionOfpLoadExclusive(
       // One cargo hold (C408 passenger S5): 50 lb/round hit the iteration cap
       // at 1200 lb. Finish remaining onto baggage while CG is still inside.
       const catchUpRemaining = cargoTargetLb - cargoPlacedLb;
-      const catchUpMid =
-        lastMinMac !== undefined && lastMaxMac !== undefined
-          ? (lastMinMac + lastMaxMac) / 2
+      const catchUpHi =
+        lastMaxMac !== undefined
+          ? lastMaxMac - CG_REBALANCE_MARGIN_MAC
           : undefined;
       const catchUpAftOk =
         lastLiveMac === undefined ||
-        catchUpMid === undefined ||
-        lastLiveMac < catchUpMid;
+        catchUpHi === undefined ||
+        lastLiveMac < catchUpHi;
       if (
         catchUpRemaining > 0.5 &&
         !preferSeatFill &&

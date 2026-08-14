@@ -4,7 +4,9 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.28** (latest) | [v0.3.28](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.28) | light_ga `manualpayload`; Accept OFP em contract-pilot |
+| **0.3.30** (latest) | [v0.3.30](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.30) | Freights: Load=lot total; Pay/Net primary sort; mercado aberto com frota |
+| **0.3.29** | [v0.3.29](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.29) | Aerostar inject UI; BN2 Market; cargo ceilings |
+| **0.3.28** | [v0.3.28](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.28) | light_ga `manualpayload`; Accept OFP em contract-pilot |
 | **0.3.27** | [v0.3.27](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.27) | Origin gate + Accu-Sim CTRL+E notes |
 | 0.3.24 | [v0.3.24](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.24) | Hybrid fill: equal first, then shift; leftover L/R |
 | 0.3.23 | [v0.3.23](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.23) | Inject/preflight `readSimVars` + pack hard-fail |

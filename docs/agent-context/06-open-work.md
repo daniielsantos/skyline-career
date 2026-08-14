@@ -32,9 +32,6 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 ## Feito (local, sem release)
 
-- **Board Load:** coluna mostra **lot total** (`quantityKg`); claim/open só no tooltip (não capar em ~1.0 klb GA).
-- **Freights sort:** clique em Pay/Net/Load (etc.) vira sort **primário** (não Access#1 + Idle#2); Access só tiebreak. Default sem clique ainda Access + idle-escalated.
-- **Market size-hide Class Ops:** só hangar vazio (starter). Com frota + Gross pay → mercado aberto; Viable/estimate quando há avião no dropdown.
 - **Max cargo (missão):** online → SimBrief (`mzfw−oew` estrutural; `maxcargo` só se ≥½ estrutural / freighter). Catálogo JSON = fallback offline/API down (não short-circuit). Prefill light_ga ainda `manualpayload`.
 - **Accept OFP cargo** também em **contract-pilot** (ex.: Blue Ridge + BN2): botão + CTA primário; trim escala pilot fee / gross.
 - **BN2 Market:** um SKU `blackbox-bn2-islander-cargo-tip-tanks` (Cargo Tip Tanks + SpecialOps family).

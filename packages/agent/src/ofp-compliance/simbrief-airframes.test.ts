@@ -299,4 +299,40 @@ describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
     assert.equal(source, 'mzfw-oew');
     assert.equal(maxCargoKg, 91958);
   });
+
+  it('ignores tiny GA maxcargo freight soft-cap and uses mzfw-oew', async () => {
+    const { maxCargoKg, source } = await resolveSimBriefMaxCargoKg({
+      simbriefIcao: 'BN2P',
+      simbriefAirframeMatch: 'Default',
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            BN2P: {
+              airframes: [
+                {
+                  airframe_internal_id: 'bn2p_default',
+                  airframe_list_type: 'BN2P',
+                  airframe_icao: 'BN2P',
+                  airframe_comments: 'Default',
+                  airframe_name: 'BN-2 Islander',
+                  airframe_passengers: 9,
+                  airframe_options: {
+                    wgtunits: 'LBS',
+                    maxcargo: 400,
+                    oew: 4114,
+                    mzfw: 6300,
+                    mtow: 6600,
+                    maxfuel: 390,
+                  },
+                },
+              ],
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+    assert.equal(source, 'mzfw-oew');
+    // 6300 − 4114 = 2186 lb → kg
+    assert.equal(maxCargoKg, Math.round(2186 / 2.2046226218));
+  });
 });

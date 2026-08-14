@@ -1001,6 +1001,19 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(isOfpCargoUnderOnlyFailure(check), true);
   });
 
+  it('reads freighter load from payload when baggage is a low freight soft-cap', () => {
+    const ofp = matchingOfp({
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 473,
+        passengerCount: 0,
+        baggage: 400,
+        payload: 783,
+      },
+    });
+    assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 783);
+  });
+
   it('does not treat airframe mismatch as cargo-under-only', () => {
     const check = compareMissionIntentToOfp(
       baseMission({
@@ -1166,6 +1179,44 @@ describe('trimMissionCargoToKg', () => {
     assert.equal(
       (world.inboundPending ?? []).find((p) => p.missionId === mission.id)?.cargoKg,
       1_500,
+    );
+  });
+
+  it('trims contract-pilot cargo and scales the pilot fee', () => {
+    const world = createSeedEconomyWorld({ seed: 'trim-cp' });
+    world.lots = [];
+    world.inboundPending = [];
+    const lot = pushTestLot(world, {
+      id: 'lot_trim_cp',
+      originIcao: 'KLAX',
+      destIcao: 'KSNA',
+      commodityId: 'general',
+      quantityKg: 400,
+      payUsd: 1_000,
+    });
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 355,
+      aircraftClassId: 'light_ga',
+      missionId: 'msn_trim_cp',
+      maxCargoKg: 400,
+    });
+    mission.status = 'dispatched';
+    mission.contractPilot = true;
+    mission.contractPilotFeeUsd = mission.payUsd;
+    mission.contractGrossPayUsd = 1_000;
+    mission.operatorNpcName = 'Blue Ridge Freight';
+    const payBefore = mission.payUsd;
+
+    const trimmed = trimMissionCargoToKg(world, mission, 181);
+    assert.equal(trimmed.mission.cargoKg, 181);
+    assert.equal(trimmed.releasedKg, 174);
+    assert.equal(lot.reservedKg, 181);
+    assert.ok(trimmed.payAfterUsd < payBefore);
+    assert.equal(trimmed.mission.contractPilotFeeUsd, trimmed.mission.payUsd);
+    assert.ok(
+      (trimmed.mission.contractGrossPayUsd ?? 0) < 1_000 &&
+        (trimmed.mission.contractGrossPayUsd ?? 0) >= 1,
     );
   });
 });

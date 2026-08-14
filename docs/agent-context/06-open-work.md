@@ -31,6 +31,8 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 ## Feito (local, sem release)
 
+- **Accept OFP cargo** também em **contract-pilot** (ex.: Blue Ridge + BN2 maxcargo 400): botão + CTA primário; trim escala pilot fee / gross.
+- **BN2 / light_ga SimBrief:** Dispatch preenche `manualpayload` (não `cargo`/Freight); capacity ignora maxcargo freight-only quando &lt; ½ de mzfw−oew (400 vs ~2186 lb).
 - Defs SimConnect reusadas para batches Watch/inject idênticos (cache no Host).
 - Watch backoff 8s→15s em queda do MSFS; UI `Simulator closed — retry in Ns`.
 - A2A Accu-Sim: liveSource `a2a-lvars` (PayloadWeight / Fuel* / Character*) no pack Aerostar/Comanche. Sem `if (a2a)` no fill.

@@ -4521,12 +4521,6 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        if (probeMission.contractPilot) {
-          send(res, 400, {
-            error: 'Cannot trim cargo on a contract-pilot flight',
-          });
-          return;
-        }
         if (!probeMission.staticId) {
           send(res, 400, {
             error: 'Mission has no static_id — Dispatch and generate an OFP first',
@@ -4574,9 +4568,6 @@ export function createCareerApiServer(port = 8787) {
               throw new Error(
                 `Mission ${mission.id} cannot accept OFP cargo (status=${mission.status})`,
               );
-            }
-            if (mission.contractPilot) {
-              throw new Error('Cannot trim cargo on a contract-pilot flight');
             }
             const trimmed = trimMissionCargoToKg(world, mission, ofpCargoKg);
             Object.assign(mission, trimmed.mission);

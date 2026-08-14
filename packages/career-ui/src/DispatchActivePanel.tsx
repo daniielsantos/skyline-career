@@ -237,6 +237,13 @@ export function DispatchActivePanel(props: {
     Boolean(mission.lastPreflightCheck) &&
     (step === 'load' || step === 'ready' || step === 'en_route');
 
+  const ofpCargoUnderOnly =
+    isOfpCargoUnderOnlyFailureUi(mission.lastOfpCheck) &&
+    Boolean(props.onAcceptOfpCargo);
+  const ofpAcceptCargoKg = ofpCargoUnderOnly
+    ? ofpCargoKgFromUnderFinding(mission.lastOfpCheck)
+    : undefined;
+
   const primaryCta = (() => {
     if (step === 'flight_plan') {
       if (!simbriefUser.trim()) {
@@ -249,6 +256,33 @@ export function DispatchActivePanel(props: {
           >
             Set SimBrief user
           </button>
+        );
+      }
+      if (ofpCargoUnderOnly) {
+        return (
+          <>
+            <button
+              type="button"
+              className="accept"
+              disabled={busy}
+              onClick={() => props.onAcceptOfpCargo?.(mission)}
+              title="Trim mission cargo and pay to match the SimBrief OFP"
+            >
+              Accept OFP cargo
+              {ofpAcceptCargoKg
+                ? ` (${formatMassExact(ofpAcceptCargoKg, weightSystem)})`
+                : ''}
+            </button>
+            <button
+              type="button"
+              className="action"
+              disabled={busy}
+              onClick={() => props.onDispatch(mission)}
+              title="Open SimBrief with the current cargo"
+            >
+              {mission.status === 'accepted' ? 'Open SimBrief' : 'Re-open SimBrief'}
+            </button>
+          </>
         );
       }
       return (
@@ -510,6 +544,31 @@ export function DispatchActivePanel(props: {
                     Checked {new Date(check.checkedAtIso).toLocaleTimeString()}
                   </span>
                 </div>
+                {check.verdict === 'fail' &&
+                isOfpCargoUnderOnlyFailureUi(check) &&
+                props.onAcceptOfpCargo ? (
+                  <div className="ofp-accept-cargo">
+                    <p>
+                      SimBrief limited payload for this leg — leftover returns to
+                      the board and{' '}
+                      {mission.contractPilot ? 'pilot fee' : 'pay'} is reduced.
+                    </p>
+                    <button
+                      type="button"
+                      className="action"
+                      disabled={busy}
+                      onClick={() => props.onAcceptOfpCargo?.(mission)}
+                    >
+                      Accept OFP cargo
+                      {(() => {
+                        const kg = ofpCargoKgFromUnderFinding(check);
+                        return kg
+                          ? ` (${formatMassExact(kg, weightSystem)})`
+                          : '';
+                      })()}
+                    </button>
+                  </div>
+                ) : null}
                 {briefingItems.length > 0 ? (
                   <dl className="ofp-briefing-grid">
                     {briefingItems.map(([label, value]) => (
@@ -529,7 +588,7 @@ export function DispatchActivePanel(props: {
                   <p>Re-check SimBrief to load the operational route.</p>
                 )}
                 {actionableFindings.length > 0 ? (
-                  <details className="preflight-technical">
+                  <details className="preflight-technical" open={ofpCargoUnderOnly}>
                     <summary>
                       {actionableFindings.length}{' '}
                       {actionableFindings.length === 1 ? 'OFP detail' : 'OFP details'}
@@ -546,31 +605,6 @@ export function DispatchActivePanel(props: {
                       ))}
                     </ul>
                   </details>
-                ) : null}
-                {check.verdict === 'fail' &&
-                isOfpCargoUnderOnlyFailureUi(check) &&
-                props.onAcceptOfpCargo &&
-                !mission.contractPilot ? (
-                  <div className="ofp-accept-cargo">
-                    <p>
-                      SimBrief limited payload for this leg — leftover returns to
-                      the board and pay is reduced.
-                    </p>
-                    <button
-                      type="button"
-                      className="action"
-                      disabled={busy}
-                      onClick={() => props.onAcceptOfpCargo?.(mission)}
-                    >
-                      Accept OFP cargo
-                      {(() => {
-                        const kg = ofpCargoKgFromUnderFinding(check);
-                        return kg
-                          ? ` (${formatMassExact(kg, weightSystem)})`
-                          : '';
-                      })()}
-                    </button>
-                  </div>
                 ) : null}
               </section>
             );

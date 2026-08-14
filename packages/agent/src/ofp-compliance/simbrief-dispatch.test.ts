@@ -57,6 +57,22 @@ describe('buildDispatchRedirectUrl', () => {
     assert.equal(qs.get('static_id'), 'skyline_test_1');
   });
 
+  it('can prefill manualpayload without cargo for GA payload airframes', () => {
+    const url = buildDispatchRedirectUrl({
+      type: 'BN2P',
+      orig: 'KSJC',
+      dest: 'KMPI',
+      pax: 0,
+      manualPayload: 0.783,
+      units: 'LBS',
+      staticId: 'career_bn2_1',
+    });
+    const qs = new URL(url).searchParams;
+    assert.equal(qs.get('pax'), '0');
+    assert.equal(qs.get('manualpayload'), '0.783');
+    assert.equal(qs.get('cargo'), null);
+  });
+
   it('includes optional airline/fltnum/route and encodes acdata JSON', () => {
     const url = buildDispatchRedirectUrl({
       type: 'B738',

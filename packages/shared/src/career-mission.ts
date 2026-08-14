@@ -2392,13 +2392,21 @@ export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
   const pax = sheet.passengerCount ?? 0;
 
   let value: number | undefined;
-  if (baggage !== undefined) {
+  if (pax <= 0) {
+    // GA payload-primary airframes often leave a low freight/baggage figure
+    // (SimBrief maxcargo) while the real load sits in payload — take the larger.
+    if (baggage !== undefined && payload !== undefined) {
+      value = Math.max(baggage, payload);
+    } else {
+      value = baggage ?? payload;
+    }
+  } else if (baggage !== undefined) {
     value = baggage;
-  } else if (payload !== undefined && pax <= 0) {
-    value = payload;
   } else {
     return undefined;
   }
+
+  if (value === undefined) return undefined;
 
   // Intent cargo is always kg.
   return unit === 'kg' ? value : value / KG_TO_LB;
@@ -2542,7 +2550,7 @@ export function formatIntentOfpCheck(check: IntentOfpCheck): string {
 
 /**
  * True when OFP confirm failed solely because SimBrief cargo is below the
- * mission (MTOW/fuel cut) — safe to offer "Accept OFP cargo" trim.
+ * mission (MTOW/fuel cut / airframe maxcargo) — safe to offer "Accept OFP cargo".
  */
 export function isOfpCargoUnderOnlyFailure(check: IntentOfpCheck): boolean {
   if (check.verdict !== 'fail') return false;
@@ -2584,9 +2592,6 @@ export function trimMissionCargoToKg(
   const normalized = normalizeMissionIntent(mission);
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot trim mission in status=${normalized.status}`);
-  }
-  if (normalized.contractPilot) {
-    throw new Error('Cannot trim cargo on a contract-pilot flight');
   }
   const target = Math.floor(targetCargoKg);
   if (!Number.isFinite(target) || target < 1) {
@@ -2638,6 +2643,22 @@ export function trimMissionCargoToKg(
     throw new Error(
       `Trim failed to reach ${target} kg (still ${next.cargoKg} kg)`,
     );
+  }
+  // Contract-pilot fee tracks the trimmed line pay; gross scales with cargo.
+  if (normalized.contractPilot) {
+    next.contractPilotFeeUsd = next.payUsd;
+    if (
+      typeof normalized.contractGrossPayUsd === 'number' &&
+      Number.isFinite(normalized.contractGrossPayUsd) &&
+      normalized.cargoKg > 0
+    ) {
+      next.contractGrossPayUsd = Math.max(
+        1,
+        Math.round(
+          (normalized.contractGrossPayUsd * next.cargoKg) / normalized.cargoKg,
+        ),
+      );
+    }
   }
   syncPlayerInbound(world, next);
   return {

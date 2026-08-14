@@ -102,6 +102,7 @@
     "simbriefAirframeMatch": "Default",
     "oewKg": 1923,
     "mtowKg": 2994,
+    "maxCargoKg": 991,
     "fuelCapacityKg": 177,
     "maxRangeNm": 800,
     "cruiseFuelFlowKgPerHour": 86.2,

@@ -245,12 +245,18 @@ export async function buildMissionDispatch(
   const weightInUnit =
     units === 'LBS' ? mission.cargoKg * KG_TO_LB : mission.cargoKg;
   const cargoThousands = cargoWeightToThousands(weightInUnit);
+  // light_ga SimBrief airframes (BN2, Comanche, …) drive load via Payload, not
+  // Freight — cargo= hits a small maxcargo soft-cap while manualpayload fills
+  // the field that matches EFB useful load.
+  const usePayloadPrefill = mission.aircraftClassId === 'light_ga';
   const url = buildDispatchRedirectUrl({
     type: resolved.type,
     orig: canonicalCareerAirportIcao(mission.originIcao),
     dest: canonicalCareerAirportIcao(mission.destIcao),
     pax: 0,
-    cargo: cargoThousands,
+    ...(usePayloadPrefill
+      ? { manualPayload: cargoThousands }
+      : { cargo: cargoThousands }),
     units,
     staticId,
   });

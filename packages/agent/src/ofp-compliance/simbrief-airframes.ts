@@ -100,18 +100,44 @@ export async function fetchSimBriefAirframesForIcao(
 /**
  * Prefer explicit maxcargo; when missing/zero (common on freighters),
  * fall back to structural payload MZFW − OEW.
+ *
+ * Passenger GA airframes often set maxcargo to a small *freight-only* soft
+ * cap (BN2 ≈ 400 lb) while useful payload is mzfw−oew (≈ 2 186 lb / EFB).
+ * When maxcargo is under half of structural payload, use structural.
  */
 export function airframeMaxCargoKg(airframe: SimBriefAirframe): number | undefined {
-  if (airframe.maxCargoKg !== undefined && airframe.maxCargoKg > 0) {
-    return Math.floor(airframe.maxCargoKg);
-  }
+  const fromMax =
+    airframe.maxCargoKg !== undefined && airframe.maxCargoKg > 0
+      ? Math.floor(airframe.maxCargoKg)
+      : undefined;
+  let fromStruct: number | undefined;
   if (airframe.mzfwKg !== undefined && airframe.oewKg !== undefined) {
     const structural = Math.floor(airframe.mzfwKg - airframe.oewKg);
-    if (structural > 0) {
-      return structural;
-    }
+    if (structural > 0) fromStruct = structural;
   }
-  return undefined;
+  if (
+    fromMax !== undefined &&
+    fromStruct !== undefined &&
+    fromMax < fromStruct * 0.5
+  ) {
+    return fromStruct;
+  }
+  if (fromMax !== undefined) return fromMax;
+  return fromStruct;
+}
+
+/** Which SimBrief weight field drove {@link airframeMaxCargoKg}. */
+export function airframeMaxCargoSource(
+  airframe: SimBriefAirframe,
+): 'maxcargo' | 'mzfw-oew' | undefined {
+  const kg = airframeMaxCargoKg(airframe);
+  if (kg === undefined) return undefined;
+  const fromMax =
+    airframe.maxCargoKg !== undefined && airframe.maxCargoKg > 0
+      ? Math.floor(airframe.maxCargoKg)
+      : undefined;
+  if (fromMax !== undefined && kg === fromMax) return 'maxcargo';
+  return 'mzfw-oew';
 }
 
 /**
@@ -271,9 +297,9 @@ export async function resolveSimBriefMaxCargoKg(opts: {
   fetchImpl?: typeof fetch;
 }): Promise<{ maxCargoKg: number; airframe: SimBriefAirframe; source: 'maxcargo' | 'mzfw-oew' }> {
   const { airframe } = await resolveSimBriefDispatchType(opts);
-  const fromMax = airframe.maxCargoKg !== undefined && airframe.maxCargoKg > 0;
   const maxCargoKg = airframeMaxCargoKg(airframe);
-  if (maxCargoKg === undefined) {
+  const source = airframeMaxCargoSource(airframe);
+  if (maxCargoKg === undefined || !source) {
     throw new Error(
       `SimBrief airframe ${airframe.internalId} has no maxcargo / mzfw-oew payload limit`,
     );
@@ -281,7 +307,7 @@ export async function resolveSimBriefMaxCargoKg(opts: {
   return {
     maxCargoKg,
     airframe,
-    source: fromMax ? 'maxcargo' : 'mzfw-oew',
+    source,
   };
 }
 

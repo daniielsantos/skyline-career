@@ -2119,12 +2119,15 @@ async function main(): Promise<void> {
 
       const staticId = mission.staticId ?? makeStaticId('career');
       const cargoThousands = cargoWeightToThousands(mission.cargoKg);
+      const usePayloadPrefill = mission.aircraftClassId === 'light_ga';
       const url = buildDispatchRedirectUrl({
         type,
         orig: mission.originIcao,
         dest: mission.destIcao,
         pax: 0,
-        cargo: cargoThousands,
+        ...(usePayloadPrefill
+          ? { manualPayload: cargoThousands }
+          : { cargo: cargoThousands }),
         units: 'KGS',
         staticId,
       });

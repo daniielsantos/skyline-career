@@ -224,9 +224,31 @@ export const DEFAULT_MARKET_BOARD_SORTS: readonly MarketBoardSortLevel[] = [
   { key: 'access', direction: 'asc' },
 ];
 
+/** Board columns the player can click — when leading, honor over access/idle. */
+const EXPLICIT_METRIC_SORT_KEYS: ReadonlySet<MarketBoardSortKey> = new Set([
+  'distance',
+  'cargo',
+  'load',
+  'expires',
+  'pay',
+  'net',
+]);
+
+/**
+ * True when the client put a metric column first (Pay / Net / Load / …).
+ * In that case we must not force Access / Idle / Near-focus ahead of it.
+ */
+export function hasExplicitMetricPrimarySort(
+  sorts: readonly MarketBoardSortLevel[] | null | undefined,
+): boolean {
+  const first = sorts?.[0];
+  return first != null && EXPLICIT_METRIC_SORT_KEYS.has(first.key);
+}
+
 /**
  * Keep Cargo Ops access as the primary sort unless the client explicitly asks
- * for locked-first (`access:desc`). Prevents pay-only sorts from burying open lots.
+ * for locked-first (`access:desc`). Prevents pay-only sorts from burying open lots
+ * when the player has not clicked a metric column.
  */
 export function ensureAccessPrimarySort(
   sorts: readonly MarketBoardSortLevel[] | null | undefined,
@@ -530,11 +552,15 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
 } {
   const filtered = rows.filter((row) => marketBoardRowMatchesFilters(row, opts));
   const requested = opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined;
-  const baseSorts =
-    opts.hangarEmpty || opts.starterSort
+  // Player clicked Pay/Net/Load/… first — honor that; do not bury under Access/Idle/Near.
+  const honorMetricPrimary = hasExplicitMetricPrimarySort(requested);
+  const baseSorts = honorMetricPrimary
+    ? [...requested!]
+    : opts.hangarEmpty || opts.starterSort
       ? ensureHangarEmptySorts(requested)
       : ensureIdleEscalatedSorts(ensureAccessPrimarySort(requested));
   const sorts =
+    !honorMetricPrimary &&
     opts.nearMaxNm !== undefined &&
     Number.isFinite(opts.nearMaxNm) &&
     opts.nearMaxNm > 0

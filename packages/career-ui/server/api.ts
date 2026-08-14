@@ -2213,15 +2213,30 @@ export function createCareerApiServer(port = 8787) {
                 maxRangeNm,
               })
             : listMarketLots(world, filter)
-        ).filter(
-          (row) =>
-            !classOpsHidesBoardLot(classOps, {
+        ).filter((row) => {
+          // Always hide crew offers on a class the player has not unlocked.
+          if (row.npcClaim?.crewNeeded) {
+            const crewClassId = row.npcClaim.aircraftClassId;
+            if (
+              crewClassId &&
+              !classOpsIsUnlocked(classOps, crewClassId)
+            ) {
+              return false;
+            }
+          }
+          // Size hide only for empty-hangar starter browsing (Gross / no fleet).
+          // Own fleet + Gross pay → full market; Viable/estimate uses the
+          // selected airframe when the client passes aircraft=.
+          if (hangarEmpty) {
+            return !classOpsHidesBoardLot(classOps, {
               availableKg: row.availableKg,
               crewNeeded: row.npcClaim?.crewNeeded,
               claimCargoKg: row.npcClaim?.cargoKg,
               crewClassId: row.npcClaim?.aircraftClassId,
-            }),
-        );
+            });
+          }
+          return true;
+        });
         type MarketBoardRow = {
           id: string;
           originIcao: string;

@@ -283,6 +283,15 @@ function compareAirportLot(
   }
 }
 
+const BOARD_METRIC_SORT_KEYS: ReadonlySet<MarketSortKey> = new Set([
+  'distance',
+  'cargo',
+  'load',
+  'expires',
+  'pay',
+  'net',
+]);
+
 function sortAirportLots(
   lots: readonly AirportLot[],
   sorts: MarketSortLevel[],
@@ -290,10 +299,14 @@ function sortAirportLots(
 ): AirportLot[] {
   const access = sorts.find((level) => level.key === 'access');
   const rest = sorts.filter((level) => level.key !== 'access');
+  const metricPrimary =
+    sorts[0] != null && BOARD_METRIC_SORT_KEYS.has(sorts[0].key);
   const levels: MarketSortLevel[] =
-    sorts.length > 0
-      ? [access ?? { key: 'access', direction: 'asc' }, ...rest]
-      : DEFAULT_BOARD_SORTS;
+    sorts.length === 0
+      ? DEFAULT_BOARD_SORTS
+      : metricPrimary
+        ? sorts
+        : [access ?? { key: 'access', direction: 'asc' }, ...rest];
   return lots
     .map((lot, index) => ({ lot, index }))
     .sort((a, b) => {
@@ -317,13 +330,34 @@ const MARKET_PAGE_SIZE = 10;
 const CONTRACTS_PAGE_SIZE = 10;
 
 function formatMarketSortParam(sorts: MarketSortLevel[]): string {
-  const access = sorts.find((level) => level.key === 'access');
-  const rest = sorts.filter((level) => level.key !== 'access');
-  const levels: MarketSortLevel[] = [
-    access ?? { key: 'access', direction: 'asc' },
-    ...rest,
-  ];
-  return levels.map((level) => `${level.key}:${level.direction}`).join(',');
+  // Preserve client order (metric-first when the player clicked Pay/Net/…).
+  return sorts.map((level) => `${level.key}:${level.direction}`).join(',');
+}
+
+/** Promote a metric column to primary; keep Access as final tiebreak. */
+function withMetricPrimarySort(
+  current: MarketSortLevel[],
+  key: MarketSortKey,
+): MarketSortLevel[] {
+  // Money / weight: highest first. Distance / expiry / name: natural asc.
+  const preferred: SortDirection =
+    key === 'pay' || key === 'net' || key === 'load' ? 'desc' : 'asc';
+  const flipped: SortDirection = preferred === 'asc' ? 'desc' : 'asc';
+  const existing = current.find((level) => level.key === key);
+  const access =
+    current.find((level) => level.key === 'access') ??
+    ({ key: 'access' as const, direction: 'asc' as const });
+  const others = current.filter(
+    (level) => level.key !== key && level.key !== 'access',
+  );
+  if (!existing) {
+    return [{ key, direction: preferred }, access, ...others];
+  }
+  if (existing.direction === preferred) {
+    return [{ key, direction: flipped }, access, ...others];
+  }
+  // Third click clears the metric; fall back to Access (+ any other levels).
+  return others.length > 0 ? [access, ...others] : [access];
 }
 const FLEET_PAGE_SIZE = 10;
 const MAX_STAGING_LOTS = 5;
@@ -478,8 +512,8 @@ function formatMoney(n: number): string {
 }
 
 /**
- * Contract/Ferry Load column: show the open claim, not free kg still on the
- * same lot (which made 3.5 klb Contracts look like 20+ klb monsters).
+ * Load column: lot total (formation size). Claim / open remain in the tooltip
+ * so Contracts do not look artificially capped at class max (~1.0 klb GA).
  */
 function LotLoadCell(props: {
   lot: {
@@ -494,6 +528,12 @@ function LotLoadCell(props: {
   };
   weightSystem?: WeightSystem;
 }) {
+  const totalKg =
+    typeof props.lot.quantityKg === 'number' &&
+    Number.isFinite(props.lot.quantityKg) &&
+    props.lot.quantityKg > 0
+      ? props.lot.quantityKg
+      : Math.max(props.lot.availableKg, 0);
   const claim = props.lot.npcClaim;
   const claimKg =
     claim?.crewNeeded &&
@@ -501,24 +541,21 @@ function LotLoadCell(props: {
     claim.cargoKg > 0
       ? claim.cargoKg
       : null;
-  if (claimKg == null) {
-    return <>{formatTonnes(props.lot.availableKg, props.weightSystem)}</>;
-  }
   const freeKg = props.lot.availableKg;
   const kind = claim?.crewReposition ? 'Ferry' : 'Contract';
+  const title =
+    claimKg != null
+      ? freeKg > 0
+        ? `Lot ${formatTonnes(totalKg, props.weightSystem)} · ${kind} hold ${formatTonnes(claimKg, props.weightSystem)} · ${formatTonnes(freeKg, props.weightSystem)} still open`
+        : `Lot ${formatTonnes(totalKg, props.weightSystem)} · ${kind} hold ${formatTonnes(claimKg, props.weightSystem)}`
+      : `Lot ${formatTonnes(totalKg, props.weightSystem)} · ${formatTonnes(freeKg, props.weightSystem)} available`;
   return (
-    <span
-      title={
-        freeKg > 0
-          ? `${kind} hold ${formatTonnes(claimKg, props.weightSystem)} · ${formatTonnes(freeKg, props.weightSystem)} still open on this lot`
-          : `${kind} hold ${formatTonnes(claimKg, props.weightSystem)}`
-      }
-    >
-      {formatTonnes(claimKg, props.weightSystem)}
-      {freeKg > 0 ? (
+    <span title={title}>
+      {formatTonnes(totalKg, props.weightSystem)}
+      {claimKg != null && freeKg > 0 ? (
         <small className="muted">
           {' '}
-          +{formatTonnes(freeKg, props.weightSystem)} open
+          · {formatTonnes(freeKg, props.weightSystem)} open
         </small>
       ) : null}
     </span>
@@ -6297,17 +6334,7 @@ export function App() {
         const direction = existing?.direction === 'asc' ? 'desc' : 'asc';
         return [{ key: 'access', direction }, ...rest];
       }
-      const existing = current.findIndex((level) => level.key === key);
-      if (existing >= 0) {
-        const level = current[existing]!;
-        if (level.direction === 'asc') {
-          return current.map((item, i) =>
-            i === existing ? { key, direction: 'desc' as const } : item,
-          );
-        }
-        return current.filter((_, i) => i !== existing);
-      }
-      return [...current, { key, direction: 'asc' as const }];
+      return withMetricPrimarySort(current, key);
     });
     setMarketPage(1);
   }
@@ -6336,17 +6363,7 @@ export function App() {
         const direction = existing?.direction === 'asc' ? 'desc' : 'asc';
         return [{ key: 'access', direction }, ...rest];
       }
-      const existing = current.findIndex((level) => level.key === key);
-      if (existing >= 0) {
-        const level = current[existing]!;
-        if (level.direction === 'asc') {
-          return current.map((item, i) =>
-            i === existing ? { key, direction: 'desc' as const } : item,
-          );
-        }
-        return current.filter((_, i) => i !== existing);
-      }
-      return [...current, { key, direction: 'asc' as const }];
+      return withMetricPrimarySort(current, key);
     });
     setContractsPage(1);
   }

@@ -130,7 +130,7 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
-  it('keeps unlocked first even when client only asks for pay desc', () => {
+  it('honors explicit pay desc over Cargo Ops access', () => {
     const mixed = [
       row({ payUsd: 900, commodityId: 'electronics', cargoLocked: true }),
       row({ payUsd: 200, commodityId: 'general', cargoLocked: false }),
@@ -144,10 +144,30 @@ describe('queryMarketBoardPage', () => {
     });
     assert.deepEqual(
       result.rows.map((r) => r.payUsd),
-      [400, 200, 900],
+      [900, 400, 200],
     );
   });
 
+  it('keeps unlocked first when access leads and pay is secondary', () => {
+    const mixed = [
+      row({ payUsd: 900, commodityId: 'electronics', cargoLocked: true }),
+      row({ payUsd: 200, commodityId: 'general', cargoLocked: false }),
+      row({ payUsd: 400, commodityId: 'supplies', cargoLocked: false }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      sorts: [
+        { key: 'access', direction: 'asc' },
+        { key: 'pay', direction: 'desc' },
+      ],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [400, 200, 900],
+    );
+  });
   it('allows locked-first when access:desc is explicit', () => {
     const mixed = [
       row({ payUsd: 200, commodityId: 'general', cargoLocked: false }),
@@ -594,13 +614,65 @@ describe('queryMarketBoardPage', () => {
     ];
     const result = queryMarketBoardPage(mixed, {
       currentTick: 0,
-      sorts: [{ key: 'pay', direction: 'desc' }],
       page: 1,
       pageSize: 10,
     });
     assert.deepEqual(
       result.rows.map((r) => r.payUsd),
       [22_000, 90_000],
+    );
+  });
+
+  it('explicit pay sort honors pay over idle escalation', () => {
+    const mixed = [
+      row({
+        payUsd: 90_000,
+        distanceNm: 1_800,
+        availableKg: 18_000,
+      }),
+      row({
+        payUsd: 22_000,
+        distanceNm: 1_200,
+        idleEscalated: true,
+        availableKg: 12_000,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      sorts: [{ key: 'pay', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.payUsd),
+      [90_000, 22_000],
+    );
+  });
+
+  it('explicit net sort beats access when nets cross lock groups', () => {
+    const mixed = [
+      row({
+        payUsd: 100,
+        estimatedNetUsd: 50,
+        commodityId: 'general',
+        cargoLocked: false,
+      }),
+      row({
+        payUsd: 900,
+        estimatedNetUsd: 400,
+        commodityId: 'electronics',
+        cargoLocked: true,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      sorts: [{ key: 'net', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.estimatedNetUsd),
+      [400, 50],
     );
   });
 

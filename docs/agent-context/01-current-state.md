@@ -4,7 +4,9 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.24** (latest) | [v0.3.24](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.24) | Hybrid fill: equal first, then shift; leftover L/R |
+| **0.3.28** (latest) | [v0.3.28](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.28) | light_ga `manualpayload`; Accept OFP em contract-pilot |
+| **0.3.27** | [v0.3.27](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.27) | Origin gate + Accu-Sim CTRL+E notes |
+| 0.3.24 | [v0.3.24](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.24) | Hybrid fill: equal first, then shift; leftover L/R |
 | 0.3.23 | [v0.3.23](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.23) | Inject/preflight `readSimVars` + pack hard-fail |
 | 0.3.22 | [v0.3.22](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.22) | Watch `readSimVars` batch + TIMEOUT abort + cruise gates |
 | 0.3.21 | [v0.3.21](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.21) | Hang mole / ping honesto / TIMEOUT por código IPC |

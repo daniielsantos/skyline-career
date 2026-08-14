@@ -121,8 +121,9 @@ Composition: aircraft large and centered for a wide market card banner. No text,
 ```
 
 ## BN2 Islander
-- **typeId:** `blackbox-bn2-islander-specialops-analogue`
+- **typeId:** `blackbox-bn2-islander-cargo-tip-tanks`
 - **file:** `bn2-islander.png`
+- **family:** Cargo Tip Tanks (Analogue/Garmin) + SpecialOps / Analogue — one Market SKU
 
 ```
 Stylized cartoon / clean vector illustration of a Britten-Norman BN-2 Islander (BN2P), three-quarter side view parked facing left.

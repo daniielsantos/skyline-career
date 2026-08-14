@@ -1,16 +1,16 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "blackbox-bn2-islander-specialops-analogue",
-  "profileKey": "blackbox/bn2-islander-specialops-analogue",
-  "semver": "1.1.0",
-  "displayName": "BN2 Islander - SpecialOps / Analogue (MSFS 2024)",
+  "profileId": "blackbox-bn2-islander-cargo-analogue-tip-tanks",
+  "profileKey": "blackbox/bn2-islander-cargo-analogue-tip-tanks",
+  "semver": "1.0.0",
+  "displayName": "BN2 Islander - Cargo / Analogue / Tip Tanks (MSFS 2024)",
   "match": {
-    "fingerprint": "183a7bda16af6681106c3486d6ed22a3593ebcdd14975d776c8ca547fc9b004d",
-    "title": "BN2 Islander - SpecialOps / Analogue",
+    "fingerprint": "4bab0caca03efbdd9deab7c1fd418818a7a87f4e8f5f7fa555c4e47bf1515a57",
+    "title": "BN2 Islander - Cargo / Analogue / Tip Tanks",
     "publisher": "blackbox",
     "icao": "BN2P",
     "liveTitles": [
-      "BN2 Islander - SpecialOps / Analogue"
+      "BN2 Islander - Cargo / Analogue / Tip Tanks"
     ]
   },
   "capabilities": [
@@ -76,7 +76,7 @@
         "op": "simvar_set",
         "var": "FUEL TANK RIGHT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN}"
+        "valueExpr": "{RIGHT_MAIN} + 3.5"
       },
       {
         "op": "simvar_set",
@@ -102,25 +102,25 @@
         {
           "var": "FUEL TANK LEFT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 3,
+          "tolerancePct": 8,
           "valueExpr": "{LEFT_MAIN}"
         },
         {
           "var": "FUEL TANK RIGHT MAIN QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 5,
+          "tolerancePct": 8,
           "valueExpr": "{RIGHT_MAIN}"
         },
         {
           "var": "FUEL TANK LEFT AUX QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 3,
+          "tolerancePct": 8,
           "valueExpr": "{LEFT_AUX}"
         },
         {
           "var": "FUEL TANK RIGHT AUX QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 3,
+          "tolerancePct": 8,
           "valueExpr": "{RIGHT_AUX}"
         }
       ]
@@ -143,15 +143,15 @@
       },
       {
         "index": 3,
-        "name": "Cabin fwd",
-        "maxLoad": 500,
-        "arm": -3.40818
+        "name": "CARGO MID",
+        "maxLoad": 1200,
+        "arm": 0.382792
       },
       {
         "index": 4,
-        "name": "Cabin aft",
+        "name": "BAGGAGE BAY",
         "maxLoad": 500,
-        "arm": 1.033674
+        "arm": -8
       }
     ],
     "writePlan": [
@@ -207,23 +207,23 @@
       "maxMac": 26.400000000000002
     },
     "calibration": {
-      "observedMac": 25.474458932876587,
-      "calibratedAtIso": "2026-08-09T17:07:03.161Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\blackboxsimulation-bn2islander24\\SimObjects\\Airplanes\\BBS_BN2_Piston\\attachments\\bbs\\part_interior_spec_ops\\config\\flight_model.cfg",
+      "observedMac": 33.228519558906555,
+      "calibratedAtIso": "2026-08-14T02:59:47.620Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\blackboxsimulation-bn2islander24\\SimObjects\\Airplanes\\BBS_BN2_Piston\\attachments\\bbs\\part_interior_cargo\\config\\flight_model.cfg",
       "emptyWeightCgPosition": [
         0.5,
         0,
         -1
       ],
       "sweep": {
-        "minObservedMac": 21.984070539474487,
-        "maxObservedMac": 27.905577421188354,
+        "minObservedMac": 24.86952543258667,
+        "maxObservedMac": 32.77984261512756,
         "payloadLb": 200,
         "forwardStation": 1,
-        "aftStation": 3,
+        "aftStation": 4,
         "usedStationArms": true,
         "restored": true,
-        "sampledAtIso": "2026-08-09T17:07:10.859Z"
+        "sampledAtIso": "2026-08-14T02:59:54.669Z"
       }
     }
   },
@@ -233,13 +233,13 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: BN2 Islander - SpecialOps / Analogue.",
+    "Homologated via wizard: BN2 Islander - Cargo / Analogue / Tip Tanks.",
     "ICAO type designator (catalog/SimBrief): BN2P.",
-    "Fuel: LEFT/RIGHT MAIN + LEFT/RIGHT AUX from writetest (v1.1.0).",
-    "RIGHT_MAIN writetest was partial (vendor rebalance) — wider verify tol.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX).",
+    "AUX/Aft tanks included.",
     "Payload stations from writetest: 1, 2, 3, 4.",
     "Station maxLoad: placeholder until flight_model.cfg calibrate.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/blackbox-bn2-islander-specialops-analogue.md"
+    "See profiles/notes/blackbox-bn2-islander-cargo-analogue-tip-tanks.md"
   ]
 }

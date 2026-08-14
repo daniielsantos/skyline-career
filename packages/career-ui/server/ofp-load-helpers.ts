@@ -1006,7 +1006,13 @@ async function applyMissionOfpLoadExclusive(
       enginesRunning: snap.enginesRunning,
     };
 
-    const fuelLbPerGal = planningLive.fuelLbPerGal;
+    // Same density as buildOfpLoadPlan — raw MSFS FUEL WEIGHT PER GALLON often
+    // flickers to avgas ~6.0 on Accu-Sim while the plan used Jet-A 6.7 (Sim 672
+    // vs Due 751 on Aerostar = identical gallons × wrong density).
+    const fuelLbPerGal = resolveFuelDensityLbPerGal(
+      resolved.profile,
+      planningLive.fuelLbPerGal,
+    );
     const weightLimits = {
       emptyWeightLb: planningLive.emptyWeightLb,
       maxGrossWeightLb: planningLive.maxGrossWeightLb,
@@ -1214,6 +1220,22 @@ async function applyMissionOfpLoadExclusive(
     let lastLiveMac: number | undefined;
     let lastMinMac: number | undefined;
     let lastMaxMac: number | undefined;
+    // Inject is fuel-then-payload sequentially, but a post-write live tank read
+    // often under-shoots Due for a beat (Accu-Sim / classic settle). Hold Sim on
+    // the write target until inject finishes so the card does not dip mid-payload.
+    let fuelUiTanks: Record<string, number> | undefined;
+
+    const paintFuelUiFromWriteTarget = (tanks: Record<string, number>) => {
+      fuelUiTanks = { ...tanks };
+      afterLive = { tanks: { ...tanks }, stations: afterLive.stations };
+      lastGoodSchematicTanks =
+        pickFuelTankBreakdown(
+          schematicTanksFromProfile(tanks),
+          lastGoodSchematicTanks,
+          tanksToFuelLb(tanks),
+        ) ?? schematicTanksFromProfile(tanks);
+      lastGoodFuelLb = tanksToFuelLb(tanks);
+    };
 
     const publishLiveProgress = (
       phase: OfpLoadProgressPhase,
@@ -1231,8 +1253,9 @@ async function applyMissionOfpLoadExclusive(
         liveStationSum >= workingSum * 0.5
           ? { ...afterLive.stations }
           : { ...workingStations };
-      const rawFuelLb = tanksToFuelLb(afterLive.tanks);
-      const rawTanks = schematicTanksFromProfile(afterLive.tanks);
+      const tanksForFuel = fuelUiTanks ?? afterLive.tanks;
+      const rawFuelLb = tanksToFuelLb(tanksForFuel);
+      const rawTanks = schematicTanksFromProfile(tanksForFuel);
       const heldTanks =
         pickFuelTankBreakdown(rawTanks, lastGoodSchematicTanks, rawFuelLb) ??
         rawTanks;
@@ -1532,22 +1555,13 @@ async function applyMissionOfpLoadExclusive(
           restoreFuelOnRollback = true;
           break;
         }
-        // Paint UI from the write target immediately so Sim/Due move each round
-        // without waiting on slow post-write live reads (Baron AUX hang).
-        afterLive = {
-          tanks,
-          stations: afterLive.stations,
-        };
-        lastGoodSchematicTanks =
-          pickFuelTankBreakdown(
-            schematicTanksFromProfile(tanks),
-            lastGoodSchematicTanks,
-            tanksToFuelLb(tanks),
-          ) ?? schematicTanksFromProfile(tanks);
-        lastGoodFuelLb = tanksToFuelLb(tanks);
+        // Paint Sim from write target each round (density-correct lb). Do not
+        // publish a post-write live under-read — that is what looked like a
+        // "flick" before payload even though fuel writes already finished.
+        paintFuelUiFromWriteTarget(tanks);
         publishLiveProgress(
           'injecting',
-          `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(lastGoodFuelLb)} lb`,
+          `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(lastGoodFuelLb ?? 0)} lb`,
         );
 
         const isFinalRound = round >= FUEL_INJECT_ROUNDS;
@@ -1556,28 +1570,13 @@ async function applyMissionOfpLoadExclusive(
           : FUEL_ROUND_SETTLE_MS;
         await delayCancellable(mission.id, settleMs);
 
-        // Live verify only on the last ramp step — intermediate reads were the
-        // ~20s stalls when unused AUX SimVars timed out after each write.
+        // Live sample only for residual math — UI stays on write target.
         if (isFinalRound) {
-          afterLive = {
-            tanks: await readLiveTanksTrustingWrite(
-              bridge,
-              resolved.profile,
-              tanks,
-              { skipTankIds: idleOuterIds },
-            ),
-            stations: afterLive.stations,
-          };
-          lastGoodSchematicTanks =
-            pickFuelTankBreakdown(
-              schematicTanksFromProfile(afterLive.tanks),
-              lastGoodSchematicTanks,
-              tanksToFuelLb(afterLive.tanks),
-            ) ?? schematicTanksFromProfile(tanks);
-          lastGoodFuelLb = tanksToFuelLb(afterLive.tanks);
-          publishLiveProgress(
-            'injecting',
-            `Fuel ${round}/${FUEL_INJECT_ROUNDS} · ${Math.round(lastGoodFuelLb)} lb live`,
+          await readLiveTanksTrustingWrite(
+            bridge,
+            resolved.profile,
+            tanks,
+            { skipTankIds: idleOuterIds },
           );
         }
       }
@@ -1609,7 +1608,7 @@ async function applyMissionOfpLoadExclusive(
           });
           publishLiveProgress(
             'injecting',
-            `Balancing tip residual into mains · ${Math.round(tanksToFuelLb(liveAfter))} lb live`,
+            `Balancing tip residual into mains · ${Math.round(tanksToFuelLb(endTanks))} lb`,
           );
           const fuelApply = await applyFuelRound(endTanks, {
             omitFuelTankWrites: idleOuterFuelTankIds(liveAfter, endTanks),
@@ -1618,54 +1617,38 @@ async function applyMissionOfpLoadExclusive(
             ...(applyResult ?? {}),
             fuel: fuelApply.fuel ?? applyResult?.fuel,
           };
-          // Optimistic UI from balanced target, then one live confirm.
-          afterLive = {
-            tanks: endTanks,
-            stations: afterLive.stations,
-          };
-          lastGoodSchematicTanks =
-            pickFuelTankBreakdown(
-              schematicTanksFromProfile(endTanks),
-              lastGoodSchematicTanks,
-              tanksToFuelLb(endTanks),
-            ) ?? schematicTanksFromProfile(endTanks);
-          lastGoodFuelLb = tanksToFuelLb(endTanks);
+          paintFuelUiFromWriteTarget(endTanks);
           publishLiveProgress(
             'injecting',
-            `Fuel balanced · ${Math.round(lastGoodFuelLb)} lb`,
+            `Fuel balanced · ${Math.round(lastGoodFuelLb ?? 0)} lb`,
           );
           await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
-          afterLive = {
-            tanks: await readLiveTanksTrustingWrite(
-              bridge,
-              resolved.profile,
-              endTanks,
-              { skipTankIds: idleOuterFuelTankIds(liveAfter, endTanks) },
-            ),
-            stations: afterLive.stations,
-          };
-          lastGoodSchematicTanks =
-            pickFuelTankBreakdown(
-              schematicTanksFromProfile(afterLive.tanks),
-              lastGoodSchematicTanks,
-              tanksToFuelLb(afterLive.tanks),
-            ) ?? schematicTanksFromProfile(endTanks);
-          lastGoodFuelLb = tanksToFuelLb(afterLive.tanks);
-          publishLiveProgress(
-            'injecting',
-            `Fuel balanced · ${Math.round(lastGoodFuelLb)} lb live`,
+          await readLiveTanksTrustingWrite(
+            bridge,
+            resolved.profile,
+            endTanks,
+            { skipTankIds: idleOuterFuelTankIds(liveAfter, endTanks) },
           );
+          paintFuelUiFromWriteTarget(endTanks);
         } else {
-          afterLive = {
-            tanks: preferWrittenFuelTanks(liveAfter, endTanks),
-            stations: afterLive.stations,
-          };
+          paintFuelUiFromWriteTarget(endTanks);
         }
+      }
+      // Fuel phase done — lock Sim at Due before any payload progress message.
+      if (!restoreFuelOnRollback) {
+        paintFuelUiFromWriteTarget(endTanks);
+        publishLiveProgress(
+          'injecting',
+          `Fuel complete · ${Math.round(lastGoodFuelLb ?? 0)} lb — loading payload…`,
+        );
       }
       if (!applyResult) applyResult = {};
     } else {
       applyResult = {};
       restoreFuelOnRollback = false;
+      const skipTanks =
+        Object.keys(plannedTanks).length > 0 ? plannedTanks : beforeLive.tanks;
+      paintFuelUiFromWriteTarget(skipTanks);
     }
 
     // Seed crew floors on aircraft before cargo rounds.
@@ -2616,7 +2599,7 @@ async function applyMissionOfpLoadExclusive(
       tanks: await readLiveTanksTrustingWrite(
         bridge,
         resolved.profile,
-        afterLive.tanks,
+        fuelUiTanks ?? afterLive.tanks,
       ),
       stations: await readLiveStationsTrustingWrite(
         bridge,
@@ -2624,6 +2607,10 @@ async function applyMissionOfpLoadExclusive(
         workingStations,
       ),
     };
+    // Progress card keeps committed fuel write target through verify.
+    if (fuelUiTanks) {
+      paintFuelUiFromWriteTarget(fuelUiTanks);
+    }
 
     // Station SimVars can under-read on Accu-Sim while the tablet LVars hold the load.
     // Prefer a2a-lvars (same reader as Watch/Preflight); only then fall back to

@@ -98,12 +98,21 @@ export async function fetchSimBriefAirframesForIcao(
 }
 
 /**
- * Prefer explicit maxcargo; when missing/zero (common on freighters),
- * fall back to structural payload MZFW − OEW.
+ * Minimum maxcargo/structural ratio that still looks like a real freighter
+ * Freight rating (B738 BCF ≈ 0.78). Below this, maxcargo is treated as a GA
+ * Freight soft-cap (BN2 ≈ 0.18) and Skyline uses mzfw−oew instead.
+ */
+export const SIMBRIEF_CREDIBLE_FREIGHT_RATIO = 0.5;
+
+/**
+ * Mission payload ceiling from one SimBrief airframe row.
  *
- * Passenger GA airframes often set maxcargo to a small *freight-only* soft
- * cap (BN2 ≈ 400 lb) while useful payload is mzfw−oew (≈ 2 186 lb / EFB).
- * When maxcargo is under half of structural payload, use structural.
+ * - **mzfw−oew** — structural zero-fuel leftover (people + bags + cargo)
+ * - **maxcargo** — SimBrief Freight field (often a soft-cap on GA)
+ *
+ * Prefer structural when known. Keep maxcargo only when it is a credible
+ * freighter rating (≥ {@link SIMBRIEF_CREDIBLE_FREIGHT_RATIO} of structural)
+ * so B738/MD11 missions stay inside SimBrief Freight; ignore tiny GA caps.
  */
 export function airframeMaxCargoKg(airframe: SimBriefAirframe): number | undefined {
   const fromMax =
@@ -115,15 +124,16 @@ export function airframeMaxCargoKg(airframe: SimBriefAirframe): number | undefin
     const structural = Math.floor(airframe.mzfwKg - airframe.oewKg);
     if (structural > 0) fromStruct = structural;
   }
-  if (
-    fromMax !== undefined &&
-    fromStruct !== undefined &&
-    fromMax < fromStruct * 0.5
-  ) {
+  if (fromStruct !== undefined) {
+    if (
+      fromMax !== undefined &&
+      fromMax >= fromStruct * SIMBRIEF_CREDIBLE_FREIGHT_RATIO
+    ) {
+      return fromMax;
+    }
     return fromStruct;
   }
-  if (fromMax !== undefined) return fromMax;
-  return fromStruct;
+  return fromMax;
 }
 
 /** Which SimBrief weight field drove {@link airframeMaxCargoKg}. */

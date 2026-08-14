@@ -1,20 +1,21 @@
 {
   "source": "simbrief",
   "icao": "BN2P",
-  "ofpId": "blackbox-bn2-islander-specialops-analogue",
+  "ofpId": "blackbox-bn2-islander-cargo-tip-tanks",
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "BN2 Islander - SpecialOps / Analogue"
+    "BN2 Islander - Cargo / Analogue / Tip Tanks"
   ],
-  "matchTitlePattern": "BN2 Islander - SpecialOps / Analogue",
+  "matchTitlePattern": "BN2 Islander - Cargo \\/ (?:Analogue|Garmin) \\/ Tip Tanks",
   "notes": [
-    "BN2 Islander - SpecialOps / Analogue — family pack (not a separate Market SKU)",
-    "Market family SKU: blackbox-bn2-islander-cargo-tip-tanks",
-    "Profile: blackbox/bn2-islander-specialops-analogue@1.0.0",
-    "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats: crew S1–S2, baggage S3–S4 (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct (LEFT/RIGHT MAIN + AUX)"
+    "Black Box BN-2 Islander family (Cargo Tip Tanks Analogue/Garmin + SpecialOps)",
+    "One Market SKU — live title picks cargo vs specialops roles/profile",
+    "Cargo tip-tank: same 4-station layout for steam vs G3000 panel",
+    "liveSources: classic fuel tanks + classic stations/weights",
+    "SimBrief: Default BN2P",
+    "Homologated profile: blackbox/bn2-islander-cargo-analogue-tip-tanks@1.0.0",
+    "Title: BN2 Islander - Cargo / Analogue / Tip Tanks"
   ],
   "fuel": {
     "unit": "lb"
@@ -25,15 +26,15 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "crewStations": [
-        1,
-        2
-      ],
+      "passengerStations": [],
       "baggageStations": [
         3,
         4
       ],
-      "passengerStations": []
+      "crewStations": [
+        1,
+        2
+      ]
     }
   },
   "liveSources": {
@@ -53,25 +54,25 @@
     {
       "simVarIndex": 1,
       "cfgIndex": 0,
-      "name": "PILOT",
+      "name": "Station 1",
       "role": "crew"
     },
     {
       "simVarIndex": 2,
       "cfgIndex": 1,
-      "name": "COPILOT",
+      "name": "Station 2",
       "role": "crew"
     },
     {
       "simVarIndex": 3,
       "cfgIndex": 2,
-      "name": "Cabin fwd",
+      "name": "Station 3",
       "role": "baggage"
     },
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
-      "name": "Cabin aft",
+      "name": "Station 4",
       "role": "baggage"
     }
   ],

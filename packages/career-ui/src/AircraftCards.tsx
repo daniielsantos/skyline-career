@@ -75,6 +75,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'asobo-beechcraft-bonanza': '/airframes/bonanza-g36.png',
   'blacksquare-b60-duke': '/airframes/duke-be60.png',
   'blackbox-bn2-islander-specialops-analogue': '/airframes/bn2-islander.png',
+  'blackbox-bn2-islander-cargo-tip-tanks': '/airframes/bn2-islander.png',
   'asobo-c172sp-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-classic-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-g1000-cargo': '/airframes/cessna-172.png',

@@ -127,9 +127,8 @@ describe('career player airframes', () => {
       'c208-caravan-cargo',
     );
     assert.equal(
-      findCareerPlayerAirframe(
-        'blacksquare-caravan-professional-super-cargomaster',
-      )?.typeId,
+      findCareerPlayerAirframe('blacksquare-caravan-professional-super-cargomaster')
+        ?.typeId,
       'c208-caravan-cargo',
     );
     assert.equal(
@@ -137,6 +136,32 @@ describe('career player airframes', () => {
         (row) => row.typeId === 'blacksquare-caravan-professional-gear',
       ),
       false,
+    );
+  });
+
+  it('lists BN2 Islander as one Market SKU with SpecialOps + Cargo Tip Tanks packs', () => {
+    assert.equal(
+      CAREER_PLAYER_AIRFRAMES.some(
+        (row) => row.typeId === 'blackbox-bn2-islander-specialops-analogue',
+      ),
+      false,
+    );
+    const bn2 = findCareerPlayerAirframe('blackbox-bn2-islander-cargo-tip-tanks');
+    assert.ok(bn2);
+    assert.equal(bn2!.label, 'BN2 Islander');
+    const paths = careerPlayerAirframePackPaths(bn2!);
+    assert.ok(paths.some((p) => p.includes('blackbox-bn2-islander-cargo-tip-tanks')));
+    assert.ok(
+      paths.some((p) => p.includes('blackbox-bn2-islander-specialops-analogue')),
+    );
+    assert.equal(
+      findCareerPlayerAirframe('blackbox-bn2-islander-specialops-analogue')?.typeId,
+      'blackbox-bn2-islander-cargo-tip-tanks',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('blackbox-bn2-islander-cargo-analogue-tip-tanks')
+        ?.typeId,
+      'blackbox-bn2-islander-cargo-tip-tanks',
     );
   });
 

@@ -1177,10 +1177,22 @@ th {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+  align-items: stretch;
 }
 
 .dispatch-primary-actions .accept {
+  flex: 1 1 14rem;
   min-width: 12rem;
+}
+
+.dispatch-primary-actions .action {
+  flex: 0 1 auto;
+}
+
+.ofp-accept-actions {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .dispatch-advanced {
@@ -5250,8 +5262,6 @@ small {
 
 .ofp-accept-cargo {
   margin-top: 0.75rem;
-  display: grid;
-  gap: 0.45rem;
 }
 
 .ofp-accept-cargo > p {

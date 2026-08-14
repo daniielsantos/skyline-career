@@ -4616,6 +4616,16 @@ export function createCareerApiServer(port = 8787) {
               ...ofpCheck,
               staticId: mission.staticId,
             };
+            // Same as confirm OFP: contract-pilot auto-authorizes Jet-A. Accept
+            // OFP clears fuelAuthorizedOfpId before reconfirm — restore it here
+            // so Load/Preflight bootstrap is not stuck waiting forever.
+            if (
+              mission.contractPilot &&
+              (ofpCheck.verdict === 'pass' || ofpCheck.verdict === 'warn') &&
+              ofpCheck.ofpId
+            ) {
+              mission.fuelAuthorizedOfpId = ofpCheck.ofpId;
+            }
             savedMission = mission;
             return true;
           });
@@ -5216,15 +5226,23 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        if (
-          !mission.lastOfpCheck?.ofpId ||
-          mission.fuelAuthorizedOfpId !== mission.lastOfpCheck.ofpId
-        ) {
-          send(res, 409, {
-            error: 'Purchase or authorize OFP block fuel before loading the aircraft',
-            code: 'fuel_purchase_required',
-          });
-          return;
+        {
+          const ofp = mission.lastOfpCheck;
+          const ofpOk =
+            Boolean(ofp?.ofpId) &&
+            (ofp?.verdict === 'pass' || ofp?.verdict === 'warn');
+          // Match UI fuelAuthorizedForOfp: contract-pilot skips Jet-A purchase.
+          const fuelOk = mission.contractPilot
+            ? ofpOk
+            : ofpOk && mission.fuelAuthorizedOfpId === ofp?.ofpId;
+          if (!fuelOk) {
+            send(res, 409, {
+              error:
+                'Purchase or authorize OFP block fuel before loading the aircraft',
+              code: 'fuel_purchase_required',
+            });
+            return;
+          }
         }
         if (isOfpLoadBusy(mission.id) || isOfpLoadActive()) {
           send(res, 409, {

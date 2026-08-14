@@ -94,16 +94,21 @@
     "fuelBurnKgPerNm": 0.522
   },
   {
-    "typeId": "blackbox-bn2-islander-specialops-analogue",
+    "typeId": "blackbox-bn2-islander-cargo-tip-tanks",
     "aircraftClassId": "light_ga",
-    "label": "BN2 Islander - SpecialOps / Analogue",
-    "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-specialops-analogue.json",
+    "label": "BN2 Islander - Passenger / Analogue / Tip Tanks",
+    "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json",
+      "profiles/ofp/blackbox-bn2-islander-passenger-analogue-tip-tanks.json",
+      "profiles/ofp/blackbox-bn2-islander-specialops-analogue.json"
+    ],
     "simbriefIcao": "BN2P",
     "simbriefAirframeMatch": "Default",
     "oewKg": 1923,
     "mtowKg": 2994,
     "maxCargoKg": 991,
-    "fuelCapacityKg": 177,
+    "fuelCapacityKg": 150,
     "maxRangeNm": 800,
     "cruiseFuelFlowKgPerHour": 86.2,
     "cruiseSpeedKt": 124,
@@ -712,6 +717,22 @@
     "fuelBurnKgPerNm": 3.2
   },
   {
+    "typeId": "pmdg-dc6",
+    "aircraftClassId": "medium_piston",
+    "label": "PMDG DC-6",
+    "rolesPackRelPath": "profiles/ofp/pmdg-dc6.json",
+    "simbriefIcao": "DC6",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 27786,
+    "mtowKg": 46628,
+    "maxCargoKg": 10000,
+    "fuelCapacityKg": 8800,
+    "maxRangeNm": 4100,
+    "cruiseFuelFlowKgPerHour": 249.5,
+    "cruiseSpeedKt": 250,
+    "fuelBurnKgPerNm": 1
+  },
+  {
     "typeId": "blackbird-c-130j-long-configuration",
     "aircraftClassId": "narrow_freighter",
     "label": "C-130J Long Configuration",
@@ -867,7 +888,7 @@
     "fuelCapacityKg": 19055,
     "maxRangeNm": 3500,
     "cruiseSpeedKt": 450,
-    "fuelBurnKgPerNm": 5.0
+    "fuelBurnKgPerNm": 5
   },
   {
     "typeId": "microsoft-a321lr",
@@ -995,22 +1016,6 @@
     "maxRangeNm": 8000,
     "cruiseSpeedKt": 490,
     "fuelBurnKgPerNm": 12
-  },
-  {
-    "typeId": "pmdg-dc6",
-    "aircraftClassId": "medium_piston",
-    "label": "PMDG DC-6",
-    "rolesPackRelPath": "profiles/ofp/pmdg-dc6.json",
-    "simbriefIcao": "DC6",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 27786,
-    "mtowKg": 46628,
-    "maxCargoKg": 10000,
-    "fuelCapacityKg": 8800,
-    "maxRangeNm": 4100,
-    "cruiseFuelFlowKgPerHour": 249.5,
-    "cruiseSpeedKt": 250,
-    "fuelBurnKgPerNm": 1
   },
   {
     "typeId": "tfdi-md11f-family",

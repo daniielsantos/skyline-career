@@ -9,15 +9,21 @@
 
 ## Fuel tanks
 
-| Var | Capacity | Id |
-|-----|----------|----|
-| `FUEL TANK LEFT MAIN QUANTITY` | 65 | LEFT_MAIN |
+| Var | Capacity | Id | Writetest |
+|-----|----------|----|-----------|
+| `FUEL TANK LEFT MAIN QUANTITY` | 65 | LEFT_MAIN | ✓ (+3.5 gal offset) |
+| `FUEL TANK RIGHT MAIN QUANTITY` | 65 | RIGHT_MAIN | ~ partial (vendor rebalance) |
+| `FUEL TANK LEFT AUX QUANTITY` | 27.5 | LEFT_AUX | ✓ (+0.8 gal offset) |
+| `FUEL TANK RIGHT AUX QUANTITY` | 27.5 | RIGHT_AUX | ✓ (+0.8 gal offset) |
+
+Total live cap ≈ **185 gal / 1110 lb**.
 
 ## Notes
 
-- Fuel via classic FUEL TANK * from writetest (LEFT_MAIN).
-- AUX deferred for v1.
+- Fuel via classic FUEL TANK * (v1.1.0: both MAINs + both AUX).
+- RIGHT_MAIN may settle off-target after write — verify tol wider.
 - Payload stations from writetest: 1, 2, 3, 4.
+- Roles: crew S1–S2 (pilot/copilot); baggage S3–S4 (freighter cargo).
 - Station maxLoad: placeholder until flight_model.cfg calibrate.
 - Homologated with interactive wizard.
 

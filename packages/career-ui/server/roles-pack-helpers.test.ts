@@ -229,6 +229,45 @@ describe('resolveMissionRolesPack', () => {
       assert.equal(roles.pack.simbriefAirframeMatch, match);
     }
   });
+
+  it('picks BN2 Cargo Tip Tanks or SpecialOps pack from one Market SKU', async () => {
+    const cases = [
+      [
+        'BN2 Islander - Cargo / Analogue / Tip Tanks',
+        /blackbox-bn2-islander-cargo-tip-tanks\.json$/,
+      ],
+      [
+        'BN2 Islander - Cargo / Garmin / Tip Tanks',
+        /blackbox-bn2-islander-cargo-tip-tanks\.json$/,
+      ],
+      [
+        'BN2 Islander - SpecialOps / Analogue',
+        /blackbox-bn2-islander-specialops-analogue\.json$/,
+      ],
+    ] as const;
+    for (const [liveTitle, pathRe] of cases) {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: 'profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json',
+        liveTitle,
+        airframeTypeId: 'blackbox-bn2-islander-cargo-tip-tanks',
+        strictAirframeMatch: true,
+      });
+      assert.match(roles.path.replace(/\\/g, '/'), pathRe);
+    }
+    // Legacy owned SpecialOps typeId aliases to the family SKU.
+    const viaAlias = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json',
+      liveTitle: 'BN2 Islander - SpecialOps / Analogue',
+      airframeTypeId: 'blackbox-bn2-islander-specialops-analogue',
+      strictAirframeMatch: true,
+    });
+    assert.match(
+      viaAlias.path.replace(/\\/g, '/'),
+      /blackbox-bn2-islander-specialops-analogue\.json$/,
+    );
+  });
 });
 
 describe('resolveDispatchSimBriefParams', () => {

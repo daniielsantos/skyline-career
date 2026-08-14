@@ -753,7 +753,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     // Analogue (steam) and Garmin (G3000) cargo tip-tank share stations / SimBrief.
     titlePattern: /BN2 Islander - Cargo \/ (?:Analogue|Garmin) \/ Tip Tanks/i,
     familyPackRel: 'blackbox-bn2-islander-cargo-tip-tanks.json',
-    marketLabel: 'BN2 Islander Cargo',
+    marketLabel: 'BN2 Islander',
     stationRoles: {
       passengerStations: [],
       baggageStations: [3, 4],
@@ -771,9 +771,9 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       { simVarIndex: 4, cfgIndex: 3, name: 'Station 4', role: 'baggage' },
     ],
     notes: [
-      'Black Box BN-2 Islander Cargo tip-tank family (Analogue + Garmin)',
-      'Same 4-station cargo layout; panel (steam vs G3000) does not change stations',
-      'One Skyline Market SKU; either glass variant matches the purchased airframe',
+      'Black Box BN-2 Islander family (Cargo Tip Tanks Analogue/Garmin + SpecialOps)',
+      'One Market SKU — live MSFS title picks cargo vs specialops roles pack',
+      'Cargo tip-tank: same 4-station layout for steam vs G3000 panel',
       'liveSources: classic fuel tanks + classic stations/weights',
       'SimBrief: Default BN2P',
     ],

@@ -20,6 +20,7 @@ import {
   matchHeuristic,
   type OfpRolesPackFile,
 } from './ofp-compliance/scaffold-roles.js';
+import { STATION_MAX_LOAD_PLACEHOLDER_LB } from './discover-payload-stations.js';
 
 type CareerPlayerAirframeRow = {
   typeId: string;
@@ -319,6 +320,42 @@ export function deriveCareerMarketWeights(opts: {
     out.fuelCapacityKg = Math.round(opts.fuelCapacityGal * dens * LB_TO_KG);
   }
   return out;
+}
+
+/**
+ * True when Career cargo stations still carry the draft placeholder maxLoad
+ * (cfg calibrate never replaced them). Summing N×500 invents a fake payload
+ * ceiling — prefer SimBrief mzfw−oew in that case.
+ */
+export function stationCargoCeilingIsPlaceholder(
+  stations: Array<{ index: number; maxLoad?: number }>,
+  stationRoles?: {
+    crewStations?: number[];
+    passengerStations?: number[];
+    baggageStations?: number[];
+  },
+  placeholderLb = STATION_MAX_LOAD_PLACEHOLDER_LB,
+): boolean {
+  const bags = stationRoles?.baggageStations ?? [];
+  const crew = new Set(stationRoles?.crewStations ?? []);
+  const indexes =
+    bags.length > 0
+      ? bags
+      : stations.map((st) => st.index).filter((idx) => !crew.has(idx));
+  if (indexes.length === 0) return false;
+  let matched = 0;
+  for (const idx of indexes) {
+    const st = stations.find((row) => row.index === idx);
+    if (
+      typeof st?.maxLoad !== 'number' ||
+      !Number.isFinite(st.maxLoad) ||
+      Math.round(st.maxLoad) !== placeholderLb
+    ) {
+      return false;
+    }
+    matched += 1;
+  }
+  return matched > 0;
 }
 
 /** Sum maxLoad for the given station indexes (Career cargo ceiling). */

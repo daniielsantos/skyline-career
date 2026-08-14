@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sharedPath = pathToFileURL(join(root, 'packages', 'shared', 'dist', 'index.js')).href;
+const verbose = process.env.BACKFILL_FINGERPRINTS_VERBOSE === '1';
 
 async function main() {
   const shared = await import(sharedPath);
@@ -35,7 +36,19 @@ async function main() {
     });
   }
 
-  console.log(JSON.stringify({ updated: results.length, results }, null, 2));
+  const changed = results.filter((r) => r.changed);
+  if (verbose) {
+    console.log(JSON.stringify({ updated: results.length, results }, null, 2));
+    return;
+  }
+  console.log(
+    `[backfill-fingerprints] ${results.length} profiles · ${changed.length} fingerprint(s) updated`,
+  );
+  for (const row of changed) {
+    console.log(
+      `  ${row.profileKey}: ${(row.before ?? '—').slice(0, 12)}… → ${row.fingerprint.slice(0, 12)}…`,
+    );
+  }
 }
 
 main().catch((err) => {

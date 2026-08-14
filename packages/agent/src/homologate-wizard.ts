@@ -67,8 +67,10 @@ import {
   deriveCareerMarketWeights,
   inferCareerClassFromIcao,
   registerCareerPlayerAirframe,
+  stationCargoCeilingIsPlaceholder,
 } from './career-player-airframe-catalog.js';
 import { careerOperationalCargoMaxLb } from './ofp-load-plan.js';
+import { resolveSimBriefMaxCargoKg } from './ofp-compliance/simbrief-airframes.js';
 import {
   findMarketFamilyCandidates,
   stationLayoutFromProfile,
@@ -396,6 +398,33 @@ async function writeCareerRolesPackAfterPromote(
     fuelCapacityGal,
     lbPerGal: liveWeights?.lbPerGal,
   });
+  let cargoCeilingNote = `${cargoMaxLoadLb} lb (stations)`;
+  // Placeholder N×500 maxLoad invents a fake useful-load; SimBrief structural
+  // (mzfw−oew / credible maxcargo) matches EFB better for Market/mission caps.
+  if (
+    stationCargoCeilingIsPlaceholder(profile.payload.stations, roles) &&
+    result.pack.simbriefIcao?.trim()
+  ) {
+    try {
+      const resolved = await resolveSimBriefMaxCargoKg({
+        simbriefIcao: result.pack.simbriefIcao,
+        simbriefAirframeMatch:
+          result.pack.simbriefAirframeMatch?.trim() || 'Default',
+        titleHint: profile.match.title ?? profile.displayName,
+      });
+      marketWeights = {
+        ...marketWeights,
+        maxCargoKg: resolved.maxCargoKg,
+      };
+      cargoCeilingNote = `${resolved.maxCargoKg} kg · simbrief ${resolved.source} (stations were ${cargoMaxLoadLb} lb placeholders)`;
+    } catch (err) {
+      console.log(
+        `  SimBrief cargo ceiling unavailable — keeping station sum (${cargoMaxLoadLb} lb): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
   // Shared Market SKU with different station maps: keep the tighter cargo ceiling.
   if (
     family != null &&
@@ -413,6 +442,7 @@ async function writeCareerRolesPackAfterPromote(
         ...marketWeights,
         maxCargoKg: Math.min(existing.maxCargoKg, marketWeights.maxCargoKg),
       };
+      cargoCeilingNote = `${cargoCeilingNote} · family min → ${marketWeights.maxCargoKg} kg`;
     }
   }
   const registered = await registerCareerPlayerAirframe({
@@ -458,7 +488,7 @@ async function writeCareerRolesPackAfterPromote(
     ['Aircraft Market', `${registered.label} (${registered.aircraftClassId})`],
     [
       'cargo ceiling',
-      `${cargoMaxLoadLb} lb → ${registered.maxCargoKg ?? '—'} kg (${cargoStationNote})`,
+      `${cargoCeilingNote} → catalog ${registered.maxCargoKg ?? '—'} kg (${cargoStationNote})`,
     ],
     [
       'weights',

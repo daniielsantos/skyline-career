@@ -2421,6 +2421,14 @@ export type WatchStatus = {
     avgVisM: number | null;
     rainFraction: number;
   } | null;
+  /** Live MSFS vs mission origin — prefer over Validate snapshot for Origin card. */
+  originProximity?: {
+    ok: boolean;
+    originIcao: string;
+    distanceNm?: number;
+    radiusNm: number;
+    code: string;
+  } | null;
 };
 
 export function postDepart(opts: { missionId: string; override?: boolean }) {

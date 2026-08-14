@@ -14,6 +14,7 @@ import {
   updateCareerPlayerAirframeBurn,
   deriveCareerMarketWeights,
   cargoMaxLoadLbFromStations,
+  stationCargoCeilingIsPlaceholder,
 } from './career-player-airframe-catalog.js';
 import type { OfpRolesPackFile } from './ofp-compliance/scaffold-roles.js';
 
@@ -186,6 +187,33 @@ describe('career player airframe registration', () => {
         [3, 7],
       ),
       1000,
+    );
+  });
+
+  it('detects draft placeholder station cargo ceilings', () => {
+    assert.equal(
+      stationCargoCeilingIsPlaceholder(
+        [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 500 },
+          { index: 4, maxLoad: 500 },
+        ],
+        { crewStations: [1, 2], baggageStations: [3, 4] },
+      ),
+      true,
+    );
+    assert.equal(
+      stationCargoCeilingIsPlaceholder(
+        [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 1200 },
+          { index: 4, maxLoad: 500 },
+        ],
+        { crewStations: [1, 2], baggageStations: [3, 4] },
+      ),
+      false,
     );
   });
 

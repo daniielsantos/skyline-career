@@ -6,8 +6,9 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 - [ ] Watch CG card: após editar EFB, `% MAC` atualiza (não congela no Validate); Loaded vs Due não trava
 - [ ] Preflight longe do origin → **NOT AT ORIGIN** + status line; Watch não auto-decola; spawn no hub certo limpa o card sem novo Validate
-- [ ] Aerostar inject: tablet PAYLOAD = Due; Preflight Sim ≈ tablet (não 303 vs 1332)
+- [ ] Aerostar inject: Sim ≈ Due sem flick 672/535→751 (densidade resolveFuelDensity na pintura); tablet PAYLOAD = Due
 - [ ] Aerostar schematic: Character* + BaggageWeight, não só S1/S7 clássicos
+- [ ] Contract-pilot inject: não exige fuelAuthorizedOfpId (Accept OFP não trava Preflight/inject)
 
 - [ ] Hot-swap Host novo (`resources/host`) — log `timeout storm` / `unrecognized_id storm` + `connect() will reopen`
 - [ ] Watch solo: um pedido `readSimVars` (não 16 stations em série)
@@ -31,8 +32,9 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 ## Feito (local, sem release)
 
-- **Accept OFP cargo** também em **contract-pilot** (ex.: Blue Ridge + BN2 maxcargo 400): botão + CTA primário; trim escala pilot fee / gross.
-- **BN2 / light_ga SimBrief:** Dispatch preenche `manualpayload` (não `cargo`/Freight); capacity ignora maxcargo freight-only quando &lt; ½ de mzfw−oew (400 vs ~2186 lb).
+- **Max cargo (missão):** online → SimBrief (`mzfw−oew` estrutural; `maxcargo` só se ≥½ estrutural / freighter). Catálogo JSON = fallback offline/API down (não short-circuit). Prefill light_ga ainda `manualpayload`.
+- **Accept OFP cargo** também em **contract-pilot** (ex.: Blue Ridge + BN2): botão + CTA primário; trim escala pilot fee / gross.
+- **BN2 Market:** um SKU `blackbox-bn2-islander-cargo-tip-tanks` (Cargo Tip Tanks + SpecialOps family).
 - Defs SimConnect reusadas para batches Watch/inject idênticos (cache no Host).
 - Watch backoff 8s→15s em queda do MSFS; UI `Simulator closed — retry in Ns`.
 - A2A Accu-Sim: liveSource `a2a-lvars` (PayloadWeight / Fuel* / Character*) no pack Aerostar/Comanche. Sem `if (a2a)` no fill.

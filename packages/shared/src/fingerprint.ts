@@ -317,6 +317,11 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     'summit',
     'amphibian',
     'floats',
+    // Black Box BN-2 cabin / tank presets — Passenger Tip Tanks must not
+    // alias onto SpecialOps (same tank/station hash, different OFP pack).
+    'specialops',
+    'tip',
+    'tanks',
     // Landing gear / tires — "Kodiak 100 Combi" must not alias onto
     // "Kodiak 100 Combi, Tundra wheels" (same tank/station hash).
     'tundra',

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  airframeMaxCargoKg,
   fallbackSimBriefAirframeForDefault,
   inferSimBriefAirframeMatchFromTitle,
   matchSimBriefAirframe,
@@ -230,7 +231,7 @@ describe('fallbackSimBriefAirframeForDefault', () => {
 });
 
 describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
-  it('converts maxcargo LBS to kg', async () => {
+  it('keeps credible freighter maxcargo (B738 BCF) over larger mzfw-oew', async () => {
     const { maxCargoKg, source, airframe } = await resolveSimBriefMaxCargoKg({
       simbriefIcao: 'B738',
       simbriefAirframeMatch: 'Converted Freighter',
@@ -300,7 +301,7 @@ describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
     assert.equal(maxCargoKg, 91958);
   });
 
-  it('ignores tiny GA maxcargo freight soft-cap and uses mzfw-oew', async () => {
+  it('prefers mzfw-oew over tiny GA Freight soft-cap (BN2)', async () => {
     const { maxCargoKg, source } = await resolveSimBriefMaxCargoKg({
       simbriefIcao: 'BN2P',
       simbriefAirframeMatch: 'Default',
@@ -334,5 +335,36 @@ describe('airframeMaxCargoKg / resolveSimBriefMaxCargoKg', () => {
     assert.equal(source, 'mzfw-oew');
     // 6300 − 4114 = 2186 lb → kg
     assert.equal(maxCargoKg, Math.round(2186 / 2.2046226218));
+  });
+
+  it('airframeMaxCargoKg prefers structural unless maxcargo is a credible freight rating', () => {
+    assert.equal(
+      airframeMaxCargoKg({
+        internalId: 'ga',
+        icao: 'BN2P',
+        listType: 'BN2P',
+        comments: 'Default',
+        name: 'BN2',
+        passengers: 9,
+        maxCargoKg: 181,
+        oewKg: 1866,
+        mzfwKg: 2858,
+      }),
+      992,
+    );
+    assert.equal(
+      airframeMaxCargoKg({
+        internalId: 'bcf',
+        icao: 'B738',
+        listType: 'B738',
+        comments: 'BCF',
+        name: 'B738',
+        passengers: 0,
+        maxCargoKg: 18_137,
+        oewKg: 39_633,
+        mzfwKg: 62_732,
+      }),
+      18_137,
+    );
   });
 });

@@ -202,6 +202,17 @@ export type WatchStatusPayload = {
   cruiseSample: CruiseSampleStatus | null;
   /** Live weather-ops score progress (headwind / rain / visibility). */
   weatherOps: ReturnType<typeof weatherOpsStatus> | null;
+  /**
+   * Live distance to mission origin (Watch tick). UI Origin card prefers this
+   * over a stale Validate snapshot on lastPreflightCheck.location.
+   */
+  originProximity: {
+    ok: boolean;
+    originIcao: string;
+    distanceNm?: number;
+    radiusNm: number;
+    code: string;
+  } | null;
 };
 
 type WatchCallbacks = {
@@ -1087,6 +1098,8 @@ export class CareerWatchSession {
   private lastLiveFuelLb: number | null = null;
   private lastLivePayloadLb: number | null = null;
   private lastLoadVerification: WatchLoadVerification | null = null;
+  /** Live origin proximity for Origin card (see WatchStatusPayload.originProximity). */
+  private lastOriginProximity: WatchStatusPayload['originProximity'] = null;
   /**
    * Envelope painted at Validate/inject (profile calibrated-live). Soft Watch
    * CG reads refresh liveMac only — never overwrite with SimVar FWD/AFT.
@@ -1282,6 +1295,7 @@ export class CareerWatchSession {
       liveFuelLb: this.lastLiveFuelLb,
       livePayloadLb: this.lastLivePayloadLb,
       loadVerification: this.lastLoadVerification,
+      originProximity: this.lastOriginProximity,
       sawAirborne: this.watchState.sawAirborne,
       lastEvent: this.lastEvent,
       lastEventAtIso: this.lastEventAtIso,
@@ -1354,6 +1368,7 @@ export class CareerWatchSession {
     this.lastLiveFuelLb = null;
     this.lastLivePayloadLb = null;
     this.lastLoadVerification = null;
+    this.lastOriginProximity = null;
     this.pinnedCgEnvelope = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
@@ -1587,6 +1602,7 @@ export class CareerWatchSession {
     this.lastLiveFuelLb = null;
     this.lastLivePayloadLb = null;
     this.lastLoadVerification = null;
+    this.lastOriginProximity = null;
     this.pinnedCgEnvelope = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
@@ -2208,38 +2224,59 @@ export class CareerWatchSession {
           ? greatCircleDistanceNm(sample.position, originCoords)
           : undefined;
       const settleRadiusNm = this.opts.settleRadiusNm ?? 12;
+      // Always refresh status payload so the Origin card tracks MSFS moves /
+      // hub changes without waiting for a mission poll of lastPreflightCheck.
+      if (
+        typeof liveDistToOriginNm === 'number' &&
+        originCoords &&
+        sample.position
+      ) {
+        const prox = evaluateOriginProximity({
+          originIcao: current.originIcao,
+          position: sample.position,
+          onGround: sample.onGround === true,
+          originCoords,
+          radiusNm: settleRadiusNm,
+        });
+        this.lastOriginProximity = {
+          ok: prox.ok,
+          originIcao: prox.originIcao,
+          ...(prox.distanceNm !== undefined
+            ? { distanceNm: prox.distanceNm }
+            : {}),
+          radiusNm: prox.radiusNm,
+          code: prox.code,
+        };
+      } else {
+        this.lastOriginProximity = null;
+      }
       // On the ramp: re-check origin so relocating hubs clears the gate without
       // a fresh Validate. Latch sticks through wheels-up for auto-depart.
       if (
         sample.onGround === true &&
         typeof liveDistToOriginNm === 'number' &&
-        originCoords
+        originCoords &&
+        this.lastOriginProximity
       ) {
         const nearOrigin = liveDistToOriginNm <= settleRadiusNm;
         const wasCleared = this.originClearedForDepart;
         this.originClearedForDepart = nearOrigin;
         if (nearOrigin !== wasCleared || current.lastPreflightCheck?.location) {
-          const prox = evaluateOriginProximity({
-            originIcao: current.originIcao,
-            position: sample.position,
-            onGround: true,
-            originCoords,
-            radiusNm: settleRadiusNm,
-          });
           const nextLocation = {
-            ok: prox.ok,
-            originIcao: prox.originIcao,
-            ...(prox.distanceNm !== undefined
-              ? { distanceNm: prox.distanceNm }
+            ok: this.lastOriginProximity.ok,
+            originIcao: this.lastOriginProximity.originIcao,
+            ...(this.lastOriginProximity.distanceNm !== undefined
+              ? { distanceNm: this.lastOriginProximity.distanceNm }
               : {}),
-            radiusNm: prox.radiusNm,
-            code: prox.code,
+            radiusNm: this.lastOriginProximity.radiusNm,
+            code: this.lastOriginProximity.code,
           };
           const prevLoc = current.lastPreflightCheck?.location;
           const locDrifted =
             !prevLoc ||
             prevLoc.ok !== nextLocation.ok ||
             prevLoc.code !== nextLocation.code ||
+            prevLoc.originIcao !== nextLocation.originIcao ||
             (typeof prevLoc.distanceNm === 'number' &&
             typeof nextLocation.distanceNm === 'number'
               ? Math.abs(prevLoc.distanceNm - nextLocation.distanceNm) >= 0.5

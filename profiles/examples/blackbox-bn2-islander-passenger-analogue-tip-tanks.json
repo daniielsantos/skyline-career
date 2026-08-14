@@ -1,16 +1,16 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "blackbox-bn2-islander-specialops-analogue",
-  "profileKey": "blackbox/bn2-islander-specialops-analogue",
-  "semver": "1.1.0",
-  "displayName": "BN2 Islander - SpecialOps / Analogue (MSFS 2024)",
+  "profileId": "blackbox-bn2-islander-passenger-analogue-tip-tanks",
+  "profileKey": "blackbox/bn2-islander-passenger-analogue-tip-tanks",
+  "semver": "1.0.0",
+  "displayName": "BN2 Islander - Passenger / Analogue / Tip Tanks (MSFS 2024)",
   "match": {
-    "fingerprint": "183a7bda16af6681106c3486d6ed22a3593ebcdd14975d776c8ca547fc9b004d",
-    "title": "BN2 Islander - SpecialOps / Analogue",
+    "fingerprint": "345d92230534b7b36367cef5c7c50a0b4150191410a74560d4a900f0dcd027c4",
+    "title": "BN2 Islander - Passenger / Analogue / Tip Tanks",
     "publisher": "blackbox",
     "icao": "BN2P",
     "liveTitles": [
-      "BN2 Islander - SpecialOps / Analogue"
+      "BN2 Islander - Passenger / Analogue / Tip Tanks"
     ]
   },
   "capabilities": [
@@ -28,24 +28,6 @@
     "strategy": "simconnect-direct",
     "unit": "gallons",
     "tanks": [
-      {
-        "id": "LEFT_MAIN",
-        "name": "Left Main",
-        "capacity": 65,
-        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
-        "readUnit": "gallons",
-        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
-        "writeUnit": "gallons"
-      },
-      {
-        "id": "RIGHT_MAIN",
-        "name": "Right Main",
-        "capacity": 65,
-        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
-        "readUnit": "gallons",
-        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
-        "writeUnit": "gallons"
-      },
       {
         "id": "LEFT_AUX",
         "name": "Left Aux",
@@ -68,18 +50,6 @@
     "writePlan": [
       {
         "op": "simvar_set",
-        "var": "FUEL TANK LEFT MAIN QUANTITY",
-        "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN} + 3.5"
-      },
-      {
-        "op": "simvar_set",
-        "var": "FUEL TANK RIGHT MAIN QUANTITY",
-        "unit": "gallons",
-        "valueExpr": "{RIGHT_MAIN}"
-      },
-      {
-        "op": "simvar_set",
         "var": "FUEL TANK LEFT AUX QUANTITY",
         "unit": "gallons",
         "valueExpr": "{LEFT_AUX} + 0.8"
@@ -100,27 +70,15 @@
       "pollIntervalMs": 250,
       "checks": [
         {
-          "var": "FUEL TANK LEFT MAIN QUANTITY",
-          "unit": "gallons",
-          "tolerancePct": 3,
-          "valueExpr": "{LEFT_MAIN}"
-        },
-        {
-          "var": "FUEL TANK RIGHT MAIN QUANTITY",
-          "unit": "gallons",
-          "tolerancePct": 5,
-          "valueExpr": "{RIGHT_MAIN}"
-        },
-        {
           "var": "FUEL TANK LEFT AUX QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 3,
+          "tolerancePct": 8,
           "valueExpr": "{LEFT_AUX}"
         },
         {
           "var": "FUEL TANK RIGHT AUX QUANTITY",
           "unit": "gallons",
-          "tolerancePct": 3,
+          "tolerancePct": 8,
           "valueExpr": "{RIGHT_AUX}"
         }
       ]
@@ -133,7 +91,7 @@
         "index": 1,
         "name": "PILOT",
         "maxLoad": 500,
-        "arm": 5.794683
+        "arm": 5.79
       },
       {
         "index": 2,
@@ -143,15 +101,57 @@
       },
       {
         "index": 3,
-        "name": "Cabin fwd",
+        "name": "PASSENGER 01",
         "maxLoad": 500,
-        "arm": -3.40818
+        "arm": 5.8
       },
       {
         "index": 4,
-        "name": "Cabin aft",
+        "name": "PASSENGER 02",
         "maxLoad": 500,
-        "arm": 1.033674
+        "arm": 5.8
+      },
+      {
+        "index": 5,
+        "name": "PASSENGER 03",
+        "maxLoad": 500,
+        "arm": 3.2
+      },
+      {
+        "index": 6,
+        "name": "PASSENGER 04",
+        "maxLoad": 500,
+        "arm": 3.2
+      },
+      {
+        "index": 7,
+        "name": "PASSENGER 05",
+        "maxLoad": 500,
+        "arm": 0.95
+      },
+      {
+        "index": 8,
+        "name": "PASSENGER 06",
+        "maxLoad": 500,
+        "arm": 0.95
+      },
+      {
+        "index": 9,
+        "name": "PASSENGER 07",
+        "maxLoad": 500,
+        "arm": -1.5
+      },
+      {
+        "index": 10,
+        "name": "PASSENGER 08",
+        "maxLoad": 500,
+        "arm": -1.5
+      },
+      {
+        "index": 11,
+        "name": "BAGGAGE BAY",
+        "maxLoad": 500,
+        "arm": -8
       }
     ],
     "writePlan": [
@@ -178,6 +178,48 @@
         "var": "PAYLOAD STATION WEIGHT:4",
         "unit": "pounds",
         "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:8",
+        "unit": "pounds",
+        "valueExpr": "{station_8}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:9",
+        "unit": "pounds",
+        "valueExpr": "{station_9}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:10",
+        "unit": "pounds",
+        "valueExpr": "{station_10}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:11",
+        "unit": "pounds",
+        "valueExpr": "{station_11}"
       },
       {
         "op": "delay",
@@ -207,23 +249,23 @@
       "maxMac": 26.400000000000002
     },
     "calibration": {
-      "observedMac": 25.474458932876587,
-      "calibratedAtIso": "2026-08-09T17:07:03.161Z",
-      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\blackboxsimulation-bn2islander24\\SimObjects\\Airplanes\\BBS_BN2_Piston\\attachments\\bbs\\part_interior_spec_ops\\config\\flight_model.cfg",
+      "observedMac": 22.1490278840065,
+      "calibratedAtIso": "2026-08-14T04:14:36.471Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\blackboxsimulation-bn2islander24\\SimObjects\\Airplanes\\BBS_BN2_Piston\\attachments\\bbs\\part_interior_pax\\config\\flight_model.cfg",
       "emptyWeightCgPosition": [
         0.5,
         0,
         -1
       ],
       "sweep": {
-        "minObservedMac": 21.984070539474487,
-        "maxObservedMac": 27.905577421188354,
+        "minObservedMac": 24.332864582538605,
+        "maxObservedMac": 32.79701769351959,
         "payloadLb": 200,
-        "forwardStation": 1,
-        "aftStation": 3,
+        "forwardStation": 4,
+        "aftStation": 11,
         "usedStationArms": true,
         "restored": true,
-        "sampledAtIso": "2026-08-09T17:07:10.859Z"
+        "sampledAtIso": "2026-08-14T04:14:45.020Z"
       }
     }
   },
@@ -233,13 +275,13 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: BN2 Islander - SpecialOps / Analogue.",
+    "Homologated via wizard: BN2 Islander - Passenger / Analogue / Tip Tanks.",
     "ICAO type designator (catalog/SimBrief): BN2P.",
-    "Fuel: LEFT/RIGHT MAIN + LEFT/RIGHT AUX from writetest (v1.1.0).",
-    "RIGHT_MAIN writetest was partial (vendor rebalance) — wider verify tol.",
-    "Payload stations from writetest: 1, 2, 3, 4.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_AUX, RIGHT_AUX).",
+    "AUX/Aft tanks included.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.",
     "Station maxLoad: placeholder until flight_model.cfg calibrate.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/blackbox-bn2-islander-specialops-analogue.md"
+    "See profiles/notes/blackbox-bn2-islander-passenger-analogue-tip-tanks.md"
   ]
 }

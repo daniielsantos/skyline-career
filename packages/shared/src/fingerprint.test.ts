@@ -121,6 +121,31 @@ describe('titlesMatchForCatalog', () => {
     );
   });
 
+  it('does not alias BN2 Passenger Tip Tanks onto SpecialOps or Cargo', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'BN2 Islander - Passenger / Analogue / Tip Tanks',
+        'BN2 Islander - SpecialOps / Analogue',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'BN2 Islander - Passenger / Analogue / Tip Tanks',
+        'BN2 Islander - Cargo / Analogue / Tip Tanks',
+      ),
+      false,
+    );
+    // Glass-only Cargo Tip Tanks stay one family.
+    assert.equal(
+      titlesMatchForCatalog(
+        'BN2 Islander - Cargo / Garmin / Tip Tanks',
+        'BN2 Islander - Cargo / Analogue / Tip Tanks',
+      ),
+      true,
+    );
+  });
+
   it('does not alias Learjet PASSENGER LONG RANGE onto plain PASSENGER', () => {
     assert.equal(
       titlesMatchForCatalog(

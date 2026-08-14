@@ -41,10 +41,17 @@ const repoRoot = getRepoRoot();
 
 export type ClassCargoLimit = {
   maxCargoKg: number;
+  /**
+   * Where the ceiling came from:
+   * - `mzfw-oew` / `maxcargo` — live SimBrief airframes.json
+   * - `airframe-catalog` — career-player-airframes.json (offline / API down)
+   * - `class-fallback` — CAREER_AIRCRAFT_CLASSES
+   */
   source: string;
   airframeLabel: string;
   oewKg?: number;
   mtowKg?: number;
+  mzfwKg?: number;
   fuelCapacityKg?: number;
   fuelBurnKgPerNm?: number;
   airframeTypeId?: string;
@@ -121,11 +128,22 @@ export async function resolveDispatchSimBriefParams(opts: {
   };
 }
 
-/** Live SimBrief freight cap for a career freighter class (cached). */
+/**
+ * Mission / staging cargo ceiling (cached).
+ *
+ * Online: SimBrief airframes.json via {@link resolveSimBriefMaxCargoKg}
+ * (structural mzfw−oew, or credible Freight maxcargo). Catalog is offline /
+ * API-failure fallback — it must not permanently override SimBrief when the
+ * network works (that hid BN2 structural payload behind a stale JSON row).
+ */
 export async function resolveClassMaxCargoKg(
   aircraftClassId: FreighterClassId,
   airframeTypeId?: string,
-  opts: { liveTitle?: string | null } = {},
+  opts: {
+    liveTitle?: string | null;
+    /** Test seam — defaults to global fetch. */
+    fetchImpl?: typeof fetch;
+  } = {},
 ): Promise<ClassCargoLimit> {
   const cacheKey = `${airframeTypeId ?? aircraftClassId}::${opts.liveTitle?.trim() || ''}`;
   const cached = cargoLimitCache.get(cacheKey);
@@ -143,60 +161,59 @@ export async function resolveClassMaxCargoKg(
         maxCargoKg: value.maxCargoKg,
         oewKg: value.oewKg,
         mtowKg: value.mtowKg,
+        mzfwKg: value.mzfwKg,
       }) ?? value.maxCargoKg;
     const next = { ...value, maxCargoKg: clamped };
     cargoLimitCache.set(cacheKey, next);
     return next;
   };
 
-  if (
-    airframe &&
-    typeof airframe.maxCargoKg === 'number' &&
-    airframe.maxCargoKg > 0 &&
-    typeof airframe.oewKg === 'number' &&
-    typeof airframe.mtowKg === 'number'
-  ) {
-    return finish({
-      maxCargoKg: Math.floor(airframe.maxCargoKg),
-      source: 'airframe-catalog',
-      airframeLabel: airframe.label,
-      oewKg: airframe.oewKg,
-      mtowKg: airframe.mtowKg,
-      fuelCapacityKg: airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
-      fuelBurnKgPerNm,
-      airframeTypeId: airframe.typeId,
-    });
-  }
   try {
     const params = await resolveDispatchSimBriefParams({
       aircraftClassId,
       airframeTypeId,
       liveTitle: opts.liveTitle,
     });
-    const resolved = await resolveSimBriefMaxCargoKg(params);
-    const catalogCap =
-      typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
-        ? Math.floor(airframe.maxCargoKg)
-        : undefined;
+    const resolved = await resolveSimBriefMaxCargoKg({
+      ...params,
+      ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+    });
     return finish({
-      maxCargoKg: catalogCap
-        ? Math.min(resolved.maxCargoKg, catalogCap)
-        : resolved.maxCargoKg,
-      source: catalogCap ? 'simbrief+airframe-cap' : resolved.source,
-      airframeLabel: resolved.airframe.comments || resolved.airframe.name,
-      oewKg: airframe?.oewKg ?? resolved.airframe.oewKg ?? aircraft.oewKg,
-      mtowKg: airframe?.mtowKg ?? resolved.airframe.mtowKg ?? aircraft.mtowKg,
+      maxCargoKg: resolved.maxCargoKg,
+      source: resolved.source,
+      airframeLabel:
+        airframe?.label ??
+        (resolved.airframe.comments || resolved.airframe.name),
+      oewKg: resolved.airframe.oewKg ?? airframe?.oewKg ?? aircraft.oewKg,
+      mtowKg: resolved.airframe.mtowKg ?? airframe?.mtowKg ?? aircraft.mtowKg,
+      mzfwKg: resolved.airframe.mzfwKg,
       fuelCapacityKg:
-        airframe?.fuelCapacityKg ??
         resolved.airframe.fuelCapacityKg ??
+        airframe?.fuelCapacityKg ??
         aircraft.fuelCapacityKg,
       fuelBurnKgPerNm,
       airframeTypeId: airframe?.typeId ?? airframeTypeId,
     });
   } catch {
+    if (
+      airframe &&
+      typeof airframe.maxCargoKg === 'number' &&
+      airframe.maxCargoKg > 0
+    ) {
+      return finish({
+        maxCargoKg: Math.floor(airframe.maxCargoKg),
+        source: 'airframe-catalog',
+        airframeLabel: airframe.label,
+        oewKg: airframe.oewKg ?? aircraft.oewKg,
+        mtowKg: airframe.mtowKg ?? aircraft.mtowKg,
+        fuelCapacityKg: airframe.fuelCapacityKg ?? aircraft.fuelCapacityKg,
+        fuelBurnKgPerNm,
+        airframeTypeId: airframe.typeId,
+      });
+    }
     return finish({
-      maxCargoKg: airframe?.maxCargoKg ?? aircraft.maxCargoKg,
-      source: airframe?.maxCargoKg ? 'airframe-catalog' : 'class-fallback',
+      maxCargoKg: aircraft.maxCargoKg,
+      source: 'class-fallback',
       airframeLabel: airframe?.label ?? aircraft.name,
       oewKg: airframe?.oewKg ?? aircraft.oewKg,
       mtowKg: airframe?.mtowKg ?? aircraft.mtowKg,
@@ -205,6 +222,11 @@ export async function resolveClassMaxCargoKg(
       airframeTypeId: airframe?.typeId ?? airframeTypeId,
     });
   }
+}
+
+/** Test helper — drop cached mission cargo ceilings. */
+export function clearClassMaxCargoKgCache(): void {
+  cargoLimitCache.clear();
 }
 
 export type DispatchWeightSystem = 'metric' | 'imperial';

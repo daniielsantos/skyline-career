@@ -259,6 +259,9 @@ const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
     'blackbox-bn2-islander-cargo-tip-tanks',
   'blackbox-bn2-islander-cargo-garmin-tip-tanks':
     'blackbox-bn2-islander-cargo-tip-tanks',
+  /** SpecialOps cabin preset — same Black Box BN2 Market family as Cargo Tip Tanks. */
+  'blackbox-bn2-islander-specialops-analogue':
+    'blackbox-bn2-islander-cargo-tip-tanks',
   'microsoft-saab-340-cargo': 'carenado-saab-340-passenger',
 };
 

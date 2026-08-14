@@ -196,6 +196,12 @@ export function DispatchActivePanel(props: {
   }
   const stickyInjectStatusRef = useRef(props.loadOfpAutoStatus);
   if (
+    stickyInjectStatusRef.current !== 'loading' &&
+    props.loadOfpAutoStatus === 'loading'
+  ) {
+    stickyFuelRef.current = {};
+  }
+  if (
     stickyInjectStatusRef.current === 'loading' &&
     props.loadOfpAutoStatus !== 'loading'
   ) {
@@ -275,7 +281,7 @@ export function DispatchActivePanel(props: {
             </button>
             <button
               type="button"
-              className="action"
+              className="action ghost"
               disabled={busy}
               onClick={() => props.onDispatch(mission)}
               title="Open SimBrief with the current cargo"
@@ -553,20 +559,6 @@ export function DispatchActivePanel(props: {
                       the board and{' '}
                       {mission.contractPilot ? 'pilot fee' : 'pay'} is reduced.
                     </p>
-                    <button
-                      type="button"
-                      className="action"
-                      disabled={busy}
-                      onClick={() => props.onAcceptOfpCargo?.(mission)}
-                    >
-                      Accept OFP cargo
-                      {(() => {
-                        const kg = ofpCargoKgFromUnderFinding(check);
-                        return kg
-                          ? ` (${formatMassExact(kg, weightSystem)})`
-                          : '';
-                      })()}
-                    </button>
                   </div>
                 ) : null}
                 {briefingItems.length > 0 ? (
@@ -605,6 +597,11 @@ export function DispatchActivePanel(props: {
                       ))}
                     </ul>
                   </details>
+                ) : null}
+                {ofpCargoUnderOnly && primaryCta ? (
+                  <div className="dispatch-primary-actions ofp-accept-actions">
+                    {primaryCta}
+                  </div>
                 ) : null}
               </section>
             );
@@ -1017,7 +1014,13 @@ export function DispatchActivePanel(props: {
             // While Skyline inject is writing, never show PREFLIGHT READY from
             // mid-ramp live numbers — the switch also looked "finished" early.
             const injecting = props.loadOfpAutoStatus === 'loading';
-            const locationOk = check.location?.ok !== false;
+            const liveLocation =
+              props.watch?.running &&
+              props.watch.missionId === mission.id &&
+              props.watch.originProximity
+                ? props.watch.originProximity
+                : check.location;
+            const locationOk = liveLocation?.ok !== false;
             const loadReady =
               view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
             const ready = injecting
@@ -1112,10 +1115,10 @@ export function DispatchActivePanel(props: {
                           : ready
                             ? 'Fuel and cargo match the confirmed OFP. Take off when Watch is connected.'
                             : loadReady && !locationOk
-                              ? check.location
-                                ? check.location.distanceNm !== undefined
-                                  ? `Aircraft is ${check.location.distanceNm.toFixed(1)} nm from ${check.location.originIcao} (need ≤${check.location.radiusNm} nm). Relocate before takeoff — Watch will not auto-depart.`
-                                  : `Not verified at ${check.location.originIcao}. Relocate before takeoff — Watch will not auto-depart.`
+                              ? liveLocation
+                                ? liveLocation.distanceNm !== undefined
+                                  ? `Aircraft is ${liveLocation.distanceNm.toFixed(1)} nm from ${liveLocation.originIcao} (need ≤${liveLocation.radiusNm} nm). Relocate before takeoff — Watch will not auto-depart.`
+                                  : `Not verified at ${liveLocation.originIcao}. Relocate before takeoff — Watch will not auto-depart.`
                                 : 'Relocate to the mission origin before takeoff — Watch will not auto-depart.'
                             : 'Fix the mismatched aircraft load before departure.'}
                     </small>
@@ -1308,7 +1311,12 @@ export function DispatchActivePanel(props: {
                         watchSample?.enginesRunning ??
                         props.simBridge?.enginesRunning ??
                         view.aircraft.enginesRunning;
-                      const loc = check.location;
+                      const loc =
+                        props.watch?.running &&
+                        props.watch.missionId === mission.id &&
+                        props.watch.originProximity
+                          ? props.watch.originProximity
+                          : check.location;
                       return (
                         <div className="preflight-aircraft-stack">
                           <div className="preflight-aircraft-state">
@@ -1408,7 +1416,7 @@ export function DispatchActivePanel(props: {
         />
       ) : null}
 
-      {primaryCta ? (
+      {primaryCta && !ofpCargoUnderOnly ? (
         <div className="dispatch-primary-actions">{primaryCta}</div>
       ) : null}
 

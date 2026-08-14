@@ -213,6 +213,7 @@ import {
   formatFlightDurationMs,
   formatLandingFpm,
   formatRunwayTouchdownDebriefLine,
+  fuelAuthorizedForOfp,
   resolveLoadPath,
   type FlightDebrief,
 } from './dispatch-flow';
@@ -3534,6 +3535,9 @@ export function App() {
   useEffect(() => {
     const username = simbriefUser.trim();
     const ofp = activeMission?.lastOfpCheck;
+    // Match deriveDispatchStep: contract-pilot skips fuel purchase, so do not
+    // require fuelAuthorizedOfpId (Accept OFP clears it; step can still be load).
+    const fuelOk = activeMission ? fuelAuthorizedForOfp(activeMission) : false;
     const eligible =
       tab === 'staging' &&
       !airportIcao &&
@@ -3541,7 +3545,7 @@ export function App() {
       activeMission?.status === 'dispatched' &&
       Boolean(username) &&
       Boolean(ofp?.ofpId) &&
-      activeMission?.fuelAuthorizedOfpId === ofp?.ofpId &&
+      fuelOk &&
       Boolean(simBridge?.connected) &&
       simBridge?.onGround !== false &&
       !watch?.running &&
@@ -3593,8 +3597,10 @@ export function App() {
   }, [
     activeMission?.id,
     activeMission?.status,
+    activeMission?.contractPilot,
     activeMission?.fuelAuthorizedOfpId,
     activeMission?.lastOfpCheck?.ofpId,
+    activeMission?.lastOfpCheck?.verdict,
     airportIcao,
     loadOfpAutoStatus,
     simBridge?.connected,

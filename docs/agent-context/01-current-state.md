@@ -4,7 +4,8 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.39** (latest) | [v0.3.39](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.39) | Fix tela EN ROUTE em branco (flex staging-panel) |
+| **0.3.40** (latest) | [v0.3.40](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.40) | EN ROUTE: Aircraft/Origin alinhados; Cancel restilizado |
+| **0.3.39** | [v0.3.39](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.39) | Fix tela EN ROUTE em branco (flex staging-panel) |
 | **0.3.38** | [v0.3.38](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.38) | EN ROUTE: OFP/Cargo/live-load alinhados na mesma coluna |
 | **0.3.37** | [v0.3.37](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.37) | Route header limpo; EN ROUTE side sem scroll |
 | **0.3.36** | [v0.3.36](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.36) | Route header hubs coloridos; technical details colapsados |

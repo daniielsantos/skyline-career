@@ -7,24 +7,6 @@ import {
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
 
-function hubIcaoSpan(
-  icao: string,
-  kind: 'origin' | 'dest',
-  onOpen: (icao: string) => void,
-) {
-  const code = icao.trim().toUpperCase();
-  return (
-    <button
-      type="button"
-      className={`dispatch-route-hub dispatch-route-hub-${kind}`}
-      onClick={() => onOpen(code)}
-      title={`Open ${code}`}
-    >
-      {code}
-    </button>
-  );
-}
-
 /** Highlight origin/dest ICAO tokens (incl. runway suffix like SAVN/12) in the OFP route. */
 function highlightOfpRoute(
   route: string,
@@ -136,16 +118,7 @@ export function DispatchRouteCard(props: {
       aria-label="Dispatch route map"
     >
       <div className="dispatch-route-map-head">
-        <div className="dispatch-route-map-head-row">
-          <strong>Route</strong>
-          <span className="dispatch-route-map-od">
-            {hubIcaoSpan(props.originIcao, 'origin', props.onOpenAirport)}
-            <span className="dispatch-route-map-od-arrow" aria-hidden="true">
-              →
-            </span>
-            {hubIcaoSpan(props.destIcao, 'dest', props.onOpenAirport)}
-          </span>
-        </div>
+        <strong>Route</strong>
         {ofpRoute ? (
           <code className="dispatch-route-map-ofp" title={ofpRoute}>
             {highlightOfpRoute(ofpRoute, props.originIcao, props.destIcao)}

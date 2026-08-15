@@ -402,76 +402,74 @@ export function DispatchActivePanel(props: {
         </div>
       </div>
 
-      <div
-        className={`cargo-capacity staging-capacity staging-ops-capacity${
-          isEnRoute ? ' staging-ops-capacity-compact' : ''
-        }`}
-      >
-        {isFerryLeg ? (
-          <span>
-            Load
-            <strong>Empty</strong>
-            <em>ferry / reposition</em>
-          </span>
-        ) : (
-          <span>
-            Cargo
-            <strong>{props.formatTonnes(mission.cargoKg)}</strong>
-            <em>
-              {(mission.lots?.length ?? 1) > 1
-                ? `${mission.lots!.length} lots`
-                : '1 lot'}
-            </em>
-          </span>
-        )}
-        <span>
-          {isFerryLeg
-            ? mission.contractPilot
-              ? 'Pilot fee'
-              : 'Payout'
-            : 'Contract'}
-          <strong>{props.formatMoney(mission.payUsd)}</strong>
-        </span>
-        <span>
-          Deadline
-          <strong>
-            {props.formatDeadline(mission.deadlineTick, continuousHours)}
-          </strong>
-        </span>
-        {!isFerryLeg ? (
-          <span>
-            Capacity left
-            <strong>
-              {props.formatTonnes(
-                Math.max(
-                  0,
-                  props.missionMaxCargoKg(mission) - mission.cargoKg,
-                ),
-              )}
-            </strong>
-            {typeof props.missionOpsCapacityHint === 'number' &&
-            props.missionOpsCapacityHint > 0 ? (
+      {!isEnRoute ? (
+        <div className="cargo-capacity staging-capacity staging-ops-capacity">
+          {isFerryLeg ? (
+            <span>
+              Load
+              <strong>Empty</strong>
+              <em>ferry / reposition</em>
+            </span>
+          ) : (
+            <span>
+              Cargo
+              <strong>{props.formatTonnes(mission.cargoKg)}</strong>
               <em>
-                of {props.formatTonnes(props.missionOpsCapacityHint)} ops
+                {(mission.lots?.length ?? 1) > 1
+                  ? `${mission.lots!.length} lots`
+                  : '1 lot'}
               </em>
-            ) : null}
-          </span>
-        ) : null}
-        {mission.fuelUplift &&
-        (mission.fuelUplift.costUsd > 0 ||
-          mission.fuelUplift.requestedKg > 0.5) ? (
+            </span>
+          )}
           <span>
-            Fuel
-            <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
-            <em>
-              {props.formatTonnes(mission.fuelUplift.requestedKg)}
-              {mission.fuelUplift.scarcity !== 'ok'
-                ? ` · ${mission.fuelUplift.scarcity}`
-                : ''}
-            </em>
+            {isFerryLeg
+              ? mission.contractPilot
+                ? 'Pilot fee'
+                : 'Payout'
+              : 'Contract'}
+            <strong>{props.formatMoney(mission.payUsd)}</strong>
           </span>
-        ) : null}
-      </div>
+          <span>
+            Deadline
+            <strong>
+              {props.formatDeadline(mission.deadlineTick, continuousHours)}
+            </strong>
+          </span>
+          {!isFerryLeg ? (
+            <span>
+              Capacity left
+              <strong>
+                {props.formatTonnes(
+                  Math.max(
+                    0,
+                    props.missionMaxCargoKg(mission) - mission.cargoKg,
+                  ),
+                )}
+              </strong>
+              {typeof props.missionOpsCapacityHint === 'number' &&
+              props.missionOpsCapacityHint > 0 ? (
+                <em>
+                  of {props.formatTonnes(props.missionOpsCapacityHint)} ops
+                </em>
+              ) : null}
+            </span>
+          ) : null}
+          {mission.fuelUplift &&
+          (mission.fuelUplift.costUsd > 0 ||
+            mission.fuelUplift.requestedKg > 0.5) ? (
+            <span>
+              Fuel
+              <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
+              <em>
+                {props.formatTonnes(mission.fuelUplift.requestedKg)}
+                {mission.fuelUplift.scarcity !== 'ok'
+                  ? ` · ${mission.fuelUplift.scarcity}`
+                  : ''}
+              </em>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {!isEnRoute &&
       !isFerryLeg &&
@@ -1151,7 +1149,7 @@ export function DispatchActivePanel(props: {
               <section
                 className={`ofp-result-card preflight-summary-card ofp-result-${
                   enRoute ? 'pass' : ready ? 'pass' : 'fail'
-                }${enRoute ? ' preflight-summary-compact' : ''}`}
+                }`}
                 aria-live="polite"
               >
                 <div className="ofp-result-head">
@@ -1300,14 +1298,12 @@ export function DispatchActivePanel(props: {
                           {massFromLb(view.fuel.plannedLb)}
                         </small>
                         <b>{loadTileMark(fuelOk)}</b>
-                        {!enRoute ? (
-                          <FuelTankSchematic
-                            tanks={view.fuel.tanks}
-                            tankCapacity={view.fuel.tankCapacity}
-                            liveFuelLb={view.fuel.liveLb}
-                            weightSystem={weightSystem}
-                          />
-                        ) : null}
+                        <FuelTankSchematic
+                          tanks={view.fuel.tanks}
+                          tankCapacity={view.fuel.tankCapacity}
+                          liveFuelLb={view.fuel.liveLb}
+                          weightSystem={weightSystem}
+                        />
                       </div>
                       <div className={loadTileClass(payloadOk)}>
                         <span>Payload (stations)</span>
@@ -1321,13 +1317,11 @@ export function DispatchActivePanel(props: {
                           )}
                         </small>
                         <b>{loadTileMark(payloadOk)}</b>
-                        {!enRoute ? (
-                          <PayloadStationSchematic
-                            stations={view.payload.stations}
-                            stationMax={view.payload.stationMax}
-                            weightSystem={weightSystem}
-                          />
-                        ) : null}
+                        <PayloadStationSchematic
+                          stations={view.payload.stations}
+                          stationMax={view.payload.stationMax}
+                          weightSystem={weightSystem}
+                        />
                       </div>
                       {view.cg ? (
                         <div
@@ -1352,8 +1346,7 @@ export function DispatchActivePanel(props: {
                           <b>
                             {view.cg.severity === 'warn' ? '⚠' : 'ℹ'}
                           </b>
-                          {!enRoute &&
-                          view.cg.minMac !== undefined &&
+                          {view.cg.minMac !== undefined &&
                           view.cg.maxMac !== undefined ? (
                             <CgEnvelopeSchematic
                               liveMac={view.cg.liveMac}
@@ -1448,53 +1441,99 @@ export function DispatchActivePanel(props: {
                         );
                       })()}
                     </div>
-                    {enRoute ? (
-                      <details className="dispatch-fold dispatch-fold-load">
-                        <summary>Load detail</summary>
-                        <div className="preflight-load-grid preflight-load-schematics">
-                          <div className={loadTileClass(fuelOk)}>
-                            <span>Fuel tanks</span>
-                            <FuelTankSchematic
-                              tanks={view.fuel.tanks}
-                              tankCapacity={view.fuel.tankCapacity}
-                              liveFuelLb={view.fuel.liveLb}
-                              weightSystem={weightSystem}
-                            />
-                          </div>
-                          <div className={loadTileClass(payloadOk)}>
-                            <span>Stations</span>
-                            <PayloadStationSchematic
-                              stations={view.payload.stations}
-                              stationMax={view.payload.stationMax}
-                              weightSystem={weightSystem}
-                            />
-                          </div>
-                          {view.cg &&
-                          view.cg.minMac !== undefined &&
-                          view.cg.maxMac !== undefined ? (
-                            <div
-                              className={
-                                view.cg.ok
-                                  ? 'preflight-load-ok'
-                                  : 'preflight-load-warn'
-                              }
-                            >
-                              <span>CG envelope</span>
-                              <CgEnvelopeSchematic
-                                liveMac={view.cg.liveMac}
-                                minMac={view.cg.minMac}
-                                maxMac={view.cg.maxMac}
-                                ok={view.cg.ok}
-                              />
-                            </div>
-                          ) : null}
-                        </div>
-                      </details>
-                    ) : null}
                   </>
                 ) : (
                   <p>Waiting for live Loaded vs Due data…</p>
                 )}
+                {enRoute ? (
+                  <div className="staging-section dispatch-enroute-cargo">
+                    <div className="staging-section-head">
+                      <h3>{isFerryLeg ? 'Ferry' : 'Cargo'}</h3>
+                    </div>
+                    <div className="cargo-capacity staging-capacity staging-ops-capacity staging-ops-capacity-inline">
+                      {isFerryLeg ? (
+                        <span>
+                          Load
+                          <strong>Empty</strong>
+                          <em>ferry / reposition</em>
+                        </span>
+                      ) : (
+                        <span>
+                          Cargo
+                          <strong>{props.formatTonnes(mission.cargoKg)}</strong>
+                          <em>
+                            {(mission.lots?.length ?? 1) > 1
+                              ? `${mission.lots!.length} lots`
+                              : '1 lot'}
+                          </em>
+                        </span>
+                      )}
+                      <span>
+                        {isFerryLeg
+                          ? mission.contractPilot
+                            ? 'Pilot fee'
+                            : 'Payout'
+                          : 'Contract'}
+                        <strong>{props.formatMoney(mission.payUsd)}</strong>
+                      </span>
+                      <span>
+                        Deadline
+                        <strong>
+                          {props.formatDeadline(
+                            mission.deadlineTick,
+                            continuousHours,
+                          )}
+                        </strong>
+                      </span>
+                      {!isFerryLeg ? (
+                        <span>
+                          Capacity left
+                          <strong>
+                            {props.formatTonnes(
+                              Math.max(
+                                0,
+                                props.missionMaxCargoKg(mission) -
+                                  mission.cargoKg,
+                              ),
+                            )}
+                          </strong>
+                        </span>
+                      ) : null}
+                      {mission.fuelUplift &&
+                      (mission.fuelUplift.costUsd > 0 ||
+                        mission.fuelUplift.requestedKg > 0.5) ? (
+                        <span>
+                          Fuel
+                          <strong>
+                            {props.formatMoney(mission.fuelUplift.costUsd)}
+                          </strong>
+                          <em>
+                            {props.formatTonnes(mission.fuelUplift.requestedKg)}
+                          </em>
+                        </span>
+                      ) : null}
+                    </div>
+                    {isFerryLeg ? (
+                      <p className="empty">
+                        {mission.reason?.trim() ||
+                          'Empty reposition — no freight on board.'}
+                      </p>
+                    ) : (mission.lots?.length ?? 0) > 0 ? (
+                      <ul className="staging-existing">
+                        {mission.lots!.map((line) => (
+                          <li
+                            key={`${line.shipmentLotId}-${line.commodityId}`}
+                          >
+                            {props.formatTonnes(line.cargoKg)} {line.commodityId}{' '}
+                            · {props.formatMoney(line.payUsd)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="empty">No cargo lots on this flight.</p>
+                    )}
+                  </div>
+                ) : null}
                 {enRoute && mission.lastOfpCheck ? (
                   <details className="dispatch-fold dispatch-fold-ofp">
                     <summary>
@@ -1537,34 +1576,6 @@ export function DispatchActivePanel(props: {
                           </div>
                         ))}
                     </dl>
-                  </details>
-                ) : null}
-                {enRoute ? (
-                  <details className="dispatch-fold dispatch-fold-cargo">
-                    <summary>
-                      {isFerryLeg
-                        ? 'Ferry · empty'
-                        : `Cargo · ${props.formatTonnes(mission.cargoKg)}`}
-                    </summary>
-                    {isFerryLeg ? (
-                      <p className="empty">
-                        {mission.reason?.trim() ||
-                          'Empty reposition — no freight on board.'}
-                      </p>
-                    ) : (mission.lots?.length ?? 0) > 0 ? (
-                      <ul className="staging-existing">
-                        {mission.lots!.map((line) => (
-                          <li
-                            key={`${line.shipmentLotId}-${line.commodityId}`}
-                          >
-                            {props.formatTonnes(line.cargoKg)} {line.commodityId}{' '}
-                            · {props.formatMoney(line.payUsd)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="empty">No cargo lots on this flight.</p>
-                    )}
                   </details>
                 ) : null}
                 {check.findings.length > 0 ? (

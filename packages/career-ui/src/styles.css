@@ -1954,16 +1954,24 @@ tr.lot-locked {
   margin-bottom: 0.85rem;
 }
 
-.staging-ops-capacity-compact {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.35rem 0.55rem;
-  margin-bottom: 0;
+.staging-ops-capacity-inline {
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.4rem 0.55rem;
+  margin: 0.35rem 0 0.55rem;
   padding: 0.45rem 0.55rem;
   font-size: 0.78rem;
 }
 
-.staging-ops-capacity-compact span em {
-  display: none;
+.staging-ops-capacity-inline span em {
+  font-size: 0.68rem;
+}
+
+.dispatch-enroute-cargo {
+  margin-top: 0.65rem;
+}
+
+.dispatch-enroute-cargo .staging-section-head {
+  margin-bottom: 0.15rem;
 }
 
 .dispatch-fold {
@@ -1971,6 +1979,7 @@ tr.lot-locked {
   background: var(--surface);
   border-radius: 0.3rem;
   padding: 0.2rem 0.55rem 0.35rem;
+  margin-top: 0.45rem;
 }
 
 .dispatch-fold > summary {
@@ -2016,7 +2025,7 @@ tr.lot-locked {
 .dispatch-active-enroute {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(17.5rem, 0.9fr);
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: stretch;
   gap: 0.5rem 0.75rem;
   height: calc(100dvh - 8.75rem);
@@ -2057,14 +2066,9 @@ tr.lot-locked {
   font-size: 0.8rem;
 }
 
-.dispatch-active-enroute > .staging-ops-capacity {
-  grid-column: 2;
-  grid-row: 3;
-}
-
 .dispatch-active-enroute > .dispatch-route-map-card {
   grid-column: 1;
-  grid-row: 3 / 5;
+  grid-row: 3;
   align-self: stretch;
   min-height: 0;
   margin: 0;
@@ -2073,7 +2077,7 @@ tr.lot-locked {
 
 .dispatch-active-enroute > .preflight-summary-card {
   grid-column: 2;
-  grid-row: 4;
+  grid-row: 3;
   align-self: stretch;
   min-height: 0;
   margin: 0;
@@ -2085,35 +2089,7 @@ tr.lot-locked {
 .dispatch-active-enroute > .dispatch-advanced,
 .dispatch-active-enroute > .settings-chip {
   grid-column: 1 / -1;
-  grid-row: 5;
-}
-
-.dispatch-active-enroute .preflight-summary-compact .ofp-result-head small {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.dispatch-active-enroute .preflight-summary-compact .preflight-load-grid {
-  grid-template-columns: 1fr 1fr;
-  gap: 0.45rem;
-  margin-top: 0.5rem;
-}
-
-.dispatch-active-enroute
-  .preflight-summary-compact
-  .preflight-load-grid
-  > .preflight-aircraft-stack {
-  grid-column: 1 / -1;
-}
-
-.dispatch-active-enroute .preflight-summary-compact .preflight-load-grid > div {
-  padding: 0.45rem 0.55rem;
-}
-
-.dispatch-active-enroute .preflight-summary-compact .dispatch-fold {
-  margin-top: 0.45rem;
+  grid-row: 4;
 }
 
 .dispatch-active-enroute .preflight-technical {
@@ -2131,7 +2107,6 @@ tr.lot-locked {
 
   .dispatch-active-enroute > .dispatch-stepper,
   .dispatch-active-enroute > .missions-head,
-  .dispatch-active-enroute > .staging-ops-capacity,
   .dispatch-active-enroute > .dispatch-route-map-card,
   .dispatch-active-enroute > .preflight-summary-card,
   .dispatch-active-enroute > .dispatch-primary-actions,

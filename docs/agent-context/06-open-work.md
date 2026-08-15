@@ -36,10 +36,11 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 ## Feito (shipped 0.3.33)
 
-- **Dispatch EN ROUTE cockpit:** grid mapa (~60%) + status/live-load (~40%); OFP/cargo/schematics em `<details>`; OFP passed colapsado em load/ready; mobile stack ~40vh.
+- **Dispatch EN ROUTE cockpit:** grid mapa (~60%) + status/live-load (~40%); OFP em `<details>`; mobile stack ~40vh.
 
 ## Feito (local, sem release)
 
+- **EN ROUTE polish:** capacity cards mesclados na seção Cargo; live load = preflight (schematics sempre visíveis); OFP ainda colapsado.
 - **Max cargo (missão):** online → SimBrief (`mzfw−oew` estrutural; `maxcargo` só se ≥½ estrutural / freighter). Catálogo JSON = fallback offline/API down (não short-circuit). Prefill light_ga ainda `manualpayload`.
 - **Accept OFP cargo** também em **contract-pilot** (ex.: Blue Ridge + BN2): botão + CTA primário; trim escala pilot fee / gross.
 - **BN2 Market:** um SKU `blackbox-bn2-islander-cargo-tip-tanks` (Cargo Tip Tanks + SpecialOps family).

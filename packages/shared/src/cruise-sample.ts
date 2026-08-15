@@ -14,6 +14,8 @@ export const DEFAULT_CRUISE_TAS_SPREAD = 0.1;
 /** Was 10%; SimVar family jitter on GA was wiping the window. */
 export const DEFAULT_CRUISE_FLOW_SPREAD = 0.2;
 export const DEFAULT_CRUISE_MAX_ALT_SPREAD_FT = 1_200;
+/** Ignore one-off SimVar spikes instead of wiping a healthy window. */
+export const DEFAULT_CRUISE_FLOW_OUTLIER = 0.4;
 export const DEFAULT_CRUISE_EMA_ALPHA = 0.3;
 
 export type CruiseTick = {
@@ -60,6 +62,7 @@ export type CruiseSampleOpts = {
   maxTasSpread?: number;
   maxFlowSpread?: number;
   maxAltSpreadFt?: number;
+  maxFlowOutlier?: number;
 };
 
 export function createCruiseSampleState(): CruiseSampleState {
@@ -105,15 +108,27 @@ function relativeSpread(values: number[]): number {
   return (max - min) / mid;
 }
 
-function tickPassesGates(tick: CruiseTick, opts: Required<CruiseSampleOpts>): boolean {
-  if (tick.onGround) return false;
+/** Hard leave-cruise: ground or real climb/descent. Clears the window. */
+function tickLeavesCruise(
+  tick: CruiseTick,
+  opts: Required<CruiseSampleOpts>,
+): boolean {
+  if (tick.onGround) return true;
   if (
     typeof tick.vsFpm === 'number' &&
     Number.isFinite(tick.vsFpm) &&
     Math.abs(tick.vsFpm) > opts.maxVsFpm
   ) {
-    return false;
+    return true;
   }
+  return false;
+}
+
+/** Soft sampleable tick — missing TAS/flow skips without wiping the window. */
+function tickIsSampleable(
+  tick: CruiseTick,
+  opts: Required<CruiseSampleOpts>,
+): boolean {
   if (
     typeof tick.tasKt !== 'number' ||
     !Number.isFinite(tick.tasKt) ||
@@ -158,6 +173,7 @@ function resolveOpts(opts?: CruiseSampleOpts): Required<CruiseSampleOpts> {
     maxTasSpread: opts?.maxTasSpread ?? DEFAULT_CRUISE_TAS_SPREAD,
     maxFlowSpread: opts?.maxFlowSpread ?? DEFAULT_CRUISE_FLOW_SPREAD,
     maxAltSpreadFt: opts?.maxAltSpreadFt ?? DEFAULT_CRUISE_MAX_ALT_SPREAD_FT,
+    maxFlowOutlier: opts?.maxFlowOutlier ?? DEFAULT_CRUISE_FLOW_OUTLIER,
   };
 }
 
@@ -181,8 +197,10 @@ function buildCommit(window: CruiseTick[], atMs: number): CruiseSampleCommit | u
 }
 
 /**
- * Feed one live tick. Clears the window on unstable samples.
- * Commits (or upgrades) when a continuous stable window reaches minStableMs.
+ * Feed one live tick.
+ * - Ground / high VS clears the window.
+ * - Missing TAS/flow or one-off flow spikes skip without wiping progress.
+ * - Commits when a continuous stable window reaches minStableMs.
  */
 export function pushCruiseTick(
   state: CruiseSampleState,
@@ -190,8 +208,23 @@ export function pushCruiseTick(
   opts?: CruiseSampleOpts,
 ): { state: CruiseSampleState; justCommitted?: CruiseSampleCommit } {
   const resolved = resolveOpts(opts);
-  if (!tickPassesGates(tick, resolved)) {
+  if (tickLeavesCruise(tick, resolved)) {
     return { state: { window: [], committed: state.committed } };
+  }
+  if (!tickIsSampleable(tick, resolved)) {
+    return { state };
+  }
+
+  // Established window: ignore abrupt SimVar fuel-flow spikes (e.g. 58→450 kg/h).
+  if (state.window.length >= 3) {
+    const medFlow = median(state.window.map((t) => t.fuelFlowKgPerHour!));
+    const flow = tick.fuelFlowKgPerHour!;
+    if (
+      medFlow > 0 &&
+      Math.abs(flow - medFlow) / medFlow > resolved.maxFlowOutlier
+    ) {
+      return { state };
+    }
   }
 
   const window = [...state.window, tick];
@@ -204,6 +237,10 @@ export function pushCruiseTick(
   }
   const stableWindow = window.slice(start);
   if (stableWindow.length >= 2 && !windowIsStable(stableWindow, resolved)) {
+    // Prefer keeping prior progress over restarting on a borderline tick.
+    if (state.window.length >= 3) {
+      return { state };
+    }
     return {
       state: {
         window: [tick],

@@ -93,6 +93,44 @@ describe('pushCruiseTick', () => {
     assert.ok(state.window.length <= 1);
     assert.equal(state.committed, undefined);
   });
+
+  it('keeps progress when a tick is missing fuel flow', () => {
+    let state = createCruiseSampleState();
+    const opts = { minStableMs: 60_000 };
+    for (let i = 0; i < 5; i += 1) {
+      state = pushCruiseTick(state, tick(i * 5_000), opts).state;
+    }
+    assert.equal(state.window.length, 5);
+    state = pushCruiseTick(
+      state,
+      tick(25_000, { fuelFlowKgPerHour: undefined }),
+      opts,
+    ).state;
+    assert.equal(state.window.length, 5);
+    assert.equal(cruiseSampleStatus(state, opts).phase, 'collecting');
+  });
+
+  it('ignores abrupt fuel-flow spikes without clearing the window', () => {
+    let state = createCruiseSampleState();
+    const opts = { minStableMs: 60_000 };
+    for (let i = 0; i < 5; i += 1) {
+      state = pushCruiseTick(
+        state,
+        tick(i * 5_000, { fuelFlowKgPerHour: 58.7 }),
+        opts,
+      ).state;
+    }
+    assert.equal(state.window.length, 5);
+    state = pushCruiseTick(
+      state,
+      tick(25_000, { fuelFlowKgPerHour: 451.8 }),
+      opts,
+    ).state;
+    assert.equal(state.window.length, 5);
+    assert.ok(
+      state.window.every((t) => Math.abs((t.fuelFlowKgPerHour ?? 0) - 58.7) < 0.1),
+    );
+  });
 });
 
 describe('mergeAirframePerfOverride', () => {

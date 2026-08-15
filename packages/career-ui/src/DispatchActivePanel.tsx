@@ -348,14 +348,8 @@ export function DispatchActivePanel(props: {
     >
       <DispatchStepper current={step} />
 
-      <div
-        className={`panel-head missions-head${
-          isEnRoute ? ' missions-head-enroute' : ''
-        }`}
-      >
-        {isEnRoute ? null : (
-          <div className="missions-head-spacer" aria-hidden="true" />
-        )}
+      <div className="panel-head missions-head">
+        <div className="missions-head-spacer" aria-hidden="true" />
         <div className="missions-head-center">
           <h2>
             <IcaoLink
@@ -393,7 +387,9 @@ export function DispatchActivePanel(props: {
           {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
             <button
               type="button"
-              className="missions-head-cancel"
+              className={`missions-head-cancel${
+                isEnRoute ? ' missions-head-cancel-enroute' : ''
+              }`}
               disabled={busy}
               title={
                 isFerryLeg
@@ -488,7 +484,7 @@ export function DispatchActivePanel(props: {
             !mission.contractPilot ? (
               <button
                 type="button"
-                className="action compact"
+                className="dispatch-edit-btn"
                 disabled={busy}
                 title="Adjust cargo lots, then regenerate the OFP"
                 onClick={() => props.onEditManifest(mission)}
@@ -1173,6 +1169,14 @@ export function DispatchActivePanel(props: {
                 ? `${names.join(' · ')} · ${cargoLots.length} lots`
                 : `${cargoLots.length} lots`;
             })();
+            const enRouteCruise =
+              ofpBriefing?.cruiseAltitudeFt !== undefined
+                ? ofpBriefing.cruiseAltitudeFt >= 18_000
+                  ? `FL${String(
+                      Math.round(ofpBriefing.cruiseAltitudeFt / 100),
+                    ).padStart(3, '0')}`
+                  : `${Math.round(ofpBriefing.cruiseAltitudeFt).toLocaleString('en-US')} FT`
+                : undefined;
             const enRouteBriefItems = (
               [
                 assignedAircraft ? ['Aircraft', assignedAircraft] : null,
@@ -1191,154 +1195,173 @@ export function DispatchActivePanel(props: {
                 ofpBriefing?.airTime
                   ? ['Air time', ofpBriefing.airTime]
                   : null,
-                ofpBriefing?.alternateIcao
-                  ? ['Alternate', ofpBriefing.alternateIcao]
+                enRouteCruise
+                  ? ['Initial altitude', enRouteCruise]
                   : null,
               ] as Array<[string, string] | null>
             ).filter((item): item is [string, string] => item !== null);
 
-            const liveLoadGrid = view ? (
-              <div className="preflight-load-grid">
-                <div className={loadTileClass(fuelOk)}>
-                  <span>Fuel</span>
-                  <strong>Sim {massFromLb(view.fuel.liveLb)}</strong>
-                  <small>
-                    {enRoute ? 'OFP dep' : 'Due'}{' '}
-                    {massFromLb(view.fuel.plannedLb)}
-                  </small>
-                  <b>{loadTileMark(fuelOk)}</b>
-                  <FuelTankSchematic
-                    tanks={view.fuel.tanks}
-                    tankCapacity={view.fuel.tankCapacity}
-                    liveFuelLb={view.fuel.liveLb}
-                    weightSystem={weightSystem}
-                  />
-                </div>
-                <div className={loadTileClass(payloadOk)}>
-                  <span>Payload (stations)</span>
-                  <strong>Sim {massFromLb(view.payload.liveLb)}</strong>
-                  <small>
-                    {formatPayloadDueLine(view.payload, massFromLb)}
-                  </small>
-                  <b>{loadTileMark(payloadOk)}</b>
-                  <PayloadStationSchematic
-                    stations={view.payload.stations}
-                    stationMax={view.payload.stationMax}
-                    weightSystem={weightSystem}
-                  />
-                </div>
-                {view.cg ? (
-                  <div
-                    className={
-                      view.cg.ok ? 'preflight-load-ok' : 'preflight-load-warn'
-                    }
-                  >
-                    <span>CG</span>
-                    <strong>
-                      {view.cg.liveMac !== undefined
-                        ? `${formatMacPct(view.cg.liveMac)}% MAC`
-                        : 'n/a'}
-                    </strong>
-                    <small>
-                      {view.cg.minMac !== undefined &&
-                      view.cg.maxMac !== undefined
-                        ? `envelope ${formatMacPct(view.cg.minMac)}–${formatMacPct(view.cg.maxMac)}`
-                        : 'advisory only'}
-                    </small>
-                    <b>{view.cg.severity === 'warn' ? '⚠' : 'ℹ'}</b>
-                    {view.cg.minMac !== undefined &&
-                    view.cg.maxMac !== undefined ? (
-                      <CgEnvelopeSchematic
-                        liveMac={view.cg.liveMac}
-                        minMac={view.cg.minMac}
-                        maxMac={view.cg.maxMac}
-                        ok={view.cg.ok}
+            const liveLoadGrid = !view ? (
+              <p>Waiting for live Loaded vs Due data…</p>
+            ) : (
+              (() => {
+                const liveLoadTiles = (
+                  <>
+                    <div className={loadTileClass(fuelOk)}>
+                      <span>Fuel</span>
+                      <strong>Sim {massFromLb(view.fuel.liveLb)}</strong>
+                      <small>
+                        {enRoute ? 'OFP dep' : 'Due'}{' '}
+                        {massFromLb(view.fuel.plannedLb)}
+                      </small>
+                      <b>{loadTileMark(fuelOk)}</b>
+                      <FuelTankSchematic
+                        tanks={view.fuel.tanks}
+                        tankCapacity={view.fuel.tankCapacity}
+                        liveFuelLb={view.fuel.liveLb}
+                        weightSystem={weightSystem}
                       />
-                    ) : null}
-                  </div>
-                ) : null}
-                {(() => {
-                  const watchSample =
-                    props.watch?.running &&
-                    props.watch.missionId === mission.id
-                      ? props.watch
-                      : null;
-                  const liveOnGround =
-                    watchSample?.onGround ??
-                    props.simBridge?.onGround ??
-                    view.aircraft.onGround;
-                  const liveEngines =
-                    watchSample?.enginesRunning ??
-                    props.simBridge?.enginesRunning ??
-                    view.aircraft.enginesRunning;
-                  const loc =
-                    props.watch?.running &&
-                    props.watch.missionId === mission.id &&
-                    props.watch.originProximity
-                      ? props.watch.originProximity
-                      : check.location;
-                  return (
-                    <div className="preflight-aircraft-stack">
-                      <div className="preflight-aircraft-state">
-                        <span>Aircraft</span>
+                    </div>
+                    <div className={loadTileClass(payloadOk)}>
+                      <span>Payload (stations)</span>
+                      <strong>Sim {massFromLb(view.payload.liveLb)}</strong>
+                      <small>
+                        {formatPayloadDueLine(view.payload, massFromLb)}
+                      </small>
+                      <b>{loadTileMark(payloadOk)}</b>
+                      <PayloadStationSchematic
+                        stations={view.payload.stations}
+                        stationMax={view.payload.stationMax}
+                        weightSystem={weightSystem}
+                      />
+                    </div>
+                    {view.cg ? (
+                      <div
+                        className={
+                          view.cg.ok
+                            ? 'preflight-load-ok'
+                            : 'preflight-load-warn'
+                        }
+                      >
+                        <span>CG</span>
                         <strong>
-                          {liveOnGround ? 'On ground' : 'Airborne'}
+                          {view.cg.liveMac !== undefined
+                            ? `${formatMacPct(view.cg.liveMac)}% MAC`
+                            : 'n/a'}
                         </strong>
                         <small>
-                          {liveEngines ? 'Engines running' : 'Engines off'}
+                          {view.cg.minMac !== undefined &&
+                          view.cg.maxMac !== undefined
+                            ? `envelope ${formatMacPct(view.cg.minMac)}–${formatMacPct(view.cg.maxMac)}`
+                            : 'advisory only'}
                         </small>
-                        <b>
-                          {enRoute
-                            ? liveOnGround
-                              ? !props.watch?.sawAirborne
-                                ? 'RAMP'
-                                : liveEngines
-                                  ? 'TAXI'
-                                  : 'LANDED'
-                              : 'AIR'
-                            : liveOnGround && !liveEngines
-                              ? 'READY'
-                              : 'CHECK'}
-                        </b>
+                        <b>{view.cg.severity === 'warn' ? '⚠' : 'ℹ'}</b>
+                        {view.cg.minMac !== undefined &&
+                        view.cg.maxMac !== undefined ? (
+                          <CgEnvelopeSchematic
+                            liveMac={view.cg.liveMac}
+                            minMac={view.cg.minMac}
+                            maxMac={view.cg.maxMac}
+                            ok={view.cg.ok}
+                          />
+                        ) : null}
                       </div>
-                      {loc ? (
-                        <div
-                          className={
-                            loc.ok ? 'preflight-load-ok' : 'preflight-load-fail'
-                          }
-                          role="status"
-                        >
-                          <span>Origin</span>
-                          <strong>
-                            {loc.ok
-                              ? `At ${loc.originIcao}`
-                              : loc.distanceNm !== undefined
-                                ? `${loc.distanceNm.toFixed(1)} nm`
-                                : loc.originIcao}
-                          </strong>
-                          <small>
-                            {enRoute && loc.ok
-                              ? 'Cleared at departure'
-                              : loc.ok
-                                ? loc.distanceNm !== undefined
-                                  ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
-                                  : `≤${loc.radiusNm} nm`
-                                : loc.distanceNm !== undefined
-                                  ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
-                                  : (check.findings.find(
-                                      (f) => f.code === loc.code,
-                                    )?.message ??
-                                    `need ≤${loc.radiusNm} nm at ${loc.originIcao}`)}
-                          </small>
-                          <b>{loc.ok ? '✓' : '✕'}</b>
-                        </div>
-                      ) : null}
+                    ) : null}
+                  </>
+                );
+
+                const watchSample =
+                  props.watch?.running &&
+                  props.watch.missionId === mission.id
+                    ? props.watch
+                    : null;
+                const liveOnGround =
+                  watchSample?.onGround ??
+                  props.simBridge?.onGround ??
+                  view.aircraft.onGround;
+                const liveEngines =
+                  watchSample?.enginesRunning ??
+                  props.simBridge?.enginesRunning ??
+                  view.aircraft.enginesRunning;
+                const loc =
+                  props.watch?.running &&
+                  props.watch.missionId === mission.id &&
+                  props.watch.originProximity
+                    ? props.watch.originProximity
+                    : check.location;
+                const liveAircraftStack = (
+                  <div className="preflight-aircraft-stack">
+                    <div className="preflight-aircraft-state">
+                      <span>Aircraft</span>
+                      <strong>
+                        {liveOnGround ? 'On ground' : 'Airborne'}
+                      </strong>
+                      <small>
+                        {liveEngines ? 'Engines running' : 'Engines off'}
+                      </small>
+                      <b>
+                        {enRoute
+                          ? liveOnGround
+                            ? !props.watch?.sawAirborne
+                              ? 'RAMP'
+                              : liveEngines
+                                ? 'TAXI'
+                                : 'LANDED'
+                            : 'AIR'
+                          : liveOnGround && !liveEngines
+                            ? 'READY'
+                            : 'CHECK'}
+                      </b>
                     </div>
-                  );
-                })()}
-              </div>
-            ) : (
-              <p>Waiting for live Loaded vs Due data…</p>
+                    {loc ? (
+                      <div
+                        className={
+                          loc.ok ? 'preflight-load-ok' : 'preflight-load-fail'
+                        }
+                        role="status"
+                      >
+                        <span>Origin</span>
+                        <strong>
+                          {loc.ok
+                            ? `At ${loc.originIcao}`
+                            : loc.distanceNm !== undefined
+                              ? `${loc.distanceNm.toFixed(1)} nm`
+                              : loc.originIcao}
+                        </strong>
+                        <small>
+                          {enRoute && loc.ok
+                            ? 'Cleared at departure'
+                            : loc.ok
+                              ? loc.distanceNm !== undefined
+                                ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
+                                : `≤${loc.radiusNm} nm`
+                              : loc.distanceNm !== undefined
+                                ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
+                                : (check.findings.find(
+                                    (f) => f.code === loc.code,
+                                  )?.message ??
+                                  `need ≤${loc.radiusNm} nm at ${loc.originIcao}`)}
+                        </small>
+                        <b>{loc.ok ? '✓' : '✕'}</b>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+
+                return enRoute ? (
+                  <div className="dispatch-enroute-live-load">
+                    <div className="dispatch-enroute-live-tiles">
+                      {liveLoadTiles}
+                    </div>
+                    {liveAircraftStack}
+                  </div>
+                ) : (
+                  <div className="preflight-load-grid">
+                    {liveLoadTiles}
+                    {liveAircraftStack}
+                  </div>
+                );
+              })()
             );
 
             const enRouteCargo = (

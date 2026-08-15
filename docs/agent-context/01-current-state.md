@@ -33,6 +33,13 @@
 
 ## Local (ainda sem release)
 
+- **Brand Horizon (A):** `--accent: #f0a35a`; `BrandMark` = ícone skyline
+  (barras) + wordmark SKY/LINE; sidebar + ProfileGate.
+- **Cruise BURN spike / `Cruise 0s`:** soma só motores combusting /
+  `NUMBER OF ENGINES`; outlier de flow (>40%) não limpa a janela; tick
+  sem TAS/flow também não. Testes em `cruise-sample` + `sample-cruise-burn`.
+  Precisa release (ou hot-swap) pra validar no desktop instalado.
+
 - **0.3.24 shipped:** equal-first até limite real do envelope; leftover
   split L/R (mesmo arm, Δarm ≤2 ft, LEFT/RIGHT, indexes consecutivos).
   Kodiak/Caravan/Bonanza validados localmente.

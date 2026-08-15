@@ -120,6 +120,7 @@ import { FboRerouteDialog } from './FboRerouteDialog';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { BushTripMapCard } from './BushTripMapCard';
+import { BrandMark } from './BrandMark';
 import { ProfileGate, ProfileGateLoading } from './ProfileGate';
 import {
   DesktopUpdateBanner,
@@ -6838,9 +6839,9 @@ export function App() {
         />
       ) : null}
       <aside className="sidebar" aria-label="Primary">
-        <p className="sidebar-brand">
-          SKY<span>LINE</span>
-        </p>
+        <div className="sidebar-brand">
+          <BrandMark />
+        </div>
         <nav className="sidebar-nav" aria-label="Board sections">
           <button
             type="button"

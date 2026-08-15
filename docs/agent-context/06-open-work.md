@@ -13,7 +13,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 - [ ] Hot-swap Host novo (`resources/host`) — log `timeout storm` / `unrecognized_id storm` + `connect() will reopen`
 - [ ] Watch solo: um pedido `readSimVars` (não 16 stations em série)
 - [ ] Watch no ar: tick de cruise ~5s no TIMEOUT (não ~45s); next tick `force: true`
-- [ ] Cruise sample 180s: VS 400 fpm / TAS 10% / flow 20% / alt 1200 ft — não zerar em bump mínimo
+- [ ] Cruise sample 180s: VS 400 fpm / TAS 10% / flow 20% / alt 1200 ft — não zerar em bump mínimo; spike BURN (ghost Eng2+) não reseta `Cruise 0s`
 - [ ] Watch: TIMEOUT não fica em loop com pipe “up”; após backoff, sample volta
 - [ ] Reinject no solo após editar EFB: matching profile → fuel/cargo sem freeze em “Reading live aircraft…”
 - [ ] Caravan: leftover do Due divide L/R da fileira (não 192 num assento e 100 no outro)

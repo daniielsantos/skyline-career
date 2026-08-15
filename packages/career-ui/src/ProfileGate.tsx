@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { CareerProfileMeta } from './api';
+import { BrandMark } from './BrandMark';
 
 export function ProfileGate(props: {
   profiles: CareerProfileMeta[];
@@ -18,7 +19,7 @@ export function ProfileGate(props: {
   return (
     <section className="panel profile-gate" aria-label="Career profiles">
       <div className="profile-gate-hero">
-        <p className="profile-gate-brand">Skyline Career</p>
+        <BrandMark className="profile-gate-brand" subtitle="Career" />
         <h1>Choose a profile</h1>
         <p className="muted">
           Each profile has its own wallet, fleet, and missions. Shared hub data
@@ -164,7 +165,7 @@ export function ProfileGateLoading() {
       aria-label="Loading career profiles"
     >
       <div className="profile-gate-hero">
-        <p className="profile-gate-brand">Skyline Career</p>
+        <BrandMark className="profile-gate-brand" subtitle="Career" />
         <h1>Loading</h1>
         <p className="muted">Preparing your profiles…</p>
       </div>

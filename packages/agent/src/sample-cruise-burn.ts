@@ -81,6 +81,14 @@ const CRUISE_FLOW_BATCH: ReadonlyArray<{
   }));
 }).flat();
 
+const CRUISE_ENGINE_META: ReadonlyArray<{ name: string; unit: string }> = [
+  { name: 'NUMBER OF ENGINES', unit: 'number' },
+  { name: 'GENERAL ENG COMBUSTION:1', unit: 'bool' },
+  { name: 'GENERAL ENG COMBUSTION:2', unit: 'bool' },
+  { name: 'GENERAL ENG COMBUSTION:3', unit: 'bool' },
+  { name: 'GENERAL ENG COMBUSTION:4', unit: 'bool' },
+];
+
 /** Probe common fuel-flow SimVars (for console diagnostics). */
 export async function probeLiveFuelFlowSimVars(
   bridge: NamedPipeSimBridge,
@@ -121,21 +129,47 @@ export async function probeLiveFuelFlowSimVars(
  * Sum per-engine fuel flow → kg/h.
  * One Host readSimVars (≤32). TIMEOUT/NOT_CONNECTED throws — Watch resets next tick.
  * First working family per engine wins (same order as sequential probe).
+ * Only engines that are combusting (or within NUMBER OF ENGINES) are summed —
+ * ghost Eng2+ SimVar noise was wiping the cruise window (e.g. 58→450 kg/h).
  */
 export async function sampleLiveCruiseFuelFlowKgPerHour(
   bridge: NamedPipeSimBridge,
 ): Promise<number | undefined> {
-  const values = await bridge.readSimVars(
-    CRUISE_FLOW_BATCH.map(({ name, unit }) => ({ name, unit })),
-  );
+  const values = await bridge.readSimVars([
+    ...CRUISE_ENGINE_META,
+    ...CRUISE_FLOW_BATCH.map(({ name, unit }) => ({ name, unit })),
+  ]);
+
+  const numberOfEnginesRaw = values[0];
+  const combustion = [1, 2, 3, 4].map((engine) => {
+    const raw = values[engine];
+    return typeof raw === 'number' && Number.isFinite(raw) && raw > 0.5;
+  });
+  const combustionKnown = combustion.some(Boolean);
+  let maxEngines = CRUISE_FLOW_MAX_ENGINES;
+  if (
+    typeof numberOfEnginesRaw === 'number' &&
+    Number.isFinite(numberOfEnginesRaw) &&
+    numberOfEnginesRaw >= 1 &&
+    numberOfEnginesRaw <= CRUISE_FLOW_MAX_ENGINES
+  ) {
+    maxEngines = Math.floor(numberOfEnginesRaw);
+  }
+
+  const engineAllowed = (engine: number): boolean => {
+    if (engine < 1 || engine > maxEngines) return false;
+    if (combustionKnown) return combustion[engine - 1] === true;
+    return engine <= maxEngines;
+  };
 
   let totalLbPerHour = 0;
   let engines = 0;
   const seen = new Set<number>();
+  const flowOffset = CRUISE_ENGINE_META.length;
   for (let i = 0; i < CRUISE_FLOW_BATCH.length; i += 1) {
     const row = CRUISE_FLOW_BATCH[i]!;
-    if (seen.has(row.engine)) continue;
-    const raw = values[i];
+    if (seen.has(row.engine) || !engineAllowed(row.engine)) continue;
+    const raw = values[flowOffset + i];
     if (
       typeof raw !== 'number' ||
       !Number.isFinite(raw) ||

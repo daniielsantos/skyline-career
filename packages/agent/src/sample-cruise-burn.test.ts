@@ -28,6 +28,9 @@ describe('sampleLiveCruiseFuelFlowKgPerHour', () => {
   it('prefers ENG FUEL FLOW PPH over bare ENG FUEL FLOW', async () => {
     const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
       mockBridge({
+        'NUMBER OF ENGINES|number': 2,
+        'GENERAL ENG COMBUSTION:1|bool': 1,
+        'GENERAL ENG COMBUSTION:2|bool': 1,
         'ENG FUEL FLOW PPH:1|pounds per hour': 40,
         'ENG FUEL FLOW PPH:2|pounds per hour': 42,
       }),
@@ -39,6 +42,9 @@ describe('sampleLiveCruiseFuelFlowKgPerHour', () => {
   it('falls back to RECIP ENG FUEL FLOW for piston twins', async () => {
     const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
       mockBridge({
+        'NUMBER OF ENGINES|number': 2,
+        'GENERAL ENG COMBUSTION:1|bool': 1,
+        'GENERAL ENG COMBUSTION:2|bool': 1,
         'RECIP ENG FUEL FLOW:1|pounds per hour': 35,
         'RECIP ENG FUEL FLOW:2|pounds per hour': 35,
       }),
@@ -46,9 +52,40 @@ describe('sampleLiveCruiseFuelFlowKgPerHour', () => {
     assert.equal(kgPerHour, 31.8);
   });
 
+  it('ignores ghost engine SimVar noise beyond NUMBER OF ENGINES', async () => {
+    const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+      mockBridge({
+        'NUMBER OF ENGINES|number': 1,
+        'GENERAL ENG COMBUSTION:1|bool': 1,
+        'ENG FUEL FLOW PPH:1|pounds per hour': 130,
+        // Ghost Eng2+ noise that previously spiked the cruise burn readout.
+        'ENG FUEL FLOW PPH:2|pounds per hour': 800,
+        'ENG FUEL FLOW PPH:3|pounds per hour': 900,
+      }),
+    );
+    // 130 lb/h → ~59.0 kg/h (not ~830+)
+    assert.equal(kgPerHour, 59);
+  });
+
+  it('sums only combusting engines when combustion flags are known', async () => {
+    const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+      mockBridge({
+        'NUMBER OF ENGINES|number': 2,
+        'GENERAL ENG COMBUSTION:1|bool': 1,
+        'GENERAL ENG COMBUSTION:2|bool': 0,
+        'ENG FUEL FLOW PPH:1|pounds per hour': 130,
+        'ENG FUEL FLOW PPH:2|pounds per hour': 800,
+      }),
+    );
+    assert.equal(kgPerHour, 59);
+  });
+
   it('ignores insane batch garbage instead of painting a huge kg/h', async () => {
     const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
       mockBridge({
+        'NUMBER OF ENGINES|number': 2,
+        'GENERAL ENG COMBUSTION:1|bool': 1,
+        'GENERAL ENG COMBUSTION:2|bool': 1,
         'ENG FUEL FLOW PPH:1|pounds per hour': 1e15,
         'ENG FUEL FLOW PPH:2|pounds per hour': 1e15,
       }),

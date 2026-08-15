@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   DispatchRouteMap,
   type DispatchAircraftPosition,
@@ -6,6 +6,61 @@ import {
   type DispatchRouteWaypoint,
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
+
+function hubIcaoSpan(
+  icao: string,
+  kind: 'origin' | 'dest',
+  onOpen: (icao: string) => void,
+) {
+  const code = icao.trim().toUpperCase();
+  return (
+    <button
+      type="button"
+      className={`dispatch-route-hub dispatch-route-hub-${kind}`}
+      onClick={() => onOpen(code)}
+      title={`Open ${code}`}
+    >
+      {code}
+    </button>
+  );
+}
+
+/** Highlight origin/dest ICAO tokens (incl. runway suffix like SAVN/12) in the OFP route. */
+function highlightOfpRoute(
+  route: string,
+  originIcao: string,
+  destIcao: string,
+): ReactNode[] {
+  const origin = originIcao.trim().toUpperCase();
+  const dest = destIcao.trim().toUpperCase();
+  return route
+    .trim()
+    .split(/(\s+)/)
+    .map((part, index) => {
+      if (!part || /^\s+$/.test(part)) return part;
+      const token = part.toUpperCase();
+      const isOrigin =
+        Boolean(origin) &&
+        (token === origin || token.startsWith(`${origin}/`));
+      const isDest =
+        Boolean(dest) && (token === dest || token.startsWith(`${dest}/`));
+      if (isOrigin) {
+        return (
+          <span key={index} className="dispatch-route-hub-origin">
+            {part}
+          </span>
+        );
+      }
+      if (isDest) {
+        return (
+          <span key={index} className="dispatch-route-hub-dest">
+            {part}
+          </span>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+}
 
 /** Compact route map card for Dispatch — below Preflight (or cockpit map when fill). */
 export function DispatchRouteCard(props: {
@@ -58,6 +113,7 @@ export function DispatchRouteCard(props: {
     Number.isFinite(props.aircraft.lat) &&
     Number.isFinite(props.aircraft.lon) &&
     !(props.aircraft.lat === 0 && props.aircraft.lon === 0);
+  const ofpRoute = props.ofpRoute?.trim() ?? '';
 
   async function refreshNavlog() {
     if (!props.onRefreshNavlog || refreshing) return;
@@ -80,18 +136,19 @@ export function DispatchRouteCard(props: {
       aria-label="Dispatch route map"
     >
       <div className="dispatch-route-map-head">
-        <div className="dispatch-route-map-head-text">
+        <div className="dispatch-route-map-head-row">
           <strong>Route</strong>
-          <small>
-            {props.originIcao.trim().toUpperCase()} →{' '}
-            {props.destIcao.trim().toUpperCase()}
-            {wptCount > 0 ? ` · ${wptCount} navlog fixes` : ''}
-            {hasAircraft ? ' · live aircraft' : ''}
-          </small>
+          <span className="dispatch-route-map-od">
+            {hubIcaoSpan(props.originIcao, 'origin', props.onOpenAirport)}
+            <span className="dispatch-route-map-od-arrow" aria-hidden="true">
+              →
+            </span>
+            {hubIcaoSpan(props.destIcao, 'dest', props.onOpenAirport)}
+          </span>
         </div>
-        {props.ofpRoute?.trim() ? (
-          <code className="dispatch-route-map-ofp" title={props.ofpRoute.trim()}>
-            {props.ofpRoute.trim()}
+        {ofpRoute ? (
+          <code className="dispatch-route-map-ofp" title={ofpRoute}>
+            {highlightOfpRoute(ofpRoute, props.originIcao, props.destIcao)}
           </code>
         ) : null}
       </div>

@@ -36,7 +36,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 ## Feito (shipped 0.3.35)
 
-- **EN ROUTE layout v2:** briefing cards no topo; Cargo com nome; Live load no fim; ROUTE no header do mapa; technical details sempre visíveis.
+- **EN ROUTE layout v2:** briefing cards no topo; Cargo com nome; Live load no fim; ROUTE no header do mapa; technical details colapsados por padrão.
 - **Watch footer:** fora da área de scroll (sem invadir scrollbar); cruise burn kg/h de volta.
 
 ## Feito (shipped 0.3.34)

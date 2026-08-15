@@ -1585,39 +1585,20 @@ export function DispatchActivePanel(props: {
                   liveLoadGrid
                 )}
                 {check.findings.length > 0 ? (
-                  enRoute ? (
-                    <div className="preflight-technical preflight-technical-open">
-                      <strong className="preflight-technical-label">
-                        {noteLabel}
-                      </strong>
-                      <ul className="ofp-findings">
-                        {check.findings.map((finding) => (
-                          <li
-                            key={`pre-${finding.code}-${finding.message}`}
-                            className={`finding-${finding.severity}`}
-                          >
-                            [{finding.severity.toUpperCase()}]{' '}
-                            {formatWeightText(finding.message, weightSystem)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <details className="preflight-technical">
-                      <summary>{noteLabel}</summary>
-                      <ul className="ofp-findings">
-                        {check.findings.map((finding) => (
-                          <li
-                            key={`pre-${finding.code}-${finding.message}`}
-                            className={`finding-${finding.severity}`}
-                          >
-                            [{finding.severity.toUpperCase()}]{' '}
-                            {formatWeightText(finding.message, weightSystem)}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )
+                  <details className="preflight-technical">
+                    <summary>{noteLabel}</summary>
+                    <ul className="ofp-findings">
+                      {check.findings.map((finding) => (
+                        <li
+                          key={`pre-${finding.code}-${finding.message}`}
+                          className={`finding-${finding.severity}`}
+                        >
+                          [{finding.severity.toUpperCase()}]{' '}
+                          {formatWeightText(finding.message, weightSystem)}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 ) : null}
               </section>
             );

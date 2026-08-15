@@ -34,9 +34,12 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 - **SAVN hub:** catálogo AR tinha SAVN = Neuquén (~180 nm). Corrigido → San Antonio Oeste; **SAZN** = Neuquén. Migrate stamps lat/lon/name no load.
 
+## Feito (shipped 0.3.33)
+
+- **Dispatch EN ROUTE cockpit:** grid mapa (~60%) + status/live-load (~40%); OFP/cargo/schematics em `<details>`; OFP passed colapsado em load/ready; mobile stack ~40vh.
+
 ## Feito (local, sem release)
 
-- **Dispatch EN ROUTE cockpit:** grid mapa (~60%) + status/live-load (~40%); OFP/cargo/schematics em `<details>`; OFP passed colapsado em load/ready; mobile stack ~40vh. Sem commit/release ainda.
 - **Max cargo (missão):** online → SimBrief (`mzfw−oew` estrutural; `maxcargo` só se ≥½ estrutural / freighter). Catálogo JSON = fallback offline/API down (não short-circuit). Prefill light_ga ainda `manualpayload`.
 - **Accept OFP cargo** também em **contract-pilot** (ex.: Blue Ridge + BN2): botão + CTA primário; trim escala pilot fee / gross.
 - **BN2 Market:** um SKU `blackbox-bn2-islander-cargo-tip-tanks` (Cargo Tip Tanks + SpecialOps family).

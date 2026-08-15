@@ -184,43 +184,80 @@ export function WatchStatusFooter(props: Props) {
               : ''}
           </span>
         ) : null}
-        {cruise && cruise.phase !== 'idle' ? (
-          <span
-            className={
-              cruise.phase === 'locked'
-                ? 'watch-flight-time ok'
-                : 'watch-flight-time pending'
-            }
-            title="Stable cruise fuel flow + TAS (≥3 min level) updates this airframe's burn after settle. Timer freezes once locked."
-          >
-            {(() => {
-              const burnKgH =
-                typeof cruise.fuelFlowKgPerHour === 'number' &&
-                Number.isFinite(cruise.fuelFlowKgPerHour) &&
-                cruise.fuelFlowKgPerHour > 0 &&
-                cruise.fuelFlowKgPerHour < 50_000
-                  ? cruise.fuelFlowKgPerHour
-                  : typeof cruise.committed?.cruiseFuelFlowKgPerHour ===
-                        'number' &&
-                      Number.isFinite(
-                        cruise.committed.cruiseFuelFlowKgPerHour,
-                      ) &&
-                      cruise.committed.cruiseFuelFlowKgPerHour > 0 &&
-                      cruise.committed.cruiseFuelFlowKgPerHour < 50_000
-                    ? cruise.committed.cruiseFuelFlowKgPerHour
-                    : null;
-              const burnLabel =
-                burnKgH != null
-                  ? ` · ${burnKgH.toLocaleString(undefined, {
-                      maximumFractionDigits: 1,
-                    })} kg/h`
-                  : '';
-              return cruise.phase === 'locked'
-                ? `Cruise · ${cruise.tasKt ?? cruise.committed?.cruiseSpeedKt ?? '—'} kt${burnLabel}`
-                : `Cruise ${Math.round(cruise.elapsedMs / 1000)}s${burnLabel}`;
-            })()}
-          </span>
-        ) : null}
+        {(() => {
+          const cruiseChip =
+            cruise && cruise.phase !== 'idle'
+              ? cruise
+              : watchRunning &&
+                  props.missionStatus === 'in_flight' &&
+                  bridgePhase === 'cruise'
+                ? cruise ?? {
+                    phase: 'idle' as const,
+                    elapsedMs: 0,
+                    requiredMs: 180_000,
+                  }
+                : null;
+          if (!cruiseChip) return null;
+          const requiredSec = Math.max(
+            1,
+            Math.round((cruiseChip.requiredMs || 180_000) / 1000),
+          );
+          const elapsedSec = Math.min(
+            requiredSec,
+            Math.round(Math.max(0, cruiseChip.elapsedMs) / 1000),
+          );
+          const burnKgH =
+            typeof cruiseChip.fuelFlowKgPerHour === 'number' &&
+            Number.isFinite(cruiseChip.fuelFlowKgPerHour) &&
+            cruiseChip.fuelFlowKgPerHour > 0 &&
+            cruiseChip.fuelFlowKgPerHour < 50_000
+              ? cruiseChip.fuelFlowKgPerHour
+              : typeof cruiseChip.committed?.cruiseFuelFlowKgPerHour ===
+                    'number' &&
+                  Number.isFinite(
+                    cruiseChip.committed.cruiseFuelFlowKgPerHour,
+                  ) &&
+                  cruiseChip.committed.cruiseFuelFlowKgPerHour > 0 &&
+                  cruiseChip.committed.cruiseFuelFlowKgPerHour < 50_000
+                ? cruiseChip.committed.cruiseFuelFlowKgPerHour
+                : null;
+          const burnLabel =
+            burnKgH != null
+              ? ` · ${burnKgH.toLocaleString(undefined, {
+                  maximumFractionDigits: 1,
+                })} kg/h`
+              : '';
+          const label =
+            cruiseChip.phase === 'locked'
+              ? `Cruise · ${cruiseChip.tasKt ?? cruiseChip.committed?.cruiseSpeedKt ?? '—'} kt${burnLabel}`
+              : `Cruise ${elapsedSec}/${requiredSec}s${burnLabel}${
+                  elapsedSec === 0 && cruiseChip.hint
+                    ? ` · ${
+                        cruiseChip.hint === 'flow'
+                          ? 'no fuel flow'
+                          : cruiseChip.hint === 'tas'
+                            ? 'no TAS'
+                            : cruiseChip.hint === 'vs'
+                              ? 'VS high'
+                              : cruiseChip.hint === 'timeout'
+                                ? 'sim timeout'
+                                : cruiseChip.hint
+                      }`
+                    : ''
+                }`;
+          return (
+            <span
+              className={
+                cruiseChip.phase === 'locked'
+                  ? 'watch-flight-time ok'
+                  : 'watch-flight-time pending'
+              }
+              title="Stable cruise fuel flow + TAS (≥3 min level) updates this airframe's burn after settle. Timer freezes once locked."
+            >
+              {label}
+            </span>
+          );
+        })()}
         {props.watch?.lastEvent?.type === 'settle_blocked' ? (
           <span className="watch-footer-error">
             {props.watch.lastEvent.reason}

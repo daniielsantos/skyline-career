@@ -32,6 +32,7 @@ import {
   stationSampleIncomplete,
   stationWeightsDrifted,
   mergeAirframePerfOverride,
+  clampCruiseFuelFlowToCatalog,
   DEFAULT_JET_A_LB_PER_GAL,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
@@ -199,7 +200,10 @@ export type WatchStatusPayload = {
   /** Live airborne progress vs planned route (anti time-compression). */
   flightTime: WatchFlightTimePayload | null;
   /** Stable-cruise burn/TAS sampler progress for this watch session. */
-  cruiseSample: CruiseSampleStatus | null;
+  cruiseSample: (CruiseSampleStatus & {
+    /** Why the 0/180s window is not advancing (Watch-only). */
+    hint?: string;
+  }) | null;
   /** Live weather-ops score progress (headwind / rain / visibility). */
   weatherOps: ReturnType<typeof weatherOpsStatus> | null;
   /**
@@ -276,6 +280,7 @@ const FLIGHT_SAMPLE_VARS = [
   { name: 'PLANE PITCH DEGREES', unit: 'degrees' },
   { name: 'G FORCE', unit: 'Gforce' },
   { name: 'AIRSPEED INDICATED', unit: 'knots' },
+  { name: 'AIRSPEED TRUE', unit: 'knots' },
   { name: 'PLANE ALTITUDE', unit: 'feet' },
   { name: 'GEAR TOTAL PCT EXTENDED', unit: 'Percent over 100' },
   { name: 'GEAR HANDLE POSITION', unit: 'number' },
@@ -290,7 +295,105 @@ const FLIGHT_SAMPLE_VARS = [
   { name: 'GENERAL ENG COMBUSTION:2', unit: 'bool' },
   { name: 'OVERSPEED WARNING', unit: 'bool' },
   { name: 'STALL WARNING', unit: 'bool' },
+  /** Cruise burn — same tick as flight sample (avoids a 2nd IPC that often TIMEOUTs). */
+  { name: 'NUMBER OF ENGINES', unit: 'number' },
+  { name: 'ENG FUEL FLOW PPH:1', unit: 'pounds per hour' },
+  { name: 'ENG FUEL FLOW PPH:2', unit: 'pounds per hour' },
+  { name: 'RECIP ENG FUEL FLOW:1', unit: 'pounds per hour' },
+  { name: 'RECIP ENG FUEL FLOW:2', unit: 'pounds per hour' },
+  { name: 'ENG FUEL FLOW GPH:1', unit: 'gallons per hour' },
+  { name: 'ENG FUEL FLOW GPH:2', unit: 'gallons per hour' },
+  { name: 'GENERAL ENG FUEL FLOW:1', unit: 'pounds per hour' },
+  /** Fallback burn for Accu-Sim (Aerostar) when eng flow SimVars stay 0. */
+  { name: 'FUEL TOTAL QUANTITY WEIGHT', unit: 'pounds' },
 ] as const;
+
+const MAX_FLIGHT_FLOW_LB_PER_HOUR = 40_000;
+const FALLBACK_AVGAS_LB_PER_GAL = 6.7;
+
+function pickEngineFlowLbPerHour(
+  candidates: Array<{ raw?: number; asGph?: boolean }>,
+): number | undefined {
+  for (const candidate of candidates) {
+    const raw = candidate.raw;
+    if (
+      typeof raw !== 'number' ||
+      !Number.isFinite(raw) ||
+      !(raw > (candidate.asGph ? 0.05 : 0.3))
+    ) {
+      continue;
+    }
+    const lb = candidate.asGph ? raw * FALLBACK_AVGAS_LB_PER_GAL : raw;
+    if (lb < MAX_FLIGHT_FLOW_LB_PER_HOUR) return lb;
+  }
+  return undefined;
+}
+
+function sumFlightFuelFlowKgPerHour(opts: {
+  numberOfEngines?: number;
+  combustion: boolean[];
+  pph: Array<number | undefined>;
+  recip: Array<number | undefined>;
+  gph: Array<number | undefined>;
+  general: Array<number | undefined>;
+}): number | undefined {
+  let maxEngines = 2;
+  if (
+    typeof opts.numberOfEngines === 'number' &&
+    Number.isFinite(opts.numberOfEngines) &&
+    opts.numberOfEngines >= 1
+  ) {
+    maxEngines = Math.min(2, Math.floor(opts.numberOfEngines));
+  }
+  const combustionKnown = opts.combustion.some(Boolean);
+  const accumulate = (requireCombustion: boolean): number | undefined => {
+    let totalLb = 0;
+    let engines = 0;
+    for (let engine = 1; engine <= maxEngines; engine += 1) {
+      if (
+        requireCombustion &&
+        combustionKnown &&
+        opts.combustion[engine - 1] !== true
+      ) {
+        continue;
+      }
+      const lb = pickEngineFlowLbPerHour([
+        { raw: opts.pph[engine - 1] },
+        { raw: opts.recip[engine - 1] },
+        { raw: opts.gph[engine - 1], asGph: true },
+        { raw: opts.general[engine - 1] },
+      ]);
+      if (lb == null) continue;
+      totalLb += lb;
+      engines += 1;
+    }
+    if (engines === 0) return undefined;
+    const kgPerHour = Math.round(totalLb * 0.45359237 * 10) / 10;
+    return kgPerHour > 0 && kgPerHour < 50_000 ? kgPerHour : undefined;
+  };
+  return accumulate(true) ?? (combustionKnown ? accumulate(false) : undefined);
+}
+
+/** Instantaneous burn from successive FUEL TOTAL QUANTITY WEIGHT samples. */
+export function fuelFlowKgPerHourFromTotalWeightDelta(opts: {
+  prevLb: number;
+  nextLb: number;
+  dtMs: number;
+}): number | undefined {
+  const dtMs = opts.dtMs;
+  // Watch cruise ticks are ~5s; Aerostar burns ~0.15 lb in that window at 100 lb/h.
+  if (!(dtMs >= 3_000) || !(dtMs <= 60_000)) return undefined;
+  const burnedLb = opts.prevLb - opts.nextLb;
+  if (!(burnedLb >= 0.05) || !(opts.prevLb > 0) || !(opts.nextLb >= 0)) {
+    return undefined;
+  }
+  const lbPerHour = burnedLb / (dtMs / 3_600_000);
+  if (!(lbPerHour > 5) || !(lbPerHour < MAX_FLIGHT_FLOW_LB_PER_HOUR)) {
+    return undefined;
+  }
+  const kgPerHour = Math.round(lbPerHour * 0.45359237 * 10) / 10;
+  return kgPerHour > 0 && kgPerHour < 50_000 ? kgPerHour : undefined;
+}
 
 export async function sampleLiveFlight(
   bridge: NamedPipeSimBridge,
@@ -304,6 +407,7 @@ export async function sampleLiveFlight(
     pitchDeg?: number;
     gForce?: number;
     indicatedAirspeedKt?: number;
+    trueAirspeedKt?: number;
     altitudeFt?: number;
     overspeedWarning?: boolean;
     stallWarning?: boolean;
@@ -311,6 +415,10 @@ export async function sampleLiveFlight(
     gearRetractable?: boolean;
     flapsPct?: number;
     aglFt?: number;
+    /** Live fuel flow for cruise burn sampling (eng 1–2 families). */
+    fuelFlowKgPerHour?: number;
+    /** Total fuel weight — Accu-Sim burn fallback via delta. */
+    fuelTotalLb?: number;
   }
 > {
   const snap = await bridge.snapshot();
@@ -344,20 +452,30 @@ export async function sampleLiveFlight(
   const pitchDeg = finiteNum(v[5]);
   const gForce = finiteNum(v[6]);
   const indicatedAirspeedKt = finiteNum(v[7]);
-  const altitudeFt = finiteNum(v[8]);
-  const gearPctRaw = finiteNum(v[9]);
-  const gearHandleRaw = finiteNum(v[10]);
-  const flapsPctRaw = finiteNum(v[11]);
-  const aglFt = finiteNum(v[12]);
-  const gearRetractableRaw = finiteNum(v[13]);
-  const n1Eng1 = finiteNum(v[14]);
-  const n1Eng2 = finiteNum(v[15]);
-  const rpmEng1 = finiteNum(v[16]);
-  const rpmEng2 = finiteNum(v[17]);
-  const combEng1 = finiteNum(v[18]);
-  const combEng2 = finiteNum(v[19]);
-  const overspeedRaw = finiteNum(v[20]);
-  const stallRaw = finiteNum(v[21]);
+  const trueAirspeedKt = finiteNum(v[8]);
+  const altitudeFt = finiteNum(v[9]);
+  const gearPctRaw = finiteNum(v[10]);
+  const gearHandleRaw = finiteNum(v[11]);
+  const flapsPctRaw = finiteNum(v[12]);
+  const aglFt = finiteNum(v[13]);
+  const gearRetractableRaw = finiteNum(v[14]);
+  const n1Eng1 = finiteNum(v[15]);
+  const n1Eng2 = finiteNum(v[16]);
+  const rpmEng1 = finiteNum(v[17]);
+  const rpmEng2 = finiteNum(v[18]);
+  const combEng1 = finiteNum(v[19]);
+  const combEng2 = finiteNum(v[20]);
+  const overspeedRaw = finiteNum(v[21]);
+  const stallRaw = finiteNum(v[22]);
+  const numberOfEngines = finiteNum(v[23]);
+  const flowPph1 = finiteNum(v[24]);
+  const flowPph2 = finiteNum(v[25]);
+  const flowRecip1 = finiteNum(v[26]);
+  const flowRecip2 = finiteNum(v[27]);
+  const flowGph1 = finiteNum(v[28]);
+  const flowGph2 = finiteNum(v[29]);
+  const flowGeneral1 = finiteNum(v[30]);
+  const fuelTotalLb = finiteNum(v[31]);
   const overspeedWarning =
     overspeedRaw !== undefined ? overspeedRaw > 0.5 : undefined;
   const stallWarning = stallRaw !== undefined ? stallRaw > 0.5 : undefined;
@@ -400,6 +518,17 @@ export async function sampleLiveFlight(
     rpm,
     combustion,
   });
+  const fuelFlowKgPerHour = sumFlightFuelFlowKgPerHour({
+    numberOfEngines,
+    combustion: [
+      typeof combEng1 === 'number' ? combEng1 > 0.5 : false,
+      typeof combEng2 === 'number' ? combEng2 > 0.5 : false,
+    ],
+    pph: [flowPph1, flowPph2],
+    recip: [flowRecip1, flowRecip2],
+    gph: [flowGph1, flowGph2],
+    general: [flowGeneral1, undefined],
+  });
 
   return {
     onGround: snap.onGround,
@@ -414,6 +543,7 @@ export async function sampleLiveFlight(
     pitchDeg,
     gForce,
     indicatedAirspeedKt,
+    trueAirspeedKt,
     altitudeFt,
     overspeedWarning,
     stallWarning,
@@ -421,6 +551,8 @@ export async function sampleLiveFlight(
     gearRetractable,
     flapsPct,
     aglFt,
+    fuelFlowKgPerHour,
+    fuelTotalLb,
   };
 }
 
@@ -1150,6 +1282,11 @@ export class CareerWatchSession {
   private originClearedForDepart = false;
   private cruiseState: CruiseSampleState = createCruiseSampleState();
   private cruiseStatus: CruiseSampleStatus | null = null;
+  /** Present while cruise window is empty — footer / debug. */
+  private cruiseIdleHint: string | null = null;
+  /** Accu-Sim burn fallback: previous FUEL TOTAL QUANTITY WEIGHT sample. */
+  private cruiseFuelTotalLb: number | null = null;
+  private cruiseFuelTotalAtMs: number | null = null;
   /**
    * Original OFP / distance planned air time for this Watch session.
    * Cruise TAS rebase floors against this (never below 55%).
@@ -1328,7 +1465,14 @@ export class CareerWatchSession {
       intervalMs: this.intervalMs,
       allowDepartOverride: this.opts.allowDepartOverride,
       flightTime,
-      cruiseSample: this.cruiseStatus,
+      cruiseSample: this.cruiseStatus
+        ? {
+            ...this.cruiseStatus,
+            ...(this.cruiseIdleHint && this.cruiseStatus.phase === 'idle'
+              ? { hint: this.cruiseIdleHint }
+              : {}),
+          }
+        : null,
       weatherOps: this.weatherStatus,
     };
   }
@@ -1384,6 +1528,9 @@ export class CareerWatchSession {
     this.originClearedForDepart = false;
     this.cruiseState = createCruiseSampleState();
     this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+    this.cruiseIdleHint = null;
+    this.cruiseFuelTotalLb = null;
+    this.cruiseFuelTotalAtMs = null;
     this.ofpExpectedRouteMs = null;
     this.scoreAcc = createFlightScoreAccumulator();
     this.lastFlightScore = finalizeFlightScore(this.scoreAcc);
@@ -1617,6 +1764,9 @@ export class CareerWatchSession {
     this.originClearedForDepart = false;
     this.cruiseState = createCruiseSampleState();
     this.cruiseStatus = null;
+    this.cruiseIdleHint = null;
+    this.cruiseFuelTotalLb = null;
+    this.cruiseFuelTotalAtMs = null;
     this.ofpExpectedRouteMs = null;
     this.scoreAcc = createFlightScoreAccumulator();
     this.lastFlightScore = null;
@@ -2494,6 +2644,183 @@ export class CareerWatchSession {
         );
       }
 
+      // Stable-cruise burn/TAS — use fuel flow from the flight batch (same IPC).
+      // A separate 29-var flow read often TIMEOUTed and left the footer at 0/180s.
+      if (
+        current.status === 'in_flight' &&
+        !sample.onGround &&
+        this.bridge &&
+        !this.pendingSimConnectReset
+      ) {
+        try {
+          const tasKt =
+            typeof sample.trueAirspeedKt === 'number' &&
+            Number.isFinite(sample.trueAirspeedKt) &&
+            sample.trueAirspeedKt >= 40
+              ? Math.round(sample.trueAirspeedKt)
+              : typeof sample.indicatedAirspeedKt === 'number' &&
+                  Number.isFinite(sample.indicatedAirspeedKt) &&
+                  sample.indicatedAirspeedKt >= 40
+                ? Math.round(sample.indicatedAirspeedKt)
+                : await readLiveCruiseTasKt(this.bridge);
+          let fuelFlowKgPerHour =
+            typeof sample.fuelFlowKgPerHour === 'number' &&
+            Number.isFinite(sample.fuelFlowKgPerHour) &&
+            sample.fuelFlowKgPerHour > 0
+              ? sample.fuelFlowKgPerHour
+              : undefined;
+          // Accu-Sim (Aerostar): classic ENG FUEL FLOW* stay 0 — derive burn from
+          // FUEL TOTAL QUANTITY WEIGHT drop between Watch ticks.
+          if (
+            fuelFlowKgPerHour == null &&
+            typeof sample.fuelTotalLb === 'number' &&
+            Number.isFinite(sample.fuelTotalLb) &&
+            sample.fuelTotalLb > 0
+          ) {
+            if (
+              this.cruiseFuelTotalLb != null &&
+              this.cruiseFuelTotalAtMs != null
+            ) {
+              fuelFlowKgPerHour = fuelFlowKgPerHourFromTotalWeightDelta({
+                prevLb: this.cruiseFuelTotalLb,
+                nextLb: sample.fuelTotalLb,
+                dtMs: nowMs - this.cruiseFuelTotalAtMs,
+              });
+            }
+            this.cruiseFuelTotalLb = sample.fuelTotalLb;
+            this.cruiseFuelTotalAtMs = nowMs;
+          }
+          if (fuelFlowKgPerHour == null) {
+            try {
+              fuelFlowKgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+                this.bridge,
+              );
+            } catch (flowErr) {
+              // Soft: flight sample already succeeded — don't tear down SimConnect
+              // just because the optional full flow probe timed out.
+              watchDebugLog('watch', 'cruise flow probe skipped', {
+                missionId: current.id,
+                error: formatIpcError(flowErr),
+                timeout: isIpcTimeout(flowErr),
+              });
+            }
+          }
+          if (fuelFlowKgPerHour != null) {
+            const catalogFlow = current.airframeTypeId
+              ? findCareerPlayerAirframe(current.airframeTypeId)
+                  ?.cruiseFuelFlowKgPerHour
+              : undefined;
+            const overrideFlow = current.airframeTypeId
+              ? snap.missions.airframePerfOverrides?.[current.airframeTypeId]
+                  ?.cruiseFuelFlowKgPerHour
+              : undefined;
+            fuelFlowKgPerHour = clampCruiseFuelFlowToCatalog(
+              fuelFlowKgPerHour,
+              catalogFlow ?? overrideFlow,
+            );
+          }
+          const pushed = pushCruiseTick(this.cruiseState, {
+            atMs: nowMs,
+            onGround: sample.onGround,
+            altFt: sample.altitudeFt,
+            vsFpm: sample.verticalSpeedFpm,
+            tasKt,
+            fuelFlowKgPerHour,
+          });
+          this.cruiseState = pushed.state;
+          this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+          if (
+            this.cruiseStatus.phase === 'idle' &&
+            this.cruiseState.window.length === 0
+          ) {
+            const vs = sample.verticalSpeedFpm;
+            const vsBlock =
+              typeof vs === 'number' &&
+              Number.isFinite(vs) &&
+              Math.abs(vs) > 400;
+            this.cruiseIdleHint = vsBlock
+              ? 'vs'
+              : tasKt == null || tasKt < 60
+                ? 'tas'
+                : fuelFlowKgPerHour == null
+                  ? 'flow'
+                  : 'unstable';
+          } else {
+            this.cruiseIdleHint = null;
+          }
+          const cruiseCommit =
+            pushed.justCommitted ?? this.cruiseState.committed;
+          if (cruiseCommit) {
+            const plannedMs =
+              this.ofpExpectedRouteMs ??
+              nextState.expectedRouteMs ??
+              expectedRouteMs;
+            const routeNm =
+              nextState.routeDistanceNm ??
+              distanceNm ??
+              current.lastOfpCheck?.briefing?.distanceNm;
+            if (
+              typeof plannedMs === 'number' &&
+              plannedMs > 0 &&
+              typeof routeNm === 'number' &&
+              routeNm > 0
+            ) {
+              const rebased = rebaseExpectedRouteMsFromCruise({
+                plannedExpectedRouteMs: plannedMs,
+                currentExpectedRouteMs:
+                  nextState.expectedRouteMs ?? expectedRouteMs,
+                distanceNm: routeNm,
+                cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
+              });
+              if (rebased.changed) {
+                const prevExpected =
+                  nextState.expectedRouteMs ?? expectedRouteMs;
+                if (
+                  prevExpected == null ||
+                  !(prevExpected > 0) ||
+                  rebased.expectedRouteMs < prevExpected
+                ) {
+                  watchDebugLog('watch', 'cruise air-time rebase', {
+                    missionId: current.id,
+                    cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
+                    distanceNm: routeNm,
+                    plannedMs,
+                    estimatedMs: rebased.estimatedMs,
+                    prevExpectedRouteMs: prevExpected ?? null,
+                    nextExpectedRouteMs: rebased.expectedRouteMs,
+                  });
+                  this.watchState = {
+                    ...nextState,
+                    expectedRouteMs: rebased.expectedRouteMs,
+                  };
+                  nextState = this.watchState;
+                }
+              }
+            }
+          }
+        } catch (cruiseErr) {
+          // Soft-fail cruise: do not mark pendingSimConnectReset — that skipped
+          // every subsequent cruise attempt after a single probe TIMEOUT.
+          watchDebugLog('watch', 'cruise sample skipped', {
+            missionId: current.id,
+            error: formatIpcError(cruiseErr),
+            timeout: isIpcTimeout(cruiseErr),
+          });
+          this.cruiseIdleHint = isIpcTimeout(cruiseErr) ? 'timeout' : 'error';
+          this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+        }
+      } else if (sample.onGround && this.cruiseState.window.length > 0) {
+        // Break the stable window on touchdown; keep any locked commit.
+        this.cruiseState = {
+          window: [],
+          committed: this.cruiseState.committed,
+        };
+        this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+        this.cruiseIdleHint = null;
+        this.cruiseFuelTotalLb = null;
+        this.cruiseFuelTotalAtMs = null;
+      }
+
       // Live weather-ops: headwind / rain / visibility while airborne.
       if (!sample.onGround && !isSimPlaybackFrozen(sample) && this.bridge) {
         try {
@@ -2554,94 +2881,6 @@ export class CareerWatchSession {
       this.lastFlightScore = finalizeFlightScore(this.scoreAcc, {
         landingVsFpm: nextState.landingFpm,
       });
-
-      // Stable-cruise burn/TAS sample while airborne on an active freighter leg.
-      // Skip if weather/flight already marked the SimConnect session dead.
-      if (
-        current.status === 'in_flight' &&
-        !sample.onGround &&
-        this.bridge &&
-        !this.pendingSimConnectReset
-      ) {
-        try {
-          const tasKt = await readLiveCruiseTasKt(this.bridge);
-          const fuelFlowKgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
-            this.bridge,
-          );
-          const pushed = pushCruiseTick(this.cruiseState, {
-            atMs: nowMs,
-            onGround: sample.onGround,
-            altFt: sample.altitudeFt,
-            vsFpm: sample.verticalSpeedFpm,
-            tasKt,
-            fuelFlowKgPerHour,
-          });
-          this.cruiseState = pushed.state;
-          this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
-          const cruiseCommit =
-            pushed.justCommitted ?? this.cruiseState.committed;
-          if (cruiseCommit) {
-            const plannedMs =
-              this.ofpExpectedRouteMs ??
-              nextState.expectedRouteMs ??
-              expectedRouteMs;
-            const routeNm =
-              nextState.routeDistanceNm ??
-              distanceNm ??
-              current.lastOfpCheck?.briefing?.distanceNm;
-            if (
-              typeof plannedMs === 'number' &&
-              plannedMs > 0 &&
-              typeof routeNm === 'number' &&
-              routeNm > 0
-            ) {
-              const rebased = rebaseExpectedRouteMsFromCruise({
-                plannedExpectedRouteMs: plannedMs,
-                currentExpectedRouteMs:
-                  nextState.expectedRouteMs ?? expectedRouteMs,
-                distanceNm: routeNm,
-                cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
-              });
-              if (rebased.changed) {
-                const prevExpected =
-                  nextState.expectedRouteMs ?? expectedRouteMs;
-                if (
-                  prevExpected == null ||
-                  !(prevExpected > 0) ||
-                  rebased.expectedRouteMs < prevExpected
-                ) {
-                  watchDebugLog('watch', 'cruise air-time rebase', {
-                    missionId: current.id,
-                    cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
-                    distanceNm: routeNm,
-                    plannedMs,
-                    estimatedMs: rebased.estimatedMs,
-                    prevExpectedRouteMs: prevExpected ?? null,
-                    nextExpectedRouteMs: rebased.expectedRouteMs,
-                  });
-                  this.watchState = {
-                    ...nextState,
-                    expectedRouteMs: rebased.expectedRouteMs,
-                  };
-                  nextState = this.watchState;
-                }
-              }
-            }
-          }
-        } catch (cruiseErr) {
-          if (simIpcSessionDied(cruiseErr)) {
-            this.pendingSimConnectReset = true;
-          }
-          this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
-        }
-      } else if (sample.onGround && this.cruiseState.window.length > 0) {
-        // Break the stable window on touchdown; keep any locked commit.
-        this.cruiseState = {
-          window: [],
-          committed: this.cruiseState.committed,
-        };
-        this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
-      }
 
       // Soft MX burn: drain only the excess above healthy (announced at preflight).
       if (
@@ -3081,10 +3320,13 @@ export class CareerWatchSession {
           if (cruiseCommit && airframeTypeId) {
             const prev =
               freshMissions.airframePerfOverrides?.[airframeTypeId];
+            const catalogFlow =
+              findCareerPlayerAirframe(airframeTypeId)?.cruiseFuelFlowKgPerHour;
             const merged = mergeAirframePerfOverride(
               prev,
               cruiseCommit,
               DEFAULT_CRUISE_EMA_ALPHA,
+              { catalogCruiseFuelFlowKgPerHour: catalogFlow },
             );
             freshMissions.airframePerfOverrides = {
               ...(freshMissions.airframePerfOverrides ?? {}),

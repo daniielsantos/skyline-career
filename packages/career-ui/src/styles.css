@@ -6638,6 +6638,83 @@ button.linkish {
   width: 100%;
 }
 
+.demand-accept-dialog {
+  width: min(100%, 520px);
+}
+
+.demand-accept-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.95rem;
+}
+
+.demand-accept-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.demand-accept-hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.demand-accept-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.45rem;
+}
+
+.demand-accept-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.demand-accept-pick strong {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
+.demand-accept-pick span {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.demand-accept-pick:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.demand-accept-pick.is-active {
+  border-color: var(--accent);
+  background: rgba(240, 165, 0, 0.1);
+}
+
+.demand-accept-pick.is-empty span {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.demand-accept-pick:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .confirm-quote {
   margin: 0;
   color: var(--ink);
@@ -7417,6 +7494,682 @@ span.dispatch-route-hub-dest {
 .fbo-icao-chip:disabled:not(.active) {
   opacity: 0.55;
   cursor: default;
+}
+
+.fbo-mode-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0.85rem;
+}
+
+.fbo-capacity-bar {
+  display: flex;
+  height: 8px;
+  width: min(100%, 22rem);
+  margin-top: 0.35rem;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--panel-border, #3a3a3a) 55%, transparent);
+}
+
+.fbo-capacity-bonded {
+  height: 100%;
+  background: var(--accent, #f0a35a);
+  opacity: 0.9;
+}
+
+.fbo-capacity-spot {
+  height: 100%;
+  background: var(--accent, #f0a35a);
+  opacity: 0.4;
+}
+
+.fbo-spot-panel {
+  margin-top: 0.25rem;
+}
+
+.fbo-spot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(14rem, 0.85fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .fbo-spot-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fbo-spot-piles h3,
+.fbo-spot-sheet h3 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.fbo-spot-sheet {
+  border: 1px solid var(--panel-border, #3a3a3a);
+  border-radius: 4px;
+  padding: 0.75rem 0.85rem;
+}
+
+.fbo-spot-mode {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+}
+
+.fbo-spot-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.fbo-spot-amount input {
+  max-width: 10rem;
+  padding: 0.35rem 0.45rem;
+}
+
+.fbo-spot-actions {
+  margin-top: 0.65rem;
+}
+
+.ports-buy-sheet {
+  margin: 0.85rem 0 1rem;
+}
+
+.ports-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.ports-panel h3 {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.ports-selected-name {
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--accent, #f0a500);
+}
+
+.ports-warehouse-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  height: 100%;
+  min-height: 0;
+}
+
+.ports-warehouse-hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.ports-wh-shelf {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0;
+  padding: 0.15rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.ports-wh-shelf-tab {
+  font-family: var(--font-display, inherit);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.7rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+
+.ports-wh-shelf-tab:hover:not(:disabled):not(.active) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ports-wh-shelf-tab.active {
+  background: rgba(240, 163, 90, 0.18);
+  color: #f0a35a;
+  cursor: default;
+}
+
+.ports-wh-shelf-tab:disabled:not(.active) {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ports-wh-buy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ports-wh-buy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  text-align: left;
+}
+
+.ports-wh-buy-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ports-wh-buy-card.is-selected {
+  border-color: rgba(240, 163, 90, 0.7);
+  box-shadow: 0 0 0 1px rgba(240, 163, 90, 0.35);
+  background: rgba(240, 163, 90, 0.08);
+}
+
+.ports-wh-buy-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ports-wh-buy-head strong {
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.ports-wh-buy-head .muted {
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.ports-wh-buy-meta {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.ports-wh-buy-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.15rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ports-wh-buy-price {
+  font-family: var(--font-display, inherit);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.ports-wh-buy-btn {
+  min-width: 4.5rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #f0a35a;
+  color: #141414;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.ports-wh-buy-btn:hover:not(:disabled) {
+  background: #ffb56f;
+}
+
+.ports-wh-buy-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ports-warehouse-side {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ports-listings-solo {
+  min-height: min(50vh, 28rem);
+}
+
+.ports-warehouse-strip h3 {
+  margin: 0;
+}
+
+.ports-warehouse-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.ports-warehouse-card {
+  flex: 1 1 11.5rem;
+  min-width: 11rem;
+  max-width: 16rem;
+  padding: 0.55rem 0.65rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.ports-warehouse-card.is-clickable {
+  cursor: pointer;
+}
+
+.ports-warehouse-card.is-clickable:hover:not(.is-selected) {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ports-wh-owned-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.ports-wh-owned-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.ports-wh-owned-title strong {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+}
+
+.ports-wh-owned-port {
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ports-wh-tier {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid rgba(240, 163, 90, 0.35);
+  color: #f0a35a;
+  background: rgba(240, 163, 90, 0.1);
+}
+
+.ports-wh-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.ports-wh-meter-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.ports-wh-meter-row > span:last-child {
+  color: rgba(255, 255, 255, 0.88);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ports-wh-meter-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ports-wh-meter-bar > span {
+  display: block;
+  height: 100%;
+  background: #6ec8ff;
+}
+
+.ports-wh-meter-bar.is-ship > span {
+  background: #f0a35a;
+}
+
+.ports-wh-shipped {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.ports-wh-shipped-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.ports-wh-shipped-bar > span {
+  display: block;
+  height: 100%;
+  background: #f0a35a;
+}
+
+.ports-wh-upgrade-hint {
+  margin: 0.1rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ports-wh-upgrade-btn {
+  margin-top: 0.2rem;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(240, 163, 90, 0.55);
+  border-radius: 4px;
+  background: rgba(240, 163, 90, 0.14);
+  color: #f0a35a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ports-wh-upgrade-btn:hover:not(:disabled) {
+  background: rgba(240, 163, 90, 0.24);
+}
+
+.ports-wh-upgrade-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ports-warehouse-stock {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.ports-warehouse-stock li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ports-warehouse-lots {
+  margin-top: 0.35rem;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.ports-warehouse-lots .data-table th,
+.ports-warehouse-lots .data-table td {
+  padding: 0.35rem 0.45rem;
+  font-size: 0.84rem;
+}
+
+.ports-warehouse-lots .commodity-cell {
+  gap: 0.4rem;
+}
+
+.ports-warehouse-lots .data-table tbody tr {
+  cursor: pointer;
+}
+
+.ports-warehouse-lots .data-table tbody tr.is-selected td {
+  background: rgba(240, 163, 90, 0.14);
+}
+
+.ports-pickup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.ports-panel .data-table td {
+  vertical-align: middle;
+}
+
+.ports-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+  gap: 0.75rem;
+  align-items: stretch;
+  min-height: min(58vh, 36rem);
+}
+
+.ports-listings {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(12, 12, 14, 0.45);
+  overflow: auto;
+}
+
+.ports-listings .table-wrap {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.ports-listings .data-table {
+  font-size: 0.86rem;
+}
+
+.ports-listings .data-table th,
+.ports-listings .data-table td {
+  padding: 0.45rem 0.55rem;
+  white-space: nowrap;
+}
+
+.ports-listings .data-table td:first-child,
+.ports-panel .data-table .commodity-cell {
+  white-space: normal;
+}
+
+.ports-map {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0b0b0c;
+}
+
+.ports-map-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: min(58vh, 36rem);
+  background: #0b0b0c;
+}
+
+@media (max-width: 960px) {
+  .ports-main {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .ports-map-canvas {
+    min-height: min(44vh, 28rem);
+    height: min(44vh, 28rem);
+  }
+}
+
+.ports-map .maplibregl-map {
+  font: inherit;
+}
+
+.ports-map .maplibregl-ctrl-attrib {
+  background: rgba(12, 12, 14, 0.75) !important;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.65rem;
+}
+
+.ports-map .maplibregl-ctrl-attrib a {
+  color: rgba(240, 163, 90, 0.85);
+}
+
+.ports-map .maplibregl-ctrl-group {
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+.ports-map .maplibregl-ctrl-group button {
+  background-color: #16161a;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.ports-map-legend {
+  position: absolute;
+  left: 0.65rem;
+  bottom: 0.65rem;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  list-style: none;
+  border-radius: 6px;
+  background: rgba(12, 12, 14, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ports-map-legend .dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.25rem;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.ports-map-legend .dot.port {
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.ports-map-legend .dot.fbo {
+  border-radius: 2px;
+}
+
+.ports-map-port-marker,
+.ports-map-hub-marker,
+.ports-map-fbo-marker {
+  padding: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.ports-map-port-marker {
+  border: 2px solid rgba(12, 12, 14, 0.9);
+  border-radius: 3px;
+  background: #f0a35a;
+  box-shadow:
+    0 0 0 1px rgba(240, 163, 90, 0.35),
+    0 0 14px rgba(240, 163, 90, 0.45);
+}
+
+.ports-map-port-marker.is-selected {
+  background: #ffc089;
+  box-shadow:
+    0 0 0 2px #fff4e8,
+    0 0 18px rgba(240, 163, 90, 0.7);
+  z-index: 2;
+}
+
+.ports-map-hub-marker {
+  border: 1px solid rgba(12, 12, 14, 0.85);
+  border-radius: 50%;
+  background: #7a8a9a;
+  opacity: 0.9;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.ports-map-hub-marker:hover {
+  background: #a8b8c8;
+}
+
+.ports-map-hub-marker.is-selected {
+  background: #f0a35a;
+  opacity: 1;
+  box-shadow:
+    0 0 0 2px #fff4e8,
+    0 0 14px rgba(240, 163, 90, 0.65);
+  z-index: 2;
+}
+
+.ports-map-fbo-marker {
+  border: 2px solid rgba(12, 12, 14, 0.9);
+  border-radius: 3px;
+  background: #6ec8ff;
+  box-shadow:
+    0 0 0 1px rgba(110, 200, 255, 0.4),
+    0 0 12px rgba(110, 200, 255, 0.55);
+  z-index: 1;
+}
+
+.ports-map-fbo-marker:hover {
+  background: #9adbff;
+}
+
+.ports-map-fbo-marker.is-selected {
+  background: #b8e7ff;
+  box-shadow:
+    0 0 0 2px #e8f7ff,
+    0 0 18px rgba(110, 200, 255, 0.85);
+  z-index: 3;
 }
 
 .fbo-route-map .dispatch-route-map-canvas {

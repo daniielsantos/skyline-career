@@ -11,6 +11,7 @@ describe('career UI routes', () => {
     assert.equal(pathForLocation({ tab: 'fleet', airportIcao: null }), '/rivals');
     assert.equal(pathForLocation({ tab: 'pilot', airportIcao: null }), '/company');
     assert.equal(pathForLocation({ tab: 'map', airportIcao: null }), '/network');
+    assert.equal(pathForLocation({ tab: 'ports', airportIcao: null }), '/ports');
     assert.equal(pathForLocation({ tab: 'missions', airportIcao: null }), '/logbook');
     assert.equal(pathForLocation({ tab: 'settings', airportIcao: null }), '/settings');
     assert.equal(
@@ -46,6 +47,10 @@ describe('career UI routes', () => {
     });
     assert.deepEqual(parseCareerPath('/map'), {
       tab: 'map',
+      airportIcao: null,
+    });
+    assert.deepEqual(parseCareerPath('/ports'), {
+      tab: 'ports',
       airportIcao: null,
     });
     assert.deepEqual(parseCareerPath('/staging'), {

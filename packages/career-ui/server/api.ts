@@ -112,10 +112,27 @@ import {
   settleAircraftMarketOps,
   settleHangarParkingFees,
   settleFboOps,
+  settleWarehouseStorageFees,
+  settlePortYardHoldFees,
   settleCompanyCredit,
   companyCreditSnapshot,
   buyFboTier1,
   upgradeFboToTier2,
+  portSnapshot,
+  buyPortListing,
+  depositPortPickupToWarehouse,
+  abandonPortPickup,
+  buyWarehouseAtPickupHub,
+  upgradeWarehouseToTier2,
+  abandonWarehouseStock,
+  playerWarehouseSnapshot,
+  quoteWarehouseBuyUsd,
+  ensureDemandOrders,
+  demandSnapshot,
+  acceptDemandOrder,
+  replaceDemandMissionCargo,
+  demandMissionEditableMaxKg,
+  ensurePortListings,
   holdLotAtFbo,
   FERRY_SOFT_NM_BUDGET,
   cancelFboHold,
@@ -169,6 +186,7 @@ import {
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CareerStore,
+  type CommodityId,
   type FreighterClassId,
   type MissionIntent,
   type PlayerAircraft,
@@ -349,10 +367,14 @@ function withMissionClientView(
     distanceRaw > 0
       ? Math.round(distanceRaw)
       : undefined;
+  const demandEditMaxKg = normalized.demandOrderId
+    ? demandMissionEditableMaxKg(missions, world, normalized)
+    : undefined;
   return {
     ...base,
     ...(airframeLabel ? { airframeLabel } : {}),
     ...(distanceNm !== undefined ? { distanceNm } : {}),
+    ...(demandEditMaxKg !== undefined ? { demandEditMaxKg } : {}),
   };
 }
 
@@ -528,6 +550,16 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
       fromTick: caught.tick - advancedTicks,
       toTick: caught.tick,
     });
+    settleWarehouseStorageFees(missions, {
+      fromTick: caught.tick - advancedTicks,
+      toTick: caught.tick,
+    });
+    settlePortYardHoldFees(missions, {
+      fromTick: caught.tick - advancedTicks,
+      toTick: caught.tick,
+    });
+    ensurePortListings(caught);
+    ensureDemandOrders(caught);
     settleCrewDailyOps(missions, caught, {
       fromTick: caught.tick - advancedTicks,
       toTick: caught.tick,
@@ -535,6 +567,7 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     settleCrewOpsDue(missions, caught, Date.now());
     listAircraftMarket(missions, caught);
     await saveMissions(missions);
+    await persistEconomyUnlocked(caught);
   }
   return caught;
 }
@@ -2824,6 +2857,321 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/fbo/spot/buy') {
+        send(res, 410, {
+          error:
+            'FBO spot trading removed — use Warehouses at port pickup hubs and the Demand Board',
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/fbo/spot/sell') {
+        send(res, 410, {
+          error:
+            'FBO spot trading removed — use Warehouses at port pickup hubs and the Demand Board',
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/ports') {
+        try {
+          // Write path: ensurePortListings must persist — migrate used to drop
+          // portListings, and a read-only seed left the UI with IDs the next
+          // buy could not find on a fresh load.
+          const result = await withCareerWrite((world, missions) =>
+            portSnapshot(world, missions),
+          );
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 500, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/buy') {
+        const body = (await readBody(req)) as {
+          listingId?: string;
+          kg?: number;
+        };
+        if (!body.listingId || body.kg == null) {
+          send(res, 400, { error: 'listingId and kg required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const bought = buyPortListing(missions, world, {
+              listingId: body.listingId!,
+              kg: Number(body.kg),
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              debitUsd: bought.debitUsd,
+              unitPriceUsd: bought.unitPriceUsd,
+              kg: bought.kg,
+              storedKg: bought.storedKg,
+              yardKg: bought.yardKg,
+              pickup: bought.pickup,
+              warehousePile: bought.warehousePile,
+              ports: portSnapshot(world, missions),
+              warehouses: playerWarehouseSnapshot(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/deposit') {
+        const body = (await readBody(req)) as { pickupId?: string; kg?: number };
+        if (!body.pickupId) {
+          send(res, 400, { error: 'pickupId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const deposited = depositPortPickupToWarehouse(missions, world, {
+              pickupId: body.pickupId!,
+              kg: body.kg != null ? Number(body.kg) : undefined,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              kg: deposited.kg,
+              hubIcao: deposited.hubIcao,
+              remainingYardKg: deposited.remainingYardKg,
+              pile: deposited.pile,
+              ports: portSnapshot(world, missions),
+              warehouses: playerWarehouseSnapshot(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/pickup/abandon') {
+        const body = (await readBody(req)) as { pickupId?: string };
+        if (!body.pickupId) {
+          send(res, 400, { error: 'pickupId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const abandoned = abandonPortPickup(missions, {
+              pickupId: body.pickupId!,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              kg: abandoned.kg,
+              hubIcao: abandoned.hubIcao,
+              commodityId: abandoned.commodityId,
+              ports: portSnapshot(world, missions),
+              warehouses: playerWarehouseSnapshot(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/stage') {
+        send(res, 410, {
+          error:
+            'Fly to FBO for spot removed — store in Warehouse and accept a Demand Board order',
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/warehouses') {
+        try {
+          const result = await withCareerRead((world, missions) =>
+            playerWarehouseSnapshot(missions, world),
+          );
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 500, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/buy') {
+        const body = (await readBody(req)) as { icao?: string };
+        if (!body.icao) {
+          send(res, 400, { error: 'icao required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const bought = buyWarehouseAtPickupHub(missions, world, body.icao!);
+            return {
+              walletUsd: missions.walletUsd,
+              debitUsd: bought.debitUsd,
+              warehouse: bought.warehouse,
+              quoteUsd: quoteWarehouseBuyUsd(world, body.icao!),
+              warehouses: playerWarehouseSnapshot(missions, world),
+              ports: portSnapshot(world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/upgrade') {
+        const body = (await readBody(req)) as { warehouseId?: string };
+        if (!body.warehouseId) {
+          send(res, 400, { error: 'warehouseId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const upgraded = upgradeWarehouseToTier2(
+              missions,
+              world,
+              body.warehouseId!,
+            );
+            return {
+              walletUsd: missions.walletUsd,
+              debitUsd: upgraded.debitUsd,
+              warehouse: upgraded.warehouse,
+              warehouses: playerWarehouseSnapshot(missions, world),
+              ports: portSnapshot(world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/stock/abandon') {
+        const body = (await readBody(req)) as { stockId?: string };
+        if (!body.stockId) {
+          send(res, 400, { error: 'stockId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const abandoned = abandonWarehouseStock(missions, {
+              stockId: body.stockId!,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              kg: abandoned.kg,
+              hubIcao: abandoned.hubIcao,
+              commodityId: abandoned.commodityId,
+              warehouseId: abandoned.warehouseId,
+              warehouses: playerWarehouseSnapshot(missions, world),
+              ports: portSnapshot(world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/demand') {
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            ensureDemandOrders(world);
+            const warehouses = playerWarehouseSnapshot(missions, world);
+            return {
+              ...demandSnapshot(world, {
+                warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
+              }),
+              warehouses,
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 500, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/demand/accept') {
+        const body = (await readBody(req)) as {
+          orderId?: string;
+          originIcao?: string;
+          aircraftId?: string;
+          kg?: number;
+        };
+        if (!body.orderId || !body.originIcao || !body.aircraftId) {
+          send(res, 400, {
+            error: 'orderId, originIcao and aircraftId required',
+          });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const accepted = acceptDemandOrder(missions, world, {
+              orderId: body.orderId!,
+              originIcao: body.originIcao!,
+              aircraftId: body.aircraftId!,
+              kg: body.kg != null ? Number(body.kg) : undefined,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              mission: withMissionClientView(world, missions, accepted.mission),
+              order: accepted.order,
+              kg: accepted.kg,
+              payUsd: accepted.payUsd,
+              warehouses: playerWarehouseSnapshot(missions, world),
+              demand: demandSnapshot(world, {
+                warehouseIcaos: (missions.playerWarehouses?.warehouses ?? []).map(
+                  (w) => w.icao,
+                ),
+              }),
+              fleet: missions.fleet,
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/fbo/hold') {
         const body = (await readBody(req)) as {
           lotId?: string;
@@ -3266,6 +3614,16 @@ export function createCareerApiServer(port = 8787) {
             fromTick: world.tick - n,
             toTick: world.tick,
           });
+          settleWarehouseStorageFees(missions, {
+            fromTick: world.tick - n,
+            toTick: world.tick,
+          });
+          settlePortYardHoldFees(missions, {
+            fromTick: world.tick - n,
+            toTick: world.tick,
+          });
+          ensurePortListings(world);
+          ensureDemandOrders(world);
           const crewDaily = settleCrewDailyOps(missions, world, {
             fromTick: world.tick - n,
             toTick: world.tick,
@@ -3592,7 +3950,7 @@ export function createCareerApiServer(port = 8787) {
               }
             | undefined;
           let dispatchError: string | undefined;
-          if (body.openDispatch !== false) {
+          if (body.openDispatch === true) {
             try {
               const built = await buildMissionDispatch(mission, {
                 liveTitle: getLastProbeAircraftTitle(),
@@ -3685,13 +4043,19 @@ export function createCareerApiServer(port = 8787) {
           if (!missions.hubSelected || missions.fleet.length === 0) {
             return { kind: 'no_hub' as const };
           }
-          const firstLot = world.lots.find((lot) => lot.id === lines[0]!.lotId);
-          if (!firstLot) return { kind: 'missing_lot' as const };
           const intoMission = body.missionId
             ? missions.missions.find((m) => m.id === body.missionId)
             : undefined;
           if (body.missionId && !intoMission) {
             return { kind: 'missing_mission' as const };
+          }
+          const demandReplace =
+            replace && Boolean(intoMission?.demandOrderId);
+          const firstLot = demandReplace
+            ? undefined
+            : world.lots.find((lot) => lot.id === lines[0]!.lotId);
+          if (!demandReplace && !firstLot) {
+            return { kind: 'missing_lot' as const };
           }
           let playerAircraft: PlayerAircraft | undefined = body.aircraftId
             ? findPlayerAircraft(missions, body.aircraftId)
@@ -3702,19 +4066,23 @@ export function createCareerApiServer(port = 8787) {
           if (!playerAircraft && intoMission?.aircraftId) {
             playerAircraft = findPlayerAircraft(missions, intoMission.aircraftId);
           }
+          const originIcao = demandReplace
+            ? intoMission!.originIcao
+            : firstLot!.originIcao;
           if (!playerAircraft) {
-            playerAircraft = listParkedAt(missions, firstLot.originIcao)[0];
+            playerAircraft = listParkedAt(missions, originIcao)[0];
           }
           if (!playerAircraft) {
             return {
               kind: 'no_parked' as const,
-              originIcao: firstLot.originIcao,
+              originIcao,
             };
           }
           return {
             kind: 'ok' as const,
             aircraftClassId: playerAircraft.aircraftClassId,
             airframeTypeId: playerAircraft.airframeTypeId,
+            demandReplace,
           };
         });
         if (peek.kind === 'no_hub') {
@@ -3754,16 +4122,106 @@ export function createCareerApiServer(port = 8787) {
                 'Buy or lease an aircraft before staging owned freights — or accept a Crew needed offer',
               );
             }
-            const firstLot = world.lots.find((lot) => lot.id === lines[0]!.lotId);
-            if (!firstLot) {
-              throw new Error(`Unknown lot ${lines[0]!.lotId}`);
-            }
             let intoMission =
               body.missionId
                 ? missions.missions.find((m) => m.id === body.missionId)
                 : undefined;
             if (body.missionId && !intoMission) {
               throw new Error(`Unknown mission ${body.missionId}`);
+            }
+
+            if (replace && intoMission?.demandOrderId) {
+              if (lines.length !== 1) {
+                throw new Error(
+                  'Demand Board edit allows exactly one cargo line',
+                );
+              }
+              let playerAircraft: PlayerAircraft | undefined = body.aircraftId
+                ? findPlayerAircraft(missions, body.aircraftId)
+                : undefined;
+              if (body.aircraftId && !playerAircraft) {
+                throw new Error(`Unknown aircraft ${body.aircraftId}`);
+              }
+              if (!playerAircraft && intoMission.aircraftId) {
+                playerAircraft = findPlayerAircraft(
+                  missions,
+                  intoMission.aircraftId,
+                );
+              }
+              if (!playerAircraft) {
+                playerAircraft = listParkedAt(
+                  missions,
+                  intoMission.originIcao,
+                )[0];
+              }
+              if (!playerAircraft) {
+                throw new Error(
+                  `No parked aircraft at ${intoMission.originIcao} — ferry one there first`,
+                );
+              }
+              if (
+                intoMission.aircraftId &&
+                intoMission.aircraftId !== playerAircraft.id
+              ) {
+                throw new Error(
+                  `Mission ${intoMission.id} is assigned to another aircraft`,
+                );
+              }
+              const aircraft = playerAircraft.aircraftClassId;
+              const playerAirframe = findCareerPlayerAirframe(
+                playerAircraft.airframeTypeId,
+              );
+              const stagingDistanceNm =
+                routeDistanceNm(
+                  world,
+                  intoMission.originIcao,
+                  intoMission.destIcao,
+                ) ??
+                intoMission.distanceNm ??
+                0;
+              const routeCargoLimit = estimateRouteCargoLimit(
+                aircraft,
+                stagingDistanceNm,
+                cargoLimit.maxCargoKg,
+                cargoLimit,
+              );
+              const operationalMaxCargoKg =
+                routeCargoLimit.operationalMaxCargoKg;
+              if (!routeCargoLimit.fuelFeasible) {
+                throw new Error(
+                  `Estimated block fuel ${routeCargoLimit.estimatedBlockFuelKg} kg exceeds ` +
+                    `${aircraft} tank capacity ${routeCargoLimit.fuelCapacityKg} kg ` +
+                    `(deficit ${routeCargoLimit.fuelDeficitKg} kg)`,
+                );
+              }
+              const mission: MissionIntent = {
+                ...replaceDemandMissionCargo(missions, world, intoMission, {
+                  cargoKg: lines[0]!.cargoKg,
+                  maxCargoKg: operationalMaxCargoKg,
+                }),
+                aircraftId: playerAircraft.id,
+                airframeTypeId: playerAirframe?.typeId,
+                rolesPackRelPath:
+                  playerAirframe?.rolesPackRelPath ??
+                  intoMission.rolesPackRelPath,
+              };
+              const idx = missions.missions.findIndex((m) => m.id === mission.id);
+              if (idx >= 0) missions.missions[idx] = mission;
+              else missions.missions.push(mission);
+              return {
+                mission,
+                appended: false,
+                lineCount: 1,
+                operationalMaxCargoKg,
+                estimatedBlockFuelKg: routeCargoLimit.estimatedBlockFuelKg,
+                walletUsd: missions.walletUsd,
+                fleet: withParkingRates(missions.fleet),
+              };
+            }
+
+            const firstLot = world.lots.find((lot) => lot.id === lines[0]!.lotId);
+            if (!firstLot) {
+              throw new Error(`Unknown lot ${lines[0]!.lotId}`);
             }
             let playerAircraft: PlayerAircraft | undefined = body.aircraftId
               ? findPlayerAircraft(missions, body.aircraftId)
@@ -3962,7 +4420,7 @@ export function createCareerApiServer(port = 8787) {
               }
             | undefined;
           let dispatchError: string | undefined;
-          if (body.openDispatch !== false) {
+          if (body.openDispatch === true) {
             try {
               const built = await buildMissionDispatch(mission, {
                 units: body.units ?? body.weightSystem,
@@ -4001,7 +4459,9 @@ export function createCareerApiServer(port = 8787) {
           }
 
           send(res, 200, {
-            mission,
+            mission: await withCareerRead((world, missions) =>
+              withMissionClientView(world, missions, mission),
+            ),
             walletUsd: committed.walletUsd,
             maxCargoKg: committed.operationalMaxCargoKg,
             structuralMaxCargoKg: cargoLimit.maxCargoKg,
@@ -5103,13 +5563,17 @@ export function createCareerApiServer(port = 8787) {
             if (result.walletCreditUsd > 0) {
               applyWalletDelta(missions, {
                 amountUsd: result.walletCreditUsd,
-                kind: 'freight_payout',
+                kind: result.mission.demandOrderId
+                  ? 'demand_payout'
+                  : 'freight_payout',
                 atTick: world.tick,
                 missionId: result.mission.id,
                 icao: result.mission.destIcao,
                 note: result.mission.contractPilot
                   ? `Contract pilot · ${result.mission.originIcao}→${result.mission.destIcao}`
-                  : `${result.mission.originIcao}→${result.mission.destIcao}`,
+                  : result.mission.demandOrderId
+                    ? `Demand · ${result.mission.originIcao}→${result.mission.destIcao}`
+                    : `${result.mission.originIcao}→${result.mission.destIcao}`,
               });
             }
             if (result.fuelDebitUsd > 0) {

@@ -61,7 +61,9 @@ export type CareerLedgerKind =
   | 'fbo_buy'
   | 'fbo_storage'
   | 'fbo_hold_expire'
+  | 'fbo_spot_buy'
   | 'fbo_spot_sale'
+  | 'port_buy'
   | 'fbo_reroute'
   | 'crew_fee'
   | 'crew_salary'
@@ -478,6 +480,15 @@ export type Mission = {
   crewDeadhead?: boolean;
   /** Player empty reposition (no freight) — Hangar → Plan empty flight. */
   emptyFlight?: boolean;
+  /** Demand Board mission (warehouse → terminal). */
+  demandOrderId?: string;
+  warehouseId?: string;
+  warehouseAvgCostUsdPerKg?: number;
+  /**
+   * Max kg allowed when editing a Demand Board flight (onboard + WH headroom).
+   * Enriched by /api/missions.
+   */
+  demandEditMaxKg?: number;
   /** Great-circle / network route distance (enriched by /api/missions). */
   distanceNm?: number;
   /** Catalog airframe label (enriched by /api/missions). */
@@ -667,6 +678,15 @@ export type PlayerFboHold = {
   distanceNm?: number;
 };
 
+export type PlayerFboStockPile = {
+  id: string;
+  fboId: string;
+  commodityId: string;
+  kg: number;
+  avgCostUsdPerKg: number;
+  acquiredAtTick: number;
+};
+
 export type PlayerFboSnapshot = {
   fbos: Array<{
     id: string;
@@ -674,12 +694,15 @@ export type PlayerFboSnapshot = {
     tier: number;
     capacityKg: number;
     usedKg: number;
+    bondedKg?: number;
+    spotKg?: number;
     canUpgradeToTier2?: boolean;
     upgradeUsd?: number | null;
     parkingFeeMult?: number;
     serviceCostMult?: number;
   }>;
   holds: PlayerFboHold[];
+  stock?: PlayerFboStockPile[];
   canBuyAtHome: boolean;
   homeBuyUsd: number | null;
   canBuyAtIcao?: boolean;
@@ -1645,6 +1668,234 @@ export function postFboUpgrade(opts: { fboId: string }) {
   });
 }
 
+export type PortListingView = {
+  id: string;
+  portId: string;
+  commodityId: string;
+  commodityName?: string;
+  availableKg: number;
+  unitPriceUsd: number;
+  allocatedHubIcao: string;
+  arrivedAtTick: number;
+  expiresAtTick: number;
+  status: string;
+  hubSpotUnitPriceUsd: number | null;
+};
+
+export type PlayerPortPickupView = {
+  id: string;
+  portId: string;
+  listingId?: string;
+  hubIcao: string;
+  commodityId: string;
+  commodityName?: string;
+  kg: number;
+  avgCostUsdPerKg: number;
+  purchasedAtTick: number;
+};
+
+export type PortsSnapshot = {
+  ports: Array<{
+    id: string;
+    name: string;
+    countryId: string;
+    lat: number;
+    lon: number;
+    pickupHubs: string[];
+    pickupHubDetails?: Array<{
+      icao: string;
+      lat: number;
+      lon: number;
+      name?: string;
+    }>;
+    listings: PortListingView[];
+  }>;
+  pickups: PlayerPortPickupView[];
+  warehouses?: PlayerWarehouseSnapshot;
+  demand?: DemandSnapshot;
+  ownedFbos?: Array<{
+    id: string;
+    icao: string;
+    lat: number;
+    lon: number;
+    name?: string;
+    tier: number;
+  }>;
+};
+
+export type PlayerWarehouseView = {
+  id: string;
+  icao: string;
+  capacityKg: number;
+  tier: 1 | 2;
+  usedKg: number;
+  freeKg: number;
+  lifetimeShippedKg?: number;
+  shippedNeededForT2Kg?: number;
+  upgradeUsd?: number | null;
+  canUpgrade?: boolean;
+  hubTier?: 'spoke' | 'regional' | 'major';
+};
+
+export type PlayerWarehousePileView = {
+  id: string;
+  warehouseId: string;
+  commodityId: string;
+  kg: number;
+  avgCostUsdPerKg: number;
+  acquiredAtTick: number;
+};
+
+export type PlayerWarehouseSnapshot = {
+  warehouses: PlayerWarehouseView[];
+  stock: PlayerWarehousePileView[];
+  pickupHubs: string[];
+  buyUsdByIcao?: Record<string, number>;
+};
+
+export type DemandOrderView = {
+  id: string;
+  destIcao: string;
+  /** Hub / airport display name for Dest tooltips. */
+  destName?: string;
+  commodityId: string;
+  commodityName: string;
+  wantedKg: number;
+  remainingKg: number;
+  maxUnitPriceUsd: number;
+  arrivedAtTick: number;
+  expiresAtTick: number;
+  status: string;
+  localSpotUsd: number | null;
+};
+
+export type DemandSnapshot = {
+  orders: DemandOrderView[];
+  warehouses?: PlayerWarehouseSnapshot;
+};
+
+export function fetchPorts() {
+  return api<PortsSnapshot>('/api/ports');
+}
+
+export function postPortBuy(opts: { listingId: string; kg: number }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    unitPriceUsd: number;
+    kg: number;
+    storedKg: number;
+    yardKg: number;
+    pickup: PlayerPortPickupView | null;
+    warehousePile: PlayerWarehousePileView | null;
+    ports: PortsSnapshot;
+    warehouses: PlayerWarehouseSnapshot;
+  }>('/api/ports/buy', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortDeposit(opts: { pickupId: string; kg?: number }) {
+  return api<{
+    walletUsd: number;
+    kg: number;
+    hubIcao: string;
+    remainingYardKg: number;
+    pile: PlayerWarehousePileView;
+    ports: PortsSnapshot;
+    warehouses: PlayerWarehouseSnapshot;
+  }>('/api/ports/deposit', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortPickupAbandon(opts: { pickupId: string }) {
+  return api<{
+    walletUsd: number;
+    kg: number;
+    hubIcao: string;
+    commodityId: string;
+    ports: PortsSnapshot;
+    warehouses: PlayerWarehouseSnapshot;
+  }>('/api/ports/pickup/abandon', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function fetchWarehouses() {
+  return api<PlayerWarehouseSnapshot>('/api/warehouses');
+}
+
+export function postWarehouseBuy(opts: { icao: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 };
+    warehouses: PlayerWarehouseSnapshot;
+    ports: PortsSnapshot;
+  }>('/api/warehouses/buy', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseUpgrade(opts: { warehouseId: string }) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 };
+    warehouses: PlayerWarehouseSnapshot;
+    ports: PortsSnapshot;
+  }>('/api/warehouses/upgrade', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseStockAbandon(opts: { stockId: string }) {
+  return api<{
+    walletUsd: number;
+    kg: number;
+    hubIcao: string;
+    commodityId: string;
+    warehouseId: string;
+    warehouses: PlayerWarehouseSnapshot;
+    ports: PortsSnapshot;
+  }>('/api/warehouses/stock/abandon', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function fetchDemand() {
+  return api<DemandSnapshot>('/api/demand');
+}
+
+export function postDemandAccept(opts: {
+  orderId: string;
+  originIcao: string;
+  aircraftId: string;
+  kg?: number;
+}) {
+  return api<{
+    walletUsd: number;
+    mission: Mission;
+    order: DemandOrderView;
+    kg: number;
+    payUsd: number;
+    warehouses: PlayerWarehouseSnapshot;
+    demand: DemandSnapshot;
+    fleet: PlayerAircraft[];
+    missions: Mission[];
+  }>('/api/demand/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
 export function postFboHold(opts: { lotId: string; cargoKg?: number }) {
   return api<{
     hold: PlayerFboHold;
@@ -2404,6 +2655,8 @@ export type WatchStatus = {
     requiredMs: number;
     tasKt?: number;
     fuelFlowKgPerHour?: number;
+    /** Why idle window is stuck (e.g. flow / tas / vs / timeout). */
+    hint?: string;
     committed?: {
       cruiseSpeedKt: number;
       cruiseFuelFlowKgPerHour: number;

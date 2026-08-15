@@ -24,6 +24,8 @@ import {
   settleFboHoldExpiries,
   settleFboStorageFees,
   upgradeFboToTier2,
+  buyFboSpot,
+  sellFboSpot,
 } from './career-fbo.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
 import { quoteHangarParkingUsdPerDay, resolveHangarParkingUsdPerDay } from './career-hangar-fees.js';
@@ -608,5 +610,60 @@ describe('player FBO', () => {
       state.playerFbos!.holds.filter((h) => h.lotId === lot!.id).length,
       1,
     );
+  });
+
+  it('rejects removed FBO spot buy/sell', () => {
+    const world = createSeedEconomyWorld({ seed: 'fbo-spot' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'SpotTrader',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyFboTier1(state, world, 'SBGR');
+    assert.throws(
+      () =>
+        buyFboSpot(state, world, {
+          icao: 'SBGR',
+          commodityId: 'general',
+          kg: 500,
+        }),
+      /removed/i,
+    );
+    assert.throws(
+      () =>
+        sellFboSpot(state, world, {
+          icao: 'SBGR',
+          commodityId: 'general',
+          kg: 200,
+        }),
+      /removed/i,
+    );
+  });
+
+  it('storage fees ignore wiped spot piles (bonded only)', () => {
+    const world = createSeedEconomyWorld({ seed: 'fbo-spot-fee' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'SpotFee',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyFboTier1(state, world, 'SBGR');
+    state.playerFbos!.stock = [
+      {
+        id: 'legacy',
+        fboId: state.playerFbos!.fbos[0]!.id,
+        commodityId: 'general',
+        kg: 400,
+        avgCostUsdPerKg: 1,
+        acquiredAtTick: world.tick,
+      },
+    ];
+    const before = state.walletUsd;
+    const storage = settleFboStorageFees(state, {
+      fromTick: world.tick,
+      toTick: world.tick + 96,
+    });
+    assert.equal(storage.debitUsd, 0);
+    assert.equal(state.walletUsd, before);
   });
 });

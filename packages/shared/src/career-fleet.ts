@@ -137,8 +137,10 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     cargoOps: normalizeCareerCargoOps(undefined),
     classOps: normalizeCareerClassOps(undefined),
     companyCredit: normalizeCompanyCredit(undefined),
-    playerFbos: { fbos: [], holds: [] },
+    playerFbos: { fbos: [], holds: [], stock: [] },
     companyCrew: { members: [] },
+    portPickups: [],
+    playerWarehouses: { warehouses: [], stock: [] },
   };
 }
 
@@ -224,8 +226,21 @@ export function normalizeMissionsState(
       ? {
           fbos: playerFbosRaw.fbos,
           holds: playerFbosRaw.holds,
+          // Spot inventory removed — always wipe on load (plan 1B).
+          stock: [],
         }
-      : { fbos: [], holds: [] };
+      : { fbos: [], holds: [], stock: [] };
+  const playerWarehousesRaw = (raw as CareerMissionsState).playerWarehouses;
+  const playerWarehouses =
+    playerWarehousesRaw &&
+    typeof playerWarehousesRaw === 'object' &&
+    Array.isArray(playerWarehousesRaw.warehouses) &&
+    Array.isArray(playerWarehousesRaw.stock)
+      ? {
+          warehouses: playerWarehousesRaw.warehouses,
+          stock: playerWarehousesRaw.stock,
+        }
+      : { warehouses: [], stock: [] };
   // Full sanitize in ensureCompanyCrew / career-crew ops.
   const companyCrewRaw = (raw as CareerMissionsState).companyCrew;
   const companyCrew =
@@ -272,6 +287,10 @@ export function normalizeMissionsState(
     playerFbos,
     companyCrew,
     ferrySoftNmUsed,
+    portPickups: Array.isArray((raw as CareerMissionsState).portPickups)
+      ? (raw as CareerMissionsState).portPickups
+      : [],
+    playerWarehouses,
     ...(activeBushTrip ? { activeBushTrip } : {}),
     ...(airframePerfOverrides
       ? { airframePerfOverrides }

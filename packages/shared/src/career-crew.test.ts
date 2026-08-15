@@ -287,7 +287,7 @@ describe('company crew', () => {
     refreshCrewHirePool(state, world, { force: true });
     hireCrewCandidate(state, world, state.companyCrew!.hirePool![0]!.id);
     assert.equal(state.companyCrew!.members.length, 1);
-    state.playerFbos = { fbos: [], holds: [] };
+    state.playerFbos = { fbos: [], holds: [], stock: [] };
     ensureCompanyCrew(state, { tick: world.tick });
     assert.equal(state.companyCrew!.members.length, 1);
   });

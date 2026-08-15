@@ -117,6 +117,7 @@ import {
 import { estimateSellBackUsd, estimateLeaseEarlyReturnUsd } from './aircraft-pricing';
 import { useConfirm } from './ConfirmDialog';
 import { FboRerouteDialog } from './FboRerouteDialog';
+import { PortsPanel } from './PortsPanel';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { BushTripMapCard } from './BushTripMapCard';
@@ -2062,7 +2063,6 @@ export function App() {
     string | null
   >(null);
   const preflightBootstrapErrorRef = useRef<string | null>(null);
-  const [preferManualLoad, setPreferManualLoad] = useState(false);
   /** Prevents a second /api/load-ofp while one is already in flight. */
   const ofpInjectInFlightRef = useRef(false);
   const loadOfpControlRef = useRef<{
@@ -3848,7 +3848,6 @@ export function App() {
   }, [activeMission?.id]);
 
   useEffect(() => {
-    setPreferManualLoad(false);
     setSkylineInjectEnabled(false);
     setLoadOfpAutoStatus('idle');
     setLoadOfpAutoError(null);
@@ -4013,7 +4012,13 @@ export function App() {
 
   async function onTick(ticks = 1) {
     const hoursLabel =
-      ticks === 1 ? '15 min' : ticks === 4 ? '1 hour' : `${ticks * 15} min`;
+      ticks === 1
+        ? '15 min'
+        : ticks === 4
+          ? '1 hour'
+          : ticks === 96
+            ? '1 day'
+            : `${ticks * 15} min`;
     await run(async () => {
       const result = await postTick(ticks);
       if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
@@ -5251,6 +5256,12 @@ export function App() {
     const lines: StagingLine[] = [];
     for (const line of editableLots.values()) {
       const market = lots.find((lot) => lot.id === line.shipmentLotId);
+      const demandMax =
+        typeof mission.demandEditMaxKg === 'number' &&
+        Number.isFinite(mission.demandEditMaxKg) &&
+        mission.demandEditMaxKg > 0
+          ? Math.floor(mission.demandEditMaxKg)
+          : undefined;
       const lot: MarketLot = market
         ? {
             ...market,
@@ -5264,7 +5275,7 @@ export function App() {
             destName: mission.destIcao,
             commodityId: line.commodityId,
             commodityName: line.commodityId,
-            availableKg: line.cargoKg,
+            availableKg: demandMax ?? line.cargoKg,
             payUsd: line.payUsd,
             urgency: line.urgency === 'urgent' ? 'urgent' : 'normal',
             reason: line.reason,
@@ -5413,7 +5424,7 @@ export function App() {
           aircraft: staging.aircraft,
           aircraftId: staging.aircraftId,
           missionId: staging.intoMissionId,
-          openDispatch: true,
+          openDispatch: false,
           replace: Boolean(staging.replaceManifest),
           weightSystem,
           lines: staging.lines.map((line) => ({
@@ -5436,32 +5447,21 @@ export function App() {
         if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
         setStaging(null);
         setWatchAutoPaused(false);
-        if (result.dispatchError) {
-          setToastKind('warn');
-          setToast(
-            `Flight ${result.mission.id} accepted, but SimBrief dispatch failed: ${result.dispatchError}`,
-          );
-        } else {
-          if (result.dispatch?.url) openSimBriefDispatchUrl(result.dispatch.url);
-          setToastKind('ok');
-          const rem =
-            result.remainingKg !== undefined
-              ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
-              : '';
-          const dispatchNote = result.dispatch
-            ? ` · SimBrief ${result.dispatch.airframeLabel}`
+        setToastKind('ok');
+        const rem =
+          result.remainingKg !== undefined
+            ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
             : '';
-          const action = result.replaced
+        const action = result.replaced
+          ? 'Updated'
+          : result.appended
             ? 'Updated'
-            : result.appended
-              ? 'Updated'
-              : 'Created';
-          setToast(
-            `${action} ${result.mission.id} · ${
-              result.lineCount ?? staging.lines.length
-            } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem}${dispatchNote}`,
-          );
-        }
+            : 'Created';
+        setToast(
+          `${action} ${result.mission.id} · ${
+            result.lineCount ?? staging.lines.length
+          } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem} · open Dispatch`,
+        );
         goToTab('staging');
       } catch (err) {
         setToastKind('fail');
@@ -5566,7 +5566,7 @@ export function App() {
       const result = await postContractPilotAccept({
         lotId: lot.id,
         airframeTypeId: selectedRef.current,
-        openDispatch: true,
+        openDispatch: false,
       });
       if (result.mission) {
         setMissions((prev) => {
@@ -5595,18 +5595,10 @@ export function App() {
       const reposition = result.pilotRelocatedFrom
         ? ` · operator covered travel ${result.pilotRelocatedFrom}→${result.pilotIcao ?? result.mission.originIcao}`
         : '';
-      if (result.dispatchError) {
-        setToastKind('warn');
-        setToast(
-          `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition}, but SimBrief failed: ${result.dispatchError}`,
-        );
-      } else {
-        if (result.dispatch?.url) openSimBriefDispatchUrl(result.dispatch.url);
-        setToastKind('ok');
-        setToast(
-          `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition} · Dispatch open`,
-        );
-      }
+      setToastKind('ok');
+      setToast(
+        `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition} · open Dispatch`,
+      );
       goToTab('staging');
       await refresh();
     });
@@ -5743,8 +5735,8 @@ export function App() {
       setToastKind(result.warning ? 'warn' : 'ok');
       setToast(
         result.returnedToMarket
-          ? `Cancelled ${result.mission.id} · ${formatTonnes(result.releasedKg)} released to market`
-          : `Cancelled ${result.mission.id} · ${result.warning ?? 'no active lot to release'}`,
+          ? `Cancelled · ${formatTonnes(result.releasedKg)} released to market`
+          : `Cancelled · ${result.warning ?? 'no active lot to release'}`,
       );
       goToTab('staging');
     });
@@ -5810,17 +5802,6 @@ export function App() {
       setToastKind('ok');
       setToast('Bush trip abandoned — no payout');
     });
-  }
-
-  function continueManuallyLoad() {
-    setPreferManualLoad(true);
-    setSkylineInjectEnabled(false);
-    setLoadOfpAutoStatus('idle');
-    setLoadOfpAutoError(null);
-    setToastKind('ok');
-    setToast(
-      'Load manually in the aircraft Mass & Balance / EFB. Loaded vs Due updates automatically.',
-    );
   }
 
   function onToggleSkylineInject(enabled: boolean) {
@@ -6551,7 +6532,7 @@ export function App() {
         : activeMission,
   });
   const activeLoadPath = activeMission
-    ? resolveLoadPath(activeMission, preferManualLoad)
+    ? resolveLoadPath(activeMission, false)
     : 'manual';
   const dispatchStatusText = dispatchStepStatusLine({
     step: dispatchStep,
@@ -6736,7 +6717,9 @@ export function App() {
               ? 'Company'
               : tab === 'map'
                 ? 'Network'
-                : tab === 'missions'
+                : tab === 'ports'
+                  ? 'Ports'
+                  : tab === 'missions'
                   ? 'Logbook'
                   : tab === 'settings'
                     ? 'Settings'
@@ -6773,7 +6756,9 @@ export function App() {
                 : 'Register your name and home hub to start the career.'
               : tab === 'map'
                 ? 'Registered Skyline hubs on OpenFreeMap Dark (free public tiles).'
-                : tab === 'missions'
+                : tab === 'ports'
+                  ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
+                  : tab === 'missions'
                   ? 'Past flights — aircraft, cargo, distance, and payout.'
                   : tab === 'settings'
                     ? 'SimBrief, weight units, and local career preferences.'
@@ -6932,7 +6917,7 @@ export function App() {
                 ? `FBO · ${playerFbos.fbos.map((f) => f.icao).join(', ')}`
                 : homeHubIcao
                   ? `Buy FBO at home · ${homeHubIcao}`
-                  : 'Bonded warehouse / crew staging'
+                  : 'Hold contracts at your hubs'
             }
           >
             FBO
@@ -6971,6 +6956,15 @@ export function App() {
             }
           >
             Network
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'ports' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('ports')}
+            disabled={busy}
+            title="Seaport factory cargo"
+          >
+            Ports
           </button>
           <button
             type="button"
@@ -7165,6 +7159,15 @@ export function App() {
                 title="Advance economy + crew wall-clock by 1 hour (4 ticks)"
               >
                 +1 h
+              </button>
+              <button
+                type="button"
+                className="action"
+                onClick={() => void onTick(96)}
+                disabled={busy}
+                title="Advance economy + crew wall-clock by 1 day (96 ticks)"
+              >
+                +1 day
               </button>
               <button
                 type="button"
@@ -7414,12 +7417,11 @@ export function App() {
                       <div>
                         <h2>FBO</h2>
                         <p>
-                          Bonded warehouse at your home hub — hold contracts
-                          without soft-filling the destination until you send
-                          to Dispatch.
+                          Hold contracts at your hubs without soft-filling the
+                          destination until you Dispatch.
                           {(playerFbos?.fbos.length ?? 0) > 1
-                            ? ' Company lane — hold here, reroute to a sister FBO, crew round-trips until you stage reverse cargo.'
-                            : ' Crew fly round-trips empty back to this base.'}
+                            ? ' Sister FBOs can reroute bonded cargo; crew round-trips until you stage the reverse leg.'
+                            : ' Crew can fly empty legs back to this base.'}
                         </p>
                         {(playerFbos?.fbos.length ?? 0) > 1 ? (
                           <div
@@ -7491,7 +7493,7 @@ export function App() {
                               ? ` — ${playerFbos.buyAtIcaoReason}.`
                               : airportIcao?.toUpperCase() ===
                                   homeHubIcao.toUpperCase()
-                                ? ' — purchase Tier 1 to store Dry / Value contracts.'
+                                ? ' — purchase Tier 1 to hold contracts here.'
                                 : ' — expand here after your home-hub FBO (needs 2 owned aircraft + Cargo Ops Value).'}
                           </p>
                         );
@@ -7502,19 +7504,45 @@ export function App() {
                       const svcPct = Math.round(
                         (1 - (localFbo.serviceCostMult ?? 1)) * 100,
                       );
+                      const bondedKg =
+                        localFbo.bondedKg ??
+                        localHolds.reduce((s, h) => s + h.cargoKg, 0);
+                      const bondedPct =
+                        localFbo.capacityKg > 0
+                          ? (bondedKg / localFbo.capacityKg) * 100
+                          : 0;
                       return (
                         <>
                           <div className="panel-head">
-                            <p className="muted">
-                              T{localFbo.tier} · {formatTonnes(localFbo.usedKg)} /{' '}
-                              {formatTonnes(localFbo.capacityKg)} used
-                              {parkPct > 0
-                                ? ` · −${parkPct}% parking`
-                                : ''}
-                              {svcPct > 0
-                                ? ` · −${svcPct}% Jet-A/MRO`
-                                : ''}
-                            </p>
+                            <div>
+                              <p className="muted">
+                                T{localFbo.tier} · {formatTonnes(bondedKg)} /{' '}
+                                {formatTonnes(localFbo.capacityKg)} bonded
+                                {parkPct > 0 ? ` · −${parkPct}% parking` : ''}
+                                {svcPct > 0 ? ` · −${svcPct}% Jet-A/MRO` : ''}
+                              </p>
+                              <div
+                                className="fbo-capacity-bar"
+                                title={`Bonded ${formatTonnes(bondedKg)} / ${formatTonnes(localFbo.capacityKg)}`}
+                              >
+                                <div
+                                  className="fbo-capacity-bonded"
+                                  style={{ width: `${bondedPct}%` }}
+                                />
+                              </div>
+                              {companyCrew && companyCrew.slotsUnlocked > 0 ? (
+                                <p className="hint">
+                                  Crew {companyCrew.slotsInUse}/
+                                  {companyCrew.slotsUnlocked}
+                                  {companyCrew.slotsFree > 0
+                                    ? ` · ${companyCrew.slotsFree} idle`
+                                    : ''}
+                                  {companyCrew.members?.[0]
+                                    ? ` · ${companyCrew.members[0].displayName} @ ${companyCrew.members[0].status === 'airborne' && companyCrew.members[0].originIcao && companyCrew.members[0].destIcao ? `${companyCrew.members[0].originIcao}→${companyCrew.members[0].destIcao}` : companyCrew.members[0].locationIcao}`
+                                    : ''}
+                                </p>
+                              ) : null}
+                            </div>
                             {localFbo.canUpgradeToTier2 ? (
                               <button
                                 type="button"
@@ -7528,19 +7556,8 @@ export function App() {
                                   : ''}
                               </button>
                             ) : null}
-                            {companyCrew && companyCrew.slotsUnlocked > 0 ? (
-                              <p className="hint">
-                                Crew roster {companyCrew.slotsInUse}/
-                                {companyCrew.slotsUnlocked}
-                                {companyCrew.slotsFree > 0
-                                  ? ` · ${companyCrew.slotsFree} idle`
-                                  : ''}
-                                {companyCrew.members?.[0]
-                                  ? ` · ${companyCrew.members[0].displayName} @ ${companyCrew.members[0].status === 'airborne' && companyCrew.members[0].originIcao && companyCrew.members[0].destIcao ? `${companyCrew.members[0].originIcao}→${companyCrew.members[0].destIcao}` : companyCrew.members[0].locationIcao}`
-                                  : ' · hire in Hangar → Crew'}
-                              </p>
-                            ) : null}
                           </div>
+                          <>
                           <FboRouteMapCard
                             baseIcao={localFbo.icao}
                             originIcao={(() => {
@@ -7975,6 +7992,7 @@ export function App() {
                               </>
                             );
                           })()}
+                          </>
                         </>
                       );
                     })()}
@@ -10427,7 +10445,6 @@ export function App() {
                 setMissionFuelQuoteRetryToken((token) => token + 1)
               }
               onToggleSkylineInject={onToggleSkylineInject}
-              onContinueManually={() => continueManuallyLoad()}
               onDepart={(m) => void onDepart(m)}
               onSettle={(m) => void onSettle(m)}
               onCrewDispatch={(m, crewMemberId) =>
@@ -10615,6 +10632,33 @@ export function App() {
             />
           )}
         </section>
+      ) : hubSelected && tab === 'ports' ? (
+        <PortsPanel
+          busy={busy}
+          weightSystem={weightSystem}
+          formatMoney={formatMoney}
+          formatTonnes={formatTonnes}
+          fleet={fleet}
+          economyTick={tick}
+          cargoOps={cargoOps}
+          onOpenCargoOps={() => {
+            setHangarPane('cargo');
+            goToTab('hangar');
+          }}
+          onWallet={setWallet}
+          onFleet={setFleet}
+          onMissions={setMissions}
+          onOpenAirport={(icao) => {
+            void openAirport(icao);
+          }}
+          onStaged={() => {
+            goToTab('staging');
+          }}
+          onToast={(kind, message) => {
+            setToastKind(kind);
+            setToast(message);
+          }}
+        />
       ) : hubSelected && tab === 'pilot' ? (
         <section className="panel pilot-panel">
           <div className="pilot-profile-grid">

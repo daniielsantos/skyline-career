@@ -156,31 +156,41 @@ export async function sampleLiveCruiseFuelFlowKgPerHour(
     maxEngines = Math.floor(numberOfEnginesRaw);
   }
 
-  const engineAllowed = (engine: number): boolean => {
-    if (engine < 1 || engine > maxEngines) return false;
-    if (combustionKnown) return combustion[engine - 1] === true;
-    return engine <= maxEngines;
-  };
-
   let totalLbPerHour = 0;
   let engines = 0;
   const seen = new Set<number>();
   const flowOffset = CRUISE_ENGINE_META.length;
-  for (let i = 0; i < CRUISE_FLOW_BATCH.length; i += 1) {
-    const row = CRUISE_FLOW_BATCH[i]!;
-    if (seen.has(row.engine) || !engineAllowed(row.engine)) continue;
-    const raw = values[flowOffset + i];
-    if (
-      typeof raw !== 'number' ||
-      !Number.isFinite(raw) ||
-      !(raw > row.min) ||
-      raw > MAX_SANE_ENGINE_LB_PER_HOUR
-    ) {
-      continue;
+  const accumulate = (requireCombustion: boolean) => {
+    totalLbPerHour = 0;
+    engines = 0;
+    seen.clear();
+    for (let i = 0; i < CRUISE_FLOW_BATCH.length; i += 1) {
+      const row = CRUISE_FLOW_BATCH[i]!;
+      if (seen.has(row.engine)) continue;
+      if (row.engine < 1 || row.engine > maxEngines) continue;
+      if (requireCombustion && combustionKnown && combustion[row.engine - 1] !== true) {
+        continue;
+      }
+      const raw = values[flowOffset + i];
+      if (
+        typeof raw !== 'number' ||
+        !Number.isFinite(raw) ||
+        !(raw > row.min) ||
+        raw > MAX_SANE_ENGINE_LB_PER_HOUR
+      ) {
+        continue;
+      }
+      seen.add(row.engine);
+      totalLbPerHour += row.asGph ? raw * FALLBACK_LB_PER_GAL : raw;
+      engines += 1;
     }
-    seen.add(row.engine);
-    totalLbPerHour += row.asGph ? raw * FALLBACK_LB_PER_GAL : raw;
-    engines += 1;
+  };
+
+  // Prefer combusting engines (drops ghost Eng2+ noise). If flags look wrong and
+  // yield nothing, fall back to NUMBER OF ENGINES only so the cruise chip can live.
+  accumulate(true);
+  if (engines === 0 && combustionKnown) {
+    accumulate(false);
   }
 
   if (engines === 0) return undefined;

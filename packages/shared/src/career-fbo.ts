@@ -1,6 +1,6 @@
 /**
- * Player FBO — company base upgrade + bonded contract warehouse.
- * Phase 1: one T1 at home hub; holds reserve lots without inbound soft-fill.
+ * Player FBO — company base + bonded contract warehouse.
+ * Spot inventory removed (Warehouses + Demand Board).
  */
 
 import {
@@ -51,6 +51,7 @@ import type {
   PlayerFbo,
   PlayerFboHold,
   PlayerFboState,
+  PlayerFboStockPile,
   PlayerFboTier,
   ShipmentLot,
 } from './types/career-economy.js';
@@ -170,7 +171,7 @@ function nextId(prefix: string, tick: number): string {
 }
 
 export function emptyPlayerFboState(): PlayerFboState {
-  return { fbos: [], holds: [] };
+  return { fbos: [], holds: [], stock: [] };
 }
 
 export function normalizePlayerFboState(raw: unknown): PlayerFboState {
@@ -262,7 +263,8 @@ export function normalizePlayerFboState(raw: unknown): PlayerFboState {
       });
     }
   }
-  return { fbos, holds };
+  const stock: PlayerFboStockPile[] = [];
+  return { fbos, holds, stock };
 }
 
 export function ensurePlayerFbos(state: CareerMissionsState): PlayerFboState {
@@ -389,11 +391,26 @@ export function canBuyFboAtIcao(
   return { ok: true, buyUsd };
 }
 
-export function fboUsedKg(state: CareerMissionsState, fboId: string): number {
+export function fboBondedUsedKg(state: CareerMissionsState, fboId: string): number {
   const fbos = ensurePlayerFbos(state);
   return fbos.holds
     .filter((h) => h.fboId === fboId)
     .reduce((sum, h) => sum + h.cargoKg, 0);
+}
+
+export function fboSpotUsedKg(_state: CareerMissionsState, _fboId: string): number {
+  return 0;
+}
+
+export function fboUsedKg(state: CareerMissionsState, fboId: string): number {
+  return fboBondedUsedKg(state, fboId);
+}
+
+export function fboFreeKg(state: CareerMissionsState, fboId: string): number {
+  const fbos = ensurePlayerFbos(state);
+  const fbo = fbos.fbos.find((f) => f.id === fboId);
+  if (!fbo) return 0;
+  return Math.max(0, fbo.capacityKg - fboUsedKg(state, fboId));
 }
 
 export function quoteFboTier2UpgradeUsd(
@@ -418,6 +435,35 @@ export function isFboHoldCommodityAllowed(commodityId: CommodityId): boolean {
   if (def.kind === 'fuel' || def.kind === 'mro') return false;
   if (commodityId === 'perishables' || def.perishable) return false;
   return true;
+}
+
+/** Alias — spot uses the same cargo allowlist as bonded holds. */
+export const isFboSpotCommodityAllowed = isFboHoldCommodityAllowed;
+
+/**
+ * @deprecated FBO spot removed — Warehouses + Demand Board.
+ */
+export function buyFboSpot(
+  _state: CareerMissionsState,
+  _world: CareerEconomyWorld,
+  _opts: { icao: string; commodityId: CommodityId; kg: number },
+): never {
+  throw new Error(
+    'FBO spot trading removed — use Warehouses at port pickup hubs and the Demand Board',
+  );
+}
+
+/**
+ * @deprecated FBO spot removed — Warehouses + Demand Board.
+ */
+export function sellFboSpot(
+  _state: CareerMissionsState,
+  _world: CareerEconomyWorld,
+  _opts: { icao: string; commodityId: CommodityId; kg: number },
+): never {
+  throw new Error(
+    'FBO spot trading removed — use Warehouses at port pickup hubs and the Demand Board',
+  );
 }
 
 /**
@@ -1289,6 +1335,7 @@ export function settleFboStorageFees(
   if (daysCharged <= 0) return empty;
 
   const fbos = ensurePlayerFbos(state);
+  fbos.stock = [];
   if (fbos.holds.length === 0) {
     return { ...empty, daysCharged };
   }
@@ -1343,6 +1390,8 @@ export function playerFboSnapshot(
   fbos: Array<
     PlayerFbo & {
       usedKg: number;
+      bondedKg: number;
+      spotKg: number;
       canUpgradeToTier2: boolean;
       upgradeUsd: number | null;
       parkingFeeMult: number;
@@ -1350,6 +1399,7 @@ export function playerFboSnapshot(
     }
   >;
   holds: PlayerFboHold[];
+  stock: PlayerFboStockPile[];
   canBuyAtHome: boolean;
   homeBuyUsd: number | null;
   /** Buy affordance for the ICAO currently being viewed (optional). */
@@ -1377,6 +1427,8 @@ export function playerFboSnapshot(
       return {
         ...f,
         usedKg: fboUsedKg(state, f.id),
+        bondedKg: fboBondedUsedKg(state, f.id),
+        spotKg: fboSpotUsedKg(state, f.id),
         canUpgradeToTier2,
         upgradeUsd,
         parkingFeeMult: FBO_PARKING_FEE_MULT[f.tier],
@@ -1394,6 +1446,7 @@ export function playerFboSnapshot(
       hold.distanceNm = distanceNm;
       return hold;
     }),
+    stock: fbos.stock.map((s) => ({ ...s })),
     canBuyAtHome,
     homeBuyUsd,
     phase1MaxOwned: FBO_MAX_OWNED,

@@ -418,6 +418,32 @@ describe('career store', () => {
     assert.equal(again.fleet[0]?.id, 'ac_test_1');
     assert.equal(again.missions[0]?.id, 'msn_1');
 
+    again.portPickups = [
+      {
+        id: 'portpk_1',
+        portId: 'BRSSZ',
+        hubIcao: 'SBGR',
+        commodityId: 'general',
+        kg: 500,
+        avgCostUsdPerKg: 0.48,
+        purchasedAtTick: 10,
+      },
+      {
+        id: 'portpk_2',
+        portId: 'BRSSZ',
+        hubIcao: 'SBGR',
+        commodityId: 'general',
+        kg: 500,
+        avgCostUsdPerKg: 0.48,
+        purchasedAtTick: 11,
+      },
+    ];
+    await store.saveMissions(again);
+    const withPickups = await store.loadMissions();
+    assert.equal(withPickups.portPickups?.length, 2);
+    assert.equal(withPickups.portPickups?.[0]?.id, 'portpk_1');
+    assert.equal(withPickups.portPickups?.[1]?.kg, 500);
+
     store.close();
   });
 

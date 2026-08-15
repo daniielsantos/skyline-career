@@ -408,6 +408,10 @@ export interface CareerEconomyWorld {
   internationalLanes?: InternationalLane[];
   /** Monotonic freight flow counters (throughput instrumentation). */
   flow?: EconomyFlowStats;
+  /** Seaport factory catalog (real ports → pickup hubs). */
+  portListings?: PortListing[];
+  /** Terminal buy-orders for player warehouse cargo (Demand Board). */
+  demandOrders?: DemandOrder[];
 }
 
 /** Lot size buckets used by flow instrumentation. */
@@ -737,6 +741,26 @@ export interface MissionIntent {
    * used to leave bush/trip-only strips and to relocate without a contract.
    */
   emptyFlight?: boolean;
+  /** Great-circle / network route distance (nm); stamped on accept when known. */
+  distanceNm?: number;
+  /**
+   * Port factory cargo staged as a hub→dest reposition (legacy). Prefer demandOrderId.
+   * Skips terminal freight delivery when settling into FBO spot (removed) — demand path uses demandOrderId.
+   */
+  portPickupId?: string;
+  /** Seaport id the cargo was bought from (restore on cancel). */
+  portId?: string;
+  /** Avg cost (USD/kg) carried from the port purchase for P&L. */
+  portAvgCostUsdPerKg?: number;
+  /**
+   * Demand Board haul: warehouse stock → terminal dest. Settle pays order price
+   * and fills destination inventory (freight delivery).
+   */
+  demandOrderId?: string;
+  /** Warehouse id cargo was drawn from (restore on cancel). */
+  warehouseId?: string;
+  /** Avg cost (USD/kg) of reserved warehouse cargo. */
+  warehouseAvgCostUsdPerKg?: number;
   /** Fee paid to the player on settle (also mirrored in payUsd for contract legs). */
   contractPilotFeeUsd?: number;
   /** Full freight value the NPC reserved (display / ledger note). */
@@ -1000,8 +1024,12 @@ export interface CareerMissionsState {
   classOps?: CareerClassOps;
   /** Revolving company credit line (Hangar cashflow). */
   companyCredit?: CompanyCreditState;
-  /** Player-owned FBOs + bonded contract holds (company assets). */
+  /** Player-owned FBOs + bonded contract holds (spot inventory removed). */
   playerFbos?: PlayerFboState;
+  /** Cargo bought at a seaport, waiting at the allocated pickup hub. */
+  portPickups?: PlayerPortPickup[];
+  /** Player warehouses at port pickup hubs + stock piles. */
+  playerWarehouses?: PlayerWarehouseState;
   /** Company crew roster (AI slots based at an FBO). */
   companyCrew?: CompanyCrewState;
   /**
@@ -1041,9 +1069,99 @@ export interface PlayerFboHold {
   distanceNm?: number;
 }
 
+/**
+ * Player-owned spot inventory at an FBO — **removed** from gameplay.
+ * Kept for save normalize (stock wiped on load).
+ */
+export interface PlayerFboStockPile {
+  id: string;
+  fboId: string;
+  commodityId: CommodityId;
+  kg: number;
+  avgCostUsdPerKg: number;
+  acquiredAtTick: number;
+}
+
 export interface PlayerFboState {
   fbos: PlayerFbo[];
   holds: PlayerFboHold[];
+  /** Always wiped empty — legacy field. */
+  stock: PlayerFboStockPile[];
+}
+
+/** Player warehouse at a port pickup hub. */
+export interface PlayerWarehouse {
+  id: string;
+  icao: string;
+  capacityKg: number;
+  tier: 1 | 2;
+  /**
+   * Lifetime kg delivered from this warehouse via Demand Board settle.
+   * Used to unlock T1→T2 upgrade (hybrid money + throughput).
+   */
+  lifetimeShippedKg?: number;
+}
+
+export interface PlayerWarehousePile {
+  id: string;
+  warehouseId: string;
+  commodityId: CommodityId;
+  kg: number;
+  avgCostUsdPerKg: number;
+  acquiredAtTick: number;
+}
+
+export interface PlayerWarehouseState {
+  warehouses: PlayerWarehouse[];
+  stock: PlayerWarehousePile[];
+}
+
+/** Terminal buy-order on the Demand Board. */
+export type DemandOrderStatus = 'open' | 'filled' | 'expired';
+
+export interface DemandOrder {
+  id: string;
+  destIcao: string;
+  commodityId: CommodityId;
+  wantedKg: number;
+  remainingKg: number;
+  /** Max USD/kg the terminal will pay. */
+  maxUnitPriceUsd: number;
+  arrivedAtTick: number;
+  expiresAtTick: number;
+  status: DemandOrderStatus;
+}
+
+/** Open factory catalog row at a real-world seaport. */
+export type PortListingStatus = 'open' | 'sold_out' | 'expired';
+
+export interface PortListing {
+  id: string;
+  portId: string;
+  commodityId: CommodityId;
+  availableKg: number;
+  /** Factory unit price (below typical hub spot). */
+  unitPriceUsd: number;
+  /** Career hub where purchased cargo waits for collection. */
+  allocatedHubIcao: string;
+  arrivedAtTick: number;
+  expiresAtTick: number;
+  status: PortListingStatus;
+}
+
+/**
+ * Player-owned cargo still at the pickup hub (bought from a port).
+ * Deposit into FBO spot only when FBO is at the same ICAO; cross-hub fly = later.
+ */
+export interface PlayerPortPickup {
+  id: string;
+  portId: string;
+  listingId?: string;
+  hubIcao: string;
+  commodityId: CommodityId;
+  kg: number;
+  avgCostUsdPerKg: number;
+  purchasedAtTick: number;
 }
 
 export type CompanyCrewStatus = 'idle' | 'airborne';
@@ -1194,7 +1312,14 @@ export type CareerLedgerKind =
   | 'fbo_buy'
   | 'fbo_storage'
   | 'fbo_hold_expire'
+  | 'fbo_spot_buy'
   | 'fbo_spot_sale'
+  | 'port_buy'
+  | 'port_yard_hold'
+  | 'warehouse_buy'
+  | 'warehouse_storage'
+  | 'warehouse_upgrade'
+  | 'demand_payout'
   | 'fbo_reroute'
   | 'crew_fee'
   | 'crew_salary'

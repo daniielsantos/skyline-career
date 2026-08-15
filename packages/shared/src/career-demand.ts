@@ -1,0 +1,641 @@
+/**
+ * Demand Board — NPC terminal buy-orders when hub stock is short.
+ * Player fulfills from warehouse stock via Dispatch missions.
+ */
+
+import {
+  airportByIcao,
+  CAREER_HUB_COORDS,
+  getCommodity,
+  localUnitPriceUsd,
+  routeDistanceNm,
+  type CareerEconomyWorld,
+} from './career-economy.js';
+import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
+import { TICKS_PER_HOUR } from './career-clock.js';
+import { hubDistanceNm } from './career-ferry-route.js';
+import {
+  depositCargoToWarehouse,
+  findPlayerWarehouseAtIcao,
+  withdrawCargoFromWarehouse,
+} from './career-warehouse-stock.js';
+import {
+  getAircraftClass,
+  listActivePlayerMissions,
+  normalizeMissionIntent,
+  recomputeMissionTotals,
+  syncPlayerInbound,
+} from './career-mission.js';
+import {
+  assignAircraftToMission,
+  findPlayerAircraft,
+} from './career-fleet.js';
+import {
+  findCareerPlayerAirframe,
+  resolveAirframeMaxRangeNm,
+} from './career-player-airframes.js';
+import type {
+  CareerMissionsState,
+  CommodityId,
+  DemandOrder,
+  MissionIntent,
+} from './types/career-economy.js';
+
+export const DEMAND_COMMODITIES: readonly CommodityId[] = [
+  'general',
+  'supplies',
+  'machinery',
+  'electronics',
+];
+
+/** Spawn when stock / capacity is below this fraction. */
+export const DEMAND_STOCK_FRAC_THRESHOLD = 0.25;
+
+/** Soft max open orders per destination hub. */
+export const DEMAND_ORDERS_PER_HUB = 2;
+
+/** Soft cap of open board rows worldwide (keeps Ports GET snappy). */
+export const DEMAND_ORDERS_GLOBAL_CAP = 48;
+
+/** Premium on local spot for max unit price (rng in range). */
+export const DEMAND_PRICE_PREMIUM_MIN = 1.05;
+export const DEMAND_PRICE_PREMIUM_MAX = 1.15;
+
+const DEMAND_TTL_TICKS = 96 * 2.5; // ~2.5 economy days
+
+function money(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function nextId(prefix: string, tick: number): string {
+  return `${prefix}_${tick}_${Math.floor(Math.random() * 1e6)}`;
+}
+
+function hashSeed(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(a: number): () => number {
+  return () => {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
+  if (!Array.isArray(world.demandOrders)) {
+    world.demandOrders = [];
+  }
+  const orders = world.demandOrders;
+
+  // Expire past-due open orders
+  for (const order of orders) {
+    if (
+      order.status === 'open' &&
+      (order.remainingKg <= 0 || order.expiresAtTick <= world.tick)
+    ) {
+      order.status = order.remainingKg <= 0 ? 'filled' : 'expired';
+      if (order.remainingKg <= 0) order.remainingKg = 0;
+    }
+  }
+
+  const rng = mulberry32(hashSeed(`${world.seed}:demand:${world.tick}`));
+
+  const openGlobal = () =>
+    orders.filter(
+      (o) =>
+        o.status === 'open' &&
+        o.remainingKg > 0 &&
+        o.expiresAtTick > world.tick,
+    ).length;
+
+  if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) {
+    world.demandOrders = orders.filter(
+      (o) =>
+        o.status === 'open' ||
+        o.expiresAtTick > world.tick - 96,
+    );
+    return world.demandOrders;
+  }
+
+  for (const ap of world.airports) {
+    if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) break;
+    if (ap.bushTripOnly) continue;
+    const icao = ap.icao.trim().toUpperCase();
+    if (!CAREER_HUB_COORDS[icao]) continue;
+
+    const openHere = orders.filter(
+      (o) =>
+        o.destIcao === icao &&
+        o.status === 'open' &&
+        o.remainingKg > 0 &&
+        o.expiresAtTick > world.tick,
+    );
+    let slots = DEMAND_ORDERS_PER_HUB - openHere.length;
+    if (slots <= 0) continue;
+
+    for (const commodityId of DEMAND_COMMODITIES) {
+      if (slots <= 0) break;
+      if (openHere.some((o) => o.commodityId === commodityId)) continue;
+
+      const pile = ap.inventory[commodityId];
+      if (!pile || pile.capacityKg <= 0) continue;
+      const frac = pile.stockKg / pile.capacityKg;
+      if (frac >= DEMAND_STOCK_FRAC_THRESHOLD) continue;
+
+      const deficitKg = Math.max(
+        0,
+        Math.floor(pile.capacityKg * DEMAND_STOCK_FRAC_THRESHOLD - pile.stockKg),
+      );
+      if (deficitKg < 200) continue;
+
+      const bandMax =
+        commodityId === 'machinery' || commodityId === 'electronics'
+          ? 2_500
+          : 4_000;
+      const bandMin = 400;
+      const wantedKg = Math.min(
+        deficitKg,
+        bandMin + Math.floor(rng() * (bandMax - bandMin)),
+      );
+      if (wantedKg < bandMin) continue;
+
+      const spot = money(localUnitPriceUsd(commodityId, pile));
+      const premium =
+        DEMAND_PRICE_PREMIUM_MIN +
+        rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
+      const maxUnitPriceUsd = money(spot * premium);
+
+      orders.push({
+        id: nextId('demand', world.tick),
+        destIcao: icao,
+        commodityId,
+        wantedKg,
+        remainingKg: wantedKg,
+        maxUnitPriceUsd,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
+        status: 'open',
+      });
+      slots -= 1;
+    }
+  }
+
+  // Prune filled/expired that are old enough (keep recent for UI briefly)
+  world.demandOrders = orders.filter(
+    (o) =>
+      o.status === 'open' ||
+      o.expiresAtTick > world.tick - 96,
+  );
+  return world.demandOrders;
+}
+
+export function listOpenDemandOrders(
+  world: CareerEconomyWorld,
+  opts: { destIcao?: string; commodityId?: CommodityId } = {},
+): DemandOrder[] {
+  ensureDemandOrders(world);
+  const dest = opts.destIcao?.trim().toUpperCase();
+  return (world.demandOrders ?? []).filter(
+    (o) =>
+      o.status === 'open' &&
+      o.remainingKg > 0 &&
+      o.expiresAtTick > world.tick &&
+      (!dest || o.destIcao === dest) &&
+      (!opts.commodityId || o.commodityId === opts.commodityId),
+  );
+}
+
+/**
+ * Accept a demand order: withdraw from warehouse at origin, stage mission WH→dest.
+ */
+export function acceptDemandOrder(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: {
+    orderId: string;
+    originIcao: string;
+    aircraftId: string;
+    /** Optional kg (defaults to min(remaining, warehouse, aircraft)). */
+    kg?: number;
+  },
+): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
+  ensureDemandOrders(world);
+  const order = (world.demandOrders ?? []).find(
+    (o) => o.id === opts.orderId.trim(),
+  );
+  if (!order || order.status !== 'open' || order.remainingKg <= 0) {
+    throw new Error('Demand order not available');
+  }
+  if (order.expiresAtTick <= world.tick) {
+    order.status = 'expired';
+    throw new Error('Demand order expired');
+  }
+  if (!cargoOpsIsUnlocked(state.cargoOps, order.commodityId)) {
+    const name = getCommodity(order.commodityId).name;
+    throw new Error(
+      `Cargo Ops: ${name} is locked — unlock it in Hangar → Cargo Ops`,
+    );
+  }
+
+  const origin = opts.originIcao.trim().toUpperCase();
+  const dest = order.destIcao.trim().toUpperCase();
+  if (origin === dest) {
+    throw new Error('Warehouse and demand destination must differ');
+  }
+
+  const wh = findPlayerWarehouseAtIcao(state, origin);
+  if (!wh) {
+    throw new Error(`No warehouse at ${origin}`);
+  }
+
+  const open = listActivePlayerMissions(state.missions ?? []);
+  if (open.length > 0) {
+    throw new Error(
+      `Finish or cancel ${open[0]!.id} before accepting a demand order`,
+    );
+  }
+
+  const aircraft = findPlayerAircraft(state, opts.aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  if (aircraft.status !== 'parked') {
+    throw new Error(`Aircraft ${aircraft.id} is not parked`);
+  }
+  if (aircraft.locationIcao.trim().toUpperCase() !== origin) {
+    throw new Error(
+      `Aircraft is at ${aircraft.locationIcao}, not warehouse hub ${origin}`,
+    );
+  }
+
+  if (!CAREER_HUB_COORDS[origin] || !CAREER_HUB_COORDS[dest]) {
+    throw new Error(`Unknown hub route ${origin}→${dest}`);
+  }
+  if (!airportByIcao(world, dest)) {
+    throw new Error(`Unknown destination ${dest}`);
+  }
+
+  const distanceNm =
+    hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);
+  if (distanceNm === undefined) {
+    throw new Error(`No route distance for ${origin}→${dest}`);
+  }
+  const maxRangeNm = resolveAirframeMaxRangeNm(
+    aircraft.airframeTypeId,
+    aircraft.aircraftClassId,
+  );
+  if (distanceNm > maxRangeNm) {
+    throw new Error(
+      `Leg ${origin}→${dest} is ${Math.round(distanceNm)} nm; max range is ${maxRangeNm} nm`,
+    );
+  }
+
+  const classDef = getAircraftClass(aircraft.aircraftClassId);
+  const airframeMax = findCareerPlayerAirframe(
+    aircraft.airframeTypeId,
+  )?.maxCargoKg;
+  const maxCargoKg = airframeMax ?? classDef.maxCargoKg;
+
+  const stockAvail = (state.playerWarehouses?.stock ?? [])
+    .filter(
+      (s) => s.warehouseId === wh.id && s.commodityId === order.commodityId,
+    )
+    .reduce((s, p) => s + p.kg, 0);
+
+  let kg = Math.max(
+    0,
+    Math.floor(
+      opts.kg ??
+        Math.min(order.remainingKg, stockAvail, maxCargoKg),
+    ),
+  );
+  kg = Math.min(kg, order.remainingKg, stockAvail, maxCargoKg);
+  if (kg <= 0) {
+    throw new Error(
+      `No ${order.commodityId} available in warehouse at ${origin} for this order`,
+    );
+  }
+
+  const withdrawn = withdrawCargoFromWarehouse(state, {
+    icao: origin,
+    commodityId: order.commodityId,
+    kg,
+  });
+
+  order.remainingKg -= kg;
+  if (order.remainingKg <= 0) {
+    order.remainingKg = 0;
+    order.status = 'filled';
+  }
+
+  const payUsd = money(order.maxUnitPriceUsd * kg);
+  const deadlineTick = Math.min(
+    order.expiresAtTick,
+    world.tick + TICKS_PER_HOUR * 72,
+  );
+  const missionId = `msn_demand_${world.tick}_${origin}_${dest}_${Math.floor(Math.random() * 1e6)}`;
+  const lotId = `demand_${order.id}_${kg}`;
+
+  const mission = recomputeMissionTotals({
+    id: missionId,
+    lots: [
+      {
+        shipmentLotId: lotId,
+        commodityId: order.commodityId,
+        cargoKg: kg,
+        payUsd,
+        urgency: 'normal',
+        reason: `Demand · ${getCommodity(order.commodityId).name} → ${dest}`,
+        deadlineTick,
+      },
+    ],
+    shipmentLotId: lotId,
+    commodityId: order.commodityId,
+    originIcao: origin,
+    destIcao: dest,
+    cargoKg: kg,
+    pax: 0,
+    aircraftClassId: aircraft.aircraftClassId,
+    airframeTypeId: aircraft.airframeTypeId,
+    rolesPackRelPath: classDef.rolesPackRelPath,
+    deadlineTick,
+    payUsd,
+    urgency: 'normal',
+    reason: `Demand delivery · ${origin}→${dest}`,
+    status: 'accepted',
+    acceptedAtTick: world.tick,
+    aircraftId: aircraft.id,
+    demandOrderId: order.id,
+    warehouseId: withdrawn.warehouseId,
+    warehouseAvgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
+    distanceNm: Math.round(distanceNm),
+  });
+
+  assignAircraftToMission(state, aircraft.id, mission.id, origin);
+  state.missions = [...(state.missions ?? []), mission];
+  syncPlayerInbound(world, mission);
+
+  return { mission, order: { ...order }, kg, payUsd };
+}
+
+function warehouseCommodityKg(
+  state: CareerMissionsState,
+  icao: string,
+  commodityId: CommodityId,
+): number {
+  const wh = findPlayerWarehouseAtIcao(state, icao);
+  if (!wh) return 0;
+  return (state.playerWarehouses?.stock ?? [])
+    .filter(
+      (s) => s.warehouseId === wh.id && s.commodityId === commodityId && s.kg > 0,
+    )
+    .reduce((s, p) => s + p.kg, 0);
+}
+
+/**
+ * Max kg the pilot may set on Edit cargo for a Demand Board mission:
+ * current onboard + min(warehouse stock, demand remaining), capped by aircraft.
+ */
+export function demandMissionEditableMaxKg(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  opts: { maxCargoKg?: number } = {},
+): number {
+  const normalized = normalizeMissionIntent(mission);
+  if (!normalized.demandOrderId) {
+    return Math.max(0, Math.floor(normalized.cargoKg));
+  }
+  const current = Math.max(0, Math.floor(normalized.cargoKg));
+  const commodityId = normalized.commodityId;
+  const stock = warehouseCommodityKg(state, normalized.originIcao, commodityId);
+  const order = (world.demandOrders ?? []).find(
+    (o) => o.id === normalized.demandOrderId,
+  );
+  const remaining =
+    order && order.expiresAtTick > world.tick
+      ? Math.max(0, Math.floor(order.remainingKg))
+      : 0;
+  const headroom = Math.min(stock, remaining);
+  const cap =
+    opts.maxCargoKg !== undefined &&
+    Number.isFinite(opts.maxCargoKg) &&
+    opts.maxCargoKg > 0
+      ? Math.floor(opts.maxCargoKg)
+      : Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.min(cap, current + headroom));
+}
+
+/**
+ * Edit cargo on an accepted/dispatched Demand Board mission.
+ * Reducing kg restores warehouse stock and demand `remainingKg`;
+ * increasing withdraws more from the warehouse and consumes demand remaining.
+ */
+export function replaceDemandMissionCargo(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  opts: { cargoKg: number; maxCargoKg?: number },
+): MissionIntent {
+  const normalized = normalizeMissionIntent(mission);
+  if (!normalized.demandOrderId) {
+    throw new Error('Not a Demand Board mission');
+  }
+  if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
+    throw new Error(`Cannot edit mission in status=${normalized.status}`);
+  }
+
+  const newKg = Math.floor(opts.cargoKg);
+  if (!Number.isFinite(newKg) || newKg <= 0) {
+    throw new Error('Edited cargo must be at least 1 kg');
+  }
+
+  const line = normalized.lots[0];
+  const oldKg = Math.max(
+    0,
+    Math.floor(line?.cargoKg ?? normalized.cargoKg ?? 0),
+  );
+  if (oldKg <= 0) {
+    throw new Error('Demand mission has no cargo to edit');
+  }
+
+  const commodityId = line?.commodityId ?? normalized.commodityId;
+  const origin = normalized.originIcao.trim().toUpperCase();
+  const dest = normalized.destIcao.trim().toUpperCase();
+
+  const classDef = getAircraftClass(normalized.aircraftClassId);
+  const airframeMax = findCareerPlayerAirframe(
+    normalized.airframeTypeId,
+  )?.maxCargoKg;
+  const maxCargoKg =
+    opts.maxCargoKg !== undefined &&
+    Number.isFinite(opts.maxCargoKg) &&
+    opts.maxCargoKg > 0
+      ? Math.floor(opts.maxCargoKg)
+      : (airframeMax ?? classDef.maxCargoKg);
+  if (newKg > maxCargoKg) {
+    throw new Error(
+      `Edited cargo ${newKg} kg exceeds aircraft capacity ${maxCargoKg} kg`,
+    );
+  }
+
+  ensureDemandOrders(world);
+  const order = (world.demandOrders ?? []).find(
+    (o) => o.id === normalized.demandOrderId,
+  );
+  if (!order) {
+    throw new Error('Demand order no longer exists');
+  }
+
+  const delta = newKg - oldKg;
+  let warehouseAvgCostUsdPerKg =
+    normalized.warehouseAvgCostUsdPerKg ?? 0;
+
+  if (delta < 0) {
+    const restore = -delta;
+    try {
+      depositCargoToWarehouse(state, {
+        icao: origin,
+        commodityId,
+        kg: restore,
+        avgCostUsdPerKg: warehouseAvgCostUsdPerKg,
+        tick: normalized.acceptedAtTick ?? world.tick,
+      });
+    } catch (error) {
+      throw new Error(
+        error instanceof Error
+          ? `Cannot return cargo to warehouse: ${error.message}`
+          : 'Cannot return cargo to warehouse',
+      );
+    }
+    order.remainingKg = Math.min(
+      order.wantedKg,
+      order.remainingKg + restore,
+    );
+    if (order.status === 'filled' && order.remainingKg > 0) {
+      order.status = 'open';
+    }
+  } else if (delta > 0) {
+    if (order.expiresAtTick <= world.tick) {
+      order.status = 'expired';
+      throw new Error('Demand order expired — cannot add more cargo');
+    }
+    if (order.status !== 'open' && order.status !== 'filled') {
+      throw new Error('Demand order is not open');
+    }
+    if (order.remainingKg < delta) {
+      throw new Error(
+        `Demand order only has ${order.remainingKg} kg remaining (need ${delta} kg more)`,
+      );
+    }
+    const withdrawn = withdrawCargoFromWarehouse(state, {
+      icao: origin,
+      commodityId,
+      kg: delta,
+    });
+    order.remainingKg -= delta;
+    if (order.remainingKg <= 0) {
+      order.remainingKg = 0;
+      order.status = 'filled';
+    } else if (order.status === 'filled') {
+      order.status = 'open';
+    }
+    warehouseAvgCostUsdPerKg = money(
+      (warehouseAvgCostUsdPerKg * oldKg +
+        withdrawn.avgCostUsdPerKg * delta) /
+        newKg,
+    );
+  }
+
+  const payUsd = money(order.maxUnitPriceUsd * newKg);
+  const deadlineTick = Math.min(
+    order.expiresAtTick,
+    line?.deadlineTick ?? normalized.deadlineTick,
+  );
+  const lotId = line?.shipmentLotId ?? normalized.shipmentLotId;
+
+  const replaced = recomputeMissionTotals({
+    ...normalized,
+    lots: [
+      {
+        shipmentLotId: lotId,
+        commodityId,
+        cargoKg: newKg,
+        payUsd,
+        urgency: line?.urgency ?? 'normal',
+        reason:
+          line?.reason ??
+          `Demand · ${getCommodity(commodityId).name} → ${dest}`,
+        deadlineTick,
+      },
+    ],
+    shipmentLotId: lotId,
+    commodityId,
+    cargoKg: newKg,
+    payUsd,
+    deadlineTick,
+    warehouseId: normalized.warehouseId,
+    warehouseAvgCostUsdPerKg,
+    demandOrderId: order.id,
+    status: 'accepted',
+    lastOfpCheck: undefined,
+    lastPreflightCheck: undefined,
+    fuelAuthorizedOfpId: undefined,
+    tripFuelBurnKg: undefined,
+    dispatchedAtTick: undefined,
+  });
+
+  const missionIdx = (state.missions ?? []).findIndex((m) => m.id === replaced.id);
+  if (missionIdx >= 0) {
+    state.missions![missionIdx] = replaced;
+  }
+
+  syncPlayerInbound(world, replaced);
+  return replaced;
+}
+
+export function demandSnapshot(
+  world: CareerEconomyWorld,
+  opts: { warehouseIcaos?: readonly string[] } = {},
+): {
+  orders: Array<
+    DemandOrder & {
+      commodityName: string;
+      destName: string;
+      localSpotUsd: number | null;
+    }
+  >;
+} {
+  const warehouseIcaos = [
+    ...new Set(
+      (opts.warehouseIcaos ?? [])
+        .map((icao) => icao.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  const open = listOpenDemandOrders(world).filter((o) => {
+    // With warehouses owned: hide Dest = only-WH hub (no valid origin≠dest).
+    // With no warehouses yet: still show the board as market intel.
+    if (warehouseIcaos.length === 0) return true;
+    const dest = o.destIcao.trim().toUpperCase();
+    return warehouseIcaos.some((icao) => icao !== dest);
+  });
+  return {
+    orders: open.map((o) => {
+      const ap = airportByIcao(world, o.destIcao);
+      const pile = ap?.inventory[o.commodityId];
+      return {
+        ...o,
+        commodityName: getCommodity(o.commodityId).name,
+        destName: ap?.name?.trim() || o.destIcao,
+        localSpotUsd: pile ? money(localUnitPriceUsd(o.commodityId, pile)) : null,
+      };
+    }),
+  };
+}

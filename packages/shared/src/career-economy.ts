@@ -2291,6 +2291,7 @@ export function migrateEconomyWorld(
 
   const homeCountryRaw = (base as { homeCountryId?: unknown }).homeCountryId;
   const lanesRaw = (base as { internationalLanes?: unknown }).internationalLanes;
+  const portListingsRaw = (base as { portListings?: unknown }).portListings;
   const migrated: CareerEconomyWorld = {
     version: 3,
     seed,
@@ -2314,6 +2315,15 @@ export function migrateEconomyWorld(
     internationalLanes: Array.isArray(lanesRaw)
       ? (lanesRaw as InternationalLane[])
       : [],
+    ...(Array.isArray(portListingsRaw)
+      ? { portListings: portListingsRaw as CareerEconomyWorld['portListings'] }
+      : {}),
+    ...(() => {
+      const demandRaw = (base as { demandOrders?: unknown }).demandOrders;
+      return Array.isArray(demandRaw)
+        ? { demandOrders: demandRaw as CareerEconomyWorld['demandOrders'] }
+        : {};
+    })(),
   };
 
   remapMislabelledClHubs(migrated);
@@ -2359,6 +2369,16 @@ export function ensureEconomyCaughtUp(
   w.fuelHauls = migrated.fuelHauls;
   w.homeCountryId = migrated.homeCountryId;
   w.internationalLanes = migrated.internationalLanes;
+  if (migrated.portListings) {
+    w.portListings = migrated.portListings;
+  } else {
+    delete w.portListings;
+  }
+  if (migrated.demandOrders) {
+    w.demandOrders = migrated.demandOrders;
+  } else {
+    delete w.demandOrders;
+  }
 
   // Mid-hour continuous ops first (arrivals between batches).
   let settledFlights = settleNpcOpsDue(w, nowMs).settledFlights;
@@ -4114,6 +4134,12 @@ export function tickEconomy(
     world.fuelHauls = migrated.fuelHauls;
     world.homeCountryId = migrated.homeCountryId;
     world.internationalLanes = migrated.internationalLanes;
+    if (migrated.portListings) {
+      world.portListings = migrated.portListings;
+    }
+    if (migrated.demandOrders) {
+      world.demandOrders = migrated.demandOrders;
+    }
   }
 
   ensureNpcFleet(world);

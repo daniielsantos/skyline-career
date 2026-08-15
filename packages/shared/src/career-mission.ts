@@ -17,6 +17,7 @@ import {
 } from './career-fleet.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
 import { hubDistanceNm } from './career-ferry-route.js';
+import { depositCargoToWarehouse, recordWarehouseShipmentKg } from './career-warehouse-stock.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
   evaluateMinAirborneElapsed,
@@ -854,6 +855,10 @@ export function syncPlayerInbound(
   if (!isActiveMissionStatus(normalized.status)) {
     return;
   }
+  // Demand Board hauls are company inventory → terminal fill, not market soft-fill.
+  if (normalized.demandOrderId || normalized.portPickupId) {
+    return;
+  }
   if (!Array.isArray(world.inboundPending)) {
     world.inboundPending = [];
   }
@@ -1371,6 +1376,11 @@ export function replaceMissionManifest(
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot edit mission in status=${normalized.status}`);
   }
+  if (normalized.demandOrderId) {
+    throw new Error(
+      'Demand Board flights use replaceDemandMissionCargo, not market replace',
+    );
+  }
   if (!Array.isArray(opts.lines) || opts.lines.length === 0) {
     throw new Error('Edited manifest requires at least one cargo line');
   }
@@ -1540,6 +1550,57 @@ export function cancelMission(
   }
   if (opts.fleet) {
     releaseAircraftOnCancel(opts.fleet, normalized);
+    if (normalized.demandOrderId) {
+      const line = normalized.lots[0];
+      const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
+      if (kg > 0) {
+        try {
+          depositCargoToWarehouse(opts.fleet, {
+            icao: normalized.originIcao,
+            commodityId: line?.commodityId ?? normalized.commodityId,
+            kg,
+            avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
+            tick: normalized.acceptedAtTick ?? world.tick,
+          });
+        } catch {
+          // Warehouse may be gone — cancel still succeeds.
+        }
+        if (!Array.isArray(world.demandOrders)) {
+          world.demandOrders = [];
+        }
+        const order = world.demandOrders.find(
+          (o) => o.id === normalized.demandOrderId,
+        );
+        if (order) {
+          order.remainingKg = Math.min(
+            order.wantedKg,
+            order.remainingKg + kg,
+          );
+          if (order.status === 'filled') {
+            order.status = 'open';
+          }
+        }
+      }
+    } else if (normalized.portPickupId) {
+      const pickups = Array.isArray(opts.fleet.portPickups)
+        ? opts.fleet.portPickups
+        : (opts.fleet.portPickups = []);
+      if (!pickups.some((p) => p.id === normalized.portPickupId)) {
+        const line = normalized.lots[0];
+        const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
+        if (kg > 0) {
+          pickups.push({
+            id: normalized.portPickupId,
+            portId: (normalized.portId ?? 'UNKNOWN').trim().toUpperCase(),
+            hubIcao: normalized.originIcao.trim().toUpperCase(),
+            commodityId: line?.commodityId ?? normalized.commodityId,
+            kg,
+            avgCostUsdPerKg: normalized.portAvgCostUsdPerKg ?? 0,
+            purchasedAtTick: normalized.acceptedAtTick ?? 0,
+          });
+        }
+      }
+    }
   }
   const cancelled = { ...normalized, status: 'cancelled' as const };
   clearPlayerInbound(world, cancelled.id);
@@ -1612,7 +1673,9 @@ export function revertFalseDepartMission(
     for (const line of normalized.lots) {
       if (
         line.shipmentLotId.startsWith('deadhead_') ||
-        line.shipmentLotId.startsWith('empty_')
+        line.shipmentLotId.startsWith('empty_') ||
+        line.shipmentLotId.startsWith('portpk_') ||
+        line.shipmentLotId.startsWith('demand_')
       ) {
         continue;
       }
@@ -1661,7 +1724,9 @@ export function departMission(
       // Synthetic deadhead / empty ids are never real market lots.
       if (
         line.shipmentLotId.startsWith('deadhead_') ||
-        line.shipmentLotId.startsWith('empty_')
+        line.shipmentLotId.startsWith('empty_') ||
+        line.shipmentLotId.startsWith('portpk_') ||
+        line.shipmentLotId.startsWith('demand_')
       ) {
         continue;
       }
@@ -2001,6 +2066,88 @@ export function settleMission(
       ) {
         continue;
       }
+      // Demand Board: company warehouse cargo — fill dest only (no origin debit).
+      if (
+        working.demandOrderId ||
+        line.shipmentLotId.startsWith('demand_')
+      ) {
+        const byIcao = new Map(
+          world.airports.map((a) => [a.icao.toUpperCase(), a] as const),
+        );
+        const dest = byIcao.get(working.destIcao.trim().toUpperCase());
+        if (!dest) {
+          throw new Error(`Unknown destination ${working.destIcao}`);
+        }
+        let pile = dest.inventory[line.commodityId];
+        if (!pile) {
+          pile = { stockKg: 0, capacityKg: 80_000 };
+          dest.inventory[line.commodityId] = pile;
+        }
+        const room = Math.max(0, pile.capacityKg - pile.stockKg);
+        const added = Math.min(line.cargoKg, room);
+        pile.stockKg += added;
+        lastDestStock = pile.stockKg;
+
+        const isLast = i === working.lots.length - 1;
+        const linePenalty = isLast
+          ? penaltyLeft
+          : Math.min(
+              line.payUsd,
+              Math.round(
+                pay.penaltyUsd * (line.payUsd / Math.max(1, working.payUsd)),
+              ),
+            );
+        penaltyLeft = Math.max(0, penaltyLeft - linePenalty);
+        const linePayout = Math.max(0, line.payUsd - linePenalty);
+        settlementLines.push({
+          shipmentLotId: line.shipmentLotId,
+          commodityId: line.commodityId,
+          deliveredKg: line.cargoKg,
+          payUsd: line.payUsd,
+          penaltyUsd: linePenalty,
+          payoutUsd: linePayout,
+        });
+        if (opts.fleet) {
+          recordWarehouseShipmentKg(opts.fleet, {
+            warehouseId: working.warehouseId,
+            icao: working.originIcao,
+            kg: line.cargoKg,
+          });
+        }
+        continue;
+      }
+      if (
+        (working.portPickupId || line.shipmentLotId.startsWith('portpk_')) &&
+        !working.demandOrderId
+      ) {
+        if (opts.fleet) {
+          try {
+            depositCargoToWarehouse(opts.fleet, {
+              icao: working.destIcao,
+              commodityId: line.commodityId,
+              kg: line.cargoKg,
+              avgCostUsdPerKg: working.portAvgCostUsdPerKg ?? 0,
+              tick: settleTick,
+            });
+          } catch (err) {
+            throw new Error(
+              `Port cargo settle failed at ${working.destIcao}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+        settlementLines.push({
+          shipmentLotId: line.shipmentLotId,
+          commodityId: line.commodityId,
+          deliveredKg: line.cargoKg,
+          payUsd: 0,
+          penaltyUsd: 0,
+          payoutUsd: 0,
+        });
+        continue;
+      }
+      // Demand Board + normal freight: fill destination terminal stock.
       const delivery = applyFreightDelivery(world, {
         commodityId: line.commodityId,
         originIcao: working.originIcao,

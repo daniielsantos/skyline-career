@@ -80,6 +80,20 @@ describe('sampleLiveCruiseFuelFlowKgPerHour', () => {
     assert.equal(kgPerHour, 59);
   });
 
+  it('falls back to NUMBER OF ENGINES when combustion flags yield no flow', async () => {
+    const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+      mockBridge({
+        'NUMBER OF ENGINES|number': 1,
+        // Misleading combustion on a dead index while Eng1 actually flows.
+        'GENERAL ENG COMBUSTION:1|bool': 0,
+        'GENERAL ENG COMBUSTION:2|bool': 1,
+        'ENG FUEL FLOW PPH:1|pounds per hour': 130,
+        'ENG FUEL FLOW PPH:2|pounds per hour': 800,
+      }),
+    );
+    assert.equal(kgPerHour, 59);
+  });
+
   it('ignores insane batch garbage instead of painting a huge kg/h', async () => {
     const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
       mockBridge({

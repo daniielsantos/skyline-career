@@ -4,6 +4,7 @@ import {
   createCruiseSampleState,
   cruiseSampleStatus,
   mergeAirframePerfOverride,
+  clampCruiseFuelFlowToCatalog,
   pushCruiseTick,
   type CruiseTick,
 } from './cruise-sample.js';
@@ -133,6 +134,14 @@ describe('pushCruiseTick', () => {
   });
 });
 
+describe('clampCruiseFuelFlowToCatalog', () => {
+  it('bands live Accu-Sim spikes around catalog burn', () => {
+    assert.equal(clampCruiseFuelFlowToCatalog(169.9, 66.5), 116.4);
+    assert.equal(clampCruiseFuelFlowToCatalog(20, 66.5), 33.3);
+    assert.equal(clampCruiseFuelFlowToCatalog(70, 66.5), 70);
+  });
+});
+
 describe('mergeAirframePerfOverride', () => {
   it('uses the first sample fully then EMA-merges', () => {
     const first = mergeAirframePerfOverride(undefined, {
@@ -165,5 +174,22 @@ describe('mergeAirframePerfOverride', () => {
     assert.ok(
       Math.abs(second.cruiseFuelFlowKgPerHour - (160 * 0.7 + 170 * 0.3)) < 0.05,
     );
+  });
+
+  it('clamps first Accu-Sim spike to catalog before learning', () => {
+    const learned = mergeAirframePerfOverride(
+      undefined,
+      {
+        cruiseSpeedKt: 190,
+        cruiseFuelFlowKgPerHour: 169.9,
+        fuelBurnKgPerNm: 0.89,
+        sampleCount: 20,
+        durationSec: 180,
+        committedAtMs: 1_000,
+      },
+      0.3,
+      { catalogCruiseFuelFlowKgPerHour: 66.5 },
+    );
+    assert.equal(learned.cruiseFuelFlowKgPerHour, 116.4);
   });
 });

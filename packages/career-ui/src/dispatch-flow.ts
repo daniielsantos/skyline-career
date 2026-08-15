@@ -427,7 +427,7 @@ export function dispatchStepStatusLine(input: {
         if (input.loadOfpAutoStatus === 'failed') {
           return (
             input.loadOfpAutoError ??
-            'Aircraft load failed — enable Skyline inject in Preflight to retry, or continue manually.'
+            'Aircraft load failed — enable Skyline inject in Preflight to retry.'
           );
         }
         if (!input.simBridgeConnected) {

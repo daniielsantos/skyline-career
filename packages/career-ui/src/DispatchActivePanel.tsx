@@ -147,7 +147,6 @@ export function DispatchActivePanel(props: {
   onBuyFuel: (mission: Mission) => void;
   onRetryFuelQuote: () => void;
   onToggleSkylineInject: (enabled: boolean) => void;
-  onContinueManually: () => void;
   onDepart: (mission: Mission) => void;
   onSettle: (mission: Mission) => void;
   /** Company crew AI dispatch (accepted/dispatched only). */
@@ -234,6 +233,16 @@ export function DispatchActivePanel(props: {
   );
   const isFerryLeg = flightKind === 'Ferry';
   const isEnRoute = step === 'en_route';
+  const routeDistanceNm =
+    typeof mission.distanceNm === 'number' &&
+    Number.isFinite(mission.distanceNm) &&
+    mission.distanceNm > 0
+      ? mission.distanceNm
+      : typeof mission.lastOfpCheck?.briefing?.distanceNm === 'number' &&
+          Number.isFinite(mission.lastOfpCheck.briefing.distanceNm) &&
+          mission.lastOfpCheck.briefing.distanceNm > 0
+        ? mission.lastOfpCheck.briefing.distanceNm
+        : undefined;
   const showOfpCard = Boolean(mission.lastOfpCheck);
   /** Collapse passed OFP after flight_plan so load/ready/en_route stay short. */
   const collapseOfpCard =
@@ -431,6 +440,12 @@ export function DispatchActivePanel(props: {
               : 'Contract'}
             <strong>{props.formatMoney(mission.payUsd)}</strong>
           </span>
+          {routeDistanceNm !== undefined ? (
+            <span>
+              Distance
+              <strong>{`${Math.round(routeDistanceNm).toLocaleString()} nm`}</strong>
+            </span>
+          ) : null}
           <span>
             Deadline
             <strong>
@@ -1507,7 +1522,7 @@ export function DispatchActivePanel(props: {
                             const injectStatus =
                               props.loadOfpAutoStatus === 'failed'
                                 ? (props.loadOfpAutoError ??
-                                  'Inject failed — turn on to retry, or continue manually below.')
+                                  'Inject failed — turn Skyline inject on to retry.')
                                 : props.loadOfpAutoStatus === 'loading'
                                   ? (props.loadOfpProgress?.message ??
                                     'Writing fuel + payload and balancing CG. Turn off to stop.')
@@ -1664,18 +1679,6 @@ export function DispatchActivePanel(props: {
       ) : null}
 
       {/* Player helpers stay visible; cheats live under Advanced + Dev mode. */}
-      {loadPath === 'inject' && step === 'load' ? (
-        <div className="dispatch-advanced-actions">
-          <button
-            type="button"
-            className="action ghost"
-            disabled={busy}
-            onClick={props.onContinueManually}
-          >
-            Continue manually
-          </button>
-        </div>
-      ) : null}
       {['accepted', 'dispatched'].includes(mission.status) &&
       props.onCrewDispatch &&
       (props.idleCrew?.length ?? 0) > 0 &&

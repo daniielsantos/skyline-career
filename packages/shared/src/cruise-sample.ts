@@ -18,6 +18,33 @@ export const DEFAULT_CRUISE_MAX_ALT_SPREAD_FT = 1_200;
 export const DEFAULT_CRUISE_FLOW_OUTLIER = 0.4;
 export const DEFAULT_CRUISE_EMA_ALPHA = 0.3;
 
+/**
+ * Live Accu-Sim / fuel-total deltas can spike on short Watch ticks.
+ * Keep learned burn near the hangar/catalog baseline.
+ */
+export const CRUISE_BURN_CATALOG_MIN_MULT = 0.5;
+export const CRUISE_BURN_CATALOG_MAX_MULT = 1.75;
+
+/** Clamp a live cruise burn sample to a band around catalog kg/h. */
+export function clampCruiseFuelFlowToCatalog(
+  liveKgPerHour: number,
+  catalogKgPerHour: number | undefined,
+): number {
+  if (!Number.isFinite(liveKgPerHour) || !(liveKgPerHour > 0)) {
+    return liveKgPerHour;
+  }
+  if (
+    typeof catalogKgPerHour !== 'number' ||
+    !Number.isFinite(catalogKgPerHour) ||
+    !(catalogKgPerHour > 0)
+  ) {
+    return Math.round(liveKgPerHour * 10) / 10;
+  }
+  const min = catalogKgPerHour * CRUISE_BURN_CATALOG_MIN_MULT;
+  const max = catalogKgPerHour * CRUISE_BURN_CATALOG_MAX_MULT;
+  return Math.round(Math.min(max, Math.max(min, liveKgPerHour)) * 10) / 10;
+}
+
 export type CruiseTick = {
   atMs: number;
   onGround: boolean;
@@ -321,16 +348,19 @@ export function mergeAirframePerfOverride(
   prev: AirframePerfOverride | undefined,
   sample: CruiseSampleCommit,
   alpha = DEFAULT_CRUISE_EMA_ALPHA,
+  opts?: { catalogCruiseFuelFlowKgPerHour?: number },
 ): AirframePerfOverride {
   const a = Math.min(1, Math.max(0, alpha));
+  const sampleFlow = clampCruiseFuelFlowToCatalog(
+    sample.cruiseFuelFlowKgPerHour,
+    opts?.catalogCruiseFuelFlowKgPerHour ?? prev?.cruiseFuelFlowKgPerHour,
+  );
   const blend = (oldVal: number | undefined, nextVal: number): number => {
     if (oldVal == null || !(oldVal > 0)) return nextVal;
     return oldVal * (1 - a) + nextVal * a;
   };
   const cruiseFuelFlowKgPerHour =
-    Math.round(
-      blend(prev?.cruiseFuelFlowKgPerHour, sample.cruiseFuelFlowKgPerHour) * 10,
-    ) / 10;
+    Math.round(blend(prev?.cruiseFuelFlowKgPerHour, sampleFlow) * 10) / 10;
   const cruiseSpeedKt = Math.round(
     blend(prev?.cruiseSpeedKt, sample.cruiseSpeedKt),
   );

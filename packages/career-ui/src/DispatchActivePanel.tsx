@@ -1336,75 +1336,81 @@ export function DispatchActivePanel(props: {
             );
 
             const enRouteCargo = (
-              <div className="staging-section dispatch-enroute-cargo">
-                <div className="staging-section-head">
-                  <h3>{isFerryLeg ? 'Ferry' : 'Cargo'}</h3>
-                </div>
-                <div className="cargo-capacity staging-capacity staging-ops-capacity staging-ops-capacity-inline">
+              <div className="dispatch-enroute-block">
+                <h3 className="dispatch-enroute-block-title">
+                  {isFerryLeg ? 'Ferry' : 'Cargo'}
+                </h3>
+                <dl className="ofp-briefing-grid dispatch-enroute-metrics">
                   {isFerryLeg ? (
-                    <span>
-                      Load
-                      <strong>Empty</strong>
-                      <em>{cargoCommodityLabel}</em>
-                    </span>
+                    <div>
+                      <dt>Load</dt>
+                      <dd>
+                        Empty
+                        <small>{cargoCommodityLabel}</small>
+                      </dd>
+                    </div>
                   ) : (
-                    <span>
-                      Cargo
-                      <strong>{props.formatTonnes(mission.cargoKg)}</strong>
-                      <em>{cargoCommodityLabel}</em>
-                    </span>
+                    <div>
+                      <dt>Load</dt>
+                      <dd>
+                        {props.formatTonnes(mission.cargoKg)}
+                        <small>{cargoCommodityLabel}</small>
+                      </dd>
+                    </div>
                   )}
-                  <span>
-                    {isFerryLeg
-                      ? mission.contractPilot
-                        ? 'Pilot fee'
-                        : 'Payout'
-                      : 'Contract'}
-                    <strong>{props.formatMoney(mission.payUsd)}</strong>
-                  </span>
-                  <span>
-                    Deadline
-                    <strong>
+                  <div>
+                    <dt>
+                      {isFerryLeg
+                        ? mission.contractPilot
+                          ? 'Pilot fee'
+                          : 'Payout'
+                        : 'Contract'}
+                    </dt>
+                    <dd>{props.formatMoney(mission.payUsd)}</dd>
+                  </div>
+                  <div>
+                    <dt>Deadline</dt>
+                    <dd>
                       {props.formatDeadline(
                         mission.deadlineTick,
                         continuousHours,
                       )}
-                    </strong>
-                  </span>
+                    </dd>
+                  </div>
                   {!isFerryLeg ? (
-                    <span>
-                      Capacity left
-                      <strong>
+                    <div>
+                      <dt>Capacity left</dt>
+                      <dd>
                         {props.formatTonnes(
                           Math.max(
                             0,
                             props.missionMaxCargoKg(mission) - mission.cargoKg,
                           ),
                         )}
-                      </strong>
-                    </span>
+                      </dd>
+                    </div>
                   ) : null}
                   {mission.fuelUplift &&
                   (mission.fuelUplift.costUsd > 0 ||
                     mission.fuelUplift.requestedKg > 0.5) ? (
-                    <span>
-                      Fuel
-                      <strong>
+                    <div>
+                      <dt>Fuel</dt>
+                      <dd>
                         {props.formatMoney(mission.fuelUplift.costUsd)}
-                      </strong>
-                      <em>
-                        {props.formatTonnes(mission.fuelUplift.requestedKg)}
-                      </em>
-                    </span>
+                        <small>
+                          {props.formatTonnes(mission.fuelUplift.requestedKg)}
+                        </small>
+                      </dd>
+                    </div>
                   ) : null}
-                </div>
+                </dl>
                 {isFerryLeg ? (
-                  <p className="empty">
+                  <p className="empty dispatch-enroute-block-note">
                     {mission.reason?.trim() ||
                       'Empty reposition — no freight on board.'}
                   </p>
                 ) : cargoLots.length > 1 ? (
-                  <ul className="staging-existing">
+                  <ul className="staging-existing dispatch-enroute-block-note">
                     {cargoLots.map((line) => (
                       <li key={`${line.shipmentLotId}-${line.commodityId}`}>
                         {props.formatTonnes(line.cargoKg)}{' '}
@@ -1426,14 +1432,17 @@ export function DispatchActivePanel(props: {
               >
                 {enRoute ? (
                   enRouteBriefItems.length > 0 ? (
-                    <dl className="ofp-briefing-grid dispatch-enroute-brief">
-                      {enRouteBriefItems.map(([label, value]) => (
-                        <div key={label}>
-                          <dt>{label}</dt>
-                          <dd>{value}</dd>
-                        </div>
-                      ))}
-                    </dl>
+                    <div className="dispatch-enroute-block">
+                      <h3 className="dispatch-enroute-block-title">OFP</h3>
+                      <dl className="ofp-briefing-grid dispatch-enroute-metrics">
+                        {enRouteBriefItems.map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
                   ) : null
                 ) : (
                   <div className="ofp-result-head">
@@ -1569,17 +1578,19 @@ export function DispatchActivePanel(props: {
                 {enRoute ? (
                   <>
                     {enRouteCargo}
-                    <div className="ofp-result-head dispatch-enroute-live-head">
-                      <div>
-                        <strong>{enRouteHeadline}</strong>
-                        <small>{enRouteSub}</small>
+                    <div className="dispatch-enroute-block dispatch-enroute-live">
+                      <div className="dispatch-enroute-live-head">
+                        <h3 className="dispatch-enroute-block-title">
+                          {enRouteHeadline}
+                        </h3>
+                        <span className="dispatch-enroute-live-checked">
+                          Checked{' '}
+                          {new Date(check.checkedAtIso).toLocaleTimeString()}
+                        </span>
                       </div>
-                      <span>
-                        Checked{' '}
-                        {new Date(check.checkedAtIso).toLocaleTimeString()}
-                      </span>
+                      <p className="dispatch-enroute-live-sub">{enRouteSub}</p>
+                      {liveLoadGrid}
                     </div>
-                    {liveLoadGrid}
                   </>
                 ) : (
                   liveLoadGrid

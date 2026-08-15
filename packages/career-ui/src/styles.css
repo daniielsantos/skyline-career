@@ -306,11 +306,21 @@ body {
   flex-direction: column;
 }
 
-/* EN ROUTE cockpit: fill the column, no outer page scroll */
-.main-content:has(> .dispatch-active-enroute) {
+/* EN ROUTE cockpit: fill main-content → staging-panel → panel (no outer scroll) */
+.main-content:has(.dispatch-active-enroute) {
   overflow: hidden;
   padding-top: 0.55rem;
   padding-bottom: 0.55rem;
+}
+
+.main-content:has(.dispatch-active-enroute) > .staging-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  padding: 0.45rem 0.65rem;
 }
 
 .brand {
@@ -2135,7 +2145,7 @@ tr.lot-locked {
   gap: 0.35rem 0.65rem;
   flex: 1 1 0;
   min-height: 0;
-  height: 0; /* take remaining main-content height, not 100dvh */
+  height: 0; /* flex child of .staging-panel — grows to fill */
   max-height: none;
   overflow: hidden;
   margin: 0;
@@ -2336,8 +2346,16 @@ tr.lot-locked {
 }
 
 @media (max-width: 900px) {
-  .main-content:has(> .dispatch-active-enroute) {
+  .main-content:has(.dispatch-active-enroute) {
     overflow: auto;
+  }
+
+  .main-content:has(.dispatch-active-enroute) > .staging-panel {
+    flex: none;
+    display: grid;
+    gap: 1.1rem;
+    overflow: visible;
+    padding: 1rem 1rem 0.5rem;
   }
 
   .dispatch-active-enroute {

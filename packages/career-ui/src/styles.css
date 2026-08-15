@@ -287,7 +287,7 @@ body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 1rem 1.35rem 3.4rem;
+  padding: 1rem 1.35rem;
   display: flex;
   flex-direction: column;
 }
@@ -416,10 +416,6 @@ body {
   .app-shell.sidebar-open .sidebar-backdrop {
     opacity: 1;
     pointer-events: auto;
-  }
-
-  .watch-status-footer {
-    left: 0;
   }
 }
 
@@ -1974,6 +1970,30 @@ tr.lot-locked {
   margin-bottom: 0.15rem;
 }
 
+.dispatch-enroute-brief {
+  margin: 0 0 0.35rem;
+}
+
+.dispatch-enroute-live-head {
+  margin-top: 0.75rem;
+  align-items: flex-start;
+}
+
+.preflight-technical-open {
+  margin-top: 0.55rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.preflight-technical-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
 .dispatch-fold {
   border: 1px solid var(--line);
   background: var(--surface);
@@ -2028,8 +2048,8 @@ tr.lot-locked {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: stretch;
   gap: 0.5rem 0.75rem;
-  height: calc(100dvh - 8.75rem);
-  max-height: calc(100dvh - 8.75rem);
+  height: calc(100dvh - 10.5rem);
+  max-height: calc(100dvh - 10.5rem);
   overflow: hidden;
   margin: 0;
   padding-bottom: 0.15rem;
@@ -4557,11 +4577,12 @@ small {
 }
 
 .watch-status-footer {
-  position: fixed;
-  left: var(--sidebar-w);
-  right: 0;
-  bottom: 0;
-  z-index: 30;
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: 20;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5459,7 +5480,6 @@ small {
   .watch-status-footer {
     align-items: center;
     flex-direction: row;
-    left: 0;
     padding: 0.35rem 0.65rem;
   }
 
@@ -6362,9 +6382,16 @@ textarea {
 .dispatch-route-map-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.35rem 0.85rem;
+}
+
+.dispatch-route-map-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
 .dispatch-route-map-head strong {
@@ -6376,6 +6403,22 @@ textarea {
 .dispatch-route-map-head small {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.dispatch-route-map-ofp {
+  display: block;
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--surface-2) 85%, #0b0b0c);
+  color: var(--ink);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .dispatch-route-map-empty {

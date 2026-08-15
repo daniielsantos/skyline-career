@@ -11150,6 +11150,7 @@ export function App() {
         </section>
       )}
 
+        </div>
       <WatchStatusFooter
         missionStatus={activeMission?.status ?? null}
         activeMissionId={activeMission?.id ?? null}
@@ -11159,7 +11160,6 @@ export function App() {
         watchAutoPaused={watchAutoPaused}
         loadOfpAutoStatus={loadOfpAutoStatus}
       />
-        </div>
       </div>
       {confirmDialog}
       {rerouteHoldId

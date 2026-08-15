@@ -822,6 +822,7 @@ export function DispatchActivePanel(props: {
           originIcao={mission.originIcao}
           destIcao={mission.destIcao}
           waypoints={mission.lastOfpCheck?.briefing?.waypoints}
+          ofpRoute={mission.lastOfpCheck?.briefing?.route}
           aircraft={stickyAircraft}
           busy={busy}
           canRefreshNavlog={Boolean(simbriefUser.trim())}
@@ -1145,6 +1146,277 @@ export function DispatchActivePanel(props: {
                 ? 'Not available'
                 : formatMassExact(lb / KG_TO_LB, weightSystem);
 
+            const ofpBriefing = mission.lastOfpCheck?.briefing;
+            const cargoLots = mission.lots ?? [];
+            const cargoCommodityLabel = (() => {
+              if (isFerryLeg) return 'ferry / reposition';
+              if (cargoLots.length === 0) {
+                return (mission.commodityId || 'cargo').replace(/_/g, ' ');
+              }
+              if (cargoLots.length === 1) {
+                return cargoLots[0]!.commodityId.replace(/_/g, ' ');
+              }
+              const names = [
+                ...new Set(
+                  cargoLots.map((line) =>
+                    line.commodityId.replace(/_/g, ' '),
+                  ),
+                ),
+              ];
+              return names.length <= 2
+                ? `${names.join(' · ')} · ${cargoLots.length} lots`
+                : `${cargoLots.length} lots`;
+            })();
+            const enRouteBriefItems = (
+              [
+                assignedAircraft ? ['Aircraft', assignedAircraft] : null,
+                ofpBriefing?.aircraftIcao
+                  ? ['OFP type', ofpBriefing.aircraftIcao]
+                  : null,
+                ofpBriefing?.distanceNm !== undefined
+                  ? [
+                      'Distance',
+                      `${Math.round(ofpBriefing.distanceNm)} NM`,
+                    ]
+                  : null,
+                ofpBriefing?.blockTime
+                  ? ['Block time', ofpBriefing.blockTime]
+                  : null,
+                ofpBriefing?.airTime
+                  ? ['Air time', ofpBriefing.airTime]
+                  : null,
+                ofpBriefing?.alternateIcao
+                  ? ['Alternate', ofpBriefing.alternateIcao]
+                  : null,
+              ] as Array<[string, string] | null>
+            ).filter((item): item is [string, string] => item !== null);
+
+            const liveLoadGrid = view ? (
+              <div className="preflight-load-grid">
+                <div className={loadTileClass(fuelOk)}>
+                  <span>Fuel</span>
+                  <strong>Sim {massFromLb(view.fuel.liveLb)}</strong>
+                  <small>
+                    {enRoute ? 'OFP dep' : 'Due'}{' '}
+                    {massFromLb(view.fuel.plannedLb)}
+                  </small>
+                  <b>{loadTileMark(fuelOk)}</b>
+                  <FuelTankSchematic
+                    tanks={view.fuel.tanks}
+                    tankCapacity={view.fuel.tankCapacity}
+                    liveFuelLb={view.fuel.liveLb}
+                    weightSystem={weightSystem}
+                  />
+                </div>
+                <div className={loadTileClass(payloadOk)}>
+                  <span>Payload (stations)</span>
+                  <strong>Sim {massFromLb(view.payload.liveLb)}</strong>
+                  <small>
+                    {formatPayloadDueLine(view.payload, massFromLb)}
+                  </small>
+                  <b>{loadTileMark(payloadOk)}</b>
+                  <PayloadStationSchematic
+                    stations={view.payload.stations}
+                    stationMax={view.payload.stationMax}
+                    weightSystem={weightSystem}
+                  />
+                </div>
+                {view.cg ? (
+                  <div
+                    className={
+                      view.cg.ok ? 'preflight-load-ok' : 'preflight-load-warn'
+                    }
+                  >
+                    <span>CG</span>
+                    <strong>
+                      {view.cg.liveMac !== undefined
+                        ? `${formatMacPct(view.cg.liveMac)}% MAC`
+                        : 'n/a'}
+                    </strong>
+                    <small>
+                      {view.cg.minMac !== undefined &&
+                      view.cg.maxMac !== undefined
+                        ? `envelope ${formatMacPct(view.cg.minMac)}–${formatMacPct(view.cg.maxMac)}`
+                        : 'advisory only'}
+                    </small>
+                    <b>{view.cg.severity === 'warn' ? '⚠' : 'ℹ'}</b>
+                    {view.cg.minMac !== undefined &&
+                    view.cg.maxMac !== undefined ? (
+                      <CgEnvelopeSchematic
+                        liveMac={view.cg.liveMac}
+                        minMac={view.cg.minMac}
+                        maxMac={view.cg.maxMac}
+                        ok={view.cg.ok}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+                {(() => {
+                  const watchSample =
+                    props.watch?.running &&
+                    props.watch.missionId === mission.id
+                      ? props.watch
+                      : null;
+                  const liveOnGround =
+                    watchSample?.onGround ??
+                    props.simBridge?.onGround ??
+                    view.aircraft.onGround;
+                  const liveEngines =
+                    watchSample?.enginesRunning ??
+                    props.simBridge?.enginesRunning ??
+                    view.aircraft.enginesRunning;
+                  const loc =
+                    props.watch?.running &&
+                    props.watch.missionId === mission.id &&
+                    props.watch.originProximity
+                      ? props.watch.originProximity
+                      : check.location;
+                  return (
+                    <div className="preflight-aircraft-stack">
+                      <div className="preflight-aircraft-state">
+                        <span>Aircraft</span>
+                        <strong>
+                          {liveOnGround ? 'On ground' : 'Airborne'}
+                        </strong>
+                        <small>
+                          {liveEngines ? 'Engines running' : 'Engines off'}
+                        </small>
+                        <b>
+                          {enRoute
+                            ? liveOnGround
+                              ? !props.watch?.sawAirborne
+                                ? 'RAMP'
+                                : liveEngines
+                                  ? 'TAXI'
+                                  : 'LANDED'
+                              : 'AIR'
+                            : liveOnGround && !liveEngines
+                              ? 'READY'
+                              : 'CHECK'}
+                        </b>
+                      </div>
+                      {loc ? (
+                        <div
+                          className={
+                            loc.ok ? 'preflight-load-ok' : 'preflight-load-fail'
+                          }
+                          role="status"
+                        >
+                          <span>Origin</span>
+                          <strong>
+                            {loc.ok
+                              ? `At ${loc.originIcao}`
+                              : loc.distanceNm !== undefined
+                                ? `${loc.distanceNm.toFixed(1)} nm`
+                                : loc.originIcao}
+                          </strong>
+                          <small>
+                            {enRoute && loc.ok
+                              ? 'Cleared at departure'
+                              : loc.ok
+                                ? loc.distanceNm !== undefined
+                                  ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
+                                  : `≤${loc.radiusNm} nm`
+                                : loc.distanceNm !== undefined
+                                  ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
+                                  : (check.findings.find(
+                                      (f) => f.code === loc.code,
+                                    )?.message ??
+                                    `need ≤${loc.radiusNm} nm at ${loc.originIcao}`)}
+                          </small>
+                          <b>{loc.ok ? '✓' : '✕'}</b>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <p>Waiting for live Loaded vs Due data…</p>
+            );
+
+            const enRouteCargo = (
+              <div className="staging-section dispatch-enroute-cargo">
+                <div className="staging-section-head">
+                  <h3>{isFerryLeg ? 'Ferry' : 'Cargo'}</h3>
+                </div>
+                <div className="cargo-capacity staging-capacity staging-ops-capacity staging-ops-capacity-inline">
+                  {isFerryLeg ? (
+                    <span>
+                      Load
+                      <strong>Empty</strong>
+                      <em>{cargoCommodityLabel}</em>
+                    </span>
+                  ) : (
+                    <span>
+                      Cargo
+                      <strong>{props.formatTonnes(mission.cargoKg)}</strong>
+                      <em>{cargoCommodityLabel}</em>
+                    </span>
+                  )}
+                  <span>
+                    {isFerryLeg
+                      ? mission.contractPilot
+                        ? 'Pilot fee'
+                        : 'Payout'
+                      : 'Contract'}
+                    <strong>{props.formatMoney(mission.payUsd)}</strong>
+                  </span>
+                  <span>
+                    Deadline
+                    <strong>
+                      {props.formatDeadline(
+                        mission.deadlineTick,
+                        continuousHours,
+                      )}
+                    </strong>
+                  </span>
+                  {!isFerryLeg ? (
+                    <span>
+                      Capacity left
+                      <strong>
+                        {props.formatTonnes(
+                          Math.max(
+                            0,
+                            props.missionMaxCargoKg(mission) - mission.cargoKg,
+                          ),
+                        )}
+                      </strong>
+                    </span>
+                  ) : null}
+                  {mission.fuelUplift &&
+                  (mission.fuelUplift.costUsd > 0 ||
+                    mission.fuelUplift.requestedKg > 0.5) ? (
+                    <span>
+                      Fuel
+                      <strong>
+                        {props.formatMoney(mission.fuelUplift.costUsd)}
+                      </strong>
+                      <em>
+                        {props.formatTonnes(mission.fuelUplift.requestedKg)}
+                      </em>
+                    </span>
+                  ) : null}
+                </div>
+                {isFerryLeg ? (
+                  <p className="empty">
+                    {mission.reason?.trim() ||
+                      'Empty reposition — no freight on board.'}
+                  </p>
+                ) : cargoLots.length > 1 ? (
+                  <ul className="staging-existing">
+                    {cargoLots.map((line) => (
+                      <li key={`${line.shipmentLotId}-${line.commodityId}`}>
+                        {props.formatTonnes(line.cargoKg)}{' '}
+                        {line.commodityId.replace(/_/g, ' ')} ·{' '}
+                        {props.formatMoney(line.payUsd)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            );
+
             return (
               <section
                 className={`ofp-result-card preflight-summary-card ofp-result-${
@@ -1152,23 +1424,31 @@ export function DispatchActivePanel(props: {
                 }`}
                 aria-live="polite"
               >
-                <div className="ofp-result-head">
-                  <div>
-                    <strong>
-                      {enRoute
-                        ? enRouteHeadline
-                        : injecting
+                {enRoute ? (
+                  enRouteBriefItems.length > 0 ? (
+                    <dl className="ofp-briefing-grid dispatch-enroute-brief">
+                      {enRouteBriefItems.map(([label, value]) => (
+                        <div key={label}>
+                          <dt>{label}</dt>
+                          <dd>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null
+                ) : (
+                  <div className="ofp-result-head">
+                    <div>
+                      <strong>
+                        {injecting
                           ? 'INJECTING LOAD'
                           : ready
                             ? 'PREFLIGHT READY'
                             : loadReady && !locationOk
                               ? 'NOT AT ORIGIN'
                               : 'PREFLIGHT FAILED'}
-                    </strong>
-                    <small>
-                      {enRoute
-                        ? enRouteSub
-                        : injecting
+                      </strong>
+                      <small>
+                        {injecting
                           ? (props.loadOfpProgress?.message ??
                             'Writing fuel and payload into the sim…')
                           : ready
@@ -1180,102 +1460,103 @@ export function DispatchActivePanel(props: {
                                   : `Not verified at ${liveLocation.originIcao}. Relocate before takeoff — Watch will not auto-depart.`
                                 : 'Relocate to the mission origin before takeoff — Watch will not auto-depart.'
                             : 'Fix the mismatched aircraft load before departure.'}
-                    </small>
-                  </div>
-                  <div className="preflight-head-actions">
-                    {loadPath === 'inject' && !enRoute ? (
-                      <div className="skyline-inject-row">
-                        {(() => {
-                          const injectStatus =
-                            props.loadOfpAutoStatus === 'failed'
-                              ? (props.loadOfpAutoError ??
-                                'Inject failed — turn on to retry, or continue manually below.')
-                              : props.loadOfpAutoStatus === 'loading'
-                                ? (props.loadOfpProgress?.message ??
-                                  'Writing fuel + payload and balancing CG. Turn off to stop.')
-                                : props.watch?.running &&
-                                    props.watch.missionId === mission.id &&
-                                    !props.simBridge?.connected
-                                  ? (props.watch.lastError ??
-                                    'Watch reconnecting to SimBridge…')
-                                  : !props.simBridge?.connected
-                                    ? 'Start SimBridge, then turn inject on.'
-                                    : null;
-                          return injectStatus ? (
-                            <p
-                              className={`skyline-inject-status${
-                                props.loadOfpAutoStatus === 'failed'
-                                  ? ' skyline-inject-status-fail'
-                                  : props.loadOfpAutoStatus === 'loading'
-                                    ? ' skyline-inject-status-busy'
-                                    : ''
-                              }`}
-                              aria-live="polite"
-                            >
-                              {injectStatus}
-                            </p>
-                          ) : null;
-                        })()}
-                        <button
-                          type="button"
-                          role="switch"
-                          className={`skyline-inject-switch${
-                            injectSwitchOn
-                              ? ' skyline-inject-switch-on'
-                              : ''
-                          }${
-                            injecting ? ' skyline-inject-switch-busy' : ''
-                          }`}
-                          aria-checked={injectSwitchOn}
-                          disabled={
-                            injecting
-                              ? false
-                              : busy ||
-                                !(
-                                  props.simBridge?.connected ||
-                                  watchLive
-                                )
-                          }
-                          title={
-                            injectSwitchOn
-                              ? injecting
-                                ? 'Turn off to cancel fuel/payload inject'
-                                : 'Skyline inject is on — turn off to leave load as-is'
-                              : 'Turn on to write OFP fuel and payload into the sim'
-                          }
-                          onClick={() =>
-                            props.onToggleSkylineInject(!injectSwitchOn)
-                          }
-                        >
-                          <span
-                            className="skyline-inject-switch-track"
-                            aria-hidden="true"
+                      </small>
+                    </div>
+                    <div className="preflight-head-actions">
+                      {loadPath === 'inject' ? (
+                        <div className="skyline-inject-row">
+                          {(() => {
+                            const injectStatus =
+                              props.loadOfpAutoStatus === 'failed'
+                                ? (props.loadOfpAutoError ??
+                                  'Inject failed — turn on to retry, or continue manually below.')
+                                : props.loadOfpAutoStatus === 'loading'
+                                  ? (props.loadOfpProgress?.message ??
+                                    'Writing fuel + payload and balancing CG. Turn off to stop.')
+                                  : props.watch?.running &&
+                                      props.watch.missionId === mission.id &&
+                                      !props.simBridge?.connected
+                                    ? (props.watch.lastError ??
+                                      'Watch reconnecting to SimBridge…')
+                                    : !props.simBridge?.connected
+                                      ? 'Start SimBridge, then turn inject on.'
+                                      : null;
+                            return injectStatus ? (
+                              <p
+                                className={`skyline-inject-status${
+                                  props.loadOfpAutoStatus === 'failed'
+                                    ? ' skyline-inject-status-fail'
+                                    : props.loadOfpAutoStatus === 'loading'
+                                      ? ' skyline-inject-status-busy'
+                                      : ''
+                                }`}
+                                aria-live="polite"
+                              >
+                                {injectStatus}
+                              </p>
+                            ) : null;
+                          })()}
+                          <button
+                            type="button"
+                            role="switch"
+                            className={`skyline-inject-switch${
+                              injectSwitchOn
+                                ? ' skyline-inject-switch-on'
+                                : ''
+                            }${
+                              injecting ? ' skyline-inject-switch-busy' : ''
+                            }`}
+                            aria-checked={injectSwitchOn}
+                            disabled={
+                              injecting
+                                ? false
+                                : busy ||
+                                  !(
+                                    props.simBridge?.connected ||
+                                    watchLive
+                                  )
+                            }
+                            title={
+                              injectSwitchOn
+                                ? injecting
+                                  ? 'Turn off to cancel fuel/payload inject'
+                                  : 'Skyline inject is on — turn off to leave load as-is'
+                                : 'Turn on to write OFP fuel and payload into the sim'
+                            }
+                            onClick={() =>
+                              props.onToggleSkylineInject(!injectSwitchOn)
+                            }
                           >
-                            <span className="skyline-inject-switch-knob" />
-                          </span>
-                          <span className="skyline-inject-switch-label">
-                            <strong>Skyline inject</strong>
-                            <small>
-                              {injecting
-                                ? 'Writing…'
-                                : props.loadOfpAutoStatus === 'failed'
-                                  ? 'Failed · off'
-                                  : props.loadOfpAutoStatus === 'done'
-                                    ? 'Done'
-                                    : props.skylineInjectEnabled
-                                      ? 'On'
-                                      : 'Off'}
-                            </small>
-                          </span>
-                        </button>
-                      </div>
-                    ) : null}
-                    <span>
-                      Checked{' '}
-                      {new Date(check.checkedAtIso).toLocaleTimeString()}
-                    </span>
+                            <span
+                              className="skyline-inject-switch-track"
+                              aria-hidden="true"
+                            >
+                              <span className="skyline-inject-switch-knob" />
+                            </span>
+                            <span className="skyline-inject-switch-label">
+                              <strong>Skyline inject</strong>
+                              <small>
+                                {injecting
+                                  ? 'Writing…'
+                                  : props.loadOfpAutoStatus === 'failed'
+                                    ? 'Failed · off'
+                                    : props.loadOfpAutoStatus === 'done'
+                                      ? 'Done'
+                                      : props.skylineInjectEnabled
+                                        ? 'On'
+                                        : 'Off'}
+                              </small>
+                            </span>
+                          </button>
+                        </div>
+                      ) : null}
+                      <span>
+                        Checked{' '}
+                        {new Date(check.checkedAtIso).toLocaleTimeString()}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
                 {props.mxFuelBurnAlert ||
                 check.findings.some((f) => f.code === 'MX_FUEL_BURN') ? (
                   <p className="banner warn mx-fuel-burn-alert" role="status">
@@ -1285,314 +1566,58 @@ export function DispatchActivePanel(props: {
                           ?.message ?? '')}
                   </p>
                 ) : null}
-                {view ? (
+                {enRoute ? (
                   <>
-                    <div className="preflight-load-grid">
-                      <div className={loadTileClass(fuelOk)}>
-                        <span>Fuel</span>
-                        <strong>
-                          Sim {massFromLb(view.fuel.liveLb)}
-                        </strong>
-                        <small>
-                          {enRoute ? 'OFP dep' : 'Due'}{' '}
-                          {massFromLb(view.fuel.plannedLb)}
-                        </small>
-                        <b>{loadTileMark(fuelOk)}</b>
-                        <FuelTankSchematic
-                          tanks={view.fuel.tanks}
-                          tankCapacity={view.fuel.tankCapacity}
-                          liveFuelLb={view.fuel.liveLb}
-                          weightSystem={weightSystem}
-                        />
+                    {enRouteCargo}
+                    <div className="ofp-result-head dispatch-enroute-live-head">
+                      <div>
+                        <strong>{enRouteHeadline}</strong>
+                        <small>{enRouteSub}</small>
                       </div>
-                      <div className={loadTileClass(payloadOk)}>
-                        <span>Payload (stations)</span>
-                        <strong>
-                          Sim {massFromLb(view.payload.liveLb)}
-                        </strong>
-                        <small>
-                          {formatPayloadDueLine(
-                            view.payload,
-                            massFromLb,
-                          )}
-                        </small>
-                        <b>{loadTileMark(payloadOk)}</b>
-                        <PayloadStationSchematic
-                          stations={view.payload.stations}
-                          stationMax={view.payload.stationMax}
-                          weightSystem={weightSystem}
-                        />
-                      </div>
-                      {view.cg ? (
-                        <div
-                          className={
-                            view.cg.ok
-                              ? 'preflight-load-ok'
-                              : 'preflight-load-warn'
-                          }
-                        >
-                          <span>CG</span>
-                          <strong>
-                            {view.cg.liveMac !== undefined
-                              ? `${formatMacPct(view.cg.liveMac)}% MAC`
-                              : 'n/a'}
-                          </strong>
-                          <small>
-                            {view.cg.minMac !== undefined &&
-                            view.cg.maxMac !== undefined
-                              ? `envelope ${formatMacPct(view.cg.minMac)}–${formatMacPct(view.cg.maxMac)}`
-                              : 'advisory only'}
-                          </small>
-                          <b>
-                            {view.cg.severity === 'warn' ? '⚠' : 'ℹ'}
-                          </b>
-                          {view.cg.minMac !== undefined &&
-                          view.cg.maxMac !== undefined ? (
-                            <CgEnvelopeSchematic
-                              liveMac={view.cg.liveMac}
-                              minMac={view.cg.minMac}
-                              maxMac={view.cg.maxMac}
-                              ok={view.cg.ok}
-                            />
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {(() => {
-                        const watchSample =
-                          props.watch?.running &&
-                          props.watch.missionId === mission.id
-                            ? props.watch
-                            : null;
-                        const liveOnGround =
-                          watchSample?.onGround ??
-                          props.simBridge?.onGround ??
-                          view.aircraft.onGround;
-                        const liveEngines =
-                          watchSample?.enginesRunning ??
-                          props.simBridge?.enginesRunning ??
-                          view.aircraft.enginesRunning;
-                        const loc =
-                          props.watch?.running &&
-                          props.watch.missionId === mission.id &&
-                          props.watch.originProximity
-                            ? props.watch.originProximity
-                            : check.location;
-                        return (
-                          <div className="preflight-aircraft-stack">
-                            <div className="preflight-aircraft-state">
-                              <span>Aircraft</span>
-                              <strong>
-                                {liveOnGround ? 'On ground' : 'Airborne'}
-                              </strong>
-                              <small>
-                                {liveEngines
-                                  ? 'Engines running'
-                                  : 'Engines off'}
-                              </small>
-                              <b>
-                                {enRoute
-                                  ? liveOnGround
-                                    ? !props.watch?.sawAirborne
-                                      ? 'RAMP'
-                                      : liveEngines
-                                        ? 'TAXI'
-                                        : 'LANDED'
-                                    : 'AIR'
-                                  : liveOnGround && !liveEngines
-                                    ? 'READY'
-                                    : 'CHECK'}
-                              </b>
-                            </div>
-                            {loc ? (
-                              <div
-                                className={
-                                  loc.ok
-                                    ? 'preflight-load-ok'
-                                    : 'preflight-load-fail'
-                                }
-                                role="status"
-                              >
-                                <span>Origin</span>
-                                <strong>
-                                  {loc.ok
-                                    ? `At ${loc.originIcao}`
-                                    : loc.distanceNm !== undefined
-                                      ? `${loc.distanceNm.toFixed(1)} nm`
-                                      : loc.originIcao}
-                                </strong>
-                                <small>
-                                  {enRoute && loc.ok
-                                    ? 'Cleared at departure'
-                                    : loc.ok
-                                      ? loc.distanceNm !== undefined
-                                        ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
-                                        : `≤${loc.radiusNm} nm`
-                                      : loc.distanceNm !== undefined
-                                        ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
-                                        : (check.findings.find(
-                                            (f) => f.code === loc.code,
-                                          )?.message ??
-                                          `need ≤${loc.radiusNm} nm at ${loc.originIcao}`)}
-                                </small>
-                                <b>{loc.ok ? '✓' : '✕'}</b>
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })()}
+                      <span>
+                        Checked{' '}
+                        {new Date(check.checkedAtIso).toLocaleTimeString()}
+                      </span>
                     </div>
+                    {liveLoadGrid}
                   </>
                 ) : (
-                  <p>Waiting for live Loaded vs Due data…</p>
+                  liveLoadGrid
                 )}
-                {enRoute ? (
-                  <div className="staging-section dispatch-enroute-cargo">
-                    <div className="staging-section-head">
-                      <h3>{isFerryLeg ? 'Ferry' : 'Cargo'}</h3>
-                    </div>
-                    <div className="cargo-capacity staging-capacity staging-ops-capacity staging-ops-capacity-inline">
-                      {isFerryLeg ? (
-                        <span>
-                          Load
-                          <strong>Empty</strong>
-                          <em>ferry / reposition</em>
-                        </span>
-                      ) : (
-                        <span>
-                          Cargo
-                          <strong>{props.formatTonnes(mission.cargoKg)}</strong>
-                          <em>
-                            {(mission.lots?.length ?? 1) > 1
-                              ? `${mission.lots!.length} lots`
-                              : '1 lot'}
-                          </em>
-                        </span>
-                      )}
-                      <span>
-                        {isFerryLeg
-                          ? mission.contractPilot
-                            ? 'Pilot fee'
-                            : 'Payout'
-                          : 'Contract'}
-                        <strong>{props.formatMoney(mission.payUsd)}</strong>
-                      </span>
-                      <span>
-                        Deadline
-                        <strong>
-                          {props.formatDeadline(
-                            mission.deadlineTick,
-                            continuousHours,
-                          )}
-                        </strong>
-                      </span>
-                      {!isFerryLeg ? (
-                        <span>
-                          Capacity left
-                          <strong>
-                            {props.formatTonnes(
-                              Math.max(
-                                0,
-                                props.missionMaxCargoKg(mission) -
-                                  mission.cargoKg,
-                              ),
-                            )}
-                          </strong>
-                        </span>
-                      ) : null}
-                      {mission.fuelUplift &&
-                      (mission.fuelUplift.costUsd > 0 ||
-                        mission.fuelUplift.requestedKg > 0.5) ? (
-                        <span>
-                          Fuel
-                          <strong>
-                            {props.formatMoney(mission.fuelUplift.costUsd)}
-                          </strong>
-                          <em>
-                            {props.formatTonnes(mission.fuelUplift.requestedKg)}
-                          </em>
-                        </span>
-                      ) : null}
-                    </div>
-                    {isFerryLeg ? (
-                      <p className="empty">
-                        {mission.reason?.trim() ||
-                          'Empty reposition — no freight on board.'}
-                      </p>
-                    ) : (mission.lots?.length ?? 0) > 0 ? (
-                      <ul className="staging-existing">
-                        {mission.lots!.map((line) => (
+                {check.findings.length > 0 ? (
+                  enRoute ? (
+                    <div className="preflight-technical preflight-technical-open">
+                      <strong className="preflight-technical-label">
+                        {noteLabel}
+                      </strong>
+                      <ul className="ofp-findings">
+                        {check.findings.map((finding) => (
                           <li
-                            key={`${line.shipmentLotId}-${line.commodityId}`}
+                            key={`pre-${finding.code}-${finding.message}`}
+                            className={`finding-${finding.severity}`}
                           >
-                            {props.formatTonnes(line.cargoKg)} {line.commodityId}{' '}
-                            · {props.formatMoney(line.payUsd)}
+                            [{finding.severity.toUpperCase()}]{' '}
+                            {formatWeightText(finding.message, weightSystem)}
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <p className="empty">No cargo lots on this flight.</p>
-                    )}
-                  </div>
-                ) : null}
-                {enRoute && mission.lastOfpCheck ? (
-                  <details className="dispatch-fold dispatch-fold-ofp">
-                    <summary>
-                      OFP{' '}
-                      {mission.lastOfpCheck.verdict === 'pass'
-                        ? 'passed'
-                        : mission.lastOfpCheck.verdict}
-                      {mission.lastOfpCheck.briefing?.distanceNm != null
-                        ? ` · ${Math.round(mission.lastOfpCheck.briefing.distanceNm)} NM`
-                        : ''}
-                    </summary>
-                    <dl className="ofp-briefing-grid">
-                      {(
-                        [
-                          assignedAircraft
-                            ? ['Hangar', assignedAircraft]
-                            : null,
-                          mission.lastOfpCheck.briefing?.aircraftIcao
-                            ? [
-                                'OFP type',
-                                mission.lastOfpCheck.briefing.aircraftIcao,
-                              ]
-                            : null,
-                          mission.lastOfpCheck.briefing?.blockTime
-                            ? [
-                                'Block time',
-                                mission.lastOfpCheck.briefing.blockTime,
-                              ]
-                            : null,
-                          mission.lastOfpCheck.briefing?.route
-                            ? ['Route', mission.lastOfpCheck.briefing.route]
-                            : null,
-                        ] as Array<[string, string] | null>
-                      )
-                        .filter((item): item is [string, string] => item !== null)
-                        .map(([label, value]) => (
-                          <div key={label}>
-                            <dt>{label}</dt>
-                            <dd>{value}</dd>
-                          </div>
+                    </div>
+                  ) : (
+                    <details className="preflight-technical">
+                      <summary>{noteLabel}</summary>
+                      <ul className="ofp-findings">
+                        {check.findings.map((finding) => (
+                          <li
+                            key={`pre-${finding.code}-${finding.message}`}
+                            className={`finding-${finding.severity}`}
+                          >
+                            [{finding.severity.toUpperCase()}]{' '}
+                            {formatWeightText(finding.message, weightSystem)}
+                          </li>
                         ))}
-                    </dl>
-                  </details>
-                ) : null}
-                {check.findings.length > 0 ? (
-                  <details className="preflight-technical">
-                    <summary>{noteLabel}</summary>
-                    <ul className="ofp-findings">
-                      {check.findings.map((finding) => (
-                        <li
-                          key={`pre-${finding.code}-${finding.message}`}
-                          className={`finding-${finding.severity}`}
-                        >
-                          [{finding.severity.toUpperCase()}]{' '}
-                          {formatWeightText(finding.message, weightSystem)}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
+                      </ul>
+                    </details>
+                  )
                 ) : null}
               </section>
             );
@@ -1604,6 +1629,7 @@ export function DispatchActivePanel(props: {
           originIcao={mission.originIcao}
           destIcao={mission.destIcao}
           waypoints={mission.lastOfpCheck?.briefing?.waypoints}
+          ofpRoute={mission.lastOfpCheck?.briefing?.route}
           aircraft={stickyAircraft}
           busy={busy}
           canRefreshNavlog={Boolean(simbriefUser.trim())}

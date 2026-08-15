@@ -193,9 +193,32 @@ export function WatchStatusFooter(props: Props) {
             }
             title="Stable cruise fuel flow + TAS (≥3 min level) updates this airframe's burn after settle. Timer freezes once locked."
           >
-            {cruise.phase === 'locked'
-              ? `Cruise · ${cruise.tasKt ?? '—'} kt`
-              : `Cruise ${Math.round(cruise.elapsedMs / 1000)}s`}
+            {(() => {
+              const burnKgH =
+                typeof cruise.fuelFlowKgPerHour === 'number' &&
+                Number.isFinite(cruise.fuelFlowKgPerHour) &&
+                cruise.fuelFlowKgPerHour > 0 &&
+                cruise.fuelFlowKgPerHour < 50_000
+                  ? cruise.fuelFlowKgPerHour
+                  : typeof cruise.committed?.cruiseFuelFlowKgPerHour ===
+                        'number' &&
+                      Number.isFinite(
+                        cruise.committed.cruiseFuelFlowKgPerHour,
+                      ) &&
+                      cruise.committed.cruiseFuelFlowKgPerHour > 0 &&
+                      cruise.committed.cruiseFuelFlowKgPerHour < 50_000
+                    ? cruise.committed.cruiseFuelFlowKgPerHour
+                    : null;
+              const burnLabel =
+                burnKgH != null
+                  ? ` · ${burnKgH.toLocaleString(undefined, {
+                      maximumFractionDigits: 1,
+                    })} kg/h`
+                  : '';
+              return cruise.phase === 'locked'
+                ? `Cruise · ${cruise.tasKt ?? cruise.committed?.cruiseSpeedKt ?? '—'} kt${burnLabel}`
+                : `Cruise ${Math.round(cruise.elapsedMs / 1000)}s${burnLabel}`;
+            })()}
           </span>
         ) : null}
         {props.watch?.lastEvent?.type === 'settle_blocked' ? (

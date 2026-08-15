@@ -12,6 +12,8 @@ export function DispatchRouteCard(props: {
   originIcao: string;
   destIcao: string;
   waypoints?: DispatchRouteWaypoint[];
+  /** Full OFP route string (shown in map header when present). */
+  ofpRoute?: string;
   /** Live aircraft from Watch (updates as the plane moves). */
   aircraft?: DispatchAircraftPosition | null;
   /** Stretch map to fill parent height (EN ROUTE cockpit). */
@@ -78,13 +80,20 @@ export function DispatchRouteCard(props: {
       aria-label="Dispatch route map"
     >
       <div className="dispatch-route-map-head">
-        <strong>Route</strong>
-        <small>
-          {props.originIcao.trim().toUpperCase()} →{' '}
-          {props.destIcao.trim().toUpperCase()}
-          {wptCount > 0 ? ` · ${wptCount} navlog fixes` : ''}
-          {hasAircraft ? ' · live aircraft' : ''}
-        </small>
+        <div className="dispatch-route-map-head-text">
+          <strong>Route</strong>
+          <small>
+            {props.originIcao.trim().toUpperCase()} →{' '}
+            {props.destIcao.trim().toUpperCase()}
+            {wptCount > 0 ? ` · ${wptCount} navlog fixes` : ''}
+            {hasAircraft ? ' · live aircraft' : ''}
+          </small>
+        </div>
+        {props.ofpRoute?.trim() ? (
+          <code className="dispatch-route-map-ofp" title={props.ofpRoute.trim()}>
+            {props.ofpRoute.trim()}
+          </code>
+        ) : null}
       </div>
       {loading ? (
         <p className="dispatch-route-map-empty">Loading map…</p>

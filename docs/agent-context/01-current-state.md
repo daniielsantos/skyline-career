@@ -4,7 +4,8 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.35** (latest) | [v0.3.35](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.35) | EN ROUTE layout v2; footer fora do scroll; cruise burn kg/h |
+| **0.3.36** (latest) | [v0.3.36](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.36) | Route header hubs coloridos; technical details colapsados |
+| **0.3.35** | [v0.3.35](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.35) | EN ROUTE layout v2; footer fora do scroll; cruise burn kg/h |
 | **0.3.34** | [v0.3.34](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.34) | EN ROUTE: capacity na seção Cargo; live load = preflight |
 | **0.3.33** | [v0.3.33](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.33) | Dispatch EN ROUTE cockpit: mapa + live load sem scroll |
 | **0.3.32** | [v0.3.32](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.32) | Status bar fixa + banners sem mission id |

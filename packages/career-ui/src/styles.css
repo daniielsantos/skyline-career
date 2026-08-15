@@ -1954,6 +1954,200 @@ tr.lot-locked {
   margin-bottom: 0.85rem;
 }
 
+.staging-ops-capacity-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.55rem;
+  margin-bottom: 0;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.staging-ops-capacity-compact span em {
+  display: none;
+}
+
+.dispatch-fold {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 0.3rem;
+  padding: 0.2rem 0.55rem 0.35rem;
+}
+
+.dispatch-fold > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.35rem 0.15rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.dispatch-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.dispatch-fold > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+
+.dispatch-fold[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.dispatch-fold .staging-section,
+.dispatch-fold .ofp-briefing-card {
+  margin-top: 0.35rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.dispatch-active {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* EN ROUTE: map dominant + status/load side, single viewport on desktop */
+.dispatch-active-enroute {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(17.5rem, 0.9fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  align-content: stretch;
+  gap: 0.5rem 0.75rem;
+  height: calc(100dvh - 8.75rem);
+  max-height: calc(100dvh - 8.75rem);
+  overflow: hidden;
+  margin: 0;
+  padding-bottom: 0.15rem;
+}
+
+.dispatch-active-enroute > .dispatch-stepper {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  padding: 0.05rem 0 0.1rem;
+}
+
+.dispatch-active-enroute .dispatch-step {
+  gap: 0.25rem;
+  font-size: 0.62rem;
+}
+
+.dispatch-active-enroute .dispatch-step-mark {
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.65rem;
+}
+
+.dispatch-active-enroute > .missions-head {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+}
+
+.dispatch-active-enroute > .missions-head h2 {
+  font-size: 1.15rem;
+}
+
+.dispatch-active-enroute > .missions-head p {
+  font-size: 0.8rem;
+}
+
+.dispatch-active-enroute > .staging-ops-capacity {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.dispatch-active-enroute > .dispatch-route-map-card {
+  grid-column: 1;
+  grid-row: 3 / 5;
+  align-self: stretch;
+  min-height: 0;
+  margin: 0;
+  height: 100%;
+}
+
+.dispatch-active-enroute > .preflight-summary-card {
+  grid-column: 2;
+  grid-row: 4;
+  align-self: stretch;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+}
+
+.dispatch-active-enroute > .dispatch-primary-actions,
+.dispatch-active-enroute > .dispatch-advanced-actions,
+.dispatch-active-enroute > .dispatch-advanced,
+.dispatch-active-enroute > .settings-chip {
+  grid-column: 1 / -1;
+  grid-row: 5;
+}
+
+.dispatch-active-enroute .preflight-summary-compact .ofp-result-head small {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dispatch-active-enroute .preflight-summary-compact .preflight-load-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.dispatch-active-enroute
+  .preflight-summary-compact
+  .preflight-load-grid
+  > .preflight-aircraft-stack {
+  grid-column: 1 / -1;
+}
+
+.dispatch-active-enroute .preflight-summary-compact .preflight-load-grid > div {
+  padding: 0.45rem 0.55rem;
+}
+
+.dispatch-active-enroute .preflight-summary-compact .dispatch-fold {
+  margin-top: 0.45rem;
+}
+
+.dispatch-active-enroute .preflight-technical {
+  margin-top: 0.4rem;
+}
+
+@media (max-width: 900px) {
+  .dispatch-active-enroute {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .dispatch-active-enroute > .dispatch-stepper,
+  .dispatch-active-enroute > .missions-head,
+  .dispatch-active-enroute > .staging-ops-capacity,
+  .dispatch-active-enroute > .dispatch-route-map-card,
+  .dispatch-active-enroute > .preflight-summary-card,
+  .dispatch-active-enroute > .dispatch-primary-actions,
+  .dispatch-active-enroute > .dispatch-advanced-actions,
+  .dispatch-active-enroute > .dispatch-advanced,
+  .dispatch-active-enroute > .settings-chip {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .dispatch-active-enroute > .dispatch-route-map-card {
+    min-height: 40vh;
+    height: 40vh;
+  }
+}
+
 .staging-ops-head-actions {
   display: flex;
   align-items: flex-start;
@@ -6123,6 +6317,34 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 0.35rem;
   background: var(--surface);
+}
+
+.dispatch-route-map-card-fill {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+}
+
+.dispatch-route-map-card-fill .dispatch-route-map-head {
+  flex-shrink: 0;
+}
+
+.dispatch-route-map-card-fill .dispatch-route-map,
+.dispatch-route-map-card-fill .dispatch-route-map-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.dispatch-route-map-fill .dispatch-route-map-canvas {
+  height: 100%;
+  min-height: 12rem;
+}
+
+.dispatch-route-map-card-fill .dispatch-route-map-hint,
+.dispatch-route-map-card-fill .dispatch-route-map-empty {
+  flex-shrink: 0;
 }
 
 .bush-trip-map-head-text {

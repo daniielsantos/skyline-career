@@ -7,13 +7,15 @@ import {
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
 
-/** Compact route map card for Dispatch — below Preflight. */
+/** Compact route map card for Dispatch — below Preflight (or cockpit map when fill). */
 export function DispatchRouteCard(props: {
   originIcao: string;
   destIcao: string;
   waypoints?: DispatchRouteWaypoint[];
   /** Live aircraft from Watch (updates as the plane moves). */
   aircraft?: DispatchAircraftPosition | null;
+  /** Stretch map to fill parent height (EN ROUTE cockpit). */
+  fill?: boolean;
   busy?: boolean;
   canRefreshNavlog?: boolean;
   onOpenAirport: (icao: string) => void;
@@ -69,7 +71,12 @@ export function DispatchRouteCard(props: {
   }
 
   return (
-    <section className="dispatch-route-map-card" aria-label="Dispatch route map">
+    <section
+      className={`dispatch-route-map-card${
+        props.fill ? ' dispatch-route-map-card-fill' : ''
+      }`}
+      aria-label="Dispatch route map"
+    >
       <div className="dispatch-route-map-head">
         <strong>Route</strong>
         <small>
@@ -84,6 +91,11 @@ export function DispatchRouteCard(props: {
       ) : origin && dest ? (
         <>
           <DispatchRouteMap
+            className={
+              props.fill
+                ? 'dispatch-route-map dispatch-route-map-fill'
+                : undefined
+            }
             origin={origin}
             dest={dest}
             waypoints={props.waypoints}

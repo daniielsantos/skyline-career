@@ -2215,15 +2215,34 @@ tr.lot-locked {
   gap: 0.4rem;
   width: 100%;
   min-width: 0;
+  flex: 0 0 auto;
 }
 
 .dispatch-enroute-live-tiles {
+  /* Shared Fuel tank / station cell height — scales up on big screens. */
+  --live-cell-h: clamp(2.35rem, 3.2vw, 3.1rem);
+  --live-cell-fs: clamp(0.58rem, 0.72vw, 0.72rem);
+  --live-fuel-max: clamp(2.6rem, 8vw, 4.75rem);
+  --live-center-w: clamp(1.35rem, 3.5vw, 2.2rem);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
   align-items: stretch;
   width: 100%;
   min-width: 0;
+}
+
+@media (max-height: 820px) {
+  .dispatch-enroute-live-tiles {
+    --live-cell-h: 2.2rem;
+    --live-cell-fs: 0.58rem;
+    --live-fuel-max: 2.85rem;
+    --live-center-w: 1.55rem;
+  }
+
+  .dispatch-enroute-live-tiles > div {
+    min-height: 9rem;
+  }
 }
 
 .dispatch-enroute-live-tiles:not(:has(> :nth-child(3))) {
@@ -2243,6 +2262,8 @@ tr.lot-locked {
   border: 1px solid var(--line);
   background: var(--surface-2);
   box-sizing: border-box;
+  container-type: inline-size;
+  container-name: live-tile;
 }
 
 .dispatch-enroute-live-tiles > div > span,
@@ -2289,97 +2310,153 @@ tr.lot-locked {
   flex-wrap: wrap;
   gap: 0.2rem;
   align-content: flex-start;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   margin-top: 0.15rem;
   padding-right: 0.1rem;
   width: 100%;
   min-width: 0;
-  min-height: 5.5rem;
+  min-height: 0;
   box-sizing: border-box;
-  overflow: auto;
+  overflow: visible;
 }
 
-.dispatch-enroute-live-tiles > div > .load-schematic-fuel {
+/* Single row under the OFP/Due label: L | C/fuselage | R */
+.dispatch-enroute-live-tiles > div > .load-schematic.load-schematic-fuel {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   justify-content: center;
+  align-items: center;
   align-content: flex-start;
-  align-items: flex-start;
+  align-self: stretch;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  min-height: var(--live-cell-h);
+  height: auto;
+  overflow: hidden;
 }
 
-.dispatch-enroute-live-tiles .load-schematic-wing,
-.dispatch-enroute-live-tiles .load-schematic-center,
-.dispatch-enroute-live-tiles .load-schematic-tip,
-.dispatch-enroute-live-tiles .load-schematic-aux {
-  flex: 1 1 2rem;
-  min-width: 2rem;
-  max-width: 3.1rem;
-  min-height: 2.65rem;
-  padding: 0.2rem 0.28rem;
-}
-
-.dispatch-enroute-live-tiles .load-schematic-fuel .load-schematic-wing,
-.dispatch-enroute-live-tiles .load-schematic-fuel .load-schematic-center,
-.dispatch-enroute-live-tiles .load-schematic-fuel .load-schematic-tip,
-.dispatch-enroute-live-tiles .load-schematic-fuel .load-schematic-aux {
-  flex: 1 1 3.2rem;
-  min-width: 3rem;
-  max-width: 4.75rem;
-  min-height: 2.65rem;
-  height: 2.65rem;
-  padding: 0.35rem 0.4rem;
+.dispatch-enroute-live-tiles .load-schematic-fuel > .load-schematic-wing,
+.dispatch-enroute-live-tiles .load-schematic-fuel > .load-schematic-tip,
+.dispatch-enroute-live-tiles .load-schematic-fuel > .load-schematic-aux {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: var(--live-fuel-max);
+  width: auto;
+  min-height: var(--live-cell-h);
+  height: var(--live-cell-h);
+  padding: 0.28rem 0.32rem;
   box-sizing: border-box;
 }
 
-/* Stations match fuel-tank height; shrink only when the row is crowded. */
-.dispatch-enroute-live-tiles .load-schematic-stations {
-  align-content: flex-start;
-  align-items: stretch;
-}
-
-.dispatch-enroute-live-tiles .load-schematic-stations .load-schematic-station {
-  flex: 1 1 2.4rem;
-  min-width: 2.2rem;
-  max-width: 3.1rem;
-  min-height: 2.65rem;
-  height: 2.65rem;
-  padding: 0.35rem 0.4rem;
+.dispatch-enroute-live-tiles .load-schematic-fuel > .load-schematic-center {
+  flex: 0 0 var(--live-center-w);
+  min-width: var(--live-center-w);
+  max-width: var(--live-center-w);
+  width: var(--live-center-w);
+  min-height: var(--live-cell-h);
+  height: var(--live-cell-h);
+  padding: 0.2rem 0.12rem;
   box-sizing: border-box;
+  align-self: center;
 }
 
-.dispatch-enroute-live-tiles
-  .load-schematic-stations:has(> :nth-child(7))
-  .load-schematic-station {
-  flex-basis: 2rem;
-  min-width: 1.85rem;
-  max-width: 2.6rem;
-  min-height: 2.15rem;
-  height: 2.15rem;
-  padding: 0.25rem 0.28rem;
-}
-
-.dispatch-enroute-live-tiles
-  .load-schematic-stations:has(> :nth-child(10))
-  .load-schematic-station {
-  flex-basis: 1.7rem;
-  min-width: 1.55rem;
-  max-width: 2.2rem;
-  min-height: 1.75rem;
-  height: 1.75rem;
-  padding: 0.18rem 0.22rem;
-}
-
-.dispatch-enroute-live-tiles
-  .load-schematic-stations:has(> :nth-child(7))
-  .load-schematic-label,
-.dispatch-enroute-live-tiles
-  .load-schematic-stations:has(> :nth-child(7))
-  .load-schematic
-  strong {
-  font-size: 0.55rem;
+.dispatch-enroute-live-tiles .load-schematic-fuel > .load-schematic-fuselage {
+  flex: 0 0 0.22rem;
+  min-width: 0.22rem;
+  width: 0.22rem;
+  max-width: 0.22rem;
+  height: var(--live-cell-h);
+  align-self: center;
+  margin: 0;
 }
 
 .dispatch-enroute-live-tiles .load-schematic-fuel .load-schematic-label,
 .dispatch-enroute-live-tiles .load-schematic-fuel .load-schematic strong {
-  font-size: 0.68rem;
+  font-size: var(--live-cell-fs);
+}
+
+/* Stations: always 5 equal columns per row (empty or loaded). */
+.dispatch-enroute-live-tiles > div > .load-schematic.load-schematic-stations {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-content: flex-start;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 0.2rem;
+  width: 100%;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.dispatch-enroute-live-tiles .load-schematic-stations .load-schematic-station {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.05rem;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  min-height: var(--live-cell-h);
+  height: auto;
+  padding: 0.2rem 0.15rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.dispatch-enroute-live-tiles .load-schematic-stations .load-schematic-label,
+.dispatch-enroute-live-tiles .load-schematic-stations .load-schematic strong {
+  max-width: 100%;
+  font-size: var(--live-cell-fs);
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.dispatch-enroute-live-tiles .load-schematic-stations .load-schematic-label {
+  font-size: max(0.5rem, calc(var(--live-cell-fs) * 0.92));
+  text-transform: uppercase;
+}
+
+/* Narrow live tiles: keep 5-up but shrink type so "270 lb" fits. */
+@container live-tile (max-width: 12.5rem) {
+  .load-schematic-stations {
+    gap: 0.12rem;
+  }
+
+  .load-schematic-stations .load-schematic-station {
+    min-height: 2.55rem;
+    padding: 0.12rem 0.06rem;
+  }
+
+  .load-schematic-stations .load-schematic-label {
+    font-size: 0.48rem;
+  }
+
+  .load-schematic-stations .load-schematic strong {
+    font-size: 0.5rem;
+    font-weight: 650;
+  }
+}
+
+@container live-tile (max-width: 10rem) {
+  .load-schematic-stations .load-schematic-station {
+    min-height: 2.7rem;
+    padding: 0.1rem 0.04rem;
+  }
+
+  .load-schematic-stations .load-schematic-label {
+    font-size: 0.44rem;
+  }
+
+  .load-schematic-stations .load-schematic strong {
+    font-size: 0.46rem;
+  }
 }
 
 .dispatch-enroute-live-tiles > div > .load-schematic-cg {
@@ -2621,7 +2698,9 @@ tr.lot-locked {
   align-self: stretch;
   min-height: 0;
   margin: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
@@ -2635,6 +2714,7 @@ tr.lot-locked {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  flex: 0 0 auto;
 }
 
 .dispatch-active-enroute .dispatch-enroute-block {
@@ -2759,25 +2839,11 @@ tr.lot-locked {
   min-height: 1.35rem;
 }
 
-/* Don't crush EN ROUTE live-tile stations — they match fuel tanks. */
+/* Don't crush EN ROUTE live-tile stations — they match fuel via --live-cell-h. */
 .dispatch-active-enroute
   .dispatch-enroute-live-tiles
   .load-schematic-station {
-  min-height: 2.65rem;
-}
-
-.dispatch-active-enroute
-  .dispatch-enroute-live-tiles
-  .load-schematic-stations:has(> :nth-child(7))
-  .load-schematic-station {
-  min-height: 2.15rem;
-}
-
-.dispatch-active-enroute
-  .dispatch-enroute-live-tiles
-  .load-schematic-stations:has(> :nth-child(10))
-  .load-schematic-station {
-  min-height: 1.75rem;
+  min-height: var(--live-cell-h);
 }
 
 .dispatch-active-enroute .load-schematic-label,

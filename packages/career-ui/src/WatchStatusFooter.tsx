@@ -177,7 +177,7 @@ export function WatchStatusFooter(props: Props) {
                 ? 'watch-flight-time ok'
                 : 'watch-flight-time pending'
             }
-            title="Stable cruise fuel flow + TAS (≥3 min level) updates this airframe's burn after settle"
+            title="Stable cruise fuel flow + TAS (≥3 min level) updates this airframe's burn after settle. Timer freezes at 180s once locked."
           >
             Cruise{' '}
             {props.watch.cruiseSample.phase === 'locked'

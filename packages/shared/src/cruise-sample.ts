@@ -253,7 +253,8 @@ export function cruiseSampleStatus(
   if (state.committed) {
     return {
       phase: 'locked',
-      elapsedMs: Math.max(elapsedMs, state.committed.durationSec * 1000),
+      // Cap at the lock threshold — wall-clock past 3 min is not useful in UI.
+      elapsedMs: resolved.minStableMs,
       requiredMs: resolved.minStableMs,
       tasKt: state.committed.cruiseSpeedKt,
       fuelFlowKgPerHour: state.committed.cruiseFuelFlowKgPerHour,

@@ -46,12 +46,28 @@ describe('pushCruiseTick', () => {
     }
     const status = cruiseSampleStatus(state, opts);
     assert.equal(status.phase, 'locked');
+    assert.equal(status.elapsedMs, 60_000);
+    assert.equal(status.requiredMs, 60_000);
     assert.ok(state.committed);
     assert.equal(state.committed.cruiseSpeedKt, 180);
     assert.equal(state.committed.cruiseFuelFlowKgPerHour, 160);
     assert.equal(state.committed.fuelBurnKgPerNm, 0.889);
   });
 
+  it('keeps locked elapsed capped at requiredMs after long cruise', () => {
+    let state = createCruiseSampleState();
+    const opts = { minStableMs: 60_000 };
+    for (let i = 0; i <= 40; i += 1) {
+      state = pushCruiseTick(state, tick(i * 5_000), opts).state;
+    }
+    const status = cruiseSampleStatus(state, opts);
+    assert.equal(status.phase, 'locked');
+    assert.equal(status.elapsedMs, 60_000);
+    assert.ok(
+      (state.window[state.window.length - 1]!.atMs - state.window[0]!.atMs) >
+        60_000,
+    );
+  });
   it('clears the window when VS exceeds the gate', () => {
     let state = createCruiseSampleState();
     const opts = { minStableMs: 60_000 };

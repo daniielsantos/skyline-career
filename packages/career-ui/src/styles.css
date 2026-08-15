@@ -829,6 +829,49 @@ td.net-neg {
 .missions-head-cancel {
   flex: 0 0 auto;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--line));
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+  color: var(--danger);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.missions-head-cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--line));
+}
+
+.missions-head-cancel:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.missions-head-enroute {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  margin: 0;
+}
+
+.missions-head-enroute .missions-head-center {
+  justify-items: start;
+  text-align: left;
+}
+
+.missions-head-enroute .missions-head-cancel {
+  padding: 0.38rem 0.7rem;
+  font-size: 0.88rem;
 }
 
 .simbrief-field {
@@ -2280,14 +2323,32 @@ tr.lot-locked {
   box-sizing: border-box;
 }
 
-.dispatch-active-enroute .preflight-load-grid > div,
-.dispatch-active-enroute .preflight-aircraft-stack > div {
+.dispatch-active-enroute .preflight-load-grid > div {
   padding: 0.4rem 0.5rem;
   gap: 0.08rem;
 }
 
 .dispatch-active-enroute .preflight-load-grid > .preflight-aircraft-stack {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.35rem;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+.dispatch-active-enroute .preflight-aircraft-stack > div {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  gap: 0.08rem;
+  box-sizing: border-box;
 }
 
 .dispatch-active-enroute .preflight-load-grid strong,

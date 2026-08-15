@@ -348,8 +348,14 @@ export function DispatchActivePanel(props: {
     >
       <DispatchStepper current={step} />
 
-      <div className="panel-head missions-head">
-        <div className="missions-head-spacer" aria-hidden="true" />
+      <div
+        className={`panel-head missions-head${
+          isEnRoute ? ' missions-head-enroute' : ''
+        }`}
+      >
+        {isEnRoute ? null : (
+          <div className="missions-head-spacer" aria-hidden="true" />
+        )}
         <div className="missions-head-center">
           <h2>
             <IcaoLink
@@ -387,7 +393,7 @@ export function DispatchActivePanel(props: {
           {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
             <button
               type="button"
-              className="action ghost danger missions-head-cancel"
+              className="missions-head-cancel"
               disabled={busy}
               title={
                 isFerryLeg

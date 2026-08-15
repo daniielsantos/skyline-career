@@ -616,6 +616,8 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'SAEZ', b: 'SANT', weight: 1.5 },
   { a: 'SAEZ', b: 'SAZS', weight: 1.6 },
   { a: 'SAEZ', b: 'SAVN', weight: 1.5 },
+  { a: 'SAEZ', b: 'SAZN', weight: 1.5 },
+  { a: 'SAZN', b: 'SAVN', weight: 1.4 },
   { a: 'SCEL', b: 'SCTE', weight: 1.8 },
   { a: 'SCEL', b: 'SCIE', weight: 1.7 },
   { a: 'SCEL', b: 'SCFA', weight: 1.7 },
@@ -1456,18 +1458,23 @@ export function ensureAirportHubTier(terminal: AirportTerminal): void {
   if (applyMsfsBushHubOverrideToTerminal(terminal)) {
     /* lat/lon/name stamped from MSFS override */
   } else {
-    // Catalog lat/lon wins when no MSFS override — bushTripOnly hubs were once
-    // seeded from PLN User WPs several NM off the field.
+    // Catalog lat/lon/name wins when no MSFS override — bushTripOnly hubs were
+    // once seeded from PLN User WPs several NM off the field; also repairs
+    // mislabeled ICAOs (e.g. SAVN was Neuquén coords).
     const catalog = CAREER_HUB_COORDS[icao];
-    if (
-      catalog &&
-      Number.isFinite(catalog.lat) &&
-      Number.isFinite(catalog.lon) &&
-      (Math.abs(terminal.lat - catalog.lat) > 1e-4 ||
-        Math.abs(terminal.lon - catalog.lon) > 1e-4)
-    ) {
-      terminal.lat = catalog.lat;
-      terminal.lon = catalog.lon;
+    if (catalog) {
+      if (
+        Number.isFinite(catalog.lat) &&
+        Number.isFinite(catalog.lon) &&
+        (Math.abs(terminal.lat - catalog.lat) > 1e-4 ||
+          Math.abs(terminal.lon - catalog.lon) > 1e-4)
+      ) {
+        terminal.lat = catalog.lat;
+        terminal.lon = catalog.lon;
+      }
+      if (catalog.name && terminal.name !== catalog.name) {
+        terminal.name = catalog.name;
+      }
     }
   }
   if (alreadyStamped) {

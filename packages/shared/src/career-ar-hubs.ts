@@ -358,7 +358,7 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
     ...agroSpoke,
   },
 
-  // ── AR-PA (9) ────────────────────────────────────────────────────────────
+  // ── AR-PA (10) ────────────────────────────────────────────────────────────
   {
     icao: 'SAZS',
     name: 'San Carlos de Bariloche',
@@ -370,7 +370,18 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
     consume: { perishables: 1.25, supplies: 1.15, electronics: 0.95 },
   },
   {
+    // Was wrongly labeled Neuquén (real ICAO SAZN) — ~180 nm inland of MSFS SAVN.
     icao: 'SAVN',
+    name: 'San Antonio Oeste Antoine de Saint Exupéry',
+    region: 'AR-PA',
+    hubTier: 'regional',
+    lat: -40.7511,
+    lon: -65.0343,
+    produce: { general: 1.1, supplies: 1.05, perishables: 1.15 },
+    consume: { machinery: 1.05, electronics: 0.95, supplies: 1.0 },
+  },
+  {
+    icao: 'SAZN',
     name: 'Neuquén Presidente Perón',
     region: 'AR-PA',
     hubTier: 'regional',
@@ -446,7 +457,7 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
   },
 ];
 
-export const AR_CAREER_HUB_COUNT = 40;
+export const AR_CAREER_HUB_COUNT = 41;
 
 export function buildArFeederCorridors(
   hubs: readonly ArCareerHubDef[] = AR_CAREER_HUBS,
@@ -479,7 +490,7 @@ export function assertArCareerHubCatalog(): void {
     'AR-BA': 13,
     'AR-CO': 9,
     'AR-NO': 9,
-    'AR-PA': 9,
+    'AR-PA': 10,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

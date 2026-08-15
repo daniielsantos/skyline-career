@@ -29,6 +29,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 1. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
 2. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+3. **SAVN hub bug (local):** catálogo AR tinha SAVN = Neuquén (~180 nm errados). Corrigido → San Antonio Oeste; SAZN = Neuquén. Requer restart/API rebuild (ou release) para migrate no save.
 
 ## Feito (local, sem release)
 

@@ -34,6 +34,12 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 - **SAVN hub:** catálogo AR tinha SAVN = Neuquén (~180 nm). Corrigido → San Antonio Oeste; **SAZN** = Neuquén. Migrate stamps lat/lon/name no load.
 
+## Feito (shipped 0.3.41)
+
+- **Brand Horizon:** accent `#f0a35a` + `BrandMark` (skyline bars + wordmark).
+- **Cruise burn:** filtra motores fantasma; outlier de flow não zera a janela.
+- **EN ROUTE live load:** tiles iguais Fuel/Payload/CG; stations = altura dos tanks; rail CG mais fino; header centrado de novo.
+
 ## Feito (shipped 0.3.40)
 
 - **EN ROUTE:** Aircraft/Origin full-width alinhados; Cancel flight com estilo display + header 2-col.

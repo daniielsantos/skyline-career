@@ -4,7 +4,8 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.40** (latest) | [v0.3.40](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.40) | EN ROUTE: Aircraft/Origin alinhados; Cancel restilizado |
+| **0.3.41** (latest) | [v0.3.41](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.41) | Brand Horizon; cruise burn spike fix; EN ROUTE live tiles |
+| **0.3.40** | [v0.3.40](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.40) | EN ROUTE: Aircraft/Origin alinhados; Cancel restilizado |
 | **0.3.39** | [v0.3.39](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.39) | Fix tela EN ROUTE em branco (flex staging-panel) |
 | **0.3.38** | [v0.3.38](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.38) | EN ROUTE: OFP/Cargo/live-load alinhados na mesma coluna |
 | **0.3.37** | [v0.3.37](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.37) | Route header limpo; EN ROUTE side sem scroll |
@@ -32,13 +33,6 @@
 `main` — handoff em `docs/agent-context/`.
 
 ## Local (ainda sem release)
-
-- **Brand Horizon (A):** `--accent: #f0a35a`; `BrandMark` = ícone skyline
-  (barras) + wordmark SKY/LINE; sidebar + ProfileGate.
-- **Cruise BURN spike / `Cruise 0s`:** soma só motores combusting /
-  `NUMBER OF ENGINES`; outlier de flow (>40%) não limpa a janela; tick
-  sem TAS/flow também não. Testes em `cruise-sample` + `sample-cruise-burn`.
-  Precisa release (ou hot-swap) pra validar no desktop instalado.
 
 - **0.3.24 shipped:** equal-first até limite real do envelope; leftover
   split L/R (mesmo arm, Δarm ≤2 ft, LEFT/RIGHT, indexes consecutivos).

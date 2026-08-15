@@ -34,6 +34,10 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 - **SAVN hub:** catálogo AR tinha SAVN = Neuquén (~180 nm). Corrigido → San Antonio Oeste; **SAZN** = Neuquén. Migrate stamps lat/lon/name no load.
 
+## Feito (shipped 0.3.38)
+
+- **EN ROUTE side:** OFP / Cargo / live-load no mesmo `dispatch-enroute-block`; títulos e grids na mesma coluna esquerda.
+
 ## Feito (shipped 0.3.37)
 
 - **Route header:** sem chips OD duplicados; hubs só com cor no texto da OFP.

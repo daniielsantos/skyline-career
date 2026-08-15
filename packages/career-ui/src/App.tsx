@@ -511,6 +511,16 @@ function formatMoney(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
+/** Player-facing route for an active dispatch (hide raw msn_… ids). */
+function activeFlightRouteLabel(mission: {
+  originIcao: string;
+  destIcao: string;
+}): string {
+  return `${mission.originIcao.trim().toUpperCase()}→${mission.destIcao
+    .trim()
+    .toUpperCase()}`;
+}
+
 /**
  * Load column: lot total (formation size). Claim / open remain in the tooltip
  * so Contracts do not look artificially capped at class max (~1.0 klb GA).
@@ -5063,7 +5073,7 @@ export function App() {
     }
     if (playerDispatchMission) {
       setError(
-        `Finish or cancel ${playerDispatchMission.id} in Dispatch before preparing another flight`,
+        `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch before preparing another flight`,
       );
       goToTab('staging');
       return;
@@ -8280,11 +8290,13 @@ export function App() {
                       ) : null}
                     </nav>
                     {playerDispatchMission && contractsLane === 'outbound' ? (
-                      <p className="banner warn">
-                        Active flight {playerDispatchMission.id} (
-                        {playerDispatchMission.originIcao}→
-                        {playerDispatchMission.destIcao}) — finish or cancel it
-                        in{' '}
+                      <p
+                        className="banner warn"
+                        title={playerDispatchMission.id}
+                      >
+                        Active flight{' '}
+                        {activeFlightRouteLabel(playerDispatchMission)} — finish
+                        or cancel it in{' '}
                         <button
                           type="button"
                           className="linkish"
@@ -8601,7 +8613,7 @@ export function App() {
                                       cargoLocked
                                         ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                                         : playerDispatchMission
-                                        ? `Finish or cancel ${playerDispatchMission.id} in Dispatch first`
+                                        ? `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch first`
                                         : lot.npcClaim?.crewNeeded
                                           ? lot.npcClaim.crewReposition
                                             ? 'Ferry empty aircraft home'
@@ -9065,10 +9077,9 @@ export function App() {
             />
           </div>
           {playerDispatchMission ? (
-            <p className="banner warn">
-              Active flight {playerDispatchMission.id} (
-              {playerDispatchMission.originIcao}→
-              {playerDispatchMission.destIcao}) — finish or cancel it in{' '}
+            <p className="banner warn" title={playerDispatchMission.id}>
+              Active flight {activeFlightRouteLabel(playerDispatchMission)} —
+              finish or cancel it in{' '}
               <button
                 type="button"
                 className="linkish"
@@ -9533,7 +9544,7 @@ export function App() {
                           cargoLocked
                             ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                             : playerDispatchMission
-                            ? `Finish or cancel ${playerDispatchMission.id} in Dispatch first`
+                            ? `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch first`
                             : fleet.length === 0 && !lot.npcClaim?.crewNeeded
                               ? 'Need an aircraft — fly Crew needed, or buy a starter'
                             : lot.npcClaim?.crewNeeded

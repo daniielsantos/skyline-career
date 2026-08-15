@@ -1361,16 +1361,18 @@ export function DispatchActivePanel(props: {
                                     : loc.originIcao}
                               </strong>
                               <small>
-                                {loc.ok
-                                  ? loc.distanceNm !== undefined
-                                    ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
-                                    : `≤${loc.radiusNm} nm`
-                                  : loc.distanceNm !== undefined
-                                    ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
-                                    : (check.findings.find(
-                                        (f) => f.code === loc.code,
-                                      )?.message ??
-                                      `need ≤${loc.radiusNm} nm at ${loc.originIcao}`)}
+                                {enRoute && loc.ok
+                                  ? 'Cleared at departure'
+                                  : loc.ok
+                                    ? loc.distanceNm !== undefined
+                                      ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
+                                      : `≤${loc.radiusNm} nm`
+                                    : loc.distanceNm !== undefined
+                                      ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
+                                      : (check.findings.find(
+                                          (f) => f.code === loc.code,
+                                        )?.message ??
+                                        `need ≤${loc.radiusNm} nm at ${loc.originIcao}`)}
                               </small>
                               <b>{loc.ok ? '✓' : '✕'}</b>
                             </div>

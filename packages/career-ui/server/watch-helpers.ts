@@ -2224,9 +2224,23 @@ export class CareerWatchSession {
           ? greatCircleDistanceNm(sample.position, originCoords)
           : undefined;
       const settleRadiusNm = this.opts.settleRadiusNm ?? 12;
-      // Always refresh status payload so the Origin card tracks MSFS moves /
-      // hub changes without waiting for a mission poll of lastPreflightCheck.
-      if (
+      // Origin card is a ramp gate. After wheels-up with a cleared latch, freeze
+      // the last on-ground OK — live distance going red as ORIGIN_NOT_ON_GROUND
+      // is noise once the flight has departed.
+      if (sample.onGround !== true && this.originClearedForDepart) {
+        if (
+          !this.lastOriginProximity ||
+          !this.lastOriginProximity.ok ||
+          this.lastOriginProximity.code === 'ORIGIN_NOT_ON_GROUND'
+        ) {
+          this.lastOriginProximity = {
+            ok: true,
+            originIcao: current.originIcao,
+            radiusNm: settleRadiusNm,
+            code: 'ORIGIN_OK',
+          };
+        }
+      } else if (
         typeof liveDistToOriginNm === 'number' &&
         originCoords &&
         sample.position

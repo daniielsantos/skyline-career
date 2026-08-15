@@ -45,7 +45,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 - Aerostar fill: se CG já passou FWD com só crew, colocar Due na metade aft (não cortar cargo). Envelope calibrado −15…15.
 - CG card: pinta envelope do perfil (calibrated-live), não SimVar FWD/AFT 0–100. Watch soft-refresh de `liveMac` (cap ~1.2s); envelope pinned do Validate.
 - Post-inject A2A: gate `PAYLOAD_NOT_APPLIED` lê `a2a-lvars` (não classic/MB); working plan sozinho não finge sucesso. Profile verify → `L:Character1Weight` + `L:BaggageWeight`.
-- Preflight origin proximity: live MSFS ≤12 nm do `originIcao` (mesmo raio do settle); `location.ok=false` → headline **NOT AT ORIGIN** (antes do voo), step fica em load, Watch **não** auto-decola. No solo o Watch relê distância e libera o latch ao chegar no hub (sem novo Validate).
+- Preflight origin proximity: live MSFS ≤12 nm do `originIcao` (mesmo raio do settle); `location.ok=false` → headline **NOT AT ORIGIN** (antes do voo), step fica em load, Watch **não** auto-decola. No solo o Watch relê distância e libera o latch ao chegar no hub (sem novo Validate). Após wheels-up com latch limpo, card Origin **congela** (não fica vermelho com ORIGIN_NOT_ON_GROUND).
 - Accu-Sim: **CTRL+E após inject** pode zerar Seat 1 / `Character1Weight` no EFB; start manual mantém. Não é write do Watch. Notas em `a2a-accusim.md` / Comanche / Aerostar. Comanche writePlan sem Character5/6.
 
 ## Não fazer sem pedido

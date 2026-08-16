@@ -86,6 +86,7 @@ import {
   settleMission,
   tickEconomyN,
   TICKS_PER_DAY,
+  benchEconomyTicks,
   type CommodityId,
   type ComplianceBaseline,
   type FreighterClassId,
@@ -1573,6 +1574,7 @@ async function main(): Promise<void> {
       console.log(`career commands:
   career init [--save path] [--seed s] [--reset]
   career tick [--n 24] [--save path]
+  career tick --bench [--seed s] [--skip-warm] [--json]
   career pulse [--save path] [--json]
   career pulse --days 7 [--every-days 1] [--write] [--out path] [--save path] [--json]
   career pulse --ticks 672 [--every 96] [--write] [--out path] [--save path] [--json]
@@ -1598,6 +1600,53 @@ async function main(): Promise<void> {
     }
 
     if (sub === 'tick') {
+      if (hasFlag(subArgs, '--bench')) {
+        const report = benchEconomyTicks({
+          seed: getFlag(subArgs, '--seed'),
+          skipWarm: hasFlag(subArgs, '--skip-warm'),
+        });
+        if (asJson) {
+          console.log(JSON.stringify(report, null, 2));
+          return;
+        }
+        const fmt = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
+        const pct = (part: number, total: number) =>
+          total <= 0 ? '0%' : `${((100 * part) / total).toFixed(1)}%`;
+        console.log(
+          `Economy tick bench  seed=${report.seed}  airports=${report.airports}  countries=${report.countries}  regions=${report.regions}  npcs=${report.npcs}`,
+        );
+        console.log(
+          `  warmTick=${report.warmTick}  lotsAfterWarm=${report.availableLotsAfterWarm}  lotsAfterDay=${report.availableLotsAfterDay}  npcInFlight=${report.npcFlightsInFlightAfterDay}`,
+        );
+        for (const [label, profile] of [
+          ['oneTick', report.oneTick],
+          ['oneDay', report.oneDay],
+        ] as const) {
+          const total = profile.ms.total;
+          console.log(
+            `  ${label}  ticks=${profile.ticks}  total=${fmt(total)}  avg=${(total / Math.max(1, profile.ticks)).toFixed(0)}ms/tick`,
+          );
+          for (const phase of [
+            'npc',
+            'formLots',
+            'production',
+            'fuel',
+            'settle',
+            'expire',
+            'escalate',
+            'events',
+            'hubLevels',
+            'ensure',
+          ] as const) {
+            const ms = profile.ms[phase];
+            if (ms < 1) continue;
+            console.log(
+              `    ${phase.padEnd(12)} ${fmt(ms).padStart(8)}  ${pct(ms, total)}`,
+            );
+          }
+        }
+        return;
+      }
       const world = await loadOrCreateCareerEconomy(savePath, {
         seed: getFlag(subArgs, '--seed'),
       });

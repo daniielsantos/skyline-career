@@ -7,6 +7,7 @@ import {
   type CareerEconomyWorld,
   type MarketLotView,
 } from './career-economy.js';
+import { invalidateLaneInboundIndex } from './career-lane-index.js';
 import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './career-aircraft-market.js';
 import {
   applyPlayerDepartFuel,
@@ -899,9 +900,13 @@ export function clearPlayerInbound(
   if (!Array.isArray(world.inboundPending) || world.inboundPending.length === 0) {
     return;
   }
+  const before = world.inboundPending.length;
   world.inboundPending = world.inboundPending.filter(
     (pending) => pending.missionId !== missionId,
   );
+  if (world.inboundPending.length !== before) {
+    invalidateLaneInboundIndex(world);
+  }
 }
 
 /**
@@ -935,6 +940,7 @@ export function syncPlayerInbound(
     source: 'player' as const,
   }));
   world.inboundPending.push(...rows);
+  invalidateLaneInboundIndex(world);
 }
 
 /** Rebuild player inbound from the missions file (source of truth). */
@@ -945,6 +951,7 @@ export function reconcilePlayerInbound(
   world.inboundPending = (world.inboundPending ?? []).filter(
     (pending) => pending.source !== 'player',
   );
+  invalidateLaneInboundIndex(world);
   for (const mission of missions) {
     syncPlayerInbound(world, mission);
   }

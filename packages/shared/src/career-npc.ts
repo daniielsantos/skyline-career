@@ -30,6 +30,13 @@ import {
   regionAverageHubLevel,
 } from './career-hub-level.js';
 import {
+  bumpLaneInboundIndex,
+  ensureLaneInboundIndex,
+  invalidateLaneInboundIndex,
+  laneInboundKgFromIndex,
+  type LaneInboundIndex,
+} from './career-lane-index.js';
+import {
   estimateRouteCargoLimit,
   getAircraftClass,
   listActivePlayerMissions,
@@ -588,9 +595,19 @@ export const HEAVY_FREIGHTER_CLASSES: ReadonlySet<FreighterClassId> = new Set([
  */
 export const LANE_SATURATION_KG = 90_000;
 
+export type { LaneInboundIndex };
+export {
+  bumpLaneInboundIndex,
+  buildLaneInboundIndex,
+  ensureLaneInboundIndex,
+  invalidateLaneInboundIndex,
+  laneInboundKgFromIndex,
+} from './career-lane-index.js';
+
 /**
  * kg currently in_flight on a specific origin→dest lane for a commodity.
  * Pass originIcao null/undefined to sum all inbound to dest (soft fill shadow).
+ * NPC flights only — for soft-fill + player pending use `laneInboundKg`.
  */
 export function npcLaneAirborneKg(
   world: CareerEconomyWorld,
@@ -650,9 +667,11 @@ export function laneInboundKg(
   destIcao: string,
   commodityId: CommodityId,
 ): number {
-  return (
-    npcLaneAirborneKg(world, originIcao, destIcao, commodityId) +
-    playerLaneInboundKg(world, originIcao, destIcao, commodityId)
+  return laneInboundKgFromIndex(
+    ensureLaneInboundIndex(world),
+    originIcao,
+    destIcao,
+    commodityId,
   );
 }
 
@@ -1903,6 +1922,8 @@ export function settleNpcOpsDue(
   nowMs = Date.now(),
 ): { settledFlights: number; promotedPilotOffers: number } {
   ensureNpcFleet(world);
+  // Flights leave in_flight here — drop lane index so the next formLots/bid rebuilds.
+  invalidateLaneInboundIndex(world);
   return settleNpcOpsDueCore(world, nowMs);
 }
 
@@ -1957,10 +1978,17 @@ export function scoreLotForNpc(
   pre?: {
     aircraft: ReturnType<typeof getAircraftClass>;
     maxCargoKg: number;
+    /** Lot ids with an open awaiting_pilot hold (built once per bid pass). */
+    awaitingPilotLotIds?: ReadonlySet<string>;
+    laneIndex?: LaneInboundIndex;
+    /** When set, skips a second routeDistanceNm lookup. */
+    distanceNm?: number;
   },
 ): number | null {
   // Player-exclusive Contract pool — other NPCs never bid while open.
-  if (
+  if (pre?.awaitingPilotLotIds) {
+    if (pre.awaitingPilotLotIds.has(lot.id)) return null;
+  } else if (
     world.npcFlights.some(
       (f) => f.lotId === lot.id && f.status === 'awaiting_pilot',
     )
@@ -1981,7 +2009,10 @@ export function scoreLotForNpc(
     }
   }
 
-  const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+  const dist =
+    typeof pre?.distanceNm === 'number' && Number.isFinite(pre.distanceNm)
+      ? pre.distanceNm
+      : routeDistanceNm(world, lot.originIcao, lot.destIcao);
   if (dist === undefined || dist > aircraft.maxRangeNm) return null;
 
   // Fuel/MTOW must allow a meaningful payload — class maxRange alone over-claims
@@ -2014,12 +2045,15 @@ export function scoreLotForNpc(
   const regionScore =
     originRegion === npc.homeRegion || destRegion === npc.homeRegion ? 0.4 : 0;
   const noise = (rng() - 0.5) * 0.22 * (1.05 - npc.reliability);
-  const laneSat = npcLaneSaturation(
-    world,
-    lot.originIcao,
-    lot.destIcao,
-    lot.commodityId,
-  );
+  const inboundKg = pre?.laneIndex
+    ? laneInboundKgFromIndex(
+        pre.laneIndex,
+        lot.originIcao,
+        lot.destIcao,
+        lot.commodityId,
+      )
+    : laneInboundKg(world, lot.originIcao, lot.destIcao, lot.commodityId);
+  const laneSat = Math.min(1, inboundKg / LANE_SATURATION_KG);
   // Leave crowded lanes for the player — Busy on the board should be a bid.
   const busyPenalty =
     laneSat >= LANE_BUSY_SATURATION ? laneSat * 0.65 : 0;
@@ -2182,6 +2216,13 @@ function claimLotForNpc(
   noteLotClaimed(world, lot.commodityId, reserved.reservedKg);
   noteNpcLeg(world, { flightHours, turnaroundHours });
   world.npcFlights.push(flight);
+  bumpLaneInboundIndex(
+    ensureLaneInboundIndex(world),
+    flight.originIcao,
+    flight.destIcao,
+    flight.commodityId,
+    flight.cargoKg,
+  );
   return flight;
 }
 
@@ -2726,6 +2767,31 @@ function npcBidOnMarket(
   const claimedLotIds = new Set(
     world.npcFlights.filter(isNpcFlightHoldingLot).map((f) => f.lotId),
   );
+  const awaitingPilotLotIds = new Set<string>();
+  for (const flight of world.npcFlights) {
+    if (flight.status === 'awaiting_pilot') {
+      awaitingPilotLotIds.add(flight.lotId);
+    }
+  }
+  const laneIndex = ensureLaneInboundIndex(world);
+  const regionCapacityCache = new Map<string, number>();
+  const regionCapacity = (region: string): number => {
+    let cached = regionCapacityCache.get(region);
+    if (cached === undefined) {
+      cached = npcRegionBidCapacity(world, region, batchNowMs);
+      regionCapacityCache.set(region, cached);
+    }
+    return cached;
+  };
+  const levelBidCache = new Map<string, number>();
+  const levelBidFor = (region: string): number => {
+    let cached = levelBidCache.get(region);
+    if (cached === undefined) {
+      cached = hubLevelNpcBidMult(regionAverageHubLevel(world, region));
+      levelBidCache.set(region, cached);
+    }
+    return cached;
+  };
 
   // One pass over the board — bidding used to re-scan every lot per idle NPC.
   const candidates: ShipmentLot[] = [];
@@ -2737,14 +2803,14 @@ function npcBidOnMarket(
   }
 
   for (const npc of idle) {
-    const regionCapacity = npcRegionBidCapacity(world, npc.homeRegion, batchNowMs);
+    const regionCap = regionCapacity(npc.homeRegion);
     const wx = regionalWeatherIndex(world, npc.homeRegion);
-    const levelBid = hubLevelNpcBidMult(regionAverageHubLevel(world, npc.homeRegion));
+    const levelBid = levelBidFor(npc.homeRegion);
     // Pulse @160: util ~55% with idle sitting out — raise attempt rate and keep a
     // higher floor when home-region capacity is thin (was self-starving bids).
     const bidChance =
       (0.34 + npc.aggressiveness * 0.58) *
-      (0.58 + 0.42 * regionCapacity) *
+      (0.58 + 0.42 * regionCap) *
       regionalWeatherBidMult(wx) *
       levelBid;
     if (rng() > bidChance) continue;
@@ -2754,15 +2820,22 @@ function npcBidOnMarket(
     const aircraft = getAircraftClass(npc.aircraftClassId);
     const maxCargoKg = npcMaxCargoKg(npc);
     const threshold = 0.48 + npc.reliability * 0.28 - npc.aggressiveness * 0.22;
+    const maxRangeNm = aircraft.maxRangeNm;
 
     let best: { lot: ShipmentLot; score: number } | undefined;
     for (const lot of candidates) {
       if (claimedLotIds.has(lot.id)) continue;
       if (lotAvailableKg(lot) <= 0) continue;
+      // Cheap reject before full score (same gate as scoreLotForNpc).
+      const dist = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+      if (dist === undefined || dist > maxRangeNm) continue;
 
       const score = scoreLotForNpc(world, npc, lot, rng, {
         aircraft,
         maxCargoKg,
+        awaitingPilotLotIds,
+        laneIndex,
+        distanceNm: dist,
       });
       if (score === null) continue;
       if (score < threshold) continue;
@@ -2775,6 +2848,9 @@ function npcBidOnMarket(
     const flight = claimLotForNpc(world, npc, best.lot, batchNowMs, rng);
     if (flight) {
       claimedLotIds.add(best.lot.id);
+      if (flight.status === 'awaiting_pilot') {
+        awaitingPilotLotIds.add(best.lot.id);
+      }
     }
   }
 }

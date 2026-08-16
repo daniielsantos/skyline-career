@@ -211,6 +211,7 @@ import {
 import {
   ensureNpcFleet,
   listNpcActivity,
+  listNpcHomeRegions,
   npcClaimForLot,
   laneInboundKg,
   npcLaneSaturation,
@@ -220,6 +221,7 @@ import {
   seedNpcFleet,
   settleNpcOpsDue,
   tickNpcFreighters,
+  ensureLaneInboundIndex,
   LANE_BUSY_SATURATION,
   LANE_BUSY_PAY_SLOPE,
   THIN_FLEET_PAY_SLOPE,
@@ -247,7 +249,6 @@ import {
   noteWarehouseFlow,
 } from './career-economy-flow.js';
 import {
-  activeLaneKg,
   countryIdFromRegion,
   ensureHomeCountryId,
   isDomesticOd,
@@ -4832,6 +4833,8 @@ function formLotsFromImbalances(
   rng: () => number,
 ): PartitionTickResult[] {
   ensureInternationalLanes(world);
+  // Warm lane inbound index once for this tick's saturation / soft-fill reads.
+  ensureLaneInboundIndex(world);
 
   const countryByIcao = countryByIcaoMap(world);
   const activeCounts = new Map<string, number>();
@@ -4839,6 +4842,16 @@ function formLotsFromImbalances(
   const largeCounts = new Map<string, number>();
   const smallCounts = new Map<string, number>();
   const availableCounts = countAvailableLots(world, countryByIcao);
+  /** Undirected OD → active lot kg (same semantics as activeLaneKg). */
+  const activeLaneKgByOd = new Map<string, number>();
+  const undirectedOdKey = (a: string, b: string): string => {
+    const o = a.trim().toUpperCase();
+    const d = b.trim().toUpperCase();
+    return o < d ? `${o}|${d}` : `${d}|${o}`;
+  };
+  const activeKgOnOd = (originIcao: string, destIcao: string): number =>
+    activeLaneKgByOd.get(undirectedOdKey(originIcao, destIcao)) ?? 0;
+
   for (const l of world.lots) {
     if (l.status !== 'available' && l.status !== 'reserved' && l.status !== 'in_transit') {
       continue;
@@ -4869,10 +4882,38 @@ function formLotsFromImbalances(
     smallCounts,
   );
 
+  // After recycle so active OD kg matches the live board.
+  for (const l of world.lots) {
+    if (l.status !== 'available' && l.status !== 'reserved' && l.status !== 'in_transit') {
+      continue;
+    }
+    const odKey = undirectedOdKey(l.originIcao, l.destIcao);
+    activeLaneKgByOd.set(odKey, (activeLaneKgByOd.get(odKey) ?? 0) + l.quantityKg);
+  }
+
   const formedByPartition = new Map<string, number>();
   const bumpFormed = (partitionId: string, n = 1) => {
     formedByPartition.set(partitionId, (formedByPartition.get(partitionId) ?? 0) + n);
   };
+
+  const batchNowMs = world.lastBatchAtMs ?? Date.now();
+  const regionCapacityCache = new Map<string, number>();
+  const regionCapacity = (region: string): number => {
+    let cached = regionCapacityCache.get(region);
+    if (cached === undefined) {
+      cached = npcRegionBidCapacity(world, region, batchNowMs);
+      regionCapacityCache.set(region, cached);
+    }
+    return cached;
+  };
+
+  const airportsByCountry = new Map<string, AirportTerminal[]>();
+  for (const ap of world.airports) {
+    const id = countryIdFromRegion(ap.region);
+    const list = airportsByCountry.get(id);
+    if (list) list.push(ap);
+    else airportsByCountry.set(id, [ap]);
+  }
 
   const pushLot = (
     key: string,
@@ -4894,7 +4935,7 @@ function formLotsFromImbalances(
     },
   ): boolean => {
     if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
-      const activeKg = activeLaneKg(world, origin.ap.icao, dest.ap.icao);
+      const activeKg = activeKgOnOd(origin.ap.icao, dest.ap.icao);
       if (activeKg + qty > opts.capacityKgPerDay) {
         return false;
       }
@@ -4934,8 +4975,7 @@ function formLotsFromImbalances(
       rawGap,
       commodity.basePricePerKg * (opts.minPayGapMult ?? 0),
     );
-    const batchNowMs = world.lastBatchAtMs ?? Date.now();
-    const capacity = npcRegionBidCapacity(world, origin.ap.region, batchNowMs);
+    const capacity = regionCapacity(origin.ap.region);
     const capacityPayMult = 1 + (1 - capacity) * THIN_FLEET_PAY_SLOPE;
     const scarcePayMult =
       laneSaturation >= LANE_BUSY_SATURATION
@@ -5008,6 +5048,8 @@ function formLotsFromImbalances(
       origin.stock.capacityKg,
     );
     world.lots.push(lot);
+    const odKey = undirectedOdKey(origin.ap.icao, dest.ap.icao);
+    activeLaneKgByOd.set(odKey, (activeLaneKgByOd.get(odKey) ?? 0) + qty);
     recordLotFormationActivity(world, origin.ap.icao, dest.ap.icao);
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
     noteAvailableLot(availableCounts, commodity.id, opts.partitionId, qty, 1);
@@ -5075,7 +5117,7 @@ function formLotsFromImbalances(
     if (priceGap < commodity.basePricePerKg * minGapMult) return;
 
     if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
-      if (activeLaneKg(world, origin.ap.icao, dest.ap.icao) >= opts.capacityKgPerDay) {
+      if (activeKgOnOd(origin.ap.icao, dest.ap.icao) >= opts.capacityKgPerDay) {
         return;
       }
     }
@@ -5200,9 +5242,7 @@ function formLotsFromImbalances(
 
   // --- Domestic: one pass per country present in the world ---
   for (const countryId of listWorldCountryIds(world)) {
-    const countryAirports = world.airports.filter(
-      (ap) => countryIdFromRegion(ap.region) === countryId,
-    );
+    const countryAirports = airportsByCountry.get(countryId) ?? [];
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       const ranked = rankAirports(countryAirports, commodity);
       // Rank by fill pressure, not absolute kg. Absolute room/surplus is a proxy
@@ -5337,28 +5377,25 @@ function formLotsFromImbalances(
     }
   }
 
+  const openGaDryByOrigin = new Map<string, number>();
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+    if (lot.quantityKg > GA_LTL_MAX_KG) continue;
+    if (!LAST_MILE_DRY_IDS.has(lot.commodityId)) continue;
+    const key = `${lot.originIcao.toUpperCase()}|${lot.commodityId}`;
+    openGaDryByOrigin.set(key, (openGaDryByOrigin.get(key) ?? 0) + 1);
+  }
   const countOpenGaDryFrom = (
     originIcao: string,
     commodityId: CommodityId,
   ): number => {
-    const icao = originIcao.toUpperCase();
-    let n = 0;
-    for (const lot of world.lots) {
-      if (lot.originIcao.toUpperCase() !== icao) continue;
-      if (lot.commodityId !== commodityId) continue;
-      if (lot.status !== 'available' && lot.status !== 'reserved') continue;
-      if (lot.quantityKg > GA_LTL_MAX_KG) continue;
-      n += 1;
-    }
-    return n;
+    return openGaDryByOrigin.get(`${originIcao.toUpperCase()}|${commodityId}`) ?? 0;
   };
 
   // Last-mile Dry: metros stay net sinks in the bulk pass, but still break
   // bulk to nearby spokes so a starter at GRU/JFK has a GA Dry contract.
   for (const countryId of listWorldCountryIds(world)) {
-    const countryAirports = world.airports.filter(
-      (ap) => countryIdFromRegion(ap.region) === countryId,
-    );
+    const countryAirports = airportsByCountry.get(countryId) ?? [];
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       if (!LAST_MILE_DRY_IDS.has(commodity.id)) continue;
       const ranked = rankAirports(countryAirports, commodity);
@@ -5428,6 +5465,14 @@ function formLotsFromImbalances(
             continue;
           }
           if ((smallCounts.get(key) ?? 0) >= caps.maxSmall) continue;
+
+          const boardPressure = commodityBoardBloated(
+            world,
+            availableCounts,
+            commodity.id,
+            countryId,
+          );
+          if (boardPressure.skipAll) break;
 
           const take = Math.min(
             origin.stock.stockKg * (origin.tier === 'spoke' ? 0.5 : 0.08),
@@ -5521,11 +5566,67 @@ function formLotsFromImbalances(
   return results;
 }
 
+/** Optional per-phase ms accumulator for tick profiling (bench / CLI). */
+export type TickPhaseId =
+  | 'ensure'
+  | 'settle'
+  | 'production'
+  | 'fuel'
+  | 'expire'
+  | 'escalate'
+  | 'events'
+  | 'formLots'
+  | 'npc'
+  | 'hubLevels'
+  | 'total';
+
+export type TickPhaseProfile = {
+  ticks: number;
+  ms: Record<TickPhaseId, number>;
+};
+
+export function createEmptyTickPhaseProfile(): TickPhaseProfile {
+  return {
+    ticks: 0,
+    ms: {
+      ensure: 0,
+      settle: 0,
+      production: 0,
+      fuel: 0,
+      expire: 0,
+      escalate: 0,
+      events: 0,
+      formLots: 0,
+      npc: 0,
+      hubLevels: 0,
+      total: 0,
+    },
+  };
+}
+
+function addTickPhaseMs(
+  profile: TickPhaseProfile | undefined,
+  phase: TickPhaseId,
+  startedAt: number,
+): void {
+  if (!profile) return;
+  profile.ms[phase] += performance.now() - startedAt;
+}
+
 /** Advance the local economy by one hourly batch. Mutates and returns the world. */
 export function tickEconomy(
   world: CareerEconomyWorld,
-  opts: { rngSeed?: string; batchNowMs?: number } = {},
+  opts: {
+    rngSeed?: string;
+    batchNowMs?: number;
+    /** When set, accumulates wall ms per phase (does not change sim behavior). */
+    profile?: TickPhaseProfile;
+  } = {},
 ): CareerEconomyWorld {
+  const profile = opts.profile;
+  const tickStartedAt = performance.now();
+  let phaseAt = tickStartedAt;
+
   if (
     (world as { version?: number }).version !== 3 ||
     !Array.isArray(world.events) ||
@@ -5558,6 +5659,8 @@ export function tickEconomy(
   ensureWorldHubLevels(world);
   ensureInternationalLanes(world);
   ensureHomeCountryId(world);
+  addTickPhaseMs(profile, 'ensure', phaseAt);
+  phaseAt = performance.now();
 
   const batchNowMs =
     opts.batchNowMs ??
@@ -5566,18 +5669,47 @@ export function tickEconomy(
   // bid pressure see the post-arrival board (also avoids a second settle in NPC tick).
   settleNpcOpsDue(world, batchNowMs);
   settleFuelHaulsDue(world, batchNowMs);
+  addTickPhaseMs(profile, 'settle', phaseAt);
+  phaseAt = performance.now();
 
   world.tick += 1;
   const rng = mulberry32(hashSeed(`${opts.rngSeed ?? world.seed}:t${world.tick}`));
 
   applyProductionConsumption(world, rng);
+  addTickPhaseMs(profile, 'production', phaseAt);
+  phaseAt = performance.now();
+
   tickFuelLogistics(world, rng, { batchNowMs });
+  addTickPhaseMs(profile, 'fuel', phaseAt);
+  phaseAt = performance.now();
+
   expireLots(world);
+  addTickPhaseMs(profile, 'expire', phaseAt);
+  phaseAt = performance.now();
+
   escalateIdleLots(world);
+  addTickPhaseMs(profile, 'escalate', phaseAt);
+  phaseAt = performance.now();
+
   maybeSpawnEvents(world, rng);
+  addTickPhaseMs(profile, 'events', phaseAt);
+  phaseAt = performance.now();
+
   formLotsFromImbalances(world, rng);
+  addTickPhaseMs(profile, 'formLots', phaseAt);
+  phaseAt = performance.now();
+
   tickNpcFreighters(world, rng, { batchNowMs });
+  addTickPhaseMs(profile, 'npc', phaseAt);
+  phaseAt = performance.now();
+
   tickHubLevels(world);
+  addTickPhaseMs(profile, 'hubLevels', phaseAt);
+
+  if (profile) {
+    profile.ticks += 1;
+    profile.ms.total += performance.now() - tickStartedAt;
+  }
 
   return world;
 }
@@ -5634,7 +5766,11 @@ export function shiftEconomyWallClock(
 export function tickEconomyN(
   world: CareerEconomyWorld,
   n: number,
-  opts: { advanceWallClock?: boolean; fromBatchAtMs?: number } = {},
+  opts: {
+    advanceWallClock?: boolean;
+    fromBatchAtMs?: number;
+    profile?: TickPhaseProfile;
+  } = {},
 ): CareerEconomyWorld {
   const steps = Math.max(0, Math.floor(n));
   const advanceWall = opts.advanceWallClock !== false;
@@ -5657,7 +5793,7 @@ export function tickEconomyN(
 
   for (let i = 0; i < steps; i++) {
     const batchNowMs = startBatch + (i + 1) * MS_PER_TICK;
-    tickEconomy(world, { batchNowMs });
+    tickEconomy(world, { batchNowMs, profile: opts.profile });
   }
 
   if (advanceWall && steps > 0) {
@@ -5668,6 +5804,74 @@ export function tickEconomyN(
   ensureNpcFleet(world);
   ensureFuelTruckFleet(world);
   return world;
+}
+
+export type EconomyTickBenchReport = {
+  seed: string;
+  airports: number;
+  countries: number;
+  regions: number;
+  npcs: number;
+  fuelTrucks: number;
+  /** After warm day (or 0 if warm skipped). */
+  warmTick: number;
+  availableLotsAfterWarm: number;
+  /** Profiled single tick after warm. */
+  oneTick: TickPhaseProfile;
+  /** Profiled +1 day (96 ticks) after the one-tick sample. */
+  oneDay: TickPhaseProfile;
+  availableLotsAfterDay: number;
+  npcFlightsInFlightAfterDay: number;
+};
+
+/**
+ * In-memory timing harness: warm one day (unprofiled), then profile 1 tick + 96 ticks.
+ * Does not change economy rules — only measures wall time.
+ */
+export function benchEconomyTicks(opts: {
+  seed?: string;
+  /** Skip the unprofiled warm day (measures cold first day instead for oneDay). */
+  skipWarm?: boolean;
+} = {}): EconomyTickBenchReport {
+  const world = createSeedEconomyWorld({ seed: opts.seed });
+  const regions = listNpcHomeRegions(world.airports);
+
+  if (!opts.skipWarm) {
+    ensureSeedMarketFormed(world);
+  }
+
+  const warmTick = world.tick;
+  const availableLotsAfterWarm = world.lots.filter(
+    (l) => l.status === 'available' && l.quantityKg > l.reservedKg,
+  ).length;
+
+  const oneTick = createEmptyTickPhaseProfile();
+  tickEconomyN(world, 1, { advanceWallClock: false, profile: oneTick });
+
+  const oneDay = createEmptyTickPhaseProfile();
+  tickEconomyN(world, TICKS_PER_DAY, {
+    advanceWallClock: false,
+    profile: oneDay,
+  });
+
+  return {
+    seed: world.seed,
+    airports: world.airports.length,
+    countries: listWorldCountryIds(world).length,
+    regions: regions.length,
+    npcs: world.npcs?.length ?? 0,
+    fuelTrucks: world.fuelTrucks?.length ?? 0,
+    warmTick,
+    availableLotsAfterWarm,
+    oneTick,
+    oneDay,
+    availableLotsAfterDay: world.lots.filter(
+      (l) => l.status === 'available' && l.quantityKg > l.reservedKg,
+    ).length,
+    npcFlightsInFlightAfterDay: (world.npcFlights ?? []).filter(
+      (f) => f.status === 'in_flight',
+    ).length,
+  };
 }
 
 /**

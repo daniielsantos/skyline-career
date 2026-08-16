@@ -55,6 +55,7 @@ import {
   pruneDeadLots,
   routeDistanceNm,
   tickEconomyN,
+  createEmptyTickPhaseProfile,
   LARGE_LOT_MAX_KG,
   LANE_SATURATION_KG,
   XL_CORRIDOR_MIN_WEIGHT,
@@ -830,6 +831,17 @@ describe('tickEconomyN market formation', () => {
       assert.match(row.lot.reason, /surplus|shortage/i);
       // Live fill can drift after formation (prod/cons + NPC); reason is stamped at create.
     }
+  });
+
+  it('tickEconomy profile accumulates phase ms without changing tick count', () => {
+    const world = createSeedEconomyWorld({ seed: 'tick-profile' });
+    const profile = createEmptyTickPhaseProfile();
+    tickEconomyN(world, 2, { advanceWallClock: false, profile });
+    assert.equal(profile.ticks, 2);
+    assert.equal(world.tick, 2);
+    assert.ok(profile.ms.total > 0);
+    assert.ok(profile.ms.formLots >= 0);
+    assert.ok(profile.ms.npc >= 0);
   });
 
   it('ensureSeedMarketFormed warms an empty tick-0 board once', () => {

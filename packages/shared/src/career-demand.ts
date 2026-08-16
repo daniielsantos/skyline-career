@@ -54,8 +54,11 @@ export const DEMAND_STOCK_FRAC_THRESHOLD = 0.25;
 /** Soft max open orders per destination hub. */
 export const DEMAND_ORDERS_PER_HUB = 2;
 
-/** Soft cap of open board rows worldwide (keeps Ports GET snappy). */
-export const DEMAND_ORDERS_GLOBAL_CAP = 48;
+/**
+ * Soft cap of open board rows worldwide (keeps Ports GET snappy).
+ * Sized for multi-country hub maps competing for terminal demand.
+ */
+export const DEMAND_ORDERS_GLOBAL_CAP = 96;
 
 /** Premium on local spot for max unit price (rng in range). */
 export const DEMAND_PRICE_PREMIUM_MIN = 1.05;

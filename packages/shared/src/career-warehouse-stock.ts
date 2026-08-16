@@ -270,6 +270,41 @@ export function withdrawCargoFromWarehouse(
   };
 }
 
+/**
+ * Non-mutating FIFO cost preview (same order as withdrawCargoFromWarehouse).
+ * Returns null when needKg <= 0 or stock is insufficient.
+ */
+export function previewWithdrawCargoCost(
+  piles: ReadonlyArray<{
+    kg: number;
+    avgCostUsdPerKg: number;
+    acquiredAtTick: number;
+  }>,
+  needKg: number,
+): { kg: number; avgCostUsdPerKg: number; costUsd: number } | null {
+  const need = Math.max(0, Math.floor(needKg));
+  if (need <= 0) return null;
+  const ordered = [...piles]
+    .filter((p) => p.kg > 0)
+    .sort((a, b) => a.acquiredAtTick - b.acquiredAtTick);
+  const available = ordered.reduce((s, p) => s + p.kg, 0);
+  if (available < need) return null;
+  let left = need;
+  let costSum = 0;
+  for (const pile of ordered) {
+    if (left <= 0) break;
+    const take = Math.min(pile.kg, left);
+    costSum += pile.avgCostUsdPerKg * take;
+    left -= take;
+  }
+  const avgCostUsdPerKg = money(costSum / need);
+  return {
+    kg: need,
+    avgCostUsdPerKg,
+    costUsd: money(avgCostUsdPerKg * need),
+  };
+}
+
 /** Drop a warehouse stock lot (no refund) to free capacity. */
 export function abandonWarehouseStock(
   state: CareerMissionsState,

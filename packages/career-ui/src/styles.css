@@ -6715,6 +6715,49 @@ button.linkish {
   cursor: default;
 }
 
+.demand-accept-pull {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.demand-accept-pull-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.demand-accept-pull-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: 0.45rem 0.75rem;
+  margin: 0 0 0.4rem;
+}
+
+.demand-accept-pull-grid dt {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.demand-accept-pull-grid dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.demand-accept-margin-pos {
+  color: var(--ok, #6fbf73);
+}
+
+.demand-accept-margin-neg {
+  color: var(--danger, #e07070);
+}
+
 .confirm-quote {
   margin: 0;
   color: var(--ink);
@@ -7588,6 +7631,43 @@ span.dispatch-route-hub-dest {
   min-height: 0;
 }
 
+.ports-loop-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ports-loop-banner-text {
+  margin: 0;
+  flex: 1 1 14rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.ports-loop-banner-cta {
+  flex: 0 0 auto;
+}
+
+.ports-loop-section-hint {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.ports-yard-aging td {
+  background: rgba(201, 162, 39, 0.08);
+}
+
+.ports-yard-held-warn {
+  color: var(--warn, #c9a227);
+  font-weight: 650;
+}
+
 .ports-panel h3 {
   margin: 1rem 0 0.4rem;
   font-size: 0.95rem;
@@ -8011,6 +8091,57 @@ span.dispatch-route-hub-dest {
 .ports-listings .data-table td:first-child,
 .ports-panel .data-table .commodity-cell {
   white-space: normal;
+}
+
+.ports-world-catalog {
+  margin-top: 0.85rem;
+}
+
+.ports-world-catalog-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.ports-world-list-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(12, 12, 14, 0.45);
+  overflow: auto;
+}
+
+.ports-world-list {
+  font-size: 0.86rem;
+  margin: 0;
+}
+
+.ports-world-list th,
+.ports-world-list td {
+  padding: 0.4rem 0.65rem;
+  white-space: nowrap;
+}
+
+.ports-world-row {
+  cursor: pointer;
+}
+
+.ports-world-row:hover {
+  background: rgba(240, 163, 90, 0.08);
+}
+
+.ports-world-row.is-selected {
+  background: rgba(240, 163, 90, 0.16);
+}
+
+.ports-world-row.is-selected td {
+  border-color: rgba(240, 163, 90, 0.2);
+}
+
+.ports-world-row-country {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(240, 163, 90, 0.95);
 }
 
 .ports-map {

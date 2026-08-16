@@ -86,6 +86,8 @@ export function PortsMap(props: {
   selectedPortId?: string | null;
   /** Hub ICAO to emphasize (warehouse / stock selection). */
   highlightedHubIcao?: string | null;
+  /** Bump to re-run camera focus even when selectedPortId is unchanged. */
+  focusToken?: number;
   onSelectPort?: (portId: string) => void;
   onSelectHub?: (icao: string) => void;
   className?: string;
@@ -382,6 +384,41 @@ export function PortsMap(props: {
           zoom: 7.4,
           duration: 550,
         });
+      } else if (selectedId) {
+        // Zoom into the selected port (+ feeders), not fitBounds of the whole catalog
+        // (AR/CL/US/BR spans the Americas and felt like a zoom-out on click).
+        const selected = props.ports.find(
+          (p) => p.id.toUpperCase() === selectedId,
+        );
+        if (selected && hasCoords(selected.lat, selected.lon)) {
+          const selBounds = new LngLatBounds([selected.lon, selected.lat], [
+            selected.lon,
+            selected.lat,
+          ]);
+          for (const hub of selected.pickupHubDetails ?? []) {
+            if (hasCoords(hub.lat, hub.lon)) {
+              selBounds.extend([hub.lon, hub.lat]);
+            }
+          }
+          const ne = selBounds.getNorthEast();
+          const sw = selBounds.getSouthWest();
+          const tight =
+            Math.abs(ne.lng - sw.lng) < 0.02 &&
+            Math.abs(ne.lat - sw.lat) < 0.02;
+          if (tight) {
+            map.easeTo({
+              center: [selected.lon, selected.lat],
+              zoom: 7.5,
+              duration: 550,
+            });
+          } else {
+            map.fitBounds(selBounds, {
+              padding: { top: 56, bottom: 56, left: 56, right: 56 },
+              maxZoom: 8,
+              duration: 550,
+            });
+          }
+        }
       } else if (props.ports.length === 1 && ownedList.length === 0) {
         const only = props.ports[0]!;
         map.easeTo({
@@ -404,6 +441,7 @@ export function PortsMap(props: {
     props.ports,
     props.selectedPortId,
     props.highlightedHubIcao,
+    props.focusToken,
     // Stabilize: identity of FBO set, not a fresh [] each parent render.
     (props.ownedFbos ?? []).map((f) => f.id).join(','),
   ]);

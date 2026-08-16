@@ -20,6 +20,12 @@ import { PortsMap } from './PortsMap';
 import { CommodityIcon } from './CommodityIcon';
 import { useConfirm } from './ConfirmDialog';
 import {
+  derivePortsLoopStep,
+  portsLoopTargetSection,
+  type PortsLoopStep,
+} from './ports-loop-guidance';
+import { previewDemandAcceptPull } from './demand-accept-preview';
+import {
   displayToKg,
   KG_TO_LB,
   kgToDisplay,
@@ -29,6 +35,23 @@ import {
 
 /** Mirror of shared WAREHOUSE_T1_CAPACITY_KG (client must not import shared). */
 const WH_T1_CAPACITY_KG = 5_000;
+/** Mirror of shared PORT_YARD_HOLD_* (client must not import shared). */
+const YARD_HOLD_USD_PER_KG_DAY = 0.05;
+const YARD_HOLD_VALUE_MULT = 2;
+const YARD_HOLD_WARN_DAYS = 2;
+
+function yardHoldUsdPerKgDay(commodityId: string): number {
+  if (commodityId === 'electronics' || commodityId === 'machinery') {
+    return YARD_HOLD_USD_PER_KG_DAY * YARD_HOLD_VALUE_MULT;
+  }
+  return YARD_HOLD_USD_PER_KG_DAY;
+}
+
+function yardHoldUsdPerDay(kg: number, commodityId: string): number {
+  const mass = Math.max(0, kg);
+  if (mass <= 0) return 0;
+  return Math.round(mass * yardHoldUsdPerKgDay(commodityId) * 100) / 100;
+}
 
 function commodityLabel(
   row: { commodityId: string; commodityName?: string },
@@ -37,6 +60,7 @@ function commodityLabel(
 }
 
 const DEMAND_PAGE_SIZE = 10;
+const WORLD_PORTS_PAGE_SIZE = 5;
 /** 1 economy tick = 15 wall-clock minutes. */
 const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
@@ -115,12 +139,86 @@ function compareDemandOrders(
   return sort.direction === 'asc' ? cmp : -cmp;
 }
 
+function portsLoopMessage(
+  step: PortsLoopStep,
+  formatTonnes: (kg: number) => string,
+  formatMoney: (n: number) => string,
+  yardHoldUsdPerDayTotal?: number,
+): string {
+  switch (step.kind) {
+    case 'buy_warehouse':
+      return 'Buy a warehouse at a port pickup hub before cargo can leave the yard.';
+    case 'store_yard': {
+      const fee =
+        yardHoldUsdPerDayTotal != null && yardHoldUsdPerDayTotal > 0
+          ? yardHoldUsdPerDayTotal
+          : step.holdUsdPerDay;
+      const feeBit =
+        fee > 0 ? ` Yard holding ${formatMoney(fee)}/day.` : '';
+      return `Store ${formatTonnes(step.kg)} of ${commodityLabel(step)} from yard at ${step.hubIcao} into your warehouse.${feeBit}`;
+    }
+    case 'fulfill_demand':
+      return step.matchCount === 1
+        ? '1 Demand order matches your warehouse stock — accept to stage a flight.'
+        : `${step.matchCount} Demand orders match your warehouse stock — accept to stage a flight.`;
+    case 'wait_demand':
+      return 'Stock is ready — Demand Board posts when hub terminals run low.';
+    case 'buy_port':
+      return 'Buy factory cargo at a seaport to start the loop.';
+  }
+}
+
+function portsLoopCtaLabel(step: PortsLoopStep): string | null {
+  switch (step.kind) {
+    case 'buy_warehouse':
+      return 'Open warehouses';
+    case 'store_yard':
+      return 'Open yard';
+    case 'fulfill_demand':
+      return 'Open Demand Board';
+    case 'wait_demand':
+      return null; // filled in when board has orders
+    case 'buy_port':
+      return 'Open catalog';
+  }
+}
+
+function portsLoopSectionHint(
+  step: PortsLoopStep,
+  formatMoney?: (n: number) => string,
+  yardHoldUsdPerDayTotal?: number,
+): string {
+  switch (step.kind) {
+    case 'buy_warehouse':
+      return 'Next: buy warehouse space on Available, then store yard cargo here.';
+    case 'store_yard': {
+      const fee =
+        yardHoldUsdPerDayTotal != null && yardHoldUsdPerDayTotal > 0
+          ? yardHoldUsdPerDayTotal
+          : step.holdUsdPerDay;
+      const feeBit =
+        fee > 0 && formatMoney
+          ? ` Yard is charging ${formatMoney(fee)}/day until you Store.`
+          : '';
+      return `Next: use Store on a yard lot below to move cargo into the warehouse.${feeBit}`;
+    }
+    case 'fulfill_demand':
+      return 'Next: accept a matching order to pull stock from your warehouse and stage a flight.';
+    case 'wait_demand':
+      return 'Your stock is waiting — check back when hubs post Demand orders.';
+    case 'buy_port':
+      return 'Next: pick a listing and buy into a warehouse (overflow goes to yard).';
+  }
+}
+
 export function PortsPanel(props: {
   busy?: boolean;
   weightSystem: WeightSystem;
   formatMoney: (n: number) => string;
   formatTonnes: (kg: number) => string;
   fleet: PlayerAircraft[];
+  /** Aircraft cargo ceiling (kg); 0 = treat as unlimited for preview. */
+  resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   economyTick?: number;
   cargoOps?: CareerCargoOps | null;
   onOpenCargoOps?: () => void;
@@ -137,6 +235,7 @@ export function PortsPanel(props: {
     null,
   );
   const [portId, setPortId] = useState<string | null>(null);
+  const [mapFocusToken, setMapFocusToken] = useState(0);
   const [buyListing, setBuyListing] = useState<PortListingView | null>(null);
   const [amountText, setAmountText] = useState('1000');
   const [acceptOrder, setAcceptOrder] = useState<DemandOrderView | null>(null);
@@ -161,6 +260,7 @@ export function PortsPanel(props: {
     direction: 'asc',
   });
   const [demandPage, setDemandPage] = useState(1);
+  const [worldPortsPage, setWorldPortsPage] = useState(1);
 
   const unit = massUnitLabel(props.weightSystem);
 
@@ -297,6 +397,38 @@ export function PortsPanel(props: {
     acceptOriginOptions.find((o) => o.icao === acceptOrigin.trim().toUpperCase())
       ?.stockKg ?? 0;
 
+  const acceptPullPreview = useMemo(() => {
+    if (!acceptOrder || !acceptOrigin) return null;
+    const origin = acceptOrigin.trim().toUpperCase();
+    const originRow = acceptOriginOptions.find((o) => o.icao === origin);
+    if (!originRow || originRow.stockKg <= 0) return null;
+    const aircraft = props.fleet.find((a) => a.id === acceptAircraftId);
+    const maxCargoKg = aircraft
+      ? Math.max(0, props.resolveMaxCargoKg?.(aircraft) ?? 0)
+      : 0;
+    const lots = (warehouses?.stock ?? []).filter(
+      (s) =>
+        s.warehouseId === originRow.warehouseId &&
+        s.commodityId === acceptOrder.commodityId &&
+        s.kg > 0,
+    );
+    return previewDemandAcceptPull({
+      remainingKg: acceptOrder.remainingKg,
+      stockKg: originRow.stockKg,
+      maxCargoKg,
+      maxUnitPriceUsd: acceptOrder.maxUnitPriceUsd,
+      lots,
+    });
+  }, [
+    acceptOrder,
+    acceptOrigin,
+    acceptAircraftId,
+    acceptOriginOptions,
+    warehouses?.stock,
+    props.fleet,
+    props.resolveMaxCargoKg,
+  ]);
+
   function openBuyModal(listing: PortListingView) {
     if (isCargoOpsCommodityLocked(listing.commodityId)) {
       props.onToast?.(
@@ -315,6 +447,12 @@ export function PortsPanel(props: {
 
   function closeBuyModal() {
     setBuyListing(null);
+  }
+
+  function selectCatalogPort(id: string) {
+    setPortId(id);
+    setMapFocusToken((n) => n + 1);
+    closeBuyModal();
   }
 
   function openAcceptModal(order: DemandOrderView) {
@@ -604,7 +742,7 @@ export function PortsPanel(props: {
       closeAcceptModal();
       props.onToast?.(
         'ok',
-        `Demand ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
+        `Demand ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
       );
       props.onStaged?.(result.mission);
     } catch (err) {
@@ -640,7 +778,29 @@ export function PortsPanel(props: {
   const portPickupHubs = useMemo(() => {
     const hubs = port?.pickupHubs ?? [];
     if (hubs.length > 0) return hubs.map((h) => h.toUpperCase());
-    return warehouses?.pickupHubs ?? ['SBGR', 'SBKP', 'SBCT'];
+    return warehouses?.pickupHubs ?? [
+      'SBGR',
+      'SBKP',
+      'SBCT',
+      'SBRF',
+      'SBEG',
+      'SBPA',
+      'SBBE',
+      'SAEZ',
+      'SAVC',
+      'SCEL',
+      'SCTE',
+      'KMIA',
+      'KEWR',
+      'KIAH',
+      'KLAX',
+      'KSEA',
+      'CYVR',
+      'CYHZ',
+      'MMVR',
+      'MMZO',
+      'MMUN',
+    ];
   }, [port?.pickupHubs, warehouses?.pickupHubs]);
   const allOwnedWarehouses = useMemo(() => {
     return [...(warehouses?.warehouses ?? [])].sort((a, b) =>
@@ -726,6 +886,35 @@ export function PortsPanel(props: {
     return portForHub.get(highlightedHubIcao)?.id ?? null;
   }, [highlightedHubIcao, portForHub]);
   const buyUsdByIcao = warehouses?.buyUsdByIcao ?? {};
+
+  const loopStep = useMemo(
+    () =>
+      derivePortsLoopStep({
+        warehouseCount: warehouses?.warehouses?.length ?? 0,
+        stock: warehouses?.stock ?? [],
+        pickups: snap?.pickups ?? [],
+        demand,
+      }),
+    [warehouses?.warehouses?.length, warehouses?.stock, snap?.pickups, demand],
+  );
+  const loopTargetSection = portsLoopTargetSection(loopStep);
+  const loopCtaLabel = useMemo(() => {
+    if (loopStep.kind === 'wait_demand') {
+      return demand.length > 0 ? 'Open Demand Board' : null;
+    }
+    return portsLoopCtaLabel(loopStep);
+  }, [loopStep, demand.length]);
+
+  function goToLoopStep() {
+    setSection(loopTargetSection);
+    if (loopStep.kind === 'buy_warehouse') {
+      setWhShelf('buy');
+    } else if (loopStep.kind === 'store_yard') {
+      setWhShelf('owned');
+      setSelectedOwnedHubIcao(loopStep.hubIcao);
+      setSelectedStockId(null);
+    }
+  }
 
   useEffect(() => {
     if (
@@ -813,6 +1002,32 @@ export function PortsPanel(props: {
     if (demandPage > demandPageCount) setDemandPage(demandPageCount);
   }, [demandPage, demandPageCount]);
 
+  const sortedWorldPorts = useMemo(() => {
+    return [...(snap?.ports ?? [])].sort((a, b) => {
+      const c = a.countryId.localeCompare(b.countryId);
+      if (c !== 0) return c;
+      return a.name.localeCompare(b.name);
+    });
+  }, [snap?.ports]);
+  const worldPortsPageCount = Math.max(
+    1,
+    Math.ceil(sortedWorldPorts.length / WORLD_PORTS_PAGE_SIZE) || 1,
+  );
+  const safeWorldPortsPage = Math.min(
+    Math.max(1, worldPortsPage),
+    worldPortsPageCount,
+  );
+  const pagedWorldPorts = useMemo(() => {
+    const start = (safeWorldPortsPage - 1) * WORLD_PORTS_PAGE_SIZE;
+    return sortedWorldPorts.slice(start, start + WORLD_PORTS_PAGE_SIZE);
+  }, [sortedWorldPorts, safeWorldPortsPage]);
+
+  useEffect(() => {
+    if (worldPortsPage > worldPortsPageCount) {
+      setWorldPortsPage(worldPortsPageCount);
+    }
+  }, [worldPortsPage, worldPortsPageCount]);
+
   function toggleDemandSort(key: DemandSortKey) {
     setDemandSort((current) => {
       if (current.key !== key) return { key, direction: 'asc' };
@@ -841,10 +1056,7 @@ export function PortsPanel(props: {
       <div className="panel-head">
         <div>
           <h2>Ports & Demand</h2>
-          <p>
-            Buy factory cargo at seaports, park it in a warehouse, then fulfill
-            Demand Board orders.
-          </p>
+          <p>Seaport cargo → warehouse → Demand Board flights.</p>
         </div>
         <button
           type="button"
@@ -864,6 +1076,27 @@ export function PortsPanel(props: {
         </p>
       ) : (
         <>
+          <div className="ports-loop-banner" role="status">
+            <p className="ports-loop-banner-text">
+              {portsLoopMessage(
+                loopStep,
+                props.formatTonnes,
+                props.formatMoney,
+                snap.yardHoldUsdPerDay,
+              )}
+            </p>
+            {loopCtaLabel ? (
+              <button
+                type="button"
+                className="action ghost ports-loop-banner-cta"
+                disabled={props.busy || loading}
+                onClick={() => goToLoopStep()}
+              >
+                {loopCtaLabel}
+              </button>
+            ) : null}
+          </div>
+
           <div
             className="fbo-mode-switcher"
             role="tablist"
@@ -914,10 +1147,19 @@ export function PortsPanel(props: {
 
           {section === 'catalog' ? (
             <>
+              {loopTargetSection === 'catalog' ? (
+                <p className="muted ports-loop-section-hint">
+                  {portsLoopSectionHint(
+                    loopStep,
+                    props.formatMoney,
+                    snap.yardHoldUsdPerDay,
+                  )}
+                </p>
+              ) : null}
               {port ? (
                 <h3 className="ports-selected-name">{port.name}</h3>
               ) : (
-                <p className="muted">Select a port on the map.</p>
+                <p className="muted">Select a port on the map or grid.</p>
               )}
 
               <div className="ports-main">
@@ -925,10 +1167,8 @@ export function PortsPanel(props: {
                   ports={mapPorts}
                   ownedFbos={mapWarehouses}
                   selectedPortId={port?.id ?? portId}
-                  onSelectPort={(id) => {
-                    setPortId(id);
-                    closeBuyModal();
-                  }}
+                  focusToken={mapFocusToken}
+                  onSelectPort={selectCatalogPort}
                   onSelectHub={(icao) => props.onOpenAirport?.(icao)}
                 />
 
@@ -1052,11 +1292,120 @@ export function PortsPanel(props: {
                   )}
                 </div>
               </div>
+
+              <section
+                className="ports-world-catalog"
+                aria-label="World port catalog"
+              >
+                <h4 className="ports-world-catalog-title">All ports</h4>
+                <div className="table-wrap ports-world-list-wrap">
+                  <table className="data-table ports-world-list">
+                    <thead>
+                      <tr>
+                        <th>Country</th>
+                        <th>Port</th>
+                        <th>Pickup</th>
+                        <th>Open</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedWorldPorts.length === 0 ? (
+                        <tr>
+                          <td colSpan={4}>
+                            <p className="empty">No ports yet.</p>
+                          </td>
+                        </tr>
+                      ) : (
+                        pagedWorldPorts.map((p) => {
+                          const selected =
+                            (port?.id ?? portId)?.toUpperCase() ===
+                            p.id.toUpperCase();
+                          return (
+                            <tr
+                              key={p.id}
+                              className={
+                                selected
+                                  ? 'ports-world-row is-selected'
+                                  : 'ports-world-row'
+                              }
+                              aria-selected={selected}
+                              onClick={() => {
+                                if (!props.busy) selectCatalogPort(p.id);
+                              }}
+                            >
+                              <td className="ports-world-row-country">
+                                {p.countryId}
+                              </td>
+                              <td>
+                                <strong>{p.name}</strong>
+                              </td>
+                              <td className="muted">
+                                {p.pickupHubs.join(', ') || '—'}
+                              </td>
+                              <td className="muted">{p.listings.length}</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {sortedWorldPorts.length > 0 ? (
+                  <nav className="pagination" aria-label="Port catalog pages">
+                    <p>
+                      {`${(safeWorldPortsPage - 1) * WORLD_PORTS_PAGE_SIZE + 1}–${Math.min(
+                        safeWorldPortsPage * WORLD_PORTS_PAGE_SIZE,
+                        sortedWorldPorts.length,
+                      )} of ${sortedWorldPorts.length}`}
+                    </p>
+                    <div>
+                      <button
+                        type="button"
+                        disabled={safeWorldPortsPage <= 1 || props.busy}
+                        onClick={() =>
+                          setWorldPortsPage(Math.max(1, safeWorldPortsPage - 1))
+                        }
+                      >
+                        Previous
+                      </button>
+                      <span>
+                        Page {safeWorldPortsPage} of {worldPortsPageCount}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={
+                          safeWorldPortsPage >= worldPortsPageCount ||
+                          props.busy
+                        }
+                        onClick={() =>
+                          setWorldPortsPage(
+                            Math.min(
+                              worldPortsPageCount,
+                              safeWorldPortsPage + 1,
+                            ),
+                          )
+                        }
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </nav>
+                ) : null}
+              </section>
             </>
           ) : null}
 
           {section === 'warehouse' ? (
             <>
+              {loopTargetSection === 'warehouse' ? (
+                <p className="muted ports-loop-section-hint">
+                  {portsLoopSectionHint(
+                    loopStep,
+                    props.formatMoney,
+                    snap.yardHoldUsdPerDay,
+                  )}
+                </p>
+              ) : null}
               <div className="ports-main">
                 <PortsMap
                   ports={mapPorts}
@@ -1498,10 +1847,14 @@ export function PortsPanel(props: {
               ) : (
                 <>
                   <p className="muted ports-warehouse-hint">
-                    Yard hold: cargo waiting outside the warehouse (no WH or WH
-                    full). Charged daily until you Store in WH — higher than
-                    warehouse storage. Lots larger than WH capacity can never
-                    fully store — Abandon (no refund) stops the fee.
+                    Yard hold: charged daily until you Store in WH (higher than
+                    warehouse storage).
+                    {snap.yardHoldUsdPerDay != null &&
+                    snap.yardHoldUsdPerDay > 0
+                      ? ` Currently ${props.formatMoney(snap.yardHoldUsdPerDay)}/day across all yard lots.`
+                      : ''}{' '}
+                    Lots larger than WH capacity can never fully store — Abandon
+                    (no refund) stops the fee.
                   </p>
                   <table className="data-table">
                     <thead>
@@ -1511,6 +1864,8 @@ export function PortsPanel(props: {
                         <th>Commodity</th>
                         <th>Mass</th>
                         <th>Cost</th>
+                        <th>Hold/day</th>
+                        <th>Held</th>
                         <th />
                       </tr>
                     </thead>
@@ -1531,8 +1886,16 @@ export function PortsPanel(props: {
                               p.hubIcao.trim().toUpperCase(),
                           )?.capacityKg ?? 0;
                         const foreverOversized = hasWh && p.kg > whCap;
+                        const holdPerDay =
+                          p.holdUsdPerDay ??
+                          yardHoldUsdPerDay(p.kg, p.commodityId);
+                        const heldDays = p.heldDays ?? 0;
+                        const aging =
+                          heldDays >= YARD_HOLD_WARN_DAYS
+                            ? 'ports-yard-aging'
+                            : undefined;
                         return (
-                          <tr key={p.id}>
+                          <tr key={p.id} className={aging}>
                             <td>{p.portId}</td>
                             <td>
                               <button
@@ -1558,6 +1921,23 @@ export function PortsPanel(props: {
                             </td>
                             <td>{props.formatTonnes(p.kg)}</td>
                             <td>{formatUnitPrice(p.avgCostUsdPerKg)}</td>
+                            <td title="Yard hold fee per economy day">
+                              {props.formatMoney(holdPerDay)}
+                            </td>
+                            <td>
+                              {heldDays >= YARD_HOLD_WARN_DAYS ? (
+                                <span
+                                  className="ports-yard-held-warn"
+                                  title={`Sitting ${heldDays} economy day(s) — store or abandon to stop fees`}
+                                >
+                                  {heldDays}d
+                                </span>
+                              ) : (
+                                <span className="muted">
+                                  {heldDays <= 0 ? 'today' : `${heldDays}d`}
+                                </span>
+                              )}
+                            </td>
                             <td className="actions ports-pickup-actions">
                               {storeAllOk ? (
                                 <button
@@ -1617,6 +1997,15 @@ export function PortsPanel(props: {
 
           {section === 'demand' ? (
             <>
+              {loopTargetSection === 'demand' ? (
+                <p className="muted ports-loop-section-hint">
+                  {portsLoopSectionHint(
+                    loopStep,
+                    props.formatMoney,
+                    snap.yardHoldUsdPerDay,
+                  )}
+                </p>
+              ) : null}
               <div className="table-wrap">
                 <table className="data-table">
                   <thead>
@@ -1848,6 +2237,7 @@ export function PortsPanel(props: {
           originOptions={acceptOriginOptions}
           aircraftOptions={acceptAircraftOptions}
           selectedOriginStockKg={selectedOriginStockKg}
+          pullPreview={acceptPullPreview}
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
           formatUnitPrice={formatUnitPrice}
@@ -1908,6 +2298,10 @@ function PortBuyDialog(props: {
     hasWh &&
     props.hubCapacityKg != null &&
     yardHoldKg > props.hubCapacityKg;
+  const yardFeePerDay = yardHoldUsdPerDay(
+    yardHoldKg,
+    props.listing.commodityId,
+  );
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -1981,7 +2375,7 @@ function PortBuyDialog(props: {
                 ? ` · ${props.formatTonnes(storeIntoWh)} stores now`
                 : ''}
               {yardHoldKg > 0
-                ? ` · ${props.formatTonnes(yardHoldKg)} yard hold (daily fee)`
+                ? ` · ${props.formatTonnes(yardHoldKg)} yard hold (${props.formatMoney(yardFeePerDay)}/day)`
                 : ''}
               {foreverYard
                 ? ` — yard remainder exceeds WH capacity; use Abandon or fly WH empty over multiple trips`
@@ -1990,7 +2384,8 @@ function PortBuyDialog(props: {
           ) : (
             <p className="muted">
               No warehouse at {props.listing.allocatedHubIcao} — full amount goes
-              to yard hold (daily fee) until you buy WH space.
+              to yard hold ({props.formatMoney(yardFeePerDay)}/day) until you buy
+              WH space.
             </p>
           )}
         </div>
@@ -2033,6 +2428,14 @@ function DemandAcceptDialog(props: {
   }>;
   aircraftOptions: PlayerAircraft[];
   selectedOriginStockKg: number;
+  pullPreview: {
+    takeKg: number;
+    avgCostUsdPerKg: number;
+    costUsd: number;
+    payUsd: number;
+    marginUsd: number;
+    limitedBy: 'order' | 'stock' | 'aircraft';
+  } | null;
   busy: boolean;
   formatTonnes: (kg: number) => string;
   formatUnitPrice: (usdPerKg: number) => string;
@@ -2055,6 +2458,15 @@ function DemandAcceptDialog(props: {
     Boolean(props.aircraftId) &&
     props.aircraftOptions.length > 0 &&
     !props.busy;
+  const preview = props.pullPreview;
+  const limitedByLabel =
+    preview?.limitedBy === 'aircraft'
+      ? 'limited by aircraft cargo'
+      : preview?.limitedBy === 'stock'
+        ? 'limited by warehouse stock'
+        : preview?.limitedBy === 'order'
+          ? 'limited by order remaining'
+          : null;
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -2174,6 +2586,49 @@ function DemandAcceptDialog(props: {
               Store {commodityLabel(props.order).toLowerCase()} in{' '}
               {selectedOrigin} before staging this demand.
             </p>
+          ) : null}
+
+          {preview && hasUsableOrigin && props.aircraftId ? (
+            <div className="demand-accept-pull" role="status">
+              <p className="demand-accept-pull-title">
+                Pull from {selectedOrigin}
+                {limitedByLabel ? ` · ${limitedByLabel}` : ''}
+              </p>
+              <dl className="demand-accept-pull-grid">
+                <div>
+                  <dt>Mass</dt>
+                  <dd>{props.formatTonnes(preview.takeKg)}</dd>
+                </div>
+                <div>
+                  <dt>Avg cost</dt>
+                  <dd>{props.formatUnitPrice(preview.avgCostUsdPerKg)}</dd>
+                </div>
+                <div>
+                  <dt>Stock cost</dt>
+                  <dd>{props.formatMoney(preview.costUsd)}</dd>
+                </div>
+                <div>
+                  <dt>Payout</dt>
+                  <dd>{props.formatMoney(preview.payUsd)}</dd>
+                </div>
+                <div>
+                  <dt>Margin</dt>
+                  <dd
+                    className={
+                      preview.marginUsd >= 0
+                        ? 'demand-accept-margin-pos'
+                        : 'demand-accept-margin-neg'
+                    }
+                  >
+                    {props.formatMoney(preview.marginUsd)}
+                  </dd>
+                </div>
+              </dl>
+              <p className="demand-accept-hint">
+                FIFO from warehouse lots at this hub — cost is the weighted
+                average of the piles that leave.
+              </p>
+            </div>
           ) : null}
         </div>
         <div className="confirm-actions">

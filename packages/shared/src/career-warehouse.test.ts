@@ -8,10 +8,12 @@ import {
   abandonWarehouseStock,
   buyWarehouseAtPickupHub,
   depositCargoToWarehouse,
+  previewWithdrawCargoCost,
   settleWarehouseStorageFees,
   upgradeWarehouseToTier2,
   warehouseFreeKg,
   warehouseTier2Progress,
+  withdrawCargoFromWarehouse,
   WAREHOUSE_T1_CAPACITY_KG,
   WAREHOUSE_T2_CAPACITY_KG,
   WAREHOUSE_T2_SHIPPED_KG,
@@ -81,6 +83,44 @@ describe('career warehouse + demand', () => {
     assert.ok(dear);
     assert.equal(cheap.kg, 500);
     assert.equal(dear.kg, 300);
+  });
+
+  it('previewWithdrawCargoCost matches FIFO withdraw average', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-preview' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WhPreview',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 200_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 4,
+      tick: world.tick + 1,
+    });
+    const piles = (state.playerWarehouses?.stock ?? []).filter(
+      (s) => s.commodityId === 'general',
+    );
+    const preview = previewWithdrawCargoCost(piles, 500);
+    assert.ok(preview);
+    // 400@2 + 100@4 = 1200 / 500 = 2.4
+    assert.equal(preview!.avgCostUsdPerKg, 2.4);
+    assert.equal(preview!.costUsd, 1200);
+    const withdrawn = withdrawCargoFromWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 500,
+    });
+    assert.equal(withdrawn.avgCostUsdPerKg, preview!.avgCostUsdPerKg);
   });
 
   it('buys warehouse at pickup hub and rejects capacity overflow', () => {

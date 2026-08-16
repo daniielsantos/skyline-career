@@ -360,6 +360,7 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: true,
+        groundSpeedKt: 18,
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
@@ -373,12 +374,50 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
+        groundSpeedKt: 0.5,
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
       { destCoords: SBRF, nowMs },
     );
     assert.equal(shutdown.event.type, 'settle');
+  });
+
+  it('does not settle on touchdown while still rolling even if engines read off', () => {
+    const plannedMs = 3_600_000;
+    const nowMs = Date.now();
+    const state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: nowMs - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
+
+    const rollout = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        groundSpeedKt: 45,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(rollout.event.type, 'none');
+
+    const stopped = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        groundSpeedKt: 1,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      rollout.nextState,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(stopped.event.type, 'settle');
   });
 
   it('settles when parked after landing even if combustion sticks', () => {

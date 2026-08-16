@@ -132,15 +132,20 @@ export function inferEnginesRunning(input: {
   return input.snapshotRunning;
 }
 
-/** Engines off, or parked (brake + nearly stopped) after a sticky combustion bit. */
+/**
+ * Ready to settle after landing: nearly stopped, and either engines off or
+ * parking brake set.
+ *
+ * Always require low ground speed when GS is known — a false “engines off”
+ * reading on touchdown must not settle mid-rollout.
+ */
 export function isShutdownOrParked(sample: FlightGroundSample): boolean {
-  if (!sample.enginesRunning) return true;
-  if (sample.parkingBrake !== true) return false;
   const gs = sample.groundSpeedKt;
   if (typeof gs === 'number' && Number.isFinite(gs) && gs >= PARKED_GROUND_SPEED_KT) {
     return false;
   }
-  return true;
+  if (!sample.enginesRunning) return true;
+  return sample.parkingBrake === true;
 }
 
 /**

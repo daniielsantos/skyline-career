@@ -1,6 +1,7 @@
 /**
- * Real-world seaports feeding cheaper “factory” cargo into career hubs.
- * Ports are lat/lon nodes (not airports). Cargo is collected at pickup hubs.
+ * Real-world seaports / ocean-access river ports feeding cheaper “factory”
+ * cargo into career hubs. Ports are lat/lon nodes (not airports). Cargo is
+ * collected at pickup hubs.
  */
 
 import {
@@ -55,6 +56,8 @@ export const PORT_LISTING_PRICE_CEIL_FRAC = 0.7;
  */
 export const PORT_YARD_HOLD_USD_PER_KG_DAY = 0.05;
 export const PORT_YARD_HOLD_VALUE_MULT = 2;
+/** Soft UI warning once a yard lot has sat this many economy days. */
+export const PORT_YARD_HOLD_WARN_DAYS = 2;
 
 /** Soft cap of simultaneous open listings per port. */
 export const PORT_LISTINGS_PER_PORT = 4;
@@ -75,6 +78,153 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lat: -25.503,
     lon: -48.508,
     pickupHubs: ['SBCT'],
+  },
+  {
+    id: 'BRSUA',
+    name: 'Port of Suape',
+    countryId: 'BR',
+    lat: -8.4,
+    lon: -34.97,
+    pickupHubs: ['SBRF'],
+  },
+  {
+    id: 'BRMAO',
+    name: 'Port of Manaus',
+    countryId: 'BR',
+    lat: -3.148,
+    lon: -59.987,
+    pickupHubs: ['SBEG'],
+  },
+  {
+    id: 'BRRIG',
+    name: 'Port of Rio Grande',
+    countryId: 'BR',
+    lat: -32.13,
+    lon: -52.1,
+    pickupHubs: ['SBPA'],
+  },
+  {
+    id: 'BRVDC',
+    name: 'Port of Vila do Conde',
+    countryId: 'BR',
+    lat: -1.544,
+    lon: -48.747,
+    pickupHubs: ['SBBE'],
+  },
+  {
+    id: 'ARBUE',
+    name: 'Port of Buenos Aires',
+    countryId: 'AR',
+    lat: -34.596,
+    lon: -58.364,
+    pickupHubs: ['SAEZ'],
+  },
+  {
+    id: 'ARCRD',
+    name: 'Port of Comodoro Rivadavia',
+    countryId: 'AR',
+    lat: -45.859,
+    lon: -67.456,
+    pickupHubs: ['SAVC'],
+  },
+  {
+    id: 'CLSAN',
+    name: 'Port of San Antonio',
+    countryId: 'CL',
+    lat: -33.583,
+    lon: -71.617,
+    pickupHubs: ['SCEL'],
+  },
+  {
+    id: 'CLPME',
+    name: 'Port of Puerto Montt',
+    countryId: 'CL',
+    lat: -41.467,
+    lon: -72.95,
+    pickupHubs: ['SCTE'],
+  },
+  {
+    id: 'USMIA',
+    name: 'Port of Miami',
+    countryId: 'US',
+    lat: 25.774,
+    lon: -80.171,
+    pickupHubs: ['KMIA'],
+  },
+  {
+    id: 'USEWR',
+    name: 'Port of New York / New Jersey',
+    countryId: 'US',
+    // Port Newark / Elizabeth (not downtown Manhattan).
+    lat: 40.692,
+    lon: -74.154,
+    pickupHubs: ['KEWR'],
+  },
+  {
+    id: 'USHOU',
+    name: 'Port of Houston',
+    countryId: 'US',
+    // Barbours Cut container terminal (Galveston Bay) — not inland Turning Basin.
+    lat: 29.682,
+    lon: -94.998,
+    pickupHubs: ['KIAH'],
+  },
+  {
+    id: 'USLAX',
+    name: 'Port of Los Angeles / Long Beach',
+    countryId: 'US',
+    lat: 33.73,
+    lon: -118.263,
+    pickupHubs: ['KLAX'],
+  },
+  {
+    id: 'USSEA',
+    name: 'Port of Seattle',
+    countryId: 'US',
+    lat: 47.573,
+    lon: -122.348,
+    pickupHubs: ['KSEA'],
+  },
+  {
+    id: 'CAVAN',
+    name: 'Port of Vancouver',
+    countryId: 'CA',
+    lat: 49.277,
+    lon: -123.121,
+    pickupHubs: ['CYVR'],
+  },
+  {
+    id: 'CAHAL',
+    name: 'Port of Halifax',
+    countryId: 'CA',
+    lat: 44.63,
+    lon: -63.56,
+    pickupHubs: ['CYHZ'],
+  },
+  {
+    id: 'MXVER',
+    name: 'Port of Veracruz',
+    countryId: 'MX',
+    lat: 19.198,
+    lon: -96.129,
+    pickupHubs: ['MMVR'],
+  },
+  {
+    id: 'MXZLO',
+    name: 'Port of Manzanillo',
+    countryId: 'MX',
+    lat: 19.065,
+    lon: -104.305,
+    pickupHubs: ['MMZO'],
+  },
+  {
+    id: 'MXCUN',
+    name: 'Port of Cancún',
+    countryId: 'MX',
+    // Puerto Juárez ferry / coastal terminal (not MMUN airport).
+    lat: 21.185,
+    lon: -86.807,
+    pickupHubs: ['MMUN'],
   },
 ];
 
@@ -500,6 +650,32 @@ function yardHoldUsdPerKgDay(commodityId: CommodityId): number {
   return PORT_YARD_HOLD_USD_PER_KG_DAY;
 }
 
+/** Public rate ($/kg/economy-day) for yard hold UI + quotes. */
+export function portYardHoldUsdPerKgDay(commodityId: CommodityId): number {
+  return yardHoldUsdPerKgDay(commodityId);
+}
+
+/** Daily yard hold charge for a pickup lot at current mass. */
+export function portYardHoldUsdPerDay(opts: {
+  kg: number;
+  commodityId: CommodityId;
+}): number {
+  const kg = Math.max(0, opts.kg);
+  if (kg <= 0) return 0;
+  return money(kg * yardHoldUsdPerKgDay(opts.commodityId));
+}
+
+/** Whole economy days a yard lot has been sitting (purchase day → now). */
+export function portYardHeldDays(
+  purchasedAtTick: number,
+  currentTick: number,
+): number {
+  return Math.max(
+    0,
+    economyDayIndex(currentTick) - economyDayIndex(purchasedAtTick),
+  );
+}
+
 export type PortYardHoldSettleResult = {
   debitUsd: number;
   requestedUsd: number;
@@ -541,7 +717,7 @@ export function settlePortYardHoldFees(
       amountUsd: -debitUsd,
       kind: 'port_yard_hold',
       atTick: opts.toTick,
-      note: `${daysCharged}d · ${pickups.length} pickup(s)`,
+      note: `Yard hold ${daysCharged}d · ${pickups.length} lot(s) · $${requestedUsd.toFixed(2)} due`,
     });
   }
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };
@@ -639,7 +815,15 @@ export function portSnapshot(
       >;
     }
   >;
-  pickups: Array<PlayerPortPickup & { commodityName: string }>;
+  pickups: Array<
+    PlayerPortPickup & {
+      commodityName: string;
+      holdUsdPerDay: number;
+      heldDays: number;
+    }
+  >;
+  /** Sum of daily yard hold fees across all pickups. */
+  yardHoldUsdPerDay: number;
   warehouses: ReturnType<typeof playerWarehouseSnapshot>;
   demand: ReturnType<typeof demandSnapshot>;
   ownedFbos: Array<{
@@ -654,6 +838,21 @@ export function portSnapshot(
   ensurePortListings(world);
   ensureDemandOrders(world);
   const pickups = state ? ensurePlayerPortPickups(state) : [];
+  const pickupViews = pickups.map((p) => {
+    const holdUsdPerDay = portYardHoldUsdPerDay({
+      kg: p.kg,
+      commodityId: p.commodityId,
+    });
+    return {
+      ...p,
+      commodityName: getCommodity(p.commodityId).name,
+      holdUsdPerDay,
+      heldDays: portYardHeldDays(p.purchasedAtTick, world.tick),
+    };
+  });
+  const yardHoldUsdPerDay = money(
+    pickupViews.reduce((sum, p) => sum + p.holdUsdPerDay, 0),
+  );
   const warehouses = state
     ? playerWarehouseSnapshot(state, world)
     : { warehouses: [], stock: [], pickupHubs: [], buyUsdByIcao: {} };
@@ -704,10 +903,8 @@ export function portSnapshot(
         ),
       })),
     })),
-    pickups: pickups.map((p) => ({
-      ...p,
-      commodityName: getCommodity(p.commodityId).name,
-    })),
+    pickups: pickupViews,
+    yardHoldUsdPerDay,
     warehouses,
     demand,
     ownedFbos,

@@ -31,6 +31,7 @@ export {
   ensurePlayerWarehouses,
   findPlayerWarehouseAtIcao,
   normalizePlayerWarehouseState,
+  previewWithdrawCargoCost,
   recordWarehouseShipmentKg,
   warehouseFreeKg,
   warehouseUsedKg,
@@ -67,7 +68,29 @@ export const WAREHOUSE_STORAGE_USD_PER_KG_DAY = 0.02;
 export const WAREHOUSE_STORAGE_VALUE_MULT = 2;
 
 /** Must match CAREER_PORTS[*].pickupHubs (avoid career-ports import cycle). */
-const PICKUP_HUB_SET = new Set(['SBGR', 'SBKP', 'SBCT']);
+const PICKUP_HUB_SET = new Set([
+  'SBGR',
+  'SBKP',
+  'SBCT',
+  'SBRF',
+  'SBEG',
+  'SBPA',
+  'SBBE',
+  'SAEZ',
+  'SAVC',
+  'SCEL',
+  'SCTE',
+  'KMIA',
+  'KEWR',
+  'KIAH',
+  'KLAX',
+  'KSEA',
+  'CYVR',
+  'CYHZ',
+  'MMVR',
+  'MMZO',
+  'MMUN',
+]);
 
 function money(n: number): number {
   return Math.round(n * 100) / 100;

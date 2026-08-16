@@ -15,12 +15,15 @@ import {
   quotePortListingUnitPriceUsd,
   resolvePortPickupHub,
   settlePortYardHoldFees,
+  portSnapshot,
   PORT_YARD_HOLD_USD_PER_KG_DAY,
+  PORT_YARD_HOLD_WARN_DAYS,
   stagePortPickupToFbo,
 } from './career-ports.js';
 import {
   buyWarehouseAtPickupHub,
   depositCargoToWarehouse,
+  isPortPickupHub,
   WAREHOUSE_T1_CAPACITY_KG,
 } from './career-warehouse.js';
 import {
@@ -63,6 +66,35 @@ describe('career ports', () => {
     assert.ok((state.ledger ?? []).some((e) => e.kind === 'port_yard_hold'));
   });
 
+  it('exposes yard hold $/day and held days on port snapshot', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-yard-ui' });
+    world.tick = 96 * 5;
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'YardUi',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.portPickups = [
+      {
+        id: 'portpk_ui',
+        portId: 'BRSSZ',
+        hubIcao: 'SBGR',
+        commodityId: 'general',
+        kg: 2_000,
+        avgCostUsdPerKg: 1,
+        purchasedAtTick: world.tick - 96 * 3,
+      },
+    ];
+    const snap = portSnapshot(world, state);
+    assert.equal(snap.pickups.length, 1);
+    assert.equal(
+      snap.pickups[0]!.holdUsdPerDay,
+      Math.round(2_000 * PORT_YARD_HOLD_USD_PER_KG_DAY * 100) / 100,
+    );
+    assert.equal(snap.pickups[0]!.heldDays, 3);
+    assert.equal(snap.yardHoldUsdPerDay, snap.pickups[0]!.holdUsdPerDay);
+    assert.ok(snap.pickups[0]!.heldDays >= PORT_YARD_HOLD_WARN_DAYS);
+  });
+
   it('rejects port buy when Cargo Ops commodity is locked', () => {
     const world = createSeedEconomyWorld({ seed: 'ports-lock' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
@@ -99,18 +131,302 @@ describe('career ports', () => {
     );
   });
 
-  it('catalogs Santos and Paranaguá with real pickup hubs', () => {
+  it('catalogs BR + AR/CL/US + CA/MX ocean-access ports with pickup hubs', () => {
     const ports = listCareerPorts();
-    assert.equal(ports.length, 2);
-    const santos = getCareerPort('BRSSZ');
-    const png = getCareerPort('BRPNG');
-    assert.ok(santos);
-    assert.ok(png);
-    assert.equal(resolvePortPickupHub(santos!), 'SBGR');
-    assert.equal(resolvePortPickupHub(png!), 'SBCT');
-    assert.ok(santos!.pickupHubs.includes('SBKP'));
-    assert.ok(santos!.lat < -23 && santos!.lat > -24);
-    assert.ok(png!.lon < -48 && png!.lon > -49);
+    assert.equal(ports.length, 20);
+    const expect: Array<{
+      id: string;
+      hub: string;
+    }> = [
+      { id: 'BRSSZ', hub: 'SBGR' },
+      { id: 'BRPNG', hub: 'SBCT' },
+      { id: 'BRSUA', hub: 'SBRF' },
+      { id: 'BRMAO', hub: 'SBEG' },
+      { id: 'BRRIG', hub: 'SBPA' },
+      { id: 'BRVDC', hub: 'SBBE' },
+      { id: 'ARBUE', hub: 'SAEZ' },
+      { id: 'ARCRD', hub: 'SAVC' },
+      { id: 'CLSAN', hub: 'SCEL' },
+      { id: 'CLPME', hub: 'SCTE' },
+      { id: 'USMIA', hub: 'KMIA' },
+      { id: 'USEWR', hub: 'KEWR' },
+      { id: 'USHOU', hub: 'KIAH' },
+      { id: 'USLAX', hub: 'KLAX' },
+      { id: 'USSEA', hub: 'KSEA' },
+      { id: 'CAVAN', hub: 'CYVR' },
+      { id: 'CAHAL', hub: 'CYHZ' },
+      { id: 'MXVER', hub: 'MMVR' },
+      { id: 'MXZLO', hub: 'MMZO' },
+      { id: 'MXCUN', hub: 'MMUN' },
+    ];
+    for (const row of expect) {
+      const port = getCareerPort(row.id);
+      assert.ok(port, row.id);
+      assert.equal(resolvePortPickupHub(port!), row.hub);
+      assert.ok(port!.pickupHubs.includes(row.hub));
+    }
+    assert.ok(getCareerPort('BRSSZ')!.pickupHubs.includes('SBKP'));
+    assert.deepEqual([...getCareerPort('BRRIG')!.pickupHubs], ['SBPA']);
+    assert.deepEqual([...getCareerPort('BRVDC')!.pickupHubs], ['SBBE']);
+    assert.ok(getCareerPort('BRRIG')!.lat < -32 && getCareerPort('BRRIG')!.lat > -33);
+    assert.ok(getCareerPort('BRVDC')!.lat < -1 && getCareerPort('BRVDC')!.lat > -2);
+    assert.equal(getCareerPort('ARBUE')!.countryId, 'AR');
+    assert.equal(getCareerPort('CLSAN')!.countryId, 'CL');
+    assert.equal(getCareerPort('USMIA')!.countryId, 'US');
+    assert.equal(getCareerPort('CAVAN')!.countryId, 'CA');
+    assert.equal(getCareerPort('MXCUN')!.countryId, 'MX');
+    // Houston marker must sit on Galveston Bay terminals, not inland Turning Basin.
+    const houston = getCareerPort('USHOU')!;
+    assert.ok(houston.lat > 29.65 && houston.lat < 29.72);
+    assert.ok(houston.lon > -95.05 && houston.lon < -94.95);
+  });
+
+  it('allows warehouse buy at Suape pickup hub SBRF', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-suape-wh' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBRF', {
+      pilotName: 'SuapeWh',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 200_000;
+    const bought = buyWarehouseAtPickupHub(state, world, 'SBRF');
+    assert.equal(bought.warehouse.icao, 'SBRF');
+    assert.equal(bought.warehouse.capacityKg, WAREHOUSE_T1_CAPACITY_KG);
+
+    ensurePortListings(world);
+    let listing = listPortListings(world, 'BRSUA').find(
+      (l) =>
+        l.allocatedHubIcao === 'SBRF' &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies'),
+    );
+    if (!listing) {
+      world.portListings = world.portListings ?? [];
+      listing = {
+        id: 'portlot_suape_test',
+        portId: 'BRSUA',
+        commodityId: 'general',
+        availableKg: 8_000,
+        unitPriceUsd: 1.2,
+        allocatedHubIcao: 'SBRF',
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      };
+      world.portListings.push(listing);
+    }
+
+    const boughtCargo = buyPortListing(state, world, {
+      listingId: listing.id,
+      kg: 1_000,
+    });
+    assert.equal(boughtCargo.kg, 1_000);
+    assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 1_000);
+    assert.ok(boughtCargo.storedKg > 0, 'WH free space should take factory cargo');
+    assert.ok(
+      (state.playerWarehouses?.stock ?? []).some(
+        (s) => s.warehouseId === bought.warehouse.id && s.kg > 0,
+      ),
+    );
+  });
+
+  it('allows warehouse buy at Manaus ocean-river pickup hub SBEG', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-manaus-wh' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBEG', {
+      pilotName: 'ManausWh',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 200_000;
+    const bought = buyWarehouseAtPickupHub(state, world, 'SBEG');
+    assert.equal(bought.warehouse.icao, 'SBEG');
+
+    ensurePortListings(world);
+    let listing = listPortListings(world, 'BRMAO').find(
+      (l) =>
+        l.allocatedHubIcao === 'SBEG' &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies'),
+    );
+    if (!listing) {
+      world.portListings = world.portListings ?? [];
+      listing = {
+        id: 'portlot_manaus_test',
+        portId: 'BRMAO',
+        commodityId: 'general',
+        availableKg: 8_000,
+        unitPriceUsd: 1.2,
+        allocatedHubIcao: 'SBEG',
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      };
+      world.portListings.push(listing);
+    }
+
+    const boughtCargo = buyPortListing(state, world, {
+      listingId: listing.id,
+      kg: 800,
+    });
+    assert.equal(boughtCargo.kg, 800);
+    assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 800);
+    assert.ok(boughtCargo.storedKg > 0);
+  });
+
+  it('allows warehouse buy at Rio Grande and Vila do Conde pickup hubs', () => {
+    for (const row of [
+      { seed: 'ports-rig-wh', hub: 'SBPA', portId: 'BRRIG' },
+      { seed: 'ports-vdc-wh', hub: 'SBBE', portId: 'BRVDC' },
+    ] as const) {
+      const world = createSeedEconomyWorld({ seed: row.seed });
+      let state = selectStarterHub(emptyMissionsStateV2(), row.hub, {
+        pilotName: `Wh${row.hub}`,
+        airframeTypeId: 'asobo-c172sp-cargo',
+      });
+      state.walletUsd = 200_000;
+      const bought = buyWarehouseAtPickupHub(state, world, row.hub);
+      assert.equal(bought.warehouse.icao, row.hub);
+
+      ensurePortListings(world);
+      let listing = listPortListings(world, row.portId).find(
+        (l) =>
+          l.allocatedHubIcao === row.hub &&
+          (l.commodityId === 'general' || l.commodityId === 'supplies'),
+      );
+      if (!listing) {
+        world.portListings = world.portListings ?? [];
+        listing = {
+          id: `portlot_${row.portId}_test`,
+          portId: row.portId,
+          commodityId: 'general',
+          availableKg: 8_000,
+          unitPriceUsd: 1.2,
+          allocatedHubIcao: row.hub,
+          arrivedAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          status: 'open',
+        };
+        world.portListings.push(listing);
+      }
+
+      const boughtCargo = buyPortListing(state, world, {
+        listingId: listing.id,
+        kg: 600,
+      });
+      assert.equal(boughtCargo.kg, 600);
+      assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 600);
+      assert.ok(boughtCargo.storedKg > 0, row.hub);
+    }
+  });
+
+  it('allows warehouse buy at AR/US sample pickup hubs SAEZ and KMIA', () => {
+    for (const hub of [
+      'SAEZ',
+      'SAVC',
+      'SCEL',
+      'SCTE',
+      'KMIA',
+      'KEWR',
+      'KIAH',
+      'KLAX',
+      'KSEA',
+    ] as const) {
+      assert.ok(isPortPickupHub(hub), hub);
+    }
+    for (const row of [
+      { seed: 'ports-saez-wh', hub: 'SAEZ', portId: 'ARBUE' },
+      { seed: 'ports-kmia-wh', hub: 'KMIA', portId: 'USMIA' },
+    ] as const) {
+      const world = createSeedEconomyWorld({ seed: row.seed });
+      let state = selectStarterHub(emptyMissionsStateV2(), row.hub, {
+        pilotName: `Wh${row.hub}`,
+        airframeTypeId: 'asobo-c172sp-cargo',
+      });
+      state.walletUsd = 200_000;
+      const bought = buyWarehouseAtPickupHub(state, world, row.hub);
+      assert.equal(bought.warehouse.icao, row.hub);
+
+      ensurePortListings(world);
+      let listing = listPortListings(world, row.portId).find(
+        (l) =>
+          l.allocatedHubIcao === row.hub &&
+          (l.commodityId === 'general' || l.commodityId === 'supplies'),
+      );
+      if (!listing) {
+        world.portListings = world.portListings ?? [];
+        listing = {
+          id: `portlot_${row.portId}_test`,
+          portId: row.portId,
+          commodityId: 'general',
+          availableKg: 8_000,
+          unitPriceUsd: 1.2,
+          allocatedHubIcao: row.hub,
+          arrivedAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          status: 'open',
+        };
+        world.portListings.push(listing);
+      }
+
+      const boughtCargo = buyPortListing(state, world, {
+        listingId: listing.id,
+        kg: 600,
+      });
+      assert.equal(boughtCargo.kg, 600);
+      assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 600);
+      assert.ok(boughtCargo.storedKg > 0, row.hub);
+    }
+  });
+
+  it('allows warehouse buy at CA/MX sample pickup hubs CYVR and MMUN', () => {
+    for (const hub of [
+      'CYVR',
+      'CYHZ',
+      'MMVR',
+      'MMZO',
+      'MMUN',
+    ] as const) {
+      assert.ok(isPortPickupHub(hub), hub);
+    }
+    for (const row of [
+      { seed: 'ports-cyvr-wh', hub: 'CYVR', portId: 'CAVAN' },
+      { seed: 'ports-mmun-wh', hub: 'MMUN', portId: 'MXCUN' },
+    ] as const) {
+      const world = createSeedEconomyWorld({ seed: row.seed });
+      let state = selectStarterHub(emptyMissionsStateV2(), row.hub, {
+        pilotName: `Wh${row.hub}`,
+        airframeTypeId: 'asobo-c172sp-cargo',
+      });
+      state.walletUsd = 200_000;
+      const bought = buyWarehouseAtPickupHub(state, world, row.hub);
+      assert.equal(bought.warehouse.icao, row.hub);
+
+      ensurePortListings(world);
+      let listing = listPortListings(world, row.portId).find(
+        (l) =>
+          l.allocatedHubIcao === row.hub &&
+          (l.commodityId === 'general' || l.commodityId === 'supplies'),
+      );
+      if (!listing) {
+        world.portListings = world.portListings ?? [];
+        listing = {
+          id: `portlot_${row.portId}_test`,
+          portId: row.portId,
+          commodityId: 'general',
+          availableKg: 8_000,
+          unitPriceUsd: 1.2,
+          allocatedHubIcao: row.hub,
+          arrivedAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          status: 'open',
+        };
+        world.portListings.push(listing);
+      }
+
+      const boughtCargo = buyPortListing(state, world, {
+        listingId: listing.id,
+        kg: 600,
+      });
+      assert.equal(boughtCargo.kg, 600);
+      assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 600);
+      assert.ok(boughtCargo.storedKg > 0, row.hub);
+    }
   });
 
   it('seeds dynamic factory listings cheaper than hub spot and base', () => {

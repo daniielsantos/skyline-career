@@ -1692,6 +1692,10 @@ export type PlayerPortPickupView = {
   kg: number;
   avgCostUsdPerKg: number;
   purchasedAtTick: number;
+  /** Daily yard hold fee for this lot ($/economy-day). */
+  holdUsdPerDay?: number;
+  /** Whole economy days since purchase. */
+  heldDays?: number;
 };
 
 export type PortsSnapshot = {
@@ -1711,6 +1715,8 @@ export type PortsSnapshot = {
     listings: PortListingView[];
   }>;
   pickups: PlayerPortPickupView[];
+  /** Sum of daily yard hold fees across all pickups. */
+  yardHoldUsdPerDay?: number;
   warehouses?: PlayerWarehouseSnapshot;
   demand?: DemandSnapshot;
   ownedFbos?: Array<{

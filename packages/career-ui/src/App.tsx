@@ -10639,6 +10639,9 @@ export function App() {
           formatMoney={formatMoney}
           formatTonnes={formatTonnes}
           fleet={fleet}
+          resolveMaxCargoKg={(acf) =>
+            hangarCatalogEntry(acf)?.maxCargoKg ?? 0
+          }
           economyTick={tick}
           cargoOps={cargoOps}
           onOpenCargoOps={() => {

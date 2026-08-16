@@ -4,7 +4,8 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.46** (latest) | [v0.3.46](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.46) | Desktop icon zoomed to MD-11F nose (readable at small sizes) |
+| **0.3.47** (latest) | [v0.3.47](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.47) | Ground staff (5 perks + grades); WH T1/T2/T3; Ports shelf polish |
+| **0.3.46** | [v0.3.46](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.46) | Desktop icon zoomed to MD-11F nose (readable at small sizes) |
 | **0.3.45** | [v0.3.45](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.45) | MD-11F brand (hero lockup + sidebar mark) + desktop icon |
 | **0.3.44** | [v0.3.44](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.44) | Ocean ports BR→CA/MX (20); Ports catalog UX; settle GS gate; demand cap 96 |
 | **0.3.43** | [v0.3.43](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.43) | Ports/WH/Demand Board; cruise burn Accu-Sim + catalog clamp |

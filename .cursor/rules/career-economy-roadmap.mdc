@@ -43,7 +43,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **South America complete:** UY/PY/PE/BO/EC/CO/VE/GY/SR/GF hub catalogs (+ existing BR/AR/CL); sparse intl lanes; fuel hubs; `REGION_NEIGHBORS` backfill for AR/CL; ports for coastal countries (BO/PY landlocked — no port).
 - **Central America complete:** PA/CR/NI/HN/GT/SV/BZ hub catalogs; sparse intl lanes (MX/US/CO/BR gateways); fuel hubs; coastal ports; fuel fleet scaled; SimBrief allowlist regen.
 - **Caribbean complete (intl-first):** CU/DO/HT/JM/BS/TT/BB/LC/GD/AG — light catalogs; regional trade via intl lanes (not dense domestic); coastal ports; SimBrief allowlist regen.
-- **Caribbean dependencies:** GP/MQ/CW/SX/AW (GF-style territories) + **US-PR** / **US-VI** regions under US; fuel fleet 60; ports incl. Philipsburg / Oranjestad / Charlotte Amalie.
+- **Caribbean dependencies:** GP/MQ/CW/SX/AW (GF-style territories) + **US-PR** / **US-VI** regions under US; ports incl. Philipsburg / Oranjestad / Charlotte Amalie.
+- **EU-1 Western core:** PT/ES/FR/GB/DE/NL/BE/IT curated hubs; EU ring + Americas bridge lanes; 8 coastal ports; fuel trucks **85**; seed **629** airports / **61** ports.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 
 ## Near-term priorities (current Brazil career)
@@ -56,10 +57,11 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 6. ~~**Central America map**~~ — PA/CR/NI/HN/GT/SV/BZ seeded.
 7. ~~**Caribbean map**~~ — CU/DO/HT/JM/BS/TT/BB/LC/GD/AG seeded (intl-first).
 8. ~~**Caribbean dependencies**~~ — GP/MQ/CW + US-PR.
-9. ~~**Caribbean leftovers**~~ — SX/AW + US-VI (551 airports / 53 ports).
-10. Polish only if needed — optional real METAR.
-11. Next map slice: Europe (or other leftovers).
-12. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+9. ~~**Caribbean leftovers**~~ — SX/AW + US-VI.
+10. ~~**EU-1 Western core**~~ — PT/ES/FR/GB/DE/NL/BE/IT.
+11. Polish only if needed — optional real METAR.
+12. Next map slice: **EU-2** Nordics + Alpes + IE.
+13. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

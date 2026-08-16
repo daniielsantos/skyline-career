@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 60;
+export const FUEL_TRUCK_FLEET_SIZE = 85;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 18 },
-  { truckClassId: 'semi_tanker', count: 28 },
-  { truckClassId: 'btrain_tanker', count: 14 },
+  { truckClassId: 'rigid_tanker', count: 25 },
+  { truckClassId: 'semi_tanker', count: 40 },
+  { truckClassId: 'btrain_tanker', count: 20 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -115,6 +115,28 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'CO-W': ['CO-C'],
   'VE-C': ['VE-W'],
   'VE-W': ['VE-C'],
+  // EU-1 Western core domestic road graphs
+  'PT-N': ['PT-C'],
+  'PT-C': ['PT-N', 'PT-S'],
+  'PT-S': ['PT-C'],
+  'ES-N': ['ES-C'],
+  'ES-C': ['ES-N', 'ES-S', 'ES-E'],
+  'ES-S': ['ES-C', 'ES-E'],
+  'ES-E': ['ES-C', 'ES-S'],
+  'FR-N': ['FR-C', 'FR-E'],
+  'FR-C': ['FR-N', 'FR-S', 'FR-E'],
+  'FR-S': ['FR-C', 'FR-E'],
+  'FR-E': ['FR-N', 'FR-C', 'FR-S'],
+  'GB-S': ['GB-M'],
+  'GB-M': ['GB-S', 'GB-N'],
+  'GB-N': ['GB-M'],
+  'DE-N': ['DE-W', 'DE-E'],
+  'DE-W': ['DE-N', 'DE-S', 'DE-E'],
+  'DE-S': ['DE-W', 'DE-E'],
+  'DE-E': ['DE-N', 'DE-W', 'DE-S'],
+  'IT-N': ['IT-C'],
+  'IT-C': ['IT-N', 'IT-S'],
+  'IT-S': ['IT-C'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -146,6 +168,22 @@ const TRUCK_NAME_POOL = [
   'Sul Fronteira Fuel',
   'Gateway Jet Haul',
   'Coastal BR Tankers',
+  'Iberia Jet Haul',
+  'Lisbon Tank Run',
+  'Madrid Fuel Line',
+  'Barcelona Pipe Road',
+  'Paris CDG Tankers',
+  'Lyon Rhone Fuel',
+  'Marseille Port Jet',
+  'Heathrow Fuel Road',
+  'Manchester Tank Line',
+  'Frankfurt Main Haul',
+  'Munich Bavaria Fuel',
+  'Hamburg Harbor Tank',
+  'Schiphol Jet Road',
+  'Brussels Tank Run',
+  'Rome Fiumicino Fuel',
+  'Milan Malpensa Haul',
 ] as const;
 
 function hashSeed(seed: string): number {

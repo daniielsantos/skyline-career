@@ -177,6 +177,14 @@ const PICKUP_HUB_SET = new Set([
   'TNCM',
   'TNCA',
   'TIST',
+  'LPPT',
+  'LEBL',
+  'LFML',
+  'EGHI',
+  'EDDH',
+  'EHRD',
+  'EBAW',
+  'LIRN',
 ]);
 
 function money(n: number): number {

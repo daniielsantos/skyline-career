@@ -24,9 +24,16 @@
 - Countries: CU/DO/HT/JM/BS/TT/BB/LC/GD/AG + **GP/MQ/CW/SX/AW**
 - **Puerto Rico:** region `US-PR` under US (TJSJ…); domestic corridors to KMIA/KEWR — not a separate country
 - **U.S. Virgin Islands:** region `US-VI` under US (TIST/TISX); domestic to KMIA + inter-island
-- Seed airports (world): **551**
-- Ports: … + San Juan, Pointe-à-Pitre, Fort-de-France, Willemstad, Philipsburg, Oranjestad, Charlotte Amalie
 - BB/GD/MQ/CW/SX/AW: single-major catalogs where island is tiny
+
+## Europe seed (EU-1 Western core)
+
+- Countries: **PT / ES / FR / GB / DE / NL / BE / IT**
+- Hubs: **78** curated; multi-region road graphs for PT/ES/FR/GB/DE/IT
+- World seed: **629** airports; **61** ports (Lisbon / Barcelona / Marseille / Southampton / Hamburg / Rotterdam / Antwerp / Naples)
+- Intl: EU gateway ring + sparse Americas bridge (LPPT/LFPG/EGLL/EDDF/LEMD/LIRF ↔ SBGR/KMIA/KEWR)
+- Fuel fleet: **85** trucks; NPC auto-scales (~979 @ 89 regions)
+- Next: EU-2 Nordics + Alpes + IE
 
 ## SimBrief cargo allowlist
 

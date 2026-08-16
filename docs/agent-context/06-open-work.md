@@ -40,9 +40,10 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 9. ~~**Dependências caribenhas**~~ — GP/MQ/CW + US-PR (região US); ports + lanes.
 10. **Tick perf (Fase 1 + formLots)** — lane indexes + formLots caches. Bench: +1 day ~**20–22s** in-memory. UX: `+1 day` em chunks de 8 ticks com progresso no toast/clock.
 11. ~~**Leftovers SX/AW/VI**~~ — SX/AW light countries + US-VI region; ports Philipsburg / Oranjestad / Charlotte Amalie; seed **551**.
-12. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-13. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
-14. Next map slice: Europe (or other leftovers).
+12. ~~**EU-1 Western core**~~ — PT/ES/FR/GB/DE/NL/BE/IT; seed **629**; ports EU; fuel trucks 85; Americas bridge lanes.
+13. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
+14. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+15. Next map slice: **EU-2** Nordics + Alpes + IE.
 
 ## Feito (shipped 0.3.47)
 

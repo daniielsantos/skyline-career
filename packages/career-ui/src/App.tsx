@@ -771,6 +771,52 @@ function regionLabel(region: string): string {
       return 'Sint Maarten';
     case 'AW-C':
       return 'Aruba';
+    case 'PT-N':
+      return 'Portugal — North';
+    case 'PT-C':
+      return 'Portugal — Central';
+    case 'PT-S':
+      return 'Portugal — South';
+    case 'ES-N':
+      return 'Spain — North';
+    case 'ES-C':
+      return 'Spain — Central';
+    case 'ES-S':
+      return 'Spain — South';
+    case 'ES-E':
+      return 'Spain — East';
+    case 'FR-N':
+      return 'France — North';
+    case 'FR-C':
+      return 'France — Central';
+    case 'FR-S':
+      return 'France — South';
+    case 'FR-E':
+      return 'France — East';
+    case 'GB-S':
+      return 'UK — South';
+    case 'GB-M':
+      return 'UK — Midlands';
+    case 'GB-N':
+      return 'UK — North';
+    case 'DE-N':
+      return 'Germany — North';
+    case 'DE-W':
+      return 'Germany — West';
+    case 'DE-S':
+      return 'Germany — South';
+    case 'DE-E':
+      return 'Germany — East';
+    case 'NL-C':
+      return 'Netherlands';
+    case 'BE-C':
+      return 'Belgium';
+    case 'IT-N':
+      return 'Italy — North';
+    case 'IT-C':
+      return 'Italy — Central';
+    case 'IT-S':
+      return 'Italy — South';
     default:
       return region;
   }

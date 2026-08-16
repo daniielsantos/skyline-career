@@ -131,9 +131,9 @@ describe('career ports', () => {
     );
   });
 
-  it('catalogs BR + AR/CL/US + CA/MX ocean-access ports with pickup hubs', () => {
+  it('catalogs Americas ocean-access ports with pickup hubs', () => {
     const ports = listCareerPorts();
-    assert.equal(ports.length, 20);
+    assert.equal(ports.length, 50);
     const expect: Array<{
       id: string;
       hub: string;
@@ -158,6 +158,36 @@ describe('career ports', () => {
       { id: 'MXVER', hub: 'MMVR' },
       { id: 'MXZLO', hub: 'MMZO' },
       { id: 'MXCUN', hub: 'MMUN' },
+      { id: 'UYMVD', hub: 'SUMU' },
+      { id: 'PECLL', hub: 'SPJC' },
+      { id: 'ECGYE', hub: 'SEGU' },
+      { id: 'COCTG', hub: 'SKCG' },
+      { id: 'COBUN', hub: 'SKCL' },
+      { id: 'VELAG', hub: 'SVMI' },
+      { id: 'GYGEO', hub: 'SYCJ' },
+      { id: 'SRPBM', hub: 'SMJP' },
+      { id: 'GFCAY', hub: 'SOCA' },
+      { id: 'PAPTY', hub: 'MPTO' },
+      { id: 'CRLIM', hub: 'MRLM' },
+      { id: 'NICOR', hub: 'MNMG' },
+      { id: 'HNPCS', hub: 'MHLM' },
+      { id: 'SVACA', hub: 'MSLP' },
+      { id: 'GTPQ', hub: 'MGGT' },
+      { id: 'BZBLZ', hub: 'MZBZ' },
+      { id: 'CUHAV', hub: 'MUHA' },
+      { id: 'DOSDQ', hub: 'MDSD' },
+      { id: 'HTPAP', hub: 'MTPP' },
+      { id: 'JMKIN', hub: 'MKJP' },
+      { id: 'BSNAS', hub: 'MYNN' },
+      { id: 'TTPOS', hub: 'TTPP' },
+      { id: 'BBBGI', hub: 'TBPB' },
+      { id: 'LCCAS', hub: 'TLPL' },
+      { id: 'GDSTG', hub: 'TGPY' },
+      { id: 'AGANU', hub: 'TAPA' },
+      { id: 'USSJU', hub: 'TJSJ' },
+      { id: 'GPPTP', hub: 'TFFR' },
+      { id: 'MQFDF', hub: 'TFFF' },
+      { id: 'CWWIL', hub: 'TNCC' },
     ];
     for (const row of expect) {
       const port = getCareerPort(row.id);
@@ -175,6 +205,29 @@ describe('career ports', () => {
     assert.equal(getCareerPort('USMIA')!.countryId, 'US');
     assert.equal(getCareerPort('CAVAN')!.countryId, 'CA');
     assert.equal(getCareerPort('MXCUN')!.countryId, 'MX');
+    assert.equal(getCareerPort('UYMVD')!.countryId, 'UY');
+    assert.equal(getCareerPort('PECLL')!.countryId, 'PE');
+    assert.equal(getCareerPort('ECGYE')!.countryId, 'EC');
+    assert.equal(getCareerPort('COCTG')!.countryId, 'CO');
+    assert.equal(getCareerPort('VELAG')!.countryId, 'VE');
+    assert.equal(getCareerPort('GYGEO')!.countryId, 'GY');
+    assert.equal(getCareerPort('SRPBM')!.countryId, 'SR');
+    assert.equal(getCareerPort('GFCAY')!.countryId, 'GF');
+    assert.equal(getCareerPort('PAPTY')!.countryId, 'PA');
+    assert.equal(getCareerPort('CRLIM')!.countryId, 'CR');
+    assert.equal(getCareerPort('NICOR')!.countryId, 'NI');
+    assert.equal(getCareerPort('HNPCS')!.countryId, 'HN');
+    assert.equal(getCareerPort('SVACA')!.countryId, 'SV');
+    assert.equal(getCareerPort('GTPQ')!.countryId, 'GT');
+    assert.equal(getCareerPort('BZBLZ')!.countryId, 'BZ');
+    assert.equal(getCareerPort('CUHAV')!.countryId, 'CU');
+    assert.equal(getCareerPort('DOSDQ')!.countryId, 'DO');
+    assert.equal(getCareerPort('JMKIN')!.countryId, 'JM');
+    assert.equal(getCareerPort('BSNAS')!.countryId, 'BS');
+    assert.equal(getCareerPort('TTPOS')!.countryId, 'TT');
+    assert.equal(getCareerPort('BBBGI')!.countryId, 'BB');
+    assert.equal(resolvePortPickupHub(getCareerPort('UYMVD')!), 'SUMU');
+    assert.equal(resolvePortPickupHub(getCareerPort('PECLL')!), 'SPJC');
     // Houston marker must sit on Galveston Bay terminals, not inland Turning Basin.
     const houston = getCareerPort('USHOU')!;
     assert.ok(houston.lat > 29.65 && houston.lat < 29.72);

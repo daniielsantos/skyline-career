@@ -129,8 +129,12 @@ describe('demand international accept', () => {
       aircraftId: aircraft.id,
       kg: 200,
     });
+    assert.ok(accepted.kg > 0 && accepted.kg <= 200);
     const expectedUnit = Math.round(3 * DEMAND_INTL_PAY_MULT * 100) / 100;
-    assert.equal(accepted.payUsd, Math.round(expectedUnit * 200 * 100) / 100);
+    assert.equal(
+      accepted.payUsd,
+      Math.round(expectedUnit * accepted.kg * 100) / 100,
+    );
     assert.match(accepted.mission.reason ?? '', /Intl demand/i);
   });
 

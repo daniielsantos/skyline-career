@@ -30,17 +30,47 @@ describe('career partition', () => {
     assert.equal(countryIdFromRegion('BR'), 'BR');
   });
 
-  it('seeds Brazil home with US/CA/MX/AR/CL partition hubs + international lanes', () => {
+  it('seeds Brazil home with full Americas partition hubs + international lanes', () => {
     const world = createSeedEconomyWorld({ seed: 'partition-seed' });
     assert.equal(world.homeCountryId, 'BR');
     assert.equal(inferHomeCountryId(world), 'BR');
     assert.deepEqual(listWorldCountryIds(world), [
+      'AG',
       'AR',
+      'BB',
+      'BO',
       'BR',
+      'BS',
+      'BZ',
       'CA',
       'CL',
+      'CO',
+      'CR',
+      'CU',
+      'CW',
+      'DO',
+      'EC',
+      'GD',
+      'GF',
+      'GP',
+      'GT',
+      'GY',
+      'HN',
+      'HT',
+      'JM',
+      'LC',
+      'MQ',
       'MX',
+      'NI',
+      'PA',
+      'PE',
+      'PY',
+      'SR',
+      'SV',
+      'TT',
       'US',
+      'UY',
+      'VE',
     ]);
     assert.ok(world.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(world.airports.some((a) => a.icao === 'KLAX'));
@@ -49,13 +79,33 @@ describe('career partition', () => {
     assert.ok(world.airports.some((a) => a.icao === 'MMMX'));
     assert.ok(world.airports.some((a) => a.icao === 'SAEZ'));
     assert.ok(world.airports.some((a) => a.icao === 'SCEL'));
-    assert.ok((world.internationalLanes?.length ?? 0) >= 30);
+    assert.ok(world.airports.some((a) => a.icao === 'SUMU'));
+    assert.ok(world.airports.some((a) => a.icao === 'SGAS'));
+    assert.ok(world.airports.some((a) => a.icao === 'SPJC'));
+    assert.ok(world.airports.some((a) => a.icao === 'SKBO'));
+    assert.ok(world.airports.some((a) => a.icao === 'SVMI'));
+    assert.ok(world.airports.some((a) => a.icao === 'SYCJ'));
+    assert.ok(world.airports.some((a) => a.icao === 'MPTO'));
+    assert.ok(world.airports.some((a) => a.icao === 'MROC'));
+    assert.ok(world.airports.some((a) => a.icao === 'MGGT'));
+    assert.ok(world.airports.some((a) => a.icao === 'MUHA'));
+    assert.ok(world.airports.some((a) => a.icao === 'MDSD'));
+    assert.ok(world.airports.some((a) => a.icao === 'MKJP'));
+    assert.ok(world.airports.some((a) => a.icao === 'MYNN'));
+    assert.ok(world.airports.some((a) => a.icao === 'TTPP'));
+    assert.ok(world.airports.some((a) => a.icao === 'TJSJ'));
+    assert.ok(world.airports.some((a) => a.icao === 'TFFR'));
+    assert.ok(world.airports.some((a) => a.icao === 'TNCC'));
+    assert.ok((world.internationalLanes?.length ?? 0) >= 90);
     const usRegions = new Set(
       world.airports
         .filter((a) => countryIdFromRegion(a.region) === 'US')
         .map((a) => a.region),
     );
-    assert.deepEqual(usRegions, new Set(['US-MW', 'US-MT', 'US-NE', 'US-SC', 'US-SE', 'US-W']));
+    assert.deepEqual(
+      usRegions,
+      new Set(['US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-W']),
+    );
   });
 
   it('syncs homeCountryId from the chosen starter hub', () => {

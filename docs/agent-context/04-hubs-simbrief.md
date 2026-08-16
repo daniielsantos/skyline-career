@@ -1,4 +1,4 @@
-# Hubs Chile / SimBrief allowlist
+# Hubs / SimBrief allowlist
 
 ## Chile ICAO cleanup
 
@@ -6,14 +6,33 @@
 - Carriel Sur = **SCIE**
 - Remap legado: `SCCD → SCIE`
 - Removidos strips não-Dispatch: `SCSN`, `SCST`, `SCTC`
-- CL hubs ~21; world airports catalog ~378 (números da sessão — revalidar no seed se mudar)
+- CL hubs ~21
+
+## South America seed (complete)
+
+- Countries: BR/AR/CL + UY/PY/PE/BO/EC/CO/VE/GY/SR/GF
+- Coastal ports: Montevideo, Callao, Guayaquil, Cartagena, Buenaventura, La Guaira, Georgetown, Paramaribo, Cayenne (BO/PY landlocked — no port)
+
+## Central America seed (complete)
+
+- Countries: PA/CR/NI/HN/GT/SV/BZ
+- Coastal ports: Balboa, Limón, Corinto, Puerto Cortés, Acajutla, Puerto Quetzal, Belize City
+- SV: only MSLP + MSSS (closed Santa Ana El Palmer omitted)
+
+## Caribbean seed (complete, intl-first)
+
+- Countries: CU/DO/HT/JM/BS/TT/BB/LC/GD/AG + **GP/MQ/CW**
+- **Puerto Rico:** region `US-PR` under US (TJSJ…); domestic corridors to KMIA/KEWR — not a separate country
+- Seed airports (world): **547**
+- Ports: … + San Juan, Pointe-à-Pitre, Fort-de-France, Willemstad
+- BB/GD/MQ/CW: single-major catalogs where island is tiny
 
 ## SimBrief cargo allowlist
 
 - `packages/shared/src/career-simbrief-airports.ts`
-- Data: `data/simbrief-dispatch-airports.json` (~336 ICAOs)
+- Data: `data/simbrief-dispatch-airports.json` (regenerate after hub changes)
 - Seed: `assertDispatchHubsAreSimBriefKnown()`
-- Gen: script `generate:simbrief-dispatch` (npm)
+- Gen: `npm run generate:simbrief-dispatch` (from `packages/shared`) — syncs catalog→JSON; does **not** call SimBrief API. Confirm ICAOs in Dispatch before adding.
 
 ## Homologate / facilities MSFS
 

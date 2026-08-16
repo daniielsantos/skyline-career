@@ -661,6 +661,110 @@ function regionLabel(region: string): string {
       return 'USA — Mountain';
     case 'US-W':
       return 'USA — West Coast';
+    case 'US-PR':
+      return 'Puerto Rico';
+    case 'CA-W':
+      return 'Canada — West';
+    case 'CA-PR':
+      return 'Canada — Prairies';
+    case 'CA-ON':
+      return 'Canada — Ontario';
+    case 'CA-QC':
+      return 'Canada — Quebec';
+    case 'CA-AT':
+      return 'Canada — Atlantic';
+    case 'MX-N':
+      return 'Mexico — North';
+    case 'MX-C':
+      return 'Mexico — Central';
+    case 'MX-S':
+      return 'Mexico — South';
+    case 'MX-Y':
+      return 'Mexico — Yucatán';
+    case 'AR-BA':
+      return 'Argentina — Buenos Aires';
+    case 'AR-CO':
+      return 'Argentina — Centro';
+    case 'AR-NO':
+      return 'Argentina — Norte';
+    case 'AR-PA':
+      return 'Argentina — Patagonia';
+    case 'CL-C':
+      return 'Chile — Centro';
+    case 'CL-S':
+      return 'Chile — Sur';
+    case 'UY-S':
+      return 'Uruguay';
+    case 'PY-C':
+      return 'Paraguay';
+    case 'PE-C':
+      return 'Peru — Costa / Centro';
+    case 'PE-S':
+      return 'Peru — Sur';
+    case 'BO-W':
+      return 'Bolivia — Altiplano';
+    case 'BO-E':
+      return 'Bolivia — Oriente';
+    case 'EC-C':
+      return 'Ecuador — Sierra / Norte';
+    case 'EC-S':
+      return 'Ecuador — Costa / Sur';
+    case 'CO-C':
+      return 'Colombia — Central';
+    case 'CO-N':
+      return 'Colombia — Caribe';
+    case 'CO-W':
+      return 'Colombia — Pacífico / Sur';
+    case 'VE-C':
+      return 'Venezuela — Central / Oriente';
+    case 'VE-W':
+      return 'Venezuela — Occidente';
+    case 'GY-C':
+      return 'Guyana';
+    case 'SR-C':
+      return 'Suriname';
+    case 'GF-C':
+      return 'French Guiana';
+    case 'PA-C':
+      return 'Panama';
+    case 'CR-C':
+      return 'Costa Rica';
+    case 'NI-C':
+      return 'Nicaragua';
+    case 'HN-C':
+      return 'Honduras';
+    case 'SV-C':
+      return 'El Salvador';
+    case 'GT-C':
+      return 'Guatemala';
+    case 'BZ-C':
+      return 'Belize';
+    case 'CU-C':
+      return 'Cuba';
+    case 'DO-C':
+      return 'Dominican Republic';
+    case 'HT-C':
+      return 'Haiti';
+    case 'JM-C':
+      return 'Jamaica';
+    case 'BS-C':
+      return 'Bahamas';
+    case 'TT-C':
+      return 'Trinidad and Tobago';
+    case 'BB-C':
+      return 'Barbados';
+    case 'LC-C':
+      return 'Saint Lucia';
+    case 'GD-C':
+      return 'Grenada';
+    case 'AG-C':
+      return 'Antigua and Barbuda';
+    case 'GP-C':
+      return 'Guadeloupe';
+    case 'MQ-C':
+      return 'Martinique';
+    case 'CW-C':
+      return 'Curacao';
     default:
       return region;
   }

@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 28;
+export const FUEL_TRUCK_FLEET_SIZE = 60;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 8 },
-  { truckClassId: 'semi_tanker', count: 14 },
-  { truckClassId: 'btrain_tanker', count: 6 },
+  { truckClassId: 'rigid_tanker', count: 18 },
+  { truckClassId: 'semi_tanker', count: 28 },
+  { truckClassId: 'btrain_tanker', count: 14 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -77,7 +77,8 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'BR-S': ['BR-SE', 'BR-CO'],
   // US continental road-neighbor graph (no BR↔US road hauls preferred).
   'US-NE': ['US-SE', 'US-MW'],
-  'US-SE': ['US-NE', 'US-MW', 'US-SC'],
+  'US-SE': ['US-NE', 'US-MW', 'US-SC', 'US-PR'],
+  'US-PR': ['US-SE'],
   'US-MW': ['US-NE', 'US-SE', 'US-SC', 'US-MT'],
   'US-SC': ['US-SE', 'US-MW', 'US-MT', 'US-W'],
   'US-MT': ['US-MW', 'US-SC', 'US-W'],
@@ -93,6 +94,26 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'MX-C': ['MX-N', 'MX-S', 'MX-Y'],
   'MX-S': ['MX-C', 'MX-Y'],
   'MX-Y': ['MX-C', 'MX-S'],
+  // Argentina domestic
+  'AR-BA': ['AR-CO', 'AR-NO', 'AR-PA'],
+  'AR-CO': ['AR-BA', 'AR-NO', 'AR-PA'],
+  'AR-NO': ['AR-BA', 'AR-CO'],
+  'AR-PA': ['AR-BA', 'AR-CO'],
+  // Chile domestic
+  'CL-C': ['CL-S'],
+  'CL-S': ['CL-C'],
+  // Multi-region SA (single-region UY/PY/GY/SR/GF need no road graph)
+  'PE-C': ['PE-S'],
+  'PE-S': ['PE-C'],
+  'BO-W': ['BO-E'],
+  'BO-E': ['BO-W'],
+  'EC-C': ['EC-S'],
+  'EC-S': ['EC-C'],
+  'CO-C': ['CO-N', 'CO-W'],
+  'CO-N': ['CO-C'],
+  'CO-W': ['CO-C'],
+  'VE-C': ['VE-W'],
+  'VE-W': ['VE-C'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -412,7 +433,12 @@ function pickBestCandidate(
 ): DispatchCandidate | undefined {
   const hubs = world.airports.filter((a) => FUEL_HUB_ICAOS.has(a.icao));
   const spokes = world.airports
-    .filter((a) => !FUEL_HUB_ICAOS.has(a.icao) && fillOf(a) < DEST_SHORTAGE_FILL)
+    .filter(
+      (a) =>
+        !a.bushTripOnly &&
+        !FUEL_HUB_ICAOS.has(a.icao) &&
+        fillOf(a) < DEST_SHORTAGE_FILL,
+    )
     .filter((a) => inboundEnrouteCount(world, a.icao) < MAX_INBOUND_HAULS)
     .sort((a, b) => fillOf(a) - fillOf(b));
 

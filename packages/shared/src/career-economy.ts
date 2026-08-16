@@ -26,6 +26,157 @@ import {
   buildClFeederCorridors,
   rewriteCareerIcaoFields,
 } from './career-cl-hubs.js';
+import {
+  assertUyCareerHubCatalog,
+  UY_CAREER_HUBS,
+  buildUyFeederCorridors,
+} from './career-uy-hubs.js';
+import {
+  assertPyCareerHubCatalog,
+  PY_CAREER_HUBS,
+  buildPyFeederCorridors,
+} from './career-py-hubs.js';
+import {
+  assertPeCareerHubCatalog,
+  PE_CAREER_HUBS,
+  buildPeFeederCorridors,
+} from './career-pe-hubs.js';
+import {
+  assertBoCareerHubCatalog,
+  BO_CAREER_HUBS,
+  buildBoFeederCorridors,
+} from './career-bo-hubs.js';
+import {
+  assertEcCareerHubCatalog,
+  EC_CAREER_HUBS,
+  buildEcFeederCorridors,
+} from './career-ec-hubs.js';
+import {
+  assertCoCareerHubCatalog,
+  CO_CAREER_HUBS,
+  buildCoFeederCorridors,
+} from './career-co-hubs.js';
+import {
+  assertVeCareerHubCatalog,
+  VE_CAREER_HUBS,
+  buildVeFeederCorridors,
+} from './career-ve-hubs.js';
+import {
+  assertGyCareerHubCatalog,
+  GY_CAREER_HUBS,
+  buildGyFeederCorridors,
+} from './career-gy-hubs.js';
+import {
+  assertSrCareerHubCatalog,
+  SR_CAREER_HUBS,
+  buildSrFeederCorridors,
+} from './career-sr-hubs.js';
+import {
+  assertGfCareerHubCatalog,
+  GF_CAREER_HUBS,
+  buildGfFeederCorridors,
+} from './career-gf-hubs.js';
+import {
+  assertPaCareerHubCatalog,
+  PA_CAREER_HUBS,
+  buildPaFeederCorridors,
+} from './career-pa-hubs.js';
+import {
+  assertCrCareerHubCatalog,
+  CR_CAREER_HUBS,
+  buildCrFeederCorridors,
+} from './career-cr-hubs.js';
+import {
+  assertNiCareerHubCatalog,
+  NI_CAREER_HUBS,
+  buildNiFeederCorridors,
+} from './career-ni-hubs.js';
+import {
+  assertHnCareerHubCatalog,
+  HN_CAREER_HUBS,
+  buildHnFeederCorridors,
+} from './career-hn-hubs.js';
+import {
+  assertSvCareerHubCatalog,
+  SV_CAREER_HUBS,
+  buildSvFeederCorridors,
+} from './career-sv-hubs.js';
+import {
+  assertGtCareerHubCatalog,
+  GT_CAREER_HUBS,
+  buildGtFeederCorridors,
+} from './career-gt-hubs.js';
+import {
+  assertBzCareerHubCatalog,
+  BZ_CAREER_HUBS,
+  buildBzFeederCorridors,
+} from './career-bz-hubs.js';
+import {
+  assertCuCareerHubCatalog,
+  CU_CAREER_HUBS,
+  buildCuFeederCorridors,
+} from './career-cu-hubs.js';
+import {
+  assertDoCareerHubCatalog,
+  DO_CAREER_HUBS,
+  buildDoFeederCorridors,
+} from './career-do-hubs.js';
+import {
+  assertHtCareerHubCatalog,
+  HT_CAREER_HUBS,
+  buildHtFeederCorridors,
+} from './career-ht-hubs.js';
+import {
+  assertJmCareerHubCatalog,
+  JM_CAREER_HUBS,
+  buildJmFeederCorridors,
+} from './career-jm-hubs.js';
+import {
+  assertBsCareerHubCatalog,
+  BS_CAREER_HUBS,
+  buildBsFeederCorridors,
+} from './career-bs-hubs.js';
+import {
+  assertTtCareerHubCatalog,
+  TT_CAREER_HUBS,
+  buildTtFeederCorridors,
+} from './career-tt-hubs.js';
+import {
+  assertBbCareerHubCatalog,
+  BB_CAREER_HUBS,
+  buildBbFeederCorridors,
+} from './career-bb-hubs.js';
+import {
+  assertLcCareerHubCatalog,
+  LC_CAREER_HUBS,
+  buildLcFeederCorridors,
+} from './career-lc-hubs.js';
+import {
+  assertGdCareerHubCatalog,
+  GD_CAREER_HUBS,
+  buildGdFeederCorridors,
+} from './career-gd-hubs.js';
+import {
+  assertAgCareerHubCatalog,
+  AG_CAREER_HUBS,
+  buildAgFeederCorridors,
+} from './career-ag-hubs.js';
+import {
+  assertGpCareerHubCatalog,
+  GP_CAREER_HUBS,
+  buildGpFeederCorridors,
+} from './career-gp-hubs.js';
+import {
+  assertMqCareerHubCatalog,
+  MQ_CAREER_HUBS,
+  buildMqFeederCorridors,
+} from './career-mq-hubs.js';
+import {
+  assertCwCareerHubCatalog,
+  CW_CAREER_HUBS,
+  buildCwFeederCorridors,
+} from './career-cw-hubs.js';
+import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
 import {
   assertMxCareerHubCatalog,
@@ -462,7 +613,7 @@ export const HUB_TIER_PROFILE: Record<
   },
 };
 
-/** Curated ICAO → tier map (BR + US + CA + MX + AR + CL catalogs). */
+/** Curated ICAO → tier map (all career country catalogs). */
 export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(US_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
@@ -470,6 +621,36 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(MX_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(AR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(CL_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(UY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(PY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(PE_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BO_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(EC_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(CO_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(VE_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(GY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(SR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(GF_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(PA_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(CR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(NI_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(HN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(SV_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(GT_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BZ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(CU_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(DO_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(HT_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(JM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BS_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(TT_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BB_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(LC_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(GD_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(AG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(GP_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(MQ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(CW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -709,6 +890,72 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'MMMX', b: 'MMVR', weight: 1.5 },
   { a: 'MMUN', b: 'MMSD', weight: 1.4 },
   { a: 'MMMX', b: 'MMPR', weight: 1.5 },
+  // Uruguay / Paraguay domestic trunks
+  { a: 'SUMU', b: 'SULS', weight: 1.7 },
+  { a: 'SUMU', b: 'SUPU', weight: 1.5 },
+  { a: 'SGAS', b: 'SGES', weight: 2.0 },
+  { a: 'SGAS', b: 'SGEN', weight: 1.5 },
+  // Peru domestic trunks
+  { a: 'SPJC', b: 'SPZO', weight: 2.0 },
+  { a: 'SPJC', b: 'SPQU', weight: 1.8 },
+  { a: 'SPJC', b: 'SPRU', weight: 1.7 },
+  { a: 'SPJC', b: 'SPQT', weight: 1.6 },
+  // Bolivia domestic trunks
+  { a: 'SLLP', b: 'SLVR', weight: 2.1 },
+  { a: 'SLLP', b: 'SLCB', weight: 1.8 },
+  { a: 'SLVR', b: 'SLCB', weight: 1.6 },
+  // Ecuador domestic trunks
+  { a: 'SEQU', b: 'SEGU', weight: 2.1 },
+  { a: 'SEGU', b: 'SECU', weight: 1.6 },
+  { a: 'SEQU', b: 'SEMT', weight: 1.5 },
+  // Colombia domestic trunks
+  { a: 'SKBO', b: 'SKRG', weight: 2.2 },
+  { a: 'SKBO', b: 'SKCL', weight: 2.0 },
+  { a: 'SKBO', b: 'SKCG', weight: 1.8 },
+  { a: 'SKRG', b: 'SKCL', weight: 1.7 },
+  { a: 'SKBQ', b: 'SKCG', weight: 1.6 },
+  // Venezuela domestic trunks
+  { a: 'SVMI', b: 'SVMC', weight: 1.9 },
+  { a: 'SVMI', b: 'SVVA', weight: 1.8 },
+  { a: 'SVMI', b: 'SVPR', weight: 1.6 },
+  { a: 'SVMI', b: 'SVMG', weight: 1.5 },
+  // Guianas domestic
+  { a: 'SYCJ', b: 'SYEC', weight: 1.6 },
+  { a: 'SMJP', b: 'SMZO', weight: 1.6 },
+  // Central America domestic trunks
+  { a: 'MPTO', b: 'MPMG', weight: 2.0 },
+  { a: 'MPTO', b: 'MPDA', weight: 1.8 },
+  { a: 'MPTO', b: 'MPBO', weight: 1.5 },
+  { a: 'MROC', b: 'MRLB', weight: 1.9 },
+  { a: 'MROC', b: 'MRPV', weight: 1.7 },
+  { a: 'MROC', b: 'MRLM', weight: 1.6 },
+  { a: 'MNMG', b: 'MNPC', weight: 1.7 },
+  { a: 'MNMG', b: 'MNBL', weight: 1.5 },
+  { a: 'MHTG', b: 'MHLM', weight: 2.0 },
+  { a: 'MHLM', b: 'MHLC', weight: 1.7 },
+  { a: 'MHTG', b: 'MHRO', weight: 1.5 },
+  { a: 'MSLP', b: 'MSSS', weight: 1.8 },
+  { a: 'MGGT', b: 'MGFL', weight: 1.8 },
+  { a: 'MGGT', b: 'MGSJ', weight: 1.6 },
+  { a: 'MZBZ', b: 'MZPL', weight: 1.6 },
+  // Caribbean domestic trunks (light — intl carries regional trade)
+  { a: 'MUHA', b: 'MUCU', weight: 1.8 },
+  { a: 'MUHA', b: 'MUVR', weight: 1.6 },
+  { a: 'MDSD', b: 'MDPC', weight: 1.9 },
+  { a: 'MDSD', b: 'MDST', weight: 1.7 },
+  { a: 'MTPP', b: 'MTCH', weight: 1.5 },
+  { a: 'MKJP', b: 'MKJS', weight: 1.9 },
+  { a: 'MYNN', b: 'MYGF', weight: 1.6 },
+  { a: 'TTPP', b: 'TTCP', weight: 1.7 },
+  { a: 'TLPL', b: 'TLPC', weight: 1.5 },
+  { a: 'TAPA', b: 'TAPH', weight: 1.4 },
+  // Puerto Rico domestic US trunks (US-PR ↔ continental SE/NE)
+  { a: 'TJSJ', b: 'KMIA', weight: 2.1 },
+  { a: 'TJSJ', b: 'KEWR', weight: 1.8 },
+  { a: 'TJSJ', b: 'TJBQ', weight: 1.6 },
+  { a: 'TJSJ', b: 'TJPS', weight: 1.5 },
+  // FR/NL Caribbean territory domestic
+  { a: 'TFFR', b: 'TFFM', weight: 1.4 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -723,6 +970,36 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildMxFeederCorridors(MX_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildArFeederCorridors(AR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildClFeederCorridors(CL_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildUyFeederCorridors(UY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildPyFeederCorridors(PY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildPeFeederCorridors(PE_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBoFeederCorridors(BO_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildEcFeederCorridors(EC_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildCoFeederCorridors(CO_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildVeFeederCorridors(VE_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildGyFeederCorridors(GY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildSrFeederCorridors(SR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildGfFeederCorridors(GF_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildPaFeederCorridors(PA_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildCrFeederCorridors(CR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildNiFeederCorridors(NI_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildHnFeederCorridors(HN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildSvFeederCorridors(SV_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildGtFeederCorridors(GT_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBzFeederCorridors(BZ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildCuFeederCorridors(CU_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildDoFeederCorridors(DO_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildHtFeederCorridors(HT_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildJmFeederCorridors(JM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBsFeederCorridors(BS_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildTtFeederCorridors(TT_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBbFeederCorridors(BB_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildLcFeederCorridors(LC_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildGdFeederCorridors(GD_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildAgFeederCorridors(AG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildGpFeederCorridors(GP_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildMqFeederCorridors(MQ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildCwFeederCorridors(CW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -1059,6 +1336,597 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'KLAX',
     capacityKgPerDay: 40_000,
   },
+  // Cone Sul — Uruguay / Paraguay
+  {
+    id: 'lane_sbpa_sumu',
+    originCountryId: 'BR',
+    destCountryId: 'UY',
+    originIcao: 'SBPA',
+    destIcao: 'SUMU',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_sbgr_sumu',
+    originCountryId: 'BR',
+    destCountryId: 'UY',
+    originIcao: 'SBGR',
+    destIcao: 'SUMU',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_saez_sumu',
+    originCountryId: 'AR',
+    destCountryId: 'UY',
+    originIcao: 'SAEZ',
+    destIcao: 'SUMU',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_sbgr_sgas',
+    originCountryId: 'BR',
+    destCountryId: 'PY',
+    originIcao: 'SBGR',
+    destIcao: 'SGAS',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_sbct_sgas',
+    originCountryId: 'BR',
+    destCountryId: 'PY',
+    originIcao: 'SBCT',
+    destIcao: 'SGAS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_saez_sgas',
+    originCountryId: 'AR',
+    destCountryId: 'PY',
+    originIcao: 'SAEZ',
+    destIcao: 'SGAS',
+    capacityKgPerDay: 45_000,
+  },
+  // Andes — Peru / Bolivia / Ecuador
+  {
+    id: 'lane_sbgr_spjc',
+    originCountryId: 'BR',
+    destCountryId: 'PE',
+    originIcao: 'SBGR',
+    destIcao: 'SPJC',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_scel_spjc',
+    originCountryId: 'CL',
+    destCountryId: 'PE',
+    originIcao: 'SCEL',
+    destIcao: 'SPJC',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_spjc_kmia',
+    originCountryId: 'PE',
+    destCountryId: 'US',
+    originIcao: 'SPJC',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_sbgr_sllp',
+    originCountryId: 'BR',
+    destCountryId: 'BO',
+    originIcao: 'SBGR',
+    destIcao: 'SLLP',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_saez_slvr',
+    originCountryId: 'AR',
+    destCountryId: 'BO',
+    originIcao: 'SAEZ',
+    destIcao: 'SLVR',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_spjc_sllp',
+    originCountryId: 'PE',
+    destCountryId: 'BO',
+    originIcao: 'SPJC',
+    destIcao: 'SLLP',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_spjc_sequ',
+    originCountryId: 'PE',
+    destCountryId: 'EC',
+    originIcao: 'SPJC',
+    destIcao: 'SEQU',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_segu_kmia',
+    originCountryId: 'EC',
+    destCountryId: 'US',
+    originIcao: 'SEGU',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_sbgr_segu',
+    originCountryId: 'BR',
+    destCountryId: 'EC',
+    originIcao: 'SBGR',
+    destIcao: 'SEGU',
+    capacityKgPerDay: 35_000,
+  },
+  // Northern SA — Colombia / Venezuela
+  {
+    id: 'lane_sbgr_skbo',
+    originCountryId: 'BR',
+    destCountryId: 'CO',
+    originIcao: 'SBGR',
+    destIcao: 'SKBO',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_skbo_kmia',
+    originCountryId: 'CO',
+    destCountryId: 'US',
+    originIcao: 'SKBO',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 60_000,
+  },
+  {
+    id: 'lane_skcg_kmia',
+    originCountryId: 'CO',
+    destCountryId: 'US',
+    originIcao: 'SKCG',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_skbo_mmmx',
+    originCountryId: 'CO',
+    destCountryId: 'MX',
+    originIcao: 'SKBO',
+    destIcao: 'MMMX',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_skbo_sequ',
+    originCountryId: 'CO',
+    destCountryId: 'EC',
+    originIcao: 'SKBO',
+    destIcao: 'SEQU',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_skbo_spjc',
+    originCountryId: 'CO',
+    destCountryId: 'PE',
+    originIcao: 'SKBO',
+    destIcao: 'SPJC',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_skbo_svmi',
+    originCountryId: 'CO',
+    destCountryId: 'VE',
+    originIcao: 'SKBO',
+    destIcao: 'SVMI',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_svmi_kmia',
+    originCountryId: 'VE',
+    destCountryId: 'US',
+    originIcao: 'SVMI',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_sbeg_svmi',
+    originCountryId: 'BR',
+    destCountryId: 'VE',
+    originIcao: 'SBEG',
+    destIcao: 'SVMI',
+    capacityKgPerDay: 35_000,
+  },
+  // Guianas
+  {
+    id: 'lane_svmi_sycj',
+    originCountryId: 'VE',
+    destCountryId: 'GY',
+    originIcao: 'SVMI',
+    destIcao: 'SYCJ',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_sbbe_sycj',
+    originCountryId: 'BR',
+    destCountryId: 'GY',
+    originIcao: 'SBBE',
+    destIcao: 'SYCJ',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_sycj_smjp',
+    originCountryId: 'GY',
+    destCountryId: 'SR',
+    originIcao: 'SYCJ',
+    destIcao: 'SMJP',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_sbbe_smjp',
+    originCountryId: 'BR',
+    destCountryId: 'SR',
+    originIcao: 'SBBE',
+    destIcao: 'SMJP',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_smjp_soca',
+    originCountryId: 'SR',
+    destCountryId: 'GF',
+    originIcao: 'SMJP',
+    destIcao: 'SOCA',
+    capacityKgPerDay: 20_000,
+  },
+  {
+    id: 'lane_sbbe_soca',
+    originCountryId: 'BR',
+    destCountryId: 'GF',
+    originIcao: 'SBBE',
+    destIcao: 'SOCA',
+    capacityKgPerDay: 20_000,
+  },
+  // Central America
+  {
+    id: 'lane_mpto_mroc',
+    originCountryId: 'PA',
+    destCountryId: 'CR',
+    originIcao: 'MPTO',
+    destIcao: 'MROC',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_mpto_skbo',
+    originCountryId: 'PA',
+    destCountryId: 'CO',
+    originIcao: 'MPTO',
+    destIcao: 'SKBO',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_mpto_kmia',
+    originCountryId: 'PA',
+    destCountryId: 'US',
+    originIcao: 'MPTO',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 70_000,
+  },
+  {
+    id: 'lane_mpto_mmmx',
+    originCountryId: 'PA',
+    destCountryId: 'MX',
+    originIcao: 'MPTO',
+    destIcao: 'MMMX',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_sbgr_mpto',
+    originCountryId: 'BR',
+    destCountryId: 'PA',
+    originIcao: 'SBGR',
+    destIcao: 'MPTO',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_mroc_mnmg',
+    originCountryId: 'CR',
+    destCountryId: 'NI',
+    originIcao: 'MROC',
+    destIcao: 'MNMG',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_mroc_kmia',
+    originCountryId: 'CR',
+    destCountryId: 'US',
+    originIcao: 'MROC',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_mroc_mmmx',
+    originCountryId: 'CR',
+    destCountryId: 'MX',
+    originIcao: 'MROC',
+    destIcao: 'MMMX',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_mnmg_mhtg',
+    originCountryId: 'NI',
+    destCountryId: 'HN',
+    originIcao: 'MNMG',
+    destIcao: 'MHTG',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_mhtg_mslp',
+    originCountryId: 'HN',
+    destCountryId: 'SV',
+    originIcao: 'MHTG',
+    destIcao: 'MSLP',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_mhlm_mggt',
+    originCountryId: 'HN',
+    destCountryId: 'GT',
+    originIcao: 'MHLM',
+    destIcao: 'MGGT',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_mslp_mggt',
+    originCountryId: 'SV',
+    destCountryId: 'GT',
+    originIcao: 'MSLP',
+    destIcao: 'MGGT',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_mggt_mmmx',
+    originCountryId: 'GT',
+    destCountryId: 'MX',
+    originIcao: 'MGGT',
+    destIcao: 'MMMX',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_mggt_mzbz',
+    originCountryId: 'GT',
+    destCountryId: 'BZ',
+    originIcao: 'MGGT',
+    destIcao: 'MZBZ',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_mzbz_mmun',
+    originCountryId: 'BZ',
+    destCountryId: 'MX',
+    originIcao: 'MZBZ',
+    destIcao: 'MMUN',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_mzbz_kmia',
+    originCountryId: 'BZ',
+    destCountryId: 'US',
+    originIcao: 'MZBZ',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 35_000,
+  },
+  // Caribbean — intl-first regional ring + continental gateways
+  {
+    id: 'lane_muha_kmia',
+    originCountryId: 'CU',
+    destCountryId: 'US',
+    originIcao: 'MUHA',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 60_000,
+  },
+  {
+    id: 'lane_muha_mdsd',
+    originCountryId: 'CU',
+    destCountryId: 'DO',
+    originIcao: 'MUHA',
+    destIcao: 'MDSD',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_muha_mynn',
+    originCountryId: 'CU',
+    destCountryId: 'BS',
+    originIcao: 'MUHA',
+    destIcao: 'MYNN',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_mdsd_kmia',
+    originCountryId: 'DO',
+    destCountryId: 'US',
+    originIcao: 'MDSD',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 70_000,
+  },
+  {
+    id: 'lane_mdsd_mtpp',
+    originCountryId: 'DO',
+    destCountryId: 'HT',
+    originIcao: 'MDSD',
+    destIcao: 'MTPP',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_mdsd_mkjp',
+    originCountryId: 'DO',
+    destCountryId: 'JM',
+    originIcao: 'MDSD',
+    destIcao: 'MKJP',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_mdsd_skcg',
+    originCountryId: 'DO',
+    destCountryId: 'CO',
+    originIcao: 'MDSD',
+    destIcao: 'SKCG',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_mtpp_kmia',
+    originCountryId: 'HT',
+    destCountryId: 'US',
+    originIcao: 'MTPP',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_mkjp_kmia',
+    originCountryId: 'JM',
+    destCountryId: 'US',
+    originIcao: 'MKJP',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 55_000,
+  },
+  {
+    id: 'lane_mkjp_ttpp',
+    originCountryId: 'JM',
+    destCountryId: 'TT',
+    originIcao: 'MKJP',
+    destIcao: 'TTPP',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_mynn_kmia',
+    originCountryId: 'BS',
+    destCountryId: 'US',
+    originIcao: 'MYNN',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_mynn_mmun',
+    originCountryId: 'BS',
+    destCountryId: 'MX',
+    originIcao: 'MYNN',
+    destIcao: 'MMUN',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_ttpp_svmi',
+    originCountryId: 'TT',
+    destCountryId: 'VE',
+    originIcao: 'TTPP',
+    destIcao: 'SVMI',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ttpp_tbpb',
+    originCountryId: 'TT',
+    destCountryId: 'BB',
+    originIcao: 'TTPP',
+    destIcao: 'TBPB',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_ttpp_tgpy',
+    originCountryId: 'TT',
+    destCountryId: 'GD',
+    originIcao: 'TTPP',
+    destIcao: 'TGPY',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_tbpb_tlpl',
+    originCountryId: 'BB',
+    destCountryId: 'LC',
+    originIcao: 'TBPB',
+    destIcao: 'TLPL',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_tlpl_tapa',
+    originCountryId: 'LC',
+    destCountryId: 'AG',
+    originIcao: 'TLPL',
+    destIcao: 'TAPA',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_tlpl_tgpy',
+    originCountryId: 'LC',
+    destCountryId: 'GD',
+    originIcao: 'TLPL',
+    destIcao: 'TGPY',
+    capacityKgPerDay: 20_000,
+  },
+  {
+    id: 'lane_tapa_kmia',
+    originCountryId: 'AG',
+    destCountryId: 'US',
+    originIcao: 'TAPA',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 30_000,
+  },
+  // Caribbean dependencies (GP / MQ / CW)
+  {
+    id: 'lane_tffr_tfff',
+    originCountryId: 'GP',
+    destCountryId: 'MQ',
+    originIcao: 'TFFR',
+    destIcao: 'TFFF',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_tffr_tapa',
+    originCountryId: 'GP',
+    destCountryId: 'AG',
+    originIcao: 'TFFR',
+    destIcao: 'TAPA',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_tffr_kmia',
+    originCountryId: 'GP',
+    destCountryId: 'US',
+    originIcao: 'TFFR',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_tfff_tbpb',
+    originCountryId: 'MQ',
+    destCountryId: 'BB',
+    originIcao: 'TFFF',
+    destIcao: 'TBPB',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_tfff_kmia',
+    originCountryId: 'MQ',
+    destCountryId: 'US',
+    originIcao: 'TFFF',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_tncc_ttpp',
+    originCountryId: 'CW',
+    destCountryId: 'TT',
+    originIcao: 'TNCC',
+    destIcao: 'TTPP',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_tncc_svmi',
+    originCountryId: 'CW',
+    destCountryId: 'VE',
+    originIcao: 'TNCC',
+    destIcao: 'SVMI',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_tncc_kmia',
+    originCountryId: 'CW',
+    destCountryId: 'US',
+    originIcao: 'TNCC',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 35_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -1270,6 +2138,68 @@ export const FUEL_HUB_ICAOS = new Set([
   'MMHO',
   'MMVR',
   'MMSD',
+  // Argentina / Chile Jet-A producers (were missing — spokes starved)
+  'SAEZ',
+  'SABE',
+  'SACO',
+  'SAME',
+  'SCEL',
+  'SCTE',
+  'SCDA',
+  'SCCI',
+  // Uruguay / Paraguay
+  'SUMU',
+  'SGAS',
+  // Peru / Bolivia / Ecuador
+  'SPJC',
+  'SPZO',
+  'SPQT',
+  'SLLP',
+  'SLVR',
+  'SEQU',
+  'SEGU',
+  // Colombia / Venezuela
+  'SKBO',
+  'SKRG',
+  'SKCG',
+  'SKCL',
+  'SVMI',
+  'SVMC',
+  'SVPR',
+  // Guianas
+  'SYCJ',
+  'SMJP',
+  'SOCA',
+  // Central America
+  'MPTO',
+  'MPDA',
+  'MROC',
+  'MRLB',
+  'MNMG',
+  'MHTG',
+  'MHLM',
+  'MSLP',
+  'MGGT',
+  'MZBZ',
+  // Caribbean
+  'MUHA',
+  'MUCU',
+  'MDSD',
+  'MDPC',
+  'MTPP',
+  'MKJP',
+  'MKJS',
+  'MYNN',
+  'TTPP',
+  'TBPB',
+  'TLPL',
+  'TGPY',
+  'TAPA',
+  'TJSJ',
+  'TJBQ',
+  'TFFR',
+  'TFFF',
+  'TNCC',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -1554,6 +2484,186 @@ export const CAREER_HUB_COORDS: Readonly<
   ),
   ...Object.fromEntries(
     CL_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    UY_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    PY_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    PE_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    BO_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    EC_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    CO_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    VE_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    GY_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    SR_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    GF_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    PA_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    CR_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    NI_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    HN_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    SV_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    GT_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    BZ_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    CU_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    DO_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    HT_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    JM_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    BS_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    TT_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    BB_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    LC_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    GD_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    AG_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    GP_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    MQ_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    CW_CAREER_HUBS.map((h) => [
       h.icao,
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
@@ -1860,8 +2970,8 @@ function ensurePile(
 }
 
 /**
- * Seed the career cargo world: BR + US + CA + MX hubs, with asymmetric
- * production/consumption so ticks create explainable lanes.
+ * Seed the career cargo world: Americas hubs (SA + Central America + Caribbean +
+ * US/CA/MX), with asymmetric production/consumption so ticks create explainable lanes.
  */
 export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEconomyWorld {
   const seed = opts.seed?.trim() || 'skyline-career-br-v1';
@@ -1869,10 +2979,41 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
 
   assertBrCareerHubCatalog();
   assertUsCareerHubCatalog();
+  assertUsPrCareerHubCatalog();
   assertCaCareerHubCatalog();
   assertMxCareerHubCatalog();
   assertArCareerHubCatalog();
   assertClCareerHubCatalog();
+  assertUyCareerHubCatalog();
+  assertPyCareerHubCatalog();
+  assertPeCareerHubCatalog();
+  assertBoCareerHubCatalog();
+  assertEcCareerHubCatalog();
+  assertCoCareerHubCatalog();
+  assertVeCareerHubCatalog();
+  assertGyCareerHubCatalog();
+  assertSrCareerHubCatalog();
+  assertGfCareerHubCatalog();
+  assertPaCareerHubCatalog();
+  assertCrCareerHubCatalog();
+  assertNiCareerHubCatalog();
+  assertHnCareerHubCatalog();
+  assertSvCareerHubCatalog();
+  assertGtCareerHubCatalog();
+  assertBzCareerHubCatalog();
+  assertCuCareerHubCatalog();
+  assertDoCareerHubCatalog();
+  assertHtCareerHubCatalog();
+  assertJmCareerHubCatalog();
+  assertBsCareerHubCatalog();
+  assertTtCareerHubCatalog();
+  assertBbCareerHubCatalog();
+  assertLcCareerHubCatalog();
+  assertGdCareerHubCatalog();
+  assertAgCareerHubCatalog();
+  assertGpCareerHubCatalog();
+  assertMqCareerHubCatalog();
+  assertCwCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -1935,6 +3076,276 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...CL_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...UY_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...PY_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...PE_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BO_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...EC_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...CO_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...VE_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...GY_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...SR_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...GF_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...PA_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...CR_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...NI_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...HN_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...SV_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...GT_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BZ_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...CU_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...DO_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...HT_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...JM_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BS_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...TT_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BB_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...LC_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...GD_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...AG_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...GP_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...MQ_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...CW_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

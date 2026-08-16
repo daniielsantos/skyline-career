@@ -3930,6 +3930,8 @@ export function laneDemandShock(
     destRegion: string;
     commodityId: CommodityId;
     tick?: number;
+    /** When set, skips re-filtering world.events (formLots hot path). */
+    events?: readonly EconomyEvent[];
   },
 ): LaneDemandShock {
   const tick = opts.tick ?? world.tick;
@@ -3939,7 +3941,8 @@ export function laneDemandShock(
   const labels: string[] = [];
   const kinds: EconomyEventKind[] = [];
 
-  for (const ev of activeEvents(world, tick)) {
+  const events = opts.events ?? activeEvents(world, tick);
+  for (const ev of events) {
     if (ev.region !== opts.originRegion && ev.region !== opts.destRegion) continue;
     if (!eventTouchesCommodity(ev, opts.commodityId)) continue;
     const atOrigin = ev.region === opts.originRegion;
@@ -4915,6 +4918,60 @@ function formLotsFromImbalances(
     else airportsByCountry.set(id, [ap]);
   }
 
+  const tickEvents = activeEvents(world, world.tick);
+  const weatherByRegion = new Map<string, ReturnType<typeof regionalWeatherIndex>>();
+  const regionWeather = (region: string) => {
+    let wx = weatherByRegion.get(region);
+    if (wx === undefined) {
+      wx = regionalWeatherIndex(world, region);
+      weatherByRegion.set(region, wx);
+    }
+    return wx;
+  };
+  const shockCache = new Map<string, LaneDemandShock>();
+  const demandShock = (
+    originRegion: string,
+    destRegion: string,
+    commodityId: CommodityId,
+  ): LaneDemandShock => {
+    const key = `${originRegion}|${destRegion}|${commodityId}`;
+    let shock = shockCache.get(key);
+    if (!shock) {
+      shock = laneDemandShock(world, {
+        originRegion,
+        destRegion,
+        commodityId,
+        events: tickEvents,
+      });
+      shockCache.set(key, shock);
+    }
+    return shock;
+  };
+  const boardPressureCache = new Map<
+    string,
+    { skipHeavy: boolean; skipAll: boolean }
+  >();
+  const boardPressureOf = (commodityId: CommodityId, partitionId: string) => {
+    const key = `${commodityId}:${partitionId}`;
+    let pressure = boardPressureCache.get(key);
+    if (!pressure) {
+      pressure = commodityBoardBloated(
+        world,
+        availableCounts,
+        commodityId,
+        partitionId,
+      );
+      boardPressureCache.set(key, pressure);
+    }
+    return pressure;
+  };
+  const invalidateBoardPressure = (
+    commodityId: CommodityId,
+    partitionId: string,
+  ) => {
+    boardPressureCache.delete(`${commodityId}:${partitionId}`);
+  };
+
   const pushLot = (
     key: string,
     commodity: (typeof CAREER_COMMODITIES)[number],
@@ -4942,14 +4999,10 @@ function formLotsFromImbalances(
     }
 
     const international = opts.international;
-    const originWx = regionalWeatherIndex(world, origin.ap.region);
-    const destWx = regionalWeatherIndex(world, dest.ap.region);
+    const originWx = regionWeather(origin.ap.region);
+    const destWx = regionWeather(dest.ap.region);
     const laneWeather = worseWeather(originWx, destWx);
-    const shock = laneDemandShock(world, {
-      originRegion: origin.ap.region,
-      destRegion: dest.ap.region,
-      commodityId: commodity.id,
-    });
+    const shock = demandShock(origin.ap.region, dest.ap.region, commodity.id);
     const destCap = dest.stock.capacityKg;
     const effectiveDestFill =
       destCap > 0 ? (dest.stock.stockKg + inboundKg) / destCap : dest.fill;
@@ -4967,9 +5020,9 @@ function formLotsFromImbalances(
         ? 1
         : 1.12;
     const corridorPayMult = 1 + Math.max(0, corridorW - 1) * 0.1;
-    const destPile = ensurePile(dest.ap, commodity.id);
+    // RankedAirport.stock is the live pile reference (same as ensurePile).
     const rawGap =
-      localUnitPriceUsd(commodity.id, destPile) -
+      localUnitPriceUsd(commodity.id, dest.stock) -
       localUnitPriceUsd(commodity.id, origin.stock);
     const gap = Math.max(
       rawGap,
@@ -5053,6 +5106,7 @@ function formLotsFromImbalances(
     recordLotFormationActivity(world, origin.ap.icao, dest.ap.icao);
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
     noteAvailableLot(availableCounts, commodity.id, opts.partitionId, qty, 1);
+    invalidateBoardPressure(commodity.id, opts.partitionId);
     noteLotFormed(world, commodity.id, qty, flowSizeBand(qty, size));
     if (size === 'xl') {
       xlCounts.set(key, (xlCounts.get(key) ?? 0) + 1);
@@ -5089,6 +5143,16 @@ function formLotsFromImbalances(
       if (!spokeFiller) return;
       if (opts.originHasOpenCorridor || rng() > 0.2) return;
     }
+
+    const boardPressure = boardPressureOf(commodity.id, opts.partitionId);
+    // Soft-cap full: nothing left to form (after spoke rng, for stream parity).
+    if (boardPressure.skipAll) return;
+
+    // Cheap reject before saturation / inbound work.
+    const priceGap = dest.price - origin.price;
+    const minGapMult = opts.international ? 0.12 : cw >= 1.5 ? 0.15 : 0.22;
+    if (priceGap < commodity.basePricePerKg * minGapMult) return;
+
     const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
     let caps = laneLotCaps(origin.tier, dest.tier, {
       originLevel: origin.ap.level,
@@ -5112,10 +5176,6 @@ function formLotsFromImbalances(
     const satPenalty = laneSat >= 0.5 ? 1 : 0;
     if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) return;
 
-    const priceGap = dest.price - origin.price;
-    const minGapMult = opts.international ? 0.12 : cw >= 1.5 ? 0.15 : 0.22;
-    if (priceGap < commodity.basePricePerKg * minGapMult) return;
-
     if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
       if (activeKgOnOd(origin.ap.icao, dest.ap.icao) >= opts.capacityKgPerDay) {
         return;
@@ -5127,12 +5187,6 @@ function formLotsFromImbalances(
     const roomKg = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
     let qty = Math.min(surplusKg, roomKg);
     qty = Math.floor(qty / 100) * 100;
-    const boardPressure = commodityBoardBloated(
-      world,
-      availableCounts,
-      commodity.id,
-      opts.partitionId,
-    );
 
     if (
       !boardPressure.skipHeavy &&
@@ -5466,13 +5520,7 @@ function formLotsFromImbalances(
           }
           if ((smallCounts.get(key) ?? 0) >= caps.maxSmall) continue;
 
-          const boardPressure = commodityBoardBloated(
-            world,
-            availableCounts,
-            commodity.id,
-            countryId,
-          );
-          if (boardPressure.skipAll) break;
+          if (boardPressureOf(commodity.id, countryId).skipAll) break;
 
           const take = Math.min(
             origin.stock.stockKg * (origin.tier === 'spoke' ? 0.5 : 0.08),
@@ -5516,8 +5564,16 @@ function formLotsFromImbalances(
 
   // --- International: only curated sparse lanes (both directions) ---
   const byIcaoAll = new Map(world.airports.map((ap) => [ap.icao.toUpperCase(), ap]));
+  const intlEndpointIcaos = new Set<string>();
+  for (const lane of world.internationalLanes ?? []) {
+    intlEndpointIcaos.add(lane.originIcao.trim().toUpperCase());
+    intlEndpointIcaos.add(lane.destIcao.trim().toUpperCase());
+  }
+  const intlAirports = world.airports.filter((ap) =>
+    intlEndpointIcaos.has(ap.icao.toUpperCase()),
+  );
   for (const commodity of CAREER_CARGO_COMMODITIES) {
-    const rankedAll = rankAirports(world.airports, commodity);
+    const rankedAll = rankAirports(intlAirports, commodity);
     const rankedByIcao = new Map(rankedAll.map((r) => [r.ap.icao.toUpperCase(), r]));
     for (const lane of world.internationalLanes ?? []) {
       const pairs: Array<[string, string]> = [

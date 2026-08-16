@@ -38,7 +38,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 7. ~~**América Central completa (seed)**~~ — PA/CR/NI/HN/GT/SV/BZ; ports costeiros; lanes MX/US/CO.
 8. ~~**Caribe (seed, intl-first)**~~ — CU/DO/HT/JM/BS/TT/BB/LC/GD/AG; ring + KMIA/MMUN/CO/VE.
 9. ~~**Dependências caribenhas**~~ — GP/MQ/CW + US-PR (região US); ports + lanes.
-10. **Tick perf (Fase 1)** — lane inbound index O(1) + activeLaneKg index + NPC bid caches. Bench: +1 day ~**2×** mais rápido (~43–60s in-memory vs ~90s); sem caps; pulse intacto. Próximo: formLots fino ou UX catch-up.
+10. **Tick perf (Fase 1 + formLots)** — lane indexes + formLots caches (weather/shock/boardPressure), price-gap early-out, intl rank só endpoints. Bench: +1 day ~**20–22s** in-memory (era ~90s → ~55s → ~21s); formLots ~5s. Sem caps de frota; pulse intacto. Próximo: UX catch-up ou Europa.
 11. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
 12. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
 13. Outras dependências (SX/AW/VI) — depois da otimização de tick.

@@ -2357,7 +2357,7 @@ export function PortsPanel(props: {
                                                 >
                                                   Hire ·{' '}
                                                   {props.formatMoney(
-                                                    cand.hireUsd,
+                                                    cand.hireUsd ?? 0,
                                                   )}
                                                 </button>
                                               </div>

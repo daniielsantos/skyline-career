@@ -1,10 +1,11 @@
-# Current state (2026-08-15)
+# Current state (2026-08-16)
 
 ## Desktop
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.44** (latest) | [v0.3.44](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.44) | Ocean ports BR→CA/MX (20); Ports catalog UX; settle GS gate; demand cap 96 |
+| **0.3.45** (latest) | [v0.3.45](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.45) | MD-11F brand (hero lockup + sidebar mark) + desktop icon |
+| **0.3.44** | [v0.3.44](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.44) | Ocean ports BR→CA/MX (20); Ports catalog UX; settle GS gate; demand cap 96 |
 | **0.3.43** | [v0.3.43](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.43) | Ports/WH/Demand Board; cruise burn Accu-Sim + catalog clamp |
 | **0.3.42** | [v0.3.42](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.42) | EN ROUTE live tiles: scale, 5 stations/row, scroll |
 | **0.3.41** | [v0.3.41](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.41) | Brand Horizon; cruise burn spike fix; EN ROUTE live tiles |

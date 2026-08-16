@@ -37,6 +37,7 @@ describe('career partition', () => {
     assert.deepEqual(listWorldCountryIds(world), [
       'AG',
       'AR',
+      'AW',
       'BB',
       'BO',
       'BR',
@@ -67,6 +68,7 @@ describe('career partition', () => {
       'PY',
       'SR',
       'SV',
+      'SX',
       'TT',
       'US',
       'UY',
@@ -104,7 +106,7 @@ describe('career partition', () => {
     );
     assert.deepEqual(
       usRegions,
-      new Set(['US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-W']),
+      new Set(['US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-VI', 'US-W']),
     );
   });
 

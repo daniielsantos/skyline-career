@@ -176,7 +176,18 @@ import {
   CW_CAREER_HUBS,
   buildCwFeederCorridors,
 } from './career-cw-hubs.js';
+import {
+  assertSxCareerHubCatalog,
+  SX_CAREER_HUBS,
+  buildSxFeederCorridors,
+} from './career-sx-hubs.js';
+import {
+  assertAwCareerHubCatalog,
+  AW_CAREER_HUBS,
+  buildAwFeederCorridors,
+} from './career-aw-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
+import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
 import {
   assertMxCareerHubCatalog,
@@ -652,6 +663,8 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(GP_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(MQ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(CW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(SX_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(AW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -955,6 +968,10 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'TJSJ', b: 'KEWR', weight: 1.8 },
   { a: 'TJSJ', b: 'TJBQ', weight: 1.6 },
   { a: 'TJSJ', b: 'TJPS', weight: 1.5 },
+  // U.S. Virgin Islands domestic US trunks (US-VI ↔ SE + inter-island)
+  { a: 'TIST', b: 'KMIA', weight: 1.9 },
+  { a: 'TIST', b: 'TISX', weight: 1.7 },
+  { a: 'TISX', b: 'KMIA', weight: 1.5 },
   // FR/NL Caribbean territory domestic
   { a: 'TFFR', b: 'TFFM', weight: 1.4 },
 ];
@@ -1001,6 +1018,8 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildGpFeederCorridors(GP_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMqFeederCorridors(MQ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildCwFeederCorridors(CW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildSxFeederCorridors(SX_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildAwFeederCorridors(AW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -1863,7 +1882,7 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'KMIA',
     capacityKgPerDay: 30_000,
   },
-  // Caribbean dependencies (GP / MQ / CW)
+  // Caribbean dependencies (GP / MQ / CW / SX / AW)
   {
     id: 'lane_tffr_tfff',
     originCountryId: 'GP',
@@ -1925,6 +1944,54 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     originCountryId: 'CW',
     destCountryId: 'US',
     originIcao: 'TNCC',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_tncm_tapa',
+    originCountryId: 'SX',
+    destCountryId: 'AG',
+    originIcao: 'TNCM',
+    destIcao: 'TAPA',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_tncm_tffr',
+    originCountryId: 'SX',
+    destCountryId: 'GP',
+    originIcao: 'TNCM',
+    destIcao: 'TFFR',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_tncm_kmia',
+    originCountryId: 'SX',
+    destCountryId: 'US',
+    originIcao: 'TNCM',
+    destIcao: 'KMIA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_tnca_tncc',
+    originCountryId: 'AW',
+    destCountryId: 'CW',
+    originIcao: 'TNCA',
+    destIcao: 'TNCC',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_tnca_svmi',
+    originCountryId: 'AW',
+    destCountryId: 'VE',
+    originIcao: 'TNCA',
+    destIcao: 'SVMI',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_tnca_kmia',
+    originCountryId: 'AW',
+    destCountryId: 'US',
+    originIcao: 'TNCA',
     destIcao: 'KMIA',
     capacityKgPerDay: 35_000,
   },
@@ -2201,6 +2268,9 @@ export const FUEL_HUB_ICAOS = new Set([
   'TFFR',
   'TFFF',
   'TNCC',
+  'TNCM',
+  'TNCA',
+  'TIST',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -2669,6 +2739,18 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    SX_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    AW_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -3015,6 +3097,9 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertGpCareerHubCatalog();
   assertMqCareerHubCatalog();
   assertCwCareerHubCatalog();
+  assertSxCareerHubCatalog();
+  assertAwCareerHubCatalog();
+  assertUsViCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -3347,6 +3432,24 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...CW_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...SX_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...AW_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

@@ -475,6 +475,30 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: -68.93,
     pickupHubs: ['TNCC'],
   },
+  {
+    id: 'SXPHI',
+    name: 'Port of Philipsburg',
+    countryId: 'SX',
+    lat: 18.03,
+    lon: -63.05,
+    pickupHubs: ['TNCM'],
+  },
+  {
+    id: 'AWORJ',
+    name: 'Port of Oranjestad',
+    countryId: 'AW',
+    lat: 12.52,
+    lon: -70.04,
+    pickupHubs: ['TNCA'],
+  },
+  {
+    id: 'USSTT',
+    name: 'Port of Charlotte Amalie',
+    countryId: 'US',
+    lat: 18.33,
+    lon: -64.93,
+    pickupHubs: ['TIST'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

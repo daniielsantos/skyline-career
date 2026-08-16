@@ -165,6 +165,12 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['CW', 'TT'],
     ['CW', 'VE'],
     ['CW', 'US'],
+    ['SX', 'AG'],
+    ['SX', 'GP'],
+    ['SX', 'US'],
+    ['AW', 'CW'],
+    ['AW', 'VE'],
+    ['AW', 'US'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

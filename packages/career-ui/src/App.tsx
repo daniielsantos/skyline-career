@@ -663,6 +663,8 @@ function regionLabel(region: string): string {
       return 'USA — West Coast';
     case 'US-PR':
       return 'Puerto Rico';
+    case 'US-VI':
+      return 'U.S. Virgin Islands';
     case 'CA-W':
       return 'Canada — West';
     case 'CA-PR':
@@ -765,6 +767,10 @@ function regionLabel(region: string): string {
       return 'Martinique';
     case 'CW-C':
       return 'Curacao';
+    case 'SX-C':
+      return 'Sint Maarten';
+    case 'AW-C':
+      return 'Aruba';
     default:
       return region;
   }

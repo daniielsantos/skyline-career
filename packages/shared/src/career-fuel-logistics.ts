@@ -77,8 +77,9 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'BR-S': ['BR-SE', 'BR-CO'],
   // US continental road-neighbor graph (no BR↔US road hauls preferred).
   'US-NE': ['US-SE', 'US-MW'],
-  'US-SE': ['US-NE', 'US-MW', 'US-SC', 'US-PR'],
-  'US-PR': ['US-SE'],
+  'US-SE': ['US-NE', 'US-MW', 'US-SC', 'US-PR', 'US-VI'],
+  'US-PR': ['US-SE', 'US-VI'],
+  'US-VI': ['US-SE', 'US-PR'],
   'US-MW': ['US-NE', 'US-SE', 'US-SC', 'US-MT'],
   'US-SC': ['US-SE', 'US-MW', 'US-MT', 'US-W'],
   'US-MT': ['US-MW', 'US-SC', 'US-W'],

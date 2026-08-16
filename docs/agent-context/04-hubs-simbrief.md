@@ -21,11 +21,12 @@
 
 ## Caribbean seed (complete, intl-first)
 
-- Countries: CU/DO/HT/JM/BS/TT/BB/LC/GD/AG + **GP/MQ/CW**
+- Countries: CU/DO/HT/JM/BS/TT/BB/LC/GD/AG + **GP/MQ/CW/SX/AW**
 - **Puerto Rico:** region `US-PR` under US (TJSJ…); domestic corridors to KMIA/KEWR — not a separate country
-- Seed airports (world): **547**
-- Ports: … + San Juan, Pointe-à-Pitre, Fort-de-France, Willemstad
-- BB/GD/MQ/CW: single-major catalogs where island is tiny
+- **U.S. Virgin Islands:** region `US-VI` under US (TIST/TISX); domestic to KMIA + inter-island
+- Seed airports (world): **551**
+- Ports: … + San Juan, Pointe-à-Pitre, Fort-de-France, Willemstad, Philipsburg, Oranjestad, Charlotte Amalie
+- BB/GD/MQ/CW/SX/AW: single-major catalogs where island is tiny
 
 ## SimBrief cargo allowlist
 

@@ -77,31 +77,32 @@ export function WatchStatusFooter(props: Props) {
     watchRunning && props.watch?.groundSpeedKt != null
       ? props.watch.groundSpeedKt
       : (props.simBridge?.groundSpeedKt ?? null);
-  const stageDetail = watchRunning
-    ? formatWatchPhaseLabel(bridgePhase) !== '—'
-      ? formatWatchPhaseLabel(bridgePhase)
-      : bridgeOnGround === true
-        ? bridgeEngines
-          ? 'On ground · engines'
-          : 'On ground'
-        : bridgeOnGround === false
-          ? 'Airborne'
-          : 'Sampling…'
-    : bridgePhase === 'taxi' ||
-        (bridgeOnGround === true &&
-          bridgeEngines &&
-          typeof bridgeGs === 'number' &&
-          bridgeGs >= 5)
-      ? 'Taxiing'
-      : bridgeOnGround === true
-        ? bridgeEngines
-          ? 'On ground · engines'
-          : 'On ground'
-        : bridgeOnGround === false
-          ? 'Airborne'
-          : bridgeConnected
-            ? 'Sampling…'
-            : '—';
+  const stageDetail = (() => {
+    const phaseLabel = formatWatchPhaseLabel(bridgePhase);
+    const movingOnGround =
+      bridgeOnGround === true &&
+      typeof bridgeGs === 'number' &&
+      bridgeGs >= 5;
+    if (watchRunning) {
+      if (bridgePhase === 'taxi_in') return 'Taxi in';
+      if (bridgePhase === 'taxi_out' || bridgePhase === 'taxi') {
+        return phaseLabel !== '—' ? phaseLabel : 'Taxiing';
+      }
+      if (bridgePhase === 'ground' && movingOnGround) return 'Taxiing';
+      if (phaseLabel !== '—') return phaseLabel;
+      if (bridgeOnGround === true) {
+        return bridgeEngines ? 'On ground · engines' : 'On ground';
+      }
+      if (bridgeOnGround === false) return 'Airborne';
+      return 'Sampling…';
+    }
+    if (bridgePhase === 'taxi' || movingOnGround) return 'Taxiing';
+    if (bridgeOnGround === true) {
+      return bridgeEngines ? 'On ground · engines' : 'On ground';
+    }
+    if (bridgeOnGround === false) return 'Airborne';
+    return bridgeConnected ? 'Sampling…' : '—';
+  })();
   // Server already sticky-holds pipeConnected across single blips; trust it.
   const watchPipeLive =
     watchRunning && props.watch?.pipeConnected !== false;

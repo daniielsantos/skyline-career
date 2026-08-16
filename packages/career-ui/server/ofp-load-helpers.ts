@@ -39,6 +39,8 @@ import {
   redistributeAroundResidualFloors,
   liveFuelMatchesTarget,
   FREIGHTER_PILOT_LB,
+  FREIGHTER_CREW_STATION_SOFT_MAX_LB,
+  SEAT_OCCUPANT_SOFT_MAX_LB,
   GA_BAGGAGE_SOFT_MAX_LB,
   resolveCgCounterweightBias,
   resolveCgFillAction,
@@ -1182,8 +1184,15 @@ async function applyMissionOfpLoadExclusive(
     }
     const preferSeatFill = (built.passengerStations?.length ?? 0) > 0;
     const seatSoftMaxByIndex: Record<number, number> = {};
+    const seatOccupantSoft = preferSeatFill
+      ? SEAT_OCCUPANT_SOFT_MAX_LB
+      : FREIGHTER_CREW_STATION_SOFT_MAX_LB;
     for (const idx of seatStations) {
-      seatSoftMaxByIndex[idx] = seatSoftMaxLb(resolved.profile, idx);
+      seatSoftMaxByIndex[idx] = seatSoftMaxLb(
+        resolved.profile,
+        idx,
+        seatOccupantSoft,
+      );
     }
     let baggageSoftMaxByIndex: Record<number, number> = {};
     const rebuildBaggageSoftMax = () => {
@@ -1235,6 +1244,24 @@ async function applyMissionOfpLoadExclusive(
           tanksToFuelLb(tanks),
         ) ?? schematicTanksFromProfile(tanks);
       lastGoodFuelLb = tanksToFuelLb(tanks);
+    };
+
+    /**
+     * Re-sample live tanks and paint the fuel card. Prefer written values when
+     * SimConnect under-reads AUX/TIP (classic flash), but adopt live outers when
+     * the aircraft redistributes fuel tip↔main after our write — otherwise the
+     * schematic stays "mains full / tips empty" until payload verify.
+     */
+    const refreshFuelUiFromLive = async (
+      writtenFallback: Record<string, number>,
+    ) => {
+      try {
+        const live = await readLiveTanks(bridge, resolved.profile);
+        const base = fuelUiTanks ?? writtenFallback;
+        paintFuelUiFromWriteTarget(preferWrittenFuelTanks(live, base));
+      } catch {
+        /* keep last painted target */
+      }
     };
 
     const publishLiveProgress = (
@@ -1634,9 +1661,12 @@ async function applyMissionOfpLoadExclusive(
           paintFuelUiFromWriteTarget(endTanks);
         }
       }
-      // Fuel phase done — lock Sim at Due before any payload progress message.
+      // Fuel phase done — settle, then re-read so tip/nacelle redistribution
+      // shows on the card before payload (not only after verify).
       if (!restoreFuelOnRollback) {
         paintFuelUiFromWriteTarget(endTanks);
+        await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
+        await refreshFuelUiFromLive(endTanks);
         publishLiveProgress(
           'injecting',
           `Fuel complete · ${Math.round(lastGoodFuelLb ?? 0)} lb — loading payload…`,
@@ -1649,6 +1679,7 @@ async function applyMissionOfpLoadExclusive(
       const skipTanks =
         Object.keys(plannedTanks).length > 0 ? plannedTanks : beforeLive.tanks;
       paintFuelUiFromWriteTarget(skipTanks);
+      await refreshFuelUiFromLive(skipTanks);
     }
 
     // Seed crew floors on aircraft before cargo rounds.
@@ -1682,6 +1713,13 @@ async function applyMissionOfpLoadExclusive(
     if (fuelOk) {
       for (let i = 0; i < CG_REBALANCE_MAX_ITERATIONS; i++) {
         assertOfpLoadNotCancelled(mission.id);
+        // Soft-refresh fuel schematic while placing cargo — catches tip/main
+        // transfer that only appears a second or two after the fuel write.
+        if (i > 0 && i % 3 === 0) {
+          await refreshFuelUiFromLive(
+            fuelUiTanks ?? plannedTanks ?? beforeLive.tanks,
+          );
+        }
         const stillPlacing = cargoPlacedLb < cargoTargetLb - 0.5;
         // Hybrid fill: equal across all cargo stations first (Kodiak /
         // Caravan). At a limit → shift and keep Due; leftover then stays
@@ -1982,20 +2020,41 @@ async function applyMissionOfpLoadExclusive(
           const direction = bias === 'aft' ? 'aft' : 'forward';
           const half = Math.max(1, Math.ceil(seatCount / 2));
           const shiftBudget = perSeatLb * half;
+          // Freighter (no pax): always shift crew+baggage together. Seat-only
+          // shift on arm-less profiles fake-moves L/R crew pairs (S1↔S2) then
+          // equalize undoes it — burned all CG iterations with movedLb>0 and
+          // unchanged stations (C90 at ~29.4% MAC).
+          const freighterShiftIndexes = built.movableStations;
+          const gaSeatShift =
+            preferSeatFill && seatStations.length >= 2
+              ? seatStations
+              : freighterShiftIndexes;
+          const freighterShiftOpts = {
+            minRetainByIndex,
+            softMaxByIndex: {
+              ...seatSoftMaxByIndex,
+              ...baggageSoftMaxByIndex,
+            },
+            // Fill forward baggage (S3/S4) before dumping onto crew (S1/S2).
+            deferTargetIndexes: built.crewStations,
+          };
           let shifted = shiftCargoForCg(
             workingStations,
             resolved.profile,
-            seatStations.length >= 2 ? seatStations : built.movableStations,
+            preferSeatFill ? gaSeatShift : freighterShiftIndexes,
             direction,
             shiftBudget,
-            {
-              minRetainByIndex,
-              softMaxByIndex: seatSoftMaxByIndex,
-            },
+            preferSeatFill
+              ? {
+                  minRetainByIndex,
+                  softMaxByIndex: seatSoftMaxByIndex,
+                }
+              : freighterShiftOpts,
           );
           if (
             shifted.movedLb <= 0 &&
             direction === 'forward' &&
+            preferSeatFill &&
             baggageStations.length > 0 &&
             seatStations.length > 0
           ) {
@@ -2012,12 +2071,13 @@ async function applyMissionOfpLoadExclusive(
                   ...seatSoftMaxByIndex,
                   ...baggageSoftMaxByIndex,
                 },
+                deferTargetIndexes: built.crewStations,
               },
             );
           }
           nextStations = shifted.stations;
           movedLb = shifted.movedLb;
-          // Freighter (no pax seats): shift among baggage when crew seats can't move.
+          // Freighter fallback if the combined soft-max path still couldn't move.
           if (
             shifted.movedLb <= 0 &&
             !preferSeatFill &&
@@ -2029,10 +2089,7 @@ async function applyMissionOfpLoadExclusive(
               built.movableStations,
               direction,
               shiftBudget,
-              {
-                minRetainByIndex,
-                softMaxByIndex: baggageSoftMaxByIndex,
-              },
+              freighterShiftOpts,
             );
             nextStations = shifted.stations;
             movedLb = shifted.movedLb;
@@ -2607,10 +2664,14 @@ async function applyMissionOfpLoadExclusive(
         workingStations,
       ),
     };
-    // Progress card keeps committed fuel write target through verify.
-    if (fuelUiTanks) {
-      paintFuelUiFromWriteTarget(fuelUiTanks);
-    }
+    // Prefer live distribution (tips/nacelles) over the OFP write map when the
+    // sim has redistributed; still hold written values if AUX/TIP under-read.
+    paintFuelUiFromWriteTarget(
+      preferWrittenFuelTanks(
+        afterLive.tanks,
+        fuelUiTanks ?? afterLive.tanks,
+      ),
+    );
 
     // Station SimVars can under-read on Accu-Sim while the tablet LVars hold the load.
     // Prefer a2a-lvars (same reader as Watch/Preflight); only then fall back to

@@ -512,22 +512,24 @@ export async function sampleLiveFlight(
   const combustion = [combEng1, combEng2]
     .filter((n): n is number => typeof n === 'number')
     .map((n) => n > 0.5);
+  const combustionFlags = [
+    typeof combEng1 === 'number' ? combEng1 > 0.5 : false,
+    typeof combEng2 === 'number' ? combEng2 > 0.5 : false,
+  ];
+  const fuelFlowKgPerHour = sumFlightFuelFlowKgPerHour({
+    numberOfEngines,
+    combustion: combustionFlags,
+    pph: [flowPph1, flowPph2],
+    recip: [flowRecip1, flowRecip2],
+    gph: [flowGph1, flowGph2],
+    general: [flowGeneral1, undefined],
+  });
   const enginesRunning = inferEnginesRunning({
     snapshotRunning: snap.enginesRunning,
     n1Pct,
     rpm,
     combustion,
-  });
-  const fuelFlowKgPerHour = sumFlightFuelFlowKgPerHour({
-    numberOfEngines,
-    combustion: [
-      typeof combEng1 === 'number' ? combEng1 > 0.5 : false,
-      typeof combEng2 === 'number' ? combEng2 > 0.5 : false,
-    ],
-    pph: [flowPph1, flowPph2],
-    recip: [flowRecip1, flowRecip2],
-    gph: [flowGph1, flowGph2],
-    general: [flowGeneral1, undefined],
+    fuelFlowKgPerHour,
   });
 
   return {

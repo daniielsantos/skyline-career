@@ -792,6 +792,8 @@ type GroundStaffPersonView = {
   perkLabel: string;
   perkHint: string;
   gradeLabel?: string;
+  /** Severance debit if fired (members only). */
+  fireSeveranceUsd?: number;
 };
 
 export type GroundStaffSnapshot = {
@@ -1132,6 +1134,7 @@ export function fetchMarket(
     sort?: string;
     distanceMaxNm?: number | string;
     commodity?: string;
+    loadMinKg?: number | string;
     loadMaxKg?: number | string;
     expiresWithinHours?: number | string;
     minPayUsd?: number | string;
@@ -1173,6 +1176,8 @@ export function fetchMarket(
   const distanceMaxNm = String(opts.distanceMaxNm ?? '').trim();
   if (distanceMaxNm) params.set('distanceMaxNm', distanceMaxNm);
   if (opts.commodity) params.set('commodity', opts.commodity);
+  const loadMinKg = String(opts.loadMinKg ?? '').trim();
+  if (loadMinKg) params.set('loadMinKg', loadMinKg);
   const loadMaxKg = String(opts.loadMaxKg ?? '').trim();
   if (loadMaxKg) params.set('loadMaxKg', loadMaxKg);
   const expiresWithinHours = String(opts.expiresWithinHours ?? '').trim();
@@ -2184,6 +2189,7 @@ export function postGroundStaffHire(opts: {
 export function postGroundStaffFire(opts: { memberId: string }) {
   return api<{
     member: GroundStaffSnapshot['members'][number];
+    debitUsd: number;
     walletUsd: number;
     groundStaff: GroundStaffSnapshot;
     warehouses?: PlayerWarehouseSnapshot;

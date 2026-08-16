@@ -308,4 +308,15 @@ describe('resolveDispatchSimBriefParams', () => {
     // The purchased SKU label wins; a mismatched live title must not leak in.
     assert.doesNotMatch(params.titleHint, /Commander/i);
   });
+
+  it('uses Aerostar AEST even when mission still has class Bonanza roles pack', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_ga',
+      airframeTypeId: 'a2a-piper-aerostar-600',
+      // Stale Demand/empty stamp: light_ga class default.
+      rolesPackRelPath: 'profiles/ofp/blacksquare-bonanza-professional.json',
+    });
+    assert.equal(params.simbriefIcao, 'AEST');
+    assert.match(params.titleHint, /Aerostar/i);
+  });
 });

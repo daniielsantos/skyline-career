@@ -30,6 +30,8 @@ export type MarketBoardSortable = {
   commodityId: string;
   commodityName: string;
   availableKg: number;
+  /** Lot formation size (Load column). Filter/sort prefer this over availableKg. */
+  quantityKg?: number;
   expiresAtTick: number;
   payUsd: number;
   /** Estimated net (pay − Jet-A) for the board-selected aircraft. */
@@ -64,6 +66,24 @@ export type MarketBoardAccessFilter = 'open' | 'locked';
 
 /** Freights route scope: international lanes vs domestic vs Amazon bush. */
 export type MarketBoardLaneFilter = 'intl' | 'domestic' | 'bush';
+
+/**
+ * Kg shown in Freights Load column (lot total / formation size).
+ * Matches career-ui `LotLoadCell`.
+ */
+export function boardLoadKg(row: {
+  availableKg: number;
+  quantityKg?: number;
+}): number {
+  if (
+    typeof row.quantityKg === 'number' &&
+    Number.isFinite(row.quantityKg) &&
+    row.quantityKg > 0
+  ) {
+    return row.quantityKg;
+  }
+  return Math.max(0, row.availableKg);
+}
 
 /**
  * Kg to quote for board lift / viable filters.
@@ -127,6 +147,8 @@ export type MarketBoardQueryOpts = {
   /** Max great-circle distance (nm). */
   distanceMaxNm?: number;
   commodityId?: string;
+  /** Exclude lots lighter than this available kg. */
+  loadMinKg?: number;
   /** Exclude lots heavier than this available kg. */
   loadMaxKg?: number;
   /** Keep lots that expire within this many wall-clock hours. */
@@ -376,7 +398,7 @@ function compareBoardRow<T extends MarketBoardSortable>(
     case 'cargo':
       return a.commodityName.localeCompare(b.commodityName);
     case 'load':
-      return a.availableKg - b.availableKg;
+      return boardLoadKg(a) - boardLoadKg(b);
     case 'expires':
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
@@ -415,6 +437,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     MarketBoardQueryOpts,
     | 'distanceMaxNm'
     | 'commodityId'
+    | 'loadMinKg'
     | 'loadMaxKg'
     | 'expiresWithinHours'
     | 'minPayUsd'
@@ -453,10 +476,18 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     return false;
   }
   if (
+    opts.loadMinKg !== undefined &&
+    Number.isFinite(opts.loadMinKg) &&
+    opts.loadMinKg > 0 &&
+    boardLoadKg(row) < opts.loadMinKg
+  ) {
+    return false;
+  }
+  if (
     opts.loadMaxKg !== undefined &&
     Number.isFinite(opts.loadMaxKg) &&
     opts.loadMaxKg > 0 &&
-    row.availableKg > opts.loadMaxKg
+    boardLoadKg(row) > opts.loadMaxKg
   ) {
     return false;
   }

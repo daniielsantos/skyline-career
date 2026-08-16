@@ -7,6 +7,8 @@ import { describe, it } from 'node:test';
 import {
   effectMultForPerk,
   fireGroundStaffMember,
+  GROUND_STAFF_FIRE_SEVERANCE_DAYS,
+  GROUND_STAFF_HIRE_SIGNING_DAYS,
   GROUND_STAFF_LOGISTICS_MULT,
   GROUND_STAFF_SOLID_MID_PCT,
   GROUND_STAFF_YARD_HOLD_MULT,
@@ -15,6 +17,7 @@ import {
   logisticsMultForWarehouse,
   normalizeGroundStaffState,
   pickGroundStaffGrade,
+  quoteGroundStaffFireSeveranceUsd,
   refreshGroundStaffHirePool,
   rollGroundStaffSkillPct,
   settleGroundStaffSalaries,
@@ -93,7 +96,7 @@ function hirePerk(
         skillPct,
         effectMult,
         salaryUsdPerDay,
-        hireUsd: salaryUsdPerDay * 2,
+        hireUsd: salaryUsdPerDay * GROUND_STAFF_HIRE_SIGNING_DAYS,
       },
       ...(roster.hirePoolByHub?.SBGR ?? []).filter((c) => c.perkId !== perkId),
     ],
@@ -269,7 +272,7 @@ describe('career ground staff', () => {
     assert.equal(groundStaffRosterSlotsFree(state, whId), 1);
   });
 
-  it('charges daily ground staff salary and allows fire', () => {
+  it('charges daily ground staff salary and fires with severance', () => {
     const world = createSeedEconomyWorld({ seed: 'gs-salary' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'GsPay',
@@ -289,9 +292,40 @@ describe('career ground staff', () => {
       (state.ledger ?? []).some((e) => e.kind === 'ground_staff_salary'),
     );
 
-    fireGroundStaffMember(state, hired.member.id);
+    const walletBeforeFire = state.walletUsd;
+    const expectedSeverance = quoteGroundStaffFireSeveranceUsd(hired.member);
+    assert.equal(
+      expectedSeverance,
+      hired.member.salaryUsdPerDay * GROUND_STAFF_FIRE_SEVERANCE_DAYS,
+    );
+    const fired = fireGroundStaffMember(state, world, hired.member.id);
+    assert.equal(fired.debitUsd, expectedSeverance);
+    assert.equal(state.walletUsd, walletBeforeFire - expectedSeverance);
     assert.equal(state.groundStaff?.members.length, 0);
     assert.equal(logisticsMultForWarehouse(state, whId), 1);
+    assert.ok((state.ledger ?? []).some((e) => e.kind === 'ground_staff_fire'));
+  });
+
+  it('blocks fire when wallet cannot cover severance', () => {
+    const world = createSeedEconomyWorld({ seed: 'gs-fire-broke' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'GsBroke',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    const whId = buyWarehouseAtPickupHub(state, world, 'SBGR').warehouse.id;
+    const hired = hirePerk(state, world, whId, 'logistics');
+    state.walletUsd = 1;
+    assert.throws(
+      () => fireGroundStaffMember(state, world, hired.member.id),
+      /Severance costs/,
+    );
+    assert.equal(state.groundStaff?.members.length, 1);
+  });
+
+  it('signing cost uses GROUND_STAFF_HIRE_SIGNING_DAYS', () => {
+    assert.equal(GROUND_STAFF_HIRE_SIGNING_DAYS, 7);
+    assert.equal(GROUND_STAFF_FIRE_SEVERANCE_DAYS, 5);
   });
 
   it('buyPortListing applies logistics mult when staff is hired', () => {

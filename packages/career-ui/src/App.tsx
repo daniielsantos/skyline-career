@@ -200,6 +200,7 @@ import {
   KG_TO_LB,
   kgToDisplay,
   loadDevMode,
+  loadFilterOptions,
   loadWeightSystem,
   massUnitLabel,
   massUnitLong,
@@ -1998,6 +1999,7 @@ export function App() {
     sort: formatMarketSortParam(DEFAULT_BOARD_SORTS),
     distanceMaxNm: '',
     commodity: '',
+    loadMinKg: '',
     loadMaxKg: '',
     expiresWithinHours: '',
     minPayUsd: '',
@@ -2130,6 +2132,7 @@ export function App() {
   const [destFilter, setDestFilter] = useState('');
   const [distanceMaxNm, setDistanceMaxNm] = useState('');
   const [cargoFilter, setCargoFilter] = useState('');
+  const [loadMinKg, setLoadMinKg] = useState('');
   const [loadMaxKg, setLoadMaxKg] = useState('');
   const [expiresWithinHours, setExpiresWithinHours] = useState('');
   const [minimumPayUsd, setMinimumPayUsd] = useState('');
@@ -2534,6 +2537,7 @@ export function App() {
       sort: formatMarketSortParam(marketSorts),
       distanceMaxNm,
       commodity: cargoFilter,
+      loadMinKg,
       loadMaxKg,
       expiresWithinHours,
       minPayUsd: minimumPayUsd,
@@ -2555,6 +2559,7 @@ export function App() {
       prev.sort === nextOpts.sort &&
       prev.distanceMaxNm === nextOpts.distanceMaxNm &&
       prev.commodity === nextOpts.commodity &&
+      prev.loadMinKg === nextOpts.loadMinKg &&
       prev.loadMaxKg === nextOpts.loadMaxKg &&
       prev.expiresWithinHours === nextOpts.expiresWithinHours &&
       prev.minPayUsd === nextOpts.minPayUsd &&
@@ -2605,6 +2610,7 @@ export function App() {
     expiresWithinHours,
     fleet,
     laneFilter,
+    loadMinKg,
     loadMaxKg,
     marketPage,
     marketSorts,
@@ -3165,6 +3171,26 @@ export function App() {
     activeWeightSystem = weightSystem;
     saveWeightSystem(weightSystem);
   }, [weightSystem]);
+
+  const loadFilterSteps = useMemo(
+    () => loadFilterOptions(weightSystem),
+    [weightSystem],
+  );
+
+  // Load filter option kg values change with metric/imperial — drop stale picks.
+  useEffect(() => {
+    const allowed = new Set(loadFilterSteps.map((s) => String(s.kg)));
+    if (loadMinKg && !allowed.has(loadMinKg)) {
+      setLoadMinKg('');
+      setMarketPage(1);
+    }
+    if (loadMaxKg && !allowed.has(loadMaxKg)) {
+      setLoadMaxKg('');
+      setMarketPage(1);
+    }
+    // Only when the unit system (hence step table) changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [loadFilterSteps]);
 
   useEffect(() => {
     saveDevMode(devMode);
@@ -6226,6 +6252,7 @@ export function App() {
       destFilter.trim() ||
       distanceMaxNm ||
       cargoFilter ||
+      loadMinKg ||
       loadMaxKg ||
       expiresWithinHours ||
       minimumPayUsd ||
@@ -6246,6 +6273,7 @@ export function App() {
     setDestFilter('');
     setDistanceMaxNm('');
     setCargoFilter('');
+    setLoadMinKg('');
     setLoadMaxKg('');
     setExpiresWithinHours('');
     setMinimumPayUsd('');
@@ -9314,20 +9342,36 @@ export function App() {
                     </select>
                   </th>
                   <th>
-                    <select
-                      aria-label="Maximum cargo load"
-                      value={loadMaxKg}
-                      onChange={(e) =>
-                        updateMarketFilter(setLoadMaxKg, e.target.value)
-                      }
-                    >
-                      <option value="">Any</option>
-                      <option value="1000">≤ 1 t</option>
-                      <option value="2000">≤ 2 t</option>
-                      <option value="5000">≤ 5 t</option>
-                      <option value="10000">≤ 10 t</option>
-                      <option value="20000">≤ 20 t</option>
-                    </select>
+                    <div className="load-filter-pair">
+                      <select
+                        aria-label="Minimum cargo load"
+                        value={loadMinKg}
+                        onChange={(e) =>
+                          updateMarketFilter(setLoadMinKg, e.target.value)
+                        }
+                      >
+                        <option value="">≥</option>
+                        {loadFilterSteps.map((step) => (
+                          <option key={`min-${step.kg}`} value={String(step.kg)}>
+                            ≥ {step.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="Maximum cargo load"
+                        value={loadMaxKg}
+                        onChange={(e) =>
+                          updateMarketFilter(setLoadMaxKg, e.target.value)
+                        }
+                      >
+                        <option value="">≤</option>
+                        {loadFilterSteps.map((step) => (
+                          <option key={`max-${step.kg}`} value={String(step.kg)}>
+                            ≤ {step.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </th>
                   <th>
                     <select

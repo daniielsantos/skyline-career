@@ -212,6 +212,40 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
+  it('filters load by lot total (quantityKg), not only availableKg', () => {
+    const mixed = [
+      row({
+        payUsd: 100,
+        commodityId: 'small',
+        availableKg: 2_000,
+        quantityKg: 2_000,
+      }),
+      row({
+        payUsd: 200,
+        commodityId: 'claimed',
+        availableKg: 3_500,
+        quantityKg: 6_500,
+      }),
+      row({
+        payUsd: 300,
+        commodityId: 'heavy',
+        availableKg: 14_000,
+        quantityKg: 14_000,
+      }),
+    ];
+    const band = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      loadMinKg: 1_000,
+      loadMaxKg: 5_000,
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      band.rows.map((r) => r.commodityId),
+      ['small'],
+    );
+  });
+
   it('filters by international vs domestic lane', () => {
     const mixed = [
       row({ payUsd: 100, commodityId: 'general', international: false }),

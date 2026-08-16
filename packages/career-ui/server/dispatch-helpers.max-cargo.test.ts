@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import {
   clearClassMaxCargoKgCache,
+  flyableDispatchCargoKg,
   resolveClassMaxCargoKg,
 } from './dispatch-helpers.ts';
 
@@ -69,5 +70,126 @@ describe('resolveClassMaxCargoKg', () => {
     });
     assert.equal(limit.source, 'class-fallback');
     assert.equal(limit.maxCargoKg, 450);
+  });
+});
+
+describe('flyableDispatchCargoKg', () => {
+  it('clamps booked mission cargo to route fuel+MTOW ops cap', () => {
+    // Book structural max; ops fuel+MTOW on a medium leg must cut below that.
+    const flyable = flyableDispatchCargoKg(
+      {
+        cargoKg: 1_588,
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+      500,
+      1_588,
+      {
+        oewKg: 3_207,
+        mtowKg: 4_756,
+        fuelCapacityKg: 1_173,
+        fuelBurnKgPerNm: 0.8,
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+    );
+    assert.equal(flyable.fuelFeasible, true);
+    assert.ok(flyable.operationalMaxCargoKg < 1_588);
+    assert.equal(flyable.cargoKg, flyable.operationalMaxCargoKg);
+    assert.ok(flyable.cargoKg > 200);
+  });
+
+  it('keeps booked cargo when already under ops cap', () => {
+    const flyable = flyableDispatchCargoKg(
+      {
+        cargoKg: 400,
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+      209,
+      1_588,
+      {
+        oewKg: 3_207,
+        mtowKg: 4_756,
+        fuelCapacityKg: 1_173,
+        fuelBurnKgPerNm: 0.8,
+      },
+    );
+    assert.equal(flyable.cargoKg, 400);
+  });
+
+  it('prefers heavier catalog OEW over lighter SimBrief OEW (offline)', () => {
+    // C90-class: SimBrief OEW ~2964 kg; catalog ~3207 kg ≈ MSFS empty.
+    const lightSb = flyableDispatchCargoKg(
+      {
+        cargoKg: 1_200,
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+      209,
+      1_588,
+      {
+        oewKg: 2_964,
+        mtowKg: 4_756,
+        fuelCapacityKg: 1_173,
+        fuelBurnKgPerNm: 0.8,
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+    );
+    const catalogOnly = flyableDispatchCargoKg(
+      {
+        cargoKg: 1_200,
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+      209,
+      1_588,
+      {
+        oewKg: 3_207,
+        mtowKg: 4_756,
+        fuelCapacityKg: 1_173,
+        fuelBurnKgPerNm: 0.8,
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+    );
+    assert.equal(lightSb.operationalMaxCargoKg, catalogOnly.operationalMaxCargoKg);
+    assert.ok(lightSb.cargoKg < 1_200);
+  });
+
+  it('reserves station crew under MTOW so SimBrief freight matches inject', () => {
+    const withCrew = flyableDispatchCargoKg(
+      {
+        cargoKg: 1_000,
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+      209,
+      1_588,
+      {
+        oewKg: 3_207,
+        mtowKg: 4_756,
+        fuelCapacityKg: 1_173,
+        fuelBurnKgPerNm: 0.8,
+      },
+    );
+    const noCrew = flyableDispatchCargoKg(
+      {
+        cargoKg: 1_000,
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-king-air-c90-gtx-passengers',
+      },
+      209,
+      1_588,
+      {
+        oewKg: 3_207,
+        mtowKg: 4_756,
+        fuelCapacityKg: 1_173,
+        fuelBurnKgPerNm: 0.8,
+      },
+      { crewKg: 0 },
+    );
+    assert.ok(withCrew.operationalMaxCargoKg < noCrew.operationalMaxCargoKg);
+    assert.ok(
+      noCrew.operationalMaxCargoKg - withCrew.operationalMaxCargoKg >= 150,
+    );
   });
 });

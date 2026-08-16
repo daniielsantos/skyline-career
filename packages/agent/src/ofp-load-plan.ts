@@ -37,10 +37,16 @@ export class OfpLoadPlanError extends Error {
 /** Operating crew seat weight (lb) on every mapped crew station. */
 export const FREIGHTER_PILOT_LB = 170;
 /**
- * Soft cap for human seats (crew + passengers). Structural maxLoad is often 500;
- * we never treat that as a normal occupant/cargo dump target.
+ * Soft cap for human seats (crew + passengers) on GA cabins. Structural
+ * maxLoad is often 500; we never treat that as a normal occupant dump target.
  */
 export const SEAT_OCCUPANT_SOFT_MAX_LB = 300;
+/**
+ * Freighter (no pax seats): soft cap on crew stations for cargo spill / CG
+ * shifts. Still clamped by profile maxLoad via {@link seatSoftMaxLb} — on a
+ * typical 500 lb station this raises the usable ceiling from 300→500.
+ */
+export const FREIGHTER_CREW_STATION_SOFT_MAX_LB = 750;
 /**
  * Soft cap per rear-baggage station on GA cabins (passenger seats present).
  * More than this usually drives CG past the aft limit on light singles.
@@ -558,11 +564,17 @@ export function distributeCargoAcrossStations(
     }
   }
 
+  const seatOccupantSoft = gaCabin
+    ? SEAT_OCCUPANT_SOFT_MAX_LB
+    : FREIGHTER_CREW_STATION_SOFT_MAX_LB;
   const seatSoftMax = Object.fromEntries(
-    seatStations.map((idx) => [idx, seatSoftMaxLb(profile, idx)]),
+    seatStations.map((idx) => [
+      idx,
+      seatSoftMaxLb(profile, idx, seatOccupantSoft),
+    ]),
   );
   const seatRoomLb = seatStations.reduce((sum, idx) => {
-    const cap = seatSoftMax[idx] ?? SEAT_OCCUPANT_SOFT_MAX_LB;
+    const cap = seatSoftMax[idx] ?? seatOccupantSoft;
     return sum + Math.max(0, cap - (stations[idx] ?? 0));
   }, 0);
   const baggageHardCapacityLb = baggageStations.reduce((sum, idx) => {
@@ -581,8 +593,8 @@ export function distributeCargoAcrossStations(
     (sum, idx) => sum + (baggageSoftMax[idx] ?? 0),
     0,
   );
-  // Freighter: full baggage only (crew stay at pilot floor — forward seats pull CG).
-  // GA: seats soft-cap + ~50 lb/baggage station.
+  // Freighter: fill baggage first; spill/CG may use crew seats up to the
+  // freighter soft-max (min with structural). GA: seats soft-cap + ~50 lb/bag.
   const fillCapacityLb = gaCabin
     ? seatRoomLb + baggageFillCapacityLb
     : baggageStations.length > 0
@@ -655,7 +667,7 @@ export function distributeCargoAcrossStations(
     );
     remainingCargo = 0;
   } else if (remainingCargo > 0 && seatStations.length > 0) {
-    // No baggage mapped — last resort onto seats (still soft-capped).
+    // No baggage mapped — last resort onto seats (GA 300 / freighter 750 soft).
     const afterSeats = equalizeMovableStations(
       stations,
       profile,
@@ -1270,6 +1282,11 @@ export function shiftCargoForCg(
   opts?: {
     minRetainByIndex?: Record<number, number>;
     softMaxByIndex?: Record<number, number>;
+    /**
+     * Prefer other destinations first when shifting forward (freighter crew
+     * seats). Fill forward baggage (S3/S4) before dumping onto crew (S1/S2).
+     */
+    deferTargetIndexes?: number[];
   },
 ): ShiftCargoForCgResult {
   const next: Record<number, number> = { ...stations };
@@ -1295,12 +1312,29 @@ export function shiftCargoForCg(
   );
   const movableSet = new Set(forwardFirst);
   const minRetain = opts?.minRetainByIndex ?? {};
+  // Without arms, consecutive indexes (S1/S2, S3/S4…) are L/R pairs — moving
+  // between them is lateral. Equalize would undo it but leave a fake movedLb.
+  const lateralMate = new Map<number, number>();
+  for (const group of findLateralStationGroups(profile, movableIndexes)) {
+    if (group.length !== 2) continue;
+    lateralMate.set(group[0]!, group[1]!);
+    lateralMate.set(group[1]!, group[0]!);
+  }
 
+  const deferredTargets = new Set(opts?.deferTargetIndexes ?? []);
   // Sources / targets stay longitudinal; among equal options we still respect floors/soft max.
   const sources =
     direction === 'forward' ? [...forwardFirst].reverse() : [...forwardFirst];
-  const targets =
+  const targetsBase =
     direction === 'forward' ? [...forwardFirst] : [...forwardFirst].reverse();
+  // Forward: baggage/nose holds before deferred crew seats (same longitudinal order).
+  const targets =
+    direction === 'forward' && deferredTargets.size > 0
+      ? [
+          ...targetsBase.filter((idx) => !deferredTargets.has(idx)),
+          ...targetsBase.filter((idx) => deferredTargets.has(idx)),
+        ]
+      : targetsBase;
 
   let movedLb = 0;
   for (const src of sources) {
@@ -1318,6 +1352,7 @@ export function shiftCargoForCg(
       const dstPos = forwardFirst.indexOf(dst);
       if (direction === 'forward' && dstPos >= srcPos) continue;
       if (direction === 'aft' && dstPos <= srcPos) continue;
+      if (lateralMate.get(src) === dst) continue;
 
       // Same longitudinal arm = L/R pair. Moving between them is lateral, not CG.
       const dstArm = armByIndex.get(dst);

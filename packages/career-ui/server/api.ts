@@ -197,9 +197,9 @@ import {
   type PlayerAircraft,
 } from '@msfs-compat/shared';
 import {
-  buildMissionDispatch,
+  buildFlyableMissionDispatch,
   confirmMissionOfp,
-  estimateRouteCargoLimit,
+  estimateFlyableRouteCargoLimit,
   resolveClassMaxCargoKg,
 } from './dispatch-helpers.ts';
 import {
@@ -2098,7 +2098,7 @@ export function createCareerApiServer(port = 8787) {
           typeof distanceNm === 'number' &&
           Number.isFinite(distanceNm) &&
           distanceNm >= 0
-            ? estimateRouteCargoLimit(
+            ? estimateFlyableRouteCargoLimit(
                 aircraft,
                 distanceNm,
                 cargoLimit.maxCargoKg,
@@ -2107,7 +2107,7 @@ export function createCareerApiServer(port = 8787) {
             : undefined;
         const routeLimitMx =
           routeLimit && mxBurn && mxBurn.mult > 1.001
-            ? estimateRouteCargoLimit(
+            ? estimateFlyableRouteCargoLimit(
                 aircraft,
                 distanceNm!,
                 cargoLimit.maxCargoKg,
@@ -2529,6 +2529,7 @@ export function createCareerApiServer(port = 8787) {
             url.searchParams.get('distanceMaxNm'),
           ),
           commodityId: commodityParam,
+          loadMinKg: parsePositiveNumberParam(url.searchParams.get('loadMinKg')),
           loadMaxKg: parsePositiveNumberParam(url.searchParams.get('loadMaxKg')),
           expiresWithinHours: parsePositiveNumberParam(
             url.searchParams.get('expiresWithinHours'),
@@ -3654,11 +3655,13 @@ export function createCareerApiServer(port = 8787) {
           const result = await withCareerWrite((world, missions) => {
             const fired = fireGroundStaffMember(
               missions,
+              world,
               body.memberId!.trim(),
             );
             const groundStaff = groundStaffSnapshot(missions, world);
             return {
-              member: fired,
+              member: fired.member,
+              debitUsd: fired.debitUsd,
               walletUsd: missions.walletUsd,
               groundStaff,
               warehouses: playerWarehouseSnapshot(missions, world),
@@ -4046,13 +4049,33 @@ export function createCareerApiServer(port = 8787) {
           let dispatchError: string | undefined;
           if (body.openDispatch === true) {
             try {
-              const built = await buildMissionDispatch(mission, {
-                liveTitle: getLastProbeAircraftTitle(),
-              });
+              const distanceNm =
+                (await withCareerRead((world) =>
+                  routeDistanceNm(
+                    world,
+                    mission.originIcao,
+                    mission.destIcao,
+                  ),
+                )) ??
+                mission.distanceNm ??
+                0;
+              const { built, flyable } = await buildFlyableMissionDispatch(
+                mission,
+                distanceNm,
+                { liveTitle: getLastProbeAircraftTitle() },
+              );
               mission = await withCareerWrite((world, missions) => {
                 const idx = missions.missions.findIndex((m) => m.id === mission.id);
+                let next = mission;
+                if (flyable.cargoKg < mission.cargoKg) {
+                  next = trimMissionCargoToKg(
+                    world,
+                    mission,
+                    flyable.cargoKg,
+                  ).mission;
+                }
                 const dispatched: MissionIntent = {
-                  ...mission,
+                  ...next,
                   staticId: built.staticId,
                   status: 'dispatched',
                   dispatchedAtTick: world.tick,
@@ -4273,7 +4296,7 @@ export function createCareerApiServer(port = 8787) {
                 ) ??
                 intoMission.distanceNm ??
                 0;
-              const routeCargoLimit = estimateRouteCargoLimit(
+              const routeCargoLimit = estimateFlyableRouteCargoLimit(
                 aircraft,
                 stagingDistanceNm,
                 cargoLimit.maxCargoKg,
@@ -4340,7 +4363,7 @@ export function createCareerApiServer(port = 8787) {
             );
             const stagingDistanceNm =
               routeDistanceNm(world, firstLot.originIcao, firstLot.destIcao) ?? 0;
-            const routeCargoLimit = estimateRouteCargoLimit(
+            const routeCargoLimit = estimateFlyableRouteCargoLimit(
               aircraft,
               stagingDistanceNm,
               cargoLimit.maxCargoKg,
@@ -4516,14 +4539,36 @@ export function createCareerApiServer(port = 8787) {
           let dispatchError: string | undefined;
           if (body.openDispatch === true) {
             try {
-              const built = await buildMissionDispatch(mission, {
-                units: body.units ?? body.weightSystem,
-                liveTitle: getLastProbeAircraftTitle(),
-              });
+              const distanceNm =
+                (await withCareerRead((world) =>
+                  routeDistanceNm(
+                    world,
+                    mission.originIcao,
+                    mission.destIcao,
+                  ),
+                )) ??
+                mission.distanceNm ??
+                0;
+              const { built, flyable } = await buildFlyableMissionDispatch(
+                mission,
+                distanceNm,
+                {
+                  units: body.units ?? body.weightSystem,
+                  liveTitle: getLastProbeAircraftTitle(),
+                },
+              );
               mission = await withCareerWrite((world, missions) => {
                 const idx = missions.missions.findIndex((m) => m.id === mission.id);
+                let next = mission;
+                if (flyable.cargoKg < mission.cargoKg) {
+                  next = trimMissionCargoToKg(
+                    world,
+                    mission,
+                    flyable.cargoKg,
+                  ).mission;
+                }
                 const dispatched: MissionIntent = {
-                  ...mission,
+                  ...next,
                   staticId: built.staticId,
                   status: 'dispatched',
                   dispatchedAtTick: world.tick,
@@ -4900,66 +4945,64 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
 
-        const dispatchCargoLimit = await resolveClassMaxCargoKg(
-          prep.aircraftClassId,
-          prep.mission.airframeTypeId,
-        );
-        const dispatchRouteLimit = estimateRouteCargoLimit(
-          prep.aircraftClassId,
-          prep.dispatchDistanceNm,
-          dispatchCargoLimit.maxCargoKg,
-          dispatchCargoLimit,
-        );
-        if (!dispatchRouteLimit.fuelFeasible) {
-          send(res, 400, {
-            error:
-              `Estimated block fuel ${dispatchRouteLimit.estimatedBlockFuelKg} kg exceeds ` +
-              `tank capacity ${dispatchRouteLimit.fuelCapacityKg} kg ` +
-              `(deficit ${dispatchRouteLimit.fuelDeficitKg} kg)`,
+        try {
+          const { built, flyable, cargoLimit } = await buildFlyableMissionDispatch(
+            prep.mission,
+            prep.dispatchDistanceNm,
+            {
+              units: body.units ?? body.weightSystem,
+              liveTitle: getLastProbeAircraftTitle(),
+            },
+          );
+          const mission = await withCareerWrite((world, missions) => {
+            const idx = missions.missions.findIndex((m) => m.id === body.missionId);
+            if (idx < 0) {
+              throw new Error(`Unknown mission ${body.missionId}`);
+            }
+            const open = missions.missions[idx]!;
+            if (open.status !== 'accepted' && open.status !== 'dispatched') {
+              throw new Error(
+                `Mission ${open.id} cannot dispatch (status=${open.status})`,
+              );
+            }
+            let next = open;
+            if (flyable.cargoKg < open.cargoKg) {
+              next = trimMissionCargoToKg(world, open, flyable.cargoKg).mission;
+            }
+            const dispatched: MissionIntent = {
+              ...next,
+              staticId: built.staticId,
+              status: 'dispatched',
+              dispatchedAtTick: world.tick,
+              lastOfpCheck: undefined,
+              lastPreflightCheck: undefined,
+              injectBallastLb: undefined,
+              fuelAuthorizedOfpId: undefined,
+            };
+            missions.missions[idx] = dispatched;
+            return dispatched;
           });
-          return;
-        }
 
-        const built = await buildMissionDispatch(prep.mission, {
-          units: body.units ?? body.weightSystem,
-          liveTitle: getLastProbeAircraftTitle(),
-        });
-        const mission = await withCareerWrite((world, missions) => {
-          const idx = missions.missions.findIndex((m) => m.id === body.missionId);
-          if (idx < 0) {
-            throw new Error(`Unknown mission ${body.missionId}`);
-          }
-          const open = missions.missions[idx]!;
-          if (open.status !== 'accepted' && open.status !== 'dispatched') {
-            throw new Error(
-              `Mission ${open.id} cannot dispatch (status=${open.status})`,
-            );
-          }
-          const dispatched: MissionIntent = {
-            ...open,
+          send(res, 200, {
+            mission,
+            url: built.url,
             staticId: built.staticId,
-            status: 'dispatched',
-            dispatchedAtTick: world.tick,
-            lastOfpCheck: undefined,
-            lastPreflightCheck: undefined,
-            injectBallastLb: undefined,
-            fuelAuthorizedOfpId: undefined,
-          };
-          missions.missions[idx] = dispatched;
-          return dispatched;
-        });
-
-        send(res, 200, {
-          mission,
-          url: built.url,
-          staticId: built.staticId,
-          type: built.type,
-          airframeLabel: built.airframeLabel,
-          cargoThousands: built.cargoThousands,
-          units: built.units,
-          // UI opens the URL once — API must not spawn a second browser.
-          opened: false,
-        });
+            type: built.type,
+            airframeLabel: built.airframeLabel,
+            cargoThousands: built.cargoThousands,
+            cargoKg: built.cargoKg,
+            units: built.units,
+            operationalMaxCargoKg: flyable.operationalMaxCargoKg,
+            structuralMaxCargoKg: cargoLimit.maxCargoKg,
+            maxCargoSource: cargoLimit.source,
+            // UI opens the URL once — API must not spawn a second browser.
+            opened: false,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 

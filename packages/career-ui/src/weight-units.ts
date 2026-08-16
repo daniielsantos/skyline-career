@@ -59,6 +59,22 @@ export function formatMass(kg: number, system: WeightSystem = 'metric'): string 
   return `${(kg / 1000).toFixed(1)} t`;
 }
 
+/** Freights Load filter steps — labels match the board mass unit. */
+export const LOAD_FILTER_STEPS = [1, 2, 5, 10, 20] as const;
+
+export function loadFilterOptions(
+  system: WeightSystem,
+): Array<{ kg: number; label: string }> {
+  return LOAD_FILTER_STEPS.map((n) => {
+    if (system === 'imperial') {
+      // n kilopounds → kg (same unit the Load column shows).
+      const kg = Math.round((n * 1000) / KG_TO_LB);
+      return { kg, label: `${n} klb` };
+    }
+    return { kg: n * 1000, label: `${n} t` };
+  });
+}
+
 /** Exact mass for inputs / toasts: kg or lb. */
 export function formatMassExact(
   kg: number,

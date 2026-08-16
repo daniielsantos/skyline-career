@@ -15,6 +15,7 @@ import {
   KG_TO_LB,
   ofpCargoKg,
   resolveAirframeFuelBurnKgPerNm,
+  resolveConservativeOpsWeights,
   type FreighterClassId,
   type MissionIntent,
 } from '@msfs-compat/shared';
@@ -62,6 +63,43 @@ const cargoLimitCache = new Map<string, ClassCargoLimit>();
 /** Re-export shared estimator — class homologation fields live on AircraftClass. */
 export { estimateRouteCargoLimit };
 
+/**
+ * Route ops cargo with offline conservative OEW/MTOW + station crew (same
+ * rules as {@link flyableDispatchCargoKg}).
+ */
+export function estimateFlyableRouteCargoLimit(
+  aircraftClassId: FreighterClassId,
+  distanceNm: number,
+  structuralMaxCargoKg: number,
+  weights: {
+    oewKg?: number;
+    mtowKg?: number;
+    fuelCapacityKg?: number;
+    fuelBurnKgPerNm?: number;
+    airframeTypeId?: string;
+    fuelBurnMult?: number;
+  } = {},
+): ReturnType<typeof estimateRouteCargoLimit> {
+  const catalog = findCareerPlayerAirframe(weights.airframeTypeId);
+  const ops = resolveConservativeOpsWeights({
+    oewKg: weights.oewKg,
+    mtowKg: weights.mtowKg,
+    catalogOewKg: catalog?.oewKg,
+    catalogMtowKg: catalog?.mtowKg,
+  });
+  return estimateRouteCargoLimit(
+    aircraftClassId,
+    distanceNm,
+    structuralMaxCargoKg,
+    {
+      ...weights,
+      oewKg: ops.oewKg,
+      mtowKg: ops.mtowKg,
+      crewKg: ops.crewKg,
+    },
+  );
+}
+
 /** Resolve SimBrief ICAO/match preferring the live/family roles pack. */
 export async function resolveDispatchSimBriefParams(opts: {
   aircraftClassId: FreighterClassId;
@@ -75,9 +113,12 @@ export async function resolveDispatchSimBriefParams(opts: {
 }> {
   const aircraft = getAircraftClass(opts.aircraftClassId);
   const airframe = findCareerPlayerAirframe(opts.airframeTypeId);
+  // Purchased SKU pack wins over mission.rolesPackRelPath: Demand/empty/FBO
+  // historically stamped the *class* pack (light_ga → Bonanza BE36) even when
+  // airframeTypeId was Aerostar/Comanche/etc.
   const rolesPackRelPath =
+    airframe?.rolesPackRelPath?.trim() ||
     opts.rolesPackRelPath?.trim() ||
-    airframe?.rolesPackRelPath ||
     aircraft.rolesPackRelPath;
 
   let packMatch: string | undefined;
@@ -117,7 +158,11 @@ export async function resolveDispatchSimBriefParams(opts: {
       inferSimBriefAirframeMatchFromTitle(airframe?.label ?? '');
 
   return {
-    simbriefIcao: packIcao || airframe?.simbriefIcao || aircraft.simbriefIcao,
+    // Catalog ICAO first so a stale class pack cannot force BE36 over AEST.
+    simbriefIcao:
+      airframe?.simbriefIcao?.trim() ||
+      packIcao ||
+      aircraft.simbriefIcao,
     simbriefAirframeMatch: preferSimBriefAirframeMatch({
       packMatch,
       inferredFromTitle: inferred,
@@ -238,11 +283,89 @@ function normalizeDispatchUnits(
   return 'KGS';
 }
 
+/**
+ * Cargo kg Skyline should hand SimBrief / inject — never above the route
+ * fuel+MTOW ops cap (mission booking can still be stale from older accepts).
+ *
+ * Offline only: heavier catalog OEW vs SimBrief + default station crew under
+ * MTOW (no live EMPTY/MTOW probe — catalog is the MSFS stand-in).
+ */
+export function flyableDispatchCargoKg(
+  mission: Pick<
+    MissionIntent,
+    'cargoKg' | 'aircraftClassId' | 'airframeTypeId'
+  >,
+  distanceNm: number,
+  structuralMaxCargoKg: number,
+  weights: {
+    oewKg?: number;
+    mtowKg?: number;
+    fuelCapacityKg?: number;
+    fuelBurnKgPerNm?: number;
+    airframeTypeId?: string;
+    fuelBurnMult?: number;
+  } = {},
+  opts: {
+    /** Station crew reserved under MTOW (kg). Default 2×170 lb. */
+    crewKg?: number;
+  } = {},
+): {
+  cargoKg: number;
+  operationalMaxCargoKg: number;
+  fuelFeasible: boolean;
+  estimatedBlockFuelKg: number;
+  fuelCapacityKg: number;
+  fuelDeficitKg: number;
+} {
+  const catalog = findCareerPlayerAirframe(
+    weights.airframeTypeId ?? mission.airframeTypeId,
+  );
+  const ops = resolveConservativeOpsWeights({
+    oewKg: weights.oewKg,
+    mtowKg: weights.mtowKg,
+    catalogOewKg: catalog?.oewKg,
+    catalogMtowKg: catalog?.mtowKg,
+    crewKg: opts.crewKg,
+  });
+
+  const route = estimateRouteCargoLimit(
+    mission.aircraftClassId,
+    distanceNm,
+    structuralMaxCargoKg,
+    {
+      ...weights,
+      oewKg: ops.oewKg,
+      mtowKg: ops.mtowKg,
+      fuelCapacityKg: weights.fuelCapacityKg ?? catalog?.fuelCapacityKg,
+      fuelBurnKgPerNm: weights.fuelBurnKgPerNm ?? catalog?.fuelBurnKgPerNm,
+      airframeTypeId: weights.airframeTypeId ?? mission.airframeTypeId,
+      crewKg: ops.crewKg,
+    },
+  );
+  const booked = Math.max(0, Math.floor(mission.cargoKg));
+  const cap = route.fuelFeasible
+    ? Math.max(0, Math.floor(route.operationalMaxCargoKg))
+    : 0;
+  return {
+    cargoKg: Math.min(booked, cap),
+    operationalMaxCargoKg: cap,
+    fuelFeasible: route.fuelFeasible,
+    estimatedBlockFuelKg: route.estimatedBlockFuelKg,
+    fuelCapacityKg: route.fuelCapacityKg,
+    fuelDeficitKg: route.fuelDeficitKg,
+  };
+}
+
 export async function buildMissionDispatch(
   mission: MissionIntent,
   opts: {
     units?: 'KGS' | 'LBS' | DispatchWeightSystem;
     liveTitle?: string | null;
+    /**
+     * Prefill cargo (kg). Defaults to mission.cargoKg. Pass the route ops cap
+     * so SimBrief is not asked for more freight than inject can load.
+     */
+    cargoKg?: number;
   } = {},
 ): Promise<{
   url: string;
@@ -250,6 +373,7 @@ export async function buildMissionDispatch(
   type: string;
   airframeLabel: string;
   cargoThousands: number;
+  cargoKg: number;
   units: 'KGS' | 'LBS';
 }> {
   const params = await resolveDispatchSimBriefParams({
@@ -264,8 +388,15 @@ export async function buildMissionDispatch(
   // Reusing it after payload edits lets SimBrief return the previous OFP and
   // can produce a false PASS when the revised values happen to match.
   const staticId = makeStaticId('career');
-  const weightInUnit =
-    units === 'LBS' ? mission.cargoKg * KG_TO_LB : mission.cargoKg;
+  const cargoKg = Math.max(
+    0,
+    Math.floor(
+      typeof opts.cargoKg === 'number' && Number.isFinite(opts.cargoKg)
+        ? opts.cargoKg
+        : mission.cargoKg,
+    ),
+  );
+  const weightInUnit = units === 'LBS' ? cargoKg * KG_TO_LB : cargoKg;
   const cargoThousands = cargoWeightToThousands(weightInUnit);
   // light_ga SimBrief airframes (BN2, Comanche, …) drive load via Payload, not
   // Freight — cargo= hits a small maxcargo soft-cap while manualpayload fills
@@ -288,8 +419,56 @@ export async function buildMissionDispatch(
     type: resolved.type,
     airframeLabel: resolved.airframe.comments || resolved.airframe.name,
     cargoThousands,
+    cargoKg,
     units,
   };
+}
+
+/**
+ * Resolve structural + route ops cap, then build a SimBrief URL whose cargo=
+ * matches what inject can actually load (not a stale overbooked mission kg).
+ */
+export async function buildFlyableMissionDispatch(
+  mission: MissionIntent,
+  distanceNm: number,
+  opts: {
+    units?: 'KGS' | 'LBS' | DispatchWeightSystem;
+    liveTitle?: string | null;
+    /** Test seam — defaults to global fetch. */
+    fetchImpl?: typeof fetch;
+  } = {},
+): Promise<{
+  built: Awaited<ReturnType<typeof buildMissionDispatch>>;
+  flyable: ReturnType<typeof flyableDispatchCargoKg>;
+  cargoLimit: ClassCargoLimit;
+}> {
+  const cargoLimit = await resolveClassMaxCargoKg(
+    mission.aircraftClassId,
+    mission.airframeTypeId,
+    {
+      liveTitle: opts.liveTitle,
+      ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+    },
+  );
+  const flyable = flyableDispatchCargoKg(
+    mission,
+    distanceNm,
+    cargoLimit.maxCargoKg,
+    cargoLimit,
+  );
+  if (!flyable.fuelFeasible) {
+    throw new Error(
+      `Estimated block fuel ${flyable.estimatedBlockFuelKg} kg exceeds ` +
+        `tank capacity ${flyable.fuelCapacityKg} kg ` +
+        `(deficit ${flyable.fuelDeficitKg} kg)`,
+    );
+  }
+  const built = await buildMissionDispatch(mission, {
+    units: opts.units,
+    liveTitle: opts.liveTitle,
+    cargoKg: flyable.cargoKg,
+  });
+  return { built, flyable, cargoLimit };
 }
 
 export async function confirmMissionOfp(

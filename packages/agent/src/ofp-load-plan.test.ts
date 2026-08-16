@@ -39,7 +39,10 @@ import {
   distributeFuelAcrossTanks,
   orderStationsLongitudinal,
   plannedStationPayloadLb,
+  seatSoftMaxLb,
   shiftCargoForCg,
+  FREIGHTER_CREW_STATION_SOFT_MAX_LB,
+  SEAT_OCCUPANT_SOFT_MAX_LB,
 } from './ofp-load-plan.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -357,6 +360,56 @@ describe('distributeCargoAcrossStations', () => {
       (err: unknown) => err instanceof OfpLoadPlanError && err.code === 'NO_CARGO_STATIONS',
     );
   });
+
+  it('freighter spill onto crew uses raised soft-max (capped by hard)', () => {
+    // No baggage — cargo must land on crew seats; soft 750 / hard 500 → 500.
+    const profile = {
+      payload: {
+        stations: [
+          { index: 1, maxLoad: 500, arm: 20 },
+          { index: 2, maxLoad: 500, arm: 20 },
+        ],
+      },
+    } as AircraftProfile;
+    const result = distributeCargoAcrossStations(660, profile, {
+      crewStations: [1, 2],
+      passengerStations: [],
+      baggageStations: [],
+    });
+    assert.equal(result.stations[1], 500);
+    assert.equal(result.stations[2], 500);
+    assert.ok((result.stations[1] ?? 0) > SEAT_OCCUPANT_SOFT_MAX_LB);
+  });
+});
+
+describe('seatSoftMaxLb', () => {
+  const profile = {
+    payload: {
+      stations: [
+        { index: 1, maxLoad: 500 },
+        { index: 2, maxLoad: 900 },
+      ],
+    },
+  } as AircraftProfile;
+
+  it('GA default soft-max stays at 300 under a 500 hard', () => {
+    assert.equal(seatSoftMaxLb(profile, 1), SEAT_OCCUPANT_SOFT_MAX_LB);
+    assert.equal(seatSoftMaxLb(profile, 1), 300);
+  });
+
+  it('freighter soft-max reaches hard when hard < 750', () => {
+    assert.equal(
+      seatSoftMaxLb(profile, 1, FREIGHTER_CREW_STATION_SOFT_MAX_LB),
+      500,
+    );
+  });
+
+  it('freighter soft-max stops at 750 when hard is higher', () => {
+    assert.equal(
+      seatSoftMaxLb(profile, 2, FREIGHTER_CREW_STATION_SOFT_MAX_LB),
+      FREIGHTER_CREW_STATION_SOFT_MAX_LB,
+    );
+  });
 });
 
 describe('orderStationsLongitudinal / shiftCargoForCg', () => {
@@ -450,6 +503,136 @@ describe('orderStationsLongitudinal / shiftCargoForCg', () => {
     );
     assert.equal(shifted.movedLb, 0);
     assert.equal(shifted.stations[forwardMost], 500);
+  });
+
+  it('freighter CG shift can fill crew past GA soft-max 300 up to hard', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 1, maxLoad: 500, arm: 40 },
+          { index: 2, maxLoad: 500, arm: 40 },
+          { index: 3, maxLoad: 500, arm: -10 },
+          { index: 4, maxLoad: 500, arm: -10 },
+        ],
+      },
+    } as AircraftProfile;
+    const softMaxByIndex = {
+      1: seatSoftMaxLb(profile, 1, FREIGHTER_CREW_STATION_SOFT_MAX_LB),
+      2: seatSoftMaxLb(profile, 2, FREIGHTER_CREW_STATION_SOFT_MAX_LB),
+      3: 500,
+      4: 500,
+    };
+    assert.equal(softMaxByIndex[1], 500);
+    const stations = { 1: 300, 2: 300, 3: 500, 4: 500 };
+    const shifted = shiftCargoForCg(
+      stations,
+      profile,
+      [1, 2, 3, 4],
+      'forward',
+      200,
+      {
+        minRetainByIndex: { 1: 170, 2: 170 },
+        softMaxByIndex,
+      },
+    );
+    assert.ok(shifted.movedLb > 0);
+    assert.ok((shifted.stations[1] ?? 0) > SEAT_OCCUPANT_SOFT_MAX_LB);
+    assert.ok((shifted.stations[1] ?? 0) <= 500);
+  });
+
+  it('does not fake-move L/R crew pairs when profile has no arms (C90)', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 500 },
+          { index: 4, maxLoad: 500 },
+          { index: 5, maxLoad: 500 },
+          { index: 6, maxLoad: 500 },
+        ],
+      },
+    } as AircraftProfile;
+    const stations = { 1: 370, 2: 370, 3: 363, 4: 362, 5: 300, 6: 300 };
+    const softMaxByIndex = {
+      1: 500,
+      2: 500,
+      3: 500,
+      4: 500,
+      5: 500,
+      6: 500,
+    };
+    // Seat-only shift must not report progress (S1↔S2 is lateral without arms).
+    const seatOnly = shiftCargoForCg(
+      stations,
+      profile,
+      [1, 2],
+      'forward',
+      130,
+      {
+        minRetainByIndex: { 1: 170, 2: 170 },
+        softMaxByIndex,
+      },
+    );
+    assert.equal(seatOnly.movedLb, 0);
+    assert.deepEqual(seatOnly.stations, stations);
+
+    // Full cabin shift should pull aft → nose onto crew room.
+    const full = shiftCargoForCg(
+      stations,
+      profile,
+      [1, 2, 3, 4, 5, 6],
+      'forward',
+      130,
+      {
+        minRetainByIndex: { 1: 170, 2: 170 },
+        softMaxByIndex,
+      },
+    );
+    assert.ok(full.movedLb > 0);
+    assert.ok(
+      (full.stations[1] ?? 0) + (full.stations[2] ?? 0) >
+        (stations[1] ?? 0) + (stations[2] ?? 0),
+    );
+  });
+
+  it('fills forward baggage before deferred crew seats (C90)', () => {
+    const profile = {
+      payload: {
+        stations: [
+          { index: 1, maxLoad: 500 },
+          { index: 2, maxLoad: 500 },
+          { index: 3, maxLoad: 500 },
+          { index: 4, maxLoad: 500 },
+          { index: 5, maxLoad: 500 },
+          { index: 6, maxLoad: 500 },
+        ],
+      },
+    } as AircraftProfile;
+    // Crew already above floor; S3/S4 have room; mass on S5/S6.
+    const stations = { 1: 200, 2: 200, 3: 300, 4: 300, 5: 400, 6: 400 };
+    const shifted = shiftCargoForCg(
+      stations,
+      profile,
+      [1, 2, 3, 4, 5, 6],
+      'forward',
+      200,
+      {
+        minRetainByIndex: { 1: 170, 2: 170 },
+        softMaxByIndex: { 1: 500, 2: 500, 3: 500, 4: 500, 5: 500, 6: 500 },
+        deferTargetIndexes: [1, 2],
+      },
+    );
+    assert.ok(shifted.movedLb > 0);
+    // S3/S4 should take the shift before more cargo piles on crew.
+    assert.ok(
+      (shifted.stations[3] ?? 0) + (shifted.stations[4] ?? 0) >
+        (stations[3] ?? 0) + (stations[4] ?? 0),
+    );
+    assert.equal(
+      (shifted.stations[1] ?? 0) + (shifted.stations[2] ?? 0),
+      (stations[1] ?? 0) + (stations[2] ?? 0),
+    );
   });
 
   it('allocateCargoRoundPerSeat adds up to 50 lb on each eligible seat', () => {

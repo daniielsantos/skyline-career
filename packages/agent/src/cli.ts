@@ -110,7 +110,7 @@ function usage(): never {
   msfs-compat-agent homologate [--pipe <name>]
   msfs-compat-agent career-hubs [all|bush|<ICAO>] [--yes] [--pipe <name>]
   msfs-compat-agent sample-burn [--type typeId] [--pipe <name>]
-  msfs-compat-agent career-airframe [wizard]|list|disable|enable|rename|remove [--type typeId] [--label name] [--keep-files]
+  msfs-compat-agent career-airframe [wizard]|list|disable|enable|rename|remove|backfill-simbrief-cargo [--type typeId] [--label name] [--keep-files] [--apply]
   msfs-compat-agent career-payload
   msfs-compat-agent probe-lvars [--preset a2a-aerostar] [--var Name ...] [--watch [sec]] [--write Name=value ...] [--pipe <name>]
   msfs-compat-agent probe-pmdg-fuel [--pipe <name>]
@@ -129,7 +129,7 @@ Notes:
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
   career-hubs: SimConnect Facilities → lat/lon/name for all career hubs (or bush / one ICAO)
   sample-burn: live cruise fuel-flow sample → patch career-player-airframes.json burn
-  career-airframe: interactive wizard (or list / disable / enable / rename / remove) for Market models
+  career-airframe: interactive wizard (or list / disable / enable / rename / remove / backfill-simbrief-cargo) for Market models
   career-payload: SimBrief maxcargo / OEW / MTOW / fuel → career-player-airframes.json (Freights ceiling)
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
@@ -407,7 +407,10 @@ async function main(): Promise<void> {
       setCareerPlayerAirframeLabel,
       suggestShortMarketLabel,
     } = await import('./career-player-airframe-catalog.js');
-    const typeId = getFlag(rest, '--type') ?? rest[1];
+    const typeIdFlag = getFlag(rest, '--type');
+    const typeIdPositional =
+      rest[1] && !rest[1].startsWith('-') ? rest[1] : undefined;
+    const typeId = typeIdFlag ?? typeIdPositional;
     if (sub === 'list') {
       const { listFamilyMatchTitles } = await import(
         './career-player-airframe-catalog.js'
@@ -424,6 +427,26 @@ async function main(): Promise<void> {
         }
       }
       if (rows.length === 0) console.log('(no player airframes registered)');
+      return;
+    }
+    if (sub === 'backfill-simbrief-cargo') {
+      const {
+        backfillSimbriefMaxCargo,
+        formatBackfillSimbriefMaxCargoReport,
+      } = await import('./backfill-simbrief-max-cargo.js');
+      const apply = hasFlag(rest, '--apply');
+      const result = await backfillSimbriefMaxCargo({
+        repoRoot,
+        apply,
+        typeId: typeId || undefined,
+      });
+      console.log(formatBackfillSimbriefMaxCargoReport(result));
+      if (!apply && result.wouldUpdate > 0) {
+        console.log(
+          'Re-run with --apply to write packages/shared/src/data/career-player-airframes.json',
+        );
+      }
+      if (result.errors > 0) process.exitCode = 1;
       return;
     }
     if (sub === 'disable' || sub === 'enable') {
@@ -520,7 +543,7 @@ async function main(): Promise<void> {
       return;
     }
     console.error(
-      'Usage: node packages/agent/dist/cli.js career-airframe [wizard]|list|disable|enable|rename|remove [--type typeId] [--label name]',
+      'Usage: node packages/agent/dist/cli.js career-airframe [wizard]|list|disable|enable|rename|remove|backfill-simbrief-cargo [--type typeId] [--label name] [--apply]',
     );
     process.exit(1);
   }

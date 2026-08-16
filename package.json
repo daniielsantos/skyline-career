@@ -12,6 +12,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "validate:profiles": "node scripts/validate-profiles.mjs",
     "fingerprints:backfill": "node scripts/backfill-fingerprints.mjs",
+    "airframes:backfill-simbrief-cargo": "node --import tsx packages/agent/src/cli.ts career-airframe backfill-simbrief-cargo",
     "host:mock": "node packages/agent/dist/mock-host.js",
     "host:native": "dotnet run --project native/SimBridgeHost -c Release -- --mode mock",
     "host:simconnect": "dotnet run --project native/SimBridgeHost -c Release -- --mode simconnect --sdk \"C:\\MSFS 2024 SDK\"",

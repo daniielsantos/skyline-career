@@ -19,7 +19,13 @@ import type {
 } from './types/career-economy.js';
 
 /** Signing cost = this × daily salary. */
-export const GROUND_STAFF_HIRE_SIGNING_DAYS = 2;
+export const GROUND_STAFF_HIRE_SIGNING_DAYS = 7;
+
+/**
+ * One-time severance when firing = this × daily salary.
+ * Closes hire→buff→fire same-day abuse (procurement / demand desk / etc.).
+ */
+export const GROUND_STAFF_FIRE_SEVERANCE_DAYS = 5;
 
 /** Candidates shown at one hub hire desk. */
 export const GROUND_STAFF_HIRE_POOL_SIZE = 3;
@@ -743,6 +749,14 @@ export function refreshGroundStaffHirePool(
   return roster;
 }
 
+export function quoteGroundStaffFireSeveranceUsd(
+  member: Pick<GroundStaffMember, 'salaryUsdPerDay'>,
+): number {
+  return money(
+    Math.max(0, member.salaryUsdPerDay) * GROUND_STAFF_FIRE_SEVERANCE_DAYS,
+  );
+}
+
 export function hireGroundStaffCandidate(
   state: CareerMissionsState,
   world: Pick<CareerEconomyWorld, 'tick'> & { seed?: string },
@@ -815,15 +829,33 @@ export function hireGroundStaffCandidate(
 
 export function fireGroundStaffMember(
   state: CareerMissionsState,
+  world: Pick<CareerEconomyWorld, 'tick'>,
   memberId: string,
-): GroundStaffMember {
+): { member: GroundStaffMember; debitUsd: number } {
   const roster = ensureGroundStaff(state);
   const idx = roster.members.findIndex((m) => m.id === memberId);
   if (idx < 0) throw new Error(`Unknown ground staff ${memberId}`);
   const member = roster.members[idx]!;
+  const debitUsd = quoteGroundStaffFireSeveranceUsd(member);
+  if (debitUsd > 0 && state.walletUsd < debitUsd) {
+    throw new Error(
+      `Severance costs $${debitUsd.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
+    );
+  }
+
+  if (debitUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -debitUsd,
+      kind: 'ground_staff_fire',
+      atTick: world.tick,
+      icao: member.hubIcao,
+      note: `Fire ${member.displayName} · ${GROUND_STAFF_FIRE_SEVERANCE_DAYS}d severance @ ${member.hubIcao}`,
+    });
+  }
+
   roster.members.splice(idx, 1);
   state.groundStaff = roster;
-  return member;
+  return { member, debitUsd };
 }
 
 export type GroundStaffSalarySettleResult = {
@@ -894,6 +926,7 @@ export function groundStaffSnapshot(
       perkLabel: string;
       perkHint: string;
       gradeLabel: string;
+      fireSeveranceUsd: number;
     }
   >;
   hirePoolByHub: Record<
@@ -932,6 +965,7 @@ export function groundStaffSnapshot(
           perkLabel: string;
           perkHint: string;
           gradeLabel: string;
+          fireSeveranceUsd: number;
         }
       >;
     }
@@ -961,7 +995,10 @@ export function groundStaffSnapshot(
     gradeLabel: GROUND_STAFF_GRADE_LABEL[row.grade],
   });
 
-  const members = roster.members.map(decorate);
+  const members = roster.members.map((row) => ({
+    ...decorate(row),
+    fireSeveranceUsd: quoteGroundStaffFireSeveranceUsd(row),
+  }));
   const hirePoolByHub: Record<
     string,
     Array<

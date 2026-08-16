@@ -180,7 +180,7 @@ interface GroundStaffState {
 
 **Economy rules**
 
-- Salary: daily `ground_staff_salary`, `company_id` scoped.
+- Salary: daily `ground_staff_salary`; hire signing **7d**; fire severance **5d** (`ground_staff_fire`).
 - Inbound settles on economy tick (same clock as yard fees).
 - Abandon WH: inbound → yard at hub (keep cost basis), not silent delete.
 - Perks **never** dispatch aircraft.

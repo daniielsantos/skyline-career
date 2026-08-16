@@ -490,6 +490,28 @@ describe('evaluateMissionFlightTransition', () => {
     );
   });
 
+  it('inferEnginesRunning does not treat Accu-Sim false combustion alone as off', () => {
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        n1Pct: [0, 0],
+        rpm: [0, 0],
+        combustion: [false, false],
+      }),
+      true,
+    );
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: false,
+        n1Pct: [0, 0],
+        rpm: [0, 0],
+        combustion: [false, false],
+        fuelFlowKgPerHour: 18,
+      }),
+      true,
+    );
+  });
+
   it('can settle on touchdown without engines when near dest', () => {
     const plannedMs = 3_600_000;
     const nowMs = Date.now();
@@ -882,6 +904,17 @@ describe('flightPhaseFromSample', () => {
     assert.equal(
       flightPhaseFromSample({ onGround: false, enginesRunning: true }),
       'airborne',
+    );
+  });
+
+  it('reports taxi from ground speed even when enginesRunning is false', () => {
+    assert.equal(
+      flightPhaseFromSample({
+        onGround: true,
+        enginesRunning: false,
+        groundSpeedKt: 12,
+      }),
+      'taxi',
     );
   });
 

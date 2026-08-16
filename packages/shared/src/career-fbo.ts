@@ -1064,7 +1064,9 @@ export function splitFboHold(
       aircraftClassId: cls.id,
       aircraftId: acf.id,
       airframeTypeId: acf.airframeTypeId,
-      rolesPackRelPath: cls.rolesPackRelPath,
+      rolesPackRelPath:
+        findCareerPlayerAirframe(acf.airframeTypeId)?.rolesPackRelPath ??
+        cls.rolesPackRelPath,
       deadlineTick: hold.deadlineTick,
       payUsd,
       urgency: hold.urgency,

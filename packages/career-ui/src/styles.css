@@ -1111,6 +1111,24 @@ th {
   min-width: 0;
 }
 
+.filter-row .load-filter-pair {
+  display: grid;
+  grid-template-columns: minmax(5.15rem, 1fr) minmax(5.15rem, 1fr);
+  gap: 0.25rem;
+  min-width: 10.5rem;
+  width: max-content;
+  max-width: none;
+}
+
+.filter-row .load-filter-pair select {
+  min-width: 5.15rem;
+  width: 5.35rem;
+  max-width: none;
+  /* Keep same height as other Freights filter selects; only width is tight. */
+  padding: 0.38rem 0.35rem;
+  font-size: 0.76rem;
+}
+
 .filter-row .access-filter-cell {
   display: flex;
   flex-direction: column;

@@ -24,6 +24,11 @@ export const PARKED_GROUND_SPEED_KT = 3;
 export const ENGINE_N1_OFF_PCT = 20;
 /** GENERAL ENG RPM below this is stopped (piston / leftover Ng). */
 export const ENGINE_RPM_OFF = 250;
+/**
+ * Live fuel flow (kg/h) that counts as engines producing — Accu-Sim pistons
+ * often leave GENERAL ENG COMBUSTION at 0 while still burning.
+ */
+export const ENGINE_FUEL_FLOW_ON_KG_H = 5;
 
 /**
  * Min ground speed (kt) to treat SIM ON GROUND=false as real wheels-up.
@@ -110,25 +115,42 @@ export interface FlightGroundSample {
 }
 
 /**
- * Prefer N1 / RPM / GENERAL ENG COMBUSTION over the snapshot ENG COMBUSTION:1
- * bit, which stays true after cutoff on several MSFS turboprops (PC-12).
+ * Prefer N1 / RPM / GENERAL ENG COMBUSTION / fuel flow over the snapshot
+ * ENG COMBUSTION:1 bit, which stays true after cutoff on several MSFS
+ * turboprops (PC-12). Accu-Sim pistons often leave GENERAL ENG COMBUSTION at 0
+ * while running — do not treat all-false combustion alone as shutdown.
  */
 export function inferEnginesRunning(input: {
   snapshotRunning: boolean;
   n1Pct?: number[];
   rpm?: number[];
   combustion?: boolean[];
+  /** Live fuel flow (kg/h); strong positive evidence when combustion is stuck 0. */
+  fuelFlowKgPerHour?: number;
 }): boolean {
-  // 0 = missing SimVar (batch FLOAT64), not a spooled-down turbine.
+  // 0 = missing SimVar (batch FLOAT64), not a spooled-down turbine / stopped prop.
   const n1 = (input.n1Pct ?? []).filter((n) => Number.isFinite(n) && n > 0);
-  const rpm = (input.rpm ?? []).filter((n) => Number.isFinite(n));
+  const rpm = (input.rpm ?? []).filter((n) => Number.isFinite(n) && n > 0);
   const comb = input.combustion ?? [];
+  const flow =
+    typeof input.fuelFlowKgPerHour === 'number' &&
+    Number.isFinite(input.fuelFlowKgPerHour)
+      ? input.fuelFlowKgPerHour
+      : undefined;
+
   if (n1.some((n) => n >= ENGINE_N1_OFF_PCT)) return true;
   if (n1.length > 0 && n1.every((n) => n < ENGINE_N1_OFF_PCT)) return false;
-  if (comb.length > 0 && comb.every((c) => !c)) return false;
+
+  if (comb.some((c) => c)) {
+    // Sticky combustion after cutoff: low RPM still means shutdown.
+    if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
+    return true;
+  }
+  if (rpm.some((r) => r >= ENGINE_RPM_OFF)) return true;
+  if (flow !== undefined && flow >= ENGINE_FUEL_FLOW_ON_KG_H) return true;
+
   if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
-  if (comb.length > 0 && comb.some((c) => c)) return true;
-  if (rpm.length > 0 && rpm.some((r) => r >= ENGINE_RPM_OFF)) return true;
+  // GENERAL ENG COMBUSTION all-false alone is inconclusive (Accu-Sim).
   return input.snapshotRunning;
 }
 
@@ -163,7 +185,9 @@ export function flightPhaseFromSample(
   const threshold = wasTaxi ? TAXI_GROUND_SPEED_EXIT_KT : TAXI_GROUND_SPEED_KT;
   const moving =
     typeof gs === 'number' && Number.isFinite(gs) && gs >= threshold;
-  if (sample.enginesRunning && moving) return 'taxi';
+  // Motion alone is enough for taxi display — enginesRunning is unreliable on
+  // Accu-Sim when classic COMBUSTION/RPM simvars stay at 0.
+  if (moving) return 'taxi';
   return sample.enginesRunning ? 'ground+engines' : 'ground';
 }
 

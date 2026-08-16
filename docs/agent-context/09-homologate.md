@@ -29,6 +29,7 @@ node packages/agent/dist/cli.js smoke --profile profiles/drafts\<arquivo>.json
 - Densidade: Jet-A ~6.7 vs avgas ~6.0 — OFP em lb / tanque em gal.
 - Capacidade do hangar (`fuelCapacityKg`) deve bater com tanques homologados.
 - Career inject: `clampFuelToCapacity` quando OFP > tanques.
+- `maxCargoKg` com stations ainda em placeholder 500: wizard prefere SimBrief. Catálogo antigo: `npm run airframes:backfill-simbrief-cargo` / `-- --apply`.
 
 ## Hubs (aeroportos career)
 

@@ -401,9 +401,58 @@ export function softenCgFindingSeverity(code: string, severity: string): string 
 }
 
 /**
+ * Station crew reserved under MTOW before freight (2×170 lb). SimBrief BOW
+ * often folds crew into OEW; MSFS empty usually does not — Skyline inject
+ * still seeds crew seats, so offline ops must leave that room.
+ */
+export const FREIGHTER_DISPATCH_CREW_KG = (2 * 170) / KG_TO_LB;
+
+/**
+ * Prefer heavier empty / lighter MTOW between a SimBrief (or class) sample and
+ * the catalog row — offline stand-in for “what MSFS will actually weigh.”
+ */
+export function resolveConservativeOpsWeights(weights: {
+  oewKg?: number;
+  mtowKg?: number;
+  catalogOewKg?: number;
+  catalogMtowKg?: number;
+  crewKg?: number;
+}): { oewKg?: number; mtowKg?: number; crewKg: number } {
+  let oewKg = weights.oewKg;
+  let mtowKg = weights.mtowKg;
+  if (
+    typeof weights.catalogOewKg === 'number' &&
+    Number.isFinite(weights.catalogOewKg) &&
+    weights.catalogOewKg > 0
+  ) {
+    oewKg =
+      typeof oewKg === 'number' && Number.isFinite(oewKg) && oewKg > 0
+        ? Math.max(oewKg, weights.catalogOewKg)
+        : weights.catalogOewKg;
+  }
+  if (
+    typeof weights.catalogMtowKg === 'number' &&
+    Number.isFinite(weights.catalogMtowKg) &&
+    weights.catalogMtowKg > 0
+  ) {
+    mtowKg =
+      typeof mtowKg === 'number' && Number.isFinite(mtowKg) && mtowKg > 0
+        ? Math.min(mtowKg, weights.catalogMtowKg)
+        : weights.catalogMtowKg;
+  }
+  const crewKg =
+    typeof weights.crewKg === 'number' &&
+    Number.isFinite(weights.crewKg) &&
+    weights.crewKg >= 0
+      ? weights.crewKg
+      : FREIGHTER_DISPATCH_CREW_KG;
+  return { oewKg, mtowKg, crewKg };
+}
+
+/**
  * Route operational cargo cap for Staging / Dispatch prefill.
  * Uses homologated class weights (or live SimBrief OEW/MTOW override):
- * min(structuralMaxCargo, MTOW − OEW − takeoffFuel − margin).
+ * min(structuralMaxCargo, MTOW − OEW − takeoffFuel − margin − crew).
  * New aircraft homologations must fill oewKg/mtowKg/fuel* on AircraftClass.
  *
  * Prefer per-airframe fuel burn / tank when provided — class light_ga burn is
@@ -428,6 +477,12 @@ export function estimateRouteCargoLimit(
      * (taxi + reserve unchanged).
      */
     fuelBurnMult?: number;
+    /**
+     * Station crew mass (kg) reserved under MTOW before freight — Skyline
+     * inject seeds ~170 lb/seat on freighter crew stations (SimBrief BOW
+     * often already includes crew; MSFS empty often does not).
+     */
+    crewKg?: number;
   } = {},
 ): {
   operationalMaxCargoKg: number;
@@ -489,9 +544,15 @@ export function estimateRouteCargoLimit(
   // Extra margin vs SimBrief's often-heavier OEW / contingency so staging
   // overbooks less often (Accept OFP cargo covers residual cuts).
   const marginKg = Math.max(50, Math.round(structural * 0.05));
+  const crewKg =
+    typeof weights.crewKg === 'number' &&
+    Number.isFinite(weights.crewKg) &&
+    weights.crewKg > 0
+      ? weights.crewKg
+      : 0;
   const mtowPayloadKg = Math.max(
     0,
-    Math.floor(mtowKg - oewKg - takeoffFuelKg - marginKg),
+    Math.floor(mtowKg - oewKg - takeoffFuelKg - marginKg - crewKg),
   );
   // Allow 1 kg float/round slack so equal display values don't hard-block.
   const fuelFeasible = estimatedBlockFuelKg <= fuelCapacityKg + 1;
@@ -954,6 +1015,7 @@ export function acceptEmptyFlight(
   }
 
   const classDef = getAircraftClass(aircraft.aircraftClassId);
+  const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
   const missionId =
     opts.missionId?.trim() ||
     `msn_empty_${world.tick}_${origin}_${dest}_${Math.floor(Math.random() * 1e6)}`;
@@ -969,7 +1031,8 @@ export function acceptEmptyFlight(
     pax: 0,
     aircraftClassId: aircraft.aircraftClassId,
     airframeTypeId: aircraft.airframeTypeId,
-    rolesPackRelPath: classDef.rolesPackRelPath,
+    rolesPackRelPath:
+      airframe?.rolesPackRelPath ?? classDef.rolesPackRelPath,
     deadlineTick: world.tick + TICKS_PER_HOUR * 48,
     payUsd: 0,
     urgency: 'normal',

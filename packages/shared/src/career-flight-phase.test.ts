@@ -175,6 +175,20 @@ describe('advanceFlightPhase', () => {
     assert.equal(phase, 'taxi_in');
   });
 
+  it('enters taxi_out from ground speed without enginesRunning', () => {
+    const phase = advanceFlightPhase(
+      'ground',
+      sample({
+        onGround: true,
+        enginesRunning: false,
+        groundSpeedKt: 14,
+        sawAirborne: false,
+        postTouchdown: false,
+      }),
+    );
+    assert.equal(phase, 'taxi_out');
+  });
+
   it('keeps climb sticky through mild VS dips', () => {
     const climbed = advanceFlightPhase(
       'climb',

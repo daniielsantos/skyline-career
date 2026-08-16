@@ -231,6 +231,27 @@ describe('estimateRouteCargoLimit', () => {
     assert.equal(result.mtowKg, 4_100);
     assert.ok(result.operationalMaxCargoKg > 1_009);
   });
+
+  it('subtracts reserved station crew from MTOW leftover', () => {
+    const bare = estimateRouteCargoLimit('light_turboprop', 209, 1_588, {
+      oewKg: 3_207,
+      mtowKg: 4_756,
+      fuelCapacityKg: 1_173,
+      fuelBurnKgPerNm: 0.8,
+      crewKg: 0,
+    });
+    const crewed = estimateRouteCargoLimit('light_turboprop', 209, 1_588, {
+      oewKg: 3_207,
+      mtowKg: 4_756,
+      fuelCapacityKg: 1_173,
+      fuelBurnKgPerNm: 0.8,
+      crewKg: 154,
+    });
+    assert.equal(
+      bare.operationalMaxCargoKg - crewed.operationalMaxCargoKg,
+      154,
+    );
+  });
 });
 
 function pushTestLot(

@@ -24,10 +24,12 @@ import {
 } from './career-warehouse-stock.js';
 import { isPortPickupHub } from './career-warehouse.js';
 import {
+  estimateRouteCargoLimit,
   getAircraftClass,
   listActivePlayerMissions,
   normalizeMissionIntent,
   recomputeMissionTotals,
+  resolveConservativeOpsWeights,
   syncPlayerInbound,
 } from './career-mission.js';
 import {
@@ -519,10 +521,39 @@ export function acceptDemandOrder(
   }
 
   const classDef = getAircraftClass(aircraft.aircraftClassId);
-  const airframeMax = findCareerPlayerAirframe(
-    aircraft.airframeTypeId,
-  )?.maxCargoKg;
-  const maxCargoKg = airframeMax ?? classDef.maxCargoKg;
+  const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
+  const structuralMax =
+    (typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
+      ? airframe.maxCargoKg
+      : undefined) ?? classDef.maxCargoKg;
+  // Match Dispatch / SimBrief prefill: fuel + MTOW ops + station crew, not
+  // structural alone (otherwise Demand books 2.2 klb and inject only flies ~1.6).
+  const opsWeights = resolveConservativeOpsWeights({
+    oewKg: airframe?.oewKg,
+    mtowKg: airframe?.mtowKg,
+    catalogOewKg: airframe?.oewKg,
+    catalogMtowKg: airframe?.mtowKg,
+  });
+  const routeLimit = estimateRouteCargoLimit(
+    aircraft.aircraftClassId,
+    distanceNm,
+    structuralMax,
+    {
+      oewKg: opsWeights.oewKg,
+      mtowKg: opsWeights.mtowKg,
+      fuelCapacityKg: airframe?.fuelCapacityKg,
+      fuelBurnKgPerNm: airframe?.fuelBurnKgPerNm,
+      airframeTypeId: aircraft.airframeTypeId,
+      crewKg: opsWeights.crewKg,
+    },
+  );
+  if (!routeLimit.fuelFeasible) {
+    throw new Error(
+      `Estimated block fuel ${routeLimit.estimatedBlockFuelKg} kg exceeds ` +
+        `tank capacity ${routeLimit.fuelCapacityKg} kg for ${origin}→${dest}`,
+    );
+  }
+  const maxCargoKg = routeLimit.operationalMaxCargoKg;
 
   const stockAvail = (state.playerWarehouses?.stock ?? [])
     .filter(
@@ -540,7 +571,9 @@ export function acceptDemandOrder(
   kg = Math.min(kg, order.remainingKg, stockAvail, maxCargoKg);
   if (kg <= 0) {
     throw new Error(
-      `No ${order.commodityId} available in warehouse at ${origin} for this order`,
+      maxCargoKg <= 0
+        ? `No payload room under MTOW/fuel for ${origin}→${dest} on this airframe`
+        : `No ${order.commodityId} available in warehouse at ${origin} for this order`,
     );
   }
 
@@ -595,7 +628,8 @@ export function acceptDemandOrder(
     pax: 0,
     aircraftClassId: aircraft.aircraftClassId,
     airframeTypeId: aircraft.airframeTypeId,
-    rolesPackRelPath: classDef.rolesPackRelPath,
+    rolesPackRelPath:
+      airframe?.rolesPackRelPath ?? classDef.rolesPackRelPath,
     deadlineTick,
     payUsd,
     urgency: 'normal',

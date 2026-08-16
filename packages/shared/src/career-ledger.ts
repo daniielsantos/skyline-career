@@ -48,6 +48,7 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   crew_hire: 'Crew hire',
   ground_staff_salary: 'Ground staff salary',
   ground_staff_hire: 'Ground staff hire',
+  ground_staff_fire: 'Ground staff severance',
   ferry: 'Ferry',
   pilot_travel: 'Pilot travel',
   fuel: 'Jet-A',

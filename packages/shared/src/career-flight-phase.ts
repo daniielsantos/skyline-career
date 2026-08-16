@@ -182,10 +182,7 @@ export function advanceFlightPhase(
       if (inLandingHold && (prevPhase === 'landing' || prevPhase === 'approach')) {
         return 'landing';
       }
-      if (
-        sample.enginesRunning &&
-        isTaxiMoving(gs, prevPhase ?? 'taxi_in')
-      ) {
+      if (isTaxiMoving(gs, prevPhase ?? 'taxi_in')) {
         return 'taxi_in';
       }
       return 'ground';
@@ -193,15 +190,13 @@ export function advanceFlightPhase(
   }
 
   // --- Still on ground, not yet airborne ---
+  // Taxi / takeoff-roll from kinematics. Do not require enginesRunning — Accu-Sim
+  // pistons often leave classic COMBUSTION/RPM at 0 while the engines are alive.
   if (sample.onGround && !sample.sawAirborne) {
-    if (
-      sample.enginesRunning &&
-      typeof gs === 'number' &&
-      gs >= TAKEOFF_ROLL_GS_KT
-    ) {
+    if (typeof gs === 'number' && gs >= TAKEOFF_ROLL_GS_KT) {
       return 'takeoff';
     }
-    if (sample.enginesRunning && isTaxiMoving(gs, prevPhase)) {
+    if (isTaxiMoving(gs, prevPhase)) {
       return 'taxi_out';
     }
     return 'ground';
@@ -319,7 +314,7 @@ export function advanceFlightPhase(
 
   // Ground after airborne but postTouchdown not yet stamped — treat as landing/taxi.
   if (sample.sawAirborne && sample.onGround) {
-    if (sample.enginesRunning && isTaxiMoving(gs, prevPhase ?? 'taxi_in')) {
+    if (isTaxiMoving(gs, prevPhase ?? 'taxi_in')) {
       return 'taxi_in';
     }
     return prevPhase === 'landing' ? 'landing' : 'ground';

@@ -1402,6 +1402,7 @@ export type CareerLedgerKind =
   | 'crew_hire'
   | 'ground_staff_salary'
   | 'ground_staff_hire'
+  | 'ground_staff_fire'
   | 'ferry'
   | 'pilot_travel'
   | 'fuel'

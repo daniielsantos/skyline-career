@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   fetchPorts,
+  fetchCargoLimit,
   postDemandAccept,
   postGroundStaffFire,
   postGroundStaffHire,
@@ -566,14 +567,68 @@ export function PortsPanel(props: {
     );
   }, [acceptOrder, acceptOrigin, acceptOriginOptions]);
 
+  /** Route fuel+MTOW ops cap — matches server acceptDemandOrder / SimBrief prefill. */
+  const [acceptOpsMaxCargoKg, setAcceptOpsMaxCargoKg] = useState<number | null>(
+    null,
+  );
+  const acceptAircraft = useMemo(
+    () => props.fleet.find((a) => a.id === acceptAircraftId) ?? null,
+    [props.fleet, acceptAircraftId],
+  );
+  const acceptStructuralMaxKg = useMemo(() => {
+    if (!acceptAircraft) return 0;
+    return Math.max(0, props.resolveMaxCargoKg?.(acceptAircraft) ?? 0);
+  }, [acceptAircraft, props.resolveMaxCargoKg]);
+
+  useEffect(() => {
+    if (!acceptOrder || !acceptOrigin || !acceptAircraft) {
+      setAcceptOpsMaxCargoKg(null);
+      return;
+    }
+    let cancelled = false;
+    // Keep the last ops value while refetching — do not flash structural (that
+    // made Mass / payout jump every App re-render / economy tick).
+    void fetchCargoLimit(
+      acceptAircraft.aircraftClassId,
+      acceptDistanceNm ?? undefined,
+      acceptAircraft.airframeTypeId,
+      {
+        originIcao: acceptOrigin.trim().toUpperCase(),
+        destIcao: acceptOrder.destIcao,
+        aircraftId: acceptAircraft.id,
+      },
+    )
+      .then((limit) => {
+        if (!cancelled) {
+          setAcceptOpsMaxCargoKg(
+            Math.max(0, Math.floor(limit.operationalMaxCargoKg)),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAcceptOpsMaxCargoKg(acceptStructuralMaxKg);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    acceptOrder?.id,
+    acceptOrder?.destIcao,
+    acceptOrigin,
+    acceptAircraft?.id,
+    acceptAircraft?.aircraftClassId,
+    acceptAircraft?.airframeTypeId,
+    acceptDistanceNm,
+    acceptStructuralMaxKg,
+  ]);
+
   const acceptPullPreview = useMemo(() => {
     if (!acceptOrder || !acceptOrigin) return null;
     const origin = acceptOrigin.trim().toUpperCase();
     const originRow = acceptOriginOptions.find((o) => o.icao === origin);
     if (!originRow || originRow.stockKg <= 0) return null;
-    const aircraft = props.fleet.find((a) => a.id === acceptAircraftId);
-    const maxCargoKg = aircraft
-      ? Math.max(0, props.resolveMaxCargoKg?.(aircraft) ?? 0)
+    const maxCargoKg = acceptAircraft
+      ? Math.max(0, acceptOpsMaxCargoKg ?? acceptStructuralMaxKg)
       : 0;
     const lots = (warehouses?.stock ?? []).filter(
       (s) =>
@@ -599,13 +654,13 @@ export function PortsPanel(props: {
   }, [
     acceptOrder,
     acceptOrigin,
-    acceptAircraftId,
+    acceptAircraft,
     acceptOriginOptions,
     acceptIntlPreview,
+    acceptOpsMaxCargoKg,
+    acceptStructuralMaxKg,
     warehouses?.stock,
     groundStaff,
-    props.fleet,
-    props.resolveMaxCargoKg,
   ]);
 
   function openBuyModal(listing: PortListingView) {
@@ -861,11 +916,15 @@ export function PortsPanel(props: {
     }
   }
 
-  async function onFireGroundStaff(memberId: string, name: string) {
+  async function onFireGroundStaff(
+    memberId: string,
+    name: string,
+    severanceUsd: number,
+  ) {
     if (props.busy || loading) return;
     const ok = await confirm({
       title: 'Fire ground staff?',
-      body: `Let ${name} go? Logistics perk stops immediately.`,
+      body: `Let ${name} go? Perk stops immediately. Severance ${props.formatMoney(severanceUsd)} (5 days' salary).`,
       confirmLabel: 'Fire',
       cancelLabel: 'Keep',
       tone: 'warn',
@@ -878,7 +937,12 @@ export function PortsPanel(props: {
       setGroundStaff(result.groundStaff);
       if (result.warehouses) setWarehouses(result.warehouses);
       if (result.ports) setSnap(result.ports);
-      props.onToast?.('ok', `Fired ${result.member.displayName}`);
+      props.onToast?.(
+        'ok',
+        result.debitUsd > 0
+          ? `Fired ${result.member.displayName} · ${props.formatMoney(result.debitUsd)} severance`
+          : `Fired ${result.member.displayName}`,
+      );
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -2259,10 +2323,18 @@ export function PortsPanel(props: {
                                                   void onFireGroundStaff(
                                                     m.id,
                                                     m.displayName,
+                                                    m.fireSeveranceUsd ??
+                                                      Math.round(
+                                                        m.salaryUsdPerDay * 5,
+                                                      ),
                                                   )
                                                 }
                                               >
                                                 Fire
+                                                {m.fireSeveranceUsd != null &&
+                                                m.fireSeveranceUsd > 0
+                                                  ? ` · ${props.formatMoney(m.fireSeveranceUsd)}`
+                                                  : ''}
                                               </button>
                                             </div>
                                           </div>

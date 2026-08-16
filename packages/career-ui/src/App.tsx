@@ -2131,6 +2131,12 @@ export function App() {
   const [regionPressure, setRegionPressure] = useState<RegionPressure[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [busy, setBusy] = useState(false);
+  /** Chunked time-advance progress (dev +1 day / large skips). */
+  const [tickAdvance, setTickAdvance] = useState<{
+    done: number;
+    total: number;
+    label: string;
+  } | null>(null);
   /** Local lock for Crew fly — avoids app-wide busy flash on every button. */
   const [crewDispatchBusy, setCrewDispatchBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -4149,40 +4155,102 @@ export function App() {
           : ticks === 96
             ? '1 day'
             : `${ticks * 15} min`;
+    // Chunk large advances so the clock/toast can update between Host round-trips.
+    const chunkSize = ticks > 8 ? 8 : ticks;
     await run(async () => {
-      const result = await postTick(ticks);
-      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      let done = 0;
+      let leasePaidUsd = 0;
+      let leaseRepossessed = 0;
+      let hangarDebitUsd = 0;
+      let hangarShortfallUsd = 0;
+      let creditPaid = 0;
+      let creditCompounded = 0;
+      let creditOverdue = 0;
+      let lastTick = tick;
+      let lastLots = 0;
+      let lastWallet: number | undefined;
+      let lastCredit: CompanyCreditSnapshot | undefined;
+
+      if (ticks > chunkSize) {
+        setTickAdvance({ done: 0, total: ticks, label: hoursLabel });
+        setToastKind('ok');
+        setToast(`Advancing ${hoursLabel}… 0/${ticks}`);
+      }
+
+      try {
+        while (done < ticks) {
+          const step = Math.min(chunkSize, ticks - done);
+          const result = await postTick(step);
+          done += step;
+          lastTick = result.tick;
+          lastLots = result.availableLots;
+          if (typeof result.walletUsd === 'number') {
+            lastWallet = result.walletUsd;
+            setWallet(result.walletUsd);
+          }
+          if (result.companyCredit) {
+            lastCredit = result.companyCredit;
+            setCompanyCredit(result.companyCredit);
+          }
+          setTick(result.tick);
+          if (typeof result.lastBatchAtMs === 'number') {
+            setLastBatchAtMs(result.lastBatchAtMs);
+          }
+          if (typeof result.serverNowMs === 'number') {
+            const clientNow = Date.now();
+            setServerOffsetMs(result.serverNowMs - clientNow);
+            setDisplayNowMs(result.serverNowMs);
+          }
+          leasePaidUsd += result.leasePaidUsd ?? 0;
+          leaseRepossessed += result.leaseRepossessed?.length ?? 0;
+          hangarDebitUsd += result.hangarDebitUsd ?? 0;
+          hangarShortfallUsd += result.hangarShortfallUsd ?? 0;
+          creditPaid += result.creditInterestPaidUsd ?? 0;
+          creditCompounded += result.creditInterestCompoundedUsd ?? 0;
+          if (typeof result.creditOverdueDays === 'number') {
+            creditOverdue = result.creditOverdueDays;
+          }
+
+          if (ticks > chunkSize) {
+            setTickAdvance({ done, total: ticks, label: hoursLabel });
+            setToast(`Advancing ${hoursLabel}… ${done}/${ticks}`);
+            // Let React paint progress before the next Host write.
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, 0);
+            });
+          }
+        }
+      } finally {
+        setTickAdvance(null);
+      }
+
+      if (typeof lastWallet === 'number') setWallet(lastWallet);
+      if (lastCredit) setCompanyCredit(lastCredit);
       const leaseNote =
-        (result.leasePaidUsd ?? 0) > 0
-          ? ` · lease ${formatMoney(result.leasePaidUsd!)}`
-          : (result.leaseRepossessed?.length ?? 0) > 0
-            ? ` · ${result.leaseRepossessed!.length} lease repossessed`
+        leasePaidUsd > 0
+          ? ` · lease ${formatMoney(leasePaidUsd)}`
+          : leaseRepossessed > 0
+            ? ` · ${leaseRepossessed} lease repossessed`
             : '';
-      const hangarDebit = result.hangarDebitUsd ?? 0;
-      const hangarShortfall = result.hangarShortfallUsd ?? 0;
       const hangarNote =
-        hangarDebit > 0 && hangarShortfall > 0
-          ? ` · hangar −${formatMoney(hangarDebit)} (short ${formatMoney(hangarShortfall)})`
-          : hangarDebit > 0
-            ? ` · hangar −${formatMoney(hangarDebit)}`
-            : hangarShortfall > 0
-              ? ` · hangar unpaid ${formatMoney(hangarShortfall)}`
+        hangarDebitUsd > 0 && hangarShortfallUsd > 0
+          ? ` · hangar −${formatMoney(hangarDebitUsd)} (short ${formatMoney(hangarShortfallUsd)})`
+          : hangarDebitUsd > 0
+            ? ` · hangar −${formatMoney(hangarDebitUsd)}`
+            : hangarShortfallUsd > 0
+              ? ` · hangar unpaid ${formatMoney(hangarShortfallUsd)}`
               : '';
-      const creditPaid = result.creditInterestPaidUsd ?? 0;
-      const creditCompounded = result.creditInterestCompoundedUsd ?? 0;
-      const creditOverdue = result.creditOverdueDays ?? 0;
       const creditNote =
         creditCompounded > 0
           ? ` · credit interest unpaid ${formatMoney(creditCompounded)} (overdue ${creditOverdue}d)`
           : creditPaid > 0
             ? ` · credit interest −${formatMoney(creditPaid)}`
             : '';
-      if (result.companyCredit) setCompanyCredit(result.companyCredit);
       setToastKind(
-        hangarShortfall > 0 || creditCompounded > 0 ? 'warn' : 'ok',
+        hangarShortfallUsd > 0 || creditCompounded > 0 ? 'warn' : 'ok',
       );
       setToast(
-        `Time advanced ${hoursLabel} → ${formatClock(result.tick)} · ${result.availableLots} lots${leaseNote}${hangarNote}${creditNote}`,
+        `Time advanced ${hoursLabel} → ${formatClock(lastTick)} · ${lastLots} lots${leaseNote}${hangarNote}${creditNote}`,
       );
     });
   }
@@ -7267,8 +7335,17 @@ export function App() {
               <span className="label">Wallet</span>
               <strong>{formatMoney(wallet)}</strong>
             </div>
-            <div className="metric" title="1 economy tick = 1 simulated hour">
-              <span className="label">Clock</span>
+            <div
+              className="metric"
+              title={
+                tickAdvance
+                  ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} batches`
+                  : '1 economy tick = 15 simulated minutes'
+              }
+            >
+              <span className="label">
+                {tickAdvance ? `Clock · ${tickAdvance.done}/${tickAdvance.total}` : 'Clock'}
+              </span>
               <strong>{formatClock(continuousHours)}</strong>
             </div>
           </div>
@@ -7299,7 +7376,9 @@ export function App() {
                 disabled={busy}
                 title="Advance economy + crew wall-clock by 1 day (96 ticks)"
               >
-                +1 day
+                {tickAdvance && tickAdvance.total === 96
+                  ? `${tickAdvance.done}/${tickAdvance.total}`
+                  : '+1 day'}
               </button>
               <button
                 type="button"

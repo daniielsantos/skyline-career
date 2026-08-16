@@ -1327,6 +1327,9 @@ export function postTick(n = 1) {
   return api<{
     tick: number;
     availableLots: number;
+    lastBatchAtMs?: number;
+    serverNowMs?: number;
+    continuousHours?: number;
     leasePaidUsd?: number;
     leaseRepossessed?: string[];
     hangarDebitUsd?: number;

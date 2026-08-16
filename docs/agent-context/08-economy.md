@@ -12,7 +12,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — usam **bush trips**.
 - **Warehouses** (pickup hubs SBGR/SBKP/SBCT/SBRF/SBEG/SBPA/SBBE + SAEZ/SAVC/SCEL/SCTE/KMIA/KEWR/KIAH/KLAX/KSEA + CYVR/CYHZ/MMVR/MMZO/MMUN): CAPEX + capacity + storage; port buy **split** free→WH / rest→yard; **partial Store**; **Abandon** yard (no refund) for oversized lots; **lotes por custo** (±3% merge band); **T1→T2 hybrid upgrade** (lifetime Demand Board shipped kg + CAPEX).
-- **Demand Board:** NPC buy-orders quando stock do hub está baixo (cap global **96** open — multi-país); accept → missão WH→dest; settle = payout + fill terminal + credit `lifetimeShippedKg`. **Edit cargo** restores/withdraws WH + demand remaining.
+- **Demand Board:** NPC buy-orders quando stock do hub está baixo (cap global **192** open, **quota por país** ≈32 com 6 países — BR não monopoliza); accept → missão WH→dest; settle = payout + fill terminal + credit `lifetimeShippedKg`. **Edit cargo** restores/withdraws WH + demand remaining. **Intl (port-fed):** cross-border só se par de país na allowlist (BR↔US/AR/CL/MX/CA, AR↔CL/US, CL↔US, US↔CA/MX) **e** origem WH em pickup hub; pay × **1.28**; Market `CAREER_INTERNATIONAL_LANES` intactas.
 - **FBO spot:** removido (stock wipe on load); FBO = bonded holds only.
 - **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico; yard hold fee diária. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
 

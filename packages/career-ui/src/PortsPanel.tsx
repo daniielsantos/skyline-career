@@ -24,7 +24,7 @@ import {
   portsLoopTargetSection,
   type PortsLoopStep,
 } from './ports-loop-guidance';
-import { previewDemandAcceptPull } from './demand-accept-preview';
+import { previewDemandAcceptPull, previewDemandInternationalRoute, greatCircleDistanceNm } from './demand-accept-preview';
 import {
   displayToKg,
   KG_TO_LB,
@@ -66,6 +66,7 @@ const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
 
 type DemandSortKey =
+  | 'country'
   | 'dest'
   | 'commodity'
   | 'wanted'
@@ -73,6 +74,31 @@ type DemandSortKey =
   | 'expires';
 
 type DemandSort = { key: DemandSortKey; direction: 'asc' | 'desc' };
+
+function demandCountryLabel(countryId: string | null | undefined): string {
+  const id = countryId?.trim().toUpperCase() ?? '';
+  if (!id) return '—';
+  switch (id) {
+    case 'BR':
+      return 'Brazil';
+    case 'US':
+      return 'USA';
+    case 'CA':
+      return 'Canada';
+    case 'MX':
+      return 'Mexico';
+    case 'AR':
+      return 'Argentina';
+    case 'CL':
+      return 'Chile';
+    default:
+      return id;
+  }
+}
+
+function demandDestCountryId(order: DemandOrderView): string {
+  return order.destCountryId?.trim().toUpperCase() ?? '';
+}
 
 /** Wall-clock duration from economy hours; matches Freights board style. */
 function formatDuration(hours: number): string {
@@ -106,6 +132,8 @@ function formatExpiresIn(
 
 function demandSortValue(order: DemandOrderView, key: DemandSortKey): string | number {
   switch (key) {
+    case 'country':
+      return demandDestCountryId(order) || 'ZZ';
     case 'dest':
       return order.destIcao.toUpperCase();
     case 'commodity':
@@ -260,6 +288,7 @@ export function PortsPanel(props: {
     direction: 'asc',
   });
   const [demandPage, setDemandPage] = useState(1);
+  const [demandCountryFilter, setDemandCountryFilter] = useState('');
   const [worldPortsPage, setWorldPortsPage] = useState(1);
 
   const unit = massUnitLabel(props.weightSystem);
@@ -375,6 +404,9 @@ export function PortsPanel(props: {
           maxCostUsdPerKg,
           freeKg: w.freeKg,
           usedKg: w.usedKg,
+          countryId: w.countryId ?? null,
+          lat: w.lat ?? null,
+          lon: w.lon ?? null,
         };
       });
     return rows.sort((a, b) => {
@@ -397,6 +429,50 @@ export function PortsPanel(props: {
     acceptOriginOptions.find((o) => o.icao === acceptOrigin.trim().toUpperCase())
       ?.stockKg ?? 0;
 
+  const acceptIntlPreview = useMemo(() => {
+    if (!acceptOrder || !acceptOrigin) return null;
+    const origin = acceptOrigin.trim().toUpperCase();
+    const originRow = acceptOriginOptions.find((o) => o.icao === origin);
+    return previewDemandInternationalRoute({
+      originIcao: origin,
+      destIcao: acceptOrder.destIcao,
+      originCountryId: originRow?.countryId,
+      destCountryId: acceptOrder.destCountryId,
+      pickupHubs: warehouses?.pickupHubs ?? [],
+    });
+  }, [
+    acceptOrder,
+    acceptOrigin,
+    acceptOriginOptions,
+    warehouses?.pickupHubs,
+  ]);
+
+  const acceptDistanceNm = useMemo(() => {
+    if (!acceptOrder || !acceptOrigin) return null;
+    const origin = acceptOrigin.trim().toUpperCase();
+    const originRow = acceptOriginOptions.find((o) => o.icao === origin);
+    const oLat = originRow?.lat;
+    const oLon = originRow?.lon;
+    const dLat = acceptOrder.destLat;
+    const dLon = acceptOrder.destLon;
+    if (
+      oLat == null ||
+      oLon == null ||
+      dLat == null ||
+      dLon == null ||
+      !Number.isFinite(oLat) ||
+      !Number.isFinite(oLon) ||
+      !Number.isFinite(dLat) ||
+      !Number.isFinite(dLon)
+    ) {
+      return null;
+    }
+    return greatCircleDistanceNm(
+      { lat: oLat, lon: oLon },
+      { lat: dLat, lon: dLon },
+    );
+  }, [acceptOrder, acceptOrigin, acceptOriginOptions]);
+
   const acceptPullPreview = useMemo(() => {
     if (!acceptOrder || !acceptOrigin) return null;
     const origin = acceptOrigin.trim().toUpperCase();
@@ -417,6 +493,9 @@ export function PortsPanel(props: {
       stockKg: originRow.stockKg,
       maxCargoKg,
       maxUnitPriceUsd: acceptOrder.maxUnitPriceUsd,
+      unitPriceMult: acceptIntlPreview?.allowed
+        ? acceptIntlPreview.unitPriceMult
+        : 1,
       lots,
     });
   }, [
@@ -424,6 +503,7 @@ export function PortsPanel(props: {
     acceptOrigin,
     acceptAircraftId,
     acceptOriginOptions,
+    acceptIntlPreview,
     warehouses?.stock,
     props.fleet,
     props.resolveMaxCargoKg,
@@ -719,6 +799,14 @@ export function PortsPanel(props: {
     ) {
       return;
     }
+    if (acceptIntlPreview && !acceptIntlPreview.allowed) {
+      props.onToast?.(
+        'fail',
+        acceptIntlPreview.blockReason ??
+          'International demand route is not allowed',
+      );
+      return;
+    }
     if (isCargoOpsCommodityLocked(acceptOrder.commodityId)) {
       props.onToast?.(
         'fail',
@@ -985,8 +1073,22 @@ export function PortsPanel(props: {
       seen.add(order.id);
       unique.push(order);
     }
-    return unique.sort((a, b) => compareDemandOrders(a, b, demandSort));
-  }, [demand, demandSort]);
+    const country = demandCountryFilter.trim().toUpperCase();
+    const filtered = country
+      ? unique.filter((o) => demandDestCountryId(o) === country)
+      : unique;
+    return filtered.sort((a, b) => compareDemandOrders(a, b, demandSort));
+  }, [demand, demandSort, demandCountryFilter]);
+
+  const demandCountryOptions = useMemo(() => {
+    const ids = new Set<string>();
+    for (const o of demand) {
+      const id = demandDestCountryId(o);
+      if (id) ids.add(id);
+    }
+    return [...ids].sort((a, b) => a.localeCompare(b));
+  }, [demand]);
+
   const demandPageCount = Math.max(
     1,
     Math.ceil(sortedDemand.length / DEMAND_PAGE_SIZE) || 1,
@@ -996,11 +1098,15 @@ export function PortsPanel(props: {
     const start = (safeDemandPage - 1) * DEMAND_PAGE_SIZE;
     return sortedDemand.slice(start, start + DEMAND_PAGE_SIZE);
   }, [sortedDemand, safeDemandPage]);
-  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${sortedDemand.length}`;
+  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${demandCountryFilter}:${sortedDemand.length}`;
 
   useEffect(() => {
     if (demandPage > demandPageCount) setDemandPage(demandPageCount);
   }, [demandPage, demandPageCount]);
+
+  useEffect(() => {
+    setDemandPage(1);
+  }, [demandCountryFilter]);
 
   const sortedWorldPorts = useMemo(() => {
     return [...(snap?.ports ?? [])].sort((a, b) => {
@@ -2006,10 +2112,43 @@ export function PortsPanel(props: {
                   )}
                 </p>
               ) : null}
+              <div className="ports-demand-toolbar">
+                <label className="ports-demand-country-filter">
+                  <span className="muted">Country</span>
+                  <select
+                    value={demandCountryFilter}
+                    aria-label="Filter demand by destination country"
+                    disabled={props.busy || loading}
+                    onChange={(e) => setDemandCountryFilter(e.target.value)}
+                  >
+                    <option value="">All countries</option>
+                    {demandCountryOptions.map((id) => (
+                      <option key={id} value={id}>
+                        {demandCountryLabel(id)} ({id})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="muted ports-demand-filter-count">
+                  {sortedDemand.length === demand.length
+                    ? `${sortedDemand.length} open`
+                    : `${sortedDemand.length} of ${demand.length} open`}
+                </p>
+              </div>
               <div className="table-wrap">
                 <table className="data-table">
                   <thead>
                     <tr>
+                      <th aria-sort={demandAriaSort('country')}>
+                        <button
+                          type="button"
+                          className={`sort-header${demandSort.key === 'country' ? ' is-sorted' : ''}`}
+                          title="Sort by destination country"
+                          onClick={() => toggleDemandSort('country')}
+                        >
+                          Country <span>{demandSortIndicator('country')}</span>
+                        </button>
+                      </th>
                       <th aria-sort={demandAriaSort('dest')}>
                         <button
                           type="button"
@@ -2068,10 +2207,11 @@ export function PortsPanel(props: {
                   <tbody key={demandTableKey}>
                     {sortedDemand.length === 0 ? (
                       <tr>
-                        <td colSpan={6}>
+                        <td colSpan={7}>
                           <p className="empty">
-                            No open demand — hubs with low stock will post
-                            orders.
+                            {demand.length === 0
+                              ? 'No open demand — hubs with low stock will post orders.'
+                              : 'No demand in this country — clear the filter or wait for new posts.'}
                           </p>
                         </td>
                       </tr>
@@ -2080,11 +2220,18 @@ export function PortsPanel(props: {
                         const cargoLocked = isCargoOpsCommodityLocked(
                           o.commodityId,
                         );
+                        const countryId = demandDestCountryId(o);
                         return (
                         <tr
                           key={`${o.id}#${index}`}
                           className={cargoLocked ? 'lot-locked' : undefined}
                         >
+                          <td
+                            className="ports-demand-country-cell"
+                            title={demandCountryLabel(countryId)}
+                          >
+                            {countryId || '—'}
+                          </td>
                           <td>
                             <button
                               type="button"
@@ -2238,6 +2385,8 @@ export function PortsPanel(props: {
           aircraftOptions={acceptAircraftOptions}
           selectedOriginStockKg={selectedOriginStockKg}
           pullPreview={acceptPullPreview}
+          intlPreview={acceptIntlPreview}
+          distanceNm={acceptDistanceNm}
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
           formatUnitPrice={formatUnitPrice}
@@ -2425,6 +2574,9 @@ function DemandAcceptDialog(props: {
     maxCostUsdPerKg: number;
     freeKg: number;
     usedKg: number;
+    countryId?: string | null;
+    lat?: number | null;
+    lon?: number | null;
   }>;
   aircraftOptions: PlayerAircraft[];
   selectedOriginStockKg: number;
@@ -2436,6 +2588,15 @@ function DemandAcceptDialog(props: {
     marginUsd: number;
     limitedBy: 'order' | 'stock' | 'aircraft';
   } | null;
+  intlPreview: {
+    international: boolean;
+    allowed: boolean;
+    unitPriceMult: number;
+    blockReason: string | null;
+    originCountryId: string | null;
+    destCountryId: string | null;
+  } | null;
+  distanceNm: number | null;
   busy: boolean;
   formatTonnes: (kg: number) => string;
   formatUnitPrice: (usdPerKg: number) => string;
@@ -2452,13 +2613,20 @@ function DemandAcceptDialog(props: {
 
   const selectedOrigin = props.originIcao.trim().toUpperCase();
   const hasUsableOrigin = props.selectedOriginStockKg > 0;
+  const intlOk = !props.intlPreview || props.intlPreview.allowed;
   const canConfirm =
     Boolean(selectedOrigin) &&
     hasUsableOrigin &&
     Boolean(props.aircraftId) &&
     props.aircraftOptions.length > 0 &&
+    intlOk &&
     !props.busy;
   const preview = props.pullPreview;
+  const intl = props.intlPreview;
+  const effectiveUnit =
+    intl?.allowed && intl.unitPriceMult > 1
+      ? props.order.maxUnitPriceUsd * intl.unitPriceMult
+      : props.order.maxUnitPriceUsd;
   const limitedByLabel =
     preview?.limitedBy === 'aircraft'
       ? 'limited by aircraft cargo'
@@ -2502,8 +2670,35 @@ function DemandAcceptDialog(props: {
           <p>
             {commodityLabel(props.order)} · up to{' '}
             {props.formatTonnes(props.order.remainingKg)} ·{' '}
-            {props.formatUnitPrice(props.order.maxUnitPriceUsd)}
+            {props.formatUnitPrice(effectiveUnit)}
+            {intl?.international && intl.allowed ? (
+              <span className="demand-accept-intl-badge" title="Port-fed international">
+                {' '}
+                Intl ×{intl.unitPriceMult.toFixed(2)}
+              </span>
+            ) : null}
           </p>
+          {props.distanceNm != null && Number.isFinite(props.distanceNm) ? (
+            <p className="demand-accept-hint">
+              Distance {selectedOrigin || 'WH'}→{props.order.destIcao}:{' '}
+              <strong>
+                {Math.round(props.distanceNm).toLocaleString()} nm
+              </strong>
+            </p>
+          ) : selectedOrigin ? (
+            <p className="demand-accept-hint">Distance unavailable for this route.</p>
+          ) : null}
+          {intl?.international && intl.allowed ? (
+            <p className="demand-accept-hint demand-accept-intl-hint">
+              International {intl.originCountryId}→{intl.destCountryId} from
+              port warehouse — pay includes intl premium.
+            </p>
+          ) : null}
+          {intl?.blockReason ? (
+            <p className="demand-accept-hint demand-accept-intl-block" role="alert">
+              {intl.blockReason}
+            </p>
+          ) : null}
 
           <div className="demand-accept-section">
             <span className="demand-accept-label">From warehouse</span>
@@ -2526,7 +2721,15 @@ function DemandAcceptDialog(props: {
                       disabled={props.busy}
                       onClick={() => props.onOriginChange(o.icao)}
                     >
-                      <strong>{o.icao}</strong>
+                      <strong>
+                        {o.icao}
+                        {o.countryId ? (
+                          <span className="demand-accept-pick-country">
+                            {' '}
+                            {o.countryId}
+                          </span>
+                        ) : null}
+                      </strong>
                       <span>
                         {usable
                           ? `${props.formatTonnes(o.stockKg)}${

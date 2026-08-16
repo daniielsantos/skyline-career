@@ -1741,6 +1741,10 @@ export type PlayerWarehouseView = {
   upgradeUsd?: number | null;
   canUpgrade?: boolean;
   hubTier?: 'spoke' | 'regional' | 'major';
+  /** ISO country from hub region (for Demand intl). */
+  countryId?: string | null;
+  lat?: number | null;
+  lon?: number | null;
 };
 
 export type PlayerWarehousePileView = {
@@ -1764,6 +1768,10 @@ export type DemandOrderView = {
   destIcao: string;
   /** Hub / airport display name for Dest tooltips. */
   destName?: string;
+  /** ISO country of dest hub (Demand intl). */
+  destCountryId?: string | null;
+  destLat?: number | null;
+  destLon?: number | null;
   commodityId: string;
   commodityName: string;
   wantedKg: number;

@@ -7,9 +7,11 @@ import {
   airportByIcao,
   CAREER_HUB_COORDS,
   hubTierOf,
+  resolveAirportCoords,
   type CareerEconomyWorld,
 } from './career-economy.js';
 import { applyWalletDelta } from './career-ledger.js';
+import { countryIdFromRegion } from './career-partition.js';
 import { economyDayIndex } from './career-weather.js';
 import {
   ensurePlayerWarehouses,
@@ -294,6 +296,9 @@ export function playerWarehouseSnapshot(
       upgradeUsd: number | null;
       canUpgrade: boolean;
       hubTier: HubTier;
+      countryId: string | null;
+      lat: number | null;
+      lon: number | null;
     }
   >;
   stock: PlayerWarehousePile[];
@@ -321,6 +326,10 @@ export function playerWarehouseSnapshot(
         w.tier === 1 && world
           ? quoteWarehouseTier2UpgradeUsd(world, w.icao)
           : null;
+      const countryId = ap?.region
+        ? countryIdFromRegion(ap.region)
+        : null;
+      const coords = resolveAirportCoords(w.icao, ap ?? null);
       return {
         ...w,
         lifetimeShippedKg: progress.shippedKg,
@@ -328,6 +337,12 @@ export function playerWarehouseSnapshot(
         upgradeUsd,
         canUpgrade: w.tier === 1 && progress.unlocked && upgradeUsd != null,
         hubTier,
+        countryId:
+          countryId && /^[A-Z]{2}$/.test(countryId) && countryId !== 'XX'
+            ? countryId
+            : null,
+        lat: coords?.lat ?? null,
+        lon: coords?.lon ?? null,
         usedKg,
         freeKg: Math.max(0, w.capacityKg - usedKg),
       };

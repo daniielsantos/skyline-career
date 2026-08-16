@@ -8,17 +8,20 @@ import {
   CAREER_HUB_COORDS,
   getCommodity,
   localUnitPriceUsd,
+  resolveAirportCoords,
   routeDistanceNm,
   type CareerEconomyWorld,
 } from './career-economy.js';
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
 import { hubDistanceNm } from './career-ferry-route.js';
+import { countryIdFromRegion } from './career-partition.js';
 import {
   depositCargoToWarehouse,
   findPlayerWarehouseAtIcao,
   withdrawCargoFromWarehouse,
 } from './career-warehouse-stock.js';
+import { isPortPickupHub } from './career-warehouse.js';
 import {
   getAircraftClass,
   listActivePlayerMissions,
@@ -56,13 +59,42 @@ export const DEMAND_ORDERS_PER_HUB = 2;
 
 /**
  * Soft cap of open board rows worldwide (keeps Ports GET snappy).
- * Sized for multi-country hub maps competing for terminal demand.
+ * Split across countries present in the world so BR hubs (seeded first)
+ * cannot monopolize every slot. With 6 map countries ≈ 32 open each.
  */
-export const DEMAND_ORDERS_GLOBAL_CAP = 96;
+export const DEMAND_ORDERS_GLOBAL_CAP = 192;
 
 /** Premium on local spot for max unit price (rng in range). */
 export const DEMAND_PRICE_PREMIUM_MIN = 1.05;
 export const DEMAND_PRICE_PREMIUM_MAX = 1.15;
+
+/**
+ * Extra pay multiplier when fulfilling Demand cross-border from a port WH.
+ * Stacks on the order's frozen maxUnitPriceUsd (already ~5–15% over spot).
+ */
+export const DEMAND_INTL_PAY_MULT = 1.28;
+
+/**
+ * Bidirectional country pairs allowed for international Demand (not Market lanes).
+ * Mirrors lane geography without binding to specific ICAO ODs.
+ */
+export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> =
+  [
+    ['BR', 'US'],
+    ['BR', 'AR'],
+    ['BR', 'CL'],
+    ['BR', 'MX'],
+    ['BR', 'CA'],
+    ['AR', 'CL'],
+    ['AR', 'US'],
+    ['CL', 'US'],
+    ['US', 'CA'],
+    ['US', 'MX'],
+  ];
+
+const DEMAND_INTL_PAIR_SET = new Set(
+  DEMAND_INTL_COUNTRY_PAIRS.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]),
+);
 
 const DEMAND_TTL_TICKS = 96 * 2.5; // ~2.5 economy days
 
@@ -92,6 +124,135 @@ function mulberry32(a: number): () => number {
   };
 }
 
+function demandAirportCountryId(ap: { region?: string }): string | null {
+  const id = countryIdFromRegion(ap.region ?? '');
+  return /^[A-Z]{2}$/.test(id) && id !== 'XX' ? id : null;
+}
+
+/**
+ * Equal-ish soft quotas per country so seed order (BR first) cannot fill
+ * DEMAND_ORDERS_GLOBAL_CAP alone. Remainder goes to sorted countries first.
+ */
+export function demandCountryOpenQuotas(
+  world: CareerEconomyWorld,
+  globalCap: number = DEMAND_ORDERS_GLOBAL_CAP,
+): Map<string, number> {
+  const countries = new Set<string>();
+  for (const ap of world.airports) {
+    if (ap.bushTripOnly) continue;
+    const icao = ap.icao.trim().toUpperCase();
+    if (!CAREER_HUB_COORDS[icao]) continue;
+    const c = demandAirportCountryId(ap);
+    if (c) countries.add(c);
+  }
+  const list = [...countries].sort((a, b) => a.localeCompare(b));
+  const n = Math.max(1, list.length);
+  const base = Math.floor(globalCap / n);
+  let rem = globalCap % n;
+  const quotas = new Map<string, number>();
+  for (const c of list) {
+    const extra = rem > 0 ? 1 : 0;
+    if (rem > 0) rem -= 1;
+    quotas.set(c, base + extra);
+  }
+  return quotas;
+}
+
+/** Country id for a career hub ICAO (from world airport region). */
+export function demandHubCountryId(
+  world: CareerEconomyWorld,
+  icao: string,
+): string | null {
+  const ap = airportByIcao(world, icao.trim().toUpperCase());
+  if (!ap?.region) return null;
+  const id = countryIdFromRegion(ap.region);
+  return /^[A-Z]{2}$/.test(id) && id !== 'XX' ? id : null;
+}
+
+export function isDemandInternationalCountryPair(
+  originCountryId: string,
+  destCountryId: string,
+): boolean {
+  const a = originCountryId.trim().toUpperCase();
+  const b = destCountryId.trim().toUpperCase();
+  if (!a || !b || a === b) return false;
+  return DEMAND_INTL_PAIR_SET.has(`${a}|${b}`);
+}
+
+/**
+ * Soft mult for pay (1 = domestic). Does not enforce port-WH / allowlist errors.
+ */
+export function demandInternationalUnitPriceMult(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+): number {
+  const originCountry = demandHubCountryId(world, originIcao);
+  const destCountry = demandHubCountryId(world, destIcao);
+  if (!originCountry || !destCountry || originCountry === destCountry) {
+    return 1;
+  }
+  if (!isDemandInternationalCountryPair(originCountry, destCountry)) {
+    return 1;
+  }
+  return DEMAND_INTL_PAY_MULT;
+}
+
+/**
+ * Gate cross-border Demand accept: allowlisted country pair + port pickup WH origin.
+ * Domestic (same country) always passes with mult 1.
+ */
+export function assertDemandInternationalAccept(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+): { international: boolean; unitPriceMult: number; originCountryId: string; destCountryId: string } {
+  const origin = originIcao.trim().toUpperCase();
+  const dest = destIcao.trim().toUpperCase();
+  const originCountryId = demandHubCountryId(world, origin);
+  const destCountryId = demandHubCountryId(world, dest);
+  if (!originCountryId || !destCountryId) {
+    throw new Error(`Unknown country for demand route ${origin}→${dest}`);
+  }
+  if (originCountryId === destCountryId) {
+    return {
+      international: false,
+      unitPriceMult: 1,
+      originCountryId,
+      destCountryId,
+    };
+  }
+  if (!isDemandInternationalCountryPair(originCountryId, destCountryId)) {
+    throw new Error(
+      `International demand ${originCountryId}→${destCountryId} is not on the allowed country pairs`,
+    );
+  }
+  if (!isPortPickupHub(origin)) {
+    throw new Error(
+      `International demand requires a warehouse at a port pickup hub (not ${origin})`,
+    );
+  }
+  return {
+    international: true,
+    unitPriceMult: DEMAND_INTL_PAY_MULT,
+    originCountryId,
+    destCountryId,
+  };
+}
+
+export function demandEffectiveUnitPriceUsd(
+  world: CareerEconomyWorld,
+  order: Pick<DemandOrder, 'maxUnitPriceUsd' | 'destIcao'>,
+  originIcao: string,
+): number {
+  const mult = demandInternationalUnitPriceMult(
+    world,
+    originIcao,
+    order.destIcao,
+  );
+  return money(order.maxUnitPriceUsd * mult);
+}
+
 export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
   if (!Array.isArray(world.demandOrders)) {
     world.demandOrders = [];
@@ -111,13 +272,38 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
 
   const rng = mulberry32(hashSeed(`${world.seed}:demand:${world.tick}`));
 
-  const openGlobal = () =>
-    orders.filter(
-      (o) =>
-        o.status === 'open' &&
-        o.remainingKg > 0 &&
-        o.expiresAtTick > world.tick,
-    ).length;
+  const isOpen = (o: DemandOrder) =>
+    o.status === 'open' &&
+    o.remainingKg > 0 &&
+    o.expiresAtTick > world.tick;
+
+  const quotas = demandCountryOpenQuotas(world);
+
+  // Existing saves may already hold a BR-only full board. Trim countries that
+  // exceed their quota (oldest first) so under-served countries can spawn.
+  {
+    const byCountry = new Map<string, DemandOrder[]>();
+    for (const o of orders) {
+      if (!isOpen(o)) continue;
+      const c = demandHubCountryId(world, o.destIcao);
+      if (!c) continue;
+      const list = byCountry.get(c) ?? [];
+      list.push(o);
+      byCountry.set(c, list);
+    }
+    for (const [country, list] of byCountry) {
+      const quota = quotas.get(country) ?? 0;
+      if (list.length <= quota) continue;
+      list.sort((a, b) => a.arrivedAtTick - b.arrivedAtTick || a.id.localeCompare(b.id));
+      const overflow = list.length - quota;
+      for (let i = 0; i < overflow; i++) {
+        const o = list[i]!;
+        o.status = 'expired';
+      }
+    }
+  }
+
+  const openGlobal = () => orders.filter(isOpen).length;
 
   if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) {
     world.demandOrders = orders.filter(
@@ -128,11 +314,24 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
     return world.demandOrders;
   }
 
-  for (const ap of world.airports) {
-    if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) break;
-    if (ap.bushTripOnly) continue;
+  const openByCountry = new Map<string, number>();
+  for (const o of orders) {
+    if (!isOpen(o)) continue;
+    const c = demandHubCountryId(world, o.destIcao);
+    if (!c) continue;
+    openByCountry.set(c, (openByCountry.get(c) ?? 0) + 1);
+  }
+
+  const trySpawnAtAirport = (ap: (typeof world.airports)[number]): void => {
+    if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) return;
+    if (ap.bushTripOnly) return;
     const icao = ap.icao.trim().toUpperCase();
-    if (!CAREER_HUB_COORDS[icao]) continue;
+    if (!CAREER_HUB_COORDS[icao]) return;
+
+    const country = demandAirportCountryId(ap);
+    if (!country) return;
+    const quota = quotas.get(country) ?? 0;
+    if ((openByCountry.get(country) ?? 0) >= quota) return;
 
     const openHere = orders.filter(
       (o) =>
@@ -142,10 +341,12 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
         o.expiresAtTick > world.tick,
     );
     let slots = DEMAND_ORDERS_PER_HUB - openHere.length;
-    if (slots <= 0) continue;
+    if (slots <= 0) return;
 
     for (const commodityId of DEMAND_COMMODITIES) {
       if (slots <= 0) break;
+      if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) break;
+      if ((openByCountry.get(country) ?? 0) >= quota) break;
       if (openHere.some((o) => o.commodityId === commodityId)) continue;
 
       const pile = ap.inventory[commodityId];
@@ -187,8 +388,15 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
         expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
         status: 'open',
       });
+      openHere.push(orders[orders.length - 1]!);
+      openByCountry.set(country, (openByCountry.get(country) ?? 0) + 1);
       slots -= 1;
     }
+  };
+
+  // Respect per-country quotas so BR-first seed order cannot monopolize the board.
+  for (const ap of world.airports) {
+    trySpawnAtAirport(ap);
   }
 
   // Prune filled/expired that are old enough (keep recent for UI briefly)
@@ -284,6 +492,8 @@ export function acceptDemandOrder(
     throw new Error(`Unknown destination ${dest}`);
   }
 
+  const intl = assertDemandInternationalAccept(world, origin, dest);
+
   const distanceNm =
     hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);
   if (distanceNm === undefined) {
@@ -337,13 +547,17 @@ export function acceptDemandOrder(
     order.status = 'filled';
   }
 
-  const payUsd = money(order.maxUnitPriceUsd * kg);
+  const unitPriceUsd = money(order.maxUnitPriceUsd * intl.unitPriceMult);
+  const payUsd = money(unitPriceUsd * kg);
   const deadlineTick = Math.min(
     order.expiresAtTick,
     world.tick + TICKS_PER_HOUR * 72,
   );
   const missionId = `msn_demand_${world.tick}_${origin}_${dest}_${Math.floor(Math.random() * 1e6)}`;
   const lotId = `demand_${order.id}_${kg}`;
+  const laneLabel = intl.international
+    ? `Intl demand · ${intl.originCountryId}→${intl.destCountryId}`
+    : `Demand delivery · ${origin}→${dest}`;
 
   const mission = recomputeMissionTotals({
     id: missionId,
@@ -354,7 +568,9 @@ export function acceptDemandOrder(
         cargoKg: kg,
         payUsd,
         urgency: 'normal',
-        reason: `Demand · ${getCommodity(order.commodityId).name} → ${dest}`,
+        reason: intl.international
+          ? `Intl demand · ${getCommodity(order.commodityId).name} → ${dest}`
+          : `Demand · ${getCommodity(order.commodityId).name} → ${dest}`,
         deadlineTick,
       },
     ],
@@ -370,7 +586,7 @@ export function acceptDemandOrder(
     deadlineTick,
     payUsd,
     urgency: 'normal',
-    reason: `Demand delivery · ${origin}→${dest}`,
+    reason: laneLabel,
     status: 'accepted',
     acceptedAtTick: world.tick,
     aircraftId: aircraft.id,
@@ -556,7 +772,9 @@ export function replaceDemandMissionCargo(
     );
   }
 
-  const payUsd = money(order.maxUnitPriceUsd * newKg);
+  const payUsd = money(
+    demandEffectiveUnitPriceUsd(world, order, origin) * newKg,
+  );
   const deadlineTick = Math.min(
     order.expiresAtTick,
     line?.deadlineTick ?? normalized.deadlineTick,
@@ -611,6 +829,9 @@ export function demandSnapshot(
     DemandOrder & {
       commodityName: string;
       destName: string;
+      destCountryId: string | null;
+      destLat: number | null;
+      destLon: number | null;
       localSpotUsd: number | null;
     }
   >;
@@ -633,10 +854,14 @@ export function demandSnapshot(
     orders: open.map((o) => {
       const ap = airportByIcao(world, o.destIcao);
       const pile = ap?.inventory[o.commodityId];
+      const coords = resolveAirportCoords(o.destIcao, ap ?? null);
       return {
         ...o,
         commodityName: getCommodity(o.commodityId).name,
         destName: ap?.name?.trim() || o.destIcao,
+        destCountryId: demandHubCountryId(world, o.destIcao),
+        destLat: coords?.lat ?? null,
+        destLon: coords?.lon ?? null,
         localSpotUsd: pile ? money(localUnitPriceUsd(o.commodityId, pile)) : null,
       };
     }),

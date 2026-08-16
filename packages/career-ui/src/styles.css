@@ -6664,6 +6664,36 @@ button.linkish {
   font-weight: 400;
 }
 
+.demand-accept-intl-badge {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(240, 163, 90, 0.98);
+  background: rgba(240, 163, 90, 0.14);
+  border: 1px solid rgba(240, 163, 90, 0.35);
+  vertical-align: middle;
+}
+
+.demand-accept-intl-hint {
+  color: rgba(240, 163, 90, 0.9);
+}
+
+.demand-accept-intl-block {
+  color: #e8a0a0;
+}
+
+.demand-accept-pick-country {
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
 .demand-accept-picks {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
@@ -7657,6 +7687,43 @@ span.dispatch-route-hub-dest {
 .ports-loop-section-hint {
   margin: 0;
   font-size: 0.85rem;
+}
+
+.ports-demand-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  margin: 0 0 0.65rem;
+}
+
+.ports-demand-country-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+}
+
+.ports-demand-country-filter select {
+  min-width: 11rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(12, 12, 14, 0.65);
+  color: inherit;
+  font: inherit;
+}
+
+.ports-demand-filter-count {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.ports-demand-country-cell {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(240, 163, 90, 0.95);
 }
 
 .ports-yard-aging td {

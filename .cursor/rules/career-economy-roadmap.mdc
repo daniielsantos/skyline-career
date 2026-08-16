@@ -39,7 +39,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **NPC ops cargo clamp:** bids use route fuel/MTOW payload (not class maxRange alone); crew offers only when a homologated airframe has lift&gt;0; unflyable awaiting_pilot promotes early and hides Fly.
 - **Ferry journey modal:** Hangar Plan opens multi-leg sheet (all hops, progress, next cost, empty-tank note); hop-by-hop Fly next leg; fixes finalDest dropped on Hangar Go.
 - **Amazon bush hubs (v1 → global + trips):** soft-field spokes in BR/US/CA/MX; draft trip `br-rio-negro-tapuruquara` (unvalidated). Inspection/heat deferred.
-- **Warehouses + Demand Board:** CAPEX warehouses at port pickup hubs (BR: SBGR/SBKP/SBCT/SBRF/SBEG/SBPA/SBBE; AR: SAEZ/SAVC; CL: SCEL/SCTE; US: KMIA/KEWR/KIAH/KLAX/KSEA; CA: CYVR/CYHZ; MX: MMVR/MMZO/MMUN); port buy → WH; Demand Board spawns on low hub stock; accept → WH→dest mission; settle fills terminal + credits WH `lifetimeShippedKg`; **Edit cargo** restores/withdraws WH + demand remaining; **T1→T2 hybrid upgrade** (shipped threshold + CAPEX); FBO spot removed/wiped.
+- **Warehouses + Demand Board:** CAPEX warehouses at port pickup hubs (BR: SBGR/SBKP/SBCT/SBRF/SBEG/SBPA/SBBE; AR: SAEZ/SAVC; CL: SCEL/SCTE; US: KMIA/KEWR/KIAH/KLAX/KSEA; CA: CYVR/CYHZ; MX: MMVR/MMZO/MMUN); port buy → WH; Demand Board spawns on low hub stock (**global cap 192 split per country** ≈32 each); accept → WH→dest mission; settle fills terminal + credits WH `lifetimeShippedKg`; **Edit cargo** restores/withdraws WH + demand remaining; **T1→T2 hybrid upgrade** (shipped threshold + CAPEX); FBO spot removed/wiped; **intl Demand** = country-pair allowlist + port pickup WH origin + ×1.28 pay (Market lanes unchanged).
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 
 ## Near-term priorities (current Brazil career)
@@ -47,6 +47,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 1. ~~**FBO spot inventory**~~ — **removed**; player Warehouses at port pickup hubs + Demand Board.
 2. ~~**Seaports (pilot)**~~ — BR + AR/CL/US + CA/MX ocean-access set shipped (**20** ports); no further country port round planned.
 3. ~~**Port price + WH lots**~~ — dynamic listing spawn + per-cost warehouse piles.
+4. ~~**Demand intl (port-fed)**~~ — cross-border accept gated by country pairs + port WH; Market lanes not expanded.
 4. Polish only if needed — optional real METAR.
 5. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 

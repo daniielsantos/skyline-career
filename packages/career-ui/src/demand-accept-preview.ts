@@ -18,8 +18,150 @@ export type DemandAcceptPullPreview = {
   limitedBy: 'order' | 'stock' | 'aircraft';
 };
 
+/** Keep in sync with DEMAND_INTL_PAY_MULT in packages/shared career-demand.ts */
+export const DEMAND_INTL_PAY_MULT = 1.28;
+
+/** Keep in sync with DEMAND_INTL_COUNTRY_PAIRS in packages/shared career-demand.ts */
+const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ['BR', 'US'],
+  ['BR', 'AR'],
+  ['BR', 'CL'],
+  ['BR', 'MX'],
+  ['BR', 'CA'],
+  ['AR', 'CL'],
+  ['AR', 'US'],
+  ['CL', 'US'],
+  ['US', 'CA'],
+  ['US', 'MX'],
+];
+
+const DEMAND_INTL_PAIR_SET = new Set(
+  DEMAND_INTL_COUNTRY_PAIRS.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]),
+);
+
 function money(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/** Great-circle distance in nautical miles (WGS84 sphere). */
+export function greatCircleDistanceNm(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  const earthNm = 3440.065;
+  return 2 * earthNm * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+export function isDemandInternationalCountryPair(
+  originCountryId: string | null | undefined,
+  destCountryId: string | null | undefined,
+): boolean {
+  const a = originCountryId?.trim().toUpperCase() ?? '';
+  const b = destCountryId?.trim().toUpperCase() ?? '';
+  if (!a || !b || a === b) return false;
+  return DEMAND_INTL_PAIR_SET.has(`${a}|${b}`);
+}
+
+export type DemandIntlRoutePreview = {
+  international: boolean;
+  allowed: boolean;
+  unitPriceMult: number;
+  /** Blocking reason when international but not accept-ready. */
+  blockReason: string | null;
+  originCountryId: string | null;
+  destCountryId: string | null;
+};
+
+/**
+ * Mirror assertDemandInternationalAccept for UI (no throw).
+ * pickupHubSet = warehouses.pickupHubs from API.
+ */
+export function previewDemandInternationalRoute(opts: {
+  originIcao: string;
+  destIcao: string;
+  originCountryId: string | null | undefined;
+  destCountryId: string | null | undefined;
+  pickupHubs: readonly string[];
+}): DemandIntlRoutePreview {
+  const origin = opts.originIcao.trim().toUpperCase();
+  const dest = opts.destIcao.trim().toUpperCase();
+  const originCountryId = opts.originCountryId?.trim().toUpperCase() || null;
+  const destCountryId = opts.destCountryId?.trim().toUpperCase() || null;
+
+  if (!origin || !dest || origin === dest) {
+    return {
+      international: false,
+      allowed: true,
+      unitPriceMult: 1,
+      blockReason: null,
+      originCountryId,
+      destCountryId,
+    };
+  }
+
+  if (!originCountryId || !destCountryId) {
+    return {
+      international: false,
+      allowed: true,
+      unitPriceMult: 1,
+      blockReason: null,
+      originCountryId,
+      destCountryId,
+    };
+  }
+
+  if (originCountryId === destCountryId) {
+    return {
+      international: false,
+      allowed: true,
+      unitPriceMult: 1,
+      blockReason: null,
+      originCountryId,
+      destCountryId,
+    };
+  }
+
+  if (!isDemandInternationalCountryPair(originCountryId, destCountryId)) {
+    return {
+      international: true,
+      allowed: false,
+      unitPriceMult: 1,
+      blockReason: `International ${originCountryId}→${destCountryId} is not on the allowed country pairs`,
+      originCountryId,
+      destCountryId,
+    };
+  }
+
+  const pickup = new Set(
+    opts.pickupHubs.map((h) => h.trim().toUpperCase()).filter(Boolean),
+  );
+  if (!pickup.has(origin)) {
+    return {
+      international: true,
+      allowed: false,
+      unitPriceMult: DEMAND_INTL_PAY_MULT,
+      blockReason: `International demand requires a warehouse at a port pickup hub (not ${origin})`,
+      originCountryId,
+      destCountryId,
+    };
+  }
+
+  return {
+    international: true,
+    allowed: true,
+    unitPriceMult: DEMAND_INTL_PAY_MULT,
+    blockReason: null,
+    originCountryId,
+    destCountryId,
+  };
 }
 
 /** FIFO weighted-average cost for withdrawing needKg (non-mutating). */
@@ -55,6 +197,8 @@ export function previewDemandAcceptPull(opts: {
   stockKg: number;
   maxCargoKg: number;
   maxUnitPriceUsd: number;
+  /** Applied after maxUnitPriceUsd (intl premium). Default 1. */
+  unitPriceMult?: number;
   lots: ReadonlyArray<DemandWithdrawLot>;
 }): DemandAcceptPullPreview | null {
   const remaining = Math.max(0, Math.floor(opts.remainingKg));
@@ -79,7 +223,14 @@ export function previewDemandAcceptPull(opts: {
 
   const fifo = previewFifoWithdrawCost(opts.lots, takeKg);
   if (!fifo) return null;
-  const payUsd = money(opts.maxUnitPriceUsd * takeKg);
+  const mult =
+    typeof opts.unitPriceMult === 'number' &&
+    Number.isFinite(opts.unitPriceMult) &&
+    opts.unitPriceMult > 0
+      ? opts.unitPriceMult
+      : 1;
+  const unit = money(opts.maxUnitPriceUsd * mult);
+  const payUsd = money(unit * takeKg);
   return {
     takeKg,
     avgCostUsdPerKg: fifo.avgCostUsdPerKg,

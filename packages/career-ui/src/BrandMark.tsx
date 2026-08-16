@@ -1,45 +1,55 @@
 /**
- * Skyline brand lockup — geometric skyline mark + SKY/LINE wordmark.
+ * Skyline brand lockup — compact sidebar mark or baked hero lockup image.
  */
+
+import md11fMarkUrl from './assets/brand/md11f-mark.png';
+import skylineHeroLockupUrl from './assets/brand/skyline-hero-lockup.png';
 
 type BrandMarkProps = {
   className?: string;
-  /** Optional secondary line (e.g. "Career" on the profile gate). */
+  /** Optional secondary line (e.g. "Career" on the compact mark). */
   subtitle?: string;
+  /**
+   * `compact` — front mark + SKYLINE (sidebar).
+   * `hero` — single lockup image: SKY · MD-11F · LINE / CAREER (profile gate).
+   */
+  variant?: 'compact' | 'hero';
 };
 
 export function BrandMark(props: BrandMarkProps) {
-  const rootClass = ['brand-mark', props.className].filter(Boolean).join(' ');
+  const variant = props.variant ?? 'compact';
+  const rootClass = ['brand-mark', `brand-mark-${variant}`, props.className]
+    .filter(Boolean)
+    .join(' ');
+
+  if (variant === 'hero') {
+    return (
+      <span className={rootClass}>
+        <img
+          className="brand-mark-hero-lockup"
+          src={skylineHeroLockupUrl}
+          alt="Skyline Career"
+          width={1400}
+          height={700}
+          decoding="async"
+          draggable={false}
+        />
+      </span>
+    );
+  }
+
   return (
     <span className={rootClass}>
       <span className="brand-mark-row" aria-label="Skyline">
-        <svg
+        <img
           className="brand-mark-icon"
-          viewBox="0 0 40 40"
-          aria-hidden="true"
-        >
-          {/* Ascending skyline bars on a runway/horizon base. */}
-          <rect x="2" y="24" width="7" height="12" rx="0.5" fill="currentColor" />
-          <rect x="11" y="16" width="7" height="20" rx="0.5" fill="currentColor" />
-          <rect
-            className="brand-mark-icon-peak"
-            x="20"
-            y="6"
-            width="8"
-            height="30"
-            rx="0.5"
-            fill="var(--accent)"
-          />
-          <rect x="30" y="14" width="7" height="22" rx="0.5" fill="currentColor" />
-          <rect
-            className="brand-mark-icon-horizon"
-            x="2"
-            y="36.5"
-            width="35"
-            height="1.5"
-            fill="var(--accent)"
-          />
-        </svg>
+          src={md11fMarkUrl}
+          alt=""
+          width={40}
+          height={40}
+          decoding="async"
+          draggable={false}
+        />
         <span className="brand-mark-lockup" aria-hidden="true">
           <span className="brand-mark-word">
             <span className="brand-mark-sky">SKY</span>

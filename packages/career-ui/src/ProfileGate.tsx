@@ -19,7 +19,11 @@ export function ProfileGate(props: {
   return (
     <section className="panel profile-gate" aria-label="Career profiles">
       <div className="profile-gate-hero">
-        <BrandMark className="profile-gate-brand" subtitle="Career" />
+        <BrandMark
+          className="profile-gate-brand"
+          subtitle="Career"
+          variant="hero"
+        />
         <h1>Choose a profile</h1>
         <p className="muted">
           Each profile has its own wallet, fleet, and missions. Shared hub data
@@ -165,7 +169,11 @@ export function ProfileGateLoading() {
       aria-label="Loading career profiles"
     >
       <div className="profile-gate-hero">
-        <BrandMark className="profile-gate-brand" subtitle="Career" />
+        <BrandMark
+          className="profile-gate-brand"
+          subtitle="Career"
+          variant="hero"
+        />
         <h1>Loading</h1>
         <p className="muted">Preparing your profiles…</p>
       </div>

@@ -16,6 +16,16 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **FBO spot:** removido (stock wipe on load); FBO = bonded holds only.
 - **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico; yard hold fee diária. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
 
+## Company tenant (SP → MP)
+
+Contrato curto — detalhe em **`.cursor/rules/career-economy-roadmap.mdc`** (*Company tenant contract*).
+
+- **Company** = tenant (`companies` / `company_state` / `company_id` em frota, missões, ledger). SP usa id `'local'`.
+- **World** = Market lots, Demand, hubs/stock, NPC, `inbound_pending`, events — hoje um save; depois shared + claim.
+- **Pilot ≠ company** — `pilot_name` / `pilot_icao` no `company_state` são atalho SP; não inchá-los; members/roles só quando houver fatia co-op.
+- Norte MP: empresa privada + mundo compartilhado + ranking por company (não rewrite de tick).
+- Ao tocar persistência: estado do jogador sempre sob `company_id`; facade `CareerStore` permanece.
+
 ## Expandir mapa / país / hub
 
 **`.cursor/rules/career-map-expansion.mdc`** — checklist obrigatório (seed hubs, fuel producers, corridors, REGION_NEIGHBORS, UI labels, tests, migrate coverage).

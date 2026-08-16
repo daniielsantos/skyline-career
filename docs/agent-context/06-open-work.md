@@ -31,8 +31,9 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 1. ~~**FBO spot inventory**~~ — removido (wipe stock); Warehouses nos hubs de pickup + Demand Board.
 2. ~~**Ports (Santos / Paranaguá)**~~ — buy → pickup / auto-WH; Store in WH; Demand Board fulfill (não Fly to FBO spot).
 3. ~~**Port dynamic price + WH lots**~~ — listing price = hub spot × frac + jitter/clamp (frozen at spawn); warehouse deposits keep separate cost lots (±3% merge band).
-4. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-5. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+4. ~~**Company tenant contract (doc)**~~ — roadmap + `08-economy`: company vs world vs pilot; sem schema members ainda.
+5. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
+6. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
 
 ## Feito (shipped 0.3.31)
 

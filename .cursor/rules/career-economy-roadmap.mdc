@@ -80,6 +80,26 @@ Do **not** start Postgres or multi-server partition until single-player SQLite +
 - **Later:** Postgres (multiplayer) behind the same facade; airport stock / NPC roster / fuel / market listings tables (v4+).
 - Always prune dead lots; DB without retention still explodes.
 
+### Company tenant contract (SP now → MP later)
+
+Protect the partition we already have. Do **not** invent members/roles/auth/Postgres until a real slice needs them.
+
+| Layer | Owns | Today (SP) | Future MP |
+|-------|------|------------|-----------|
+| **Company** (tenant) | wallet, fleet, missions, warehouses/port pickups, cargo ops, aircraft market offers, ledger rows, bush trip active | `companies` + `company_state` + `company_id` on fleet/missions/ledger; id `'local'` (`LOCAL_COMPANY_ID`) | Many companies; same columns |
+| **World** (shared sim) | hubs/stock, lots/Market, Demand board rows, NPC fleet/flights, fuel trucks, inbound_pending, economy events, weather index | Single process / one save — not tagged by company | Shared boards + claim; inbound already multi-source-ready |
+| **Pilot / actor** (person) | display name, “who flew”, later roles | `pilot_name` / `pilot_icao` live on `company_state` as SP shortcut | Split: actor/member ≠ company; ledger may gain `actor_id` when useful |
+
+**North star for MP:** private company + shared world + optional co-op members (Owner / Dispatcher / Pilot) + company rankings. Not “everyone in one wallet” and not “presence-only”.
+
+**Discipline while shipping SP**
+
+1. New player-owned state → hang on `company_id` / `company_state` (or a table keyed by it). Never a save-global blob for fleet/WH/missions/ledger.
+2. Do not grow more *person* fields into `company_state` without deciding actor vs company. `pilot_*` stays the temporary SP stand-in.
+3. World mutations (lot claim, demand accept, inbound publish) should stay expressible without assuming a single human — company is the claimant.
+4. Skip `members` / invites / rankings schema until co-op or competitive boards ship.
+5. Keep `CareerStore` as the persistence facade so SQLite → Postgres does not rewrite game rules.
+
 ## Optional later
 
 - Real METAR fold-in (fatia B) into the regional weather index.

@@ -26,6 +26,8 @@ import {
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
+import { normalizeGroundStaffState } from './career-ground-staff.js';
+import { normalizePlayerWarehouseState } from './career-warehouse-stock.js';
 import {
   normalizeCareerClassOps,
   syncClassOpsFromFleet,
@@ -139,8 +141,9 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     companyCredit: normalizeCompanyCredit(undefined),
     playerFbos: { fbos: [], holds: [], stock: [] },
     companyCrew: { members: [] },
+    groundStaff: { members: [] },
     portPickups: [],
-    playerWarehouses: { warehouses: [], stock: [] },
+    playerWarehouses: { warehouses: [], stock: [], inboundTransfers: [] },
   };
 }
 
@@ -231,16 +234,7 @@ export function normalizeMissionsState(
         }
       : { fbos: [], holds: [], stock: [] };
   const playerWarehousesRaw = (raw as CareerMissionsState).playerWarehouses;
-  const playerWarehouses =
-    playerWarehousesRaw &&
-    typeof playerWarehousesRaw === 'object' &&
-    Array.isArray(playerWarehousesRaw.warehouses) &&
-    Array.isArray(playerWarehousesRaw.stock)
-      ? {
-          warehouses: playerWarehousesRaw.warehouses,
-          stock: playerWarehousesRaw.stock,
-        }
-      : { warehouses: [], stock: [] };
+  const playerWarehouses = normalizePlayerWarehouseState(playerWarehousesRaw);
   // Full sanitize in ensureCompanyCrew / career-crew ops.
   const companyCrewRaw = (raw as CareerMissionsState).companyCrew;
   const companyCrew =
@@ -260,6 +254,9 @@ export function normalizeMissionsState(
             : {}),
         }
       : { members: [] };
+  const groundStaff = normalizeGroundStaffState(
+    (raw as CareerMissionsState).groundStaff,
+  );
   const ferrySoftRaw = (raw as CareerMissionsState).ferrySoftNmUsed;
   const ferrySoftNmUsed =
     typeof ferrySoftRaw === 'number' && Number.isFinite(ferrySoftRaw)
@@ -286,6 +283,7 @@ export function normalizeMissionsState(
     companyCredit,
     playerFbos,
     companyCrew,
+    groundStaff,
     ferrySoftNmUsed,
     portPickups: Array.isArray((raw as CareerMissionsState).portPickups)
       ? (raw as CareerMissionsState).portPickups

@@ -767,6 +767,74 @@ export type CompanyCrewSnapshot = {
   }>;
 };
 
+export type GroundStaffPerkId =
+  | 'logistics'
+  | 'yard'
+  | 'procurement'
+  | 'demand_desk'
+  | 'wh_ops';
+
+export type GroundStaffGrade = 'ace' | 'solid' | 'capable' | 'green';
+
+type GroundStaffPersonView = {
+  id: string;
+  displayName: string;
+  warehouseId?: string;
+  hubIcao?: string;
+  perkId: GroundStaffPerkId;
+  grade?: GroundStaffGrade;
+  skillPct?: number;
+  effectMult?: number;
+  salaryUsdPerDay: number;
+  hireUsd?: number;
+  hiredAtTick?: number;
+  portraitId?: string;
+  perkLabel: string;
+  perkHint: string;
+  gradeLabel?: string;
+};
+
+export type GroundStaffSnapshot = {
+  members: Array<
+    GroundStaffPersonView & {
+      warehouseId: string;
+      hubIcao: string;
+      hiredAtTick: number;
+    }
+  >;
+  hirePoolByHub: Record<string, GroundStaffPersonView[]>;
+  hirePoolDayByHub: Record<string, number>;
+  byWarehouse: Record<
+    string,
+    {
+      warehouseId: string;
+      hubIcao: string;
+      tier: 1 | 2 | 3;
+      slotsUnlocked: number;
+      slotsUsed: number;
+      slotsFree: number;
+      logisticsActive: boolean;
+      logisticsMult: number;
+      yardActive?: boolean;
+      yardHoldMult?: number;
+      procurementActive?: boolean;
+      procurementMult?: number;
+      demandDeskActive?: boolean;
+      demandDeskMult?: number;
+      whOpsActive?: boolean;
+      whOpsCapexMult?: number;
+      whOpsShippedMult?: number;
+      members: Array<
+        GroundStaffPersonView & {
+          warehouseId: string;
+          hubIcao: string;
+          hiredAtTick: number;
+        }
+      >;
+    }
+  >;
+};
+
 export type CareerRunwaySurface =
   | 'asphalt'
   | 'concrete'
@@ -941,6 +1009,7 @@ export function fetchState() {
       classOps?: CareerClassOps | null;
       playerFbos?: PlayerFboSnapshot | null;
       companyCrew?: CompanyCrewSnapshot | null;
+      groundStaff?: GroundStaffSnapshot | null;
       leaseUnlock?: AircraftLeaseUnlock;
       starterAircraft?: Array<{
         typeId: string;
@@ -1717,8 +1786,11 @@ export type PortsSnapshot = {
   pickups: PlayerPortPickupView[];
   /** Sum of daily yard hold fees across all pickups. */
   yardHoldUsdPerDay?: number;
+  /** Economy tick at snapshot (inbound ETA). */
+  tick?: number;
   warehouses?: PlayerWarehouseSnapshot;
   demand?: DemandSnapshot;
+  groundStaff?: GroundStaffSnapshot;
   ownedFbos?: Array<{
     id: string;
     icao: string;
@@ -1733,11 +1805,18 @@ export type PlayerWarehouseView = {
   id: string;
   icao: string;
   capacityKg: number;
-  tier: 1 | 2;
+  tier: 1 | 2 | 3;
   usedKg: number;
   freeKg: number;
+  /** Kg reserved in port→WH inbound transfers. */
+  inboundKg?: number;
+  /** Free after stock + inbound reservation. */
+  inboundFreeKg?: number;
   lifetimeShippedKg?: number;
+  /** @deprecated Prefer shippedNeededForNextTierKg. */
   shippedNeededForT2Kg?: number;
+  shippedNeededForNextTierKg?: number;
+  nextTier?: 2 | 3 | null;
   upgradeUsd?: number | null;
   canUpgrade?: boolean;
   hubTier?: 'spoke' | 'regional' | 'major';
@@ -1756,11 +1835,26 @@ export type PlayerWarehousePileView = {
   acquiredAtTick: number;
 };
 
+export type WarehouseInboundTransferView = {
+  id: string;
+  warehouseId: string;
+  hubIcao: string;
+  portId: string;
+  listingId?: string;
+  commodityId: string;
+  kg: number;
+  unitCostUsd: number;
+  purchasedAtTick: number;
+  readyAtTick: number;
+};
+
 export type PlayerWarehouseSnapshot = {
   warehouses: PlayerWarehouseView[];
   stock: PlayerWarehousePileView[];
+  inboundTransfers?: WarehouseInboundTransferView[];
   pickupHubs: string[];
   buyUsdByIcao?: Record<string, number>;
+  groundStaff?: GroundStaffSnapshot;
 };
 
 export type DemandOrderView = {
@@ -1799,8 +1893,12 @@ export function postPortBuy(opts: { listingId: string; kg: number }) {
     unitPriceUsd: number;
     kg: number;
     storedKg: number;
+    inboundKg?: number;
     yardKg: number;
+    transferTicks?: number;
+    readyAtTick?: number | null;
     pickup: PlayerPortPickupView | null;
+    inboundTransfer?: WarehouseInboundTransferView | null;
     warehousePile: PlayerWarehousePileView | null;
     ports: PortsSnapshot;
     warehouses: PlayerWarehouseSnapshot;
@@ -1847,7 +1945,7 @@ export function postWarehouseBuy(opts: { icao: string }) {
   return api<{
     walletUsd: number;
     debitUsd: number;
-    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 };
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 };
     warehouses: PlayerWarehouseSnapshot;
     ports: PortsSnapshot;
   }>('/api/warehouses/buy', {
@@ -1860,7 +1958,7 @@ export function postWarehouseUpgrade(opts: { warehouseId: string }) {
   return api<{
     walletUsd: number;
     debitUsd: number;
-    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 };
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 };
     warehouses: PlayerWarehouseSnapshot;
     ports: PortsSnapshot;
   }>('/api/warehouses/upgrade', {
@@ -2061,6 +2159,36 @@ export function postCrewFire(opts: { memberId: string }) {
     walletUsd: number;
     companyCrew: CompanyCrewSnapshot;
   }>('/api/crew/fire', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postGroundStaffHire(opts: {
+  warehouseId: string;
+  candidateId: string;
+}) {
+  return api<{
+    member: GroundStaffSnapshot['members'][number];
+    debitUsd: number;
+    walletUsd: number;
+    groundStaff: GroundStaffSnapshot;
+    warehouses?: PlayerWarehouseSnapshot;
+    ports?: PortsSnapshot;
+  }>('/api/ground-staff/hire', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postGroundStaffFire(opts: { memberId: string }) {
+  return api<{
+    member: GroundStaffSnapshot['members'][number];
+    walletUsd: number;
+    groundStaff: GroundStaffSnapshot;
+    warehouses?: PlayerWarehouseSnapshot;
+    ports?: PortsSnapshot;
+  }>('/api/ground-staff/fire', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

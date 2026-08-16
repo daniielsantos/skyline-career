@@ -15,10 +15,18 @@ import { applyWalletDelta } from './career-ledger.js';
 import { isFboHoldCommodityAllowed, ensurePlayerFbos } from './career-fbo.js';
 import {
   depositCargoToWarehouse,
+  ensurePlayerWarehouses,
   findPlayerWarehouseAtIcao,
+  warehouseInboundFreeKg,
   warehouseFreeKg,
+  warehouseInboundTransferTicks,
   playerWarehouseSnapshot,
 } from './career-warehouse.js';
+import {
+  logisticsMultForWarehouse,
+  procurementMultForHub,
+  yardHoldMultForHub,
+} from './career-ground-staff.js';
 import { demandSnapshot, ensureDemandOrders } from './career-demand.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
@@ -28,6 +36,7 @@ import type {
   PlayerPortPickup,
   PlayerWarehousePile,
   PortListing,
+  WarehouseInboundTransfer,
 } from './types/career-economy.js';
 
 export type CareerPortDef = {
@@ -449,8 +458,8 @@ export function ensurePlayerPortPickups(
 }
 
 /**
- * Buy kg from a port listing → warehouse and/or yard pickup at the allocated hub.
- * If a warehouse has free space, as much as fits is deposited; the rest waits as pickup.
+ * Buy kg from a port listing → inbound WH transfer and/or yard pickup.
+ * Cargo does not teleport into WH stock; it arrives after transfer ticks.
  */
 export function buyPortListing(
   state: CareerMissionsState,
@@ -460,9 +469,14 @@ export function buyPortListing(
   debitUsd: number;
   unitPriceUsd: number;
   kg: number;
+  /** @deprecated Always 0 on buy — use inboundKg (arrives later). */
   storedKg: number;
+  inboundKg: number;
   yardKg: number;
+  transferTicks: number;
+  readyAtTick: number | null;
   pickup: PlayerPortPickup | null;
+  inboundTransfer: WarehouseInboundTransfer | null;
   warehousePile: PlayerWarehousePile | null;
   listing: PortListing;
 } {
@@ -505,7 +519,9 @@ export function buyPortListing(
     throw new Error(`Unknown pickup hub ${hub}`);
   }
 
-  const unitPriceUsd = money(listing.unitPriceUsd);
+  const unitPriceUsd = money(
+    listing.unitPriceUsd * procurementMultForHub(state, hub),
+  );
   const debitUsd = money(unitPriceUsd * qty);
   if (state.walletUsd < debitUsd) {
     throw new Error(
@@ -528,19 +544,32 @@ export function buyPortListing(
   });
 
   const wh = findPlayerWarehouseAtIcao(state, hub);
-  const free = wh ? warehouseFreeKg(state, wh.id) : 0;
-  const storedKg = wh ? Math.min(qty, Math.max(0, free)) : 0;
-  const yardKg = qty - storedKg;
+  const free = wh ? warehouseInboundFreeKg(state, wh.id) : 0;
+  const inboundKg = wh ? Math.min(qty, Math.max(0, free)) : 0;
+  const yardKg = qty - inboundKg;
+  const logisticsMult = wh ? logisticsMultForWarehouse(state, wh.id) : 1;
+  const transferTicks =
+    inboundKg > 0
+      ? warehouseInboundTransferTicks(inboundKg, logisticsMult)
+      : 0;
+  const readyAtTick =
+    inboundKg > 0 ? world.tick + transferTicks : null;
 
-  let warehousePile: PlayerWarehousePile | null = null;
-  if (storedKg > 0) {
-    warehousePile = depositCargoToWarehouse(state, {
-      icao: hub,
+  let inboundTransfer: WarehouseInboundTransfer | null = null;
+  if (inboundKg > 0 && wh && readyAtTick != null) {
+    inboundTransfer = {
+      id: nextId('whin', world.tick),
+      warehouseId: wh.id,
+      hubIcao: hub,
+      portId: listing.portId,
+      listingId: listing.id,
       commodityId: listing.commodityId,
-      kg: storedKg,
-      avgCostUsdPerKg: unitPriceUsd,
-      tick: world.tick,
-    });
+      kg: inboundKg,
+      unitCostUsd: unitPriceUsd,
+      purchasedAtTick: world.tick,
+      readyAtTick,
+    };
+    ensurePlayerWarehouses(state).inboundTransfers!.push(inboundTransfer);
   }
 
   let pickup: PlayerPortPickup | null = null;
@@ -562,10 +591,14 @@ export function buyPortListing(
     debitUsd,
     unitPriceUsd,
     kg: qty,
-    storedKg,
+    storedKg: 0,
+    inboundKg,
     yardKg,
+    transferTicks,
+    readyAtTick,
     pickup,
-    warehousePile,
+    inboundTransfer,
+    warehousePile: null,
     listing: { ...listing },
   };
 }
@@ -659,10 +692,16 @@ export function portYardHoldUsdPerKgDay(commodityId: CommodityId): number {
 export function portYardHoldUsdPerDay(opts: {
   kg: number;
   commodityId: CommodityId;
+  hubIcao?: string;
+  state?: Pick<CareerMissionsState, 'groundStaff' | 'playerWarehouses'>;
 }): number {
   const kg = Math.max(0, opts.kg);
   if (kg <= 0) return 0;
-  return money(kg * yardHoldUsdPerKgDay(opts.commodityId));
+  const mult =
+    opts.state && opts.hubIcao
+      ? yardHoldMultForHub(opts.state, opts.hubIcao)
+      : 1;
+  return money(kg * yardHoldUsdPerKgDay(opts.commodityId) * mult);
 }
 
 /** Whole economy days a yard lot has been sitting (purchase day → now). */
@@ -704,8 +743,12 @@ export function settlePortYardHoldFees(
 
   let requestedUsd = 0;
   for (const pickup of pickups) {
+    const mult = yardHoldMultForHub(state, pickup.hubIcao);
     requestedUsd +=
-      pickup.kg * yardHoldUsdPerKgDay(pickup.commodityId) * daysCharged;
+      pickup.kg *
+      yardHoldUsdPerKgDay(pickup.commodityId) *
+      mult *
+      daysCharged;
   }
   requestedUsd = money(requestedUsd);
   if (requestedUsd <= 0) return { ...empty, daysCharged };
@@ -824,6 +867,8 @@ export function portSnapshot(
   >;
   /** Sum of daily yard hold fees across all pickups. */
   yardHoldUsdPerDay: number;
+  /** Economy tick at snapshot time (for inbound ETA). */
+  tick: number;
   warehouses: ReturnType<typeof playerWarehouseSnapshot>;
   demand: ReturnType<typeof demandSnapshot>;
   ownedFbos: Array<{
@@ -842,6 +887,8 @@ export function portSnapshot(
     const holdUsdPerDay = portYardHoldUsdPerDay({
       kg: p.kg,
       commodityId: p.commodityId,
+      hubIcao: p.hubIcao,
+      state: state ?? undefined,
     });
     return {
       ...p,
@@ -855,7 +902,13 @@ export function portSnapshot(
   );
   const warehouses = state
     ? playerWarehouseSnapshot(state, world)
-    : { warehouses: [], stock: [], pickupHubs: [], buyUsdByIcao: {} };
+    : {
+        warehouses: [],
+        stock: [],
+        inboundTransfers: [],
+        pickupHubs: [],
+        buyUsdByIcao: {},
+      };
   const demand = demandSnapshot(world, {
     warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
   });
@@ -905,6 +958,7 @@ export function portSnapshot(
     })),
     pickups: pickupViews,
     yardHoldUsdPerDay,
+    tick: world.tick,
     warehouses,
     demand,
     ownedFbos,

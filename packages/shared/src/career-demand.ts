@@ -16,6 +16,7 @@ import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import { countryIdFromRegion } from './career-partition.js';
+import { demandDeskMultForWarehouse } from './career-ground-staff.js';
 import {
   depositCargoToWarehouse,
   findPlayerWarehouseAtIcao,
@@ -244,13 +245,21 @@ export function demandEffectiveUnitPriceUsd(
   world: CareerEconomyWorld,
   order: Pick<DemandOrder, 'maxUnitPriceUsd' | 'destIcao'>,
   originIcao: string,
+  opts?: {
+    state?: Pick<CareerMissionsState, 'groundStaff'>;
+    warehouseId?: string;
+  },
 ): number {
-  const mult = demandInternationalUnitPriceMult(
+  const intl = demandInternationalUnitPriceMult(
     world,
     originIcao,
     order.destIcao,
   );
-  return money(order.maxUnitPriceUsd * mult);
+  let unit = order.maxUnitPriceUsd * intl;
+  if (opts?.state && opts.warehouseId) {
+    unit *= demandDeskMultForWarehouse(opts.state, opts.warehouseId);
+  }
+  return money(unit);
 }
 
 export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
@@ -547,7 +556,11 @@ export function acceptDemandOrder(
     order.status = 'filled';
   }
 
-  const unitPriceUsd = money(order.maxUnitPriceUsd * intl.unitPriceMult);
+  const unitPriceUsd = money(
+    order.maxUnitPriceUsd *
+      intl.unitPriceMult *
+      demandDeskMultForWarehouse(state, withdrawn.warehouseId),
+  );
   const payUsd = money(unitPriceUsd * kg);
   const deadlineTick = Math.min(
     order.expiresAtTick,
@@ -773,7 +786,10 @@ export function replaceDemandMissionCargo(
   }
 
   const payUsd = money(
-    demandEffectiveUnitPriceUsd(world, order, origin) * newKg,
+    demandEffectiveUnitPriceUsd(world, order, origin, {
+      state,
+      warehouseId: normalized.warehouseId,
+    }) * newKg,
   );
   const deadlineTick = Math.min(
     order.expiresAtTick,

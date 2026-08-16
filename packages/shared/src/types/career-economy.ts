@@ -1032,6 +1032,8 @@ export interface CareerMissionsState {
   playerWarehouses?: PlayerWarehouseState;
   /** Company crew roster (AI slots based at an FBO). */
   companyCrew?: CompanyCrewState;
+  /** Ground staff at player warehouses (ports / WH ops — not flight crew). */
+  groundStaff?: GroundStaffState;
   /**
    * Lifetime ferry nm that already consumed the early-career soft fee budget.
    * First FERRY_SOFT_NM_BUDGET nm of ferry pay a reduced fee.
@@ -1094,10 +1096,10 @@ export interface PlayerWarehouse {
   id: string;
   icao: string;
   capacityKg: number;
-  tier: 1 | 2;
+  tier: 1 | 2 | 3;
   /**
    * Lifetime kg delivered from this warehouse via Demand Board settle.
-   * Used to unlock T1→T2 upgrade (hybrid money + throughput).
+   * Used to unlock T1→T2 / T2→T3 upgrades (hybrid money + throughput).
    */
   lifetimeShippedKg?: number;
 }
@@ -1111,9 +1113,28 @@ export interface PlayerWarehousePile {
   acquiredAtTick: number;
 }
 
+/**
+ * Port buy cargo en route to a warehouse (not stock yet).
+ * Settles into WH (or yard overflow) at readyAtTick.
+ */
+export interface WarehouseInboundTransfer {
+  id: string;
+  warehouseId: string;
+  hubIcao: string;
+  portId: string;
+  listingId?: string;
+  commodityId: CommodityId;
+  kg: number;
+  unitCostUsd: number;
+  purchasedAtTick: number;
+  readyAtTick: number;
+}
+
 export interface PlayerWarehouseState {
   warehouses: PlayerWarehouse[];
   stock: PlayerWarehousePile[];
+  /** Port→WH transfers in flight (slice 1 ground logistics). */
+  inboundTransfers?: WarehouseInboundTransfer[];
 }
 
 /** Terminal buy-order on the Demand Board. */
@@ -1210,6 +1231,61 @@ export interface CompanyCrewState {
   /** Economy day when hirePool was last rolled. */
   hirePoolDay?: number;
   hirePoolIcao?: string;
+}
+
+/**
+ * Ground ops perks (warehouse / ports). v1 ships `logistics` + `yard`;
+ * other ids are reserved for later slices.
+ */
+export type GroundStaffPerkId =
+  | 'logistics'
+  | 'yard'
+  | 'procurement'
+  | 'demand_desk'
+  | 'wh_ops';
+
+/**
+ * Hire-desk quality band (people grades — not aircraft condition names).
+ * Rolled once at hire and frozen on the member.
+ */
+export type GroundStaffGrade = 'ace' | 'solid' | 'capable' | 'green';
+
+/** Candidate at a warehouse hire desk (short pool per pickup hub). */
+export interface GroundStaffCandidate {
+  id: string;
+  displayName: string;
+  perkId: GroundStaffPerkId;
+  grade: GroundStaffGrade;
+  /** 40–99 skill inside the grade band (frozen). */
+  skillPct: number;
+  /** Perk-specific effect multiplier (frozen; lower usually = stronger perk). */
+  effectMult: number;
+  salaryUsdPerDay: number;
+  hireUsd: number;
+  portraitId?: string;
+}
+
+/** Hired ground staff assigned to one player warehouse. */
+export interface GroundStaffMember {
+  id: string;
+  displayName: string;
+  warehouseId: string;
+  hubIcao: string;
+  perkId: GroundStaffPerkId;
+  grade: GroundStaffGrade;
+  skillPct: number;
+  effectMult: number;
+  salaryUsdPerDay: number;
+  hiredAtTick: number;
+  portraitId?: string;
+}
+
+export interface GroundStaffState {
+  members: GroundStaffMember[];
+  /** Hire desk candidates keyed by pickup hub ICAO. */
+  hirePoolByHub?: Record<string, GroundStaffCandidate[]>;
+  /** Economy day when each hub pool was last rolled. */
+  hirePoolDayByHub?: Record<string, number>;
 }
 
 
@@ -1324,6 +1400,8 @@ export type CareerLedgerKind =
   | 'crew_fee'
   | 'crew_salary'
   | 'crew_hire'
+  | 'ground_staff_salary'
+  | 'ground_staff_hire'
   | 'ferry'
   | 'pilot_travel'
   | 'fuel'

@@ -62,7 +62,7 @@ export type CrewReadyMission = {
   aircraftLabel: string;
 };
 
-function CrewPortrait(props: {
+export function CrewPortrait(props: {
   name: string;
   /** Future: real headshot URL from roster asset pack. */
   imageUrl?: string | null;

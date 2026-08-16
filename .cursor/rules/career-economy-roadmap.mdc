@@ -39,7 +39,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **NPC ops cargo clamp:** bids use route fuel/MTOW payload (not class maxRange alone); crew offers only when a homologated airframe has lift&gt;0; unflyable awaiting_pilot promotes early and hides Fly.
 - **Ferry journey modal:** Hangar Plan opens multi-leg sheet (all hops, progress, next cost, empty-tank note); hop-by-hop Fly next leg; fixes finalDest dropped on Hangar Go.
 - **Amazon bush hubs (v1 → global + trips):** soft-field spokes in BR/US/CA/MX; draft trip `br-rio-negro-tapuruquara` (unvalidated). Inspection/heat deferred.
-- **Warehouses + Demand Board:** CAPEX warehouses at port pickup hubs (BR: SBGR/SBKP/SBCT/SBRF/SBEG/SBPA/SBBE; AR: SAEZ/SAVC; CL: SCEL/SCTE; US: KMIA/KEWR/KIAH/KLAX/KSEA; CA: CYVR/CYHZ; MX: MMVR/MMZO/MMUN); port buy → WH; Demand Board spawns on low hub stock (**global cap 192 split per country** ≈32 each); accept → WH→dest mission; settle fills terminal + credits WH `lifetimeShippedKg`; **Edit cargo** restores/withdraws WH + demand remaining; **T1→T2 hybrid upgrade** (shipped threshold + CAPEX); FBO spot removed/wiped; **intl Demand** = country-pair allowlist + port pickup WH origin + ×1.28 pay (Market lanes unchanged).
+- **Warehouses + Demand Board:** CAPEX warehouses at port pickup hubs (BR: SBGR/SBKP/SBCT/SBRF/SBEG/SBPA/SBBE; AR: SAEZ/SAVC; CL: SCEL/SCTE; US: KMIA/KEWR/KIAH/KLAX/KSEA; CA: CYVR/CYHZ; MX: MMVR/MMZO/MMUN); port buy → WH; Demand Board spawns on low hub stock (**global cap 192 split per country** ≈32 each); accept → WH→dest mission; settle fills terminal + credits WH `lifetimeShippedKg`; **Edit cargo** restores/withdraws WH + demand remaining; **T1/T2/T3** (5/10/15 klb = 2268/4536/6804 kg) hybrid upgrade (shipped + CAPEX); FBO spot removed/wiped; **intl Demand** = country-pair allowlist + port pickup WH origin + ×1.28 pay (Market lanes unchanged).
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 
 ## Near-term priorities (current Brazil career)
@@ -99,6 +99,101 @@ Protect the partition we already have. Do **not** invent members/roles/auth/Post
 3. World mutations (lot claim, demand accept, inbound publish) should stay expressible without assuming a single human — company is the claimant.
 4. Skip `members` / invites / rankings schema until co-op or competitive boards ship.
 5. Keep `CareerStore` as the persistence facade so SQLite → Postgres does not rewrite game rules.
+
+### Ground staff (Ports / WH) — hire + logistics + yard shipped
+
+**Intent:** same hire/perk/salary *pattern* as FBO `companyCrew`, but **ground ops only** — never auto-fly Demand/Market for the player.
+
+**Core friction (why staff exists):** today `buyPortListing` can deposit straight into WH free capacity — cargo “teleports”. Prefer:
+
+1. Buy → cargo enters **inbound transfer** (port apron → WH), not WH stock yet.
+2. After `readyAtTick`, auto-deposit into WH (or soft-fail → yard if WH full).
+3. Until ready: not Demand-eligible / not WH stock; UI shows ETA.
+4. **`logistics` perk** shortens transfer duration; **`yard`** cuts yard hold — both via frozen `effectMult` from hire grade (ace/solid/capable/green).
+
+Yard overflow (no free kg / no WH) stays as today; transfer applies to the kg that *would* have gone free→WH.
+
+| | FBO `companyCrew` | WH `groundStaff` |
+|--|-------------------|------------------|
+| Domain | Air legs | Ports / warehouses / Demand desk |
+| Base | FBO ICAO | Port pickup hub WH (`warehouseId` + hub ICAO) |
+| Unlock | Own FBO | Own warehouse at that hub (T1+) |
+| Slots | FBO crew slots | **1** @ T1 · **2** @ T2 · **3** @ T3 |
+| Optional? | Required for crew dispatch | **Optional** — ports work without hire; staff = faster transfer / cheaper yard |
+
+**Suggested types** (company tenant; **not** `company_crew_json`):
+
+```ts
+type GroundStaffPerkId =
+  | 'logistics'   // −transfer time port→WH
+  | 'yard'        // −yard hold fee (×0.85)
+  | 'procurement' // mild better port listing price
+  | 'demand_desk' // +Demand margin from that WH
+  | 'wh_ops';     // +lifetimeShipped / −upgrade CAPEX
+
+/** Cargo bought at port, en route to WH (not stock yet). */
+interface WarehouseInboundTransfer {
+  id: string;
+  warehouseId: string;
+  hubIcao: string;
+  portId: string;
+  commodityId: CommodityId;
+  kg: number;
+  unitCostUsd: number; // cost basis into WH piles on arrive
+  purchasedAtTick: number;
+  readyAtTick: number;
+}
+
+interface GroundStaffMember {
+  id: string;
+  displayName: string;
+  warehouseId: string;
+  hubIcao: string;
+  perkId: GroundStaffPerkId;
+  salaryUsdPerDay: number;
+  hiredAtTick: number;
+  portraitId?: string;
+}
+
+interface GroundStaffState {
+  members: GroundStaffMember[];
+  hirePoolByHub?: Record<string, GroundStaffCandidate[]>;
+  /** Or hang on PlayerWarehouseState.inTransit[] */
+  inboundTransfers?: WarehouseInboundTransfer[];
+}
+```
+
+**Transfer timing (draft — tune in play)**
+
+- Base: **4–8 ticks** (~1–2h at 15-min), +1 tick / ~8 t above 10 t (cap +4).
+- Staff **`logistics`** / **`yard`**: duration / hold × member `effectMult` (floor 2 ticks on transfer). Hire rolls grade + skillPct; mid-**solid** ≈ ×0.55 / ×0.85.
+- Seats: no double-stack same perk; hire desk rolls **logistics + yard**.
+- On ready: `depositCargoToWarehouse`; overflow → yard + toast.
+
+**Perk → visible loop**
+
+1. **`logistics`** — shorter port→WH ETA; chip from live mult.
+2. **`yard`** — yard hold discount from live mult at hub ICAO.
+3. **`procurement`** — port buy unit × effectMult (~0.97 mid).
+4. **`demand_desk`** — Demand pay × effectMult (~1.04 mid).
+5. **`wh_ops`** — upgrade CAPEX × effectMult (~0.93) + shipped credit from skillPct (~1.05).
+
+**Economy rules**
+
+- Salary: daily `ground_staff_salary`, `company_id` scoped.
+- Inbound settles on economy tick (same clock as yard fees).
+- Abandon WH: inbound → yard at hub (keep cost basis), not silent delete.
+- Perks **never** dispatch aircraft.
+
+**UI**
+
+- Port buy: “In transit to WH · ETA ~Xh” (not instant stock).
+- WH card: in-transit list (commodity, kg, ticks left).
+- Hire desk; grade chip (Ace/Solid/…); logistics/yard chips from live `effectMult`.
+
+**First slice:** ~~inbound transfer on buy (**even without staff**) + UI + tick deposit~~ **shipped**; ~~hire + grades + all five perks (`logistics` / `yard` / `procurement` / `demand_desk` / `wh_ops`)~~ **shipped**; ~~WH T1/T2/T3 (5/10/15 klb)~~ **shipped**.
+
+**Out of scope:** NPC flying Demand; merging into FBO crew roster; post-hire grade wear/treino.
 
 ## Optional later
 

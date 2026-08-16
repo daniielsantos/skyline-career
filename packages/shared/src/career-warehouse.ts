@@ -14,16 +14,22 @@ import { applyWalletDelta } from './career-ledger.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { economyDayIndex } from './career-weather.js';
 import {
+  depositCargoToWarehouse,
   ensurePlayerWarehouses,
   findPlayerWarehouseAtIcao,
+  warehouseFreeKg,
   warehouseUsedKg,
+  warehouseInboundPendingKg,
   WAREHOUSE_CAPACITY_KG,
 } from './career-warehouse-stock.js';
+import { whOpsCapexMultForWarehouse } from './career-ground-staff.js';
 import type {
   CareerMissionsState,
   HubTier,
+  PlayerPortPickup,
   PlayerWarehouse,
   PlayerWarehousePile,
+  WarehouseInboundTransfer,
 } from './types/career-economy.js';
 
 export {
@@ -32,18 +38,46 @@ export {
   emptyPlayerWarehouseState,
   ensurePlayerWarehouses,
   findPlayerWarehouseAtIcao,
+  migrateWarehouseTierAndCapacity,
   normalizePlayerWarehouseState,
   previewWithdrawCargoCost,
   recordWarehouseShipmentKg,
   warehouseFreeKg,
+  warehouseInboundFreeKg,
+  warehouseInboundPendingKg,
   warehouseUsedKg,
   withdrawCargoFromWarehouse,
   WAREHOUSE_CAPACITY_KG,
   WAREHOUSE_LOT_MERGE_REL_BAND,
 } from './career-warehouse-stock.js';
 
+/** Base port→WH transfer duration (economy ticks). */
+export const WAREHOUSE_INBOUND_BASE_TICKS = 4;
+/** Cap on transfer duration before logistics perk. */
+export const WAREHOUSE_INBOUND_MAX_TICKS = 8;
+
+/**
+ * Economy ticks until port buy cargo arrives at WH.
+ * Scales mildly with mass; logisticsMult &lt; 1 shortens (ground staff logistics perk).
+ */
+export function warehouseInboundTransferTicks(
+  kg: number,
+  logisticsMult: number = 1,
+): number {
+  const mass = Math.max(0, Math.floor(kg));
+  let ticks = WAREHOUSE_INBOUND_BASE_TICKS;
+  if (mass > 10_000) {
+    ticks += Math.min(4, Math.ceil((mass - 10_000) / 8_000));
+  }
+  ticks = Math.min(WAREHOUSE_INBOUND_MAX_TICKS, Math.max(WAREHOUSE_INBOUND_BASE_TICKS, ticks));
+  const mult =
+    Number.isFinite(logisticsMult) && logisticsMult > 0 ? logisticsMult : 1;
+  return Math.max(2, Math.round(ticks * mult));
+}
+
 export const WAREHOUSE_T1_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[1];
 export const WAREHOUSE_T2_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[2];
+export const WAREHOUSE_T3_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[3];
 
 /** CAPEX by hub tier (cheaper than FBO — storage only). */
 export const WAREHOUSE_T1_BUY_USD: Record<HubTier, number> = {
@@ -59,11 +93,21 @@ export const WAREHOUSE_T2_UPGRADE_USD: Record<HubTier, number> = {
   major: 32_000,
 };
 
+/** CAPEX to upgrade T2 → T3 (~0.85× T2 table). */
+export const WAREHOUSE_T3_UPGRADE_USD: Record<HubTier, number> = {
+  spoke: 8_500,
+  regional: 15_300,
+  major: 27_200,
+};
+
 /**
  * Lifetime Demand Board kg that must leave this warehouse (settle) before T2
  * upgrade is purchasable.
  */
-export const WAREHOUSE_T2_SHIPPED_KG = 10_000;
+export const WAREHOUSE_T2_SHIPPED_KG = 5_000;
+
+/** Lifetime shipped kg gate for T2 → T3. */
+export const WAREHOUSE_T3_SHIPPED_KG = 12_000;
 
 /** Mirror FBO bonded storage rates. */
 export const WAREHOUSE_STORAGE_USD_PER_KG_DAY = 0.02;
@@ -174,22 +218,128 @@ export function quoteWarehouseTier2UpgradeUsd(
   return WAREHOUSE_T2_UPGRADE_USD[hubTierOf(ap ?? { icao })];
 }
 
+export function quoteWarehouseTier3UpgradeUsd(
+  world: Pick<CareerEconomyWorld, 'airports'>,
+  icao: string,
+): number {
+  const ap = world.airports.find(
+    (a) => a.icao.toUpperCase() === icao.trim().toUpperCase(),
+  );
+  return WAREHOUSE_T3_UPGRADE_USD[hubTierOf(ap ?? { icao })];
+}
+
+export function quoteWarehouseUpgradeUsd(
+  world: Pick<CareerEconomyWorld, 'airports'>,
+  warehouse: Pick<PlayerWarehouse, 'tier' | 'icao' | 'id'>,
+  state?: Pick<CareerMissionsState, 'groundStaff'>,
+): number | null {
+  let base: number | null = null;
+  if (warehouse.tier === 1) {
+    base = quoteWarehouseTier2UpgradeUsd(world, warehouse.icao);
+  } else if (warehouse.tier === 2) {
+    base = quoteWarehouseTier3UpgradeUsd(world, warehouse.icao);
+  } else {
+    return null;
+  }
+  const mult = state
+    ? whOpsCapexMultForWarehouse(state, warehouse.id)
+    : 1;
+  return money(base * mult);
+}
+
+export function warehouseUpgradeProgress(wh: PlayerWarehouse): {
+  shippedKg: number;
+  neededKg: number;
+  unlocked: boolean;
+  nextTier: 2 | 3 | null;
+} {
+  const shippedKg = Math.max(0, Math.floor(wh.lifetimeShippedKg ?? 0));
+  if (wh.tier === 1) {
+    return {
+      shippedKg,
+      neededKg: WAREHOUSE_T2_SHIPPED_KG,
+      unlocked: shippedKg >= WAREHOUSE_T2_SHIPPED_KG,
+      nextTier: 2,
+    };
+  }
+  if (wh.tier === 2) {
+    return {
+      shippedKg,
+      neededKg: WAREHOUSE_T3_SHIPPED_KG,
+      unlocked: shippedKg >= WAREHOUSE_T3_SHIPPED_KG,
+      nextTier: 3,
+    };
+  }
+  return {
+    shippedKg,
+    neededKg: WAREHOUSE_T3_SHIPPED_KG,
+    unlocked: false,
+    nextTier: null,
+  };
+}
+
+/** @deprecated Prefer warehouseUpgradeProgress. */
 export function warehouseTier2Progress(wh: PlayerWarehouse): {
   shippedKg: number;
   neededKg: number;
   unlocked: boolean;
 } {
-  const shippedKg = Math.max(0, Math.floor(wh.lifetimeShippedKg ?? 0));
+  const progress = warehouseUpgradeProgress(wh);
   return {
-    shippedKg,
+    shippedKg: progress.shippedKg,
     neededKg: WAREHOUSE_T2_SHIPPED_KG,
-    unlocked: shippedKg >= WAREHOUSE_T2_SHIPPED_KG,
+    unlocked: wh.tier === 1 && progress.unlocked,
   };
 }
 
 /**
- * Upgrade an owned warehouse T1 → T2 (same ICAO).
+ * Upgrade an owned warehouse T1 → T2 or T2 → T3 (same ICAO).
  * Requires lifetime Demand Board shipped kg + CAPEX.
+ */
+export function upgradeWarehouse(
+  state: CareerMissionsState,
+  world: Pick<CareerEconomyWorld, 'airports' | 'tick'>,
+  warehouseId: string,
+): { warehouse: PlayerWarehouse; debitUsd: number } {
+  const whs = ensurePlayerWarehouses(state);
+  const warehouse = whs.warehouses.find((w) => w.id === warehouseId.trim());
+  if (!warehouse) throw new Error(`Unknown warehouse ${warehouseId}`);
+  if (warehouse.tier >= 3) {
+    throw new Error(`Warehouse at ${warehouse.icao} is already Tier ${warehouse.tier}`);
+  }
+  const progress = warehouseUpgradeProgress(warehouse);
+  if (!progress.nextTier || !progress.unlocked) {
+    throw new Error(
+      `Ship ${progress.neededKg.toLocaleString()} kg from ${warehouse.icao} via Demand Board before upgrading (have ${progress.shippedKg.toLocaleString()} kg)`,
+    );
+  }
+
+  const debitUsd = quoteWarehouseUpgradeUsd(world, warehouse, state);
+  if (debitUsd == null) {
+    throw new Error(`Warehouse at ${warehouse.icao} cannot be upgraded further`);
+  }
+  if (state.walletUsd < debitUsd) {
+    throw new Error(
+      `Warehouse upgrade $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
+    );
+  }
+
+  const nextTier = progress.nextTier;
+  const nextCap = WAREHOUSE_CAPACITY_KG[nextTier];
+  applyWalletDelta(state, {
+    amountUsd: -debitUsd,
+    kind: 'warehouse_upgrade',
+    atTick: world.tick,
+    icao: warehouse.icao,
+    note: `Warehouse T${nextTier} upgrade · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`,
+  });
+  warehouse.tier = nextTier;
+  warehouse.capacityKg = Math.max(warehouse.capacityKg, nextCap);
+  return { warehouse, debitUsd };
+}
+
+/**
+ * @deprecated Prefer upgradeWarehouse (T1→T2 or T2→T3).
  */
 export function upgradeWarehouseToTier2(
   state: CareerMissionsState,
@@ -199,36 +349,14 @@ export function upgradeWarehouseToTier2(
   const whs = ensurePlayerWarehouses(state);
   const warehouse = whs.warehouses.find((w) => w.id === warehouseId.trim());
   if (!warehouse) throw new Error(`Unknown warehouse ${warehouseId}`);
-  if (warehouse.tier >= 2) {
-    throw new Error(`Warehouse at ${warehouse.icao} is already Tier ${warehouse.tier}`);
-  }
-  const progress = warehouseTier2Progress(warehouse);
-  if (!progress.unlocked) {
+  if (warehouse.tier !== 1) {
     throw new Error(
-      `Ship ${progress.neededKg.toLocaleString()} kg from ${warehouse.icao} via Demand Board before upgrading (have ${progress.shippedKg.toLocaleString()} kg)`,
+      warehouse.tier >= 2
+        ? `Warehouse at ${warehouse.icao} is already Tier ${warehouse.tier}`
+        : `Unknown warehouse ${warehouseId}`,
     );
   }
-
-  const debitUsd = quoteWarehouseTier2UpgradeUsd(world, warehouse.icao);
-  if (state.walletUsd < debitUsd) {
-    throw new Error(
-      `Warehouse upgrade $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
-    );
-  }
-
-  applyWalletDelta(state, {
-    amountUsd: -debitUsd,
-    kind: 'warehouse_upgrade',
-    atTick: world.tick,
-    icao: warehouse.icao,
-    note: `Warehouse T2 upgrade · ${warehouse.icao} · ${WAREHOUSE_T2_CAPACITY_KG.toLocaleString()} kg`,
-  });
-  warehouse.tier = 2;
-  warehouse.capacityKg = Math.max(
-    warehouse.capacityKg,
-    WAREHOUSE_T2_CAPACITY_KG,
-  );
-  return { warehouse, debitUsd };
+  return upgradeWarehouse(state, world, warehouseId);
 }
 
 function storageUsdPerKgDay(commodityId: PlayerWarehousePile['commodityId']): number {
@@ -283,6 +411,64 @@ export function settleWarehouseStorageFees(
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };
 }
 
+/**
+ * Deposit ready inbound transfers into WH stock; overflow → yard pickup.
+ */
+export function settleWarehouseInboundTransfers(
+  state: CareerMissionsState,
+  world: Pick<CareerEconomyWorld, 'tick'>,
+): {
+  deposited: WarehouseInboundTransfer[];
+  yardOverflow: PlayerPortPickup[];
+} {
+  const pending = [...(ensurePlayerWarehouses(state).inboundTransfers ?? [])];
+  if (pending.length === 0) return { deposited: [], yardOverflow: [] };
+
+  const still: WarehouseInboundTransfer[] = [];
+  const deposited: WarehouseInboundTransfer[] = [];
+  const yardOverflow: PlayerPortPickup[] = [];
+  const tick = world.tick;
+
+  for (const tr of pending) {
+    if (tr.readyAtTick > tick) {
+      still.push(tr);
+      continue;
+    }
+    const free = warehouseFreeKg(state, tr.warehouseId);
+    const intoWh = Math.min(tr.kg, Math.max(0, free));
+    const overflowKg = tr.kg - intoWh;
+    if (intoWh > 0) {
+      depositCargoToWarehouse(state, {
+        icao: tr.hubIcao,
+        commodityId: tr.commodityId,
+        kg: intoWh,
+        avgCostUsdPerKg: tr.unitCostUsd,
+        tick,
+      });
+    }
+    if (overflowKg > 0) {
+      const pickup: PlayerPortPickup = {
+        id: nextId('portpk', tick),
+        portId: tr.portId,
+        listingId: tr.listingId,
+        hubIcao: tr.hubIcao,
+        commodityId: tr.commodityId,
+        kg: overflowKg,
+        avgCostUsdPerKg: tr.unitCostUsd,
+        purchasedAtTick: tick,
+      };
+      if (!Array.isArray(state.portPickups)) state.portPickups = [];
+      state.portPickups.push(pickup);
+      yardOverflow.push(pickup);
+    }
+    deposited.push({ ...tr });
+  }
+
+  // depositCargoToWarehouse re-normalizes warehouses — write still onto the live state.
+  ensurePlayerWarehouses(state).inboundTransfers = still;
+  return { deposited, yardOverflow };
+}
+
 export function playerWarehouseSnapshot(
   state: CareerMissionsState,
   world?: Pick<CareerEconomyWorld, 'airports'>,
@@ -291,8 +477,13 @@ export function playerWarehouseSnapshot(
     PlayerWarehouse & {
       usedKg: number;
       freeKg: number;
+      inboundKg: number;
+      inboundFreeKg: number;
       lifetimeShippedKg: number;
+      /** @deprecated Prefer shippedNeededForNextTierKg. */
       shippedNeededForT2Kg: number;
+      shippedNeededForNextTierKg: number;
+      nextTier: 2 | 3 | null;
       upgradeUsd: number | null;
       canUpgrade: boolean;
       hubTier: HubTier;
@@ -302,6 +493,7 @@ export function playerWarehouseSnapshot(
     }
   >;
   stock: PlayerWarehousePile[];
+  inboundTransfers: WarehouseInboundTransfer[];
   pickupHubs: string[];
   /** CAPEX quote per pickup hub (for Buy UI). */
   buyUsdByIcao: Record<string, number>;
@@ -317,15 +509,15 @@ export function playerWarehouseSnapshot(
   return {
     warehouses: whs.warehouses.map((w) => {
       const usedKg = warehouseUsedKg(state, w.id);
-      const progress = warehouseTier2Progress(w);
+      const inboundKg = warehouseInboundPendingKg(state, w.id);
+      const progress = warehouseUpgradeProgress(w);
       const ap = world?.airports.find(
         (a) => a.icao.toUpperCase() === w.icao.toUpperCase(),
       );
       const hubTier = hubTierOf(ap ?? { icao: w.icao });
-      const upgradeUsd =
-        w.tier === 1 && world
-          ? quoteWarehouseTier2UpgradeUsd(world, w.icao)
-          : null;
+      const upgradeUsd = world
+        ? quoteWarehouseUpgradeUsd(world, w, state)
+        : null;
       const countryId = ap?.region
         ? countryIdFromRegion(ap.region)
         : null;
@@ -334,8 +526,13 @@ export function playerWarehouseSnapshot(
         ...w,
         lifetimeShippedKg: progress.shippedKg,
         shippedNeededForT2Kg: progress.neededKg,
+        shippedNeededForNextTierKg: progress.neededKg,
+        nextTier: progress.nextTier,
         upgradeUsd,
-        canUpgrade: w.tier === 1 && progress.unlocked && upgradeUsd != null,
+        canUpgrade:
+          progress.nextTier != null &&
+          progress.unlocked &&
+          upgradeUsd != null,
         hubTier,
         countryId:
           countryId && /^[A-Z]{2}$/.test(countryId) && countryId !== 'XX'
@@ -345,9 +542,12 @@ export function playerWarehouseSnapshot(
         lon: coords?.lon ?? null,
         usedKg,
         freeKg: Math.max(0, w.capacityKg - usedKg),
+        inboundKg,
+        inboundFreeKg: Math.max(0, w.capacityKg - usedKg - inboundKg),
       };
     }),
     stock: whs.stock.map((s) => ({ ...s })),
+    inboundTransfers: (whs.inboundTransfers ?? []).map((t) => ({ ...t })),
     pickupHubs,
     buyUsdByIcao,
   };

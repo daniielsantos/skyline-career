@@ -73,6 +73,7 @@ export function ensureV3Ddl(db: SqliteDb): void {
       airframe_perf_json TEXT,
       player_fbos_json TEXT,
       company_crew_json TEXT,
+      ground_staff_json TEXT,
       active_bush_trip_json TEXT,
       port_pickups_json TEXT,
       player_warehouses_json TEXT,
@@ -189,6 +190,9 @@ export function ensureV3Ddl(db: SqliteDb): void {
   }
   if (!columnExists(db, 'company_state', 'company_crew_json')) {
     db.exec(`ALTER TABLE company_state ADD COLUMN company_crew_json TEXT`);
+  }
+  if (!columnExists(db, 'company_state', 'ground_staff_json')) {
+    db.exec(`ALTER TABLE company_state ADD COLUMN ground_staff_json TEXT`);
   }
   if (!columnExists(db, 'company_state', 'active_bush_trip_json')) {
     db.exec(`ALTER TABLE company_state ADD COLUMN active_bush_trip_json TEXT`);
@@ -1003,13 +1007,13 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        company_id, wallet_usd, pilot_name, pilot_icao, hub_selected,
        company_credit_json, cargo_ops_json, aircraft_market_json,
        aircraft_market_day, aircraft_market_demand_day, airframe_perf_json,
-       player_fbos_json, company_crew_json, active_bush_trip_json,
+       player_fbos_json, company_crew_json, ground_staff_json, active_bush_trip_json,
        port_pickups_json, player_warehouses_json, updated_at_ms
      ) VALUES (
        @company_id, @wallet_usd, @pilot_name, @pilot_icao, @hub_selected,
        @company_credit_json, @cargo_ops_json, @aircraft_market_json,
        @aircraft_market_day, @aircraft_market_demand_day, @airframe_perf_json,
-       @player_fbos_json, @company_crew_json, @active_bush_trip_json,
+       @player_fbos_json, @company_crew_json, @ground_staff_json, @active_bush_trip_json,
        @port_pickups_json, @player_warehouses_json, @updated_at_ms
      )
      ON CONFLICT(company_id) DO UPDATE SET
@@ -1027,6 +1031,10 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        company_crew_json = COALESCE(
          excluded.company_crew_json,
          company_state.company_crew_json
+       ),
+       ground_staff_json = COALESCE(
+         excluded.ground_staff_json,
+         company_state.ground_staff_json
        ),
        active_bush_trip_json = excluded.active_bush_trip_json,
        port_pickups_json = excluded.port_pickups_json,
@@ -1059,12 +1067,19 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
     company_crew_json: state.companyCrew
       ? JSON.stringify(state.companyCrew)
       : null,
+    ground_staff_json: state.groundStaff
+      ? JSON.stringify(state.groundStaff)
+      : null,
     active_bush_trip_json: state.activeBushTrip
       ? JSON.stringify(state.activeBushTrip)
       : null,
     port_pickups_json: JSON.stringify(state.portPickups ?? []),
     player_warehouses_json: JSON.stringify(
-      state.playerWarehouses ?? { warehouses: [], stock: [] },
+      state.playerWarehouses ?? {
+        warehouses: [],
+        stock: [],
+        inboundTransfers: [],
+      },
     ),
     updated_at_ms: now,
   });
@@ -1079,7 +1094,7 @@ export function readCompanyStateScalars(
       `SELECT wallet_usd, pilot_name, pilot_icao, hub_selected, company_credit_json,
               cargo_ops_json, aircraft_market_json, aircraft_market_day,
               aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
-              company_crew_json, active_bush_trip_json, port_pickups_json,
+              company_crew_json, ground_staff_json, active_bush_trip_json, port_pickups_json,
               player_warehouses_json
        FROM company_state WHERE company_id = ?`,
     )
@@ -1097,6 +1112,7 @@ export function readCompanyStateScalars(
         airframe_perf_json: string | null;
         player_fbos_json: string | null;
         company_crew_json: string | null;
+        ground_staff_json: string | null;
         active_bush_trip_json: string | null;
         port_pickups_json: string | null;
         player_warehouses_json: string | null;
@@ -1164,6 +1180,13 @@ export function readCompanyStateScalars(
       /* ignore */
     }
   }
+  if (row.ground_staff_json) {
+    try {
+      out.groundStaff = JSON.parse(row.ground_staff_json);
+    } catch {
+      /* ignore */
+    }
+  }
   if (row.active_bush_trip_json) {
     try {
       out.activeBushTrip = JSON.parse(row.active_bush_trip_json);
@@ -1188,15 +1211,30 @@ export function readCompanyStateScalars(
         out.playerWarehouses = {
           warehouses: Array.isArray(parsed.warehouses) ? parsed.warehouses : [],
           stock: Array.isArray(parsed.stock) ? parsed.stock : [],
+          inboundTransfers: Array.isArray(parsed.inboundTransfers)
+            ? parsed.inboundTransfers
+            : [],
         };
       } else {
-        out.playerWarehouses = { warehouses: [], stock: [] };
+        out.playerWarehouses = {
+          warehouses: [],
+          stock: [],
+          inboundTransfers: [],
+        };
       }
     } catch {
-      out.playerWarehouses = { warehouses: [], stock: [] };
+      out.playerWarehouses = {
+        warehouses: [],
+        stock: [],
+        inboundTransfers: [],
+      };
     }
   } else {
-    out.playerWarehouses = { warehouses: [], stock: [] };
+    out.playerWarehouses = {
+      warehouses: [],
+      stock: [],
+      inboundTransfers: [],
+    };
   }
   return out;
 }

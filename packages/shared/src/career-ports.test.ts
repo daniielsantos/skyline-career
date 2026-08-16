@@ -219,11 +219,12 @@ describe('career ports', () => {
       kg: 1_000,
     });
     assert.equal(boughtCargo.kg, 1_000);
-    assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 1_000);
-    assert.ok(boughtCargo.storedKg > 0, 'WH free space should take factory cargo');
+    assert.equal(boughtCargo.inboundKg + boughtCargo.yardKg, 1_000);
+    assert.ok(boughtCargo.inboundKg > 0, 'WH free space should reserve inbound');
+    assert.equal((state.playerWarehouses?.stock ?? []).length, 0);
     assert.ok(
-      (state.playerWarehouses?.stock ?? []).some(
-        (s) => s.warehouseId === bought.warehouse.id && s.kg > 0,
+      (state.playerWarehouses?.inboundTransfers ?? []).some(
+        (x) => x.warehouseId === bought.warehouse.id && x.kg > 0,
       ),
     );
   });
@@ -265,8 +266,8 @@ describe('career ports', () => {
       kg: 800,
     });
     assert.equal(boughtCargo.kg, 800);
-    assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 800);
-    assert.ok(boughtCargo.storedKg > 0);
+    assert.equal(boughtCargo.inboundKg + boughtCargo.yardKg, 800);
+    assert.ok(boughtCargo.inboundKg > 0);
   });
 
   it('allows warehouse buy at Rio Grande and Vila do Conde pickup hubs', () => {
@@ -310,8 +311,8 @@ describe('career ports', () => {
         kg: 600,
       });
       assert.equal(boughtCargo.kg, 600);
-      assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 600);
-      assert.ok(boughtCargo.storedKg > 0, row.hub);
+      assert.equal(boughtCargo.inboundKg + boughtCargo.yardKg, 600);
+      assert.ok(boughtCargo.inboundKg > 0, row.hub);
     }
   });
 
@@ -369,8 +370,8 @@ describe('career ports', () => {
         kg: 600,
       });
       assert.equal(boughtCargo.kg, 600);
-      assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 600);
-      assert.ok(boughtCargo.storedKg > 0, row.hub);
+      assert.equal(boughtCargo.inboundKg + boughtCargo.yardKg, 600);
+      assert.ok(boughtCargo.inboundKg > 0, row.hub);
     }
   });
 
@@ -424,8 +425,8 @@ describe('career ports', () => {
         kg: 600,
       });
       assert.equal(boughtCargo.kg, 600);
-      assert.equal(boughtCargo.storedKg + boughtCargo.yardKg, 600);
-      assert.ok(boughtCargo.storedKg > 0, row.hub);
+      assert.equal(boughtCargo.inboundKg + boughtCargo.yardKg, 600);
+      assert.ok(boughtCargo.inboundKg > 0, row.hub);
     }
   });
 
@@ -545,9 +546,10 @@ describe('career ports', () => {
       listingId: listing!.id,
       kg: 2_000,
     });
-    assert.equal(bought.storedKg, 800);
+    assert.equal(bought.inboundKg, 800);
     assert.equal(bought.yardKg, 1_200);
-    assert.ok(bought.warehousePile);
+    assert.ok(bought.inboundTransfer);
+    assert.equal(bought.inboundTransfer!.kg, 800);
     assert.ok(bought.pickup);
     assert.equal(bought.pickup!.kg, 1_200);
   });
@@ -592,13 +594,13 @@ describe('career ports', () => {
       listingId: listing!.id,
       kg: buyKg,
     });
-    assert.equal(bought.storedKg, WAREHOUSE_T1_CAPACITY_KG);
+    assert.equal(bought.inboundKg, WAREHOUSE_T1_CAPACITY_KG);
     assert.equal(bought.yardKg, 2_000);
     assert.equal(bought.pickup!.kg, 2_000);
 
-    // Free some WH space by abandoning is not needed — empty via direct stock wipe
-    // then partial-store after buying into a full WH again would be separate.
-    // Here: fill free to 500, then deposit should take 500 and leave 1500 yard.
+    // Free some WH space — inbound still reserved until settle, so clear transfers
+    // then leave 500 free for partial yard Store.
+    state.playerWarehouses!.inboundTransfers = [];
     state.playerWarehouses!.stock = [
       {
         id: 'whpile_fill',

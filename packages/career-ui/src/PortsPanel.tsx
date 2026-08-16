@@ -2,6 +2,8 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   fetchPorts,
   postDemandAccept,
+  postGroundStaffFire,
+  postGroundStaffHire,
   postPortBuy,
   postPortDeposit,
   postPortPickupAbandon,
@@ -10,6 +12,7 @@ import {
   postWarehouseStockAbandon,
   type CareerCargoOps,
   type DemandOrderView,
+  type GroundStaffSnapshot,
   type Mission,
   type PlayerAircraft,
   type PlayerWarehouseSnapshot,
@@ -18,6 +21,8 @@ import {
 } from './api';
 import { PortsMap } from './PortsMap';
 import { CommodityIcon } from './CommodityIcon';
+import { CrewPortrait } from './CrewPanel';
+import { crewPortraitUrl } from './crewPortraits';
 import { useConfirm } from './ConfirmDialog';
 import {
   derivePortsLoopStep,
@@ -33,8 +38,76 @@ import {
   type WeightSystem,
 } from './weight-units';
 
-/** Mirror of shared WAREHOUSE_T1_CAPACITY_KG (client must not import shared). */
-const WH_T1_CAPACITY_KG = 5_000;
+/** Mirror of shared WAREHOUSE_*_CAPACITY_KG (client must not import shared). */
+const WH_T1_CAPACITY_KG = 2_268;
+const WH_T2_CAPACITY_KG = 4_536;
+const WH_T3_CAPACITY_KG = 6_804;
+/** Mirror of shared port→WH inbound transfer ticks. */
+const INBOUND_BASE_TICKS = 4;
+const INBOUND_MAX_TICKS = 8;
+const LOGISTICS_MULT = 0.55;
+
+function transferDiscountLabel(mult: number | undefined | null): string {
+  const m =
+    typeof mult === 'number' && Number.isFinite(mult) && mult > 0 && mult < 1
+      ? mult
+      : LOGISTICS_MULT;
+  return `Transfer −${Math.round((1 - m) * 100)}%`;
+}
+
+function yardDiscountLabel(mult: number | undefined | null): string {
+  const m =
+    typeof mult === 'number' && Number.isFinite(mult) && mult > 0 && mult < 1
+      ? mult
+      : 0.85;
+  return `−${Math.round((1 - m) * 100)}%`;
+}
+
+function procurementDiscountLabel(mult: number | undefined | null): string {
+  const m =
+    typeof mult === 'number' && Number.isFinite(mult) && mult > 0 && mult < 1
+      ? mult
+      : 0.97;
+  return `Port −${Math.round((1 - m) * 100)}%`;
+}
+
+function demandPayBoostLabel(mult: number | undefined | null): string {
+  const m =
+    typeof mult === 'number' && Number.isFinite(mult) && mult > 1
+      ? mult
+      : 1.04;
+  return `Demand +${Math.round((m - 1) * 100)}%`;
+}
+
+function whOpsCapexLabel(mult: number | undefined | null): string {
+  const m =
+    typeof mult === 'number' && Number.isFinite(mult) && mult > 0 && mult < 1
+      ? mult
+      : 0.93;
+  return `Upgrade −${Math.round((1 - m) * 100)}%`;
+}
+
+function inboundTransferTicksClient(
+  kg: number,
+  logisticsMult: number = 1,
+): number {
+  const mass = Math.max(0, Math.floor(kg));
+  let ticks = INBOUND_BASE_TICKS;
+  if (mass > 10_000) {
+    ticks += Math.min(4, Math.ceil((mass - 10_000) / 8_000));
+  }
+  ticks = Math.min(INBOUND_MAX_TICKS, Math.max(INBOUND_BASE_TICKS, ticks));
+  const mult =
+    Number.isFinite(logisticsMult) && logisticsMult > 0 ? logisticsMult : 1;
+  return Math.max(2, Math.round(ticks * mult));
+}
+
+/** 15-min economy ticks → hours. */
+function ticksToHoursLabel(ticks: number): string {
+  const h = ticks * 0.25;
+  if (h < 1) return `${Math.round(ticks * 15)} min`;
+  return Number.isInteger(h) ? `${h} h` : `${h.toFixed(1)} h`;
+}
 /** Mirror of shared PORT_YARD_HOLD_* (client must not import shared). */
 const YARD_HOLD_USD_PER_KG_DAY = 0.05;
 const YARD_HOLD_VALUE_MULT = 2;
@@ -59,7 +132,7 @@ function commodityLabel(
   return row.commodityName?.trim() || row.commodityId;
 }
 
-const DEMAND_PAGE_SIZE = 10;
+const DEMAND_PAGE_SIZE = 11;
 const WORLD_PORTS_PAGE_SIZE = 5;
 /** 1 economy tick = 15 wall-clock minutes. */
 const HOURS_PER_TICK = 0.25;
@@ -262,6 +335,9 @@ export function PortsPanel(props: {
   const [warehouses, setWarehouses] = useState<PlayerWarehouseSnapshot | null>(
     null,
   );
+  const [groundStaff, setGroundStaff] = useState<GroundStaffSnapshot | null>(
+    null,
+  );
   const [portId, setPortId] = useState<string | null>(null);
   const [mapFocusToken, setMapFocusToken] = useState(0);
   const [buyListing, setBuyListing] = useState<PortListingView | null>(null);
@@ -275,7 +351,7 @@ export function PortsPanel(props: {
   const [section, setSection] = useState<'catalog' | 'warehouse' | 'demand'>(
     'catalog',
   );
-  const [whShelf, setWhShelf] = useState<'owned' | 'buy'>('owned');
+  const [whShelf, setWhShelf] = useState<'owned' | 'staff' | 'buy'>('owned');
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
   const [selectedOwnedHubIcao, setSelectedOwnedHubIcao] = useState<string | null>(
     null,
@@ -308,6 +384,9 @@ export function PortsPanel(props: {
       setSnap(nextPorts);
       setDemand(nextPorts.demand?.orders ?? []);
       setWarehouses(nextPorts.warehouses ?? null);
+      setGroundStaff(
+        nextPorts.groundStaff ?? nextPorts.warehouses?.groundStaff ?? null,
+      );
       if (!portId && nextPorts.ports[0]) setPortId(nextPorts.ports[0].id);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -335,7 +414,21 @@ export function PortsPanel(props: {
       : 0;
   const preview =
     buyListing && kg > 0
-      ? Math.round(buyListing.unitPriceUsd * kg * 100) / 100
+      ? Math.round(
+          buyListing.unitPriceUsd *
+            kg *
+            (() => {
+              const hub = buyListing.allocatedHubIcao.trim().toUpperCase();
+              const wh = (warehouses?.warehouses ?? []).find(
+                (w) => w.icao.trim().toUpperCase() === hub,
+              );
+              const mult = wh
+                ? groundStaff?.byWarehouse[wh.id]?.procurementMult
+                : undefined;
+              return typeof mult === 'number' && mult > 0 ? mult : 1;
+            })() *
+            100,
+        ) / 100
       : 0;
 
   const mapPorts = useMemo(
@@ -488,14 +581,19 @@ export function PortsPanel(props: {
         s.commodityId === acceptOrder.commodityId &&
         s.kg > 0,
     );
+    const deskMult = (() => {
+      const m = groundStaff?.byWarehouse[originRow.warehouseId]?.demandDeskMult;
+      return typeof m === 'number' && Number.isFinite(m) && m > 0 ? m : 1;
+    })();
+    const intlMult = acceptIntlPreview?.allowed
+      ? acceptIntlPreview.unitPriceMult
+      : 1;
     return previewDemandAcceptPull({
       remainingKg: acceptOrder.remainingKg,
       stockKg: originRow.stockKg,
       maxCargoKg,
       maxUnitPriceUsd: acceptOrder.maxUnitPriceUsd,
-      unitPriceMult: acceptIntlPreview?.allowed
-        ? acceptIntlPreview.unitPriceMult
-        : 1,
+      unitPriceMult: intlMult * deskMult,
       lots,
     });
   }, [
@@ -505,6 +603,7 @@ export function PortsPanel(props: {
     acceptOriginOptions,
     acceptIntlPreview,
     warehouses?.stock,
+    groundStaff,
     props.fleet,
     props.resolveMaxCargoKg,
   ]);
@@ -596,20 +695,45 @@ export function PortsPanel(props: {
       props.onWallet?.(result.walletUsd);
       setSnap(result.ports);
       setWarehouses(result.warehouses ?? result.ports.warehouses ?? null);
+      setGroundStaff(
+        result.ports.groundStaff ??
+          result.warehouses?.groundStaff ??
+          groundStaff,
+      );
       if (result.ports.demand?.orders) setDemand(result.ports.demand.orders);
-      const stored = result.storedKg ?? 0;
+      const inbound = result.inboundKg ?? 0;
       const yard = result.yardKg ?? 0;
-      let where = 'stored';
-      if (stored > 0 && yard > 0) {
-        where = `${props.formatTonnes(stored)} into WH · ${props.formatTonnes(yard)} yard hold`;
-      } else if (stored > 0) {
-        where = `into warehouse`;
+      const eta =
+        result.transferTicks != null && result.transferTicks > 0
+          ? ticksToHoursLabel(result.transferTicks)
+          : null;
+      const logisticsChip =
+        inbound > 0 &&
+        result.inboundTransfer &&
+        (result.ports.groundStaff?.byWarehouse[
+          result.inboundTransfer.warehouseId
+        ]?.logisticsActive ||
+          groundStaff?.byWarehouse[result.inboundTransfer.warehouseId]
+            ?.logisticsActive)
+          ? ` · ${transferDiscountLabel(
+              result.ports.groundStaff?.byWarehouse[
+                result.inboundTransfer.warehouseId
+              ]?.logisticsMult ??
+                groundStaff?.byWarehouse[result.inboundTransfer.warehouseId]
+                  ?.logisticsMult,
+            )}`
+          : '';
+      let where = 'recorded';
+      if (inbound > 0 && yard > 0) {
+        where = `${props.formatTonnes(inbound)} in transit to WH${eta ? ` (~${eta})` : ''}${logisticsChip} · ${props.formatTonnes(yard)} yard`;
+      } else if (inbound > 0) {
+        where = `in transit to WH${eta ? ` · ETA ~${eta}` : ''}${logisticsChip}`;
       } else if (yard > 0) {
         where = `yard hold at ${result.pickup?.hubIcao ?? buyListing.allocatedHubIcao}`;
       }
       props.onToast?.('ok', `Bought ${props.formatTonnes(result.kg)} · ${where}`);
       closeBuyModal();
-      if (yard > 0) setSection('warehouse');
+      if (inbound > 0 || yard > 0) setSection('warehouse');
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -690,6 +814,11 @@ export function PortsPanel(props: {
       props.onWallet?.(result.walletUsd);
       setWarehouses(result.warehouses);
       setSnap(result.ports);
+      setGroundStaff(
+        result.ports.groundStaff ??
+          result.warehouses?.groundStaff ??
+          groundStaff,
+      );
       props.onToast?.(
         'ok',
         `Warehouse at ${icao} · ${props.formatMoney(result.debitUsd)}`,
@@ -706,18 +835,76 @@ export function PortsPanel(props: {
     }
   }
 
+  async function onHireGroundStaff(warehouseId: string, candidateId: string) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postGroundStaffHire({ warehouseId, candidateId });
+      props.onWallet?.(result.walletUsd);
+      setGroundStaff(result.groundStaff);
+      if (result.warehouses) setWarehouses(result.warehouses);
+      if (result.ports) {
+        setSnap(result.ports);
+        if (result.ports.demand?.orders) setDemand(result.ports.demand.orders);
+      }
+      props.onToast?.(
+        'ok',
+        `Hired ${result.member.displayName} · ${props.formatMoney(result.debitUsd)}`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onFireGroundStaff(memberId: string, name: string) {
+    if (props.busy || loading) return;
+    const ok = await confirm({
+      title: 'Fire ground staff?',
+      body: `Let ${name} go? Logistics perk stops immediately.`,
+      confirmLabel: 'Fire',
+      cancelLabel: 'Keep',
+      tone: 'warn',
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const result = await postGroundStaffFire({ memberId });
+      props.onWallet?.(result.walletUsd);
+      setGroundStaff(result.groundStaff);
+      if (result.warehouses) setWarehouses(result.warehouses);
+      if (result.ports) setSnap(result.ports);
+      props.onToast?.('ok', `Fired ${result.member.displayName}`);
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onUpgradeWarehouse(warehouseId: string, icao: string) {
     if (props.busy || loading) return;
     const wh = (warehouses?.warehouses ?? []).find((w) => w.id === warehouseId);
+    const nextTier = wh?.nextTier ?? (wh?.tier === 1 ? 2 : wh?.tier === 2 ? 3 : null);
+    if (!nextTier) return;
+    const nextCap =
+      nextTier === 3 ? WH_T3_CAPACITY_KG : WH_T2_CAPACITY_KG;
     const price =
       wh?.upgradeUsd != null ? props.formatMoney(wh.upgradeUsd) : 'upgrade';
     const ok = await confirm({
-      title: `Upgrade ${icao} to Tier 2?`,
+      title: `Upgrade ${icao} to Tier ${nextTier}?`,
       body: (
         <>
           <p>
-            Capacity rises to {props.formatTonnes(12_000)} (from{' '}
-            {props.formatTonnes(wh?.capacityKg ?? 5_000)}).
+            Capacity rises to {props.formatTonnes(nextCap)} (from{' '}
+            {props.formatTonnes(wh?.capacityKg ?? WH_T1_CAPACITY_KG)}).
           </p>
           <p>Cost {price}. No refund.</p>
         </>
@@ -735,7 +922,7 @@ export function PortsPanel(props: {
       setSnap(result.ports);
       props.onToast?.(
         'ok',
-        `Warehouse ${icao} → T2 · ${props.formatMoney(result.debitUsd)}`,
+        `Warehouse ${icao} → T${result.warehouse.tier} · ${props.formatMoney(result.debitUsd)}`,
       );
     } catch (err) {
       props.onToast?.(
@@ -854,7 +1041,7 @@ export function PortsPanel(props: {
     const wh = (warehouses?.warehouses ?? []).find(
       (w) => w.icao.trim().toUpperCase() === hub,
     );
-    return wh?.freeKg ?? 0;
+    return wh?.inboundFreeKg ?? wh?.freeKg ?? 0;
   }
 
   function canStoreAtHub(hubIcao: string, needKg?: number): boolean {
@@ -973,6 +1160,26 @@ export function PortsPanel(props: {
     if (!highlightedHubIcao) return null;
     return portForHub.get(highlightedHubIcao)?.id ?? null;
   }, [highlightedHubIcao, portForHub]);
+  const staffFocusWarehouse = useMemo(() => {
+    const list = warehouses?.warehouses ?? [];
+    if (list.length === 0) return null;
+    if (highlightedHubIcao) {
+      const hit = list.find(
+        (w) => w.icao.trim().toUpperCase() === highlightedHubIcao,
+      );
+      if (hit) return hit;
+    }
+    return list[0] ?? null;
+  }, [warehouses?.warehouses, highlightedHubIcao]);
+  const staffFocusMeta = staffFocusWarehouse
+    ? groundStaff?.byWarehouse[staffFocusWarehouse.id]
+    : undefined;
+  const staffHirePool =
+    staffFocusWarehouse && groundStaff
+      ? (groundStaff.hirePoolByHub[
+          staffFocusWarehouse.icao.trim().toUpperCase()
+        ] ?? [])
+      : [];
   const buyUsdByIcao = warehouses?.buyUsdByIcao ?? {};
 
   const loopStep = useMemo(
@@ -1181,28 +1388,7 @@ export function PortsPanel(props: {
             : 'Loading ports…'}
         </p>
       ) : (
-        <>
-          <div className="ports-loop-banner" role="status">
-            <p className="ports-loop-banner-text">
-              {portsLoopMessage(
-                loopStep,
-                props.formatTonnes,
-                props.formatMoney,
-                snap.yardHoldUsdPerDay,
-              )}
-            </p>
-            {loopCtaLabel ? (
-              <button
-                type="button"
-                className="action ghost ports-loop-banner-cta"
-                disabled={props.busy || loading}
-                onClick={() => goToLoopStep()}
-              >
-                {loopCtaLabel}
-              </button>
-            ) : null}
-          </div>
-
+        <div className="ports-panel-body">
           <div
             className="fbo-mode-switcher"
             role="tablist"
@@ -1251,6 +1437,29 @@ export function PortsPanel(props: {
             </button>
           </div>
 
+          {section !== loopTargetSection ? (
+            <div className="ports-loop-banner" role="status">
+              <p className="ports-loop-banner-text">
+                {portsLoopMessage(
+                  loopStep,
+                  props.formatTonnes,
+                  props.formatMoney,
+                  snap.yardHoldUsdPerDay,
+                )}
+              </p>
+              {loopCtaLabel ? (
+                <button
+                  type="button"
+                  className="action ghost ports-loop-banner-cta"
+                  disabled={props.busy || loading}
+                  onClick={() => goToLoopStep()}
+                >
+                  {loopCtaLabel}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {section === 'catalog' ? (
             <>
               {loopTargetSection === 'catalog' ? (
@@ -1263,9 +1472,13 @@ export function PortsPanel(props: {
                 </p>
               ) : null}
               {port ? (
-                <h3 className="ports-selected-name">{port.name}</h3>
+                <h3 className="ports-selected-name ports-stage-title">
+                  {port.name}
+                </h3>
               ) : (
-                <p className="muted">Select a port on the map or grid.</p>
+                <p className="ports-stage-title is-muted">
+                  Select a port on the map or grid.
+                </p>
               )}
 
               <div className="ports-main">
@@ -1512,12 +1725,22 @@ export function PortsPanel(props: {
                   )}
                 </p>
               ) : null}
+              <h3 className="ports-stage-title">
+                {whShelf === 'staff'
+                  ? 'Ground staff'
+                  : whShelf === 'buy'
+                    ? 'Available warehouses'
+                    : highlightedHubIcao
+                      ? `Warehouse · ${highlightedHubIcao}`
+                      : 'Your warehouses'}
+              </h3>
               <div className="ports-main">
                 <PortsMap
                   ports={mapPorts}
                   ownedFbos={mapWarehouses}
                   selectedPortId={
-                    whShelf === 'owned' && highlightPortId
+                    (whShelf === 'owned' || whShelf === 'staff') &&
+                    highlightPortId
                       ? highlightPortId
                       : whShelf === 'buy' && selectedBuyHubIcao
                         ? (portForHub.get(selectedBuyHubIcao)?.id ??
@@ -1526,7 +1749,7 @@ export function PortsPanel(props: {
                         : (port?.id ?? portId)
                   }
                   highlightedHubIcao={
-                    whShelf === 'owned'
+                    whShelf === 'owned' || whShelf === 'staff'
                       ? highlightedHubIcao
                       : whShelf === 'buy'
                         ? selectedBuyHubIcao
@@ -1534,7 +1757,7 @@ export function PortsPanel(props: {
                   }
                   onSelectPort={(id) => {
                     setPortId(id);
-                    if (whShelf === 'owned') {
+                    if (whShelf === 'owned' || whShelf === 'staff') {
                       setSelectedStockId(null);
                       setSelectedOwnedHubIcao(null);
                     }
@@ -1545,60 +1768,86 @@ export function PortsPanel(props: {
 
                 <div className="ports-warehouse-side">
                   <div className="ports-warehouse-strip">
-                    <h3>Warehouses</h3>
-                    <p className="muted ports-warehouse-hint">
-                      {whShelf === 'owned'
-                        ? 'All your warehouses and stock lots. Select a warehouse or lot to highlight it on the map.'
-                        : 'All buyable pickup hubs worldwide. Select a hub to highlight it on the map, then buy.'}
-                    </p>
-                    <div
-                      className="ports-wh-shelf"
-                      role="tablist"
-                      aria-label="Warehouse shelf"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={whShelf === 'owned'}
-                        className={
-                          whShelf === 'owned'
-                            ? 'ports-wh-shelf-tab active'
-                            : 'ports-wh-shelf-tab'
-                        }
-                        disabled={props.busy || loading}
-                        onClick={() => {
-                          setWhShelf('owned');
-                          setSelectedBuyHubIcao(null);
-                        }}
+                    <div className="ports-wh-head">
+                      <h3>Warehouses</h3>
+                      <p className="muted ports-warehouse-hint">
+                        {whShelf === 'owned'
+                          ? 'Your hubs and stock — select to highlight on the map.'
+                          : whShelf === 'staff'
+                            ? 'Hire per warehouse · Ace→Green grades · salary by grade.'
+                            : 'Buyable hubs — select on the map, then buy.'}
+                      </p>
+                      <div
+                        className="ports-wh-shelf"
+                        role="tablist"
+                        aria-label="Warehouse shelf"
                       >
-                        Yours
-                        {allOwnedWarehouses.length > 0
-                          ? ` (${allOwnedWarehouses.length})`
-                          : ''}
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={whShelf === 'buy'}
-                        className={
-                          whShelf === 'buy'
-                            ? 'ports-wh-shelf-tab active'
-                            : 'ports-wh-shelf-tab'
-                        }
-                        disabled={props.busy || loading}
-                        onClick={() => {
-                          setWhShelf('buy');
-                          setSelectedStockId(null);
-                          setSelectedOwnedHubIcao(null);
-                        }}
-                      >
-                        Available
-                        {allBuyableHubs.length > 0
-                          ? ` (${allBuyableHubs.length})`
-                          : ''}
-                      </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={whShelf === 'owned'}
+                          className={
+                            whShelf === 'owned'
+                              ? 'ports-wh-shelf-tab active'
+                              : 'ports-wh-shelf-tab'
+                          }
+                          disabled={props.busy || loading}
+                          onClick={() => {
+                            setWhShelf('owned');
+                            setSelectedBuyHubIcao(null);
+                          }}
+                        >
+                          Yours
+                          {allOwnedWarehouses.length > 0
+                            ? ` (${allOwnedWarehouses.length})`
+                            : ''}
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={whShelf === 'staff'}
+                          className={
+                            whShelf === 'staff'
+                              ? 'ports-wh-shelf-tab active'
+                              : 'ports-wh-shelf-tab'
+                          }
+                          disabled={props.busy || loading}
+                          onClick={() => {
+                            setWhShelf('staff');
+                            setSelectedBuyHubIcao(null);
+                            setSelectedStockId(null);
+                          }}
+                        >
+                          Ground staff
+                          {(groundStaff?.members.length ?? 0) > 0
+                            ? ` (${groundStaff!.members.length})`
+                            : ''}
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={whShelf === 'buy'}
+                          className={
+                            whShelf === 'buy'
+                              ? 'ports-wh-shelf-tab active'
+                              : 'ports-wh-shelf-tab'
+                          }
+                          disabled={props.busy || loading}
+                          onClick={() => {
+                            setWhShelf('buy');
+                            setSelectedStockId(null);
+                            setSelectedOwnedHubIcao(null);
+                          }}
+                        >
+                          Available
+                          {allBuyableHubs.length > 0
+                            ? ` (${allBuyableHubs.length})`
+                            : ''}
+                        </button>
+                      </div>
                     </div>
 
+                    <div className="ports-wh-body">
                     {whShelf === 'owned' ? (
                       <>
                         {allOwnedWarehouses.length === 0 ? (
@@ -1613,8 +1862,13 @@ export function PortsPanel(props: {
                               const linked = portForHub.get(icao);
                               const active = highlightedHubIcao === icao;
                               const shipped = wh.lifetimeShippedKg ?? 0;
+                              const nextTier =
+                                wh.nextTier ??
+                                (wh.tier < 3 ? ((wh.tier + 1) as 2 | 3) : null);
                               const needed =
-                                wh.shippedNeededForT2Kg ?? 10_000;
+                                wh.shippedNeededForNextTierKg ??
+                                wh.shippedNeededForT2Kg ??
+                                (nextTier === 3 ? 12_000 : 5_000);
                               const shippedPct = Math.min(
                                 100,
                                 Math.round((shipped / Math.max(1, needed)) * 100),
@@ -1697,10 +1951,10 @@ export function PortsPanel(props: {
                                     </div>
                                   </div>
 
-                                  {wh.tier < 2 ? (
+                                  {nextTier != null ? (
                                     <div className="ports-wh-meter">
                                       <div className="ports-wh-meter-row">
-                                        <span>Shipped for T2</span>
+                                        <span>Shipped for T{nextTier}</span>
                                         <span>
                                           {props.formatTonnes(shipped)} /{' '}
                                           {props.formatTonnes(needed)}
@@ -1708,7 +1962,7 @@ export function PortsPanel(props: {
                                       </div>
                                       <div
                                         className="ports-wh-meter-bar is-ship"
-                                        title={`${shippedPct}% toward T2`}
+                                        title={`${shippedPct}% toward T${nextTier}`}
                                       >
                                         <span
                                           style={{ width: `${shippedPct}%` }}
@@ -1716,32 +1970,44 @@ export function PortsPanel(props: {
                                       </div>
                                       {wh.canUpgrade &&
                                       wh.upgradeUsd != null ? (
-                                        <button
-                                          type="button"
-                                          className="ports-wh-upgrade-btn"
-                                          disabled={props.busy || loading}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            void onUpgradeWarehouse(
-                                              wh.id,
-                                              icao,
-                                            );
-                                          }}
-                                        >
-                                          Upgrade to T2 ·{' '}
-                                          {props.formatMoney(wh.upgradeUsd)}
-                                        </button>
+                                        <>
+                                          <button
+                                            type="button"
+                                            className="ports-wh-upgrade-btn"
+                                            disabled={props.busy || loading}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              void onUpgradeWarehouse(
+                                                wh.id,
+                                                icao,
+                                              );
+                                            }}
+                                          >
+                                            Upgrade to T{nextTier} ·{' '}
+                                            {props.formatMoney(wh.upgradeUsd)}
+                                          </button>
+                                          {groundStaff?.byWarehouse[wh.id]
+                                            ?.whOpsActive ? (
+                                            <p className="ports-wh-upgrade-hint">
+                                              {whOpsCapexLabel(
+                                                groundStaff.byWarehouse[wh.id]
+                                                  ?.whOpsCapexMult,
+                                              )}{' '}
+                                              (WH ops)
+                                            </p>
+                                          ) : null}
+                                        </>
                                       ) : (
                                         <p className="ports-wh-upgrade-hint">
                                           {wh.upgradeUsd != null
                                             ? `${hubTierLabel ? `${hubTierLabel} · ` : ''}Upgrade ${props.formatMoney(wh.upgradeUsd)} after ship goal`
-                                            : 'Ship Demand Board cargo from this hub to unlock T2'}
+                                            : `Ship Demand Board cargo from this hub to unlock T${nextTier}`}
                                         </p>
                                       )}
                                     </div>
                                   ) : (
                                     <p className="ports-wh-upgrade-hint">
-                                      Tier 2 · max for now
+                                      Tier 3 · max capacity
                                     </p>
                                   )}
                                 </div>
@@ -1859,6 +2125,260 @@ export function PortsPanel(props: {
                           </p>
                         ) : null}
                       </>
+                    ) : whShelf === 'staff' ? (
+                      allOwnedWarehouses.length === 0 ? (
+                        <p className="empty">
+                          Buy a warehouse on Available before hiring ground
+                          staff.
+                        </p>
+                      ) : (
+                        <div className="ports-ground-staff">
+                          <div className="ports-ground-staff-hubs">
+                            {allOwnedWarehouses.map((wh) => {
+                              const icao = wh.icao.trim().toUpperCase();
+                              const meta = groundStaff?.byWarehouse[wh.id];
+                              const linked = portForHub.get(icao);
+                              const active =
+                                staffFocusWarehouse?.id === wh.id;
+                              const slotsUsed = meta?.slotsUsed ?? 0;
+                              const slotsUnlocked =
+                                meta?.slotsUnlocked ??
+                                (wh.tier >= 2 ? 2 : 1);
+                              return (
+                                <button
+                                  key={wh.id}
+                                  type="button"
+                                  className={
+                                    active
+                                      ? 'ports-ground-staff-hub is-selected'
+                                      : 'ports-ground-staff-hub'
+                                  }
+                                  disabled={props.busy || loading}
+                                  onClick={() => selectOwnedHub(icao)}
+                                >
+                                  <span className="ports-ground-staff-hub-icao">
+                                    {icao}
+                                  </span>
+                                  <span className="ports-ground-staff-hub-name muted">
+                                    {linked?.name ?? 'Pickup hub'}
+                                  </span>
+                                  <span className="ports-ground-staff-hub-meta muted">
+                                    T{wh.tier} · {slotsUsed}/{slotsUnlocked}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {staffFocusWarehouse ? (
+                            <>
+                              <div className="crew-section">
+                                <h4 className="crew-section-title">Roster</h4>
+                                <p className="muted crew-section-lede">
+                                  {staffFocusWarehouse.icao.toUpperCase()} ·{' '}
+                                  {staffFocusMeta?.slotsUsed ?? 0}/
+                                  {staffFocusMeta?.slotsUnlocked ??
+                                    (staffFocusWarehouse.tier >= 3
+                                      ? 3
+                                      : staffFocusWarehouse.tier >= 2
+                                        ? 2
+                                        : 1)}
+                                  {staffFocusMeta?.logisticsActive
+                                    ? ` · ${transferDiscountLabel(staffFocusMeta.logisticsMult)}`
+                                    : ''}
+                                  {staffFocusMeta?.yardActive
+                                    ? ` · Yard ${yardDiscountLabel(staffFocusMeta.yardHoldMult)}`
+                                    : ''}
+                                  {staffFocusMeta?.procurementActive
+                                    ? ` · ${procurementDiscountLabel(staffFocusMeta.procurementMult)}`
+                                    : ''}
+                                  {staffFocusMeta?.demandDeskActive
+                                    ? ` · ${demandPayBoostLabel(staffFocusMeta.demandDeskMult)}`
+                                    : ''}
+                                  {staffFocusMeta?.whOpsActive
+                                    ? ` · ${whOpsCapexLabel(staffFocusMeta.whOpsCapexMult)}`
+                                    : ''}
+                                </p>
+                                {(staffFocusMeta?.members.length ?? 0) ===
+                                0 ? (
+                                  <p className="empty">
+                                    Empty — hire below.
+                                  </p>
+                                ) : (
+                                  <ul className="crew-person-grid">
+                                    {(staffFocusMeta?.members ?? []).map(
+                                      (m) => (
+                                        <li
+                                          key={m.id}
+                                          className="crew-person-card"
+                                        >
+                                          <CrewPortrait
+                                            name={m.displayName}
+                                            imageUrl={crewPortraitUrl(
+                                              m.portraitId,
+                                            )}
+                                          />
+                                          <div className="crew-person-body">
+                                            <div className="crew-person-head">
+                                              <strong className="crew-person-name">
+                                                {m.displayName}
+                                              </strong>
+                                              <span className="crew-status idle">
+                                                On duty
+                                              </span>
+                                            </div>
+                                            <p className="crew-person-perk">
+                                              {m.gradeLabel ? (
+                                                <span className="crew-perk-tag">
+                                                  {m.gradeLabel}
+                                                </span>
+                                              ) : null}
+                                              <span className="crew-perk-tag">
+                                                {m.perkLabel}
+                                              </span>
+                                              {m.perkHint ? (
+                                                <span className="muted">
+                                                  {' '}
+                                                  {m.perkHint}
+                                                </span>
+                                              ) : null}
+                                            </p>
+                                            <p className="crew-card-meta">
+                                              {props.formatMoney(
+                                                m.salaryUsdPerDay,
+                                              )}
+                                              /day · {m.hubIcao}
+                                            </p>
+                                            <div className="crew-card-actions">
+                                              <button
+                                                type="button"
+                                                className="action ghost"
+                                                disabled={
+                                                  props.busy || loading
+                                                }
+                                                onClick={() =>
+                                                  void onFireGroundStaff(
+                                                    m.id,
+                                                    m.displayName,
+                                                  )
+                                                }
+                                              >
+                                                Fire
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </li>
+                                      ),
+                                    )}
+                                  </ul>
+                                )}
+                              </div>
+
+                              <div className="crew-section">
+                                <h4 className="crew-section-title">
+                                  Hire desk
+                                </h4>
+                                <p className="muted crew-section-lede">
+                                  {staffHirePool.length} at{' '}
+                                  {staffFocusWarehouse.icao.toUpperCase()} ·
+                                  refresh each day
+                                  {(staffFocusMeta?.slotsFree ?? 0) <= 0
+                                    ? ' · slot full'
+                                    : ''}
+                                </p>
+                                {(staffFocusMeta?.slotsFree ?? 0) <= 0 &&
+                                staffHirePool.length === 0 ? (
+                                  <p className="muted">
+                                    Slot full — fire or upgrade WH.
+                                  </p>
+                                ) : staffHirePool.length === 0 ? (
+                                  <p className="empty">
+                                    No candidates today.
+                                  </p>
+                                ) : (
+                                  <ul className="crew-person-grid">
+                                    {staffHirePool.map((cand) => {
+                                      const dup = (
+                                        staffFocusMeta?.members ?? []
+                                      ).some(
+                                        (m) => m.perkId === cand.perkId,
+                                      );
+                                      const canHire =
+                                        (staffFocusMeta?.slotsFree ?? 0) >
+                                          0 && !dup;
+                                      return (
+                                        <li
+                                          key={cand.id}
+                                          className="crew-person-card is-hire"
+                                        >
+                                          <CrewPortrait
+                                            name={cand.displayName}
+                                            imageUrl={crewPortraitUrl(
+                                              cand.portraitId,
+                                            )}
+                                          />
+                                          <div className="crew-person-body">
+                                            <div className="crew-person-head">
+                                              <strong className="crew-person-name">
+                                                {cand.displayName}
+                                              </strong>
+                                              {cand.gradeLabel ? (
+                                                <span className="crew-perk-tag">
+                                                  {cand.gradeLabel}
+                                                </span>
+                                              ) : null}
+                                              <span className="crew-perk-tag">
+                                                {cand.perkLabel}
+                                              </span>
+                                            </div>
+                                            <p className="crew-card-meta">
+                                              {cand.perkHint}
+                                            </p>
+                                            <p className="crew-card-meta">
+                                              Salary{' '}
+                                              {props.formatMoney(
+                                                cand.salaryUsdPerDay,
+                                              )}
+                                              /day
+                                            </p>
+                                            {canHire ? (
+                                              <div className="crew-card-actions">
+                                                <button
+                                                  type="button"
+                                                  className="accept"
+                                                  disabled={
+                                                    props.busy || loading
+                                                  }
+                                                  onClick={() =>
+                                                    void onHireGroundStaff(
+                                                      staffFocusWarehouse.id,
+                                                      cand.id,
+                                                    )
+                                                  }
+                                                >
+                                                  Hire ·{' '}
+                                                  {props.formatMoney(
+                                                    cand.hireUsd,
+                                                  )}
+                                                </button>
+                                              </div>
+                                            ) : (
+                                              <p className="crew-card-meta muted">
+                                                {dup
+                                                  ? 'Perk already on roster'
+                                                  : 'No free roster slot'}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                              </div>
+                            </>
+                          ) : null}
+                        </div>
+                      )
                     ) : allBuyableHubs.length === 0 ? (
                       <p className="empty">
                         Every port pickup hub already has a warehouse.
@@ -1937,18 +2457,76 @@ export function PortsPanel(props: {
                         })}
                       </div>
                     )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <h3>
-                Your pickups
-                {port ? ` · ${port.name}` : ''}
-              </h3>
+              {(warehouses?.inboundTransfers?.length ?? 0) > 0 ? (
+                <>
+                  <h4 className="ports-inbound-heading">In transit to WH</h4>
+                  <p className="muted ports-warehouse-hint">
+                    Factory cargo is moving from the port apron into your
+                    warehouse — not Demand-ready until it arrives.
+                  </p>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Hub</th>
+                        <th>Commodity</th>
+                        <th>Mass</th>
+                        <th>ETA</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(warehouses?.inboundTransfers ?? []).map((t) => {
+                        const now = snap?.tick ?? 0;
+                        const left = Math.max(0, t.readyAtTick - now);
+                        const label = commodityLabel({
+                          commodityId: t.commodityId,
+                        });
+                        const logisticsMeta =
+                          groundStaff?.byWarehouse[t.warehouseId];
+                        const logistics =
+                          logisticsMeta?.logisticsActive === true;
+                        return (
+                          <tr key={t.id}>
+                            <td>{t.hubIcao}</td>
+                            <td>
+                              <span className="commodity-inline">
+                                <CommodityIcon
+                                  commodityId={t.commodityId}
+                                  size={22}
+                                  title={label}
+                                />
+                                {label}
+                              </span>
+                            </td>
+                            <td>{props.formatTonnes(t.kg)}</td>
+                            <td>
+                              {left <= 0
+                                ? 'Arriving…'
+                                : `~${ticksToHoursLabel(left)}`}
+                              {logistics ? (
+                                <span className="ports-ground-staff-perk">
+                                  {' '}
+                                  {transferDiscountLabel(
+                                    logisticsMeta?.logisticsMult,
+                                  )}
+                                </span>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </>
+              ) : null}
               {portPickups.length === 0 ? (
                 <p className="empty">
-                  No cargo waiting at this port’s hubs — buys auto-store when a
-                  warehouse has room.
+                  No cargo waiting in the yard — buys go in transit to WH when
+                  space is reserved, otherwise yard hold.
                 </p>
               ) : (
                 <>
@@ -1996,6 +2574,18 @@ export function PortsPanel(props: {
                           p.holdUsdPerDay ??
                           yardHoldUsdPerDay(p.kg, p.commodityId);
                         const heldDays = p.heldDays ?? 0;
+                        const yardMeta = (warehouses?.warehouses ?? []).find(
+                          (w) =>
+                            w.icao.trim().toUpperCase() ===
+                            p.hubIcao.trim().toUpperCase(),
+                        );
+                        const yardHoldMult = yardMeta
+                          ? groundStaff?.byWarehouse[yardMeta.id]?.yardHoldMult
+                          : undefined;
+                        const yardDiscount =
+                          yardMeta != null &&
+                          groundStaff?.byWarehouse[yardMeta.id]?.yardActive ===
+                            true;
                         const aging =
                           heldDays >= YARD_HOLD_WARN_DAYS
                             ? 'ports-yard-aging'
@@ -2027,8 +2617,20 @@ export function PortsPanel(props: {
                             </td>
                             <td>{props.formatTonnes(p.kg)}</td>
                             <td>{formatUnitPrice(p.avgCostUsdPerKg)}</td>
-                            <td title="Yard hold fee per economy day">
+                            <td
+                              title={
+                                yardDiscount
+                                  ? `Yard hold fee per economy day (${yardDiscountLabel(yardHoldMult)} Yard boss)`
+                                  : 'Yard hold fee per economy day'
+                              }
+                            >
                               {props.formatMoney(holdPerDay)}
+                              {yardDiscount ? (
+                                <span className="muted">
+                                  {' '}
+                                  · {yardDiscountLabel(yardHoldMult)}
+                                </span>
+                              ) : null}
                             </td>
                             <td>
                               {heldDays >= YARD_HOLD_WARN_DAYS ? (
@@ -2102,52 +2704,44 @@ export function PortsPanel(props: {
           ) : null}
 
           {section === 'demand' ? (
-            <>
-              {loopTargetSection === 'demand' ? (
-                <p className="muted ports-loop-section-hint">
-                  {portsLoopSectionHint(
-                    loopStep,
-                    props.formatMoney,
-                    snap.yardHoldUsdPerDay,
-                  )}
-                </p>
-              ) : null}
-              <div className="ports-demand-toolbar">
-                <label className="ports-demand-country-filter">
-                  <span className="muted">Country</span>
-                  <select
-                    value={demandCountryFilter}
-                    aria-label="Filter demand by destination country"
-                    disabled={props.busy || loading}
-                    onChange={(e) => setDemandCountryFilter(e.target.value)}
-                  >
-                    <option value="">All countries</option>
-                    {demandCountryOptions.map((id) => (
-                      <option key={id} value={id}>
-                        {demandCountryLabel(id)} ({id})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p className="muted ports-demand-filter-count">
-                  {sortedDemand.length === demand.length
-                    ? `${sortedDemand.length} open`
-                    : `${sortedDemand.length} of ${demand.length} open`}
-                </p>
-              </div>
-              <div className="table-wrap">
-                <table className="data-table">
+            <div className="ports-demand-board">
+              <div className="table-wrap ports-demand-table-wrap">
+                <table className="data-table ports-demand-table">
                   <thead>
                     <tr>
-                      <th aria-sort={demandAriaSort('country')}>
-                        <button
-                          type="button"
-                          className={`sort-header${demandSort.key === 'country' ? ' is-sorted' : ''}`}
-                          title="Sort by destination country"
-                          onClick={() => toggleDemandSort('country')}
-                        >
-                          Country <span>{demandSortIndicator('country')}</span>
-                        </button>
+                      <th
+                        className="ports-demand-country-th"
+                        aria-sort={demandAriaSort('country')}
+                      >
+                        <div className="ports-demand-country-th-inner">
+                          <button
+                            type="button"
+                            className={`sort-header${demandSort.key === 'country' ? ' is-sorted' : ''}`}
+                            title="Sort by destination country"
+                            onClick={() => toggleDemandSort('country')}
+                          >
+                            Country{' '}
+                            <span>{demandSortIndicator('country')}</span>
+                          </button>
+                          <label className="ports-demand-country-filter ports-demand-country-filter-in-th">
+                            <select
+                              value={demandCountryFilter}
+                              aria-label="Filter demand by destination country"
+                              disabled={props.busy || loading}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) =>
+                                setDemandCountryFilter(e.target.value)
+                              }
+                            >
+                              <option value="">All</option>
+                              {demandCountryOptions.map((id) => (
+                                <option key={id} value={id}>
+                                  {id}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
                       </th>
                       <th aria-sort={demandAriaSort('dest')}>
                         <button
@@ -2346,9 +2940,9 @@ export function PortsPanel(props: {
                   </div>
                 </nav>
               ) : null}
-            </>
+            </div>
           ) : null}
-        </>
+        </div>
       )}
 
       {buyListing ? (
@@ -2366,6 +2960,46 @@ export function PortsPanel(props: {
                 buyListing.allocatedHubIcao.trim().toUpperCase(),
             )?.capacityKg ?? null
           }
+          logisticsActive={Boolean(
+            (() => {
+              const hub = buyListing.allocatedHubIcao.trim().toUpperCase();
+              const wh = (warehouses?.warehouses ?? []).find(
+                (w) => w.icao.trim().toUpperCase() === hub,
+              );
+              return wh
+                ? groundStaff?.byWarehouse[wh.id]?.logisticsActive
+                : false;
+            })(),
+          )}
+          logisticsMult={(() => {
+            const hub = buyListing.allocatedHubIcao.trim().toUpperCase();
+            const wh = (warehouses?.warehouses ?? []).find(
+              (w) => w.icao.trim().toUpperCase() === hub,
+            );
+            return wh
+              ? groundStaff?.byWarehouse[wh.id]?.logisticsMult
+              : undefined;
+          })()}
+          procurementActive={Boolean(
+            (() => {
+              const hub = buyListing.allocatedHubIcao.trim().toUpperCase();
+              const wh = (warehouses?.warehouses ?? []).find(
+                (w) => w.icao.trim().toUpperCase() === hub,
+              );
+              return wh
+                ? groundStaff?.byWarehouse[wh.id]?.procurementActive
+                : false;
+            })(),
+          )}
+          procurementMult={(() => {
+            const hub = buyListing.allocatedHubIcao.trim().toUpperCase();
+            const wh = (warehouses?.warehouses ?? []).find(
+              (w) => w.icao.trim().toUpperCase() === hub,
+            );
+            return wh
+              ? groundStaff?.byWarehouse[wh.id]?.procurementMult
+              : undefined;
+          })()}
           busy={Boolean(props.busy || loading)}
           formatMoney={props.formatMoney}
           formatTonnes={props.formatTonnes}
@@ -2386,6 +3020,16 @@ export function PortsPanel(props: {
           selectedOriginStockKg={selectedOriginStockKg}
           pullPreview={acceptPullPreview}
           intlPreview={acceptIntlPreview}
+          demandDeskMult={(() => {
+            const wh = (warehouses?.warehouses ?? []).find(
+              (w) =>
+                w.icao.trim().toUpperCase() ===
+                acceptOrigin.trim().toUpperCase(),
+            );
+            return wh
+              ? groundStaff?.byWarehouse[wh.id]?.demandDeskMult
+              : undefined;
+          })()}
           distanceNm={acceptDistanceNm}
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
@@ -2419,6 +3063,10 @@ function PortBuyDialog(props: {
   previewUsd: number;
   hubFreeKg: number;
   hubCapacityKg: number | null;
+  logisticsActive?: boolean;
+  logisticsMult?: number;
+  procurementActive?: boolean;
+  procurementMult?: number;
   busy: boolean;
   formatMoney: (n: number) => string;
   formatTonnes: (kg: number) => string;
@@ -2441,8 +3089,17 @@ function PortBuyDialog(props: {
   const canConfirm =
     props.kg > 0 && props.kg <= props.listing.availableKg && !props.busy;
   const hasWh = props.hubCapacityKg != null && props.hubCapacityKg > 0;
-  const storeIntoWh = hasWh ? Math.min(props.kg, props.hubFreeKg) : 0;
-  const yardHoldKg = Math.max(0, props.kg - storeIntoWh);
+  const inboundKg = hasWh ? Math.min(props.kg, props.hubFreeKg) : 0;
+  const yardHoldKg = Math.max(0, props.kg - inboundKg);
+  const transferTicks =
+    inboundKg > 0
+      ? inboundTransferTicksClient(
+          inboundKg,
+          props.logisticsActive
+            ? (props.logisticsMult ?? LOGISTICS_MULT)
+            : 1,
+        )
+      : 0;
   const foreverYard =
     hasWh &&
     props.hubCapacityKg != null &&
@@ -2515,13 +3172,16 @@ function PortBuyDialog(props: {
           <p className="muted">
             Max {props.formatTonnes(props.listing.availableKg)} · debit ≈{' '}
             {props.formatMoney(props.previewUsd)}
+            {props.procurementActive
+              ? ` · ${procurementDiscountLabel(props.procurementMult)}`
+              : ''}
           </p>
           {hasWh ? (
             <p className={foreverYard ? 'confirm-quote is-error' : 'muted'}>
               WH free {props.formatTonnes(props.hubFreeKg)} /{' '}
               {props.formatTonnes(props.hubCapacityKg!)}
-              {storeIntoWh > 0
-                ? ` · ${props.formatTonnes(storeIntoWh)} stores now`
+              {inboundKg > 0
+                ? ` · ${props.formatTonnes(inboundKg)} in transit (~${ticksToHoursLabel(transferTicks)}${props.logisticsActive ? `, ${transferDiscountLabel(props.logisticsMult)}` : ''})`
                 : ''}
               {yardHoldKg > 0
                 ? ` · ${props.formatTonnes(yardHoldKg)} yard hold (${props.formatMoney(yardFeePerDay)}/day)`
@@ -2596,6 +3256,7 @@ function DemandAcceptDialog(props: {
     originCountryId: string | null;
     destCountryId: string | null;
   } | null;
+  demandDeskMult?: number;
   distanceNm: number | null;
   busy: boolean;
   formatTonnes: (kg: number) => string;
@@ -2623,10 +3284,16 @@ function DemandAcceptDialog(props: {
     !props.busy;
   const preview = props.pullPreview;
   const intl = props.intlPreview;
+  const deskMult =
+    typeof props.demandDeskMult === 'number' &&
+    Number.isFinite(props.demandDeskMult) &&
+    props.demandDeskMult > 0
+      ? props.demandDeskMult
+      : 1;
   const effectiveUnit =
-    intl?.allowed && intl.unitPriceMult > 1
-      ? props.order.maxUnitPriceUsd * intl.unitPriceMult
-      : props.order.maxUnitPriceUsd;
+    props.order.maxUnitPriceUsd *
+    (intl?.allowed && intl.unitPriceMult > 1 ? intl.unitPriceMult : 1) *
+    deskMult;
   const limitedByLabel =
     preview?.limitedBy === 'aircraft'
       ? 'limited by aircraft cargo'
@@ -2675,6 +3342,12 @@ function DemandAcceptDialog(props: {
               <span className="demand-accept-intl-badge" title="Port-fed international">
                 {' '}
                 Intl ×{intl.unitPriceMult.toFixed(2)}
+              </span>
+            ) : null}
+            {deskMult > 1 ? (
+              <span className="muted" title="Demand desk perk">
+                {' '}
+                · {demandPayBoostLabel(deskMult)}
               </span>
             ) : null}
           </p>

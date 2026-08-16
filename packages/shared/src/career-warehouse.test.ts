@@ -8,15 +8,20 @@ import {
   abandonWarehouseStock,
   buyWarehouseAtPickupHub,
   depositCargoToWarehouse,
+  normalizePlayerWarehouseState,
   previewWithdrawCargoCost,
   settleWarehouseStorageFees,
+  settleWarehouseInboundTransfers,
+  upgradeWarehouse,
   upgradeWarehouseToTier2,
   warehouseFreeKg,
   warehouseTier2Progress,
   withdrawCargoFromWarehouse,
   WAREHOUSE_T1_CAPACITY_KG,
   WAREHOUSE_T2_CAPACITY_KG,
+  WAREHOUSE_T3_CAPACITY_KG,
   WAREHOUSE_T2_SHIPPED_KG,
+  WAREHOUSE_T3_SHIPPED_KG,
 } from './career-warehouse.js';
 import {
   acceptDemandOrder,
@@ -201,7 +206,7 @@ describe('career warehouse + demand', () => {
     );
   });
 
-  it('port buy deposits into warehouse when present', () => {
+  it('port buy queues inbound transfer when warehouse present', () => {
     const world = createSeedEconomyWorld({ seed: 'wh-port' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'WhPort',
@@ -239,9 +244,10 @@ describe('career warehouse + demand', () => {
       kg: 500,
     });
     assert.equal(bought.pickup, null);
-    assert.ok(bought.warehousePile);
-    assert.equal(bought.warehousePile!.kg, 500);
+    assert.ok(bought.inboundTransfer);
+    assert.equal(bought.inboundKg, 500);
     assert.equal((state.portPickups ?? []).length, 0);
+    assert.equal((state.playerWarehouses?.stock ?? []).length, 0);
   });
 
   it('port pickup stores into warehouse manually', () => {
@@ -617,6 +623,62 @@ describe('career warehouse + demand', () => {
     );
   });
 
+  it('hybrid T3 upgrade after more shipped kg', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-upgrade-t3' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WhUpgradeT3',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    const whId = buyWarehouseAtPickupHub(state, world, 'SBGR').warehouse.id;
+    const row = () => state.playerWarehouses!.warehouses[0]!;
+    row().lifetimeShippedKg = WAREHOUSE_T2_SHIPPED_KG;
+    upgradeWarehouse(state, world, whId);
+    assert.equal(row().tier, 2);
+    assert.equal(row().capacityKg, WAREHOUSE_T2_CAPACITY_KG);
+
+    assert.throws(
+      () => upgradeWarehouse(state, world, whId),
+      /Ship .* kg from SBGR/i,
+    );
+    row().lifetimeShippedKg = WAREHOUSE_T3_SHIPPED_KG;
+    const upgraded = upgradeWarehouse(state, world, whId);
+    assert.equal(upgraded.warehouse.tier, 3);
+    assert.equal(upgraded.warehouse.capacityKg, WAREHOUSE_T3_CAPACITY_KG);
+    assert.throws(
+      () => upgradeWarehouse(state, world, whId),
+      /already Tier 3/i,
+    );
+  });
+
+  it('migrates legacy 5 t T1 warehouse to T2 klb caps', () => {
+    const migrated = normalizePlayerWarehouseState({
+      warehouses: [
+        {
+          id: 'wh_legacy',
+          icao: 'SBGR',
+          tier: 1,
+          capacityKg: 5_000,
+          lifetimeShippedKg: 100,
+        },
+      ],
+      stock: [
+        {
+          id: 'stk_1',
+          warehouseId: 'wh_legacy',
+          commodityId: 'general',
+          kg: 4_800,
+          avgCostUsdPerKg: 1,
+          acquiredAtTick: 0,
+        },
+      ],
+      inboundTransfers: [],
+    });
+    assert.equal(migrated.warehouses[0]!.tier, 2);
+    assert.equal(migrated.warehouses[0]!.capacityKg, 4_800);
+    assert.equal(migrated.stock[0]!.kg, 4_800);
+  });
+
   it('charges warehouse storage fees', () => {
     const world = createSeedEconomyWorld({ seed: 'wh-fee' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
@@ -675,5 +737,39 @@ describe('career warehouse + demand', () => {
       ],
     });
     assert.equal(wiped.stock.length, 0);
+  });
+
+  it('inbound transfer settles into WH after readyAtTick', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-inbound-settle' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WhInbound',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    ensurePortListings(world);
+    const listing = listPortListings(world, 'BRSSZ').find(
+      (l) =>
+        l.allocatedHubIcao === 'SBGR' &&
+        l.availableKg >= 500 &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies'),
+    );
+    assert.ok(listing);
+    const bought = buyPortListing(state, world, {
+      listingId: listing!.id,
+      kg: 500,
+    });
+    assert.ok(bought.inboundTransfer);
+    assert.equal((state.playerWarehouses?.stock ?? []).length, 0);
+
+    world.tick = bought.readyAtTick!;
+    const settled = settleWarehouseInboundTransfers(state, world);
+    assert.equal(settled.deposited.length, 1);
+    assert.equal(settled.yardOverflow.length, 0);
+    assert.equal(
+      (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
+      500,
+    );
+    assert.equal((state.playerWarehouses?.inboundTransfers ?? []).length, 0);
   });
 });

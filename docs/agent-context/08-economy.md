@@ -11,7 +11,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - Partição por país (`homeCountryId` / região `XX-YY` → país `XX`).
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — usam **bush trips**.
-- **Warehouses** (pickup hubs SBGR/SBKP/SBCT/SBRF/SBEG/SBPA/SBBE + SAEZ/SAVC/SCEL/SCTE/KMIA/KEWR/KIAH/KLAX/KSEA + CYVR/CYHZ/MMVR/MMZO/MMUN): CAPEX + capacity + storage; port buy **split** free→WH / rest→yard; **partial Store**; **Abandon** yard (no refund) for oversized lots; **lotes por custo** (±3% merge band); **T1→T2 hybrid upgrade** (lifetime Demand Board shipped kg + CAPEX).
+- **Warehouses** (pickup hubs …): CAPEX + capacity + storage; port buy → **inbound transfer** (ETA ticks) → WH stock (overflow → yard); **partial Store**; **Abandon** yard; **T1/T2/T3** (5/10/15 klb = 2268/4536/6804 kg) hybrid upgrade (shipped gate + CAPEX).
 - **Demand Board:** NPC buy-orders quando stock do hub está baixo (cap global **192** open, **quota por país** ≈32 com 6 países — BR não monopoliza); accept → missão WH→dest; settle = payout + fill terminal + credit `lifetimeShippedKg`. **Edit cargo** restores/withdraws WH + demand remaining. **Intl (port-fed):** cross-border só se par de país na allowlist (BR↔US/AR/CL/MX/CA, AR↔CL/US, CL↔US, US↔CA/MX) **e** origem WH em pickup hub; pay × **1.28**; Market `CAREER_INTERNATIONAL_LANES` intactas.
 - **FBO spot:** removido (stock wipe on load); FBO = bonded holds only.
 - **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico; yard hold fee diária. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
@@ -25,6 +25,15 @@ Contrato curto — detalhe em **`.cursor/rules/career-economy-roadmap.mdc`** (*C
 - **Pilot ≠ company** — `pilot_name` / `pilot_icao` no `company_state` são atalho SP; não inchá-los; members/roles só quando houver fatia co-op.
 - Norte MP: empresa privada + mundo compartilhado + ranking por company (não rewrite de tick).
 - Ao tocar persistência: estado do jogador sempre sob `company_id`; facade `CareerStore` permanece.
+
+## Ground staff (Ports / WH)
+
+Contrato em **`.cursor/rules/career-economy-roadmap.mdc`** (*Ground staff*).
+
+- Hire/fire + salary (`ground_staff_hire` / `ground_staff_salary`); slots **1@T1 / 2@T2 / 3@T3**.
+- Grades **ace / solid / capable / green** (skillPct band + frozen `effectMult` at hire).
+- Perks shipped: **`logistics`**, **`yard`**, **`procurement`** (port price), **`demand_desk`** (Demand pay), **`wh_ops`** (upgrade CAPEX + shipped credit).
+- Hire desk na aba Warehouse (Ports) rola as 5 perks.
 
 ## Expandir mapa / país / hub
 

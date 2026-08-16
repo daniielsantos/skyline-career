@@ -35,6 +35,8 @@ const KIND_LABEL: Record<string, string> = {
   crew_fee: 'Crew dispatch fee',
   crew_salary: 'Crew salary',
   crew_hire: 'Crew hire',
+  ground_staff_salary: 'Ground staff salary',
+  ground_staff_hire: 'Ground staff hire',
   ferry: 'Ferry',
   pilot_travel: 'Pilot travel',
   fuel: 'Jet-A',

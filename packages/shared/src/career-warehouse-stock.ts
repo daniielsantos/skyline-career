@@ -8,6 +8,7 @@ import type {
   PlayerWarehouse,
   PlayerWarehousePile,
   PlayerWarehouseState,
+  WarehouseInboundTransfer,
 } from './types/career-economy.js';
 
 function money(n: number): number {
@@ -36,14 +37,70 @@ export function isWarehouseCommodityAllowed(id: CommodityId): boolean {
  */
 export const WAREHOUSE_LOT_MERGE_REL_BAND = 0.03;
 
-/** Bonded storage capacity by warehouse tier. */
-export const WAREHOUSE_CAPACITY_KG: Record<1 | 2, number> = {
-  1: 5_000,
-  2: 12_000,
+/**
+ * Bonded storage capacity by warehouse tier (literal klb → kg).
+ * T1 5 klb · T2 10 klb · T3 15 klb.
+ */
+export const WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3, number> = {
+  1: 2_268,
+  2: 4_536,
+  3: 6_804,
 };
 
-export function warehouseTierOf(tier: unknown): 1 | 2 {
-  return tier === 2 ? 2 : 1;
+/** Legacy caps before klb-literal T1/T2/T3 (5 t / 12 t). */
+const LEGACY_WAREHOUSE_T1_CAP_KG = 5_000;
+const LEGACY_WAREHOUSE_T2_CAP_KG = 12_000;
+
+export type WarehouseTier = 1 | 2 | 3;
+
+export function warehouseTierOf(tier: unknown): WarehouseTier {
+  if (tier === 3) return 3;
+  if (tier === 2) return 2;
+  return 1;
+}
+
+/**
+ * Remap saved WH row to current T1/T2/T3.
+ * Old T1 (~5 t) → T2; old T2 (~12 t) → T3; new klb caps keep declared tier.
+ * `capacityKg = max(usedKg, tierCap)` so stock is never truncated.
+ */
+export function migrateWarehouseTierAndCapacity(opts: {
+  tier: unknown;
+  capacityKg: number;
+  usedKg?: number;
+}): { tier: WarehouseTier; capacityKg: number } {
+  const rawCap = Math.max(0, Math.floor(opts.capacityKg));
+  const usedKg = Math.max(0, Math.floor(opts.usedKg ?? 0));
+  const declared = warehouseTierOf(opts.tier);
+
+  const matchesNewCap = (t: WarehouseTier) =>
+    rawCap === WAREHOUSE_CAPACITY_KG[t] ||
+    Math.abs(rawCap - WAREHOUSE_CAPACITY_KG[t]) <= 2;
+
+  let tier: WarehouseTier;
+  if (matchesNewCap(1)) {
+    tier = 1;
+  } else if (matchesNewCap(2)) {
+    tier = 2;
+  } else if (matchesNewCap(3)) {
+    tier = 3;
+  } else if (
+    rawCap >= LEGACY_WAREHOUSE_T2_CAP_KG - 500 ||
+    (declared === 2 && rawCap >= 8_000)
+  ) {
+    // Legacy T2 (~10–12 t) → T3.
+    tier = 3;
+  } else if (rawCap >= LEGACY_WAREHOUSE_T1_CAP_KG - 500 || declared === 2) {
+    // Legacy T1 (~5 t) or odd mid-cap T2 → T2.
+    tier = 2;
+  } else {
+    tier = declared === 3 ? 3 : declared;
+  }
+
+  return {
+    tier,
+    capacityKg: Math.max(usedKg, WAREHOUSE_CAPACITY_KG[tier]),
+  };
 }
 
 function costsWithinMergeBand(a: number, b: number): boolean {
@@ -52,7 +109,7 @@ function costsWithinMergeBand(a: number, b: number): boolean {
 }
 
 export function emptyPlayerWarehouseState(): PlayerWarehouseState {
-  return { warehouses: [], stock: [] };
+  return { warehouses: [], stock: [], inboundTransfers: [] };
 }
 
 export function normalizePlayerWarehouseState(
@@ -60,34 +117,8 @@ export function normalizePlayerWarehouseState(
 ): PlayerWarehouseState {
   if (!raw || typeof raw !== 'object') return emptyPlayerWarehouseState();
   const r = raw as Record<string, unknown>;
-  const warehouses: PlayerWarehouse[] = [];
-  if (Array.isArray(r.warehouses)) {
-    for (const row of r.warehouses) {
-      if (!row || typeof row !== 'object') continue;
-      const w = row as Record<string, unknown>;
-      const id = typeof w.id === 'string' ? w.id.trim() : '';
-      const icao =
-        typeof w.icao === 'string' ? w.icao.trim().toUpperCase() : '';
-      const capacityKg =
-        typeof w.capacityKg === 'number' && Number.isFinite(w.capacityKg)
-          ? Math.max(0, Math.floor(w.capacityKg))
-          : 0;
-      if (!id || !icao || capacityKg <= 0) continue;
-      const tier = warehouseTierOf(w.tier);
-      const lifetimeShippedKg =
-        typeof w.lifetimeShippedKg === 'number' &&
-        Number.isFinite(w.lifetimeShippedKg)
-          ? Math.max(0, Math.floor(w.lifetimeShippedKg))
-          : 0;
-      warehouses.push({
-        id,
-        icao,
-        tier,
-        capacityKg: Math.max(capacityKg, WAREHOUSE_CAPACITY_KG[tier]),
-        lifetimeShippedKg,
-      });
-    }
-  }
+
+  // Parse stock first so usedKg can protect capacity on migrate.
   const stock: PlayerWarehousePile[] = [];
   if (Array.isArray(r.stock)) {
     for (const row of r.stock) {
@@ -97,9 +128,7 @@ export function normalizePlayerWarehouseState(
       const warehouseId =
         typeof s.warehouseId === 'string' ? s.warehouseId.trim() : '';
       const commodityId =
-        typeof s.commodityId === 'string'
-          ? (s.commodityId as CommodityId)
-          : null;
+        typeof s.commodityId === 'string' ? s.commodityId.trim() : '';
       const kg =
         typeof s.kg === 'number' && Number.isFinite(s.kg)
           ? Math.max(0, Math.floor(s.kg))
@@ -115,17 +144,107 @@ export function normalizePlayerWarehouseState(
           ? Math.max(0, Math.floor(s.acquiredAtTick))
           : 0;
       if (!id || !warehouseId || !commodityId || kg <= 0) continue;
+      if (!isWarehouseCommodityAllowed(commodityId as CommodityId)) continue;
       stock.push({
         id,
         warehouseId,
-        commodityId,
+        commodityId: commodityId as CommodityId,
         kg,
         avgCostUsdPerKg,
         acquiredAtTick,
       });
     }
   }
-  return { warehouses, stock };
+
+  const usedByWh = new Map<string, number>();
+  for (const s of stock) {
+    usedByWh.set(s.warehouseId, (usedByWh.get(s.warehouseId) ?? 0) + s.kg);
+  }
+
+  const warehouses: PlayerWarehouse[] = [];
+  if (Array.isArray(r.warehouses)) {
+    for (const row of r.warehouses) {
+      if (!row || typeof row !== 'object') continue;
+      const w = row as Record<string, unknown>;
+      const id = typeof w.id === 'string' ? w.id.trim() : '';
+      const icao =
+        typeof w.icao === 'string' ? w.icao.trim().toUpperCase() : '';
+      const capacityKgRaw =
+        typeof w.capacityKg === 'number' && Number.isFinite(w.capacityKg)
+          ? Math.max(0, Math.floor(w.capacityKg))
+          : 0;
+      if (!id || !icao || capacityKgRaw <= 0) continue;
+      const lifetimeShippedKg =
+        typeof w.lifetimeShippedKg === 'number' &&
+        Number.isFinite(w.lifetimeShippedKg)
+          ? Math.max(0, Math.floor(w.lifetimeShippedKg))
+          : 0;
+      const migrated = migrateWarehouseTierAndCapacity({
+        tier: w.tier,
+        capacityKg: capacityKgRaw,
+        usedKg: usedByWh.get(id) ?? 0,
+      });
+      warehouses.push({
+        id,
+        icao,
+        tier: migrated.tier,
+        capacityKg: migrated.capacityKg,
+        lifetimeShippedKg,
+      });
+    }
+  }
+  const inboundTransfers: WarehouseInboundTransfer[] = [];
+  if (Array.isArray(r.inboundTransfers)) {
+    for (const row of r.inboundTransfers) {
+      if (!row || typeof row !== 'object') continue;
+      const t = row as Record<string, unknown>;
+      const id = typeof t.id === 'string' ? t.id.trim() : '';
+      const warehouseId =
+        typeof t.warehouseId === 'string' ? t.warehouseId.trim() : '';
+      const hubIcao =
+        typeof t.hubIcao === 'string' ? t.hubIcao.trim().toUpperCase() : '';
+      const portId = typeof t.portId === 'string' ? t.portId.trim() : '';
+      const listingId =
+        typeof t.listingId === 'string' ? t.listingId.trim() : undefined;
+      const commodityId =
+        typeof t.commodityId === 'string'
+          ? (t.commodityId as CommodityId)
+          : null;
+      const kg =
+        typeof t.kg === 'number' && Number.isFinite(t.kg)
+          ? Math.max(0, Math.floor(t.kg))
+          : 0;
+      const unitCostUsd =
+        typeof t.unitCostUsd === 'number' && Number.isFinite(t.unitCostUsd)
+          ? Math.max(0, money(t.unitCostUsd))
+          : 0;
+      const purchasedAtTick =
+        typeof t.purchasedAtTick === 'number' &&
+        Number.isFinite(t.purchasedAtTick)
+          ? Math.max(0, Math.floor(t.purchasedAtTick))
+          : 0;
+      const readyAtTick =
+        typeof t.readyAtTick === 'number' && Number.isFinite(t.readyAtTick)
+          ? Math.max(0, Math.floor(t.readyAtTick))
+          : 0;
+      if (!id || !warehouseId || !hubIcao || !portId || !commodityId || kg <= 0) {
+        continue;
+      }
+      inboundTransfers.push({
+        id,
+        warehouseId,
+        hubIcao,
+        portId,
+        ...(listingId ? { listingId } : {}),
+        commodityId,
+        kg,
+        unitCostUsd,
+        purchasedAtTick,
+        readyAtTick: Math.max(readyAtTick, purchasedAtTick),
+      });
+    }
+  }
+  return { warehouses, stock, inboundTransfers };
 }
 
 export function ensurePlayerWarehouses(
@@ -165,6 +284,33 @@ export function warehouseFreeKg(
   );
   if (!wh) return 0;
   return Math.max(0, wh.capacityKg - warehouseUsedKg(state, warehouseId));
+}
+
+/** Kg already committed to inbound transfers (not yet in stock). */
+export function warehouseInboundPendingKg(
+  state: CareerMissionsState,
+  warehouseId: string,
+): number {
+  return ensurePlayerWarehouses(state)
+    .inboundTransfers!.filter((t) => t.warehouseId === warehouseId)
+    .reduce((sum, t) => sum + t.kg, 0);
+}
+
+/**
+ * Free capacity after stock + inbound reservations (for port buy routing).
+ */
+export function warehouseInboundFreeKg(
+  state: CareerMissionsState,
+  warehouseId: string,
+): number {
+  const wh = ensurePlayerWarehouses(state).warehouses.find(
+    (w) => w.id === warehouseId,
+  );
+  if (!wh) return 0;
+  const committed =
+    warehouseUsedKg(state, warehouseId) +
+    warehouseInboundPendingKg(state, warehouseId);
+  return Math.max(0, wh.capacityKg - committed);
 }
 
 export function depositCargoToWarehouse(
@@ -334,7 +480,13 @@ export function abandonWarehouseStock(
 /** Credit Demand Board deliveries toward WH T2 unlock (idempotent per call). */
 export function recordWarehouseShipmentKg(
   state: CareerMissionsState,
-  opts: { warehouseId?: string; icao?: string; kg: number },
+  opts: {
+    warehouseId?: string;
+    icao?: string;
+    kg: number;
+    /** Optional credit multiplier (e.g. wh_ops). Defaults to 1. */
+    creditMult?: number;
+  },
 ): number {
   const kg = Math.max(0, Math.floor(opts.kg));
   if (kg <= 0) return 0;
@@ -347,6 +499,17 @@ export function recordWarehouseShipmentKg(
     wh = findPlayerWarehouseAtIcao(state, opts.icao);
   }
   if (!wh) return 0;
-  wh.lifetimeShippedKg = Math.max(0, Math.floor(wh.lifetimeShippedKg ?? 0)) + kg;
+  const mult =
+    typeof opts.creditMult === 'number' &&
+    Number.isFinite(opts.creditMult) &&
+    opts.creditMult > 0
+      ? opts.creditMult
+      : 1;
+  const credited =
+    mult >= 1
+      ? Math.max(kg, Math.floor(kg * mult))
+      : Math.max(0, Math.floor(kg * mult));
+  wh.lifetimeShippedKg =
+    Math.max(0, Math.floor(wh.lifetimeShippedKg ?? 0)) + credited;
   return wh.lifetimeShippedKg;
 }

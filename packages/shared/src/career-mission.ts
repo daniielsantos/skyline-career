@@ -18,6 +18,7 @@ import {
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import { depositCargoToWarehouse, recordWarehouseShipmentKg } from './career-warehouse-stock.js';
+import { whOpsShippedMultForWarehouse } from './career-ground-staff.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
   evaluateMinAirborneElapsed,
@@ -2108,10 +2109,14 @@ export function settleMission(
           payoutUsd: linePayout,
         });
         if (opts.fleet) {
+          const creditMult = working.warehouseId
+            ? whOpsShippedMultForWarehouse(opts.fleet, working.warehouseId)
+            : 1;
           recordWarehouseShipmentKg(opts.fleet, {
             warehouseId: working.warehouseId,
             icao: working.originIcao,
             kg: line.cargoKg,
+            creditMult,
           });
         }
         continue;

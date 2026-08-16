@@ -113,6 +113,7 @@ import {
   settleHangarParkingFees,
   settleFboOps,
   settleWarehouseStorageFees,
+  settleWarehouseInboundTransfers,
   settlePortYardHoldFees,
   settleCompanyCredit,
   companyCreditSnapshot,
@@ -123,7 +124,7 @@ import {
   depositPortPickupToWarehouse,
   abandonPortPickup,
   buyWarehouseAtPickupHub,
-  upgradeWarehouseToTier2,
+  upgradeWarehouse,
   abandonWarehouseStock,
   playerWarehouseSnapshot,
   quoteWarehouseBuyUsd,
@@ -152,6 +153,10 @@ import {
   companyCrewSnapshot,
   hireCrewCandidate,
   fireCrewMember,
+  settleGroundStaffDailyOps,
+  groundStaffSnapshot,
+  hireGroundStaffCandidate,
+  fireGroundStaffMember,
   releaseCompanyCrewFromMission,
   drawCompanyCredit,
   repayCompanyCredit,
@@ -554,6 +559,7 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
       fromTick: caught.tick - advancedTicks,
       toTick: caught.tick,
     });
+    settleWarehouseInboundTransfers(missions, caught);
     settlePortYardHoldFees(missions, {
       fromTick: caught.tick - advancedTicks,
       toTick: caught.tick,
@@ -561,6 +567,10 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     ensurePortListings(caught);
     ensureDemandOrders(caught);
     settleCrewDailyOps(missions, caught, {
+      fromTick: caught.tick - advancedTicks,
+      toTick: caught.tick,
+    });
+    settleGroundStaffDailyOps(missions, caught, {
       fromTick: caught.tick - advancedTicks,
       toTick: caught.tick,
     });
@@ -1273,6 +1283,7 @@ export function createCareerApiServer(port = 8787) {
             classOps: missions.classOps ?? null,
             playerFbos: playerFboSnapshot(missions, world),
             companyCrew: companyCrewSnapshot(missions, world),
+            groundStaff: groundStaffSnapshot(missions, world),
             homeCountryId: world.homeCountryId ?? null,
             countries: listWorldCountryIds(world),
             internationalLaneCount: world.internationalLanes?.length ?? 0,
@@ -2878,9 +2889,10 @@ export function createCareerApiServer(port = 8787) {
           // Write path: ensurePortListings must persist — migrate used to drop
           // portListings, and a read-only seed left the UI with IDs the next
           // buy could not find on a fresh load.
-          const result = await withCareerWrite((world, missions) =>
-            portSnapshot(world, missions),
-          );
+          const result = await withCareerWrite((world, missions) => ({
+            ...portSnapshot(world, missions),
+            groundStaff: groundStaffSnapshot(missions, world),
+          }));
           send(res, 200, result);
         } catch (error) {
           send(res, 500, {
@@ -2912,8 +2924,12 @@ export function createCareerApiServer(port = 8787) {
               unitPriceUsd: bought.unitPriceUsd,
               kg: bought.kg,
               storedKg: bought.storedKg,
+              inboundKg: bought.inboundKg,
               yardKg: bought.yardKg,
+              transferTicks: bought.transferTicks,
+              readyAtTick: bought.readyAtTick,
               pickup: bought.pickup,
+              inboundTransfer: bought.inboundTransfer,
               warehousePile: bought.warehousePile,
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
@@ -3000,9 +3016,10 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/warehouses') {
         try {
-          const result = await withCareerRead((world, missions) =>
-            playerWarehouseSnapshot(missions, world),
-          );
+          const result = await withCareerRead((world, missions) => ({
+            ...playerWarehouseSnapshot(missions, world),
+            groundStaff: groundStaffSnapshot(missions, world),
+          }));
           send(res, 200, result);
         } catch (error) {
           send(res, 500, {
@@ -3049,7 +3066,7 @@ export function createCareerApiServer(port = 8787) {
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            const upgraded = upgradeWarehouseToTier2(
+            const upgraded = upgradeWarehouse(
               missions,
               world,
               body.warehouseId!,
@@ -3589,6 +3606,77 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/ground-staff/hire') {
+        const body = (await readBody(req)) as {
+          warehouseId?: string;
+          candidateId?: string;
+        };
+        if (!body.warehouseId?.trim() || !body.candidateId?.trim()) {
+          send(res, 400, { error: 'warehouseId and candidateId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const hired = hireGroundStaffCandidate(missions, world, {
+              warehouseId: body.warehouseId!.trim(),
+              candidateId: body.candidateId!.trim(),
+            });
+            const groundStaff = groundStaffSnapshot(missions, world);
+            return {
+              member: hired.member,
+              debitUsd: hired.debitUsd,
+              walletUsd: missions.walletUsd,
+              groundStaff,
+              warehouses: playerWarehouseSnapshot(missions, world),
+              ports: {
+                ...portSnapshot(world, missions),
+                groundStaff,
+              },
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ground-staff/fire') {
+        const body = (await readBody(req)) as { memberId?: string };
+        if (!body.memberId?.trim()) {
+          send(res, 400, { error: 'memberId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const fired = fireGroundStaffMember(
+              missions,
+              body.memberId!.trim(),
+            );
+            const groundStaff = groundStaffSnapshot(missions, world);
+            return {
+              member: fired,
+              walletUsd: missions.walletUsd,
+              groundStaff,
+              warehouses: playerWarehouseSnapshot(missions, world),
+              ports: {
+                ...portSnapshot(world, missions),
+                groundStaff,
+              },
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'GET' && path === '/api/missions') {
         const payload = await withCareerRead((world, missions) => ({
           ...missions,
@@ -3618,6 +3706,7 @@ export function createCareerApiServer(port = 8787) {
             fromTick: world.tick - n,
             toTick: world.tick,
           });
+          settleWarehouseInboundTransfers(missions, world);
           settlePortYardHoldFees(missions, {
             fromTick: world.tick - n,
             toTick: world.tick,
@@ -3625,6 +3714,10 @@ export function createCareerApiServer(port = 8787) {
           ensurePortListings(world);
           ensureDemandOrders(world);
           const crewDaily = settleCrewDailyOps(missions, world, {
+            fromTick: world.tick - n,
+            toTick: world.tick,
+          });
+          const groundStaffDaily = settleGroundStaffDailyOps(missions, world, {
             fromTick: world.tick - n,
             toTick: world.tick,
           });
@@ -3664,6 +3757,7 @@ export function createCareerApiServer(port = 8787) {
             fboHoldsExpired: fboOps.expired.length,
             fboExpirePenaltyUsd: fboOps.expirePenaltyUsd,
             crewSalaryDebitUsd: crewDaily.salary.debitUsd,
+            groundStaffSalaryDebitUsd: groundStaffDaily.salary.debitUsd,
             crewSettled: crewOps.settled.length,
             creditInterestPaidUsd: creditOps.interestPaidUsd,
             creditInterestCompoundedUsd: creditOps.interestCompoundedUsd,

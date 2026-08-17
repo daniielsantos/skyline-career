@@ -2280,6 +2280,8 @@ export function App() {
   const [lots, setLots] = useState<MarketLot[]>([]);
   const [marketTotalLots, setMarketTotalLots] = useState(0);
   const [marketPageCount, setMarketPageCount] = useState(1);
+  /** Local Freights board refresh — not the app-wide `busy` lock. */
+  const [marketBoardLoading, setMarketBoardLoading] = useState(false);
   /** Kept in a ref so `refresh` stays stable while board query params change. */
   const marketFetchOptsRef = useRef({
     originQuery: '',
@@ -2878,9 +2880,13 @@ export function App() {
       prev.nearIcao === nextOpts.nearIcao &&
       prev.nearMaxNm === nextOpts.nearMaxNm &&
       prev.aircraft === nextOpts.aircraft;
-    if (unchanged) return;
+    if (unchanged) {
+      setMarketBoardLoading(false);
+      return;
+    }
 
     let cancelled = false;
+    setMarketBoardLoading(true);
     const timer = setTimeout(() => {
       void fetchMarket(nextOpts.aircraft, nextOpts)
         .then((market) => {
@@ -2901,6 +2907,9 @@ export function App() {
           if (cancelled) return;
           const message = err instanceof Error ? err.message : String(err);
           if (!isNeedsProfileMessage(message)) setError(message);
+        })
+        .finally(() => {
+          if (!cancelled) setMarketBoardLoading(false);
         });
     }, 250);
     return () => {
@@ -4491,48 +4500,52 @@ export function App() {
   }
 
   async function onSelectCareerProfile(id: string) {
-    await run(async () => {
-      const result = await postCareerProfileSelect(id);
-      setCareerProfiles(result.profiles);
-      setActiveCareerProfile(
-        result.profile ??
-          result.profiles.find((p) => p.id === result.activeId) ??
-          null,
-      );
-      setShowProfileGate(false);
-      setStaging(null);
-      setActiveBushTrip(null);
-      setBushWatch(null);
-      setFlightDebrief(null);
-      await refresh();
-      setToastKind('ok');
-      setToast(
-        `Playing as ${
-          result.profile?.name ??
-          result.profiles.find((p) => p.id === id)?.name ??
-          'profile'
-        }`,
-      );
-    });
+    await run(
+      async () => {
+        const result = await postCareerProfileSelect(id);
+        setCareerProfiles(result.profiles);
+        setActiveCareerProfile(
+          result.profile ??
+            result.profiles.find((p) => p.id === result.activeId) ??
+            null,
+        );
+        setStaging(null);
+        setActiveBushTrip(null);
+        setBushWatch(null);
+        setFlightDebrief(null);
+        await refresh();
+        setShowProfileGate(false);
+        setToastKind('ok');
+        setToast(
+          `Playing as ${
+            result.profile?.name ??
+            result.profiles.find((p) => p.id === id)?.name ??
+            'profile'
+          }`,
+        );
+      },
+      { refreshAfter: false },
+    );
   }
 
   async function onCreateCareerProfile(name: string) {
-    await run(async () => {
-      const created = await postCareerProfileCreate(name);
-      const result = await postCareerProfileSelect(created.profile.id);
-      setCareerProfiles(result.profiles);
-      setActiveCareerProfile(
-        result.profile ?? created.profile,
-      );
-      setShowProfileGate(false);
-      setStaging(null);
-      setActiveBushTrip(null);
-      setBushWatch(null);
-      setFlightDebrief(null);
-      await refresh();
-      setToastKind('ok');
-      setToast(`Playing as ${created.profile.name}`);
-    });
+    await run(
+      async () => {
+        const created = await postCareerProfileCreate(name);
+        const result = await postCareerProfileSelect(created.profile.id);
+        setCareerProfiles(result.profiles);
+        setActiveCareerProfile(result.profile ?? created.profile);
+        setStaging(null);
+        setActiveBushTrip(null);
+        setBushWatch(null);
+        setFlightDebrief(null);
+        await refresh();
+        setShowProfileGate(false);
+        setToastKind('ok');
+        setToast(`Playing as ${created.profile.name}`);
+      },
+      { refreshAfter: false },
+    );
   }
 
   async function onDeleteCareerProfile(id: string) {
@@ -7212,6 +7225,7 @@ export function App() {
           profiles={careerProfiles}
           lastActiveId={activeCareerProfile?.id ?? null}
           busy={busy}
+          busyLabel="Opening career…"
           error={error && !isNeedsProfileMessage(error) ? error : null}
           onSelect={(id) => void onSelectCareerProfile(id)}
           onCreate={(name) => void onCreateCareerProfile(name)}
@@ -9554,7 +9568,18 @@ export function App() {
               before preparing another.
             </p>
           ) : null}
-          <div className="table-wrap">
+          <div
+            className={`table-wrap freights-board-table${
+              marketBoardLoading ? ' is-loading' : ''
+            }`}
+            aria-busy={marketBoardLoading}
+          >
+            {marketBoardLoading ? (
+              <div className="freights-board-loading" role="status" aria-live="polite">
+                <span className="profile-gate-spinner" aria-hidden />
+                <span>Updating freights…</span>
+              </div>
+            ) : null}
             <table>
               <thead>
                 <tr>
@@ -10060,11 +10085,13 @@ export function App() {
                 {pagedLots.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="empty">
-                      {marketTotalLots === 0 &&
-                      !hasMarketFilters &&
-                      marketSorts.length === 0
-                        ? 'No freights yet — try Reset world again or advance +15 min.'
-                        : 'No freights match the selected filters.'}
+                      {marketBoardLoading
+                        ? 'Updating freights…'
+                        : marketTotalLots === 0 &&
+                            !hasMarketFilters &&
+                            marketSorts.length === 0
+                          ? 'No freights yet — try Reset world again or advance +15 min.'
+                          : 'No freights match the selected filters.'}
                     </td>
                   </tr>
                 ) : null}
@@ -10073,17 +10100,19 @@ export function App() {
           </div>
           <nav className="pagination" aria-label="Freight pages">
             <p>
-              {marketTotalLots === 0
-                ? '0 records'
-                : `${(safeMarketPage - 1) * MARKET_PAGE_SIZE + 1}–${Math.min(
-                    safeMarketPage * MARKET_PAGE_SIZE,
-                    marketTotalLots,
-                  )} of ${marketTotalLots}`}
+              {marketBoardLoading
+                ? 'Updating…'
+                : marketTotalLots === 0
+                  ? '0 records'
+                  : `${(safeMarketPage - 1) * MARKET_PAGE_SIZE + 1}–${Math.min(
+                      safeMarketPage * MARKET_PAGE_SIZE,
+                      marketTotalLots,
+                    )} of ${marketTotalLots}`}
             </p>
             <div>
               <button
                 type="button"
-                disabled={safeMarketPage <= 1}
+                disabled={marketBoardLoading || safeMarketPage <= 1}
                 onClick={() => setMarketPage((page) => Math.max(1, page - 1))}
               >
                 Previous
@@ -10093,7 +10122,9 @@ export function App() {
               </span>
               <button
                 type="button"
-                disabled={safeMarketPage >= marketPageCount}
+                disabled={
+                  marketBoardLoading || safeMarketPage >= marketPageCount
+                }
                 onClick={() =>
                   setMarketPage((page) => Math.min(marketPageCount, page + 1))
                 }

@@ -6,6 +6,8 @@ export function ProfileGate(props: {
   profiles: CareerProfileMeta[];
   lastActiveId: string | null;
   busy: boolean;
+  /** Shown while busy (default: Working…). */
+  busyLabel?: string;
   error: string | null;
   onSelect: (id: string) => void;
   onCreate: (name: string) => void;
@@ -153,7 +155,7 @@ export function ProfileGate(props: {
       {props.busy ? (
         <div className="profile-gate-busy" role="status" aria-live="polite">
           <span className="profile-gate-spinner" aria-hidden />
-          <span>Working…</span>
+          <span>{props.busyLabel ?? 'Working…'}</span>
         </div>
       ) : null}
     </section>

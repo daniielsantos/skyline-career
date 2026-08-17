@@ -567,6 +567,11 @@ import {
   MM_CAREER_HUBS,
   buildMmFeederCorridors,
 } from './career-mm-hubs.js';
+import {
+  assertThCareerHubCatalog,
+  TH_CAREER_HUBS,
+  buildThFeederCorridors,
+} from './career-th-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1122,6 +1127,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BD_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(BT_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(MM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(TH_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1661,6 +1667,16 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'VYNT', b: 'VYMD', weight: 1.8 },
   { a: 'VYYY', b: 'VYSW', weight: 1.5 },
   { a: 'VYMD', b: 'VYSW', weight: 1.4 },
+  // Asia-10 Thailand domestic trunks
+  { a: 'VTBS', b: 'VTBD', weight: 1.9 },
+  { a: 'VTBS', b: 'VTBU', weight: 1.6 },
+  { a: 'VTBS', b: 'VTCC', weight: 1.8 },
+  { a: 'VTCC', b: 'VTCT', weight: 1.5 },
+  { a: 'VTCC', b: 'VTUK', weight: 1.4 },
+  { a: 'VTBS', b: 'VTUK', weight: 1.5 },
+  { a: 'VTBS', b: 'VTSP', weight: 1.8 },
+  { a: 'VTBS', b: 'VTSS', weight: 1.7 },
+  { a: 'VTSP', b: 'VTSS', weight: 1.5 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1783,6 +1799,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildBdFeederCorridors(BD_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildBtFeederCorridors(BT_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMmFeederCorridors(MM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildThFeederCorridors(TH_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4540,6 +4557,47 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'VECC',
     capacityKgPerDay: 35_000,
   },
+  // Asia-10 Thailand
+  {
+    id: 'lane_vtbs_vyyy',
+    originCountryId: 'TH',
+    destCountryId: 'MM',
+    originIcao: 'VTBS',
+    destIcao: 'VYYY',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_vtcc_vymd',
+    originCountryId: 'TH',
+    destCountryId: 'MM',
+    originIcao: 'VTCC',
+    destIcao: 'VYMD',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_vtbs_vghs',
+    originCountryId: 'TH',
+    destCountryId: 'BD',
+    originIcao: 'VTBS',
+    destIcao: 'VGHS',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_vtbs_vecc',
+    originCountryId: 'TH',
+    destCountryId: 'IN',
+    originIcao: 'VTBS',
+    destIcao: 'VECC',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_vtbs_vidp',
+    originCountryId: 'TH',
+    destCountryId: 'IN',
+    originIcao: 'VTBS',
+    destIcao: 'VIDP',
+    capacityKgPerDay: 40_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4978,6 +5036,10 @@ export const FUEL_HUB_ICAOS = new Set([
   'VQPR',
   'VYYY',
   'VYMD',
+  // Asia-10 Thailand
+  'VTBS',
+  'VTCC',
+  'VTSP',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5914,6 +5976,12 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    TH_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -6339,6 +6407,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertBdCareerHubCatalog();
   assertBtCareerHubCatalog();
   assertMmCareerHubCatalog();
+  assertThCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -7373,6 +7442,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...MM_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...TH_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

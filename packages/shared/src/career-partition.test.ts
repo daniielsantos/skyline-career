@@ -137,6 +137,7 @@ describe('career partition', () => {
       'SV',
       'SX',
       'SY',
+      'TH',
       'TJ',
       'TM',
       'TN',

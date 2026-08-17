@@ -1012,6 +1012,22 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 96.17,
     pickupHubs: ['VYYY'],
   },
+  {
+    id: 'THLCB',
+    name: 'Laem Chabang',
+    countryId: 'TH',
+    lat: 13.08,
+    lon: 100.9,
+    pickupHubs: ['VTBU'],
+  },
+  {
+    id: 'THHKT',
+    name: 'Phuket',
+    countryId: 'TH',
+    lat: 7.82,
+    lon: 98.43,
+    pickupHubs: ['VTSP'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

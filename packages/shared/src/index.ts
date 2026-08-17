@@ -130,6 +130,7 @@ export * from './career-np-hubs.js';
 export * from './career-bd-hubs.js';
 export * from './career-bt-hubs.js';
 export * from './career-mm-hubs.js';
+export * from './career-th-hubs.js';
 export * from './career-simbrief-airports.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';

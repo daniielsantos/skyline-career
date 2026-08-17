@@ -13824,5 +13824,187 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "VTBD": {
+    "name": "Bangkok Intl",
+    "lat": 13.914372324943542,
+    "lon": 100.60569182038307,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "3L",
+        "headingTrueDeg": 28.733901977539062,
+        "lengthM": 3690.094970703125,
+        "widthM": 59.385108947753906,
+        "lat": 13.911672681570053,
+        "lon": 100.60415267944336,
+        "identReciprocal": "21R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "3R",
+        "headingTrueDeg": 28.711103439331055,
+        "lengthM": 3504.005126953125,
+        "widthM": 43.419918060302734,
+        "lat": 13.913388289511204,
+        "lon": 100.60926988720894,
+        "identReciprocal": "21L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VTBS": {
+    "name": "Suvarnabhumi Intl",
+    "lat": 13.685833364725113,
+    "lon": 100.74888870120049,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 14.421005249023438,
+        "lengthM": 4000.457763671875,
+        "widthM": 58.384544372558594,
+        "lat": 13.674207329750061,
+        "lon": 100.75642794370651,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2R",
+        "headingTrueDeg": 14.345126152038574,
+        "lengthM": 3699.577392578125,
+        "widthM": 58.74979019165039,
+        "lat": 13.6874745413661,
+        "lon": 100.73893189430237,
+        "identReciprocal": "20L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "20R",
+        "headingTrueDeg": 194.34559631347656,
+        "lengthM": 4247.13671875,
+        "widthM": 50,
+        "lat": 13.682665340602398,
+        "lon": 100.73383033275604,
+        "identReciprocal": "2L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VTBU": {
+    "name": "U-Taphao Intl",
+    "lat": 12.679611034691334,
+    "lon": 101.00491672754288,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 184.5889129638672,
+        "lengthM": 3492.16455078125,
+        "widthM": 58.375579833984375,
+        "lat": 12.679794766008854,
+        "lon": 101.00498825311661,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VTCC": {
+    "name": "Chiang Mai Intl",
+    "lat": 18.771388828754425,
+    "lon": 98.96277755498886,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 180.15237426757812,
+        "lengthM": 3397.870361328125,
+        "widthM": 45,
+        "lat": 18.76841861754656,
+        "lon": 98.9628978073597,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VTCT": {
+    "name": "Chiang Rai Intl",
+    "lat": 19.952222295105457,
+    "lon": 99.88305553793907,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 28.904460906982422,
+        "lengthM": 2997.052001953125,
+        "widthM": 40.76959228515625,
+        "lat": 19.952338971197605,
+        "lon": 99.88294646143913,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VTSP": {
+    "name": "Phuket Intl",
+    "lat": 8.112500086426735,
+    "lon": 98.30916658043861,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 264.613525390625,
+        "lengthM": 2998.037109375,
+        "widthM": 45,
+        "lat": 8.113205842673779,
+        "lon": 98.31684395670891,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VTSS": {
+    "name": "Hat Yai Intl",
+    "lat": 6.932777725160122,
+    "lon": 100.3949998319149,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 82.9669189453125,
+        "lengthM": 3045.019775390625,
+        "widthM": 39.80118179321289,
+        "lat": 6.932667754590511,
+        "lon": 100.3942134976387,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VTUK": {
+    "name": "Khon Kaen",
+    "lat": 16.464552618563175,
+    "lon": 102.78227493166924,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 32.62125015258789,
+        "lengthM": 3047.779052734375,
+        "widthM": 40.57503890991211,
+        "lat": 16.466658152639866,
+        "lon": 102.78368085622787,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

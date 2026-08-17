@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 380;
+export const FUEL_TRUCK_FLEET_SIZE = 395;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 107 },
-  { truckClassId: 'semi_tanker', count: 168 },
-  { truckClassId: 'btrain_tanker', count: 105 },
+  { truckClassId: 'rigid_tanker', count: 111 },
+  { truckClassId: 'semi_tanker', count: 175 },
+  { truckClassId: 'btrain_tanker', count: 109 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -252,6 +252,10 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'BT-C': [],
   'MM-S': ['MM-N'],
   'MM-N': ['MM-S'],
+  // Asia-10 Thailand domestic road graph
+  'TH-C': ['TH-N', 'TH-S'],
+  'TH-N': ['TH-C'],
+  'TH-S': ['TH-C'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -452,6 +456,12 @@ const TRUCK_NAME_POOL = [
   'Mandalay Fuel Road',
   'Naypyidaw Fuel Run',
   'Sittwe Fuel Run',
+  'Suvarnabhumi Tank',
+  'Don Mueang Fuel',
+  'U-Tapao Fuel Road',
+  'Chiang Mai Tank Line',
+  'Phuket Tank Line',
+  'Hat Yai Fuel Run',
 ] as const;
 
 function hashSeed(seed: string): number {

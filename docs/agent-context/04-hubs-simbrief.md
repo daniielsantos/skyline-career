@@ -150,7 +150,15 @@
 - ICAO traps: Paro **VQPR** (not Thailand Betong BTZ/VTSY); Yangon **VYYY** (country MM, ICAO VY* — not Mexico MM*); skip military VYML/VYNP/VYST; Thailand VT* deferred
 - Ports: Yangon → VYYY
 - World seed: **916** airports; **115** ports; fuel trucks **380**; **+3** Bhutan/Myanmar regions
-- Next: Thailand / South-East Asia face
+- Next: Thailand
+
+## Asia-10 Thailand
+
+- Country: TH (Laem Chabang seaport + Phuket)
+- ICAO traps: Bangkok cargo major is **VTBS** Suvarnabhumi (not **VTBD** Don Mueang); U-Tapao **VTBU** (Laem Chabang pickup); skip military VTPI/VTBK; Betong **VTSY** is not Bhutan
+- Ports: Laem Chabang → VTBU; Phuket → VTSP
+- World seed: **924** airports; **117** ports; fuel trucks **395**; **+3** Thailand regions
+- Next: Vietnam / Malaysia / Singapore face
 
 ## SimBrief cargo allowlist
 

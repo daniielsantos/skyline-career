@@ -34,7 +34,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Asia-6 Central Asia east** no seed: TJ/KG — **899** airports; **113** ports; fuel trucks **340**. ICAO: UCFM (not UAFM), UCFO (not UAFO); UTDK omitted (no stock MSFS).
 - **Asia-7 Afghanistan** no seed: AF — **903** airports; **113** ports; fuel trucks **350**. ICAO: OAKB (not OAIX).
 - **Asia-8 Nepal / Bangladesh** no seed: NP/BD — **910** airports; **114** ports; fuel trucks **365**. ICAO: VNKT, VNPK (not VNPR), VGHS (not VGZR).
-- **Asia-9 Bhutan / Myanmar** no seed: BT/MM — **916** airports; **115** ports; fuel trucks **380**. ICAO: VQPR, VYYY (country MM / ICAO VY*; Thailand VT* deferred). Next slice: Thailand / South-East Asia.
+- **Asia-9 Bhutan / Myanmar** no seed: BT/MM — **916** airports; **115** ports; fuel trucks **380**. ICAO: VQPR, VYYY (country MM / ICAO VY*).
+- **Asia-10 Thailand** no seed: TH — **924** airports; **117** ports; fuel trucks **395**. ICAO: VTBS (not VTBD-as-major), VTBU, VTSP. Next slice: Vietnam / Malaysia / Singapore.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).

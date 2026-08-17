@@ -1055,6 +1055,12 @@ function regionLabel(region: string): string {
       return 'Myanmar — South / Yangon';
     case 'MM-N':
       return 'Myanmar — North / Mandalay';
+    case 'TH-C':
+      return 'Thailand — Central / Bangkok';
+    case 'TH-N':
+      return 'Thailand — North / Chiang Mai';
+    case 'TH-S':
+      return 'Thailand — South / Phuket';
     default:
       return region;
   }

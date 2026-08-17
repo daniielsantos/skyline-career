@@ -302,6 +302,10 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['BT', 'BD'],
     ['MM', 'BD'],
     ['MM', 'IN'],
+    // Asia-10 Thailand (do not backfill remaining EU-2+ pairs here)
+    ['TH', 'MM'],
+    ['TH', 'BD'],
+    ['TH', 'IN'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

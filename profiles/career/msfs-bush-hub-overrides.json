@@ -13168,5 +13168,245 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "UAAA": {
+    "name": "Almaty",
+    "lat": 43.355555422604084,
+    "lon": 77.0438888669014,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5R",
+        "headingTrueDeg": 55.70738220214844,
+        "lengthM": 4383.49560546875,
+        "widthM": 25,
+        "lat": 43.352333419024944,
+        "lon": 77.03986197710037,
+        "identReciprocal": "23L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5L",
+        "headingTrueDeg": 55.72685241699219,
+        "lengthM": 4492.59716796875,
+        "widthM": 44.42524719238281,
+        "lat": 43.35871875286102,
+        "lon": 77.04813703894615,
+        "identReciprocal": "23R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UACC": {
+    "name": "Nursultan Nazarbayev Internation",
+    "lat": 51.02250002324581,
+    "lon": 71.46611094474792,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "22",
+        "headingTrueDeg": 224.45787048339844,
+        "lengthM": 3502.36572265625,
+        "widthM": 44.0845947265625,
+        "lat": 51.02258887141943,
+        "lon": 71.46626427769661,
+        "identReciprocal": "4",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UAII": {
+    "name": "Shymkent",
+    "lat": 42.36499987542629,
+    "lon": 69.47555556893349,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "28",
+        "headingTrueDeg": 286.2961730957031,
+        "lengthM": 3288.44921875,
+        "widthM": 45.95318603515625,
+        "lat": 42.36508335918188,
+        "lon": 69.47543308138847,
+        "identReciprocal": "10",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "UATE": {
+    "name": "Aktau",
+    "lat": 43.860000148415565,
+    "lon": 51.09083354473114,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 302.7361145019531,
+        "lengthM": 2654.83251953125,
+        "widthM": 40.401023864746094,
+        "lat": 43.8601003959775,
+        "lon": 51.090827733278275,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UTAA": {
+    "name": "Ashgabat",
+    "lat": 37.98658333718777,
+    "lon": 58.35843041539192,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "29R",
+        "headingTrueDeg": 299.5224609375,
+        "lengthM": 3783.401123046875,
+        "widthM": 45.45414733886719,
+        "lat": 37.9917811229825,
+        "lon": 58.361860513687134,
+        "identReciprocal": "11L",
+        "surface": "concrete"
+      },
+      {
+        "ident": "29",
+        "headingTrueDeg": 299.50762939453125,
+        "lengthM": 2979.82275390625,
+        "widthM": 56.78164291381836,
+        "lat": 37.981694675982,
+        "lon": 58.35987165570259,
+        "identReciprocal": "11",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "UTAK": {
+    "name": "Turkmenbashi",
+    "lat": 40.06329707801342,
+    "lon": 53.00733894109726,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "34L",
+        "headingTrueDeg": 346.5682373046875,
+        "lengthM": 3486.161376953125,
+        "widthM": 39.4226188659668,
+        "lat": 40.06624348461628,
+        "lon": 53.004099279642105,
+        "identReciprocal": "16R",
+        "surface": "concrete"
+      },
+      {
+        "ident": "34R",
+        "headingTrueDeg": 346.52374267578125,
+        "lengthM": 2467.264892578125,
+        "widthM": 41.20297622680664,
+        "lat": 40.06348181515932,
+        "lon": 53.00725355744362,
+        "identReciprocal": "16L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UTNN": {
+    "name": "Nukus",
+    "lat": 42.48921096324921,
+    "lon": 59.622744619846344,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "33",
+        "headingTrueDeg": 334.6417236328125,
+        "lengthM": 2987.583740234375,
+        "widthM": 45.07282638549805,
+        "lat": 42.489232420921326,
+        "lon": 59.622793793678284,
+        "identReciprocal": "15",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7",
+        "headingTrueDeg": 75.5796127319336,
+        "lengthM": 596.2588500976562,
+        "widthM": 21.482837677001953,
+        "lat": 42.489548586308956,
+        "lon": 59.628107249736786,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UTSB": {
+    "name": "Bukhara",
+    "lat": 39.775283485651016,
+    "lon": 64.48227792978287,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 10.16871452331543,
+        "lengthM": 2988.552490234375,
+        "widthM": 42.099754333496094,
+        "lat": 39.77526806294918,
+        "lon": 64.48227167129517,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UTSS": {
+    "name": "Samarkand",
+    "lat": 39.70165282487869,
+    "lon": 66.98243871331215,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 275.7037048339844,
+        "lengthM": 3086.47900390625,
+        "widthM": 44.01865768432617,
+        "lat": 39.70054876059294,
+        "lon": 66.98384374380112,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UTTT": {
+    "name": "Yuzhny",
+    "lat": 41.25666651874781,
+    "lon": 69.28166672587395,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8L",
+        "headingTrueDeg": 81.6500015258789,
+        "lengthM": 3998.7041015625,
+        "widthM": 62.06178665161133,
+        "lat": 41.258414313197136,
+        "lon": 69.28075522184372,
+        "identReciprocal": "26R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8R",
+        "headingTrueDeg": 81.6456527709961,
+        "lengthM": 3904.14990234375,
+        "widthM": 42.68235778808594,
+        "lat": 41.256545819342136,
+        "lon": 69.28116381168365,
+        "identReciprocal": "26L",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

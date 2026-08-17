@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 295;
+export const FUEL_TRUCK_FLEET_SIZE = 320;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 83 },
-  { truckClassId: 'semi_tanker', count: 131 },
-  { truckClassId: 'btrain_tanker', count: 81 },
+  { truckClassId: 'rigid_tanker', count: 90 },
+  { truckClassId: 'semi_tanker', count: 142 },
+  { truckClassId: 'btrain_tanker', count: 88 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -230,6 +230,12 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   // Asia-4 Sri Lanka domestic road graph
   'LK-W': ['LK-E'],
   'LK-E': ['LK-W'],
+  // Asia-5 Central Asia domestic road graphs
+  'KZ-S': ['KZ-N'],
+  'KZ-N': ['KZ-S'],
+  'UZ-E': ['UZ-W'],
+  'UZ-W': ['UZ-E'],
+  'TM-C': [],
 };
 
 const TRUCK_NAME_POOL = [
@@ -400,6 +406,15 @@ const TRUCK_NAME_POOL = [
   'Ratmalana Fuel Road',
   'Mattala Tank Line',
   'Jaffna Fuel Run',
+  'Almaty Tank Line',
+  'Astana Fuel Road',
+  'Aktau Caspian Tank',
+  'Shymkent Fuel Run',
+  'Tashkent Jet Haul',
+  'Samarkand Tank Line',
+  'Bukhara Fuel Road',
+  'Ashgabat Tank Run',
+  'Turkmenbashi Caspian Fuel',
 ] as const;
 
 function hashSeed(seed: string): number {

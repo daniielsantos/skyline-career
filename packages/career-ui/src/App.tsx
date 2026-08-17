@@ -1021,6 +1021,16 @@ function regionLabel(region: string): string {
       return 'Sri Lanka — West / Colombo';
     case 'LK-E':
       return 'Sri Lanka — East / Hambantota';
+    case 'KZ-S':
+      return 'Kazakhstan — South / Almaty';
+    case 'KZ-N':
+      return 'Kazakhstan — North / Astana';
+    case 'UZ-E':
+      return 'Uzbekistan — East / Tashkent';
+    case 'UZ-W':
+      return 'Uzbekistan — West / Bukhara';
+    case 'TM-C':
+      return 'Turkmenistan — Ashgabat';
     default:
       return region;
   }

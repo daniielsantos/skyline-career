@@ -109,7 +109,16 @@
 - ICAO traps: Colombo intl **VCBI** Bandaranaike (not **VCCC** Ratmalana as major); Mattala **VCRI**
 - Ports: Colombo → VCBI
 - World seed: **884** airports; **111** ports; fuel trucks **295**; **+2** Sri Lanka regions
-- Next: Central Asia
+- Next: Central Asia west (KZ/UZ/TM)
+
+## Asia-5 Central Asia west
+
+- Countries: KZ / UZ / TM (TJ/KG deferred)
+- ICAO traps: Tashkent **UTTT** (not UTNN Nukus); Turkmenbashi **UTAK** (not UTBK); do not seed UAFM (OurAirports lists it as Manas; Bishkek is UCFM)
+- Ports: Aktau → UATE; Turkmenbashi → UTAK
+- World seed: **894** airports; **113** ports; fuel trucks **320**; **+5** Central Asia west regions
+- Remaps: `UTBK→UTAK`
+- Next: TJ/KG
 
 ## SimBrief cargo allowlist
 

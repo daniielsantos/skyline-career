@@ -212,6 +212,8 @@ const PICKUP_HUB_SET = new Set([
   'VOMM',
   'VECC',
   'VCBI',
+  'UATE',
+  'UTAK',
 ]);
 
 function money(n: number): number {

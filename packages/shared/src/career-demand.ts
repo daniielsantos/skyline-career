@@ -273,6 +273,14 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['LK', 'AE'],
     ['LK', 'OM'],
     ['LK', 'SA'],
+    // Asia-5 Central Asia (do not backfill remaining EU-2+ pairs here)
+    ['KZ', 'UZ'],
+    ['KZ', 'AZ'],
+    ['KZ', 'TM'],
+    ['UZ', 'TM'],
+    ['UZ', 'IR'],
+    ['TM', 'IR'],
+    ['TM', 'AZ'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

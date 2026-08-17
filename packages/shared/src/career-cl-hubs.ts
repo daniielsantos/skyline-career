@@ -297,6 +297,8 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // Asia-3: old Bengaluru HAL VOBG → VOBL; Begumpet VOHY → VOHS
   VOBG: 'VOBL',
   VOHY: 'VOHS',
+  // Asia-5: Turkmenbashi is UTAK (not UTBK)
+  UTBK: 'UTAK',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

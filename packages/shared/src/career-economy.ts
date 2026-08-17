@@ -642,9 +642,31 @@ import {
   NC_CAREER_HUBS,
   buildNcFeederCorridors,
 } from './career-nc-hubs.js';
+import {
+  assertPfCareerHubCatalog,
+  PF_CAREER_HUBS,
+  buildPfFeederCorridors,
+} from './career-pf-hubs.js';
+import {
+  assertPwCareerHubCatalog,
+  PW_CAREER_HUBS,
+  buildPwFeederCorridors,
+} from './career-pw-hubs.js';
+import {
+  assertWsCareerHubCatalog,
+  WS_CAREER_HUBS,
+  buildWsFeederCorridors,
+} from './career-ws-hubs.js';
+import {
+  assertToCareerHubCatalog,
+  TO_CAREER_HUBS,
+  buildToFeederCorridors,
+} from './career-to-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertUsHiCareerHubCatalog } from './career-us-hi-hubs.js';
+import { assertUsGuCareerHubCatalog } from './career-us-gu-hubs.js';
+import { assertUsAsCareerHubCatalog } from './career-us-as-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
 import {
   assertMxCareerHubCatalog,
@@ -1213,6 +1235,10 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(FJ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(PG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(NC_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(PF_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(PW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(WS_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(TO_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1817,6 +1843,9 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'ZGGG', b: 'ZPPP', weight: 1.5 },
   { a: 'PHNL', b: 'KLAX', weight: 1.9 },
   { a: 'PHNL', b: 'KSFO', weight: 1.8 },
+  // Asia-16 Guam / Polynesia / Micronesia trunks
+  { a: 'PGUM', b: 'PHNL', weight: 1.8 },
+  { a: 'NSTU', b: 'PHNL', weight: 1.7 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1954,6 +1983,10 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildFjFeederCorridors(FJ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildPgFeederCorridors(PG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildNcFeederCorridors(NC_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildPfFeederCorridors(PF_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildPwFeederCorridors(PW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildWsFeederCorridors(WS_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildToFeederCorridors(TO_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -5109,6 +5142,71 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'YSSY',
     capacityKgPerDay: 30_000,
   },
+  // Asia-16 Guam / Polynesia / Micronesia
+  {
+    id: 'lane_pgum_rjaa',
+    originCountryId: 'US',
+    destCountryId: 'JP',
+    originIcao: 'PGUM',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_pgum_rpll',
+    originCountryId: 'US',
+    destCountryId: 'PH',
+    originIcao: 'PGUM',
+    destIcao: 'RPLL',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_ptro_rpll',
+    originCountryId: 'PW',
+    destCountryId: 'PH',
+    originIcao: 'PTRO',
+    destIcao: 'RPLL',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_ntaa_phnl',
+    originCountryId: 'PF',
+    destCountryId: 'US',
+    originIcao: 'NTAA',
+    destIcao: 'PHNL',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ntaa_nzaa',
+    originCountryId: 'PF',
+    destCountryId: 'NZ',
+    originIcao: 'NTAA',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_nsfa_nzaa',
+    originCountryId: 'WS',
+    destCountryId: 'NZ',
+    originIcao: 'NSFA',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_nftf_nzaa',
+    originCountryId: 'TO',
+    destCountryId: 'NZ',
+    originIcao: 'NFTF',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_nstu_nsfa',
+    originCountryId: 'US',
+    destCountryId: 'WS',
+    originIcao: 'NSTU',
+    destIcao: 'NSFA',
+    capacityKgPerDay: 25_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -5597,6 +5695,13 @@ export const FUEL_HUB_ICAOS = new Set([
   'NFFN',
   'AYPY',
   'NWWW',
+  // Asia-16 Guam / Polynesia / Micronesia
+  'PGUM',
+  'NTAA',
+  'PTRO',
+  'NSTU',
+  'NSFA',
+  'NFTF',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -6623,6 +6728,30 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    PF_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    PW_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    WS_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    TO_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -6973,6 +7102,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertAwCareerHubCatalog();
   assertUsViCareerHubCatalog();
   assertUsHiCareerHubCatalog();
+  assertUsGuCareerHubCatalog();
+  assertUsAsCareerHubCatalog();
   assertPtCareerHubCatalog();
   assertEsCareerHubCatalog();
   assertFrCareerHubCatalog();
@@ -7064,6 +7195,10 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertFjCareerHubCatalog();
   assertPgCareerHubCatalog();
   assertNcCareerHubCatalog();
+  assertPfCareerHubCatalog();
+  assertPwCareerHubCatalog();
+  assertWsCareerHubCatalog();
+  assertToCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -8233,6 +8368,42 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...NC_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...PF_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...PW_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...WS_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...TO_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

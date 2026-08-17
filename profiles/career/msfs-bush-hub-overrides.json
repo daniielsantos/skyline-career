@@ -15706,5 +15706,139 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "NFTF": {
+    "name": "Fua'amotu Intl",
+    "lat": -21.24186124652624,
+    "lon": -175.14044165611267,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 121.87867736816406,
+        "lengthM": 2671.10107421875,
+        "widthM": 45.12024688720703,
+        "lat": -21.24080915004015,
+        "lon": -175.149956792593,
+        "identReciprocal": "29",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "NSFA": {
+    "name": "Faleolo Intl",
+    "lat": -13.831838741898537,
+    "lon": -171.9980138540268,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "26",
+        "headingTrueDeg": 269.2481384277344,
+        "lengthM": 3000.489990234375,
+        "widthM": 51.10677719116211,
+        "lat": -13.83000947535038,
+        "lon": -172.0083636045456,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "NSTU": {
+    "name": "Pago Pago Intl",
+    "lat": -14.331661015748978,
+    "lon": -170.7115025818348,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 60.04325866699219,
+        "lengthM": 3048.049072265625,
+        "widthM": 45.68741226196289,
+        "lat": -14.333615005016327,
+        "lon": -170.71304574608803,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.97669982910156,
+        "lengthM": 1169.674072265625,
+        "widthM": 28.58556365966797,
+        "lat": -14.326388463377953,
+        "lon": -170.70759683847427,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "NTAA": {
+    "name": "Faaa",
+    "lat": -17.556666657328606,
+    "lon": -149.61138904094696,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 54.29818344116211,
+        "lengthM": 3447.35888671875,
+        "widthM": 44.7616081237793,
+        "lat": -17.55364380776882,
+        "lon": -149.60725888609886,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PGUM": {
+    "name": "Guam Intl",
+    "lat": 13.483949862420559,
+    "lon": 144.79712784290314,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "6L",
+        "headingTrueDeg": 64.97550964355469,
+        "lengthM": 3655.130126953125,
+        "widthM": 42.52847671508789,
+        "lat": 13.484735414385796,
+        "lon": 144.79670360684395,
+        "identReciprocal": "24R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6R",
+        "headingTrueDeg": 64.9527359008789,
+        "lengthM": 3046.206787109375,
+        "widthM": 41.6369743347168,
+        "lat": 13.483010418713093,
+        "lon": 144.79753777384758,
+        "identReciprocal": "24L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PTRO": {
+    "name": "Babelthuap/Koror",
+    "lat": 7.367305643856525,
+    "lon": 134.54425022006035,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 91.28450012207031,
+        "lengthM": 2190.477783203125,
+        "widthM": 46.43689727783203,
+        "lat": 7.367287538945675,
+        "lon": 134.54424664378166,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

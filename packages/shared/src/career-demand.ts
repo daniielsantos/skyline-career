@@ -346,6 +346,14 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['FJ', 'NZ'],
     ['PG', 'AU'],
     ['NC', 'AU'],
+    // Asia-16 Guam / Polynesia / Micronesia (do not backfill remaining EU-2+ pairs here)
+    ['US', 'PH'],
+    ['PW', 'PH'],
+    ['PF', 'US'],
+    ['PF', 'NZ'],
+    ['WS', 'NZ'],
+    ['TO', 'NZ'],
+    ['US', 'WS'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

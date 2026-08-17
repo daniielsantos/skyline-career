@@ -702,6 +702,10 @@ function regionLabel(region: string): string {
       return 'U.S. Virgin Islands';
     case 'US-HI':
       return 'USA — Hawaii';
+    case 'US-GU':
+      return 'USA — Guam';
+    case 'US-AS':
+      return 'USA — American Samoa';
     case 'CA-W':
       return 'Canada — West';
     case 'CA-PR':
@@ -1170,6 +1174,14 @@ function regionLabel(region: string): string {
       return 'Papua New Guinea — Port Moresby';
     case 'NC-S':
       return 'New Caledonia — Noumea';
+    case 'PF-I':
+      return 'French Polynesia — Tahiti';
+    case 'PW-C':
+      return 'Palau — Koror';
+    case 'WS-U':
+      return 'Samoa — Upolu';
+    case 'TO-T':
+      return 'Tonga — Tongatapu';
     default:
       return region;
   }

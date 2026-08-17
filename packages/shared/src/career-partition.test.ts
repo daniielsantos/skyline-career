@@ -130,12 +130,14 @@ describe('career partition', () => {
         'OM',
       'PA',
         'PE',
+        'PF',
         'PG',
         'PH',
       'PK',
       'PL',
-      'PT',
-      'PY',
+        'PT',
+        'PW',
+        'PY',
       'QA',
       'RO',
       'RS',
@@ -152,8 +154,9 @@ describe('career partition', () => {
       'TH',
       'TJ',
       'TM',
-      'TN',
-      'TR',
+        'TN',
+        'TO',
+        'TR',
         'TT',
         'TW',
         'UA',
@@ -161,8 +164,9 @@ describe('career partition', () => {
       'UY',
       'UZ',
       'VE',
-      'VN',
-      'XK',
+        'VN',
+        'WS',
+        'XK',
       'YE',
     ]);
     assert.ok(world.airports.some((a) => a.icao === 'KMIA'));
@@ -197,7 +201,7 @@ describe('career partition', () => {
     );
     assert.deepEqual(
       usRegions,
-      new Set(['US-HI', 'US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-VI', 'US-W']),
+      new Set(['US-AS', 'US-GU', 'US-HI', 'US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-VI', 'US-W']),
     );
   });
 

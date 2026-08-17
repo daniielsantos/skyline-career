@@ -201,7 +201,15 @@
 - Ports: Dalian → ZYTL; Xiamen → ZSAM; Honolulu → PHNL; Nadi → NFFN; Port Moresby → AYPY; Nouméa → NWWW
 - World seed: **984** airports; **147** ports; fuel trucks **585**; **+4** Pacific regions (CN reuses CN-N/E/S/W)
 - Remaps: `ZLSN→ZLXY`
-- Next: leftover Pacific (Guam / Tahiti) or stop map
+- Next: leftover Pacific (Guam / Tahiti)
+
+## Asia-16 Guam / Polynesia / Micronesia
+
+- Countries: US-GU / US-AS (US territories) + PF / PW / WS / TO. Saipan, Vanuatu, Solomon, Cook, Kiribati deferred
+- ICAO traps: Guam **PGUM** Won Pat (not **PGUA** Andersen); Papeete **NTAA** Faa'a (not NTTB Bora Bora); Palau **PTRO**; Pago Pago **NSTU**; Apia **NSFA** Faleolo (not NSAU); Tonga **NFTF** Fua'amotu (not NFTV Vava'u)
+- Ports: Guam → PGUM; Papeete → NTAA; Koror → PTRO; Pago Pago → NSTU; Apia → NSFA; Nuku'alofa → NFTF
+- World seed: **990** airports; **153** ports; fuel trucks **615**; **+6** Pacific regions
+- Next: leftover Pacific (Vanuatu / Solomon / Cook), or stop map
 
 ## SimBrief cargo allowlist
 

@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 195;
+export const FUEL_TRUCK_FLEET_SIZE = 215;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 55 },
-  { truckClassId: 'semi_tanker', count: 88 },
-  { truckClassId: 'btrain_tanker', count: 52 },
+  { truckClassId: 'rigid_tanker', count: 60 },
+  { truckClassId: 'semi_tanker', count: 97 },
+  { truckClassId: 'btrain_tanker', count: 58 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -198,6 +198,13 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'KW-C': [],
   'OM-N': ['OM-S'],
   'OM-S': ['OM-N'],
+  // MENA-3 North Gulf domestic road graphs
+  'IQ-C': ['IQ-S', 'IQ-N'],
+  'IQ-S': ['IQ-C'],
+  'IQ-N': ['IQ-C'],
+  'IR-N': ['IR-C'],
+  'IR-C': ['IR-N', 'IR-S'],
+  'IR-S': ['IR-C'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -325,6 +332,13 @@ const TRUCK_NAME_POOL = [
   'Muscat Jet Road',
   'Salalah South Fuel',
   'Sohar Port Tank',
+  'Baghdad Jet Haul',
+  'Basra Gulf Tank',
+  'Erbil Fuel Road',
+  'Tehran Imam Tank',
+  'Shiraz Fuel Line',
+  'Bandar Abbas Port Tank',
+  'Mashhad Tank Run',
 ] as const;
 
 function hashSeed(seed: string): number {

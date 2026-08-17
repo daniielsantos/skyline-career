@@ -287,6 +287,8 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // MENA-2 MSFS Facilities corrections
   OETH: 'OETF',
   OKBK: 'OKKK',
+  // MENA-3: OIBA is Abu Musa; Bandar Abbas is OIKB
+  OIBA: 'OIKB',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

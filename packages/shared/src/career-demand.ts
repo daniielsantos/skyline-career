@@ -220,6 +220,18 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['QA', 'BH'],
     ['QA', 'TR'],
     ['BH', 'KW'],
+    // MENA-3 North Gulf (do not backfill remaining EU-2+ pairs here)
+    ['IQ', 'KW'],
+    ['IQ', 'SA'],
+    ['IQ', 'AE'],
+    ['IQ', 'QA'],
+    ['IQ', 'IR'],
+    ['IQ', 'TR'],
+    ['IQ', 'EG'],
+    ['IR', 'AE'],
+    ['IR', 'QA'],
+    ['IR', 'OM'],
+    ['IR', 'TR'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

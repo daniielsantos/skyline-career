@@ -21,7 +21,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **EU-7 East** no seed: TR/UA.
 - **EU-8 Europe gaps** no seed: BY/MD/GE/AM/AZ/LU/MT/CY/XK — **778** airports; **84** ports; fuel trucks **158**. Europe countries-with-hubs complete (UGKO omitted — not in stock MSFS).
 - **MENA-1 Mediterranean face** no seed: MA/DZ/TN/EG/IL — **803** airports; **89** ports; fuel trucks **175**. ICAO traps: HEBA (not HEAX), GMFF, LLER.
-- **MENA-2 Gulf** no seed: SA/AE/QA/BH/KW/OM — **827** airports; **97** ports; fuel trucks **195**. ICAO: OTHH (not OTBD as major), OMDB, OERK, OETF (not OETH), OKKK (not OKBK). Next slice: MENA-3 (IQ/IR and/or Levant-east / LY-SD).
+- **MENA-2 Gulf** no seed: SA/AE/QA/BH/KW/OM — **827** airports; **97** ports; fuel trucks **195**. ICAO: OTHH (not OTBD as major), OMDB, OERK, OETF (not OETH), OKKK (not OKBK).
+- **MENA-3 North Gulf** no seed: IQ/IR — **841** airports; **99** ports; fuel trucks **215**. ICAO: ORBI (not ORBS), ORMM, OIIE (OIII regional), OIKB Bandar Abbas (not OIBA), OIKK Kerman. Next slice: Levant-east (JO/LB/SY) and/or LY-SD.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).

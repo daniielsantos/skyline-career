@@ -109,6 +109,8 @@ export * from './career-qa-hubs.js';
 export * from './career-bh-hubs.js';
 export * from './career-kw-hubs.js';
 export * from './career-om-hubs.js';
+export * from './career-iq-hubs.js';
+export * from './career-ir-hubs.js';
 export * from './career-simbrief-airports.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';

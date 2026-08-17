@@ -971,6 +971,18 @@ function regionLabel(region: string): string {
       return 'Oman — North / Muscat';
     case 'OM-S':
       return 'Oman — South / Salalah';
+    case 'IQ-C':
+      return 'Iraq — Central / Baghdad';
+    case 'IQ-S':
+      return 'Iraq — South / Basra';
+    case 'IQ-N':
+      return 'Iraq — North / Kurdistan';
+    case 'IR-N':
+      return 'Iran — North / East';
+    case 'IR-C':
+      return 'Iran — Central / Tehran';
+    case 'IR-S':
+      return 'Iran — South / Gulf';
     default:
       return region;
   }

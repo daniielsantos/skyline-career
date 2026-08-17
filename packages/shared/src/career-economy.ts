@@ -462,6 +462,16 @@ import {
   OM_CAREER_HUBS,
   buildOmFeederCorridors,
 } from './career-om-hubs.js';
+import {
+  assertIqCareerHubCatalog,
+  IQ_CAREER_HUBS,
+  buildIqFeederCorridors,
+} from './career-iq-hubs.js';
+import {
+  assertIrCareerHubCatalog,
+  IR_CAREER_HUBS,
+  buildIrFeederCorridors,
+} from './career-ir-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -996,6 +1006,8 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BH_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(KW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(OM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(IQ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(IR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1444,6 +1456,19 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'OOMS', b: 'OOSH', weight: 1.9 },
   { a: 'OOMS', b: 'OOKB', weight: 1.5 },
   { a: 'OOMS', b: 'OOSA', weight: 1.7 },
+  // MENA-3 North Gulf domestic trunks
+  { a: 'ORBI', b: 'ORNI', weight: 1.8 },
+  { a: 'ORBI', b: 'ORMM', weight: 2.0 },
+  { a: 'ORBI', b: 'ORER', weight: 1.9 },
+  { a: 'ORER', b: 'ORSU', weight: 1.6 },
+  { a: 'ORER', b: 'ORBM', weight: 1.5 },
+  { a: 'OIIE', b: 'OIII', weight: 2.0 },
+  { a: 'OIIE', b: 'OIFM', weight: 1.9 },
+  { a: 'OIIE', b: 'OIMM', weight: 1.7 },
+  { a: 'OIIE', b: 'OITT', weight: 1.6 },
+  { a: 'OIIE', b: 'OISS', weight: 1.9 },
+  { a: 'OISS', b: 'OIKB', weight: 1.8 },
+  { a: 'OISS', b: 'OIKK', weight: 1.5 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1545,6 +1570,8 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildBhFeederCorridors(BH_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildKwFeederCorridors(KW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildOmFeederCorridors(OM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildIqFeederCorridors(IQ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildIrFeederCorridors(IR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -3625,6 +3652,103 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'OMDB',
     capacityKgPerDay: 30_000,
   },
+  // MENA-3 North Gulf
+  {
+    id: 'lane_orbi_okkk',
+    originCountryId: 'IQ',
+    destCountryId: 'KW',
+    originIcao: 'ORBI',
+    destIcao: 'OKKK',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ormm_oedf',
+    originCountryId: 'IQ',
+    destCountryId: 'SA',
+    originIcao: 'ORMM',
+    destIcao: 'OEDF',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ormm_okkk',
+    originCountryId: 'IQ',
+    destCountryId: 'KW',
+    originIcao: 'ORMM',
+    destIcao: 'OKKK',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_orbi_othh',
+    originCountryId: 'IQ',
+    destCountryId: 'QA',
+    originIcao: 'ORBI',
+    destIcao: 'OTHH',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_orbi_omdb',
+    originCountryId: 'IQ',
+    destCountryId: 'AE',
+    originIcao: 'ORBI',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_oiie_omdb',
+    originCountryId: 'IR',
+    destCountryId: 'AE',
+    originIcao: 'OIIE',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_oiie_othh',
+    originCountryId: 'IR',
+    destCountryId: 'QA',
+    originIcao: 'OIIE',
+    destIcao: 'OTHH',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_oiss_ooms',
+    originCountryId: 'IR',
+    destCountryId: 'OM',
+    originIcao: 'OISS',
+    destIcao: 'OOMS',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_orbi_oiie',
+    originCountryId: 'IQ',
+    destCountryId: 'IR',
+    originIcao: 'ORBI',
+    destIcao: 'OIIE',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ltfm_oiie',
+    originCountryId: 'TR',
+    destCountryId: 'IR',
+    originIcao: 'LTFM',
+    destIcao: 'OIIE',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_ltfm_orbi',
+    originCountryId: 'TR',
+    destCountryId: 'IQ',
+    originIcao: 'LTFM',
+    destIcao: 'ORBI',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_heca_orbi',
+    originCountryId: 'EG',
+    destCountryId: 'IQ',
+    originIcao: 'HECA',
+    destIcao: 'ORBI',
+    capacityKgPerDay: 35_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4014,6 +4138,11 @@ export const FUEL_HUB_ICAOS = new Set([
   'OBBI',
   'OKKK',
   'OOMS',
+  // MENA-3 North Gulf
+  'ORBI',
+  'ORMM',
+  'OIIE',
+  'OISS',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -4824,6 +4953,18 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    IQ_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    IR_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -5228,6 +5369,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertBhCareerHubCatalog();
   assertKwCareerHubCatalog();
   assertOmCareerHubCatalog();
+  assertIqCareerHubCatalog();
+  assertIrCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -6073,6 +6216,24 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...OM_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...IQ_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...IR_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

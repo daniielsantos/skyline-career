@@ -54,6 +54,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **EU-8 Europe gaps:** BY/MD/GE/AM/AZ/LU/MT/CY/XK; Caucasus + microstates with civil hubs; Batumi/Baku/Malta/Limassol ports; fuel trucks **158**; seed **778** airports / **84** ports. Remaps UBGN→UBBG, UDLS→UDSG; UGKO omitted (no stock MSFS facility). Europe complete (AD/MC/SM/VA/LI omitted — no civil hubs).
 - **MENA-1 Mediterranean face:** MA/DZ/TN/EG/IL curated hubs (Alexandria **HEBA**, Fes **GMFF**, Eilat **LLER**); Tangier Med / Algiers / Tunis-Radès / Alexandria / Haifa ports; fuel trucks **175**; seed **803** airports / **89** ports. Sparse EU + Maghreb + East-Med lanes. Libya / Sudan / Levant-east / Gulf deferred to later slices.
 - **MENA-2 Gulf:** SA/AE/QA/BH/KW/OM curated hubs (Doha **OTHH**, Dubai **OMDB**, Riyadh **OERK**, Taif **OETF**, Kuwait **OKKK**); Jeddah/Dammam/Jebel Ali/Khalifa/Hamad/KBS/Shuwaikh/Muscat ports; fuel trucks **195**; seed **827** airports / **97** ports. Intra-Gulf ring + EG/IL/TR/CY bridges. IQ/IR/YE/LY/SD/Levant-east deferred.
+- **MENA-3 North Gulf:** IQ/IR curated hubs (Baghdad **ORBI**, Basra **ORMM**, Erbil **ORER**, Tehran Imam **OIIE**, Shiraz **OISS**, Bandar Abbas **OIKB**, Kerman **OIKK**); Um Qasr/Basra + Bandar Abbas ports; fuel trucks **215**; seed **841** airports / **99** ports. Remap OIBA→OIKB. Sparse IQ/IR↔GCC + TR/EG bridges. Levant-east / LY-SD / YE deferred.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
@@ -88,9 +89,10 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 17. ~~**EU-8 Europe gaps**~~ — BY/MD/GE/AM/AZ/LU/MT/CY/XK.
 18. ~~**MENA-1 Mediterranean face**~~ — MA/DZ/TN/EG/IL.
 19. ~~**MENA-2 Gulf**~~ — SA/AE/QA/BH/KW/OM.
-20. Polish only if needed — optional real METAR.
-21. Next map slice: MENA-3 (IQ/IR and/or Levant-east / LY-SD) — not Asia yet.
-22. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+20. ~~**MENA-3 North Gulf**~~ — IQ/IR.
+21. Polish only if needed — optional real METAR.
+22. Next map slice: Levant-east (JO/LB/SY) and/or LY-SD — not Asia yet.
+23. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

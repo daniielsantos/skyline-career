@@ -49,7 +49,15 @@
 - Ports: Jeddah Islamic → OEJN; Dammam → OEDF; Jebel Ali → OMDB; Khalifa → OMAA; Hamad → OTHH; KBS → OBBI; Shuwaikh → OKKK; Muscat → OOMS
 - World seed: **827** airports; **97** ports; fuel trucks **195**; **+10** Gulf regions
 - Remaps: `OETH→OETF`, `OKBK→OKKK`
-- Next: MENA-3 (IQ/IR and/or Levant-east / LY-SD)
+
+## MENA-3 North Gulf
+
+- Countries: IQ / IR (Levant-east JO/LB/SY, LY/SD, YE deferred)
+- ICAO traps: Baghdad **ORBI** (not ORBS); Tehran intl **OIIE** (Mehrabad **OIII** regional only); Basra **ORMM**; Bandar Abbas **OIKB** (not OIBA Abu Musa); Kerman **OIKK**
+- Ports: Um Qasr / Basra → ORMM; Bandar Abbas → OIKB
+- World seed: **841** airports; **99** ports; fuel trucks **215**; **+6** North Gulf regions
+- Remaps: `OIBA→OIKB`
+- Next: Levant-east and/or LY-SD
 
 ## SimBrief cargo allowlist
 

@@ -198,6 +198,8 @@ const PICKUP_HUB_SET = new Set([
   'OBBI',
   'OKKK',
   'OOMS',
+  'ORMM',
+  'OIKB',
 ]);
 
 function money(n: number): number {

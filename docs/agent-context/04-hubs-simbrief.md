@@ -64,7 +64,15 @@
 - ICAO traps: Amman intl **OJAI** (Marka **OJAM** spoke); Beirut **OLBA**; Damascus **OSDI**
 - Ports: Aqaba → OJAQ; Beirut → OLBA; Latakia → OSLK
 - World seed: **848** airports; **102** ports; fuel trucks **230**; **+5** Levant regions
-- Next: LY-SD
+
+## MENA-5 Maghreb/Nile gap
+
+- Countries: LY / SD (YE deferred)
+- ICAO traps: Tripoli **HLLM** Mitiga (not closed **HLLT**); Benghazi **HLLB**; Khartoum **HSSK** (not legacy **HSSS**); Port Sudan **HSPN**
+- Ports: Misrata → HLMS; Port Sudan → HSPN
+- World seed: **854** airports; **104** ports; fuel trucks **245**; **+4** regions
+- Remaps: `HLLT→HLLM`, `HSSS→HSSK`
+- Next: YE (Asia later)
 
 ## SimBrief cargo allowlist
 

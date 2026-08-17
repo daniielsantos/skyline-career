@@ -245,6 +245,14 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['SY', 'TR'],
     ['SY', 'IQ'],
     ['SY', 'JO'],
+    // MENA-5 Maghreb/Nile gap (do not backfill remaining EU-2+ pairs here)
+    ['LY', 'TN'],
+    ['LY', 'EG'],
+    ['LY', 'MT'],
+    ['LY', 'TR'],
+    ['SD', 'EG'],
+    ['SD', 'SA'],
+    ['SD', 'LY'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

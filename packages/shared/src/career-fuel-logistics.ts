@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 230;
+export const FUEL_TRUCK_FLEET_SIZE = 245;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 64 },
-  { truckClassId: 'semi_tanker', count: 104 },
-  { truckClassId: 'btrain_tanker', count: 62 },
+  { truckClassId: 'rigid_tanker', count: 68 },
+  { truckClassId: 'semi_tanker', count: 111 },
+  { truckClassId: 'btrain_tanker', count: 66 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -211,6 +211,11 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'LB-C': [],
   'SY-S': ['SY-N'],
   'SY-N': ['SY-S'],
+  // MENA-5 Maghreb/Nile gap domestic road graphs
+  'LY-W': ['LY-E'],
+  'LY-E': ['LY-W'],
+  'SD-C': ['SD-E'],
+  'SD-E': ['SD-C'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -350,6 +355,11 @@ const TRUCK_NAME_POOL = [
   'Beirut Fuel Line',
   'Damascus Tank Run',
   'Latakia Port Tank',
+  'Tripoli Mitiga Tank',
+  'Misrata Port Tank',
+  'Benghazi Fuel Line',
+  'Khartoum Tank Run',
+  'Port Sudan Red Sea Tank',
 ] as const;
 
 function hashSeed(seed: string): number {

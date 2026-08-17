@@ -289,6 +289,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   OKBK: 'OKKK',
   // MENA-3: OIBA is Abu Musa; Bandar Abbas is OIKB
   OIBA: 'OIKB',
+  // MENA-5: closed Tripoli HLLT → Mitiga HLLM; legacy Khartoum HSSS → HSSK
+  HLLT: 'HLLM',
+  HSSS: 'HSSK',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

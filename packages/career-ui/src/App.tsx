@@ -993,6 +993,14 @@ function regionLabel(region: string): string {
       return 'Syria — South / Damascus';
     case 'SY-N':
       return 'Syria — North / Coast';
+    case 'LY-W':
+      return 'Libya — West / Tripoli';
+    case 'LY-E':
+      return 'Libya — East / Benghazi';
+    case 'SD-C':
+      return 'Sudan — Central / Khartoum';
+    case 'SD-E':
+      return 'Sudan — East / Port Sudan';
     default:
       return region;
   }

@@ -57,7 +57,7 @@ Ship: desktop installer (`npm run pack:desktop` / `release:desktop`).
 - **SimBridge exclusive gate** — serializa probe/watch start/inject no Node (`simbridge-gate.ts`).  
 - **Economy** — ticks 15 min (`TICKS_PER_DAY=96`), hubs por país/região, NPC, fuel trucks, SQLite store. Detalhe: `.cursor/rules/career-economy-roadmap.mdc`.  
 - **Map expansion** — checklist obrigatório: `.cursor/rules/career-map-expansion.mdc`.  
-- **Bush trips** — soft-field / tours; não misturar com Market freights normais.  
+- **Bush trips** — soft-field / tours; **board temporarily disabled** (`BUSH_TRIPS_BOARD_ENABLED=false`); não misturar com Market freights.  
 - **Homologate hubs** — facility MSFS deve bater ICAO catalog e ≤25 nm.
 
 ## Persistência

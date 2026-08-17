@@ -65,6 +65,7 @@ import {
   isBushTripOnlyHub,
   acceptBushTrip,
   abandonBushTrip,
+  BUSH_TRIPS_BOARD_ENABLED,
   bushTripToBoardRow,
   bushTripMapNodes,
   getBushTrip,
@@ -4785,6 +4786,7 @@ export function createCareerApiServer(port = 8787) {
           return {
             trips,
             active: activeView,
+            boardEnabled: BUSH_TRIPS_BOARD_ENABLED,
             walletUsd: missions.walletUsd,
             tick: world.tick,
             ...fleetPayload(missions, world),
@@ -4865,6 +4867,10 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/bush-trips/accept') {
+        if (!BUSH_TRIPS_BOARD_ENABLED) {
+          send(res, 503, { error: 'Bush trips are temporarily disabled' });
+          return;
+        }
         const body = (await readBody(req)) as {
           tripId?: string;
           aircraftId?: string;

@@ -34,7 +34,14 @@
 - EU-8 ports: Batumi / Baku / Marsaxlokk / Limassol
 - Homologation: **UBBG** (not UBGN), **UDSG** (not UDLS); **UGKO** omitted (absent in stock MSFS)
 - Microstates without civil hubs (AD/MC/SM/VA/LI) intentionally omitted
-- Next: MENA / Asia
+
+## MENA-1 Mediterranean face
+
+- Countries: MA / DZ / TN / EG / IL (Libya / Sudan / Levant-east / Gulf deferred)
+- ICAO traps: Alexandria **HEBA** (not HEAX); Fes **GMFF**; Eilat **LLER** (Ramon)
+- Ports: Tangier Med → GMTT; Algiers → DAAG; Tunis/Radès → DTTA; Alexandria → HEBA; Haifa → LLHA
+- World seed: **803** airports; **89** ports; fuel trucks **175**; **~155** regions
+- Next: MENA-2 Gulf
 
 ## SimBrief cargo allowlist
 

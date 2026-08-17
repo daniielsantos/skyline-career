@@ -27,7 +27,7 @@ export function ProfileGate(props: {
         <h1>Choose a profile</h1>
         <p className="muted">
           Each profile has its own wallet, fleet, and missions. Shared hub data
-          and bush trip plans stay the same for everyone.
+          stays the same for everyone.
         </p>
       </div>
 

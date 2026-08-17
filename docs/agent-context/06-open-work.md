@@ -50,10 +50,11 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 17. ~~**EU-6 W. Balkans**~~ — BA/ME/AL/MK; seed **748**; ports **77**; fuel trucks **140**.
 18. ~~**EU-7 East**~~ — TR/UA; seed **762**; ports **80**; fuel trucks **148**.
 19. ~~**EU-8 Europe gaps**~~ — BY/MD/GE/AM/AZ/LU/MT/CY/XK; seed **778**; ports **84**; fuel trucks **158**. Homolog: UBBG/UDSG; UGKO dropped (no stock MSFS).
-20. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-21. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
-22. Next map slice: MENA / Asia.
-23. Re-run `npm run career-hubs -- missing` após rebuild shared.
+20. ~~**MENA-1 Mediterranean face**~~ — MA/DZ/TN/EG/IL; seed **803**; ports **89**; fuel trucks **175**. ICAO: HEBA/GMFF/LLER. Homolog: `npm run career-hubs -- missing` after rebuild.
+21. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
+22. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+23. Next map slice: **MENA-2 Gulf** (not Asia yet).
+24. Re-run `npm run career-hubs -- missing` após rebuild shared.
 
 ## Feito (shipped 0.3.47)
 
@@ -111,6 +112,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 
 ## Feito (local, sem release)
 
+- **Bush trips board off:** `BUSH_TRIPS_BOARD_ENABLED=false` (shared + UI flag) — aba Freights→Bush trips escondida; Accept API 503; abandon/active ainda ok.
 - **Demand Edit cargo:** reduzir devolve kg à WH + restaura `remainingKg` do pedido; aumentar retira da WH (UI `demandEditMaxKg`).
 - **Ports yard lock:** buy split (free→WH / rest→yard); partial Store; Abandon oversized yard (no refund). T1 WH = **5 klb** (2268 kg); T2/T3 = 10/15 klb.
 - **WH T2 hybrid upgrade:** unlock after `WAREHOUSE_T2_SHIPPED_KG` (10t) Demand Board settle from that WH + CAPEX; capacity 5t→12t.

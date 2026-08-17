@@ -302,14 +302,30 @@ describe('career warehouse + demand', () => {
 
   it('demand board hides Dest when it is the only owned warehouse hub', () => {
     const world = createSeedEconomyWorld({ seed: 'demand-filter-wh' });
-    for (const icao of ['SBCT', 'SBKP'] as const) {
-      const ap = world.airports.find((a) => a.icao === icao);
-      assert.ok(ap);
-      ap!.inventory.general!.stockKg = Math.floor(
-        ap!.inventory.general!.capacityKg * 0.05,
-      );
-    }
-    ensureDemandOrders(world);
+    world.demandOrders = [
+      {
+        id: 'demand_pin_sbct',
+        destIcao: 'SBCT',
+        commodityId: 'general',
+        wantedKg: 2_000,
+        remainingKg: 2_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+      {
+        id: 'demand_pin_sbkp',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 2_000,
+        remainingKg: 2_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
     assert.ok(
       listOpenDemandOrders(world, { destIcao: 'SBCT', commodityId: 'general' })
         .length >= 1,
@@ -402,7 +418,19 @@ describe('career warehouse + demand', () => {
     assert.ok(dest);
     const destPile = dest!.inventory.general!;
     destPile.stockKg = Math.floor(destPile.capacityKg * 0.05);
-    ensureDemandOrders(world);
+    world.demandOrders = [
+      {
+        id: 'demand_pin_fly_sbkp',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 4_000,
+        remainingKg: 4_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
     const order = listOpenDemandOrders(world, {
       destIcao: 'SBKP',
       commodityId: 'general',
@@ -420,9 +448,11 @@ describe('career warehouse + demand', () => {
     });
     assert.equal(accepted.mission.demandOrderId, order!.id);
     assert.ok(accepted.payUsd > 0);
+    const lifted = accepted.kg;
+    assert.ok(lifted > 0);
     assert.equal(
       (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
-      500,
+      800 - lifted,
     );
 
     const remainingAfterAccept = order!.remainingKg;
@@ -433,7 +463,7 @@ describe('career warehouse + demand', () => {
     );
     const reopened = (world.demandOrders ?? []).find((o) => o.id === order!.id);
     assert.ok(reopened);
-    assert.equal(reopened!.remainingKg, remainingAfterAccept + 300);
+    assert.equal(reopened!.remainingKg, remainingAfterAccept + lifted);
 
     // Fresh accept + settle
     destPile.stockKg = Math.floor(destPile.capacityKg * 0.05);
@@ -473,7 +503,7 @@ describe('career warehouse + demand', () => {
     assert.equal(state.walletUsd, beforeWallet + settled.walletCreditUsd);
     assert.ok(destPile.stockKg > beforeStock);
     const wh = state.playerWarehouses!.warehouses[0]!;
-    assert.equal(wh.lifetimeShippedKg ?? 0, 250);
+    assert.equal(wh.lifetimeShippedKg ?? 0, accepted2.kg);
   });
 
   it('edit demand cargo restores WH on reduce and withdraws on increase', () => {
@@ -497,7 +527,19 @@ describe('career warehouse + demand', () => {
     dest!.inventory.general!.stockKg = Math.floor(
       dest!.inventory.general!.capacityKg * 0.05,
     );
-    ensureDemandOrders(world);
+    world.demandOrders = [
+      {
+        id: 'demand_pin_edit_sbkp',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 4_000,
+        remainingKg: 4_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
     const order = listOpenDemandOrders(world, {
       destIcao: 'SBKP',
       commodityId: 'general',
@@ -514,40 +556,46 @@ describe('career warehouse + demand', () => {
       aircraftId: aircraft.id,
       kg: 300,
     });
+    const lifted = accepted.kg;
+    assert.ok(lifted >= 100, `expected usable lift, got ${lifted}`);
     const remainingAfterAccept = order!.remainingKg;
     assert.equal(
       (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
-      500,
+      800 - lifted,
     );
 
+    const reducedKg = 100;
     const reduced = replaceDemandMissionCargo(state, world, accepted.mission, {
-      cargoKg: 200,
+      cargoKg: reducedKg,
     });
-    assert.equal(reduced.cargoKg, 200);
+    assert.equal(reduced.cargoKg, reducedKg);
     assert.equal(
       Math.round(reduced.payUsd),
-      Math.round(order!.maxUnitPriceUsd * 200),
+      Math.round(order!.maxUnitPriceUsd * reducedKg),
     );
     assert.equal(
       (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
-      600,
+      800 - reducedKg,
     );
-    assert.equal(order!.remainingKg, remainingAfterAccept + 100);
+    assert.equal(order!.remainingKg, remainingAfterAccept + (lifted - reducedKg));
     assert.equal(reduced.status, 'accepted');
 
     const maxEditable = demandMissionEditableMaxKg(state, world, reduced);
-    assert.ok(maxEditable >= 200);
-    assert.ok(maxEditable <= 200 + Math.min(600, order!.remainingKg));
+    assert.ok(maxEditable >= reducedKg);
+    assert.ok(
+      maxEditable <=
+        reducedKg + Math.min(800 - reducedKg, order!.remainingKg),
+    );
 
     const increased = replaceDemandMissionCargo(state, world, reduced, {
-      cargoKg: 350,
+      cargoKg: lifted,
     });
-    assert.equal(increased.cargoKg, 350);
+    assert.equal(increased.cargoKg, lifted);
     assert.equal(
       (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
-      450,
+      800 - lifted,
     );
-    assert.equal(order!.remainingKg, remainingAfterAccept + 100 - 150);
+    assert.equal(order!.remainingKg, remainingAfterAccept);
 
     assert.throws(
       () =>

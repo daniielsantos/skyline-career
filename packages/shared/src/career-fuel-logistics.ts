@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 158;
+export const FUEL_TRUCK_FLEET_SIZE = 175;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 46 },
-  { truckClassId: 'semi_tanker', count: 70 },
-  { truckClassId: 'btrain_tanker', count: 42 },
+  { truckClassId: 'rigid_tanker', count: 50 },
+  { truckClassId: 'semi_tanker', count: 78 },
+  { truckClassId: 'btrain_tanker', count: 47 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -173,6 +173,20 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'UA-W': ['UA-C'],
   'UA-C': ['UA-W', 'UA-E'],
   'UA-E': ['UA-C'],
+  // MENA-1 Mediterranean face domestic road graphs
+  'MA-N': ['MA-C'],
+  'MA-C': ['MA-N', 'MA-S'],
+  'MA-S': ['MA-C'],
+  'DZ-N': ['DZ-W', 'DZ-E'],
+  'DZ-W': ['DZ-N'],
+  'DZ-E': ['DZ-N'],
+  'TN-N': ['TN-S'],
+  'TN-S': ['TN-N'],
+  'EG-N': ['EG-S', 'EG-R'],
+  'EG-S': ['EG-N'],
+  'EG-R': ['EG-N'],
+  'IL-C': ['IL-S'],
+  'IL-S': ['IL-C'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -272,6 +286,21 @@ const TRUCK_NAME_POOL = [
   'Malta Island Fuel',
   'Larnaca Jet Road',
   'Pristina Tank Run',
+  'Casablanca Jet Road',
+  'Tangier Med Tank',
+  'Marrakech Fuel Line',
+  'Agadir Tank Run',
+  'Algiers Jet Haul',
+  'Oran Port Fuel',
+  'Tunis Carthage Tank',
+  'Monastir Fuel Road',
+  'Cairo Jet Haul',
+  'Alexandria Borg Tank',
+  'Sharm Red Sea Fuel',
+  'Hurghada Tank Line',
+  'Tel Aviv Ben Gurion Fuel',
+  'Haifa Port Tank',
+  'Eilat Ramon Haul',
 ] as const;
 
 function hashSeed(seed: string): number {

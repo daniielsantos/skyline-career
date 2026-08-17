@@ -2,7 +2,11 @@
  * Unified bush trips — Activities-style arcs over soft-field bush hubs / tour spokes / bushTripOnly locals.
  * Market freights no longer form on bush ODs; payload rides on trip legs.
  * Playable only when `msfsValidated` (manual MSFS 2024 check).
+ *
+ * Product flag: Freights → Bush trips board + new Accept. Catalog/code stay;
+ * abandon / finish of an already-active trip still works.
  */
+export const BUSH_TRIPS_BOARD_ENABLED = false;
 
 import {
   type BushCountryId,

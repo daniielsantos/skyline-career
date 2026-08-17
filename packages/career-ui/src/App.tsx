@@ -153,6 +153,7 @@ import {
   logbookPayoutUsd,
   logbookStatusLabel,
 } from './logbook';
+import { BUSH_TRIPS_BOARD_ENABLED } from './feature-flags';
 
 function normalizeStarterHubs(
   hubs: Array<StarterHubOption | string> | null | undefined,
@@ -924,6 +925,32 @@ function regionLabel(region: string): string {
       return 'Cyprus';
     case 'XK-C':
       return 'Kosovo';
+    case 'MA-N':
+      return 'Morocco — North';
+    case 'MA-C':
+      return 'Morocco — Center';
+    case 'MA-S':
+      return 'Morocco — South';
+    case 'DZ-N':
+      return 'Algeria — North / Algiers';
+    case 'DZ-W':
+      return 'Algeria — West';
+    case 'DZ-E':
+      return 'Algeria — East';
+    case 'TN-N':
+      return 'Tunisia — North';
+    case 'TN-S':
+      return 'Tunisia — South / Coast';
+    case 'EG-N':
+      return 'Egypt — Nile Delta';
+    case 'EG-S':
+      return 'Egypt — Upper Nile';
+    case 'EG-R':
+      return 'Egypt — Red Sea';
+    case 'IL-C':
+      return 'Israel — Center';
+    case 'IL-S':
+      return 'Israel — South';
     default:
       return region;
   }
@@ -2505,6 +2532,12 @@ export function App() {
     setSelectedFboMissionId(null);
     setSplitHoldId(null);
   }, [airportIcao, terminalSection]);
+
+  useEffect(() => {
+    if (!BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush') {
+      setFreightsBoard('freights');
+    }
+  }, [freightsBoard]);
 
   useEffect(() => {
     if (!selectedFboHoldId) return;
@@ -7139,7 +7172,7 @@ export function App() {
                   ? 'Past flights — aircraft, cargo, distance, and payout.'
                   : tab === 'settings'
                     ? 'SimBrief, weight units, and local career preferences.'
-                    : freightsBoard === 'bush'
+                    : freightsBoard === 'bush' && BUSH_TRIPS_BOARD_ENABLED
                       ? 'Validated bush trip arcs — light GA only, separate from Market freights.'
                       : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
   const parkedIcao =
@@ -7748,12 +7781,12 @@ export function App() {
           {airportView.airport.bushTripOnly ? (
             <p className="banner warn" role="status">
               Trip-only strip — no cargo terminal, Market freights, or ferry.
-              Used only as a bush-trip endpoint (map / PLN).
+              Reserved for bush-trip routing (board temporarily disabled).
             </p>
           ) : airportView.airport.bush ? (
             <p className="banner warn" role="status">
               Bush soft-field — no ferry in or out. Market freights do not form
-              here; fly light GA bush trips from Freights → Bush trips.
+              here. Light GA bush trips are temporarily unavailable.
             </p>
           ) : null}
           <nav className="terminal-sections" aria-label="Terminal sections">
@@ -8451,7 +8484,8 @@ export function App() {
                         <h2>Trip-only strip</h2>
                         <p className="muted">
                           No warehouse stock or demand here — Skyline keeps this
-                          field for bush-trip routing only.
+                          field for bush-trip routing (board temporarily
+                          disabled).
                         </p>
                       </div>
                     </div>
@@ -9209,42 +9243,44 @@ export function App() {
         </section>
       ) : hubSelected && tab === 'market' ? (
         <section className="panel">
-          <div className="settings-choice" role="tablist" aria-label="Freight boards">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={freightsBoard === 'freights'}
-              className={
-                freightsBoard === 'freights'
-                  ? 'settings-choice-btn active'
-                  : 'settings-choice-btn'
-              }
-              onClick={() => setFreightsBoard('freights')}
-              disabled={busy}
-            >
-              Freights
-              <small>Market lots</small>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={freightsBoard === 'bush'}
-              className={
-                freightsBoard === 'bush'
-                  ? 'settings-choice-btn active'
-                  : 'settings-choice-btn'
-              }
-              onClick={() => {
-                setFreightsBoard('bush');
-                void refreshBushTrips();
-              }}
-              disabled={busy}
-            >
-              Bush trips
-              <small>Fixed arcs · light GA</small>
-            </button>
-          </div>
-          {freightsBoard === 'bush' ? (
+          {BUSH_TRIPS_BOARD_ENABLED ? (
+            <div className="settings-choice" role="tablist" aria-label="Freight boards">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={freightsBoard === 'freights'}
+                className={
+                  freightsBoard === 'freights'
+                    ? 'settings-choice-btn active'
+                    : 'settings-choice-btn'
+                }
+                onClick={() => setFreightsBoard('freights')}
+                disabled={busy}
+              >
+                Freights
+                <small>Market lots</small>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={freightsBoard === 'bush'}
+                className={
+                  freightsBoard === 'bush'
+                    ? 'settings-choice-btn active'
+                    : 'settings-choice-btn'
+                }
+                onClick={() => {
+                  setFreightsBoard('bush');
+                  void refreshBushTrips();
+                }}
+                disabled={busy}
+              >
+                Bush trips
+                <small>Fixed arcs · light GA</small>
+              </button>
+            </div>
+          ) : null}
+          {BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush' ? (
             <>
               <div className="panel-head">
                 <p className="panel-stats">
@@ -10120,17 +10156,31 @@ export function App() {
                   >
                     Abandon trip
                   </button>
-                  <button
-                    type="button"
-                    className="action ghost"
-                    disabled={busy}
-                    onClick={() => {
-                      setFreightsBoard('bush');
-                      selectTab('market');
-                    }}
-                  >
-                    Bush board
-                  </button>
+                  {BUSH_TRIPS_BOARD_ENABLED ? (
+                    <button
+                      type="button"
+                      className="action ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setFreightsBoard('bush');
+                        selectTab('market');
+                      }}
+                    >
+                      Bush board
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="action ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setFreightsBoard('freights');
+                        selectTab('market');
+                      }}
+                    >
+                      Freights
+                    </button>
+                  )}
                 </div>
               </div>
               <BushTripMapCard

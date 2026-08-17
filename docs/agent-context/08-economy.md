@@ -20,9 +20,10 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **EU-6 W. Balkans** no seed: BA/ME/AL/MK.
 - **EU-7 East** no seed: TR/UA.
 - **EU-8 Europe gaps** no seed: BY/MD/GE/AM/AZ/LU/MT/CY/XK — **778** airports; **84** ports; fuel trucks **158**. Europe countries-with-hubs complete (UGKO omitted — not in stock MSFS).
+- **MENA-1 Mediterranean face** no seed: MA/DZ/TN/EG/IL — **803** airports; **89** ports; fuel trucks **175**. ICAO traps: HEBA (not HEAX), GMFF, LLER. Next slice: MENA-2 Gulf.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
-- Soft-field **bush** hubs: Market não forma freight nesses ODs — usam **bush trips**.
+- Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).
 - **Warehouses** (pickup hubs …): CAPEX + capacity + storage; port buy → **inbound transfer** (ETA ticks) → WH stock (overflow → yard); **partial Store**; **Abandon** yard; **T1/T2/T3** (5/10/15 klb = 2268/4536/6804 kg) hybrid upgrade (shipped gate + CAPEX).
 - **Demand Board:** NPC buy-orders quando stock do hub está baixo (cap global **192** open, **quota por país** ≈32 com 6 países — BR não monopoliza); accept → missão WH→dest; settle = payout + fill terminal + credit `lifetimeShippedKg`. **Edit cargo** restores/withdraws WH + demand remaining. **Intl (port-fed):** cross-border só se par de país na allowlist (BR↔US/AR/CL/MX/CA, AR↔CL/US, CL↔US, US↔CA/MX) **e** origem WH em pickup hub; pay × **1.28**; Market `CAREER_INTERNATIONAL_LANES` intactas.
 - Homologação grava OEW/MTOW live; `maxCargoKg` placeholder (N×500) → preferir SimBrief. Backfill: `npm run airframes:backfill-simbrief-cargo` (dry-run) / `-- --apply`.

@@ -189,6 +189,23 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['BE', 'DE'],
     ['DE', 'IT'],
     ['IT', 'US'],
+    // MENA-1 Mediterranean face (do not backfill remaining EU-2+ pairs here)
+    ['MA', 'ES'],
+    ['MA', 'PT'],
+    ['MA', 'FR'],
+    ['MA', 'DZ'],
+    ['DZ', 'FR'],
+    ['DZ', 'ES'],
+    ['DZ', 'TN'],
+    ['TN', 'IT'],
+    ['TN', 'FR'],
+    ['TN', 'MT'],
+    ['EG', 'GR'],
+    ['EG', 'TR'],
+    ['EG', 'CY'],
+    ['EG', 'IL'],
+    ['IL', 'CY'],
+    ['IL', 'GR'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

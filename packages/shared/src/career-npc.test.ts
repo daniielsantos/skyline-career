@@ -60,6 +60,7 @@ import {
   isDomesticOd,
   isInternationalOdAllowed,
 } from './career-economy.js';
+import { invalidateLaneInboundIndex } from './career-lane-index.js';
 
 type SeedWorld = ReturnType<typeof createSeedEconomyWorld>;
 
@@ -545,6 +546,7 @@ describe('NPC freighter fleet', () => {
       arrivesAtMs: world.lastBatchAtMs + 4 * 3_600_000,
       status: 'in_flight',
     });
+    invalidateLaneInboundIndex(world);
     const busy = scoreLotForNpc(world, npc!, lot, rng);
     assert.ok(busy != null);
     assert.ok(
@@ -837,16 +839,15 @@ describe('NPC freighter fleet', () => {
   it('describes thin-fleet and lane-busy pressure for UI chips', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-pressure-chips' });
     const nowMs = world.lastBatchAtMs;
-    const region = world.npcs[0]!.homeRegion;
+    const origin = 'SBGR';
+    const dest = 'SBGL';
+    const region =
+      world.airports.find((a) => a.icao === origin)?.region ?? 'BR-SE';
     for (const npc of world.npcs.filter((n) => n.homeRegion === region)) {
       npc.status = 'resting';
       npc.restUntilMs = nowMs + 12 * 3_600_000;
       npc.currentFlightId = undefined;
     }
-    const origin =
-      world.airports.find((a) => a.region === region)?.icao ?? 'SBGR';
-    const dest =
-      world.airports.find((a) => a.icao !== origin)?.icao ?? 'SBGL';
 
     const thin = describeLotMarketPressure(
       world,
@@ -873,6 +874,7 @@ describe('NPC freighter fleet', () => {
       arrivesAtMs: nowMs + 2 * 3_600_000,
       status: 'in_flight',
     });
+    invalidateLaneInboundIndex(world);
     const busy = describeLotMarketPressure(
       world,
       { originIcao: origin, destIcao: dest, commodityId: 'general' },
@@ -911,6 +913,7 @@ describe('NPC freighter fleet', () => {
       status: 'in_flight',
     };
     world.npcFlights.push(flight);
+    invalidateLaneInboundIndex(world);
 
     assert.equal(npcLaneAirborneKg(world, 'SBGR', 'SBGL', 'electronics'), 14_000);
     assert.equal(npcLaneAirborneKg(world, null, 'SBGL', 'electronics'), 14_000);
@@ -932,6 +935,7 @@ describe('NPC freighter fleet', () => {
         source: 'player',
       },
     ];
+    invalidateLaneInboundIndex(world);
     assert.equal(playerLaneInboundKg(world, 'SBGR', 'SBGL', 'electronics'), 7_000);
     assert.equal(laneInboundKg(world, 'SBGR', 'SBGL', 'electronics'), 21_000);
     assert.ok(
@@ -940,6 +944,7 @@ describe('NPC freighter fleet', () => {
     );
 
     flight.cargoKg = LANE_SATURATION_KG;
+    invalidateLaneInboundIndex(world);
     assert.equal(npcLaneSaturation(world, 'SBGR', 'SBGL', 'electronics'), 1);
   });
 
@@ -1467,7 +1472,8 @@ describe('NPC freighter fleet', () => {
       'light_turboprop',
       offerKg,
     );
-    assert.equal(structuralLift, offerKg);
+    // Catalog structural payload (mtow − oew), not the offer or class fallback.
+    assert.equal(structuralLift, 1_573);
     const routeLift = contractPilotLiftKg(typeId, 'light_turboprop', offerKg, {
       distanceNm: 913,
     });
@@ -2046,7 +2052,9 @@ describe('NPC freighter fleet', () => {
     );
 
     const extraStarter = starters.find(
-      (n) => !open.some((f) => f.npcId === n.id),
+      (n) =>
+        !open.some((f) => f.npcId === n.id) &&
+        Boolean(findReachableAwayPad(world, n)),
     );
     assert.ok(extraStarter);
     const awayStarter = findReachableAwayPad(world, extraStarter!);
@@ -2059,7 +2067,11 @@ describe('NPC freighter fleet', () => {
         }),
       /Failed to create reposition offer/,
     );
-    const extraOther = others.find((n) => !open.some((f) => f.npcId === n.id));
+    const extraOther = others.find(
+      (n) =>
+        !open.some((f) => f.npcId === n.id) &&
+        Boolean(findReachableAwayPad(world, n)),
+    );
     assert.ok(extraOther);
     const awayOther = findReachableAwayPad(world, extraOther!);
     assert.ok(awayOther);

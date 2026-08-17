@@ -547,6 +547,16 @@ import {
   AF_CAREER_HUBS,
   buildAfFeederCorridors,
 } from './career-af-hubs.js';
+import {
+  assertNpCareerHubCatalog,
+  NP_CAREER_HUBS,
+  buildNpFeederCorridors,
+} from './career-np-hubs.js';
+import {
+  assertBdCareerHubCatalog,
+  BD_CAREER_HUBS,
+  buildBdFeederCorridors,
+} from './career-bd-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1098,6 +1108,8 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(TJ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(KG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(AF_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(NP_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BD_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1624,6 +1636,13 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'OAKB', b: 'OAKN', weight: 1.8 },
   { a: 'OAKN', b: 'OAHR', weight: 1.6 },
   { a: 'OAKB', b: 'OAHR', weight: 1.5 },
+  // Asia-8 Nepal / Bangladesh domestic trunks
+  { a: 'VNKT', b: 'VNPK', weight: 1.7 },
+  { a: 'VNKT', b: 'VNBW', weight: 1.6 },
+  { a: 'VGHS', b: 'VGEG', weight: 1.9 },
+  { a: 'VGHS', b: 'VGSY', weight: 1.6 },
+  { a: 'VGHS', b: 'VGRJ', weight: 1.5 },
+  { a: 'VGEG', b: 'VGSY', weight: 1.4 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1742,6 +1761,8 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildTjFeederCorridors(TJ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildKgFeederCorridors(KG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildAfFeederCorridors(AF_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildNpFeederCorridors(NP_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBdFeederCorridors(BD_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4425,6 +4446,39 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'UTDD',
     capacityKgPerDay: 30_000,
   },
+  // Asia-8 Nepal / Bangladesh
+  {
+    id: 'lane_vnkt_vidp',
+    originCountryId: 'NP',
+    destCountryId: 'IN',
+    originIcao: 'VNKT',
+    destIcao: 'VIDP',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_vghs_vecc',
+    originCountryId: 'BD',
+    destCountryId: 'IN',
+    originIcao: 'VGHS',
+    destIcao: 'VECC',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_vghs_vnkt',
+    originCountryId: 'BD',
+    destCountryId: 'NP',
+    originIcao: 'VGHS',
+    destIcao: 'VNKT',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_vghs_vegt',
+    originCountryId: 'BD',
+    destCountryId: 'IN',
+    originIcao: 'VGHS',
+    destIcao: 'VEGT',
+    capacityKgPerDay: 30_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4855,6 +4909,10 @@ export const FUEL_HUB_ICAOS = new Set([
   // Asia-7 Afghanistan
   'OAKB',
   'OAKN',
+  // Asia-8 Nepal / Bangladesh
+  'VNKT',
+  'VGHS',
+  'VGEG',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5767,6 +5825,18 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    NP_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    BD_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -6188,6 +6258,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertTjCareerHubCatalog();
   assertKgCareerHubCatalog();
   assertAfCareerHubCatalog();
+  assertNpCareerHubCatalog();
+  assertBdCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -7186,6 +7258,24 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...AF_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...NP_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BD_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

@@ -303,6 +303,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   UAFM: 'UCFM',
   UAFO: 'UCFO',
   UTDK: 'UTDD',
+  // Asia-8: Pokhara in stock MSFS is VNPK (not VNPR intl); Dhaka is VGHS (not VGZR)
+  VNPR: 'VNPK',
+  VGZR: 'VGHS',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

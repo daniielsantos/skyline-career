@@ -1043,6 +1043,12 @@ function regionLabel(region: string): string {
       return 'Afghanistan — North / Kabul';
     case 'AF-S':
       return 'Afghanistan — South / Kandahar';
+    case 'NP-C':
+      return 'Nepal — Kathmandu';
+    case 'BD-C':
+      return 'Bangladesh — Central / Dhaka';
+    case 'BD-E':
+      return 'Bangladesh — East / Chittagong';
     default:
       return region;
   }

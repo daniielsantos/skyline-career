@@ -133,7 +133,16 @@
 - Countries: AF (landlocked — no ports)
 - ICAO traps: Kabul **OAKB** (not **OAIX** Bagram); skip Jalalabad OAJL
 - World seed: **903** airports; **113** ports; fuel trucks **350**; **+2** Afghanistan regions
-- Next: NP / BD / South-East Asia face
+- Next: Nepal / Bangladesh
+
+## Asia-8 Nepal / Bangladesh
+
+- Countries: NP / BD (BT deferred)
+- ICAO traps: Kathmandu **VNKT**; Pokhara **VNPK** (stock MSFS; **VNPR** intl omitted); Dhaka **VGHS** (not **VGZR** Zia); skip VNLK Lukla
+- Ports: Chittagong → VGEG
+- World seed: **910** airports; **114** ports; fuel trucks **365**; **+3** Nepal/Bangladesh regions
+- Remaps: `VNPR→VNPK`, `VGZR→VGHS`
+- Next: BT / South-East Asia face
 
 ## SimBrief cargo allowlist
 

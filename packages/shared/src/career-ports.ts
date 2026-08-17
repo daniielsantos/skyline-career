@@ -996,6 +996,14 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 52.97,
     pickupHubs: ['UTAK'],
   },
+  {
+    id: 'BDCGP',
+    name: 'Chittagong',
+    countryId: 'BD',
+    lat: 22.32,
+    lon: 91.8,
+    pickupHubs: ['VGEG'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

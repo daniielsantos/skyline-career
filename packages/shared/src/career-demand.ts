@@ -292,6 +292,10 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['AF', 'IR'],
     ['AF', 'UZ'],
     ['AF', 'TJ'],
+    // Asia-8 Nepal / Bangladesh (do not backfill remaining EU-2+ pairs here)
+    ['NP', 'IN'],
+    ['BD', 'IN'],
+    ['BD', 'NP'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

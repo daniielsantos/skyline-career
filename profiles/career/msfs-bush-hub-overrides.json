@@ -13577,5 +13577,138 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "VGEG": {
+    "name": "Shah Amanat Intl",
+    "lat": 22.257022373378277,
+    "lon": 91.82220831513405,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 228.26791381835938,
+        "lengthM": 2939.78369140625,
+        "widthM": 50.417076110839844,
+        "lat": 22.249639257788658,
+        "lon": 91.81329756975174,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VGHS": {
+    "name": "Hazrat Shahjalal International A",
+    "lat": 23.843347169458866,
+    "lon": 90.3977832198143,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "14",
+        "headingTrueDeg": 143.86651611328125,
+        "lengthM": 3201.6923828125,
+        "widthM": 46,
+        "lat": 23.843370974063873,
+        "lon": 90.3977657854557,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VGRJ": {
+    "name": "Shah Mokhdum",
+    "lat": 24.437352865934372,
+    "lon": 88.61653313040733,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 170.08145141601562,
+        "lengthM": 1817.98974609375,
+        "widthM": 29.182559967041016,
+        "lat": 24.43737968802452,
+        "lon": 88.61652195453644,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VGSY": {
+    "name": "Osmany Intl",
+    "lat": 24.961341507732868,
+    "lon": 91.87163606286049,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "29",
+        "headingTrueDeg": 293.1123962402344,
+        "lengthM": 3032.913330078125,
+        "widthM": 45.23295211791992,
+        "lat": 24.963788352906704,
+        "lon": 91.86498060822487,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VNBW": {
+    "name": "Bhairahawa",
+    "lat": 27.507222220301628,
+    "lon": 83.41805577278137,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "28",
+        "headingTrueDeg": 278.82275390625,
+        "lengthM": 1489.7550048828125,
+        "widthM": 32.05585479736328,
+        "lat": 27.505705766379833,
+        "lon": 83.4161876142025,
+        "identReciprocal": "10",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VNKT": {
+    "name": "Tribhuvan Intl",
+    "lat": 27.69611109048128,
+    "lon": 85.36055535078049,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 201.9744873046875,
+        "lengthM": 3048.513916015625,
+        "widthM": 44.4749755859375,
+        "lat": 27.696657590568066,
+        "lon": 85.35916328430176,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VNPK": {
+    "name": "Pokhara",
+    "lat": 28.199122175574303,
+    "lon": 83.97857218980789,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 39.65541076660156,
+        "lengthM": 1442.0677490234375,
+        "widthM": 31.52359390258789,
+        "lat": 28.200999721884727,
+        "lon": 83.98153960704803,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

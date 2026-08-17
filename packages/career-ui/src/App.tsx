@@ -885,6 +885,14 @@ function regionLabel(region: string): string {
       return 'Iceland — Southwest';
     case 'IS-NE':
       return 'Iceland — North / East';
+    case 'BA-C':
+      return 'Bosnia and Herzegovina';
+    case 'ME-C':
+      return 'Montenegro';
+    case 'AL-C':
+      return 'Albania';
+    case 'MK-C':
+      return 'North Macedonia';
     default:
       return region;
   }

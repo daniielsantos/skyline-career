@@ -26,16 +26,17 @@
 - **U.S. Virgin Islands:** region `US-VI` under US (TIST/TISX); domestic to KMIA + inter-island
 - BB/GD/MQ/CW/SX/AW: single-major catalogs where island is tiny
 
-## Europe seed (EU-1 … EU-5)
+## Europe seed (EU-1 … EU-6)
 
 - **EU-1:** PT / ES / FR / GB / DE / NL / BE / IT
 - **EU-2:** IE / DK / NO / SE / FI / CH / AT
 - **EU-3:** PL / CZ / SK / HU / EE / LV / LT
 - **EU-4 Balkans:** HR / SI / RO / BG / GR / RS
 - **EU-5 Iceland:** IS (BIKF / BIRK / BIAR / BIEG)
-- World seed: **738** airports; **75** ports; fuel trucks **134**; **~123** regions
-- EU-5 port: Reykjavik (pickup BIRK/BIKF)
-- Next: remaining Balkans (BA/ME/AL/MK) / further east
+- **EU-6 W. Balkans:** BA / ME / AL / MK
+- World seed: **748** airports; **77** ports; fuel trucks **140**; **~127** regions
+- EU-6 ports: Bar (ME) / Durres (AL)
+- Next: further east (TR / UA / etc.) or fill gaps
 
 ## SimBrief cargo allowlist
 

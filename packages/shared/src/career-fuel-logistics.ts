@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 134;
+export const FUEL_TRUCK_FLEET_SIZE = 140;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 39 },
-  { truckClassId: 'semi_tanker', count: 60 },
-  { truckClassId: 'btrain_tanker', count: 35 },
+  { truckClassId: 'rigid_tanker', count: 41 },
+  { truckClassId: 'semi_tanker', count: 62 },
+  { truckClassId: 'btrain_tanker', count: 37 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -246,6 +246,10 @@ const TRUCK_NAME_POOL = [
   'Belgrade Tesla Tank',
   'Keflavik Jet Road',
   'Akureyri Tank Line',
+  'Sarajevo Tank Run',
+  'Podgorica Fuel Road',
+  'Tirana Jet Haul',
+  'Skopje Tank Line',
 ] as const;
 
 function hashSeed(seed: string): number {

@@ -1593,6 +1593,53 @@ function writeLastFboIcao(icao: string): void {
   }
 }
 
+/** Enough AirportView to paint the FBO panel before `/api/airport` finishes. */
+function buildOptimisticAirportView(
+  icao: string,
+  opts: {
+    hub?: NetworkHub | null;
+    playerFbos?: PlayerFboSnapshot | null;
+    homeHubIcao?: string | null;
+    tick: number;
+    lastBatchAtMs: number;
+    msPerTick: number;
+  },
+): AirportView {
+  const code = icao.trim().toUpperCase();
+  const hub = opts.hub ?? null;
+  return {
+    serverNowMs: Date.now(),
+    lastBatchAtMs: opts.lastBatchAtMs,
+    tick: opts.tick,
+    continuousHours: 0,
+    msPerTick: opts.msPerTick,
+    airport: {
+      icao: code,
+      name: hub?.name ?? code,
+      region: hub?.region ?? '',
+      level: hub?.level ?? 1,
+      lat: hub?.lat,
+      lon: hub?.lon,
+      hubTier: hub?.hubTier,
+      bush: hub?.bush,
+      bushTripOnly: hub?.bushTripOnly,
+    },
+    totalStockKg: 0,
+    totalStockTonnes: 0,
+    commodities: [],
+    outboundLots: [],
+    inboundLots: [],
+    arrivals: [],
+    departures: [],
+    npcActivity: [],
+    fuelInbound: [],
+    fuelRecent: [],
+    playerFbos: opts.playerFbos ?? null,
+    homeHubIcao: opts.homeHubIcao ?? null,
+    runways: [],
+  };
+}
+
 function IcaoLink(props: {
   icao: string;
   onOpen: (icao: string) => void;
@@ -2488,6 +2535,8 @@ export function App() {
   /** Default on: hide locked / OOR / zero-lift when an aircraft is selected. */
   const [viableOnly, setViableOnly] = useState(true);
   const boardAircraftInitRef = useRef(false);
+  /** Bumps on each airport open so stale FBO hydrates are ignored. */
+  const airportOpenSeqRef = useRef(0);
   const [nearMe, setNearMe] = useState(false);
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
@@ -4272,11 +4321,10 @@ export function App() {
   ) {
     const next = icao.toUpperCase();
     const section = opts?.section ?? 'inventory';
-    await run(async () => {
-      const view = await fetchAirportView(next);
-      setAirportView(view);
-      if (view.playerFbos) setPlayerFbos(view.playerFbos);
-      if (airportIcao !== next) {
+    const switchingIcao = airportIcao !== next;
+
+    const applyTerminalNav = () => {
+      if (switchingIcao) {
         setTerminalSection(section);
         setContractsLane('outbound');
         setContractsSorts([...DEFAULT_BOARD_SORTS]);
@@ -4290,21 +4338,58 @@ export function App() {
       }
       setAirportIcao(next);
       writeCareerLocation({ tab, airportIcao: next });
-      if (opts?.section === 'fbo') {
+      if (section === 'fbo') {
         writeLastFboIcao(next);
       }
+    };
+
+    // FBO: paint immediately from cached snapshot + network hub metadata; hydrate
+    // the heavy `/api/airport` payload (lot estimates) in the background.
+    if (section === 'fbo') {
+      const hub =
+        networkHubs.find((h) => h.icao.toUpperCase() === next) ?? null;
+      setAirportView(
+        buildOptimisticAirportView(next, {
+          hub,
+          playerFbos,
+          homeHubIcao: homeHubIcao || null,
+          tick,
+          lastBatchAtMs,
+          msPerTick,
+        }),
+      );
+      applyTerminalNav();
+      const seq = ++airportOpenSeqRef.current;
+      void fetchAirportView(next)
+        .then((view) => {
+          if (airportOpenSeqRef.current !== seq) return;
+          setAirportView(view);
+          if (view.playerFbos) setPlayerFbos(view.playerFbos);
+        })
+        .catch((err: unknown) => {
+          if (airportOpenSeqRef.current !== seq) return;
+          const message = err instanceof Error ? err.message : String(err);
+          if (!isNeedsProfileMessage(message)) setError(message);
+        });
+      return;
+    }
+
+    await run(async () => {
+      const view = await fetchAirportView(next);
+      setAirportView(view);
+      if (view.playerFbos) setPlayerFbos(view.playerFbos);
+      applyTerminalNav();
     }, { refreshAfter: false, lockUi: false });
   }
 
-  async function openFboBoard() {
+  function openFboBoard() {
     setAirportReturn(null);
     setSidebarOpen(false);
     const owned = (playerFbos?.fbos ?? []).map((f) => f.icao.toUpperCase());
     const current = airportIcao?.toUpperCase() ?? null;
-    if (current && owned.includes(current)) {
+    if (current && owned.includes(current) && airportView) {
       writeLastFboIcao(current);
       setTerminalSection('fbo');
-      void run(refresh, { refreshAfter: false, lockUi: false });
       return;
     }
     const last = readLastFboIcao();
@@ -4319,10 +4404,11 @@ export function App() {
       setToast('Set a home hub before opening FBO');
       return;
     }
-    await openAirport(target, { section: 'fbo' });
+    void openAirport(target, { section: 'fbo' });
   }
 
   function closeAirport() {
+    airportOpenSeqRef.current += 1;
     setAirportIcao(null);
     setAirportView(null);
     setTerminalSection('inventory');
@@ -4338,6 +4424,7 @@ export function App() {
   }
 
   function goToTab(next: Tab, opts: { replace?: boolean } = {}) {
+    airportOpenSeqRef.current += 1;
     setAirportIcao(null);
     setAirportView(null);
     setTerminalSection('inventory');
@@ -7346,27 +7433,10 @@ export function App() {
           </button>
           <button
             type="button"
-            className={!showAirport && tab === 'staging' ? 'tab active' : 'tab'}
-            onClick={() => selectTab('staging')}
-            disabled={busy}
-            title={
-              activeMission
-                ? `Dispatch · ${activeMission.originIcao}→${activeMission.destIcao}`
-                : activeBushTrip
-                  ? `Dispatch · bush ${activeBushTrip.fromIcao}→${activeBushTrip.toIcao}`
-                  : staging
-                    ? `Dispatch draft · ${staging.originIcao}→${staging.destIcao}`
-                    : 'Guided preflight — OFP, fuel, load, fly'
-            }
-          >
-            Dispatch
-          </button>
-          <button
-            type="button"
             className={
               showAirport && terminalSection === 'fbo' ? 'tab active' : 'tab'
             }
-            onClick={() => void openFboBoard()}
+            onClick={() => openFboBoard()}
             disabled={busy}
             title={
               playerFbos?.fbos.length

@@ -1009,6 +1009,10 @@ function regionLabel(region: string): string {
       return 'Pakistan — North / Islamabad';
     case 'PK-S':
       return 'Pakistan — South / Karachi';
+    case 'IN-N':
+      return 'India — North / Delhi';
+    case 'IN-W':
+      return 'India — West / Mumbai';
     default:
       return region;
   }

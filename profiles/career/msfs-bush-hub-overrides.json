@@ -12698,5 +12698,197 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "VAAH": {
+    "name": "Ahmedabad",
+    "lat": 23.071194514632225,
+    "lon": 72.62643903493881,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 44.50139236450195,
+        "lengthM": 3493.190185546875,
+        "widthM": 42.08321762084961,
+        "lat": 23.077199645340443,
+        "lon": 72.63445928692818,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VABB": {
+    "name": "Chhatrapati Shivaji Intl",
+    "lat": 19.091555401682854,
+    "lon": 72.86597236990929,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 89.14881896972656,
+        "lengthM": 3444.8798828125,
+        "widthM": 58.98752975463867,
+        "lat": 19.08866163343191,
+        "lon": 72.86428570747375,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "32",
+        "headingTrueDeg": 314.1614990234375,
+        "lengthM": 2870.013671875,
+        "widthM": 42.84821701049805,
+        "lat": 19.089493118226528,
+        "lon": 72.86699339747429,
+        "identReciprocal": "14",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VAPO": {
+    "name": "Pune AB",
+    "lat": 18.582499958574772,
+    "lon": 73.92027765512466,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 93.75359344482422,
+        "lengthM": 2528.584228515625,
+        "widthM": 41.99699783325195,
+        "lat": 18.582344390451908,
+        "lon": 73.91841039061546,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VIAR": {
+    "name": "Amritsar",
+    "lat": 31.71059176325798,
+    "lon": 74.80015575885773,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "34",
+        "headingTrueDeg": 337.5693359375,
+        "lengthM": 3653.60107421875,
+        "widthM": 45.11935806274414,
+        "lat": 31.711245886981487,
+        "lon": 74.7964771091938,
+        "identReciprocal": "16",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VIDP": {
+    "name": "Indira Gandhi Intl",
+    "lat": 28.568611219525337,
+    "lon": 77.11222216486931,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 91.46732330322266,
+        "lengthM": 2813.058349609375,
+        "widthM": 43.905418395996094,
+        "lat": 28.57021853327751,
+        "lon": 77.10252285003662,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "10",
+        "headingTrueDeg": 104.69035339355469,
+        "lengthM": 3812.3955078125,
+        "widthM": 43.394142150878906,
+        "lat": 28.562886714935303,
+        "lon": 77.10372135043144,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11L",
+        "headingTrueDeg": 103.63550567626953,
+        "lengthM": 4430.169921875,
+        "widthM": 50,
+        "lat": 28.545490242540836,
+        "lon": 77.08987578749657,
+        "identReciprocal": "29R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11R",
+        "headingTrueDeg": 103.59513092041016,
+        "lengthM": 4433.8134765625,
+        "widthM": 58.49500274658203,
+        "lat": 28.542491868138313,
+        "lon": 77.08751678466797,
+        "identReciprocal": "29L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VIJO": {
+    "name": "Jodhpur AB",
+    "lat": 26.251078359782696,
+    "lon": 73.04793030023575,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 224.78599548339844,
+        "lengthM": 3212.44580078125,
+        "widthM": 43.939430236816406,
+        "lat": 26.25110987573862,
+        "lon": 73.04789364337921,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VIJP": {
+    "name": "Jaipur",
+    "lat": 26.824166513979435,
+    "lon": 75.8024999499321,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 84.04759979248047,
+        "lengthM": 3407.35693359375,
+        "widthM": 42.91668701171875,
+        "lat": 26.82463489472866,
+        "lon": 75.8162896335125,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VOGO": {
+    "name": "Dabolim",
+    "lat": 15.380838923156261,
+    "lon": 73.82706686854362,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "26",
+        "headingTrueDeg": 258.6160583496094,
+        "lengthM": 3423.21484375,
+        "widthM": 43.1892204284668,
+        "lat": 15.380827523767948,
+        "lon": 73.83278131484985,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

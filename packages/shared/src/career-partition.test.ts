@@ -86,6 +86,7 @@ describe('career partition', () => {
       'HU',
       'IE',
       'IL',
+      'IN',
       'IQ',
       'IR',
       'IS',

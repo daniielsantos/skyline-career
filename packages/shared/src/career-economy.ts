@@ -507,6 +507,11 @@ import {
   PK_CAREER_HUBS,
   buildPkFeederCorridors,
 } from './career-pk-hubs.js';
+import {
+  assertInCareerHubCatalog,
+  IN_CAREER_HUBS,
+  buildInFeederCorridors,
+} from './career-in-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1050,6 +1055,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(SD_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(YE_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(PK_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(IN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1532,6 +1538,15 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'OPKC', b: 'OPMT', weight: 1.8 },
   { a: 'OPKC', b: 'OPIS', weight: 2.0 },
   { a: 'OPLA', b: 'OPMT', weight: 1.6 },
+  // Asia-2 India west domestic trunks
+  { a: 'VIDP', b: 'VIAR', weight: 1.8 },
+  { a: 'VIDP', b: 'VIJP', weight: 1.9 },
+  { a: 'VIJP', b: 'VIJO', weight: 1.5 },
+  { a: 'VABB', b: 'VAPO', weight: 1.9 },
+  { a: 'VABB', b: 'VAAH', weight: 1.8 },
+  { a: 'VABB', b: 'VOGO', weight: 1.6 },
+  { a: 'VIDP', b: 'VABB', weight: 2.0 },
+  { a: 'VAAH', b: 'VIJP', weight: 1.6 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1642,6 +1657,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildSdFeederCorridors(SD_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildYeFeederCorridors(YE_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildPkFeederCorridors(PK_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildInFeederCorridors(IN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4079,6 +4095,47 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'OEJN',
     capacityKgPerDay: 40_000,
   },
+  // Asia-2 India west
+  {
+    id: 'lane_vidp_opis',
+    originCountryId: 'IN',
+    destCountryId: 'PK',
+    originIcao: 'VIDP',
+    destIcao: 'OPIS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_viar_opla',
+    originCountryId: 'IN',
+    destCountryId: 'PK',
+    originIcao: 'VIAR',
+    destIcao: 'OPLA',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_vabb_opkc',
+    originCountryId: 'IN',
+    destCountryId: 'PK',
+    originIcao: 'VABB',
+    destIcao: 'OPKC',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_vabb_omdb',
+    originCountryId: 'IN',
+    destCountryId: 'AE',
+    originIcao: 'VABB',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_vabb_oejn',
+    originCountryId: 'IN',
+    destCountryId: 'SA',
+    originIcao: 'VABB',
+    destIcao: 'OEJN',
+    capacityKgPerDay: 40_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4486,6 +4543,10 @@ export const FUEL_HUB_ICAOS = new Set([
   // Asia-1 Pakistan
   'OPIS',
   'OPKC',
+  // Asia-2 India west
+  'VIDP',
+  'VABB',
+  'VAAH',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5350,6 +5411,12 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    IN_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -5763,6 +5830,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertSdCareerHubCatalog();
   assertYeCareerHubCatalog();
   assertPkCareerHubCatalog();
+  assertInCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -6689,6 +6757,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...PK_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...IN_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

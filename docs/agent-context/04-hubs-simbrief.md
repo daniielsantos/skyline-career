@@ -82,12 +82,19 @@
 
 ## Asia-1 Pakistan
 
-- Countries: PK (India / Central Asia deferred)
+- Countries: PK
 - ICAO traps: Islamabad **OPIS** (not old **OPRN** Chaklala); Karachi **OPKC** (not OPMR Masroor); Lahore **OPLA**
 - Ports: Karachi → OPKC
 - World seed: **864** airports; **107** ports; fuel trucks **265**; **+2** Pakistan regions
 - Remaps: `OPRN→OPIS`
-- Next: India west or Central Asia
+
+## Asia-2 India west
+
+- Countries: IN (east/south and Central Asia deferred)
+- ICAO traps: Delhi **VIDP** (not VIDD Safdarjung); Mumbai **VABB**; Goa **VOGO** Dabolim (not **VOGA** Mopa); Ahmedabad **VAAH**
+- Ports: Mumbai → VABB
+- World seed: **872** airports; **108** ports; fuel trucks **275**; **+2** India regions
+- Next: India east/south or Central Asia
 
 ## SimBrief cargo allowlist
 

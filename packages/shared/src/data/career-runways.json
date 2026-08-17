@@ -19015,5 +19015,311 @@
       "surface": "asphalt",
       "lighted": true
     }
+  ],
+  "AYPY": [
+    {
+      "ident": "14L",
+      "identReciprocal": "32R",
+      "headingTrueDeg": 148.9,
+      "lengthM": 2750,
+      "widthM": 45.1,
+      "lat": -9.43087,
+      "lon": 147.214005,
+      "surface": "asphalt",
+      "lighted": true
+    },
+    {
+      "ident": "14R",
+      "identReciprocal": "32L",
+      "headingTrueDeg": 148.2,
+      "lengthM": 1410,
+      "widthM": 45.1,
+      "lat": -9.43471,
+      "lon": 147.212997,
+      "surface": "asphalt",
+      "lighted": false
+    }
+  ],
+  "NFFN": [
+    {
+      "ident": "02",
+      "identReciprocal": "20",
+      "headingTrueDeg": 37.9,
+      "lengthM": 3273,
+      "widthM": 45.7,
+      "lat": -17.773701,
+      "lon": 177.427994,
+      "surface": "asphalt",
+      "lighted": true
+    },
+    {
+      "ident": "09",
+      "identReciprocal": "27",
+      "headingTrueDeg": 104.9,
+      "lengthM": 2136,
+      "widthM": 45.7,
+      "lat": -17.7535,
+      "lon": 177.436005,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "NWWW": [
+    {
+      "ident": "11",
+      "identReciprocal": "29",
+      "headingTrueDeg": 121.1,
+      "lengthM": 3250,
+      "widthM": 45.1,
+      "lat": -22.007,
+      "lon": 166.199005,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "PHNL": [
+    {
+      "ident": "08L",
+      "identReciprocal": "26R",
+      "headingTrueDeg": 90,
+      "lengthM": 3767,
+      "widthM": 61,
+      "lat": 21.325199,
+      "lon": -157.942993,
+      "surface": "asphalt",
+      "lighted": false
+    },
+    {
+      "ident": "08R",
+      "identReciprocal": "26L",
+      "headingTrueDeg": 90,
+      "lengthM": 3658,
+      "widthM": 61,
+      "lat": 21.306801,
+      "lon": -157.945999,
+      "surface": "asphalt",
+      "lighted": false
+    },
+    {
+      "ident": "04R",
+      "identReciprocal": "22L",
+      "headingTrueDeg": 52.7,
+      "lengthM": 2744,
+      "widthM": 45.7,
+      "lat": 21.3139,
+      "lon": -157.927002,
+      "surface": "asphalt",
+      "lighted": false
+    },
+    {
+      "ident": "04L",
+      "identReciprocal": "22R",
+      "headingTrueDeg": 52.4,
+      "lengthM": 2120,
+      "widthM": 45.7,
+      "lat": 21.3183,
+      "lon": -157.923004,
+      "surface": "asphalt",
+      "lighted": false
+    },
+    {
+      "ident": "08W",
+      "identReciprocal": "26W",
+      "headingTrueDeg": 90.8,
+      "lengthM": 1551,
+      "widthM": 91.4,
+      "lat": 21.3113,
+      "lon": -157.917007,
+      "surface": "water",
+      "lighted": false
+    },
+    {
+      "ident": "04W",
+      "identReciprocal": "22W",
+      "headingTrueDeg": 51.4,
+      "lengthM": 914,
+      "widthM": 45.7,
+      "lat": 21.314699,
+      "lon": -157.912994,
+      "surface": "water",
+      "lighted": false
+    }
+  ],
+  "ZHHH": [
+    {
+      "ident": "05L",
+      "identReciprocal": "23R",
+      "headingTrueDeg": 41.3,
+      "lengthM": 3600,
+      "widthM": 60,
+      "lat": 30.757639,
+      "lon": 114.210793,
+      "surface": "concrete",
+      "lighted": true
+    },
+    {
+      "ident": "04",
+      "identReciprocal": "22",
+      "headingTrueDeg": 42,
+      "lengthM": 3400,
+      "widthM": 45.1,
+      "lat": 30.772301,
+      "lon": 114.195999,
+      "surface": "asphalt",
+      "lighted": true
+    },
+    {
+      "ident": "05R",
+      "identReciprocal": "23L",
+      "headingTrueDeg": 41.3,
+      "lengthM": 3200,
+      "widthM": 45.1,
+      "lat": 30.758211,
+      "lon": 114.216393,
+      "surface": "concrete",
+      "lighted": true
+    }
+  ],
+  "ZLXY": [
+    {
+      "ident": "05L",
+      "identReciprocal": "23R",
+      "headingTrueDeg": 48.7,
+      "lengthM": 3800,
+      "widthM": 45.1,
+      "lat": 34.442154,
+      "lon": 108.735619,
+      "surface": "asphalt",
+      "lighted": true
+    },
+    {
+      "ident": "05R",
+      "identReciprocal": "23L",
+      "headingTrueDeg": 0,
+      "lengthM": 3800,
+      "widthM": 60.4,
+      "lat": 0,
+      "lon": 0,
+      "surface": "other",
+      "lighted": true
+    },
+    {
+      "ident": "06L",
+      "identReciprocal": "24R",
+      "headingTrueDeg": 48.7,
+      "lengthM": 3800,
+      "widthM": 60,
+      "lat": 34.420982,
+      "lon": 108.751053,
+      "surface": "concrete",
+      "lighted": true
+    },
+    {
+      "ident": "06R",
+      "identReciprocal": "24L",
+      "headingTrueDeg": 48.9,
+      "lengthM": 3000,
+      "widthM": 45.1,
+      "lat": 34.423126,
+      "lon": 108.76033,
+      "surface": "concrete",
+      "lighted": true
+    }
+  ],
+  "ZPPP": [
+    {
+      "ident": "04",
+      "identReciprocal": "22",
+      "headingTrueDeg": 38.2,
+      "lengthM": 4500,
+      "widthM": 60,
+      "lat": 25.089687,
+      "lon": 102.930748,
+      "surface": "asphalt",
+      "lighted": true
+    },
+    {
+      "ident": "03",
+      "identReciprocal": "21",
+      "headingTrueDeg": 38.2,
+      "lengthM": 4000,
+      "widthM": 45.1,
+      "lat": 25.102249,
+      "lon": 102.917015,
+      "surface": "concrete",
+      "lighted": true
+    }
+  ],
+  "ZSAM": [
+    {
+      "ident": "05",
+      "identReciprocal": "23",
+      "headingTrueDeg": 51.5,
+      "lengthM": 3400,
+      "widthM": 45.1,
+      "lat": 24.534599,
+      "lon": 118.114998,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "ZUCK": [
+    {
+      "ident": "03L",
+      "identReciprocal": "21R",
+      "headingTrueDeg": 16.8,
+      "lengthM": 3800,
+      "widthM": 60,
+      "lat": 29.714319,
+      "lon": 106.661469,
+      "surface": "concrete",
+      "lighted": true
+    },
+    {
+      "ident": "02R",
+      "identReciprocal": "20L",
+      "headingTrueDeg": 16.8,
+      "lengthM": 3600,
+      "widthM": 45.1,
+      "lat": 29.704762,
+      "lon": 106.640671,
+      "surface": "concrete",
+      "lighted": true
+    },
+    {
+      "ident": "03R",
+      "identReciprocal": "21L",
+      "headingTrueDeg": 16.8,
+      "lengthM": 3400,
+      "widthM": 45.1,
+      "lat": 29.720997,
+      "lon": 106.6679,
+      "surface": "concrete",
+      "lighted": true
+    },
+    {
+      "ident": "02L",
+      "identReciprocal": "20R",
+      "headingTrueDeg": 16.7,
+      "lengthM": 3200,
+      "widthM": 45.1,
+      "lat": 29.705181,
+      "lon": 106.636749,
+      "surface": "concrete",
+      "lighted": true
+    }
+  ],
+  "ZYTL": [
+    {
+      "ident": "10",
+      "identReciprocal": "28",
+      "headingTrueDeg": 95.6,
+      "lengthM": 3300,
+      "widthM": 45.1,
+      "lat": 38.967098,
+      "lon": 121.519997,
+      "surface": "concrete",
+      "lighted": true
+    }
   ]
 }

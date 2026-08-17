@@ -313,6 +313,8 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   WIMK: 'WIMM',
   WRRR: 'WADD',
   RPML: 'RPMY',
+  // Asia-15: closed Xi'an Xiguan → Xianyang
+  ZLSN: 'ZLXY',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

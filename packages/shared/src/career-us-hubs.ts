@@ -7,6 +7,7 @@ import type { CommodityId, HubTier } from './types/career-economy.js';
 import { US_BUSH_TRIP_ONLY_HUBS } from './career-us-bush-trip-hubs.js';
 import { US_PR_CAREER_HUBS } from './career-us-pr-hubs.js';
 import { US_VI_CAREER_HUBS } from './career-us-vi-hubs.js';
+import { US_HI_CAREER_HUBS } from './career-us-hi-hubs.js';
 
 export type UsCareerRegion =
   | 'US-W'
@@ -16,7 +17,8 @@ export type UsCareerRegion =
   | 'US-SE'
   | 'US-NE'
   | 'US-PR'
-  | 'US-VI';
+  | 'US-VI'
+  | 'US-HI';
 
 export type UsCareerHubDef = {
   icao: string;
@@ -1265,11 +1267,13 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
   ...US_PR_CAREER_HUBS,
   // U.S. Virgin Islands (US territory — region US-VI)
   ...US_VI_CAREER_HUBS,
+  // Hawaii (US state — region US-HI)
+  ...US_HI_CAREER_HUBS,
   // FAA locals / trip-only endpoints (Activities PLN Airport nodes)
   ...US_BUSH_TRIP_ONLY_HUBS,
 ];
 
-export const US_CAREER_HUB_COUNT = 162;
+export const US_CAREER_HUB_COUNT = 163;
 
 function haversineNm(
   a: { lat: number; lon: number },

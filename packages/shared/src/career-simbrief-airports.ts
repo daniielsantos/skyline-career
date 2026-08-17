@@ -131,6 +131,9 @@ import { KR_CAREER_HUBS } from './career-kr-hubs.js';
 import { TW_CAREER_HUBS } from './career-tw-hubs.js';
 import { AU_CAREER_HUBS } from './career-au-hubs.js';
 import { NZ_CAREER_HUBS } from './career-nz-hubs.js';
+import { FJ_CAREER_HUBS } from './career-fj-hubs.js';
+import { PG_CAREER_HUBS } from './career-pg-hubs.js';
+import { NC_CAREER_HUBS } from './career-nc-hubs.js';
 import allowlistRaw from './data/simbrief-dispatch-airports.json' with { type: 'json' };
 
 type CareerHubRow = {
@@ -266,6 +269,9 @@ const ALL_CAREER_HUBS: readonly CareerHubRow[] = [
   ...TW_CAREER_HUBS,
   ...AU_CAREER_HUBS,
   ...NZ_CAREER_HUBS,
+  ...FJ_CAREER_HUBS,
+  ...PG_CAREER_HUBS,
+  ...NC_CAREER_HUBS,
 ];
 
 /** ICAOs that must never be cargo/Dispatch hubs (MSFS-only or closed). */

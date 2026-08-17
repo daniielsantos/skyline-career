@@ -15396,5 +15396,315 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "AYPY": {
+    "name": "Jacksons",
+    "lat": -9.440277703106403,
+    "lon": 147.21861094236374,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "14L",
+        "headingTrueDeg": 148.50894165039062,
+        "lengthM": 2751.2001953125,
+        "widthM": 43.57521057128906,
+        "lat": -9.441452845931053,
+        "lon": 147.22043707966805,
+        "identReciprocal": "32R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14R",
+        "headingTrueDeg": 148.52157592773438,
+        "lengthM": 1308.6104736328125,
+        "widthM": 30.72858238220215,
+        "lat": -9.439711757004261,
+        "lon": 147.2160968184471,
+        "identReciprocal": "32L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "NFFN": {
+    "name": "Nadi Intl",
+    "lat": -17.75638896971941,
+    "lon": 177.44361117482185,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 104.12340545654297,
+        "lengthM": 2131.07080078125,
+        "widthM": 43.16112518310547,
+        "lat": -17.755401581525803,
+        "lon": 177.4458061158657,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "20",
+        "headingTrueDeg": 217.69708251953125,
+        "lengthM": 3287.05419921875,
+        "widthM": 48.531558990478516,
+        "lat": -17.761609219014645,
+        "lon": 177.438083589077,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "NWWW": {
+    "name": "Tontouta",
+    "lat": -22.014444395899773,
+    "lon": 166.21305540204048,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 121.08432006835938,
+        "lengthM": 3249.48974609375,
+        "widthM": 43.65523910522461,
+        "lat": -22.01450977474451,
+        "lon": 166.21299907565117,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "PHNL": {
+    "name": "Honolulu Intl",
+    "lat": 21.317816711962223,
+    "lon": -157.92022794485092,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 89.63520050048828,
+        "lengthM": 1902.9559326171875,
+        "widthM": 117.46466064453125,
+        "lat": 21.31135929375887,
+        "lon": -157.90523752570152,
+        "identReciprocal": "26",
+        "surface": "water"
+      },
+      {
+        "ident": "22L",
+        "headingTrueDeg": 232.99220275878906,
+        "lengthM": 2739.555908203125,
+        "widthM": 47.51848602294922,
+        "lat": 21.321382373571396,
+        "lon": -157.9166015982628,
+        "identReciprocal": "4R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "22R",
+        "headingTrueDeg": 232.9457244873047,
+        "lengthM": 2122.881103515625,
+        "widthM": 46.76911163330078,
+        "lat": 21.32410917431116,
+        "lon": -157.91517779231071,
+        "identReciprocal": "4L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "22W",
+        "headingTrueDeg": 230.7635040283203,
+        "lengthM": 1434.347900390625,
+        "widthM": 137.73272705078125,
+        "lat": 21.317748986184597,
+        "lon": -157.91017949581146,
+        "identReciprocal": "4W",
+        "surface": "water"
+      },
+      {
+        "ident": "26L",
+        "headingTrueDeg": 269.9753723144531,
+        "lengthM": 3659.806640625,
+        "widthM": 60.671424865722656,
+        "lat": 21.306812949478626,
+        "lon": -157.92821153998375,
+        "identReciprocal": "8R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "26R",
+        "headingTrueDeg": 270.0713806152344,
+        "lengthM": 3745.58544921875,
+        "widthM": 46.44031524658203,
+        "lat": 21.3252554833889,
+        "lon": -157.92517706751823,
+        "identReciprocal": "8L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZHHH": {
+    "name": "Tianhe",
+    "lat": 30.78499998897314,
+    "lon": 114.20666679739952,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 41.45703887939453,
+        "lengthM": 3396.3818359375,
+        "widthM": 45,
+        "lat": 30.78371487557888,
+        "lon": 114.20815587043762,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5L",
+        "headingTrueDeg": 41.461875915527344,
+        "lengthM": 3599.7529296875,
+        "widthM": 60,
+        "lat": 30.76981734484434,
+        "lon": 114.22322541475296,
+        "identReciprocal": "23R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZLXY": {
+    "name": "Xianyang",
+    "lat": 34.44499991834164,
+    "lon": 108.75,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "24R",
+        "headingTrueDeg": 228.6919403076172,
+        "lengthM": 3796.373046875,
+        "widthM": 47.44831085205078,
+        "lat": 34.43223629146814,
+        "lon": 108.76658454537392,
+        "identReciprocal": "6L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23R",
+        "headingTrueDeg": 228.73104858398438,
+        "lengthM": 2998.821044921875,
+        "widthM": 41.71037292480469,
+        "lat": 34.44696497172117,
+        "lon": 108.75221103429794,
+        "identReciprocal": "5L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZPPP": {
+    "name": "Wujiaba",
+    "lat": 25.10499995201826,
+    "lon": 102.94166654348373,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 38.35763931274414,
+        "lengthM": 3990.67626953125,
+        "widthM": 51.95293426513672,
+        "lat": 25.1164747774601,
+        "lon": 102.92933687567711,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4L",
+        "headingTrueDeg": 38.40841293334961,
+        "lengthM": 4490.99462890625,
+        "widthM": 56.08129119873047,
+        "lat": 25.105701684951782,
+        "lon": 102.94466570019722,
+        "identReciprocal": "22R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZSAM": {
+    "name": "Gaoqi",
+    "lat": 24.544999971985817,
+    "lon": 118.12666654586792,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 52.071868896484375,
+        "lengthM": 3399.947509765625,
+        "widthM": 48.057823181152344,
+        "lat": 24.544118866324425,
+        "lon": 118.12765270471573,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZUCK": {
+    "name": "Jiangbei",
+    "lat": 29.72708746790886,
+    "lon": 106.65099889039993,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "3L",
+        "headingTrueDeg": 16.71337890625,
+        "lengthM": 3805.568603515625,
+        "widthM": 59.33589172363281,
+        "lat": 29.730720855295658,
+        "lon": 106.66710779070854,
+        "identReciprocal": "21R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "20L",
+        "headingTrueDeg": 196.80300903320312,
+        "lengthM": 3603.904541015625,
+        "widthM": 48.82252883911133,
+        "lat": 29.720243141055107,
+        "lon": 106.6459858417511,
+        "identReciprocal": "2R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "20R",
+        "headingTrueDeg": 196.6969757080078,
+        "lengthM": 3199.009033203125,
+        "widthM": 44.36784744262695,
+        "lat": 29.71901636570692,
+        "lon": 106.64147391915321,
+        "identReciprocal": "2L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZYTL": {
+    "name": "Zhoushuizi",
+    "lat": 38.96666653454304,
+    "lon": 121.54000014066696,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 95.60291290283203,
+        "lengthM": 3298.136962890625,
+        "widthM": 44.69529342651367,
+        "lat": 38.9656962454319,
+        "lon": 121.53855353593826,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

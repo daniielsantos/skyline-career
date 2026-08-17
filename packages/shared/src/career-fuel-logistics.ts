@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 565;
+export const FUEL_TRUCK_FLEET_SIZE = 585;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 158 },
-  { truckClassId: 'semi_tanker', count: 250 },
-  { truckClassId: 'btrain_tanker', count: 157 },
+  { truckClassId: 'rigid_tanker', count: 164 },
+  { truckClassId: 'semi_tanker', count: 259 },
+  { truckClassId: 'btrain_tanker', count: 162 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -276,8 +276,8 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   // Asia-13 China / Japan / Korea domestic road graphs
   'CN-N': ['CN-E', 'CN-W'],
   'CN-E': ['CN-N', 'CN-S'],
-  'CN-S': ['CN-E'],
-  'CN-W': ['CN-N'],
+  'CN-S': ['CN-E', 'CN-W'],
+  'CN-W': ['CN-N', 'CN-S'],
   'JP-E': ['JP-W', 'JP-N'],
   'JP-W': ['JP-E', 'JP-S'],
   'JP-S': ['JP-W'],
@@ -294,6 +294,11 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'AU-W': [],
   'NZ-N': [],
   'NZ-S': [],
+  // Asia-15 Pacific hinge (islands — no road to the mainland)
+  'US-HI': [],
+  'FJ-W': [],
+  'PG-S': [],
+  'NC-S': [],
 };
 
 const TRUCK_NAME_POOL = [
@@ -544,6 +549,13 @@ const TRUCK_NAME_POOL = [
   'Perth Fuel Run',
   'Auckland Tank Line',
   'Christchurch Fuel',
+  'Xianyang Tank Line',
+  'Kunming Fuel Road',
+  'Dalian Port Fuel',
+  'Honolulu Tank Line',
+  'Nadi Fuel Run',
+  'Jacksons Tank Line',
+  'Tontouta Fuel',
 ] as const;
 
 function hashSeed(seed: string): number {

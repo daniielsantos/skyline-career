@@ -339,6 +339,13 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['AU', 'JP'],
     ['AU', 'ID'],
     ['NZ', 'SG'],
+    // Asia-15 Pacific hinge (do not backfill remaining EU-2+ pairs here)
+    ['US', 'JP'],
+    ['US', 'AU'],
+    ['FJ', 'AU'],
+    ['FJ', 'NZ'],
+    ['PG', 'AU'],
+    ['NC', 'AU'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

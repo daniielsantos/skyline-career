@@ -3,7 +3,8 @@
  *
  * Beijing cargo major is ZBAA Capital (not ZBAD Daxing). Shanghai cargo major
  * is ZSPD Pudong (not ZSSS Hongqiao). Guangzhou is ZGGG Baiyun. Chengdu is
- * ZUUU Shuangliu (Tianfu ZUTF deferred). Taiwan RC* deferred.
+ * ZUUU Shuangliu (Tianfu ZUTF deferred). Inland west / northeast / Xiamen
+ * added in Asia-15. Urumqi ZWWW and Qingdao ZSQD deferred.
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -26,7 +27,7 @@ export type CnCareerHubDef = {
   bush?: true;
 };
 
-/** 6 curated China hubs. Pudong pickup is ZSPD; Yantian pickup is ZGSZ. */
+/** 12 curated China hubs. Pudong pickup is ZSPD; Yantian ZGSZ; Dalian ZYTL; Xiamen ZSAM. */
 export const CN_CAREER_HUBS: readonly CnCareerHubDef[] = [
   {
     icao: 'ZBAA',
@@ -88,9 +89,69 @@ export const CN_CAREER_HUBS: readonly CnCareerHubDef[] = [
     produce: { electronics: 1.3, general: 1.35, machinery: 1.2 },
     consume: { perishables: 1.15, supplies: 1.15, fuel: 1.2 },
   },
+  {
+    icao: 'ZLXY',
+    name: "Xi'an Xianyang",
+    region: 'CN-W',
+    hubTier: 'regional',
+    lat: 34.4422,
+    lon: 108.7624,
+    produce: { electronics: 1.3, machinery: 1.25, general: 1.25 },
+    consume: { perishables: 1.15, supplies: 1.1, fuel: 1.2 },
+  },
+  {
+    icao: 'ZPPP',
+    name: 'Kunming Changshui',
+    region: 'CN-W',
+    hubTier: 'regional',
+    lat: 25.1103,
+    lon: 102.9367,
+    produce: { perishables: 1.3, general: 1.25, supplies: 1.1 },
+    consume: { electronics: 1.05, machinery: 1.0, fuel: 1.2 },
+  },
+  {
+    icao: 'ZYTL',
+    name: 'Dalian Zhoushuizi',
+    region: 'CN-N',
+    hubTier: 'regional',
+    lat: 38.9657,
+    lon: 121.5385,
+    produce: { machinery: 1.3, general: 1.3, electronics: 1.15 },
+    consume: { perishables: 1.15, supplies: 1.1, fuel: 1.2 },
+  },
+  {
+    icao: 'ZUCK',
+    name: 'Chongqing Jiangbei',
+    region: 'CN-W',
+    hubTier: 'regional',
+    lat: 29.7123,
+    lon: 106.6519,
+    produce: { machinery: 1.3, general: 1.3, electronics: 1.15 },
+    consume: { perishables: 1.15, supplies: 1.1, fuel: 1.15 },
+  },
+  {
+    icao: 'ZHHH',
+    name: 'Wuhan Tianhe',
+    region: 'CN-E',
+    hubTier: 'regional',
+    lat: 30.7748,
+    lon: 114.2137,
+    produce: { electronics: 1.3, general: 1.3, machinery: 1.2 },
+    consume: { perishables: 1.15, supplies: 1.1, fuel: 1.15 },
+  },
+  {
+    icao: 'ZSAM',
+    name: 'Xiamen Gaoqi',
+    region: 'CN-S',
+    hubTier: 'regional',
+    lat: 24.5439,
+    lon: 118.1275,
+    produce: { electronics: 1.35, general: 1.3, machinery: 1.15 },
+    consume: { perishables: 1.15, supplies: 1.1, fuel: 1.15 },
+  },
 ];
 
-export const CN_CAREER_HUB_COUNT = 6;
+export const CN_CAREER_HUB_COUNT = 12;
 
 export function buildCnFeederCorridors(
   hubs: readonly CnCareerHubDef[] = CN_CAREER_HUBS,
@@ -120,7 +181,10 @@ export function assertCnCareerHubCatalog(): void {
   if (CN_CAREER_HUBS.some((h) => h.icao === 'ZSSS' && h.hubTier === 'major')) {
     throw new Error('CN catalog must not treat ZSSS Hongqiao as the cargo major');
   }
-  if (CN_CAREER_HUBS.some((h) => ['ZUTF', 'ZBTJ', 'RCTP'].includes(h.icao))) {
-    throw new Error('CN catalog must not seed ZUTF / ZBTJ / RCTP this slice');
+  if (CN_CAREER_HUBS.some((h) => ['ZUTF', 'ZBTJ', 'RCTP', 'ZLSN'].includes(h.icao))) {
+    throw new Error('CN catalog must not seed ZUTF / ZBTJ / RCTP / ZLSN');
+  }
+  if (!CN_CAREER_HUBS.some((h) => h.icao === 'ZLXY')) {
+    throw new Error('CN catalog must include ZLXY (Xianyang, not closed Xiguan)');
   }
 }

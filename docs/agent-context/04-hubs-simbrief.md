@@ -192,7 +192,16 @@
 - ICAO traps: Taipei cargo major is **RCTP** Taoyuan (not **RCSS** Songshan); Sydney **YSSY** Kingsford Smith (not **YSBK** Bankstown); Melbourne **YMML** (not **YMEN** Essendon); Auckland **NZAA** (not **NZWN** Wellington); skip RCMQ/RCNN, Darwin YPDN, Hobart YMHB
 - Ports: Keelung → RCTP; Kaohsiung → RCKH; Sydney → YSSY; Melbourne → YMML; Brisbane → YBBN; Fremantle → YPPH; Auckland → NZAA
 - World seed: **974** airports; **141** ports; fuel trucks **565**; **+8** TW/AU/NZ regions
-- Next: leftover China inland / Pacific, or stop map
+- Next: China inland / Pacific hinge
+
+## Asia-15 China inland / Pacific hinge
+
+- Countries: CN inland extension + US-HI / FJ / PG / NC. Guam, Papeete, Urumqi, Qingdao deferred
+- ICAO traps: Xi'an **ZLXY** Xianyang (not closed **ZLSN** Xiguan); Kunming **ZPPP** Changshui; Dalian **ZYTL**; Chongqing **ZUCK**; Wuhan **ZHHH**; Xiamen **ZSAM**; Honolulu **PHNL** (not PHIK/PHJR); Nadi **NFFN**; Port Moresby **AYPY** (not AYNZ); Nouméa **NWWW** (not NWWM Magenta). Still skip ZUTF Tianfu
+- Ports: Dalian → ZYTL; Xiamen → ZSAM; Honolulu → PHNL; Nadi → NFFN; Port Moresby → AYPY; Nouméa → NWWW
+- World seed: **984** airports; **147** ports; fuel trucks **585**; **+4** Pacific regions (CN reuses CN-N/E/S/W)
+- Remaps: `ZLSN→ZLXY`
+- Next: leftover Pacific (Guam / Tahiti) or stop map
 
 ## SimBrief cargo allowlist
 

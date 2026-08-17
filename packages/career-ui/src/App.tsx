@@ -700,6 +700,8 @@ function regionLabel(region: string): string {
       return 'Puerto Rico';
     case 'US-VI':
       return 'U.S. Virgin Islands';
+    case 'US-HI':
+      return 'USA — Hawaii';
     case 'CA-W':
       return 'Canada — West';
     case 'CA-PR':
@@ -1162,6 +1164,12 @@ function regionLabel(region: string): string {
       return 'New Zealand — Auckland';
     case 'NZ-S':
       return 'New Zealand — Christchurch';
+    case 'FJ-W':
+      return 'Fiji — Nadi';
+    case 'PG-S':
+      return 'Papua New Guinea — Port Moresby';
+    case 'NC-S':
+      return 'New Caledonia — Noumea';
     default:
       return region;
   }

@@ -283,7 +283,16 @@
 - Port: WSSAV → NSAU
 - World seed: **1002** airports; **165** ports; fuel trucks **675**
 - Intl lanes: NSAU–NZAA, NSAU–NFTV; demand pair WS/TO
-- **Map seed complete** — optional future slices only (PW 2nd hub, AU Darwin/Hobart, BN, etc.)
+- **Map seed complete** — optional future slices only (AU Darwin/Hobart, BN, etc.)
+
+## Asia-26 Angaur micro-slice (pending homolog)
+
+- Country: PW — new region **PW-A** (Angaur; Koror stays **PW-C** / PTRO)
+- ICAO: **ANG** Angaur Airstrip (FAA LID — not PTRO Roman Tmetuchl)
+- Port: PWANG → ANG
+- World seed target: **1003** airports; **166** ports; fuel trucks **680**
+- Intl lanes: ANG–PGUM, ANG–RPLL; domestic corridor ANG–PTRO
+- **Not homologated** — confirm ANG in SimBrief Dispatch + `npm run career-hubs -- missing --yes` after rebuild
 
 ## SimBrief cargo allowlist
 

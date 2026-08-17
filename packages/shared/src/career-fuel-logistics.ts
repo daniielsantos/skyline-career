@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 675;
+export const FUEL_TRUCK_FLEET_SIZE = 680;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 186 },
-  { truckClassId: 'semi_tanker', count: 297 },
-  { truckClassId: 'btrain_tanker', count: 192 },
+  { truckClassId: 'rigid_tanker', count: 187 },
+  { truckClassId: 'semi_tanker', count: 299 },
+  { truckClassId: 'btrain_tanker', count: 194 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -305,6 +305,7 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'PF-I': [],
   'PF-L': [],
   'PW-C': [],
+  'PW-A': [],
   'WS-U': [],
   'WS-S': [],
   'TO-T': [],

@@ -253,6 +253,7 @@ const PICKUP_HUB_SET = new Set([
   'NTAA',
   'NTTB',
   'PTRO',
+  'ANG',
   'NSTU',
   'NSFA',
   'NSAU',

@@ -19608,5 +19608,18 @@
       "surface": "other",
       "lighted": false
     }
+  ],
+  "ANG": [
+    {
+      "ident": "05",
+      "identReciprocal": "23",
+      "headingTrueDeg": 50,
+      "lengthM": 2134,
+      "widthM": 46,
+      "lat": 6.906829,
+      "lon": 134.145386,
+      "surface": "gravel",
+      "lighted": false
+    }
   ]
 }

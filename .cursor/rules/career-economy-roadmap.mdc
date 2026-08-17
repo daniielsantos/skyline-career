@@ -132,8 +132,9 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 39. ~~**Asia-16 Guam / Polynesia / Micronesia**~~ — US-GU/US-AS + PF/PW/WS/TO.
 40. ~~**Asia-17 Vanuatu / Solomon / Cook / Kiribati**~~ — VU/SB/CK/KI.
 41. ~~**Asia-18–25 Pacific micro-hubs**~~ — PGSN/PLCH/NFTV/NVSS/AGGM/NCAI/NTTB/NSAU; seed **1002** / **165** ports / **675** trucks. **Map seed complete.**
-42. Optional future map slices (PW 2nd hub, AU Darwin/Hobart, BN, etc.) — not required.
-43. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+42. Optional future map slices (AU Darwin/Hobart, BN, etc.) — not required.
+43. **Asia-26 Angaur (ANG / PW-A)** — Palau 2nd hub; seed **1003** / **166** ports / **680** trucks. Pending homolog.
+44. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

@@ -1893,6 +1893,10 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'NSAU', b: 'NSFA', weight: 1.35 },
   { a: 'NSAU', b: 'NZAA', weight: 1.45 },
   { a: 'NSAU', b: 'NFTV', weight: 1.35 },
+  // Asia-26 Angaur micro-slice
+  { a: 'ANG', b: 'PTRO', weight: 1.35 },
+  { a: 'ANG', b: 'PGUM', weight: 1.45 },
+  { a: 'ANG', b: 'RPLL', weight: 1.4 },
   { a: 'NSTU', b: 'PHNL', weight: 1.7 },
 ];
 
@@ -5452,6 +5456,23 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'NFTV',
     capacityKgPerDay: 25_000,
   },
+  // Asia-26 Angaur micro-slice
+  {
+    id: 'lane_ang_pgum',
+    originCountryId: 'PW',
+    destCountryId: 'US',
+    originIcao: 'ANG',
+    destIcao: 'PGUM',
+    capacityKgPerDay: 28_000,
+  },
+  {
+    id: 'lane_ang_rpll',
+    originCountryId: 'PW',
+    destCountryId: 'PH',
+    originIcao: 'ANG',
+    destIcao: 'RPLL',
+    capacityKgPerDay: 25_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -5960,6 +5981,7 @@ export const FUEL_HUB_ICAOS = new Set([
   'NCAI',
   'NTTB',
   'NSAU',
+  'ANG',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */

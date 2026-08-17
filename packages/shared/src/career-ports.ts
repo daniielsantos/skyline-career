@@ -1309,6 +1309,14 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     pickupHubs: ['PTRO'],
   },
   {
+    id: 'PWANG',
+    name: 'Angaur',
+    countryId: 'PW',
+    lat: 6.91,
+    lon: 134.15,
+    pickupHubs: ['ANG'],
+  },
+  {
     id: 'ASPPG',
     name: 'Pago Pago',
     countryId: 'US',

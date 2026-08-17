@@ -83,7 +83,8 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 50. ~~**Asia-23 Aitutaki (NCAI / CK-N)**~~ — CK-N; seed **1000** / **163** ports / **665** trucks.
 51. ~~**Asia-24 Bora Bora (NTTB / PF-L)**~~ — PF-L; seed **1001** / **164** ports / **670** trucks.
 52. ~~**Asia-25 Asau (NSAU / WS-S)**~~ — WS-S; seed **1002** / **165** ports / **675** trucks. **Map seed complete.**
-53. Optional future map slices (PW 2nd hub, AU Darwin/Hobart, NZ Wellington, TW south, CN inland, BN) — not required.
+53. **Asia-26 Angaur (ANG / PW-A)** — implemented, pending homolog; seed **1003** / **166** ports / **680** trucks.
+54. Optional future map slices (AU Darwin/Hobart, NZ Wellington, TW south, CN inland, BN) — not required.
 
 ## Feito (shipped 0.3.47)
 

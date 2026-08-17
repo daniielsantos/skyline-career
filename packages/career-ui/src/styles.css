@@ -8501,6 +8501,65 @@ span.dispatch-route-hub-dest {
   vertical-align: middle;
 }
 
+.ports-concession-chip {
+  margin-left: 0.55rem;
+  vertical-align: middle;
+  cursor: pointer;
+  border: none;
+  font: inherit;
+}
+
+.ports-concession-chip:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.ports-concession-open {
+  margin-left: 0.45rem;
+  vertical-align: middle;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.45rem;
+}
+
+.ports-stock-details {
+  margin: 0.55rem 0.65rem 0;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+}
+
+.ports-stock-details > summary {
+  cursor: pointer;
+  color: var(--muted, #9aa0a6);
+  list-style: none;
+  user-select: none;
+}
+
+.ports-stock-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ports-stock-details > summary::before {
+  content: '▸ ';
+  opacity: 0.7;
+}
+
+.ports-stock-details[open] > summary::before {
+  content: '▾ ';
+}
+
+.ports-stock-details .ports-inventory-bars {
+  margin-top: 0.45rem;
+}
+
+.ports-concession-dialog {
+  max-width: 26rem;
+}
+
+.ports-concession-dialog .ports-concession-gates {
+  margin: 0.65rem 0 1rem;
+}
+
 .ports-inventory-bars {
   display: grid;
   grid-template-columns: 1fr 1fr;

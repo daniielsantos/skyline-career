@@ -56,6 +56,15 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
 
+## Port endgame backlog (after map / playtest)
+
+Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always **1** in v1).
+
+- **P2 / P3 CAPEX tree:** upgrade spent cash + throughput gates; scale **inventory soft caps** and/or listing slots / mild buffs (avoid stacking huge price discounts — prefer capacity + restock rate).
+- **Escalating lease** with level or lifetime throughput (anti-snowball for operators who hold forever).
+- **Optional specials marketplace** (machinery/electronics only) as acceleration on top of passive restock — not a replacement.
+- Still deferred: NPC port authorities, multi-concession, fee-to-operator wallet, ocean shipping sim.
+
 ## Near-term priorities (current Brazil career)
 
 1. ~~**FBO spot inventory**~~ — **removed**; player Warehouses at port pickup hubs + Demand Board.

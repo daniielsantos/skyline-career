@@ -344,6 +344,7 @@ export function PortsPanel(props: {
   const [portId, setPortId] = useState<string | null>(null);
   const [mapFocusToken, setMapFocusToken] = useState(0);
   const [buyListing, setBuyListing] = useState<PortListingView | null>(null);
+  const [concessionOpen, setConcessionOpen] = useState(false);
   const [amountText, setAmountText] = useState('1000');
   const [acceptOrder, setAcceptOrder] = useState<DemandOrderView | null>(null);
   const [acceptOrigin, setAcceptOrigin] = useState('');
@@ -688,6 +689,7 @@ export function PortsPanel(props: {
   function selectCatalogPort(id: string) {
     setPortId(id);
     setMapFocusToken((n) => n + 1);
+    setConcessionOpen(false);
     closeBuyModal();
   }
 
@@ -818,6 +820,7 @@ export function PortsPanel(props: {
         'ok',
         `Claimed port concession · operator rates active`,
       );
+      setConcessionOpen(false);
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -854,6 +857,7 @@ export function PortsPanel(props: {
           groundStaff,
       );
       props.onToast?.('ok', 'Port lease renewed');
+      setConcessionOpen(false);
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -1603,19 +1607,33 @@ export function PortsPanel(props: {
               {port ? (
                 <h3 className="ports-selected-name ports-stage-title">
                   {port.name}
-                  {port.concession?.status === 'yours' ? (
-                    <span className="tag ports-operator-badge" title="Operator rates">
-                      Operator
-                    </span>
-                  ) : port.concession?.status === 'held' ? (
-                    <span className="tag" title="Another company operates this port">
-                      Concession held
-                    </span>
-                  ) : (
-                    <span className="tag muted" title="No operator">
-                      Vacant
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    className={
+                      port.concession?.status === 'yours'
+                        ? 'tag ports-operator-badge ports-concession-chip'
+                        : port.concession?.status === 'held'
+                          ? 'tag ports-concession-chip'
+                          : 'tag muted ports-concession-chip'
+                    }
+                    title="Port concession (endgame)"
+                    disabled={props.busy}
+                    onClick={() => setConcessionOpen(true)}
+                  >
+                    {port.concession?.status === 'yours'
+                      ? 'Operator'
+                      : port.concession?.status === 'held'
+                        ? 'Held'
+                        : 'Vacant'}
+                  </button>
+                  <button
+                    type="button"
+                    className="action ghost ports-concession-open"
+                    disabled={props.busy}
+                    onClick={() => setConcessionOpen(true)}
+                  >
+                    Concession…
+                  </button>
                 </h3>
               ) : (
                 <p className="ports-stage-title is-muted">
@@ -1636,83 +1654,9 @@ export function PortsPanel(props: {
                 <div className="ports-listings">
                   {port ? (
                     <>
-                      <div className="ports-concession-panel">
-                        {port.concession?.status === 'yours' ? (
-                          <div className="ports-concession-row">
-                            <p className="muted">
-                              Operator rates (~10% cheaper buys, ~15% faster
-                              inbound, +1 listing). Throughput{' '}
-                              {props.formatTonnes(
-                                port.concession.lifetimeThroughputKg ?? 0,
-                              )}
-                              {port.concession.leasePaidThroughTick != null &&
-                              props.economyTick != null
-                                ? ` · lease through tick ${port.concession.leasePaidThroughTick}`
-                                : null}
-                            </p>
-                            <button
-                              type="button"
-                              className="action ghost"
-                              disabled={props.busy || loading}
-                              onClick={() =>
-                                void onRenewConcession(
-                                  port.id,
-                                  port.concession?.claim?.leaseUsd ?? 17_500,
-                                )
-                              }
-                            >
-                              Renew lease
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="ports-concession-row">
-                            <div>
-                              <p className="muted">
-                                Claim concession (endgame): T3 WH at a pickup +{' '}
-                                {(
-                                  port.concession?.claim?.shippedNeededKg ??
-                                  25_000
-                                ).toLocaleString()}{' '}
-                                kg shipped + claim CAPEX.
-                              </p>
-                              {port.concession?.claim &&
-                              !port.concession.claim.ok ? (
-                                <ul className="ports-concession-gates">
-                                  {port.concession.claim.reasons.map((r) => (
-                                    <li key={r}>{r}</li>
-                                  ))}
-                                </ul>
-                              ) : null}
-                            </div>
-                            <button
-                              type="button"
-                              className="accept"
-                              disabled={
-                                props.busy ||
-                                loading ||
-                                !port.concession?.claim?.ok
-                              }
-                              title={
-                                port.concession?.claim?.ok
-                                  ? `Claim $${(
-                                      (port.concession.claim.claimUsd ?? 0) +
-                                      (port.concession.claim.leaseUsd ?? 0)
-                                    ).toLocaleString()} (CAPEX + first lease)`
-                                  : port.concession?.claim?.reasons.join(' · ')
-                              }
-                              onClick={() => void onClaimConcession(port.id)}
-                            >
-                              Claim
-                              {port.concession?.claim
-                                ? ` · ${props.formatMoney(
-                                    port.concession.claim.claimUsd +
-                                      port.concession.claim.leaseUsd,
-                                  )}`
-                                : ''}
-                            </button>
-                          </div>
-                        )}
-                        {(port.inventory?.length ?? 0) > 0 ? (
+                      {(port.inventory?.length ?? 0) > 0 ? (
+                        <details className="ports-stock-details">
+                          <summary>Port stock</summary>
                           <div
                             className="ports-inventory-bars"
                             aria-label="Port stock"
@@ -1743,8 +1687,8 @@ export function PortsPanel(props: {
                               );
                             })}
                           </div>
-                        ) : null}
-                      </div>
+                        </details>
+                      ) : null}
                     <div className="table-wrap">
                       <table className="data-table">
                         <thead>
@@ -3277,6 +3221,136 @@ export function PortsPanel(props: {
           onCancel={closeBuyModal}
           onConfirm={() => void onConfirmBuy()}
         />
+      ) : null}
+
+      {concessionOpen && port ? (
+        <div
+          className="confirm-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setConcessionOpen(false);
+          }}
+        >
+          <div
+            className="confirm-dialog ports-concession-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ports-concession-title"
+          >
+            <p className="confirm-kicker">Endgame</p>
+            <h3 id="ports-concession-title">{port.name} · Concession</h3>
+            {port.concession?.status === 'yours' ? (
+              <>
+                <p className="muted">
+                  Operator rates (~10% cheaper buys, ~15% faster inbound, +1
+                  listing). Throughput{' '}
+                  {props.formatTonnes(
+                    port.concession.lifetimeThroughputKg ?? 0,
+                  )}
+                  {port.concession.leasePaidThroughTick != null &&
+                  props.economyTick != null
+                    ? ` · lease through tick ${port.concession.leasePaidThroughTick}`
+                    : null}
+                </p>
+                <div className="confirm-actions">
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy || loading}
+                    onClick={() => setConcessionOpen(false)}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="accept"
+                    disabled={props.busy || loading}
+                    onClick={() =>
+                      void onRenewConcession(
+                        port.id,
+                        port.concession?.claim?.leaseUsd ?? 17_500,
+                      )
+                    }
+                  >
+                    Renew lease
+                    {port.concession?.claim?.leaseUsd != null
+                      ? ` · ${props.formatMoney(port.concession.claim.leaseUsd)}`
+                      : ''}
+                  </button>
+                </div>
+              </>
+            ) : port.concession?.status === 'held' ? (
+              <>
+                <p className="muted">
+                  Another company holds this concession. You can still buy
+                  listings and own a warehouse at pickup hubs.
+                </p>
+                <div className="confirm-actions">
+                  <button
+                    type="button"
+                    className="action ghost"
+                    onClick={() => setConcessionOpen(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="muted">
+                  Claim requires a T3 warehouse at a pickup hub,{' '}
+                  {(
+                    port.concession?.claim?.shippedNeededKg ?? 25_000
+                  ).toLocaleString()}{' '}
+                  kg shipped from that WH, and CAPEX + first lease window.
+                </p>
+                {port.concession?.claim && !port.concession.claim.ok ? (
+                  <ul className="ports-concession-gates">
+                    {port.concession.claim.reasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                ) : port.concession?.claim?.ok ? (
+                  <p className="muted">Gates met — ready to claim.</p>
+                ) : null}
+                <div className="confirm-actions">
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy || loading}
+                    onClick={() => setConcessionOpen(false)}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="accept"
+                    disabled={
+                      props.busy || loading || !port.concession?.claim?.ok
+                    }
+                    title={
+                      port.concession?.claim?.ok
+                        ? `Claim $${(
+                            (port.concession.claim.claimUsd ?? 0) +
+                            (port.concession.claim.leaseUsd ?? 0)
+                          ).toLocaleString()} (CAPEX + first lease)`
+                        : port.concession?.claim?.reasons.join(' · ')
+                    }
+                    onClick={() => void onClaimConcession(port.id)}
+                  >
+                    Claim
+                    {port.concession?.claim
+                      ? ` · ${props.formatMoney(
+                          port.concession.claim.claimUsd +
+                            port.concession.claim.leaseUsd,
+                        )}`
+                      : ''}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       ) : null}
 
       {acceptOrder ? (

@@ -667,6 +667,14 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 23.64,
     pickupHubs: ['LGAV'],
   },
+  {
+    id: 'ISREK',
+    name: 'Port of Reykjavik',
+    countryId: 'IS',
+    lat: 64.15,
+    lon: -21.94,
+    pickupHubs: ['BIRK', 'BIKF'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

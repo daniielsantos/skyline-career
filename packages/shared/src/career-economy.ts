@@ -327,6 +327,11 @@ import {
   RS_CAREER_HUBS,
   buildRsFeederCorridors,
 } from './career-rs-hubs.js';
+import {
+  assertIsCareerHubCatalog,
+  IS_CAREER_HUBS,
+  buildIsFeederCorridors,
+} from './career-is-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -834,6 +839,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(GR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(RS_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(IS_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1215,6 +1221,10 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'LGAV', b: 'LGIR', weight: 1.8 },
   { a: 'LGTS', b: 'LGAL', weight: 1.5 },
   { a: 'LYBE', b: 'LYNI', weight: 1.7 },
+  // EU-5 Iceland domestic trunks
+  { a: 'BIKF', b: 'BIRK', weight: 1.9 },
+  { a: 'BIKF', b: 'BIAR', weight: 1.8 },
+  { a: 'BIAR', b: 'BIEG', weight: 1.5 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1289,6 +1299,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildBgFeederCorridors(BG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildGrFeederCorridors(GR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildRsFeederCorridors(RS_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildIsFeederCorridors(IS_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -2788,6 +2799,39 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'LIMC',
     capacityKgPerDay: 35_000,
   },
+  // EU-5 Iceland gateways
+  {
+    id: 'lane_bikf_egll',
+    originCountryId: 'IS',
+    destCountryId: 'GB',
+    originIcao: 'BIKF',
+    destIcao: 'EGLL',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_bikf_eidw',
+    originCountryId: 'IS',
+    destCountryId: 'IE',
+    originIcao: 'BIKF',
+    destIcao: 'EIDW',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_bikf_engm',
+    originCountryId: 'IS',
+    destCountryId: 'NO',
+    originIcao: 'BIKF',
+    destIcao: 'ENGM',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_bikf_ekch',
+    originCountryId: 'IS',
+    destCountryId: 'DK',
+    originIcao: 'BIKF',
+    destIcao: 'EKCH',
+    capacityKgPerDay: 40_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -3131,6 +3175,9 @@ export const FUEL_HUB_ICAOS = new Set([
   'LGTS',
   'LYBE',
   'LYNI',
+  // EU-5 Iceland
+  'BIKF',
+  'BIAR',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -3779,6 +3826,12 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    IS_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -4156,6 +4209,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertBgCareerHubCatalog();
   assertGrCareerHubCatalog();
   assertRsCareerHubCatalog();
+  assertIsCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -4758,6 +4812,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...RS_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...IS_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

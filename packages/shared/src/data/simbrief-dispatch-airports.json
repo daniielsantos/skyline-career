@@ -1,6 +1,10 @@
 {
   "note": "Cargo/Dispatch ICAOs confirmed for SimBrief. Bush-trip-only strips are exempt. Regenerated via scripts/gen-simbrief-dispatch-airports.mjs after adding a hub.",
   "icaos": [
+    "BIAR",
+    "BIEG",
+    "BIKF",
+    "BIRK",
     "CYAM",
     "CYBG",
     "CYBL",

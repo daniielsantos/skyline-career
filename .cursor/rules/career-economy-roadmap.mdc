@@ -48,6 +48,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **EU-2 Nordics + Alps + IE:** IE/DK/NO/SE/FI/CH/AT curated hubs; Nordic ring + Alps/EU-1 gateway lanes; 5 coastal ports; fuel trucks **100**; seed **672** airports / **66** ports.
 - **EU-3 Central-East + Baltics:** PL/CZ/SK/HU/EE/LV/LT curated hubs; Visegrád + Baltics rings + EU gateways; 4 coastal ports; fuel trucks **115**; seed **706** airports / **70** ports.
 - **EU-4 Balkans:** HR/SI/RO/BG/GR/RS curated hubs; Adriatic–Black Sea–Aegean corridors + AT/HU/IT/DE gateways; 4 coastal ports; fuel trucks **130**; seed **734** airports / **74** ports.
+- **EU-5 Iceland:** IS curated hubs (BIKF/BIRK/BIAR/BIEG); gateways to EGLL/EIDW/ENGM/EKCH; Reykjavik port; fuel trucks **134**; seed **738** airports / **75** ports.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 
 ## Near-term priorities (current Brazil career)
@@ -65,9 +66,10 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 11. ~~**EU-2 Nordics + Alps + IE**~~ — IE/DK/NO/SE/FI/CH/AT.
 12. ~~**EU-3 Central-East + Baltics**~~ — PL/CZ/SK/HU/EE/LV/LT.
 13. ~~**EU-4 Balkans**~~ — HR/SI/RO/BG/GR/RS.
-14. Polish only if needed — optional real METAR.
-15. Next map slice: Iceland / remaining Balkans (BA/ME/AL/MK).
-16. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+14. ~~**EU-5 Iceland**~~ — IS.
+15. Polish only if needed — optional real METAR.
+16. Next map slice: remaining Balkans (BA/ME/AL/MK).
+17. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

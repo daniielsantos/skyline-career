@@ -881,6 +881,10 @@ function regionLabel(region: string): string {
       return 'Greece — South / Islands';
     case 'RS-C':
       return 'Serbia';
+    case 'IS-SW':
+      return 'Iceland — Southwest';
+    case 'IS-NE':
+      return 'Iceland — North / East';
     default:
       return region;
   }

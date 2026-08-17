@@ -51,6 +51,7 @@ describe('career partition', () => {
       'BE',
       'BG',
       'BH',
+      'BN',
       'BO',
       'BR',
       'BS',

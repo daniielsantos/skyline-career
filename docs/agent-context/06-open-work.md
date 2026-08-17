@@ -83,8 +83,13 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 50. ~~**Asia-23 Aitutaki (NCAI / CK-N)**~~ — CK-N; seed **1000** / **163** ports / **665** trucks.
 51. ~~**Asia-24 Bora Bora (NTTB / PF-L)**~~ — PF-L; seed **1001** / **164** ports / **670** trucks.
 52. ~~**Asia-25 Asau (NSAU / WS-S)**~~ — WS-S; seed **1002** / **165** ports / **675** trucks. **Map seed complete.**
-53. **Asia-26 Angaur (ANG / PW-A)** — implemented, pending homolog; seed **1003** / **166** ports / **680** trucks.
-54. Optional future map slices (AU Darwin/Hobart, NZ Wellington, TW south, CN inland, BN) — not required.
+53. ~~**Asia-26 Angaur (ANG / PW-A)**~~ — PW-A; seed **1003** / **166** ports / **680** trucks.
+54. ~~**Asia-27 Darwin (YPDN / AU-NT)**~~ — AU-NT; seed **1004** / **167** ports / **685** trucks.
+55. ~~**Asia-28 Brunei (WBSB / BN-C)**~~ — BN; seed **1005** / **168** ports / **690** trucks.
+56. ~~**Asia-29 Hobart (YMHB / AU-T)**~~ — AU-T; seed **1006** / **169** ports / **695** trucks.
+57. ~~**Asia-30 Wellington (NZWN / NZ-W)**~~ — NZ-W; seed **1007** / **170** ports / **700** trucks.
+58. ~~**Asia-31 Taiwan south (RCMQ / RCNN)**~~ — TW-C + TW-S; seed **1009** / **170** ports / **710** trucks.
+59. ~~**Asia-32 China gap (ZSQD / ZWWW)**~~ — CN-E + CN-W; seed **1011** / **171** ports / **720** trucks. **Pacific/Asia map complete.**
 
 ## Feito (shipped 0.3.47)
 

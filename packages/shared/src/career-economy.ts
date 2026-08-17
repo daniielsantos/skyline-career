@@ -588,6 +588,11 @@ import {
   buildSgFeederCorridors,
 } from './career-sg-hubs.js';
 import {
+  assertBnCareerHubCatalog,
+  BN_CAREER_HUBS,
+  buildBnFeederCorridors,
+} from './career-bn-hubs.js';
+import {
   assertIdCareerHubCatalog,
   ID_CAREER_HUBS,
   buildIdFeederCorridors,
@@ -1245,6 +1250,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(VN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(MY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(SG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(ID_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(PH_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(CN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
@@ -1856,6 +1862,29 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'YBBN', b: 'YBCS', weight: 1.5 },
   { a: 'YSSY', b: 'YPPH', weight: 1.6 },
   { a: 'YSSY', b: 'YSCB', weight: 1.5 },
+  // Asia-27 Darwin micro-slice
+  { a: 'YPDN', b: 'YBCS', weight: 1.5 },
+  { a: 'YPDN', b: 'YSSY', weight: 1.45 },
+  { a: 'YPDN', b: 'AYPY', weight: 1.45 },
+  { a: 'YPDN', b: 'WIII', weight: 1.4 },
+  // Asia-28 Brunei micro-slice
+  { a: 'WBSB', b: 'WSSS', weight: 1.45 },
+  { a: 'WBSB', b: 'WMKK', weight: 1.4 },
+  // Asia-29 Hobart micro-slice
+  { a: 'YMHB', b: 'YMML', weight: 1.45 },
+  { a: 'YMHB', b: 'YSSY', weight: 1.4 },
+  // Asia-30 Wellington micro-slice
+  { a: 'NZWN', b: 'NZAA', weight: 1.45 },
+  { a: 'NZWN', b: 'NZCH', weight: 1.35 },
+  // Asia-31 Taiwan south micro-slice
+  { a: 'RCMQ', b: 'RCTP', weight: 1.45 },
+  { a: 'RCNN', b: 'RCKH', weight: 1.4 },
+  { a: 'RCNN', b: 'RCMQ', weight: 1.35 },
+  // Asia-32 China coastal/inland gap
+  { a: 'ZSQD', b: 'ZYTL', weight: 1.45 },
+  { a: 'ZSQD', b: 'ZSPD', weight: 1.4 },
+  { a: 'ZWWW', b: 'ZLXY', weight: 1.4 },
+  { a: 'ZWWW', b: 'ZPPP', weight: 1.35 },
   { a: 'NZAA', b: 'NZCH', weight: 1.7 },
   // Asia-15 China inland + Hawaii / Fiji / PNG / New Caledonia trunks
   { a: 'ZBAA', b: 'ZYTL', weight: 1.6 },
@@ -2024,6 +2053,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildVnFeederCorridors(VN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMyFeederCorridors(MY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildSgFeederCorridors(SG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBnFeederCorridors(BN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildIdFeederCorridors(ID_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildPhFeederCorridors(PH_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildCnFeederCorridors(CN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
@@ -5473,6 +5503,92 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'RPLL',
     capacityKgPerDay: 25_000,
   },
+  // Asia-27 Darwin micro-slice
+  {
+    id: 'lane_ypdn_aypy',
+    originCountryId: 'AU',
+    destCountryId: 'PG',
+    originIcao: 'YPDN',
+    destIcao: 'AYPY',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_ypdn_wiii',
+    originCountryId: 'AU',
+    destCountryId: 'ID',
+    originIcao: 'YPDN',
+    destIcao: 'WIII',
+    capacityKgPerDay: 35_000,
+  },
+  // Asia-28 Brunei micro-slice
+  {
+    id: 'lane_wbsb_wsss',
+    originCountryId: 'BN',
+    destCountryId: 'SG',
+    originIcao: 'WBSB',
+    destIcao: 'WSSS',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_wbsb_wmkk',
+    originCountryId: 'BN',
+    destCountryId: 'MY',
+    originIcao: 'WBSB',
+    destIcao: 'WMKK',
+    capacityKgPerDay: 28_000,
+  },
+  // Asia-29 Hobart micro-slice
+  {
+    id: 'lane_ymhb_nzwn',
+    originCountryId: 'AU',
+    destCountryId: 'NZ',
+    originIcao: 'YMHB',
+    destIcao: 'NZWN',
+    capacityKgPerDay: 28_000,
+  },
+  // Asia-30 Wellington micro-slice
+  {
+    id: 'lane_nzwn_yssy',
+    originCountryId: 'NZ',
+    destCountryId: 'AU',
+    originIcao: 'NZWN',
+    destIcao: 'YSSY',
+    capacityKgPerDay: 30_000,
+  },
+  // Asia-31 Taiwan south micro-slice
+  {
+    id: 'lane_rcmq_rjaa',
+    originCountryId: 'TW',
+    destCountryId: 'JP',
+    originIcao: 'RCMQ',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_rcnn_rjaa',
+    originCountryId: 'TW',
+    destCountryId: 'JP',
+    originIcao: 'RCNN',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 32_000,
+  },
+  // Asia-32 China coastal/inland gap
+  {
+    id: 'lane_zsqd_rjaa',
+    originCountryId: 'CN',
+    destCountryId: 'JP',
+    originIcao: 'ZSQD',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_zwww_utt',
+    originCountryId: 'CN',
+    destCountryId: 'UZ',
+    originIcao: 'ZWWW',
+    destIcao: 'UTTT',
+    capacityKgPerDay: 30_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -5982,6 +6098,14 @@ export const FUEL_HUB_ICAOS = new Set([
   'NTTB',
   'NSAU',
   'ANG',
+  'YPDN',
+  'YMHB',
+  'WBSB',
+  'NZWN',
+  'RCMQ',
+  'RCNN',
+  'ZSQD',
+  'ZWWW',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -6943,6 +7067,12 @@ export const CAREER_HUB_COORDS: Readonly<
     ]),
   ),
   ...Object.fromEntries(
+    BN_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
     ID_CAREER_HUBS.map((h) => [
       h.icao,
       { lat: h.lat, lon: h.lon, name: h.name },
@@ -7489,6 +7619,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertVnCareerHubCatalog();
   assertMyCareerHubCatalog();
   assertSgCareerHubCatalog();
+  assertBnCareerHubCatalog();
   assertIdCareerHubCatalog();
   assertPhCareerHubCatalog();
   assertCnCareerHubCatalog();
@@ -8578,6 +8709,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...SG_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BN_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

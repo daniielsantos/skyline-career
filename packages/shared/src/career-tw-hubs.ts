@@ -2,7 +2,7 @@
  * Taiwan career hub catalog — Asia-14 Formosa Strait face.
  *
  * Taipei cargo major is RCTP Taoyuan (not RCSS Songshan). Kaohsiung RCKH is
- * the southern seaport pickup. Taichung RCMQ / Tainan RCNN air bases omitted.
+ * the southern seaport pickup. Taichung RCMQ and Tainan RCNN added Asia-31.
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -11,7 +11,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type TwCareerRegion = 'TW-N' | 'TW-S';
+export type TwCareerRegion = 'TW-N' | 'TW-S' | 'TW-C';
 
 export type TwCareerHubDef = {
   icao: string;
@@ -25,7 +25,7 @@ export type TwCareerHubDef = {
   bush?: true;
 };
 
-/** 3 curated Taiwan hubs. Keelung/Taipei pickup is RCTP; Kaohsiung is RCKH. */
+/** 5 curated Taiwan hubs. Keelung/Taipei pickup is RCTP; Kaohsiung is RCKH. */
 export const TW_CAREER_HUBS: readonly TwCareerHubDef[] = [
   {
     icao: 'RCTP',
@@ -57,9 +57,29 @@ export const TW_CAREER_HUBS: readonly TwCareerHubDef[] = [
     produce: { machinery: 1.3, general: 1.35, electronics: 1.2 },
     consume: { perishables: 1.15, supplies: 1.15, fuel: 1.2 },
   },
+  {
+    icao: 'RCMQ',
+    name: 'Taichung International',
+    region: 'TW-C',
+    hubTier: 'regional',
+    lat: 24.2647,
+    lon: 120.621,
+    produce: { machinery: 1.25, general: 1.3, electronics: 1.15 },
+    consume: { perishables: 1.1, supplies: 1.1, fuel: 1.15 },
+  },
+  {
+    icao: 'RCNN',
+    name: 'Tainan International',
+    region: 'TW-S',
+    hubTier: 'regional',
+    lat: 22.9504,
+    lon: 120.206,
+    produce: { electronics: 1.2, general: 1.25, supplies: 1.05 },
+    consume: { perishables: 1.1, machinery: 0.95, fuel: 1.1 },
+  },
 ];
 
-export const TW_CAREER_HUB_COUNT = 3;
+export const TW_CAREER_HUB_COUNT = 5;
 
 export function buildTwFeederCorridors(
   hubs: readonly TwCareerHubDef[] = TW_CAREER_HUBS,
@@ -83,7 +103,7 @@ export function assertTwCareerHubCatalog(): void {
   if (TW_CAREER_HUBS.some((h) => h.icao === 'RCSS' && h.hubTier === 'major')) {
     throw new Error('TW catalog must not treat RCSS Songshan as the cargo major');
   }
-  if (TW_CAREER_HUBS.some((h) => ['RCMQ', 'RCNN', 'RCQC'].includes(h.icao))) {
-    throw new Error('TW catalog must not seed RCMQ / RCNN / RCQC');
+  if (TW_CAREER_HUBS.some((h) => h.icao === 'RCQC')) {
+    throw new Error('TW catalog must not seed RCQC');
   }
 }

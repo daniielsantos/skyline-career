@@ -312,6 +312,9 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['VN', 'SG'],
     ['MY', 'TH'],
     ['MY', 'SG'],
+    ['BN', 'MY'],
+    ['BN', 'SG'],
+    ['BN', 'ID'],
     ['SG', 'TH'],
     // Asia-12 Indonesia / Philippines (do not backfill remaining EU-2+ pairs here)
     ['ID', 'SG'],

@@ -123,6 +123,7 @@ import { TH_CAREER_HUBS } from './career-th-hubs.js';
 import { VN_CAREER_HUBS } from './career-vn-hubs.js';
 import { MY_CAREER_HUBS } from './career-my-hubs.js';
 import { SG_CAREER_HUBS } from './career-sg-hubs.js';
+import { BN_CAREER_HUBS } from './career-bn-hubs.js';
 import { ID_CAREER_HUBS } from './career-id-hubs.js';
 import { PH_CAREER_HUBS } from './career-ph-hubs.js';
 import { CN_CAREER_HUBS } from './career-cn-hubs.js';
@@ -269,6 +270,7 @@ const ALL_CAREER_HUBS: readonly CareerHubRow[] = [
   ...VN_CAREER_HUBS,
   ...MY_CAREER_HUBS,
   ...SG_CAREER_HUBS,
+  ...BN_CAREER_HUBS,
   ...ID_CAREER_HUBS,
   ...PH_CAREER_HUBS,
   ...CN_CAREER_HUBS,

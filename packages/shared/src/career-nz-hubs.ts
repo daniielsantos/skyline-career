@@ -11,7 +11,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type NzCareerRegion = 'NZ-N' | 'NZ-S';
+export type NzCareerRegion = 'NZ-N' | 'NZ-S' | 'NZ-W';
 
 export type NzCareerHubDef = {
   icao: string;
@@ -25,7 +25,7 @@ export type NzCareerHubDef = {
   bush?: true;
 };
 
-/** 2 curated New Zealand hubs. Auckland seaport pickup is NZAA. */
+/** 3 curated New Zealand hubs. Auckland seaport pickup is NZAA. */
 export const NZ_CAREER_HUBS: readonly NzCareerHubDef[] = [
   {
     icao: 'NZAA',
@@ -47,9 +47,19 @@ export const NZ_CAREER_HUBS: readonly NzCareerHubDef[] = [
     produce: { perishables: 1.3, general: 1.25, supplies: 1.1 },
     consume: { electronics: 1.05, machinery: 1.0, fuel: 1.2 },
   },
+  {
+    icao: 'NZWN',
+    name: 'Wellington International',
+    region: 'NZ-W',
+    hubTier: 'regional',
+    lat: -41.326839,
+    lon: 174.806862,
+    produce: { general: 1.25, electronics: 1.15, supplies: 1.1 },
+    consume: { perishables: 1.1, machinery: 0.95, fuel: 1.15 },
+  },
 ];
 
-export const NZ_CAREER_HUB_COUNT = 2;
+export const NZ_CAREER_HUB_COUNT = 3;
 
 export function buildNzFeederCorridors(
   hubs: readonly NzCareerHubDef[] = NZ_CAREER_HUBS,
@@ -70,7 +80,10 @@ export function assertNzCareerHubCatalog(): void {
   if (!NZ_CAREER_HUBS.some((h) => h.icao === 'NZAA' && h.hubTier === 'major')) {
     throw new Error('NZ catalog must include major NZAA (Auckland)');
   }
-  if (NZ_CAREER_HUBS.some((h) => ['NZWN', 'NZQN', 'NZDN'].includes(h.icao))) {
-    throw new Error('NZ catalog must not seed Wellington, Queenstown, or Dunedin');
+  if (!NZ_CAREER_HUBS.some((h) => h.icao === 'NZWN' && h.hubTier === 'regional')) {
+    throw new Error('NZ catalog must include regional NZWN (Wellington)');
+  }
+  if (NZ_CAREER_HUBS.some((h) => ['NZQN', 'NZDN'].includes(h.icao))) {
+    throw new Error('NZ catalog must not seed Queenstown or Dunedin');
   }
 }

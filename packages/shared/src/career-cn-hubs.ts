@@ -4,7 +4,7 @@
  * Beijing cargo major is ZBAA Capital (not ZBAD Daxing). Shanghai cargo major
  * is ZSPD Pudong (not ZSSS Hongqiao). Guangzhou is ZGGG Baiyun. Chengdu is
  * ZUUU Shuangliu (Tianfu ZUTF deferred). Inland west / northeast / Xiamen
- * added in Asia-15. Urumqi ZWWW and Qingdao ZSQD deferred.
+ * added in Asia-15. Qingdao ZSQD and Urumqi ZWWW added Asia-32.
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -27,7 +27,7 @@ export type CnCareerHubDef = {
   bush?: true;
 };
 
-/** 12 curated China hubs. Pudong pickup is ZSPD; Yantian ZGSZ; Dalian ZYTL; Xiamen ZSAM. */
+/** 14 curated China hubs. Pudong pickup is ZSPD; Yantian ZGSZ; Dalian ZYTL; Xiamen ZSAM. */
 export const CN_CAREER_HUBS: readonly CnCareerHubDef[] = [
   {
     icao: 'ZBAA',
@@ -149,9 +149,29 @@ export const CN_CAREER_HUBS: readonly CnCareerHubDef[] = [
     produce: { electronics: 1.35, general: 1.3, machinery: 1.15 },
     consume: { perishables: 1.15, supplies: 1.1, fuel: 1.15 },
   },
+  {
+    icao: 'ZSQD',
+    name: 'Qingdao Jiaodong',
+    region: 'CN-E',
+    hubTier: 'regional',
+    lat: 36.362,
+    lon: 120.088,
+    produce: { machinery: 1.3, general: 1.3, electronics: 1.15 },
+    consume: { perishables: 1.15, supplies: 1.1, fuel: 1.15 },
+  },
+  {
+    icao: 'ZWWW',
+    name: 'Urumqi Tianshan',
+    region: 'CN-W',
+    hubTier: 'regional',
+    lat: 43.9136,
+    lon: 87.4794,
+    produce: { general: 1.25, machinery: 1.2, supplies: 1.1 },
+    consume: { electronics: 1.0, perishables: 1.05, fuel: 1.15 },
+  },
 ];
 
-export const CN_CAREER_HUB_COUNT = 12;
+export const CN_CAREER_HUB_COUNT = 14;
 
 export function buildCnFeederCorridors(
   hubs: readonly CnCareerHubDef[] = CN_CAREER_HUBS,

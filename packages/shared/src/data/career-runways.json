@@ -19621,5 +19621,109 @@
       "surface": "gravel",
       "lighted": false
     }
+  ],
+  "YPDN": [
+    {
+      "ident": "11",
+      "identReciprocal": "29",
+      "headingTrueDeg": 96,
+      "lengthM": 3354,
+      "widthM": 60,
+      "lat": -12.4094,
+      "lon": 130.865,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "WBSB": [
+    {
+      "ident": "03",
+      "identReciprocal": "21",
+      "headingTrueDeg": 30,
+      "lengthM": 3657,
+      "widthM": 46,
+      "lat": 4.9442,
+      "lon": 114.928,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "YMHB": [
+    {
+      "ident": "12",
+      "identReciprocal": "30",
+      "headingTrueDeg": 120,
+      "lengthM": 2259,
+      "widthM": 45,
+      "lat": -42.837,
+      "lon": 147.513,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "NZWN": [
+    {
+      "ident": "16",
+      "identReciprocal": "34",
+      "headingTrueDeg": 160,
+      "lengthM": 2140,
+      "widthM": 45,
+      "lat": -41.326839,
+      "lon": 174.806862,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "RCMQ": [
+    {
+      "ident": "18",
+      "identReciprocal": "36",
+      "headingTrueDeg": 180,
+      "lengthM": 3658,
+      "widthM": 46,
+      "lat": 24.2647,
+      "lon": 120.621,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "RCNN": [
+    {
+      "ident": "18",
+      "identReciprocal": "36",
+      "headingTrueDeg": 180,
+      "lengthM": 3050,
+      "widthM": 46,
+      "lat": 22.9504,
+      "lon": 120.206,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "ZSQD": [
+    {
+      "ident": "17",
+      "identReciprocal": "35",
+      "headingTrueDeg": 170,
+      "lengthM": 3600,
+      "widthM": 60,
+      "lat": 36.362,
+      "lon": 120.088,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "ZWWW": [
+    {
+      "ident": "08",
+      "identReciprocal": "26",
+      "headingTrueDeg": 80,
+      "lengthM": 3600,
+      "widthM": 60,
+      "lat": 43.9136,
+      "lon": 87.4794,
+      "surface": "asphalt",
+      "lighted": true
+    }
   ]
 }

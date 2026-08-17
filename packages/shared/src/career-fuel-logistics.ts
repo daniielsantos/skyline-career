@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 680;
+export const FUEL_TRUCK_FLEET_SIZE = 720;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 187 },
-  { truckClassId: 'semi_tanker', count: 299 },
-  { truckClassId: 'btrain_tanker', count: 194 },
+  { truckClassId: 'rigid_tanker', count: 195 },
+  { truckClassId: 'semi_tanker', count: 315 },
+  { truckClassId: 'btrain_tanker', count: 210 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -264,6 +264,7 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'MY-E': ['MY-K'],
   'MY-K': ['MY-E'],
   'SG-C': [],
+  'BN-C': [],
   // Asia-12 Indonesia / Philippines — island groups keep local fuel hubs
   'ID-J': [],
   'ID-S': [],
@@ -286,14 +287,18 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'KR-S': ['KR-C'],
   'KR-J': [],
   // Asia-14 Taiwan / Australia / New Zealand domestic road graphs
-  'TW-N': ['TW-S'],
-  'TW-S': ['TW-N'],
+  'TW-N': ['TW-S', 'TW-C'],
+  'TW-S': ['TW-N', 'TW-C'],
+  'TW-C': ['TW-N', 'TW-S'],
   'AU-E': ['AU-S', 'AU-Q'],
-  'AU-S': ['AU-E'],
-  'AU-Q': ['AU-E'],
+  'AU-S': ['AU-E', 'AU-T'],
+  'AU-Q': ['AU-E', 'AU-NT'],
   'AU-W': [],
-  'NZ-N': [],
-  'NZ-S': [],
+  'AU-NT': ['AU-Q'],
+  'AU-T': ['AU-S'],
+  'NZ-N': ['NZ-W'],
+  'NZ-S': ['NZ-W'],
+  'NZ-W': ['NZ-N', 'NZ-S'],
   // Asia-15 Pacific hinge (islands — no road to the mainland)
   'US-HI': [],
   'FJ-W': [],

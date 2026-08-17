@@ -283,16 +283,22 @@
 - Port: WSSAV → NSAU
 - World seed: **1002** airports; **165** ports; fuel trucks **675**
 - Intl lanes: NSAU–NZAA, NSAU–NFTV; demand pair WS/TO
-- **Map seed complete** — optional future slices only (AU Darwin/Hobart, BN, etc.)
+- **Pacific/Asia map complete** — Asia-27–32 cleanup shipped; seed **1011** / **171** ports / **720** trucks.
 
-## Asia-26 Angaur micro-slice (pending homolog)
+## Asia-26–32 Pacific/Asia cleanup (shipped)
 
-- Country: PW — new region **PW-A** (Angaur; Koror stays **PW-C** / PTRO)
-- ICAO: **ANG** Angaur Airstrip (FAA LID — not PTRO Roman Tmetuchl)
-- Port: PWANG → ANG
-- World seed target: **1003** airports; **166** ports; fuel trucks **680**
-- Intl lanes: ANG–PGUM, ANG–RPLL; domestic corridor ANG–PTRO
-- **Not homologated** — confirm ANG in SimBrief Dispatch + `npm run career-hubs -- missing --yes` after rebuild
+| Slice | Hub(s) | Region | Notes |
+|-------|--------|--------|-------|
+| 26 | **ANG** | PW-A | Palau 2nd hub; FAA LID |
+| 27 | **YPDN** | AU-NT | Darwin; lanes AYPY/WIII |
+| 28 | **WBSB** | BN-C | Brunei (deferred Asia-12); lanes WSSS/WMKK |
+| 29 | **YMHB** | AU-T | Hobart; lane NZWN |
+| 30 | **NZWN** | NZ-W | Wellington; lane YSSY |
+| 31 | **RCMQ**, **RCNN** | TW-C, TW-S | Taichung/Tainan; lanes RJAA |
+| 32 | **ZSQD**, **ZWWW** | CN-E, CN-W | Qingdao/Urumqi; lanes RJAA/UTTT |
+
+- **Still skip:** ZUTF Tianfu (by design)
+- Homolog: `npm run career-hubs -- missing --yes` after rebuild
 
 ## SimBrief cargo allowlist
 

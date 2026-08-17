@@ -16078,5 +16078,24 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "ANG": {
+    "name": "Angaur Airstrip",
+    "lat": 6.900000125169754,
+    "lon": 134.1499999165535,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 225.03289794921875,
+        "lengthM": 1954.58203125,
+        "widthM": 31.418500900268555,
+        "lat": 6.906738840043545,
+        "lon": 134.1453368961811,
+        "identReciprocal": "5",
+        "surface": "grass"
+      }
+    ]
   }
 }

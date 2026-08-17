@@ -75,7 +75,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Asia-15 China inland / Pacific hinge:** CN inland (Xianyang **ZLXY**, Kunming **ZPPP**, Dalian **ZYTL**, Chongqing **ZUCK**, Wuhan **ZHHH**, Xiamen **ZSAM**) + Honolulu **PHNL** (US-HI) + Nadi **NFFN** + Port Moresby **AYPY** + Nouméa **NWWW**; Dalian + Xiamen + Honolulu + Nadi + Moresby + Nouméa ports; fuel trucks **585**; seed **984** airports / **147** ports. Remap ZLSN→ZLXY. Sparse TW/KR/VN/JP/AU/NZ bridges.
 - **Asia-16 Guam / Polynesia / Micronesia:** Guam **PGUM** (US-GU), Papeete **NTAA**, Palau **PTRO**, Pago Pago **NSTU** (US-AS), Faleolo **NSFA**, Fua'amotu **NFTF**; Guam + Papeete + Koror + Pago Pago + Apia + Nuku'alofa ports; fuel trucks **615**; seed **990** airports / **153** ports. Sparse JP/PH/NZ/US bridges.
 - **Asia-17 Vanuatu / Solomon / Cook / Kiribati:** Port Vila **NVVV**, Honiara **AGGH**, Rarotonga **NCRG**, Tarawa **NGTA**; Port Vila + Honiara + Rarotonga + Tarawa ports; fuel trucks **635**; seed **994** airports / **157** ports. Solomon ISO **SB** (not Brazil **BR**). Sparse AU/NZ/NC/FJ bridges.
-- **Asia-18–25 Pacific micro-hubs:** Saipan **PGSN** (US-MP), Cassidy **PLCH** (KI-L), Vava'u **NFTV** (TO-V), Santo **NVSS** (VU-S), Munda **AGGM** (SB-W), Aitutaki **NCAI** (CK-N), Bora Bora **NTTB** (PF-L), Asau **NSAU** (WS-S); fuel trucks **675**; seed **1002** airports / **165** ports. Demand pairs KI/US, TO/CK, TO/US, WS/TO. **Map seed complete.**
+- **Asia-18–25 Pacific micro-hubs:** Saipan **PGSN** (US-MP), Cassidy **PLCH** (KI-L), Vava'u **NFTV** (TO-V), Santo **NVSS** (VU-S), Munda **AGGM** (SB-W), Aitutaki **NCAI** (CK-N), Bora Bora **NTTB** (PF-L), Asau **NSAU** (WS-S); fuel trucks **675**; seed **1002** airports / **165** ports. Demand pairs KI/US, TO/CK, TO/US, WS/TO.
+- **Asia-26–32 Pacific/Asia cleanup:** Angaur **ANG**, Darwin **YPDN**, Brunei **WBSB**, Hobart **YMHB**, Wellington **NZWN**, Taichung/Tainan **RCMQ/RCNN**, Qingdao/Urumqi **ZSQD/ZWWW**; fuel trucks **720**; seed **1011** airports / **171** ports / **138** countries. **Pacific/Asia map complete.**
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
@@ -132,9 +133,10 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 39. ~~**Asia-16 Guam / Polynesia / Micronesia**~~ — US-GU/US-AS + PF/PW/WS/TO.
 40. ~~**Asia-17 Vanuatu / Solomon / Cook / Kiribati**~~ — VU/SB/CK/KI.
 41. ~~**Asia-18–25 Pacific micro-hubs**~~ — PGSN/PLCH/NFTV/NVSS/AGGM/NCAI/NTTB/NSAU; seed **1002** / **165** ports / **675** trucks. **Map seed complete.**
-42. Optional future map slices (AU Darwin/Hobart, BN, etc.) — not required.
-43. **Asia-26 Angaur (ANG / PW-A)** — Palau 2nd hub; seed **1003** / **166** ports / **680** trucks. Pending homolog.
-44. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+42. ~~**Asia-26 Angaur (ANG / PW-A)**~~ — Palau 2nd hub.
+43. ~~**Asia-27–32 Pacific/Asia cleanup**~~ — YPDN/WBSB/YMHB/NZWN/RCMQ/RCNN/ZSQD/ZWWW; seed **1011** / **171** ports / **720** trucks. **Pacific/Asia map complete.**
+44. **Next map region:** Russia (RU-1) or Sub-Saharan Africa (AF-1) — not started.
+45. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

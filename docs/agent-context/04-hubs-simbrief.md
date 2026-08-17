@@ -126,7 +126,14 @@
 - ICAO traps: Bishkek Manas **UCFM** (not **UAFM** OurAirports ident); Osh **UCFO** (not **UAFO**); **UTDK** Kulob omitted (absent in stock MSFS); skip UTDT Bokhtar
 - World seed: **899** airports; **113** ports; fuel trucks **340**; **+4** Central Asia east regions
 - Remaps: `UAFM→UCFM`, `UAFO→UCFO`, `UTDK→UTDD`
-- Next: AF / South-East Asia face
+- Next: Afghanistan
+
+## Asia-7 Afghanistan
+
+- Countries: AF (landlocked — no ports)
+- ICAO traps: Kabul **OAKB** (not **OAIX** Bagram); skip Jalalabad OAJL
+- World seed: **903** airports; **113** ports; fuel trucks **350**; **+2** Afghanistan regions
+- Next: NP / BD / South-East Asia face
 
 ## SimBrief cargo allowlist
 

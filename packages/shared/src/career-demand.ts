@@ -287,6 +287,11 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['TJ', 'KZ'],
     ['KG', 'KZ'],
     ['KG', 'UZ'],
+    // Asia-7 Afghanistan (do not backfill remaining EU-2+ pairs here)
+    ['AF', 'PK'],
+    ['AF', 'IR'],
+    ['AF', 'UZ'],
+    ['AF', 'TJ'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

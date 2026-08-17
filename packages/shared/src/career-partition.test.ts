@@ -36,6 +36,7 @@ describe('career partition', () => {
     assert.equal(inferHomeCountryId(world), 'BR');
     assert.deepEqual(listWorldCountryIds(world), [
       'AE',
+      'AF',
       'AG',
       'AL',
       'AM',

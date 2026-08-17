@@ -63,7 +63,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Asia-3 India south/east:** IN hubs (Bengaluru **VOBL**, Chennai **VOMM**, Hyderabad **VOHS**, Cochin **VOCI**, Kolkata **VECC**, Guwahati **VEGT**, Bhubaneswar **VEBS**, Patna **VEPT**); Chennai + Kolkata ports; fuel trucks **285**; seed **880** airports / **110** ports. Remaps VOBG→VOBL, VOHY→VOHS. Sparse AE/SA/OM bridges.
 - **Asia-4 Sri Lanka:** LK curated hubs (Colombo **VCBI**, Ratmalana **VCCC**, Mattala **VCRI**, Jaffna **VCCJ**); Colombo port; fuel trucks **295**; seed **884** airports / **111** ports. Sparse IN/AE bridges.
 - **Asia-5 Central Asia west:** KZ/UZ/TM curated hubs (Almaty **UAAA**, Astana **UACC**, Aktau **UATE**, Tashkent **UTTT**, Samarkand **UTSS**, Ashgabat **UTAA**, Turkmenbashi **UTAK**); Aktau + Turkmenbashi ports; fuel trucks **320**; seed **894** airports / **113** ports. Remap UTBK→UTAK. Sparse UZ/AZ/IR bridges.
-- **Asia-6 Central Asia east:** TJ/KG curated hubs (Dushanbe **UTDD**, Khujand **UTDL**, Bishkek Manas **UCFM**, Osh **UCFO**, Issyk-Kul **UCFL**); **UTDK** Kulob omitted (no stock MSFS); landlocked (no ports); fuel trucks **340**; seed **899** airports / **113** ports. Remaps UAFM→UCFM, UAFO→UCFO, UTDK→UTDD. Sparse UZ/KZ bridges. AF / South-East Asia next.
+- **Asia-6 Central Asia east:** TJ/KG curated hubs (Dushanbe **UTDD**, Khujand **UTDL**, Bishkek Manas **UCFM**, Osh **UCFO**, Issyk-Kul **UCFL**); **UTDK** Kulob omitted (no stock MSFS); landlocked (no ports); fuel trucks **340**; seed **899** airports / **113** ports. Remaps UAFM→UCFM, UAFO→UCFO, UTDK→UTDD. Sparse UZ/KZ bridges.
+- **Asia-7 Afghanistan:** AF curated hubs (Kabul **OAKB**, Mazar-i-Sharif **OAMS**, Kandahar **OAKN**, Herat **OAHR**); OAIX Bagram omitted; landlocked (no ports); fuel trucks **350**; seed **903** airports / **113** ports. Sparse PK/IR/UZ/TJ bridges. NP / BD / South-East Asia next.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
@@ -108,9 +109,10 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 27. ~~**Asia-4 Sri Lanka**~~ — LK.
 28. ~~**Asia-5 Central Asia west**~~ — KZ/UZ/TM.
 29. ~~**Asia-6 Central Asia east**~~ — TJ/KG.
-30. Polish only if needed — optional real METAR.
-31. Next map slice: Asia (AF / South-East face).
-32. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+30. ~~**Asia-7 Afghanistan**~~ — AF.
+31. Polish only if needed — optional real METAR.
+32. Next map slice: Asia (NP / BD / South-East face).
+33. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

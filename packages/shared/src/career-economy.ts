@@ -542,6 +542,11 @@ import {
   KG_CAREER_HUBS,
   buildKgFeederCorridors,
 } from './career-kg-hubs.js';
+import {
+  assertAfCareerHubCatalog,
+  AF_CAREER_HUBS,
+  buildAfFeederCorridors,
+} from './career-af-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1092,6 +1097,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(TM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(TJ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(KG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(AF_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1613,6 +1619,11 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'UTDD', b: 'UTDL', weight: 1.8 },
   { a: 'UCFM', b: 'UCFL', weight: 1.6 },
   { a: 'UCFM', b: 'UCFO', weight: 1.8 },
+  // Asia-7 Afghanistan domestic trunks
+  { a: 'OAKB', b: 'OAMS', weight: 1.7 },
+  { a: 'OAKB', b: 'OAKN', weight: 1.8 },
+  { a: 'OAKN', b: 'OAHR', weight: 1.6 },
+  { a: 'OAKB', b: 'OAHR', weight: 1.5 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1730,6 +1741,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildTmFeederCorridors(TM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildTjFeederCorridors(TJ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildKgFeederCorridors(KG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildAfFeederCorridors(AF_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4372,6 +4384,47 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'UCFM',
     capacityKgPerDay: 30_000,
   },
+  // Asia-7 Afghanistan
+  {
+    id: 'lane_oakb_opis',
+    originCountryId: 'AF',
+    destCountryId: 'PK',
+    originIcao: 'OAKB',
+    destIcao: 'OPIS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_oakn_opqt',
+    originCountryId: 'AF',
+    destCountryId: 'PK',
+    originIcao: 'OAKN',
+    destIcao: 'OPQT',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_oahr_oiie',
+    originCountryId: 'AF',
+    destCountryId: 'IR',
+    originIcao: 'OAHR',
+    destIcao: 'OIIE',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_oams_uttt',
+    originCountryId: 'AF',
+    destCountryId: 'UZ',
+    originIcao: 'OAMS',
+    destIcao: 'UTTT',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_oakb_utdd',
+    originCountryId: 'AF',
+    destCountryId: 'TJ',
+    originIcao: 'OAKB',
+    destIcao: 'UTDD',
+    capacityKgPerDay: 30_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4799,6 +4852,9 @@ export const FUEL_HUB_ICAOS = new Set([
   'UTDD',
   'UCFM',
   'UCFO',
+  // Asia-7 Afghanistan
+  'OAKB',
+  'OAKN',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5705,6 +5761,12 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    AF_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -6125,6 +6187,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertTmCareerHubCatalog();
   assertTjCareerHubCatalog();
   assertKgCareerHubCatalog();
+  assertAfCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -7114,6 +7177,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...KG_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...AF_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

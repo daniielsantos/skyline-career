@@ -13491,5 +13491,91 @@
     "lon": 69.6953335404396,
     "source": "msfs_facility",
     "validatedAt": "2026-08-17"
+  },
+  "OAHR": {
+    "name": "Herat",
+    "lat": 34.20999985188246,
+    "lon": 62.228333204984665,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 187.34442138671875,
+        "lengthM": 2998.989990234375,
+        "widthM": 42.511112213134766,
+        "lat": 34.20776691287756,
+        "lon": 62.22794249653816,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OAKB": {
+    "name": "Kabul Intl",
+    "lat": 34.56583343446255,
+    "lon": 69.21250015497208,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "29",
+        "headingTrueDeg": 287.27935791015625,
+        "lengthM": 3500.8310546875,
+        "widthM": 45,
+        "lat": 34.56586126238108,
+        "lon": 69.21231642365456,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OAKN": {
+    "name": "Kandahar",
+    "lat": 31.50583326816559,
+    "lon": 65.84777757525444,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 235.09127807617188,
+        "lengthM": 3204.678466796875,
+        "widthM": 51.44721221923828,
+        "lat": 31.505853049457073,
+        "lon": 65.84779724478722,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OAMS": {
+    "name": "Mazar",
+    "lat": 36.706944331526756,
+    "lon": 67.20944434404373,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "24R",
+        "headingTrueDeg": 245.69549560546875,
+        "lengthM": 3181.0478515625,
+        "widthM": 41.91602325439453,
+        "lat": 36.70696411281824,
+        "lon": 67.20940321683884,
+        "identReciprocal": "6L",
+        "surface": "concrete"
+      },
+      {
+        "ident": "24",
+        "headingTrueDeg": 245.91355895996094,
+        "lengthM": 2999.149658203125,
+        "widthM": 45.34367752075195,
+        "lat": 36.706341840326786,
+        "lon": 67.21626251935959,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

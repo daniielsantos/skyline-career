@@ -1039,6 +1039,10 @@ function regionLabel(region: string): string {
       return 'Kyrgyzstan — North / Bishkek';
     case 'KG-S':
       return 'Kyrgyzstan — South / Osh';
+    case 'AF-N':
+      return 'Afghanistan — North / Kabul';
+    case 'AF-S':
+      return 'Afghanistan — South / Kandahar';
     default:
       return region;
   }

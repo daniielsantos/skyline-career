@@ -320,6 +320,16 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['PH', 'SG'],
     ['PH', 'MY'],
     ['PH', 'VN'],
+    // Asia-13 China / Japan / Korea (do not backfill remaining EU-2+ pairs here)
+    ['CN', 'JP'],
+    ['CN', 'KR'],
+    ['CN', 'SG'],
+    ['CN', 'VN'],
+    ['JP', 'KR'],
+    ['JP', 'SG'],
+    ['JP', 'PH'],
+    ['KR', 'PH'],
+    ['KR', 'SG'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

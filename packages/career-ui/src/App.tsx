@@ -1124,6 +1124,28 @@ function regionLabel(region: string): string {
       return 'Philippines — Visayas / Cebu';
     case 'PH-M':
       return 'Philippines — Mindanao / Davao';
+    case 'CN-N':
+      return 'China — North / Beijing';
+    case 'CN-E':
+      return 'China — East / Shanghai';
+    case 'CN-S':
+      return 'China — South / Guangzhou';
+    case 'CN-W':
+      return 'China — West / Chengdu';
+    case 'JP-E':
+      return 'Japan — Kanto / Tokyo';
+    case 'JP-W':
+      return 'Japan — Kansai / Osaka';
+    case 'JP-S':
+      return 'Japan — Kyushu / Fukuoka';
+    case 'JP-N':
+      return 'Japan — Hokkaido / Sapporo';
+    case 'KR-C':
+      return 'South Korea — Seoul / Incheon';
+    case 'KR-S':
+      return 'South Korea — Busan';
+    case 'KR-J':
+      return 'South Korea — Jeju';
     default:
       return region;
   }

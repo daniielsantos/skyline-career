@@ -14572,5 +14572,501 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "RJAA": {
+    "name": "Narita Intl",
+    "lat": 35.76527774333954,
+    "lon": 140.38555562496185,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "34L",
+        "headingTrueDeg": 329.4742736816406,
+        "lengthM": 4006.3076171875,
+        "widthM": 60.75311279296875,
+        "lat": 35.75887765735388,
+        "lon": 140.37955820560455,
+        "identReciprocal": "16R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "34R",
+        "headingTrueDeg": 329.4845886230469,
+        "lengthM": 2565.779541015625,
+        "widthM": 58.11420440673828,
+        "lat": 35.79522594809532,
+        "lon": 140.3853142261505,
+        "identReciprocal": "16L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJBB": {
+    "name": "Kansai Intl",
+    "lat": 34.43416681140661,
+    "lon": 135.23277774453163,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "6L",
+        "headingTrueDeg": 51.01639175415039,
+        "lengthM": 4003.465087890625,
+        "widthM": 60.62334442138672,
+        "lat": 34.43993490189314,
+        "lon": 135.2230627834797,
+        "identReciprocal": "24R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6R",
+        "headingTrueDeg": 50.836673736572266,
+        "lengthM": 3501.6787109375,
+        "widthM": 59.65935516357422,
+        "lat": 34.42730337381363,
+        "lon": 135.24399295449257,
+        "identReciprocal": "24L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJCC": {
+    "name": "New Chitose",
+    "lat": 42.77527794241905,
+    "lon": 141.6924999654293,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18L",
+        "headingTrueDeg": 172.58920288085938,
+        "lengthM": 3992.99609375,
+        "widthM": 41.541011810302734,
+        "lat": 42.79315385967493,
+        "lon": 141.66876822710037,
+        "identReciprocal": "36R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18R",
+        "headingTrueDeg": 172.521484375,
+        "lengthM": 2688.952392578125,
+        "widthM": 41.665321350097656,
+        "lat": 42.79857460409403,
+        "lon": 141.6641217470169,
+        "identReciprocal": "36L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "19L",
+        "headingTrueDeg": 172.65936279296875,
+        "lengthM": 2985.180908203125,
+        "widthM": 56.55224609375,
+        "lat": 42.77542244642973,
+        "lon": 141.6940824687481,
+        "identReciprocal": "1R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "19R",
+        "headingTrueDeg": 172.66432189941406,
+        "lengthM": 2988.11474609375,
+        "widthM": 57.00262451171875,
+        "lat": 42.77508247643709,
+        "lon": 141.69044941663742,
+        "identReciprocal": "1L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJFF": {
+    "name": "Fukuoka",
+    "lat": 33.58444433659315,
+    "lon": 130.45166686177254,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16L",
+        "headingTrueDeg": 150.3303985595703,
+        "lengthM": 2791.2373046875,
+        "widthM": 59.694095611572266,
+        "lat": 33.58593229204416,
+        "lon": 130.45068696141243,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJTT": {
+    "name": "Tokyo (Haneda) Intl",
+    "lat": 35.55333327502012,
+    "lon": 139.78111132979393,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16L",
+        "headingTrueDeg": 150.0084228515625,
+        "lengthM": 3351.060302734375,
+        "widthM": 60.471397399902344,
+        "lat": 35.55280722677708,
+        "lon": 139.79583352804184,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16R",
+        "headingTrueDeg": 150.00592041015625,
+        "lengthM": 3095.599365234375,
+        "widthM": 59.013912200927734,
+        "lat": 35.548711493611336,
+        "lon": 139.77706477046013,
+        "identReciprocal": "34L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "22",
+        "headingTrueDeg": 214.8944854736328,
+        "lengthM": 2489.38037109375,
+        "widthM": 58.893653869628906,
+        "lat": 35.55825747549534,
+        "lon": 139.76917952299118,
+        "identReciprocal": "4",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23",
+        "headingTrueDeg": 222.45523071289062,
+        "lengthM": 2488.669677734375,
+        "widthM": 61,
+        "lat": 35.53234063088894,
+        "lon": 139.81276631355286,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RKPC": {
+    "name": "Jeju Intl",
+    "lat": 33.51222217082977,
+    "lon": 126.49277776479721,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "31",
+        "headingTrueDeg": 305.76165771484375,
+        "lengthM": 1912.5155029296875,
+        "widthM": 40.88569641113281,
+        "lat": 33.51050220429897,
+        "lon": 126.49565666913986,
+        "identReciprocal": "13",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "25",
+        "headingTrueDeg": 238.29336547851562,
+        "lengthM": 3175.2529296875,
+        "widthM": 48.50518798828125,
+        "lat": 33.5074183344841,
+        "lon": 126.48303061723709,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RKPK": {
+    "name": "Gimhae Intl",
+    "lat": 35.1805555075407,
+    "lon": 128.9380556344986,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18R",
+        "headingTrueDeg": 173.9919891357422,
+        "lengthM": 3197.861572265625,
+        "widthM": 59.44152069091797,
+        "lat": 35.17952151596546,
+        "lon": 128.93697068095207,
+        "identReciprocal": "36L",
+        "surface": "concrete"
+      },
+      {
+        "ident": "18L",
+        "headingTrueDeg": 173.95713806152344,
+        "lengthM": 2740.465087890625,
+        "widthM": 43.861873626708984,
+        "lat": 35.18173970282078,
+        "lon": 128.93901228904724,
+        "identReciprocal": "36R",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "RKSI": {
+    "name": "Incheon Intl",
+    "lat": 37.462500147521496,
+    "lon": 126.43916666507721,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "33L",
+        "headingTrueDeg": 324.51251220703125,
+        "lengthM": 3754.927490234375,
+        "widthM": 59.121700286865234,
+        "lat": 37.468045614659786,
+        "lon": 126.44858255982399,
+        "identReciprocal": "15R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "33R",
+        "headingTrueDeg": 324.5567932128906,
+        "lengthM": 3753.186767578125,
+        "widthM": 57.061119079589844,
+        "lat": 37.47019875794649,
+        "lon": 126.45239397883415,
+        "identReciprocal": "15L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "34L",
+        "headingTrueDeg": 324.6333923339844,
+        "lengthM": 3751.313232421875,
+        "widthM": 59.08392333984375,
+        "lat": 37.455157935619354,
+        "lon": 126.42552807927132,
+        "identReciprocal": "16R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "34R",
+        "headingTrueDeg": 324.6509704589844,
+        "lengthM": 4020.577880859375,
+        "widthM": 58.628299713134766,
+        "lat": 37.45805371552706,
+        "lon": 126.42870426177979,
+        "identReciprocal": "16L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZBAA": {
+    "name": "Beijing Capital",
+    "lat": 40.078699328005314,
+    "lon": 116.59476712346077,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18L",
+        "headingTrueDeg": 173.16946411132812,
+        "lengthM": 3799.982177734375,
+        "widthM": 57.61490249633789,
+        "lat": 40.072451792657375,
+        "lon": 116.5974560379982,
+        "identReciprocal": "36R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18R",
+        "headingTrueDeg": 173.1370849609375,
+        "lengthM": 3197.69384765625,
+        "widthM": 47.92414093017578,
+        "lat": 40.08777055889368,
+        "lon": 116.57190263271332,
+        "identReciprocal": "36L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "19",
+        "headingTrueDeg": 173.16024780273438,
+        "lengthM": 3796.423828125,
+        "widthM": 57.489105224609375,
+        "lat": 40.07587127387524,
+        "lon": 116.6149391233921,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZGGG": {
+    "name": "Baiyun",
+    "lat": 23.393333181738853,
+    "lon": 113.30833330750465,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1R",
+        "headingTrueDeg": 13.977871894836426,
+        "lengthM": 3594.0361328125,
+        "widthM": 45,
+        "lat": 23.392733372747898,
+        "lon": 113.287802785635,
+        "identReciprocal": "19L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2L",
+        "headingTrueDeg": 13.926518440246582,
+        "lengthM": 3796.115966796875,
+        "widthM": 60,
+        "lat": 23.392313607037067,
+        "lon": 113.30985501408577,
+        "identReciprocal": "20R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2R",
+        "headingTrueDeg": 13.991034507751465,
+        "lengthM": 3802.977783203125,
+        "widthM": 60,
+        "lat": 23.38615458458662,
+        "lon": 113.31225112080574,
+        "identReciprocal": "20L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZGSZ": {
+    "name": "Baoan",
+    "lat": 22.63833325356245,
+    "lon": 113.81166681647301,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 153.06251525878906,
+        "lengthM": 3397.45947265625,
+        "widthM": 42.84347915649414,
+        "lat": 22.639318630099297,
+        "lon": 113.81062433123589,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16L",
+        "headingTrueDeg": 153.03585815429688,
+        "lengthM": 3797.56689453125,
+        "widthM": 56.975223541259766,
+        "lat": 22.639162056148052,
+        "lon": 113.7932413816452,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZSPD": {
+    "name": "Pudong",
+    "lat": 31.14500004798174,
+    "lon": 121.79333344101906,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16L",
+        "headingTrueDeg": 162.01315307617188,
+        "lengthM": 3799.818359375,
+        "widthM": 59.282588958740234,
+        "lat": 31.14388056099415,
+        "lon": 121.82226240634918,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16R",
+        "headingTrueDeg": 161.98577880859375,
+        "lengthM": 3800.1640625,
+        "widthM": 59.282588958740234,
+        "lat": 31.14266250282526,
+        "lon": 121.81789755821228,
+        "identReciprocal": "34L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17L",
+        "headingTrueDeg": 161.99374389648438,
+        "lengthM": 3999.712158203125,
+        "widthM": 60,
+        "lat": 31.14407803863287,
+        "lon": 121.79241880774498,
+        "identReciprocal": "35R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17R",
+        "headingTrueDeg": 161.99295043945312,
+        "lengthM": 3400.031982421875,
+        "widthM": 57.52614974975586,
+        "lat": 31.140222027897835,
+        "lon": 121.78879603743553,
+        "identReciprocal": "35L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZSSS": {
+    "name": "Hongqiao",
+    "lat": 31.19666676968336,
+    "lon": 121.3349997997284,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18L",
+        "headingTrueDeg": 177.33900451660156,
+        "lengthM": 3406.591552734375,
+        "widthM": 65,
+        "lat": 31.197885163128376,
+        "lon": 121.33629217743874,
+        "identReciprocal": "36R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18R",
+        "headingTrueDeg": 177.31089782714844,
+        "lengthM": 3311.246826171875,
+        "widthM": 70,
+        "lat": 31.198174841701984,
+        "lon": 121.33243605494499,
+        "identReciprocal": "36L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ZUUU": {
+    "name": "Shuangliu",
+    "lat": 30.58000009506941,
+    "lon": 103.9483331143856,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "20L",
+        "headingTrueDeg": 201.8311767578125,
+        "lengthM": 3598.95654296875,
+        "widthM": 57.00703048706055,
+        "lat": 30.534550063312054,
+        "lon": 103.94369378685951,
+        "identReciprocal": "2R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "20R",
+        "headingTrueDeg": 201.8515167236328,
+        "lengthM": 3593.08984375,
+        "widthM": 42.79209518432617,
+        "lat": 30.57848397642374,
+        "lon": 103.94700184464455,
+        "identReciprocal": "2L",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

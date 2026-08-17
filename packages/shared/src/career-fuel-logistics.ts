@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 470;
+export const FUEL_TRUCK_FLEET_SIZE = 525;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 132 },
-  { truckClassId: 'semi_tanker', count: 208 },
-  { truckClassId: 'btrain_tanker', count: 130 },
+  { truckClassId: 'rigid_tanker', count: 147 },
+  { truckClassId: 'semi_tanker', count: 232 },
+  { truckClassId: 'btrain_tanker', count: 146 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -273,6 +273,18 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'PH-L': [],
   'PH-V': [],
   'PH-M': [],
+  // Asia-13 China / Japan / Korea domestic road graphs
+  'CN-N': ['CN-E', 'CN-W'],
+  'CN-E': ['CN-N', 'CN-S'],
+  'CN-S': ['CN-E'],
+  'CN-W': ['CN-N'],
+  'JP-E': ['JP-W', 'JP-N'],
+  'JP-W': ['JP-E', 'JP-S'],
+  'JP-S': ['JP-W'],
+  'JP-N': ['JP-E'],
+  'KR-C': ['KR-S'],
+  'KR-S': ['KR-C'],
+  'KR-J': [],
 };
 
 const TRUCK_NAME_POOL = [
@@ -500,6 +512,20 @@ const TRUCK_NAME_POOL = [
   'Mactan Cebu Tank',
   'Davao Fuel Run',
   'Laguindingan Fuel',
+  'Capital Tank Line',
+  'Pudong Fuel Road',
+  'Hongqiao Fuel',
+  'Baiyun Tank Line',
+  'Baoan Port Fuel',
+  'Shuangliu Tank Run',
+  'Narita Tank Line',
+  'Haneda Fuel Road',
+  'Kansai Tank Run',
+  'Fukuoka Fuel',
+  'New Chitose Tank',
+  'Incheon Tank Line',
+  'Gimhae Fuel Road',
+  'Jeju Fuel Run',
 ] as const;
 
 function hashSeed(seed: string): number {

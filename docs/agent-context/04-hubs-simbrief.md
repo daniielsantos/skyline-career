@@ -176,7 +176,15 @@
 - Ports: Tanjung Priok → WIII; Tanjung Perak → WARR; Belawan → WIMM; Kota Kinabalu → WBKK; Kuching → WBGG; Manila → RPLL; Cebu → RPVM
 - World seed: **948** airports; **128** ports; fuel trucks **470**; **+10** ID/MY-east/PH regions
 - Remaps: `WIMK→WIMM`, `WRRR→WADD`, `RPML→RPMY`
-- Next: China / Japan / Korea face
+- Next: China / Japan / Korea
+
+## Asia-13 China / Japan / Korea
+
+- Countries: CN / JP / KR. Taiwan RC* and inland China (Xi'an, Kunming, Dalian) deferred
+- ICAO traps: Beijing **ZBAA** (not **ZBAD** Daxing as major); Shanghai cargo **ZSPD** (not **ZSSS** Hongqiao as major); Chengdu **ZUUU** (not ZUTF Tianfu); Tokyo cargo **RJAA** Narita (not **RJTT** Haneda as major); Seoul **RKSI** Incheon (not **RKSS** Gimpo)
+- Ports: Shanghai → ZSPD; Yantian → ZGSZ; Tokyo → RJTT; Osaka → RJBB; Incheon → RKSI; Busan → RKPK
+- World seed: **962** airports; **134** ports; fuel trucks **525**; **+11** CN/JP/KR regions
+- Next: Taiwan / Australia face
 
 ## SimBrief cargo allowlist
 

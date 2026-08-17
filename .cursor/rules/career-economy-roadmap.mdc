@@ -67,7 +67,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Asia-7 Afghanistan:** AF curated hubs (Kabul **OAKB**, Mazar-i-Sharif **OAMS**, Kandahar **OAKN**, Herat **OAHR**); OAIX Bagram omitted; landlocked (no ports); fuel trucks **350**; seed **903** airports / **113** ports. Sparse PK/IR/UZ/TJ bridges.
 - **Asia-8 Nepal / Bangladesh:** NP/BD curated hubs (Kathmandu **VNKT**, Pokhara **VNPK**, Gautam Buddha **VNBW**, Dhaka **VGHS**, Chittagong **VGEG**, Sylhet **VGSY**); **VNPR** intl omitted (no stock MSFS); Chittagong port; fuel trucks **365**; seed **910** airports / **114** ports. Remaps VNPR→VNPK, VGZR→VGHS. Sparse IN bridges.
 - **Asia-9 Bhutan / Myanmar:** BT/MM curated hubs (Paro **VQPR**, Gelephu **VQGP**, Yangon **VYYY**, Sittwe **VYSW**, Mandalay **VYMD**, Naypyidaw **VYNT**); Yangon port; fuel trucks **380**; seed **916** airports / **115** ports. Country MM uses VY* ICAOs (not Mexico MM*). Sparse BD/IN/NP bridges.
-- **Asia-10 Thailand:** TH curated hubs (Suvarnabhumi **VTBS**, Don Mueang **VTBD**, U-Tapao **VTBU**, Chiang Mai **VTCC**, Chiang Rai **VTCT**, Khon Kaen **VTUK**, Phuket **VTSP**, Hat Yai **VTSS**); Laem Chabang + Phuket ports; fuel trucks **395**; seed **924** airports / **117** ports. Sparse MM/BD/IN bridges. VN/MY/SG deferred.
+- **Asia-10 Thailand:** TH curated hubs (Suvarnabhumi **VTBS**, Don Mueang **VTBD**, U-Tapao **VTBU**, Chiang Mai **VTCC**, Chiang Rai **VTCT**, Khon Kaen **VTUK**, Phuket **VTSP**, Hat Yai **VTSS**); Laem Chabang + Phuket ports; fuel trucks **395**; seed **924** airports / **117** ports. Sparse MM/BD/IN bridges.
+- **Asia-11 Vietnam / Malaysia / Singapore:** VN/MY/SG curated hubs (Hanoi **VVNB**, Hai Phong **VVCI**, Da Nang **VVDN**, Tan Son Nhat **VVTS**, Can Tho **VVCT**, KLIA **WMKK**, Johor **WMKJ**, Penang **WMKP**, Ipoh **WMKI**, Changi **WSSS**); Hai Phong + Saigon + Port Klang + Singapore ports; fuel trucks **420**; seed **934** airports / **121** ports. Remaps VVGL→VVNB, VVLT→VVTS. East Malaysia WB* deferred. Sparse TH bridges.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
@@ -116,9 +117,10 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 31. ~~**Asia-8 Nepal / Bangladesh**~~ — NP/BD.
 32. ~~**Asia-9 Bhutan / Myanmar**~~ — BT/MM.
 33. ~~**Asia-10 Thailand**~~ — TH.
-34. Polish only if needed — optional real METAR.
-35. Next map slice: Asia (Vietnam / Malaysia / Singapore face).
-36. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+34. ~~**Asia-11 Vietnam / Malaysia / Singapore**~~ — VN/MY/SG.
+35. Polish only if needed — optional real METAR.
+36. Next map slice: Asia (Indonesia / East Malaysia / Philippines face).
+37. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

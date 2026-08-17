@@ -306,6 +306,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // Asia-8: Pokhara in stock MSFS is VNPK (not VNPR intl); Dhaka is VGHS (not VGZR)
   VNPR: 'VNPK',
   VGZR: 'VGHS',
+  // Asia-11: Gia Lam air base is not Hanoi cargo; Long Thanh is still unopened
+  VVGL: 'VVNB',
+  VVLT: 'VVTS',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

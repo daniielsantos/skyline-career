@@ -572,6 +572,21 @@ import {
   TH_CAREER_HUBS,
   buildThFeederCorridors,
 } from './career-th-hubs.js';
+import {
+  assertVnCareerHubCatalog,
+  VN_CAREER_HUBS,
+  buildVnFeederCorridors,
+} from './career-vn-hubs.js';
+import {
+  assertMyCareerHubCatalog,
+  MY_CAREER_HUBS,
+  buildMyFeederCorridors,
+} from './career-my-hubs.js';
+import {
+  assertSgCareerHubCatalog,
+  SG_CAREER_HUBS,
+  buildSgFeederCorridors,
+} from './career-sg-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1128,6 +1143,9 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BT_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(MM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(TH_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(VN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(MY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(SG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1677,6 +1695,16 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'VTBS', b: 'VTSP', weight: 1.8 },
   { a: 'VTBS', b: 'VTSS', weight: 1.7 },
   { a: 'VTSP', b: 'VTSS', weight: 1.5 },
+  // Asia-11 Vietnam / Malaysia / Singapore domestic trunks
+  { a: 'VVNB', b: 'VVCI', weight: 1.7 },
+  { a: 'VVNB', b: 'VVDN', weight: 1.6 },
+  { a: 'VVTS', b: 'VVCT', weight: 1.6 },
+  { a: 'VVTS', b: 'VVDN', weight: 1.5 },
+  { a: 'VVNB', b: 'VVTS', weight: 1.9 },
+  { a: 'WMKK', b: 'WMKJ', weight: 1.6 },
+  { a: 'WMKK', b: 'WMKP', weight: 1.7 },
+  { a: 'WMKP', b: 'WMKI', weight: 1.5 },
+  { a: 'WMKK', b: 'WMKI', weight: 1.4 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1800,6 +1828,9 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildBtFeederCorridors(BT_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMmFeederCorridors(MM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildThFeederCorridors(TH_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildVnFeederCorridors(VN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildMyFeederCorridors(MY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildSgFeederCorridors(SG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4598,6 +4629,63 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'VIDP',
     capacityKgPerDay: 40_000,
   },
+  // Asia-11 Vietnam / Malaysia / Singapore
+  {
+    id: 'lane_vvnb_vtbs',
+    originCountryId: 'VN',
+    destCountryId: 'TH',
+    originIcao: 'VVNB',
+    destIcao: 'VTBS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_vvts_vtbs',
+    originCountryId: 'VN',
+    destCountryId: 'TH',
+    originIcao: 'VVTS',
+    destIcao: 'VTBS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_vvts_wmkk',
+    originCountryId: 'VN',
+    destCountryId: 'MY',
+    originIcao: 'VVTS',
+    destIcao: 'WMKK',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_vvts_wsss',
+    originCountryId: 'VN',
+    destCountryId: 'SG',
+    originIcao: 'VVTS',
+    destIcao: 'WSSS',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_wmkk_vtbs',
+    originCountryId: 'MY',
+    destCountryId: 'TH',
+    originIcao: 'WMKK',
+    destIcao: 'VTBS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_wmkk_wsss',
+    originCountryId: 'MY',
+    destCountryId: 'SG',
+    originIcao: 'WMKK',
+    destIcao: 'WSSS',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_wsss_vtbs',
+    originCountryId: 'SG',
+    destCountryId: 'TH',
+    originIcao: 'WSSS',
+    destIcao: 'VTBS',
+    capacityKgPerDay: 45_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -5040,6 +5128,12 @@ export const FUEL_HUB_ICAOS = new Set([
   'VTBS',
   'VTCC',
   'VTSP',
+  // Asia-11 Vietnam / Malaysia / Singapore
+  'VVNB',
+  'VVTS',
+  'WMKK',
+  'WMKP',
+  'WSSS',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5982,6 +6076,24 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    VN_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    MY_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    SG_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -6408,6 +6520,9 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertBtCareerHubCatalog();
   assertMmCareerHubCatalog();
   assertThCareerHubCatalog();
+  assertVnCareerHubCatalog();
+  assertMyCareerHubCatalog();
+  assertSgCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -7451,6 +7566,33 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...TH_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...VN_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...MY_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...SG_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

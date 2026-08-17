@@ -306,6 +306,13 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['TH', 'MM'],
     ['TH', 'BD'],
     ['TH', 'IN'],
+    // Asia-11 Vietnam / Malaysia / Singapore (do not backfill remaining EU-2+ pairs here)
+    ['VN', 'TH'],
+    ['VN', 'MY'],
+    ['VN', 'SG'],
+    ['MY', 'TH'],
+    ['MY', 'SG'],
+    ['SG', 'TH'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

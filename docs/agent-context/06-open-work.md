@@ -66,10 +66,11 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 33. ~~**Asia-8 Nepal / Bangladesh**~~ — NP/BD; seed **910**; ports **114**; fuel trucks **365**. ICAO: VNKT/VNPK (not VNPR)/VGHS (not VGZR). Homolog after rebuild.
 34. ~~**Asia-9 Bhutan / Myanmar**~~ — BT/MM; seed **916**; ports **115**; fuel trucks **380**. ICAO: VQPR/VYYY (not Mexico MM*). Homolog after rebuild.
 35. ~~**Asia-10 Thailand**~~ — TH; seed **924**; ports **117**; fuel trucks **395**. ICAO: VTBS (not VTBD-as-major)/VTBU/VTSP. Homolog after rebuild.
-36. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-37. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
-38. Next map slice: **Asia** (Vietnam / Malaysia / Singapore face).
-39. Re-run `npm run career-hubs -- missing` após rebuild shared.
+36. ~~**Asia-11 Vietnam / Malaysia / Singapore**~~ — VN/MY/SG; seed **934**; ports **121**; fuel trucks **420**. ICAO: VVNB/VVTS (not VVGL/VVLT)/WMKK/WSSS. Homolog after rebuild.
+37. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
+38. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+39. Next map slice: **Asia** (Indonesia / East Malaysia / Philippines face).
+40. Re-run `npm run career-hubs -- missing` após rebuild shared.
 
 ## Feito (shipped 0.3.47)
 

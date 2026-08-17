@@ -158,7 +158,16 @@
 - ICAO traps: Bangkok cargo major is **VTBS** Suvarnabhumi (not **VTBD** Don Mueang); U-Tapao **VTBU** (Laem Chabang pickup); skip military VTPI/VTBK; Betong **VTSY** is not Bhutan
 - Ports: Laem Chabang → VTBU; Phuket → VTSP
 - World seed: **924** airports; **117** ports; fuel trucks **395**; **+3** Thailand regions
-- Next: Vietnam / Malaysia / Singapore face
+- Next: Vietnam / Malaysia / Singapore
+
+## Asia-11 Vietnam / Malaysia / Singapore
+
+- Countries: VN / MY (peninsula) / SG. East Malaysia WB* and Indonesia deferred
+- ICAO traps: Hanoi **VVNB** (not **VVGL** Gia Lam); HCMC **VVTS** (not **VVLT** Long Thanh, unopened); KLIA **WMKK** (not WMSA-as-major / WMKB); Changi **WSSS** (not WSAP)
+- Ports: Hai Phong → VVCI; Ho Chi Minh → VVTS; Port Klang → WMKK; Singapore → WSSS
+- World seed: **934** airports; **121** ports; fuel trucks **420**; **+5** VN/MY/SG regions
+- Remaps: `VVGL→VVNB`, `VVLT→VVTS`
+- Next: Indonesia / East Malaysia / Philippines face
 
 ## SimBrief cargo allowlist
 

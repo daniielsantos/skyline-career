@@ -1028,6 +1028,38 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 98.43,
     pickupHubs: ['VTSP'],
   },
+  {
+    id: 'VNHPH',
+    name: 'Hai Phong',
+    countryId: 'VN',
+    lat: 20.86,
+    lon: 106.68,
+    pickupHubs: ['VVCI'],
+  },
+  {
+    id: 'VNSGN',
+    name: 'Ho Chi Minh',
+    countryId: 'VN',
+    lat: 10.75,
+    lon: 106.72,
+    pickupHubs: ['VVTS'],
+  },
+  {
+    id: 'MYPKG',
+    name: 'Port Klang',
+    countryId: 'MY',
+    lat: 3.0,
+    lon: 101.4,
+    pickupHubs: ['WMKK'],
+  },
+  {
+    id: 'SGSIN',
+    name: 'Singapore',
+    countryId: 'SG',
+    lat: 1.26,
+    lon: 103.82,
+    pickupHubs: ['WSSS'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

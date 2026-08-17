@@ -114,6 +114,7 @@ describe('career partition', () => {
       'MQ',
       'MT',
       'MX',
+      'MY',
       'NI',
       'NL',
       'NO',
@@ -131,6 +132,7 @@ describe('career partition', () => {
       'SA',
       'SD',
       'SE',
+      'SG',
       'SI',
       'SK',
       'SR',
@@ -148,6 +150,7 @@ describe('career partition', () => {
       'UY',
       'UZ',
       'VE',
+      'VN',
       'XK',
       'YE',
     ]);

@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 395;
+export const FUEL_TRUCK_FLEET_SIZE = 420;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 111 },
-  { truckClassId: 'semi_tanker', count: 175 },
-  { truckClassId: 'btrain_tanker', count: 109 },
+  { truckClassId: 'rigid_tanker', count: 118 },
+  { truckClassId: 'semi_tanker', count: 186 },
+  { truckClassId: 'btrain_tanker', count: 116 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -256,6 +256,12 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'TH-C': ['TH-N', 'TH-S'],
   'TH-N': ['TH-C'],
   'TH-S': ['TH-C'],
+  // Asia-11 Vietnam / Malaysia / Singapore domestic road graphs
+  'VN-N': ['VN-S'],
+  'VN-S': ['VN-N'],
+  'MY-C': ['MY-N'],
+  'MY-N': ['MY-C'],
+  'SG-C': [],
 };
 
 const TRUCK_NAME_POOL = [
@@ -462,6 +468,13 @@ const TRUCK_NAME_POOL = [
   'Chiang Mai Tank Line',
   'Phuket Tank Line',
   'Hat Yai Fuel Run',
+  'Noi Bai Tank Line',
+  'Hai Phong Port Fuel',
+  'Da Nang Fuel Run',
+  'Tan Son Nhat Tank',
+  'KLIA Tank Line',
+  'Penang Fuel Road',
+  'Changi Tank Line',
 ] as const;
 
 function hashSeed(seed: string): number {

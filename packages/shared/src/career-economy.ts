@@ -687,6 +687,7 @@ import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertUsHiCareerHubCatalog } from './career-us-hi-hubs.js';
 import { assertUsGuCareerHubCatalog } from './career-us-gu-hubs.js';
 import { assertUsAsCareerHubCatalog } from './career-us-as-hubs.js';
+import { assertUsMpCareerHubCatalog } from './career-us-mp-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
 import {
   assertMxCareerHubCatalog,
@@ -1869,6 +1870,29 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'PHNL', b: 'KSFO', weight: 1.8 },
   // Asia-16 Guam / Polynesia / Micronesia trunks
   { a: 'PGUM', b: 'PHNL', weight: 1.8 },
+  { a: 'PGSN', b: 'PGUM', weight: 1.6 },
+  { a: 'PGSN', b: 'PHNL', weight: 1.5 },
+  { a: 'PLCH', b: 'NGTA', weight: 1.4 },
+  { a: 'PLCH', b: 'NFFN', weight: 1.5 },
+  { a: 'PLCH', b: 'PHNL', weight: 1.6 },
+  { a: 'NFTV', b: 'NFTF', weight: 1.35 },
+  { a: 'NFTV', b: 'NZAA', weight: 1.5 },
+  { a: 'NFTV', b: 'NCRG', weight: 1.4 },
+  { a: 'NVSS', b: 'NVVV', weight: 1.35 },
+  { a: 'NVSS', b: 'NWWW', weight: 1.45 },
+  { a: 'NVSS', b: 'YSSY', weight: 1.4 },
+  { a: 'AGGM', b: 'AGGH', weight: 1.35 },
+  { a: 'AGGM', b: 'AYPY', weight: 1.45 },
+  { a: 'AGGM', b: 'YSSY', weight: 1.4 },
+  { a: 'NCAI', b: 'NCRG', weight: 1.35 },
+  { a: 'NCAI', b: 'NZAA', weight: 1.5 },
+  { a: 'NCAI', b: 'NTAA', weight: 1.45 },
+  { a: 'NTTB', b: 'NTAA', weight: 1.4 },
+  { a: 'NTTB', b: 'NZAA', weight: 1.5 },
+  { a: 'NTTB', b: 'NCRG', weight: 1.4 },
+  { a: 'NSAU', b: 'NSFA', weight: 1.35 },
+  { a: 'NSAU', b: 'NZAA', weight: 1.45 },
+  { a: 'NSAU', b: 'NFTV', weight: 1.35 },
   { a: 'NSTU', b: 'PHNL', weight: 1.7 },
 ];
 
@@ -5292,6 +5316,142 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'NFFN',
     capacityKgPerDay: 25_000,
   },
+  // Asia-18 Saipan micro-slice
+  {
+    id: 'lane_pgsn_pgum',
+    originCountryId: 'US',
+    destCountryId: 'US',
+    originIcao: 'PGSN',
+    destIcao: 'PGUM',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_pgsn_phnl',
+    originCountryId: 'US',
+    destCountryId: 'US',
+    originIcao: 'PGSN',
+    destIcao: 'PHNL',
+    capacityKgPerDay: 35_000,
+  },
+  // Asia-19 Kiritimati micro-slice
+  {
+    id: 'lane_plch_nffn',
+    originCountryId: 'KI',
+    destCountryId: 'FJ',
+    originIcao: 'PLCH',
+    destIcao: 'NFFN',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_plch_phnl',
+    originCountryId: 'KI',
+    destCountryId: 'US',
+    originIcao: 'PLCH',
+    destIcao: 'PHNL',
+    capacityKgPerDay: 35_000,
+  },
+  // Asia-20 Vava'u micro-slice
+  {
+    id: 'lane_nftv_nzaa',
+    originCountryId: 'TO',
+    destCountryId: 'NZ',
+    originIcao: 'NFTV',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_nftv_ncrg',
+    originCountryId: 'TO',
+    destCountryId: 'CK',
+    originIcao: 'NFTV',
+    destIcao: 'NCRG',
+    capacityKgPerDay: 25_000,
+  },
+  // Asia-21 Santo micro-slice
+  {
+    id: 'lane_nvss_nwww',
+    originCountryId: 'VU',
+    destCountryId: 'NC',
+    originIcao: 'NVSS',
+    destIcao: 'NWWW',
+    capacityKgPerDay: 28_000,
+  },
+  {
+    id: 'lane_nvss_yssy',
+    originCountryId: 'VU',
+    destCountryId: 'AU',
+    originIcao: 'NVSS',
+    destIcao: 'YSSY',
+    capacityKgPerDay: 30_000,
+  },
+  // Asia-22 Munda micro-slice
+  {
+    id: 'lane_aggm_aypy',
+    originCountryId: 'SB',
+    destCountryId: 'PG',
+    originIcao: 'AGGM',
+    destIcao: 'AYPY',
+    capacityKgPerDay: 28_000,
+  },
+  {
+    id: 'lane_aggm_yssy',
+    originCountryId: 'SB',
+    destCountryId: 'AU',
+    originIcao: 'AGGM',
+    destIcao: 'YSSY',
+    capacityKgPerDay: 30_000,
+  },
+  // Asia-23 Aitutaki micro-slice
+  {
+    id: 'lane_ncai_nzaa',
+    originCountryId: 'CK',
+    destCountryId: 'NZ',
+    originIcao: 'NCAI',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_ncai_ntaa',
+    originCountryId: 'CK',
+    destCountryId: 'PF',
+    originIcao: 'NCAI',
+    destIcao: 'NTAA',
+    capacityKgPerDay: 25_000,
+  },
+  // Asia-24 Bora Bora micro-slice
+  {
+    id: 'lane_nttb_nzaa',
+    originCountryId: 'PF',
+    destCountryId: 'NZ',
+    originIcao: 'NTTB',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_nttb_ncrg',
+    originCountryId: 'PF',
+    destCountryId: 'CK',
+    originIcao: 'NTTB',
+    destIcao: 'NCRG',
+    capacityKgPerDay: 25_000,
+  },
+  // Asia-25 Asau micro-slice
+  {
+    id: 'lane_nsau_nzaa',
+    originCountryId: 'WS',
+    destCountryId: 'NZ',
+    originIcao: 'NSAU',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 28_000,
+  },
+  {
+    id: 'lane_nsau_nftv',
+    originCountryId: 'WS',
+    destCountryId: 'TO',
+    originIcao: 'NSAU',
+    destIcao: 'NFTV',
+    capacityKgPerDay: 25_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -5792,6 +5952,14 @@ export const FUEL_HUB_ICAOS = new Set([
   'AGGH',
   'NCRG',
   'NGTA',
+  'PGSN',
+  'PLCH',
+  'NFTV',
+  'NVSS',
+  'AGGM',
+  'NCAI',
+  'NTTB',
+  'NSAU',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -7218,6 +7386,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertUsHiCareerHubCatalog();
   assertUsGuCareerHubCatalog();
   assertUsAsCareerHubCatalog();
+  assertUsMpCareerHubCatalog();
   assertPtCareerHubCatalog();
   assertEsCareerHubCatalog();
   assertFrCareerHubCatalog();

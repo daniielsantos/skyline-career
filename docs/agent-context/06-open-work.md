@@ -76,7 +76,16 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 43. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
 44. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
 45. **Map seed complete** — optional micro-slices (Saipan PGSN, Cassidy PLCH) only if desired.
-46. Re-run `npm run career-hubs -- missing` após rebuild shared.
+46. **Asia-18 Saipan (PGSN / US-MP)** — implemented, pending homolog; seed **995** / **158** ports / **640** trucks.
+47. **Asia-19 Kiritimati (PLCH / KI-L)** — implemented, pending homolog; seed **996** / **159** ports / **645** trucks.
+48. **Asia-20 Vava'u (NFTV / TO-V)** — implemented, pending homolog; seed **997** / **160** ports / **650** trucks.
+49. **Asia-21 Santo (NVSS / VU-S)** — implemented, pending homolog; seed **998** / **161** ports / **655** trucks.
+50. **Asia-22 Munda (AGGM / SB-W)** — implemented, pending homolog; seed **999** / **162** ports / **660** trucks.
+51. **Asia-23 Aitutaki (NCAI / CK-N)** — implemented, pending homolog; seed **1000** / **163** ports / **665** trucks.
+52. **Asia-24 Bora Bora (NTTB / PF-L)** — implemented, pending homolog; seed **1001** / **164** ports / **670** trucks.
+53. **Asia-25 Asau (NSAU / WS-S)** — implemented, pending homolog; seed **1002** / **165** ports / **675** trucks.
+54. Batch Asia-18–25 homolog + single commit when ready.
+55. Re-run `npm run career-hubs -- missing --yes` após rebuild shared.
 
 ## Feito (shipped 0.3.47)
 

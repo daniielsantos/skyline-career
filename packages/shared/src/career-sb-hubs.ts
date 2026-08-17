@@ -1,8 +1,8 @@
 /**
- * Solomon Islands career hub catalog — Asia-17 leftover Pacific face.
+ * Solomon Islands career hub catalog — Guadalcanal + Western.
  *
- * Country id is SB (ISO), not Brazil BR. Honiara cargo major is AGGH
- * (not Munda AGGM).
+ * Country id is SB (ISO), not Brazil BR. Honiara cargo major is AGGH;
+ * Munda is AGGM (Western Province).
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -11,7 +11,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type SbCareerRegion = 'SB-G';
+export type SbCareerRegion = 'SB-G' | 'SB-W';
 
 export type SbCareerHubDef = {
   icao: string;
@@ -25,7 +25,7 @@ export type SbCareerHubDef = {
   bush?: true;
 };
 
-/** 1 curated Solomon Islands hub. Honiara seaport pickup is AGGH. */
+/** 2 curated Solomon Islands hubs — Guadalcanal (SB-G) + Western (SB-W). */
 export const SB_CAREER_HUBS: readonly SbCareerHubDef[] = [
   {
     icao: 'AGGH',
@@ -37,9 +37,19 @@ export const SB_CAREER_HUBS: readonly SbCareerHubDef[] = [
     produce: { supplies: 1.25, general: 1.3, machinery: 1.1 },
     consume: { perishables: 1.15, electronics: 1.0, fuel: 1.2 },
   },
+  {
+    icao: 'AGGM',
+    name: 'Munda International',
+    region: 'SB-W',
+    hubTier: 'major',
+    lat: -8.3279,
+    lon: 157.263,
+    produce: { perishables: 1.2, general: 1.15, supplies: 1.1 },
+    consume: { electronics: 0.9, machinery: 0.85, fuel: 1.1 },
+  },
 ];
 
-export const SB_CAREER_HUB_COUNT = 1;
+export const SB_CAREER_HUB_COUNT = 2;
 
 export function buildSbFeederCorridors(
   hubs: readonly SbCareerHubDef[] = SB_CAREER_HUBS,
@@ -60,8 +70,8 @@ export function assertSbCareerHubCatalog(): void {
   if (!SB_CAREER_HUBS.some((h) => h.icao === 'AGGH' && h.hubTier === 'major')) {
     throw new Error('SB catalog must include major AGGH (Honiara)');
   }
-  if (SB_CAREER_HUBS.some((h) => h.icao === 'AGGM')) {
-    throw new Error('SB catalog must not seed AGGM Munda as the cargo major');
+  if (!SB_CAREER_HUBS.some((h) => h.icao === 'AGGM' && h.hubTier === 'major')) {
+    throw new Error('SB catalog must include major AGGM (Munda)');
   }
   if (SB_CAREER_HUBS.some((h) => h.region.startsWith('BR'))) {
     throw new Error('Solomon Islands must not use Brazil BR regions');

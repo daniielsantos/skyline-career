@@ -148,6 +148,7 @@ export * from './career-pg-hubs.js';
 export * from './career-nc-hubs.js';
 export * from './career-us-gu-hubs.js';
 export * from './career-us-as-hubs.js';
+export * from './career-us-mp-hubs.js';
 export * from './career-pf-hubs.js';
 export * from './career-pw-hubs.js';
 export * from './career-ws-hubs.js';

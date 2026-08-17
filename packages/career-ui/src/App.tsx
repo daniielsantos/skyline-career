@@ -706,6 +706,8 @@ function regionLabel(region: string): string {
       return 'USA — Guam';
     case 'US-AS':
       return 'USA — American Samoa';
+    case 'US-MP':
+      return 'USA — Northern Mariana Islands';
     case 'CA-W':
       return 'Canada — West';
     case 'CA-PR':
@@ -1176,20 +1178,34 @@ function regionLabel(region: string): string {
       return 'New Caledonia — Noumea';
     case 'PF-I':
       return 'French Polynesia — Tahiti';
+    case 'PF-L':
+      return 'French Polynesia — Bora Bora';
     case 'PW-C':
       return 'Palau — Koror';
     case 'WS-U':
       return 'Samoa — Upolu';
+    case 'WS-S':
+      return "Samoa — Savai'i";
     case 'TO-T':
       return 'Tonga — Tongatapu';
+    case 'TO-V':
+      return "Tonga — Vava'u";
     case 'VU-C':
-      return 'Vanuatu — Port Vila';
+      return 'Vanuatu — Efate';
+    case 'VU-S':
+      return 'Vanuatu — Santo';
     case 'SB-G':
       return 'Solomon Islands — Guadalcanal';
+    case 'SB-W':
+      return 'Solomon Islands — Western';
     case 'CK-C':
       return 'Cook Islands — Rarotonga';
+    case 'CK-N':
+      return 'Cook Islands — Aitutaki';
     case 'KI-T':
       return 'Kiribati — Tarawa';
+    case 'KI-L':
+      return 'Kiribati — Kiritimati';
     default:
       return region;
   }

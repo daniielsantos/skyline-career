@@ -220,6 +220,78 @@
 - Intl lanes: NVVV–YSSY/NWWW; AGGH–YSSY/AYPY; NCRG–NZAA/NTAA; NGTA–NFFN
 - Map seed **complete** — optional micro-slices only (Saipan PGSN, Cassidy PLCH, etc.)
 
+## Asia-18 Saipan micro-slice (pending homolog)
+
+- Country: US-MP (Northern Mariana Islands, under US)
+- ICAO: Saipan **PGSN** International (deferred from Asia-16)
+- Port: USMPS → PGSN
+- World seed target: **995** airports; **158** ports; fuel trucks **640**; **+1** US region (US-MP)
+- Intl lanes: PGSN–PGUM, PGSN–PHNL
+- **Not committed** — homolog with `npm run career-hubs -- missing --yes` after rebuild
+
+## Asia-19 Kiritimati micro-slice (pending homolog)
+
+- Country: KI — new region **KI-L** (Line Islands; Tarawa stays **KI-T**)
+- ICAO: **PLCH** Cassidy Field (not NGTU)
+- Port: KICXI → PLCH
+- World seed target: **996** airports; **159** ports; fuel trucks **645**
+- Intl lanes: PLCH–NFFN, PLCH–PHNL; demand pair KI/US
+- Stacks on Asia-18 (PGSN) — **not committed**
+
+## Asia-20 Vava'u micro-slice (pending homolog)
+
+- Country: TO — new region **TO-V** (Vava'u; Tongatapu stays **TO-T** / NFTF)
+- ICAO: **NFTV** Vava'u International
+- Port: TOVAV → NFTV
+- World seed target: **997** airports; **160** ports; fuel trucks **650**
+- Intl lanes: NFTV–NZAA, NFTV–NCRG; demand pair TO/CK
+- Stacks on Asia-18/19 — **not committed**
+
+## Asia-21 Santo micro-slice (pending homolog)
+
+- Country: VU — new region **VU-S** (Espiritu Santo; Efate stays **VU-C** / NVVV)
+- ICAO: **NVSS** Pekoa International
+- Port: VUSAN → NVSS
+- World seed target: **998** airports; **161** ports; fuel trucks **655**
+- Intl lanes: NVSS–NWWW, NVSS–YSSY
+- Stacks on Asia-18–20 — **not committed**
+
+## Asia-22 Munda micro-slice (pending homolog)
+
+- Country: **SB** (Solomon Islands ISO — not Brazil **BR**) — new region **SB-W** (Western; Guadalcanal stays **SB-G** / AGGH)
+- ICAO: **AGGM** Munda International
+- Port: SBMUN → AGGM
+- World seed target: **999** airports; **162** ports; fuel trucks **660**
+- Intl lanes: AGGM–AYPY, AGGM–YSSY
+- Stacks on Asia-18–21 — **not committed**
+
+## Asia-23 Aitutaki micro-slice (pending homolog)
+
+- Country: CK — new region **CK-N** (Aitutaki; Rarotonga stays **CK-C** / NCRG)
+- ICAO: **NCAI** Aitutaki International
+- Port: CKAIT → NCAI
+- World seed target: **1000** airports; **163** ports; fuel trucks **665**
+- Intl lanes: NCAI–NZAA, NCAI–NTAA
+- Stacks on Asia-18–22 — **not committed**
+
+## Asia-24 Bora Bora micro-slice (pending homolog)
+
+- Country: PF — new region **PF-L** (Leeward / Bora Bora; Tahiti stays **PF-I** / NTAA)
+- ICAO: **NTTB** Bora Bora
+- Port: PFBOB → NTTB
+- World seed target: **1001** airports; **164** ports; fuel trucks **670**
+- Intl lanes: NTTB–NZAA, NTTB–NCRG; domestic corridor NTTB–NTAA
+- Stacks on Asia-18–23 — **not committed**
+
+## Asia-25 Asau micro-slice (pending homolog)
+
+- Country: WS — new region **WS-S** (Savai'i; Upolu stays **WS-U** / NSFA)
+- ICAO: **NSAU** Asau
+- Port: WSSAV → NSAU
+- World seed target: **1002** airports; **165** ports; fuel trucks **675**
+- Intl lanes: NSAU–NZAA, NSAU–NFTV; demand pair WS/TO
+- Stacks on Asia-18–24 — **not committed**
+
 ## SimBrief cargo allowlist
 
 - `packages/shared/src/career-simbrief-airports.ts`

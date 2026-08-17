@@ -205,7 +205,7 @@ describe('career partition', () => {
     );
     assert.deepEqual(
       usRegions,
-      new Set(['US-AS', 'US-GU', 'US-HI', 'US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-VI', 'US-W']),
+      new Set(['US-AS', 'US-GU', 'US-HI', 'US-MP', 'US-MW', 'US-MT', 'US-NE', 'US-PR', 'US-SC', 'US-SE', 'US-VI', 'US-W']),
     );
   });
 

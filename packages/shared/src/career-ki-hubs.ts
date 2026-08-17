@@ -1,7 +1,7 @@
 /**
- * Kiribati career hub catalog — Asia-17 leftover Pacific face.
+ * Kiribati career hub catalog — Gilbert + Line Islands.
  *
- * Tarawa cargo major is NGTA Bonriki (not Cassidy PLCH on Kiritimati).
+ * Tarawa cargo major is NGTA Bonriki; Kiritimati is PLCH Cassidy (not NGTU).
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -10,7 +10,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type KiCareerRegion = 'KI-T';
+export type KiCareerRegion = 'KI-T' | 'KI-L';
 
 export type KiCareerHubDef = {
   icao: string;
@@ -24,7 +24,7 @@ export type KiCareerHubDef = {
   bush?: true;
 };
 
-/** 1 curated Kiribati hub. Tarawa seaport pickup is NGTA. */
+/** 2 curated Kiribati hubs — Tarawa (KI-T) + Kiritimati (KI-L). */
 export const KI_CAREER_HUBS: readonly KiCareerHubDef[] = [
   {
     icao: 'NGTA',
@@ -36,9 +36,19 @@ export const KI_CAREER_HUBS: readonly KiCareerHubDef[] = [
     produce: { general: 1.25, supplies: 1.2, perishables: 1.15 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.2 },
   },
+  {
+    icao: 'PLCH',
+    name: 'Kiritimati Cassidy Field',
+    region: 'KI-L',
+    hubTier: 'major',
+    lat: 1.9861,
+    lon: -157.3498,
+    produce: { perishables: 1.2, general: 1.15, supplies: 1.1 },
+    consume: { electronics: 0.9, machinery: 0.85, fuel: 1.15 },
+  },
 ];
 
-export const KI_CAREER_HUB_COUNT = 1;
+export const KI_CAREER_HUB_COUNT = 2;
 
 export function buildKiFeederCorridors(
   hubs: readonly KiCareerHubDef[] = KI_CAREER_HUBS,
@@ -59,7 +69,10 @@ export function assertKiCareerHubCatalog(): void {
   if (!KI_CAREER_HUBS.some((h) => h.icao === 'NGTA' && h.hubTier === 'major')) {
     throw new Error('KI catalog must include major NGTA (Bonriki)');
   }
-  if (KI_CAREER_HUBS.some((h) => ['PLCH', 'NGTU'].includes(h.icao))) {
-    throw new Error('KI catalog must not seed PLCH Cassidy or NGTU this slice');
+  if (!KI_CAREER_HUBS.some((h) => h.icao === 'PLCH' && h.hubTier === 'major')) {
+    throw new Error('KI catalog must include major PLCH (Cassidy Field)');
+  }
+  if (KI_CAREER_HUBS.some((h) => h.icao === 'NGTU')) {
+    throw new Error('KI catalog must not seed NGTU');
   }
 }

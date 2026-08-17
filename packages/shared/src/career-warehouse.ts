@@ -249,15 +249,23 @@ const PICKUP_HUB_SET = new Set([
   'AYPY',
   'NWWW',
   'PGUM',
+  'PGSN',
   'NTAA',
+  'NTTB',
   'PTRO',
   'NSTU',
   'NSFA',
+  'NSAU',
   'NFTF',
+  'NFTV',
   'NVVV',
+  'NVSS',
   'AGGH',
+  'AGGM',
   'NCRG',
+  'NCAI',
   'NGTA',
+  'PLCH',
 ]);
 
 function money(n: number): number {

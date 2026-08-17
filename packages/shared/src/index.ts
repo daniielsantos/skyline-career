@@ -116,6 +116,7 @@ export * from './career-lb-hubs.js';
 export * from './career-sy-hubs.js';
 export * from './career-ly-hubs.js';
 export * from './career-sd-hubs.js';
+export * from './career-ye-hubs.js';
 export * from './career-simbrief-airports.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';

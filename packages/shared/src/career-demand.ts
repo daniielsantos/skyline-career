@@ -253,6 +253,11 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['SD', 'EG'],
     ['SD', 'SA'],
     ['SD', 'LY'],
+    // MENA-6 Yemen (do not backfill remaining EU-2+ pairs here)
+    ['YE', 'SA'],
+    ['YE', 'OM'],
+    ['YE', 'AE'],
+    ['YE', 'SD'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

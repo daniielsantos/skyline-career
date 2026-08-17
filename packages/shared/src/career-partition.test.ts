@@ -135,6 +135,7 @@ describe('career partition', () => {
       'UY',
       'VE',
       'XK',
+      'YE',
     ]);
     assert.ok(world.airports.some((a) => a.icao === 'KMIA'));
     assert.ok(world.airports.some((a) => a.icao === 'KLAX'));

@@ -1001,6 +1001,10 @@ function regionLabel(region: string): string {
       return 'Sudan — Central / Khartoum';
     case 'SD-E':
       return 'Sudan — East / Port Sudan';
+    case 'YE-N':
+      return "Yemen — North / Sana'a";
+    case 'YE-S':
+      return 'Yemen — South / Aden';
     default:
       return region;
   }

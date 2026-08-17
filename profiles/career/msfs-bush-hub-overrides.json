@@ -12344,5 +12344,205 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "HLLB": {
+    "name": "Benina",
+    "lat": 32.09680572152138,
+    "lon": 20.269561260938644,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "33L",
+        "headingTrueDeg": 330.2708435058594,
+        "lengthM": 3587.75537109375,
+        "widthM": 40.84710693359375,
+        "lat": 32.096093595027924,
+        "lon": 20.268139243125916,
+        "identReciprocal": "15R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "33R",
+        "headingTrueDeg": 330.25518798828125,
+        "lengthM": 3587.533935546875,
+        "widthM": 40.69443130493164,
+        "lat": 32.09746956825256,
+        "lon": 20.27093678712845,
+        "identReciprocal": "15L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HLLM": {
+    "name": "Mitiga",
+    "lat": 32.8944443911314,
+    "lon": 13.27777773141861,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 105.30143737792969,
+        "lengthM": 3360.962158203125,
+        "widthM": 43.10293197631836,
+        "lat": 32.89179604500532,
+        "lon": 13.287613838911057,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HLMS": {
+    "name": "Misurata",
+    "lat": 32.324166521430016,
+    "lon": 15.061944276094437,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 145.7830047607422,
+        "lengthM": 3391.987060546875,
+        "widthM": 44.20447540283203,
+        "lat": 32.32532858848572,
+        "lon": 15.060938894748688,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HSOB": {
+    "name": "El Obeid",
+    "lat": 13.1527778506279,
+    "lon": 30.23277774453163,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 188.31910705566406,
+        "lengthM": 2986.35400390625,
+        "widthM": 45.632205963134766,
+        "lat": 13.15315905958414,
+        "lon": 30.232749581336975,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HSPN": {
+    "name": "Port Sudan",
+    "lat": 19.433611147105694,
+    "lon": 37.23416671156883,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "34",
+        "headingTrueDeg": 347.4832763671875,
+        "lengthM": 2497.680908203125,
+        "widthM": 42.73540496826172,
+        "lat": 19.43360611796379,
+        "lon": 37.234033048152924,
+        "identReciprocal": "16",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HSSK": {
+    "name": "Khartoum",
+    "lat": 15.590277872979641,
+    "lon": 32.55305573344231,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.48995971679688,
+        "lengthM": 2980.87451171875,
+        "widthM": 43.28232955932617,
+        "lat": 15.589537248015404,
+        "lon": 32.553150951862335,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OYAA": {
+    "name": "Aden Intl",
+    "lat": 12.829166650772095,
+    "lon": 45.03000006079674,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "26R",
+        "headingTrueDeg": 257.166748046875,
+        "lengthM": 3102.902587890625,
+        "widthM": 44.73352813720703,
+        "lat": 12.829458005726337,
+        "lon": 45.02886280417442,
+        "identReciprocal": "8L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OYHD": {
+    "name": "Hodeidah Intl",
+    "lat": 14.75138884037733,
+    "lon": 42.97611102461815,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 206.18162536621094,
+        "lengthM": 2987.81103515625,
+        "widthM": 57.008174896240234,
+        "lat": 14.752966314554214,
+        "lon": 42.97632113099098,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OYRN": {
+    "name": "Riyan",
+    "lat": 14.662500098347664,
+    "lon": 49.37499985098839,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 241.91600036621094,
+        "lengthM": 2987.675048828125,
+        "widthM": 38.045074462890625,
+        "lat": 14.662508815526962,
+        "lon": 49.3750624358654,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OYSN": {
+    "name": "Sanaa Intl",
+    "lat": 15.479444302618504,
+    "lon": 44.21972215175629,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 179.70278930664062,
+        "lengthM": 3251.35693359375,
+        "widthM": 44.28084945678711,
+        "lat": 15.476268902420998,
+        "lon": 44.21976774930954,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

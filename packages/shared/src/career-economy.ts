@@ -497,6 +497,11 @@ import {
   SD_CAREER_HUBS,
   buildSdFeederCorridors,
 } from './career-sd-hubs.js';
+import {
+  assertYeCareerHubCatalog,
+  YE_CAREER_HUBS,
+  buildYeFeederCorridors,
+} from './career-ye-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1038,6 +1043,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(SY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(LY_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(SD_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(YE_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1509,6 +1515,10 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'HLLM', b: 'HLLB', weight: 1.9 },
   { a: 'HSSK', b: 'HSOB', weight: 1.6 },
   { a: 'HSSK', b: 'HSPN', weight: 1.9 },
+  // MENA-6 Yemen domestic trunks
+  { a: 'OYSN', b: 'OYHD', weight: 1.8 },
+  { a: 'OYSN', b: 'OYAA', weight: 2.0 },
+  { a: 'OYAA', b: 'OYRN', weight: 1.6 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1617,6 +1627,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildSyFeederCorridors(SY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildLyFeederCorridors(LY_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildSdFeederCorridors(SD_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildYeFeederCorridors(YE_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -3972,6 +3983,47 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'OEJN',
     capacityKgPerDay: 35_000,
   },
+  // MENA-6 Yemen
+  {
+    id: 'lane_oysn_oejn',
+    originCountryId: 'YE',
+    destCountryId: 'SA',
+    originIcao: 'OYSN',
+    destIcao: 'OEJN',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_oyaa_oejn',
+    originCountryId: 'YE',
+    destCountryId: 'SA',
+    originIcao: 'OYAA',
+    destIcao: 'OEJN',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_oyaa_ooms',
+    originCountryId: 'YE',
+    destCountryId: 'OM',
+    originIcao: 'OYAA',
+    destIcao: 'OOMS',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_oysn_omdb',
+    originCountryId: 'YE',
+    destCountryId: 'AE',
+    originIcao: 'OYSN',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_oysn_hssk',
+    originCountryId: 'YE',
+    destCountryId: 'SD',
+    originIcao: 'OYSN',
+    destIcao: 'HSSK',
+    capacityKgPerDay: 30_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4373,6 +4425,9 @@ export const FUEL_HUB_ICAOS = new Set([
   // MENA-5 Maghreb/Nile gap
   'HLLM',
   'HSSK',
+  // MENA-6 Yemen
+  'OYSN',
+  'OYAA',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5225,6 +5280,12 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    YE_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -5636,6 +5697,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertSyCareerHubCatalog();
   assertLyCareerHubCatalog();
   assertSdCareerHubCatalog();
+  assertYeCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -6544,6 +6606,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...SD_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...YE_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

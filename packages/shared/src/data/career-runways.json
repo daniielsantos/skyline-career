@@ -16571,5 +16571,57 @@
       "surface": "asphalt",
       "lighted": true
     }
+  ],
+  "OYAA": [
+    {
+      "ident": "08",
+      "identReciprocal": "26",
+      "headingTrueDeg": 77,
+      "lengthM": 3100,
+      "widthM": 45.1,
+      "lat": 12.8264,
+      "lon": 45.014801,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "OYHD": [
+    {
+      "ident": "03",
+      "identReciprocal": "21",
+      "headingTrueDeg": 26.2,
+      "lengthM": 3000,
+      "widthM": 45.1,
+      "lat": 14.7408,
+      "lon": 42.9701,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "OYRN": [
+    {
+      "ident": "06",
+      "identReciprocal": "24",
+      "headingTrueDeg": 61.9,
+      "lengthM": 3000,
+      "widthM": 45.1,
+      "lat": 14.6563,
+      "lon": 49.362701,
+      "surface": "asphalt",
+      "lighted": true
+    }
+  ],
+  "OYSN": [
+    {
+      "ident": "18",
+      "identReciprocal": "36",
+      "headingTrueDeg": 179.6,
+      "lengthM": 3252,
+      "widthM": 45.1,
+      "lat": 15.491,
+      "lon": 44.219601,
+      "surface": "asphalt",
+      "lighted": true
+    }
   ]
 }

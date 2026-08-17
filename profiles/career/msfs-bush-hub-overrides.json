@@ -12890,5 +12890,207 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "VEBS": {
+    "name": "Bhubaneshwar",
+    "lat": 20.246666818857193,
+    "lon": 85.81861093640327,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 231.43235778808594,
+        "lengthM": 1271.02294921875,
+        "widthM": 45,
+        "lat": 20.244357101619244,
+        "lon": 85.81779554486275,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "32",
+        "headingTrueDeg": 323.84844970703125,
+        "lengthM": 2742.6201171875,
+        "widthM": 45,
+        "lat": 20.250871181488037,
+        "lon": 85.81279501318932,
+        "identReciprocal": "14",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VECC": {
+    "name": "Netaji Subhash Chandra Bose Inte",
+    "lat": 22.653963826596737,
+    "lon": 88.4467251598835,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "19L",
+        "headingTrueDeg": 186.2005615234375,
+        "lengthM": 3630.448974609375,
+        "widthM": 45,
+        "lat": 22.65851654112339,
+        "lon": 88.44821646809578,
+        "identReciprocal": "1R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "19R",
+        "headingTrueDeg": 186.21786499023438,
+        "lengthM": 3267.709716796875,
+        "widthM": 45,
+        "lat": 22.651021778583527,
+        "lon": 88.44525709748268,
+        "identReciprocal": "1L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VEGT": {
+    "name": "Guwahati",
+    "lat": 26.105022355914116,
+    "lon": 91.58543899655342,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 202.6109161376953,
+        "lengthM": 3104.203369140625,
+        "widthM": 44.7952766418457,
+        "lat": 26.107700541615486,
+        "lon": 91.58570855855942,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VEPT": {
+    "name": "Patna",
+    "lat": 25.593661218881607,
+    "lon": 85.09198352694511,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 248.34507751464844,
+        "lengthM": 2069.178466796875,
+        "widthM": 43.22761917114258,
+        "lat": 25.59076678007841,
+        "lon": 85.08743897080421,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VOBL": {
+    "name": "Kempegowda Intl",
+    "lat": 13.198872283101082,
+    "lon": 77.7054776251316,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9L",
+        "headingTrueDeg": 90.48909759521484,
+        "lengthM": 3996.94091796875,
+        "widthM": 44.412899017333984,
+        "lat": 13.20702888071537,
+        "lon": 77.70451247692108,
+        "identReciprocal": "27R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9R",
+        "headingTrueDeg": 90.47913360595703,
+        "lengthM": 3999.484130859375,
+        "widthM": 45,
+        "lat": 13.189592845737934,
+        "lon": 77.7084168791771,
+        "identReciprocal": "27L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VOCI": {
+    "name": "Cochin Intl",
+    "lat": 10.153538770973682,
+    "lon": 76.4072223007679,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 267.86932373046875,
+        "lengthM": 3399.966796875,
+        "widthM": 42.0620231628418,
+        "lat": 10.151116736233234,
+        "lon": 76.4005172252655,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VOHS": {
+    "name": "Rajiv Gandhi Intl",
+    "lat": 17.240555584430695,
+    "lon": 78.42888906598091,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "27L",
+        "headingTrueDeg": 269.19512939453125,
+        "lengthM": 4251.95361328125,
+        "widthM": 60.68827819824219,
+        "lat": 17.22883801907301,
+        "lon": 78.43287572264671,
+        "identReciprocal": "9R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "27R",
+        "headingTrueDeg": 269.1742858886719,
+        "lengthM": 4374.97705078125,
+        "widthM": 43.407188415527344,
+        "lat": 17.23089225590229,
+        "lon": 78.43286275863647,
+        "identReciprocal": "9L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VOMM": {
+    "name": "Chennai Intl",
+    "lat": 12.99509983509779,
+    "lon": 80.17360299825668,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 249.05230712890625,
+        "lengthM": 3658.664794921875,
+        "widthM": 44.444000244140625,
+        "lat": 12.990057952702045,
+        "lon": 80.1686780154705,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "30",
+        "headingTrueDeg": 297.6745910644531,
+        "lengthM": 2889.243896484375,
+        "widthM": 44.90355682373047,
+        "lat": 13.000860214233398,
+        "lon": 80.167897939682,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 275;
+export const FUEL_TRUCK_FLEET_SIZE = 285;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 77 },
-  { truckClassId: 'semi_tanker', count: 123 },
-  { truckClassId: 'btrain_tanker', count: 75 },
+  { truckClassId: 'rigid_tanker', count: 80 },
+  { truckClassId: 'semi_tanker', count: 127 },
+  { truckClassId: 'btrain_tanker', count: 78 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -222,9 +222,11 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   // Asia-1 Pakistan domestic road graph
   'PK-N': ['PK-S'],
   'PK-S': ['PK-N'],
-  // Asia-2 India west domestic road graph
-  'IN-N': ['IN-W'],
-  'IN-W': ['IN-N'],
+  // Asia-2 / Asia-3 India domestic road graph
+  'IN-N': ['IN-W', 'IN-E'],
+  'IN-W': ['IN-N', 'IN-S'],
+  'IN-S': ['IN-W', 'IN-E'],
+  'IN-E': ['IN-N', 'IN-S'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -385,6 +387,12 @@ const TRUCK_NAME_POOL = [
   'Amritsar Tank Line',
   'Pune Fuel Run',
   'Goa Dabolim Tank',
+  'Bengaluru Tank Line',
+  'Chennai Port Fuel',
+  'Hyderabad Fuel Road',
+  'Cochin Jet Haul',
+  'Kolkata Hooghly Tank',
+  'Guwahati Fuel Run',
 ] as const;
 
 function hashSeed(seed: string): number {

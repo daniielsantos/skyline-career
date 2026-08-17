@@ -294,6 +294,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   HSSS: 'HSSK',
   // Asia-1: old Islamabad / Chaklala OPRN → OPIS
   OPRN: 'OPIS',
+  // Asia-3: old Bengaluru HAL VOBG → VOBL; Begumpet VOHY → VOHS
+  VOBG: 'VOBL',
+  VOHY: 'VOHS',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

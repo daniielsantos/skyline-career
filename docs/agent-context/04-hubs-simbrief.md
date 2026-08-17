@@ -90,11 +90,19 @@
 
 ## Asia-2 India west
 
-- Countries: IN (east/south and Central Asia deferred)
+- Countries: IN
 - ICAO traps: Delhi **VIDP** (not VIDD Safdarjung); Mumbai **VABB**; Goa **VOGO** Dabolim (not **VOGA** Mopa); Ahmedabad **VAAH**
 - Ports: Mumbai → VABB
-- World seed: **872** airports; **108** ports; fuel trucks **275**; **+2** India regions
-- Next: India east/south or Central Asia
+- World seed: **872** airports; **108** ports; fuel trucks **275**; **+2** India west regions
+
+## Asia-3 India south / east
+
+- Countries: IN (Central Asia / Sri Lanka deferred)
+- ICAO traps: Bengaluru **VOBL** (not **VOBG** HAL); Hyderabad **VOHS** (not **VOHY** Begumpet); Chennai **VOMM**; Kolkata **VECC**
+- Ports: Chennai → VOMM; Kolkata → VECC (Hooghly river→sea)
+- World seed: **880** airports; **110** ports; fuel trucks **285**; **+2** India south/east regions
+- Remaps: `VOBG→VOBL`, `VOHY→VOHS`
+- Next: Central Asia or Sri Lanka
 
 ## SimBrief cargo allowlist
 

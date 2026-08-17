@@ -1013,6 +1013,10 @@ function regionLabel(region: string): string {
       return 'India — North / Delhi';
     case 'IN-W':
       return 'India — West / Mumbai';
+    case 'IN-S':
+      return 'India — South / Bengaluru';
+    case 'IN-E':
+      return 'India — East / Kolkata';
     default:
       return region;
   }

@@ -1547,6 +1547,17 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'VABB', b: 'VOGO', weight: 1.6 },
   { a: 'VIDP', b: 'VABB', weight: 2.0 },
   { a: 'VAAH', b: 'VIJP', weight: 1.6 },
+  // Asia-3 India south / east domestic trunks
+  { a: 'VOBL', b: 'VOMM', weight: 1.9 },
+  { a: 'VOBL', b: 'VOHS', weight: 1.8 },
+  { a: 'VOMM', b: 'VOCI', weight: 1.6 },
+  { a: 'VOBL', b: 'VIDP', weight: 1.8 },
+  { a: 'VOBL', b: 'VABB', weight: 1.8 },
+  { a: 'VECC', b: 'VEBS', weight: 1.6 },
+  { a: 'VECC', b: 'VEGT', weight: 1.7 },
+  { a: 'VECC', b: 'VEPT', weight: 1.5 },
+  { a: 'VECC', b: 'VIDP', weight: 1.8 },
+  { a: 'VOMM', b: 'VECC', weight: 1.7 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -4136,6 +4147,39 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'OEJN',
     capacityKgPerDay: 40_000,
   },
+  // Asia-3 India south / east
+  {
+    id: 'lane_vomm_omdb',
+    originCountryId: 'IN',
+    destCountryId: 'AE',
+    originIcao: 'VOMM',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_vobl_oejn',
+    originCountryId: 'IN',
+    destCountryId: 'SA',
+    originIcao: 'VOBL',
+    destIcao: 'OEJN',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_voci_ooms',
+    originCountryId: 'IN',
+    destCountryId: 'OM',
+    originIcao: 'VOCI',
+    destIcao: 'OOMS',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_vecc_omdb',
+    originCountryId: 'IN',
+    destCountryId: 'AE',
+    originIcao: 'VECC',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 40_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4547,6 +4591,10 @@ export const FUEL_HUB_ICAOS = new Set([
   'VIDP',
   'VABB',
   'VAAH',
+  // Asia-3 India south / east
+  'VOBL',
+  'VOMM',
+  'VECC',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */

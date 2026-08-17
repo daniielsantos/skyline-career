@@ -1,5 +1,5 @@
 /**
- * India west career hub catalog — Asia-2 Arabian Sea / Indus face.
+ * India career hub catalog — Asia-2 west + Asia-3 south/east faces.
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -8,7 +8,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type InCareerRegion = 'IN-N' | 'IN-W';
+export type InCareerRegion = 'IN-N' | 'IN-W' | 'IN-S' | 'IN-E';
 
 export type InCareerHubDef = {
   icao: string;
@@ -31,7 +31,7 @@ const inland = {
   >,
 };
 
-/** 8 curated west-India hubs. Delhi is VIDP; Mumbai is VABB; Goa is VOGO (not VOGA). */
+/** 16 curated India hubs. Bengaluru is VOBL (not VOBG); Hyderabad is VOHS (not VOHY). */
 export const IN_CAREER_HUBS: readonly InCareerHubDef[] = [
   {
     icao: 'VIDP',
@@ -110,9 +110,87 @@ export const IN_CAREER_HUBS: readonly InCareerHubDef[] = [
     produce: { perishables: 1.25, general: 1.2, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  {
+    icao: 'VOBL',
+    name: 'Bengaluru Kempegowda',
+    region: 'IN-S',
+    hubTier: 'major',
+    lat: 13.1979,
+    lon: 77.7063,
+    produce: { electronics: 1.5, general: 1.45, machinery: 1.3 },
+    consume: { perishables: 1.2, supplies: 1.15, general: 1.1 },
+  },
+  {
+    icao: 'VOMM',
+    name: 'Chennai International',
+    region: 'IN-S',
+    hubTier: 'major',
+    lat: 12.99,
+    lon: 80.1693,
+    produce: { electronics: 1.4, general: 1.45, machinery: 1.25 },
+    consume: { perishables: 1.2, supplies: 1.15, fuel: 1.2 },
+  },
+  {
+    icao: 'VOHS',
+    name: 'Hyderabad Rajiv Gandhi',
+    region: 'IN-S',
+    hubTier: 'regional',
+    lat: 17.2313,
+    lon: 78.4299,
+    produce: { electronics: 1.35, general: 1.3, machinery: 1.2 },
+    consume: { perishables: 1.15, supplies: 1.1, fuel: 1.1 },
+  },
+  {
+    icao: 'VOCI',
+    name: 'Cochin International',
+    region: 'IN-S',
+    hubTier: 'spoke',
+    lat: 10.151,
+    lon: 76.4008,
+    produce: { perishables: 1.25, general: 1.2, supplies: 1.1 },
+    consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
+  },
+  {
+    icao: 'VECC',
+    name: 'Kolkata Netaji Subhas Chandra Bose',
+    region: 'IN-E',
+    hubTier: 'major',
+    lat: 22.654,
+    lon: 88.4477,
+    produce: { electronics: 1.4, general: 1.45, machinery: 1.25 },
+    consume: { perishables: 1.2, supplies: 1.15, fuel: 1.2 },
+  },
+  {
+    icao: 'VEGT',
+    name: 'Guwahati Lokpriya Gopinath Bordoloi',
+    region: 'IN-E',
+    hubTier: 'regional',
+    lat: 26.1067,
+    lon: 91.5852,
+    produce: { general: 1.25, perishables: 1.2, supplies: 1.15 },
+    consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
+  },
+  {
+    icao: 'VEBS',
+    name: 'Bhubaneswar Biju Patnaik',
+    region: 'IN-E',
+    hubTier: 'spoke',
+    lat: 20.251,
+    lon: 85.8147,
+    ...inland,
+  },
+  {
+    icao: 'VEPT',
+    name: 'Patna Jay Prakash Narayan',
+    region: 'IN-E',
+    hubTier: 'spoke',
+    lat: 25.5913,
+    lon: 85.088,
+    ...inland,
+  },
 ];
 
-export const IN_CAREER_HUB_COUNT = 8;
+export const IN_CAREER_HUB_COUNT = 16;
 
 export function buildInFeederCorridors(
   hubs: readonly InCareerHubDef[] = IN_CAREER_HUBS,
@@ -141,5 +219,21 @@ export function assertInCareerHubCatalog(): void {
   }
   if (IN_CAREER_HUBS.some((h) => h.icao === 'VOGA' || h.icao === 'VIDD')) {
     throw new Error('IN catalog must not use VOGA Mopa or VIDD Safdarjung');
+  }
+  if (!IN_CAREER_HUBS.some((h) => h.icao === 'VOBL' && h.hubTier === 'major')) {
+    throw new Error('IN catalog must include major VOBL (Bengaluru)');
+  }
+  if (!IN_CAREER_HUBS.some((h) => h.icao === 'VOMM' && h.hubTier === 'major')) {
+    throw new Error('IN catalog must include major VOMM (Chennai)');
+  }
+  if (!IN_CAREER_HUBS.some((h) => h.icao === 'VECC' && h.hubTier === 'major')) {
+    throw new Error('IN catalog must include major VECC (Kolkata)');
+  }
+  if (
+    IN_CAREER_HUBS.some(
+      (h) => h.icao === 'VOBG' || h.icao === 'VOHY' || h.icao === 'VOML',
+    )
+  ) {
+    throw new Error('IN catalog must not use VOBG HAL, VOHY Begumpet, or VOML Mangalore as hubs');
   }
 }

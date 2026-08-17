@@ -59,7 +59,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **MENA-5 Maghreb/Nile gap:** LY/SD curated hubs (Tripoli **HLLM**, Benghazi **HLLB**, Khartoum **HSSK**, Port Sudan **HSPN**); Misrata + Port Sudan ports; fuel trucks **245**; seed **854** airports / **104** ports. Remaps HLLT→HLLM, HSSS→HSSK. Sparse TN/EG/MT/SA bridges. YE deferred.
 - **MENA-6 Yemen:** YE curated hubs (Sana'a **OYSN**, Aden **OYAA**, Hodeidah **OYHD**, Mukalla **OYRN**); Aden + Hodeidah ports; fuel trucks **255**; seed **858** airports / **106** ports. Sparse SA/OM/AE/SD bridges.
 - **Asia-1 Pakistan:** PK curated hubs (Islamabad **OPIS**, Karachi **OPKC**, Lahore **OPLA**, Peshawar **OPPS**, Quetta **OPQT**, Multan **OPMT**); Karachi port; fuel trucks **265**; seed **864** airports / **107** ports. Remap OPRN→OPIS. Sparse AE/OM/IR/SA bridges.
-- **Asia-2 India west:** IN curated hubs (Delhi **VIDP**, Mumbai **VABB**, Ahmedabad **VAAH**, Amritsar **VIAR**, Jaipur **VIJP**, Jodhpur **VIJO**, Pune **VAPO**, Goa **VOGO**); Mumbai port; fuel trucks **275**; seed **872** airports / **108** ports. Sparse PK/AE/SA bridges. East India / Central Asia next.
+- **Asia-2 India west:** IN curated hubs (Delhi **VIDP**, Mumbai **VABB**, Ahmedabad **VAAH**, Amritsar **VIAR**, Jaipur **VIJP**, Jodhpur **VIJO**, Pune **VAPO**, Goa **VOGO**); Mumbai port; fuel trucks **275**; seed **872** airports / **108** ports. Sparse PK/AE/SA bridges.
+- **Asia-3 India south/east:** IN hubs (Bengaluru **VOBL**, Chennai **VOMM**, Hyderabad **VOHS**, Cochin **VOCI**, Kolkata **VECC**, Guwahati **VEGT**, Bhubaneswar **VEBS**, Patna **VEPT**); Chennai + Kolkata ports; fuel trucks **285**; seed **880** airports / **110** ports. Remaps VOBG→VOBL, VOHY→VOHS. Sparse AE/SA/OM bridges. Central Asia / Sri Lanka next.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
@@ -100,9 +101,10 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 23. ~~**MENA-6 Yemen**~~ — YE.
 24. ~~**Asia-1 Pakistan**~~ — PK.
 25. ~~**Asia-2 India west**~~ — IN (west face).
-26. Polish only if needed — optional real METAR.
-27. Next map slice: Asia (India east/south or Central Asia).
-28. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+26. ~~**Asia-3 India south/east**~~ — IN (south/east face).
+27. Polish only if needed — optional real METAR.
+28. Next map slice: Asia (Central Asia or Sri Lanka).
+29. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

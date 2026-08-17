@@ -1302,16 +1302,33 @@ export function settleAircraftMarketOps(
   state: CareerMissionsState,
   economyTick: number,
   world?: CareerEconomyWorld,
+  opts?: {
+    /** Max lease payment loops this call (default: unlimited). */
+    maxInstallments?: number;
+    /** If term ended, keep aircraft and mark soft end instead of removing. */
+    deferTermRepossess?: boolean;
+  },
 ): {
   paidUsd: number;
   repossessed: string[];
+  termEndedSoft: string[];
+  overdueIds: string[];
+  installmentsPaid: number;
   leaseOutEarnedUsd: number;
   leaseOutReturned: string[];
   npcTaken?: number;
 } {
   let paidUsd = 0;
+  let installmentsPaid = 0;
   const repossessed: string[] = [];
+  const termEndedSoft: string[] = [];
+  const overdueIds: string[] = [];
   const keep: PlayerAircraft[] = [];
+  const maxInstallments =
+    typeof opts?.maxInstallments === 'number' && opts.maxInstallments >= 0
+      ? Math.floor(opts.maxInstallments)
+      : Number.POSITIVE_INFINITY;
+  const deferTerm = opts?.deferTermRepossess === true;
 
   for (const aircraft of state.fleet) {
     if (aircraft.ownership !== 'leased' || !aircraft.lease) {
@@ -1319,7 +1336,12 @@ export function settleAircraftMarketOps(
       continue;
     }
     const lease = aircraft.lease;
-    while (economyTick >= lease.nextDueTick && economyTick < lease.termEndsTick) {
+    let paidThisAcf = 0;
+    while (
+      economyTick >= lease.nextDueTick &&
+      economyTick < lease.termEndsTick &&
+      paidThisAcf < maxInstallments
+    ) {
       if (state.walletUsd < lease.monthlyUsd) {
         aircraft.leaseOverdue = true;
         break;
@@ -1333,10 +1355,32 @@ export function settleAircraftMarketOps(
         note: aircraft.label,
       });
       paidUsd += lease.monthlyUsd;
+      paidThisAcf += 1;
+      installmentsPaid += 1;
       lease.nextDueTick += TICKS_PER_MONTH;
       aircraft.leaseOverdue = false;
     }
+    // More months due but capped — leave overdue so Hangar prompts payment.
+    if (
+      economyTick >= lease.nextDueTick &&
+      economyTick < lease.termEndsTick &&
+      paidThisAcf >= maxInstallments &&
+      Number.isFinite(maxInstallments)
+    ) {
+      aircraft.leaseOverdue = true;
+    }
+    if (aircraft.leaseOverdue) {
+      overdueIds.push(aircraft.id);
+    }
     if (economyTick >= lease.termEndsTick) {
+      if (deferTerm) {
+        lease.termEndedSoft = true;
+        aircraft.leaseOverdue = true;
+        if (!overdueIds.includes(aircraft.id)) overdueIds.push(aircraft.id);
+        termEndedSoft.push(aircraft.id);
+        keep.push(aircraft);
+        continue;
+      }
       repossessed.push(aircraft.id);
       continue;
     }
@@ -1355,6 +1399,9 @@ export function settleAircraftMarketOps(
   return {
     paidUsd,
     repossessed,
+    termEndedSoft,
+    overdueIds,
+    installmentsPaid,
     leaseOutEarnedUsd: leaseOut.earnedUsd,
     leaseOutReturned: leaseOut.returned,
     npcTaken,
@@ -1414,6 +1461,10 @@ export function quoteLeaseEarlyReturnUsd(
   if (aircraft.ownership !== 'leased' || !aircraft.lease) {
     throw new Error('Aircraft is not under lease');
   }
+  // Soft term-end after long AFK: lessor reclaim at $0 (no early-return penalty).
+  if (aircraft.lease.termEndedSoft === true || economyTick >= aircraft.lease.termEndsTick) {
+    return 0;
+  }
   const remaining = leaseRemainingMonths(aircraft, economyTick);
   if (remaining <= 0) {
     throw new Error('Lease term already ended — the lessor will reclaim the airframe');
@@ -1425,6 +1476,7 @@ export function quoteLeaseEarlyReturnUsd(
 /**
  * Return a leased airframe before term end. Pays the early-return penalty and
  * removes the aircraft from the fleet (same outcome as natural repossess).
+ * Soft term-end (`termEndedSoft`) allows a free return even if leaseOverdue.
  */
 export function returnAircraftLeaseEarly(
   state: CareerMissionsState,
@@ -1436,7 +1488,10 @@ export function returnAircraftLeaseEarly(
   if (aircraft.ownership !== 'leased' || !aircraft.lease) {
     throw new Error('Aircraft is not under lease');
   }
-  if (aircraft.leaseOverdue) {
+  const softEnded =
+    aircraft.lease.termEndedSoft === true ||
+    economyTick >= aircraft.lease.termEndsTick;
+  if (aircraft.leaseOverdue && !softEnded) {
     throw new Error(
       'Lease payment is overdue — clear the due month before returning early',
     );
@@ -1451,22 +1506,26 @@ export function returnAircraftLeaseEarly(
     throw new Error(`Cannot return lease while aircraft is ${aircraft.status}`);
   }
 
-  const remainingMonths = leaseRemainingMonths(aircraft, economyTick);
+  const remainingMonths = softEnded
+    ? 0
+    : leaseRemainingMonths(aircraft, economyTick);
   const debit = quoteLeaseEarlyReturnUsd(aircraft, economyTick);
-  if (state.walletUsd < debit) {
+  if (debit > 0 && state.walletUsd < debit) {
     throw new Error(
       `Early return $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
 
-  applyWalletDelta(state, {
-    amountUsd: -debit,
-    kind: 'lease_early_return',
-    atTick: economyTick,
-    aircraftId: aircraft.id,
-    icao: aircraft.locationIcao,
-    note: `${aircraft.label} · ${remainingMonths} mo left`,
-  });
+  if (debit > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -debit,
+      kind: 'lease_early_return',
+      atTick: economyTick,
+      aircraftId: aircraft.id,
+      icao: aircraft.locationIcao,
+      note: `${aircraft.label} · ${remainingMonths} mo left`,
+    });
+  }
   state.fleet = state.fleet.filter((a) => a.id !== aircraft.id);
   return { state, debitUsd: debit, remainingMonths };
 }

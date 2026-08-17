@@ -31,7 +31,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Inject freighter CG soft-max:** crew stations usam soft **750** lb (`FREIGHTER_CREW_STATION_SOFT_MAX_LB`, ainda `min` com maxLoad); GA/Accu-Sim ficam em **300**. Due = cargo+crew inalterado.
 - **CG shift sem arms:** não mover entre pares L/R (S1↔S2); freighter counterweight usa crew+baggage juntos — evita loop falso no C90. Forward: enche baggage (S3/S4) antes de dump em crew (`deferTargetIndexes`).
 - **FBO spot:** removido (stock wipe on load); FBO = bonded holds only.
-- **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico; yard hold fee diária. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
+- **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico + **inventory** (restock passivo); yard hold fee diária. **Concession v1:** CAPEX + lease renovável (1/empresa); gates T3 WH + 25k shipped; buffs operador (~10% preço, ~15% ETA, +1 listing); não exclui compra/WH de outros. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
+- **Offline fee cap:** catch-up wall-clock cobra no máx. **7** economy-days de hangar/WH/yard/FBO storage/crew+ground salaries; lease ≤1 installment + defer term repossess (`termEndedSoft`); debug time-skip uncapped. Banner em `/api/state`.
 
 ## Company tenant (SP → MP)
 

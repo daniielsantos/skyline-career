@@ -6,6 +6,8 @@ import {
   postGroundStaffFire,
   postGroundStaffHire,
   postPortBuy,
+  postPortConcessionClaim,
+  postPortConcessionRenew,
   postPortDeposit,
   postPortPickupAbandon,
   postWarehouseBuy,
@@ -799,6 +801,69 @@ export function PortsPanel(props: {
     }
   }
 
+  async function onClaimConcession(portIdToClaim: string) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortConcessionClaim({ portId: portIdToClaim });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      setWarehouses(result.ports.warehouses ?? warehouses);
+      setGroundStaff(
+        result.ports.groundStaff ??
+          result.ports.warehouses?.groundStaff ??
+          groundStaff,
+      );
+      props.onToast?.(
+        'ok',
+        `Claimed port concession · operator rates active`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onRenewConcession(portIdToRenew: string, leaseUsd: number) {
+    if (props.busy || loading) return;
+    const ok = await confirm({
+      title: 'Renew port lease?',
+      body: (
+        <p>
+          Extend the concession lease by 7 economy days for{' '}
+          <strong>{props.formatMoney(leaseUsd)}</strong>.
+        </p>
+      ),
+      confirmLabel: 'Renew lease',
+      cancelLabel: 'Cancel',
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const result = await postPortConcessionRenew({ portId: portIdToRenew });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      setWarehouses(result.ports.warehouses ?? warehouses);
+      setGroundStaff(
+        result.ports.groundStaff ??
+          result.ports.warehouses?.groundStaff ??
+          groundStaff,
+      );
+      props.onToast?.('ok', 'Port lease renewed');
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onDeposit(pickupId: string) {
     if (props.busy || loading) return;
     setLoading(true);
@@ -1538,6 +1603,19 @@ export function PortsPanel(props: {
               {port ? (
                 <h3 className="ports-selected-name ports-stage-title">
                   {port.name}
+                  {port.concession?.status === 'yours' ? (
+                    <span className="tag ports-operator-badge" title="Operator rates">
+                      Operator
+                    </span>
+                  ) : port.concession?.status === 'held' ? (
+                    <span className="tag" title="Another company operates this port">
+                      Concession held
+                    </span>
+                  ) : (
+                    <span className="tag muted" title="No operator">
+                      Vacant
+                    </span>
+                  )}
                 </h3>
               ) : (
                 <p className="ports-stage-title is-muted">
@@ -1557,6 +1635,116 @@ export function PortsPanel(props: {
 
                 <div className="ports-listings">
                   {port ? (
+                    <>
+                      <div className="ports-concession-panel">
+                        {port.concession?.status === 'yours' ? (
+                          <div className="ports-concession-row">
+                            <p className="muted">
+                              Operator rates (~10% cheaper buys, ~15% faster
+                              inbound, +1 listing). Throughput{' '}
+                              {props.formatTonnes(
+                                port.concession.lifetimeThroughputKg ?? 0,
+                              )}
+                              {port.concession.leasePaidThroughTick != null &&
+                              props.economyTick != null
+                                ? ` · lease through tick ${port.concession.leasePaidThroughTick}`
+                                : null}
+                            </p>
+                            <button
+                              type="button"
+                              className="action ghost"
+                              disabled={props.busy || loading}
+                              onClick={() =>
+                                void onRenewConcession(
+                                  port.id,
+                                  port.concession?.claim?.leaseUsd ?? 17_500,
+                                )
+                              }
+                            >
+                              Renew lease
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="ports-concession-row">
+                            <div>
+                              <p className="muted">
+                                Claim concession (endgame): T3 WH at a pickup +{' '}
+                                {(
+                                  port.concession?.claim?.shippedNeededKg ??
+                                  25_000
+                                ).toLocaleString()}{' '}
+                                kg shipped + claim CAPEX.
+                              </p>
+                              {port.concession?.claim &&
+                              !port.concession.claim.ok ? (
+                                <ul className="ports-concession-gates">
+                                  {port.concession.claim.reasons.map((r) => (
+                                    <li key={r}>{r}</li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              className="accept"
+                              disabled={
+                                props.busy ||
+                                loading ||
+                                !port.concession?.claim?.ok
+                              }
+                              title={
+                                port.concession?.claim?.ok
+                                  ? `Claim $${(
+                                      (port.concession.claim.claimUsd ?? 0) +
+                                      (port.concession.claim.leaseUsd ?? 0)
+                                    ).toLocaleString()} (CAPEX + first lease)`
+                                  : port.concession?.claim?.reasons.join(' · ')
+                              }
+                              onClick={() => void onClaimConcession(port.id)}
+                            >
+                              Claim
+                              {port.concession?.claim
+                                ? ` · ${props.formatMoney(
+                                    port.concession.claim.claimUsd +
+                                      port.concession.claim.leaseUsd,
+                                  )}`
+                                : ''}
+                            </button>
+                          </div>
+                        )}
+                        {(port.inventory?.length ?? 0) > 0 ? (
+                          <div
+                            className="ports-inventory-bars"
+                            aria-label="Port stock"
+                          >
+                            {port.inventory!.map((row) => {
+                              const frac =
+                                row.capKg > 0
+                                  ? Math.min(1, row.stockKg / row.capKg)
+                                  : 0;
+                              return (
+                                <div
+                                  key={row.commodityId}
+                                  className="ports-inventory-bar"
+                                  title={`${commodityLabel(row)} ${props.formatTonnes(row.stockKg)} / ${props.formatTonnes(row.capKg)}`}
+                                >
+                                  <span className="ports-inventory-bar-label">
+                                    {commodityLabel(row)}
+                                  </span>
+                                  <div className="ports-inventory-bar-track">
+                                    <div
+                                      className="ports-inventory-bar-fill"
+                                      style={{
+                                        width: `${Math.round(frac * 100)}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                      </div>
                     <div className="table-wrap">
                       <table className="data-table">
                         <thead>
@@ -1670,6 +1858,7 @@ export function PortsPanel(props: {
                         </tbody>
                       </table>
                     </div>
+                    </>
                   ) : (
                     <p className="empty">Select a port.</p>
                   )}
@@ -1689,12 +1878,13 @@ export function PortsPanel(props: {
                         <th>Port</th>
                         <th>Pickup</th>
                         <th>Open</th>
+                        <th>Concession</th>
                       </tr>
                     </thead>
                     <tbody>
                       {pagedWorldPorts.length === 0 ? (
                         <tr>
-                          <td colSpan={4}>
+                          <td colSpan={5}>
                             <p className="empty">No ports yet.</p>
                           </td>
                         </tr>
@@ -1703,6 +1893,12 @@ export function PortsPanel(props: {
                           const selected =
                             (port?.id ?? portId)?.toUpperCase() ===
                             p.id.toUpperCase();
+                          const conc =
+                            p.concession?.status === 'yours'
+                              ? 'Yours'
+                              : p.concession?.status === 'held'
+                                ? 'Held'
+                                : 'Vacant';
                           return (
                             <tr
                               key={p.id}
@@ -1726,6 +1922,7 @@ export function PortsPanel(props: {
                                 {p.pickupHubs.join(', ') || '—'}
                               </td>
                               <td className="muted">{p.listings.length}</td>
+                              <td className="muted">{conc}</td>
                             </tr>
                           );
                         })

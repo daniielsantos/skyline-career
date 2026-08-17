@@ -27,7 +27,24 @@ import {
   procurementMultForHub,
   yardHoldMultForHub,
 } from './career-ground-staff.js';
+import {
+  creditPortInventory,
+  creditPortOperatorThroughput,
+  debitPortInventory,
+  ensurePortInventoryRestock,
+  evaluatePortConcessionClaim,
+  findActivePortOperator,
+  isPortOperator,
+  portInventorySnapshot,
+  portListingSlotCap,
+  portStockPriceFactor,
+  PORT_OPERATOR_ETA_MULT,
+  PORT_OPERATOR_PRICE_MULT,
+  syncWorldPortConcessions,
+  tickPortConcessions,
+} from './career-port-concessions.js';
 import { demandSnapshot, ensureDemandOrders } from './career-demand.js';
+import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   CareerEconomyWorld,
@@ -790,13 +807,14 @@ export function portFactoryUnitPriceUsd(commodityId: CommodityId): number {
 
 /**
  * Dynamic factory unit price for a new listing, frozen at spawn.
- * Anchored to allocated-hub spot × factory frac, with jitter + clamp.
+ * Anchored to allocated-hub spot × factory frac, stock scarcity, jitter + clamp.
  */
 export function quotePortListingUnitPriceUsd(
   world: CareerEconomyWorld,
   opts: {
     commodityId: CommodityId;
     allocatedHubIcao: string;
+    portId?: string;
     rng?: () => number;
   },
 ): { unitPriceUsd: number; hubSpotUnitPriceUsd: number | null } {
@@ -810,7 +828,10 @@ export function quotePortListingUnitPriceUsd(
   const rng = opts.rng ?? (() => 0.5);
   const jitter =
     1 - PORT_LISTING_PRICE_JITTER + rng() * (2 * PORT_LISTING_PRICE_JITTER);
-  let unit = anchor * jitter;
+  const stockFactor = opts.portId
+    ? portStockPriceFactor(world, opts.portId, commodityId)
+    : 1;
+  let unit = anchor * jitter * stockFactor;
   const floor = base * PORT_LISTING_PRICE_FLOOR_FRAC;
   const ceil =
     hubSpot != null && hubSpot > 0
@@ -842,15 +863,30 @@ function mulberry32(a: number): () => number {
   };
 }
 
-/** Seed / top-up port catalog listings (idempotent per missing slots). */
+/** Seed / top-up port catalog listings from passive inventory. */
 export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
+  ensurePortInventoryRestock(world);
   if (!Array.isArray(world.portListings)) {
     world.portListings = [];
   }
   const listings = world.portListings;
   const rng = mulberry32(hashSeed(`${world.seed}:ports:${world.tick}`));
 
+  // Return unused kg from expired open listings to inventory.
+  for (const l of listings) {
+    if (
+      l.status === 'open' &&
+      l.expiresAtTick <= world.tick &&
+      l.availableKg > 0
+    ) {
+      creditPortInventory(world, l.portId, l.commodityId, l.availableKg);
+      l.availableKg = 0;
+      l.status = 'expired';
+    }
+  }
+
   for (const port of CAREER_PORTS) {
+    const slotCap = portListingSlotCap(world, port.id);
     const open = listings.filter(
       (l) =>
         l.portId === port.id &&
@@ -858,13 +894,11 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
         l.availableKg > 0 &&
         l.expiresAtTick > world.tick,
     );
-    let need = PORT_LISTINGS_PER_PORT - open.length;
+    let need = slotCap - open.length;
     let guard = 0;
     let slot = 0;
-    while (need > 0 && guard++ < 12) {
+    while (need > 0 && guard++ < 16) {
       const commodityId = PORT_CARGO[Math.floor(rng() * PORT_CARGO.length)]!;
-      // Prefer default pickup hub for the first open slot so home-hub careers
-      // can always find a same-ICAO deposit path in tests / early play.
       const hub =
         slot === 0
           ? port.pickupHubs[0]!
@@ -875,19 +909,29 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
         need -= 1;
         continue;
       }
-      const baseKg = commodityId === 'machinery' || commodityId === 'electronics'
-        ? 8_000 + Math.floor(rng() * 22_000)
-        : 20_000 + Math.floor(rng() * 80_000);
+      const wantedKg =
+        commodityId === 'machinery' || commodityId === 'electronics'
+          ? 8_000 + Math.floor(rng() * 22_000)
+          : 20_000 + Math.floor(rng() * 80_000);
+      const taken = debitPortInventory(world, port.id, commodityId, wantedKg);
+      if (taken < 2_000) {
+        if (taken > 0) {
+          creditPortInventory(world, port.id, commodityId, taken);
+        }
+        need -= 1;
+        continue;
+      }
       const quoted = quotePortListingUnitPriceUsd(world, {
         commodityId,
         allocatedHubIcao: hub,
+        portId: port.id,
         rng,
       });
       listings.push({
         id: nextId('portlot', world.tick),
         portId: port.id,
         commodityId,
-        availableKg: baseKg,
+        availableKg: taken,
         unitPriceUsd: quoted.unitPriceUsd,
         allocatedHubIcao: hub,
         arrivedAtTick: world.tick,
@@ -898,10 +942,14 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
     }
   }
 
-  // Drop expired empties
   world.portListings = listings.filter(
     (l) =>
-      !(l.status === 'open' && (l.availableKg <= 0 || l.expiresAtTick <= world.tick)),
+      !(
+        (l.status === 'open' &&
+          (l.availableKg <= 0 || l.expiresAtTick <= world.tick)) ||
+        l.status === 'expired' ||
+        l.status === 'sold_out'
+      ),
   );
   return world.portListings;
 }
@@ -1031,8 +1079,16 @@ export function buyPortListing(
     throw new Error(`Unknown pickup hub ${hub}`);
   }
 
+  const rawUnit = money(
+    listing.unitPriceUsd *
+      procurementMultForHub(state, hub) *
+      (isPortOperator(world, listing.portId, LOCAL_COMPANY_ID)
+        ? PORT_OPERATOR_PRICE_MULT
+        : 1),
+  );
+  // Soft floor: stacked discounts cannot drop below 75% of listing unit.
   const unitPriceUsd = money(
-    listing.unitPriceUsd * procurementMultForHub(state, hub),
+    Math.max(rawUnit, listing.unitPriceUsd * 0.75),
   );
   const debitUsd = money(unitPriceUsd * qty);
   if (state.walletUsd < debitUsd) {
@@ -1055,14 +1111,19 @@ export function buyPortListing(
     note: `${port.name} · ${listing.commodityId} · ${qty} kg @ $${unitPriceUsd}/kg → ${hub}`,
   });
 
+  creditPortOperatorThroughput(state, world, listing.portId, qty);
+
   const wh = findPlayerWarehouseAtIcao(state, hub);
   const free = wh ? warehouseInboundFreeKg(state, wh.id) : 0;
   const inboundKg = wh ? Math.min(qty, Math.max(0, free)) : 0;
   const yardKg = qty - inboundKg;
   const logisticsMult = wh ? logisticsMultForWarehouse(state, wh.id) : 1;
+  const operatorEta = isPortOperator(world, listing.portId, LOCAL_COMPANY_ID)
+    ? PORT_OPERATOR_ETA_MULT
+    : 1;
   const transferTicks =
     inboundKg > 0
-      ? warehouseInboundTransferTicks(inboundKg, logisticsMult)
+      ? warehouseInboundTransferTicks(inboundKg, logisticsMult * operatorEta)
       : 0;
   const readyAtTick =
     inboundKg > 0 ? world.tick + transferTicks : null;
@@ -1368,6 +1429,19 @@ export function portSnapshot(
           hubSpotUnitPriceUsd: number | null;
         }
       >;
+      inventory: Array<{
+        commodityId: CommodityId;
+        commodityName: string;
+        stockKg: number;
+        capKg: number;
+      }>;
+      concession: {
+        status: 'vacant' | 'yours' | 'held';
+        companyId: string | null;
+        leasePaidThroughTick: number | null;
+        lifetimeThroughputKg: number | null;
+        claim: ReturnType<typeof evaluatePortConcessionClaim> | null;
+      };
     }
   >;
   pickups: Array<
@@ -1391,7 +1465,12 @@ export function portSnapshot(
     name?: string;
     tier: number;
   }>;
+  concessions: NonNullable<CareerMissionsState['playerPortConcessions']>;
 } {
+  if (state) {
+    tickPortConcessions(state, world);
+    syncWorldPortConcessions(world, state);
+  }
   ensurePortListings(world);
   ensureDemandOrders(world);
   const pickups = state ? ensurePlayerPortPickups(state) : [];
@@ -1445,34 +1524,57 @@ export function portSnapshot(
       })
     : [];
   return {
-    ports: CAREER_PORTS.map((port) => ({
-      ...port,
-      pickupHubs: [...port.pickupHubs],
-      pickupHubDetails: port.pickupHubs.map((icao) => {
-        const coords = CAREER_HUB_COORDS[icao];
-        const ap = airportByIcao(world, icao);
-        return {
-          icao,
-          lat: coords?.lat ?? ap?.lat ?? port.lat,
-          lon: coords?.lon ?? ap?.lon ?? port.lon,
-          name: coords?.name ?? ap?.name,
-        };
-      }),
-      listings: listPortListings(world, port.id).map((l) => ({
-        ...l,
-        commodityName: getCommodity(l.commodityId).name,
-        hubSpotUnitPriceUsd: hubSpotUnitPriceUsd(
-          world,
-          l.allocatedHubIcao,
-          l.commodityId,
-        ),
-      })),
-    })),
+    ports: CAREER_PORTS.map((port) => {
+      const op = findActivePortOperator(world, port.id);
+      const yours = Boolean(
+        state && op && op.companyId === LOCAL_COMPANY_ID,
+      );
+      const yoursConc = state?.playerPortConcessions?.find(
+        (c) => c.portId === port.id && c.companyId === LOCAL_COMPANY_ID,
+      );
+      return {
+        ...port,
+        pickupHubs: [...port.pickupHubs],
+        pickupHubDetails: port.pickupHubs.map((icao) => {
+          const coords = CAREER_HUB_COORDS[icao];
+          const ap = airportByIcao(world, icao);
+          return {
+            icao,
+            lat: coords?.lat ?? ap?.lat ?? port.lat,
+            lon: coords?.lon ?? ap?.lon ?? port.lon,
+            name: coords?.name ?? ap?.name,
+          };
+        }),
+        listings: listPortListings(world, port.id).map((l) => ({
+          ...l,
+          commodityName: getCommodity(l.commodityId).name,
+          hubSpotUnitPriceUsd: hubSpotUnitPriceUsd(
+            world,
+            l.allocatedHubIcao,
+            l.commodityId,
+          ),
+        })),
+        inventory: portInventorySnapshot(world, port.id).map((row) => ({
+          ...row,
+          commodityName: getCommodity(row.commodityId).name,
+        })),
+        concession: {
+          status: yours ? 'yours' : op ? 'held' : 'vacant',
+          companyId: op?.companyId ?? null,
+          leasePaidThroughTick: op?.leasePaidThroughTick ?? null,
+          lifetimeThroughputKg: yoursConc?.lifetimeThroughputKg ?? null,
+          claim: state
+            ? evaluatePortConcessionClaim(state, world, port.id)
+            : null,
+        },
+      };
+    }),
     pickups: pickupViews,
     yardHoldUsdPerDay,
     tick: world.tick,
     warehouses,
     demand,
     ownedFbos,
+    concessions: state?.playerPortConcessions ?? [],
   };
 }

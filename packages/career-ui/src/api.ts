@@ -30,6 +30,7 @@ export type PlayerAircraft = {
     nextDueTick: number;
     termEndsTick: number;
     buyoutUsd?: number;
+    termEndedSoft?: boolean;
   };
   listedListingId?: string;
   leaseOut?: {
@@ -1013,6 +1014,7 @@ export function fetchState() {
       companyCrew?: CompanyCrewSnapshot | null;
       groundStaff?: GroundStaffSnapshot | null;
       leaseUnlock?: AircraftLeaseUnlock;
+      offlineFeeSummary?: OfflineFeeSummary | null;
       starterAircraft?: Array<{
         typeId: string;
         label: string;
@@ -1022,6 +1024,27 @@ export function fetchState() {
     }
   >('/api/state');
 }
+
+export type OfflineFeeSummary = {
+  daysAway: number;
+  daysBilled: number;
+  capped: boolean;
+  passiveDebitUsd: number;
+  debitUsdByKind?: Partial<{
+    hangar: number;
+    warehouse: number;
+    yard: number;
+    fboStorage: number;
+    crewSalary: number;
+    groundStaffSalary: number;
+  }>;
+  lease?: {
+    installmentsPaid: number;
+    overdueIds: string[];
+    termEndedSoftIds: string[];
+    repossessedIds: string[];
+  };
+};
 
 export type CareerProfileMeta = {
   id: string;
@@ -1790,6 +1813,30 @@ export type PortsSnapshot = {
       name?: string;
     }>;
     listings: PortListingView[];
+    inventory?: Array<{
+      commodityId: string;
+      commodityName: string;
+      stockKg: number;
+      capKg: number;
+    }>;
+    concession?: {
+      status: 'vacant' | 'yours' | 'held';
+      companyId: string | null;
+      leasePaidThroughTick: number | null;
+      lifetimeThroughputKg: number | null;
+      claim: {
+        ok: boolean;
+        reasons: string[];
+        claimUsd: number;
+        leaseUsd: number;
+        leaseDays: number;
+        shippedKg: number;
+        shippedNeededKg: number;
+        hasTier3Warehouse: boolean;
+        alreadyHoldsConcession: boolean;
+        portOccupied: boolean;
+      } | null;
+    };
   }>;
   pickups: PlayerPortPickupView[];
   /** Sum of daily yard hold fees across all pickups. */
@@ -1806,6 +1853,14 @@ export type PortsSnapshot = {
     lon: number;
     name?: string;
     tier: number;
+  }>;
+  concessions?: Array<{
+    portId: string;
+    companyId: string;
+    level: number;
+    claimedAtTick: number;
+    leasePaidThroughTick: number;
+    lifetimeThroughputKg: number;
   }>;
 };
 
@@ -1911,6 +1966,45 @@ export function postPortBuy(opts: { listingId: string; kg: number }) {
     ports: PortsSnapshot;
     warehouses: PlayerWarehouseSnapshot;
   }>('/api/ports/buy', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortConcessionClaim(opts: { portId: string }) {
+  return api<{
+    walletUsd: number;
+    concession: {
+      portId: string;
+      companyId: string;
+      level: number;
+      claimedAtTick: number;
+      leasePaidThroughTick: number;
+      lifetimeThroughputKg: number;
+    };
+    ports: PortsSnapshot;
+  }>('/api/ports/concession/claim', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortConcessionRenew(opts: {
+  portId: string;
+  days?: number;
+}) {
+  return api<{
+    walletUsd: number;
+    concession: {
+      portId: string;
+      companyId: string;
+      level: number;
+      claimedAtTick: number;
+      leasePaidThroughTick: number;
+      lifetimeThroughputKg: number;
+    };
+    ports: PortsSnapshot;
+  }>('/api/ports/concession/renew', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

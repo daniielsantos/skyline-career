@@ -8468,6 +8468,72 @@ span.dispatch-route-hub-dest {
   overflow: auto;
 }
 
+.ports-concession-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.65rem 0.65rem 0;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ports-concession-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ports-concession-row > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.ports-concession-gates {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--muted, #9aa0a6);
+}
+
+.ports-operator-badge {
+  margin-left: 0.55rem;
+  vertical-align: middle;
+}
+
+.ports-inventory-bars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 0.75rem;
+}
+
+.ports-inventory-bar {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.35rem;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.ports-inventory-bar-label {
+  color: var(--muted, #9aa0a6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ports-inventory-bar-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.ports-inventory-bar-fill {
+  height: 100%;
+  background: rgba(61, 139, 253, 0.75);
+}
+
 .ports-listings .table-wrap {
   margin: 0;
   flex: 1;

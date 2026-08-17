@@ -613,9 +613,10 @@ export function HangarAircraftCard(props: {
     (acf.status === 'parked' || acf.status === 'maintenance') &&
     (afPct < 100 || engPct < 100);
   const canBuyout = acf.ownership === 'leased' && Boolean(acf.lease);
+  const softTermEnded = acf.lease?.termEndedSoft === true;
   const canReturnLease =
     canBuyout &&
-    !acf.leaseOverdue &&
+    (!acf.leaseOverdue || softTermEnded) &&
     (acf.status === 'parked' || acf.status === 'maintenance');
   const pilotHere =
     props.pilotIcao.trim().toUpperCase() ===
@@ -765,7 +766,9 @@ export function HangarAircraftCard(props: {
                   {acf.condition}
                 </span>
               ) : null}
-              {acf.leaseOverdue ? (
+              {acf.lease?.termEndedSoft ? (
+                <span className="badge badge-warn">lease term ended</span>
+              ) : acf.leaseOverdue ? (
                 <span className="badge badge-warn">lease overdue</span>
               ) : null}
             </div>
@@ -1089,6 +1092,7 @@ export function HangarAircraftCard(props: {
                     onClick={() => props.onReturnLease(acf.id)}
                   >
                     Return lease
+                    {softTermEnded ? ' (free)' : ''}
                   </button>
                 ) : null}
                 {canList ? (

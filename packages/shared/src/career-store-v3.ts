@@ -77,6 +77,7 @@ export function ensureV3Ddl(db: SqliteDb): void {
       active_bush_trip_json TEXT,
       port_pickups_json TEXT,
       player_warehouses_json TEXT,
+      player_port_concessions_json TEXT,
       updated_at_ms INTEGER NOT NULL,
       FOREIGN KEY (company_id) REFERENCES companies(id)
     );
@@ -202,6 +203,11 @@ export function ensureV3Ddl(db: SqliteDb): void {
   }
   if (!columnExists(db, 'company_state', 'player_warehouses_json')) {
     db.exec(`ALTER TABLE company_state ADD COLUMN player_warehouses_json TEXT`);
+  }
+  if (!columnExists(db, 'company_state', 'player_port_concessions_json')) {
+    db.exec(
+      `ALTER TABLE company_state ADD COLUMN player_port_concessions_json TEXT`,
+    );
   }
   db.exec(`
     CREATE INDEX IF NOT EXISTS ledger_company_tick_idx ON ledger(company_id, at_tick);
@@ -1008,13 +1014,13 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        company_credit_json, cargo_ops_json, aircraft_market_json,
        aircraft_market_day, aircraft_market_demand_day, airframe_perf_json,
        player_fbos_json, company_crew_json, ground_staff_json, active_bush_trip_json,
-       port_pickups_json, player_warehouses_json, updated_at_ms
+       port_pickups_json, player_warehouses_json, player_port_concessions_json, updated_at_ms
      ) VALUES (
        @company_id, @wallet_usd, @pilot_name, @pilot_icao, @hub_selected,
        @company_credit_json, @cargo_ops_json, @aircraft_market_json,
        @aircraft_market_day, @aircraft_market_demand_day, @airframe_perf_json,
        @player_fbos_json, @company_crew_json, @ground_staff_json, @active_bush_trip_json,
-       @port_pickups_json, @player_warehouses_json, @updated_at_ms
+       @port_pickups_json, @player_warehouses_json, @player_port_concessions_json, @updated_at_ms
      )
      ON CONFLICT(company_id) DO UPDATE SET
        wallet_usd = excluded.wallet_usd,
@@ -1039,6 +1045,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        active_bush_trip_json = excluded.active_bush_trip_json,
        port_pickups_json = excluded.port_pickups_json,
        player_warehouses_json = excluded.player_warehouses_json,
+       player_port_concessions_json = excluded.player_port_concessions_json,
        updated_at_ms = excluded.updated_at_ms`,
   ).run({
     company_id: LOCAL_COMPANY_ID,
@@ -1081,6 +1088,9 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
         inboundTransfers: [],
       },
     ),
+    player_port_concessions_json: JSON.stringify(
+      state.playerPortConcessions ?? [],
+    ),
     updated_at_ms: now,
   });
 }
@@ -1095,7 +1105,7 @@ export function readCompanyStateScalars(
               cargo_ops_json, aircraft_market_json, aircraft_market_day,
               aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
               company_crew_json, ground_staff_json, active_bush_trip_json, port_pickups_json,
-              player_warehouses_json
+              player_warehouses_json, player_port_concessions_json
        FROM company_state WHERE company_id = ?`,
     )
     .get(companyId) as
@@ -1116,6 +1126,7 @@ export function readCompanyStateScalars(
         active_bush_trip_json: string | null;
         port_pickups_json: string | null;
         player_warehouses_json: string | null;
+        player_port_concessions_json: string | null;
       }
     | undefined;
   if (!row) return null;
@@ -1235,6 +1246,16 @@ export function readCompanyStateScalars(
       stock: [],
       inboundTransfers: [],
     };
+  }
+  if (row.player_port_concessions_json) {
+    try {
+      const parsed = JSON.parse(row.player_port_concessions_json);
+      out.playerPortConcessions = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      out.playerPortConcessions = [];
+    }
+  } else {
+    out.playerPortConcessions = [];
   }
   return out;
 }

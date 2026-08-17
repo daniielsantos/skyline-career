@@ -98,6 +98,7 @@ import {
   type PlayerAircraft,
   type PlayerFboSnapshot,
   type CompanyCrewSnapshot,
+  type OfflineFeeSummary,
   type RegionPressure,
   type SimBridgeStatus,
   type StarterHubOption,
@@ -2302,6 +2303,8 @@ export function App() {
     null,
   );
   const [toastKind, setToastKind] = useState<'ok' | 'warn' | 'fail'>('ok');
+  const [offlineFeeBanner, setOfflineFeeBanner] =
+    useState<OfflineFeeSummary | null>(null);
   const toast = toastState?.text ?? null;
   const toastSeqRef = useRef(0);
   const setToast = useCallback((text: string | null) => {
@@ -2630,6 +2633,9 @@ export function App() {
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
     if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
+    if (state.offlineFeeSummary) {
+      setOfflineFeeBanner(state.offlineFeeSummary);
+    }
     setLots(market.lots);
     setMarketTotalLots(market.totalLots ?? market.lots.length);
     setMarketPageCount(market.pageCount ?? 1);
@@ -4822,7 +4828,8 @@ export function App() {
   async function onReturnLease(aircraftId: string) {
     const acf = fleet.find((a) => a.id === aircraftId);
     if (!acf?.lease) return;
-    if (acf.leaseOverdue) {
+    const softEnded = acf.lease.termEndedSoft === true;
+    if (acf.leaseOverdue && !softEnded) {
       setToastKind('fail');
       setToast('Clear the overdue lease payment before returning early');
       return;
@@ -4831,9 +4838,21 @@ export function App() {
       acf.lease,
       tick,
     );
-    if (remainingMonths <= 0) {
-      setToastKind('warn');
-      setToast('Lease term already ended — the lessor will reclaim the airframe');
+    if (softEnded || remainingMonths <= 0) {
+      const ok = await confirm({
+        title: `Return ${acf.label}?`,
+        body: 'Lease term ended while you were away — return the airframe to the lessor at no penalty (or buy out to keep it).',
+        confirmLabel: 'Return airframe',
+        tone: 'warn',
+      });
+      if (!ok) return;
+      await run(async () => {
+        const result = await postAircraftReturnLease({ aircraftId });
+        setFleet(result.fleet);
+        setWallet(result.walletUsd);
+        setToastKind('ok');
+        setToast('Lease returned · term ended');
+      });
       return;
     }
     const ok = await confirm({
@@ -7586,6 +7605,26 @@ export function App() {
             className="banner-close"
             onClick={() => setToast(null)}
             aria-label="Dismiss message"
+          >
+            ×
+          </button>
+        </p>
+      ) : null}
+      {offlineFeeBanner ? (
+        <p className="banner warn" role="status">
+          <span>
+            {offlineFeeBanner.capped
+              ? `Away ~${offlineFeeBanner.daysAway} economy days · passive fees charged for ${offlineFeeBanner.daysBilled} days (${formatMoney(offlineFeeBanner.passiveDebitUsd)} hangar/storage/staff).`
+              : 'Welcome back.'}
+            {(offlineFeeBanner.lease?.termEndedSoftIds.length ?? 0) > 0
+              ? ' A lease term ended while away — return or buy out in Hangar.'
+              : ''}
+          </span>
+          <button
+            type="button"
+            className="banner-close"
+            onClick={() => setOfflineFeeBanner(null)}
+            aria-label="Dismiss offline fee notice"
           >
             ×
           </button>

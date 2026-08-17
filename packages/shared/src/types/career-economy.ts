@@ -410,6 +410,10 @@ export interface CareerEconomyWorld {
   flow?: EconomyFlowStats;
   /** Seaport factory catalog (real ports → pickup hubs). */
   portListings?: PortListing[];
+  /** Passive factory stock per port × commodity (drains into listings). */
+  portInventories?: PortInventoryRow[];
+  /** Thin world index of who operates each port (lease window). */
+  portConcessions?: PortConcessionIndexRow[];
   /** Terminal buy-orders for player warehouse cargo (Demand Board). */
   demandOrders?: DemandOrder[];
 }
@@ -944,6 +948,11 @@ export interface AircraftLeaseContract {
   termEndsTick: number;
   buyoutUsd?: number;
   listingId?: string;
+  /**
+   * Term ended during a long offline catch-up — airframe kept for player
+   * action (return/buyout) instead of silent repossess.
+   */
+  termEndedSoft?: boolean;
 }
 
 /** Income side when an NPC/market leases a player-listed airframe. */
@@ -1030,6 +1039,8 @@ export interface CareerMissionsState {
   portPickups?: PlayerPortPickup[];
   /** Player warehouses at port pickup hubs + stock piles. */
   playerWarehouses?: PlayerWarehouseState;
+  /** Endgame seaport concessions (company-owned leases). */
+  playerPortConcessions?: PlayerPortConcession[];
   /** Company crew roster (AI slots based at an FBO). */
   companyCrew?: CompanyCrewState;
   /** Ground staff at player warehouses (ports / WH ops — not flight crew). */
@@ -1168,6 +1179,35 @@ export interface PortListing {
   arrivedAtTick: number;
   expiresAtTick: number;
   status: PortListingStatus;
+}
+
+/** Passive warehouse stock at a seaport (feeds listings). */
+export interface PortInventoryRow {
+  portId: string;
+  commodityId: CommodityId;
+  stockKg: number;
+  lastRestockTick: number;
+}
+
+/** World-side operator index (mirrors active company concessions). */
+export interface PortConcessionIndexRow {
+  portId: string;
+  companyId: string;
+  leasePaidThroughTick: number;
+}
+
+/** Company-owned seaport concession (endgame lease). */
+export type PortConcessionLevel = 1 | 2 | 3;
+
+export interface PlayerPortConcession {
+  portId: string;
+  companyId: string;
+  /** P1 only in v1 UI; field ready for later upgrades. */
+  level: PortConcessionLevel;
+  claimedAtTick: number;
+  leasePaidThroughTick: number;
+  /** Cumulative kg bought at this port by anyone while under this operator. */
+  lifetimeThroughputKg: number;
 }
 
 /**
@@ -1392,6 +1432,8 @@ export type CareerLedgerKind =
   | 'fbo_spot_sale'
   | 'port_buy'
   | 'port_yard_hold'
+  | 'port_concession_claim'
+  | 'port_concession_lease'
   | 'warehouse_buy'
   | 'warehouse_storage'
   | 'warehouse_upgrade'

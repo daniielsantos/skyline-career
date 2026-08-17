@@ -611,12 +611,27 @@ describe('career ports', () => {
     });
 
     ensurePortListings(world);
-    const listing = listPortListings(world, 'BRSSZ').find(
+    let listing = listPortListings(world, 'BRSSZ').find(
       (l) =>
         l.allocatedHubIcao === 'SBGR' &&
         l.availableKg >= 2_000 &&
         (l.commodityId === 'general' || l.commodityId === 'supplies'),
     );
+    if (!listing) {
+      world.portListings = world.portListings ?? [];
+      world.portListings.push({
+        id: 'portlot_split_test',
+        portId: 'BRSSZ',
+        commodityId: 'general',
+        availableKg: 5_000,
+        unitPriceUsd: 1.5,
+        allocatedHubIcao: 'SBGR',
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 96 * 3,
+        status: 'open',
+      });
+      listing = world.portListings.at(-1)!;
+    }
     assert.ok(listing);
 
     const bought = buyPortListing(state, world, {

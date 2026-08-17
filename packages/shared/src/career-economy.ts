@@ -5949,6 +5949,8 @@ export function migrateEconomyWorld(
   const homeCountryRaw = (base as { homeCountryId?: unknown }).homeCountryId;
   const lanesRaw = (base as { internationalLanes?: unknown }).internationalLanes;
   const portListingsRaw = (base as { portListings?: unknown }).portListings;
+  const portInventoriesRaw = (base as { portInventories?: unknown }).portInventories;
+  const portConcessionsRaw = (base as { portConcessions?: unknown }).portConcessions;
   const migrated: CareerEconomyWorld = {
     version: 3,
     seed,
@@ -5974,6 +5976,18 @@ export function migrateEconomyWorld(
       : [],
     ...(Array.isArray(portListingsRaw)
       ? { portListings: portListingsRaw as CareerEconomyWorld['portListings'] }
+      : {}),
+    ...(Array.isArray(portInventoriesRaw)
+      ? {
+          portInventories:
+            portInventoriesRaw as CareerEconomyWorld['portInventories'],
+        }
+      : {}),
+    ...(Array.isArray(portConcessionsRaw)
+      ? {
+          portConcessions:
+            portConcessionsRaw as CareerEconomyWorld['portConcessions'],
+        }
       : {}),
     ...(() => {
       const demandRaw = (base as { demandOrders?: unknown }).demandOrders;
@@ -6031,6 +6045,16 @@ export function ensureEconomyCaughtUp(
     w.portListings = migrated.portListings;
   } else {
     delete w.portListings;
+  }
+  if (migrated.portInventories) {
+    w.portInventories = migrated.portInventories;
+  } else {
+    delete w.portInventories;
+  }
+  if (migrated.portConcessions) {
+    w.portConcessions = migrated.portConcessions;
+  } else {
+    delete w.portConcessions;
   }
   if (migrated.demandOrders) {
     w.demandOrders = migrated.demandOrders;
@@ -7950,6 +7974,12 @@ export function tickEconomy(
     world.internationalLanes = migrated.internationalLanes;
     if (migrated.portListings) {
       world.portListings = migrated.portListings;
+    }
+    if (migrated.portInventories) {
+      world.portInventories = migrated.portInventories;
+    }
+    if (migrated.portConcessions) {
+      world.portConcessions = migrated.portConcessions;
     }
     if (migrated.demandOrders) {
       world.demandOrders = migrated.demandOrders;

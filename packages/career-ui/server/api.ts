@@ -134,6 +134,10 @@ import {
   replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
   ensurePortListings,
+  claimPortConcession,
+  renewPortConcession,
+  tickPortConcessions,
+  ensurePortInventoryRestock,
   holdLotAtFbo,
   FERRY_SOFT_NM_BUDGET,
   cancelFboHold,
@@ -182,6 +186,9 @@ import {
   missionLoadPolicy,
   careerAllowsDirectInject,
   economyDayIndex,
+  effectiveFeeTickRange,
+  buildOfflineFeeSummary,
+  type OfflineFeeSummary,
   fuelBurnMultFromAircraft,
   padOfpBlockFuelKgForMx,
   isOfpCargoUnderOnlyFailure,
@@ -306,6 +313,8 @@ const bootSourceStamp = await serverSourceStamp();
 const careerRoot = await resolveCareerRoot();
 let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
+/** One-shot banner after long wall-clock catch-up; cleared on /api/state. */
+let pendingOfflineFeeSummary: OfflineFeeSummary | null = null;
 
 await ensureCareerProfilesLayout(careerRoot);
 await loadProfileMsfsBushHubOverrides(careerRoot);
@@ -546,36 +555,71 @@ async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
     await activeStore.saveEconomy(caught);
   }
   if (advancedTicks > 0) {
-    settleAircraftMarketOps(missions, caught.tick, caught);
-    settleHangarParkingFees(missions, caught, {
-      fromTick: caught.tick - advancedTicks,
-      toTick: caught.tick,
+    const rawFrom = caught.tick - advancedTicks;
+    const feeRange = effectiveFeeTickRange(rawFrom, caught.tick);
+    const leaseOps = settleAircraftMarketOps(missions, caught.tick, caught, {
+      maxInstallments: feeRange.capped ? 1 : undefined,
+      deferTermRepossess: feeRange.capped,
     });
-    settleFboOps(missions, caught, {
-      fromTick: caught.tick - advancedTicks,
-      toTick: caught.tick,
+    const hangarOps = settleHangarParkingFees(missions, caught, {
+      fromTick: feeRange.fromTick,
+      toTick: feeRange.toTick,
     });
-    settleWarehouseStorageFees(missions, {
-      fromTick: caught.tick - advancedTicks,
-      toTick: caught.tick,
+    const fboOps = settleFboOps(missions, caught, {
+      fromTick: feeRange.fromTick,
+      toTick: feeRange.toTick,
+    });
+    const whOps = settleWarehouseStorageFees(missions, {
+      fromTick: feeRange.fromTick,
+      toTick: feeRange.toTick,
     });
     settleWarehouseInboundTransfers(missions, caught);
-    settlePortYardHoldFees(missions, {
-      fromTick: caught.tick - advancedTicks,
-      toTick: caught.tick,
+    const yardOps = settlePortYardHoldFees(missions, {
+      fromTick: feeRange.fromTick,
+      toTick: feeRange.toTick,
     });
+    tickPortConcessions(missions, caught);
+    ensurePortInventoryRestock(caught);
     ensurePortListings(caught);
     ensureDemandOrders(caught);
-    settleCrewDailyOps(missions, caught, {
-      fromTick: caught.tick - advancedTicks,
-      toTick: caught.tick,
+    const crewDaily = settleCrewDailyOps(missions, caught, {
+      fromTick: feeRange.fromTick,
+      toTick: feeRange.toTick,
     });
-    settleGroundStaffDailyOps(missions, caught, {
-      fromTick: caught.tick - advancedTicks,
-      toTick: caught.tick,
+    const groundStaffDaily = settleGroundStaffDailyOps(missions, caught, {
+      fromTick: feeRange.fromTick,
+      toTick: feeRange.toTick,
     });
     settleCrewOpsDue(missions, caught, Date.now());
     listAircraftMarket(missions, caught);
+
+    const passiveDebitUsd =
+      hangarOps.debitUsd +
+      (fboOps.storage?.debitUsd ?? 0) +
+      whOps.debitUsd +
+      yardOps.debitUsd +
+      (crewDaily.salary?.debitUsd ?? 0) +
+      (groundStaffDaily.salary?.debitUsd ?? 0);
+    const summary = buildOfflineFeeSummary({
+      feeRange,
+      passiveDebitUsd,
+      debitUsdByKind: {
+        hangar: hangarOps.debitUsd,
+        warehouse: whOps.debitUsd,
+        yard: yardOps.debitUsd,
+        fboStorage: fboOps.storage?.debitUsd ?? 0,
+        crewSalary: crewDaily.salary?.debitUsd ?? 0,
+        groundStaffSalary: groundStaffDaily.salary?.debitUsd ?? 0,
+      },
+      lease: {
+        installmentsPaid: leaseOps.installmentsPaid,
+        overdueIds: leaseOps.overdueIds,
+        termEndedSoftIds: leaseOps.termEndedSoft,
+        repossessedIds: leaseOps.repossessed,
+      },
+    });
+    if (summary) pendingOfflineFeeSummary = summary;
+
     await saveMissions(missions);
     await persistEconomyUnlocked(caught);
   }
@@ -1263,6 +1307,8 @@ export function createCareerApiServer(port = 8787) {
         const payload = await withCareerRead((world, missions) => {
           const nowMs = Date.now();
           const npcBusy = (world.npcs ?? []).filter((n) => n.status === 'busy').length;
+          const offlineFeeSummary = pendingOfflineFeeSummary;
+          pendingOfflineFeeSummary = null;
           return {
             needsProfile: false,
             activeProfileId,
@@ -1288,6 +1334,7 @@ export function createCareerApiServer(port = 8787) {
             countries: listWorldCountryIds(world),
             internationalLaneCount: world.internationalLanes?.length ?? 0,
             store: store!.kind,
+            ...(offlineFeeSummary ? { offlineFeeSummary } : {}),
           };
         });
         send(res, 200, payload);
@@ -2945,6 +2992,61 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/ports/concession/claim') {
+        const body = (await readBody(req)) as { portId?: string };
+        if (!body.portId) {
+          send(res, 400, { error: 'portId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const concession = claimPortConcession(missions, world, {
+              portId: body.portId!,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              concession,
+              ports: portSnapshot(world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/concession/renew') {
+        const body = (await readBody(req)) as { portId?: string; days?: number };
+        if (!body.portId) {
+          send(res, 400, { error: 'portId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const concession = renewPortConcession(missions, world, {
+              portId: body.portId!,
+              days: body.days != null ? Number(body.days) : undefined,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              concession,
+              ports: portSnapshot(world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/ports/deposit') {
         const body = (await readBody(req)) as { pickupId?: string; kg?: number };
         if (!body.pickupId) {
@@ -3714,6 +3816,8 @@ export function createCareerApiServer(port = 8787) {
             fromTick: world.tick - n,
             toTick: world.tick,
           });
+          tickPortConcessions(missions, world);
+          ensurePortInventoryRestock(world);
           ensurePortListings(world);
           ensureDemandOrders(world);
           const crewDaily = settleCrewDailyOps(missions, world, {

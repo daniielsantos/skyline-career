@@ -88,9 +88,16 @@ const TICKS_PER_MONTH = 96 * 30;
  * Half the remaining months of rent, clamped to 1–3 months.
  */
 export function estimateLeaseEarlyReturnUsd(
-  lease: { monthlyUsd: number; termEndsTick: number },
+  lease: {
+    monthlyUsd: number;
+    termEndsTick: number;
+    termEndedSoft?: boolean;
+  },
   economyTick: number,
 ): { penaltyUsd: number; remainingMonths: number } {
+  if (lease.termEndedSoft === true || economyTick >= lease.termEndsTick) {
+    return { penaltyUsd: 0, remainingMonths: 0 };
+  }
   const ticksLeft = lease.termEndsTick - economyTick;
   const remainingMonths =
     ticksLeft <= 0 ? 0 : Math.max(1, Math.ceil(ticksLeft / TICKS_PER_MONTH));

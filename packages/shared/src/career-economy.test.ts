@@ -84,9 +84,9 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 894);
+    assert.equal(world.airports.length, 899);
     assert.equal(world.homeCountryId, 'BR');
-    assert.ok((world.internationalLanes?.length ?? 0) >= 198);
+    assert.ok((world.internationalLanes?.length ?? 0) >= 203);
     const br = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'BR',
     );
@@ -404,6 +404,12 @@ describe('career-economy seed', () => {
     const tm = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'TM',
     );
+    const tj = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'TJ',
+    );
+    const kg = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'KG',
+    );
     assert.equal(br.length, 62);
     assert.equal(us.length, 123);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
@@ -531,6 +537,8 @@ describe('career-economy seed', () => {
     assert.equal(kz.length, 4);
     assert.equal(uz.length, 4);
     assert.equal(tm.length, 2);
+    assert.equal(tj.length, 2);
+    assert.equal(kg.length, 3);
     assert.deepEqual(
       [...listWorldCountryIds(world)].sort(),
       [
@@ -592,6 +600,7 @@ describe('career-economy seed', () => {
         'IT',
         'JM',
         'JO',
+        'KG',
         'KW',
         'KZ',
         'LB',
@@ -630,6 +639,7 @@ describe('career-economy seed', () => {
         'SV',
         'SX',
         'SY',
+        'TJ',
         'TM',
         'TN',
         'TR',
@@ -799,6 +809,30 @@ describe('career-economy seed', () => {
     );
     assert.equal(
       world.airports.some((airport) => airport.icao === 'UTBK'),
+      false,
+    );
+    assert.ok(world.airports.some((airport) => airport.icao === 'UTDD'));
+    assert.ok(world.airports.some((airport) => airport.icao === 'UTDL'));
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'UTDK'),
+      false,
+    );
+    assert.ok(world.airports.some((airport) => airport.icao === 'UCFM'));
+    assert.ok(world.airports.some((airport) => airport.icao === 'UCFO'));
+    assert.equal(
+      world.airports.find((a) => a.icao === 'UTDD')?.hubTier,
+      'major',
+    );
+    assert.equal(
+      world.airports.find((a) => a.icao === 'UCFM')?.hubTier,
+      'major',
+    );
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'UAFM'),
+      false,
+    );
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'UAFO'),
       false,
     );
     assert.deepEqual(
@@ -999,6 +1033,10 @@ describe('career-economy seed', () => {
         'UZ-E',
         'UZ-W',
         'TM-C',
+        'TJ-S',
+        'TJ-N',
+        'KG-N',
+        'KG-S',
       ]),
     );
     assert.equal(world.tick, 0);
@@ -2506,7 +2544,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 38);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 894);
+    assert.equal(migrated.airports.length, 899);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));
@@ -2551,6 +2589,9 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.ok(migrated.airports.some((a) => a.icao === 'UTTT'));
     assert.ok(migrated.airports.some((a) => a.icao === 'UTAA'));
     assert.ok(migrated.airports.some((a) => a.icao === 'UTAK'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'UTDD'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'UCFM'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'UCFO'));
     assert.ok((migrated.internationalLanes?.length ?? 0) >= 30);
     const again = createSeedEconomyWorld({ seed: 'hub-coverage-idem' });
     assert.equal(ensureCareerHubCoverage(again), false);

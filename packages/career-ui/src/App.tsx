@@ -1031,6 +1031,14 @@ function regionLabel(region: string): string {
       return 'Uzbekistan — West / Bukhara';
     case 'TM-C':
       return 'Turkmenistan — Ashgabat';
+    case 'TJ-S':
+      return 'Tajikistan — South / Dushanbe';
+    case 'TJ-N':
+      return 'Tajikistan — North / Khujand';
+    case 'KG-N':
+      return 'Kyrgyzstan — North / Bishkek';
+    case 'KG-S':
+      return 'Kyrgyzstan — South / Osh';
     default:
       return region;
   }

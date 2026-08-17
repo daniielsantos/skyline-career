@@ -299,6 +299,10 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   VOHY: 'VOHS',
   // Asia-5: Turkmenbashi is UTAK (not UTBK)
   UTBK: 'UTAK',
+  // Asia-6: Manas is UCFM (OurAirports ident UAFM); Osh is UCFO (ident UAFO)
+  UAFM: 'UCFM',
+  UAFO: 'UCFO',
+  UTDK: 'UTDD',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

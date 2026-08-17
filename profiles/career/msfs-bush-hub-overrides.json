@@ -13408,5 +13408,88 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "UCFL": {
+    "name": "Issyk-Kul",
+    "lat": 42.5857138261199,
+    "lon": 76.7018111050129,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 74.17411041259766,
+        "lengthM": 3789.186279296875,
+        "widthM": 43.88184356689453,
+        "lat": 42.585703767836094,
+        "lon": 76.70178964734077,
+        "identReciprocal": "25",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "UCFM": {
+    "name": "Manas",
+    "lat": 43.06127216666937,
+    "lon": 74.47750836610794,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 79.94329833984375,
+        "lengthM": 4192.8662109375,
+        "widthM": 54.366607666015625,
+        "lat": 43.061294965445995,
+        "lon": 74.47748064994812,
+        "identReciprocal": "25",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "UCFO": {
+    "name": "Osh",
+    "lat": 40.60899719595909,
+    "lon": 72.79321387410164,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 125.64354705810547,
+        "lengthM": 2811.766357421875,
+        "widthM": 44.233211517333984,
+        "lat": 40.60956750065088,
+        "lon": 72.79218345880508,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UTDD": {
+    "name": "Dushanbe",
+    "lat": 38.54361109435558,
+    "lon": 68.82472202181816,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 90.13035583496094,
+        "lengthM": 3102.980712890625,
+        "widthM": 43.08067321777344,
+        "lat": 38.5436724498868,
+        "lon": 68.82443457841873,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UTDL": {
+    "name": "Khujand International",
+    "lat": 40.21539710462093,
+    "lon": 69.6953335404396,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
   }
 }

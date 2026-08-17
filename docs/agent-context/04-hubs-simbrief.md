@@ -120,6 +120,14 @@
 - Remaps: `UTBK→UTAK`
 - Next: TJ/KG
 
+## Asia-6 Central Asia east
+
+- Countries: TJ / KG (landlocked — no ports)
+- ICAO traps: Bishkek Manas **UCFM** (not **UAFM** OurAirports ident); Osh **UCFO** (not **UAFO**); **UTDK** Kulob omitted (absent in stock MSFS); skip UTDT Bokhtar
+- World seed: **899** airports; **113** ports; fuel trucks **340**; **+4** Central Asia east regions
+- Remaps: `UAFM→UCFM`, `UAFO→UCFO`, `UTDK→UTDD`
+- Next: AF / South-East Asia face
+
 ## SimBrief cargo allowlist
 
 - `packages/shared/src/career-simbrief-airports.ts`

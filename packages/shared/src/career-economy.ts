@@ -532,6 +532,16 @@ import {
   TM_CAREER_HUBS,
   buildTmFeederCorridors,
 } from './career-tm-hubs.js';
+import {
+  assertTjCareerHubCatalog,
+  TJ_CAREER_HUBS,
+  buildTjFeederCorridors,
+} from './career-tj-hubs.js';
+import {
+  assertKgCareerHubCatalog,
+  KG_CAREER_HUBS,
+  buildKgFeederCorridors,
+} from './career-kg-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1080,6 +1090,8 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(KZ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(UZ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(TM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(TJ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(KG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1597,6 +1609,10 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'UTTT', b: 'UTNN', weight: 1.5 },
   { a: 'UTSB', b: 'UTNN', weight: 1.4 },
   { a: 'UTAA', b: 'UTAK', weight: 1.8 },
+  // Asia-6 Tajikistan / Kyrgyzstan domestic trunks
+  { a: 'UTDD', b: 'UTDL', weight: 1.8 },
+  { a: 'UCFM', b: 'UCFL', weight: 1.6 },
+  { a: 'UCFM', b: 'UCFO', weight: 1.8 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1712,6 +1728,8 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildKzFeederCorridors(KZ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildUzFeederCorridors(UZ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildTmFeederCorridors(TM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildTjFeederCorridors(TJ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildKgFeederCorridors(KG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4313,6 +4331,47 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'UBBB',
     capacityKgPerDay: 35_000,
   },
+  // Asia-6 Tajikistan / Kyrgyzstan
+  {
+    id: 'lane_utdd_uttt',
+    originCountryId: 'TJ',
+    destCountryId: 'UZ',
+    originIcao: 'UTDD',
+    destIcao: 'UTTT',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_utdl_uttt',
+    originCountryId: 'TJ',
+    destCountryId: 'UZ',
+    originIcao: 'UTDL',
+    destIcao: 'UTTT',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_ucfm_uaaa',
+    originCountryId: 'KG',
+    destCountryId: 'KZ',
+    originIcao: 'UCFM',
+    destIcao: 'UAAA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ucfo_uttt',
+    originCountryId: 'KG',
+    destCountryId: 'UZ',
+    originIcao: 'UCFO',
+    destIcao: 'UTTT',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_utdd_ucfm',
+    originCountryId: 'TJ',
+    destCountryId: 'KG',
+    originIcao: 'UTDD',
+    destIcao: 'UCFM',
+    capacityKgPerDay: 30_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4736,6 +4795,10 @@ export const FUEL_HUB_ICAOS = new Set([
   'UACC',
   'UTTT',
   'UTAA',
+  // Asia-6 Tajikistan / Kyrgyzstan
+  'UTDD',
+  'UCFM',
+  'UCFO',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5630,6 +5693,18 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    TJ_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    KG_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -6048,6 +6123,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertKzCareerHubCatalog();
   assertUzCareerHubCatalog();
   assertTmCareerHubCatalog();
+  assertTjCareerHubCatalog();
+  assertKgCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -7019,6 +7096,24 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...TM_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...TJ_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...KG_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

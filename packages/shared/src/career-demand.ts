@@ -281,6 +281,12 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['UZ', 'IR'],
     ['TM', 'IR'],
     ['TM', 'AZ'],
+    // Asia-6 Tajikistan / Kyrgyzstan (do not backfill remaining EU-2+ pairs here)
+    ['TJ', 'UZ'],
+    ['TJ', 'KG'],
+    ['TJ', 'KZ'],
+    ['KG', 'KZ'],
+    ['KG', 'UZ'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

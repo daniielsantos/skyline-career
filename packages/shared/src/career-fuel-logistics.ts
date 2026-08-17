@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 320;
+export const FUEL_TRUCK_FLEET_SIZE = 340;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 90 },
-  { truckClassId: 'semi_tanker', count: 142 },
-  { truckClassId: 'btrain_tanker', count: 88 },
+  { truckClassId: 'rigid_tanker', count: 96 },
+  { truckClassId: 'semi_tanker', count: 150 },
+  { truckClassId: 'btrain_tanker', count: 94 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -236,6 +236,11 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'UZ-E': ['UZ-W'],
   'UZ-W': ['UZ-E'],
   'TM-C': [],
+  // Asia-6 Tajikistan / Kyrgyzstan domestic road graphs
+  'TJ-S': ['TJ-N'],
+  'TJ-N': ['TJ-S'],
+  'KG-N': ['KG-S'],
+  'KG-S': ['KG-N'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -415,6 +420,12 @@ const TRUCK_NAME_POOL = [
   'Bukhara Fuel Road',
   'Ashgabat Tank Run',
   'Turkmenbashi Caspian Fuel',
+  'Dushanbe Tank Line',
+  'Khujand Fuel Road',
+  'Kulob Fuel Run',
+  'Bishkek Manas Tank',
+  'Osh Fergana Fuel',
+  'Issyk-Kul Tank Line',
 ] as const;
 
 function hashSeed(seed: string): number {

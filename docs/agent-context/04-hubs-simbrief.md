@@ -46,7 +46,9 @@
 
 - Recusar facility MSFS se ident ≠ catalog **ou** distância **> 25 nm** (`msfsFacilityMatchesCareerHub`).
 - Persistir só ICAOs do catalog; prune deny-list de overrides.
-- `pruneOrphanCareerHubs` no migrate/boot.
+- `pruneOrphanCareerHubs` no migrate/boot (também dropa `npcFlights` órfãos).
+- `remapRetiredCareerAirportIdents` aplica `CAREER_AIRPORT_ICAO_REMAP` (ex. MPPB→MPPA) **antes** do prune — evita `Unknown origin airport` no settle.
+- NI spoke: **MNMR** Montelimar (MNCE Costa Esmeralda não está no scenery default).
 - Override JSON limpo de `SCCD` / `SCSN` / `SCST` / `SCTC`.
 
 ## UI (sessão)

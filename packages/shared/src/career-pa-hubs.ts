@@ -74,7 +74,7 @@ export const PA_CAREER_HUBS: readonly PaCareerHubDef[] = [
     consume: { electronics: 0.95, machinery: 0.95 },
   },
   {
-    icao: 'MPPB',
+    icao: 'MPPA',
     name: 'Panama Pacifico',
     region: 'PA-C',
     hubTier: 'spoke',
@@ -83,7 +83,7 @@ export const PA_CAREER_HUBS: readonly PaCareerHubDef[] = [
     ...drySpoke,
   },
   {
-    icao: 'MPSA',
+    icao: 'MPSM',
     name: 'Rio Hato Scarlett Martinez',
     region: 'PA-C',
     hubTier: 'spoke',

@@ -109,7 +109,7 @@ function usage(): never {
   msfs-compat-agent smoke --profile <path.json> [--pipe <name>]
   msfs-compat-agent apply --profile <path.json> --fuel-left <n> --fuel-right <n> [--fuel-center <n>] [--fuel-left-aux <n>] [--fuel-right-aux <n>] [--pipe <name>]
   msfs-compat-agent homologate [--pipe <name>]
-  msfs-compat-agent career-hubs [all|bush|<ICAO>] [--yes] [--pipe <name>]
+  msfs-compat-agent career-hubs [all|bush|missing|<ICAO>] [--yes] [--force] [--pipe <name>]
   msfs-compat-agent sample-burn [--type typeId] [--pipe <name>]
   msfs-compat-agent career-airframe [wizard]|list|disable|enable|rename|remove|backfill-simbrief-cargo [--type typeId] [--label name] [--keep-files] [--apply]
   msfs-compat-agent career-payload
@@ -128,7 +128,7 @@ Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
   Catalog default: http://localhost:8080/v1 (MSFS_COMPAT_CATALOG_URL)
   Homologation: homologate (wizard) OR draft-profile --calibrate → smoke → promote
-  career-hubs: SimConnect Facilities → lat/lon/name for all career hubs (or bush / one ICAO)
+  career-hubs: SimConnect Facilities → lat/lon/name for career hubs (all / bush / missing / one ICAO)
   sample-burn: live cruise fuel-flow sample → patch career-player-airframes.json burn
   career-airframe: interactive wizard (or list / disable / enable / rename / remove / backfill-simbrief-cargo) for Market models
   career-payload: SimBrief maxcargo / OEW / MTOW / fuel → career-player-airframes.json (Freights ceiling)
@@ -356,12 +356,14 @@ async function main(): Promise<void> {
     const { runCareerHubsWizard } = await import('./career-hubs-wizard.js');
     const scopeArg = rest.find((a) => !a.startsWith('--'));
     const yes = hasFlag(rest, '--yes');
+    const force = hasFlag(rest, '--force');
     await withBridge(pipeName, async (bridge) =>
       runCareerHubsWizard({
         bridge,
         repoRoot,
         scope: scopeArg,
         yes,
+        force,
       }),
     );
     return;

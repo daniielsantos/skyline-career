@@ -41,7 +41,7 @@ const agroSpoke = {
   >,
 };
 
-/** 6 curated Guatemala hubs — capital + Petén + coasts. */
+/** 6 curated Guatemala hubs — capital + Petén + coasts (civil MSFS idents). */
 export const GT_CAREER_HUBS: readonly GtCareerHubDef[] = [
   {
     icao: 'MGGT',
@@ -54,7 +54,7 @@ export const GT_CAREER_HUBS: readonly GtCareerHubDef[] = [
     consume: { perishables: 1.15, general: 1.05, supplies: 1.0 },
   },
   {
-    icao: 'MGFL',
+    icao: 'MGMM',
     name: 'Flores Mundo Maya',
     region: 'GT-C',
     hubTier: 'regional',
@@ -74,12 +74,12 @@ export const GT_CAREER_HUBS: readonly GtCareerHubDef[] = [
     consume: { electronics: 0.95, supplies: 0.95 },
   },
   {
-    icao: 'MGMM',
-    name: 'Puerto Barrios',
+    icao: 'MGCB',
+    name: 'Coban',
     region: 'GT-C',
     hubTier: 'spoke',
-    lat: 15.7309,
-    lon: -88.5838,
+    lat: 15.469,
+    lon: -90.4067,
     ...agroSpoke,
   },
   {
@@ -92,12 +92,12 @@ export const GT_CAREER_HUBS: readonly GtCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'MGHT',
-    name: 'Huehuetenango',
+    icao: 'MGRT',
+    name: 'Retalhuleu',
     region: 'GT-C',
     hubTier: 'spoke',
-    lat: 15.3274,
-    lon: -91.525,
+    lat: 14.521,
+    lon: -91.6973,
     ...drySpoke,
   },
 ];

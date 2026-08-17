@@ -116,12 +116,12 @@ export const PE_CAREER_HUBS: readonly PeCareerHubDef[] = [
     ...drySpoke,
   },
   {
-    icao: 'SPMS',
-    name: 'Moyobamba',
+    icao: 'SPJI',
+    name: 'Juanjui',
     region: 'PE-C',
     hubTier: 'spoke',
-    lat: -6.0472,
-    lon: -76.9864,
+    lat: -7.1691,
+    lon: -76.7286,
     ...agroSpoke,
   },
 

@@ -82,12 +82,13 @@ export const NI_CAREER_HUBS: readonly NiCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'MNRR',
-    name: 'San Juan de Nicaragua',
+    // Costa Esmeralda (MNCE/ECI) is not in default MSFS scenery — use Montelimar.
+    icao: 'MNMR',
+    name: 'Montelimar',
     region: 'NI-C',
     hubTier: 'spoke',
-    lat: 10.8262,
-    lon: -83.7378,
+    lat: 11.7861,
+    lon: -86.5114,
     ...drySpoke,
   },
 ];

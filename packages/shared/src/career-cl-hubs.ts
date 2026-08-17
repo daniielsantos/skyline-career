@@ -266,6 +266,20 @@ export const CL_CAREER_HUB_COUNT = 21;
  */
 export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   SCCD: 'SCIE',
+  // Wizard / scenery corrections (wrong ICAO or missing→civil swap)
+  MDJB: 'MDCY',
+  MGFL: 'MGMM',
+  MGHT: 'MGRT',
+  MNRR: 'MNMR',
+  MNCE: 'MNMR',
+  MPPB: 'MPPA',
+  MPSA: 'MPSM',
+  MRQP: 'MRNS',
+  MZCF: 'MZSP',
+  SLRI: 'SLCO',
+  SLET: 'SLGY',
+  SPMS: 'SPJI',
+  SVCP: 'SVMT',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

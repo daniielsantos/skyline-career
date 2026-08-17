@@ -91,8 +91,8 @@ export const DO_CAREER_HUBS: readonly DoCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'MDJB',
-    name: 'Samana El Catey',
+    icao: 'MDCY',
+    name: 'Samana El Catey Presidente Juan Bosch',
     region: 'DO-C',
     hubTier: 'spoke',
     lat: 19.2676,

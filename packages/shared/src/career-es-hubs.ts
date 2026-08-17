@@ -99,12 +99,12 @@ export const ES_CAREER_HUBS: readonly EsCareerHubDef[] = [
     consume: { perishables: 1.2, general: 1.05, supplies: 1.05 },
   },
   {
-    icao: 'LEZG',
-    name: 'Zaragoza',
+    icao: 'LEDA',
+    name: 'Lleida Alguaire',
     region: 'ES-C',
     hubTier: 'regional',
-    lat: 41.6662,
-    lon: -1.04155,
+    lat: 41.7282,
+    lon: 0.535023,
     ...industrial,
   },
   {

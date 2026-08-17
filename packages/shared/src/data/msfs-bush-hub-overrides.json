@@ -4,7 +4,7 @@
     "lat": 35.286277793347836,
     "lon": -116.08136102557182,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "15",
@@ -23,7 +23,7 @@
     "lat": 40.650305561721325,
     "lon": -120.76850831508636,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "16",
@@ -42,7 +42,7 @@
     "lat": 33.28419718891382,
     "lon": -85.80896660685539,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "27",
@@ -61,7 +61,7 @@
     "lat": 39.58080556243658,
     "lon": -79.33594465255737,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "9",
@@ -80,7 +80,7 @@
     "lat": 38.37986122816801,
     "lon": -118.09675008058548,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "13",
@@ -99,7 +99,7 @@
     "lat": 35.42648322880268,
     "lon": -83.45821380615234,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "11",
@@ -118,7 +118,7 @@
     "lat": 40.75748059898615,
     "lon": -119.21592235565186,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "5R",
@@ -147,7 +147,7 @@
     "lat": 39.99721381813288,
     "lon": -120.21685838699341,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "33",
@@ -166,7 +166,7 @@
     "lat": 38.01686681807041,
     "lon": -122.52080842852592,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "4",
@@ -185,7 +185,7 @@
     "lat": 38.70463348925114,
     "lon": -123.43250826001167,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
+    "validatedAt": "2026-08-16",
     "runways": [
       {
         "ident": "30",
@@ -204,76 +204,28 @@
     "lat": 40.13872213661671,
     "lon": -120.17997220158577,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "6",
-        "headingTrueDeg": 79.4850845336914,
-        "lengthM": 993.6480102539062,
-        "widthM": 12.192000389099121,
-        "lat": 40.138753317296505,
-        "lon": -120.1797978579998,
-        "identReciprocal": "24",
-        "surface": "asphalt"
-      }
-    ]
+    "validatedAt": "2026-08-16"
   },
   "L06": {
     "name": "Furnace Creek",
     "lat": 36.460499949753284,
     "lon": -116.8798054754734,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "15",
-        "headingTrueDeg": 162.35357666015625,
-        "lengthM": 933.8588256835938,
-        "widthM": 21.209245681762695,
-        "lat": 36.460527777671814,
-        "lon": -116.8798765540123,
-        "identReciprocal": "33",
-        "surface": "asphalt"
-      }
-    ]
+    "validatedAt": "2026-08-16"
   },
   "L61": {
     "name": "Shoshone",
     "lat": 35.96861097961664,
     "lon": -116.2692779302597,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "15",
-        "headingTrueDeg": 168.64772033691406,
-        "lengthM": 725.404541015625,
-        "widthM": 8.71057415008545,
-        "lat": 35.968606285750866,
-        "lon": -116.26928552985191,
-        "identReciprocal": "33",
-        "surface": "asphalt"
-      }
-    ]
+    "validatedAt": "2026-08-16"
   },
   "M45": {
     "name": "Alpine County",
     "lat": 38.734750002622604,
     "lon": -119.76705551147461,
     "source": "msfs_facility",
-    "validatedAt": "2026-08-11",
-    "runways": [
-      {
-        "ident": "17",
-        "headingTrueDeg": 183.74403381347656,
-        "lengthM": 1354.2259521484375,
-        "widthM": 15.239999771118164,
-        "lat": 38.73474430292845,
-        "lon": -119.7670429944992,
-        "identReciprocal": "35",
-        "surface": "asphalt"
-      }
-    ]
+    "validatedAt": "2026-08-16"
   },
   "NC06": {
     "name": "Elk River",

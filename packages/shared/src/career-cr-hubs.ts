@@ -92,12 +92,12 @@ export const CR_CAREER_HUBS: readonly CrCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'MRQP',
-    name: 'Quepos La Managua',
+    icao: 'MRNS',
+    name: 'Nosara',
     region: 'CR-C',
     hubTier: 'spoke',
-    lat: 9.4432,
-    lon: -84.1298,
+    lat: 9.9765,
+    lon: -85.653,
     ...agroSpoke,
   },
   {

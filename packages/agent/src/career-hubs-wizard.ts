@@ -13,6 +13,7 @@ import {
   listBushTripOnlyIcaos,
   listCareerHubIcaos,
   listMsfsBushHubOverrides,
+  lookupMsfsBushHubOverride,
   msfsFacilityMatchesCareerHub,
   openCareerStore,
   pruneOrphanCareerHubs,
@@ -28,14 +29,17 @@ import {
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
 import { confirm, printSection, withPrompts, type AskFn } from './prompt.js';
 import { IpcClientError } from './ipc/types.js';
+import { isSimDownError } from './sim-session-health.js';
 
 export type CareerHubsWizardOpts = {
   bridge: NamedPipeSimBridge;
   repoRoot: string;
-  /** Optional non-interactive scope: all | bush | icao */
-  scope?: 'all' | 'bush' | string;
+  /** Optional non-interactive scope: all | bush | missing | icao */
+  scope?: 'all' | 'bush' | 'missing' | string;
   /** Skip prompts when scope is set. */
   yes?: boolean;
+  /** Re-fetch even when an msfs_facility override already exists. */
+  force?: boolean;
 };
 
 type FacilityHit = {
@@ -45,6 +49,17 @@ type FacilityHit = {
   lon: number;
   runways?: CareerRunway[];
 };
+
+/** Host may spend ~5s on RequestFacilityData + up to 15s on airport-list fallback. */
+const FACILITY_IPC_TIMEOUT_MS = 30_000;
+const FACILITY_TIMEOUT_RETRIES = 2;
+const FACILITY_RETRY_DELAY_MS = 750;
+/** Pace requests so Facility + list fallback does not tear down SimConnect. */
+const BETWEEN_HUB_DELAY_MS = 200;
+/** Persist overrides periodically so a mid-run crash keeps progress. */
+const PERSIST_EVERY_OK = 25;
+const SESSION_RECONNECT_ATTEMPTS = 2;
+const SESSION_RECONNECT_DELAY_MS = 2_000;
 
 const SURFACE_SET = new Set<RunwaySurface>([
   'asphalt',
@@ -105,7 +120,7 @@ function mapFacilityRunways(
 }
 
 type RunRow =
-  | { icao: string; ok: true; override: MsfsBushHubOverride }
+  | { icao: string; ok: true; override: MsfsBushHubOverride; skipped?: boolean }
   | { icao: string; ok: false; error: string };
 
 function todayUtc(): string {
@@ -114,6 +129,40 @@ function todayUtc(): string {
 
 function overridesPath(repoRoot: string): string {
   return join(repoRoot, 'profiles', 'career', 'msfs-bush-hub-overrides.json');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (error instanceof IpcClientError && error.code === 'TIMEOUT') return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /\bTIMEOUT\b/i.test(message) || /timed out/i.test(message);
+}
+
+function isSessionDeadError(error: unknown): boolean {
+  if (isSimDownError(error)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /SimConnect is not connected|SimConnect disconnected|not connected to MSFS/i.test(
+    message,
+  );
+}
+
+async function reconnectSimSession(bridge: NamedPipeSimBridge): Promise<void> {
+  console.log('  reconnecting SimConnect session…');
+  await bridge.open('MSFS Compat Career Hubs', { resetSession: true });
+  const status = await bridge.status().catch(() => null);
+  if (!status?.connected) {
+    throw new Error(
+      'SimConnect still disconnected after reconnect — check MSFS / host:simconnect',
+    );
+  }
+}
+
+function hasFacilityOverride(icao: string): boolean {
+  const row = lookupMsfsBushHubOverride(icao);
+  return row?.source === 'msfs_facility';
 }
 
 async function loadRuntimeOverrides(repoRoot: string): Promise<void> {
@@ -153,7 +202,9 @@ async function fetchFacility(
   icao: string,
 ): Promise<FacilityHit> {
   try {
-    const facility = await bridge.getAirportFacility(icao);
+    const facility = await bridge.getAirportFacility(icao, {
+      timeoutMs: FACILITY_IPC_TIMEOUT_MS,
+    });
     if (
       !Number.isFinite(facility.lat) ||
       !Number.isFinite(facility.lon) ||
@@ -161,13 +212,13 @@ async function fetchFacility(
     ) {
       throw new Error(`invalid coords for ${icao}`);
     }
-      return {
-        icao: (facility.icao || icao).trim().toUpperCase() || icao,
-        name: facility.name?.trim() || undefined,
-        lat: facility.lat,
-        lon: facility.lon,
-        runways: mapFacilityRunways(facility.runways),
-      };
+    return {
+      icao: (facility.icao || icao).trim().toUpperCase() || icao,
+      name: facility.name?.trim() || undefined,
+      lat: facility.lat,
+      lon: facility.lon,
+      runways: mapFacilityRunways(facility.runways),
+    };
   } catch (error) {
     if (
       error instanceof IpcClientError &&
@@ -182,12 +233,41 @@ async function fetchFacility(
   }
 }
 
+async function fetchFacilityWithRetry(
+  bridge: NamedPipeSimBridge,
+  icao: string,
+): Promise<FacilityHit> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= FACILITY_TIMEOUT_RETRIES; attempt++) {
+    try {
+      return await fetchFacility(bridge, icao);
+    } catch (error) {
+      lastError = error;
+      if (!isTimeoutError(error) || attempt >= FACILITY_TIMEOUT_RETRIES) {
+        throw error;
+      }
+      process.stdout.write(` retry${attempt + 1}…`);
+      await sleep(FACILITY_RETRY_DELAY_MS);
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(String(lastError ?? 'facility lookup failed'));
+}
+
+function filterMissingFacilityOverrides(icaos: string[]): string[] {
+  return icaos.filter((icao) => !hasFacilityOverride(icao));
+}
+
 async function pickScope(
   ask: AskFn,
   opts: CareerHubsWizardOpts,
 ): Promise<string[]> {
   if (opts.scope === 'all') return listCareerHubIcaos();
   if (opts.scope === 'bush') return listBushTripOnlyIcaos();
+  if (opts.scope === 'missing') {
+    return filterMissingFacilityOverrides(listCareerHubIcaos());
+  }
   if (opts.scope && opts.scope !== 'wizard') {
     const code = opts.scope.trim().toUpperCase();
     if (!isCareerHubIcao(code)) {
@@ -198,18 +278,25 @@ async function pickScope(
 
   const allCount = listCareerHubIcaos().length;
   const bushCount = listBushTripOnlyIcaos().length;
+  const missingCount = filterMissingFacilityOverrides(listCareerHubIcaos())
+    .length;
   printSection('MSFS hub Facilities homologation');
   console.log('  MSFS must be running. SimBridgeHost needs getAirportFacility.');
   console.log('  Writes profiles/career/msfs-bush-hub-overrides.json + local economy.');
+  console.log('  Facility lookups use a 30s IPC timeout (host may warm the airport list).');
   console.log('');
   console.log(`  1. All career hubs (${allCount})`);
   console.log(`  2. Bush-trip-only locals (${bushCount})`);
-  console.log('  3. Single ICAO');
-  const choice = (await ask('Choice', '1')).trim();
+  console.log(`  3. Missing only — no msfs_facility override yet (${missingCount})`);
+  console.log('  4. Single ICAO');
+  const choice = (await ask('Choice', '3')).trim();
   if (choice === '2' || choice.toLowerCase() === 'bush') {
     return listBushTripOnlyIcaos();
   }
-  if (choice === '3' || choice.toLowerCase() === 'icao') {
+  if (choice === '3' || choice.toLowerCase() === 'missing') {
+    return filterMissingFacilityOverrides(listCareerHubIcaos());
+  }
+  if (choice === '4' || choice.toLowerCase() === 'icao') {
     const raw = (await ask('ICAO')).trim().toUpperCase();
     if (!isCareerHubIcao(raw)) {
       throw new Error(`${raw || '(empty)'} is not a career hub`);
@@ -225,8 +312,22 @@ export async function runCareerHubsWizard(
   await loadRuntimeOverrides(opts.repoRoot);
 
   const icaos = await withPrompts(async (ask) => {
-    const list = await pickScope(ask, opts);
+    let list = await pickScope(ask, opts);
+    if (!opts.force && opts.scope !== 'missing' && list.length > 1) {
+      const before = list.length;
+      list = filterMissingFacilityOverrides(list);
+      const skipped = before - list.length;
+      if (skipped > 0) {
+        console.log(
+          `  Skipping ${skipped} hub(s) that already have msfs_facility overrides (use --force to redo).`,
+        );
+      }
+    }
     if (opts.yes) return list;
+    if (list.length === 0) {
+      console.log('  Nothing to fetch — every hub already has an msfs_facility override.');
+      return list;
+    }
     const label =
       list.length === 1
         ? list[0]!
@@ -242,6 +343,14 @@ export async function runCareerHubsWizard(
     return list;
   });
 
+  if (icaos.length === 0) {
+    const path = await persistOverrides(opts.repoRoot);
+    printSection('Done');
+    console.log('  ok=0  fail=0  (nothing pending)');
+    console.log(`  overrides → ${path}`);
+    return { okCount: 0, failCount: 0, path };
+  }
+
   const status = await opts.bridge.status().catch(() => null);
   if (!status?.connected) {
     throw new Error(
@@ -249,18 +358,58 @@ export async function runCareerHubsWizard(
     );
   }
 
-  // Probe once so UNSUPPORTED fails fast with a clear message.
-  await fetchFacility(opts.bridge, icaos[0]!);
+  // Probe once so UNSUPPORTED fails fast. NOT_FOUND/TIMEOUT on the first ICAO
+  // must not abort the whole batch (common for hubs missing from local scenery).
+  try {
+    await fetchFacilityWithRetry(opts.bridge, icaos[0]!);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/getAirportFacility|rebuild and restart/i.test(message)) {
+      throw error;
+    }
+    console.log(
+      `  note: probe ${icaos[0]} failed (${message}) — continuing with the batch`,
+    );
+  }
 
   printSection(`Fetching ${icaos.length} facilities`);
   const rows: RunRow[] = [];
   let i = 0;
+  let okSincePersist = 0;
+  let abortedForSession = false;
   for (const icao of icaos) {
     i += 1;
+    if (i > 1) await sleep(BETWEEN_HUB_DELAY_MS);
     process.stdout.write(`  [${i}/${icaos.length}] ${icao}…`);
     try {
-      const hit = await fetchFacility(opts.bridge, icao);
-      const match = msfsFacilityMatchesCareerHub(icao, hit);
+      let hit: FacilityHit;
+      try {
+        hit = await fetchFacilityWithRetry(opts.bridge, icao);
+      } catch (error) {
+        if (!isSessionDeadError(error)) throw error;
+        let recovered = false;
+        for (let r = 0; r < SESSION_RECONNECT_ATTEMPTS; r++) {
+          try {
+            process.stdout.write(` reconnect${r + 1}…`);
+            await sleep(SESSION_RECONNECT_DELAY_MS);
+            await reconnectSimSession(opts.bridge);
+            hit = await fetchFacilityWithRetry(opts.bridge, icao);
+            recovered = true;
+            break;
+          } catch (reconnectError) {
+            if (
+              r + 1 >= SESSION_RECONNECT_ATTEMPTS ||
+              !isSessionDeadError(reconnectError)
+            ) {
+              throw reconnectError;
+            }
+          }
+        }
+        if (!recovered) {
+          throw error;
+        }
+      }
+      const match = msfsFacilityMatchesCareerHub(icao, hit!);
       if (!match.ok) {
         rows.push({ icao, ok: false, error: match.reason });
         console.log(` SKIP  ${match.reason}`);
@@ -268,26 +417,40 @@ export async function runCareerHubsWizard(
       }
       const catalogName = CAREER_HUB_COORDS[icao]?.name;
       const override: MsfsBushHubOverride = {
-        name: hit.name || catalogName || icao,
-        lat: hit.lat,
-        lon: hit.lon,
+        name: hit!.name || catalogName || icao,
+        lat: hit!.lat,
+        lon: hit!.lon,
         source: 'msfs_facility',
         validatedAt: todayUtc(),
-        ...(hit.runways?.length ? { runways: hit.runways } : {}),
+        ...(hit!.runways?.length ? { runways: hit!.runways } : {}),
       };
       upsertRuntimeMsfsBushHubOverride(icao, override);
       rows.push({ icao, ok: true, override });
-      const rwyN = hit.runways?.length ?? 0;
+      okSincePersist += 1;
+      const rwyN = hit!.runways?.length ?? 0;
       console.log(
         ` ok  ${override.name}  ${override.lat.toFixed(4)},${override.lon.toFixed(4)}  rwy×${rwyN}`,
       );
+      if (okSincePersist >= PERSIST_EVERY_OK) {
+        await persistOverrides(opts.repoRoot);
+        okSincePersist = 0;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       rows.push({ icao, ok: false, error: message });
       console.log(` FAIL  ${message}`);
       // Hard stop if the host itself is wrong — no point looping 200×.
       if (/getAirportFacility|rebuild and restart/i.test(message)) {
+        await persistOverrides(opts.repoRoot).catch(() => undefined);
         throw error;
+      }
+      // SimConnect died and reconnect failed — stop so we don't spam FAIL.
+      if (isSessionDeadError(error)) {
+        abortedForSession = true;
+        console.log(
+          '  aborting batch — SimConnect session is down. Progress saved; re-run with `npm run career-hubs -- missing` after MSFS/host is healthy.',
+        );
+        break;
       }
     }
   }
@@ -376,6 +539,14 @@ export async function runCareerHubsWizard(
       if (row.ok) continue;
       console.log(`    ${row.icao}: ${row.error}`);
     }
+    console.log(
+      '  Tip: re-run with `npm run career-hubs -- missing` to retry only hubs still without overrides.',
+    );
+  }
+  if (abortedForSession) {
+    console.log(
+      '  Session aborted early — confirm MSFS is running and host:simconnect is healthy, then retry missing.',
+    );
   }
   console.log('  Restart career-ui so map/GFP pick up the new coords.');
   return { okCount, failCount, path };

@@ -86,12 +86,12 @@ export const VE_CAREER_HUBS: readonly VeCareerHubDef[] = [
     consume: { electronics: 0.95, supplies: 0.95 },
   },
   {
-    icao: 'SVCP',
-    name: 'Cumaná Antonio José de Sucre',
+    icao: 'SVMT',
+    name: 'Maturin Jose Tadeo Monagas',
     region: 'VE-C',
     hubTier: 'spoke',
-    lat: 10.4503,
-    lon: -64.1305,
+    lat: 9.749,
+    lon: -63.1534,
     ...agroSpoke,
   },
   {

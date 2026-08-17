@@ -73,12 +73,12 @@ export const BZ_CAREER_HUBS: readonly BzCareerHubDef[] = [
     ...drySpoke,
   },
   {
-    icao: 'MZCF',
-    name: 'Caye Caulker',
+    icao: 'MZSP',
+    name: 'San Pedro Ambergris Caye',
     region: 'BZ-C',
     hubTier: 'spoke',
-    lat: 17.7347,
-    lon: -88.0325,
+    lat: 17.9139,
+    lon: -87.9711,
     ...agroSpoke,
   },
 ];

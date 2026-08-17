@@ -47,6 +47,7 @@ import {
   msfsFacilityMatchesCareerHub,
   pruneOrphanCareerHubs,
   remapMislabelledClHubs,
+  remapRetiredCareerAirportIdents,
   MS_PER_HOUR,
   MS_PER_TICK,
   TICKS_PER_DAY,
@@ -2057,6 +2058,59 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.equal(
       migrated.airports.some((airport) => airport.icao === 'SCSN'),
       false,
+    );
+  });
+
+  it('remaps retired hub idents (MPPB→MPPA) and drops orphan NPC legs', () => {
+    const world = createSeedEconomyWorld({ seed: 'remap-mppb' });
+    const mppa = world.airports.find((a) => a.icao === 'MPPA');
+    assert.ok(mppa);
+    world.airports.push({
+      ...structuredClone(mppa!),
+      icao: 'MPPB',
+      name: 'Legacy Howard',
+    });
+    const flight: NpcFlight = {
+      id: 'npc-mppb-leg',
+      npcId: world.npcs[0]?.id ?? 'npc-test',
+      lotId: 'lot-none',
+      originIcao: 'MPPB',
+      destIcao: 'MPTO',
+      commodityId: 'general',
+      cargoKg: 400,
+      payUsd: 1,
+      aircraftClassId: 'light_ga',
+      departedAtTick: world.tick,
+      arrivesAtTick: world.tick + 2,
+      departedAtMs: world.lastBatchAtMs,
+      arrivesAtMs: world.lastBatchAtMs + 2 * MS_PER_HOUR,
+      status: 'in_flight',
+    };
+    world.npcFlights.push(flight);
+    assert.equal(remapRetiredCareerAirportIdents(world), true);
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'MPPB'),
+      false,
+    );
+    assert.equal(
+      world.npcFlights.some((row) => row.originIcao === 'MPPA'),
+      true,
+    );
+
+    const legacy = createSeedEconomyWorld({ seed: 'remap-mppb-migrate' });
+    legacy.npcFlights.push({
+      ...flight,
+      id: 'npc-mppb-leg2',
+      originIcao: 'MPPB',
+    });
+    const after = migrateEconomyWorld(legacy);
+    assert.equal(
+      after.npcFlights.some((row) => row.originIcao === 'MPPB'),
+      false,
+    );
+    assert.equal(
+      after.npcFlights.some((row) => row.originIcao === 'MPPA'),
+      true,
     );
   });
 

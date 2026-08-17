@@ -22,6 +22,7 @@ import {
 } from './career-ca-hubs.js';
 import {
   assertClCareerHubCatalog,
+  CAREER_AIRPORT_ICAO_REMAP,
   CL_CAREER_HUBS,
   buildClFeederCorridors,
   rewriteCareerIcaoFields,
@@ -997,7 +998,7 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'MHLM', b: 'MHLC', weight: 1.7 },
   { a: 'MHTG', b: 'MHRO', weight: 1.5 },
   { a: 'MSLP', b: 'MSSS', weight: 1.8 },
-  { a: 'MGGT', b: 'MGFL', weight: 1.8 },
+  { a: 'MGGT', b: 'MGMM', weight: 1.8 },
   { a: 'MGGT', b: 'MGSJ', weight: 1.6 },
   { a: 'MZBZ', b: 'MZPL', weight: 1.6 },
   // Caribbean domestic trunks (light — intl carries regional trade)
@@ -4131,6 +4132,62 @@ export function remapMislabelledClHubs(world: CareerEconomyWorld): boolean {
 }
 
 /**
+ * Apply CAREER_AIRPORT_ICAO_REMAP to live world (lots / NPC flights / airports)
+ * before orphan prune. Without this, remapped hubs (e.g. MPPB→MPPA) leave
+ * in-flight NPC legs that crash settle with "Unknown origin airport".
+ */
+export function remapRetiredCareerAirportIdents(
+  world: CareerEconomyWorld,
+): boolean {
+  let changed = false;
+  for (const [fromRaw, toRaw] of Object.entries(CAREER_AIRPORT_ICAO_REMAP)) {
+    const from = fromRaw.trim().toUpperCase();
+    const to = toRaw.trim().toUpperCase();
+    if (!from || !to || from === to) continue;
+    if (!(to in CAREER_HUB_COORDS)) continue;
+
+    const fromAp = world.airports.find(
+      (ap) => ap.icao.trim().toUpperCase() === from,
+    );
+    const refsFrom =
+      Boolean(fromAp) ||
+      world.lots.some(
+        (lot) =>
+          lot.originIcao.trim().toUpperCase() === from ||
+          lot.destIcao.trim().toUpperCase() === from,
+      ) ||
+      (world.npcFlights ?? []).some(
+        (flight) =>
+          flight.originIcao.trim().toUpperCase() === from ||
+          flight.destIcao.trim().toUpperCase() === from,
+      ) ||
+      (world.inboundPending ?? []).some(
+        (pending) =>
+          pending.originIcao.trim().toUpperCase() === from ||
+          pending.destIcao.trim().toUpperCase() === from,
+      );
+    if (!refsFrom) continue;
+
+    rewriteCareerIcaoFields(world, from, to);
+    const toAp = world.airports.find(
+      (ap) => ap.icao.trim().toUpperCase() === to,
+    );
+    if (fromAp && toAp && fromAp !== toAp) {
+      world.airports = world.airports.filter((ap) => ap !== fromAp);
+    } else if (fromAp) {
+      fromAp.icao = to;
+      const coords = CAREER_HUB_COORDS[to];
+      if (coords) {
+        fromAp.lat = coords.lat;
+        fromAp.lon = coords.lon;
+      }
+    }
+    changed = true;
+  }
+  return changed;
+}
+
+/**
  * Drop airports (and their lots) that are no longer in the catalog — e.g.
  * MSFS-only strips removed because they cannot Dispatch.
  */
@@ -4143,6 +4200,19 @@ export function pruneOrphanCareerHubs(world: CareerEconomyWorld): boolean {
       .map((ap) => ap.icao.trim().toUpperCase())
       .filter((icao) => icao && !keep.has(icao)),
   );
+  // Also drop legs that still cite retired idents after a catalog remap.
+  for (const lot of world.lots) {
+    const o = lot.originIcao.trim().toUpperCase();
+    const d = lot.destIcao.trim().toUpperCase();
+    if (o && !keep.has(o)) orphan.add(o);
+    if (d && !keep.has(d)) orphan.add(d);
+  }
+  for (const flight of world.npcFlights ?? []) {
+    const o = flight.originIcao.trim().toUpperCase();
+    const d = flight.destIcao.trim().toUpperCase();
+    if (o && !keep.has(o)) orphan.add(o);
+    if (d && !keep.has(d)) orphan.add(d);
+  }
   if (orphan.size === 0) return false;
 
   world.airports = world.airports.filter(
@@ -4158,6 +4228,13 @@ export function pruneOrphanCareerHubs(world: CareerEconomyWorld): boolean {
       (pending) =>
         !orphan.has(pending.originIcao.trim().toUpperCase()) &&
         !orphan.has(pending.destIcao.trim().toUpperCase()),
+    );
+  }
+  if (Array.isArray(world.npcFlights) && world.npcFlights.length > 0) {
+    world.npcFlights = world.npcFlights.filter(
+      (flight) =>
+        !orphan.has(flight.originIcao.trim().toUpperCase()) &&
+        !orphan.has(flight.destIcao.trim().toUpperCase()),
     );
   }
   return true;
@@ -4262,6 +4339,7 @@ export function migrateEconomyWorld(
   };
 
   remapMislabelledClHubs(migrated);
+  remapRetiredCareerAirportIdents(migrated);
   pruneOrphanCareerHubs(migrated);
   ensureCareerHubCoverage(migrated);
   ensureInternationalLanes(migrated);

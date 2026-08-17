@@ -44,6 +44,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 13. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
 14. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
 15. Next map slice: **EU-2** Nordics + Alpes + IE.
+16. Re-run `npm run career-hubs -- missing` após rebuild shared — esperar **MNMR** (não MNCE); wizard não deve crashar em MPPB.
 
 ## Feito (shipped 0.3.47)
 

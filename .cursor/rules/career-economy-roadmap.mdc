@@ -46,6 +46,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Caribbean dependencies:** GP/MQ/CW/SX/AW (GF-style territories) + **US-PR** / **US-VI** regions under US; ports incl. Philipsburg / Oranjestad / Charlotte Amalie.
 - **EU-1 Western core:** PT/ES/FR/GB/DE/NL/BE/IT curated hubs; EU ring + Americas bridge lanes; 8 coastal ports; fuel trucks **85**; seed **629** airports / **61** ports.
 - **EU-2 Nordics + Alps + IE:** IE/DK/NO/SE/FI/CH/AT curated hubs; Nordic ring + Alps/EU-1 gateway lanes; 5 coastal ports; fuel trucks **100**; seed **672** airports / **66** ports.
+- **EU-3 Central-East + Baltics:** PL/CZ/SK/HU/EE/LV/LT curated hubs; Visegrád + Baltics rings + EU gateways; 4 coastal ports; fuel trucks **115**; seed **706** airports / **70** ports.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 
 ## Near-term priorities (current Brazil career)
@@ -61,9 +62,10 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 9. ~~**Caribbean leftovers**~~ — SX/AW + US-VI.
 10. ~~**EU-1 Western core**~~ — PT/ES/FR/GB/DE/NL/BE/IT.
 11. ~~**EU-2 Nordics + Alps + IE**~~ — IE/DK/NO/SE/FI/CH/AT.
-12. Polish only if needed — optional real METAR.
-13. Next map slice: Eastern Europe / Balkans / Iceland.
-14. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+12. ~~**EU-3 Central-East + Baltics**~~ — PL/CZ/SK/HU/EE/LV/LT.
+13. Polish only if needed — optional real METAR.
+14. Next map slice: Balkans / Iceland.
+15. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

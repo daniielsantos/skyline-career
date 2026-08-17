@@ -8436,5 +8436,801 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "EEPU": {
+    "name": "Parnu",
+    "lat": 58.41888885945082,
+    "lon": 24.47277769446373,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 215.25680541992188,
+        "lengthM": 2476.4833984375,
+        "widthM": 46.071834564208984,
+        "lat": 58.41884929686785,
+        "lon": 24.472404420375824,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EETN": {
+    "name": "Tallinn",
+    "lat": 59.413333274424076,
+    "lon": 24.83249992132187,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 90.2182388305664,
+        "lengthM": 3060.94970703125,
+        "widthM": 57.98664093017578,
+        "lat": 59.41326051950455,
+        "lon": 24.832714945077896,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EETU": {
+    "name": "Ulenurme",
+    "lat": 58.3075000718236,
+    "lon": 26.686944365501404,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "26",
+        "headingTrueDeg": 268.43475341796875,
+        "lengthM": 1787.9600830078125,
+        "widthM": 29.873750686645508,
+        "lat": 58.30740116536617,
+        "lon": 26.686749905347824,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPBY": {
+    "name": "Szwederowo",
+    "lat": 53.0966666713357,
+    "lon": 17.97777771949768,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 212.4727783203125,
+        "lengthM": 575.31201171875,
+        "widthM": 25,
+        "lat": 53.104530572891235,
+        "lon": 17.963074296712875,
+        "identReciprocal": "3",
+        "surface": "grass"
+      },
+      {
+        "ident": "26",
+        "headingTrueDeg": 261.9974670410156,
+        "lengthM": 2496.71142578125,
+        "widthM": 61.07088088989258,
+        "lat": 53.09681486338377,
+        "lon": 17.977750450372696,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "26R",
+        "headingTrueDeg": 264.9356384277344,
+        "lengthM": 646.785400390625,
+        "widthM": 25,
+        "lat": 53.106634095311165,
+        "lon": 17.961000502109528,
+        "identReciprocal": "8L",
+        "surface": "grass"
+      },
+      {
+        "ident": "29",
+        "headingTrueDeg": 299.8232727050781,
+        "lengthM": 651.3950805664062,
+        "widthM": 25,
+        "lat": 53.10376849025488,
+        "lon": 17.95997053384781,
+        "identReciprocal": "11",
+        "surface": "grass"
+      },
+      {
+        "ident": "30",
+        "headingTrueDeg": 307.5155334472656,
+        "lengthM": 1042.28955078125,
+        "widthM": 48.63263702392578,
+        "lat": 53.10263693332672,
+        "lon": 17.956560105085373,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPGD": {
+    "name": "Lecha Walesy",
+    "lat": 54.377416446805,
+    "lon": 18.46607208251953,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 112.95146179199219,
+        "lengthM": 2801.898681640625,
+        "widthM": 42.473426818847656,
+        "lat": 54.376163855195045,
+        "lon": 18.47188711166382,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPKK": {
+    "name": "Balice",
+    "lat": 50.07777772843838,
+    "lon": 19.78472203016281,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 257.82379150390625,
+        "lengthM": 2547.91015625,
+        "widthM": 56.55668258666992,
+        "lat": 50.07779650390148,
+        "lon": 19.785495400428772,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPKT": {
+    "name": "Pyrzowice",
+    "lat": 50.47416664659977,
+    "lon": 19.08000022172928,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "26",
+        "headingTrueDeg": 270.19482421875,
+        "lengthM": 3199.01171875,
+        "widthM": 45,
+        "lat": 50.476028099656105,
+        "lon": 19.082113802433014,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPLL": {
+    "name": "Lublinek",
+    "lat": 51.721944361925125,
+    "lon": 19.39805567264557,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 250.63046264648438,
+        "lengthM": 2495.902587890625,
+        "widthM": 43.24925231933594,
+        "lat": 51.71991057693958,
+        "lon": 19.38917711377144,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "25L",
+        "headingTrueDeg": 250.92855834960938,
+        "lengthM": 696.8511962890625,
+        "widthM": 167.9312744140625,
+        "lat": 51.72031491994858,
+        "lon": 19.401394575834274,
+        "identReciprocal": "7R",
+        "surface": "grass"
+      }
+    ]
+  },
+  "EPPO": {
+    "name": "Lawica",
+    "lat": 52.4211110919714,
+    "lon": 16.826388984918594,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 107.60643768310547,
+        "lengthM": 2489.2724609375,
+        "widthM": 46.98543930053711,
+        "lat": 52.421589866280556,
+        "lon": 16.82354137301445,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPRZ": {
+    "name": "Jasionka",
+    "lat": 50.11000011116266,
+    "lon": 22.018889039754868,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 91.16595458984375,
+        "lengthM": 3201.763427734375,
+        "widthM": 41.17934036254883,
+        "lat": 50.10994244366884,
+        "lon": 22.023987025022507,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPSC": {
+    "name": "Goleniow",
+    "lat": 53.584722094237804,
+    "lon": 14.90222230553627,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 131.0163116455078,
+        "lengthM": 2491.83935546875,
+        "widthM": 56.01303482055664,
+        "lat": 53.58473986387253,
+        "lon": 14.9022576212883,
+        "identReciprocal": "31",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "EPWA": {
+    "name": "Okecie",
+    "lat": 52.165833190083504,
+    "lon": 20.967222154140472,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 114.56646728515625,
+        "lengthM": 2801.37646484375,
+        "widthM": 49.46448516845703,
+        "lat": 52.16624893248081,
+        "lon": 20.96533164381981,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 151.69334411621094,
+        "lengthM": 3689.174072265625,
+        "widthM": 59.74190902709961,
+        "lat": 52.16396402567625,
+        "lon": 20.96867635846138,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EPWR": {
+    "name": "Strachowice",
+    "lat": 51.10277786850929,
+    "lon": 16.88583344221115,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 115.98751068115234,
+        "lengthM": 2500.672607421875,
+        "widthM": 50.84961700439453,
+        "lat": 51.10388562083244,
+        "lon": 16.881906241178513,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EVLA": {
+    "name": "Liepaja Intl",
+    "lat": 56.517500057816505,
+    "lon": 21.096944510936737,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 70.26302337646484,
+        "lengthM": 1994.5543212890625,
+        "widthM": 35.757781982421875,
+        "lat": 56.517495699226856,
+        "lon": 21.096965968608856,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EVRA": {
+    "name": "Riga Intl",
+    "lat": 56.9236109778285,
+    "lon": 23.971111178398132,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 185.1489715576172,
+        "lengthM": 3206.829833984375,
+        "widthM": 44.649383544921875,
+        "lat": 56.92078862339258,
+        "lon": 23.970661461353302,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EVVA": {
+    "name": "Ventspils Intl",
+    "lat": 57.357777804136276,
+    "lon": 21.544166654348373,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 215.42823791503906,
+        "lengthM": 1284.861328125,
+        "widthM": 25,
+        "lat": 57.35776640474796,
+        "lon": 21.54419168829918,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EYKA": {
+    "name": "Kaunas Intl",
+    "lat": 54.96388882398605,
+    "lon": 24.08472239971161,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 85.07073211669922,
+        "lengthM": 3249.832275390625,
+        "widthM": 46.06442642211914,
+        "lat": 54.963931404054165,
+        "lon": 24.08477023243904,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EYPA": {
+    "name": "Palanga Intl",
+    "lat": 55.97305554896593,
+    "lon": 21.09388902783394,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 12.692873001098633,
+        "lengthM": 2278.154052734375,
+        "widthM": 45.33688735961914,
+        "lat": 55.97310248762369,
+        "lon": 21.09381839632988,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EYSA": {
+    "name": "Siauliai Intl",
+    "lat": 55.89388880878687,
+    "lon": 23.39499995112419,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "14L",
+        "headingTrueDeg": 146.13491821289062,
+        "lengthM": 3497.23095703125,
+        "widthM": 61.46828842163086,
+        "lat": 55.893853940069675,
+        "lon": 23.39499369263649,
+        "identReciprocal": "32R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14R",
+        "headingTrueDeg": 146.15792846679688,
+        "lengthM": 3242.73681640625,
+        "widthM": 33.8726692199707,
+        "lat": 55.892013274133205,
+        "lon": 23.392467945814133,
+        "identReciprocal": "32L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EYVI": {
+    "name": "Vilnius Intl",
+    "lat": 54.63694430887699,
+    "lon": 25.2877776324749,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 201.89947509765625,
+        "lengthM": 2509.70166015625,
+        "widthM": 50.46143341064453,
+        "lat": 54.63419705629349,
+        "lon": 25.285779386758804,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LHBP": {
+    "name": "Ferihegy",
+    "lat": 47.43944428861141,
+    "lon": 19.26194429397583,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "13L",
+        "headingTrueDeg": 132.44442749023438,
+        "lengthM": 3705.847900390625,
+        "widthM": 43.25981903076172,
+        "lat": 47.43419352918863,
+        "lon": 19.275687485933304,
+        "identReciprocal": "31R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13R",
+        "headingTrueDeg": 132.41439819335938,
+        "lengthM": 3009.543212890625,
+        "widthM": 43.43109893798828,
+        "lat": 47.43960488587618,
+        "lon": 19.235477596521378,
+        "identReciprocal": "31L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LHDC": {
+    "name": "Debrecen",
+    "lat": 47.488888800144196,
+    "lon": 21.61527782678604,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "4L",
+        "headingTrueDeg": 47.8200798034668,
+        "lengthM": 2460.45263671875,
+        "widthM": 73.25102996826172,
+        "lat": 47.49000124633312,
+        "lon": 21.61393940448761,
+        "identReciprocal": "22R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4R",
+        "headingTrueDeg": 47.841678619384766,
+        "lengthM": 2499.310791015625,
+        "widthM": 39.316368103027344,
+        "lat": 47.48892903327942,
+        "lon": 21.615355163812637,
+        "identReciprocal": "22L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LHNY": {
+    "name": "Nyiregyhaza",
+    "lat": 47.97944437712431,
+    "lon": 21.692222356796265,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18R",
+        "headingTrueDeg": 181.2852325439453,
+        "lengthM": 993.3160400390625,
+        "widthM": 18.618907928466797,
+        "lat": 47.983989380300045,
+        "lon": 21.69236496090889,
+        "identReciprocal": "36L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LHPR": {
+    "name": "Gyor-Per",
+    "lat": 47.62722238898277,
+    "lon": 17.808333188295364,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "29",
+        "headingTrueDeg": 299.50372314453125,
+        "lengthM": 2028.13037109375,
+        "widthM": 30.57734489440918,
+        "lat": 47.62838043272495,
+        "lon": 17.804977297782898,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LHSM": {
+    "name": "Balaton",
+    "lat": 46.686388961970806,
+    "lon": 17.159166634082794,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 165.2099609375,
+        "lengthM": 2500.3896484375,
+        "widthM": 58.58641052246094,
+        "lat": 46.686370857059956,
+        "lon": 17.15911254286766,
+        "identReciprocal": "34",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "LKKV": {
+    "name": "Karlovy Vary",
+    "lat": 50.203055664896965,
+    "lon": 12.915000021457672,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 113.10548400878906,
+        "lengthM": 2158.968505859375,
+        "widthM": 30.177486419677734,
+        "lat": 50.20305298268795,
+        "lon": 12.915169894695282,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "12",
+        "headingTrueDeg": 113.12208557128906,
+        "lengthM": 1020.7832641601562,
+        "widthM": 29.272653579711914,
+        "lat": 50.203932747244835,
+        "lon": 12.913850247859955,
+        "identReciprocal": "30",
+        "surface": "grass"
+      }
+    ]
+  },
+  "LKMT": {
+    "name": "Mosnov",
+    "lat": 49.696111120283604,
+    "lon": 18.110833168029785,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "22",
+        "headingTrueDeg": 226.26063537597656,
+        "lengthM": 3506.65576171875,
+        "widthM": 62.23480224609375,
+        "lat": 49.69621170312166,
+        "lon": 18.110843896865845,
+        "identReciprocal": "4",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "LKPD": {
+    "name": "Pardubice",
+    "lat": 50.01345835626125,
+    "lon": 15.738572180271149,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 272.7593994140625,
+        "lengthM": 2494.713134765625,
+        "widthM": 70.65489959716797,
+        "lat": 50.013460367918015,
+        "lon": 15.738524347543716,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LKPR": {
+    "name": "Ruzyne",
+    "lat": 50.10083332657814,
+    "lon": 14.259999990463257,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 244.98130798339844,
+        "lengthM": 3715.464599609375,
+        "widthM": 43.24818420410156,
+        "lat": 50.10890409350395,
+        "lon": 14.249842464923859,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "30",
+        "headingTrueDeg": 307.0063171386719,
+        "lengthM": 3257.170166015625,
+        "widthM": 44.69612121582031,
+        "lat": 50.09925987571478,
+        "lon": 14.263478815555573,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LKTB": {
+    "name": "Turany",
+    "lat": 49.15138900279999,
+    "lon": 16.693888753652573,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 97.49044036865234,
+        "lengthM": 990.9342651367188,
+        "widthM": 32.67558288574219,
+        "lat": 49.15074560791254,
+        "lon": 16.69241487979889,
+        "identReciprocal": "26",
+        "surface": "grass"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 97.5319595336914,
+        "lengthM": 2648.87939453125,
+        "widthM": 59.62081527709961,
+        "lat": 49.151344411075115,
+        "lon": 16.693857461214066,
+        "identReciprocal": "27",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "LZIB": {
+    "name": "M.R. Stefanik",
+    "lat": 48.16999990493059,
+    "lon": 17.212777733802795,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 43.920902252197266,
+        "lengthM": 2915.61572265625,
+        "widthM": 55,
+        "lat": 48.17022118717432,
+        "lon": 17.21294939517975,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "31",
+        "headingTrueDeg": 313.9203186035156,
+        "lengthM": 3190.404296875,
+        "widthM": 43.12263488769531,
+        "lat": 48.1657774373889,
+        "lon": 17.219436764717102,
+        "identReciprocal": "13",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LZKZ": {
+    "name": "Kosice",
+    "lat": 48.66305563598871,
+    "lon": 21.241111010313034,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 13.010575294494629,
+        "lengthM": 3104.657958984375,
+        "widthM": 43.67670440673828,
+        "lat": 48.66307642310858,
+        "lon": 21.24118834733963,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LZPP": {
+    "name": "Piestany",
+    "lat": 48.62500011920929,
+    "lon": 17.828611135482788,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 13.610520362854004,
+        "lengthM": 1997.9923095703125,
+        "widthM": 28.091636657714844,
+        "lat": 48.625118136405945,
+        "lon": 17.828560173511505,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LZTT": {
+    "name": "Popradâ€“Tatry Airport",
+    "lat": 49.07361097633839,
+    "lon": 20.24111106991768,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7L",
+        "headingTrueDeg": 73.50587463378906,
+        "lengthM": 760,
+        "widthM": 36.902523040771484,
+        "lat": 49.070971347391605,
+        "lon": 20.240597873926163,
+        "identReciprocal": "25R",
+        "surface": "grass"
+      },
+      {
+        "ident": "7R",
+        "headingTrueDeg": 73.50587463378906,
+        "lengthM": 760,
+        "widthM": 36.902523040771484,
+        "lat": 49.07058443874121,
+        "lon": 20.240772664546967,
+        "identReciprocal": "25L",
+        "surface": "grass"
+      },
+      {
+        "ident": "27",
+        "headingTrueDeg": 274.199951171875,
+        "lengthM": 2600,
+        "widthM": 45,
+        "lat": 49.073614329099655,
+        "lon": 20.241088718175888,
+        "identReciprocal": "9",
+        "surface": "concrete"
+      }
+    ]
   }
 }

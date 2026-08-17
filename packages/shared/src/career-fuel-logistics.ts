@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 100;
+export const FUEL_TRUCK_FLEET_SIZE = 115;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 30 },
-  { truckClassId: 'semi_tanker', count: 45 },
-  { truckClassId: 'btrain_tanker', count: 25 },
+  { truckClassId: 'rigid_tanker', count: 34 },
+  { truckClassId: 'semi_tanker', count: 51 },
+  { truckClassId: 'btrain_tanker', count: 30 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -150,6 +150,12 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'FI-N': ['FI-S'],
   'AT-E': ['AT-W'],
   'AT-W': ['AT-E'],
+  // EU-3 Central-East + Baltics domestic road graphs
+  'PL-N': ['PL-C'],
+  'PL-C': ['PL-N', 'PL-S'],
+  'PL-S': ['PL-C'],
+  'CZ-W': ['CZ-E'],
+  'CZ-E': ['CZ-W'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -210,6 +216,16 @@ const TRUCK_NAME_POOL = [
   'Geneva Jet Road',
   'Vienna Tank Line',
   'Innsbruck Alpine Haul',
+  'Warsaw Chopin Fuel',
+  'Gdansk Harbor Tank',
+  'Krakow Tank Run',
+  'Prague Vaclav Fuel',
+  'Brno Industrial Haul',
+  'Bratislava Tank Line',
+  'Budapest Liszt Fuel',
+  'Tallinn Jet Road',
+  'Riga Port Tank',
+  'Vilnius Fuel Line',
 ] as const;
 
 function hashSeed(seed: string): number {

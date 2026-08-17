@@ -843,6 +843,26 @@ function regionLabel(region: string): string {
       return 'Austria — East';
     case 'AT-W':
       return 'Austria — West';
+    case 'PL-N':
+      return 'Poland — North';
+    case 'PL-C':
+      return 'Poland — Central';
+    case 'PL-S':
+      return 'Poland — South';
+    case 'CZ-W':
+      return 'Czechia — West';
+    case 'CZ-E':
+      return 'Czechia — East';
+    case 'SK-C':
+      return 'Slovakia';
+    case 'HU-C':
+      return 'Hungary';
+    case 'EE-C':
+      return 'Estonia';
+    case 'LV-C':
+      return 'Latvia';
+    case 'LT-C':
+      return 'Lithuania';
     default:
       return region;
   }

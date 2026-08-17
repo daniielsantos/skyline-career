@@ -26,18 +26,14 @@
 - **U.S. Virgin Islands:** region `US-VI` under US (TIST/TISX); domestic to KMIA + inter-island
 - BB/GD/MQ/CW/SX/AW: single-major catalogs where island is tiny
 
-## Europe seed (EU-1 … EU-7)
+## Europe seed (EU-1 … EU-8) — complete for countries with civil hubs
 
-- **EU-1:** PT / ES / FR / GB / DE / NL / BE / IT
-- **EU-2:** IE / DK / NO / SE / FI / CH / AT
-- **EU-3:** PL / CZ / SK / HU / EE / LV / LT
-- **EU-4 Balkans:** HR / SI / RO / BG / GR / RS
-- **EU-5 Iceland:** IS (BIKF / BIRK / BIAR / BIEG)
-- **EU-6 W. Balkans:** BA / ME / AL / MK
-- **EU-7 East:** TR / UA
-- World seed: **762** airports; **80** ports; fuel trucks **148**; **~133** regions
-- EU-7 ports: Istanbul / Izmir / Odesa
-- Next: fill gaps (BY/MD/GE/AM/AZ) or MENA / Asia
+- **EU-1…EU-7:** Western / Nordics / Baltics / Balkans / Iceland / TR / UA
+- **EU-8 gaps:** BY / MD / GE / AM / AZ / LU / MT / CY / XK
+- World seed: **779** airports; **84** ports; fuel trucks **158**; **~142** regions
+- EU-8 ports: Batumi / Baku / Marsaxlokk / Limassol
+- Microstates without civil hubs (AD/MC/SM/VA/LI) intentionally omitted
+- Next: MENA / Asia
 
 ## SimBrief cargo allowlist
 

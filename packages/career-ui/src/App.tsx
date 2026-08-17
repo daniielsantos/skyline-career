@@ -905,6 +905,24 @@ function regionLabel(region: string): string {
       return 'Ukraine — Central';
     case 'UA-E':
       return 'Ukraine — East';
+    case 'BY-C':
+      return 'Belarus';
+    case 'MD-C':
+      return 'Moldova';
+    case 'GE-C':
+      return 'Georgia';
+    case 'AM-C':
+      return 'Armenia';
+    case 'AZ-C':
+      return 'Azerbaijan';
+    case 'LU-C':
+      return 'Luxembourg';
+    case 'MT-C':
+      return 'Malta';
+    case 'CY-C':
+      return 'Cyprus';
+    case 'XK-C':
+      return 'Kosovo';
     default:
       return region;
   }

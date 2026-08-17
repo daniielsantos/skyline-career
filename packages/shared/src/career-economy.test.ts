@@ -84,7 +84,7 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 762);
+    assert.equal(world.airports.length, 779);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 119);
     const br = world.airports.filter(
@@ -302,6 +302,33 @@ describe('career-economy seed', () => {
     const ua = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'UA',
     );
+    const by = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'BY',
+    );
+    const md = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'MD',
+    );
+    const ge = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'GE',
+    );
+    const am = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'AM',
+    );
+    const az = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'AZ',
+    );
+    const lu = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'LU',
+    );
+    const mt = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'MT',
+    );
+    const cy = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'CY',
+    );
+    const xk = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'XK',
+    );
     assert.equal(br.length, 62);
     assert.equal(us.length, 123);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
@@ -395,14 +422,25 @@ describe('career-economy seed', () => {
     assert.equal(mk.length, 2);
     assert.equal(tr.length, 8);
     assert.equal(ua.length, 6);
+    assert.equal(by.length, 3);
+    assert.equal(md.length, 2);
+    assert.equal(ge.length, 3);
+    assert.equal(am.length, 2);
+    assert.equal(az.length, 2);
+    assert.equal(lu.length, 1);
+    assert.equal(mt.length, 1);
+    assert.equal(cy.length, 2);
+    assert.equal(xk.length, 1);
     assert.deepEqual(
       [...listWorldCountryIds(world)].sort(),
       [
         'AG',
         'AL',
+        'AM',
         'AR',
         'AT',
         'AW',
+        'AZ',
         'BA',
         'BB',
         'BE',
@@ -410,6 +448,7 @@ describe('career-economy seed', () => {
         'BO',
         'BR',
         'BS',
+        'BY',
         'BZ',
         'CA',
         'CH',
@@ -418,6 +457,7 @@ describe('career-economy seed', () => {
         'CR',
         'CU',
         'CW',
+        'CY',
         'CZ',
         'DE',
         'DK',
@@ -429,6 +469,7 @@ describe('career-economy seed', () => {
         'FR',
         'GB',
         'GD',
+        'GE',
         'GF',
         'GP',
         'GR',
@@ -444,10 +485,13 @@ describe('career-economy seed', () => {
         'JM',
         'LC',
         'LT',
+        'LU',
         'LV',
+        'MD',
         'ME',
         'MK',
         'MQ',
+        'MT',
         'MX',
         'NI',
         'NL',
@@ -471,6 +515,7 @@ describe('career-economy seed', () => {
         'US',
         'UY',
         'VE',
+        'XK',
       ],
     );
     const laSerena = world.airports.find((airport) => airport.icao === 'SCSE');
@@ -626,6 +671,15 @@ describe('career-economy seed', () => {
         'UA-W',
         'UA-C',
         'UA-E',
+        'BY-C',
+        'MD-C',
+        'GE-C',
+        'AM-C',
+        'AZ-C',
+        'LU-C',
+        'MT-C',
+        'CY-C',
+        'XK-C',
       ]),
     );
     assert.equal(world.tick, 0);
@@ -2130,7 +2184,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 38);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 762);
+    assert.equal(migrated.airports.length, 779);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));

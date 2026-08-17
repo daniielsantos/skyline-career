@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 148;
+export const FUEL_TRUCK_FLEET_SIZE = 158;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 43 },
-  { truckClassId: 'semi_tanker', count: 66 },
-  { truckClassId: 'btrain_tanker', count: 39 },
+  { truckClassId: 'rigid_tanker', count: 46 },
+  { truckClassId: 'semi_tanker', count: 70 },
+  { truckClassId: 'btrain_tanker', count: 42 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -263,6 +263,15 @@ const TRUCK_NAME_POOL = [
   'Kyiv Boryspil Tank',
   'Lviv Fuel Road',
   'Odesa Harbor Tank',
+  'Minsk Tank Run',
+  'Chisinau Fuel Road',
+  'Tbilisi Jet Haul',
+  'Yerevan Tank Line',
+  'Baku Caspian Fuel',
+  'Luxembourg Cargo Tank',
+  'Malta Island Fuel',
+  'Larnaca Jet Road',
+  'Pristina Tank Run',
 ] as const;
 
 function hashSeed(seed: string): number {

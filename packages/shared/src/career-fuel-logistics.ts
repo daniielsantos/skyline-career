@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 285;
+export const FUEL_TRUCK_FLEET_SIZE = 295;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 80 },
-  { truckClassId: 'semi_tanker', count: 127 },
-  { truckClassId: 'btrain_tanker', count: 78 },
+  { truckClassId: 'rigid_tanker', count: 83 },
+  { truckClassId: 'semi_tanker', count: 131 },
+  { truckClassId: 'btrain_tanker', count: 81 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -227,6 +227,9 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'IN-W': ['IN-N', 'IN-S'],
   'IN-S': ['IN-W', 'IN-E'],
   'IN-E': ['IN-N', 'IN-S'],
+  // Asia-4 Sri Lanka domestic road graph
+  'LK-W': ['LK-E'],
+  'LK-E': ['LK-W'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -393,6 +396,10 @@ const TRUCK_NAME_POOL = [
   'Cochin Jet Haul',
   'Kolkata Hooghly Tank',
   'Guwahati Fuel Run',
+  'Colombo Bandaranaike Tank',
+  'Ratmalana Fuel Road',
+  'Mattala Tank Line',
+  'Jaffna Fuel Run',
 ] as const;
 
 function hashSeed(seed: string): number {

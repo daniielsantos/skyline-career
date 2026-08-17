@@ -512,6 +512,11 @@ import {
   IN_CAREER_HUBS,
   buildInFeederCorridors,
 } from './career-in-hubs.js';
+import {
+  assertLkCareerHubCatalog,
+  LK_CAREER_HUBS,
+  buildLkFeederCorridors,
+} from './career-lk-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1056,6 +1061,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(YE_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(PK_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(IN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(LK_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1558,6 +1564,11 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'VECC', b: 'VEPT', weight: 1.5 },
   { a: 'VECC', b: 'VIDP', weight: 1.8 },
   { a: 'VOMM', b: 'VECC', weight: 1.7 },
+  // Asia-4 Sri Lanka domestic trunks
+  { a: 'VCBI', b: 'VCCC', weight: 1.8 },
+  { a: 'VCBI', b: 'VCRI', weight: 1.7 },
+  { a: 'VCBI', b: 'VCCJ', weight: 1.6 },
+  { a: 'VCRI', b: 'VCCJ', weight: 1.4 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1669,6 +1680,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildYeFeederCorridors(YE_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildPkFeederCorridors(PK_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildInFeederCorridors(IN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildLkFeederCorridors(LK_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4180,6 +4192,39 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'OMDB',
     capacityKgPerDay: 40_000,
   },
+  // Asia-4 Sri Lanka
+  {
+    id: 'lane_vcbi_vomm',
+    originCountryId: 'LK',
+    destCountryId: 'IN',
+    originIcao: 'VCBI',
+    destIcao: 'VOMM',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_vcbi_voci',
+    originCountryId: 'LK',
+    destCountryId: 'IN',
+    originIcao: 'VCBI',
+    destIcao: 'VOCI',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_vcbi_vabb',
+    originCountryId: 'LK',
+    destCountryId: 'IN',
+    originIcao: 'VCBI',
+    destIcao: 'VABB',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_vcbi_omdb',
+    originCountryId: 'LK',
+    destCountryId: 'AE',
+    originIcao: 'VCBI',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 40_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -4595,6 +4640,9 @@ export const FUEL_HUB_ICAOS = new Set([
   'VOBL',
   'VOMM',
   'VECC',
+  // Asia-4 Sri Lanka
+  'VCBI',
+  'VCRI',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -5465,6 +5513,12 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    LK_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -5879,6 +5933,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertYeCareerHubCatalog();
   assertPkCareerHubCatalog();
   assertInCareerHubCatalog();
+  assertLkCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -6814,6 +6869,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...IN_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...LK_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

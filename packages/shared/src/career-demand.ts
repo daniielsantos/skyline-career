@@ -268,6 +268,11 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['IN', 'AE'],
     ['IN', 'OM'],
     ['IN', 'SA'],
+    // Asia-4 Sri Lanka (do not backfill remaining EU-2+ pairs here)
+    ['LK', 'IN'],
+    ['LK', 'AE'],
+    ['LK', 'OM'],
+    ['LK', 'SA'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

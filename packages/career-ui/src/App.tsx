@@ -1017,6 +1017,10 @@ function regionLabel(region: string): string {
       return 'India — South / Bengaluru';
     case 'IN-E':
       return 'India — East / Kolkata';
+    case 'LK-W':
+      return 'Sri Lanka — West / Colombo';
+    case 'LK-E':
+      return 'Sri Lanka — East / Hambantota';
     default:
       return region;
   }

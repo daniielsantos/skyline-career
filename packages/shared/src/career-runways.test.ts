@@ -27,7 +27,7 @@ const SAMPLE: CareerRunway = {
 describe('career-runways catalog', () => {
   it('covers every network career hub with at least one runway', () => {
     const missing = listHubsMissingRunways();
-    for (const icao of ['GMMN', 'HEBA', 'LLER', 'DAAG', 'DTTA', 'SBGR', 'OEJN', 'OMDB', 'OTHH', 'OKKK', 'OETF', 'ORBI', 'ORMM', 'OIIE', 'OJAI', 'OLBA', 'OSDI', 'HLLM', 'HSSK', 'OYSN', 'OYAA', 'OPIS', 'OPKC', 'VIDP', 'VABB', 'VOBL', 'VOMM', 'VECC'] as const) {
+    for (const icao of ['GMMN', 'HEBA', 'LLER', 'DAAG', 'DTTA', 'SBGR', 'OEJN', 'OMDB', 'OTHH', 'OKKK', 'OETF', 'ORBI', 'ORMM', 'OIIE', 'OJAI', 'OLBA', 'OSDI', 'HLLM', 'HSSK', 'OYSN', 'OYAA', 'OPIS', 'OPKC', 'VIDP', 'VABB', 'VOBL', 'VOMM', 'VECC', 'VCBI', 'VCRI'] as const) {
       assert.ok(getAirportRunways(icao).length >= 1, `${icao} needs runways`);
       assert.equal(missing.includes(icao), false, `${icao} should not be missing`);
     }

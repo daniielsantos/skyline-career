@@ -102,7 +102,14 @@
 - Ports: Chennai → VOMM; Kolkata → VECC (Hooghly river→sea)
 - World seed: **880** airports; **110** ports; fuel trucks **285**; **+2** India south/east regions
 - Remaps: `VOBG→VOBL`, `VOHY→VOHS`
-- Next: Central Asia or Sri Lanka
+
+## Asia-4 Sri Lanka
+
+- Countries: LK (Central Asia deferred)
+- ICAO traps: Colombo intl **VCBI** Bandaranaike (not **VCCC** Ratmalana as major); Mattala **VCRI**
+- Ports: Colombo → VCBI
+- World seed: **884** airports; **111** ports; fuel trucks **295**; **+2** Sri Lanka regions
+- Next: Central Asia
 
 ## SimBrief cargo allowlist
 

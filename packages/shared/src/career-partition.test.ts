@@ -96,6 +96,7 @@ describe('career partition', () => {
       'KW',
       'LB',
       'LC',
+      'LK',
       'LT',
       'LU',
       'LV',

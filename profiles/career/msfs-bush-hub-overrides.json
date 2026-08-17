@@ -13092,5 +13092,81 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "VCBI": {
+    "name": "Bandaranaike Intl Colombo",
+    "lat": 7.1801890432834625,
+    "lon": 79.88529995083809,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "22",
+        "headingTrueDeg": 217.22390747070312,
+        "lengthM": 3345.27392578125,
+        "widthM": 43.28157043457031,
+        "lat": 7.181162014603615,
+        "lon": 79.8838721215725,
+        "identReciprocal": "4",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VCCC": {
+    "name": "Colombo",
+    "lat": 6.823055595159531,
+    "lon": 79.88499999046326,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "22",
+        "headingTrueDeg": 212.13473510742188,
+        "lengthM": 1772.5147705078125,
+        "widthM": 28.883758544921875,
+        "lat": 6.821724884212017,
+        "lon": 79.88600894808769,
+        "identReciprocal": "4",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VCCJ": {
+    "name": "Jaffna AB",
+    "lat": 9.791896864771843,
+    "lon": 80.07187932729721,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 225.67138671875,
+        "lengthM": 2286.172607421875,
+        "widthM": 35,
+        "lat": 9.792344123125076,
+        "lon": 80.07006391882896,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VCRI": {
+    "name": "Mattala Rajapaksa Intl",
+    "lat": 6.2844666838645935,
+    "lon": 81.124127805233,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 225.87635803222656,
+        "lengthM": 3498.390869140625,
+        "widthM": 58.45606231689453,
+        "lat": 6.284503899514675,
+        "lon": 81.12414255738258,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

@@ -28,7 +28,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **MENA-6 Yemen** no seed: YE — **858** airports; **106** ports; fuel trucks **255**. ICAO: OYSN, OYAA.
 - **Asia-1 Pakistan** no seed: PK — **864** airports; **107** ports; fuel trucks **265**. ICAO: OPIS (not OPRN), OPKC.
 - **Asia-2 India west** no seed: IN — **872** airports; **108** ports; fuel trucks **275**. ICAO: VIDP (not VIDD), VABB, VOGO (not VOGA).
-- **Asia-3 India south/east** no seed: IN — **880** airports; **110** ports; fuel trucks **285**. ICAO: VOBL (not VOBG), VOMM, VOHS (not VOHY), VECC. Next slice: Central Asia or Sri Lanka.
+- **Asia-3 India south/east** no seed: IN — **880** airports; **110** ports; fuel trucks **285**. ICAO: VOBL (not VOBG), VOMM, VOHS (not VOHY), VECC.
+- **Asia-4 Sri Lanka** no seed: LK — **884** airports; **111** ports; fuel trucks **295**. ICAO: VCBI (not VCCC-as-major), VCRI. Next slice: Central Asia.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).

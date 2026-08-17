@@ -563,6 +563,46 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 14.27,
     pickupHubs: ['LIRN'],
   },
+  {
+    id: 'IEDUB',
+    name: 'Port of Dublin',
+    countryId: 'IE',
+    lat: 53.35,
+    lon: -6.2,
+    pickupHubs: ['EIDW'],
+  },
+  {
+    id: 'DKCPH',
+    name: 'Port of Copenhagen',
+    countryId: 'DK',
+    lat: 55.7,
+    lon: 12.6,
+    pickupHubs: ['EKCH'],
+  },
+  {
+    id: 'NOOSL',
+    name: 'Port of Oslo',
+    countryId: 'NO',
+    lat: 59.9,
+    lon: 10.75,
+    pickupHubs: ['ENGM'],
+  },
+  {
+    id: 'SEGOT',
+    name: 'Port of Gothenburg',
+    countryId: 'SE',
+    lat: 57.7,
+    lon: 11.95,
+    pickupHubs: ['ESGG'],
+  },
+  {
+    id: 'FIHEL',
+    name: 'Port of Helsinki',
+    countryId: 'FI',
+    lat: 60.15,
+    lon: 24.95,
+    pickupHubs: ['EFHK'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

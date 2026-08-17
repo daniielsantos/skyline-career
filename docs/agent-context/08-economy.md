@@ -12,7 +12,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **América do Sul completa** no seed: BR/AR/CL + UY/PY/PE/BO/EC/CO/VE/GY/SR/GF.
 - **América Central completa** no seed: PA/CR/NI/HN/GT/SV/BZ.
 - **Caribe (intl-first)** no seed: CU/DO/HT/JM/BS/TT/BB/LC/GD/AG + dependências GP/MQ/CW/**SX/AW**; **Puerto Rico = US-PR**, **USVI = US-VI** (país US).
-- **EU-1 Western core** no seed: PT/ES/FR/GB/DE/NL/BE/IT — **629** airports; **61** ports; fuel trucks **85**.
+- **EU-1 Western core** no seed: PT/ES/FR/GB/DE/NL/BE/IT.
+- **EU-2 Nordics + Alps + IE** no seed: IE/DK/NO/SE/FI/CH/AT — **672** airports; **66** ports; fuel trucks **100**.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — usam **bush trips**.

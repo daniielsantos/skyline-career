@@ -133,7 +133,7 @@ describe('career ports', () => {
 
   it('catalogs Americas ocean-access ports with pickup hubs', () => {
     const ports = listCareerPorts();
-    assert.equal(ports.length, 61);
+    assert.equal(ports.length, 66);
     const expect: Array<{
       id: string;
       hub: string;
@@ -199,6 +199,11 @@ describe('career ports', () => {
       { id: 'NLRTM', hub: 'EHRD' },
       { id: 'BEANR', hub: 'EBAW' },
       { id: 'ITNAP', hub: 'LIRN' },
+      { id: 'IEDUB', hub: 'EIDW' },
+      { id: 'DKCPH', hub: 'EKCH' },
+      { id: 'NOOSL', hub: 'ENGM' },
+      { id: 'SEGOT', hub: 'ESGG' },
+      { id: 'FIHEL', hub: 'EFHK' },
     ];
     for (const row of expect) {
       const port = getCareerPort(row.id);

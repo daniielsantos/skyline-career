@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 85;
+export const FUEL_TRUCK_FLEET_SIZE = 100;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 25 },
-  { truckClassId: 'semi_tanker', count: 40 },
-  { truckClassId: 'btrain_tanker', count: 20 },
+  { truckClassId: 'rigid_tanker', count: 30 },
+  { truckClassId: 'semi_tanker', count: 45 },
+  { truckClassId: 'btrain_tanker', count: 25 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -137,6 +137,19 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'IT-N': ['IT-C'],
   'IT-C': ['IT-N', 'IT-S'],
   'IT-S': ['IT-C'],
+  // EU-2 Nordics + Alps + IE domestic road graphs
+  'IE-E': ['IE-W'],
+  'IE-W': ['IE-E'],
+  'DK-E': ['DK-W'],
+  'DK-W': ['DK-E'],
+  'NO-S': ['NO-N'],
+  'NO-N': ['NO-S'],
+  'SE-S': ['SE-N'],
+  'SE-N': ['SE-S'],
+  'FI-S': ['FI-N'],
+  'FI-N': ['FI-S'],
+  'AT-E': ['AT-W'],
+  'AT-W': ['AT-E'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -184,6 +197,19 @@ const TRUCK_NAME_POOL = [
   'Brussels Tank Run',
   'Rome Fiumicino Fuel',
   'Milan Malpensa Haul',
+  'Dublin Jet Road',
+  'Shannon Tank Run',
+  'Copenhagen Fuel Line',
+  'Billund Tank Haul',
+  'Oslo Gardermoen Fuel',
+  'Bergen Fjord Tank',
+  'Stockholm Arlanda Haul',
+  'Gothenburg Port Fuel',
+  'Helsinki Vantaa Tank',
+  'Zurich Alpine Fuel',
+  'Geneva Jet Road',
+  'Vienna Tank Line',
+  'Innsbruck Alpine Haul',
 ] as const;
 
 function hashSeed(seed: string): number {

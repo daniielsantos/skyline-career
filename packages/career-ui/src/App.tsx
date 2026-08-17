@@ -817,6 +817,32 @@ function regionLabel(region: string): string {
       return 'Italy — Central';
     case 'IT-S':
       return 'Italy — South';
+    case 'IE-E':
+      return 'Ireland — East';
+    case 'IE-W':
+      return 'Ireland — West';
+    case 'DK-E':
+      return 'Denmark — East';
+    case 'DK-W':
+      return 'Denmark — West';
+    case 'NO-S':
+      return 'Norway — South';
+    case 'NO-N':
+      return 'Norway — North';
+    case 'SE-S':
+      return 'Sweden — South';
+    case 'SE-N':
+      return 'Sweden — North';
+    case 'FI-S':
+      return 'Finland — South';
+    case 'FI-N':
+      return 'Finland — North';
+    case 'CH-C':
+      return 'Switzerland';
+    case 'AT-E':
+      return 'Austria — East';
+    case 'AT-W':
+      return 'Austria — West';
     default:
       return region;
   }

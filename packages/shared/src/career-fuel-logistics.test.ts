@@ -27,15 +27,15 @@ describe('fuel truck logistics', () => {
     );
     assert.equal(
       world.fuelTrucks!.filter((t) => t.truckClassId === 'rigid_tanker').length,
-      60,
+      64,
     );
     assert.equal(
       world.fuelTrucks!.filter((t) => t.truckClassId === 'semi_tanker').length,
-      97,
+      104,
     );
     assert.equal(
       world.fuelTrucks!.filter((t) => t.truckClassId === 'btrain_tanker').length,
-      58,
+      62,
     );
   });
 

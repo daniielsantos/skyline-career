@@ -12161,5 +12161,188 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "OJAI": {
+    "name": "Queen Alia Intl",
+    "lat": 31.724127866327763,
+    "lon": 35.99462226033211,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "26L",
+        "headingTrueDeg": 260.3822021484375,
+        "lengthM": 3658.908447265625,
+        "widthM": 60.62639236450195,
+        "lat": 31.71716082841158,
+        "lon": 35.99951237440109,
+        "identReciprocal": "8R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "26R",
+        "headingTrueDeg": 260.3523864746094,
+        "lengthM": 3663.624755859375,
+        "widthM": 61.547691345214844,
+        "lat": 31.72951675951481,
+        "lon": 35.98851755261421,
+        "identReciprocal": "8L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OJAM": {
+    "name": "Marka Intl",
+    "lat": 31.97270292788744,
+    "lon": 35.99157214164734,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 244.04859924316406,
+        "lengthM": 3598.3486328125,
+        "widthM": 44.1151237487793,
+        "lat": 31.972477287054062,
+        "lon": 35.99092572927475,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OJAQ": {
+    "name": "King Hussein Intl",
+    "lat": 29.611619375646114,
+    "lon": 35.01806661486626,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 16.92169761657715,
+        "lengthM": 3002.4990234375,
+        "widthM": 45.7392463684082,
+        "lat": 29.61098436266184,
+        "lon": 35.017845779657364,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OLBA": {
+    "name": "Beirut Intl",
+    "lat": 33.81905011832714,
+    "lon": 35.490030348300934,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 166.98098754882812,
+        "lengthM": 3393.599853515625,
+        "widthM": 44.173770904541016,
+        "lat": 33.82513638585806,
+        "lon": 35.48304498195648,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 176.9257354736328,
+        "lengthM": 3220.024169921875,
+        "widthM": 43.72962188720703,
+        "lat": 33.82376443594694,
+        "lon": 35.48792213201523,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "21",
+        "headingTrueDeg": 212.88035583496094,
+        "lengthM": 3809.943115234375,
+        "widthM": 43.13764190673828,
+        "lat": 33.812532015144825,
+        "lon": 35.49198970198631,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OSAP": {
+    "name": "Aleppo Intl",
+    "lat": 36.1804860457778,
+    "lon": 37.226755768060684,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9R",
+        "headingTrueDeg": 96.71038818359375,
+        "lengthM": 2908.49365234375,
+        "widthM": 43.90011978149414,
+        "lat": 36.18065033107996,
+        "lon": 37.22430422902107,
+        "identReciprocal": "27L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OSDI": {
+    "name": "Damascus Intl",
+    "lat": 33.410833328962326,
+    "lon": 36.513333320617676,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23L",
+        "headingTrueDeg": 228.4210662841797,
+        "lengthM": 3591.935302734375,
+        "widthM": 39.424922943115234,
+        "lat": 33.395592011511326,
+        "lon": 36.510342210531235,
+        "identReciprocal": "5R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23R",
+        "headingTrueDeg": 228.39039611816406,
+        "lengthM": 3585.212646484375,
+        "widthM": 38.92495346069336,
+        "lat": 33.42558246105909,
+        "lon": 36.518315076828,
+        "identReciprocal": "5L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OSLK": {
+    "name": "Bassel Al-Assad International Ai",
+    "lat": 35.40242448449135,
+    "lon": 35.94989284873009,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "17L",
+        "headingTrueDeg": 176.59535217285156,
+        "lengthM": 2872.48681640625,
+        "widthM": 59.70491027832031,
+        "lat": 35.40103040635586,
+        "lon": 35.950535237789154,
+        "identReciprocal": "35R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17R",
+        "headingTrueDeg": 176.5768280029297,
+        "lengthM": 2998.7099609375,
+        "widthM": 44.672889709472656,
+        "lat": 35.401688888669014,
+        "lon": 35.94834789633751,
+        "identReciprocal": "35L",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

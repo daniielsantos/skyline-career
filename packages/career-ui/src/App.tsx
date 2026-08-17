@@ -983,6 +983,16 @@ function regionLabel(region: string): string {
       return 'Iran — Central / Tehran';
     case 'IR-S':
       return 'Iran — South / Gulf';
+    case 'JO-C':
+      return 'Jordan — Central / Amman';
+    case 'JO-S':
+      return 'Jordan — South / Aqaba';
+    case 'LB-C':
+      return 'Lebanon — Beirut';
+    case 'SY-S':
+      return 'Syria — South / Damascus';
+    case 'SY-N':
+      return 'Syria — North / Coast';
     default:
       return region;
   }

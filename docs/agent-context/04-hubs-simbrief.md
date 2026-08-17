@@ -57,7 +57,14 @@
 - Ports: Um Qasr / Basra → ORMM; Bandar Abbas → OIKB
 - World seed: **841** airports; **99** ports; fuel trucks **215**; **+6** North Gulf regions
 - Remaps: `OIBA→OIKB`
-- Next: Levant-east and/or LY-SD
+
+## MENA-4 Levant-east
+
+- Countries: JO / LB / SY (LY/SD, YE deferred)
+- ICAO traps: Amman intl **OJAI** (Marka **OJAM** spoke); Beirut **OLBA**; Damascus **OSDI**
+- Ports: Aqaba → OJAQ; Beirut → OLBA; Latakia → OSLK
+- World seed: **848** airports; **102** ports; fuel trucks **230**; **+5** Levant regions
+- Next: LY-SD
 
 ## SimBrief cargo allowlist
 

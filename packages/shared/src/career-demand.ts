@@ -232,6 +232,19 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['IR', 'QA'],
     ['IR', 'OM'],
     ['IR', 'TR'],
+    // MENA-4 Levant-east (do not backfill remaining EU-2+ pairs here)
+    ['JO', 'IL'],
+    ['JO', 'SA'],
+    ['JO', 'IQ'],
+    ['JO', 'TR'],
+    ['JO', 'EG'],
+    ['LB', 'IL'],
+    ['LB', 'TR'],
+    ['LB', 'CY'],
+    ['LB', 'EG'],
+    ['SY', 'TR'],
+    ['SY', 'IQ'],
+    ['SY', 'JO'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

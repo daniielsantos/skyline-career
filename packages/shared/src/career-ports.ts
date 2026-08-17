@@ -884,6 +884,30 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 56.27,
     pickupHubs: ['OIKB'],
   },
+  {
+    id: 'JOAQB',
+    name: 'Aqaba',
+    countryId: 'JO',
+    lat: 29.52,
+    lon: 35.0,
+    pickupHubs: ['OJAQ'],
+  },
+  {
+    id: 'LBBEY',
+    name: 'Beirut',
+    countryId: 'LB',
+    lat: 33.9,
+    lon: 35.52,
+    pickupHubs: ['OLBA'],
+  },
+  {
+    id: 'SYLTK',
+    name: 'Latakia',
+    countryId: 'SY',
+    lat: 35.52,
+    lon: 35.78,
+    pickupHubs: ['OSLK'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

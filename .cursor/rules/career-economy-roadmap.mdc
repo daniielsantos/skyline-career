@@ -74,6 +74,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Asia-14 Taiwan / Australia / New Zealand:** TW/AU/NZ curated hubs (Taoyuan **RCTP**, Songshan **RCSS**, Kaohsiung **RCKH**, Sydney **YSSY**, Canberra **YSCB**, Melbourne **YMML**, Adelaide **YPAD**, Brisbane **YBBN**, Cairns **YBCS**, Perth **YPPH**, Auckland **NZAA**, Christchurch **NZCH**); Keelung + Kaohsiung + Sydney + Melbourne + Brisbane + Fremantle + Auckland ports; fuel trucks **565**; seed **974** airports / **141** ports. Sparse CN/JP/SG/ID bridges.
 - **Asia-15 China inland / Pacific hinge:** CN inland (Xianyang **ZLXY**, Kunming **ZPPP**, Dalian **ZYTL**, Chongqing **ZUCK**, Wuhan **ZHHH**, Xiamen **ZSAM**) + Honolulu **PHNL** (US-HI) + Nadi **NFFN** + Port Moresby **AYPY** + Nouméa **NWWW**; Dalian + Xiamen + Honolulu + Nadi + Moresby + Nouméa ports; fuel trucks **585**; seed **984** airports / **147** ports. Remap ZLSN→ZLXY. Sparse TW/KR/VN/JP/AU/NZ bridges.
 - **Asia-16 Guam / Polynesia / Micronesia:** Guam **PGUM** (US-GU), Papeete **NTAA**, Palau **PTRO**, Pago Pago **NSTU** (US-AS), Faleolo **NSFA**, Fua'amotu **NFTF**; Guam + Papeete + Koror + Pago Pago + Apia + Nuku'alofa ports; fuel trucks **615**; seed **990** airports / **153** ports. Sparse JP/PH/NZ/US bridges.
+- **Asia-17 Vanuatu / Solomon / Cook / Kiribati:** Port Vila **NVVV**, Honiara **AGGH**, Rarotonga **NCRG**, Tarawa **NGTA**; Port Vila + Honiara + Rarotonga + Tarawa ports; fuel trucks **635**; seed **994** airports / **157** ports. Solomon ISO **SB** (not Brazil **BR**). Sparse AU/NZ/NC/FJ bridges. **Map seed complete.**
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
@@ -128,8 +129,9 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 37. ~~**Asia-14 Taiwan / Australia / New Zealand**~~ — TW/AU/NZ.
 38. ~~**Asia-15 China inland / Pacific hinge**~~ — CN inland + US-HI/FJ/PG/NC.
 39. ~~**Asia-16 Guam / Polynesia / Micronesia**~~ — US-GU/US-AS + PF/PW/WS/TO.
-40. Next map slice: leftover Pacific (Vanuatu / Solomon / Cook), or stop map.
-41. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+40. ~~**Asia-17 Vanuatu / Solomon / Cook / Kiribati**~~ — VU/SB/CK/KI.
+41. **Map seed complete** — optional micro-slices (Saipan PGSN, Cassidy PLCH) only if desired.
+42. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

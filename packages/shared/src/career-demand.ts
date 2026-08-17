@@ -354,6 +354,14 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['WS', 'NZ'],
     ['TO', 'NZ'],
     ['US', 'WS'],
+    // Asia-17 leftover Pacific (do not backfill remaining EU-2+ pairs here)
+    ['VU', 'AU'],
+    ['VU', 'NC'],
+    ['SB', 'AU'],
+    ['SB', 'PG'],
+    ['CK', 'NZ'],
+    ['CK', 'PF'],
+    ['KI', 'FJ'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

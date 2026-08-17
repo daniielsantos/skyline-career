@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 615;
+export const FUEL_TRUCK_FLEET_SIZE = 635;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 172 },
-  { truckClassId: 'semi_tanker', count: 272 },
-  { truckClassId: 'btrain_tanker', count: 171 },
+  { truckClassId: 'rigid_tanker', count: 178 },
+  { truckClassId: 'semi_tanker', count: 281 },
+  { truckClassId: 'btrain_tanker', count: 176 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -305,6 +305,10 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'PW-C': [],
   'WS-U': [],
   'TO-T': [],
+  'VU-C': [],
+  'SB-G': [],
+  'CK-C': [],
+  'KI-T': [],
 };
 
 const TRUCK_NAME_POOL = [
@@ -568,6 +572,10 @@ const TRUCK_NAME_POOL = [
   'Koror Fuel Road',
   'Faleolo Tank Line',
   "Fua'amotu Fuel",
+  'Bauerfield Tank Line',
+  'Honiara Fuel Run',
+  'Rarotonga Tank Line',
+  'Bonriki Fuel',
 ] as const;
 
 function hashSeed(seed: string): number {

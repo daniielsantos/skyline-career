@@ -72,10 +72,11 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 39. ~~**Asia-14 Taiwan / Australia / New Zealand**~~ — TW/AU/NZ; seed **974**; ports **141**; fuel trucks **565**. ICAO: RCTP (not RCSS-as-major)/YSSY (not YSBK)/YMML (not YMEN)/NZAA (not NZWN). Homolog after rebuild.
 40. ~~**Asia-15 China inland / Pacific hinge**~~ — CN inland + US-HI/FJ/PG/NC; seed **984**; ports **147**; fuel trucks **585**. ICAO: ZLXY (not ZLSN)/ZPPP/ZYTL/PHNL/NFFN/AYPY/NWWW (not NWWM). Homolog after rebuild.
 41. ~~**Asia-16 Guam / Polynesia / Micronesia**~~ — US-GU/US-AS + PF/PW/WS/TO; seed **990**; ports **153**; fuel trucks **615**. ICAO: PGUM (not PGUA)/NTAA/PTRO/NSTU/NSFA/NFTF (not NFTV). Homolog after rebuild.
-42. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-43. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
-44. Next map slice: leftover Pacific (Vanuatu / Solomon / Cook), or stop map.
-45. Re-run `npm run career-hubs -- missing` após rebuild shared.
+42. ~~**Asia-17 Vanuatu / Solomon / Cook / Kiribati**~~ — VU/SB/CK/KI; seed **994**; ports **157**; fuel trucks **635**. ICAO: NVVV (not NVSS)/AGGH (not AGGM)/NCRG (not NCAI)/NGTA (not PLCH). Homolog after rebuild.
+43. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
+44. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+45. **Map seed complete** — optional micro-slices (Saipan PGSN, Cassidy PLCH) only if desired.
+46. Re-run `npm run career-hubs -- missing` após rebuild shared.
 
 ## Feito (shipped 0.3.47)
 

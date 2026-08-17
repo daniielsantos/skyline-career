@@ -1182,6 +1182,14 @@ function regionLabel(region: string): string {
       return 'Samoa — Upolu';
     case 'TO-T':
       return 'Tonga — Tongatapu';
+    case 'VU-C':
+      return 'Vanuatu — Port Vila';
+    case 'SB-G':
+      return 'Solomon Islands — Guadalcanal';
+    case 'CK-C':
+      return 'Cook Islands — Rarotonga';
+    case 'KI-T':
+      return 'Kiribati — Tarawa';
     default:
       return region;
   }

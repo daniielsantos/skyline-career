@@ -209,7 +209,16 @@
 - ICAO traps: Guam **PGUM** Won Pat (not **PGUA** Andersen); Papeete **NTAA** Faa'a (not NTTB Bora Bora); Palau **PTRO**; Pago Pago **NSTU**; Apia **NSFA** Faleolo (not NSAU); Tonga **NFTF** Fua'amotu (not NFTV Vava'u)
 - Ports: Guam → PGUM; Papeete → NTAA; Koror → PTRO; Pago Pago → NSTU; Apia → NSFA; Nuku'alofa → NFTF
 - World seed: **990** airports; **153** ports; fuel trucks **615**; **+6** Pacific regions
-- Next: leftover Pacific (Vanuatu / Solomon / Cook), or stop map
+- Next: ~~leftover Pacific (Vanuatu / Solomon / Cook)~~ → Asia-17
+
+## Asia-17 Vanuatu / Solomon / Cook / Kiribati
+
+- Countries: VU / SB / CK / KI (Solomon Islands ISO **SB**, not Brazil **BR**)
+- ICAO traps: Port Vila **NVVV** Bauerfield (not NVSS Santo); Honiara **AGGH** (not AGGM Munda); Rarotonga **NCRG** (not NCAI Aitutaki); Tarawa **NGTA** Bonriki (not PLCH Cassidy / NGTU)
+- Ports: Port Vila → NVVV; Honiara → AGGH; Rarotonga → NCRG; Tarawa → NGTA
+- World seed: **994** airports; **157** ports; fuel trucks **635**; **+4** Pacific regions
+- Intl lanes: NVVV–YSSY/NWWW; AGGH–YSSY/AYPY; NCRG–NZAA/NTAA; NGTA–NFFN
+- Map seed **complete** — optional micro-slices only (Saipan PGSN, Cassidy PLCH, etc.)
 
 ## SimBrief cargo allowlist
 

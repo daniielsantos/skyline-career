@@ -662,6 +662,26 @@ import {
   TO_CAREER_HUBS,
   buildToFeederCorridors,
 } from './career-to-hubs.js';
+import {
+  assertVuCareerHubCatalog,
+  VU_CAREER_HUBS,
+  buildVuFeederCorridors,
+} from './career-vu-hubs.js';
+import {
+  assertSbCareerHubCatalog,
+  SB_CAREER_HUBS,
+  buildSbFeederCorridors,
+} from './career-sb-hubs.js';
+import {
+  assertCkCareerHubCatalog,
+  CK_CAREER_HUBS,
+  buildCkFeederCorridors,
+} from './career-ck-hubs.js';
+import {
+  assertKiCareerHubCatalog,
+  KI_CAREER_HUBS,
+  buildKiFeederCorridors,
+} from './career-ki-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertUsHiCareerHubCatalog } from './career-us-hi-hubs.js';
@@ -1239,6 +1259,10 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(PW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(WS_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(TO_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(VU_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(SB_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(CK_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(KI_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1987,6 +2011,10 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildPwFeederCorridors(PW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildWsFeederCorridors(WS_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildToFeederCorridors(TO_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildVuFeederCorridors(VU_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildSbFeederCorridors(SB_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildCkFeederCorridors(CK_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildKiFeederCorridors(KI_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -5207,6 +5235,63 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'NSFA',
     capacityKgPerDay: 25_000,
   },
+  // Asia-17 leftover Pacific
+  {
+    id: 'lane_nvvv_yssy',
+    originCountryId: 'VU',
+    destCountryId: 'AU',
+    originIcao: 'NVVV',
+    destIcao: 'YSSY',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_nvvv_nwww',
+    originCountryId: 'VU',
+    destCountryId: 'NC',
+    originIcao: 'NVVV',
+    destIcao: 'NWWW',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_aggh_yssy',
+    originCountryId: 'SB',
+    destCountryId: 'AU',
+    originIcao: 'AGGH',
+    destIcao: 'YSSY',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_aggh_aypy',
+    originCountryId: 'SB',
+    destCountryId: 'PG',
+    originIcao: 'AGGH',
+    destIcao: 'AYPY',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_ncrg_nzaa',
+    originCountryId: 'CK',
+    destCountryId: 'NZ',
+    originIcao: 'NCRG',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_ncrg_ntaa',
+    originCountryId: 'CK',
+    destCountryId: 'PF',
+    originIcao: 'NCRG',
+    destIcao: 'NTAA',
+    capacityKgPerDay: 25_000,
+  },
+  {
+    id: 'lane_ngta_nffn',
+    originCountryId: 'KI',
+    destCountryId: 'FJ',
+    originIcao: 'NGTA',
+    destIcao: 'NFFN',
+    capacityKgPerDay: 25_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -5702,6 +5787,11 @@ export const FUEL_HUB_ICAOS = new Set([
   'NSTU',
   'NSFA',
   'NFTF',
+  // Asia-17 leftover Pacific
+  'NVVV',
+  'AGGH',
+  'NCRG',
+  'NGTA',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -6752,6 +6842,30 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    VU_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    SB_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    CK_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    KI_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -7199,6 +7313,10 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertPwCareerHubCatalog();
   assertWsCareerHubCatalog();
   assertToCareerHubCatalog();
+  assertVuCareerHubCatalog();
+  assertSbCareerHubCatalog();
+  assertCkCareerHubCatalog();
+  assertKiCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -8404,6 +8522,42 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...TO_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...VU_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...SB_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...CK_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...KI_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

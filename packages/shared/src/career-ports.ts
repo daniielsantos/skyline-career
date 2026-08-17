@@ -1316,6 +1316,38 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: -175.18,
     pickupHubs: ['NFTF'],
   },
+  {
+    id: 'VUVLI',
+    name: 'Port Vila',
+    countryId: 'VU',
+    lat: -17.73,
+    lon: 168.32,
+    pickupHubs: ['NVVV'],
+  },
+  {
+    id: 'SBHIR',
+    name: 'Honiara',
+    countryId: 'SB',
+    lat: -9.43,
+    lon: 160.02,
+    pickupHubs: ['AGGH'],
+  },
+  {
+    id: 'CKRAR',
+    name: 'Avatiu',
+    countryId: 'CK',
+    lat: -21.21,
+    lon: -159.78,
+    pickupHubs: ['NCRG'],
+  },
+  {
+    id: 'KITRW',
+    name: 'Tarawa',
+    countryId: 'KI',
+    lat: 1.36,
+    lon: 173.15,
+    pickupHubs: ['NGTA'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

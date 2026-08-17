@@ -1,6 +1,7 @@
 {
   "note": "Cargo/Dispatch ICAOs confirmed for SimBrief. Bush-trip-only strips are exempt. Regenerated via scripts/gen-simbrief-dispatch-airports.mjs after adding a hub.",
   "icaos": [
+    "AGGH",
     "AYPY",
     "BIAR",
     "BIEG",
@@ -523,11 +524,14 @@
     "MZBZ",
     "MZPL",
     "MZSP",
+    "NCRG",
     "NFFN",
     "NFTF",
+    "NGTA",
     "NSFA",
     "NSTU",
     "NTAA",
+    "NVVV",
     "NWWW",
     "NZAA",
     "NZCH",

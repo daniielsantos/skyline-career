@@ -50,6 +50,7 @@
 - `pruneOrphanCareerHubs` no migrate/boot (também dropa `npcFlights` órfãos).
 - `remapRetiredCareerAirportIdents` aplica `CAREER_AIRPORT_ICAO_REMAP` (ex. MPPB→MPPA) **antes** do prune — evita `Unknown origin airport` no settle.
 - NI spoke: **MNMR** Montelimar (MNCE Costa Esmeralda não está no scenery default).
+- SE spoke: **ESMQ** Kalmar (ESMX é Växjö Kronoberg — não confundir).
 - Override JSON limpo de `SCCD` / `SCSN` / `SCST` / `SCTC`.
 
 ## UI (sessão)

@@ -82,8 +82,8 @@ export const SE_CAREER_HUBS: readonly SeCareerHubDef[] = [
     consume: { perishables: 1.05, machinery: 0.9 },
   },
   {
-    icao: 'ESMX',
-    name: 'Kalmar',
+    icao: 'ESMQ',
+    name: 'Kalmar Oland',
     region: 'SE-S',
     hubTier: 'spoke',
     lat: 56.6853,

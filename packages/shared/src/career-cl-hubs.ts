@@ -280,6 +280,7 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   SLET: 'SLGY',
   SPMS: 'SPJI',
   SVCP: 'SVMT',
+  ESMX: 'ESMQ',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

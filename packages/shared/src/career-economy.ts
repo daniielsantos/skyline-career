@@ -1103,7 +1103,7 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'ENBR', b: 'ENZV', weight: 1.6 },
   { a: 'ESSA', b: 'ESGG', weight: 2.0 },
   { a: 'ESSA', b: 'ESPA', weight: 1.7 },
-  { a: 'ESGG', b: 'ESMX', weight: 1.5 },
+  { a: 'ESGG', b: 'ESMQ', weight: 1.5 },
   { a: 'EFHK', b: 'EFTU', weight: 1.8 },
   { a: 'EFHK', b: 'EFRO', weight: 1.6 },
   { a: 'LSZH', b: 'LSGG', weight: 1.9 },

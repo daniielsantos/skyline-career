@@ -155,6 +155,39 @@ import {
 } from './logbook';
 import { BUSH_TRIPS_BOARD_ENABLED } from './feature-flags';
 
+type CareerRefreshScope = {
+  market?: boolean;
+  missions?: boolean;
+  npc?: boolean;
+  aircraftMarket?: boolean;
+  bushTrips?: boolean;
+  airport?: boolean;
+};
+
+/** Background / tab-switch fetch: only endpoints the open view actually paints. */
+function liveRefreshScope(tab: CareerTab, airportOpen: boolean): CareerRefreshScope {
+  if (airportOpen) {
+    return { npc: true, market: true, airport: true };
+  }
+  switch (tab) {
+    case 'fleet':
+      return { npc: true };
+    case 'market':
+      return {
+        market: true,
+        npc: true,
+        bushTrips: BUSH_TRIPS_BOARD_ENABLED,
+      };
+    case 'aircraft':
+      return { aircraftMarket: true };
+    case 'missions':
+    case 'staging':
+      return { missions: true };
+    default:
+      return {};
+  }
+}
+
 function normalizeStarterHubs(
   hubs: Array<StarterHubOption | string> | null | undefined,
 ): StarterHubOption[] {
@@ -1061,55 +1094,22 @@ function regionLabel(region: string): string {
       return 'Thailand — North / Chiang Mai';
     case 'TH-S':
       return 'Thailand — South / Phuket';
+    case 'VN-N':
+      return 'Vietnam — North / Hanoi';
+    case 'VN-S':
+      return 'Vietnam — South / Ho Chi Minh';
+    case 'MY-C':
+      return 'Malaysia — Central / Kuala Lumpur';
+    case 'MY-N':
+      return 'Malaysia — North / Penang';
+    case 'SG-C':
+      return 'Singapore';
     default:
       return region;
   }
 }
 
-function RegionPressureChips(props: {
-  regions: RegionPressure[];
-  className?: string;
-}) {
-  const thin = props.regions.filter((r) => r.thinFleet);
-  const busy = props.regions.filter((r) => r.laneBusy);
-  const wx = props.regions.filter(
-    (r) => r.weather === 'marginal' || r.weather === 'poor',
-  );
-  if (thin.length === 0 && busy.length === 0 && wx.length === 0) return null;
-  return (
-    <div className={props.className ?? 'pressure-chips'}>
-      {thin.map((r) => (
-        <span
-          key={`thin-${r.region}`}
-          className="tag pressure"
-          title={`${regionLabel(r.region)}: ${r.ready}/${r.total} ready to bid · ${r.resting} resting · ${r.maintenance ?? 0} in MX — thinner local fleet tends to raise outbound freights`}
-        >
-          {r.region} thin fleet
-        </span>
-      ))}
-      {busy.map((r) => (
-        <span
-          key={`busy-${r.region}`}
-          className="tag pressure"
-          title={`${regionLabel(r.region)}: outbound lanes are crowded — freight pays more, NPCs back off`}
-        >
-          {r.region} lane busy
-        </span>
-      ))}
-      {wx.map((r) => (
-        <span
-          key={`wx-${r.region}`}
-          className={`tag weather ${r.weather}`}
-          title={`${regionLabel(r.region)}: simulated ${r.weather} weather today — freights pay more / expire sooner; local NPCs bid less`}
-        >
-          {r.region} {r.weather}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/** Compact climate for Freights: local region first, rest collapsed. */
+/** Compact climate for Freights / Rivals: local region first, rest collapsed. */
 function MarketSignalsLine(props: {
   regions: RegionPressure[];
   focusIcao?: string;
@@ -1195,6 +1195,9 @@ function MarketSignalsLine(props: {
     : awaitingRegion
       ? tokens
       : tokens.slice(3);
+  const worldGroups = groupSignalsByCountry(collapsed);
+  const worldShown = worldGroups.slice(0, 12);
+  const worldHidden = worldGroups.length - worldShown.length;
 
   const nearLabel = props.focusIcao
     ? `Near ${props.focusIcao}${focusRegion ? ` · ${focusRegion}` : ''}`
@@ -1227,19 +1230,28 @@ function MarketSignalsLine(props: {
             >
               {worldOpen
                 ? 'Hide more'
-                : `More · ${collapsed.length} signal${collapsed.length === 1 ? '' : 's'}`}
+                : `More · ${worldGroups.length} countr${worldGroups.length === 1 ? 'y' : 'ies'}`}
             </button>
           </>
         ) : null}
       </p>
-      {worldOpen && collapsed.length > 0 ? (
+      {worldOpen && worldShown.length > 0 ? (
         <p className="market-signals-world">
-          {collapsed.map((t, i) => (
-            <span key={t.key} className="market-signals-token" title={t.title}>
+          {worldShown.map((g, i) => (
+            <span
+              key={g.countryId}
+              className="market-signals-token"
+              title={g.title}
+            >
               {i > 0 ? ' · ' : ''}
-              {t.region} {t.text}
+              {g.countryId} {g.count}
             </span>
           ))}
+          {worldHidden > 0 ? (
+            <span className="market-signals-token">
+              {` · +${worldHidden} countr${worldHidden === 1 ? 'y' : 'ies'}`}
+            </span>
+          ) : null}
         </p>
       ) : null}
     </div>
@@ -1251,6 +1263,35 @@ function countryIdFromRegionLabel(region: string): string {
   const dash = raw.indexOf('-');
   if (dash > 0) return raw.slice(0, dash);
   return raw.slice(0, 2) || raw;
+}
+
+function groupSignalsByCountry(
+  tokens: readonly {
+    key: string;
+    region: string;
+    text: string;
+    title: string;
+  }[],
+): Array<{ countryId: string; count: number; title: string }> {
+  const map = new Map<string, { count: number; bits: string[] }>();
+  for (const t of tokens) {
+    const id = countryIdFromRegionLabel(t.region) || t.region;
+    const cur = map.get(id) ?? { count: 0, bits: [] };
+    cur.count += 1;
+    if (cur.bits.length < 8) cur.bits.push(`${t.region} ${t.text}`);
+    map.set(id, cur);
+  }
+  return [...map.entries()]
+    .map(([countryId, v]) => ({
+      countryId,
+      count: v.count,
+      title:
+        v.bits.join(' · ') +
+        (v.count > v.bits.length ? ` · +${v.count - v.bits.length}` : ''),
+    }))
+    .sort(
+      (a, b) => b.count - a.count || a.countryId.localeCompare(b.countryId),
+    );
 }
 
 function resolveHubRegion(
@@ -1993,6 +2034,7 @@ function MovementBoard(props: {
 
 type FleetPhaseFilter =
   | ''
+  | 'airborne'
   | 'enroute'
   | 'arriving'
   | 'turnaround'
@@ -2048,13 +2090,20 @@ function FleetRoster(props: {
   busy?: boolean;
   nowMs: number;
   weightSystem?: WeightSystem;
+  homeCountryId?: string;
 }) {
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
   const [phaseFilter, setPhaseFilter] = useState<FleetPhaseFilter>('');
-  const [countryFilter, setCountryFilter] = useState('');
+  const [countryOverride, setCountryOverride] = useState<string | undefined>(
+    undefined,
+  );
   const [classFilter, setClassFilter] = useState<'' | AircraftClass>('');
   const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
+  const countryFilter =
+    countryOverride !== undefined
+      ? countryOverride
+      : (props.homeCountryId ?? '');
 
   const enriched = useMemo(
     () =>
@@ -2081,7 +2130,11 @@ function FleetRoster(props: {
       .split(/\s+/)
       .filter(Boolean);
     return enriched.filter(({ npc, phase, mission }) => {
-      if (phaseFilter && phase !== phaseFilter) return false;
+      if (phaseFilter === 'airborne') {
+        if (phase !== 'enroute' && phase !== 'arriving') return false;
+      } else if (phaseFilter && phase !== phaseFilter) {
+        return false;
+      }
       if (classFilter && npc.aircraftClassId !== classFilter) return false;
       if (
         countryFilter &&
@@ -2117,6 +2170,45 @@ function FleetRoster(props: {
     });
   }, [enriched, phaseFilter, classFilter, countryFilter, laneFilter, query]);
 
+  const scoped = useMemo(
+    () =>
+      countryFilter
+        ? enriched.filter(
+            ({ npc }) => countryIdFromRegion(npc.homeRegion) === countryFilter,
+          )
+        : enriched,
+    [enriched, countryFilter],
+  );
+  const phaseCounts = useMemo(() => {
+    let airborne = 0;
+    let turnaround = 0;
+    let resting = 0;
+    let maintenance = 0;
+    let idle = 0;
+    for (const row of scoped) {
+      if (row.phase === 'enroute' || row.phase === 'arriving') airborne += 1;
+      else if (row.phase === 'turnaround') turnaround += 1;
+      else if (row.phase === 'resting') resting += 1;
+      else if (row.phase === 'maintenance') maintenance += 1;
+      else idle += 1;
+    }
+    return {
+      airborne,
+      turnaround,
+      resting,
+      maintenance,
+      idle,
+      total: scoped.length,
+    };
+  }, [scoped]);
+  const defaultCountry = props.homeCountryId ?? '';
+  const hasFilters =
+    query.trim() !== '' ||
+    phaseFilter !== '' ||
+    classFilter !== '' ||
+    laneFilter !== '' ||
+    countryFilter !== defaultCountry;
+
   const pageCount = Math.max(1, Math.ceil(filtered.length / FLEET_PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageRows = filtered.slice(
@@ -2147,15 +2239,34 @@ function FleetRoster(props: {
     );
   }
 
-  const hasFilters =
-    query.trim() !== '' ||
-    phaseFilter !== '' ||
-    classFilter !== '' ||
-    countryFilter !== '' ||
-    laneFilter !== '';
+  const togglePhase = (phase: FleetPhaseFilter) => {
+    setPhaseFilter((cur) => (cur === phase ? '' : phase));
+  };
 
   return (
     <>
+      <div className="rivals-phase-bar" role="toolbar" aria-label="Rival status">
+        {(
+          [
+            ['', 'All', phaseCounts.total],
+            ['airborne', 'Airborne', phaseCounts.airborne],
+            ['turnaround', 'Turnaround', phaseCounts.turnaround],
+            ['maintenance', 'MX', phaseCounts.maintenance],
+            ['resting', 'Resting', phaseCounts.resting],
+            ['idle', 'Idle', phaseCounts.idle],
+          ] as const
+        ).map(([id, label, count]) => (
+          <button
+            key={id || 'all'}
+            type="button"
+            className={phaseFilter === id ? 'is-on' : undefined}
+            aria-pressed={phaseFilter === id}
+            onClick={() => togglePhase(id)}
+          >
+            {label} {count}
+          </button>
+        ))}
+      </div>
       <div className="table-wrap">
         <table className="fleet-table">
           <thead>
@@ -2196,7 +2307,7 @@ function FleetRoster(props: {
               <th>
                 <select
                   value={countryFilter}
-                  onChange={(e) => setCountryFilter(e.target.value)}
+                  onChange={(e) => setCountryOverride(e.target.value)}
                   aria-label="Filter by home country"
                 >
                   <option value="">All countries</option>
@@ -2216,6 +2327,7 @@ function FleetRoster(props: {
                   aria-label="Filter by status"
                 >
                   <option value="">All statuses</option>
+                  <option value="airborne">Airborne</option>
                   <option value="enroute">En route</option>
                   <option value="arriving">Arriving</option>
                   <option value="turnaround">Turnaround</option>
@@ -2253,7 +2365,7 @@ function FleetRoster(props: {
                       setQuery('');
                       setPhaseFilter('');
                       setClassFilter('');
-                      setCountryFilter('');
+                      setCountryOverride(undefined);
                       setLaneFilter('');
                     }}
                   >
@@ -2799,23 +2911,34 @@ export function App() {
     }
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (scope?: CareerRefreshScope) => {
     setError(null);
     const state = await fetchState();
     if (state.needsProfile) {
       setShowProfileGate(true);
       return;
     }
+    const full = scope == null;
+    const wantMarket = full || scope.market === true;
+    const wantMissions = full || scope.missions === true;
+    const wantNpc = full || scope.npc === true;
+    const wantAircraft = full || scope.aircraftMarket === true;
+    const wantBush = full || scope.bushTrips === true;
+    const wantAirport = Boolean(airportIcao) && (full || scope?.airport === true);
     const [market, missionState, npcState, acMarket] = await Promise.all([
-      fetchMarket(
-        marketFetchOptsRef.current.aircraft,
-        marketFetchOptsRef.current,
-      ),
-      fetchMissions(),
-      fetchNpcFleet(),
-      fetchAircraftMarket().catch(() => null),
+      wantMarket
+        ? fetchMarket(
+            marketFetchOptsRef.current.aircraft,
+            marketFetchOptsRef.current,
+          )
+        : Promise.resolve(null),
+      wantMissions ? fetchMissions() : Promise.resolve(null),
+      wantNpc ? fetchNpcFleet() : Promise.resolve(null),
+      wantAircraft
+        ? fetchAircraftMarket().catch(() => null)
+        : Promise.resolve(null),
     ]);
-    void refreshBushTrips();
+    if (wantBush) void refreshBushTrips();
     const clientNow = Date.now();
     const serverNow = state.serverNowMs ?? clientNow;
     setServerOffsetMs(serverNow - clientNow);
@@ -2823,40 +2946,54 @@ export function App() {
     setLastBatchAtMs(state.lastBatchAtMs ?? serverNow);
     setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
     setDisplayNowMs(serverNow);
-    setWallet(missionState.walletUsd);
+    setWallet(missionState?.walletUsd ?? state.walletUsd);
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
     if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
     if (state.offlineFeeSummary) {
       setOfflineFeeBanner(state.offlineFeeSummary);
     }
-    setLots(market.lots);
-    setMarketTotalLots(market.totalLots ?? market.lots.length);
-    setMarketPageCount(market.pageCount ?? 1);
-    if (market.page && market.page !== marketFetchOptsRef.current.page) {
-      setMarketPage(market.page);
-      marketFetchOptsRef.current = {
-        ...marketFetchOptsRef.current,
-        page: market.page,
-      };
+    if (market) {
+      setLots(market.lots);
+      setMarketTotalLots(market.totalLots ?? market.lots.length);
+      setMarketPageCount(market.pageCount ?? 1);
+      if (market.page && market.page !== marketFetchOptsRef.current.page) {
+        setMarketPage(market.page);
+        marketFetchOptsRef.current = {
+          ...marketFetchOptsRef.current,
+          page: market.page,
+        };
+      }
+      setMarketEvents(market.events ?? []);
+      if (!npcState?.activity.length) {
+        setNpcActivity(market.npcActivity ?? []);
+      }
+      if (!npcState?.regionPressure?.length) {
+        setRegionPressure(market.regionPressure ?? []);
+      }
     }
-    setMarketEvents(market.events ?? []);
-    setNpcActivity(npcState.activity.length ? npcState.activity : market.npcActivity ?? []);
-    setNpcBusy(npcState.busy);
-    setNpcFleet(npcState.fleet);
-    setNpcSummary({
-      airborne: npcState.airborne,
-      turnaround: npcState.turnaround,
-      resting: npcState.resting ?? 0,
-      maintenance: npcState.maintenance ?? 0,
-      idle: npcState.idle,
-    });
-    setRegionPressure(
-      npcState.regionPressure?.length
-        ? npcState.regionPressure
-        : market.regionPressure ?? [],
-    );
-    setMissions(missionState.missions.slice().reverse());
+    if (npcState) {
+      setNpcActivity(
+        npcState.activity.length ? npcState.activity : market?.npcActivity ?? [],
+      );
+      setNpcBusy(npcState.busy);
+      setNpcFleet(npcState.fleet);
+      setNpcSummary({
+        airborne: npcState.airborne,
+        turnaround: npcState.turnaround,
+        resting: npcState.resting ?? 0,
+        maintenance: npcState.maintenance ?? 0,
+        idle: npcState.idle,
+      });
+      setRegionPressure(
+        npcState.regionPressure?.length
+          ? npcState.regionPressure
+          : market?.regionPressure ?? [],
+      );
+    }
+    if (missionState) {
+      setMissions(missionState.missions.slice().reverse());
+    }
     setHubSelected(Boolean(state.hubSelected));
     setFleet(state.fleet ?? []);
     setHubOptions(normalizeStarterHubs(state.hubs));
@@ -2877,12 +3014,12 @@ export function App() {
       if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
       if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
     }
-    if (!state.hubSelected) {
+    if (!state.hubSelected && full) {
       const firstHub = networkCargoHubs(normalizeStarterHubs(state.hubs))[0]
         ?.icao;
       setSignupHub((prev) => prev || firstHub || 'SBGR');
     }
-    if (airportIcao) {
+    if (wantAirport && airportIcao) {
       const view = await fetchAirportView(airportIcao);
       setAirportView(view);
     }
@@ -2978,15 +3115,16 @@ export function App() {
 
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
-    void refresh().catch((err: unknown) => {
+    void refreshRef.current().catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       if (!isNeedsProfileMessage(message)) setError(message);
     });
-  }, [refresh, showProfileGate, activeCareerProfile?.id]);
+  }, [showProfileGate, activeCareerProfile?.id]);
 
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
+    if (tab !== 'market' && !airportIcao) return;
     const boardAcf = fleet.find((a) => a.id === boardAircraftId);
     const originQuery = originFilter.trim();
     const focusIcao = (
@@ -3097,6 +3235,8 @@ export function App() {
     nearMe,
     pilotIcao,
     homeHubIcao,
+    tab,
+    airportIcao,
   ]);
 
   useEffect(() => {
@@ -3180,11 +3320,11 @@ export function App() {
     return () => window.clearInterval(id);
   }, [serverOffsetMs]);
 
-  // Live board: soft-refresh on market, rivals, or an open terminal.
+  // Live board: poll only what the open view needs (not the whole career dump).
   useEffect(() => {
     if (tab !== 'fleet' && tab !== 'market' && !airportIcao) return;
     const id = window.setInterval(() => {
-      void refresh().catch(() => {
+      void refresh(liveRefreshScope(tab, Boolean(airportIcao))).catch(() => {
         /* ignore background refresh errors */
       });
     }, 15_000);
@@ -4522,7 +4662,10 @@ export function App() {
     setSidebarOpen(false);
     goToTab(next);
     // Soft refresh in background — don't flash disabled on every nav button.
-    void run(refresh, { refreshAfter: false, lockUi: false });
+    void run(() => refresh(liveRefreshScope(next, false)), {
+      refreshAfter: false,
+      lockUi: false,
+    });
   }
 
   async function returnToAirport() {
@@ -7531,7 +7674,7 @@ export function App() {
             className={!showAirport && tab === 'fleet' ? 'tab active' : 'tab'}
             onClick={() => selectTab('fleet')}
             disabled={busy}
-            title={`${npcBusy} competing freighters busy`}
+            title={`${npcBusy} busy · ${npcSummary.airborne} airborne`}
           >
             Rivals
           </button>
@@ -11775,15 +11918,23 @@ export function App() {
           <div className="panel-head">
             <div>
               <p className="panel-stats">
-                {npcBusy} busy · {npcSummary.airborne} airborne · {npcSummary.turnaround}{' '}
-                turnaround · {npcSummary.maintenance} MX · {npcSummary.resting} resting ·{' '}
-                {npcSummary.idle} idle
-                <span className="live-dot" title="Auto-refreshes every 15s; clock ticks every second">
+                Competing freighters
+                <span
+                  className="live-dot"
+                  title="Auto-refreshes every 15s; clock ticks every second"
+                >
                   {' '}
                   · live
                 </span>
               </p>
-              <RegionPressureChips regions={regionPressure} />
+              <MarketSignalsLine
+                regions={regionPressure}
+                focusIcao={signalFocusIcao || undefined}
+                focusRegion={resolveHubRegion(
+                  signalFocusIcao || undefined,
+                  networkHubs,
+                )}
+              />
               <MarketEventsSummary
                 events={marketEvents}
                 expanded={marketEventsExpanded}
@@ -11796,6 +11947,11 @@ export function App() {
             onOpen={openAirport}
             busy={busy}
             nowMs={displayNowMs}
+            weightSystem={weightSystem}
+            homeCountryId={countryIdFromRegion(
+              resolveHubRegion(homeHubIcao || signalFocusIcao, networkHubs) ??
+                '',
+            )}
           />
         </section>
       ) : !hubSelected ? null : (

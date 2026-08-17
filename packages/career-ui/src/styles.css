@@ -5256,17 +5256,6 @@ small {
   color: #6b3a52;
 }
 
-.pressure-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.55rem;
-}
-
-.pressure-chips .tag {
-  margin-left: 0;
-}
-
 .pay {
   font-family: var(--font-display);
   font-size: 1.25rem;
@@ -6509,6 +6498,36 @@ small {
 .live-dot {
   color: var(--ok);
   font-size: 0.85em;
+}
+
+.rivals-phase-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 0.75rem;
+}
+
+.rivals-phase-bar button {
+  padding: 0.32rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.rivals-phase-bar button:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 28%, var(--line));
+}
+
+.rivals-phase-bar button.is-on {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .fleet-table td small {

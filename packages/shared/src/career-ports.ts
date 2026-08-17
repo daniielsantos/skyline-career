@@ -635,6 +635,38 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 21.14,
     pickupHubs: ['EYPA'],
   },
+  {
+    id: 'HRSPL',
+    name: 'Port of Split',
+    countryId: 'HR',
+    lat: 43.5,
+    lon: 16.43,
+    pickupHubs: ['LDSP'],
+  },
+  {
+    id: 'SIKOP',
+    name: 'Port of Koper',
+    countryId: 'SI',
+    lat: 45.55,
+    lon: 13.73,
+    pickupHubs: ['LJLJ'],
+  },
+  {
+    id: 'BGVAR',
+    name: 'Port of Varna',
+    countryId: 'BG',
+    lat: 43.2,
+    lon: 27.92,
+    pickupHubs: ['LBWN'],
+  },
+  {
+    id: 'GRPIR',
+    name: 'Port of Piraeus',
+    countryId: 'GR',
+    lat: 37.94,
+    lon: 23.64,
+    pickupHubs: ['LGAV'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

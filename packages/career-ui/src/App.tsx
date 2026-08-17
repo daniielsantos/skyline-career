@@ -863,6 +863,24 @@ function regionLabel(region: string): string {
       return 'Latvia';
     case 'LT-C':
       return 'Lithuania';
+    case 'HR-N':
+      return 'Croatia — North';
+    case 'HR-S':
+      return 'Croatia — South';
+    case 'SI-C':
+      return 'Slovenia';
+    case 'RO-W':
+      return 'Romania — West';
+    case 'RO-E':
+      return 'Romania — East';
+    case 'BG-C':
+      return 'Bulgaria';
+    case 'GR-N':
+      return 'Greece — North';
+    case 'GR-S':
+      return 'Greece — South / Islands';
+    case 'RS-C':
+      return 'Serbia';
     default:
       return region;
   }

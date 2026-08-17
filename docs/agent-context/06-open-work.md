@@ -43,10 +43,11 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 12. ~~**EU-1 Western core**~~ — PT/ES/FR/GB/DE/NL/BE/IT; seed **629**; ports EU; fuel trucks 85; Americas bridge lanes.
 13. ~~**EU-2 Nordics + Alps + IE**~~ — IE/DK/NO/SE/FI/CH/AT; seed **672**; ports **66**; fuel trucks **100**.
 14. ~~**EU-3 Central-East + Baltics**~~ — PL/CZ/SK/HU/EE/LV/LT; seed **706**; ports **70**; fuel trucks **115**.
-15. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-16. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
-17. Next map slice: Balkans / Iceland.
-18. Re-run `npm run career-hubs -- missing` após rebuild shared — esperar **MNMR** (não MNCE); wizard não deve crashar em MPPB.
+15. ~~**EU-4 Balkans**~~ — HR/SI/RO/BG/GR/RS; seed **734**; ports **74**; fuel trucks **130**.
+16. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
+17. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+18. Next map slice: Iceland / remaining Balkans (BA/ME/AL/MK).
+19. Re-run `npm run career-hubs -- missing` após rebuild shared.
 
 ## Feito (shipped 0.3.47)
 

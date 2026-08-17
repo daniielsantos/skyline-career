@@ -10798,5 +10798,1002 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "DAAE": {
+    "name": "Soummam-Abane Ramdane",
+    "lat": 36.71194430440664,
+    "lon": 5.069444328546524,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 81.77418518066406,
+        "lengthM": 2396.005126953125,
+        "widthM": 41.995094299316406,
+        "lat": 36.71199459582567,
+        "lon": 5.069892704486847,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DAAG": {
+    "name": "Houari Boumediene",
+    "lat": 36.6944445669651,
+    "lon": 3.2169444859027863,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 52.84983444213867,
+        "lengthM": 3499.678466796875,
+        "widthM": 61.24506759643555,
+        "lat": 36.703425608575344,
+        "lon": 3.2358621060848236,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 91.65860748291016,
+        "lengthM": 3504.71826171875,
+        "widthM": 46.67855453491211,
+        "lat": 36.69159539043903,
+        "lon": 3.190387934446335,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DAAS": {
+    "name": "Setif Ain Arnat",
+    "lat": 36.17861118167639,
+    "lon": 5.329999923706055,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 266.84515380859375,
+        "lengthM": 2390.377685546875,
+        "widthM": 44.49132537841797,
+        "lat": 36.17836743593216,
+        "lon": 5.327131748199463,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DABC": {
+    "name": "Mohamed Boudiaf",
+    "lat": 36.28527794033289,
+    "lon": 6.6191665828228,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 136.18992614746094,
+        "lengthM": 2391.9990234375,
+        "widthM": 42.51888656616211,
+        "lat": 36.27666436135769,
+        "lon": 6.624087989330292,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16",
+        "headingTrueDeg": 159.17051696777344,
+        "lengthM": 2986.60205078125,
+        "widthM": 44.436588287353516,
+        "lat": 36.27538025379181,
+        "lon": 6.616650223731995,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DAOO": {
+    "name": "Es Senia",
+    "lat": 35.62722209841013,
+    "lon": -0.6113889813423157,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7L",
+        "headingTrueDeg": 67.26593017578125,
+        "lengthM": 3610.95068359375,
+        "widthM": 45,
+        "lat": 35.622949339449406,
+        "lon": -0.6237535178661346,
+        "identReciprocal": "25R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7R",
+        "headingTrueDeg": 67.2831039428711,
+        "lengthM": 2998.28173828125,
+        "widthM": 45,
+        "lat": 35.6193907186389,
+        "lon": -0.6255693733692169,
+        "identReciprocal": "25L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DTMB": {
+    "name": "Habib Bourguiba",
+    "lat": 35.75805556029081,
+    "lon": 10.75472205877304,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 73.53821563720703,
+        "lengthM": 2960.438232421875,
+        "widthM": 44.56383514404297,
+        "lat": 35.75785104185343,
+        "lon": 10.754009485244751,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DTTA": {
+    "name": "Carthage",
+    "lat": 36.85111105442047,
+    "lon": 10.226944237947464,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 12.330304145812988,
+        "lengthM": 3202.363037109375,
+        "widthM": 43,
+        "lat": 36.853181049227715,
+        "lon": 10.22757813334465,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "11",
+        "headingTrueDeg": 112.49638366699219,
+        "lengthM": 2852.82568359375,
+        "widthM": 44.89008331298828,
+        "lat": 36.849355548620224,
+        "lon": 10.232474505901337,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DTTJ": {
+    "name": "Zarzis",
+    "lat": 33.87555554509163,
+    "lon": 10.777222216129303,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 88.27388000488281,
+        "lengthM": 3110.98193359375,
+        "widthM": 41.616783142089844,
+        "lat": 33.87544892728329,
+        "lon": 10.777139067649841,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "DTTX": {
+    "name": "Thyna",
+    "lat": 34.720555655658245,
+    "lon": 10.688610970973969,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 148.14883422851562,
+        "lengthM": 2701.549072265625,
+        "widthM": 44.292381286621094,
+        "lat": 34.71641566604376,
+        "lon": 10.69170132279396,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GMAD": {
+    "name": "Al-Massira",
+    "lat": 30.322499983012676,
+    "lon": -9.411389082670212,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 91.58568572998047,
+        "lengthM": 3190.032470703125,
+        "widthM": 40.92230987548828,
+        "lat": 30.322620682418346,
+        "lon": -9.41153571009636,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GMFF": {
+    "name": "Saiss",
+    "lat": 33.92722226679325,
+    "lon": -4.977777600288391,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 90.24534606933594,
+        "lengthM": 3190.308349609375,
+        "widthM": 41.5286750793457,
+        "lat": 33.927304074168205,
+        "lon": -4.977852702140808,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GMFO": {
+    "name": "Angads",
+    "lat": 34.78611119091511,
+    "lon": -1.9255556166172028,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 57.71726989746094,
+        "lengthM": 3005.837890625,
+        "widthM": 45,
+        "lat": 34.78716965764761,
+        "lon": -1.923946738243103,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "31",
+        "headingTrueDeg": 310.91357421875,
+        "lengthM": 3001.509521484375,
+        "widthM": 45,
+        "lat": 34.80104874819517,
+        "lon": -1.9398392736911774,
+        "identReciprocal": "13",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GMME": {
+    "name": "Sale",
+    "lat": 34.05138876289129,
+    "lon": -6.751666814088821,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 31.322261810302734,
+        "lengthM": 3495.0673828125,
+        "widthM": 43,
+        "lat": 34.051440730690956,
+        "lon": -6.751527339220047,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GMMN": {
+    "name": "Mohamed V",
+    "lat": 33.36416658014059,
+    "lon": -7.581666558980942,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "17L",
+        "headingTrueDeg": 163.9871368408203,
+        "lengthM": 3706.713623046875,
+        "widthM": 44.40727233886719,
+        "lat": 33.367908261716366,
+        "lon": -7.588001936674118,
+        "identReciprocal": "35R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17R",
+        "headingTrueDeg": 163.93838500976562,
+        "lengthM": 3706.521728515625,
+        "widthM": 43.109867095947266,
+        "lat": 33.36699429899454,
+        "lon": -7.591947466135025,
+        "identReciprocal": "35L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GMMX": {
+    "name": "Menara",
+    "lat": 31.608611159026623,
+    "lon": -8.040833473205566,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 95.8805923461914,
+        "lengthM": 3099.57080078125,
+        "widthM": 44.753082275390625,
+        "lat": 31.606877110898495,
+        "lon": -8.036224097013474,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "GMTT": {
+    "name": "Ibn Batouta",
+    "lat": 35.73166664689779,
+    "lon": -5.921110957860947,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "28",
+        "headingTrueDeg": 276.49554443359375,
+        "lengthM": 3500.1416015625,
+        "widthM": 42.15376663208008,
+        "lat": 35.73164854198694,
+        "lon": -5.9210412204265594,
+        "identReciprocal": "10",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HEBA": {
+    "name": "Borg El Arab Intl",
+    "lat": 30.918055661022663,
+    "lon": 29.69583347439766,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "14L",
+        "headingTrueDeg": 142.85841369628906,
+        "lengthM": 3393.89501953125,
+        "widthM": 50,
+        "lat": 30.918108969926834,
+        "lon": 29.695849120616913,
+        "identReciprocal": "32R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14R",
+        "headingTrueDeg": 142.88624572753906,
+        "lengthM": 3394.66064453125,
+        "widthM": 44.839481353759766,
+        "lat": 30.916899293661118,
+        "lon": 29.693892002105713,
+        "identReciprocal": "32L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HECA": {
+    "name": "Cairo Intl",
+    "lat": 30.111389011144638,
+    "lon": 31.413888931274414,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23C",
+        "headingTrueDeg": 229.23399353027344,
+        "lengthM": 3999.17822265625,
+        "widthM": 60.28113555908203,
+        "lat": 30.111475847661495,
+        "lon": 31.413951516151428,
+        "identReciprocal": "5C",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23L",
+        "headingTrueDeg": 229.25599670410156,
+        "lengthM": 3996.9462890625,
+        "widthM": 60.23960876464844,
+        "lat": 30.10894887149334,
+        "lon": 31.434776186943054,
+        "identReciprocal": "5R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23R",
+        "headingTrueDeg": 229.5,
+        "lengthM": 3301.388671875,
+        "widthM": 57.762332916259766,
+        "lat": 30.12941211462021,
+        "lon": 31.393244862556458,
+        "identReciprocal": "5L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HEGN": {
+    "name": "Hurghada Intl",
+    "lat": 27.178611047565937,
+    "lon": 33.800833225250244,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16L",
+        "headingTrueDeg": 165.2151641845703,
+        "lengthM": 3980.186279296875,
+        "widthM": 46,
+        "lat": 27.178652957081795,
+        "lon": 33.80095526576042,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16R",
+        "headingTrueDeg": 165.19529724121094,
+        "lengthM": 3999.9287109375,
+        "widthM": 61,
+        "lat": 27.176420018076897,
+        "lon": 33.791694939136505,
+        "identReciprocal": "34L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HELX": {
+    "name": "Luxor Intl",
+    "lat": 25.67083340138197,
+    "lon": 32.706388682127,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 22.62912368774414,
+        "lengthM": 2990.908203125,
+        "widthM": 44.87053680419922,
+        "lat": 25.671049989759922,
+        "lon": 32.70646199584007,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HESH": {
+    "name": "Sharm El Sheikh Intl",
+    "lat": 27.978611066937447,
+    "lon": 34.393333196640015,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "4L",
+        "headingTrueDeg": 42.780757904052734,
+        "lengthM": 3069.662109375,
+        "widthM": 45.98436737060547,
+        "lat": 27.978669069707394,
+        "lon": 34.39326211810112,
+        "identReciprocal": "22R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4R",
+        "headingTrueDeg": 42.78940963745117,
+        "lengthM": 3068.07470703125,
+        "widthM": 45.78374481201172,
+        "lat": 27.975914776325226,
+        "lon": 34.396619349718094,
+        "identReciprocal": "22L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "HESN": {
+    "name": "Aswan Intl",
+    "lat": 23.964444547891617,
+    "lon": 32.819999903440475,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "35",
+        "headingTrueDeg": 350.94964599609375,
+        "lengthM": 3390.52685546875,
+        "widthM": 41.622047424316406,
+        "lat": 23.96435536444187,
+        "lon": 32.8199677169323,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LLBG": {
+    "name": "Ben Gurion",
+    "lat": 32.00944449752569,
+    "lon": 34.885555654764175,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 121.38127899169922,
+        "lengthM": 3109.227783203125,
+        "widthM": 45,
+        "lat": 32.00689237564802,
+        "lon": 34.880837202072144,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "21",
+        "headingTrueDeg": 208.80860900878906,
+        "lengthM": 2770.728271484375,
+        "widthM": 60,
+        "lat": 32.00719580054283,
+        "lon": 34.89313781261444,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "26",
+        "headingTrueDeg": 259.8257751464844,
+        "lengthM": 4057.63623046875,
+        "widthM": 45,
+        "lat": 32.01545834541321,
+        "lon": 34.877841621637344,
+        "identReciprocal": "8",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LLER": {
+    "name": "Ramon International Airport",
+    "lat": 29.730000011622906,
+    "lon": 35.00999987125397,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "1",
+        "headingTrueDeg": 13.711874961853027,
+        "lengthM": 3604.055908203125,
+        "widthM": 45,
+        "lat": 29.727155193686485,
+        "lon": 35.01406520605087,
+        "identReciprocal": "19",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LLHA": {
+    "name": "Haifa",
+    "lat": 32.80833341181278,
+    "lon": 35.04277780652046,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 159.93289184570312,
+        "lengthM": 1285.0323486328125,
+        "widthM": 31.144325256347656,
+        "lat": 32.81036484986544,
+        "lon": 35.04365220665932,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OBBI": {
+    "name": "Bahrain Intl",
+    "lat": 26.270833499729633,
+    "lon": 50.63361123204231,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "30L",
+        "headingTrueDeg": 302.62261962890625,
+        "lengthM": 2522.328857421875,
+        "widthM": 44.64822769165039,
+        "lat": 26.264998354017735,
+        "lon": 50.640200078487396,
+        "identReciprocal": "12R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "30R",
+        "headingTrueDeg": 302.6260681152344,
+        "lengthM": 3956.645751953125,
+        "widthM": 60.301231384277344,
+        "lat": 26.270835511386395,
+        "lon": 50.63366040587425,
+        "identReciprocal": "12L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEAB": {
+    "name": "Abha",
+    "lat": 18.24027791619301,
+    "lon": 42.65638902783394,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 129.19284057617188,
+        "lengthM": 3343.22900390625,
+        "widthM": 42.27442169189453,
+        "lat": 18.240385204553604,
+        "lon": 42.65654504299164,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEAH": {
+    "name": "Al Ahsa",
+    "lat": 25.28611108660698,
+    "lon": 49.486111253499985,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 164.9270477294922,
+        "lengthM": 3056.8916015625,
+        "widthM": 43.048763275146484,
+        "lat": 25.28545930981636,
+        "lon": 49.485242664813995,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEDF": {
+    "name": "King Fahd Intl",
+    "lat": 26.47111102938652,
+    "lon": 49.7977776825428,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "34L",
+        "headingTrueDeg": 344.44903564453125,
+        "lengthM": 4025.88134765625,
+        "widthM": 60,
+        "lat": 26.471232064068317,
+        "lon": 49.78673189878464,
+        "identReciprocal": "16R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "34R",
+        "headingTrueDeg": 344.4679260253906,
+        "lengthM": 4004.353271484375,
+        "widthM": 60,
+        "lat": 26.47119015455246,
+        "lon": 49.809084981679916,
+        "identReciprocal": "16L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEGS": {
+    "name": "Gassim",
+    "lat": 26.302794367074966,
+    "lon": 43.774158507585526,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 152.90518188476562,
+        "lengthM": 3000.0888671875,
+        "widthM": 43.10871887207031,
+        "lat": 26.302785649895668,
+        "lon": 43.774158507585526,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEHL": {
+    "name": "Hail",
+    "lat": 27.43972208350897,
+    "lon": 41.686388701200485,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 183.51235961914062,
+        "lengthM": 3658.92578125,
+        "widthM": 41.6745491027832,
+        "lat": 27.438191883265972,
+        "lon": 41.6862653195858,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEJN": {
+    "name": "King Abdulaziz Intl",
+    "lat": 21.681111194193363,
+    "lon": 39.15611118078232,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16C",
+        "headingTrueDeg": 159.86660766601562,
+        "lengthM": 3997.474853515625,
+        "widthM": 59.173309326171875,
+        "lat": 21.67815674096346,
+        "lon": 39.15820553898811,
+        "identReciprocal": "34C",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16L",
+        "headingTrueDeg": 159.880859375,
+        "lengthM": 3998.597412109375,
+        "widthM": 60.17318344116211,
+        "lat": 21.683523505926132,
+        "lon": 39.17378783226013,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16R",
+        "headingTrueDeg": 159.8572540283203,
+        "lengthM": 3798.744384765625,
+        "widthM": 59.401161193847656,
+        "lat": 21.686688847839832,
+        "lon": 39.13320600986481,
+        "identReciprocal": "34L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEMA": {
+    "name": "Pr Mohammad Bin Abdulaziz Intl",
+    "lat": 24.550277888774872,
+    "lon": 39.70583349466324,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "35",
+        "headingTrueDeg": 348.9906005859375,
+        "lengthM": 4327.53564453125,
+        "widthM": 60.181156158447266,
+        "lat": 24.557204693555832,
+        "lon": 39.70741018652916,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "36",
+        "headingTrueDeg": 3.785930871963501,
+        "lengthM": 3043.081298828125,
+        "widthM": 46.51350021362305,
+        "lat": 24.549771957099438,
+        "lon": 39.702964425086975,
+        "identReciprocal": "18",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OERK": {
+    "name": "King Khaled Intl",
+    "lat": 24.962777830660343,
+    "lon": 46.7080557346344,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "33L",
+        "headingTrueDeg": 330.0420227050781,
+        "lengthM": 4200.50927734375,
+        "widthM": 60.5208740234375,
+        "lat": 24.954527020454407,
+        "lon": 46.68528065085411,
+        "identReciprocal": "15R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "33R",
+        "headingTrueDeg": 330.0694274902344,
+        "lengthM": 4205.91357421875,
+        "widthM": 55.17020797729492,
+        "lat": 24.96041413396597,
+        "lon": 46.71242505311966,
+        "identReciprocal": "15L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OEYN": {
+    "name": "Yenbo",
+    "lat": 24.144177697598934,
+    "lon": 38.06354463100433,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 103.26830291748047,
+        "lengthM": 3212.627685546875,
+        "widthM": 39.399871826171875,
+        "lat": 24.144162610173225,
+        "lon": 38.063542395830154,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OMAA": {
+    "name": "Abu Dhabi International",
+    "lat": 24.433055631816387,
+    "lon": 54.6511110663414,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OMAL": {
+    "name": "Al Ain",
+    "lat": 24.261666499078274,
+    "lon": 55.609166622161865,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OMDB": {
+    "name": "Dubai International",
+    "lat": 25.252777934074402,
+    "lon": 55.36444455385208,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OMFJ": {
+    "name": "Fujairah",
+    "lat": 25.112222135066986,
+    "lon": 56.324166655540466,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OMRK": {
+    "name": "Ras Al Khaimah",
+    "lat": 25.613333210349083,
+    "lon": 55.93888878822327,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OMSJ": {
+    "name": "Sharjah",
+    "lat": 25.32916657626629,
+    "lon": 55.516110956668854,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OOKB": {
+    "name": "Khasab",
+    "lat": 26.171666532754898,
+    "lon": 56.240277886390686,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OOMS": {
+    "name": "Muscat International",
+    "lat": 23.60019989311695,
+    "lon": 58.28359991312027,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OOSA": {
+    "name": "Salalah",
+    "lat": 17.0387277379632,
+    "lon": 54.09129738807678,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OOSH": {
+    "name": "Sohar",
+    "lat": 24.386105574667454,
+    "lon": 56.62561923265457,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OTBD": {
+    "name": "Doha International",
+    "lat": 25.261058248579502,
+    "lon": 51.56509459018707,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OTHH": {
+    "name": "Doha Hamad International",
+    "lat": 25.27456384152174,
+    "lon": 51.60837784409523,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "OETF": {
+    "name": "Taif",
+    "lat": 21.483333483338356,
+    "lon": 40.54444447159767,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 74.47175598144531,
+        "lengthM": 3724.68701171875,
+        "widthM": 44.96931076049805,
+        "lat": 21.481733545660973,
+        "lon": 40.53810507059097,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "35",
+        "headingTrueDeg": 352.1593933105469,
+        "lengthM": 3336.8505859375,
+        "widthM": 42.73046112060547,
+        "lat": 21.49135060608387,
+        "lon": 40.54318159818649,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OKKK": {
+    "name": "Kuwait International Airport",
+    "lat": 29.223935902118683,
+    "lon": 47.97271952033043,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "33L",
+        "headingTrueDeg": 335.096923828125,
+        "lengthM": 3396.175048828125,
+        "widthM": 42.357913970947266,
+        "lat": 29.22663487493992,
+        "lon": 47.9689085483551,
+        "identReciprocal": "15R",
+        "surface": "concrete"
+      },
+      {
+        "ident": "33R",
+        "headingTrueDeg": 335.13201904296875,
+        "lengthM": 3496.32861328125,
+        "widthM": 44.93558120727539,
+        "lat": 29.22692220658064,
+        "lon": 47.990992069244385,
+        "identReciprocal": "15L",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

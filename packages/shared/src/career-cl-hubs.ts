@@ -284,6 +284,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // EU-8 MSFS Facilities corrections
   UBGN: 'UBBG',
   UDLS: 'UDSG',
+  // MENA-2 MSFS Facilities corrections
+  OETH: 'OETF',
+  OKBK: 'OKKK',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

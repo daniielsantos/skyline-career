@@ -40,8 +40,16 @@
 - Countries: MA / DZ / TN / EG / IL (Libya / Sudan / Levant-east / Gulf deferred)
 - ICAO traps: Alexandria **HEBA** (not HEAX); Fes **GMFF**; Eilat **LLER** (Ramon)
 - Ports: Tangier Med → GMTT; Algiers → DAAG; Tunis/Radès → DTTA; Alexandria → HEBA; Haifa → LLHA
-- World seed: **803** airports; **89** ports; fuel trucks **175**; **~155** regions
-- Next: MENA-2 Gulf
+- World seed after MENA-1: **803** airports; **89** ports; fuel trucks **175**; **~155** regions
+
+## MENA-2 Gulf
+
+- Countries: SA / AE / QA / BH / KW / OM (IQ / IR / YE / LY / SD / Levant-east deferred)
+- ICAO traps: Doha major **OTHH** (Hamad; OTBD spoke only); Dubai **OMDB**; Riyadh **OERK**; Taif **OETF** (not OETH); Kuwait **OKKK** (not OKBK)
+- Ports: Jeddah Islamic → OEJN; Dammam → OEDF; Jebel Ali → OMDB; Khalifa → OMAA; Hamad → OTHH; KBS → OBBI; Shuwaikh → OKKK; Muscat → OOMS
+- World seed: **827** airports; **97** ports; fuel trucks **195**; **+10** Gulf regions
+- Remaps: `OETH→OETF`, `OKBK→OKKK`
+- Next: MENA-3 (IQ/IR and/or Levant-east / LY-SD)
 
 ## SimBrief cargo allowlist
 

@@ -432,6 +432,36 @@ import {
   IL_CAREER_HUBS,
   buildIlFeederCorridors,
 } from './career-il-hubs.js';
+import {
+  assertSaCareerHubCatalog,
+  SA_CAREER_HUBS,
+  buildSaFeederCorridors,
+} from './career-sa-hubs.js';
+import {
+  assertAeCareerHubCatalog,
+  AE_CAREER_HUBS,
+  buildAeFeederCorridors,
+} from './career-ae-hubs.js';
+import {
+  assertQaCareerHubCatalog,
+  QA_CAREER_HUBS,
+  buildQaFeederCorridors,
+} from './career-qa-hubs.js';
+import {
+  assertBhCareerHubCatalog,
+  BH_CAREER_HUBS,
+  buildBhFeederCorridors,
+} from './career-bh-hubs.js';
+import {
+  assertKwCareerHubCatalog,
+  KW_CAREER_HUBS,
+  buildKwFeederCorridors,
+} from './career-kw-hubs.js';
+import {
+  assertOmCareerHubCatalog,
+  OM_CAREER_HUBS,
+  buildOmFeederCorridors,
+} from './career-om-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -960,6 +990,12 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(TN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(EG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(IL_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(SA_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(AE_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(QA_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(BH_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(KW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(OM_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1389,6 +1425,25 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'HECA', b: 'HELX', weight: 1.6 },
   { a: 'LLBG', b: 'LLHA', weight: 1.8 },
   { a: 'LLBG', b: 'LLER', weight: 1.6 },
+  // MENA-2 Gulf domestic trunks
+  { a: 'OEJN', b: 'OEMA', weight: 2.0 },
+  { a: 'OEJN', b: 'OETF', weight: 1.7 },
+  { a: 'OEJN', b: 'OEAB', weight: 1.6 },
+  { a: 'OEJN', b: 'OEYN', weight: 1.6 },
+  { a: 'OERK', b: 'OEGS', weight: 1.9 },
+  { a: 'OERK', b: 'OEHL', weight: 1.6 },
+  { a: 'OERK', b: 'OEJN', weight: 2.1 },
+  { a: 'OERK', b: 'OEDF', weight: 2.0 },
+  { a: 'OEDF', b: 'OEAH', weight: 1.7 },
+  { a: 'OMDB', b: 'OMSJ', weight: 2.0 },
+  { a: 'OMDB', b: 'OMRK', weight: 1.6 },
+  { a: 'OMDB', b: 'OMFJ', weight: 1.5 },
+  { a: 'OMDB', b: 'OMAA', weight: 2.0 },
+  { a: 'OMAA', b: 'OMAL', weight: 1.8 },
+  { a: 'OTHH', b: 'OTBD', weight: 1.5 },
+  { a: 'OOMS', b: 'OOSH', weight: 1.9 },
+  { a: 'OOMS', b: 'OOKB', weight: 1.5 },
+  { a: 'OOMS', b: 'OOSA', weight: 1.7 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1484,6 +1539,12 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildTnFeederCorridors(TN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildEgFeederCorridors(EG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildIlFeederCorridors(IL_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildSaFeederCorridors(SA_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildAeFeederCorridors(AE_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildQaFeederCorridors(QA_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildBhFeederCorridors(BH_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildKwFeederCorridors(KW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildOmFeederCorridors(OM_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -3435,6 +3496,135 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'DTTA',
     capacityKgPerDay: 35_000,
   },
+  // MENA-2 Gulf ring + bridges
+  {
+    id: 'lane_oejn_omdb',
+    originCountryId: 'SA',
+    destCountryId: 'AE',
+    originIcao: 'OEJN',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_oerk_omdb',
+    originCountryId: 'SA',
+    destCountryId: 'AE',
+    originIcao: 'OERK',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_oedf_omdb',
+    originCountryId: 'SA',
+    destCountryId: 'AE',
+    originIcao: 'OEDF',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_oedf_okkk',
+    originCountryId: 'SA',
+    destCountryId: 'KW',
+    originIcao: 'OEDF',
+    destIcao: 'OKKK',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_omdb_othh',
+    originCountryId: 'AE',
+    destCountryId: 'QA',
+    originIcao: 'OMDB',
+    destIcao: 'OTHH',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_omdb_obbi',
+    originCountryId: 'AE',
+    destCountryId: 'BH',
+    originIcao: 'OMDB',
+    destIcao: 'OBBI',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_omaa_ooms',
+    originCountryId: 'AE',
+    destCountryId: 'OM',
+    originIcao: 'OMAA',
+    destIcao: 'OOMS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_othh_obbi',
+    originCountryId: 'QA',
+    destCountryId: 'BH',
+    originIcao: 'OTHH',
+    destIcao: 'OBBI',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_obbi_okkk',
+    originCountryId: 'BH',
+    destCountryId: 'KW',
+    originIcao: 'OBBI',
+    destIcao: 'OKKK',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_omdb_ooms',
+    originCountryId: 'AE',
+    destCountryId: 'OM',
+    originIcao: 'OMDB',
+    destIcao: 'OOMS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_heca_oejn',
+    originCountryId: 'EG',
+    destCountryId: 'SA',
+    originIcao: 'HECA',
+    destIcao: 'OEJN',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_heca_omdb',
+    originCountryId: 'EG',
+    destCountryId: 'AE',
+    originIcao: 'HECA',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_llbg_omdb',
+    originCountryId: 'IL',
+    destCountryId: 'AE',
+    originIcao: 'LLBG',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_ltfm_omdb',
+    originCountryId: 'TR',
+    destCountryId: 'AE',
+    originIcao: 'LTFM',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_ltfm_othh',
+    originCountryId: 'TR',
+    destCountryId: 'QA',
+    originIcao: 'LTFM',
+    destIcao: 'OTHH',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_lclk_omdb',
+    originCountryId: 'CY',
+    destCountryId: 'AE',
+    originIcao: 'LCLK',
+    destIcao: 'OMDB',
+    capacityKgPerDay: 30_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -3814,6 +4004,16 @@ export const FUEL_HUB_ICAOS = new Set([
   'HECA',
   'HEBA',
   'LLBG',
+  // MENA-2 Gulf
+  'OEJN',
+  'OERK',
+  'OEDF',
+  'OMDB',
+  'OMAA',
+  'OTHH',
+  'OBBI',
+  'OKKK',
+  'OOMS',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -4588,6 +4788,42 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    SA_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    AE_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    QA_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    BH_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    KW_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    OM_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -4986,6 +5222,12 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertTnCareerHubCatalog();
   assertEgCareerHubCatalog();
   assertIlCareerHubCatalog();
+  assertSaCareerHubCatalog();
+  assertAeCareerHubCatalog();
+  assertQaCareerHubCatalog();
+  assertBhCareerHubCatalog();
+  assertKwCareerHubCatalog();
+  assertOmCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -5777,6 +6019,60 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...IL_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...SA_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...AE_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...QA_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...BH_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...KW_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...OM_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

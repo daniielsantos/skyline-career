@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 175;
+export const FUEL_TRUCK_FLEET_SIZE = 195;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 50 },
-  { truckClassId: 'semi_tanker', count: 78 },
-  { truckClassId: 'btrain_tanker', count: 47 },
+  { truckClassId: 'rigid_tanker', count: 55 },
+  { truckClassId: 'semi_tanker', count: 88 },
+  { truckClassId: 'btrain_tanker', count: 52 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -187,6 +187,17 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'EG-R': ['EG-N'],
   'IL-C': ['IL-S'],
   'IL-S': ['IL-C'],
+  // MENA-2 Gulf domestic road graphs
+  'SA-W': ['SA-C'],
+  'SA-C': ['SA-W', 'SA-E'],
+  'SA-E': ['SA-C'],
+  'AE-N': ['AE-C'],
+  'AE-C': ['AE-N'],
+  'QA-C': [],
+  'BH-C': [],
+  'KW-C': [],
+  'OM-N': ['OM-S'],
+  'OM-S': ['OM-N'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -301,6 +312,19 @@ const TRUCK_NAME_POOL = [
   'Tel Aviv Ben Gurion Fuel',
   'Haifa Port Tank',
   'Eilat Ramon Haul',
+  'Jeddah Red Sea Tank',
+  'Riyadh Central Fuel',
+  'Dammam Gulf Tank',
+  'Medina Fuel Road',
+  'Dubai Jet Haul',
+  'Abu Dhabi Tank Line',
+  'Sharjah Fuel Run',
+  'Doha Hamad Tank',
+  'Bahrain Island Fuel',
+  'Kuwait Shuwaikh Tank',
+  'Muscat Jet Road',
+  'Salalah South Fuel',
+  'Sohar Port Tank',
 ] as const;
 
 function hashSeed(seed: string): number {

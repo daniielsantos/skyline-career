@@ -190,6 +190,14 @@ const PICKUP_HUB_SET = new Set([
   'DTTA',
   'HEBA',
   'LLHA',
+  'OEJN',
+  'OEDF',
+  'OMDB',
+  'OMAA',
+  'OTHH',
+  'OBBI',
+  'OKKK',
+  'OOMS',
 ]);
 
 function money(n: number): number {

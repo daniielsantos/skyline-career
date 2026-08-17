@@ -951,6 +951,26 @@ function regionLabel(region: string): string {
       return 'Israel — Center';
     case 'IL-S':
       return 'Israel — South';
+    case 'SA-W':
+      return 'Saudi Arabia — West / Red Sea';
+    case 'SA-C':
+      return 'Saudi Arabia — Central';
+    case 'SA-E':
+      return 'Saudi Arabia — East / Gulf';
+    case 'AE-N':
+      return 'UAE — Northern Emirates';
+    case 'AE-C':
+      return 'UAE — Abu Dhabi';
+    case 'QA-C':
+      return 'Qatar';
+    case 'BH-C':
+      return 'Bahrain';
+    case 'KW-C':
+      return 'Kuwait';
+    case 'OM-N':
+      return 'Oman — North / Muscat';
+    case 'OM-S':
+      return 'Oman — South / Salalah';
     default:
       return region;
   }

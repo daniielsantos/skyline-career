@@ -309,6 +309,10 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // Asia-11: Gia Lam air base is not Hanoi cargo; Long Thanh is still unopened
   VVGL: 'VVNB',
   VVLT: 'VVTS',
+  // Asia-12: Polonia/Soewondo WIMK → Kualanamu; old Bali WRRR → WADD; Lumbia RPML → Laguindingan
+  WIMK: 'WIMM',
+  WRRR: 'WADD',
+  RPML: 'RPMY',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

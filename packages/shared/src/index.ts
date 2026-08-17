@@ -134,6 +134,8 @@ export * from './career-th-hubs.js';
 export * from './career-vn-hubs.js';
 export * from './career-my-hubs.js';
 export * from './career-sg-hubs.js';
+export * from './career-id-hubs.js';
+export * from './career-ph-hubs.js';
 export * from './career-simbrief-airports.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';

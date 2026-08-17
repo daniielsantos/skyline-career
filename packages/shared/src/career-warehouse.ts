@@ -222,6 +222,13 @@ const PICKUP_HUB_SET = new Set([
   'VVTS',
   'WMKK',
   'WSSS',
+  'WIII',
+  'WARR',
+  'WIMM',
+  'WBKK',
+  'WBGG',
+  'RPLL',
+  'RPVM',
 ]);
 
 function money(n: number): number {

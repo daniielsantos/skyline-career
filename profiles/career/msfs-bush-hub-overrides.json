@@ -14266,5 +14266,311 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "RPLC": {
+    "name": "Clark Intl",
+    "lat": 15.186111219227314,
+    "lon": 120.5602777004242,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 21.038692474365234,
+        "lengthM": 3187.189208984375,
+        "widthM": 60,
+        "lat": 15.187845602631569,
+        "lon": 120.56320533156395,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RPLL": {
+    "name": "Ninoy Aquino Intl",
+    "lat": 14.510000087320805,
+    "lon": 121.01361125707626,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 60.300331115722656,
+        "lengthM": 3736.60546875,
+        "widthM": 60,
+        "lat": 14.506122283637524,
+        "lon": 121.01506009697914,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 134.73873901367188,
+        "lengthM": 2246.93310546875,
+        "widthM": 45,
+        "lat": 14.516407884657383,
+        "lon": 121.0115173459053,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RPMD": {
+    "name": "Bangoy Intl",
+    "lat": 7.1255554631352425,
+    "lon": 125.6458331644535,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 229.08848571777344,
+        "lengthM": 2995.1591796875,
+        "widthM": 44.90689468383789,
+        "lat": 7.125518582761288,
+        "lon": 125.64578175544739,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RPMY": {
+    "name": "Laguindingan Airport",
+    "lat": 8.612194955348969,
+    "lon": 124.45652961730957,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 85.51203918457031,
+        "lengthM": 2095.067626953125,
+        "widthM": 42.46406936645508,
+        "lat": 8.612205013632774,
+        "lon": 124.45651486515999,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RPVM": {
+    "name": "Lapu Lapu/Mactan-Cebu Intl",
+    "lat": 10.307563953101635,
+    "lon": 123.97943884134293,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "22L",
+        "headingTrueDeg": 224.83450317382812,
+        "lengthM": 3303.798095703125,
+        "widthM": 43.42313003540039,
+        "lat": 10.30755389481783,
+        "lon": 123.97946119308472,
+        "identReciprocal": "4R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WAAA": {
+    "name": "Hasanuddin",
+    "lat": -5.06083320826292,
+    "lon": 119.55444440245628,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 130.58241271972656,
+        "lengthM": 2496.857421875,
+        "widthM": 42.10969924926758,
+        "lat": -5.061683468520641,
+        "lon": 119.5539852976799,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "21",
+        "headingTrueDeg": 210.01708984375,
+        "lengthM": 3199.947265625,
+        "widthM": 42.84246063232422,
+        "lat": -5.079762227833271,
+        "lon": 119.55123290419579,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WADD": {
+    "name": "Bali Intl",
+    "lat": -8.747499994933605,
+    "lon": 115.16916677355766,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 267.6788330078125,
+        "lengthM": 2999.52294921875,
+        "widthM": 44.71666717529297,
+        "lat": -8.748428374528885,
+        "lon": 115.1674510538578,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WALL": {
+    "name": "Sepinggan",
+    "lat": -1.2674999982118607,
+    "lon": 116.89388886094093,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 247.1291046142578,
+        "lengthM": 2501.565673828125,
+        "widthM": 41.80543518066406,
+        "lat": -1.268349252641201,
+        "lon": 116.89450174570084,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WARR": {
+    "name": "Juanda",
+    "lat": -7.380813919007778,
+    "lon": 112.78633072972298,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 99.18505096435547,
+        "lengthM": 2995.7841796875,
+        "widthM": 43.24057388305664,
+        "lat": -7.3798127844929695,
+        "lon": 112.78696462512016,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WBGG": {
+    "name": "Kuching Intl",
+    "lat": 1.4852779358625412,
+    "lon": 110.34500017762184,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 68.1937484741211,
+        "lengthM": 3777.526123046875,
+        "widthM": 45.34083938598633,
+        "lat": 1.487269476056099,
+        "lon": 110.35269364714622,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WBKK": {
+    "name": "Kota Kinabalu",
+    "lat": 5.931944288313389,
+    "lon": 116.0502777993679,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 202.79318237304688,
+        "lengthM": 3779.57568359375,
+        "widthM": 42.44532012939453,
+        "lat": 5.933992490172386,
+        "lon": 116.04979321360588,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WBKS": {
+    "name": "Sandakan",
+    "lat": 5.90083334594965,
+    "lon": 118.06138873100281,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 80.63076782226562,
+        "lengthM": 2131.742919921875,
+        "widthM": 40.04844665527344,
+        "lat": 5.901264511048794,
+        "lon": 118.05964708328247,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WIII": {
+    "name": "Soekarno-Hatta Intl",
+    "lat": -6.123611256480217,
+    "lon": 106.66111126542091,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "24",
+        "headingTrueDeg": 248.32598876953125,
+        "lengthM": 2993.380859375,
+        "widthM": 57.215633392333984,
+        "lat": -6.108799427747726,
+        "lon": 106.65710404515266,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "25L",
+        "headingTrueDeg": 248.25279235839844,
+        "lengthM": 3664.785888671875,
+        "widthM": 60.25231170654297,
+        "lat": -6.1363571137189865,
+        "lon": 106.65896594524384,
+        "identReciprocal": "7R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "25R",
+        "headingTrueDeg": 248.29171752929688,
+        "lengthM": 3601.00244140625,
+        "widthM": 57.73567199707031,
+        "lat": -6.114907823503017,
+        "lon": 106.65390238165855,
+        "identReciprocal": "7L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WIMM": {
+    "name": "Kualanamu International",
+    "lat": 3.642222248017788,
+    "lon": 98.88527780771255,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 225.0335693359375,
+        "lengthM": 3748.66845703125,
+        "widthM": 59.53403854370117,
+        "lat": 3.6378495767712593,
+        "lon": 98.87054085731506,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

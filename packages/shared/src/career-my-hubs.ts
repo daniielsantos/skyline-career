@@ -2,7 +2,8 @@
  * Malaysia career hub catalog — Asia-11 Strait of Malacca face.
  *
  * KLIA is WMKK (not WMSA Subang as major, not WMKB Butterworth).
- * East Malaysia WB* (Sabah / Sarawak) deferred with Indonesia / Borneo.
+ * East Malaysia WB* (Sabah / Sarawak) is seeded as MY-E / MY-K — no road link
+ * to the peninsula (`REGION_NEIGHBORS` stays Borneo-only).
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -11,7 +12,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type MyCareerRegion = 'MY-C' | 'MY-N';
+export type MyCareerRegion = 'MY-C' | 'MY-N' | 'MY-E' | 'MY-K';
 
 export type MyCareerHubDef = {
   icao: string;
@@ -25,7 +26,7 @@ export type MyCareerHubDef = {
   bush?: true;
 };
 
-/** 4 curated peninsula Malaysia hubs. Port Klang pickup is WMKK. */
+/** 7 curated Malaysia hubs. Port Klang pickup is WMKK; KK / Kuching are East ports. */
 export const MY_CAREER_HUBS: readonly MyCareerHubDef[] = [
   {
     icao: 'WMKK',
@@ -67,9 +68,39 @@ export const MY_CAREER_HUBS: readonly MyCareerHubDef[] = [
     produce: { general: 1.2, perishables: 1.15, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  {
+    icao: 'WBKK',
+    name: 'Kota Kinabalu International',
+    region: 'MY-E',
+    hubTier: 'regional',
+    lat: 5.9327,
+    lon: 116.0493,
+    produce: { general: 1.3, perishables: 1.2, electronics: 1.15 },
+    consume: { machinery: 1.05, supplies: 1.15, fuel: 1.2 },
+  },
+  {
+    icao: 'WBKS',
+    name: 'Sandakan',
+    region: 'MY-E',
+    hubTier: 'regional',
+    lat: 5.9009,
+    lon: 118.059,
+    produce: { perishables: 1.25, general: 1.2, supplies: 1.1 },
+    consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
+  },
+  {
+    icao: 'WBGG',
+    name: 'Kuching International',
+    region: 'MY-K',
+    hubTier: 'regional',
+    lat: 1.4874,
+    lon: 110.3529,
+    produce: { general: 1.3, perishables: 1.2, machinery: 1.15 },
+    consume: { electronics: 1.0, supplies: 1.1, fuel: 1.2 },
+  },
 ];
 
-export const MY_CAREER_HUB_COUNT = 4;
+export const MY_CAREER_HUB_COUNT = 7;
 
 export function buildMyFeederCorridors(
   hubs: readonly MyCareerHubDef[] = MY_CAREER_HUBS,
@@ -93,7 +124,13 @@ export function assertMyCareerHubCatalog(): void {
   if (MY_CAREER_HUBS.some((h) => h.icao === 'WMSA' && h.hubTier === 'major')) {
     throw new Error('MY catalog must not treat WMSA Subang as the cargo major');
   }
-  if (MY_CAREER_HUBS.some((h) => h.icao === 'WMKB' || h.icao.startsWith('WB'))) {
-    throw new Error('MY catalog must not seed WMKB Butterworth or East Malaysia WB*');
+  if (MY_CAREER_HUBS.some((h) => h.icao === 'WMKB')) {
+    throw new Error('MY catalog must not seed WMKB Butterworth');
+  }
+  if (!MY_CAREER_HUBS.some((h) => h.icao === 'WBKK')) {
+    throw new Error('MY catalog must include WBKK Kota Kinabalu');
+  }
+  if (!MY_CAREER_HUBS.some((h) => h.icao === 'WBGG')) {
+    throw new Error('MY catalog must include WBGG Kuching');
   }
 }

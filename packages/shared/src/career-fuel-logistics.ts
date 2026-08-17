@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 420;
+export const FUEL_TRUCK_FLEET_SIZE = 470;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 118 },
-  { truckClassId: 'semi_tanker', count: 186 },
-  { truckClassId: 'btrain_tanker', count: 116 },
+  { truckClassId: 'rigid_tanker', count: 132 },
+  { truckClassId: 'semi_tanker', count: 208 },
+  { truckClassId: 'btrain_tanker', count: 130 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -261,7 +261,18 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'VN-S': ['VN-N'],
   'MY-C': ['MY-N'],
   'MY-N': ['MY-C'],
+  'MY-E': ['MY-K'],
+  'MY-K': ['MY-E'],
   'SG-C': [],
+  // Asia-12 Indonesia / Philippines — island groups keep local fuel hubs
+  'ID-J': [],
+  'ID-S': [],
+  'ID-B': [],
+  'ID-K': [],
+  'ID-U': [],
+  'PH-L': [],
+  'PH-V': [],
+  'PH-M': [],
 };
 
 const TRUCK_NAME_POOL = [
@@ -475,6 +486,20 @@ const TRUCK_NAME_POOL = [
   'KLIA Tank Line',
   'Penang Fuel Road',
   'Changi Tank Line',
+  'Soekarno-Hatta Tank',
+  'Juanda Fuel Road',
+  'Kualanamu Tank Line',
+  'Ngurah Rai Fuel',
+  'Sepinggan Tank Run',
+  'Hasanuddin Fuel Road',
+  'Kota Kinabalu Tank',
+  'Sandakan Fuel Run',
+  'Kuching Tank Line',
+  'Ninoy Aquino Tank',
+  'Clark Fuel Road',
+  'Mactan Cebu Tank',
+  'Davao Fuel Run',
+  'Laguindingan Fuel',
 ] as const;
 
 function hashSeed(seed: string): number {

@@ -167,7 +167,16 @@
 - Ports: Hai Phong → VVCI; Ho Chi Minh → VVTS; Port Klang → WMKK; Singapore → WSSS
 - World seed: **934** airports; **121** ports; fuel trucks **420**; **+5** VN/MY/SG regions
 - Remaps: `VVGL→VVNB`, `VVLT→VVTS`
-- Next: Indonesia / East Malaysia / Philippines face
+- Next: Indonesia / East Malaysia / Philippines
+
+## Asia-12 Indonesia / East Malaysia / Philippines
+
+- Countries: ID / PH. East Malaysia regions **MY-E** (Sabah) / **MY-K** (Sarawak) added to existing MY. Brunei / Papua / Batam deferred
+- ICAO traps: Jakarta **WIII** (not **WIHH** Halim); Medan **WIMM** (not **WIMK** Polonia); Bali **WADD**; Cagayan **RPMY** (not **RPML** Lumbia); skip Semarang WARS/WAHS, Yogyakarta WAHI, Subic RPLB
+- Ports: Tanjung Priok → WIII; Tanjung Perak → WARR; Belawan → WIMM; Kota Kinabalu → WBKK; Kuching → WBGG; Manila → RPLL; Cebu → RPVM
+- World seed: **948** airports; **128** ports; fuel trucks **470**; **+10** ID/MY-east/PH regions
+- Remaps: `WIMK→WIMM`, `WRRR→WADD`, `RPML→RPMY`
+- Next: China / Japan / Korea face
 
 ## SimBrief cargo allowlist
 

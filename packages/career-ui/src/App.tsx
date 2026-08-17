@@ -1102,8 +1102,28 @@ function regionLabel(region: string): string {
       return 'Malaysia — Central / Kuala Lumpur';
     case 'MY-N':
       return 'Malaysia — North / Penang';
+    case 'MY-E':
+      return 'Malaysia — Sabah / Kota Kinabalu';
+    case 'MY-K':
+      return 'Malaysia — Sarawak / Kuching';
     case 'SG-C':
       return 'Singapore';
+    case 'ID-J':
+      return 'Indonesia — Java / Jakarta';
+    case 'ID-S':
+      return 'Indonesia — Sumatra / Medan';
+    case 'ID-B':
+      return 'Indonesia — Bali / Denpasar';
+    case 'ID-K':
+      return 'Indonesia — Kalimantan / Balikpapan';
+    case 'ID-U':
+      return 'Indonesia — Sulawesi / Makassar';
+    case 'PH-L':
+      return 'Philippines — Luzon / Manila';
+    case 'PH-V':
+      return 'Philippines — Visayas / Cebu';
+    case 'PH-M':
+      return 'Philippines — Mindanao / Davao';
     default:
       return region;
   }

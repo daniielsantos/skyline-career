@@ -313,6 +313,13 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['MY', 'TH'],
     ['MY', 'SG'],
     ['SG', 'TH'],
+    // Asia-12 Indonesia / Philippines (do not backfill remaining EU-2+ pairs here)
+    ['ID', 'SG'],
+    ['ID', 'MY'],
+    ['ID', 'PH'],
+    ['PH', 'SG'],
+    ['PH', 'MY'],
+    ['PH', 'VN'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

@@ -84,9 +84,9 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 910);
+    assert.equal(world.airports.length, 916);
     assert.equal(world.homeCountryId, 'BR');
-    assert.ok((world.internationalLanes?.length ?? 0) >= 212);
+    assert.ok((world.internationalLanes?.length ?? 0) >= 217);
     const br = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'BR',
     );
@@ -419,6 +419,12 @@ describe('career-economy seed', () => {
     const bd = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'BD',
     );
+    const bt = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'BT',
+    );
+    const mm = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'MM',
+    );
     assert.equal(br.length, 62);
     assert.equal(us.length, 123);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
@@ -551,6 +557,8 @@ describe('career-economy seed', () => {
     assert.equal(af.length, 4);
     assert.equal(np.length, 3);
     assert.equal(bd.length, 4);
+    assert.equal(bt.length, 2);
+    assert.equal(mm.length, 4);
     assert.deepEqual(
       [...listWorldCountryIds(world)].sort(),
       [
@@ -572,6 +580,7 @@ describe('career-economy seed', () => {
         'BO',
         'BR',
         'BS',
+        'BT',
         'BY',
         'BZ',
         'CA',
@@ -628,6 +637,7 @@ describe('career-economy seed', () => {
         'MD',
         'ME',
         'MK',
+        'MM',
         'MQ',
         'MT',
         'MX',
@@ -882,6 +892,28 @@ describe('career-economy seed', () => {
       world.airports.some((airport) => airport.icao === 'VGZR'),
       false,
     );
+    assert.ok(world.airports.some((airport) => airport.icao === 'VQPR'));
+    assert.ok(world.airports.some((airport) => airport.icao === 'VQGP'));
+    assert.ok(world.airports.some((airport) => airport.icao === 'VYYY'));
+    assert.ok(world.airports.some((airport) => airport.icao === 'VYMD'));
+    assert.ok(world.airports.some((airport) => airport.icao === 'VYNT'));
+    assert.ok(world.airports.some((airport) => airport.icao === 'VYSW'));
+    assert.equal(
+      world.airports.find((a) => a.icao === 'VQPR')?.hubTier,
+      'major',
+    );
+    assert.equal(
+      world.airports.find((a) => a.icao === 'VYYY')?.hubTier,
+      'major',
+    );
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'VYML'),
+      false,
+    );
+    assert.equal(
+      world.airports.some((airport) => airport.icao === 'VTBS'),
+      false,
+    );
     assert.deepEqual(
       new Set(world.airports.map((airport) => airport.region)),
       new Set([
@@ -1089,6 +1121,9 @@ describe('career-economy seed', () => {
         'NP-C',
         'BD-C',
         'BD-E',
+        'BT-C',
+        'MM-S',
+        'MM-N',
       ]),
     );
     assert.equal(world.tick, 0);
@@ -2596,7 +2631,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 38);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 910);
+    assert.equal(migrated.airports.length, 916);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));
@@ -2652,6 +2687,9 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.ok(migrated.airports.some((a) => a.icao === 'VNPK'));
     assert.ok(migrated.airports.some((a) => a.icao === 'VGHS'));
     assert.ok(migrated.airports.some((a) => a.icao === 'VGEG'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'VQPR'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'VYYY'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'VYMD'));
     assert.ok((migrated.internationalLanes?.length ?? 0) >= 30);
     const again = createSeedEconomyWorld({ seed: 'hub-coverage-idem' });
     assert.equal(ensureCareerHubCoverage(again), false);

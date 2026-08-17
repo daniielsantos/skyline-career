@@ -1049,6 +1049,12 @@ function regionLabel(region: string): string {
       return 'Bangladesh — Central / Dhaka';
     case 'BD-E':
       return 'Bangladesh — East / Chittagong';
+    case 'BT-C':
+      return 'Bhutan — Paro';
+    case 'MM-S':
+      return 'Myanmar — South / Yangon';
+    case 'MM-N':
+      return 'Myanmar — North / Mandalay';
     default:
       return region;
   }

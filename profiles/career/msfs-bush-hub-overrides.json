@@ -13710,5 +13710,119 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "VQGP": {
+    "name": "Gelephu Airport",
+    "lat": 26.884572207927704,
+    "lon": 90.46416118741035,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 118.23698425292969,
+        "lengthM": 1494.5478515625,
+        "widthM": 28.748117446899414,
+        "lat": 26.884564496576786,
+        "lon": 90.46415492892265,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VQPR": {
+    "name": "Paro",
+    "lat": 27.403119318187237,
+    "lon": 89.42480564117432,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 150.41464233398438,
+        "lengthM": 2265.366455078125,
+        "widthM": 30.9686279296875,
+        "lat": 27.403279580175877,
+        "lon": 89.42470997571945,
+        "identReciprocal": "33",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "VYMD": {
+    "name": "Mandalay Intl",
+    "lat": 21.701072193682194,
+    "lon": 95.97745567560196,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 170.70303344726562,
+        "lengthM": 4266.37646484375,
+        "widthM": 54.30892562866211,
+        "lat": 21.70105442404747,
+        "lon": 95.97743555903435,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VYNT": {
+    "name": "Naypyitaw Intl",
+    "lat": 19.623550102114677,
+    "lon": 96.20099991559982,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 157.35328674316406,
+        "lengthM": 3654.505615234375,
+        "widthM": 54.65745162963867,
+        "lat": 19.623548090457916,
+        "lon": 96.2010084092617,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VYSW": {
+    "name": "Sittwe",
+    "lat": 20.13277217745781,
+    "lon": 92.87264719605446,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 104.1550064086914,
+        "lengthM": 1838.89599609375,
+        "widthM": 42.614112854003906,
+        "lat": 20.13276446610689,
+        "lon": 92.87268877029419,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VYYY": {
+    "name": "Yangon Intl",
+    "lat": 16.90726663917303,
+    "lon": 96.13323882222176,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 33.087493896484375,
+        "lengthM": 3417.99853515625,
+        "widthM": 57.24928665161133,
+        "lat": 16.910850070416927,
+        "lon": 96.13569796085358,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

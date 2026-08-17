@@ -142,7 +142,15 @@
 - Ports: Chittagong → VGEG
 - World seed: **910** airports; **114** ports; fuel trucks **365**; **+3** Nepal/Bangladesh regions
 - Remaps: `VNPR→VNPK`, `VGZR→VGHS`
-- Next: BT / South-East Asia face
+- Next: BT / Myanmar (Thailand deferred)
+
+## Asia-9 Bhutan / Myanmar
+
+- Countries: BT (landlocked) / MM (Yangon river→sea)
+- ICAO traps: Paro **VQPR** (not Thailand Betong BTZ/VTSY); Yangon **VYYY** (country MM, ICAO VY* — not Mexico MM*); skip military VYML/VYNP/VYST; Thailand VT* deferred
+- Ports: Yangon → VYYY
+- World seed: **916** airports; **115** ports; fuel trucks **380**; **+3** Bhutan/Myanmar regions
+- Next: Thailand / South-East Asia face
 
 ## SimBrief cargo allowlist
 

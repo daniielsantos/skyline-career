@@ -296,6 +296,12 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['NP', 'IN'],
     ['BD', 'IN'],
     ['BD', 'NP'],
+    // Asia-9 Bhutan / Myanmar (do not backfill remaining EU-2+ pairs here)
+    ['BT', 'IN'],
+    ['BT', 'NP'],
+    ['BT', 'BD'],
+    ['MM', 'BD'],
+    ['MM', 'IN'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

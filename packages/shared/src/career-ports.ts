@@ -1004,6 +1004,14 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 91.8,
     pickupHubs: ['VGEG'],
   },
+  {
+    id: 'MMYGN',
+    name: 'Yangon',
+    countryId: 'MM',
+    lat: 16.78,
+    lon: 96.17,
+    pickupHubs: ['VYYY'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

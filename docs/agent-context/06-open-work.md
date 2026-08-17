@@ -56,10 +56,11 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 23. ~~**MENA-4 Levant-east**~~ — JO/LB/SY; seed **848**; ports **102**; fuel trucks **230**. ICAO: OJAI/OLBA/OSDI. Homolog after rebuild.
 24. ~~**MENA-5 Maghreb/Nile gap**~~ — LY/SD; seed **854**; ports **104**; fuel trucks **245**. ICAO: HLLM (not HLLT)/HLLB/HSSK (not HSSS)/HSPN. Homolog after rebuild.
 25. ~~**MENA-6 Yemen**~~ — YE; seed **858**; ports **106**; fuel trucks **255**. ICAO: OYSN/OYAA. Homolog after rebuild.
-26. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
-27. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
-28. Next map slice: **Asia** (start small).
-29. Re-run `npm run career-hubs -- missing` após rebuild shared.
+26. ~~**Asia-1 Pakistan**~~ — PK; seed **864**; ports **107**; fuel trucks **265**. ICAO: OPIS (not OPRN)/OPKC. Homolog after rebuild.
+27. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
+28. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
+29. Next map slice: **Asia** (India west or Central Asia).
+30. Re-run `npm run career-hubs -- missing` após rebuild shared.
 
 ## Feito (shipped 0.3.47)
 

@@ -292,6 +292,8 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // MENA-5: closed Tripoli HLLT → Mitiga HLLM; legacy Khartoum HSSS → HSSK
   HLLT: 'HLLM',
   HSSS: 'HSSK',
+  // Asia-1: old Islamabad / Chaklala OPRN → OPIS
+  OPRN: 'OPIS',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

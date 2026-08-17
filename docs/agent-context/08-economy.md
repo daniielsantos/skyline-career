@@ -25,7 +25,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **MENA-3 North Gulf** no seed: IQ/IR — **841** airports; **99** ports; fuel trucks **215**. ICAO: ORBI (not ORBS), ORMM, OIIE (OIII regional), OIKB Bandar Abbas (not OIBA), OIKK Kerman.
 - **MENA-4 Levant-east** no seed: JO/LB/SY — **848** airports; **102** ports; fuel trucks **230**. ICAO: OJAI (not OJAM-as-only-major), OLBA, OSDI.
 - **MENA-5 Maghreb/Nile gap** no seed: LY/SD — **854** airports; **104** ports; fuel trucks **245**. ICAO: HLLM (not HLLT), HLLB, HSSK (not HSSS), HSPN.
-- **MENA-6 Yemen** no seed: YE — **858** airports; **106** ports; fuel trucks **255**. ICAO: OYSN, OYAA. Next slice: Asia.
+- **MENA-6 Yemen** no seed: YE — **858** airports; **106** ports; fuel trucks **255**. ICAO: OYSN, OYAA.
+- **Asia-1 Pakistan** no seed: PK — **864** airports; **107** ports; fuel trucks **265**. ICAO: OPIS (not OPRN), OPKC. Next slice: India west or Central Asia.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).

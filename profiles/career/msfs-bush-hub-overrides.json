@@ -12544,5 +12544,159 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "OPIS": {
+    "name": "Islamabad Intl",
+    "lat": 33.549083434045315,
+    "lon": 72.82564982771873,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "28L",
+        "headingTrueDeg": 280.58880615234375,
+        "lengthM": 3659.934814453125,
+        "widthM": 65,
+        "lat": 33.54813527315855,
+        "lon": 72.82540887594223,
+        "identReciprocal": "10R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "28R",
+        "headingTrueDeg": 280.4895324707031,
+        "lengthM": 3663.667236328125,
+        "widthM": 45,
+        "lat": 33.549988344311714,
+        "lon": 72.82580628991127,
+        "identReciprocal": "10L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OPKC": {
+    "name": "Jinnah Intl",
+    "lat": 24.908558316528797,
+    "lon": 67.16276094317436,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7L",
+        "headingTrueDeg": 74.38766479492188,
+        "lengthM": 3186.82177734375,
+        "widthM": 42.69441604614258,
+        "lat": 24.908557310700417,
+        "lon": 67.16276049613953,
+        "identReciprocal": "25R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "7R",
+        "headingTrueDeg": 74.37788391113281,
+        "lengthM": 3397.721435546875,
+        "widthM": 46.244163513183594,
+        "lat": 24.90471538156271,
+        "lon": 67.15884894132614,
+        "identReciprocal": "25L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OPLA": {
+    "name": "Allama Iqbal Intl",
+    "lat": 31.521561071276665,
+    "lon": 74.40457507967949,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18R",
+        "headingTrueDeg": 180.8562469482422,
+        "lengthM": 2748.982421875,
+        "widthM": 47.029457092285156,
+        "lat": 31.521621756255627,
+        "lon": 74.40258085727692,
+        "identReciprocal": "36L",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "18L",
+        "headingTrueDeg": 180.82359313964844,
+        "lengthM": 3351.738525390625,
+        "widthM": 44.632545471191406,
+        "lat": 31.521601639688015,
+        "lon": 74.40457105636597,
+        "identReciprocal": "36R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OPMT": {
+    "name": "Multan Intl",
+    "lat": 30.203222148120403,
+    "lon": 71.4191110432148,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 183.31431579589844,
+        "lengthM": 3203.142578125,
+        "widthM": 47.072044372558594,
+        "lat": 30.205311253666878,
+        "lon": 71.41921475529671,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OPPS": {
+    "name": "Peshawar Intl",
+    "lat": 33.99391405284405,
+    "lon": 71.51458337903023,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "35",
+        "headingTrueDeg": 356.0060119628906,
+        "lengthM": 2742.07666015625,
+        "widthM": 42.071937561035156,
+        "lat": 33.993760496377945,
+        "lon": 71.51457443833351,
+        "identReciprocal": "17",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OPQT": {
+    "name": "Samungli",
+    "lat": 30.252144299447536,
+    "lon": 66.93868070840836,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "31L",
+        "headingTrueDeg": 316.62982177734375,
+        "lengthM": 3648.066650390625,
+        "widthM": 29.068708419799805,
+        "lat": 30.250716023147106,
+        "lon": 66.93696856498718,
+        "identReciprocal": "13R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "31R",
+        "headingTrueDeg": 316.6147155761719,
+        "lengthM": 3647.62158203125,
+        "widthM": 40.96192169189453,
+        "lat": 30.252156034111977,
+        "lon": 66.93868786096573,
+        "identReciprocal": "13L",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

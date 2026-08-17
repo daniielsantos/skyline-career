@@ -112,6 +112,7 @@ describe('career partition', () => {
       'OM',
       'PA',
       'PE',
+      'PK',
       'PL',
       'PT',
       'PY',

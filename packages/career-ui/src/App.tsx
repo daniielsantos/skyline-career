@@ -1005,6 +1005,10 @@ function regionLabel(region: string): string {
       return "Yemen — North / Sana'a";
     case 'YE-S':
       return 'Yemen — South / Aden';
+    case 'PK-N':
+      return 'Pakistan — North / Islamabad';
+    case 'PK-S':
+      return 'Pakistan — South / Karachi';
     default:
       return region;
   }

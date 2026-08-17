@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 255;
+export const FUEL_TRUCK_FLEET_SIZE = 265;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 71 },
-  { truckClassId: 'semi_tanker', count: 115 },
-  { truckClassId: 'btrain_tanker', count: 69 },
+  { truckClassId: 'rigid_tanker', count: 74 },
+  { truckClassId: 'semi_tanker', count: 119 },
+  { truckClassId: 'btrain_tanker', count: 72 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -219,6 +219,9 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   // MENA-6 Yemen domestic road graph
   'YE-N': ['YE-S'],
   'YE-S': ['YE-N'],
+  // Asia-1 Pakistan domestic road graph
+  'PK-N': ['PK-S'],
+  'PK-S': ['PK-N'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -367,6 +370,12 @@ const TRUCK_NAME_POOL = [
   'Aden Gulf Tank',
   'Hodeidah Red Sea Tank',
   'Mukalla Riyan Tank',
+  'Karachi Jinnah Tank',
+  'Islamabad Fuel Road',
+  'Lahore Tank Line',
+  'Peshawar Fuel Run',
+  'Quetta Highland Tank',
+  'Multan Canal Fuel',
 ] as const;
 
 function hashSeed(seed: string): number {

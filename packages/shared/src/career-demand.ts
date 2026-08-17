@@ -258,6 +258,11 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['YE', 'OM'],
     ['YE', 'AE'],
     ['YE', 'SD'],
+    // Asia-1 Pakistan (do not backfill remaining EU-2+ pairs here)
+    ['PK', 'AE'],
+    ['PK', 'OM'],
+    ['PK', 'IR'],
+    ['PK', 'SA'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

@@ -75,11 +75,19 @@
 
 ## MENA-6 Yemen
 
-- Countries: YE (Asia deferred)
+- Countries: YE
 - ICAO traps: Sana'a **OYSN**; Aden **OYAA**
 - Ports: Aden → OYAA; Hodeidah → OYHD
 - World seed: **858** airports; **106** ports; fuel trucks **255**; **+2** Yemen regions
-- Next: Asia
+
+## Asia-1 Pakistan
+
+- Countries: PK (India / Central Asia deferred)
+- ICAO traps: Islamabad **OPIS** (not old **OPRN** Chaklala); Karachi **OPKC** (not OPMR Masroor); Lahore **OPLA**
+- Ports: Karachi → OPKC
+- World seed: **864** airports; **107** ports; fuel trucks **265**; **+2** Pakistan regions
+- Remaps: `OPRN→OPIS`
+- Next: India west or Central Asia
 
 ## SimBrief cargo allowlist
 

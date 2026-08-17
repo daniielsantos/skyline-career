@@ -940,6 +940,14 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     lon: 42.95,
     pickupHubs: ['OYHD'],
   },
+  {
+    id: 'PKKHI',
+    name: 'Karachi',
+    countryId: 'PK',
+    lat: 24.85,
+    lon: 66.98,
+    pickupHubs: ['OPKC'],
+  },
 ];
 
 const PORT_BY_ID = new Map(CAREER_PORTS.map((p) => [p.id, p]));

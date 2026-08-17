@@ -17,7 +17,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **EU-3 Central-East + Baltics** no seed: PL/CZ/SK/HU/EE/LV/LT.
 - **EU-4 Balkans** no seed: HR/SI/RO/BG/GR/RS.
 - **EU-5 Iceland** no seed: IS.
-- **EU-6 W. Balkans** no seed: BA/ME/AL/MK — **748** airports; **77** ports; fuel trucks **140**.
+- **EU-6 W. Balkans** no seed: BA/ME/AL/MK.
+- **EU-7 East** no seed: TR/UA — **762** airports; **80** ports; fuel trucks **148**.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — usam **bush trips**.

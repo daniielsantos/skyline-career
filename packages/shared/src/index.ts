@@ -87,6 +87,8 @@ export * from './career-ba-hubs.js';
 export * from './career-me-hubs.js';
 export * from './career-al-hubs.js';
 export * from './career-mk-hubs.js';
+export * from './career-tr-hubs.js';
+export * from './career-ua-hubs.js';
 export * from './career-simbrief-airports.js';
 export * from './career-player-airframes.js';
 export * from './market-board-query.js';

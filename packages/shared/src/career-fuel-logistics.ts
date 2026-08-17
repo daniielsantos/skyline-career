@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 140;
+export const FUEL_TRUCK_FLEET_SIZE = 148;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 41 },
-  { truckClassId: 'semi_tanker', count: 62 },
-  { truckClassId: 'btrain_tanker', count: 37 },
+  { truckClassId: 'rigid_tanker', count: 43 },
+  { truckClassId: 'semi_tanker', count: 66 },
+  { truckClassId: 'btrain_tanker', count: 39 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -166,6 +166,13 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   // EU-5 Iceland domestic road graph
   'IS-SW': ['IS-NE'],
   'IS-NE': ['IS-SW'],
+  // EU-7 East domestic road graphs
+  'TR-W': ['TR-C'],
+  'TR-C': ['TR-W', 'TR-E'],
+  'TR-E': ['TR-C'],
+  'UA-W': ['UA-C'],
+  'UA-C': ['UA-W', 'UA-E'],
+  'UA-E': ['UA-C'],
 };
 
 const TRUCK_NAME_POOL = [
@@ -250,6 +257,12 @@ const TRUCK_NAME_POOL = [
   'Podgorica Fuel Road',
   'Tirana Jet Haul',
   'Skopje Tank Line',
+  'Istanbul Jet Road',
+  'Ankara Tank Haul',
+  'Izmir Port Fuel',
+  'Kyiv Boryspil Tank',
+  'Lviv Fuel Road',
+  'Odesa Harbor Tank',
 ] as const;
 
 function hashSeed(seed: string): number {

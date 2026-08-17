@@ -84,7 +84,7 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 748);
+    assert.equal(world.airports.length, 762);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 119);
     const br = world.airports.filter(
@@ -296,6 +296,12 @@ describe('career-economy seed', () => {
     const mk = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'MK',
     );
+    const tr = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'TR',
+    );
+    const ua = world.airports.filter(
+      (a) => countryIdFromRegion(a.region) === 'UA',
+    );
     assert.equal(br.length, 62);
     assert.equal(us.length, 123);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
@@ -387,6 +393,8 @@ describe('career-economy seed', () => {
     assert.equal(me.length, 2);
     assert.equal(al.length, 2);
     assert.equal(mk.length, 2);
+    assert.equal(tr.length, 8);
+    assert.equal(ua.length, 6);
     assert.deepEqual(
       [...listWorldCountryIds(world)].sort(),
       [
@@ -457,7 +465,9 @@ describe('career-economy seed', () => {
         'SR',
         'SV',
         'SX',
+        'TR',
         'TT',
+        'UA',
         'US',
         'UY',
         'VE',
@@ -610,6 +620,12 @@ describe('career-economy seed', () => {
         'ME-C',
         'AL-C',
         'MK-C',
+        'TR-W',
+        'TR-C',
+        'TR-E',
+        'UA-W',
+        'UA-C',
+        'UA-E',
       ]),
     );
     assert.equal(world.tick, 0);
@@ -2114,7 +2130,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 38);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 748);
+    assert.equal(migrated.airports.length, 762);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));

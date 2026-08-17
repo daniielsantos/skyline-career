@@ -893,6 +893,18 @@ function regionLabel(region: string): string {
       return 'Albania';
     case 'MK-C':
       return 'North Macedonia';
+    case 'TR-W':
+      return 'Turkey — West';
+    case 'TR-C':
+      return 'Turkey — Central / South';
+    case 'TR-E':
+      return 'Turkey — East';
+    case 'UA-W':
+      return 'Ukraine — West / Black Sea';
+    case 'UA-C':
+      return 'Ukraine — Central';
+    case 'UA-E':
+      return 'Ukraine — East';
     default:
       return region;
   }

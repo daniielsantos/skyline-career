@@ -352,6 +352,16 @@ import {
   MK_CAREER_HUBS,
   buildMkFeederCorridors,
 } from './career-mk-hubs.js';
+import {
+  assertTrCareerHubCatalog,
+  TR_CAREER_HUBS,
+  buildTrFeederCorridors,
+} from './career-tr-hubs.js';
+import {
+  assertUaCareerHubCatalog,
+  UA_CAREER_HUBS,
+  buildUaFeederCorridors,
+} from './career-ua-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -864,6 +874,8 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(ME_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(AL_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(MK_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(TR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(UA_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1256,6 +1268,18 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'LYPG', b: 'LYTV', weight: 1.6 },
   { a: 'LATI', b: 'LAKU', weight: 1.5 },
   { a: 'LWSK', b: 'LWOH', weight: 1.6 },
+  // EU-7 East domestic trunks
+  { a: 'LTFM', b: 'LTFJ', weight: 2.0 },
+  { a: 'LTFM', b: 'LTBJ', weight: 1.9 },
+  { a: 'LTFM', b: 'LTAC', weight: 2.0 },
+  { a: 'LTAC', b: 'LTAI', weight: 1.8 },
+  { a: 'LTAC', b: 'LTAJ', weight: 1.7 },
+  { a: 'LTAC', b: 'LTCG', weight: 1.6 },
+  { a: 'UKBB', b: 'UKKK', weight: 1.8 },
+  { a: 'UKBB', b: 'UKLL', weight: 1.9 },
+  { a: 'UKBB', b: 'UKOO', weight: 1.8 },
+  { a: 'UKBB', b: 'UKHH', weight: 1.8 },
+  { a: 'UKHH', b: 'UKDD', weight: 1.5 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1335,6 +1359,8 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildMeFeederCorridors(ME_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildAlFeederCorridors(AL_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMkFeederCorridors(MK_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildTrFeederCorridors(TR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildUaFeederCorridors(UA_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -2940,6 +2966,87 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'LOWW',
     capacityKgPerDay: 35_000,
   },
+  // EU-7 East
+  {
+    id: 'lane_ltfm_lgav',
+    originCountryId: 'TR',
+    destCountryId: 'GR',
+    originIcao: 'LTFM',
+    destIcao: 'LGAV',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_ltfm_lrop',
+    originCountryId: 'TR',
+    destCountryId: 'RO',
+    originIcao: 'LTFM',
+    destIcao: 'LROP',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_ltfm_eddf',
+    originCountryId: 'TR',
+    destCountryId: 'DE',
+    originIcao: 'LTFM',
+    destIcao: 'EDDF',
+    capacityKgPerDay: 50_000,
+  },
+  {
+    id: 'lane_ltac_lhbp',
+    originCountryId: 'TR',
+    destCountryId: 'HU',
+    originIcao: 'LTAC',
+    destIcao: 'LHBP',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ltfm_lbsf',
+    originCountryId: 'TR',
+    destCountryId: 'BG',
+    originIcao: 'LTFM',
+    destIcao: 'LBSF',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ukbb_epwa',
+    originCountryId: 'UA',
+    destCountryId: 'PL',
+    originIcao: 'UKBB',
+    destIcao: 'EPWA',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_ukbb_lrop',
+    originCountryId: 'UA',
+    destCountryId: 'RO',
+    originIcao: 'UKBB',
+    destIcao: 'LROP',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ukbb_lhbp',
+    originCountryId: 'UA',
+    destCountryId: 'HU',
+    originIcao: 'UKBB',
+    destIcao: 'LHBP',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ukll_epwa',
+    originCountryId: 'UA',
+    destCountryId: 'PL',
+    originIcao: 'UKLL',
+    destIcao: 'EPWA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_ukoo_lrop',
+    originCountryId: 'UA',
+    destCountryId: 'RO',
+    originIcao: 'UKOO',
+    destIcao: 'LROP',
+    capacityKgPerDay: 35_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -3291,6 +3398,14 @@ export const FUEL_HUB_ICAOS = new Set([
   'LYPG',
   'LATI',
   'LWSK',
+  // EU-7 East
+  'LTFM',
+  'LTAC',
+  'LTBJ',
+  'LTAI',
+  'UKBB',
+  'UKLL',
+  'UKOO',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -3969,6 +4084,18 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    TR_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    UA_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -4351,6 +4478,8 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertMeCareerHubCatalog();
   assertAlCareerHubCatalog();
   assertMkCareerHubCatalog();
+  assertTrCareerHubCatalog();
+  assertUaCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -4998,6 +5127,24 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...MK_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...TR_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...UA_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

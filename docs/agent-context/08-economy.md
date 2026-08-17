@@ -42,15 +42,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Asia-14 Taiwan / Australia / New Zealand** no seed: TW/AU/NZ — **974** airports; **141** ports; fuel trucks **565**. ICAO: RCTP (not RCSS as major), YSSY (not YSBK), YMML (not YMEN), NZAA (not NZWN).
 - **Asia-15 China inland / Pacific hinge** no seed: CN inland + US-HI/FJ/PG/NC — **984** airports; **147** ports; fuel trucks **585**. ICAO: ZLXY (not ZLSN), ZPPP, ZYTL, PHNL, NFFN, AYPY, NWWW (not NWWM).
 - **Asia-16 Guam / Polynesia / Micronesia** no seed: US-GU/US-AS + PF/PW/WS/TO — **990** airports; **153** ports; fuel trucks **615**. ICAO: PGUM (not PGUA), NTAA, PTRO, NSTU, NSFA, NFTF (not NFTV).
-- **Asia-17 Vanuatu / Solomon / Cook / Kiribati** no seed: VU/SB/CK/KI — **994** airports; **157** ports; fuel trucks **635**. ICAO: NVVV (not NVSS), AGGH (not AGGM), NCRG (not NCAI), NGTA (not PLCH). **Map seed complete.**
-- **Asia-18 Saipan micro-slice (pending homolog):** US-MP **PGSN** — **995** airports; **158** ports; fuel trucks **640**. Lanes PGSN–PGUM/PHNL.
-- **Asia-19 Kiritimati micro-slice (pending homolog):** KI-L **PLCH** — **996** airports; **159** ports; fuel trucks **645**. Lanes PLCH–NFFN/PHNL.
-- **Asia-20 Vava'u micro-slice (pending homolog):** TO-V **NFTV** — **997** airports; **160** ports; fuel trucks **650**. Lanes NFTV–NZAA/NCRG.
-- **Asia-21 Santo micro-slice (pending homolog):** VU-S **NVSS** — **998** airports; **161** ports; fuel trucks **655**. Lanes NVSS–NWWW/YSSY.
-- **Asia-22 Munda micro-slice (pending homolog):** SB-W **AGGM** — **999** airports; **162** ports; fuel trucks **660**. Lanes AGGM–AYPY/YSSY.
-- **Asia-23 Aitutaki micro-slice (pending homolog):** CK-N **NCAI** — **1000** airports; **163** ports; fuel trucks **665**. Lanes NCAI–NZAA/NTAA.
-- **Asia-24 Bora Bora micro-slice (pending homolog):** PF-L **NTTB** — **1001** airports; **164** ports; fuel trucks **670**. Lanes NTTB–NZAA/NCRG.
-- **Asia-25 Asau micro-slice (pending homolog):** WS-S **NSAU** — **1002** airports; **165** ports; fuel trucks **675**. Lanes NSAU–NZAA/NFTV.
+- **Asia-17 Vanuatu / Solomon / Cook / Kiribati** no seed: VU/SB/CK/KI — **994** airports; **157** ports; fuel trucks **635**. ICAO: NVVV (not NVSS), AGGH (not AGGM), NCRG (not NCAI), NGTA (not PLCH).
+- **Asia-18–25 Pacific micro-hubs** no seed: US-MP/KI-L/TO-V/VU-S/SB-W/CK-N/PF-L/WS-S — **1002** airports; **165** ports; fuel trucks **675**. ICAO: PGSN, PLCH, NFTV, NVSS, AGGM, NCAI, NTTB, NSAU. Demand pairs: KI/US, TO/CK, TO/US, WS/TO. **Map seed complete.**
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).

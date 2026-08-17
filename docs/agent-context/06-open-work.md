@@ -47,7 +47,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 16. ~~**EU-5 Iceland**~~ — IS; seed **738**; ports **75**; fuel trucks **134**.
 17. ~~**EU-6 W. Balkans**~~ — BA/ME/AL/MK; seed **748**; ports **77**; fuel trucks **140**.
 18. ~~**EU-7 East**~~ — TR/UA; seed **762**; ports **80**; fuel trucks **148**.
-19. ~~**EU-8 Europe gaps**~~ — BY/MD/GE/AM/AZ/LU/MT/CY/XK; seed **779**; ports **84**; fuel trucks **158**.
+19. ~~**EU-8 Europe gaps**~~ — BY/MD/GE/AM/AZ/LU/MT/CY/XK; seed **778**; ports **84**; fuel trucks **158**. Homolog: UBBG/UDSG; UGKO dropped (no stock MSFS).
 20. Homologar wing tanks Twin Otter com vars corretas + writetest (só se quiser range completo).
 21. Dual-client IPC — **só** se freeze Watch+inject ainda aparecer no 0.3.24+.
 22. Next map slice: MENA / Asia.

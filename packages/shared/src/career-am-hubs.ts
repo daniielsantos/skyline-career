@@ -35,7 +35,7 @@ export const AM_CAREER_HUBS: readonly AmCareerHubDef[] = [
     consume: { perishables: 1.15, supplies: 1.05, general: 1.05 },
   },
   {
-    icao: 'UDLS',
+    icao: 'UDSG',
     name: 'Gyumri Shirak',
     region: 'AM-C',
     hubTier: 'spoke',

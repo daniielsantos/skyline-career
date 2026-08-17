@@ -30,8 +30,9 @@
 
 - **EU-1…EU-7:** Western / Nordics / Baltics / Balkans / Iceland / TR / UA
 - **EU-8 gaps:** BY / MD / GE / AM / AZ / LU / MT / CY / XK
-- World seed: **779** airports; **84** ports; fuel trucks **158**; **~142** regions
+- World seed: **778** airports; **84** ports; fuel trucks **158**; **~142** regions
 - EU-8 ports: Batumi / Baku / Marsaxlokk / Limassol
+- Homologation: **UBBG** (not UBGN), **UDSG** (not UDLS); **UGKO** omitted (absent in stock MSFS)
 - Microstates without civil hubs (AD/MC/SM/VA/LI) intentionally omitted
 - Next: MENA / Asia
 

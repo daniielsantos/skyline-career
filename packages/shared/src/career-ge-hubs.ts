@@ -1,5 +1,7 @@
 /**
  * Georgia career hub catalog — EU-8 Europe gaps.
+ *
+ * UGKO (Kutaisi) omitted: not present in stock MSFS Facilities scenery.
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
@@ -22,7 +24,7 @@ export type GeCareerHubDef = {
   bush?: true;
 };
 
-/** 3 curated Georgia hubs. */
+/** 2 curated Georgia hubs (stock MSFS Facilities). */
 export const GE_CAREER_HUBS: readonly GeCareerHubDef[] = [
   {
     icao: 'UGTB',
@@ -33,16 +35,6 @@ export const GE_CAREER_HUBS: readonly GeCareerHubDef[] = [
     lon: 44.9547,
     produce: { electronics: 1.25, general: 1.3, machinery: 1.1 },
     consume: { perishables: 1.15, supplies: 1.05, general: 1.05 },
-  },
-  {
-    icao: 'UGKO',
-    name: 'Kutaisi',
-    region: 'GE-C',
-    hubTier: 'regional',
-    lat: 42.1767,
-    lon: 42.4826,
-    produce: { general: 1.2, machinery: 1.1, perishables: 1.1 },
-    consume: { electronics: 0.95, supplies: 1.0 },
   },
   {
     icao: 'UGSB',
@@ -56,7 +48,7 @@ export const GE_CAREER_HUBS: readonly GeCareerHubDef[] = [
   },
 ];
 
-export const GE_CAREER_HUB_COUNT = 3;
+export const GE_CAREER_HUB_COUNT = 2;
 
 export function buildGeFeederCorridors(
   hubs: readonly GeCareerHubDef[] = GE_CAREER_HUBS,

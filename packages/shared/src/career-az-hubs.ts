@@ -35,7 +35,7 @@ export const AZ_CAREER_HUBS: readonly AzCareerHubDef[] = [
     consume: { perishables: 1.15, supplies: 1.1, general: 1.05 },
   },
   {
-    icao: 'UBGN',
+    icao: 'UBBG',
     name: 'Ganja',
     region: 'AZ-C',
     hubTier: 'regional',

@@ -281,6 +281,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   SPMS: 'SPJI',
   SVCP: 'SVMT',
   ESMX: 'ESMQ',
+  // EU-8 MSFS Facilities corrections
+  UBGN: 'UBBG',
+  UDLS: 'UDSG',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

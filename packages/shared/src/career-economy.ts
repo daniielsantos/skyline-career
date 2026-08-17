@@ -1338,10 +1338,9 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'UMMS', b: 'UMBB', weight: 1.7 },
   { a: 'UMMS', b: 'UMGG', weight: 1.6 },
   { a: 'LUKK', b: 'LUBM', weight: 1.5 },
-  { a: 'UGTB', b: 'UGKO', weight: 1.7 },
   { a: 'UGTB', b: 'UGSB', weight: 1.6 },
-  { a: 'UDYZ', b: 'UDLS', weight: 1.5 },
-  { a: 'UBBB', b: 'UBGN', weight: 1.6 },
+  { a: 'UDYZ', b: 'UDSG', weight: 1.5 },
+  { a: 'UBBB', b: 'UBBG', weight: 1.6 },
   { a: 'LCLK', b: 'LCPH', weight: 1.6 },
 ];
 

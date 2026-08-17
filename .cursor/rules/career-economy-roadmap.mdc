@@ -51,7 +51,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **EU-5 Iceland:** IS curated hubs (BIKF/BIRK/BIAR/BIEG); gateways to EGLL/EIDW/ENGM/EKCH; Reykjavik port; fuel trucks **134**; seed **738** airports / **75** ports.
 - **EU-6 W. Balkans:** BA/ME/AL/MK curated hubs; ring to RS/HR/GR/BG + LOWW gateway; Bar + Durres ports; fuel trucks **140**; seed **748** airports / **77** ports.
 - **EU-7 East:** TR/UA curated hubs; gateways to GR/RO/DE/HU/BG/PL; Istanbul/Izmir/Odesa ports; fuel trucks **148**; seed **762** airports / **80** ports.
-- **EU-8 Europe gaps:** BY/MD/GE/AM/AZ/LU/MT/CY/XK; Caucasus + microstates with civil hubs; Batumi/Baku/Malta/Limassol ports; fuel trucks **158**; seed **779** airports / **84** ports. Europe complete (AD/MC/SM/VA/LI omitted — no civil hubs).
+- **EU-8 Europe gaps:** BY/MD/GE/AM/AZ/LU/MT/CY/XK; Caucasus + microstates with civil hubs; Batumi/Baku/Malta/Limassol ports; fuel trucks **158**; seed **778** airports / **84** ports. Remaps UBGN→UBBG, UDLS→UDSG; UGKO omitted (no stock MSFS facility). Europe complete (AD/MC/SM/VA/LI omitted — no civil hubs).
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 
 ## Near-term priorities (current Brazil career)

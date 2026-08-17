@@ -184,7 +184,15 @@
 - ICAO traps: Beijing **ZBAA** (not **ZBAD** Daxing as major); Shanghai cargo **ZSPD** (not **ZSSS** Hongqiao as major); Chengdu **ZUUU** (not ZUTF Tianfu); Tokyo cargo **RJAA** Narita (not **RJTT** Haneda as major); Seoul **RKSI** Incheon (not **RKSS** Gimpo)
 - Ports: Shanghai → ZSPD; Yantian → ZGSZ; Tokyo → RJTT; Osaka → RJBB; Incheon → RKSI; Busan → RKPK
 - World seed: **962** airports; **134** ports; fuel trucks **525**; **+11** CN/JP/KR regions
-- Next: Taiwan / Australia face
+- Next: Taiwan / Australia / New Zealand
+
+## Asia-14 Taiwan / Australia / New Zealand
+
+- Countries: TW / AU / NZ. Inland China and Pacific islands deferred
+- ICAO traps: Taipei cargo major is **RCTP** Taoyuan (not **RCSS** Songshan); Sydney **YSSY** Kingsford Smith (not **YSBK** Bankstown); Melbourne **YMML** (not **YMEN** Essendon); Auckland **NZAA** (not **NZWN** Wellington); skip RCMQ/RCNN, Darwin YPDN, Hobart YMHB
+- Ports: Keelung → RCTP; Kaohsiung → RCKH; Sydney → YSSY; Melbourne → YMML; Brisbane → YBBN; Fremantle → YPPH; Auckland → NZAA
+- World seed: **974** airports; **141** ports; fuel trucks **565**; **+8** TW/AU/NZ regions
+- Next: leftover China inland / Pacific, or stop map
 
 ## SimBrief cargo allowlist
 

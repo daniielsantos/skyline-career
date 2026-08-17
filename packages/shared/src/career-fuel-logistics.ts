@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 525;
+export const FUEL_TRUCK_FLEET_SIZE = 565;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 147 },
-  { truckClassId: 'semi_tanker', count: 232 },
-  { truckClassId: 'btrain_tanker', count: 146 },
+  { truckClassId: 'rigid_tanker', count: 158 },
+  { truckClassId: 'semi_tanker', count: 250 },
+  { truckClassId: 'btrain_tanker', count: 157 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -285,6 +285,15 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'KR-C': ['KR-S'],
   'KR-S': ['KR-C'],
   'KR-J': [],
+  // Asia-14 Taiwan / Australia / New Zealand domestic road graphs
+  'TW-N': ['TW-S'],
+  'TW-S': ['TW-N'],
+  'AU-E': ['AU-S', 'AU-Q'],
+  'AU-S': ['AU-E'],
+  'AU-Q': ['AU-E'],
+  'AU-W': [],
+  'NZ-N': [],
+  'NZ-S': [],
 };
 
 const TRUCK_NAME_POOL = [
@@ -526,6 +535,15 @@ const TRUCK_NAME_POOL = [
   'Incheon Tank Line',
   'Gimhae Fuel Road',
   'Jeju Fuel Run',
+  'Taoyuan Tank Line',
+  'Songshan Fuel Road',
+  'Kaohsiung Port Fuel',
+  'Kingsford Smith Tank',
+  'Tullamarine Fuel Road',
+  'Brisbane Tank Line',
+  'Perth Fuel Run',
+  'Auckland Tank Line',
+  'Christchurch Fuel',
 ] as const;
 
 function hashSeed(seed: string): number {

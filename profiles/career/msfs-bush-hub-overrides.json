@@ -15068,5 +15068,333 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "NZAA": {
+    "name": "Auckland Intl",
+    "lat": -37.00805548578501,
+    "lon": 174.79166686534882,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5R",
+        "headingTrueDeg": 70.92606353759766,
+        "lengthM": 3681.503173828125,
+        "widthM": 44.708824157714844,
+        "lat": -37.01205600053072,
+        "lon": 174.78619784116745,
+        "identReciprocal": "23L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "NZCH": {
+    "name": "Christchurch Intl",
+    "lat": -43.489444591104984,
+    "lon": 172.53444448113441,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 39.98240661621094,
+        "lengthM": 3289.9921875,
+        "widthM": 38.5106201171875,
+        "lat": -43.48628360778093,
+        "lon": 172.53514409065247,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "2L",
+        "headingTrueDeg": 39.83550262451172,
+        "lengthM": 617.3231201171875,
+        "widthM": 57.866153717041016,
+        "lat": -43.48430782556534,
+        "lon": 172.53260359168053,
+        "identReciprocal": "20R",
+        "surface": "grass"
+      },
+      {
+        "ident": "29",
+        "headingTrueDeg": 310.2008361816406,
+        "lengthM": 1700.806640625,
+        "widthM": 48.59878921508789,
+        "lat": -43.48941508680582,
+        "lon": 172.53277078270912,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RCKH": {
+    "name": "Kaohsiung Intl",
+    "lat": 22.576944530010223,
+    "lon": 120.35027772188187,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 91.90303039550781,
+        "lengthM": 3136.175048828125,
+        "widthM": 57.599998474121094,
+        "lat": 22.5770752876997,
+        "lon": 120.35023614764214,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RCSS": {
+    "name": "Songshan",
+    "lat": 25.069722197949886,
+    "lon": 121.55250012874603,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 92.22949981689453,
+        "lengthM": 2606.126220703125,
+        "widthM": 57.94923400878906,
+        "lat": 25.069591104984283,
+        "lon": 121.55247643589973,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RCTP": {
+    "name": "Taoyuan International Airport",
+    "lat": 25.08027769625187,
+    "lon": 121.23222202062607,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23L",
+        "headingTrueDeg": 229.0020294189453,
+        "lengthM": 3687.265380859375,
+        "widthM": 59.7536735534668,
+        "lat": 25.072364173829556,
+        "lon": 121.23811393976212,
+        "identReciprocal": "5R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23R",
+        "headingTrueDeg": 229.0361785888672,
+        "lengthM": 3651.6025390625,
+        "widthM": 63.09758758544922,
+        "lat": 25.08370790630579,
+        "lon": 121.22970789670944,
+        "identReciprocal": "5L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "YBBN": {
+    "name": "Brisbane Intl",
+    "lat": -27.384166829288006,
+    "lon": 153.1174997985363,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "19L",
+        "headingTrueDeg": 207.03099060058594,
+        "lengthM": 3562.4326171875,
+        "widthM": 45.814735412597656,
+        "lat": -27.38898776471615,
+        "lon": 153.12612041831017,
+        "identReciprocal": "1R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "19R",
+        "headingTrueDeg": 207.0215301513672,
+        "lengthM": 3299.8984375,
+        "widthM": 60.53413772583008,
+        "lat": -27.369817681610584,
+        "lon": 153.11438351869583,
+        "identReciprocal": "1L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "YBCS": {
+    "name": "Cairns Intl",
+    "lat": -16.88583344221115,
+    "lon": 145.75527772307396,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 156.4806365966797,
+        "lengthM": 3195.572265625,
+        "widthM": 45.495601654052734,
+        "lat": -16.879051811993122,
+        "lon": 145.7495440542698,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "YMML": {
+    "name": "Melbourne Intl",
+    "lat": -37.673333175480366,
+    "lon": 144.84333336353302,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 94.23844909667969,
+        "lengthM": 2286.59326171875,
+        "widthM": 45.06748962402344,
+        "lat": -37.66150698065758,
+        "lon": 144.83515441417694,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16",
+        "headingTrueDeg": 171.5957489013672,
+        "lengthM": 3655.04931640625,
+        "widthM": 59.37913513183594,
+        "lat": -37.669486217200756,
+        "lon": 144.83794882893562,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "YPAD": {
+    "name": "Adelaide Intl",
+    "lat": -34.944999888539314,
+    "lon": 138.5305555164814,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 230.1648406982422,
+        "lengthM": 3101.839111328125,
+        "widthM": 45,
+        "lat": -34.949578419327736,
+        "lon": 138.53023409843445,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "30",
+        "headingTrueDeg": 303.49041748046875,
+        "lengthM": 1653.4423828125,
+        "widthM": 45,
+        "lat": -34.94527783244848,
+        "lon": 138.52945625782013,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "YPPH": {
+    "name": "Perth Intl",
+    "lat": -31.940277703106403,
+    "lon": 115.96694424748421,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 193.8741912841797,
+        "lengthM": 3440.7822265625,
+        "widthM": 43.86641311645508,
+        "lat": -31.943666338920593,
+        "lon": 115.96407786011696,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "24",
+        "headingTrueDeg": 238.78529357910156,
+        "lengthM": 2160.583984375,
+        "widthM": 44.47731399536133,
+        "lat": -31.935944259166718,
+        "lon": 115.96900150179863,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "YSCB": {
+    "name": "Canberra",
+    "lat": -35.30694454908371,
+    "lon": 149.1949997842312,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 129.98825073242188,
+        "lengthM": 1676.8909912109375,
+        "widthM": 44.6243896484375,
+        "lat": -35.30552331358194,
+        "lon": 149.19223174452782,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "17",
+        "headingTrueDeg": 179.99575805664062,
+        "lengthM": 3282.72021484375,
+        "widthM": 45.80195617675781,
+        "lat": -35.30541971325874,
+        "lon": 149.19444501399994,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "YSSY": {
+    "name": "Kingsford Smith Intl",
+    "lat": -33.94611105322838,
+    "lon": 151.17722243070602,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 74.16969299316406,
+        "lengthM": 2530,
+        "widthM": 45,
+        "lat": -33.94064337015152,
+        "lon": 151.17679104208946,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16L",
+        "headingTrueDeg": 167.85621643066406,
+        "lengthM": 2438,
+        "widthM": 45,
+        "lat": -33.96035995334387,
+        "lon": 151.19110867381096,
+        "identReciprocal": "34R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16R",
+        "headingTrueDeg": 167.7920684814453,
+        "lengthM": 3962.66064453125,
+        "widthM": 45,
+        "lat": -33.94681815057993,
+        "lon": 151.1761187016964,
+        "identReciprocal": "34L",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

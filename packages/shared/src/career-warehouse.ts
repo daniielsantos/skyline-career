@@ -235,6 +235,13 @@ const PICKUP_HUB_SET = new Set([
   'RJBB',
   'RKSI',
   'RKPK',
+  'RCTP',
+  'RCKH',
+  'YSSY',
+  'YMML',
+  'YBBN',
+  'YPPH',
+  'NZAA',
 ]);
 
 function money(n: number): number {

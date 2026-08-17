@@ -38,7 +38,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Asia-10 Thailand** no seed: TH — **924** airports; **117** ports; fuel trucks **395**. ICAO: VTBS (not VTBD-as-major), VTBU, VTSP.
 - **Asia-11 Vietnam / Malaysia / Singapore** no seed: VN/MY/SG — **934** airports; **121** ports; fuel trucks **420**. ICAO: VVNB/VVTS (not VVGL/VVLT), WMKK, WSSS.
 - **Asia-12 Indonesia / East Malaysia / Philippines** no seed: ID/PH + MY-E/MY-K — **948** airports; **128** ports; fuel trucks **470**. ICAO: WIII (not WIHH), WIMM (not WIMK), RPLL, RPMY (not RPML).
-- **Asia-13 China / Japan / Korea** no seed: CN/JP/KR — **962** airports; **134** ports; fuel trucks **525**. ICAO: ZBAA/ZSPD (not ZBAD/ZSSS as major), RJAA (not RJTT as major), RKSI (not RKSS). Next slice: Taiwan / Australia.
+- **Asia-13 China / Japan / Korea** no seed: CN/JP/KR — **962** airports; **134** ports; fuel trucks **525**. ICAO: ZBAA/ZSPD (not ZBAD/ZSSS as major), RJAA (not RJTT as major), RKSI (not RKSS).
+- **Asia-14 Taiwan / Australia / New Zealand** no seed: TW/AU/NZ — **974** airports; **141** ports; fuel trucks **565**. ICAO: RCTP (not RCSS as major), YSSY (not YSBK), YMML (not YMEN), NZAA (not NZWN). Next slice: leftover China inland / Pacific, or stop map.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).

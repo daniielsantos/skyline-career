@@ -1146,6 +1146,22 @@ function regionLabel(region: string): string {
       return 'South Korea — Busan';
     case 'KR-J':
       return 'South Korea — Jeju';
+    case 'TW-N':
+      return 'Taiwan — Taipei / Taoyuan';
+    case 'TW-S':
+      return 'Taiwan — Kaohsiung';
+    case 'AU-E':
+      return 'Australia — Sydney / Canberra';
+    case 'AU-S':
+      return 'Australia — Melbourne / Adelaide';
+    case 'AU-Q':
+      return 'Australia — Queensland';
+    case 'AU-W':
+      return 'Australia — Perth';
+    case 'NZ-N':
+      return 'New Zealand — Auckland';
+    case 'NZ-S':
+      return 'New Zealand — Christchurch';
     default:
       return region;
   }

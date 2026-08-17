@@ -612,6 +612,21 @@ import {
   KR_CAREER_HUBS,
   buildKrFeederCorridors,
 } from './career-kr-hubs.js';
+import {
+  assertTwCareerHubCatalog,
+  TW_CAREER_HUBS,
+  buildTwFeederCorridors,
+} from './career-tw-hubs.js';
+import {
+  assertAuCareerHubCatalog,
+  AU_CAREER_HUBS,
+  buildAuFeederCorridors,
+} from './career-au-hubs.js';
+import {
+  assertNzCareerHubCatalog,
+  NZ_CAREER_HUBS,
+  buildNzFeederCorridors,
+} from './career-nz-hubs.js';
 import { assertUsPrCareerHubCatalog } from './career-us-pr-hubs.js';
 import { assertUsViCareerHubCatalog } from './career-us-vi-hubs.js';
 import { assertDispatchHubsAreSimBriefKnown } from './career-simbrief-airports.js';
@@ -1176,6 +1191,9 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(CN_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(JP_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(KR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(TW_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(AU_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(NZ_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
 };
 
 export function hubTierOf(airport: Pick<AirportTerminal, 'icao' | 'hubTier'>): HubTier {
@@ -1759,6 +1777,16 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'RJAA', b: 'RJCC', weight: 1.6 },
   { a: 'RKSI', b: 'RKPK', weight: 1.8 },
   { a: 'RKSI', b: 'RKPC', weight: 1.6 },
+  // Asia-14 Taiwan / Australia / New Zealand domestic trunks
+  { a: 'RCTP', b: 'RCSS', weight: 1.8 },
+  { a: 'RCTP', b: 'RCKH', weight: 1.7 },
+  { a: 'YSSY', b: 'YMML', weight: 1.9 },
+  { a: 'YMML', b: 'YPAD', weight: 1.6 },
+  { a: 'YSSY', b: 'YBBN', weight: 1.8 },
+  { a: 'YBBN', b: 'YBCS', weight: 1.5 },
+  { a: 'YSSY', b: 'YPPH', weight: 1.6 },
+  { a: 'YSSY', b: 'YSCB', weight: 1.5 },
+  { a: 'NZAA', b: 'NZCH', weight: 1.7 },
 ];
 
 export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
@@ -1890,6 +1918,9 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildCnFeederCorridors(CN_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildJpFeederCorridors(JP_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildKrFeederCorridors(KR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildTwFeederCorridors(TW_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildAuFeederCorridors(AU_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildNzFeederCorridors(NZ_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
 ];
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
@@ -4907,6 +4938,71 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'WSSS',
     capacityKgPerDay: 35_000,
   },
+  // Asia-14 Taiwan / Australia / New Zealand
+  {
+    id: 'lane_rctp_zspd',
+    originCountryId: 'TW',
+    destCountryId: 'CN',
+    originIcao: 'RCTP',
+    destIcao: 'ZSPD',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_rctp_rjaa',
+    originCountryId: 'TW',
+    destCountryId: 'JP',
+    originIcao: 'RCTP',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_rctp_wsss',
+    originCountryId: 'TW',
+    destCountryId: 'SG',
+    originIcao: 'RCTP',
+    destIcao: 'WSSS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_yssy_wsss',
+    originCountryId: 'AU',
+    destCountryId: 'SG',
+    originIcao: 'YSSY',
+    destIcao: 'WSSS',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_yssy_nzaa',
+    originCountryId: 'AU',
+    destCountryId: 'NZ',
+    originIcao: 'YSSY',
+    destIcao: 'NZAA',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_yssy_rjaa',
+    originCountryId: 'AU',
+    destCountryId: 'JP',
+    originIcao: 'YSSY',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ymml_wsss',
+    originCountryId: 'AU',
+    destCountryId: 'SG',
+    originIcao: 'YMML',
+    destIcao: 'WSSS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_nzaa_wsss',
+    originCountryId: 'NZ',
+    destCountryId: 'SG',
+    originIcao: 'NZAA',
+    destIcao: 'WSSS',
+    capacityKgPerDay: 35_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -5378,6 +5474,15 @@ export const FUEL_HUB_ICAOS = new Set([
   'RKSI',
   'RKPK',
   'RKPC',
+  // Asia-14 Taiwan / Australia / New Zealand
+  'RCTP',
+  'RCKH',
+  'YSSY',
+  'YMML',
+  'YBBN',
+  'YPPH',
+  'NZAA',
+  'NZCH',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -6368,6 +6473,24 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    TW_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    AU_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
+  ...Object.fromEntries(
+    NZ_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -6802,6 +6925,9 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertCnCareerHubCatalog();
   assertJpCareerHubCatalog();
   assertKrCareerHubCatalog();
+  assertTwCareerHubCatalog();
+  assertAuCareerHubCatalog();
+  assertNzCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -7917,6 +8043,33 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...KR_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...TW_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...AU_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...NZ_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

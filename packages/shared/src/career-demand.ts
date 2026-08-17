@@ -330,6 +330,15 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['JP', 'PH'],
     ['KR', 'PH'],
     ['KR', 'SG'],
+    // Asia-14 Taiwan / Australia / New Zealand (do not backfill remaining EU-2+ pairs here)
+    ['TW', 'CN'],
+    ['TW', 'JP'],
+    ['TW', 'SG'],
+    ['AU', 'SG'],
+    ['AU', 'NZ'],
+    ['AU', 'JP'],
+    ['AU', 'ID'],
+    ['NZ', 'SG'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

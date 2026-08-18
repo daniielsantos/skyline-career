@@ -9,6 +9,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
 - Lots / Market / NPC / fuel trucks / hub levels / aircraft market / wear / ledger / SQLite store.
 - **Schema v4:** hubs + stock em tabelas (`airports` / `airport_stock`) com `world_id`; tick ainda in-memory; terminal Inventory usa `GET /api/airport?part=stock` (SQL, sem lock); payload completo (lots/NPC) hidrata depois.
+- **Schema v5:** NPC roster, fuel trucks/hauls, Demand board e port listings/inventory/concessions em tabelas (`world_id`); arrays stripped de `economy_json`. Tick ainda in-memory. WH/concessões do player ficam no `company_state`.
 - Partição por país (`homeCountryId` / região `XX-YY` → país `XX`).
 - **América do Sul completa** no seed: BR/AR/CL + UY/PY/PE/BO/EC/CO/VE/GY/SR/GF.
 - **América Central completa** no seed: PA/CR/NI/HN/GT/SV/BZ.

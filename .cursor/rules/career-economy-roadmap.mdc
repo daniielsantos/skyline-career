@@ -33,7 +33,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **US continental medium map:** 6 regions (NE/SE/MW/SC/MT/W), 24 US hubs, sparse BR↔US intl lanes, NPC fleet 44, fuel trucks 20; resilient regional corridors (≥2 gateways per US regional), critical-full domestic overflow valve, and near-full production throttle; Market `intl` chip; health/market expose `countries` + `internationalLaneCount`.
 - **Lots table (schema v2):** `lots` dual-written with `economy_json` on `saveEconomy`; hydrate overlay on load when table non-empty; real meta upgrade 1→2. Tick/missions still in-memory.
 - **Schema v3:** lots are SoT (stripped from `economy_json`); `companies`/`company_state`/`fleet_aircraft`/`missions` + `inbound_pending`/`npc_flights`/`economy_events`; ledger has `company_id` (`local` for SP). Tick still in-memory behind `CareerStore`.
-- **Schema v4:** world tables are SoT — `worlds` + `economy_meta` + `airports` + `airport_stock` keyed by `world_id` (`local` in SP); hubs/stock stripped from `economy_json`; terminal Inventory is `GET /api/airport?part=stock` (SQL, no career lock); full `/api/airport` still hydrates lots/NPC behind the lock. Tick still in-memory. MP shape: companies belong to a world; lots may carry `claimed_by_company_id`. NPC/fuel/ports still blob (v5).
+- **Schema v4:** world tables are SoT — `worlds` + `economy_meta` + `airports` + `airport_stock` keyed by `world_id` (`local` in SP); hubs/stock stripped from `economy_json`; terminal Inventory is `GET /api/airport?part=stock` (SQL, no career lock); full `/api/airport` still hydrates lots/NPC behind the lock. Tick still in-memory. MP shape: companies belong to a world; lots may carry `claimed_by_company_id`.
+- **Schema v5:** world ops tables are SoT — `npcs`, `fuel_trucks`, `fuel_hauls`, `demand_orders`, `port_listings`, `port_inventories`, `port_concessions` keyed by `world_id`; stripped from `economy_json`. Tick still in-memory. Player WH / concessions stay on `company_state` (tenant).
 - **Map expansion playbook:** `.cursor/rules/career-map-expansion.mdc` — checklist when adding airports/regions (seed constants + auto coverage on migrate).
 - **15-min economy ticks:** `MS_PER_TICK = 900_000`, `TICKS_PER_DAY = 96`; physics (flight/rest/MX/fuel) uses `MS_PER_HOUR`; per-tick flows ÷4 and tick lifetimes ×4 so a career day stays ~24h wall-clock. Old saves need Reset world (no tick-scale migrate).
 - **NPC airframe variants:** curated ICAO types from FSLTL traffic `flight_model.cfg` scrape (A321F, MD11F, 208B, …) — label + optional cargo ceiling only; not player OFP flight models. Legacy fleets backfill via `ensureNpcAirframes`.
@@ -190,8 +191,8 @@ Do **not** start Postgres or multi-server partition until single-player SQLite +
 
 ### Persistence
 
-- **Now:** SQLite embedded (`skyline.sqlite`) via `CareerStore` facade; schema v4 world tables (`airports` / `airport_stock` / `economy_meta`, keyed by `world_id`) + v3 company/hot tables; NPC/fuel/ports still in `economy_json`.
-- **Later:** Postgres (multiplayer) behind the same facade; NPC roster / fuel / market listings tables (v5+). Same `world_id` + `company_id` partition.
+- **Now:** SQLite embedded (`skyline.sqlite`) via `CareerStore` facade; schema v5 world ops tables (`npcs` / `fuel_*` / `demand_orders` / `port_*`, keyed by `world_id`) + v4 hubs/stock + v3 company/hot tables. Tick still in-memory. Player WH/concessions stay on `company_state`.
+- **Later:** Postgres (multiplayer) behind the same facade. Same `world_id` + `company_id` partition.
 - Always prune dead lots; DB without retention still explodes.
 
 ### Company tenant contract (SP now → MP later)

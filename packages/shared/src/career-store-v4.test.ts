@@ -236,7 +236,7 @@ describe('career store v4', () => {
     db.close();
 
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    assert.equal(schemaVersionInDb(store.sqlitePath!), '4');
+    assert.equal(schemaVersionInDb(store.sqlitePath!), CAREER_STORE_SCHEMA_VERSION);
     assert.ok(countAirportsInDb(store.sqlitePath!) >= 60);
     assert.equal(readAirportStockKg(store.sqlitePath!, 'SBGR', 'general'), 777);
 

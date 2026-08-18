@@ -58,6 +58,14 @@ import {
   type AirportBoardSnapshot,
   type AirportInventorySnapshot,
 } from './career-store-v4.js';
+import {
+  economyBlobHasWorldOps,
+  ensureV5Ddl,
+  hydrateWorldOpsFromTables,
+  migrateV4toV5IfNeeded,
+  persistWorldOpsTables,
+  stripEconomyWorldOps,
+} from './career-store-v5.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
@@ -67,7 +75,7 @@ import type {
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '4';
+export const CAREER_STORE_SCHEMA_VERSION = '5';
 export { LOCAL_WORLD_ID };
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
 
@@ -123,10 +131,14 @@ function economyNeedsRewrite(
   advancedTicks: number,
   settledFlights: number,
 ): boolean {
-  const npcCountBefore = Array.isArray(existing.npcs) ? existing.npcs.length : 0;
-  const trucksBefore = Array.isArray(existing.fuelTrucks)
-    ? existing.fuelTrucks.length
-    : 0;
+  const blobNpcs = Array.isArray(existing.npcs) ? existing.npcs : [];
+  const blobHasNpcs = blobNpcs.length > 0;
+  const npcCountBefore = blobHasNpcs ? blobNpcs.length : caught.npcs.length;
+  const blobTrucks = Array.isArray(existing.fuelTrucks) ? existing.fuelTrucks : [];
+  const blobHasTrucks = blobTrucks.length > 0;
+  const trucksBefore = blobHasTrucks
+    ? blobTrucks.length
+    : (caught.fuelTrucks?.length ?? 0);
   const blobAirports = Array.isArray(existing.airports) ? existing.airports : [];
   const blobHasAirports = blobAirports.length > 0;
   const airportsBefore = blobHasAirports ? blobAirports.length : caught.airports.length;
@@ -135,8 +147,8 @@ function economyNeedsRewrite(
         .map((ap) => `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`)
         .join('|')
     : '';
-  const npcRegionsBefore = Array.isArray(existing.npcs)
-    ? (existing.npcs as Array<{ homeRegion?: string }>)
+  const npcRegionsBefore = blobHasNpcs
+    ? (blobNpcs as Array<{ homeRegion?: string }>)
         .map((npc) => npc.homeRegion ?? '')
         .join('|')
     : '';
@@ -157,15 +169,16 @@ function economyNeedsRewrite(
     advancedTicks > 0 ||
     settledFlights > 0 ||
     version !== 3 ||
-    caught.npcs.length !== npcCountBefore ||
-    (caught.fuelTrucks?.length ?? 0) !== trucksBefore ||
+    (blobHasNpcs && caught.npcs.length !== npcCountBefore) ||
+    (blobHasTrucks && (caught.fuelTrucks?.length ?? 0) !== trucksBefore) ||
     (blobHasAirports && caught.airports.length !== airportsBefore) ||
-    npcRegionsAfter !== npcRegionsBefore ||
+    (blobHasNpcs && npcRegionsAfter !== npcRegionsBefore) ||
     (blobHasAirports && hubLevelSigAfter !== hubLevelSigBefore) ||
     missingHubTiers ||
     missingHomeCountry ||
     economyBlobHasHotArrays(existing) ||
-    economyBlobHasAirports(existing)
+    economyBlobHasAirports(existing) ||
+    economyBlobHasWorldOps(existing)
   );
 }
 
@@ -429,6 +442,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
 
   ensureV3Ddl(db);
   ensureV4Ddl(db);
+  ensureV5Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -450,14 +464,20 @@ function ensureSqliteSchema(db: SqliteDb): void {
   const afterV3 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
     | undefined;
-  const verNow = Number.parseInt(afterV3?.value ?? ver.value, 10);
-  if (!Number.isFinite(verNow) || verNow < 4) {
-    migrateV3toV4IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
-  } else {
-    ensureLocalWorld(db);
-    ensureLocalCompany(db);
-    stampCompanyWorldId(db);
+  const verAfterV3 = Number.parseInt(afterV3?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV3) || verAfterV3 < 4) {
+    migrateV3toV4IfNeeded(db, metaSet, '4');
   }
+  const afterV4 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verNow = Number.parseInt(afterV4?.value ?? ver.value, 10);
+  if (!Number.isFinite(verNow) || verNow < 5) {
+    migrateV4toV5IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+  }
+  ensureLocalWorld(db);
+  ensureLocalCompany(db);
+  stampCompanyWorldId(db);
 }
 
 function metaSet(db: SqliteDb, key: string, value: string): void {
@@ -535,8 +555,25 @@ class SqliteCareerStore implements CareerStore {
         }`,
       );
     }
+    const blobForDirty: Record<string, unknown> = {
+      version: existing.version,
+      homeCountryId: existing.homeCountryId,
+      npcs: existing.npcs,
+      fuelTrucks: existing.fuelTrucks,
+      fuelHauls: existing.fuelHauls,
+      demandOrders: existing.demandOrders,
+      portListings: existing.portListings,
+      portInventories: existing.portInventories,
+      portConcessions: existing.portConcessions,
+      airports: existing.airports,
+      lots: existing.lots,
+      inboundPending: existing.inboundPending,
+      npcFlights: existing.npcFlights,
+      events: existing.events,
+    };
     hydrateWorldFromTables(this.db, existing as unknown as CareerEconomyWorld);
     hydrateAirportsFromTables(this.db, existing as unknown as CareerEconomyWorld);
+    hydrateWorldOpsFromTables(this.db, existing as unknown as CareerEconomyWorld);
     overlayEconomyMeta(this.db, existing as unknown as CareerEconomyWorld);
     const tableAirports = countAirportRows(this.db);
     const blobAirports = Array.isArray(existing.airports) ? existing.airports.length : 0;
@@ -552,7 +589,7 @@ class SqliteCareerStore implements CareerStore {
     );
     ensureHomeCountryId(caught);
     const afterIcaos = airportIcaoList(caught);
-    let dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
+    let dirty = economyNeedsRewrite(blobForDirty, caught, advancedTicks, settledFlights);
     if (ensureSeedMarketFormed(caught)) dirty = true;
     if (clHubIdentRemapsForPlayer(beforeIcaos, afterIcaos).length > 0) dirty = true;
     await persistClHubIdentRemaps(this, beforeIcaos, afterIcaos);
@@ -565,7 +602,9 @@ class SqliteCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    const blob = stripEconomyAirports(stripEconomyHotArrays(toSave));
+    const blob = stripEconomyWorldOps(
+      stripEconomyAirports(stripEconomyHotArrays(toSave)),
+    );
     const json = JSON.stringify(blob);
     const now = Date.now();
     runInTransaction(this.db, () => {
@@ -577,6 +616,7 @@ class SqliteCareerStore implements CareerStore {
         .run(json, now);
       persistWorldLiveTables(this.db, toSave);
       persistWorldAirports(this.db, toSave);
+      persistWorldOpsTables(this.db, toSave);
       stampCompanyWorldId(this.db);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
       metaSet(this.db, 'economy_tick', String(toSave.tick));

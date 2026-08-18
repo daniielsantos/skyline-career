@@ -121,9 +121,12 @@ import { FboRerouteDialog } from './FboRerouteDialog';
 import { PortsPanel } from './PortsPanel';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
+import { FerryHubCombobox } from './FerryHubCombobox';
 import { BushTripMapCard } from './BushTripMapCard';
 import { BrandMark } from './BrandMark';
-import { ProfileGate, ProfileGateLoading } from './ProfileGate';
+import { AirportNamesProvider, IcaoLink } from './IcaoLink';
+import { BusyBlock, BusyChip, TableSkeleton } from './Busy';
+import { CareerProfileManage, ProfileGate, ProfileGateLoading } from './ProfileGate';
 import {
   DesktopUpdateBanner,
   DesktopUpdatesCard,
@@ -602,8 +605,7 @@ function LotLoadCell(props: {
       {formatTonnes(totalKg, props.weightSystem)}
       {claimKg != null && freeKg > 0 ? (
         <small className="muted">
-          {' '}
-          · {formatTonnes(freeKg, props.weightSystem)} open
+          {formatTonnes(freeKg, props.weightSystem)} open
         </small>
       ) : null}
     </span>
@@ -628,11 +630,12 @@ function LotPayCell(props: {
 }) {
   const claim = props.lot.npcClaim;
   if (claim?.crewNeeded && typeof claim.pilotFeeUsd === 'number') {
-    const fee = formatCrewFeeText(claim, formatMoney);
     return (
-      <span title="Your contract fee (operator freight is higher; you take the crew cut)">
-        {fee ?? formatMoney(claim.pilotFeeUsd)}
-      </span>
+      <CrewFeeAmount
+        claim={claim}
+        formatMoney={formatMoney}
+        title="Your contract fee (operator freight is higher; you take the crew cut)"
+      />
     );
   }
   return (
@@ -670,6 +673,55 @@ function countryLabel(countryId: string): string {
       return countryId;
   }
 }
+
+function countryDisplayName(countryId: string, sampleRegion: string): string {
+  const labeled = regionLabel(sampleRegion);
+  if (labeled !== sampleRegion) {
+    const dash = labeled.indexOf('—');
+    const name = (dash > 0 ? labeled.slice(0, dash) : labeled).trim();
+    if (name) return name;
+  }
+  return countryLabel(countryId);
+}
+
+const FALLBACK_STARTER_HUBS: StarterHubOption[] = [
+  {
+    icao: 'SBGR',
+    name: 'São Paulo/Guarulhos',
+    region: 'BR-SE',
+    hubTier: 'major',
+  },
+  {
+    icao: 'SBGL',
+    name: 'Rio de Janeiro/Galeão',
+    region: 'BR-SE',
+    hubTier: 'major',
+  },
+  {
+    icao: 'SBKP',
+    name: 'Campinas/Viracopos',
+    region: 'BR-SE',
+    hubTier: 'major',
+  },
+  {
+    icao: 'SBCF',
+    name: 'Belo Horizonte/Confins',
+    region: 'BR-SE',
+    hubTier: 'regional',
+  },
+  {
+    icao: 'SBPA',
+    name: 'Porto Alegre',
+    region: 'BR-S',
+    hubTier: 'regional',
+  },
+  {
+    icao: 'SBRF',
+    name: 'Recife',
+    region: 'BR-NE',
+    hubTier: 'regional',
+  },
+];
 
 function regionLabel(region: string): string {
   switch (region) {
@@ -1859,7 +1911,7 @@ function formatExpiry(opts: {
     0,
     remaining - Math.min(1, Math.max(0, frac)),
   );
-  return `Expires in ${formatDuration(continuousRemainingTicks * HOURS_PER_TICK)}`;
+  return `${formatDuration(continuousRemainingTicks * HOURS_PER_TICK)} left`;
 }
 
 function formatDeadline(deadlineTick: number, continuousHours: number): string {
@@ -1968,7 +2020,37 @@ function writeLastFboIcao(icao: string): void {
   }
 }
 
-/** Enough AirportView to paint the FBO panel before `/api/airport` finishes. */
+function marketLotToAirportLot(lot: MarketLot): AirportLot {
+  return {
+    id: lot.id,
+    originIcao: lot.originIcao,
+    destIcao: lot.destIcao,
+    commodityId: lot.commodityId,
+    commodityName: lot.commodityName,
+    availableKg: lot.availableKg,
+    quantityKg: lot.quantityKg,
+    payUsd: lot.payUsd,
+    estimatedFuelCostUsd: lot.estimatedFuelCostUsd,
+    estimatedNetUsd: lot.estimatedNetUsd,
+    estimatedLiftKg: lot.estimatedLiftKg,
+    estimatedMarginPct: lot.estimatedMarginPct,
+    estimatedFuelFeasible: lot.estimatedFuelFeasible,
+    estimatedInRange: lot.estimatedInRange,
+    urgency: lot.urgency,
+    status: 'available',
+    createdAtTick: lot.createdAtTick ?? 0,
+    expiresAtTick: lot.expiresAtTick,
+    ticksRemaining: lot.ticksRemaining ?? 0,
+    expired: false,
+    perishable: Boolean(lot.perishable),
+    bush: lot.bush,
+    distanceNm: lot.distanceNm,
+    reason: lot.reason,
+    npcClaim: lot.npcClaim,
+  };
+}
+
+/** Enough AirportView to paint the terminal before `/api/airport` finishes. */
 function buildOptimisticAirportView(
   icao: string,
   opts: {
@@ -1978,10 +2060,16 @@ function buildOptimisticAirportView(
     tick: number;
     lastBatchAtMs: number;
     msPerTick: number;
+    lots?: MarketLot[];
   },
 ): AirportView {
   const code = icao.trim().toUpperCase();
   const hub = opts.hub ?? null;
+  const related = (opts.lots ?? []).filter(
+    (lot) =>
+      lot.originIcao.toUpperCase() === code ||
+      lot.destIcao.toUpperCase() === code,
+  );
   return {
     serverNowMs: Date.now(),
     lastBatchAtMs: opts.lastBatchAtMs,
@@ -2002,8 +2090,12 @@ function buildOptimisticAirportView(
     totalStockKg: 0,
     totalStockTonnes: 0,
     commodities: [],
-    outboundLots: [],
-    inboundLots: [],
+    outboundLots: related
+      .filter((lot) => lot.originIcao.toUpperCase() === code)
+      .map(marketLotToAirportLot),
+    inboundLots: related
+      .filter((lot) => lot.destIcao.toUpperCase() === code)
+      .map(marketLotToAirportLot),
     arrivals: [],
     departures: [],
     npcActivity: [],
@@ -2015,25 +2107,27 @@ function buildOptimisticAirportView(
   };
 }
 
-function IcaoLink(props: {
-  icao: string;
-  onOpen: (icao: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className="icao-link"
-      disabled={props.disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        props.onOpen(props.icao);
-      }}
-      title={`Open ${props.icao} terminal`}
-    >
-      {props.icao}
-    </button>
-  );
+function mergeAirportStock(
+  prev: AirportView | null,
+  stock: AirportView,
+): AirportView {
+  if (!prev || prev.airport.icao !== stock.airport.icao) return stock;
+  return {
+    ...stock,
+    outboundLots: stock.outboundLots.length
+      ? stock.outboundLots
+      : prev.outboundLots,
+    inboundLots: stock.inboundLots.length
+      ? stock.inboundLots
+      : prev.inboundLots,
+    arrivals: stock.arrivals?.length ? stock.arrivals : prev.arrivals,
+    departures: stock.departures?.length ? stock.departures : prev.departures,
+    npcActivity: stock.npcActivity?.length ? stock.npcActivity : prev.npcActivity,
+    playerFbos: stock.playerFbos ?? prev.playerFbos,
+    events: stock.events?.length ? stock.events : prev.events,
+    runways: stock.runways?.length ? stock.runways : prev.runways,
+    homeHubIcao: stock.homeHubIcao ?? prev.homeHubIcao,
+  };
 }
 
 function LotExpiry(props: {
@@ -2057,7 +2151,7 @@ function LotExpiry(props: {
             className="expiry overdue"
             title={`${kind} window closed — operator departing`}
           >
-            {kind} closed
+            Closed
           </span>
         );
       }
@@ -2065,13 +2159,13 @@ function LotExpiry(props: {
       return (
         <span
           className={leftHours <= 1 ? 'expiry soon' : 'expiry'}
-          title={`Market deadline paused while this ${kind.toLowerCase()} is open`}
+          title={`${kind}${
+            claim.aircraftClassId
+              ? ` · ${aircraftClassLabel(claim.aircraftClassId)}`
+              : ''
+          } · market deadline paused while open`}
         >
-          {kind}
-          {claim.aircraftClassId
-            ? ` · ${aircraftClassLabel(claim.aircraftClassId)}`
-            : ''}{' '}
-          · {formatDuration(leftHours)} left
+          {formatDuration(leftHours)} left
         </span>
       );
     }
@@ -2080,7 +2174,7 @@ function LotExpiry(props: {
         className="expiry"
         title={`${kind} open — operator waiting for a pilot`}
       >
-        {kind} open
+        Open
       </span>
     );
   }
@@ -2112,6 +2206,27 @@ function formatCrewFeeText(
     typeof claim.pilotFeeMinUsd === 'number' ? claim.pilotFeeMinUsd : max;
   if (min < max) return `${formatMoney(min)}–${formatMoney(max)}`;
   return formatMoney(max);
+}
+
+function CrewFeeAmount(props: {
+  claim: { pilotFeeUsd?: number; pilotFeeMinUsd?: number };
+  formatMoney: (n: number) => string;
+  title?: string;
+}) {
+  if (typeof props.claim.pilotFeeUsd !== 'number') return null;
+  const max = props.claim.pilotFeeUsd;
+  const min =
+    typeof props.claim.pilotFeeMinUsd === 'number'
+      ? props.claim.pilotFeeMinUsd
+      : max;
+  if (min < max) {
+    return (
+      <span className="pay-range" title={props.title}>
+        {props.formatMoney(min)}–{props.formatMoney(max)}
+      </span>
+    );
+  }
+  return <span title={props.title}>{props.formatMoney(max)}</span>;
 }
 
 function NpcTakenBadge(props: {
@@ -2776,6 +2891,7 @@ export function App() {
     initialLocation.airportIcao,
   );
   const [airportView, setAirportView] = useState<AirportView | null>(null);
+  const [airportHydrating, setAirportHydrating] = useState(false);
   const [terminalSection, setTerminalSection] =
     useState<TerminalSection>('inventory');
   const [contractsLane, setContractsLane] =
@@ -3023,6 +3139,7 @@ export function App() {
   const [pilotIcao, setPilotIcao] = useState('');
   const [signupName, setSignupName] = useState('');
   const [signupHub, setSignupHub] = useState('');
+  const [signupCountry, setSignupCountry] = useState('');
   const [aircraftListings, setAircraftListings] = useState<AircraftListing[]>([]);
   const [aircraftDeliveryQuotes, setAircraftDeliveryQuotes] = useState<
     Record<string, AircraftDeliveryQuoteView>
@@ -3601,7 +3718,6 @@ export function App() {
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
     if (!hubSelected) return;
-    if (tab !== 'map' && tab !== 'market') return;
     void refreshNetworkHubs().catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       if (isNeedsProfileMessage(message)) return;
@@ -3609,7 +3725,7 @@ export function App() {
       setToast(message);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, hubSelected, showProfileGate, activeCareerProfile?.id]);
+  }, [hubSelected, showProfileGate, activeCareerProfile?.id]);
 
   // Poll MSFS watch session while active. One shot when idle so a mid-flight
   // reload can still attach; stop interval after settle (no forever /api/watch/status).
@@ -4099,6 +4215,7 @@ export function App() {
     if (tab === 'staging' && !airportIcao) return;
     setAirportIcao(null);
     setAirportView(null);
+    setAirportHydrating(false);
     setTab('staging');
     writeCareerLocation({ tab: 'staging', airportIcao: null }, { replace: true });
   }, [hubSelected, missions, tab, airportIcao]);
@@ -4829,43 +4946,51 @@ export function App() {
       }
     };
 
-    // FBO: paint immediately from cached snapshot + network hub metadata; hydrate
-    // the heavy `/api/airport` payload (lot estimates) in the background.
-    if (section === 'fbo') {
-      const hub =
-        networkHubs.find((h) => h.icao.toUpperCase() === next) ?? null;
-      setAirportView(
-        buildOptimisticAirportView(next, {
-          hub,
-          playerFbos,
-          homeHubIcao: homeHubIcao || null,
-          tick,
-          lastBatchAtMs,
-          msPerTick,
-        }),
-      );
+    // Paint the terminal immediately from hub metadata + Freights lots already
+    // on screen; hydrate `/api/airport` (stock, movements, estimates) in the
+    // background so a click from Freights does not sit on the board for seconds.
+    if (!switchingIcao) {
       applyTerminalNav();
-      const seq = ++airportOpenSeqRef.current;
-      void fetchAirportView(next)
-        .then((view) => {
-          if (airportOpenSeqRef.current !== seq) return;
-          setAirportView(view);
-          if (view.playerFbos) setPlayerFbos(view.playerFbos);
-        })
-        .catch((err: unknown) => {
-          if (airportOpenSeqRef.current !== seq) return;
-          const message = err instanceof Error ? err.message : String(err);
-          if (!isNeedsProfileMessage(message)) setError(message);
-        });
       return;
     }
 
-    await run(async () => {
-      const view = await fetchAirportView(next);
-      setAirportView(view);
-      if (view.playerFbos) setPlayerFbos(view.playerFbos);
-      applyTerminalNav();
-    }, { refreshAfter: false, lockUi: false });
+    const hub =
+      networkHubs.find((h) => h.icao.toUpperCase() === next) ?? null;
+    setAirportView(
+      buildOptimisticAirportView(next, {
+        hub,
+        playerFbos,
+        homeHubIcao: homeHubIcao || null,
+        tick,
+        lastBatchAtMs,
+        msPerTick,
+        lots,
+      }),
+    );
+    applyTerminalNav();
+    setAirportHydrating(true);
+    const seq = ++airportOpenSeqRef.current;
+    void (async () => {
+      try {
+        const stock = await fetchAirport(next, { part: 'stock' });
+        if (airportOpenSeqRef.current !== seq) return;
+        setAirportView((prev) => mergeAirportStock(prev, stock));
+      } catch {
+        /* Full payload below may still succeed. */
+      }
+      try {
+        const view = await fetchAirportView(next);
+        if (airportOpenSeqRef.current !== seq) return;
+        setAirportView(view);
+        if (view.playerFbos) setPlayerFbos(view.playerFbos);
+        setAirportHydrating(false);
+      } catch (err: unknown) {
+        if (airportOpenSeqRef.current !== seq) return;
+        setAirportHydrating(false);
+        const message = err instanceof Error ? err.message : String(err);
+        if (!isNeedsProfileMessage(message)) setError(message);
+      }
+    })();
   }
 
   function openFboBoard() {
@@ -4897,6 +5022,7 @@ export function App() {
     airportOpenSeqRef.current += 1;
     setAirportIcao(null);
     setAirportView(null);
+    setAirportHydrating(false);
     setTerminalSection('inventory');
     setContractsLane('outbound');
     setContractsSorts([...DEFAULT_BOARD_SORTS]);
@@ -4914,6 +5040,7 @@ export function App() {
     airportOpenSeqRef.current += 1;
     setAirportIcao(null);
     setAirportView(null);
+    setAirportHydrating(false);
     setTerminalSection('inventory');
     setContractsLane('outbound');
     setContractsSorts([...DEFAULT_BOARD_SORTS]);
@@ -5173,9 +5300,27 @@ export function App() {
         const result = await deleteCareerProfile(id);
         setCareerProfiles(result.profiles);
         if (activeCareerProfile?.id === id) {
-          const nextLast =
-            result.profiles.find((p) => p.id === result.activeId) ?? null;
-          setActiveCareerProfile(nextLast);
+          if (watch?.running) {
+            try {
+              await postWatchStop({ reset: true });
+            } catch {
+              /* ignore */
+            }
+          }
+          if (bushWatch?.running) {
+            try {
+              await postBushWatchStop();
+            } catch {
+              /* ignore */
+            }
+          }
+          await postCareerProfileClear();
+          setActiveCareerProfile(null);
+          setShowProfileGate(true);
+          setStaging(null);
+          setActiveBushTrip(null);
+          setBushWatch(null);
+          setWatch(null);
         }
         setToastKind('ok');
         setToast('Profile deleted');
@@ -7166,6 +7311,7 @@ export function App() {
           if (cancelled) return;
           setAirportView(view);
           if (view.playerFbos) setPlayerFbos(view.playerFbos);
+          setAirportHydrating(false);
         })
         .catch((err: unknown) => {
           if (cancelled) return;
@@ -7758,6 +7904,64 @@ export function App() {
     fleet.find((a) => a.status === 'parked')?.locationIcao ?? homeHubIcao;
   const signalFocusIcao = pilotIcao || parkedIcao || homeHubIcao;
 
+  const airportNames = useMemo(() => {
+    const names = new Map<string, string>();
+    for (const hub of networkHubs) {
+      const name = hub.name?.trim();
+      if (name) names.set(hub.icao.toUpperCase(), name);
+    }
+    for (const lot of lots) {
+      const origin = lot.originName?.trim();
+      const dest = lot.destName?.trim();
+      if (origin) names.set(lot.originIcao.toUpperCase(), origin);
+      if (dest) names.set(lot.destIcao.toUpperCase(), dest);
+    }
+    const here = airportView?.airport;
+    if (here?.name?.trim()) {
+      names.set(here.icao.toUpperCase(), here.name.trim());
+    }
+    return names;
+  }, [networkHubs, lots, airportView?.airport.icao, airportView?.airport.name]);
+
+  const signupCargoHubs = useMemo(() => {
+    const raw =
+      hubOptions.length > 0 ? networkCargoHubs(hubOptions) : FALLBACK_STARTER_HUBS;
+    const tierRank = { major: 0, regional: 1, spoke: 2 };
+    return raw.slice().sort((a, b) => {
+      const tr = tierRank[a.hubTier] - tierRank[b.hubTier];
+      return tr !== 0 ? tr : a.icao.localeCompare(b.icao);
+    });
+  }, [hubOptions]);
+
+  const signupCountries = useMemo(() => {
+    const samples = new Map<string, string>();
+    for (const hub of signupCargoHubs) {
+      const id = countryIdFromRegion(hub.region);
+      if (!id) continue;
+      const prev = samples.get(id);
+      if (!prev) {
+        samples.set(id, hub.region);
+        continue;
+      }
+      const preferNext =
+        regionLabel(hub.region).includes('—') && !regionLabel(prev).includes('—');
+      if (preferNext) samples.set(id, hub.region);
+    }
+    return [...samples.entries()]
+      .map(([id, region]) => ({
+        id,
+        label: countryDisplayName(id, region),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [signupCargoHubs]);
+
+  const signupHubsForCountry = useMemo(() => {
+    if (!signupCountry) return signupCargoHubs;
+    return signupCargoHubs.filter(
+      (hub) => countryIdFromRegion(hub.region) === signupCountry,
+    );
+  }, [signupCargoHubs, signupCountry]);
+
   if (profilesLoading) {
     return (
       <div className="app-shell profile-gate-shell">
@@ -7795,8 +7999,6 @@ export function App() {
           error={error && !isNeedsProfileMessage(error) ? error : null}
           onSelect={(id) => void onSelectCareerProfile(id)}
           onCreate={(name) => void onCreateCareerProfile(name)}
-          onDelete={(id) => void onDeleteCareerProfile(id)}
-          onRename={(id, name) => void onRenameCareerProfile(id, name)}
         />
         {confirmDialog}
       </div>
@@ -7804,6 +8006,7 @@ export function App() {
   }
 
   return (
+    <AirportNamesProvider names={airportNames}>
     <div className={`app-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
       {sidebarOpen ? (
         <button
@@ -8261,69 +8464,64 @@ export function App() {
                 required
               />
             </label>
-            <label className="pilot-field">
-              Home hub
-              <select
-                value={signupHub}
-                onChange={(e) => setSignupHub(e.target.value)}
-                disabled={busy}
-                required
-              >
-                <option value="">Select ICAO…</option>
-                {(hubOptions.length > 0
-                  ? networkCargoHubs(hubOptions)
-                  : ([
-                      {
-                        icao: 'SBGR',
-                        name: 'São Paulo/Guarulhos',
-                        region: 'BR-SE',
-                        hubTier: 'major',
-                      },
-                      {
-                        icao: 'SBGL',
-                        name: 'Rio de Janeiro/Galeão',
-                        region: 'BR-SE',
-                        hubTier: 'major',
-                      },
-                      {
-                        icao: 'SBKP',
-                        name: 'Campinas/Viracopos',
-                        region: 'BR-SE',
-                        hubTier: 'major',
-                      },
-                      {
-                        icao: 'SBCF',
-                        name: 'Belo Horizonte/Confins',
-                        region: 'BR-SE',
-                        hubTier: 'regional',
-                      },
-                      {
-                        icao: 'SBPA',
-                        name: 'Porto Alegre',
-                        region: 'BR-S',
-                        hubTier: 'regional',
-                      },
-                      {
-                        icao: 'SBRF',
-                        name: 'Recife',
-                        region: 'BR-NE',
-                        hubTier: 'regional',
-                      },
-                    ] as StarterHubOption[])
-                )
-                  .slice()
-                  .sort((a, b) => {
-                    const tierRank = { major: 0, regional: 1, spoke: 2 };
-                    const tr = tierRank[a.hubTier] - tierRank[b.hubTier];
-                    return tr !== 0 ? tr : a.icao.localeCompare(b.icao);
-                  })
-                  .map((hub) => (
-                    <option key={hub.icao} value={hub.icao}>
-                      {formatStarterHubOption(hub)}
+            <div className="pilot-signup-hubs">
+              <label className="pilot-field">
+                Country
+                <select
+                  value={signupCountry}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSignupCountry(next);
+                    if (!signupHub) return;
+                    const selected = signupCargoHubs.find(
+                      (hub) => hub.icao === signupHub,
+                    );
+                    if (
+                      next &&
+                      selected &&
+                      countryIdFromRegion(selected.region) !== next
+                    ) {
+                      setSignupHub('');
+                    }
+                  }}
+                  disabled={busy}
+                  aria-label="Filter home hubs by country"
+                >
+                  <option value="">All countries</option>
+                  {signupCountries.map((country) => (
+                    <option key={country.id} value={country.id}>
+                      {country.label} ({country.id})
                     </option>
                   ))}
-              </select>
-            </label>
+                </select>
+              </label>
+              <label className="pilot-field">
+                Home hub
+                <FerryHubCombobox
+                  id="signup-home-hub"
+                  hubs={signupHubsForCountry.map((hub) => ({
+                    icao: hub.icao,
+                    name: hub.name,
+                    region: hub.region,
+                    detail: [
+                      hubTierLabel(hub.hubTier),
+                      countryDisplayName(
+                        countryIdFromRegion(hub.region),
+                        hub.region,
+                      ),
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                  }))}
+                  value={signupHub}
+                  onChange={setSignupHub}
+                  disabled={busy}
+                  plainText
+                  maxResults={signupCountry ? 40 : 16}
+                  placeholder="Type ICAO, city, or country…"
+                />
+              </label>
+            </div>
             <button
               type="submit"
               className="accept"
@@ -8340,7 +8538,10 @@ export function App() {
       ) : null}
 
       {hubSelected && showAirport ? (
-        <section className="panel airport-panel">
+        <section
+          className="panel airport-panel"
+          aria-busy={airportHydrating || undefined}
+        >
           {airportView.airport.bushTripOnly ? (
             <p className="banner warn" role="status">
               Trip-only strip — no cargo terminal, Market freights, or ferry.
@@ -9059,8 +9260,15 @@ export function App() {
                       <div>
                         <h2>Terminal inventory</h2>
                         <p>
-                          {formatTonnes(airportView.totalStockTonnes * 1000)} total stock ·{' '}
-                          {formatClock(continuousHours)}
+                          {airportHydrating &&
+                          airportView.commodities.length === 0 ? (
+                            <span className="skel skel-line" style={{ width: '9.5rem' }} />
+                          ) : (
+                            <>
+                              {formatTonnes(airportView.totalStockTonnes * 1000)}{' '}
+                              total stock · {formatClock(continuousHours)}
+                            </>
+                          )}
                         </p>
                         {airportView.events && airportView.events.length > 0 ? (
                           <ul className="event-list">
@@ -9077,7 +9285,13 @@ export function App() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="table-wrap">
+                    <div
+                      className={`table-wrap${
+                        airportHydrating && airportView.commodities.length === 0
+                          ? ' is-loading'
+                          : ''
+                      }`}
+                    >
                       <table>
                         <thead>
                           <tr>
@@ -9091,7 +9305,11 @@ export function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {airportView.commodities.map((c) => (
+                          {airportHydrating &&
+                          airportView.commodities.length === 0 ? (
+                            <TableSkeleton rows={6} cols={7} />
+                          ) : (
+                          airportView.commodities.map((c) => (
                             <tr key={c.commodityId}>
                               <td>
                                 <div className="commodity-cell">
@@ -9155,10 +9373,14 @@ export function App() {
                                 /{massUnitLabel(weightSystem)}
                               </td>
                             </tr>
-                          ))}
+                          ))
+                          )}
                         </tbody>
                       </table>
                     </div>
+                    {!airportHydrating ||
+                    (airportView.fuelInbound?.length ?? 0) > 0 ||
+                    (airportView.fuelRecent?.length ?? 0) > 0 ? (
                     <FuelLogisticsBlock
                       inbound={airportView.fuelInbound ?? []}
                       recent={airportView.fuelRecent ?? []}
@@ -9166,6 +9388,7 @@ export function App() {
                       onOpen={openAirport}
                       busy={busy}
                     />
+                    ) : null}
                   </>
                   )
                 ) : null}
@@ -9347,12 +9570,17 @@ export function App() {
                         before preparing another.
                       </p>
                     ) : null}
-                    <div className="table-wrap">
+                    <div
+                      className={`table-wrap${airportHydrating ? ' is-loading' : ''}`}
+                    >
+                      {airportHydrating && sortedContractLots.length > 0 ? (
+                        <BusyChip label="Updating contracts" />
+                      ) : null}
                       <table className="contracts-table">
                         <thead>
                           <tr>
-                            <th>Route</th>
-                            <th aria-sort={contractsAriaSort('distance')}>
+                            <th className="col-route">Route</th>
+                            <th aria-sort={contractsAriaSort('distance')} className="col-compact">
                               <button
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'distance') ? ' is-sorted' : ''}`}
@@ -9363,7 +9591,7 @@ export function App() {
                                 <span>{contractsSortIndicator('distance')}</span>
                               </button>
                             </th>
-                            <th aria-sort={contractsAriaSort('cargo')}>
+                            <th aria-sort={contractsAriaSort('cargo')} className="col-cargo">
                               <button
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'cargo') ? ' is-sorted' : ''}`}
@@ -9374,7 +9602,7 @@ export function App() {
                                 <span>{contractsSortIndicator('cargo')}</span>
                               </button>
                             </th>
-                            <th aria-sort={contractsAriaSort('load')}>
+                            <th aria-sort={contractsAriaSort('load')} className="col-compact">
                               <button
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'load') ? ' is-sorted' : ''}`}
@@ -9385,7 +9613,7 @@ export function App() {
                                 <span>{contractsSortIndicator('load')}</span>
                               </button>
                             </th>
-                            <th aria-sort={contractsAriaSort('expires')}>
+                            <th aria-sort={contractsAriaSort('expires')} className="col-compact">
                               <button
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'expires') ? ' is-sorted' : ''}`}
@@ -9396,7 +9624,7 @@ export function App() {
                                 <span>{contractsSortIndicator('expires')}</span>
                               </button>
                             </th>
-                            <th aria-sort={contractsAriaSort('pay')}>
+                            <th aria-sort={contractsAriaSort('pay')} className="col-money">
                               <button
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'pay') ? ' is-sorted' : ''}`}
@@ -9406,7 +9634,7 @@ export function App() {
                                 Pay <span>{contractsSortIndicator('pay')}</span>
                               </button>
                             </th>
-                            <th aria-sort={contractsAriaSort('net')}>
+                            <th aria-sort={contractsAriaSort('net')} className="col-money">
                               <button
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
@@ -9422,7 +9650,7 @@ export function App() {
                               </button>
                             </th>
                             {contractsLane === 'outbound' ? (
-                              <th aria-sort={contractsAriaSort('access')}>
+                              <th aria-sort={contractsAriaSort('access')} className="col-access">
                                 <button
                                   type="button"
                                   className={`sort-header${contractsSorts.some((l) => l.key === 'access') ? ' is-sorted' : ''}`}
@@ -9436,8 +9664,13 @@ export function App() {
                             ) : null}
                           </tr>
                           <tr className="filter-row">
-                            <th colSpan={6} />
-                            <th>
+                            <th className="col-route" />
+                            <th className="col-compact" />
+                            <th className="col-cargo" />
+                            <th className="col-compact" />
+                            <th className="col-compact" />
+                            <th className="col-money" />
+                            <th className="col-money">
                               <div className="contract-net-filters">
                                 <label className="profitable-filter">
                                   <input
@@ -9470,7 +9703,7 @@ export function App() {
                               </div>
                             </th>
                             {contractsLane === 'outbound' ? (
-                              <th>
+                              <th className="col-access">
                                 <select
                                   aria-label="Filter by Cargo Ops access"
                                   value={contractsAccessFilter}
@@ -9512,7 +9745,7 @@ export function App() {
                                 )
                               }
                             >
-                              <td>
+                              <td className="col-route">
                                 <div className="route">
                                   <IcaoLink
                                     icao={lot.originIcao}
@@ -9560,12 +9793,12 @@ export function App() {
                                   formatMoney={formatMoney}
                                 />
                               </td>
-                              <td className="distance">
+                              <td className="distance col-compact">
                                 {lot.distanceNm !== undefined
                                   ? `${Math.round(lot.distanceNm).toLocaleString()} nm`
                                   : '—'}
                               </td>
-                              <td>
+                              <td className="col-cargo">
                                 <div className="commodity-cell">
                                   <CommodityIcon
                                     commodityId={lot.commodityId}
@@ -9577,13 +9810,13 @@ export function App() {
                                   </div>
                                 </div>
                               </td>
-                              <td>
+                              <td className="col-compact">
                                 <LotLoadCell
                                   lot={lot}
                                   weightSystem={weightSystem}
                                 />
                               </td>
-                              <td>
+                              <td className="col-compact">
                                 <LotExpiry
                                   lot={lot}
                                   tick={tick}
@@ -9594,29 +9827,37 @@ export function App() {
                                   <small>Perishable</small>
                                 ) : null}
                               </td>
-                              <td className="pay">
+                              <td className="pay col-money">
                                 <LotPayCell lot={lot} />
                               </td>
                               <td
                                 className={
-                                  lot.npcClaim?.crewNeeded &&
-                                  typeof lot.npcClaim.pilotFeeUsd === 'number'
-                                    ? lot.npcClaim.pilotFeeUsd > 0
-                                      ? 'net net-pos'
-                                      : 'net'
-                                    : typeof lot.estimatedNetUsd === 'number' &&
-                                        lot.estimatedInRange !== false
-                                      ? lot.estimatedNetUsd > 0
+                                  [
+                                    'col-money',
+                                    lot.npcClaim?.crewNeeded &&
+                                    typeof lot.npcClaim.pilotFeeUsd === 'number'
+                                      ? lot.npcClaim.pilotFeeUsd > 0
                                         ? 'net net-pos'
-                                        : lot.estimatedNetUsd < 0
-                                          ? 'net net-neg'
-                                          : 'net'
-                                      : 'net'
+                                        : 'net'
+                                      : typeof lot.estimatedNetUsd === 'number' &&
+                                          lot.estimatedInRange !== false
+                                        ? lot.estimatedNetUsd > 0
+                                          ? 'net net-pos'
+                                          : lot.estimatedNetUsd < 0
+                                            ? 'net net-neg'
+                                            : 'net'
+                                        : 'net',
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' ')
                                 }
                               >
                                 {lot.npcClaim?.crewNeeded &&
                                 typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                                  formatCrewFeeText(lot.npcClaim, formatMoney)
+                                  <CrewFeeAmount
+                                    claim={lot.npcClaim}
+                                    formatMoney={formatMoney}
+                                  />
                                 ) : boardAircraft &&
                                   lot.estimatedInRange === false ? (
                                   <small title="Beyond selected aircraft range">
@@ -9642,7 +9883,7 @@ export function App() {
                                 )}
                               </td>
                               {contractsLane === 'outbound' ? (
-                                <td>
+                                <td className="col-access">
                                   <div className="contract-actions">
                                   <button
                                     type="button"
@@ -9722,7 +9963,12 @@ export function App() {
                             </tr>
                             );
                           })}
-                          {sortedContractLots.length === 0 ? (
+                          {airportHydrating && sortedContractLots.length === 0 ? (
+                            <TableSkeleton
+                              rows={5}
+                              cols={contractsLane === 'outbound' ? 8 : 7}
+                            />
+                          ) : sortedContractLots.length === 0 ? (
                             <tr>
                               <td
                                 colSpan={contractsLane === 'outbound' ? 8 : 7}
@@ -10160,16 +10406,16 @@ export function App() {
             aria-busy={marketBoardLoading}
           >
             {marketBoardLoading ? (
-              <div className="freights-board-loading" role="status" aria-live="polite">
-                <span className="profile-gate-spinner" aria-hidden />
-                <span>Updating freights…</span>
-              </div>
+              <BusyChip
+                className="freights-board-loading"
+                label="Updating freights"
+              />
             ) : null}
             <table>
               <thead>
                 <tr>
-                  <th>Route</th>
-                  <th aria-sort={marketAriaSort('distance')}>
+                  <th className="col-route">Route</th>
+                  <th aria-sort={marketAriaSort('distance')} className="col-compact">
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'distance') ? ' is-sorted' : ''}`}
@@ -10179,7 +10425,7 @@ export function App() {
                       Distance <span>{sortIndicator('distance')}</span>
                     </button>
                   </th>
-                  <th aria-sort={marketAriaSort('cargo')}>
+                  <th aria-sort={marketAriaSort('cargo')} className="col-cargo">
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'cargo') ? ' is-sorted' : ''}`}
@@ -10189,7 +10435,7 @@ export function App() {
                       Cargo <span>{sortIndicator('cargo')}</span>
                     </button>
                   </th>
-                  <th aria-sort={marketAriaSort('load')}>
+                  <th aria-sort={marketAriaSort('load')} className="col-compact">
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'load') ? ' is-sorted' : ''}`}
@@ -10199,7 +10445,7 @@ export function App() {
                       Load <span>{sortIndicator('load')}</span>
                     </button>
                   </th>
-                  <th aria-sort={marketAriaSort('expires')}>
+                  <th aria-sort={marketAriaSort('expires')} className="col-compact">
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'expires') ? ' is-sorted' : ''}`}
@@ -10209,7 +10455,7 @@ export function App() {
                       Expires <span>{sortIndicator('expires')}</span>
                     </button>
                   </th>
-                  <th aria-sort={marketAriaSort('pay')}>
+                  <th aria-sort={marketAriaSort('pay')} className="col-money">
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'pay') ? ' is-sorted' : ''}`}
@@ -10219,7 +10465,7 @@ export function App() {
                       Pay <span>{sortIndicator('pay')}</span>
                     </button>
                   </th>
-                  <th aria-sort={marketAriaSort('net')}>
+                  <th aria-sort={marketAriaSort('net')} className="col-money">
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
@@ -10234,7 +10480,7 @@ export function App() {
                       Net <span>{sortIndicator('net')}</span>
                     </button>
                   </th>
-                  <th aria-sort={marketAriaSort('access')}>
+                  <th aria-sort={marketAriaSort('access')} className="col-access">
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'access') ? ' is-sorted' : ''}`}
@@ -10246,7 +10492,7 @@ export function App() {
                   </th>
                 </tr>
                 <tr className="filter-row">
-                  <th>
+                  <th className="col-route">
                     <div className="route-filter-stack">
                       <div className="route-filter-pair">
                         <input
@@ -10336,7 +10582,7 @@ export function App() {
                       </select>
                     </div>
                   </th>
-                  <th>
+                  <th className="col-compact">
                     <select
                       aria-label="Maximum distance"
                       value={distanceMaxNm}
@@ -10351,7 +10597,7 @@ export function App() {
                       <option value="2000">≤ 2,000 nm</option>
                     </select>
                   </th>
-                  <th>
+                  <th className="col-cargo">
                     <select
                       aria-label="Cargo commodity"
                       value={cargoFilter}
@@ -10367,7 +10613,7 @@ export function App() {
                       ))}
                     </select>
                   </th>
-                  <th>
+                  <th className="col-compact">
                     <div className="load-filter-pair">
                       <select
                         aria-label="Minimum cargo load"
@@ -10399,7 +10645,7 @@ export function App() {
                       </select>
                     </div>
                   </th>
-                  <th>
+                  <th className="col-compact">
                     <select
                       aria-label="Expires within"
                       value={expiresWithinHours}
@@ -10414,7 +10660,7 @@ export function App() {
                       <option value="48">≤ 48 h</option>
                     </select>
                   </th>
-                  <th>
+                  <th className="col-money">
                     <select
                       aria-label="Minimum pay"
                       value={minimumPayUsd}
@@ -10429,7 +10675,7 @@ export function App() {
                       <option value="25000">≥ $25,000</option>
                     </select>
                   </th>
-                  <th>
+                  <th className="col-money">
                     <label className="profitable-filter">
                       <input
                         type="checkbox"
@@ -10445,7 +10691,7 @@ export function App() {
                       </span>
                     </label>
                   </th>
-                  <th>
+                  <th className="col-access">
                     <div className="access-filter-cell">
                       <select
                         aria-label="Filter by Cargo Ops access"
@@ -10496,11 +10742,21 @@ export function App() {
                   const cargoLocked = isCargoOpsCommodityLocked(lot.commodityId);
                   return (
                   <tr key={lot.id} className={cargoLocked ? 'lot-locked' : undefined}>
-                    <td>
+                    <td className="col-route">
                       <div className="route">
-                        <IcaoLink icao={lot.originIcao} onOpen={openAirport} disabled={busy} />
+                        <IcaoLink
+                          icao={lot.originIcao}
+                          name={lot.originName}
+                          onOpen={openAirport}
+                          disabled={busy}
+                        />
                         <span className="arrow">→</span>
-                        <IcaoLink icao={lot.destIcao} onOpen={openAirport} disabled={busy} />
+                        <IcaoLink
+                          icao={lot.destIcao}
+                          name={lot.destName}
+                          onOpen={openAirport}
+                          disabled={busy}
+                        />
                         {lot.urgency === 'urgent' ? <span className="tag">Urgent</span> : null}
                         {(lot.quantityKg ?? lot.availableKg) >= 40_000 ? (
                           <span className="tag" title="Wide fill · XL lot (40–90 t)">
@@ -10546,12 +10802,12 @@ export function App() {
                         formatMoney={formatMoney}
                       />
                     </td>
-                    <td className="distance">
+                    <td className="distance col-compact">
                       {lot.distanceNm !== undefined
                         ? `${Math.round(lot.distanceNm).toLocaleString()} nm`
                         : '—'}
                     </td>
-                    <td>
+                    <td className="col-cargo">
                       <div className="commodity-cell">
                         <CommodityIcon
                           commodityId={lot.commodityId}
@@ -10563,10 +10819,10 @@ export function App() {
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td className="col-compact">
                       <LotLoadCell lot={lot} weightSystem={weightSystem} />
                     </td>
-                    <td>
+                    <td className="col-compact">
                       <LotExpiry
                         lot={lot}
                         tick={tick}
@@ -10575,28 +10831,36 @@ export function App() {
                       />
                       {lot.perishable ? <small>Perishable</small> : null}
                     </td>
-                    <td className="pay">
+                    <td className="pay col-money">
                       <LotPayCell lot={lot} idlePct={idlePct} />
                     </td>
                     <td
                       className={
-                        lot.npcClaim?.crewNeeded &&
-                        typeof lot.npcClaim.pilotFeeUsd === 'number'
-                          ? lot.npcClaim.pilotFeeUsd > 0
-                            ? 'net net-pos'
-                            : 'net'
-                          : typeof lot.estimatedNetUsd === 'number'
-                            ? lot.estimatedNetUsd > 0
+                        [
+                          'col-money',
+                          lot.npcClaim?.crewNeeded &&
+                          typeof lot.npcClaim.pilotFeeUsd === 'number'
+                            ? lot.npcClaim.pilotFeeUsd > 0
                               ? 'net net-pos'
-                              : lot.estimatedNetUsd < 0
-                                ? 'net net-neg'
-                                : 'net'
-                            : 'net'
+                              : 'net'
+                            : typeof lot.estimatedNetUsd === 'number'
+                              ? lot.estimatedNetUsd > 0
+                                ? 'net net-pos'
+                                : lot.estimatedNetUsd < 0
+                                  ? 'net net-neg'
+                                  : 'net'
+                              : 'net',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')
                       }
                     >
                       {lot.npcClaim?.crewNeeded &&
                       typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                        formatCrewFeeText(lot.npcClaim, formatMoney)
+                        <CrewFeeAmount
+                          claim={lot.npcClaim}
+                          formatMoney={formatMoney}
+                        />
                       ) : boardAircraft &&
                         typeof lot.estimatedNetUsd === 'number' ? (
                         <span
@@ -10614,7 +10878,7 @@ export function App() {
                         '—'
                       )}
                     </td>
-                    <td>
+                    <td className="col-access">
                       <button
                         type="button"
                         className="accept"
@@ -11409,7 +11673,7 @@ export function App() {
                 {stagingExistingLots + staging.lines.length >= MAX_STAGING_LOTS ? (
                   <p className="empty">Manifest lot cap reached ({MAX_STAGING_LOTS}).</p>
                 ) : stagingRouteLotsLoading ? (
-                  <p className="empty">Loading all available lots on this route…</p>
+                  <BusyBlock label="Loading route lots" />
                 ) : stagingRouteLotsError ? (
                   <p className="empty">
                     Could not load route lots: {stagingRouteLotsError}
@@ -11691,9 +11955,11 @@ export function App() {
             <div>
               <h2>Network</h2>
               <p>
-                {networkHubsLoading
-                  ? 'Loading hubs…'
-                  : `${networkHubs.length} cargo network hubs · trip-only bush strips are hidden · click a marker to open the terminal`}
+                {networkHubsLoading && networkHubs.length === 0 ? (
+                  <span className="skel skel-line" style={{ width: '16rem' }} />
+                ) : (
+                  `${networkHubs.length} cargo network hubs · trip-only bush strips are hidden · click a marker to open the terminal`
+                )}
               </p>
             </div>
             <button
@@ -11710,7 +11976,11 @@ export function App() {
               Refresh
             </button>
           </div>
-          {networkHubs.length === 0 && !networkHubsLoading ? (
+          {networkHubsLoading && networkHubs.length === 0 ? (
+            <div className="hub-network-map" aria-busy="true">
+              <BusyBlock label="Loading network" />
+            </div>
+          ) : networkHubs.length === 0 ? (
             <p className="empty">No hubs in the economy world yet.</p>
           ) : (
             <HubNetworkMap
@@ -11804,6 +12074,18 @@ export function App() {
                   <dd>{fleet.length}</dd>
                 </div>
               </dl>
+              <div className="profile-manage-block">
+                <p className="aircraft-card-section-label">Save</p>
+                <CareerProfileManage
+                  name={activeCareerProfile.name}
+                  canDelete={careerProfiles.length > 1}
+                  busy={busy}
+                  onRename={(name) =>
+                    void onRenameCareerProfile(activeCareerProfile.id, name)
+                  }
+                  onDelete={() => void onDeleteCareerProfile(activeCareerProfile.id)}
+                />
+              </div>
             </div>
             <div className="pilot-card pilot-card-wide">
               <h3>Progression</h3>
@@ -12372,5 +12654,6 @@ export function App() {
           })()
         : null}
     </div>
+    </AirportNamesProvider>
   );
 }

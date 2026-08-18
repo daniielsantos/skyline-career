@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 export type FerryHubOption = {
   icao: string;
   name?: string;
+  region?: string;
+  detail?: string;
 };
 
 function hubMatches(hub: FerryHubOption, rawQuery: string): boolean {
@@ -11,7 +13,11 @@ function hubMatches(hub: FerryHubOption, rawQuery: string): boolean {
   if (!q) return true;
   if (hub.icao.includes(q)) return true;
   const name = (hub.name ?? '').toUpperCase();
-  return name.includes(q);
+  if (name.includes(q)) return true;
+  const region = (hub.region ?? '').toUpperCase();
+  if (region.includes(q)) return true;
+  const detail = (hub.detail ?? '').toUpperCase();
+  return detail.includes(q);
 }
 
 type MenuBox = { top: number; left: number; width: number; maxHeight: number };
@@ -23,10 +29,15 @@ type MenuBox = { top: number; left: number; width: number; maxHeight: number };
  */
 export function FerryHubCombobox(props: {
   hubs: FerryHubOption[];
-  excludeIcao: string;
+  excludeIcao?: string;
   value: string;
   onChange: (icao: string) => void;
   disabled?: boolean;
+  id?: string;
+  placeholder?: string;
+  maxResults?: number;
+  /** Keep typed case (city / country search). Ferry stays uppercase via CSS. */
+  plainText?: boolean;
 }) {
   const listId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -35,6 +46,8 @@ export function FerryHubCombobox(props: {
   const [query, setQuery] = useState(props.value);
   const [open, setOpen] = useState(false);
   const [menuBox, setMenuBox] = useState<MenuBox | null>(null);
+  const exclude = (props.excludeIcao ?? '').toUpperCase();
+  const maxResults = props.maxResults ?? 12;
 
   useEffect(() => {
     setQuery((current) => {
@@ -50,15 +63,15 @@ export function FerryHubCombobox(props: {
   const available = useMemo(
     () =>
       props.hubs.filter(
-        (hub) => hub.icao && hub.icao !== props.excludeIcao.toUpperCase(),
+        (hub) => hub.icao && hub.icao !== exclude,
       ),
-    [props.hubs, props.excludeIcao],
+    [props.hubs, exclude],
   );
 
   const matches = useMemo(() => {
     const filtered = available.filter((hub) => hubMatches(hub, query));
-    return filtered.slice(0, 12);
-  }, [available, query]);
+    return filtered.slice(0, maxResults);
+  }, [available, query, maxResults]);
 
   const exactIcao = useMemo(() => {
     const q = query.trim().toUpperCase();
@@ -118,10 +131,10 @@ export function FerryHubCombobox(props: {
   }
 
   function onQueryChange(raw: string) {
-    const next = raw.toUpperCase();
+    const next = props.plainText ? raw : raw.toUpperCase();
     setQuery(next);
     setOpen(true);
-    const trimmed = next.trim();
+    const trimmed = next.trim().toUpperCase();
     if (!trimmed) {
       props.onChange('');
       return;
@@ -175,7 +188,11 @@ export function FerryHubCombobox(props: {
                       onClick={() => commitIcao(hub.icao)}
                     >
                       <strong>{hub.icao}</strong>
-                      {hub.name ? <span>{hub.name}</span> : null}
+                      {hub.name || hub.detail ? (
+                        <span>
+                          {[hub.name, hub.detail].filter(Boolean).join(' · ')}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 ))}
@@ -191,8 +208,12 @@ export function FerryHubCombobox(props: {
       : null;
 
   return (
-    <div className="ferry-hub-combobox" ref={rootRef}>
+    <div
+      className={`ferry-hub-combobox${props.plainText ? ' is-plain' : ''}`}
+      ref={rootRef}
+    >
       <input
+        id={props.id}
         ref={inputRef}
         type="text"
         role="combobox"
@@ -201,7 +222,7 @@ export function FerryHubCombobox(props: {
         aria-autocomplete="list"
         autoComplete="off"
         spellCheck={false}
-        placeholder="Type ICAO or name…"
+        placeholder={props.placeholder ?? 'Type ICAO or name…'}
         value={query}
         disabled={props.disabled}
         onChange={(e) => onQueryChange(e.target.value)}

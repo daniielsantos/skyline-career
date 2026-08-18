@@ -13,6 +13,11 @@ export const TICKS_PER_DAY = 96;
 export const MS_PER_TICK = MS_PER_HOUR / TICKS_PER_HOUR;
 /** Cap catch-up per load so a long offline stretch stays responsive (14 days). */
 export const MAX_CATCH_UP_TICKS = TICKS_PER_DAY * 14;
+/**
+ * Interactive load (profile open / /api/state) only simulates this many batches.
+ * One tick is ~10s at current world scale; leftover elapsed is snapped on lastBatchAtMs.
+ */
+export const MAX_LOAD_CATCH_UP_TICKS = 1;
 
 export function hoursToMs(hours: number): number {
   return hours * MS_PER_HOUR;

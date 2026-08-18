@@ -10,6 +10,7 @@ import {
   createSeedEconomyWorld,
   ensureEconomyCaughtUp,
   ensureSeedMarketFormed,
+  MAX_LOAD_CATCH_UP_TICKS,
   migrateEconomyWorld,
 } from './career-economy.js';
 import {
@@ -40,6 +41,23 @@ import {
   replaceLedgerV3,
   stripEconomyHotArrays,
 } from './career-store-v3.js';
+import {
+  countAirportRows,
+  economyBlobHasAirports,
+  ensureLocalWorld,
+  ensureV4Ddl,
+  hydrateAirportsFromTables,
+  migrateV3toV4IfNeeded,
+  overlayEconomyMeta,
+  persistWorldAirports,
+  readAirportBoard,
+  readAirportInventory,
+  stampCompanyWorldId,
+  stripEconomyAirports,
+  LOCAL_WORLD_ID,
+  type AirportBoardSnapshot,
+  type AirportInventorySnapshot,
+} from './career-store-v4.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
@@ -49,7 +67,9 @@ import type {
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '3';
+export const CAREER_STORE_SCHEMA_VERSION = '4';
+export { LOCAL_WORLD_ID };
+export type { AirportBoardSnapshot, AirportInventorySnapshot };
 
 export type EconomyLoadResult = {
   world: CareerEconomyWorld;
@@ -63,10 +83,16 @@ export type EconomyLoadResult = {
 export interface CareerStore {
   readonly kind: CareerStoreKind;
   readonly sqlitePath?: string;
-  loadEconomy(): Promise<EconomyLoadResult>;
+  loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult>;
   saveEconomy(world: CareerEconomyWorld): Promise<void>;
   loadMissions(): Promise<CareerMissionsState>;
   saveMissions(state: CareerMissionsState): Promise<void>;
+  /** In-process world after last load/save — skip blob parse on hot reads. */
+  peekEconomyWorld(): CareerEconomyWorld | null;
+  /** Schema v4: hub + stock + lots by ICAO. JSON store uses RAM if present. */
+  readAirportBoard(icao: string): AirportBoardSnapshot | null;
+  /** Hub + stock + clock only (no lots). SQL, no economy blob. */
+  readAirportInventory(icao: string): AirportInventorySnapshot | null;
   /** Ledger rows (materialized in SQLite; from missions blob for JSON). */
   loadLedger(): Promise<CareerLedgerEntry[]>;
   summarizeCashflow(atTick: number): Promise<{
@@ -87,6 +113,10 @@ export type OpenCareerStoreOpts = {
   sqliteFileName?: string;
 };
 
+function catchUpOpts(opts?: { maxCatchUpTicks?: number }) {
+  return { maxTicks: opts?.maxCatchUpTicks ?? MAX_LOAD_CATCH_UP_TICKS };
+}
+
 function economyNeedsRewrite(
   existing: Record<string, unknown>,
   caught: CareerEconomyWorld,
@@ -97,9 +127,11 @@ function economyNeedsRewrite(
   const trucksBefore = Array.isArray(existing.fuelTrucks)
     ? existing.fuelTrucks.length
     : 0;
-  const airportsBefore = Array.isArray(existing.airports) ? existing.airports.length : 0;
-  const hubLevelSigBefore = Array.isArray(existing.airports)
-    ? (existing.airports as Array<{ level?: number; levelXp?: number; levelCurveVersion?: number }>)
+  const blobAirports = Array.isArray(existing.airports) ? existing.airports : [];
+  const blobHasAirports = blobAirports.length > 0;
+  const airportsBefore = blobHasAirports ? blobAirports.length : caught.airports.length;
+  const hubLevelSigBefore = blobHasAirports
+    ? (blobAirports as Array<{ level?: number; levelXp?: number; levelCurveVersion?: number }>)
         .map((ap) => `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`)
         .join('|')
     : '';
@@ -108,15 +140,17 @@ function economyNeedsRewrite(
         .map((npc) => npc.homeRegion ?? '')
         .join('|')
     : '';
-  const missingHubTiers = Array.isArray(existing.airports)
-    ? (existing.airports as Array<{ hubTier?: string }>).some((ap) => !ap.hubTier)
+  const missingHubTiers = blobHasAirports
+    ? (blobAirports as Array<{ hubTier?: string }>).some((ap) => !ap.hubTier)
     : false;
   const missingHomeCountry = !(existing as { homeCountryId?: string }).homeCountryId;
   const version = (existing as { version?: number }).version;
 
-  const hubLevelSigAfter = (caught.airports ?? [])
-    .map((ap) => `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`)
-    .join('|');
+  const hubLevelSigAfter = blobHasAirports
+    ? (caught.airports ?? [])
+        .map((ap) => `${ap.level ?? ''}:${ap.levelXp ?? ''}:${ap.levelCurveVersion ?? ''}`)
+        .join('|')
+    : '';
   const npcRegionsAfter = (caught.npcs ?? []).map((npc) => npc.homeRegion ?? '').join('|');
 
   return (
@@ -125,12 +159,13 @@ function economyNeedsRewrite(
     version !== 3 ||
     caught.npcs.length !== npcCountBefore ||
     (caught.fuelTrucks?.length ?? 0) !== trucksBefore ||
-    caught.airports.length !== airportsBefore ||
+    (blobHasAirports && caught.airports.length !== airportsBefore) ||
     npcRegionsAfter !== npcRegionsBefore ||
-    hubLevelSigAfter !== hubLevelSigBefore ||
+    (blobHasAirports && hubLevelSigAfter !== hubLevelSigBefore) ||
     missingHubTiers ||
     missingHomeCountry ||
-    economyBlobHasHotArrays(existing)
+    economyBlobHasHotArrays(existing) ||
+    economyBlobHasAirports(existing)
   );
 }
 
@@ -173,23 +208,84 @@ async function persistClHubIdentRemaps(
 
 class JsonCareerStore implements CareerStore {
   readonly kind = 'json' as const;
+  private ram: CareerEconomyWorld | null = null;
   constructor(
     private readonly economyPath: string,
     private readonly missionsPath: string,
   ) {}
 
-  async loadEconomy(): Promise<EconomyLoadResult> {
+  peekEconomyWorld(): CareerEconomyWorld | null {
+    return this.ram;
+  }
+
+  readAirportInventory(icao: string): AirportInventorySnapshot | null {
+    const world = this.ram;
+    if (!world) return null;
+    const code = icao.trim().toUpperCase();
+    const airport = world.airports.find((a) => a.icao === code);
+    if (!airport) return null;
+    return {
+      worldId: LOCAL_WORLD_ID,
+      meta: {
+        worldId: LOCAL_WORLD_ID,
+        seed: world.seed,
+        tick: world.tick,
+        lastBatchAtMs: world.lastBatchAtMs,
+        homeCountryId: world.homeCountryId ?? '',
+      },
+      airport,
+    };
+  }
+
+  readAirportBoard(icao: string): AirportBoardSnapshot | null {
+    const world = this.ram;
+    if (!world) return null;
+    const code = icao.trim().toUpperCase();
+    const airport = world.airports.find((a) => a.icao === code);
+    if (!airport) return null;
+    const lots = (world.lots ?? []).filter(
+      (lot) =>
+        (lot.originIcao === code || lot.destIcao === code) &&
+        (lot.status === 'available' ||
+          lot.status === 'reserved' ||
+          lot.status === 'in_transit'),
+    );
+    const partnerIcaos = lots
+      .flatMap((l) => [l.originIcao, l.destIcao])
+      .filter((c) => c !== code);
+    const relatedAirports = world.airports.filter((a) => partnerIcaos.includes(a.icao));
+    return {
+      worldId: LOCAL_WORLD_ID,
+      meta: {
+        worldId: LOCAL_WORLD_ID,
+        seed: world.seed,
+        tick: world.tick,
+        lastBatchAtMs: world.lastBatchAtMs,
+        homeCountryId: world.homeCountryId ?? '',
+      },
+      airport,
+      lots,
+      relatedAirports,
+    };
+  }
+
+  async loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult> {
     const existing = await readJsonFile<Record<string, unknown>>(this.economyPath);
     if (existing && Array.isArray(existing.airports)) {
       const beforeIcaos = airportIcaoList(existing);
       const world = migrateEconomyWorld(existing);
-      const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
+      const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(
+        world,
+        Date.now(),
+        catchUpOpts(opts),
+      );
       ensureHomeCountryId(caught);
       const afterIcaos = airportIcaoList(caught);
       let dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
       if (ensureSeedMarketFormed(caught)) dirty = true;
       if (clHubIdentRemapsForPlayer(beforeIcaos, afterIcaos).length > 0) dirty = true;
       await persistClHubIdentRemaps(this, beforeIcaos, afterIcaos);
+      this.ram = caught;
       return { world: caught, advancedTicks, settledFlights, dirty };
     }
     if (existing) {
@@ -200,6 +296,7 @@ class JsonCareerStore implements CareerStore {
     const fresh = createSeedEconomyWorld();
     ensureSeedMarketFormed(fresh);
     await this.saveEconomy(fresh);
+    this.ram = fresh;
     return { world: fresh, advancedTicks: 0, settledFlights: 0, dirty: false };
   }
 
@@ -208,6 +305,7 @@ class JsonCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
+    this.ram = toSave;
     await writeJsonFileAtomic(this.economyPath, toSave);
   }
 
@@ -248,7 +346,7 @@ class JsonCareerStore implements CareerStore {
   }
 
   close(): void {
-    /* no-op */
+    this.ram = null;
   }
 }
 
@@ -330,12 +428,15 @@ function ensureSqliteSchema(db: SqliteDb): void {
   `);
 
   ensureV3Ddl(db);
+  ensureV4Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
     | undefined;
   if (!ver) {
+    ensureLocalWorld(db);
     ensureLocalCompany(db);
+    stampCompanyWorldId(db);
     db.prepare(`INSERT INTO meta (key, value) VALUES ('schema_version', ?)`).run(
       CAREER_STORE_SCHEMA_VERSION,
     );
@@ -344,11 +445,18 @@ function ensureSqliteSchema(db: SqliteDb): void {
 
   const current = Number.parseInt(ver.value, 10);
   if (!Number.isFinite(current) || current < 3) {
-    migrateV2toV3IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
-  } else if (ver.value !== CAREER_STORE_SCHEMA_VERSION) {
-    metaSet(db, 'schema_version', CAREER_STORE_SCHEMA_VERSION);
+    migrateV2toV3IfNeeded(db, metaSet, '3');
+  }
+  const afterV3 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verNow = Number.parseInt(afterV3?.value ?? ver.value, 10);
+  if (!Number.isFinite(verNow) || verNow < 4) {
+    migrateV3toV4IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   } else {
+    ensureLocalWorld(db);
     ensureLocalCompany(db);
+    stampCompanyWorldId(db);
   }
 }
 
@@ -363,10 +471,23 @@ class SqliteCareerStore implements CareerStore {
   readonly kind = 'sqlite' as const;
   readonly sqlitePath: string;
   private readonly db: SqliteDb;
+  private ram: CareerEconomyWorld | null = null;
 
   constructor(sqlitePath: string) {
     this.sqlitePath = sqlitePath;
     this.db = openSqliteDb(sqlitePath);
+  }
+
+  peekEconomyWorld(): CareerEconomyWorld | null {
+    return this.ram;
+  }
+
+  readAirportInventory(icao: string): AirportInventorySnapshot | null {
+    return readAirportInventory(this.db, icao, LOCAL_WORLD_ID);
+  }
+
+  readAirportBoard(icao: string): AirportBoardSnapshot | null {
+    return readAirportBoard(this.db, icao, LOCAL_WORLD_ID);
   }
 
   hasEconomyRow(): boolean {
@@ -380,7 +501,21 @@ class SqliteCareerStore implements CareerStore {
     metaSet(this.db, 'migrated_from_json', new Date().toISOString());
   }
 
-  async loadEconomy(): Promise<EconomyLoadResult> {
+  async loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult> {
+    if (this.ram) {
+      const world = migrateEconomyWorld(this.ram);
+      const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(
+        world,
+        Date.now(),
+        catchUpOpts(opts),
+      );
+      ensureHomeCountryId(caught);
+      let dirty = advancedTicks > 0 || settledFlights > 0;
+      if (ensureSeedMarketFormed(caught)) dirty = true;
+      this.ram = caught;
+      return { world: caught, advancedTicks, settledFlights, dirty };
+    }
+
     const row = this.db.prepare(`SELECT json FROM economy_json WHERE id = 1`).get() as
       | { json: string }
       | undefined;
@@ -400,20 +535,28 @@ class SqliteCareerStore implements CareerStore {
         }`,
       );
     }
-    if (!Array.isArray(existing.airports)) {
-      throw new Error('SQLite economy_json has no airports[]; refusing to reseed');
-    }
-    const beforeIcaos = airportIcaoList(existing);
-    // Hydrate lots before CL ident remap so SCCD/SCIE rewrite sees airports + lots.
     hydrateWorldFromTables(this.db, existing as unknown as CareerEconomyWorld);
+    hydrateAirportsFromTables(this.db, existing as unknown as CareerEconomyWorld);
+    overlayEconomyMeta(this.db, existing as unknown as CareerEconomyWorld);
+    const tableAirports = countAirportRows(this.db);
+    const blobAirports = Array.isArray(existing.airports) ? existing.airports.length : 0;
+    if (tableAirports === 0 && blobAirports === 0) {
+      throw new Error('SQLite world has no airports (tables or blob); refusing to reseed');
+    }
+    const beforeIcaos = airportIcaoList(existing as { airports?: Array<{ icao?: string }> });
     const world = migrateEconomyWorld(existing);
-    const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(world);
+    const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(
+      world,
+      Date.now(),
+      catchUpOpts(opts),
+    );
     ensureHomeCountryId(caught);
     const afterIcaos = airportIcaoList(caught);
     let dirty = economyNeedsRewrite(existing, caught, advancedTicks, settledFlights);
     if (ensureSeedMarketFormed(caught)) dirty = true;
     if (clHubIdentRemapsForPlayer(beforeIcaos, afterIcaos).length > 0) dirty = true;
     await persistClHubIdentRemaps(this, beforeIcaos, afterIcaos);
+    this.ram = caught;
     return { world: caught, advancedTicks, settledFlights, dirty };
   }
 
@@ -422,7 +565,7 @@ class SqliteCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    const blob = stripEconomyHotArrays(toSave);
+    const blob = stripEconomyAirports(stripEconomyHotArrays(toSave));
     const json = JSON.stringify(blob);
     const now = Date.now();
     runInTransaction(this.db, () => {
@@ -433,9 +576,12 @@ class SqliteCareerStore implements CareerStore {
         )
         .run(json, now);
       persistWorldLiveTables(this.db, toSave);
+      persistWorldAirports(this.db, toSave);
+      stampCompanyWorldId(this.db);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
       metaSet(this.db, 'economy_tick', String(toSave.tick));
     });
+    this.ram = toSave;
   }
 
   async loadMissions(): Promise<CareerMissionsState> {
@@ -505,6 +651,7 @@ class SqliteCareerStore implements CareerStore {
   }
 
   close(): void {
+    this.ram = null;
     this.db.close();
   }
 }
@@ -605,4 +752,4 @@ export function createJsonCareerStore(opts: {
 }
 
 /** @internal test helper */
-export { countLotsRows };
+export { countLotsRows, countAirportRows };

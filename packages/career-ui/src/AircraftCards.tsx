@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
+import { IcaoLink } from './IcaoLink';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
 import {
   fetchFerryPlan,
@@ -373,15 +374,11 @@ export function MarketListingCard(props: {
           <strong>{listing.label || aircraftModelLabel(listing.aircraftClassId)}</strong>
           <div className="aircraft-card-meta">
             <span>{aircraftClassLabel(listing.aircraftClassId)}</span>
-            <button
-              type="button"
-              className="icao-link"
+            <IcaoLink
+              icao={listing.basedIcao}
+              onOpen={props.onOpenAirport}
               disabled={props.busy}
-              onClick={() => props.onOpenAirport(listing.basedIcao)}
-              title={`Open ${listing.basedIcao} terminal`}
-            >
-              {listing.basedIcao}
-            </button>
+            />
             <span>
               {Math.round(listing.hoursAirframe)}/
               {Math.round(listing.hoursEngine)} h
@@ -779,15 +776,11 @@ export function HangarAircraftCard(props: {
           <p className="aircraft-card-section-label">Where</p>
           <div className="hangar-where-line">
             <span className="hangar-where-status">{hangarWhereLabel(acf)}</span>
-            <button
-              type="button"
-              className="icao-link"
+            <IcaoLink
+              icao={acf.locationIcao}
+              onOpen={props.onOpenAirport}
               disabled={props.busy}
-              onClick={() => props.onOpenAirport(acf.locationIcao)}
-              title={`Open ${acf.locationIcao} terminal`}
-            >
-              {acf.locationIcao}
-            </button>
+            />
           </div>
           <div className="hangar-where-line hangar-where-pilot">
             Pilot {pilotHere ? 'here' : `at ${pilotLabel}`}

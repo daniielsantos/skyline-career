@@ -6,6 +6,7 @@ import {
   type DispatchRouteWaypoint,
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
+import { BusyBlock } from './Busy';
 
 /** Highlight origin/dest ICAO tokens (incl. runway suffix like SAVN/12) in the OFP route. */
 function highlightOfpRoute(
@@ -126,7 +127,7 @@ export function DispatchRouteCard(props: {
         ) : null}
       </div>
       {loading ? (
-        <p className="dispatch-route-map-empty">Loading map…</p>
+        <BusyBlock label="Loading map" className="dispatch-route-map-empty" />
       ) : origin && dest ? (
         <>
           <DispatchRouteMap

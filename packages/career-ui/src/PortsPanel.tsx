@@ -23,6 +23,7 @@ import {
   type PortsSnapshot,
 } from './api';
 import { PortsMap } from './PortsMap';
+import { BusyBlock } from './Busy';
 import { CommodityIcon } from './CommodityIcon';
 import { CrewPortrait } from './CrewPanel';
 import { crewPortraitUrl } from './crewPortraits';
@@ -1515,11 +1516,11 @@ export function PortsPanel(props: {
       </div>
 
       {!snap ? (
-        <p className="empty">
-          {loadError
-            ? `Could not load ports — ${loadError}`
-            : 'Loading ports…'}
-        </p>
+        loadError ? (
+          <p className="empty">Could not load ports — {loadError}</p>
+        ) : (
+          <BusyBlock label="Loading ports" />
+        )
       ) : (
         <div className="ports-panel-body">
           <div

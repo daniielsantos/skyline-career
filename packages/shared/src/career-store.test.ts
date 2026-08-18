@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +12,16 @@ import {
   openCareerStore,
 } from './career-store.js';
 import type { MissionIntent, PlayerAircraft, ShipmentLot } from './types/career-economy.js';
+
+function countAirportsInDb(sqlitePath: string): number {
+  const db = new DatabaseSync(sqlitePath);
+  try {
+    const row = db.prepare(`SELECT COUNT(*) AS n FROM airports`).get() as { n: number };
+    return Number(row.n);
+  } finally {
+    db.close();
+  }
+}
 
 function countLotsInDb(sqlitePath: string): number {
   const db = new DatabaseSync(sqlitePath);
@@ -92,7 +102,7 @@ describe('career store', () => {
       amountUsd: 800,
       kind: 'freight_payout',
       atTick: 48,
-      note: 'SBGR→SBGL',
+      note: 'SBGRâ†’SBGL',
     });
     applyWalletDelta(missions, {
       amountUsd: -85,
@@ -161,6 +171,8 @@ describe('career store', () => {
     assert.equal(Array.isArray(blob.lots) ? blob.lots.length : -1, 0);
     assert.equal(Array.isArray(blob.npcFlights) ? blob.npcFlights.length : -1, 0);
     assert.equal(Array.isArray(blob.events) ? blob.events.length : -1, 0);
+    assert.equal(Array.isArray(blob.airports) ? blob.airports.length : -1, 0);
+    assert.ok(countAirportsInDb(store.sqlitePath) >= world.airports.length);
 
     const sample = world.lots[0]!;
     sample.status = 'reserved';
@@ -173,7 +185,7 @@ describe('career store', () => {
     assert.equal(row.reserved_kg, sample.reservedKg);
     assert.ok(row.origin_country_id, 'lot origin_country_id stamped');
 
-    // Corrupt blob lots but keep table — load should prefer table.
+    // Corrupt blob lots but keep table â€” load should prefer table.
     const db = new DatabaseSync(store.sqlitePath);
     const blobRow = db.prepare(`SELECT json FROM economy_json WHERE id = 1`).get() as {
       json: string;
@@ -251,7 +263,7 @@ describe('career store', () => {
     db.close();
 
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    assert.equal(schemaVersionInDb(store.sqlitePath!), '3');
+    assert.equal(schemaVersionInDb(store.sqlitePath!), CAREER_STORE_SCHEMA_VERSION);
     assert.equal(companyLocalExists(store.sqlitePath!), true);
 
     const loaded = await store.loadEconomy();
@@ -394,7 +406,7 @@ describe('career store', () => {
     db.close();
 
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    assert.equal(schemaVersionInDb(store.sqlitePath!), '3');
+    assert.equal(schemaVersionInDb(store.sqlitePath!), CAREER_STORE_SCHEMA_VERSION);
     assert.equal(companyLocalExists(store.sqlitePath!), true);
 
     const m = await store.loadMissions();

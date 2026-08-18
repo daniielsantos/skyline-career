@@ -322,7 +322,7 @@ await loadProfileMsfsBushHubOverrides(careerRoot);
 await persistProfileMsfsBushHubOverrides(careerRoot);
 
 async function stampMsfsOverridesOnStore(target: CareerStore): Promise<void> {
-  const { world, dirty } = await target.loadEconomy();
+  const { world, dirty } = await target.loadEconomy({ maxCatchUpTicks: 0 });
   let stamped = 0;
   const pruned = pruneOrphanCareerHubs(world);
   for (const airport of world.airports) {
@@ -771,6 +771,112 @@ function clockPayload(world: CareerEconomyWorld, nowMs = Date.now()) {
   };
 }
 
+function clockPayloadFromMeta(
+  meta: { tick: number; lastBatchAtMs: number },
+  nowMs: number,
+) {
+  const anchor =
+    typeof meta.lastBatchAtMs === 'number' && Number.isFinite(meta.lastBatchAtMs)
+      ? meta.lastBatchAtMs
+      : nowMs;
+  const frac = Math.max(0, nowMs - anchor) / MS_PER_TICK;
+  return {
+    serverNowMs: nowMs,
+    lastBatchAtMs: meta.lastBatchAtMs,
+    lastSyncedAtMs: meta.lastBatchAtMs,
+    tick: meta.tick,
+    continuousHours: meta.tick + frac,
+    msPerTick: MS_PER_TICK,
+    fuelHaulsEnroute: 0,
+  };
+}
+
+function mapAirportCommodities(
+  airport: CareerEconomyWorld['airports'][number],
+) {
+  return CAREER_COMMODITIES.map((c) => {
+    const pile = airport.inventory[c.id] ?? { stockKg: 0, capacityKg: 0 };
+    const fill = fillPct(pile.stockKg, pile.capacityKg);
+    const productionPerTickKg = airport.production[c.id] ?? 0;
+    const consumptionPerTickKg = airport.consumption[c.id] ?? 0;
+    return {
+      commodityId: c.id,
+      name: c.name,
+      kind: c.kind ?? 'cargo',
+      perishable: Boolean(c.perishable),
+      highValue: Boolean(c.highValue),
+      stockKg: pile.stockKg,
+      capacityKg: pile.capacityKg,
+      stockTonnes: pile.stockKg / 1000,
+      capacityTonnes: pile.capacityKg / 1000,
+      fillPct: fill,
+      balance: stockBalance(fill),
+      trend: stockTrend(productionPerTickKg, consumptionPerTickKg),
+      productionPerTickKg,
+      consumptionPerTickKg,
+      unitPriceUsd: localUnitPriceUsd(c.id, pile),
+    };
+  });
+}
+
+function mapAirportTerminalChrome(
+  airport: CareerEconomyWorld['airports'][number],
+) {
+  const levelInfo = hubLevelXpProgress(airport);
+  const levelProfile = hubLevelProfile(levelInfo.level);
+  return {
+    airport: {
+      icao: airport.icao,
+      name: airport.name,
+      region: airport.region,
+      level: levelInfo.level,
+      hubTier: hubTierOf(airport),
+      bush: Boolean(airport.bush) || isBushHub(airport.icao),
+      bushTripOnly: Boolean(airport.bushTripOnly) || isBushTripOnlyHub(airport.icao),
+      lat: airport.lat,
+      lon: airport.lon,
+    },
+    hubLevel: {
+      level: levelInfo.level,
+      xp: levelInfo.xp,
+      xpIntoLevel: levelInfo.xpIntoLevel,
+      xpForNext: levelInfo.xpForNext,
+      progressPct: levelInfo.progressPct,
+      capacityMult: levelProfile.capacityMult,
+      flowMult: levelProfile.flowMult,
+      laneBonus: levelProfile.laneBonus,
+      originPayMult: levelProfile.originPayMult,
+      quiet: (airport.activityScore ?? 40) < 8,
+    },
+  };
+}
+
+function mapAirportStockPayload(
+  snap: NonNullable<ReturnType<CareerStore['readAirportInventory']>>,
+  nowMs: number,
+) {
+  const commodities = mapAirportCommodities(snap.airport);
+  const totalStockKg = commodities.reduce((sum, c) => sum + c.stockKg, 0);
+  return {
+    ...clockPayloadFromMeta(snap.meta, nowMs),
+    ...mapAirportTerminalChrome(snap.airport),
+    events: [],
+    totalStockKg,
+    totalStockTonnes: totalStockKg / 1000,
+    commodities,
+    outboundLots: [],
+    inboundLots: [],
+    arrivals: [],
+    departures: [],
+    npcActivity: [],
+    fuelInbound: [],
+    fuelRecent: [],
+    playerFbos: null,
+    homeHubIcao: null,
+    runways: [],
+  };
+}
+
 function mapFuelHaulView(
   row: ReturnType<typeof listFuelHaulViews>[number],
 ) {
@@ -790,6 +896,23 @@ function mapFuelHaulView(
     progressPct: row.progressPct,
     status: row.status,
     phase: row.phase,
+  };
+}
+
+function overlayAirportBoard(
+  cached: CareerEconomyWorld,
+  board: ReturnType<CareerStore['readAirportBoard']>,
+  airport: CareerEconomyWorld['airports'][number],
+): CareerEconomyWorld {
+  if (!board) return cached;
+  const byIcao = new Map(cached.airports.map((a) => [a.icao, a]));
+  byIcao.set(airport.icao, airport);
+  for (const ap of board.relatedAirports) byIcao.set(ap.icao, ap);
+  return {
+    ...cached,
+    tick: board.meta.tick || cached.tick,
+    lastBatchAtMs: board.meta.lastBatchAtMs || cached.lastBatchAtMs,
+    airports: [...byIcao.values()],
   };
 }
 
@@ -2689,38 +2812,41 @@ export function createCareerApiServer(port = 8787) {
       const airportMatch = path.match(/^\/api\/airport\/([A-Za-z0-9]{3,4})$/);
       if (req.method === 'GET' && airportMatch) {
         const icao = airportMatch[1]!.toUpperCase();
-        const world = await loadEconomy();
-        const missions = await loadMissions();
         const nowMs = Date.now();
-        const airport = world.airports.find((a) => a.icao === icao);
-        if (!airport) {
+        if (url.searchParams.get('part') === 'stock') {
+          const snap = requireStore().readAirportInventory(icao);
+          if (!snap) {
+            send(res, 404, { error: `Unknown airport ${icao}` });
+            return;
+          }
+          send(res, 200, mapAirportStockPayload(snap, nowMs));
+          return;
+        }
+        const loaded = await withCareerLock(async () => {
+          const active = requireStore();
+          if (!active.peekEconomyWorld()) {
+            await loadEconomyUnlocked();
+          }
+          const missions = await loadMissions();
+          const cached = active.peekEconomyWorld();
+          if (!cached) return null;
+          const board = active.readAirportBoard(icao);
+          const airport =
+            board?.airport ?? cached.airports.find((a) => a.icao === icao);
+          if (!airport) return { missing: true as const };
+          return {
+            world: overlayAirportBoard(cached, board, airport),
+            missions,
+            airport,
+            boardLots: board?.lots,
+          };
+        });
+        if (!loaded || 'missing' in loaded) {
           send(res, 404, { error: `Unknown airport ${icao}` });
           return;
         }
-
-        const commodities = CAREER_COMMODITIES.map((c) => {
-          const pile = airport.inventory[c.id] ?? { stockKg: 0, capacityKg: 0 };
-          const fill = fillPct(pile.stockKg, pile.capacityKg);
-          const productionPerTickKg = airport.production[c.id] ?? 0;
-          const consumptionPerTickKg = airport.consumption[c.id] ?? 0;
-          return {
-            commodityId: c.id,
-            name: c.name,
-            kind: c.kind ?? 'cargo',
-            perishable: Boolean(c.perishable),
-            highValue: Boolean(c.highValue),
-            stockKg: pile.stockKg,
-            capacityKg: pile.capacityKg,
-            stockTonnes: pile.stockKg / 1000,
-            capacityTonnes: pile.capacityKg / 1000,
-            fillPct: fill,
-            balance: stockBalance(fill),
-            trend: stockTrend(productionPerTickKg, consumptionPerTickKg),
-            productionPerTickKg,
-            consumptionPerTickKg,
-            unitPriceUsd: localUnitPriceUsd(c.id, pile),
-          };
-        });
+        const { world, missions, airport, boardLots } = loaded;
+        const commodities = mapAirportCommodities(airport);
 
         const totalStockKg = commodities.reduce((sum, c) => sum + c.stockKg, 0);
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
@@ -2736,7 +2862,7 @@ export function createCareerApiServer(port = 8787) {
               aircraft,
             )
           : undefined;
-        const relatedLots = world.lots
+        const relatedLots = (boardLots ?? world.lots)
           .filter(
             (lot) =>
               (lot.originIcao === icao || lot.destIcao === icao) &&
@@ -2814,34 +2940,11 @@ export function createCareerApiServer(port = 8787) {
           .filter((h) => h.status === 'completed' || h.phase === 'delivered')
           .slice(-3)
           .map(mapFuelHaulView);
-        const levelInfo = hubLevelXpProgress(airport);
-        const levelProfile = hubLevelProfile(levelInfo.level);
+        const chrome = mapAirportTerminalChrome(airport);
 
         send(res, 200, {
           ...clockPayload(world, nowMs),
-          airport: {
-            icao: airport.icao,
-            name: airport.name,
-            region: airport.region,
-            level: levelInfo.level,
-            hubTier: hubTierOf(airport),
-            bush: Boolean(airport.bush) || isBushHub(airport.icao),
-            bushTripOnly: Boolean(airport.bushTripOnly) || isBushTripOnlyHub(airport.icao),
-            lat: airport.lat,
-            lon: airport.lon,
-          },
-          hubLevel: {
-            level: levelInfo.level,
-            xp: levelInfo.xp,
-            xpIntoLevel: levelInfo.xpIntoLevel,
-            xpForNext: levelInfo.xpForNext,
-            progressPct: levelInfo.progressPct,
-            capacityMult: levelProfile.capacityMult,
-            flowMult: levelProfile.flowMult,
-            laneBonus: levelProfile.laneBonus,
-            originPayMult: levelProfile.originPayMult,
-            quiet: (airport.activityScore ?? 40) < 8,
-          },
+          ...chrome,
           events: listActiveEconomyEvents(world, { icao }),
           totalStockKg,
           totalStockTonnes: totalStockKg / 1000,

@@ -1311,12 +1311,15 @@ export function fetchAirport(
   opts: {
     aircraft?: AircraftClass;
     airframe?: string;
+    /** Hub + stock only — skips lots / NPC / estimates. */
+    part?: 'stock';
   } = {},
 ) {
   const params = new URLSearchParams();
   if (opts.aircraft) params.set('aircraft', opts.aircraft);
   const airframe = opts.airframe?.trim();
   if (airframe) params.set('airframe', airframe);
+  if (opts.part) params.set('part', opts.part);
   const qs = params.toString();
   return api<AirportView>(
     `/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}${

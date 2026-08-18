@@ -1113,19 +1113,18 @@ th {
 
 .filter-row .load-filter-pair {
   display: grid;
-  grid-template-columns: minmax(5.15rem, 1fr) minmax(5.15rem, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 0.25rem;
-  min-width: 10.5rem;
-  width: max-content;
-  max-width: none;
+  min-width: 0;
+  width: 100%;
 }
 
 .filter-row .load-filter-pair select {
-  min-width: 5.15rem;
-  width: 5.35rem;
+  min-width: 0;
+  width: 100%;
   max-width: none;
   /* Keep same height as other Freights filter selects; only width is tight. */
-  padding: 0.38rem 0.35rem;
+  padding: 0.38rem 0.3rem;
   font-size: 0.76rem;
 }
 
@@ -1972,6 +1971,14 @@ th {
   flex-direction: column;
   gap: 0.1rem;
   min-width: 0;
+  overflow: hidden;
+}
+
+.commodity-cell strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .commodity-inline {
@@ -3363,7 +3370,8 @@ tr.lot-locked {
 
 .route {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.45rem;
   align-items: center;
 }
 
@@ -3670,7 +3678,7 @@ tr.lot-locked {
   text-transform: none;
   font-weight: 400;
   cursor: help;
-  max-width: 18rem;
+  max-width: 100%;
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
@@ -3691,7 +3699,19 @@ tr.lot-locked {
 .pilot-signup {
   display: grid;
   gap: 1rem;
-  max-width: 28rem;
+  max-width: 36rem;
+}
+
+.pilot-signup-hubs {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .pilot-signup-hubs {
+    grid-template-columns: minmax(10rem, 0.9fr) minmax(14rem, 1.2fr);
+    align-items: end;
+  }
 }
 
 .profile-gate-shell {
@@ -3786,7 +3806,8 @@ tr.lot-locked {
   color: var(--muted);
 }
 
-.profile-gate-spinner {
+.profile-gate-spinner,
+.busy-spinner {
   width: 1.15rem;
   height: 1.15rem;
   border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
@@ -3795,10 +3816,86 @@ tr.lot-locked {
   animation: profile-gate-spin 0.7s linear infinite;
 }
 
-.profile-gate-spinner-lg {
+.profile-gate-spinner-lg,
+.busy-spinner-lg {
   width: 2.25rem;
   height: 2.25rem;
   border-width: 3px;
+}
+
+.busy-spinner-sm {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-width: 2px;
+}
+
+.busy-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+.busy-block {
+  display: grid;
+  place-content: center;
+  min-height: 10rem;
+  padding: 1.5rem;
+}
+
+.skel {
+  display: block;
+  height: 0.62rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 65%, var(--accent));
+  opacity: 0.42;
+  animation: profile-gate-shimmer 1.2s ease-in-out infinite;
+}
+
+.skel-line {
+  display: inline-block;
+  height: 0.7rem;
+  vertical-align: middle;
+}
+
+.skel-icon {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 6px;
+}
+
+.skel-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.skel-row td {
+  pointer-events: none;
+}
+
+.table-wrap.is-loading {
+  position: relative;
+}
+
+.table-wrap.is-loading > .busy-chip {
+  position: absolute;
+  left: 50%;
+  top: 6.5rem;
+  z-index: 2;
+  transform: translateX(-50%);
+}
+
+.table-wrap.is-loading > table tbody:not(:has(.skel-row)) {
+  opacity: 0.45;
+  transition: opacity 120ms ease;
 }
 
 @keyframes profile-gate-spin {
@@ -3853,26 +3950,34 @@ tr.lot-locked {
   gap: 0.65rem;
 }
 
-.profile-gate-row {
-  display: grid;
-  gap: 0.5rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 92%, var(--accent));
-}
-
 .profile-gate-play {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: space-between;
   gap: 0.45rem 0.7rem;
+  width: 100%;
   text-align: left;
   font: inherit;
   color: inherit;
-  background: transparent;
-  border: 0;
   cursor: pointer;
-  padding: 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent));
+}
+
+.profile-gate-play.is-last {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+}
+
+.profile-gate-play:hover:not(:disabled),
+.profile-gate-play:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.profile-gate-play:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .profile-gate-play strong {
@@ -3887,25 +3992,48 @@ tr.lot-locked {
   color: var(--accent);
 }
 
-.profile-gate-row-actions {
+.profile-gate-create {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.profile-manage-block {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.profile-manage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.profile-manage-name {
+  margin: 0;
+  font-weight: 650;
+  font-size: 0.98rem;
+}
+
+.profile-manage-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
 }
 
-.profile-gate-create,
-.profile-gate-rename {
+.profile-manage-rename {
   display: grid;
-  gap: 0.65rem;
-}
-
-.profile-gate-rename {
   grid-template-columns: 1fr auto auto;
+  gap: 0.5rem;
   align-items: center;
 }
 
 @media (max-width: 640px) {
-  .profile-gate-rename {
+  .profile-manage-rename {
     grid-template-columns: 1fr;
   }
 }
@@ -4539,6 +4667,11 @@ tr.lot-locked {
 .ferry-hub-combobox input:focus {
   outline: 1px solid color-mix(in srgb, var(--accent, #f0a35a) 70%, transparent);
   outline-offset: 1px;
+}
+
+.ferry-hub-combobox.is-plain input {
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .ferry-hub-menu {
@@ -5328,10 +5461,102 @@ small {
   white-space: nowrap;
 }
 
+.pay-range {
+  white-space: nowrap;
+}
+
 .distance {
   white-space: nowrap;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* Freights + terminal Contracts: extra width is shared, not dumped on one column. */
+.freights-board-table table,
+table.contracts-table {
+  table-layout: fixed;
+}
+
+.freights-board-table .col-route,
+table.contracts-table .col-route {
+  width: 18%;
+  overflow: hidden;
+}
+
+.freights-board-table .col-cargo,
+table.contracts-table .col-cargo {
+  width: 12%;
+}
+
+.freights-board-table .col-compact,
+table.contracts-table .col-compact {
+  width: 8%;
+  white-space: nowrap;
+}
+
+.freights-board-table .col-money,
+table.contracts-table .col-money {
+  width: 16%;
+  white-space: nowrap;
+}
+
+.freights-board-table .col-access,
+table.contracts-table .col-access {
+  width: 14%;
+}
+
+.freights-board-table .col-route .route-filter-stack,
+table.contracts-table .col-route .route-filter-stack {
+  min-width: 0;
+}
+
+.freights-board-table .col-route .route-filter,
+table.contracts-table .col-route .route-filter {
+  min-width: 0;
+}
+
+.freights-board-table .filter-row .col-compact select,
+.freights-board-table .filter-row .col-money select,
+.freights-board-table .filter-row .col-access select,
+table.contracts-table .filter-row .col-compact select,
+table.contracts-table .filter-row .col-money select,
+table.contracts-table .filter-row .col-access select {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.freights-board-table td.col-compact small,
+table.contracts-table td.col-compact small {
+  display: block;
+  margin-top: 0.12rem;
+  white-space: nowrap;
+}
+
+.freights-board-table .pay,
+.freights-board-table td.net,
+table.contracts-table .pay,
+table.contracts-table td.net {
+  font-size: 1.05rem;
+}
+
+.freights-board-table .col-access .accept,
+.freights-board-table .col-access .action,
+table.contracts-table .col-access .accept,
+table.contracts-table .col-access .action {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+}
+
+.contract-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: stretch;
 }
 
 .empty {
@@ -7075,19 +7300,7 @@ button.linkish {
   left: 50%;
   top: 9.5rem;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
   transform: translateX(-50%);
-  padding: 0.45rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  backdrop-filter: blur(3px);
-  color: var(--muted);
-  font-size: 0.88rem;
-  pointer-events: none;
-  white-space: nowrap;
 }
 
 table {
@@ -7533,6 +7746,15 @@ span.dispatch-route-hub-dest {
   color: var(--muted);
   text-align: center;
   font-size: 0.85rem;
+}
+
+.busy-block.dispatch-route-map-empty {
+  min-height: 16rem;
+  padding: 2.5rem 0.5rem;
+}
+
+.hub-network-map > .busy-block {
+  min-height: 28rem;
 }
 
 .dispatch-route-map-hint {

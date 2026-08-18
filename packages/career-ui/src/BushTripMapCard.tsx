@@ -6,6 +6,7 @@ import {
   type DispatchRouteWaypoint,
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
+import { BusyBlock } from './Busy';
 import { downloadBushTripGfp, downloadBushTripPln, type BushTripMapNode } from './api';
 
 type HubStopStatus = 'done' | 'current' | 'next';
@@ -423,7 +424,7 @@ export function BushTripMapCard(props: {
         </ol>
       ) : null}
       {loading ? (
-        <p className="dispatch-route-map-empty">Loading map…</p>
+        <BusyBlock label="Loading map" className="dispatch-route-map-empty" />
       ) : origin && dest ? (
         <DispatchRouteMap
           className="dispatch-route-map bush-trip-route-map"

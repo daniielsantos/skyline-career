@@ -8,6 +8,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
 - Lots / Market / NPC / fuel trucks / hub levels / aircraft market / wear / ledger / SQLite store.
+- **Schema v4:** hubs + stock em tabelas (`airports` / `airport_stock`) com `world_id`; tick ainda in-memory; terminal Inventory usa `GET /api/airport?part=stock` (SQL, sem lock); payload completo (lots/NPC) hidrata depois.
 - Partição por país (`homeCountryId` / região `XX-YY` → país `XX`).
 - **América do Sul completa** no seed: BR/AR/CL + UY/PY/PE/BO/EC/CO/VE/GY/SR/GF.
 - **América Central completa** no seed: PA/CR/NI/HN/GT/SV/BZ.
@@ -78,8 +79,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 
 Contrato curto — detalhe em **`.cursor/rules/career-economy-roadmap.mdc`** (*Company tenant contract*).
 
-- **Company** = tenant (`companies` / `company_state` / `company_id` em frota, missões, ledger). SP usa id `'local'`.
-- **World** = Market lots, Demand, hubs/stock, NPC, `inbound_pending`, events — hoje um save; depois shared + claim.
+- **Company** = tenant (`companies` / `company_state` / `company_id` em frota, missões, ledger). SP usa id `'local'`. `companies.world_id` aponta para o mundo.
+- **World** = hubs/stock (`airports` + `airport_stock`), lots, Demand, NPC, `inbound_pending`, events — `world_id = 'local'` no SP; MP = várias companies no mesmo world.
 - **Pilot ≠ company** — `pilot_name` / `pilot_icao` no `company_state` são atalho SP; não inchá-los; members/roles só quando houver fatia co-op.
 - Norte MP: empresa privada + mundo compartilhado + ranking por company (não rewrite de tick).
 - Ao tocar persistência: estado do jogador sempre sob `company_id`; facade `CareerStore` permanece.

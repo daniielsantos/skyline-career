@@ -2678,7 +2678,7 @@ describe('tickEconomyN market formation', () => {
     assert.equal(world.tick, 0);
     assert.equal(world.lots.length, 0);
     assert.equal(ensureSeedMarketFormed(world), true);
-    assert.ok(world.tick >= 96);
+    assert.ok(world.tick >= 1);
     assert.ok(listMarketLots(world).length > 0);
     assert.equal(ensureSeedMarketFormed(world), false);
   });
@@ -4037,6 +4037,18 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.equal(advancedTicks, 13);
     assert.equal(world.tick, 13);
     assert.equal(world.lastBatchAtMs, threeHoursPlus - 5 * 60 * 1000);
+  });
+
+  it('caps catch-up at maxTicks and still snaps lastBatch to wall clock', () => {
+    const world = createSeedEconomyWorld({ seed: 'catch-up-cap' });
+    const start = 1_700_000_000_000;
+    world.lastBatchAtMs = start;
+    world.tick = 0;
+    const later = start + 7 * MS_PER_HOUR;
+    const { advancedTicks } = ensureEconomyCaughtUp(world, later, { maxTicks: 1 });
+    assert.equal(advancedTicks, 1);
+    assert.equal(world.tick, 1);
+    assert.equal(world.lastBatchAtMs, later);
   });
 
   it('returns 0 when less than one batch elapsed', () => {

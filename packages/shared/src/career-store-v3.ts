@@ -25,6 +25,8 @@ import type {
 } from './types/career-economy.js';
 
 export const LOCAL_COMPANY_ID = 'local';
+/** SP world tenant; same string as career-store-v4 LOCAL_WORLD_ID. */
+export const LOCAL_WORLD_ID_V3 = 'local';
 
 export type SqliteDb = DatabaseSync;
 
@@ -291,21 +293,23 @@ export function upsertLots(
   const countries = icaoCountryMap(airports);
   const ids = lots.map((l) => l.id);
   if (ids.length === 0) {
-    db.prepare(`DELETE FROM lots`).run();
+    db.prepare(`DELETE FROM lots WHERE world_id = ?`).run(LOCAL_WORLD_ID_V3);
     return;
   }
   const placeholders = ids.map(() => '?').join(',');
-  db.prepare(`DELETE FROM lots WHERE id NOT IN (${placeholders})`).run(...ids);
+  db.prepare(
+    `DELETE FROM lots WHERE world_id = ? AND id NOT IN (${placeholders})`,
+  ).run(LOCAL_WORLD_ID_V3, ...ids);
 
   const upsert = db.prepare(
     `INSERT INTO lots (
        id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
        created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
-       origin_country_id, dest_country_id
+       origin_country_id, dest_country_id, world_id
      ) VALUES (
        @id, @commodity_id, @origin_icao, @dest_icao, @quantity_kg, @reserved_kg,
        @created_at_tick, @expires_at_tick, @pay_usd, @base_pay_usd, @urgency, @reason, @status,
-       @origin_country_id, @dest_country_id
+       @origin_country_id, @dest_country_id, @world_id
      )
      ON CONFLICT(id) DO UPDATE SET
        commodity_id = excluded.commodity_id,
@@ -321,7 +325,8 @@ export function upsertLots(
        reason = excluded.reason,
        status = excluded.status,
        origin_country_id = excluded.origin_country_id,
-       dest_country_id = excluded.dest_country_id`,
+       dest_country_id = excluded.dest_country_id,
+       world_id = excluded.world_id`,
   );
   for (const lot of lots) {
     upsert.run({
@@ -343,6 +348,7 @@ export function upsertLots(
       status: lot.status,
       origin_country_id: countryForIcao(countries, lot.originIcao) || null,
       dest_country_id: countryForIcao(countries, lot.destIcao) || null,
+      world_id: LOCAL_WORLD_ID_V3,
     });
   }
 }
@@ -454,14 +460,14 @@ export function replaceInboundPending(
   airports?: CareerEconomyWorld['airports'],
 ): void {
   const countries = icaoCountryMap(airports);
-  db.prepare(`DELETE FROM inbound_pending`).run();
+  db.prepare(`DELETE FROM inbound_pending WHERE world_id = ?`).run(LOCAL_WORLD_ID_V3);
   const ins = db.prepare(
     `INSERT INTO inbound_pending (
        id, mission_id, origin_icao, dest_icao, commodity_id, cargo_kg,
-       expires_at_tick, source, origin_country_id, dest_country_id, payload_json
+       expires_at_tick, source, origin_country_id, dest_country_id, payload_json, world_id
      ) VALUES (
        @id, @mission_id, @origin_icao, @dest_icao, @commodity_id, @cargo_kg,
-       @expires_at_tick, @source, @origin_country_id, @dest_country_id, @payload_json
+       @expires_at_tick, @source, @origin_country_id, @dest_country_id, @payload_json, @world_id
      )`,
   );
   for (const row of rows) {
@@ -489,6 +495,7 @@ export function replaceInboundPending(
       origin_country_id: countryForIcao(countries, originIcao) || null,
       dest_country_id: countryForIcao(countries, destIcao) || null,
       payload_json: extra,
+      world_id: LOCAL_WORLD_ID_V3,
     });
   }
 }
@@ -561,16 +568,16 @@ export function replaceNpcFlights(
   airports?: CareerEconomyWorld['airports'],
 ): void {
   const countries = icaoCountryMap(airports);
-  db.prepare(`DELETE FROM npc_flights`).run();
+  db.prepare(`DELETE FROM npc_flights WHERE world_id = ?`).run(LOCAL_WORLD_ID_V3);
   const ins = db.prepare(
     `INSERT INTO npc_flights (
        id, npc_id, lot_id, origin_icao, dest_icao, commodity_id, cargo_kg, pay_usd,
        aircraft_class_id, departed_at_tick, arrives_at_tick, departed_at_ms, arrives_at_ms,
-       status, origin_country_id, dest_country_id, payload_json
+       status, origin_country_id, dest_country_id, payload_json, world_id
      ) VALUES (
        @id, @npc_id, @lot_id, @origin_icao, @dest_icao, @commodity_id, @cargo_kg, @pay_usd,
        @aircraft_class_id, @departed_at_tick, @arrives_at_tick, @departed_at_ms, @arrives_at_ms,
-       @status, @origin_country_id, @dest_country_id, @payload_json
+       @status, @origin_country_id, @dest_country_id, @payload_json, @world_id
      )`,
   );
   for (const f of flights) {
@@ -610,6 +617,7 @@ export function replaceNpcFlights(
       origin_country_id: countryForIcao(countries, originIcao) || null,
       dest_country_id: countryForIcao(countries, destIcao) || null,
       payload_json: extra,
+      world_id: LOCAL_WORLD_ID_V3,
     });
   }
 }
@@ -653,12 +661,12 @@ export function readEconomyEvents(db: SqliteDb): EconomyEvent[] {
 }
 
 export function replaceEconomyEvents(db: SqliteDb, events: EconomyEvent[]): void {
-  db.prepare(`DELETE FROM economy_events`).run();
+  db.prepare(`DELETE FROM economy_events WHERE world_id = ?`).run(LOCAL_WORLD_ID_V3);
   const ins = db.prepare(
     `INSERT INTO economy_events (
-       id, kind, region, commodity_id, starts_at_tick, ends_at_tick, label, country_id, payload_json
+       id, kind, region, commodity_id, starts_at_tick, ends_at_tick, label, country_id, payload_json, world_id
      ) VALUES (
-       @id, @kind, @region, @commodity_id, @starts_at_tick, @ends_at_tick, @label, @country_id, @payload_json
+       @id, @kind, @region, @commodity_id, @starts_at_tick, @ends_at_tick, @label, @country_id, @payload_json, @world_id
      )`,
   );
   for (const e of events) {
@@ -674,6 +682,7 @@ export function replaceEconomyEvents(db: SqliteDb, events: EconomyEvent[]): void
       label,
       country_id: countryIdFromRegion(region) || null,
       payload_json: extra,
+      world_id: LOCAL_WORLD_ID_V3,
     });
   }
 }
@@ -725,14 +734,15 @@ export function ensureLocalCompany(
     return;
   }
   db.prepare(
-    `INSERT INTO companies (id, display_name, home_hub_icao, home_country_id, created_at_ms)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO companies (id, display_name, home_hub_icao, home_country_id, created_at_ms, world_id)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   ).run(
     LOCAL_COMPANY_ID,
     opts?.displayName ?? '',
     opts?.homeHubIcao ?? '',
     opts?.homeCountryId ?? '',
     now,
+    LOCAL_WORLD_ID_V3,
   );
 }
 

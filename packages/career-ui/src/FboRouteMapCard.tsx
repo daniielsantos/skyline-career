@@ -6,6 +6,7 @@ import {
   type DispatchRouteEndpoint,
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
+import { BusyBlock } from './Busy';
 
 /** FBO / Contracts terminal map — base pin, OD route, optional en-route aircraft. */
 export function FboRouteMapCard(props: {
@@ -124,7 +125,7 @@ export function FboRouteMapCard(props: {
         <small>{headline}</small>
       </div>
       {loading ? (
-        <p className="dispatch-route-map-empty">Loading map…</p>
+        <BusyBlock label="Loading map" className="dispatch-route-map-empty" />
       ) : mapOrigin && (!showRoute || mapDest) ? (
         <DispatchRouteMap
           className="dispatch-route-map fbo-route-map"

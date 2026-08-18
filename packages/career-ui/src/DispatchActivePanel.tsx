@@ -16,6 +16,7 @@ import {
   formatMacPct,
 } from './LoadSchematic';
 import { DispatchRouteCard } from './DispatchRouteCard';
+import { IcaoLink } from './IcaoLink';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
   formatPayloadDueLine,
@@ -45,27 +46,6 @@ export function DispatchStepper(props: { current: DispatchStepId }) {
         );
       })}
     </ol>
-  );
-}
-
-function IcaoLink(props: {
-  icao: string;
-  onOpen: (icao: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className="icao-link"
-      disabled={props.disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        props.onOpen(props.icao);
-      }}
-      title={`Open ${props.icao} terminal`}
-    >
-      {props.icao}
-    </button>
   );
 }
 

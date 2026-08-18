@@ -1225,6 +1225,7 @@ export {
   hoursToMs,
   hoursToTicks,
   MAX_CATCH_UP_TICKS,
+  MAX_LOAD_CATCH_UP_TICKS,
   msToHours,
   MS_PER_HOUR,
   MS_PER_TICK,
@@ -11949,7 +11950,16 @@ export function ensureEconomyCaughtUp(
 
   const elapsed = Math.max(0, nowMs - last);
   const maxTicks = opts.maxTicks ?? MAX_CATCH_UP_TICKS;
-  const hours = Math.min(maxTicks, Math.floor(elapsed / MS_PER_TICK));
+  const wantedTicks = Math.floor(elapsed / MS_PER_TICK);
+  const hours = Math.min(maxTicks, wantedTicks);
+  if (wantedTicks > hours) {
+    console.log(
+      `[career] catch-up capped at ${hours}/${wantedTicks} ticks (${(
+        (wantedTicks * MS_PER_TICK) /
+        hoursToMs(1)
+      ).toFixed(1)}h elapsed)`,
+    );
+  }
   if (hours > 0) {
     tickEconomyN(w, hours, { advanceWallClock: true, fromBatchAtMs: last });
   }
@@ -14077,8 +14087,8 @@ export function benchEconomyTicks(opts: {
 }
 
 /**
- * Fresh seeds start at tick 0 with an empty board. Warm one career day so
- * Freights/Contracts exist on first boot and after reset without a manual +1 day.
+ * Fresh seeds start at tick 0 with an empty board. Warm one batch so
+ * Freights/Contracts exist on first boot without a 96-tick (+1 day) wait.
  * No-op when the world already has time or available lots.
  */
 export function ensureSeedMarketFormed(world: CareerEconomyWorld): boolean {
@@ -14086,7 +14096,7 @@ export function ensureSeedMarketFormed(world: CareerEconomyWorld): boolean {
     (lot) => lot.status === 'available' && lot.quantityKg > lot.reservedKg,
   );
   if (world.tick > 0 || hasAvailable) return false;
-  tickEconomyN(world, TICKS_PER_DAY);
+  tickEconomyN(world, 1);
   return true;
 }
 

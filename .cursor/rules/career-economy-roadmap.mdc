@@ -33,6 +33,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **US continental medium map:** 6 regions (NE/SE/MW/SC/MT/W), 24 US hubs, sparse BR↔US intl lanes, NPC fleet 44, fuel trucks 20; resilient regional corridors (≥2 gateways per US regional), critical-full domestic overflow valve, and near-full production throttle; Market `intl` chip; health/market expose `countries` + `internationalLaneCount`.
 - **Lots table (schema v2):** `lots` dual-written with `economy_json` on `saveEconomy`; hydrate overlay on load when table non-empty; real meta upgrade 1→2. Tick/missions still in-memory.
 - **Schema v3:** lots are SoT (stripped from `economy_json`); `companies`/`company_state`/`fleet_aircraft`/`missions` + `inbound_pending`/`npc_flights`/`economy_events`; ledger has `company_id` (`local` for SP). Tick still in-memory behind `CareerStore`.
+- **Schema v4:** world tables are SoT — `worlds` + `economy_meta` + `airports` + `airport_stock` keyed by `world_id` (`local` in SP); hubs/stock stripped from `economy_json`; terminal Inventory is `GET /api/airport?part=stock` (SQL, no career lock); full `/api/airport` still hydrates lots/NPC behind the lock. Tick still in-memory. MP shape: companies belong to a world; lots may carry `claimed_by_company_id`. NPC/fuel/ports still blob (v5).
 - **Map expansion playbook:** `.cursor/rules/career-map-expansion.mdc` — checklist when adding airports/regions (seed constants + auto coverage on migrate).
 - **15-min economy ticks:** `MS_PER_TICK = 900_000`, `TICKS_PER_DAY = 96`; physics (flight/rest/MX/fuel) uses `MS_PER_HOUR`; per-tick flows ÷4 and tick lifetimes ×4 so a career day stays ~24h wall-clock. Old saves need Reset world (no tick-scale migrate).
 - **NPC airframe variants:** curated ICAO types from FSLTL traffic `flight_model.cfg` scrape (A321F, MD11F, 208B, …) — label + optional cargo ceiling only; not player OFP flight models. Legacy fleets backfill via `ensureNpcAirframes`.
@@ -189,8 +190,8 @@ Do **not** start Postgres or multi-server partition until single-player SQLite +
 
 ### Persistence
 
-- **Now:** SQLite embedded (`skyline.sqlite`) via `CareerStore` facade; schema v3 tables for hot/contested state; cold remainder in blobs.
-- **Later:** Postgres (multiplayer) behind the same facade; airport stock / NPC roster / fuel / market listings tables (v4+).
+- **Now:** SQLite embedded (`skyline.sqlite`) via `CareerStore` facade; schema v4 world tables (`airports` / `airport_stock` / `economy_meta`, keyed by `world_id`) + v3 company/hot tables; NPC/fuel/ports still in `economy_json`.
+- **Later:** Postgres (multiplayer) behind the same facade; NPC roster / fuel / market listings tables (v5+). Same `world_id` + `company_id` partition.
 - Always prune dead lots; DB without retention still explodes.
 
 ### Company tenant contract (SP now → MP later)
@@ -199,8 +200,8 @@ Protect the partition we already have. Do **not** invent members/roles/auth/Post
 
 | Layer | Owns | Today (SP) | Future MP |
 |-------|------|------------|-----------|
-| **Company** (tenant) | wallet, fleet, missions, warehouses/port pickups, cargo ops, aircraft market offers, ledger rows, bush trip active | `companies` + `company_state` + `company_id` on fleet/missions/ledger; id `'local'` (`LOCAL_COMPANY_ID`) | Many companies; same columns |
-| **World** (shared sim) | hubs/stock, lots/Market, Demand board rows, NPC fleet/flights, fuel trucks, inbound_pending, economy events, weather index | Single process / one save — not tagged by company | Shared boards + claim; inbound already multi-source-ready |
+| **Company** (tenant) | wallet, fleet, missions, warehouses/port pickups, cargo ops, aircraft market offers, ledger rows, bush trip active | `companies` + `company_state` + `company_id` on fleet/missions/ledger; id `'local'` (`LOCAL_COMPANY_ID`); `companies.world_id` = `'local'` | Many companies in one world; same columns |
+| **World** (shared sim) | hubs/stock, lots/Market, Demand board rows, NPC fleet/flights, fuel trucks, inbound_pending, economy events, weather index | One `worlds` row `'local'` (`LOCAL_WORLD_ID`); airports/stock/lots tagged `world_id` | Shared boards + claim (`lots.claimed_by_company_id`); inbound already multi-source-ready |
 | **Pilot / actor** (person) | display name, “who flew”, later roles | `pilot_name` / `pilot_icao` live on `company_state` as SP shortcut | Split: actor/member ≠ company; ledger may gain `actor_id` when useful |
 
 **North star for MP:** private company + shared world + optional co-op members (Owner / Dispatcher / Pilot) + company rankings. Not “everyone in one wallet” and not “presence-only”.

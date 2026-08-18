@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CareerProfileMeta } from './api';
 import { BrandMark } from './BrandMark';
+import { BusySpinner } from './Busy';
 
 export function ProfileGate(props: {
   profiles: CareerProfileMeta[];
@@ -11,12 +12,8 @@ export function ProfileGate(props: {
   error: string | null;
   onSelect: (id: string) => void;
   onCreate: (name: string) => void;
-  onDelete: (id: string) => void;
-  onRename: (id: string, name: string) => void;
 }) {
   const [newName, setNewName] = useState('');
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
 
   return (
     <section className="panel profile-gate" aria-label="Career profiles">
@@ -41,78 +38,19 @@ export function ProfileGate(props: {
         ) : (
           props.profiles.map((p) => {
             const isLast = p.id === props.lastActiveId;
-            const isRenaming = renamingId === p.id;
             return (
-              <li key={p.id} className="profile-gate-row">
-                {isRenaming ? (
-                  <form
-                    className="profile-gate-rename"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      props.onRename(p.id, renameValue);
-                      setRenamingId(null);
-                    }}
-                  >
-                    <input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      autoFocus
-                      disabled={props.busy}
-                      aria-label="Rename profile"
-                    />
-                    <button type="submit" className="action" disabled={props.busy}>
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="action ghost"
-                      disabled={props.busy}
-                      onClick={() => setRenamingId(null)}
-                    >
-                      Cancel
-                    </button>
-                  </form>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="profile-gate-play"
-                      disabled={props.busy}
-                      onClick={() => props.onSelect(p.id)}
-                    >
-                      <strong>{p.name}</strong>
-                      {isLast ? (
-                        <span className="profile-gate-last">Last played</span>
-                      ) : null}
-                    </button>
-                    <div className="profile-gate-row-actions">
-                      <button
-                        type="button"
-                        className="action ghost"
-                        disabled={props.busy}
-                        onClick={() => {
-                          setRenamingId(p.id);
-                          setRenameValue(p.name);
-                        }}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        className="action ghost"
-                        disabled={props.busy || props.profiles.length <= 1}
-                        title={
-                          props.profiles.length <= 1
-                            ? 'Cannot delete the last profile'
-                            : 'Delete this save'
-                        }
-                        onClick={() => props.onDelete(p.id)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className={`profile-gate-play${isLast ? ' is-last' : ''}`}
+                  disabled={props.busy}
+                  onClick={() => props.onSelect(p.id)}
+                >
+                  <strong>{p.name}</strong>
+                  {isLast ? (
+                    <span className="profile-gate-last">Last played</span>
+                  ) : null}
+                </button>
               </li>
             );
           })
@@ -149,11 +87,90 @@ export function ProfileGate(props: {
 
       {props.busy ? (
         <div className="profile-gate-busy" role="status" aria-live="polite">
-          <span className="profile-gate-spinner" aria-hidden />
+          <BusySpinner />
           <span>{props.busyLabel ?? 'Working…'}</span>
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** Rename / delete the loaded save — Company tab, not the profile gate. */
+export function CareerProfileManage(props: {
+  name: string;
+  canDelete: boolean;
+  busy: boolean;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(props.name);
+
+  if (editing) {
+    return (
+      <form
+        className="profile-manage-rename"
+        onSubmit={(e) => {
+          e.preventDefault();
+          props.onRename(value);
+          setEditing(false);
+        }}
+      >
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          autoFocus
+          disabled={props.busy}
+          minLength={2}
+          required
+          aria-label="Profile name"
+        />
+        <button type="submit" className="action" disabled={props.busy || value.trim().length < 2}>
+          Save
+        </button>
+        <button
+          type="button"
+          className="action ghost"
+          disabled={props.busy}
+          onClick={() => {
+            setValue(props.name);
+            setEditing(false);
+          }}
+        >
+          Cancel
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="profile-manage">
+      <p className="profile-manage-name">{props.name}</p>
+      <div className="profile-manage-actions">
+        <button
+          type="button"
+          className="action ghost"
+          disabled={props.busy}
+          onClick={() => {
+            setValue(props.name);
+            setEditing(true);
+          }}
+        >
+          Rename
+        </button>
+        <button
+          type="button"
+          className="action ghost danger"
+          disabled={props.busy || !props.canDelete}
+          title={
+            props.canDelete ? 'Delete this save' : 'Cannot delete the last profile'
+          }
+          onClick={() => props.onDelete()}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -173,7 +190,7 @@ export function ProfileGateLoading() {
         />
       </div>
       <div className="profile-gate-loading-body">
-        <span className="profile-gate-spinner profile-gate-spinner-lg" aria-hidden />
+        <BusySpinner size="lg" />
         <div className="profile-gate-loading-bars" aria-hidden>
           <span />
           <span />

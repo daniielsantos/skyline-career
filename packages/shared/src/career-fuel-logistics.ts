@@ -20,15 +20,15 @@ import type {
   FuelTruckClassId,
 } from './types/career-economy.js';
 
-export const FUEL_TRUCK_FLEET_SIZE = 720;
+export const FUEL_TRUCK_FLEET_SIZE = 765;
 
 export const FUEL_TRUCK_COMPOSITION: ReadonlyArray<{
   truckClassId: FuelTruckClassId;
   count: number;
 }> = [
-  { truckClassId: 'rigid_tanker', count: 195 },
-  { truckClassId: 'semi_tanker', count: 315 },
-  { truckClassId: 'btrain_tanker', count: 210 },
+  { truckClassId: 'rigid_tanker', count: 207 },
+  { truckClassId: 'semi_tanker', count: 335 },
+  { truckClassId: 'btrain_tanker', count: 223 },
 ] as const;
 
 /** Usable Jet-A payload per truck class (kg). Hard cap 32 t. */
@@ -323,6 +323,16 @@ const REGION_NEIGHBORS: Record<string, readonly string[]> = {
   'CK-N': [],
   'KI-T': [],
   'KI-L': [],
+  // RU-1 Russia domestic road graph
+  'RU-M': ['RU-NW', 'RU-V', 'RU-N'],
+  'RU-NW': ['RU-M', 'RU-V', 'RU-N'],
+  'RU-N': ['RU-NW'],
+  'RU-V': ['RU-M', 'RU-NW', 'RU-S', 'RU-SI'],
+  'RU-S': ['RU-V'],
+  'RU-SI': ['RU-V', 'RU-E', 'RU-FE'],
+  'RU-E': ['RU-SI', 'RU-NE'],
+  'RU-NE': ['RU-E', 'RU-FE', 'RU-SI'],
+  'RU-FE': ['RU-SI', 'RU-NE'],
 };
 
 const TRUCK_NAME_POOL = [

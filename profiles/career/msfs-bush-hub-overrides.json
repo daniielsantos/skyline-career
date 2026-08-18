@@ -16097,5 +16097,449 @@
         "surface": "grass"
       }
     ]
+  },
+  "NZWN": {
+    "name": "Wellington Intl",
+    "lat": -41.32722236216068,
+    "lon": 174.8052777349949,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "34",
+        "headingTrueDeg": 2.8699731826782227,
+        "lengthM": 2049.560302734375,
+        "widthM": 39.60000228881836,
+        "lat": -41.32666915655136,
+        "lon": 174.80691075325012,
+        "identReciprocal": "16",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RCMQ": {
+    "name": "Ching Chuan Kang AB",
+    "lat": 24.26500014960766,
+    "lon": 120.62083348631859,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "36",
+        "headingTrueDeg": 356.5462646484375,
+        "lengthM": 3658.3017578125,
+        "widthM": 57.148414611816406,
+        "lat": 24.265062175691128,
+        "lon": 120.6207324564457,
+        "identReciprocal": "18",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RCNN": {
+    "name": "Tainan Aero",
+    "lat": 22.949166744947433,
+    "lon": 120.21111130714417,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "18R",
+        "headingTrueDeg": 178.73472595214844,
+        "lengthM": 3050.79150390625,
+        "widthM": 43.51185607910156,
+        "lat": 22.950351275503635,
+        "lon": 120.20413130521774,
+        "identReciprocal": "36L",
+        "surface": "concrete"
+      },
+      {
+        "ident": "18L",
+        "headingTrueDeg": 178.71929931640625,
+        "lengthM": 3048.33740234375,
+        "widthM": 44.25532531738281,
+        "lat": 22.95041598379612,
+        "lon": 120.20756945014,
+        "identReciprocal": "36R",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UHHH": {
+    "name": "Novy",
+    "lat": 48.52805569767952,
+    "lon": 135.18805548548698,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5L",
+        "headingTrueDeg": 42.1295280456543,
+        "lengthM": 3507.84619140625,
+        "widthM": 47.277862548828125,
+        "lat": 48.52804999798536,
+        "lon": 135.18570989370346,
+        "identReciprocal": "23R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "5R",
+        "headingTrueDeg": 42.13304901123047,
+        "lengthM": 4002.005615234375,
+        "widthM": 55.439266204833984,
+        "lat": 48.527944050729275,
+        "lon": 135.19087851047516,
+        "identReciprocal": "23L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UHWW": {
+    "name": "Knevichi",
+    "lat": 43.39805569499731,
+    "lon": 132.14888870716095,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "25L",
+        "headingTrueDeg": 240.98104858398438,
+        "lengthM": 3506.9267578125,
+        "widthM": 61.77295684814453,
+        "lat": 43.396904692053795,
+        "lon": 132.14954629540443,
+        "identReciprocal": "7R",
+        "surface": "concrete"
+      },
+      {
+        "ident": "25R",
+        "headingTrueDeg": 241.0340118408203,
+        "lengthM": 3502.919677734375,
+        "widthM": 57.54327392578125,
+        "lat": 43.39895389974117,
+        "lon": 132.14799240231514,
+        "identReciprocal": "7L",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "ULLI": {
+    "name": "Pulkovo",
+    "lat": 59.800277799367905,
+    "lon": 30.262500196695328,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "28L",
+        "headingTrueDeg": 286.4634704589844,
+        "lengthM": 3780,
+        "widthM": 60,
+        "lat": 59.79512460529804,
+        "lon": 30.250639021396637,
+        "identReciprocal": "10R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "28R",
+        "headingTrueDeg": 286.29998779296875,
+        "lengthM": 3397,
+        "widthM": 60,
+        "lat": 59.80542529374361,
+        "lon": 30.27442216873169,
+        "identReciprocal": "10L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UNNT": {
+    "name": "Tolmachevo",
+    "lat": 55.03333322703838,
+    "lon": 82.59916663169861,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 81.06104278564453,
+        "lengthM": 3592.810791015625,
+        "widthM": 58.42506408691406,
+        "lat": 55.0124391540885,
+        "lon": 82.65043795108795,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "34",
+        "headingTrueDeg": 350.1020812988281,
+        "lengthM": 3684.091064453125,
+        "widthM": 58.723026275634766,
+        "lat": 55.033594742417336,
+        "lon": 82.59902849793434,
+        "identReciprocal": "16",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "USSS": {
+    "name": "Koltsovo Yekaterinburg",
+    "lat": 56.743055395781994,
+    "lon": 60.80305561423302,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "UUDD": {
+    "name": "Domodedovo",
+    "lat": 55.40916670113802,
+    "lon": 37.907499969005585,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "UUEE": {
+    "name": "Sheremetyevo",
+    "lat": 55.97249999642372,
+    "lon": 37.41305574774742,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "UWGG": {
+    "name": "Nizhny Novgorod Strigino",
+    "lat": 56.23000010848045,
+    "lon": 43.78416672348976,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "UWWW": {
+    "name": "Kurumoch Samara",
+    "lat": 53.50111126899719,
+    "lon": 50.15388876199722,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "WBSB": {
+    "name": "Brunei International",
+    "lat": 4.944202713668346,
+    "lon": 114.92835268378258,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "YMHB": {
+    "name": "Hobart International",
+    "lat": -42.83611111342907,
+    "lon": 147.51027792692184,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "YPDN": {
+    "name": "Darwin International",
+    "lat": -12.414722107350826,
+    "lon": 130.87666645646095,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "ZSQD": {
+    "name": "Qingdao Jiaodong",
+    "lat": 36.36194385588169,
+    "lon": 120.08833318948746,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "ZWWW": {
+    "name": "Urumqi Tianshan",
+    "lat": 43.9083332195878,
+    "lon": 87.47500017285347,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17"
+  },
+  "URRP": {
+    "name": "Platov International Airport",
+    "lat": 47.49388877302408,
+    "lon": 39.92472231388092,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-17",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 54.44034194946289,
+        "lengthM": 3601.39404296875,
+        "widthM": 50,
+        "lat": 47.49397963285446,
+        "lon": 39.9247907102108,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UEEE": {
+    "name": "Yakutsk",
+    "lat": 62.09333349019289,
+    "lon": 129.7733335196972,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "5R",
+        "headingTrueDeg": 36.84292221069336,
+        "lengthM": 1654.9383544921875,
+        "widthM": 60,
+        "lat": 62.10028141736984,
+        "lon": 129.78612452745438,
+        "identReciprocal": "23L",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "UHMM": {
+    "name": "Sokol",
+    "lat": 59.910833425819874,
+    "lon": 150.72027772665024,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "28",
+        "headingTrueDeg": 273.0799865722656,
+        "lengthM": 3452,
+        "widthM": 60,
+        "lat": 59.91097692400217,
+        "lon": 150.7203496992588,
+        "identReciprocal": "10",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UHPP": {
+    "name": "Yelizovo",
+    "lat": 53.169444389641285,
+    "lon": 158.45055565238,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 157.4369659423828,
+        "lengthM": 3400.444580078125,
+        "widthM": 60,
+        "lat": 53.17018702626228,
+        "lon": 158.4534354507923,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "16R",
+        "headingTrueDeg": 157.4369659423828,
+        "lengthM": 3444.796142578125,
+        "widthM": 45,
+        "lat": 53.16992584615946,
+        "lon": 158.45018550753593,
+        "identReciprocal": "34L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UIII": {
+    "name": "Irkutsk",
+    "lat": 52.26722236722708,
+    "lon": 104.39472243189812,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "30",
+        "headingTrueDeg": 293.5406799316406,
+        "lengthM": 3715.961181640625,
+        "widthM": 45.270240783691406,
+        "lat": 52.267149947583675,
+        "lon": 104.39461827278137,
+        "identReciprocal": "12",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "ULMM": {
+    "name": "Murmansk",
+    "lat": 68.78166675567627,
+    "lon": 32.751110941171646,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 146.19248962402344,
+        "lengthM": 2504.706298828125,
+        "widthM": 42,
+        "lat": 68.78174655139446,
+        "lon": 32.75201126933098,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UMKK": {
+    "name": "Khrabrovo",
+    "lat": 54.891666658222675,
+    "lon": 20.59861108660698,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 65.73532104492188,
+        "lengthM": 3350.830810546875,
+        "widthM": 45,
+        "lat": 54.89168778061867,
+        "lon": 20.598527938127518,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "UNKL": {
+    "name": "Yemelyanovo",
+    "lat": 56.17305546998978,
+    "lon": 92.49333322048187,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 113.105712890625,
+        "lengthM": 3702.226318359375,
+        "widthM": 56.46489334106445,
+        "lat": 56.17295488715172,
+        "lon": 92.49320447444916,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "URSS": {
+    "name": "Sochi",
+    "lat": 43.44444449990988,
+    "lon": 39.946944415569305,
+    "source": "msfs_facility",
+    "validatedAt": "2026-08-18",
+    "runways": [
+      {
+        "ident": "20",
+        "headingTrueDeg": 208.61117553710938,
+        "lengthM": 2500.384521484375,
+        "widthM": 45.542537689208984,
+        "lat": 43.44415280967951,
+        "lon": 39.95199680328369,
+        "identReciprocal": "2",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "24",
+        "headingTrueDeg": 244.7873992919922,
+        "lengthM": 2897.421630859375,
+        "widthM": 41.35333251953125,
+        "lat": 43.44498194754124,
+        "lon": 39.941997081041336,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

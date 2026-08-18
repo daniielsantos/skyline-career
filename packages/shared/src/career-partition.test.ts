@@ -144,6 +144,7 @@ describe('career partition', () => {
       'QA',
       'RO',
       'RS',
+      'RU',
         'SA',
         'SB',
         'SD',

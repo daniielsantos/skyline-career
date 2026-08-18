@@ -90,6 +90,8 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 57. ~~**Asia-30 Wellington (NZWN / NZ-W)**~~ — NZ-W; seed **1007** / **170** ports / **700** trucks.
 58. ~~**Asia-31 Taiwan south (RCMQ / RCNN)**~~ — TW-C + TW-S; seed **1009** / **170** ports / **710** trucks.
 59. ~~**Asia-32 China gap (ZSQD / ZWWW)**~~ — CN-E + CN-W; seed **1011** / **171** ports / **720** trucks. **Pacific/Asia map complete.**
+60. ~~**RU-1 Russia core**~~ — RU; seed **1021** / **174** ports / **750** trucks. ICAO: UUEE/UUDD/ULLI/UNNT/UHWW/**URRP** (not URRR). Homolog after rebuild.
+61. ~~**RU-2 Russia gaps**~~ — +8 hubs (ULMM/UMKK/UNKL/UIII/UEEE/UHMM/UHPP/URSS); seed **1029** / **176** ports / **765** trucks. Homolog after rebuild.
 
 ## Feito (shipped 0.3.47)
 

@@ -82,6 +82,7 @@ export * from './career-ro-hubs.js';
 export * from './career-bg-hubs.js';
 export * from './career-gr-hubs.js';
 export * from './career-rs-hubs.js';
+export * from './career-ru-hubs.js';
 export * from './career-is-hubs.js';
 export * from './career-ba-hubs.js';
 export * from './career-me-hubs.js';

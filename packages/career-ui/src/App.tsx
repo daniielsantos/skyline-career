@@ -924,6 +924,24 @@ function regionLabel(region: string): string {
       return 'Greece — South / Islands';
     case 'RS-C':
       return 'Serbia';
+    case 'RU-M':
+      return 'Russia — Moscow / Central';
+    case 'RU-NW':
+      return 'Russia — Northwest';
+    case 'RU-N':
+      return 'Russia — Arctic / Kaliningrad';
+    case 'RU-V':
+      return 'Russia — Volga / Urals';
+    case 'RU-S':
+      return 'Russia — South';
+    case 'RU-SI':
+      return 'Russia — Siberia';
+    case 'RU-E':
+      return 'Russia — Central Siberia';
+    case 'RU-NE':
+      return 'Russia — Yakutia / North Pacific';
+    case 'RU-FE':
+      return 'Russia — Far East';
     case 'IS-SW':
       return 'Iceland — Southwest';
     case 'IS-NE':

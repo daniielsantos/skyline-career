@@ -71,6 +71,7 @@ import { RO_CAREER_HUBS } from './career-ro-hubs.js';
 import { BG_CAREER_HUBS } from './career-bg-hubs.js';
 import { GR_CAREER_HUBS } from './career-gr-hubs.js';
 import { RS_CAREER_HUBS } from './career-rs-hubs.js';
+import { RU_CAREER_HUBS } from './career-ru-hubs.js';
 import { IS_CAREER_HUBS } from './career-is-hubs.js';
 import { BA_CAREER_HUBS } from './career-ba-hubs.js';
 import { ME_CAREER_HUBS } from './career-me-hubs.js';
@@ -218,6 +219,7 @@ const ALL_CAREER_HUBS: readonly CareerHubRow[] = [
   ...BG_CAREER_HUBS,
   ...GR_CAREER_HUBS,
   ...RS_CAREER_HUBS,
+  ...RU_CAREER_HUBS,
   ...IS_CAREER_HUBS,
   ...BA_CAREER_HUBS,
   ...ME_CAREER_HUBS,

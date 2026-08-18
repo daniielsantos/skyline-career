@@ -368,6 +368,17 @@ export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]>
     ['CK', 'PF'],
     ['KI', 'FJ'],
     ['KI', 'US'],
+    // RU-1 Russia (do not backfill remaining EU-2+ pairs here)
+    ['RU', 'UA'],
+    ['RU', 'BY'],
+    ['RU', 'FI'],
+    ['RU', 'NO'],
+    ['RU', 'PL'],
+    ['RU', 'KZ'],
+    ['RU', 'CN'],
+    ['RU', 'JP'],
+    ['RU', 'GE'],
+    ['RU', 'TR'],
   ];
 
 const DEMAND_INTL_PAIR_SET = new Set(

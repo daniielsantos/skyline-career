@@ -328,6 +328,11 @@ import {
   buildRsFeederCorridors,
 } from './career-rs-hubs.js';
 import {
+  assertRuCareerHubCatalog,
+  RU_CAREER_HUBS,
+  buildRuFeederCorridors,
+} from './career-ru-hubs.js';
+import {
   assertIsCareerHubCatalog,
   IS_CAREER_HUBS,
   buildIsFeederCorridors,
@@ -1198,6 +1203,7 @@ export const HUB_TIER_BY_ICAO: Readonly<Record<string, HubTier>> = {
   ...Object.fromEntries(BG_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(GR_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(RS_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
+  ...Object.fromEntries(RU_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(IS_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(BA_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
   ...Object.fromEntries(ME_CAREER_HUBS.map((h) => [h.icao, h.hubTier])),
@@ -1885,6 +1891,47 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'ZSQD', b: 'ZSPD', weight: 1.4 },
   { a: 'ZWWW', b: 'ZLXY', weight: 1.4 },
   { a: 'ZWWW', b: 'ZPPP', weight: 1.35 },
+  // RU-1 Russia domestic trunks
+  { a: 'UUEE', b: 'UUDD', weight: 2.0 },
+  { a: 'UUEE', b: 'ULLI', weight: 2.0 },
+  { a: 'UUEE', b: 'UWGG', weight: 1.8 },
+  { a: 'UUEE', b: 'UNNT', weight: 1.9 },
+  { a: 'ULLI', b: 'UWGG', weight: 1.6 },
+  { a: 'USSS', b: 'UWWW', weight: 1.8 },
+  { a: 'USSS', b: 'UWGG', weight: 1.7 },
+  { a: 'URRP', b: 'UWWW', weight: 1.7 },
+  { a: 'UNNT', b: 'UHHH', weight: 1.8 },
+  { a: 'UHHH', b: 'UHWW', weight: 1.9 },
+  // RU-2 Russia Arctic / Siberia / Pacific gaps
+  { a: 'ULLI', b: 'ULMM', weight: 1.7 },
+  { a: 'UNNT', b: 'UNKL', weight: 1.9 },
+  { a: 'UNKL', b: 'UIII', weight: 1.8 },
+  { a: 'UIII', b: 'UEEE', weight: 1.6 },
+  { a: 'UEEE', b: 'UHMM', weight: 1.5 },
+  { a: 'UHMM', b: 'UHHH', weight: 1.6 },
+  { a: 'UHPP', b: 'UHMM', weight: 1.4 },
+  { a: 'URSS', b: 'URRP', weight: 1.5 },
+  // RU-2 sparse intl corridor weights
+  { a: 'ULMM', b: 'EFHK', weight: 1.4 },
+  { a: 'UMKK', b: 'EPWA', weight: 1.5 },
+  { a: 'UMKK', b: 'EYVI', weight: 1.4 },
+  { a: 'UNKL', b: 'ZLXY', weight: 1.5 },
+  { a: 'UIII', b: 'ZBAA', weight: 1.4 },
+  { a: 'URSS', b: 'LTFM', weight: 1.4 },
+  { a: 'UHMM', b: 'RJAA', weight: 1.3 },
+  // RU-1 sparse intl corridor weights
+  { a: 'UUEE', b: 'UKBB', weight: 1.9 },
+  { a: 'UUEE', b: 'UMMS', weight: 1.8 },
+  { a: 'ULLI', b: 'EFHK', weight: 1.7 },
+  { a: 'ULLI', b: 'ENGM', weight: 1.6 },
+  { a: 'UUEE', b: 'UACC', weight: 1.7 },
+  { a: 'USSS', b: 'UAAA', weight: 1.6 },
+  { a: 'UHWW', b: 'ZBAA', weight: 1.7 },
+  { a: 'UNNT', b: 'ZLXY', weight: 1.5 },
+  { a: 'UHWW', b: 'RJAA', weight: 1.6 },
+  { a: 'UUEE', b: 'UGTB', weight: 1.5 },
+  { a: 'URRP', b: 'LTFM', weight: 1.5 },
+  { a: 'ULLI', b: 'EPWA', weight: 1.5 },
   { a: 'NZAA', b: 'NZCH', weight: 1.7 },
   // Asia-15 China inland + Hawaii / Fiji / PNG / New Caledonia trunks
   { a: 'ZBAA', b: 'ZYTL', weight: 1.6 },
@@ -2001,6 +2048,7 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
   ...buildBgFeederCorridors(BG_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildGrFeederCorridors(GR_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildRsFeederCorridors(RS_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
+  ...buildRuFeederCorridors(RU_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildIsFeederCorridors(IS_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildBaFeederCorridors(BA_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
   ...buildMeFeederCorridors(ME_CAREER_HUBS, CAREER_CARGO_CORRIDORS_MANUAL),
@@ -5589,6 +5637,160 @@ export const CAREER_INTERNATIONAL_LANES: ReadonlyArray<InternationalLane> = [
     destIcao: 'UTTT',
     capacityKgPerDay: 30_000,
   },
+  // RU-1 Russia gateways
+  {
+    id: 'lane_uuee_ukbb',
+    originCountryId: 'RU',
+    destCountryId: 'UA',
+    originIcao: 'UUEE',
+    destIcao: 'UKBB',
+    capacityKgPerDay: 45_000,
+  },
+  {
+    id: 'lane_uuee_umms',
+    originCountryId: 'RU',
+    destCountryId: 'BY',
+    originIcao: 'UUEE',
+    destIcao: 'UMMS',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ulli_efhk',
+    originCountryId: 'RU',
+    destCountryId: 'FI',
+    originIcao: 'ULLI',
+    destIcao: 'EFHK',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_ulli_engm',
+    originCountryId: 'RU',
+    destCountryId: 'NO',
+    originIcao: 'ULLI',
+    destIcao: 'ENGM',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_ulli_epwa',
+    originCountryId: 'RU',
+    destCountryId: 'PL',
+    originIcao: 'ULLI',
+    destIcao: 'EPWA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_uuee_uacc',
+    originCountryId: 'RU',
+    destCountryId: 'KZ',
+    originIcao: 'UUEE',
+    destIcao: 'UACC',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_usss_uaaa',
+    originCountryId: 'RU',
+    destCountryId: 'KZ',
+    originIcao: 'USSS',
+    destIcao: 'UAAA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_uhww_zbaa',
+    originCountryId: 'RU',
+    destCountryId: 'CN',
+    originIcao: 'UHWW',
+    destIcao: 'ZBAA',
+    capacityKgPerDay: 40_000,
+  },
+  {
+    id: 'lane_unnt_zlxy',
+    originCountryId: 'RU',
+    destCountryId: 'CN',
+    originIcao: 'UNNT',
+    destIcao: 'ZLXY',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_uhww_rjaa',
+    originCountryId: 'RU',
+    destCountryId: 'JP',
+    originIcao: 'UHWW',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_uuee_ugtb',
+    originCountryId: 'RU',
+    destCountryId: 'GE',
+    originIcao: 'UUEE',
+    destIcao: 'UGTB',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_urrp_ltfm',
+    originCountryId: 'RU',
+    destCountryId: 'TR',
+    originIcao: 'URRP',
+    destIcao: 'LTFM',
+    capacityKgPerDay: 35_000,
+  },
+  // RU-2 Russia Arctic / Siberia gateways
+  {
+    id: 'lane_ulmm_efhk',
+    originCountryId: 'RU',
+    destCountryId: 'FI',
+    originIcao: 'ULMM',
+    destIcao: 'EFHK',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_umkk_epwa',
+    originCountryId: 'RU',
+    destCountryId: 'PL',
+    originIcao: 'UMKK',
+    destIcao: 'EPWA',
+    capacityKgPerDay: 35_000,
+  },
+  {
+    id: 'lane_umkk_eyvi',
+    originCountryId: 'RU',
+    destCountryId: 'LT',
+    originIcao: 'UMKK',
+    destIcao: 'EYVI',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_unkl_zlxy',
+    originCountryId: 'RU',
+    destCountryId: 'CN',
+    originIcao: 'UNKL',
+    destIcao: 'ZLXY',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_uiii_zbaa',
+    originCountryId: 'RU',
+    destCountryId: 'CN',
+    originIcao: 'UIII',
+    destIcao: 'ZBAA',
+    capacityKgPerDay: 28_000,
+  },
+  {
+    id: 'lane_urss_ltfm',
+    originCountryId: 'RU',
+    destCountryId: 'TR',
+    originIcao: 'URSS',
+    destIcao: 'LTFM',
+    capacityKgPerDay: 30_000,
+  },
+  {
+    id: 'lane_uhmm_rjaa',
+    originCountryId: 'RU',
+    destCountryId: 'JP',
+    originIcao: 'UHMM',
+    destIcao: 'RJAA',
+    capacityKgPerDay: 25_000,
+  },
 ];
 
 /** Merge curated international lanes into a world (idempotent by id / OD). */
@@ -6106,6 +6308,14 @@ export const FUEL_HUB_ICAOS = new Set([
   'RCNN',
   'ZSQD',
   'ZWWW',
+  // RU-1 Russia
+  'UUEE',
+  'ULLI',
+  'UNNT',
+  'UHWW',
+  // RU-2 Russia
+  'UMKK',
+  'UNKL',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -7186,6 +7396,12 @@ export const CAREER_HUB_COORDS: Readonly<
       { lat: h.lat, lon: h.lon, name: h.name },
     ]),
   ),
+  ...Object.fromEntries(
+    RU_CAREER_HUBS.map((h) => [
+      h.icao,
+      { lat: h.lat, lon: h.lon, name: h.name },
+    ]),
+  ),
 };
 
 export function resolveAirportCoords(
@@ -7639,6 +7855,7 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertSbCareerHubCatalog();
   assertCkCareerHubCatalog();
   assertKiCareerHubCatalog();
+  assertRuCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
   assertBushTripCatalog();
 
@@ -8889,6 +9106,15 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
       bush: h.bush === true,
     })),
     ...KI_CAREER_HUBS.map((h) => ({
+      icao: h.icao,
+      name: h.name,
+      region: h.region,
+      hubTier: h.hubTier,
+      produce: h.produce,
+      consume: h.consume,
+      bush: h.bush === true,
+    })),
+    ...RU_CAREER_HUBS.map((h) => ({
       icao: h.icao,
       name: h.name,
       region: h.region,

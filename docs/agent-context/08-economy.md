@@ -46,6 +46,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Asia-18–25 Pacific micro-hubs** no seed: US-MP/KI-L/TO-V/VU-S/SB-W/CK-N/PF-L/WS-S — **1002** airports; **165** ports; fuel trucks **675**. ICAO: PGSN, PLCH, NFTV, NVSS, AGGM, NCAI, NTTB, NSAU. Demand pairs: KI/US, TO/CK, TO/US, WS/TO.
 - **Asia-26 Angaur micro-slice:** PW-A **ANG** — part of batch through **1011** airports.
 - **Asia-27–32 Pacific/Asia cleanup batch:** YPDN, WBSB, YMHB, NZWN, RCMQ/RCNN, ZSQD/ZWWW — **1011** airports; **171** ports; fuel trucks **720**; **138** countries. **Pacific/Asia map complete** (ZUTF Tianfu still skipped by design).
+- **RU-1 Russia core** no seed: RU — **1021** airports; **174** ports; fuel trucks **750**; **139** countries. ICAO: UUEE/UUDD (Moscow majors), ULLI, UNNT, UHWW, **URRP** (not closed URRR); ports St Petersburg / Novorossiysk / Vladivostok. Sparse UA/BY/FI/NO/PL/KZ/CN/JP/GE/TR lanes.
+- **RU-2 Russia gaps** no seed: +8 hubs Arctic/Siberia/Pacific — **1029** airports; **176** ports; fuel trucks **765**. ICAO: ULMM, UMKK, UNKL, UIII, UEEE, UHMM, UHPP, URSS; ports Murmansk / Kaliningrad.
 - **Tick bench:** `benchEconomyTicks` / CLI `career tick --bench`. Após Fase 1 + formLots: +1 day ~**20–22s** in-memory no seed Americas (baseline pré-opt ~90s) — sem capar frota; pulse inalterado.
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.
 - Soft-field **bush** hubs: Market não forma freight nesses ODs — bush trips board **off** por agora (`BUSH_TRIPS_BOARD_ENABLED`).

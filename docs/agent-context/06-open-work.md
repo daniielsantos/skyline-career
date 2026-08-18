@@ -41,7 +41,7 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 7. ~~**América Central completa (seed)**~~ — PA/CR/NI/HN/GT/SV/BZ; ports costeiros; lanes MX/US/CO.
 8. ~~**Caribe (seed, intl-first)**~~ — CU/DO/HT/JM/BS/TT/BB/LC/GD/AG; ring + KMIA/MMUN/CO/VE.
 9. ~~**Dependências caribenhas**~~ — GP/MQ/CW + US-PR (região US); ports + lanes.
-10. **Tick perf (Fase 1 + formLots)** — lane indexes + formLots caches. Bench: +1 day ~**20–22s** in-memory. UX: `+1 day` em chunks de 8 ticks com progresso no toast/clock.
+10. **Tick perf (Fase 2b)** — rng por partição×commodity no `formLots` + fita NPC `seed:tN:npc`. `skipAll` corta spoke filler (não só corredor). Produção/fuel/eventos na fita `seed:tN` (iguais ao build anterior). Lots/NPC **não** replay bit-a-bit vs Fase 2. Bench: tick 1 ~**10s**; regime ~**2s**/tick (`formLots` ~0.8–1.3s, npc ~0.8–1.1s). Board no cap ainda gasta ~1s em países *abaixo* da quota (skipAll falso). UI `+1 day` já em chunks de 8. Restante: NPC scan in-range.
 11. ~~**Leftovers SX/AW/VI**~~ — SX/AW light countries + US-VI region; ports Philipsburg / Oranjestad / Charlotte Amalie; seed **551**.
 12. ~~**EU-1 Western core**~~ — PT/ES/FR/GB/DE/NL/BE/IT; seed **629**; ports EU; fuel trucks 85; Americas bridge lanes.
 13. ~~**EU-2 Nordics + Alps + IE**~~ — IE/DK/NO/SE/FI/CH/AT; seed **672**; ports **66**; fuel trucks **100**.

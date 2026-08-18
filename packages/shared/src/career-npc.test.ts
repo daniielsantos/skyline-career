@@ -503,6 +503,47 @@ describe('NPC freighter fleet', () => {
     assert.equal(scoreLotForNpc(world, ga!, heavy, rng), null);
   });
 
+  it('wide NPCs can score long-haul intl lots that light GA cannot', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-intl-index' });
+    const wide = world.npcs.find((n) => n.aircraftClassId === 'wide_freighter');
+    const ga = world.npcs.find((n) => n.aircraftClassId === 'light_ga');
+    const narrow = world.npcs.find((n) => n.aircraftClassId === 'narrow_freighter');
+    assert.ok(wide);
+    assert.ok(ga);
+    assert.ok(narrow);
+    assert.equal(isInternationalOdAllowed(world, 'SBGR', 'KMIA'), true);
+    const dist = routeDistanceNm(world, 'SBGR', 'KMIA');
+    assert.ok(dist != null && dist > 2500, `GRU→MIA should be long-haul (${dist} nm)`);
+    assert.ok(dist < 6000, `GRU→MIA should be in wide range (${dist} nm)`);
+    wide!.status = 'idle';
+    wide!.feeBias = 0.5;
+    wide!.aggressiveness = 0.5;
+    wide!.reliability = 1;
+    ga!.status = 'idle';
+    ga!.feeBias = 0.5;
+    narrow!.status = 'idle';
+    narrow!.feeBias = 0.5;
+    const lot: ShipmentLot = {
+      id: 'lot-intl-gru-mia',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'KMIA',
+      quantityKg: 20_000,
+      reservedKg: 0,
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 96,
+      payUsd: 80_000,
+      basePayUsd: 80_000,
+      urgency: 'normal',
+      reason: 'test intl trunk',
+      status: 'available',
+    };
+    const rng = () => 0.5;
+    assert.ok(scoreLotForNpc(world, wide!, lot, rng) != null);
+    assert.equal(scoreLotForNpc(world, ga!, lot, rng), null);
+    assert.equal(scoreLotForNpc(world, narrow!, lot, rng), null);
+  });
+
   it('scores busy lanes lower so NPCs leave crowded OD freight for the player', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-busy-penalty' });
     const npc = world.npcs.find((n) => n.aircraftClassId === 'narrow_freighter');

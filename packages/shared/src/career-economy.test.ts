@@ -2741,6 +2741,7 @@ describe('tickEconomyN market formation', () => {
   });
 
   it('keeps lots stable across identical seeds', () => {
+    // Partition-local lot rng + dedicated NPC stream: same seed still matches.
     const a = createSeedEconomyWorld({ seed: 'same' });
     const b = createSeedEconomyWorld({ seed: 'same' });
     a.lastBatchAtMs = 1;
@@ -2752,6 +2753,27 @@ describe('tickEconomyN market formation', () => {
       a.lots.map((l) => [l.commodityId, l.originIcao, l.destIcao, l.quantityKg]),
       b.lots.map((l) => [l.commodityId, l.originIcao, l.destIcao, l.quantityKg]),
     );
+    assert.deepEqual(
+      (a.npcFlights ?? []).map((f) => [f.npcId, f.lotId, f.status, f.cargoKg]),
+      (b.npcFlights ?? []).map((f) => [f.npcId, f.lotId, f.status, f.cargoKg]),
+    );
+  });
+
+  it('keeps US and international lots after large-country boards fill', () => {
+    const world = createSeedEconomyWorld({ seed: 'partition-rng' });
+    tickEconomyN(world, 12, { fromBatchAtMs: 1 });
+    const available = world.lots.filter((l) => l.status === 'available');
+    const countryByIcao = new Map(
+      world.airports.map((a) => [a.icao, countryIdFromRegion(a.region)]),
+    );
+    const us = available.filter((l) => countryByIcao.get(l.originIcao) === 'US');
+    const br = available.filter((l) => countryByIcao.get(l.originIcao) === 'BR');
+    const intl = available.filter(
+      (l) => lotBoardPartition(l, countryByIcao) === INTL_BOARD_PARTITION,
+    );
+    assert.ok(br.length > 0, 'expected BR lots');
+    assert.ok(us.length > 0, 'expected US lots (not starved by BR skipAll)');
+    assert.ok(intl.length > 0, 'expected international lots');
   });
   it('spawns small LTL lots (80–2000 kg) alongside larger freight', () => {
     const world = createSeedEconomyWorld({ seed: 'ltl-lots' });

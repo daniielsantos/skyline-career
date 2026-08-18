@@ -12983,7 +12983,7 @@ type RankedAirport = {
  */
 function formLotsFromImbalances(
   world: CareerEconomyWorld,
-  rng: () => number,
+  tickKey: string,
 ): PartitionTickResult[] {
   ensureInternationalLanes(world);
   // Warm lane inbound index once for this tick's saturation / soft-fill reads.
@@ -13122,6 +13122,22 @@ function formLotsFromImbalances(
     boardPressureCache.delete(`${commodityId}:${partitionId}`);
   };
 
+  // Independent stream per partition×commodity so skipAll can drop remaining
+  // pairs (including spoke rng) without shifting later countries or SKUs.
+  const lotRngCache = new Map<string, () => number>();
+  const lotRng = (
+    partitionId: string,
+    commodityId: CommodityId,
+  ): (() => number) => {
+    const key = `${partitionId}:${commodityId}`;
+    let rng = lotRngCache.get(key);
+    if (!rng) {
+      rng = mulberry32(hashSeed(`${tickKey}:lots:${key}`));
+      lotRngCache.set(key, rng);
+    }
+    return rng;
+  };
+
   const pushLot = (
     key: string,
     commodity: (typeof CAREER_COMMODITIES)[number],
@@ -13209,6 +13225,7 @@ function formLotsFromImbalances(
           (international ? 2.1 : 1.8) *
           Math.max(1, bushPay * 0.95),
       ) * sizePayMult;
+    const rng = lotRng(opts.partitionId, commodity.id);
     const payUsd = Math.round(qty * payPerKg);
     // Lot life in 15-min ticks (legacy hour lives × 4).
     const baseLife = commodity.perishable
@@ -13287,16 +13304,17 @@ function formLotsFromImbalances(
     if (!opts.international && !isDomesticOd(origin.ap.region, dest.ap.region)) {
       return;
     }
+
+    const boardPressure = boardPressureOf(commodity.id, opts.partitionId);
+    if (boardPressure.skipAll) return;
+    const rng = lotRng(opts.partitionId, commodity.id);
+
     if (cw <= 1) {
       if (!opts.allowSpokeFiller) return;
       const spokeFiller = origin.tier === 'spoke' && dest.tier === 'spoke';
       if (!spokeFiller) return;
       if (opts.originHasOpenCorridor || rng() > 0.2) return;
     }
-
-    const boardPressure = boardPressureOf(commodity.id, opts.partitionId);
-    // Soft-cap full: nothing left to form (after spoke rng, for stream parity).
-    if (boardPressure.skipAll) return;
 
     // Cheap reject before saturation / inbound work.
     const priceGap = dest.price - origin.price;
@@ -13448,6 +13466,7 @@ function formLotsFromImbalances(
   for (const countryId of listWorldCountryIds(world)) {
     const countryAirports = airportsByCountry.get(countryId) ?? [];
     for (const commodity of CAREER_CARGO_COMMODITIES) {
+      if (boardPressureOf(commodity.id, countryId).skipAll) continue;
       const ranked = rankAirports(countryAirports, commodity);
       // Rank by fill pressure, not absolute kg. Absolute room/surplus is a proxy
       // for warehouse size, so the same high-capacity majors won every slot every
@@ -13531,6 +13550,7 @@ function formLotsFromImbalances(
       };
 
       for (const origin of origins) {
+        if (boardPressureOf(commodity.id, countryId).skipAll) break;
         const hasOpenCorridor = originHasOpenCorridor(origin);
         const orderedDests = [...destinations].sort((a, b) => {
           const wa = corridorWeight(origin.ap.icao, a.ap.icao);
@@ -13538,7 +13558,15 @@ function formLotsFromImbalances(
           return wb - wa;
         });
         for (const dest of orderedDests) {
-          tryFormPair(commodity, origin, dest, corridorWeight(origin.ap.icao, dest.ap.icao), {
+          if (boardPressureOf(commodity.id, countryId).skipAll) break;
+          const cw = corridorWeight(origin.ap.icao, dest.ap.icao);
+          if (cw > 1) {
+            const minGapMult = cw >= 1.5 ? 0.15 : 0.22;
+            if (dest.price - origin.price < commodity.basePricePerKg * minGapMult) {
+              continue;
+            }
+          }
+          tryFormPair(commodity, origin, dest, cw, {
             international: false,
             partitionId: countryId,
             allowSpokeFiller: true,
@@ -13551,6 +13579,7 @@ function formLotsFromImbalances(
         // commodity/tick. It still requires a deep shortage, price gap, range,
         // and normal lane caps; curated corridors continue to win first.
         if (
+          !boardPressureOf(commodity.id, countryId).skipAll &&
           origin.tier !== 'major' &&
           origin.fill >= DOMESTIC_OVERFLOW_ORIGIN_FILL &&
           !hasOpenCorridor
@@ -13602,6 +13631,8 @@ function formLotsFromImbalances(
     const countryAirports = airportsByCountry.get(countryId) ?? [];
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       if (!LAST_MILE_DRY_IDS.has(commodity.id)) continue;
+      // Last-mile dest scan: skipAll is rng-safe (partition stream). Drop n².
+      if (boardPressureOf(commodity.id, countryId).skipAll) continue;
       const ranked = rankAirports(countryAirports, commodity);
       for (const origin of ranked) {
         if (!LAST_MILE_ORIGIN_TIERS.has(origin.tier)) continue;
@@ -13618,6 +13649,7 @@ function formLotsFromImbalances(
         if (origin.stock.stockKg < SMALL_LOT_MIN_KG) continue;
         let open = countOpenGaDryFrom(origin.ap.icao, commodity.id);
         if (open >= LAST_MILE_OPEN_LOTS_PER_ORIGIN) continue;
+        if (boardPressureOf(commodity.id, countryId).skipAll) break;
 
         const dests: Array<{
           row: RankedAirport;
@@ -13723,6 +13755,8 @@ function formLotsFromImbalances(
     intlEndpointIcaos.has(ap.icao.toUpperCase()),
   );
   for (const commodity of CAREER_CARGO_COMMODITIES) {
+    // Intl cw is always ≥ INTERNATIONAL_CORRIDOR_WEIGHT (2) — no spoke rng.
+    if (boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll) continue;
     const rankedAll = rankAirports(intlAirports, commodity);
     const rankedByIcao = new Map(rankedAll.map((r) => [r.ap.icao.toUpperCase(), r]));
     for (const lane of world.internationalLanes ?? []) {
@@ -13739,6 +13773,8 @@ function formLotsFromImbalances(
         if (!origin || !dest) continue;
         if (origin.fill < 0.55 || origin.surplusKg < 400) continue;
         if (dest.fill > 0.45 || dest.roomKg < 400) continue;
+        if (boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll) continue;
+        if (dest.price - origin.price < commodity.basePricePerKg * 0.12) continue;
         const cw = Math.max(
           corridorWeight(origin.ap.icao, dest.ap.icao),
           INTERNATIONAL_CORRIDOR_WEIGHT,
@@ -13885,7 +13921,8 @@ export function tickEconomy(
   phaseAt = performance.now();
 
   world.tick += 1;
-  const rng = mulberry32(hashSeed(`${opts.rngSeed ?? world.seed}:t${world.tick}`));
+  const tickKey = `${opts.rngSeed ?? world.seed}:t${world.tick}`;
+  const rng = mulberry32(hashSeed(tickKey));
 
   applyProductionConsumption(world, rng);
   addTickPhaseMs(profile, 'production', phaseAt);
@@ -13907,11 +13944,13 @@ export function tickEconomy(
   addTickPhaseMs(profile, 'events', phaseAt);
   phaseAt = performance.now();
 
-  formLotsFromImbalances(world, rng);
+  formLotsFromImbalances(world, tickKey);
   addTickPhaseMs(profile, 'formLots', phaseAt);
   phaseAt = performance.now();
 
-  tickNpcFreighters(world, rng, { batchNowMs });
+  tickNpcFreighters(world, mulberry32(hashSeed(`${tickKey}:npc`)), {
+    batchNowMs,
+  });
   addTickPhaseMs(profile, 'npc', phaseAt);
   phaseAt = performance.now();
 

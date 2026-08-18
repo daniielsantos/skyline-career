@@ -379,126 +379,140 @@ export function DispatchRouteMap(props: {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    let cancelled = false;
 
     const paint = () => {
-      for (const marker of markersRef.current) marker.remove();
-      markersRef.current = [];
+      if (cancelled) return;
+      try {
+        for (const marker of markersRef.current) marker.remove();
+        markersRef.current = [];
 
-      const dest = props.dest ?? null;
-      setRouteLine(map, props.origin, dest, props.waypoints);
+        const dest = props.dest ?? null;
+        setRouteLine(map, props.origin, dest, props.waypoints);
 
-      // Route gone → drop aircraft; live effect will recreate if needed.
-      if (!dest) {
-        aircraftMarkerRef.current?.remove();
-        aircraftMarkerRef.current = null;
-      }
+        // Route gone → drop aircraft; live effect will recreate if needed.
+        if (!dest) {
+          aircraftMarkerRef.current?.remove();
+          aircraftMarkerRef.current = null;
+        }
 
-      const originKind = props.originRole ?? 'dep';
-      const ends: Array<{
-        endpoint: DispatchRouteEndpoint;
-        kind: 'dep' | 'arr' | 'fbo';
-      }> = [{ endpoint: props.origin, kind: originKind }];
-      if (dest) {
-        ends.push({ endpoint: dest, kind: 'arr' });
-      }
+        const originKind = props.originRole ?? 'dep';
+        const ends: Array<{
+          endpoint: DispatchRouteEndpoint;
+          kind: 'dep' | 'arr' | 'fbo';
+        }> = [{ endpoint: props.origin, kind: originKind }];
+        if (dest) {
+          ends.push({ endpoint: dest, kind: 'arr' });
+        }
 
-      for (const { endpoint, kind } of ends) {
-        const el = endpointMarker(endpoint, kind);
-        el.addEventListener('click', (event) => {
-          event.stopPropagation();
-          onSelectRef.current?.(endpoint.icao);
-        });
-        const title =
-          kind === 'dep'
-            ? 'Departure'
-            : kind === 'arr'
-              ? 'Arrival'
-              : 'FBO base';
-        const marker = new Marker({ element: el, anchor: 'bottom' })
-          .setLngLat([endpoint.lon, endpoint.lat])
-          .setPopup(
-            new Popup({
-              offset: 14,
-              closeButton: false,
-              className: 'dispatch-route-popup',
-            }).setHTML(
-              `<strong>${title}</strong><br/>${endpoint.icao}${
-                endpoint.name ? ` · ${endpoint.name}` : ''
-              }`,
-            ),
-          )
-          .addTo(map);
-        markersRef.current.push(marker);
-      }
-
-      if (dest) {
-        for (const wpt of intermediateWaypoints(
-          props.origin,
-          dest,
-          props.waypoints,
-        )) {
-          const isHub = isAirportWaypoint(wpt);
-          const el = isHub ? hubRouteMarker(wpt) : waypointMarker(wpt);
-          if (isHub) {
-            el.addEventListener('click', (event) => {
-              event.stopPropagation();
-              onSelectRef.current?.(wpt.ident);
-            });
-          }
+        for (const { endpoint, kind } of ends) {
+          const el = endpointMarker(endpoint, kind);
+          el.addEventListener('click', (event) => {
+            event.stopPropagation();
+            onSelectRef.current?.(endpoint.icao);
+          });
+          const title =
+            kind === 'dep'
+              ? 'Departure'
+              : kind === 'arr'
+                ? 'Arrival'
+                : 'FBO base';
           const marker = new Marker({ element: el, anchor: 'bottom' })
-            .setLngLat([wpt.lon, wpt.lat])
+            .setLngLat([endpoint.lon, endpoint.lat])
             .setPopup(
               new Popup({
-                offset: isHub ? 14 : 10,
+                offset: 14,
                 closeButton: false,
                 className: 'dispatch-route-popup',
               }).setHTML(
-                isHub
-                  ? `<strong>Hub</strong><br/>${wpt.ident}`
-                  : `<strong>${wpt.ident}</strong>${
-                      wpt.type ? `<br/>${wpt.type}` : ''
-                    }`,
+                `<strong>${title}</strong><br/>${endpoint.icao}${
+                  endpoint.name ? ` · ${endpoint.name}` : ''
+                }`,
               ),
             )
             .addTo(map);
           markersRef.current.push(marker);
         }
-      }
 
-      // Only auto-frame when the route geometry actually changes. Polling /
-      // parent re-renders were re-fitting and yanking the camera off the
-      // user's pan/zoom.
-      const cameraKey = routeCameraKey(
-        props.origin,
-        dest,
-        props.waypoints,
-        props.originRole,
-      );
-      if (fittedRouteKeyRef.current !== cameraKey) {
-        fittedRouteKeyRef.current = cameraKey;
         if (dest) {
-          const bounds = new LngLatBounds();
-          for (const p of buildRouteTrack(
+          for (const wpt of intermediateWaypoints(
             props.origin,
             dest,
             props.waypoints,
           )) {
-            bounds.extend([p.lon, p.lat]);
+            const isHub = isAirportWaypoint(wpt);
+            const el = isHub ? hubRouteMarker(wpt) : waypointMarker(wpt);
+            if (isHub) {
+              el.addEventListener('click', (event) => {
+                event.stopPropagation();
+                onSelectRef.current?.(wpt.ident);
+              });
+            }
+            const marker = new Marker({ element: el, anchor: 'bottom' })
+              .setLngLat([wpt.lon, wpt.lat])
+              .setPopup(
+                new Popup({
+                  offset: isHub ? 14 : 10,
+                  closeButton: false,
+                  className: 'dispatch-route-popup',
+                }).setHTML(
+                  isHub
+                    ? `<strong>Hub</strong><br/>${wpt.ident}`
+                    : `<strong>${wpt.ident}</strong>${
+                        wpt.type ? `<br/>${wpt.type}` : ''
+                      }`,
+                ),
+              )
+              .addTo(map);
+            markersRef.current.push(marker);
           }
-          map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
-        } else {
-          map.flyTo({
-            center: [props.origin.lon, props.origin.lat],
-            zoom: 5.5,
-            duration: 500,
-          });
         }
+
+        // Only auto-frame when the route geometry actually changes. Polling /
+        // parent re-renders were re-fitting and yanking the camera off the
+        // user's pan/zoom.
+        const cameraKey = routeCameraKey(
+          props.origin,
+          dest,
+          props.waypoints,
+          props.originRole,
+        );
+        if (fittedRouteKeyRef.current !== cameraKey) {
+          fittedRouteKeyRef.current = cameraKey;
+          if (dest) {
+            const bounds = new LngLatBounds();
+            for (const p of buildRouteTrack(
+              props.origin,
+              dest,
+              props.waypoints,
+            )) {
+              bounds.extend([p.lon, p.lat]);
+            }
+            map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
+          } else {
+            map.flyTo({
+              center: [props.origin.lon, props.origin.lat],
+              zoom: 5.5,
+              duration: 500,
+            });
+          }
+        }
+        map.resize();
+      } catch {
+        // Style/source not ready yet — load/idle below retries.
       }
-      map.resize();
     };
 
-    if (map.isStyleLoaded()) paint();
-    else map.once('load', paint);
+    paint();
+    if (!map.isStyleLoaded()) {
+      map.once('load', paint);
+      map.once('idle', paint);
+    }
+    return () => {
+      cancelled = true;
+      map.off('load', paint);
+      map.off('idle', paint);
+    };
   }, [props.origin, props.dest, props.waypoints, props.originRole]);
 
   // Live aircraft — move marker only; do not refit route bounds each tick.

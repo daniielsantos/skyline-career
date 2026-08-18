@@ -42,20 +42,27 @@ export function FboRouteMapCard(props: {
   const [missing, setMissing] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Drop destination immediately on deselect — don't wait for the fetch cycle.
+  // Drop a stale arrival the moment the selected ICAO changes — don't keep
+  // drawing KLIT while the header already says SBEG.
+  const destMatches =
+    Boolean(destCode) && dest?.icao.toUpperCase() === destCode;
+
   useEffect(() => {
-    if (!showRoute) {
-      setDest(null);
-    }
-  }, [showRoute]);
+    setDest((cur) => {
+      if (!showRoute || !destCode) return null;
+      if (cur && cur.icao.toUpperCase() === destCode) return cur;
+      return null;
+    });
+  }, [showRoute, destCode]);
 
   useEffect(() => {
     let cancelled = false;
-    const alreadyHaveBase =
-      base?.icao.toUpperCase() === baseCode &&
-      origin?.icao.toUpperCase() === originCode;
-    // Avoid blanking the map when clearing a route back to the FBO pin.
-    if (!(showRoute === false && alreadyHaveBase)) {
+    const haveOrigin =
+      (origin ?? base)?.icao.toUpperCase() === originCode &&
+      base?.icao.toUpperCase() === baseCode;
+    // Keep the map mounted when only the destination changes (MapLibre misses
+    // `load` after destroy/recreate and the old route looks frozen).
+    if (!haveOrigin) {
       setLoading(true);
     }
     void (async () => {
@@ -82,13 +89,12 @@ export function FboRouteMapCard(props: {
     return () => {
       cancelled = true;
     };
-    // base/origin in alreadyHaveBase are intentional snapshots for the loading skip.
+    // origin/base snapshots are only for the loading skip.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resolve on code changes only
   }, [baseCode, originCode, destCode, showRoute]);
 
   const mapOrigin = origin ?? base;
-  // Never keep a stale dest/aircraft after deselect.
-  const mapDest = showRoute ? dest : null;
+  const mapDest = showRoute && destMatches ? dest : null;
   const aircraft: DispatchAircraftPosition | null = useMemo(() => {
     if (
       !showRoute ||
@@ -124,9 +130,9 @@ export function FboRouteMapCard(props: {
         {props.showTitle === false ? null : <strong>Map</strong>}
         <small>{headline}</small>
       </div>
-      {loading ? (
+      {loading && !mapOrigin ? (
         <BusyBlock label="Loading map" className="dispatch-route-map-empty" />
-      ) : mapOrigin && (!showRoute || mapDest) ? (
+      ) : mapOrigin ? (
         <DispatchRouteMap
           className="dispatch-route-map fbo-route-map"
           origin={mapOrigin}
@@ -149,6 +155,13 @@ export function FboRouteMapCard(props: {
         <p className="fbo-route-map-hint">
           {props.idleHint ??
             'Select a bonded hold or crew leg below to draw the route.'}
+        </p>
+      ) : null}
+      {showRoute && mapOrigin && !mapDest ? (
+        <p className="fbo-route-map-hint">
+          {destCode && missing.includes(destCode)
+            ? `Missing coords for ${destCode}.`
+            : 'Drawing route…'}
         </p>
       ) : null}
       {showRoute && aircraft && props.aircraftLabel ? (

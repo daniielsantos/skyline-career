@@ -188,7 +188,7 @@ body {
 .brand-mark-hero {
   align-items: center;
   width: 100%;
-  max-width: min(34rem, 100%);
+  max-width: min(22rem, 100%);
 }
 
 .brand-mark-hero-lockup {
@@ -204,7 +204,7 @@ body {
 .profile-gate-brand.brand-mark-hero {
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.35rem;
 }
 
 .sidebar-nav {
@@ -3695,7 +3695,12 @@ tr.lot-locked {
 }
 
 .profile-gate-shell {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
   min-height: 100vh;
+  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   display: grid;
   place-items: center;
   padding: 2rem 1.25rem;
@@ -3716,10 +3721,11 @@ tr.lot-locked {
 }
 
 .profile-gate {
-  width: min(36rem, 100%);
+  width: min(28rem, 100%);
   display: grid;
-  gap: 1.25rem;
+  gap: 1.1rem;
   position: relative;
+  padding: 1.5rem 1.35rem 1.35rem;
   animation: profile-gate-enter 280ms ease-out;
 }
 
@@ -3827,9 +3833,12 @@ tr.lot-locked {
 }
 
 .profile-gate-hero h1 {
-  margin: 0.25rem 0 0.5rem;
-  font-size: clamp(1.75rem, 4vw, 2.35rem);
-  letter-spacing: -0.02em;
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .profile-gate-brand {
@@ -3853,8 +3862,10 @@ tr.lot-locked {
 }
 
 .profile-gate-play {
-  display: grid;
-  gap: 0.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.7rem;
   text-align: left;
   font: inherit;
   color: inherit;
@@ -3866,6 +3877,14 @@ tr.lot-locked {
 
 .profile-gate-play strong {
   font-size: 1.05rem;
+}
+
+.profile-gate-last {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .profile-gate-row-actions {

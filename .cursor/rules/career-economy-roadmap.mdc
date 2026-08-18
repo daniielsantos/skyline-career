@@ -79,6 +79,8 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Asia-26–32 Pacific/Asia cleanup:** Angaur **ANG**, Darwin **YPDN**, Brunei **WBSB**, Hobart **YMHB**, Wellington **NZWN**, Taichung/Tainan **RCMQ/RCNN**, Qingdao/Urumqi **ZSQD/ZWWW**; fuel trucks **720**; seed **1011** airports / **171** ports / **138** countries. **Pacific/Asia map complete.**
 - **RU-1 Russia core:** RU curated hubs (Moscow **UUEE**/**UUDD**, **ULLI**, **UNNT**, **UHWW** + Volga/South/Far East spokes); 6 regions; St Petersburg / Novorossiysk / Vladivostok ports; fuel trucks **750**; seed **1021** airports / **174** ports / **139** countries. Remap **URRR→URRP**; Moscow majors UUEE/UUDD (not UUWW Vnukovo).
 - **RU-2 Russia gaps:** +8 hubs (**ULMM**, **UMKK**, **UNKL**, **UIII**, **UEEE**, **UHMM**, **UHPP**, **URSS**); regions **RU-N** / **RU-E** / **RU-NE**; Murmansk / Kaliningrad ports; fuel trucks **765**; seed **1029** airports / **176** ports. Sparse FI/PL/LT/CN/JP/TR lanes from new gateways.
+- **CN-2 China densify:** +16 hubs (northeast / Yangtze / south / west); **30** CN hubs; Ningbo + Haikou ports; fuel trucks **780**; seed **1045** / **178** ports. Skip **ZBTJ** Tianjin and **ZUTF** Tianfu. Sparse JP/KR/VN/TW lanes.
+- **RU-3 Russia densify:** +22 hubs (Volga / south / Siberia / Far East / Sakhalin); **40** RU hubs; Arkhangelsk + Korsakov ports; fuel trucks **800**; seed **1067** / **180** ports. Skip **URRR**. Sparse NO/TR/GE/KZ/JP lanes.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` passive restock feeds listings; operator buffs (~10% buy, ~15% inbound ETA, +5 listing slots); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
@@ -139,8 +141,10 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 43. ~~**Asia-27–32 Pacific/Asia cleanup**~~ — YPDN/WBSB/YMHB/NZWN/RCMQ/RCNN/ZSQD/ZWWW; seed **1011** / **171** ports / **720** trucks. **Pacific/Asia map complete.**
 44. ~~**RU-1 Russia core**~~ — UUEE/ULLI/UNNT/UHWW + 6 regions; seed **1021** / **174** ports / **750** trucks.
 45. ~~**RU-2 Russia gaps**~~ — ULMM/UMKK/UNKL/UIII/UEEE/UHMM/UHPP/URSS; seed **1029** / **176** ports / **765** trucks.
-46. **Next map region:** Sub-Saharan Africa (AF-1) — not started.
-47. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+46. ~~**CN-2 China densify**~~ — +16 hubs to **30** CN; seed **1045** / **178** ports / **780** trucks. Skip ZBTJ/ZUTF.
+47. ~~**RU-3 Russia densify**~~ — +22 hubs to **40** RU; seed **1067** / **180** ports / **800** trucks. Skip URRR.
+48. **Next map region:** Sub-Saharan Africa (AF-1) — not started.
+49. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

@@ -26,11 +26,7 @@ export function ProfileGate(props: {
           subtitle="Career"
           variant="hero"
         />
-        <h1>Choose a profile</h1>
-        <p className="muted">
-          Each profile has its own wallet, fleet, and missions. Shared hub data
-          stays the same for everyone.
-        </p>
+        <h1>Select a profile</h1>
       </div>
 
       {props.error ? (
@@ -41,7 +37,7 @@ export function ProfileGate(props: {
 
       <ul className="profile-gate-list">
         {props.profiles.length === 0 ? (
-          <li className="muted">No saves yet — create one below.</li>
+          <li className="muted">No profiles yet.</li>
         ) : (
           props.profiles.map((p) => {
             const isLast = p.id === props.lastActiveId;
@@ -85,10 +81,9 @@ export function ProfileGate(props: {
                       onClick={() => props.onSelect(p.id)}
                     >
                       <strong>{p.name}</strong>
-                      <span className="muted">
-                        {isLast ? 'Last played · ' : ''}
-                        updated {new Date(p.updatedAt).toLocaleString()}
-                      </span>
+                      {isLast ? (
+                        <span className="profile-gate-last">Last played</span>
+                      ) : null}
                     </button>
                     <div className="profile-gate-row-actions">
                       <button
@@ -137,7 +132,7 @@ export function ProfileGate(props: {
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="e.g. Daniel · US bush"
+            placeholder="Pilot name"
             disabled={props.busy}
             minLength={2}
             required
@@ -176,8 +171,6 @@ export function ProfileGateLoading() {
           subtitle="Career"
           variant="hero"
         />
-        <h1>Loading</h1>
-        <p className="muted">Preparing your profiles…</p>
       </div>
       <div className="profile-gate-loading-body">
         <span className="profile-gate-spinner profile-gate-spinner-lg" aria-hidden />

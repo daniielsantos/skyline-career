@@ -92,6 +92,8 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 59. ~~**Asia-32 China gap (ZSQD / ZWWW)**~~ — CN-E + CN-W; seed **1011** / **171** ports / **720** trucks. **Pacific/Asia map complete.**
 60. ~~**RU-1 Russia core**~~ — RU; seed **1021** / **174** ports / **750** trucks. ICAO: UUEE/UUDD/ULLI/UNNT/UHWW/**URRP** (not URRR). Homolog after rebuild.
 61. ~~**RU-2 Russia gaps**~~ — +8 hubs (ULMM/UMKK/UNKL/UIII/UEEE/UHMM/UHPP/URSS); seed **1029** / **176** ports / **765** trucks. Homolog after rebuild.
+62. ~~**CN-2 China densify**~~ — +16 hubs (ZYTX/ZYCC/ZYHB/ZBHH/ZSHC/ZSNJ/ZHCC/ZSNB/ZSFZ/ZGHA/ZGNN/ZJHK/ZJSY/ZUGY/ZLLL/ZLIC); seed **1045** / **178** ports / **780** trucks. Skip ZBTJ/ZUTF. Homolog after rebuild.
+63. ~~**RU-3 Russia densify**~~ — +22 hubs to **40** RU; seed **1067** / **180** ports / **800** trucks. Skip URRR. Homolog after rebuild.
 
 ## Feito (shipped 0.3.47)
 

@@ -9378,6 +9378,8 @@ type AirportLookupCache = {
   len: number;
   byIcao: Map<string, AirportTerminal>;
   routeNm: Map<string, number | undefined>;
+  /** Same-country dests in the last-mile NM band, lazy per origin. */
+  lastMileByOrigin: Map<string, Array<{ destIcao: string; nm: number }>>;
 };
 
 const airportLookupByList = new WeakMap<
@@ -9394,7 +9396,12 @@ function airportLookup(
     for (const airport of airports) {
       byIcao.set(airport.icao.toUpperCase(), airport);
     }
-    cache = { len: airports.length, byIcao, routeNm: new Map() };
+    cache = {
+      len: airports.length,
+      byIcao,
+      routeNm: new Map(),
+      lastMileByOrigin: new Map(),
+    };
     airportLookupByList.set(airports, cache);
   }
   return cache;
@@ -9434,6 +9441,28 @@ export function routeDistanceNm(
       : undefined;
   lookup.routeNm.set(key, nm);
   return nm;
+}
+
+function lastMileDestsFrom(
+  world: Pick<CareerEconomyWorld, 'airports'>,
+  originIcao: string,
+): Array<{ destIcao: string; nm: number }> {
+  const originCode = originIcao.trim().toUpperCase();
+  const lookup = airportLookup(world.airports);
+  const cached = lookup.lastMileByOrigin.get(originCode);
+  if (cached) return cached;
+  const origin = lookup.byIcao.get(originCode);
+  const countryId = origin ? countryIdFromRegion(origin.region) : '';
+  const dests: Array<{ destIcao: string; nm: number }> = [];
+  for (const dest of world.airports) {
+    if (dest.icao === originCode) continue;
+    if (countryIdFromRegion(dest.region) !== countryId) continue;
+    const nm = routeDistanceNm(world, originCode, dest.icao);
+    if (nm == null || nm < LAST_MILE_MIN_NM || nm > LAST_MILE_MAX_NM) continue;
+    dests.push({ destIcao: dest.icao, nm });
+  }
+  lookup.lastMileByOrigin.set(originCode, dests);
+  return dests;
 }
 
 function pile(stockKg: number, capacityKg: number): StockPile {
@@ -13634,6 +13663,7 @@ function formLotsFromImbalances(
       // Last-mile dest scan: skipAll is rng-safe (partition stream). Drop n².
       if (boardPressureOf(commodity.id, countryId).skipAll) continue;
       const ranked = rankAirports(countryAirports, commodity);
+      const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
       for (const origin of ranked) {
         if (!LAST_MILE_ORIGIN_TIERS.has(origin.tier)) continue;
         // Surplus majors already export in the bulk pass, but that pass prefers
@@ -13656,25 +13686,18 @@ function formLotsFromImbalances(
           nm: number;
           cw: number;
         }> = [];
-        for (const dest of ranked) {
-          if (dest.ap.icao === origin.ap.icao) continue;
+        for (const neighbor of lastMileDestsFrom(world, origin.ap.icao)) {
+          const dest = byIcao.get(neighbor.destIcao);
+          if (!dest) continue;
           // Majors break-bulk to spokes/regionals, not to other majors.
           // Spokes may still feed a nearby major (the home-hub short hop).
           if (origin.tier === 'major' && dest.tier === 'major') continue;
           if (dest.fill > LAST_MILE_MAX_DEST_FILL) continue;
           if (dest.roomKg < SMALL_LOT_MIN_KG) continue;
           if (!isBushFreightOdAllowed(origin.ap.icao, dest.ap.icao)) continue;
-          const nm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
-          if (
-            nm == null ||
-            nm < LAST_MILE_MIN_NM ||
-            nm > LAST_MILE_MAX_NM
-          ) {
-            continue;
-          }
           dests.push({
             row: dest,
-            nm,
+            nm: neighbor.nm,
             cw: corridorWeight(origin.ap.icao, dest.ap.icao),
           });
         }
@@ -13950,6 +13973,7 @@ export function tickEconomy(
 
   tickNpcFreighters(world, mulberry32(hashSeed(`${tickKey}:npc`)), {
     batchNowMs,
+    tickKey,
   });
   addTickPhaseMs(profile, 'npc', phaseAt);
   phaseAt = performance.now();

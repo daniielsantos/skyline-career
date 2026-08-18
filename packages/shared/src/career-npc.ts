@@ -432,6 +432,10 @@ function hashSeed(seed: string): number {
   return h >>> 0;
 }
 
+function hash01(seed: string): number {
+  return hashSeed(seed) / 4294967296;
+}
+
 function mulberry32(seed: number): () => number {
   let t = seed >>> 0;
   return () => {
@@ -440,6 +444,32 @@ function mulberry32(seed: number): () => number {
     r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function npcBidScore(args: {
+  fillRatio: number;
+  payScore: number;
+  urgencyHot: boolean;
+  expiryFrac: number;
+  regionMatch: boolean;
+  noise: number;
+  busyPenalty: number;
+  aggressiveness: number;
+}): number {
+  const urgencyScore = args.urgencyHot
+    ? 0.55 * args.aggressiveness
+    : 0.12 * args.aggressiveness;
+  const expiryScore = args.expiryFrac * (0.25 + 0.55 * args.aggressiveness);
+  const regionScore = args.regionMatch ? 0.4 : 0;
+  return (
+    args.fillRatio * 0.85 +
+    args.payScore * 0.55 +
+    urgencyScore +
+    expiryScore +
+    regionScore +
+    args.noise -
+    args.busyPenalty
+  );
 }
 
 function lotAvailableKg(lot: ShipmentLot): number {
@@ -2041,15 +2071,10 @@ export function scoreLotForNpc(
   const cargoKg = Math.min(avail, maxCargoKg, opsMax);
   const fillRatio = cargoKg / maxCargoKg;
   const payScore = Math.min(2.2, payPerKg / commodity.basePricePerKg);
-  const urgencyScore =
-    lot.urgency === 'urgent' ? 0.55 * npc.aggressiveness : 0.12 * npc.aggressiveness;
   const life = Math.max(1, lot.expiresAtTick - lot.createdAtTick);
   const ticksLeft = Math.max(0, lot.expiresAtTick - world.tick);
-  const expiryScore = (1 - ticksLeft / life) * (0.25 + 0.55 * npc.aggressiveness);
   const originRegion = airportRegion(world, lot.originIcao);
   const destRegion = airportRegion(world, lot.destIcao);
-  const regionScore =
-    originRegion === npc.homeRegion || destRegion === npc.homeRegion ? 0.4 : 0;
   const noise = (rng() - 0.5) * 0.22 * (1.05 - npc.reliability);
   const inboundKg = pre?.laneIndex
     ? laneInboundKgFromIndex(
@@ -2064,15 +2089,17 @@ export function scoreLotForNpc(
   const busyPenalty =
     laneSat >= LANE_BUSY_SATURATION ? laneSat * 0.65 : 0;
 
-  return (
-    fillRatio * 0.85 +
-    payScore * 0.55 +
-    urgencyScore +
-    expiryScore +
-    regionScore +
-    noise -
-    busyPenalty
-  );
+  return npcBidScore({
+    fillRatio,
+    payScore,
+    urgencyHot: lot.urgency === 'urgent',
+    expiryFrac: 1 - ticksLeft / life,
+    regionMatch:
+      originRegion === npc.homeRegion || destRegion === npc.homeRegion,
+    noise,
+    busyPenalty,
+    aggressiveness: npc.aggressiveness,
+  });
 }
 
 function claimLotForNpc(
@@ -2731,10 +2758,53 @@ export function contractPilotFeeRangeUsd(
   };
 }
 
+function pushRegionBucket(
+  buckets: Map<string, BidCandidate[]>,
+  region: string | undefined,
+  row: BidCandidate,
+): void {
+  const key = region ?? '';
+  const list = buckets.get(key);
+  if (list) list.push(row);
+  else buckets.set(key, [row]);
+}
+
+function compactLiveRows(rows: BidCandidate[]): void {
+  let write = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    if (row.dead) continue;
+    rows[write++] = row;
+  }
+  rows.length = write;
+}
+
+type BidCandidate = {
+  lot: ShipmentLot;
+  dist: number;
+  payPerKg: number;
+  basePricePerKg: number;
+  payScore: number;
+  originRegion: string | undefined;
+  destRegion: string | undefined;
+  expiryFrac: number;
+  odKey: string;
+  urgencyHot: boolean;
+  dead: boolean;
+  seenGen: number;
+};
+
+type ClassBidBoard = {
+  rows: BidCandidate[];
+  byOriginRegion: Map<string, BidCandidate[]>;
+  byDestRegion: Map<string, BidCandidate[]>;
+};
+
 function npcBidOnMarket(
   world: CareerEconomyWorld,
   rng: () => number,
   batchNowMs: number,
+  tickKey: string,
 ): void {
   const idle = world.npcs.filter((n) => {
     if (n.currentFlightId) return false;
@@ -2795,16 +2865,6 @@ function npcBidOnMarket(
 
   // One pass over the board, then per-class slices. Same gates as scoreLotForNpc
   // (range + GA LTL) — intl lots stay on every class that can fly the OD.
-  type BidCandidate = {
-    lot: ShipmentLot;
-    dist: number;
-    payPerKg: number;
-    basePricePerKg: number;
-    originRegion: string | undefined;
-    destRegion: string | undefined;
-    life: number;
-    odKey: string;
-  };
   const board: BidCandidate[] = [];
   for (const lot of world.lots) {
     if (lot.status !== 'available' && lot.status !== 'reserved') continue;
@@ -2816,21 +2876,34 @@ function npcBidOnMarket(
     const origin = lot.originIcao.trim().toUpperCase();
     const dest = lot.destIcao.trim().toUpperCase();
     const commodity = getCommodity(lot.commodityId);
+    const life = Math.max(1, lot.expiresAtTick - lot.createdAtTick);
+    const ticksLeft = Math.max(0, lot.expiresAtTick - world.tick);
     board.push({
       lot,
       dist,
       payPerKg: lot.payUsd / Math.max(1, lot.quantityKg),
       basePricePerKg: commodity.basePricePerKg,
+      payScore: Math.min(
+        2.2,
+        lot.payUsd / Math.max(1, lot.quantityKg) / commodity.basePricePerKg,
+      ),
       originRegion: airportRegion(world, lot.originIcao),
       destRegion: airportRegion(world, lot.destIcao),
-      life: Math.max(1, lot.expiresAtTick - lot.createdAtTick),
+      expiryFrac: 1 - ticksLeft / life,
       odKey: `${origin}|${dest}|${lot.commodityId}`,
+      urgencyHot: lot.urgency === 'urgent',
+      dead: false,
+      seenGen: 0,
     });
   }
-  const candidatesByClass = new Map<FreighterClassId, BidCandidate[]>();
+  const candidatesByClass = new Map<FreighterClassId, ClassBidBoard>();
   for (const slot of NPC_FLEET_CLASS_SHARES) {
     const maxRangeNm = getAircraftClass(slot.aircraftClassId).maxRangeNm;
-    const rows: BidCandidate[] = [];
+    const classBoard: ClassBidBoard = {
+      rows: [],
+      byOriginRegion: new Map(),
+      byDestRegion: new Map(),
+    };
     for (const row of board) {
       if (row.dist > maxRangeNm) continue;
       if (
@@ -2839,10 +2912,17 @@ function npcBidOnMarket(
       ) {
         continue;
       }
-      rows.push(row);
+      classBoard.rows.push(row);
+      pushRegionBucket(classBoard.byOriginRegion, row.originRegion, row);
+      pushRegionBucket(classBoard.byDestRegion, row.destRegion, row);
     }
-    candidatesByClass.set(slot.aircraftClassId, rows);
+    candidatesByClass.set(slot.aircraftClassId, classBoard);
   }
+  const fallbackBoard: ClassBidBoard = {
+    rows: board,
+    byOriginRegion: new Map(),
+    byDestRegion: new Map(),
+  };
   const opsMaxCache = new Map<string, number>();
   const operationalMaxFor = (
     npc: NpcFreighter,
@@ -2858,6 +2938,7 @@ function npcBidOnMarket(
     return cached;
   };
 
+  let visitGen = 1;
   for (const npc of idle) {
     const regionCap = regionCapacity(npc.homeRegion);
     const wx = regionalWeatherIndex(world, npc.homeRegion);
@@ -2875,56 +2956,88 @@ function npcBidOnMarket(
 
     const maxCargoKg = npcMaxCargoKg(npc);
     const threshold = 0.48 + npc.reliability * 0.28 - npc.aggressiveness * 0.22;
-    const candidates = candidatesByClass.get(npc.aircraftClassId) ?? board;
+    const classBoard =
+      candidatesByClass.get(npc.aircraftClassId) ?? fallbackBoard;
     const minPayMult = 0.35 * npc.feeBias;
-    const urgencyIdle = 0.12 * npc.aggressiveness;
-    const urgencyHot = 0.55 * npc.aggressiveness;
-    const expiryBase = 0.25 + 0.55 * npc.aggressiveness;
     const noiseScale = 0.22 * (1.05 - npc.reliability);
+    const maxNoise = 0.5 * noiseScale;
     const home = npc.homeRegion;
-
-    let best: { lot: ShipmentLot; score: number } | undefined;
-    for (const row of candidates) {
-      const lot = row.lot;
-      if (claimedLotIds.has(lot.id)) continue;
-      const opsMax = operationalMaxFor(npc, row.dist, maxCargoKg);
-      if (opsMax < NPC_MIN_BID_KG) continue;
-      if (row.payPerKg < row.basePricePerKg * minPayMult) continue;
-
-      // Same formula as scoreLotForNpc (bidReady) — rng is the next call.
-      const avail = lot.quantityKg - lot.reservedKg;
-      const cargoKg = Math.min(avail, maxCargoKg, opsMax);
-      const fillRatio = cargoKg / maxCargoKg;
-      const payScore = Math.min(2.2, row.payPerKg / row.basePricePerKg);
-      const urgencyScore =
-        lot.urgency === 'urgent' ? urgencyHot : urgencyIdle;
-      const ticksLeft = Math.max(0, lot.expiresAtTick - world.tick);
-      const expiryScore = (1 - ticksLeft / row.life) * expiryBase;
-      const regionScore =
-        row.originRegion === home || row.destRegion === home ? 0.4 : 0;
-      const noise = (rng() - 0.5) * noiseScale;
+    const scoreArgs = {
+      payScore: 0,
+      urgencyHot: false,
+      expiryFrac: 0,
+      regionMatch: false,
+      noise: 0,
+      busyPenalty: 0,
+      aggressiveness: npc.aggressiveness,
+      fillRatio: 1,
+    };
+    const busyPenaltyOf = (row: BidCandidate): number => {
       const inboundKg = laneIndex.byOd.get(row.odKey) ?? 0;
       const laneSat = Math.min(1, inboundKg / LANE_SATURATION_KG);
-      const busyPenalty =
-        laneSat >= LANE_BUSY_SATURATION ? laneSat * 0.65 : 0;
-      const score =
-        fillRatio * 0.85 +
-        payScore * 0.55 +
-        urgencyScore +
-        expiryScore +
-        regionScore +
-        noise -
-        busyPenalty;
-      if (score < threshold) continue;
+      return laneSat >= LANE_BUSY_SATURATION ? laneSat * 0.65 : 0;
+    };
+    const ceilingOf = (row: BidCandidate, regionMatch: boolean): number => {
+      scoreArgs.payScore = row.payScore;
+      scoreArgs.urgencyHot = row.urgencyHot;
+      scoreArgs.expiryFrac = row.expiryFrac;
+      scoreArgs.regionMatch = regionMatch;
+      scoreArgs.noise = maxNoise;
+      scoreArgs.busyPenalty = busyPenaltyOf(row);
+      scoreArgs.fillRatio = 1;
+      return npcBidScore(scoreArgs);
+    };
+
+    visitGen += 1;
+    const gen = visitGen;
+    let best: { lot: ShipmentLot; score: number; row: BidCandidate } | undefined;
+
+    const consider = (row: BidCandidate, regionMatch: boolean): void => {
+      if (row.dead || row.seenGen === gen) return;
+      row.seenGen = gen;
+      const lot = row.lot;
+      if (row.payPerKg < row.basePricePerKg * minPayMult) return;
+      const optimistic = ceilingOf(row, regionMatch);
+      if (optimistic < threshold) return;
+      if (best && optimistic < best.score) return;
+      const opsMax = operationalMaxFor(npc, row.dist, maxCargoKg);
+      if (opsMax < NPC_MIN_BID_KG) return;
+      const avail = lot.quantityKg - lot.reservedKg;
+      const cargoKg = Math.min(avail, maxCargoKg, opsMax);
+      const noise =
+        (hash01(`${tickKey}:npc:noise:${npc.id}:${lot.id}`) - 0.5) * noiseScale;
+      scoreArgs.payScore = row.payScore;
+      scoreArgs.urgencyHot = row.urgencyHot;
+      scoreArgs.expiryFrac = row.expiryFrac;
+      scoreArgs.regionMatch = regionMatch;
+      scoreArgs.noise = noise;
+      scoreArgs.busyPenalty = busyPenaltyOf(row);
+      scoreArgs.fillRatio = cargoKg / maxCargoKg;
+      const score = npcBidScore(scoreArgs);
+      if (score < threshold) return;
       if (!best || score > best.score) {
-        best = { lot, score };
+        best = { lot, score, row };
       }
+    };
+
+    const homeOrigin = classBoard.byOriginRegion.get(home) ?? [];
+    const homeDest = classBoard.byDestRegion.get(home) ?? [];
+    for (const row of homeOrigin) consider(row, true);
+    for (const row of homeDest) {
+      consider(row, row.originRegion === home || row.destRegion === home);
+    }
+    for (const row of classBoard.rows) {
+      if (row.originRegion === home || row.destRegion === home) continue;
+      consider(row, false);
     }
 
     if (!best) continue;
-    const flight = claimLotForNpc(world, npc, best.lot, batchNowMs, rng);
+    const claimRng = mulberry32(hashSeed(`${tickKey}:npc:claim:${npc.id}`));
+    const flight = claimLotForNpc(world, npc, best.lot, batchNowMs, claimRng);
     if (flight) {
       claimedLotIds.add(best.lot.id);
+      best.row.dead = true;
+      compactLiveRows(classBoard.rows);
     }
   }
 }
@@ -2935,11 +3048,13 @@ function npcBidOnMarket(
 export function tickNpcFreighters(
   world: CareerEconomyWorld,
   rng: () => number,
-  opts: { batchNowMs?: number } = {},
+  opts: { batchNowMs?: number; tickKey?: string } = {},
 ): void {
   // Fleet ensure + settle run at the start of tickEconomy (before lot formation).
   const batchNowMs = opts.batchNowMs ?? world.lastBatchAtMs ?? Date.now();
-  npcBidOnMarket(world, rng, batchNowMs);
+  const tickKey =
+    opts.tickKey ?? `${world.seed}:t${world.tick}`;
+  npcBidOnMarket(world, rng, batchNowMs, tickKey);
 }
 
 export function listNpcActivity(

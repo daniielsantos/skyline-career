@@ -42,7 +42,7 @@ Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A live
 7. ~~**América Central completa (seed)**~~ — PA/CR/NI/HN/GT/SV/BZ; ports costeiros; lanes MX/US/CO.
 8. ~~**Caribe (seed, intl-first)**~~ — CU/DO/HT/JM/BS/TT/BB/LC/GD/AG; ring + KMIA/MMUN/CO/VE.
 9. ~~**Dependências caribenhas**~~ — GP/MQ/CW + US-PR (região US); ports + lanes.
-10. **Tick perf (Fase 2b)** — rng por partição×commodity no `formLots` + fita NPC `seed:tN:npc`. `skipAll` corta spoke filler (não só corredor). Produção/fuel/eventos na fita `seed:tN` (iguais ao build anterior). Lots/NPC **não** replay bit-a-bit vs Fase 2. Bench: tick 1 ~**10s**; regime ~**2s**/tick (`formLots` ~0.8–1.3s, npc ~0.8–1.1s). Board no cap ainda gasta ~1s em países *abaixo* da quota (skipAll falso). UI `+1 day` já em chunks de 8. Restante: NPC scan in-range.
+10. **Tick perf (Fase 2c)** — NPC bid: region index + hash noise + prune lots that cannot beat the current best. Claim rng is a per-NPC stream (board size no longer shifts who bids). Last-mile dests cached on airport lookup. Bench (seed `board-cap`, regime): **~2.1s**/tick (was ~2.9s); **npc ~110ms** (was ~870ms); formLots still ~2.0s when countries are below quota. Same seed still replays lots/NPC. No Dry retune.
 11. ~~**Leftovers SX/AW/VI**~~ — SX/AW light countries + US-VI region; ports Philipsburg / Oranjestad / Charlotte Amalie; seed **551**.
 12. ~~**EU-1 Western core**~~ — PT/ES/FR/GB/DE/NL/BE/IT; seed **629**; ports EU; fuel trucks 85; Americas bridge lanes.
 13. ~~**EU-2 Nordics + Alps + IE**~~ — IE/DK/NO/SE/FI/CH/AT; seed **672**; ports **66**; fuel trucks **100**.

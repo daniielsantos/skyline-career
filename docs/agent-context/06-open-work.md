@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). Dual-client IPC de fora.
+Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). Dual-client IPC de fora.
 
 ## Validar (manual)
 
@@ -162,6 +162,10 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 - **Dispatch EN ROUTE cockpit:** grid mapa (~60%) + status/live-load (~40%); OFP em `<details>`; mobile stack ~40vh.
 
 ## Feito (local, sem release)
+
+- **Airport tab:** field plate + MapLibre Hybrid satellite + runways beside the map. `MAPTILER_KEY` via `GET /api/map/satellite-style` (do not commit the key; SDK unused — MapLibre 5 vs UI 6 whitescreen).
+- **Contracts map:** taller canvas (`min(50vh, 34rem)`).
+- **Market board:** debounce ICAO typing; skip unfiltered bootstrap `/api/market` when the board owns the fetch.
 
 - **Bush trips board off:** `BUSH_TRIPS_BOARD_ENABLED=false` (shared + UI flag) — aba Freights→Bush trips escondida; Accept API 503; abandon/active ainda ok.
 - **Demand Edit cargo:** reduzir devolve kg à WH + restaura `remainingKg` do pedido; aumentar retira da WH (UI `demandEditMaxKg`).

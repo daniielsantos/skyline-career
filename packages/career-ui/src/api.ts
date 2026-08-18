@@ -1306,6 +1306,15 @@ export function fetchNpcFleet() {
   >('/api/npc');
 }
 
+export async function fetchSatelliteMapStyle() {
+  return api<{ apiKey: string | null; styleUrl: string | null }>(
+    '/api/map/satellite-style',
+    {
+      cache: 'no-store',
+    },
+  );
+}
+
 export function fetchAirport(
   icao: string,
   opts: {

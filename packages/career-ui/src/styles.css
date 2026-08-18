@@ -5290,6 +5290,10 @@ tr.lot-locked {
   min-width: 0;
 }
 
+.contracts-board .fbo-route-map .dispatch-route-map-canvas {
+  height: min(50vh, 34rem);
+}
+
 .contracts-board .fbo-route-map-card .dispatch-route-map-head {
   min-height: 2.35rem;
   align-content: end;
@@ -5390,6 +5394,163 @@ table.contracts-table tbody tr.is-selected:hover td {
 .terminal-section:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.airport-plate {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1.5rem;
+  margin: 0 0 1.35rem;
+}
+
+.airport-plate dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.airport-plate dd {
+  margin: 0.2rem 0 0;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.airport-plate .tag {
+  margin-left: 0.45rem;
+  vertical-align: middle;
+}
+
+.panel-head h2 .tag {
+  margin-left: 0.45rem;
+  vertical-align: middle;
+}
+
+.airport-sat-map-card {
+  margin: 0 0 1.35rem;
+}
+
+.airport-field-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(17rem, 0.9fr);
+  gap: 1rem 1.15rem;
+  align-items: stretch;
+  margin: 0 0 1.35rem;
+}
+
+.airport-field-split .airport-sat-map-card {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.airport-field-split .airport-sat-map {
+  flex: 1;
+  min-height: min(58vh, 44rem);
+}
+
+.airport-field-split .airport-sat-map-canvas {
+  height: 100%;
+  min-height: min(58vh, 44rem);
+}
+
+.airport-field-split .airport-runways {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.airport-field-split .airport-runways .table-wrap {
+  flex: 1;
+  max-height: min(58vh, 44rem);
+  overflow: auto;
+}
+
+@media (max-width: 72rem) {
+  .airport-field-split {
+    grid-template-columns: 1fr;
+  }
+
+  .airport-field-split .airport-runways .table-wrap {
+    max-height: 18rem;
+  }
+}
+
+.airport-sat-map-card > .muted {
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--surface);
+}
+
+.airport-sat-map {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b0b0c;
+}
+
+.airport-sat-map-canvas {
+  width: 100%;
+  height: min(58vh, 44rem);
+  background: #0b0b0c;
+}
+
+.airport-sat-map .maplibregl-map {
+  font: inherit;
+}
+
+.airport-sat-map .maplibregl-ctrl-attrib {
+  background: rgba(12, 12, 14, 0.75) !important;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.65rem;
+}
+
+.airport-sat-map .maplibregl-ctrl-attrib a {
+  color: rgba(110, 168, 254, 0.8);
+}
+
+.airport-sat-map .maplibregl-ctrl-group {
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+.airport-sat-map .maplibregl-ctrl-group button {
+  background-color: #16161a;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.airport-sat-map-pin {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f0c14b;
+  box-shadow: 0 0 0 2px #111114, 0 0 10px rgba(240, 193, 75, 0.55);
+  cursor: pointer;
+  appearance: none;
+}
+
+.airport-runways h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.airport-runways .table-wrap {
+  overflow-x: auto;
+}
+
+.airport-runways table {
+  width: 100%;
 }
 
 .terminal-tab {

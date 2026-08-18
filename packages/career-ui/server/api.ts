@@ -248,6 +248,11 @@ import {
 } from './career-profiles.ts';
 import { createPromiseLock } from './career-write-lock.ts';
 import {
+  loadMaptilerEnvFiles,
+  maptilerKeyFromEnv,
+  maptilerSatelliteStyleUrl,
+} from './maptiler-style.ts';
+import {
   getRepoRoot,
   getUiDist,
   resolveCareerRoot,
@@ -256,6 +261,19 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = getRepoRoot();
 const uiDist = getUiDist();
+loadMaptilerEnvFiles([
+  repoRoot,
+  process.cwd(),
+  process.env.SKYLINE_CAREER_DATA?.trim(),
+  join(repoRoot, 'profiles', 'career'),
+]);
+if (maptilerSatelliteStyleUrl()) {
+  console.log('MapTiler satellite: enabled');
+} else {
+  console.log(
+    'MapTiler satellite: MAPTILER_KEY missing — uncomment it in .env and restart Career API',
+  );
+}
 
 /**
  * Newest mtime across server sources, captured at boot. `dev.mjs` compares it
@@ -822,19 +840,26 @@ function mapAirportCommodities(
 function mapAirportTerminalChrome(
   airport: CareerEconomyWorld['airports'][number],
 ) {
+  const stamped = {
+    icao: airport.icao,
+    name: airport.name,
+    lat: airport.lat,
+    lon: airport.lon,
+  };
+  applyMsfsBushHubOverrideToTerminal(stamped);
   const levelInfo = hubLevelXpProgress(airport);
   const levelProfile = hubLevelProfile(levelInfo.level);
   return {
     airport: {
       icao: airport.icao,
-      name: airport.name,
+      name: stamped.name,
       region: airport.region,
       level: levelInfo.level,
       hubTier: hubTierOf(airport),
       bush: Boolean(airport.bush) || isBushHub(airport.icao),
       bushTripOnly: Boolean(airport.bushTripOnly) || isBushTripOnlyHub(airport.icao),
-      lat: airport.lat,
-      lon: airport.lon,
+      lat: stamped.lat,
+      lon: stamped.lon,
     },
     hubLevel: {
       level: levelInfo.level,
@@ -873,7 +898,7 @@ function mapAirportStockPayload(
     fuelRecent: [],
     playerFbos: null,
     homeHubIcao: null,
-    runways: [],
+    runways: getAirportRunways(snap.airport.icao),
   };
 }
 
@@ -1241,6 +1266,15 @@ export function createCareerApiServer(port = 8787) {
     }
 
     try {
+      if (req.method === 'GET' && path === '/api/map/satellite-style') {
+        const apiKey = maptilerKeyFromEnv();
+        send(res, 200, {
+          apiKey,
+          styleUrl: maptilerSatelliteStyleUrl(),
+        });
+        return;
+      }
+
       if (req.method === 'GET' && path === '/api/health') {
         if (!store) {
           send(res, 200, {

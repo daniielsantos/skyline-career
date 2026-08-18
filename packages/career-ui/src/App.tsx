@@ -260,11 +260,12 @@ import {
 } from './dispatch-flow';
 import { RunwayTouchdownDiagram } from './RunwayTouchdownDiagram';
 import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
+import { TerminalAirportPanel } from './TerminalAirportPanel';
 import { WatchStatusFooter } from './WatchStatusFooter';
 import { mxFuelBurnFromAircraft } from './mx-fuel-burn';
 
 type Tab = CareerTab;
-type TerminalSection = 'inventory' | 'contracts' | 'movements' | 'fbo';
+type TerminalSection = 'airport' | 'inventory' | 'contracts' | 'movements' | 'fbo';
 type ContractsLane = 'outbound' | 'inbound';
 type MarketSortKey =
   | 'distance'
@@ -368,6 +369,9 @@ function sortAirportLots(
 }
 
 const MARKET_PAGE_SIZE = 10;
+/** Wait out ICAO/city typing before hitting the board API. */
+const MARKET_TEXT_DEBOUNCE_MS = 500;
+const MARKET_FILTER_DEBOUNCE_MS = 180;
 const CONTRACTS_PAGE_SIZE = 10;
 
 function formatMarketSortParam(sorts: MarketSortLevel[]): string {
@@ -2114,6 +2118,14 @@ function mergeAirportStock(
   if (!prev || prev.airport.icao !== stock.airport.icao) return stock;
   return {
     ...stock,
+    airport: {
+      ...stock.airport,
+      name: prev.airport.name || stock.airport.name,
+      region: prev.airport.region || stock.airport.region,
+      lat: prev.airport.lat ?? stock.airport.lat,
+      lon: prev.airport.lon ?? stock.airport.lon,
+      hubTier: prev.airport.hubTier ?? stock.airport.hubTier,
+    },
     outboundLots: stock.outboundLots.length
       ? stock.outboundLots
       : prev.outboundLots,
@@ -2948,6 +2960,12 @@ export function App() {
     nearMaxNm: '' as number | string,
     aircraft: undefined as AircraftClass | undefined,
   });
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  /** First `/api/state` for this profile has landed (fleet known). */
+  const careerReadyRef = useRef(false);
+  /** Avoid double bootstrap refresh (profile select + Strict Mode). */
+  const bootProfileKeyRef = useRef<string | null>(null);
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
   const [npcActivity, setNpcActivity] = useState<NpcActivity[]>([]);
@@ -3303,7 +3321,14 @@ export function App() {
       return;
     }
     const full = scope == null;
-    const wantMarket = full || scope.market === true;
+    const bootstrapping = !careerReadyRef.current;
+    const boardOwnsMarket =
+      tabRef.current === 'market' || Boolean(airportIcao);
+    // Board effect issues /api/market with the live filters. Skip the unfiltered
+    // bootstrap copy so we don't fetch twice (and flip viableOnly when fleet hydrates).
+    const wantMarket =
+      (full || scope.market === true) &&
+      !(bootstrapping && boardOwnsMarket);
     const wantMissions = full || scope.missions === true;
     const wantNpc = full || scope.npc === true;
     const wantAircraft = full || scope.aircraftMarket === true;
@@ -3407,6 +3432,7 @@ export function App() {
       const view = await fetchAirportView(airportIcao);
       setAirportView(view);
     }
+    careerReadyRef.current = true;
   }, [airportIcao, refreshBushTrips]);
 
   const refreshRef = useRef(refresh);
@@ -3498,7 +3524,14 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (showProfileGate || !activeCareerProfile) return;
+    if (showProfileGate) {
+      bootProfileKeyRef.current = null;
+      careerReadyRef.current = false;
+      return;
+    }
+    if (!activeCareerProfile) return;
+    if (bootProfileKeyRef.current === activeCareerProfile.id) return;
+    bootProfileKeyRef.current = activeCareerProfile.id;
     void refreshRef.current().catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       if (!isNeedsProfileMessage(message)) setError(message);
@@ -3509,6 +3542,10 @@ export function App() {
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
     if (tab !== 'market' && !airportIcao) return;
+    if (!careerReadyRef.current) {
+      setMarketBoardLoading(true);
+      return;
+    }
     const boardAcf = fleet.find((a) => a.id === boardAircraftId);
     const originQuery = originFilter.trim();
     const focusIcao = (
@@ -3567,8 +3604,15 @@ export function App() {
     }
 
     let cancelled = false;
-    setMarketBoardLoading(true);
+    const typingIcao =
+      prev.originQuery !== nextOpts.originQuery ||
+      prev.destQuery !== nextOpts.destQuery;
+    const debounceMs = typingIcao
+      ? MARKET_TEXT_DEBOUNCE_MS
+      : MARKET_FILTER_DEBOUNCE_MS;
     const timer = setTimeout(() => {
+      if (cancelled) return;
+      setMarketBoardLoading(true);
       void fetchMarket(nextOpts.aircraft, nextOpts)
         .then((market) => {
           if (cancelled) return;
@@ -5250,7 +5294,6 @@ export function App() {
         setActiveBushTrip(null);
         setBushWatch(null);
         setFlightDebrief(null);
-        await refresh();
         setShowProfileGate(false);
         setToastKind('ok');
         setToast(
@@ -5276,7 +5319,6 @@ export function App() {
         setActiveBushTrip(null);
         setBushWatch(null);
         setFlightDebrief(null);
-        await refresh();
         setShowProfileGate(false);
         setToastKind('ok');
         setToast(`Playing as ${created.profile.name}`);
@@ -8557,6 +8599,18 @@ export function App() {
             <button
               type="button"
               className={
+                terminalSection === 'airport'
+                  ? 'terminal-section active'
+                  : 'terminal-section'
+              }
+              onClick={() => setTerminalSection('airport')}
+              disabled={busy}
+            >
+              Airport
+            </button>
+            <button
+              type="button"
+              className={
                 terminalSection === 'inventory'
                   ? 'terminal-section active'
                   : 'terminal-section'
@@ -8616,6 +8670,17 @@ export function App() {
               </button>
             ) : null}
           </nav>
+
+                {terminalSection === 'airport' ? (
+                  <TerminalAirportPanel
+                    airport={airportView.airport}
+                    hubLevel={airportView.hubLevel}
+                    runways={airportView.runways ?? []}
+                    homeHubIcao={airportView.homeHubIcao}
+                    hydrating={airportHydrating}
+                    regionDisplay={regionLabel(airportView.airport.region)}
+                  />
+                ) : null}
 
                 {terminalSection === 'fbo' ? (
                   <>

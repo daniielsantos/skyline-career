@@ -8,7 +8,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type PtCareerRegion = 'PT-N' | 'PT-C' | 'PT-S';
+export type PtCareerRegion = 'PT-N' | 'PT-C' | 'PT-S' | 'PT-M' | 'PT-A';
 
 export type PtCareerHubDef = {
   icao: string;
@@ -40,7 +40,7 @@ const agro = {
   >,
 };
 
-/** 7 curated Portugal hubs. */
+/** 9 curated Portugal hubs (mainland + Madeira + Azores). */
 export const PT_CAREER_HUBS: readonly PtCareerHubDef[] = [
   {
     icao: 'LPPR',
@@ -108,9 +108,29 @@ export const PT_CAREER_HUBS: readonly PtCareerHubDef[] = [
     lon: -8.58396,
     ...agro,
   },
+  {
+    icao: 'LPMA',
+    name: 'Funchal Cristiano Ronaldo',
+    region: 'PT-M',
+    hubTier: 'major',
+    lat: 32.6978,
+    lon: -16.7746,
+    produce: { perishables: 1.3, general: 1.25, electronics: 1.1 },
+    consume: { machinery: 0.95, supplies: 1.15, fuel: 1.2 },
+  },
+  {
+    icao: 'LPPD',
+    name: 'Ponta Delgada João Paulo II',
+    region: 'PT-A',
+    hubTier: 'major',
+    lat: 37.7412,
+    lon: -25.6979,
+    produce: { perishables: 1.25, general: 1.2, supplies: 1.1 },
+    consume: { electronics: 0.95, machinery: 0.9, fuel: 1.2 },
+  },
 ];
 
-export const PT_CAREER_HUB_COUNT = 7;
+export const PT_CAREER_HUB_COUNT = 9;
 
 export function buildPtFeederCorridors(
   hubs: readonly PtCareerHubDef[] = PT_CAREER_HUBS,
@@ -130,5 +150,17 @@ export function assertPtCareerHubCatalog(): void {
   }
   if (!PT_CAREER_HUBS.some((h) => h.icao === 'LPPT' && h.hubTier === 'major')) {
     throw new Error('PT catalog must include major LPPT');
+  }
+  if (!PT_CAREER_HUBS.some((h) => h.icao === 'LPMA' && h.hubTier === 'major')) {
+    throw new Error('PT catalog must include major LPMA (Madeira)');
+  }
+  if (!PT_CAREER_HUBS.some((h) => h.icao === 'LPPD' && h.hubTier === 'major')) {
+    throw new Error('PT catalog must include major LPPD (Azores)');
+  }
+  if (PT_CAREER_HUBS.some((h) => h.icao === 'LPPS')) {
+    throw new Error('PT catalog must use LPMA for Madeira, not LPPS Porto Santo');
+  }
+  if (PT_CAREER_HUBS.some((h) => h.icao === 'LPLA')) {
+    throw new Error('PT catalog must use LPPD for Azores cargo, not LPLA Lajes');
   }
 }

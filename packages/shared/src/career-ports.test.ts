@@ -133,7 +133,7 @@ describe('career ports', () => {
 
   it('catalogs Americas ocean-access ports with pickup hubs', () => {
     const ports = listCareerPorts();
-    assert.equal(ports.length, 180);
+    assert.equal(ports.length, 219);
     const expect: Array<{
       id: string;
       hub: string;
@@ -300,6 +300,45 @@ describe('career ports', () => {
       { id: 'KITRW', hub: 'NGTA' },
       { id: 'USMPS', hub: 'PGSN' },
       { id: 'KICXI', hub: 'PLCH' },
+      { id: 'NGLOS', hub: 'DNMM' },
+      { id: 'NGPHC', hub: 'DNPO' },
+      { id: 'GHTEM', hub: 'DGAA' },
+      { id: 'SNDKR', hub: 'GOOY' },
+      { id: 'CIABJ', hub: 'DIAP' },
+      { id: 'KEMBA', hub: 'HKMO' },
+      { id: 'ZACT', hub: 'FACT' },
+      { id: 'ZADUR', hub: 'FALE' },
+      { id: 'TZDAR', hub: 'HTDA' },
+      { id: 'AOLAD', hub: 'FNLU' },
+      { id: 'CMDLA', hub: 'FKKD' },
+      { id: 'MZMPM', hub: 'FQMA' },
+      { id: 'MZBEW', hub: 'FQBR' },
+      { id: 'NAWVB', hub: 'FYWB' },
+      { id: 'CDMAT', hub: 'FZAA' },
+      { id: 'CGPNR', hub: 'FCPP' },
+      { id: 'GALBV', hub: 'FOOL' },
+      { id: 'GAPOG', hub: 'FOOG' },
+      { id: 'GQSSG', hub: 'FGSL' },
+      { id: 'BJCOO', hub: 'DBBB' },
+      { id: 'TGLFW', hub: 'DXXX' },
+      { id: 'GNCKY', hub: 'GUCY' },
+      { id: 'SLFNA', hub: 'GFLL' },
+      { id: 'LRROB', hub: 'GLRB' },
+      { id: 'GMBJL', hub: 'GBYD' },
+      { id: 'GWOXB', hub: 'GGOV' },
+      { id: 'CVSID', hub: 'GVAC' },
+      { id: 'STTMS', hub: 'FPST' },
+      { id: 'MRNKC', hub: 'GQNO' },
+      { id: 'MGTMM', hub: 'FMMT' },
+      { id: 'MUMRU', hub: 'FIMP' },
+      { id: 'SCSEZ', hub: 'FSIA' },
+      { id: 'KMHAH', hub: 'FMCH' },
+      { id: 'SOMGQ', hub: 'HCMM' },
+      { id: 'DJJIB', hub: 'HDAM' },
+      { id: 'ERMSW', hub: 'HHAS' },
+      { id: 'PTFNC', hub: 'LPMA' },
+      { id: 'PTPDL', hub: 'LPPD' },
+      { id: 'ESLPA', hub: 'GCLP' },
     ];
     for (const row of expect) {
       const port = getCareerPort(row.id);

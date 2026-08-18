@@ -7,7 +7,7 @@ import {
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
 
-/** FBO terminal map — base pin, OD route, optional en-route aircraft. */
+/** FBO / Contracts terminal map — base pin, OD route, optional en-route aircraft. */
 export function FboRouteMapCard(props: {
   baseIcao: string;
   /** Selected hold/leg origin (usually the FBO hub). */
@@ -20,6 +20,14 @@ export function FboRouteMapCard(props: {
   routeProgress?: number | null;
   /** Popup label for the moving aircraft marker. */
   aircraftLabel?: string | null;
+  /** Origin marker role. Defaults to FBO when origin is the base. */
+  originRole?: 'dep' | 'fbo';
+  /** Idle headline when no destination is selected. */
+  idleHeadline?: string;
+  /** Idle hint under the map when no destination is selected. */
+  idleHint?: string;
+  /** When false, hide the "Map" heading (route line still shows). */
+  showTitle?: boolean;
   onOpenAirport: (icao: string) => void;
 }) {
   const baseCode = props.baseIcao.trim().toUpperCase();
@@ -107,12 +115,12 @@ export function FboRouteMapCard(props: {
       : '';
   const headline = showRoute
     ? `${originCode} → ${destCode}${distLabel}${progressLabel}`
-    : `${baseCode} · FBO base`;
+    : (props.idleHeadline ?? `${baseCode} · FBO base`);
 
   return (
     <section className="fbo-route-map-card" aria-label="FBO route map">
       <div className="dispatch-route-map-head">
-        <strong>Map</strong>
+        {props.showTitle === false ? null : <strong>Map</strong>}
         <small>{headline}</small>
       </div>
       {loading ? (
@@ -125,7 +133,8 @@ export function FboRouteMapCard(props: {
           aircraft={aircraft}
           aircraftLabel={showRoute ? props.aircraftLabel : null}
           originRole={
-            mapOrigin.icao.toUpperCase() === baseCode ? 'fbo' : 'dep'
+            props.originRole ??
+            (mapOrigin.icao.toUpperCase() === baseCode ? 'fbo' : 'dep')
           }
           onSelectAirport={props.onOpenAirport}
         />
@@ -137,7 +146,8 @@ export function FboRouteMapCard(props: {
       )}
       {!loading && mapOrigin && !showRoute ? (
         <p className="fbo-route-map-hint">
-          Select a bonded hold or crew leg below to draw the route.
+          {props.idleHint ??
+            'Select a bonded hold or crew leg below to draw the route.'}
         </p>
       ) : null}
       {showRoute && aircraft && props.aircraftLabel ? (

@@ -34,6 +34,8 @@ Partition invariants (do not break):
 - Domestic lot formation loops **per country** (`listWorldCountryIds`).
 - Cross-country freight **only** when an `internationalLanes` entry matches the OD.
 - Fuel trucks prefer same-country neighbors via `REGION_NEIGHBORS`.
+- Ocean islands in the same country get **isolated** `REGION_NEIGHBORS` (`[]`) plus **domestic air corridors** to the mainland (no fake road tanker hops over water).
+- Nearby-island international commerce is **sparse `CAREER_INTERNATIONAL_LANES` + matching `career-demand.ts` pairs** — never a new regional-bloc mechanic and never `REGION_NEIGHBORS` across countries.
 
 Then run the airport checklist below for every hub in the new territory.
 

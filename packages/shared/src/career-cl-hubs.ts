@@ -315,6 +315,19 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   RPML: 'RPMY',
   // Asia-15: closed Xi'an Xiguan → Xianyang
   ZLSN: 'ZLXY',
+  // AF-1: Dakar stock ident is GOOY; Durban is FALE; Luanda is FNLU; Yaoundé is FKYS
+  GOBD: 'GOOY',
+  FADN: 'FALE',
+  FNUB: 'FNLU',
+  FKKY: 'FKYS',
+  // AF-2: Beira is FQBR (not FQBE)
+  FQBE: 'FQBR',
+  // AF-3: Lusaka is FLKK (not FLLS); Harare is FVHA (not FVRG); Bulawayo is FVBU (not FVJN)
+  FLLS: 'FLKK',
+  FVRG: 'FVHA',
+  FVJN: 'FVBU',
+  // AF-7: Juba stock ident is HJJJ (not legacy HSSJ)
+  HSSJ: 'HJJJ',
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

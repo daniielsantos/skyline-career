@@ -144,6 +144,54 @@ import { VU_CAREER_HUBS } from './career-vu-hubs.js';
 import { SB_CAREER_HUBS } from './career-sb-hubs.js';
 import { CK_CAREER_HUBS } from './career-ck-hubs.js';
 import { KI_CAREER_HUBS } from './career-ki-hubs.js';
+import { NG_CAREER_HUBS } from './career-ng-hubs.js';
+import { GH_CAREER_HUBS } from './career-gh-hubs.js';
+import { SN_CAREER_HUBS } from './career-sn-hubs.js';
+import { CI_CAREER_HUBS } from './career-ci-hubs.js';
+import { KE_CAREER_HUBS } from './career-ke-hubs.js';
+import { ET_CAREER_HUBS } from './career-et-hubs.js';
+import { ZA_CAREER_HUBS } from './career-za-hubs.js';
+import { TZ_CAREER_HUBS } from './career-tz-hubs.js';
+import { AO_CAREER_HUBS } from './career-ao-hubs.js';
+import { CM_CAREER_HUBS } from './career-cm-hubs.js';
+import { UG_CAREER_HUBS } from './career-ug-hubs.js';
+import { RW_CAREER_HUBS } from './career-rw-hubs.js';
+import { MZ_CAREER_HUBS } from './career-mz-hubs.js';
+import { NA_CAREER_HUBS } from './career-na-hubs.js';
+import { BW_CAREER_HUBS } from './career-bw-hubs.js';
+import { ZM_CAREER_HUBS } from './career-zm-hubs.js';
+import { ZW_CAREER_HUBS } from './career-zw-hubs.js';
+import { MW_CAREER_HUBS } from './career-mw-hubs.js';
+import { CD_CAREER_HUBS } from './career-cd-hubs.js';
+import { CG_CAREER_HUBS } from './career-cg-hubs.js';
+import { GA_CAREER_HUBS } from './career-ga-hubs.js';
+import { GQ_CAREER_HUBS } from './career-gq-hubs.js';
+import { CF_CAREER_HUBS } from './career-cf-hubs.js';
+import { TD_CAREER_HUBS } from './career-td-hubs.js';
+import { BI_CAREER_HUBS } from './career-bi-hubs.js';
+import { BJ_CAREER_HUBS } from './career-bj-hubs.js';
+import { TG_CAREER_HUBS } from './career-tg-hubs.js';
+import { BF_CAREER_HUBS } from './career-bf-hubs.js';
+import { ML_CAREER_HUBS } from './career-ml-hubs.js';
+import { NE_CAREER_HUBS } from './career-ne-hubs.js';
+import { GN_CAREER_HUBS } from './career-gn-hubs.js';
+import { SL_CAREER_HUBS } from './career-sl-hubs.js';
+import { LR_CAREER_HUBS } from './career-lr-hubs.js';
+import { GM_CAREER_HUBS } from './career-gm-hubs.js';
+import { GW_CAREER_HUBS } from './career-gw-hubs.js';
+import { CV_CAREER_HUBS } from './career-cv-hubs.js';
+import { ST_CAREER_HUBS } from './career-st-hubs.js';
+import { MR_CAREER_HUBS } from './career-mr-hubs.js';
+import { MG_CAREER_HUBS } from './career-mg-hubs.js';
+import { MU_CAREER_HUBS } from './career-mu-hubs.js';
+import { SC_CAREER_HUBS } from './career-sc-hubs.js';
+import { KM_CAREER_HUBS } from './career-km-hubs.js';
+import { LS_CAREER_HUBS } from './career-ls-hubs.js';
+import { SZ_CAREER_HUBS } from './career-sz-hubs.js';
+import { SO_CAREER_HUBS } from './career-so-hubs.js';
+import { DJ_CAREER_HUBS } from './career-dj-hubs.js';
+import { ER_CAREER_HUBS } from './career-er-hubs.js';
+import { SS_CAREER_HUBS } from './career-ss-hubs.js';
 import allowlistRaw from './data/simbrief-dispatch-airports.json' with { type: 'json' };
 
 type CareerHubRow = {
@@ -292,6 +340,54 @@ const ALL_CAREER_HUBS: readonly CareerHubRow[] = [
   ...SB_CAREER_HUBS,
   ...CK_CAREER_HUBS,
   ...KI_CAREER_HUBS,
+  ...NG_CAREER_HUBS,
+  ...GH_CAREER_HUBS,
+  ...SN_CAREER_HUBS,
+  ...CI_CAREER_HUBS,
+  ...KE_CAREER_HUBS,
+  ...ET_CAREER_HUBS,
+  ...ZA_CAREER_HUBS,
+  ...TZ_CAREER_HUBS,
+  ...AO_CAREER_HUBS,
+  ...CM_CAREER_HUBS,
+  ...UG_CAREER_HUBS,
+  ...RW_CAREER_HUBS,
+  ...MZ_CAREER_HUBS,
+  ...NA_CAREER_HUBS,
+  ...BW_CAREER_HUBS,
+  ...ZM_CAREER_HUBS,
+  ...ZW_CAREER_HUBS,
+  ...MW_CAREER_HUBS,
+  ...CD_CAREER_HUBS,
+  ...CG_CAREER_HUBS,
+  ...GA_CAREER_HUBS,
+  ...GQ_CAREER_HUBS,
+  ...CF_CAREER_HUBS,
+  ...TD_CAREER_HUBS,
+  ...BI_CAREER_HUBS,
+  ...BJ_CAREER_HUBS,
+  ...TG_CAREER_HUBS,
+  ...BF_CAREER_HUBS,
+  ...ML_CAREER_HUBS,
+  ...NE_CAREER_HUBS,
+  ...GN_CAREER_HUBS,
+  ...SL_CAREER_HUBS,
+  ...LR_CAREER_HUBS,
+  ...GM_CAREER_HUBS,
+  ...GW_CAREER_HUBS,
+  ...CV_CAREER_HUBS,
+  ...ST_CAREER_HUBS,
+  ...MR_CAREER_HUBS,
+  ...MG_CAREER_HUBS,
+  ...MU_CAREER_HUBS,
+  ...SC_CAREER_HUBS,
+  ...KM_CAREER_HUBS,
+  ...LS_CAREER_HUBS,
+  ...SZ_CAREER_HUBS,
+  ...SO_CAREER_HUBS,
+  ...DJ_CAREER_HUBS,
+  ...ER_CAREER_HUBS,
+  ...SS_CAREER_HUBS,
 ];
 
 /** ICAOs that must never be cargo/Dispatch hubs (MSFS-only or closed). */

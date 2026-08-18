@@ -65,7 +65,6 @@ import {
   postEmptyFlight,
   postPilotTravel,
   postContractPilotAccept,
-  fetchContractPilotOptions,
   postStagingCommit,
   postTick,
   postDebugCreditWallet,
@@ -117,6 +116,7 @@ import {
 } from './load-verification';
 import { estimateSellBackUsd, estimateLeaseEarlyReturnUsd } from './aircraft-pricing';
 import { useConfirm } from './ConfirmDialog';
+import { ContractPilotPick } from './ContractPilotPick';
 import { FboRerouteDialog } from './FboRerouteDialog';
 import { PortsPanel } from './PortsPanel';
 import { FboSplitDialog } from './FboSplitDialog';
@@ -820,6 +820,10 @@ function regionLabel(region: string): string {
       return 'Portugal — Central';
     case 'PT-S':
       return 'Portugal — South';
+    case 'PT-M':
+      return 'Portugal — Madeira';
+    case 'PT-A':
+      return 'Portugal — Azores';
     case 'ES-N':
       return 'Spain — North';
     case 'ES-C':
@@ -828,6 +832,8 @@ function regionLabel(region: string): string {
       return 'Spain — South';
     case 'ES-E':
       return 'Spain — East';
+    case 'ES-CN':
+      return 'Spain — Canary Islands';
     case 'FR-N':
       return 'France — North';
     case 'FR-C':
@@ -1224,6 +1230,136 @@ function regionLabel(region: string): string {
       return 'Kiribati — Tarawa';
     case 'KI-L':
       return 'Kiribati — Kiritimati';
+    case 'NG-SW':
+      return 'Nigeria — Southwest / Lagos';
+    case 'NG-C':
+      return 'Nigeria — Central / Abuja';
+    case 'GH-C':
+      return 'Ghana — Accra';
+    case 'SN-W':
+      return 'Senegal — Dakar / Coast';
+    case 'SN-E':
+      return 'Senegal — East / Tambacounda';
+    case 'CI-S':
+      return "Côte d'Ivoire — Abidjan";
+    case 'KE-C':
+      return 'Kenya — Central / Nairobi';
+    case 'KE-E':
+      return 'Kenya — Coast / Mombasa';
+    case 'ET-C':
+      return 'Ethiopia — Addis Ababa';
+    case 'ZA-G':
+      return 'South Africa — Gauteng / Johannesburg';
+    case 'ZA-W':
+      return 'South Africa — Western Cape';
+    case 'ZA-E':
+      return 'South Africa — KwaZulu-Natal';
+    case 'TZ-E':
+      return 'Tanzania — Coast / Dar es Salaam';
+    case 'TZ-N':
+      return 'Tanzania — North / Kilimanjaro';
+    case 'AO-N':
+      return 'Angola — Luanda';
+    case 'CM-L':
+      return 'Cameroon — Littoral / Douala';
+    case 'CM-C':
+      return 'Cameroon — Centre / Yaoundé';
+    case 'UG-C':
+      return 'Uganda — Entebbe / Kampala';
+    case 'RW-C':
+      return 'Rwanda — Kigali';
+    case 'MZ-S':
+      return 'Mozambique — South / Maputo';
+    case 'MZ-C':
+      return 'Mozambique — Central / Beira';
+    case 'NA-C':
+      return 'Namibia — Central / Windhoek';
+    case 'NA-W':
+      return 'Namibia — Coast / Walvis Bay';
+    case 'BW-C':
+      return 'Botswana — Gaborone';
+    case 'NG-N':
+      return 'Nigeria — North / Kano';
+    case 'ZM-C':
+      return 'Zambia — Lusaka';
+    case 'ZW-C':
+      return 'Zimbabwe — Harare';
+    case 'ZW-S':
+      return 'Zimbabwe — South / Bulawayo';
+    case 'MW-C':
+      return 'Malawi — Central / Lilongwe';
+    case 'MW-S':
+      return 'Malawi — South / Blantyre';
+    case 'CD-W':
+      return 'DR Congo — West / Kinshasa';
+    case 'CD-S':
+      return 'DR Congo — South / Lubumbashi';
+    case 'CD-N':
+      return 'DR Congo — North / Kisangani';
+    case 'CG-C':
+      return 'Congo — Brazzaville';
+    case 'CG-W':
+      return 'Congo — Coast / Pointe-Noire';
+    case 'GA-N':
+      return 'Gabon — Libreville';
+    case 'GA-W':
+      return 'Gabon — Coast / Port-Gentil';
+    case 'GQ-N':
+      return 'Equatorial Guinea — Malabo';
+    case 'CF-C':
+      return 'Central African Republic — Bangui';
+    case 'TD-C':
+      return "Chad — N'Djamena";
+    case 'BI-C':
+      return 'Burundi — Bujumbura';
+    case 'BJ-S':
+      return 'Benin — Cotonou';
+    case 'TG-S':
+      return 'Togo — Lomé';
+    case 'BF-C':
+      return 'Burkina Faso — Ouagadougou';
+    case 'ML-C':
+      return 'Mali — Bamako';
+    case 'NE-W':
+      return 'Niger — Niamey';
+    case 'GN-W':
+      return 'Guinea — Conakry';
+    case 'SL-W':
+      return 'Sierra Leone — Freetown';
+    case 'LR-C':
+      return 'Liberia — Monrovia';
+    case 'GM-W':
+      return 'Gambia — Banjul';
+    case 'GW-C':
+      return 'Guinea-Bissau — Bissau';
+    case 'CV-N':
+      return 'Cabo Verde — Sal';
+    case 'ST-C':
+      return 'São Tomé and Príncipe';
+    case 'MR-W':
+      return 'Mauritania — Nouakchott';
+    case 'MG-C':
+      return 'Madagascar — Antananarivo';
+    case 'MG-E':
+      return 'Madagascar — Toamasina';
+    case 'MU-C':
+      return 'Mauritius';
+    case 'SC-N':
+      return 'Seychelles — Mahé';
+    case 'KM-C':
+      return 'Comoros — Moroni';
+    case 'LS-C':
+      return 'Lesotho — Maseru';
+    case 'SZ-E':
+      return 'Eswatini — King Mswati';
+    case 'SO-S':
+      return 'Somalia — Mogadishu';
+    case 'DJ-E':
+      return 'Djibouti';
+    case 'ER-C':
+      return 'Eritrea — Asmara';
+    case 'SS-C':
+      return 'South Sudan — Juba';
     default:
       return region;
   }
@@ -2633,7 +2769,7 @@ function FleetRoster(props: {
 }
 
 export function App() {
-  const { confirm, confirmDialog } = useConfirm();
+  const { confirm, confirmDialog, setConfirmDisabled } = useConfirm();
   const initialLocation = readCareerLocation();
   const [tab, setTab] = useState<Tab>(initialLocation.tab);
   const [airportIcao, setAirportIcao] = useState<string | null>(
@@ -2653,6 +2789,9 @@ export function App() {
   const [contractsSisterOnly, setContractsSisterOnly] = useState(false);
   const [contractsProfitableOnly, setContractsProfitableOnly] = useState(false);
   const [contractsViableOnly, setContractsViableOnly] = useState(true);
+  const [selectedContractLotId, setSelectedContractLotId] = useState<
+    string | null
+  >(null);
   /** When Hangar was opened to ferry for a contract, Back restores this terminal. */
   const [airportReturn, setAirportReturn] = useState<{
     icao: string;
@@ -2950,6 +3089,14 @@ export function App() {
     );
     if (!stillThere) setSelectedFboMissionId(null);
   }, [missions, selectedFboMissionId]);
+
+  useEffect(() => {
+    if (!selectedContractLotId || !airportView) return;
+    const stillThere =
+      airportView.outboundLots.some((lot) => lot.id === selectedContractLotId) ||
+      airportView.inboundLots.some((lot) => lot.id === selectedContractLotId);
+    if (!stillThere) setSelectedContractLotId(null);
+  }, [airportView, selectedContractLotId]);
 
   useEffect(() => {
     const loc = { tab, airportIcao };
@@ -4671,6 +4818,7 @@ export function App() {
         setContractsProfitableOnly(false);
         setContractsViableOnly(true);
         setContractsPage(1);
+        setSelectedContractLotId(null);
       } else if (opts?.section) {
         setTerminalSection(opts.section);
       }
@@ -4757,6 +4905,7 @@ export function App() {
     setContractsProfitableOnly(false);
     setContractsViableOnly(true);
     setContractsPage(1);
+    setSelectedContractLotId(null);
     setAirportReturn(null);
     writeCareerLocation({ tab, airportIcao: null });
   }
@@ -4773,6 +4922,7 @@ export function App() {
     setContractsProfitableOnly(false);
     setContractsViableOnly(true);
     setContractsPage(1);
+    setSelectedContractLotId(null);
     setTab(next);
     writeCareerLocation({ tab: next, airportIcao: null }, opts);
   }
@@ -6354,6 +6504,8 @@ export function App() {
 
   async function onAcceptContractPilot(lot: {
     id: string;
+    originIcao?: string;
+    destIcao?: string;
     npcClaim?: {
       crewNeeded?: boolean;
       crewReposition?: boolean;
@@ -6364,85 +6516,34 @@ export function App() {
     } | null;
   }) {
     if (!lot.npcClaim?.crewNeeded) return;
-    let options;
-    try {
-      options = await fetchContractPilotOptions({ lotId: lot.id });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      setToastKind('fail');
-      setToast(message);
-      void refresh().catch(() => {
-        /* ignore */
-      });
-      return;
-    }
-    const isRepo = Boolean(
-      lot.npcClaim.crewReposition || options.offer.crewReposition,
-    );
-    const flyable = isRepo
-      ? options.airframes.filter((a) => a.pilotFeeUsd > 0)
-      : options.airframes.filter((a) => a.liftKg > 0);
-    if (flyable.length === 0) {
-      const classLabel = options.offer.aircraftClassId.replace(/_/g, ' ');
-      const message = isRepo
-        ? `No homologated ${classLabel} airframe for this ferry`
-        : `No homologated ${classLabel} can fly this route with cargo (${formatTonnes(options.offer.cargoKg)} · ${Math.round(options.offer.distanceNm ?? 0)} nm) — fuel/MTOW leaves 0 lift`;
-      setError(message);
-      setToastKind('fail');
-      setToast(message);
-      void refresh().catch(() => {
-        /* ignore */
-      });
-      return;
-    }
-    const preferred =
-      flyable.find((a) => a.coversOffer) ??
-      flyable.slice().sort((a, b) => b.liftKg - a.liftKg)[0]!;
-    const selectedRef = { current: preferred.typeId };
+    const isRepo = Boolean(lot.npcClaim.crewReposition);
+    const selectedRef = { current: '' };
     const ok = await confirm({
       title: isRepo ? 'Choose aircraft for ferry' : 'Choose aircraft for contract',
       confirmLabel: isRepo ? 'Ferry' : 'Fly',
       cancelLabel: 'Cancel',
+      confirmDisabled: true,
       body: (
-        <div className="contract-pilot-pick">
-          <p>
-            {options.offer.originIcao} → {options.offer.destIcao} ·{' '}
-            {isRepo
-              ? 'empty ferry'
-              : `${formatTonnes(options.offer.cargoKg)} reserved`}{' '}
-            · {options.offer.aircraftClassId.replace(/_/g, ' ')}
-          </p>
-          <p className="muted">
-            {isRepo
-              ? 'Pick any homologated airframe of this class. Operator covers fuel.'
-              : 'Pick any homologated airframe of this class. Lift is capped by route fuel/MTOW — leftover stays on the board for you to claim again until the window closes (then the operator flies what remains).'}
-          </p>
-          <label className="contract-pilot-pick-label">
-            Aircraft
-            <select
-              className="contract-pilot-pick-select"
-              defaultValue={preferred.typeId}
-              onChange={(event) => {
-                selectedRef.current = event.target.value;
-              }}
-            >
-              {flyable.map((a) => (
-                <option key={a.typeId} value={a.typeId}>
-                  {a.label} · lift {formatTonnes(a.liftKg)}
-                  {a.routeLimited ? ' · route-limited' : ''}
-                  {a.remainderKg > 0
-                    ? ` · ${formatTonnes(a.remainderKg)} left on board`
-                    : ' · full offer'}
-                  {` · fee ${formatMoney(a.pilotFeeUsd)}`}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <ContractPilotPick
+          lotId={lot.id}
+          isRepo={isRepo}
+          originIcao={lot.originIcao}
+          destIcao={lot.destIcao}
+          cargoKg={lot.npcClaim.cargoKg}
+          aircraftClassId={lot.npcClaim.aircraftClassId}
+          formatTonnes={formatTonnes}
+          formatMoney={formatMoney}
+          selectedRef={selectedRef}
+          onReadyChange={(ready) => setConfirmDisabled(!ready)}
+        />
       ),
     });
     if (!ok) return;
+    if (!selectedRef.current) {
+      setToastKind('fail');
+      setToast('Pick an airframe before flying');
+      return;
+    }
     await run(async () => {
       const result = await postContractPilotAccept({
         lotId: lot.id,
@@ -7561,6 +7662,11 @@ export function App() {
     const start = (safeContractsPage - 1) * CONTRACTS_PAGE_SIZE;
     return sortedContractLots.slice(start, start + CONTRACTS_PAGE_SIZE);
   }, [safeContractsPage, sortedContractLots]);
+  const selectedContractLot = showAirport
+    ? (airportView.outboundLots.find((lot) => lot.id === selectedContractLotId) ??
+      airportView.inboundLots.find((lot) => lot.id === selectedContractLotId) ??
+      null)
+    : null;
   const toastScope = showAirport ? `airport:${airportIcao}` : `tab:${tab}`;
   const toastScopeRef = useRef<{ id: number; scope: string } | null>(null);
 
@@ -8272,6 +8378,7 @@ export function App() {
               onClick={() => {
                 setContractsLane('outbound');
                 setContractsPage(1);
+                setSelectedContractLotId(null);
                 setTerminalSection('contracts');
               }}
               disabled={busy}
@@ -9068,10 +9175,6 @@ export function App() {
                     <div className="panel-head">
                       <div>
                         <h2>Contracts</h2>
-                        <p>
-                          {airportView.outboundLots.length} outbound ·{' '}
-                          {airportView.inboundLots.length} inbound
-                        </p>
                         <div className="board-aircraft">
                           <label>
                             <span>Estimate net for</span>
@@ -9128,6 +9231,22 @@ export function App() {
                         </div>
                       </div>
                     </div>
+                    <div className="contracts-board">
+                    <FboRouteMapCard
+                      baseIcao={airportView.airport.icao}
+                      originIcao={
+                        selectedContractLot?.originIcao ??
+                        airportView.airport.icao
+                      }
+                      destIcao={selectedContractLot?.destIcao ?? null}
+                      distanceNm={selectedContractLot?.distanceNm}
+                      originRole="dep"
+                      idleHeadline={`${airportView.airport.icao} · hub`}
+                      idleHint="Select a contract below to draw the route."
+                      showTitle={false}
+                      onOpenAirport={openAirport}
+                    />
+                    <div className="contracts-board-list">
                     <nav
                       className="contracts-lanes"
                       aria-label="Contract direction"
@@ -9142,6 +9261,7 @@ export function App() {
                         onClick={() => {
                           setContractsLane('outbound');
                           setContractsPage(1);
+                          setSelectedContractLotId(null);
                         }}
                         disabled={busy}
                       >
@@ -9157,6 +9277,7 @@ export function App() {
                         onClick={() => {
                           setContractsLane('inbound');
                           setContractsPage(1);
+                          setSelectedContractLotId(null);
                         }}
                         disabled={busy}
                       >
@@ -9227,7 +9348,7 @@ export function App() {
                       </p>
                     ) : null}
                     <div className="table-wrap">
-                      <table>
+                      <table className="contracts-table">
                         <thead>
                           <tr>
                             <th>Route</th>
@@ -9376,7 +9497,20 @@ export function App() {
                             return (
                             <tr
                               key={lot.id}
-                              className={cargoLocked ? 'lot-locked' : undefined}
+                              className={[
+                                cargoLocked ? 'lot-locked' : '',
+                                selectedContractLotId === lot.id
+                                  ? 'is-selected'
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ') || undefined}
+                              aria-selected={selectedContractLotId === lot.id}
+                              onClick={() =>
+                                setSelectedContractLotId((cur) =>
+                                  cur === lot.id ? null : lot.id,
+                                )
+                              }
                             >
                               <td>
                                 <div className="route">
@@ -9522,11 +9656,14 @@ export function App() {
                                         : lot.status !== 'available' ||
                                           lot.availableKg <= 0)
                                     }
-                                    onClick={() =>
-                                      lot.npcClaim?.crewNeeded
-                                        ? void onAcceptContractPilot(lot)
-                                        : enterStagingFromContract(lot)
-                                    }
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (lot.npcClaim?.crewNeeded) {
+                                        void onAcceptContractPilot(lot);
+                                      } else {
+                                        enterStagingFromContract(lot);
+                                      }
+                                    }}
                                     title={
                                       cargoLocked
                                         ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
@@ -9570,7 +9707,10 @@ export function App() {
                                         lot.status !== 'available' ||
                                         lot.availableKg <= 0
                                       }
-                                      onClick={() => void onHoldAtFbo(lot)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void onHoldAtFbo(lot);
+                                      }}
                                       title="Bond a chosen quantity at FBO without soft-filling destination"
                                     >
                                       Hold at FBO
@@ -9695,6 +9835,8 @@ export function App() {
                         </button>
                       </div>
                     </nav>
+                    </div>
+                    </div>
                   </>
                 ) : null}
         </section>

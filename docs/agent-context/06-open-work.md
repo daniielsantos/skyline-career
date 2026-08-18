@@ -94,6 +94,16 @@ Atualizado 2026-08-13: A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). 
 61. ~~**RU-2 Russia gaps**~~ — +8 hubs (ULMM/UMKK/UNKL/UIII/UEEE/UHMM/UHPP/URSS); seed **1029** / **176** ports / **765** trucks. Homolog after rebuild.
 62. ~~**CN-2 China densify**~~ — +16 hubs (ZYTX/ZYCC/ZYHB/ZBHH/ZSHC/ZSNJ/ZHCC/ZSNB/ZSFZ/ZGHA/ZGNN/ZJHK/ZJSY/ZUGY/ZLLL/ZLIC); seed **1045** / **178** ports / **780** trucks. Skip ZBTJ/ZUTF. Homolog after rebuild.
 63. ~~**RU-3 Russia densify**~~ — +22 hubs to **40** RU; seed **1067** / **180** ports / **800** trucks. Skip URRR. Homolog after rebuild.
+64. ~~**AF-1 Sub-Saharan core**~~ — NG/GH/SN/CI/KE/ET/ZA/TZ/AO/CM; seed **1084** / **191** ports / **880** trucks. ICAO: DNMM/HKJK/FAOR/GOOY/FALE/FNLU. Homolog after rebuild.
+65. ~~**AF-2 Sub-Saharan densify**~~ — UG/RW/MZ/NA/BW + DNKN/DGSI; seed **1093** / **194** ports / **920** trucks. ICAO: HUEN/HRYR/FQMA/**FQBR**/FYWH/FBSK. Homolog after rebuild.
+66. ~~**AF-3 Sub-Saharan leftovers**~~ — ZM/ZW/MW/CD + GOTT; seed **1101** / **195** ports / **960** trucks. ICAO: FLKK (not FLLS), FVHA (not FVRG), FVBU, FWKI, FWCL, FZAA (not FZAB), FZQA, GOTT (not GOTB). Homolog after rebuild.
+67. ~~**AF-4 Central Africa / Congo basin**~~ — CG/GA/GQ/CF/TD/BI + FZIC; seed **1110** / **199** ports / **1005** trucks. ICAO: FCBB/FCPP/FOOL/FOOG/FGSL/FEFF/FTTJ/HBBA/FZIC (not FZIA). Homolog after rebuild.
+68. ~~**AF-5 West Africa leftovers**~~ — BJ/TG/BF/ML/NE/GN/SL/LR/GM/GW/CV/ST; seed **1122** / **208** ports / **1065** trucks. ICAO: DBBB/DXXX (not DXNG)/DFFD/GABS (not GAGO)/DRRN/GUCY/GFLL/GLRB (not GLMR)/GBYD/GGOV/GVAC/FPST. Island hops GVAC–GOOY, FPST–FOOL/FGSL. Homolog after rebuild.
+69. ~~**AF-6 leftovers**~~ — MR/MG/MU/SC/KM/LS/SZ; seed **1130** / **213** ports / **1105** trucks. ICAO: GQNO (not GQNN)/FMMI/FMMT/FIMP (not FIMR)/FSIA (not FSPP)/FMCH/FXMM/FDSK (not FDMS). Island hops FMMI–FIMP–FSIA–FMCH plus GQNO–GOOY / FMMI–FQMA / FXMM–FAOR / FDSK–FAOR. Homolog after rebuild.
+70. ~~**AF-7 Horn of Africa**~~ — SO/DJ/ER/SS; seed **1134** / **216** ports / **1125** trucks. ICAO: HCMM/HDAM/HHAS/HJJJ (not HSSJ). Hops HCMM–HKJK/HDAM, HDAM–HAAB/HHAS, HHAS–HAAB, HJJJ–HUEN/HSSK/HKJK. Homolog after rebuild.
+71. ~~**EU-1 Macaronesia densify**~~ — LPMA / LPPD / GCLP (not LPPS / LPLA / GCTS); seed **1137** / **219** ports / **1140** trucks. Isolated **PT-M** / **PT-A** / **ES-CN**. Island hops LPMA–GCLP, LPPD–GCLP, GCLP–GMMN, LPMA–GMMN, GCLP–GQNO, GCLP–GVAC. Homolog after rebuild.
+72. ~~**Pacific island-neighbor gap**~~ — Nadi **NFFN**–Port Vila **NVVV** / Nouméa **NWWW** (Fiji was AU/NZ-only). Lanes >= **399**.
+73. **Next:** MR GQPP / DRC FZNA / EG FGBT / CV GVNP / FLSK if homolog proves stock. Africa country coverage complete except those densify leftovers.
 
 ## Feito (shipped 0.3.47)
 

@@ -1449,40 +1449,47 @@ export function postContractPilotAccept(opts: {
   });
 }
 
+export type ContractPilotOptions = {
+  offer: {
+    lotId: string;
+    npcFlightId: string;
+    originIcao: string;
+    destIcao: string;
+    aircraftClassId: string;
+    cargoKg: number;
+    payUsd: number;
+    distanceNm?: number | null;
+    crewReposition?: boolean;
+    pilotFeeUsd: number;
+    awaitingPilotUntilMs?: number;
+  };
+  airframes: ContractPilotPickAirframe[];
+};
+
+export type ContractPilotPickAirframe = {
+  typeId: string;
+  label: string;
+  aircraftClassId: string;
+  maxCargoKg: number;
+  operationalMaxCargoKg: number;
+  liftKg: number;
+  remainderKg: number;
+  coversOffer: boolean;
+  routeLimited: boolean;
+  pilotFeeUsd: number;
+};
+
 export function fetchContractPilotOptions(opts: {
   lotId?: string;
   npcFlightId?: string;
+  signal?: AbortSignal;
 }) {
   const q = new URLSearchParams();
   if (opts.lotId) q.set('lotId', opts.lotId);
   if (opts.npcFlightId) q.set('npcFlightId', opts.npcFlightId);
-  return api<{
-    offer: {
-      lotId: string;
-      npcFlightId: string;
-      originIcao: string;
-      destIcao: string;
-      aircraftClassId: string;
-      cargoKg: number;
-      payUsd: number;
-      distanceNm?: number | null;
-      crewReposition?: boolean;
-      pilotFeeUsd: number;
-      awaitingPilotUntilMs?: number;
-    };
-    airframes: Array<{
-      typeId: string;
-      label: string;
-      aircraftClassId: string;
-      maxCargoKg: number;
-      operationalMaxCargoKg: number;
-      liftKg: number;
-      remainderKg: number;
-      coversOffer: boolean;
-      routeLimited: boolean;
-      pilotFeeUsd: number;
-    }>;
-  }>(`/api/contract-pilot/options?${q.toString()}`);
+  return api<ContractPilotOptions>(`/api/contract-pilot/options?${q.toString()}`, {
+    signal: opts.signal,
+  });
 }
 
 export function postStagingCommit(opts: {

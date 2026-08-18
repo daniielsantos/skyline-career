@@ -8,7 +8,7 @@ import {
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
 
-export type EsCareerRegion = 'ES-N' | 'ES-C' | 'ES-S' | 'ES-E';
+export type EsCareerRegion = 'ES-N' | 'ES-C' | 'ES-S' | 'ES-E' | 'ES-CN';
 
 export type EsCareerHubDef = {
   icao: string;
@@ -49,7 +49,7 @@ const industrial = {
   >,
 };
 
-/** 14 curated Spain hubs. */
+/** 15 curated Spain hubs (mainland + Canary Islands). */
 export const ES_CAREER_HUBS: readonly EsCareerHubDef[] = [
   {
     icao: 'LEBB',
@@ -184,9 +184,19 @@ export const ES_CAREER_HUBS: readonly EsCareerHubDef[] = [
     produce: { general: 1.2, perishables: 1.15, supplies: 1.1 },
     consume: { electronics: 1.05, machinery: 0.95 },
   },
+  {
+    icao: 'GCLP',
+    name: 'Gran Canaria',
+    region: 'ES-CN',
+    hubTier: 'major',
+    lat: 27.9319,
+    lon: -15.3866,
+    produce: { perishables: 1.3, general: 1.25, electronics: 1.1 },
+    consume: { machinery: 0.95, supplies: 1.15, fuel: 1.2 },
+  },
 ];
 
-export const ES_CAREER_HUB_COUNT = 14;
+export const ES_CAREER_HUB_COUNT = 15;
 
 export function buildEsFeederCorridors(
   hubs: readonly EsCareerHubDef[] = ES_CAREER_HUBS,
@@ -204,9 +214,12 @@ export function assertEsCareerHubCatalog(): void {
       `ES_CAREER_HUBS length ${ES_CAREER_HUBS.length} !== ${ES_CAREER_HUB_COUNT}`,
     );
   }
-  for (const icao of ['LEMD', 'LEBL'] as const) {
+  for (const icao of ['LEMD', 'LEBL', 'GCLP'] as const) {
     if (!ES_CAREER_HUBS.some((h) => h.icao === icao && h.hubTier === 'major')) {
       throw new Error(`ES catalog must include major ${icao}`);
     }
+  }
+  if (ES_CAREER_HUBS.some((h) => h.icao === 'GCTS')) {
+    throw new Error('ES catalog must use GCLP for Canaries cargo, not GCTS Tenerife');
   }
 }

@@ -8,6 +8,8 @@ export type ConfirmOptions = {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
+  /** Fly/Confirm starts disabled (e.g. while the body still loads). */
+  confirmDisabled?: boolean;
 };
 
 type PendingConfirm = ConfirmOptions & {
@@ -16,9 +18,11 @@ type PendingConfirm = ConfirmOptions & {
 
 export function useConfirm() {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
+  const [confirmDisabled, setConfirmDisabled] = useState(false);
 
   const confirm = useCallback((opts: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
+      setConfirmDisabled(opts.confirmDisabled ?? false);
       setPending({ ...opts, resolve });
     });
   }, []);
@@ -28,9 +32,13 @@ export function useConfirm() {
       current?.resolve(value);
       return null;
     });
+    setConfirmDisabled(false);
   }, []);
 
-  const onConfirm = useCallback(() => close(true), [close]);
+  const onConfirm = useCallback(() => {
+    if (confirmDisabled) return;
+    close(true);
+  }, [close, confirmDisabled]);
   const onCancel = useCallback(() => close(false), [close]);
 
   const confirmDialog = pending ? (
@@ -40,12 +48,13 @@ export function useConfirm() {
       confirmLabel={pending.confirmLabel}
       cancelLabel={pending.cancelLabel}
       tone={pending.tone}
+      confirmDisabled={confirmDisabled}
       onConfirm={onConfirm}
       onCancel={onCancel}
     />
   ) : null;
 
-  return { confirm, confirmDialog };
+  return { confirm, confirmDialog, setConfirmDisabled };
 }
 
 function ConfirmDialog(props: {
@@ -54,6 +63,7 @@ function ConfirmDialog(props: {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -64,11 +74,15 @@ function ConfirmDialog(props: {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const onCancelRef = useRef(props.onCancel);
   onCancelRef.current = props.onCancel;
+  const startOnCancel = useRef(Boolean(props.confirmDisabled));
 
   // Focus once on open — re-running on parent re-renders steals focus from
   // interactive body controls (e.g. <select>) and closes native dropdowns.
   useEffect(() => {
-    const focusTarget = tone === 'danger' ? cancelRef.current : confirmRef.current;
+    const focusTarget =
+      tone === 'danger' || startOnCancel.current
+        ? cancelRef.current
+        : confirmRef.current;
     focusTarget?.focus();
   }, [tone]);
 
@@ -130,6 +144,8 @@ function ConfirmDialog(props: {
                   ? 'action warn'
                   : 'action'
             }
+            disabled={props.confirmDisabled}
+            aria-busy={props.confirmDisabled || undefined}
             onClick={props.onConfirm}
           >
             {props.confirmLabel ?? 'Confirm'}

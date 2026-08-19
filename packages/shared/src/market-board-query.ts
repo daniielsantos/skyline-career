@@ -1,5 +1,6 @@
 import { TICKS_PER_HOUR } from './career-clock.js';
 import { CLASS_OPS_STARTER_IDS } from './career-class-ops.js';
+import { boardNetSortUsd } from './career-contract-pilot-fee.js';
 
 /** Origin radius (nm) for Near me / empty-hangar Freights. Keep in lockstep with LAST_MILE_MAX_NM. */
 export const BOARD_NEAR_MAX_NM = 600;
@@ -48,6 +49,10 @@ export type MarketBoardSortable = {
   classLocked?: boolean;
   /** Open Crew needed / ferry hold. */
   crewNeeded?: boolean;
+  /** Empty deadhead — NET sort uses pilot fee only. */
+  crewReposition?: boolean;
+  /** Max contract-pilot fee on crew-needed rows. */
+  pilotFeeUsd?: number;
   /** NPC class on a crew-needed hold. */
   crewClassId?: string;
   /** Last-mile Dry break-bulk from a metro/spoke. */
@@ -388,6 +393,7 @@ function compareBoardRow<T extends MarketBoardSortable>(
   a: T,
   b: T,
   key: MarketBoardSortKey,
+  hangarEmpty: boolean,
 ): number {
   switch (key) {
     case 'distance':
@@ -403,17 +409,10 @@ function compareBoardRow<T extends MarketBoardSortable>(
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
       return a.payUsd - b.payUsd;
-    case 'net': {
-      const aNet =
-        typeof a.estimatedNetUsd === 'number' && Number.isFinite(a.estimatedNetUsd)
-          ? a.estimatedNetUsd
-          : Number.NEGATIVE_INFINITY;
-      const bNet =
-        typeof b.estimatedNetUsd === 'number' && Number.isFinite(b.estimatedNetUsd)
-          ? b.estimatedNetUsd
-          : Number.NEGATIVE_INFINITY;
-      return aNet - bNet;
-    }
+    case 'net':
+      return (
+        boardNetSortUsd(a, { hangarEmpty }) - boardNetSortUsd(b, { hangarEmpty })
+      );
     case 'access':
       // Unlocked (false) before locked (true) when ascending.
       return Number(Boolean(a.cargoLocked)) - Number(Boolean(b.cargoLocked));
@@ -602,7 +601,12 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
     .map((row, index) => ({ row, index }))
     .sort((a, b) => {
       for (const level of sorts) {
-        const comparison = compareBoardRow(a.row, b.row, level.key);
+        const comparison = compareBoardRow(
+          a.row,
+          b.row,
+          level.key,
+          Boolean(opts.hangarEmpty),
+        );
         if (comparison !== 0) {
           return comparison * (level.direction === 'asc' ? 1 : -1);
         }

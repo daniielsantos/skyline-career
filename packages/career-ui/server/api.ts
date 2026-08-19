@@ -84,6 +84,7 @@ import {
   boardDisplayPayUsd,
   queryMarketBoardPage,
   quoteFuelUplift,
+  quoteContractPilotFeeUsd,
   resolveAirframeMaxRangeNm,
   regionFuelThin,
   missionRemainingCapacityKg,
@@ -2586,6 +2587,11 @@ export function createCareerApiServer(port = 8787) {
                 !classOpsIsUnlocked(classOps, crewClassId),
             ),
             crewNeeded: Boolean(row.npcClaim?.crewNeeded),
+            ...(row.npcClaim?.crewReposition ? { crewReposition: true } : {}),
+            ...(row.npcClaim?.crewNeeded &&
+            typeof row.npcClaim.pilotFeeUsd === 'number'
+              ? { pilotFeeUsd: row.npcClaim.pilotFeeUsd }
+              : {}),
             ...(row.npcClaim?.aircraftClassId
               ? { crewClassId: row.npcClaim.aircraftClassId }
               : {}),
@@ -4261,7 +4267,7 @@ export function createCareerApiServer(port = 8787) {
                 crewReposition: flight.kind === 'reposition',
                 pilotFeeUsd:
                   flight.pilotFeeUsd ??
-                  Math.max(50, Math.round(flight.payUsd * 0.4)),
+                  quoteContractPilotFeeUsd(flight.payUsd),
                 awaitingPilotUntilMs: flight.awaitingPilotUntilMs,
               },
               airframes,

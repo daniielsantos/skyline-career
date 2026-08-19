@@ -710,6 +710,32 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
+  it('net sort uses operator freight for crew offers when hangar is empty', () => {
+    const mixed = [
+      row({
+        payUsd: 300,
+        crewNeeded: true,
+        pilotFeeUsd: 300,
+      }),
+      row({
+        payUsd: 900,
+        crewNeeded: true,
+        pilotFeeUsd: 900,
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      hangarEmpty: true,
+      sorts: [{ key: 'net', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.pilotFeeUsd),
+      [900, 300],
+    );
+  });
+
   it('starter sort still ranks last-mile ahead of idle wide pay', () => {
     const mixed = [
       row({

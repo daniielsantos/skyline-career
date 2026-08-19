@@ -8,6 +8,7 @@ import {
   type MarketLotView,
 } from './career-economy.js';
 import { invalidateLaneInboundIndex } from './career-lane-index.js';
+import { quoteContractPilotFeeUsd } from './career-contract-pilot-fee.js';
 import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './career-aircraft-market.js';
 import {
   applyPlayerDepartFuel,
@@ -1714,8 +1715,7 @@ function returnContractSliceToOpenOffer(
 
   flight.cargoKg += addKg;
   flight.payUsd = Math.max(1, flight.payUsd + addPay);
-  // Mirror CONTRACT_PILOT_FEE_FRAC without importing career-npc (cycle).
-  flight.pilotFeeUsd = Math.max(50, Math.round(flight.payUsd * 0.4));
+  flight.pilotFeeUsd = quoteContractPilotFeeUsd(flight.payUsd);
 
   const lot = world.lots.find((l) => l.id === line.shipmentLotId);
   if (lot && (lot.status === 'in_transit' || lot.status === 'available')) {

@@ -1106,9 +1106,24 @@ th {
 
 .filter-row .route-filter-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(4.75rem, 0.72fr);
   gap: 0.35rem;
   min-width: 0;
+  width: 100%;
+}
+
+.filter-row .route-lane-filter {
+  min-width: 0;
+  width: 100%;
+  padding: 0.38rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.76rem;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .filter-row .load-filter-pair {

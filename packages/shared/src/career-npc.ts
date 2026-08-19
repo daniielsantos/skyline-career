@@ -52,6 +52,9 @@ import {
 } from './career-player-airframes.js';
 import { noteLotClaimed, noteNpcLeg, noteNpcRest } from './career-economy-flow.js';
 import {
+  quoteContractPilotFeeUsd,
+} from './career-contract-pilot-fee.js';
+import {
   countryIdFromRegion,
   isDomesticOd,
   isInternationalOdAllowed,
@@ -198,8 +201,13 @@ const TURNAROUND_HOURS = 0.5;
 /** Economy-tick floor after block time (~30 min = 2 × 15-min batches). */
 const TURNAROUND_MIN_TICKS = 2;
 
-/** Share of reserved freight pay offered to a contract pilot. */
-export const CONTRACT_PILOT_FEE_FRAC = 0.4;
+export {
+  CONTRACT_PILOT_FEE_FRAC,
+  CONTRACT_PILOT_FEE_MIN_USD,
+  boardNetSortUsd,
+  operatorFreightFromPilotFeeUsd,
+  quoteContractPilotFeeUsd,
+} from './career-contract-pilot-fee.js';
 /** Min wall-clock hours an awaiting_pilot offer stays open. */
 export const AWAITING_PILOT_MIN_HOURS = 3;
 /** Max wall-clock hours an awaiting_pilot offer stays open. */
@@ -272,11 +280,6 @@ export function countOpenContractPilotOffers(
     const starter = isStarterContractPilotClass(f.aircraftClassId);
     return band === 'starter' ? starter : !starter;
   }).length;
-}
-
-export function quoteContractPilotFeeUsd(payUsd: number): number {
-  const pay = Math.max(0, payUsd);
-  return Math.max(50, Math.round(pay * CONTRACT_PILOT_FEE_FRAC));
 }
 
 /** Min wall-clock hours a reposition crew offer stays open. */

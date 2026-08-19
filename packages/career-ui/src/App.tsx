@@ -115,6 +115,11 @@ import {
   pickStableLiveFuelLb,
 } from './load-verification';
 import { estimateSellBackUsd, estimateLeaseEarlyReturnUsd } from './aircraft-pricing';
+import {
+  boardNetSortUsd,
+  contractPilotFeePctLabel,
+  operatorFreightFromPilotFeeUsd,
+} from './contract-pilot-fee';
 import { useConfirm } from './ConfirmDialog';
 import { ContractPilotPick } from './ContractPilotPick';
 import { FboRerouteDialog } from './FboRerouteDialog';
@@ -294,6 +299,7 @@ function compareAirportLot(
   b: AirportLot,
   key: MarketSortKey,
   isLocked: (commodityId: string) => boolean,
+  hangarEmpty: boolean,
 ): number {
   switch (key) {
     case 'distance':
@@ -309,17 +315,10 @@ function compareAirportLot(
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
       return a.payUsd - b.payUsd;
-    case 'net': {
-      const aNet =
-        typeof a.estimatedNetUsd === 'number' && Number.isFinite(a.estimatedNetUsd)
-          ? a.estimatedNetUsd
-          : Number.NEGATIVE_INFINITY;
-      const bNet =
-        typeof b.estimatedNetUsd === 'number' && Number.isFinite(b.estimatedNetUsd)
-          ? b.estimatedNetUsd
-          : Number.NEGATIVE_INFINITY;
-      return aNet - bNet;
-    }
+    case 'net':
+      return (
+        boardNetSortUsd(a, { hangarEmpty }) - boardNetSortUsd(b, { hangarEmpty })
+      );
     case 'access':
       return Number(isLocked(a.commodityId)) - Number(isLocked(b.commodityId));
   }
@@ -338,6 +337,7 @@ function sortAirportLots(
   lots: readonly AirportLot[],
   sorts: MarketSortLevel[],
   isLocked: (commodityId: string) => boolean,
+  hangarEmpty: boolean,
 ): AirportLot[] {
   const access = sorts.find((level) => level.key === 'access');
   const rest = sorts.filter((level) => level.key !== 'access');
@@ -358,6 +358,7 @@ function sortAirportLots(
           b.lot,
           level.key,
           isLocked,
+          hangarEmpty,
         );
         if (comparison !== 0) {
           return comparison * (level.direction === 'asc' ? 1 : -1);
@@ -624,6 +625,7 @@ function LotPayCell(props: {
     availableKg?: number;
     npcClaim?: {
       crewNeeded?: boolean;
+      crewReposition?: boolean;
       cargoKg?: number;
       pilotFeeUsd?: number;
       pilotFeeMinUsd?: number;
@@ -633,12 +635,16 @@ function LotPayCell(props: {
   idlePct?: number | null;
 }) {
   const claim = props.lot.npcClaim;
+  const crewPct = contractPilotFeePctLabel();
   if (claim?.crewNeeded && typeof claim.pilotFeeUsd === 'number') {
+    const title = claim.crewReposition
+      ? 'Ferry pilot fee — empty reposition; NPC pays fuel'
+      : `Your ${crewPct} crew cut — operator keeps the rest and pays fuel & MX`;
     return (
       <CrewFeeAmount
         claim={claim}
         formatMoney={formatMoney}
-        title="Your contract fee (operator freight is higher; you take the crew cut)"
+        title={title}
       />
     );
   }
@@ -2239,6 +2245,45 @@ function CrewFeeAmount(props: {
     );
   }
   return <span title={props.title}>{props.formatMoney(max)}</span>;
+}
+
+/** Operator-side freight lot pay (contract rows only — not your take-home). */
+function OperatorFreightAmount(props: {
+  claim: {
+    pilotFeeUsd?: number;
+    pilotFeeMinUsd?: number;
+    crewReposition?: boolean;
+  };
+  formatMoney: (n: number) => string;
+}) {
+  if (props.claim.crewReposition) {
+    return (
+      <span className="muted" title="Empty ferry — no freight lot">
+        —
+      </span>
+    );
+  }
+  if (typeof props.claim.pilotFeeUsd !== 'number') return null;
+  const maxFee = props.claim.pilotFeeUsd;
+  const minFee =
+    typeof props.claim.pilotFeeMinUsd === 'number'
+      ? props.claim.pilotFeeMinUsd
+      : maxFee;
+  const maxOp = operatorFreightFromPilotFeeUsd(maxFee);
+  const minOp = operatorFreightFromPilotFeeUsd(minFee);
+  const title = `Operator freight lot pay (your ${contractPilotFeePctLabel()} crew cut is in Pay)`;
+  if (minOp < maxOp) {
+    return (
+      <span className="pay-range muted" title={title}>
+        {props.formatMoney(minOp)}–{props.formatMoney(maxOp)}
+      </span>
+    );
+  }
+  return (
+    <span className="muted" title={title}>
+      {props.formatMoney(maxOp)}
+    </span>
+  );
 }
 
 function NpcTakenBadge(props: {
@@ -7827,6 +7872,7 @@ export function App() {
       filtered,
       contractsSorts,
       isCargoOpsCommodityLocked,
+      boardEstimateFleet.length === 0,
     );
   }, [
     contractLots,
@@ -7836,6 +7882,7 @@ export function App() {
     contractsProfitableOnly,
     contractsViableOnly,
     boardAircraft,
+    boardEstimateFleet.length,
     contractsLane,
     sisterFboIcaos,
     cargoOps,
@@ -9462,6 +9509,13 @@ export function App() {
                     <div className="panel-head">
                       <div>
                         <h2>Contracts</h2>
+                        {boardEstimateFleet.length === 0 ? (
+                          <p className="muted board-contract-pilot-hint">
+                            Contract pilot — you earn a{' '}
+                            {contractPilotFeePctLabel()} crew cut on freight;
+                            the operator keeps the rest and pays fuel &amp; MX.
+                          </p>
+                        ) : (
                         <div className="board-aircraft">
                           <label>
                             <span>Estimate net for</span>
@@ -9516,6 +9570,7 @@ export function App() {
                             );
                           })()}
                         </div>
+                        )}
                       </div>
                     </div>
                     <div className="contracts-board">
@@ -9692,10 +9747,15 @@ export function App() {
                               <button
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'pay') ? ' is-sorted' : ''}`}
-                                title="Sort by pay. Click another column to add a sort level; click again to reverse or clear."
+                                title={
+                                  boardEstimateFleet.length === 0
+                                    ? `Your ${contractPilotFeePctLabel()} crew cut — what you take home`
+                                    : 'Sort by pay. Click another column to add a sort level; click again to reverse or clear.'
+                                }
                                 onClick={() => toggleContractsSort('pay')}
                               >
-                                Pay <span>{contractsSortIndicator('pay')}</span>
+                                {boardEstimateFleet.length === 0 ? 'Your fee' : 'Pay'}{' '}
+                                <span>{contractsSortIndicator('pay')}</span>
                               </button>
                             </th>
                             <th aria-sort={contractsAriaSort('net')} className="col-money">
@@ -9703,14 +9763,19 @@ export function App() {
                                 type="button"
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
                                 title={
-                                  boardAircraft
-                                    ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
-                                    : 'Select an aircraft above to estimate net (pay − Jet-A)'
+                                  boardEstimateFleet.length === 0
+                                    ? 'Operator freight lot pay (not your take-home)'
+                                    : boardAircraft
+                                      ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
+                                      : 'Select an aircraft above to estimate net (pay − Jet-A)'
                                 }
                                 onClick={() => toggleContractsSort('net')}
-                                disabled={!boardAircraft}
+                                disabled={
+                                  boardEstimateFleet.length > 0 && !boardAircraft
+                                }
                               >
-                                Net <span>{contractsSortIndicator('net')}</span>
+                                {boardEstimateFleet.length === 0 ? 'Freight' : 'Net'}{' '}
+                                <span>{contractsSortIndicator('net')}</span>
                               </button>
                             </th>
                             {contractsLane === 'outbound' ? (
@@ -9918,10 +9983,17 @@ export function App() {
                               >
                                 {lot.npcClaim?.crewNeeded &&
                                 typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                                  <CrewFeeAmount
-                                    claim={lot.npcClaim}
-                                    formatMoney={formatMoney}
-                                  />
+                                  boardEstimateFleet.length === 0 ? (
+                                    <OperatorFreightAmount
+                                      claim={lot.npcClaim}
+                                      formatMoney={formatMoney}
+                                    />
+                                  ) : (
+                                    <CrewFeeAmount
+                                      claim={lot.npcClaim}
+                                      formatMoney={formatMoney}
+                                    />
+                                  )
                                 ) : boardAircraft &&
                                   lot.estimatedInRange === false ? (
                                   <small title="Beyond selected aircraft range">
@@ -10370,7 +10442,11 @@ export function App() {
                     setMarketPage(1);
                   }}
                 >
-                  <option value="">Gross pay only</option>
+                  <option value="">
+                    {fleet.length === 0
+                      ? 'Gross pay (no aircraft)'
+                      : 'Gross pay only'}
+                  </option>
                   {boardEstimateFleet.map((acf) => (
                     <option key={acf.id} value={acf.id}>
                       {acf.label}
@@ -10534,14 +10610,17 @@ export function App() {
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
                       title={
-                        boardAircraft
-                          ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
-                          : 'Select an aircraft above to estimate net (pay − Jet-A)'
+                        fleet.length === 0
+                          ? 'Sort by operator freight lot pay (not your crew cut)'
+                          : boardAircraft
+                            ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
+                            : 'Select an aircraft above to estimate net (pay − Jet-A)'
                       }
                       onClick={() => toggleMarketSort('net')}
-                      disabled={!boardAircraft}
+                      disabled={fleet.length > 0 && !boardAircraft}
                     >
-                      Net <span>{sortIndicator('net')}</span>
+                      {fleet.length === 0 ? 'Freight' : 'Net'}{' '}
+                      <span>{sortIndicator('net')}</span>
                     </button>
                   </th>
                   <th aria-sort={marketAriaSort('access')} className="col-access">
@@ -10580,6 +10659,26 @@ export function App() {
                             updateMarketFilter(setDestFilter, e.target.value)
                           }
                         />
+                        <select
+                          className="route-lane-filter"
+                          aria-label="Filter by route scope"
+                          value={laneFilter}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setLaneFilter(
+                              next === 'intl' ||
+                                next === 'domestic' ||
+                                next === 'bush'
+                                ? next
+                                : '',
+                            );
+                            setMarketPage(1);
+                          }}
+                        >
+                          <option value="">Any route</option>
+                          <option value="intl">Intl</option>
+                          <option value="domestic">Domestic</option>
+                        </select>
                       </div>
                       {nearMe && boardNearIcao && !originFilter.trim() ? (
                         <button
@@ -10625,25 +10724,6 @@ export function App() {
                           ))}
                         </div>
                       ) : null}
-                      <select
-                        aria-label="Filter by route scope"
-                        value={laneFilter}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setLaneFilter(
-                            next === 'intl' ||
-                              next === 'domestic' ||
-                              next === 'bush'
-                              ? next
-                              : '',
-                          );
-                          setMarketPage(1);
-                        }}
-                      >
-                        <option value="">Any route</option>
-                        <option value="intl">Intl</option>
-                        <option value="domestic">Domestic</option>
-                      </select>
                     </div>
                   </th>
                   <th className="col-compact">
@@ -10921,10 +11001,17 @@ export function App() {
                     >
                       {lot.npcClaim?.crewNeeded &&
                       typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                        <CrewFeeAmount
-                          claim={lot.npcClaim}
-                          formatMoney={formatMoney}
-                        />
+                        fleet.length === 0 ? (
+                          <OperatorFreightAmount
+                            claim={lot.npcClaim}
+                            formatMoney={formatMoney}
+                          />
+                        ) : (
+                          <CrewFeeAmount
+                            claim={lot.npcClaim}
+                            formatMoney={formatMoney}
+                          />
+                        )
                       ) : boardAircraft &&
                         typeof lot.estimatedNetUsd === 'number' ? (
                         <span

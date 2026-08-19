@@ -28,16 +28,21 @@ import {
   yardHoldMultForHub,
 } from './career-ground-staff.js';
 import {
+  concessionLeaseUsdForDays,
   creditPortInventory,
   creditPortOperatorThroughput,
   debitPortInventory,
-  ensurePortInventoryRestock,
+  estimatePortInboundCargo,
   evaluatePortConcessionClaim,
+  evaluatePortConcessionUpgrade,
   findActivePortOperator,
   isPortOperator,
+  nextPortDischargeTick,
   portInventorySnapshot,
   portListingSlotCap,
+  portOperatorLevel,
   portStockPriceFactor,
+  recentPortThroughputKg,
   PORT_OPERATOR_ETA_MULT,
   PORT_OPERATOR_PRICE_MULT,
   syncWorldPortConcessions,
@@ -1946,9 +1951,8 @@ function mulberry32(a: number): () => number {
   };
 }
 
-/** Seed / top-up port catalog listings from passive inventory. */
+/** Seed / top-up port catalog listings from existing yard stock (no restock). */
 export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
-  ensurePortInventoryRestock(world);
   if (!Array.isArray(world.portListings)) {
     world.portListings = [];
   }
@@ -2518,12 +2522,26 @@ export function portSnapshot(
         stockKg: number;
         capKg: number;
       }>;
+      inbound: {
+        arrivesAtTick: number;
+        ticksLeft: number;
+        totalKg: number;
+        cargo: Array<{
+          commodityId: CommodityId;
+          commodityName: string;
+          kg: number;
+        }>;
+      } | null;
       concession: {
         status: 'vacant' | 'yours' | 'held';
         companyId: string | null;
+        level: 1 | 2 | 3 | null;
         leasePaidThroughTick: number | null;
         lifetimeThroughputKg: number | null;
+        recentThroughputKg: number | null;
+        renewLeaseUsd: number | null;
         claim: ReturnType<typeof evaluatePortConcessionClaim> | null;
+        upgrade: ReturnType<typeof evaluatePortConcessionUpgrade> | null;
       };
     }
   >;
@@ -2613,8 +2631,16 @@ export function portSnapshot(
         state && op && op.companyId === LOCAL_COMPANY_ID,
       );
       const yoursConc = state?.playerPortConcessions?.find(
-        (c) => c.portId === port.id && c.companyId === LOCAL_COMPANY_ID,
+        (c) =>
+          c.portId === port.id &&
+          c.companyId === LOCAL_COMPANY_ID &&
+          c.leasePaidThroughTick > world.tick,
       );
+      const arrivesAtTick = nextPortDischargeTick(world, port.id);
+      const inboundCargo = estimatePortInboundCargo(world, port.id).filter(
+        (row) => row.kg > 0,
+      );
+      const inboundTotal = inboundCargo.reduce((s, row) => s + row.kg, 0);
       return {
         ...port,
         pickupHubs: [...port.pickupHubs],
@@ -2641,14 +2667,45 @@ export function portSnapshot(
           ...row,
           commodityName: getCommodity(row.commodityId).name,
         })),
+        inbound:
+          inboundTotal > 0
+            ? {
+                arrivesAtTick,
+                ticksLeft: Math.max(0, arrivesAtTick - world.tick),
+                totalKg: inboundTotal,
+                cargo: inboundCargo.map((row) => ({
+                  ...row,
+                  commodityName: getCommodity(row.commodityId).name,
+                })),
+              }
+            : null,
         concession: {
           status: yours ? 'yours' : op ? 'held' : 'vacant',
           companyId: op?.companyId ?? null,
+          level: yours
+            ? portOperatorLevel(world, port.id)
+            : op
+              ? portOperatorLevel(world, port.id)
+              : null,
           leasePaidThroughTick: op?.leasePaidThroughTick ?? null,
           lifetimeThroughputKg: yoursConc?.lifetimeThroughputKg ?? null,
+          recentThroughputKg: yoursConc
+            ? recentPortThroughputKg(yoursConc, world.tick)
+            : null,
+          renewLeaseUsd: yoursConc
+            ? concessionLeaseUsdForDays(
+                yoursConc,
+                world.tick,
+                7,
+              )
+            : null,
           claim: state
             ? evaluatePortConcessionClaim(state, world, port.id)
             : null,
+          upgrade:
+            state && yours
+              ? evaluatePortConcessionUpgrade(state, world, port.id)
+              : null,
         },
       };
     }),

@@ -1638,6 +1638,7 @@ async function main(): Promise<void> {
             'escalate',
             'events',
             'hubLevels',
+            'portRestock',
             'ensure',
           ] as const) {
             const ms = profile.ms[phase];

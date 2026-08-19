@@ -412,6 +412,11 @@ export interface CareerEconomyWorld {
   portListings?: PortListing[];
   /** Passive factory stock per port × commodity (drains into listings). */
   portInventories?: PortInventoryRow[];
+  /**
+   * Next world discharge per port (economy-day cadence). Not stripped from
+   * the blob — small, and tick-settled independently of listings.
+   */
+  portInboundShips?: PortInboundShip[];
   /** Thin world index of who operates each port (lease window). */
   portConcessions?: PortConcessionIndexRow[];
   /** Terminal buy-orders for player warehouse cargo (Demand Board). */
@@ -1189,25 +1194,36 @@ export interface PortInventoryRow {
   lastRestockTick: number;
 }
 
-/** World-side operator index (mirrors active company concessions). */
-export interface PortConcessionIndexRow {
+/** Scheduled factory discharge (one ship per port). Cargo is computed on arrival. */
+export interface PortInboundShip {
   portId: string;
-  companyId: string;
-  leasePaidThroughTick: number;
+  arrivesAtTick: number;
 }
 
 /** Company-owned seaport concession (endgame lease). */
 export type PortConcessionLevel = 1 | 2 | 3;
 
+/** World-side operator index (mirrors active company concessions). */
+export interface PortConcessionIndexRow {
+  portId: string;
+  companyId: string;
+  leasePaidThroughTick: number;
+  level?: PortConcessionLevel;
+}
+
 export interface PlayerPortConcession {
   portId: string;
   companyId: string;
-  /** P1 only in v1 UI; field ready for later upgrades. */
+  /** P1 default; P2 enlarges yard cap. P3 reserved. */
   level: PortConcessionLevel;
   claimedAtTick: number;
   leasePaidThroughTick: number;
   /** Cumulative kg bought at this port by anyone while under this operator. */
   lifetimeThroughputKg: number;
+  /** Economy-day index (`floor(tick/96)`) for `throughputWindowKg[0]`. */
+  throughputWindowDay?: number;
+  /** Last 7 economy days of port throughput, `[today, yesterday, …]`. */
+  throughputWindowKg?: number[];
 }
 
 /**
@@ -1434,6 +1450,7 @@ export type CareerLedgerKind =
   | 'port_yard_hold'
   | 'port_concession_claim'
   | 'port_concession_lease'
+  | 'port_concession_upgrade'
   | 'warehouse_buy'
   | 'warehouse_storage'
   | 'warehouse_upgrade'

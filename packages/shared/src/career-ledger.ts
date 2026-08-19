@@ -40,6 +40,7 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   port_yard_hold: 'Port yard hold',
   port_concession_claim: 'Port concession claim',
   port_concession_lease: 'Port concession lease',
+  port_concession_upgrade: 'Port concession upgrade',
   warehouse_buy: 'Warehouse purchase',
   warehouse_storage: 'Warehouse storage',
   warehouse_upgrade: 'Warehouse upgrade',

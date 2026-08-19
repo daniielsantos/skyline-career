@@ -9062,6 +9062,11 @@ span.dispatch-route-hub-dest {
   margin-top: 0.45rem;
 }
 
+.ports-inbound-note {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+}
+
 .ports-concession-dialog {
   max-width: 26rem;
 }

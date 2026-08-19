@@ -72,8 +72,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Inject freighter CG soft-max:** crew stations usam soft **750** lb (`FREIGHTER_CREW_STATION_SOFT_MAX_LB`, ainda `min` com maxLoad); GA/Accu-Sim ficam em **300**. Due = cargo+crew inalterado.
 - **CG shift sem arms:** não mover entre pares L/R (S1↔S2); freighter counterweight usa crew+baggage juntos — evita loop falso no C90. Forward: enche baggage (S3/S4) antes de dump em crew (`deferTargetIndexes`).
 - **FBO spot:** removido (stock wipe on load); FBO = bonded holds only.
-- **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico + **inventory** (restock passivo); yard hold fee diária. **Concession v1:** CAPEX + lease renovável (1/empresa); gates T3 WH + 25k shipped; buffs operador (~10% preço, ~15% ETA, +1 listing); não exclui compra/WH de outros. UI: chip Vacant/Held/Operator → dialog Concession. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
-- **Port P2/P3 (backlog):** ver roadmap *Port endgame backlog* — `level` no save já existe; caps/buffs por nível ainda não.
+- **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico. **Inventory:** 1 descarga/dia de economia (8% do cap) no tick — não ao abrir a aba; listings só do pátio já em estoque. UI: próxima descarga + ETA. **Concession:** CAPEX + lease renovável (1/empresa); gates T3 WH + 25k shipped; buffs P1 (~10% preço, ~15% ETA, +1 listing). **P2:** cap ×1.35 (mesmo % de restock); lease escala com throughput 7d (máx ×1.75) + ×1.2 no P2. Sem desconto extra de compra. UI: chip Operator P1/P2. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
+- **Port P3 / specials / feeder (backlog):** ver roadmap *Port endgame backlog*.
 - **Offline fee cap:** catch-up wall-clock cobra no máx. **7** economy-days de hangar/WH/yard/FBO storage/crew+ground salaries; lease ≤1 installment + defer term repossess (`termEndedSoft`); debug time-skip uncapped. Banner em `/api/state`.
 
 ## Company tenant (SP → MP)

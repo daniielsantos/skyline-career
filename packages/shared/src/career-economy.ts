@@ -969,6 +969,7 @@ import {
   shiftFuelLogisticsWallClock,
   tickFuelLogistics,
 } from './career-fuel-logistics.js';
+import { tickPortInboundShips } from './career-port-concessions.js';
 import {
   ensureNpcFleet,
   listNpcActivity,
@@ -11850,6 +11851,7 @@ export function migrateEconomyWorld(
   const lanesRaw = (base as { internationalLanes?: unknown }).internationalLanes;
   const portListingsRaw = (base as { portListings?: unknown }).portListings;
   const portInventoriesRaw = (base as { portInventories?: unknown }).portInventories;
+  const portInboundShipsRaw = (base as { portInboundShips?: unknown }).portInboundShips;
   const portConcessionsRaw = (base as { portConcessions?: unknown }).portConcessions;
   const migrated: CareerEconomyWorld = {
     version: 3,
@@ -11881,6 +11883,12 @@ export function migrateEconomyWorld(
       ? {
           portInventories:
             portInventoriesRaw as CareerEconomyWorld['portInventories'],
+        }
+      : {}),
+    ...(Array.isArray(portInboundShipsRaw)
+      ? {
+          portInboundShips:
+            portInboundShipsRaw as CareerEconomyWorld['portInboundShips'],
         }
       : {}),
     ...(Array.isArray(portConcessionsRaw)
@@ -11950,6 +11958,11 @@ export function ensureEconomyCaughtUp(
     w.portInventories = migrated.portInventories;
   } else {
     delete w.portInventories;
+  }
+  if (migrated.portInboundShips) {
+    w.portInboundShips = migrated.portInboundShips;
+  } else {
+    delete w.portInboundShips;
   }
   if (migrated.portConcessions) {
     w.portConcessions = migrated.portConcessions;
@@ -13843,6 +13856,7 @@ export type TickPhaseId =
   | 'formLots'
   | 'npc'
   | 'hubLevels'
+  | 'portRestock'
   | 'total';
 
 export type TickPhaseProfile = {
@@ -13864,6 +13878,7 @@ export function createEmptyTickPhaseProfile(): TickPhaseProfile {
       formLots: 0,
       npc: 0,
       hubLevels: 0,
+      portRestock: 0,
       total: 0,
     },
   };
@@ -13916,6 +13931,9 @@ export function tickEconomy(
     }
     if (migrated.portInventories) {
       world.portInventories = migrated.portInventories;
+    }
+    if (migrated.portInboundShips) {
+      world.portInboundShips = migrated.portInboundShips;
     }
     if (migrated.portConcessions) {
       world.portConcessions = migrated.portConcessions;
@@ -13980,6 +13998,10 @@ export function tickEconomy(
 
   tickHubLevels(world);
   addTickPhaseMs(profile, 'hubLevels', phaseAt);
+  phaseAt = performance.now();
+
+  tickPortInboundShips(world);
+  addTickPhaseMs(profile, 'portRestock', phaseAt);
 
   if (profile) {
     profile.ticks += 1;

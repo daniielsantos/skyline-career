@@ -230,9 +230,17 @@ export function ensureV5Ddl(db: SqliteDb): void {
       port_id TEXT NOT NULL,
       company_id TEXT NOT NULL,
       lease_paid_through_tick INTEGER NOT NULL,
+      level INTEGER NOT NULL DEFAULT 1,
       PRIMARY KEY (world_id, port_id)
     );
   `);
+  try {
+    db.exec(
+      `ALTER TABLE port_concessions ADD COLUMN level INTEGER NOT NULL DEFAULT 1`,
+    );
+  } catch {
+    /* column already exists */
+  }
 }
 
 export function countNpcRows(db: SqliteDb, worldId = LOCAL_WORLD_ID): number {
@@ -744,15 +752,20 @@ export function readPortConcessions(
 ): PortConcessionIndexRow[] {
   const rows = db
     .prepare(
-      `SELECT port_id, company_id, lease_paid_through_tick
+      `SELECT port_id, company_id, lease_paid_through_tick, level
        FROM port_concessions WHERE world_id = ? ORDER BY port_id ASC`,
     )
     .all(worldId) as Array<Record<string, unknown>>;
-  return rows.map((r) => ({
-    portId: sqlText(r.port_id),
-    companyId: sqlText(r.company_id),
-    leasePaidThroughTick: sqlNum(r.lease_paid_through_tick),
-  }));
+  return rows.map((r) => {
+    const levelNum = Math.floor(sqlNum(r.level, 1));
+    const level = levelNum === 2 || levelNum === 3 ? levelNum : 1;
+    return {
+      portId: sqlText(r.port_id),
+      companyId: sqlText(r.company_id),
+      leasePaidThroughTick: sqlNum(r.lease_paid_through_tick),
+      level,
+    };
+  });
 }
 
 export function replacePortConcessions(
@@ -764,15 +777,17 @@ export function replacePortConcessions(
   rows = uniqueByKey(rows, (r) => String(r.portId ?? '').trim().toUpperCase());
   const ins = db.prepare(
     `INSERT INTO port_concessions (
-       world_id, port_id, company_id, lease_paid_through_tick
-     ) VALUES (@world_id, @port_id, @company_id, @lease_paid_through_tick)`,
+       world_id, port_id, company_id, lease_paid_through_tick, level
+     ) VALUES (@world_id, @port_id, @company_id, @lease_paid_through_tick, @level)`,
   );
   for (const r of rows) {
+    const level = r.level === 2 || r.level === 3 ? r.level : 1;
     ins.run({
       world_id: worldId,
       port_id: r.portId,
       company_id: r.companyId,
       lease_paid_through_tick: r.leasePaidThroughTick,
+      level,
     });
   }
 }

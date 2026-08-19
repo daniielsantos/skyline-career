@@ -13,6 +13,8 @@ import type {
   CommodityId,
   PlayerPortConcession,
   PortConcessionIndexRow,
+  PortConcessionLevel,
+  PortInboundShip,
   PortInventoryRow,
 } from './types/career-economy.js';
 
@@ -39,9 +41,11 @@ export const PORT_INVENTORY_CAP_KG: Record<CommodityId, number> = {
 
 /** Passive restock toward cap per economy day (96 ticks). */
 export const PORT_RESTOCK_FRAC_PER_DAY = 0.08;
+/** One discharge per economy day — cargo is cap × frac, computed on arrival. */
+export const PORT_RESTOCK_INTERVAL_TICKS = 96;
 
 export const PORT_CONCESSION_CLAIM_USD = 175_000;
-/** Lease fee per economy day while concession is held. */
+/** Lease fee per economy day while concession is held (P1, idle). */
 export const PORT_CONCESSION_LEASE_USD_PER_DAY = 2_500;
 /** Initial / renew window length in economy days. */
 export const PORT_CONCESSION_LEASE_DAYS = 7;
@@ -49,6 +53,16 @@ export const PORT_CONCESSION_LEASE_TICKS =
   PORT_CONCESSION_LEASE_DAYS * 96;
 /** WH lifetime shipped kg gate at a pickup hub of the port. */
 export const PORT_CONCESSION_SHIPPED_KG = 25_000;
+
+/** P2 yard: larger soft caps (restock % unchanged → more kg per ship). */
+export const PORT_P2_CAP_MULT = 1.35;
+export const PORT_P2_UPGRADE_USD = 220_000;
+/** Lifetime kg through this port (operator) to unlock P2. */
+export const PORT_P2_THROUGHPUT_KG = 80_000;
+export const PORT_P2_LEASE_LEVEL_MULT = 1.2;
+/** Recent 7-day throughput that doubles the variable lease term (capped). */
+export const PORT_LEASE_THROUGHPUT_REF_KG = 80_000;
+export const PORT_LEASE_THROUGHPUT_MAX_MULT = 1.75;
 
 export const PORT_OPERATOR_PRICE_MULT = 0.9;
 export const PORT_OPERATOR_ETA_MULT = 0.85;
@@ -76,8 +90,24 @@ function mulberry32(a: number): () => number {
   };
 }
 
-export function portInventoryCapKg(commodityId: CommodityId): number {
-  return PORT_INVENTORY_CAP_KG[commodityId] ?? 0;
+export function portOperatorLevel(
+  world: CareerEconomyWorld,
+  portId: string,
+): PortConcessionLevel {
+  const level = findActivePortOperator(world, portId)?.level;
+  return level === 2 || level === 3 ? level : 1;
+}
+
+export function portInventoryCapKg(
+  commodityId: CommodityId,
+  opts?: { world?: CareerEconomyWorld; portId?: string },
+): number {
+  const base = PORT_INVENTORY_CAP_KG[commodityId] ?? 0;
+  if (base <= 0) return 0;
+  if (!opts?.world || !opts.portId) return base;
+  return Math.floor(
+    base * (portOperatorLevel(opts.world, opts.portId) >= 2 ? PORT_P2_CAP_MULT : 1),
+  );
 }
 
 export function ensurePlayerPortConcessions(
@@ -101,6 +131,7 @@ export function syncWorldPortConcessions(
       portId: c.portId,
       companyId: c.companyId,
       leasePaidThroughTick: c.leasePaidThroughTick,
+      level: c.level === 2 || c.level === 3 ? c.level : 1,
     }),
   );
 }
@@ -180,21 +211,113 @@ export function getPortInventoryStock(
   return row?.stockKg ?? 0;
 }
 
-/** Restock toward caps based on ticks since lastRestockTick. */
-export function ensurePortInventoryRestock(world: CareerEconomyWorld): void {
-  const rows = ensurePortInventories(world);
-  for (const row of rows) {
-    const cap = portInventoryCapKg(row.commodityId);
-    if (cap <= 0) continue;
-    const elapsed = Math.max(0, world.tick - (row.lastRestockTick ?? world.tick));
-    if (elapsed <= 0) continue;
-    const days = elapsed / 96;
-    const add = Math.floor(cap * PORT_RESTOCK_FRAC_PER_DAY * days);
-    if (add > 0) {
-      row.stockKg = Math.min(cap, row.stockKg + add);
-    }
-    row.lastRestockTick = world.tick;
+function restockKgForArrival(
+  world: CareerEconomyWorld,
+  portId: string,
+  commodityId: CommodityId,
+): number {
+  const cap = portInventoryCapKg(commodityId, { world, portId });
+  if (cap <= 0) return 0;
+  const stock = getPortInventoryStock(world, portId, commodityId);
+  const room = Math.max(0, cap - stock);
+  const add = Math.floor(cap * PORT_RESTOCK_FRAC_PER_DAY);
+  return Math.min(room, add);
+}
+
+function dischargePortShip(world: CareerEconomyWorld, portId: string): void {
+  for (const commodityId of PORT_CARGO) {
+    const add = restockKgForArrival(world, portId, commodityId);
+    if (add > 0) creditPortInventory(world, portId, commodityId, add);
   }
+  const id = portId.trim().toUpperCase();
+  for (const row of world.portInventories ?? []) {
+    if (row.portId === id) row.lastRestockTick = world.tick;
+  }
+}
+
+function portLastRestockTick(world: CareerEconomyWorld, portId: string): number {
+  const id = portId.trim().toUpperCase();
+  let last = 0;
+  for (const row of world.portInventories ?? []) {
+    if (row.portId !== id) continue;
+    last = Math.max(last, row.lastRestockTick ?? 0);
+  }
+  return last;
+}
+
+/**
+ * Economy-tick restock: one inbound ship per port per economy day.
+ * Catch-up discharges missed ships (offline days). Does not spawn listings.
+ */
+export function tickPortInboundShips(world: CareerEconomyWorld): void {
+  ensurePortInventories(world);
+  if (!Array.isArray(world.portInboundShips)) {
+    world.portInboundShips = [];
+  }
+  const next: PortInboundShip[] = [];
+  const seen = new Set<string>();
+
+  for (const ship of world.portInboundShips) {
+    const portId = String(ship.portId ?? '').trim().toUpperCase();
+    if (!portId || seen.has(portId)) continue;
+    seen.add(portId);
+    let arrives = Math.floor(Number(ship.arrivesAtTick) || 0);
+    if (arrives <= 0) {
+      arrives = world.tick + PORT_RESTOCK_INTERVAL_TICKS;
+    }
+    while (arrives <= world.tick) {
+      dischargePortShip(world, portId);
+      arrives += PORT_RESTOCK_INTERVAL_TICKS;
+    }
+    next.push({ portId, arrivesAtTick: arrives });
+  }
+
+  for (const port of listCareerPorts()) {
+    if (seen.has(port.id)) continue;
+    const baseline = portLastRestockTick(world, port.id);
+    let arrives = baseline + PORT_RESTOCK_INTERVAL_TICKS;
+    if (arrives <= 0) arrives = world.tick + PORT_RESTOCK_INTERVAL_TICKS;
+    while (arrives <= world.tick) {
+      dischargePortShip(world, port.id);
+      arrives += PORT_RESTOCK_INTERVAL_TICKS;
+    }
+    next.push({ portId: port.id, arrivesAtTick: arrives });
+  }
+
+  world.portInboundShips = next;
+}
+
+/** @deprecated Use tickPortInboundShips — kept for tests and debug time-skip. */
+export function ensurePortInventoryRestock(world: CareerEconomyWorld): void {
+  tickPortInboundShips(world);
+}
+
+export function estimatePortInboundCargo(
+  world: CareerEconomyWorld,
+  portId: string,
+): Array<{ commodityId: CommodityId; kg: number }> {
+  const id = portId.trim().toUpperCase();
+  return PORT_CARGO.map((commodityId) => ({
+    commodityId,
+    kg: restockKgForArrival(world, id, commodityId),
+  }));
+}
+
+export function portInboundShipFor(
+  world: CareerEconomyWorld,
+  portId: string,
+): PortInboundShip | undefined {
+  const id = portId.trim().toUpperCase();
+  return (world.portInboundShips ?? []).find((s) => s.portId === id);
+}
+
+export function nextPortDischargeTick(
+  world: CareerEconomyWorld,
+  portId: string,
+): number {
+  const ship = portInboundShipFor(world, portId);
+  if (ship && ship.arrivesAtTick > 0) return ship.arrivesAtTick;
+  return portLastRestockTick(world, portId) + PORT_RESTOCK_INTERVAL_TICKS;
 }
 
 export function debitPortInventory(
@@ -234,7 +357,7 @@ export function creditPortInventory(
     };
     rows.push(row);
   }
-  const cap = portInventoryCapKg(commodityId);
+  const cap = portInventoryCapKg(commodityId, { world, portId: id });
   row.stockKg = Math.min(
     cap > 0 ? cap : row.stockKg + kg,
     row.stockKg + Math.max(0, Math.floor(kg)),
@@ -250,13 +373,99 @@ export function portStockPriceFactor(
   portId: string,
   commodityId: CommodityId,
 ): number {
-  const cap = portInventoryCapKg(commodityId);
+  const cap = portInventoryCapKg(commodityId, { world, portId });
   if (cap <= 0) return 1;
   const stock = getPortInventoryStock(world, portId, commodityId);
   const frac = Math.min(1, Math.max(0, stock / cap));
   // frac=1 → 0.88; frac=0 → 1.18
   return 1.18 - frac * 0.3;
 }
+
+const THROUGHPUT_WINDOW_DAYS = 7;
+
+function economyDayIndex(tick: number): number {
+  return Math.floor(Math.max(0, tick) / 96);
+}
+
+export function alignConcessionThroughputWindow(
+  conc: PlayerPortConcession,
+  tick: number,
+): number[] {
+  const day = economyDayIndex(tick);
+  let window = Array.isArray(conc.throughputWindowKg)
+    ? conc.throughputWindowKg.map((n) =>
+        Math.max(0, Math.floor(Number(n) || 0)),
+      )
+    : [];
+  if (window.length !== THROUGHPUT_WINDOW_DAYS) {
+    window = Array.from({ length: THROUGHPUT_WINDOW_DAYS }, () => 0);
+    conc.throughputWindowDay = day;
+    conc.throughputWindowKg = window;
+    return window;
+  }
+  const prev = conc.throughputWindowDay ?? day;
+  const shift = day - prev;
+  if (shift > 0) {
+    if (shift >= THROUGHPUT_WINDOW_DAYS) {
+      window = Array.from({ length: THROUGHPUT_WINDOW_DAYS }, () => 0);
+    } else {
+      window = [
+        ...Array.from({ length: shift }, () => 0),
+        ...window.slice(0, THROUGHPUT_WINDOW_DAYS - shift),
+      ];
+    }
+    conc.throughputWindowDay = day;
+    conc.throughputWindowKg = window;
+  } else if (conc.throughputWindowDay == null) {
+    conc.throughputWindowDay = day;
+  }
+  return window;
+}
+
+export function recentPortThroughputKg(
+  conc: PlayerPortConcession,
+  tick: number,
+): number {
+  return alignConcessionThroughputWindow(conc, tick).reduce(
+    (s, n) => s + n,
+    0,
+  );
+}
+
+export function concessionLeaseUsdPerDay(
+  conc: PlayerPortConcession,
+  tick: number,
+): number {
+  const levelMult = (conc.level ?? 1) >= 2 ? PORT_P2_LEASE_LEVEL_MULT : 1;
+  const recent = recentPortThroughputKg(conc, tick);
+  const tMult =
+    1 +
+    Math.min(
+      PORT_LEASE_THROUGHPUT_MAX_MULT - 1,
+      recent / PORT_LEASE_THROUGHPUT_REF_KG,
+    );
+  return money(PORT_CONCESSION_LEASE_USD_PER_DAY * levelMult * tMult);
+}
+
+export function concessionLeaseUsdForDays(
+  conc: PlayerPortConcession,
+  tick: number,
+  days: number,
+): number {
+  return money(
+    concessionLeaseUsdPerDay(conc, tick) * Math.max(1, Math.floor(days)),
+  );
+}
+
+export type PortConcessionUpgradeGate = {
+  ok: boolean;
+  reasons: string[];
+  upgradeUsd: number;
+  neededKg: number;
+  shippedKg: number;
+  fromLevel: PortConcessionLevel;
+  toLevel: PortConcessionLevel;
+};
 
 export type PortConcessionClaimGate = {
   ok: boolean;
@@ -425,7 +634,11 @@ export function renewPortConcession(
   if (!conc) {
     throw new Error('No active concession to renew on this port');
   }
-  const leaseUsd = money(PORT_CONCESSION_LEASE_USD_PER_DAY * days);
+  const leaseUsd = concessionLeaseUsdForDays(
+    conc,
+    world.tick,
+    days,
+  );
   if (state.walletUsd < leaseUsd) {
     throw new Error(
       `Lease renew $${leaseUsd.toLocaleString()} exceeds wallet`,
@@ -440,6 +653,80 @@ export function renewPortConcession(
   });
   const base = Math.max(conc.leasePaidThroughTick, world.tick);
   conc.leasePaidThroughTick = base + days * 96;
+  syncWorldPortConcessions(world, state);
+  return conc;
+}
+
+export function evaluatePortConcessionUpgrade(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  portId: string,
+  companyId: string = LOCAL_COMPANY_ID,
+): PortConcessionUpgradeGate {
+  const port = getCareerPort(portId);
+  const reasons: string[] = [];
+  const conc = port
+    ? ensurePlayerPortConcessions(state).find(
+        (c) =>
+          c.portId === port.id &&
+          c.companyId === companyId &&
+          c.leasePaidThroughTick > world.tick,
+      )
+    : undefined;
+  const fromLevel: PortConcessionLevel =
+    conc?.level === 2 || conc?.level === 3 ? conc.level : 1;
+  const shippedKg = conc?.lifetimeThroughputKg ?? 0;
+  if (!port) reasons.push('Unknown port');
+  if (!conc) reasons.push('No active concession on this port');
+  if (conc && fromLevel >= 2) reasons.push('Port yard is already upgraded');
+  if (conc && shippedKg < PORT_P2_THROUGHPUT_KG) {
+    reasons.push(
+      `Need ${PORT_P2_THROUGHPUT_KG.toLocaleString()} kg throughput at this port (have ${shippedKg.toLocaleString()})`,
+    );
+  }
+  if (state.walletUsd < PORT_P2_UPGRADE_USD) {
+    reasons.push(
+      `Need $${PORT_P2_UPGRADE_USD.toLocaleString()} to enlarge the yard`,
+    );
+  }
+  return {
+    ok: reasons.length === 0,
+    reasons,
+    upgradeUsd: PORT_P2_UPGRADE_USD,
+    neededKg: PORT_P2_THROUGHPUT_KG,
+    shippedKg,
+    fromLevel,
+    toLevel: 2,
+  };
+}
+
+export function upgradePortConcession(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { portId: string; companyId?: string },
+): PlayerPortConcession {
+  const companyId = opts.companyId ?? LOCAL_COMPANY_ID;
+  const port = getCareerPort(opts.portId);
+  if (!port) throw new Error('Unknown port');
+  const gate = evaluatePortConcessionUpgrade(state, world, port.id, companyId);
+  if (!gate.ok) {
+    throw new Error(gate.reasons[0] ?? 'Cannot upgrade port concession');
+  }
+  const conc = ensurePlayerPortConcessions(state).find(
+    (c) =>
+      c.portId === port.id &&
+      c.companyId === companyId &&
+      c.leasePaidThroughTick > world.tick,
+  );
+  if (!conc) throw new Error('No active concession on this port');
+  applyWalletDelta(state, {
+    amountUsd: -gate.upgradeUsd,
+    kind: 'port_concession_upgrade',
+    atTick: world.tick,
+    icao: port.pickupHubs[0],
+    note: `P2 yard · ${port.name}`,
+  });
+  conc.level = 2;
   syncWorldPortConcessions(world, state);
   return conc;
 }
@@ -476,8 +763,10 @@ export function creditPortOperatorThroughput(
       c.leasePaidThroughTick > world.tick,
   );
   if (!conc) return;
-  conc.lifetimeThroughputKg =
-    (conc.lifetimeThroughputKg ?? 0) + Math.max(0, Math.floor(kg));
+  const add = Math.max(0, Math.floor(kg));
+  conc.lifetimeThroughputKg = (conc.lifetimeThroughputKg ?? 0) + add;
+  const window = alignConcessionThroughputWindow(conc, world.tick);
+  window[0] = (window[0] ?? 0) + add;
 }
 
 export function portInventorySnapshot(
@@ -489,6 +778,6 @@ export function portInventorySnapshot(
   return PORT_CARGO.map((commodityId) => ({
     commodityId,
     stockKg: getPortInventoryStock(world, id, commodityId),
-    capKg: portInventoryCapKg(commodityId),
+    capKg: portInventoryCapKg(commodityId, { world, portId: id }),
   }));
 }

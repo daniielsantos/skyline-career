@@ -1838,11 +1838,24 @@ export type PortsSnapshot = {
       stockKg: number;
       capKg: number;
     }>;
+    inbound?: {
+      arrivesAtTick: number;
+      ticksLeft: number;
+      totalKg: number;
+      cargo: Array<{
+        commodityId: string;
+        commodityName: string;
+        kg: number;
+      }>;
+    } | null;
     concession?: {
       status: 'vacant' | 'yours' | 'held';
       companyId: string | null;
+      level?: 1 | 2 | 3 | null;
       leasePaidThroughTick: number | null;
       lifetimeThroughputKg: number | null;
+      recentThroughputKg?: number | null;
+      renewLeaseUsd?: number | null;
       claim: {
         ok: boolean;
         reasons: string[];
@@ -1854,6 +1867,15 @@ export type PortsSnapshot = {
         hasTier3Warehouse: boolean;
         alreadyHoldsConcession: boolean;
         portOccupied: boolean;
+      } | null;
+      upgrade?: {
+        ok: boolean;
+        reasons: string[];
+        upgradeUsd: number;
+        neededKg: number;
+        shippedKg: number;
+        fromLevel: number;
+        toLevel: number;
       } | null;
     };
   }>;
@@ -2024,6 +2046,24 @@ export function postPortConcessionRenew(opts: {
     };
     ports: PortsSnapshot;
   }>('/api/ports/concession/renew', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortConcessionUpgrade(opts: { portId: string }) {
+  return api<{
+    walletUsd: number;
+    concession: {
+      portId: string;
+      companyId: string;
+      level: number;
+      claimedAtTick: number;
+      leasePaidThroughTick: number;
+      lifetimeThroughputKg: number;
+    };
+    ports: PortsSnapshot;
+  }>('/api/ports/concession/upgrade', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

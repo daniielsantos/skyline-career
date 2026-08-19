@@ -137,6 +137,7 @@ import {
   ensurePortListings,
   claimPortConcession,
   renewPortConcession,
+  upgradePortConcession,
   tickPortConcessions,
   ensurePortInventoryRestock,
   holdLotAtFbo,
@@ -3178,6 +3179,33 @@ export function createCareerApiServer(port = 8787) {
             const concession = renewPortConcession(missions, world, {
               portId: body.portId!,
               days: body.days != null ? Number(body.days) : undefined,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              concession,
+              ports: portSnapshot(world, missions),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/concession/upgrade') {
+        const body = (await readBody(req)) as { portId?: string };
+        if (!body.portId) {
+          send(res, 400, { error: 'portId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const concession = upgradePortConcession(missions, world, {
+              portId: body.portId!,
             });
             return {
               walletUsd: missions.walletUsd,

@@ -8,6 +8,7 @@ import {
   postPortBuy,
   postPortConcessionClaim,
   postPortConcessionRenew,
+  postPortConcessionUpgrade,
   postPortDeposit,
   postPortPickupAbandon,
   postWarehouseBuy,
@@ -869,6 +870,44 @@ export function PortsPanel(props: {
     }
   }
 
+  async function onUpgradeConcession(portIdToUpgrade: string, upgradeUsd: number) {
+    if (props.busy || loading) return;
+    const ok = await confirm({
+      title: 'Enlarge port yard (P2)?',
+      body: (
+        <p>
+          Bigger factory stock cap (same restock %, more kg per discharge) for{' '}
+          <strong>{props.formatMoney(upgradeUsd)}</strong>. Lease scales with
+          recent throughput — no extra buy discount.
+        </p>
+      ),
+      confirmLabel: 'Upgrade yard',
+      cancelLabel: 'Cancel',
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const result = await postPortConcessionUpgrade({ portId: portIdToUpgrade });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      setWarehouses(result.ports.warehouses ?? warehouses);
+      setGroundStaff(
+        result.ports.groundStaff ??
+          result.ports.warehouses?.groundStaff ??
+          groundStaff,
+      );
+      props.onToast?.('ok', 'P2 yard unlocked');
+      setConcessionOpen(false);
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onDeposit(pickupId: string) {
     if (props.busy || loading) return;
     setLoading(true);
@@ -1622,7 +1661,7 @@ export function PortsPanel(props: {
                     onClick={() => setConcessionOpen(true)}
                   >
                     {port.concession?.status === 'yours'
-                      ? 'Operator'
+                      ? `Operator P${port.concession.level ?? 1}`
                       : port.concession?.status === 'held'
                         ? 'Held'
                         : 'Vacant'}
@@ -1688,6 +1727,16 @@ export function PortsPanel(props: {
                               );
                             })}
                           </div>
+                          {port.inbound && port.inbound.totalKg > 0 ? (
+                            <p className="muted ports-inbound-note">
+                              Next discharge
+                              {port.inbound.ticksLeft <= 0
+                                ? ' arriving with the next economy tick'
+                                : ` in ~${ticksToHoursLabel(port.inbound.ticksLeft)}`}
+                              {' · '}
+                              {props.formatTonnes(port.inbound.totalKg)}
+                            </p>
+                          ) : null}
                         </details>
                       ) : null}
                     <div className="table-wrap">
@@ -1708,7 +1757,9 @@ export function PortsPanel(props: {
                             <tr>
                               <td colSpan={7}>
                                 <p className="empty">
-                                  No open listings — refresh later.
+                                  {port.inbound && port.inbound.ticksLeft > 0
+                                    ? `No open listings — next discharge in ~${ticksToHoursLabel(port.inbound.ticksLeft)}.`
+                                    : 'No open listings — wait for the next discharge.'}
                                 </p>
                               </td>
                             </tr>
@@ -3243,11 +3294,18 @@ export function PortsPanel(props: {
             {port.concession?.status === 'yours' ? (
               <>
                 <p className="muted">
-                  Operator rates (~10% cheaper buys, ~15% faster inbound, +1
-                  listing). Throughput{' '}
+                  P{port.concession.level ?? 1} operator: ~10% cheaper buys, ~15%
+                  faster inbound, +1 listing
+                  {(port.concession.level ?? 1) >= 2
+                    ? ', enlarged yard cap'
+                    : ''}
+                  . Throughput{' '}
                   {props.formatTonnes(
                     port.concession.lifetimeThroughputKg ?? 0,
                   )}
+                  {port.concession.recentThroughputKg != null
+                    ? ` · 7d ${props.formatTonnes(port.concession.recentThroughputKg)}`
+                    : ''}
                   {port.concession.leasePaidThroughTick != null &&
                   props.economyTick != null
                     ? ` · lease through tick ${port.concession.leasePaidThroughTick}`
@@ -3262,6 +3320,32 @@ export function PortsPanel(props: {
                   >
                     Close
                   </button>
+                  {port.concession.upgrade &&
+                  (port.concession.level ?? 1) < 2 ? (
+                    <button
+                      type="button"
+                      className="action ghost"
+                      disabled={
+                        props.busy || loading || !port.concession.upgrade.ok
+                      }
+                      title={
+                        port.concession.upgrade.ok
+                          ? 'Enlarge factory cap'
+                          : port.concession.upgrade.reasons.join(' · ')
+                      }
+                      onClick={() =>
+                        void onUpgradeConcession(
+                          port.id,
+                          port.concession?.upgrade?.upgradeUsd ?? 220_000,
+                        )
+                      }
+                    >
+                      P2 yard
+                      {port.concession.upgrade.upgradeUsd
+                        ? ` · ${props.formatMoney(port.concession.upgrade.upgradeUsd)}`
+                        : ''}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="accept"
@@ -3269,14 +3353,18 @@ export function PortsPanel(props: {
                     onClick={() =>
                       void onRenewConcession(
                         port.id,
-                        port.concession?.claim?.leaseUsd ?? 17_500,
+                        port.concession?.renewLeaseUsd ??
+                          port.concession?.claim?.leaseUsd ??
+                          17_500,
                       )
                     }
                   >
                     Renew lease
-                    {port.concession?.claim?.leaseUsd != null
-                      ? ` · ${props.formatMoney(port.concession.claim.leaseUsd)}`
-                      : ''}
+                    {port.concession?.renewLeaseUsd != null
+                      ? ` · ${props.formatMoney(port.concession.renewLeaseUsd)}`
+                      : port.concession?.claim?.leaseUsd != null
+                        ? ` · ${props.formatMoney(port.concession.claim.leaseUsd)}`
+                        : ''}
                   </button>
                 </div>
               </>

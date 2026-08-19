@@ -2,7 +2,7 @@
 
 Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). Dual-client IPC de fora.
 
-**Shipped (needs Career API restart):** old profile UNIQUE `port_listings.world_id, id` — persist v5 dedupes colliding listing ids (last wins). Delete active/last profile returns to the gate.
+**Shipped (uncommitted):** port restock is a daily inbound discharge on the economy tick (not on opening Ports). Listings spawn from yard stock only. Ports UI shows next discharge ETA. Concession P2 enlarges yard cap; renew lease scales with 7-day throughput (no extra buy discount).
 
 ## Validar (manual)
 
@@ -35,7 +35,7 @@ Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A live
 2. ~~**Ports (Santos / Paranaguá)**~~ — buy → pickup / auto-WH; Store in WH; Demand Board fulfill (não Fly to FBO spot).
 3. ~~**Port dynamic price + WH lots**~~ — listing price = hub spot × frac + jitter/clamp (frozen at spawn); warehouse deposits keep separate cost lots (±3% merge band).
 3b. ~~**Port concession v1**~~ — inventory restock + reactive price; claim/renew lease; operator buffs; 1/company; gates T3+25k shipped.
-3c. **Port P2/P3 + specials market (backlog)** — depois de playtest; ver roadmap *Port endgame backlog* (não bloquear mapa).
+3c. **Port P2/P3 + specials market (backlog)** — P2 yard cap shipped; P3 / specials / regional restock share later.
 4. ~~**Company tenant contract (doc)**~~ — roadmap + `08-economy`: company vs world vs pilot; sem schema members ainda.
 4b. ~~**Schema v4 world tables**~~ — `worlds` / `economy_meta` / `airports` / `airport_stock` + `world_id`; terminal SQL; tick in-memory.
 4c. ~~**Schema v5 world ops tables**~~ — `npcs` / `fuel_trucks` / `fuel_hauls` / `demand_orders` / `port_listings` / `port_inventories` / `port_concessions` keyed by `world_id` (`local` in SP); stripped from `economy_json`. Tick still in-memory. Player WH/concessions stay on `company_state`. Next: Postgres / members (not now).

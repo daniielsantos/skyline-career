@@ -16,16 +16,22 @@ import {
   PORT_CONCESSION_LEASE_TICKS,
   PORT_CONCESSION_LEASE_USD_PER_DAY,
   PORT_CONCESSION_SHIPPED_KG,
+  PORT_P2_CAP_MULT,
+  PORT_P2_THROUGHPUT_KG,
+  PORT_P2_UPGRADE_USD,
   claimPortConcession,
+  concessionLeaseUsdPerDay,
   debitPortInventory,
   ensurePortInventories,
   ensurePortInventoryRestock,
   evaluatePortConcessionClaim,
   getPortInventoryStock,
   isPortOperator,
+  portInventoryCapKg,
   portListingSlotCap,
   renewPortConcession,
   tickPortConcessions,
+  upgradePortConcession,
 } from './career-port-concessions.js';
 import {
   createSeedEconomyWorld,
@@ -226,5 +232,39 @@ describe('port concessions', () => {
       state.playerPortConcessions![0]!.leasePaidThroughTick,
       through + 7 * 96,
     );
+  });
+
+  it('listing spawn does not restock the yard', () => {
+    const world = createSeedEconomyWorld({ seed: 'port-no-get-restock' });
+    ensurePortInventories(world);
+    const row = (world.portInventories ?? []).find(
+      (r) => r.portId === 'BRSSZ' && r.commodityId === 'general',
+    )!;
+    row.stockKg = 0;
+    const before = getPortInventoryStock(world, 'BRSSZ', 'general');
+    ensurePortListings(world);
+    assert.equal(getPortInventoryStock(world, 'BRSSZ', 'general'), before);
+  });
+
+  it('P2 enlarges yard cap and lease scales with recent throughput', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 1_000_000;
+    const conc = claimPortConcession(state, world, { portId: 'BRSSZ' });
+    const p1Cap = portInventoryCapKg('general', { world, portId: 'BRSSZ' });
+    const idleLease = concessionLeaseUsdPerDay(conc, world.tick);
+    assert.equal(idleLease, PORT_CONCESSION_LEASE_USD_PER_DAY);
+
+    conc.lifetimeThroughputKg = PORT_P2_THROUGHPUT_KG;
+    conc.throughputWindowDay = Math.floor(world.tick / 96);
+    conc.throughputWindowKg = [PORT_P2_THROUGHPUT_KG, 0, 0, 0, 0, 0, 0];
+    const busyLease = concessionLeaseUsdPerDay(conc, world.tick);
+    assert.ok(busyLease > idleLease);
+
+    state.walletUsd = Math.max(state.walletUsd, PORT_P2_UPGRADE_USD + 1);
+    const upgraded = upgradePortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(upgraded.level, 2);
+    const p2Cap = portInventoryCapKg('general', { world, portId: 'BRSSZ' });
+    assert.equal(p2Cap, Math.floor(p1Cap * PORT_P2_CAP_MULT));
   });
 });

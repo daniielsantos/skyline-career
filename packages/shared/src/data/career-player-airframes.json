@@ -733,6 +733,20 @@
     "fuelBurnKgPerNm": 1
   },
   {
+    "typeId": "inibuilds-boeing-b707-gns",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Boeing B707 GNS",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-boeing-b707-gns.json",
+    "simbriefIcao": "B703",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 67268,
+    "mtowKg": 151318,
+    "maxCargoKg": 33974,
+    "fuelCapacityKg": 72497,
+    "maxRangeNm": 800,
+    "fuelBurnKgPerNm": 5
+  },
+  {
     "typeId": "blackbird-c-130j-long-configuration",
     "aircraftClassId": "narrow_freighter",
     "label": "C-130J Long Configuration",
@@ -958,6 +972,51 @@
     "fuelBurnKgPerNm": 5.581
   },
   {
+    "typeId": "inibuilds-a350-1000-default-cabin",
+    "aircraftClassId": "wide_freighter",
+    "label": "A350-1000 Default Cabin",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-a350.json",
+    "simbriefIcao": "A35K",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 158107,
+    "mtowKg": 308000,
+    "maxCargoKg": 61893,
+    "fuelCapacityKg": 122460,
+    "maxRangeNm": 6000,
+    "cruiseSpeedKt": 490,
+    "fuelBurnKgPerNm": 12
+  },
+  {
+    "typeId": "inibuilds-a350-900-default-cabin",
+    "aircraftClassId": "wide_freighter",
+    "label": "A350-900 Default Cabin",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-a350.json",
+    "simbriefIcao": "A359",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 141778,
+    "mtowKg": 268000,
+    "maxCargoKg": 53922,
+    "fuelCapacityKg": 108330,
+    "maxRangeNm": 6000,
+    "cruiseSpeedKt": 490,
+    "fuelBurnKgPerNm": 12
+  },
+  {
+    "typeId": "inibuilds-a350-900-ulr",
+    "aircraftClassId": "wide_freighter",
+    "label": "A350-900 ULR",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-a350.json",
+    "simbriefIcao": "A359",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 141778,
+    "mtowKg": 268000,
+    "maxCargoKg": 53922,
+    "fuelCapacityKg": 130692,
+    "maxRangeNm": 9000,
+    "cruiseSpeedKt": 490,
+    "fuelBurnKgPerNm": 12
+  },
+  {
     "typeId": "pmdg-777-200er-rr",
     "aircraftClassId": "wide_freighter",
     "label": "PMDG 777-200ER RR",
@@ -1031,6 +1090,21 @@
     "maxRangeNm": 6000,
     "cruiseFuelFlowKgPerHour": 5760,
     "cruiseSpeedKt": 480,
+    "fuelBurnKgPerNm": 12
+  },
+  {
+    "typeId": "toliss-toliss-a346-pro-preset-pax",
+    "aircraftClassId": "wide_freighter",
+    "label": "ToLiss A346 PRO Preset Pax",
+    "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
+    "simbriefIcao": "A346",
+    "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
+    "oewKg": 185500,
+    "mtowKg": 368000,
+    "maxCargoKg": 56811,
+    "fuelCapacityKg": 152024,
+    "maxRangeNm": 6000,
+    "cruiseSpeedKt": 490,
     "fuelBurnKgPerNm": 12
   }
 ]

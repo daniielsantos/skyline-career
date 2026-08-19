@@ -97,6 +97,8 @@ Stylized cartoon / clean vector illustration of a Beechcraft Bonanza G36 (BE36),
 
 Keep the aircraft highly recognizable: low-wing single piston Bonanza with conventional straight tail (not V-tail), retractable tricycle gear down, modern G1000-era Bonanza cabin windows, clean sporty single-engine Beech look. Must read as Bonanza G36 at a glance.
 
+PROPELLER (critical — do not omit): one three-blade propeller on the nose, clearly visible — spinner, hub, and all three blades readable in three-quarter view (static prop, not motion blur). Never a smooth nose without a propeller.
+
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
 CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphalt GA apron with yellow taxi lines, small gray hangar, soft blue hills. Cool blue wash #6b8cae. Soft ground shadow.
@@ -123,12 +125,14 @@ Composition: aircraft large and centered for a wide market card banner. No text,
 ## BN2 Islander
 - **typeId:** `blackbox-bn2-islander-cargo-tip-tanks`
 - **file:** `bn2-islander.png`
-- **family:** Cargo Tip Tanks (Analogue/Garmin) + SpecialOps / Analogue — one Market SKU
+- **family:** Cargo Tip Tanks (Analogue/Garmin) + Passenger / Analogue / Tip Tanks + SpecialOps — one Market SKU
 
 ```
 Stylized cartoon / clean vector illustration of a Britten-Norman BN-2 Islander (BN2P), three-quarter side view parked facing left.
 
-Keep the aircraft highly recognizable: high-wing twin piston utility, two engines under the wings, fixed tricycle gear, square utilitarian cabin, short stubby nose, boxy freighter/commuter look typical of the Islander. Must read as BN-2 Islander at a glance — not a Twin Otter, not a Caravan.
+Keep the aircraft highly recognizable: high-wing twin piston utility, two engines under the wings, fixed tricycle gear, square utilitarian cabin, short stubby nose, boxy freighter/commuter look typical of the Islander. Optional wing tip tanks visible. Must read as BN-2 Islander at a glance — not a Twin Otter, not a Caravan.
+
+PROPELLERS (critical — do not omit): TWO propellers, one on each wing engine — each a two-blade prop with visible hub and blades (static, not motion blur). Both props must be clearly drawn; never show bare engine nacelles with no propellers.
 
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
@@ -161,6 +165,8 @@ Composition: aircraft large and centered for a wide market card banner. No text,
 Stylized cartoon / clean vector illustration of a Cessna 152 (C152), three-quarter side view parked facing left.
 
 Keep the aircraft highly recognizable: high-wing with struts, single piston, fixed tricycle gear (often without wheel pants), smaller two-seat cabin than a 172, shorter fuselage, classic trainer look. Must read as a Cessna 152 at a glance — clearly smaller / simpler than a 172.
+
+PROPELLER (critical — do not omit): one two-blade propeller on the nose, clearly visible in three-quarter view — hub, blades, and spinner (or bare metal hub) must be drawn; prop disc may be static (not motion-blurred). Never show a smooth closed nose cone with no propeller.
 
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
@@ -226,6 +232,8 @@ Stylized cartoon / clean vector illustration of a Piper Aerostar 600 (AEST), thr
 
 Keep the aircraft highly recognizable: low mid-wing twin piston, engines mounted on the wings close to the fuselage, retractable tricycle gear down, conventional empennage, sleek fast twin look, relatively pointed nose, high-performance GA twin silhouette. Must read as a Piper Aerostar 600 at a glance.
 
+PROPELLERS (critical — do not omit): TWO three-blade propellers, one on each wing engine — hubs, spinners, and blades clearly visible in three-quarter view (static props). Never show twin-engine nacelles without propellers.
+
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
 CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphalt GA apron with yellow taxi lines, small gray hangar, soft blue hills. Cool blue wash #6b8cae. Soft ground shadow.
@@ -241,6 +249,8 @@ Composition: aircraft large and centered for a wide market card banner. No text,
 Stylized cartoon / clean vector illustration of a Piper PA-24-250 Comanche (PA24), three-quarter side view parked facing left.
 
 Keep the aircraft highly recognizable: low-wing single piston classic Comanche, retractable tricycle gear down, conventional empennage, sleek 1950s–60s Piper look, distinctive Comanche cabin and wing. Must read as a PA-24 Comanche at a glance — not a Cherokee, not a Bonanza.
+
+PROPELLER (critical — do not omit): one two-blade propeller on the nose with visible hub and blades (static prop, optional spinner). Never a smooth closed nose with no propeller.
 
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
@@ -289,6 +299,8 @@ Composition: aircraft large and centered for a wide market card banner. No text,
 Stylized cartoon / clean vector illustration of a Rockwell Commander 114 (AC11), three-quarter side view parked facing left.
 
 Keep the aircraft highly recognizable: low-wing single piston, retractable tricycle gear down, conventional empennage, distinctive Commander features — relatively tall / roomy cabin greenhouse, short stout nose cowling, mid-span wing, clean sporty single-engine look typical of the 114/114TC. Must read as a Commander 114 at a glance — not a Cessna or Piper.
+
+PROPELLER (critical — do not omit): one two-blade propeller on the nose — hub, blades, and spinner clearly visible in three-quarter view (static prop). Never show a smooth nose cone without a propeller.
 
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
@@ -1065,6 +1077,86 @@ Keep the aircraft highly recognizable: stretched 777-300 twinjet, two huge under
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
 CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock / apron scale, oversized ramp atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Boeing B707 GNS
+- **typeId:** `inibuilds-boeing-b707-gns`
+- **file:** `b707-gns.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 707-320B classic jetliner (B703), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: narrow-body four-engine jet, four podded turbojet engines under the wings, swept low wing, distinctive 707 nose, long fuselage with passenger windows, conventional tail, tricycle gear down. Four underwing engines essential — not a 737, not a DC-8.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / early night cargo ramp, purple-indigo sky wash echoing #7a6a9a / #42385c, container silhouettes, apron floodlights, industrial freighter atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Airbus A350-900 Default Cabin
+- **typeId:** `inibuilds-a350-900-default-cabin`
+- **file:** `a350-900.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A350-900 widebody twinjet (A359), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: twin large underwing engines, A350 curved cockpit windshield, upward blended winglets, long fuselage with passenger windows, conventional tail, gear down. Twin engines only — not A340 (four engines), not 777.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Airbus A350-900 ULR
+- **typeId:** `inibuilds-a350-900-ulr`
+- **file:** `a350-900-ulr.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A350-900 ULR widebody twinjet (A359), three-quarter side view parked facing left.
+
+Same A350-900 external silhouette as standard -900: twin underwing engines, A350 curved cockpit, blended winglets, long fuselage, gear down. Must read as A350-900 at a glance.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Airbus A350-1000 Default Cabin
+- **typeId:** `inibuilds-a350-1000-default-cabin`
+- **file:** `a350-1000.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A350-1000 widebody twinjet (A35K), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: stretched A350 twinjet, two large underwing engines, A350 curved cockpit, blended winglets, noticeably LONGER fuselage than A350-900, gear down. Stretch length essential.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## ToLiss A346 PRO Preset Pax
+- **typeId:** `toliss-toliss-a346-pro-preset-pax`
+- **file:** `a346.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A340-600 widebody quadjet (A346), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: very long widebody with FOUR underwing engines (two per side), Airbus A340 nose and cockpit, dense passenger window row, tall tail, gear down. Four engines essential — distinguishes from A350 twinjet.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
 
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```

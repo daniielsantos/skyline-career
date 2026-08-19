@@ -1,0 +1,128 @@
+{
+  "source": "simbrief",
+  "icao": "A359",
+  "ofpId": "inibuilds-a350-family",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "A350-900 Default Cabin",
+    "A350-900 (Default Cabin)",
+    "A350-900 ULR",
+    "A350-1000 Default Cabin",
+    "A350-1000 (Default Cabin)"
+  ],
+  "matchTitlePattern": "A350-(900|1000)",
+  "notes": [
+    "A350-900 Default Cabin — auto roles pack from homologated profile",
+    "Profile: inibuilds/a350-900-default-cabin@1.0.0",
+    "loadMethod: native-simbrief; injectCapable: false",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Fuel strategy: simconnect-direct",
+    "Joined Market family ofpId=inibuilds-a350-family",
+    "Homologated profile: inibuilds/a350-900-default-cabin@1.0.0",
+    "Title: A350-900 Default Cabin",
+    "A350-900 ULR — auto roles pack from homologated profile",
+    "Profile: inibuilds/a350-900-ulr@1.0.0",
+    "Homologated profile: inibuilds/a350-900-ulr@1.0.0",
+    "Title: A350-900 ULR",
+    "A350-1000 Default Cabin — auto roles pack from homologated profile",
+    "Profile: inibuilds/a350-1000-default-cabin@1.0.0",
+    "Homologated profile: inibuilds/a350-1000-default-cabin@1.0.0",
+    "Title: A350-1000 Default Cabin"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "A35K",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Station 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Station 2",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Station 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Station 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Station 5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "Station 6",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "Station 7",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "Station 8",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

@@ -123,8 +123,30 @@ export function inferCareerClassFromIcao(icao: string): FreighterClassId {
   ) {
     return 'narrow_freighter';
   }
-  if (['MD11', 'MD1F', 'B744', 'B748', 'A332', 'A333', 'A339', 'A388', 'B77F', 'B77L', 'B772', 'B77W'].includes(normalized)) {
+  if (
+    [
+      'MD11',
+      'MD1F',
+      'B744',
+      'B748',
+      'A332',
+      'A333',
+      'A339',
+      'A346',
+      'A350',
+      'A359',
+      'A35K',
+      'A388',
+      'B77F',
+      'B77L',
+      'B772',
+      'B77W',
+    ].includes(normalized)
+  ) {
     return 'wide_freighter';
+  }
+  if (['B703', 'B707', 'B720'].includes(normalized)) {
+    return 'narrow_freighter';
   }
   // Unknown ICAO — prefer GA over widebody so burn/range fallbacks stay sane.
   return 'light_ga';

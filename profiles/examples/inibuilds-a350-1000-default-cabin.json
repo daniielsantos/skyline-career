@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "inibuilds-a350-1000-default-cabin",
+  "profileKey": "inibuilds/a350-1000-default-cabin",
+  "semver": "1.0.0",
+  "displayName": "A350-1000 Default Cabin (MSFS 2024)",
+  "match": {
+    "fingerprint": "e59324308dd19ed0a13cf8069db0fe3942eebcf61de5ee750f91122d7c6a7618",
+    "title": "A350-1000 Default Cabin",
+    "publisher": "inibuilds",
+    "icao": "A35K",
+    "liveTitles": [
+      "A350-1000 (Default Cabin)"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 7800,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 7800,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "CENTER",
+        "name": "Center",
+        "capacity": 13200,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "CENTER2",
+        "name": "Center 2",
+        "capacity": 13200,
+        "readVar": "FUEL TANK CENTER2 QUANTITY",
+        "readUnit": "gallons"
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "calibrated-live",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 50
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: A350-1000 Default Cabin.",
+    "ICAO type designator (catalog/SimBrief): A35K.",
+    "Load method: native-simbrief (no Skyline inject).",
+    "Fuel/payload write plans intentionally empty — load via addon EFB/tablet.",
+    "Use compare-ofp + Career Loaded vs Due for validation.",
+    "See profiles/notes/inibuilds-a350-1000-default-cabin.md"
+  ]
+}

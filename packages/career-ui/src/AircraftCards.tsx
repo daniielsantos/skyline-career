@@ -77,6 +77,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'blacksquare-b60-duke': '/airframes/duke-be60.png',
   'blackbox-bn2-islander-specialops-analogue': '/airframes/bn2-islander.png',
   'blackbox-bn2-islander-cargo-tip-tanks': '/airframes/bn2-islander.png',
+  'blackbox-bn2-islander-passenger-analogue-tip-tanks': '/airframes/bn2-islander.png',
   'asobo-c172sp-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-classic-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-g1000-cargo': '/airframes/cessna-172.png',
@@ -176,6 +177,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'pmdg-738-bbj2-family': '/airframes/b738-bbj2.png',
   'pmdg-738-bcf-family': '/airframes/b738-bcf.png',
   'pmdg-738-pax-family': '/airframes/b738-pax.png',
+  'inibuilds-boeing-b707-gns': '/airframes/b707-gns.png',
 
   // --- wide_freighter ---
   'tfdi-md11f-family': '/airframes/md-11f.png',
@@ -183,6 +185,10 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'pmdg-777-200lr': '/airframes/b777-200lr.png',
   'pmdg-777-200er-rr': '/airframes/b777-200er.png',
   'pmdg-777-300er': '/airframes/b777-300er.png',
+  'inibuilds-a350-900-default-cabin': '/airframes/a350-900.png',
+  'inibuilds-a350-900-ulr': '/airframes/a350-900-ulr.png',
+  'inibuilds-a350-1000-default-cabin': '/airframes/a350-1000.png',
+  'toliss-toliss-a346-pro-preset-pax': '/airframes/a346.png',
 };
 
 export function airframeCardArtUrl(

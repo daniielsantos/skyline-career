@@ -1,0 +1,110 @@
+{
+  "source": "simbrief",
+  "icao": "A346",
+  "ofpId": "toliss-a346",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "ToLiss A346 PRO Preset Pax",
+    "ToLiss A346 PRO [Preset Pax]"
+  ],
+  "matchTitlePattern": "ToLiss A346|A346 PRO",
+  "notes": [
+    "Aerosoft / ToLiss A346 PRO (Preset Pax) — flight_model station_load.0..6",
+    "liveSources: classic stations; fuel mass-balance then classic (no PMDG/TFDi probe)",
+    "SimBrief: A346 passenger airframe",
+    "Package has Pax preset only (no freighter)",
+    "Homologated profile: toliss/toliss-a346-pro-preset-pax@1.0.0",
+    "Title: ToLiss A346 PRO Preset Pax"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "passengerStations": [
+        3,
+        4,
+        5
+      ],
+      "baggageStations": [
+        6,
+        7
+      ],
+      "crewStations": [
+        1,
+        2
+      ]
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "mass-balance",
+      "classic"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "A346",
+  "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Pilot",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Copilot",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Business class",
+      "role": "passenger"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Premium economy",
+      "role": "passenger"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Economy class",
+      "role": "passenger"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "Forward baggage",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "Rear baggage",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

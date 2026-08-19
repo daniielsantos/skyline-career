@@ -1,0 +1,342 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "inibuilds-boeing-b707-gns",
+  "profileKey": "inibuilds/boeing-b707-gns",
+  "semver": "1.0.0",
+  "displayName": "Boeing B707 GNS (MSFS 2024)",
+  "match": {
+    "fingerprint": "24c77d2e47739d92fabb42f3687f5df0dcf5eac69bed6a4f65114db2cadd95e7",
+    "title": "Boeing B707 GNS",
+    "publisher": "inibuilds",
+    "icao": "B703",
+    "liveTitles": [
+      "Boeing B707 GNS"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 4069,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 4069,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "CENTER",
+        "name": "Center",
+        "capacity": 10193,
+        "readVar": "FUEL TANK CENTER QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK CENTER QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 2323,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT AUX QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 2323,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_TIP",
+        "name": "Left Tip",
+        "capacity": 439,
+        "readVar": "FUEL TANK LEFT TIP QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT TIP QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_TIP",
+        "name": "Right Tip",
+        "capacity": 439,
+        "readVar": "FUEL TANK RIGHT TIP QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT TIP QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK CENTER QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{CENTER}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT TIP QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_TIP} + 0.9"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT TIP QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_TIP} + 0.9"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK CENTER QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{CENTER}"
+        },
+        {
+          "var": "FUEL TANK LEFT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_AUX}"
+        },
+        {
+          "var": "FUEL TANK RIGHT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_AUX}"
+        },
+        {
+          "var": "FUEL TANK LEFT TIP QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_TIP}"
+        },
+        {
+          "var": "FUEL TANK RIGHT TIP QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_TIP}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:8",
+        "unit": "pounds",
+        "valueExpr": "{station_8}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 16,
+      "maxMac": 35
+    },
+    "calibration": {
+      "observedMac": 25.292405486106873,
+      "calibratedAtIso": "2026-08-19T20:33:01.983Z",
+      "sweep": {
+        "minObservedMac": 25.749775767326355,
+        "maxObservedMac": 25.861886143684387,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 8,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-08-19T20:33:09.902Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Boeing B707 GNS.",
+    "ICAO type designator (catalog/SimBrief): B703.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, CENTER, LEFT_AUX, RIGHT_AUX, LEFT_TIP, RIGHT_TIP).",
+    "AUX/Aft tanks included.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8.",
+    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/inibuilds-boeing-b707-gns.md"
+  ]
+}

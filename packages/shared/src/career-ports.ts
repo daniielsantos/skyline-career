@@ -1859,8 +1859,11 @@ function money(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+let portListingSeq = 0;
+
 function nextId(prefix: string, tick: number): string {
-  return `${prefix}_${tick}_${Math.floor(Math.random() * 1e6)}`;
+  portListingSeq += 1;
+  return `${prefix}_${tick}_${portListingSeq}_${Math.floor(Math.random() * 1e9)}`;
 }
 
 export function listCareerPorts(): readonly CareerPortDef[] {

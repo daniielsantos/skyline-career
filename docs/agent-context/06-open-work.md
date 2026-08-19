@@ -2,6 +2,8 @@
 
 Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). Dual-client IPC de fora.
 
+**Shipped (needs Career API restart):** old profile UNIQUE `port_listings.world_id, id` — persist v5 dedupes colliding listing ids (last wins). Delete active/last profile returns to the gate.
+
 ## Validar (manual)
 
 - [ ] Watch CG card: após editar EFB, `% MAC` atualiza (não congela no Validate); Loaded vs Due não trava

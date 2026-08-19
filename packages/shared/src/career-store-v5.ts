@@ -81,6 +81,21 @@ function parsePayload(raw: string | null): Record<string, unknown> {
   }
 }
 
+function rowId(row: { id?: unknown }): string {
+  return typeof row.id === 'string' ? row.id.trim() : '';
+}
+
+/** Last row wins. Old blobs used `Math.random() * 1e6` listing ids and can collide. */
+function uniqueByKey<T>(rows: T[], keyOf: (row: T) => string): T[] {
+  const map = new Map<string, T>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    if (!key) continue;
+    map.set(key, row);
+  }
+  return [...map.values()];
+}
+
 function withSqliteTransaction(db: SqliteDb, fn: () => void): void {
   let started = false;
   try {
@@ -299,6 +314,7 @@ export function replaceNpcs(
   worldId = LOCAL_WORLD_ID,
 ): void {
   db.prepare(`DELETE FROM npcs WHERE world_id = ?`).run(worldId);
+  npcs = uniqueByKey(npcs, rowId);
   const ins = db.prepare(
     `INSERT INTO npcs (
        world_id, id, name, aircraft_class_id, airframe_type_id, max_cargo_kg,
@@ -410,6 +426,7 @@ export function replaceFuelTrucks(
   worldId = LOCAL_WORLD_ID,
 ): void {
   db.prepare(`DELETE FROM fuel_trucks WHERE world_id = ?`).run(worldId);
+  trucks = uniqueByKey(trucks, rowId);
   const ins = db.prepare(
     `INSERT INTO fuel_trucks (
        world_id, id, name, truck_class_id, home_region, status, current_haul_id,
@@ -480,6 +497,7 @@ export function replaceFuelHauls(
   worldId = LOCAL_WORLD_ID,
 ): void {
   db.prepare(`DELETE FROM fuel_hauls WHERE world_id = ?`).run(worldId);
+  hauls = uniqueByKey(hauls, rowId);
   const ins = db.prepare(
     `INSERT INTO fuel_hauls (
        world_id, id, truck_id, origin_icao, dest_icao, commodity_id, cargo_kg,
@@ -557,6 +575,7 @@ export function replaceDemandOrders(
   worldId = LOCAL_WORLD_ID,
 ): void {
   db.prepare(`DELETE FROM demand_orders WHERE world_id = ?`).run(worldId);
+  orders = uniqueByKey(orders, rowId);
   const ins = db.prepare(
     `INSERT INTO demand_orders (
        world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
@@ -634,6 +653,7 @@ export function replacePortListings(
   worldId = LOCAL_WORLD_ID,
 ): void {
   db.prepare(`DELETE FROM port_listings WHERE world_id = ?`).run(worldId);
+  listings = uniqueByKey(listings, rowId);
   const ins = db.prepare(
     `INSERT INTO port_listings (
        world_id, id, port_id, commodity_id, available_kg, unit_price_usd,
@@ -697,6 +717,11 @@ export function replacePortInventories(
   worldId = LOCAL_WORLD_ID,
 ): void {
   db.prepare(`DELETE FROM port_inventories WHERE world_id = ?`).run(worldId);
+  rows = uniqueByKey(
+    rows,
+    (r) =>
+      `${String(r.portId ?? '').trim().toUpperCase()}\0${String(r.commodityId ?? '')}`,
+  );
   const ins = db.prepare(
     `INSERT INTO port_inventories (
        world_id, port_id, commodity_id, stock_kg, last_restock_tick
@@ -736,6 +761,7 @@ export function replacePortConcessions(
   worldId = LOCAL_WORLD_ID,
 ): void {
   db.prepare(`DELETE FROM port_concessions WHERE world_id = ?`).run(worldId);
+  rows = uniqueByKey(rows, (r) => String(r.portId ?? '').trim().toUpperCase());
   const ins = db.prepare(
     `INSERT INTO port_concessions (
        world_id, port_id, company_id, lease_paid_through_tick

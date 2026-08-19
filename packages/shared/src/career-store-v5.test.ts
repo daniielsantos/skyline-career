@@ -9,6 +9,7 @@ import { emptyMissionsStateV2 } from './career-fleet.js';
 import { CAREER_STORE_SCHEMA_VERSION, openCareerStore } from './career-store.js';
 import { ensureV3Ddl } from './career-store-v3.js';
 import { ensureV4Ddl } from './career-store-v4.js';
+import { ensureV5Ddl, readPortListings, replacePortListings } from './career-store-v5.js';
 
 function schemaVersionInDb(sqlitePath: string): string {
   const db = new DatabaseSync(sqlitePath);
@@ -209,6 +210,110 @@ describe('career store v5', () => {
     assert.ok(reloadedNpc);
     assert.equal(reloadedNpc.aircraftClassId, sampleNpc.aircraftClassId);
     assert.equal(reloadedNpc.status, sampleNpc.status);
+    store.close();
+  });
+
+  it('replacePortListings keeps the last row when ids collide', () => {
+    const db = new DatabaseSync(':memory:');
+    ensureV5Ddl(db);
+    const listing = {
+      id: 'portlot_dup',
+      portId: 'BRSSZ',
+      commodityId: 'general' as const,
+      availableKg: 1000,
+      unitPriceUsd: 1,
+      allocatedHubIcao: 'SBGR',
+      arrivedAtTick: 1,
+      expiresAtTick: 100,
+      status: 'open' as const,
+    };
+    replacePortListings(db, [
+      listing,
+      { ...listing, availableKg: 9000 },
+      { ...listing, id: 'portlot_other', availableKg: 4000 },
+    ]);
+    const rows = readPortListings(db);
+    assert.equal(rows.length, 2);
+    assert.equal(rows.find((r) => r.id === 'portlot_dup')?.availableKg, 9000);
+    assert.equal(rows.find((r) => r.id === 'portlot_other')?.availableKg, 4000);
+  });
+
+  it('upgrades a v4 blob with duplicate port listing ids', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-v4-dup-listings-'));
+    const sqlitePath = join(dir, 'skyline.sqlite');
+    const world = createSeedEconomyWorld({ seed: 'v4-dup-listings' });
+    world.lastBatchAtMs = Date.now();
+    const listing = {
+      id: 'portlot_1_123',
+      portId: 'BRSSZ',
+      commodityId: 'general' as const,
+      availableKg: 5000,
+      unitPriceUsd: 1.1,
+      allocatedHubIcao: 'SBGR',
+      arrivedAtTick: world.tick,
+      expiresAtTick: world.tick + 10_000,
+      status: 'open' as const,
+    };
+    world.portListings = [listing, { ...listing, availableKg: 2500 }];
+
+    const db = new DatabaseSync(sqlitePath);
+    db.exec(`
+      CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      CREATE TABLE economy_json (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        json TEXT NOT NULL,
+        updated_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE missions_json (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        json TEXT NOT NULL,
+        updated_at_ms INTEGER NOT NULL
+      );
+      CREATE TABLE ledger (
+        id TEXT PRIMARY KEY NOT NULL,
+        at_tick INTEGER NOT NULL,
+        day_index INTEGER NOT NULL,
+        amount_usd REAL NOT NULL,
+        kind TEXT NOT NULL,
+        note TEXT,
+        aircraft_id TEXT,
+        mission_id TEXT,
+        icao TEXT
+      );
+      CREATE TABLE lots (
+        id TEXT PRIMARY KEY NOT NULL,
+        commodity_id TEXT NOT NULL,
+        origin_icao TEXT NOT NULL,
+        dest_icao TEXT NOT NULL,
+        quantity_kg INTEGER NOT NULL,
+        reserved_kg INTEGER NOT NULL,
+        created_at_tick INTEGER NOT NULL,
+        expires_at_tick INTEGER NOT NULL,
+        pay_usd INTEGER NOT NULL,
+        base_pay_usd INTEGER,
+        urgency TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL
+      );
+      INSERT INTO meta (key, value) VALUES ('schema_version', '4');
+    `);
+    ensureV3Ddl(db);
+    ensureV4Ddl(db);
+    db.prepare(
+      `INSERT INTO economy_json (id, json, updated_at_ms) VALUES (1, ?, ?)`,
+    ).run(JSON.stringify(world), Date.now());
+    db.prepare(
+      `INSERT INTO missions_json (id, json, updated_at_ms) VALUES (1, ?, ?)`,
+    ).run(JSON.stringify(emptyMissionsStateV2()), Date.now());
+    db.close();
+
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    assert.equal(schemaVersionInDb(store.sqlitePath!), CAREER_STORE_SCHEMA_VERSION);
+    assert.equal(countRows(store.sqlitePath!, 'port_listings'), 1);
+    const loaded = await store.loadEconomy();
+    const kept = (loaded.world.portListings ?? []).filter((l) => l.id === listing.id);
+    assert.equal(kept.length, 1);
+    assert.equal(kept[0]?.availableKg, 2500);
     store.close();
   });
 });

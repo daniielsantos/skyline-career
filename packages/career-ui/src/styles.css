@@ -5021,6 +5021,13 @@ tr.lot-locked {
   line-height: 1.15;
 }
 
+.aircraft-card-registration {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
 .aircraft-card-meta {
   display: flex;
   flex-wrap: wrap;

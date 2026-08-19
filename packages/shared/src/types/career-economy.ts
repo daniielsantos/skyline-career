@@ -926,6 +926,8 @@ export interface AircraftListing {
   /** Concrete homologated player model within the economic class. */
   airframeTypeId?: string;
   label: string;
+  /** Unique tail number / registration (e.g. PR-SKY, N208AS). */
+  registration?: string;
   basedIcao: string;
   /** Purchase price, or lease down-payment. */
   askingUsd: number;
@@ -1492,6 +1494,8 @@ export interface PlayerAircraft {
   /** Concrete homologated model bought/leased from the aircraft market. */
   airframeTypeId?: string;
   label: string;
+  /** Unique tail number shown on cards, dispatch, and market listings. */
+  registration?: string;
   /** ICAO where the aircraft is parked (or last parked while assigned). */
   locationIcao: string;
   fuelKg: number;

@@ -41,6 +41,14 @@ import {
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
 } from './career-player-airframes.js';
+import {
+  allocateAircraftRegistration,
+  collectUsedAircraftRegistrations,
+  countryIdForHubIcao,
+  ensureAircraftRegistrations,
+  normalizeAircraftRegistration,
+  registrationForListingPurchase,
+} from './career-aircraft-registration.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   AircraftListing,
@@ -174,6 +182,21 @@ export const LEASE_OUT_HOURS_PER_MONTH: Record<FreighterClassId, number> = {
   narrow_freighter: 48,
   wide_freighter: 55,
 };
+
+function allocateAircraftRegistrationFromMarket(opts: {
+  world: CareerEconomyWorld;
+  basedIcao: string;
+  used: Set<string>;
+  seedHint: string;
+  rng: () => number;
+}): string {
+  return allocateAircraftRegistration({
+    countryId: countryIdForHubIcao(opts.basedIcao, opts.world),
+    used: opts.used,
+    rng: opts.rng,
+    seedHint: opts.seedHint,
+  });
+}
 
 function hashSeed(seed: string): number {
   let h = 2166136261;
@@ -436,11 +459,13 @@ export function generateAircraftMarketListings(opts: {
   walletUsd: number;
   dayIndex: number;
   economyTick: number;
+  usedRegistrations: Set<string>;
 }): AircraftListing[] {
   const rng = mulberry32(
     hashSeed(`${opts.world.seed}:acf-market:d${opts.dayIndex}`),
   );
   const listings: AircraftListing[] = [];
+  const used = opts.usedRegistrations;
 
   // Every enabled homologated player airframe is represented on each daily
   // board. Condition, location and sale kind still rotate by seed/day.
@@ -462,12 +487,20 @@ export function generateAircraftMarketListings(opts: {
       airframe.maxCargoKg,
     );
     const pcts = conditionPctsForListing(condition, kind, rng);
+    const registration = allocateAircraftRegistrationFromMarket({
+      world: opts.world,
+      basedIcao,
+      used,
+      seedHint: `${opts.dayIndex}_${airframe.typeId}_${i}`,
+      rng,
+    });
     listings.push({
       id: `acfl_${opts.dayIndex}_${i}_${airframe.typeId}`,
       kind,
       aircraftClassId,
       airframeTypeId: airframe.typeId,
       label: airframe.label,
+      registration,
       basedIcao,
       askingUsd: Math.max(500, priced.askingUsd),
       leaseMonthlyUsd: priced.leaseMonthlyUsd,
@@ -788,11 +821,13 @@ export function ensureAircraftMarket(
     staleDisabledAirframe;
 
   if (needRefresh) {
+    const used = collectUsedAircraftRegistrations(state);
     const generated = generateAircraftMarketListings({
       world,
       walletUsd: state.walletUsd,
       dayIndex: day,
       economyTick: tick,
+      usedRegistrations: used,
     });
     listings = [...generated, ...playerKeep];
     state.aircraftMarket = listings;
@@ -802,6 +837,7 @@ export function ensureAircraftMarket(
     state.aircraftMarketDay = day;
   }
 
+  ensureAircraftRegistrations(state, world);
   applyNpcDemand(state, world, day);
   return state;
 }
@@ -861,6 +897,9 @@ function buildAircraftFromListing(
       findCareerPlayerAirframe(listing.airframeTypeId)?.label ??
       listing.label ??
       classLabelShort(listing.aircraftClassId),
+    registration:
+      normalizeAircraftRegistration(listing.registration) ??
+      registrationForListingPurchase(listing, state),
     locationIcao: listing.basedIcao,
     fuelKg: Math.round(capacity * 0.4),
     fuelCapacityKg: capacity,
@@ -1184,6 +1223,7 @@ export function sellPlayerAircraft(
     label:
       findCareerPlayerAirframe(aircraft.airframeTypeId)?.label ??
       aircraft.label,
+    registration: normalizeAircraftRegistration(aircraft.registration) ?? undefined,
     basedIcao: aircraft.locationIcao,
     askingUsd: Math.max(500, askingUsd),
     condition: aircraft.condition ?? 'good',
@@ -1254,6 +1294,7 @@ export function listAircraftForLease(
     label:
       findCareerPlayerAirframe(aircraft.airframeTypeId)?.label ??
       aircraft.label,
+    registration: normalizeAircraftRegistration(aircraft.registration) ?? undefined,
     basedIcao: aircraft.locationIcao,
     askingUsd: monthly,
     leaseMonthlyUsd: monthly,

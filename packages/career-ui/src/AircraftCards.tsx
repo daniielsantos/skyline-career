@@ -295,6 +295,14 @@ function formatCargoShort(kg: number, formatMass: (kg: number) => string): strin
   return formatMass(kg);
 }
 
+function formatAircraftRegistration(
+  registration: string | undefined | null,
+): string | null {
+  if (typeof registration !== 'string') return null;
+  const compact = registration.trim().toUpperCase();
+  return compact.length >= 3 ? compact : null;
+}
+
 export function MarketListingCard(props: {
   listing: AircraftListing;
   catalog?: AircraftCatalogEntry;
@@ -347,6 +355,7 @@ export function MarketListingCard(props: {
       : !canAfford
         ? 'Not enough cash for deposit'
         : undefined;
+  const registration = formatAircraftRegistration(listing.registration);
 
   return (
     <article className="aircraft-card">
@@ -378,6 +387,9 @@ export function MarketListingCard(props: {
       <div className="aircraft-card-body">
         <div className="aircraft-card-title">
           <strong>{listing.label || aircraftModelLabel(listing.aircraftClassId)}</strong>
+          {registration ? (
+            <div className="aircraft-card-registration">{registration}</div>
+          ) : null}
           <div className="aircraft-card-meta">
             <span>{aircraftClassLabel(listing.aircraftClassId)}</span>
             <IcaoLink
@@ -600,6 +612,7 @@ export function HangarAircraftCard(props: {
         )
       : null;
   const note = hangarStatusNote(acf);
+  const registration = formatAircraftRegistration(acf.registration);
   const canList =
     (acf.ownership ?? 'owned') === 'owned' &&
     acf.status === 'parked' &&
@@ -762,6 +775,9 @@ export function HangarAircraftCard(props: {
         <div className="hangar-section hangar-section-title">
           <div className="aircraft-card-title">
             <strong>{acf.label}</strong>
+            {registration ? (
+              <div className="aircraft-card-registration">{registration}</div>
+            ) : null}
             <div className="aircraft-card-meta">
               <span>{aircraftClassLabel(acf.aircraftClassId)}</span>
               {acf.condition ? (

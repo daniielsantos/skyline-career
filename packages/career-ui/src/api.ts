@@ -11,6 +11,7 @@ export type PlayerAircraft = {
   aircraftClassId: AircraftClass;
   airframeTypeId?: string;
   label: string;
+  registration?: string;
   locationIcao: string;
   fuelKg: number;
   fuelCapacityKg: number;
@@ -147,6 +148,7 @@ export type AircraftListing = {
   aircraftClassId: AircraftClass;
   airframeTypeId?: string;
   label: string;
+  registration?: string;
   basedIcao: string;
   askingUsd: number;
   leaseMonthlyUsd?: number;

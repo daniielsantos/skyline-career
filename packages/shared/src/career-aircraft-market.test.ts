@@ -35,17 +35,20 @@ describe('aircraft market', () => {
   it('generates a stable new/used/lease board for a seed day', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-seed' });
     const marketAirframes = listCareerPlayerAirframes();
+    const used = new Set<string>();
     const a = generateAircraftMarketListings({
       world,
       walletUsd: 10_000,
       dayIndex: 3,
       economyTick: world.tick,
+      usedRegistrations: used,
     });
     const b = generateAircraftMarketListings({
       world,
       walletUsd: 10_000,
       dayIndex: 3,
       economyTick: world.tick,
+      usedRegistrations: new Set<string>(),
     });
     assert.equal(a.length, marketAirframes.length);
     assert.deepEqual(
@@ -62,6 +65,7 @@ describe('aircraft market', () => {
         walletUsd: 10_000,
         dayIndex: day,
         economyTick: world.tick,
+        usedRegistrations: new Set<string>(),
       })) {
         kinds.add(listing.kind);
       }
@@ -71,6 +75,8 @@ describe('aircraft market', () => {
     assert.ok(kinds.has('lease'));
     assert.ok(a.every((l) => Boolean(l.airframeTypeId)));
     assert.ok(a.every((l) => l.label.length > 0));
+    assert.ok(a.every((l) => typeof l.registration === 'string' && l.registration.length >= 3));
+    assert.equal(new Set(a.map((l) => l.registration)).size, a.length);
     for (const used of a.filter((l) => l.kind === 'used')) {
       const msrp = resolveAircraftMsrpUsd({
         aircraftClassId: used.aircraftClassId,
@@ -110,6 +116,7 @@ describe('aircraft market', () => {
       walletUsd: 5_000,
       dayIndex: 1,
       economyTick: world.tick,
+      usedRegistrations: new Set<string>(),
     });
     assert.deepEqual(
       new Set(listings.map((listing) => listing.airframeTypeId)),
@@ -147,6 +154,7 @@ describe('aircraft market', () => {
     assert.equal(aircraft.locationIcao, usedGa!.basedIcao);
     assert.equal(aircraft.airframeTypeId, usedGa!.airframeTypeId);
     assert.equal(aircraft.label, usedGa!.label);
+    assert.equal(aircraft.registration, usedGa!.registration);
     assert.equal(state.walletUsd, 0);
     assert.ok(state.fleet.some((a) => a.id === aircraft.id));
   });

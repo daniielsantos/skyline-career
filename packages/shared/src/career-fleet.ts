@@ -32,6 +32,12 @@ import {
   normalizeCareerClassOps,
   syncClassOpsFromFleet,
 } from './career-class-ops.js';
+import {
+  allocateAircraftRegistration,
+  countryIdForHubIcao,
+  ensureAircraftRegistrations,
+  normalizeAircraftRegistration,
+} from './career-aircraft-registration.js';
 import { normalizeCompanyCredit } from './career-company-credit.js';
 import {
   assertPilotAtIcao,
@@ -265,7 +271,7 @@ export function normalizeMissionsState(
   const activeBushTrip = normalizeActiveBushTripField(
     (raw as CareerMissionsState).activeBushTrip,
   );
-  return {
+  const result: CareerMissionsState = {
     version: 2,
     walletUsd,
     missions,
@@ -294,6 +300,8 @@ export function normalizeMissionsState(
       ? { airframePerfOverrides }
       : {}),
   };
+  ensureAircraftRegistrations(result);
+  return result;
 }
 
 function normalizeActiveBushTripField(
@@ -512,6 +520,8 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
         : undefined,
   };
   ensureAircraftConditionPcts(normalized);
+  const reg = normalizeAircraftRegistration(raw.registration);
+  if (reg) normalized.registration = reg;
   return normalized;
 }
 
@@ -632,11 +642,17 @@ export function selectStarterHub(
   );
   const interval = INSPECTION_INTERVAL_HOURS[starterAirframe.aircraftClassId];
   const stem = starterAirframe.typeId.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+  const registration = allocateAircraftRegistration({
+    countryId: countryIdForHubIcao(hub),
+    used: new Set<string>(),
+    seedHint: `starter_${stem}_${hub}`,
+  });
   const starter: PlayerAircraft = {
     id: `acf_${stem}_1`,
     aircraftClassId: starterAirframe.aircraftClassId,
     airframeTypeId: starterAirframe.typeId,
     label: starterAirframe.label,
+    registration,
     locationIcao: hub,
     fuelKg: Math.round(capacity * 0.45),
     fuelCapacityKg: capacity,

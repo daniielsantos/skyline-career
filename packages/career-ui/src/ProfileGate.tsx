@@ -162,9 +162,7 @@ export function CareerProfileManage(props: {
           type="button"
           className="action ghost danger"
           disabled={props.busy || !props.canDelete}
-          title={
-            props.canDelete ? 'Delete this save' : 'Cannot delete the last profile'
-          }
+          title={props.canDelete ? 'Delete this save' : 'Delete unavailable'}
           onClick={() => props.onDelete()}
         >
           Delete

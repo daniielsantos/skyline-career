@@ -45,4 +45,14 @@ describe('career profiles', () => {
     assert.equal(after.profiles.length, 1);
     assert.equal(after.profiles[0]!.id, b.id);
   });
+
+  it('deletes the last remaining profile and leaves an empty gate', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'career-prof-last-'));
+    await ensureCareerProfilesLayout(root);
+    const only = await createCareerProfile(root, 'Solo');
+    await setActiveCareerProfile(root, only.id);
+    const after = await deleteCareerProfile(root, only.id);
+    assert.equal(after.activeId, null);
+    assert.equal(after.profiles.length, 0);
+  });
 });

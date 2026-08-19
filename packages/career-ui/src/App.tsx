@@ -5356,7 +5356,6 @@ export function App() {
               /* ignore */
             }
           }
-          await postCareerProfileClear();
           setActiveCareerProfile(null);
           setShowProfileGate(true);
           setStaging(null);
@@ -12143,7 +12142,7 @@ export function App() {
                 <p className="aircraft-card-section-label">Save</p>
                 <CareerProfileManage
                   name={activeCareerProfile.name}
-                  canDelete={careerProfiles.length > 1}
+                  canDelete
                   busy={busy}
                   onRename={(name) =>
                     void onRenameCareerProfile(activeCareerProfile.id, name)

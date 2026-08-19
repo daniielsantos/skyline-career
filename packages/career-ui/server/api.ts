@@ -1429,17 +1429,26 @@ export function createCareerApiServer(port = 8787) {
 
       const profileDeleteMatch = path.match(/^\/api\/profiles\/([a-z0-9]+)$/i);
       if (req.method === 'DELETE' && profileDeleteMatch) {
+        const id = profileDeleteMatch[1]!;
         try {
-          if (activeProfileId === profileDeleteMatch[1]) {
-            send(res, 400, {
-              error: 'Switch to another profile before deleting the active one',
+          if (activeProfileId === id) {
+            if (watchSession.getStatus().running) await watchSession.stop();
+            if (bushWatchSession.getStatus().running) {
+              await bushWatchSession.stop();
+            }
+            await withCareerLock(async () => {
+              if (store) {
+                try {
+                  store.close();
+                } catch {
+                  /* ignore */
+                }
+                store = null;
+                activeProfileId = null;
+              }
             });
-            return;
           }
-          const file = await deleteCareerProfile(
-            careerRoot,
-            profileDeleteMatch[1]!,
-          );
+          const file = await deleteCareerProfile(careerRoot, id);
           send(res, 200, { profiles: file.profiles, activeId: file.activeId });
         } catch (error) {
           send(res, 400, {

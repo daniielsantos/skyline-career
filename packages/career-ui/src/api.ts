@@ -924,9 +924,19 @@ export type AirportView = ClockSync & {
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  try {
+    if (localStorage.getItem('skyline.devMode') === '1') {
+      headers['X-Skyline-Dev-Mode'] = '1';
+    }
+  } catch {
+    /* ignore */
+  }
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
     ...init,
+    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
   const data = (await res.json()) as T & { error?: string };
   if (!res.ok) {
@@ -1179,6 +1189,8 @@ export function fetchMarket(
     access?: 'open' | 'locked' | '';
     /** Route scope: intl = cross-country, domestic = same country. */
     lane?: 'intl' | 'domestic' | 'bush' | '';
+    /** Crew needed vs own-aircraft freights. */
+    crew?: 'crew' | 'aircraft' | '';
   } = {},
 ) {
   const params = new URLSearchParams();
@@ -1215,6 +1227,8 @@ export function fetchMarket(
   if (access === 'open' || access === 'locked') params.set('access', access);
   const lane = String(opts.lane ?? '').trim();
   if (lane === 'intl' || lane === 'domestic') params.set('lane', lane);
+  const crew = String(opts.crew ?? '').trim();
+  if (crew === 'crew' || crew === 'aircraft') params.set('crew', crew);
   const qs = params.toString();
   return api<
     ClockSync & {

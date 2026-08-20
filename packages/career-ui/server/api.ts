@@ -12,9 +12,15 @@ import {
   CAREER_COMMODITIES,
   cancelMission,
   cargoOpsIsUnlocked,
+  unlockAllCareerCargoOps,
+  unlockAllCareerClassOps,
   classOpsIsUnlocked,
   classOpsHidesBoardLot,
   CLASS_OPS_STARTER_IDS,
+  LEASE_UNLOCK_CLEAN_DRY_SETTLES,
+  dryCleanSettlesOk,
+  aircraftLeaseUnlockProgress,
+  aircraftLeaseUnlockProgressDevOpen,
   BOARD_NEAR_MAX_NM,
   getAircraftClass,
   clearAircraftMaintenanceWithParts,
@@ -80,6 +86,7 @@ import {
   estimateBoardLotEconomics,
   parseMarketBoardAccessFilter,
   parseMarketBoardLaneFilter,
+  parseMarketBoardCrewFilter,
   parseMarketBoardSorts,
   parsePositiveNumberParam,
   boardFreightKgForEstimates,
@@ -173,7 +180,6 @@ import {
   assertCompanyCreditAllowsOps,
   settleMission,
   signAircraftLease,
-  aircraftLeaseUnlockProgress,
   resolveHangarParkingUsdPerDay,
   applyWalletDelta,
   summarizeCareerLedger,
@@ -441,6 +447,7 @@ function withParkingRates(
 function fleetPayload(
   missions: MissionsFile,
   world?: Pick<CareerEconomyWorld, 'airports'>,
+  req?: import('node:http').IncomingMessage,
 ) {
   const starterAircraft = listStarterCareerPlayerAirframes().map((airframe) => ({
     typeId: airframe.typeId,
@@ -469,8 +476,12 @@ function fleetPayload(
     starterAircraft,
     companyCredit: companyCreditSnapshot(missions),
     playerFbos: playerFboSnapshot(missions, world),
-    leaseUnlock: aircraftLeaseUnlockProgress(missions),
-    classOps: missions.classOps ?? null,
+    leaseUnlock: req
+      ? leaseUnlockForRequest(req, missions)
+      : aircraftLeaseUnlockProgress(missions),
+    classOps: req
+      ? classOpsForRequest(req, missions.classOps) ?? null
+      : missions.classOps ?? null,
     activeBushTrip: missions.activeBushTrip ?? null,
   };
 }
@@ -697,13 +708,83 @@ async function withCareerWrite<T>(
   });
 }
 
+function requestDevMode(req: import('node:http').IncomingMessage): boolean {
+  const raw = req.headers['x-skyline-dev-mode'];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value === '1' || value === 'true';
+}
+
+/** Gate copy of cargo ops — unlocked in Dev Mode, not written back to save. */
+function cargoOpsForRequest(
+  req: import('node:http').IncomingMessage,
+  ops: CareerMissionsState['cargoOps'],
+): CareerMissionsState['cargoOps'] {
+  if (!requestDevMode(req)) return ops;
+  return unlockAllCareerCargoOps(ops ?? undefined);
+}
+
+/** Gate copy of class ops — unlocked in Dev Mode, not written back to save. */
+function classOpsForRequest(
+  req: import('node:http').IncomingMessage,
+  ops: CareerMissionsState['classOps'],
+): CareerMissionsState['classOps'] {
+  if (!requestDevMode(req)) return ops;
+  return unlockAllCareerClassOps(ops ?? undefined);
+}
+
+function leaseUnlockForRequest(
+  req: import('node:http').IncomingMessage,
+  missions: Pick<CareerMissionsState, 'cargoOps'>,
+) {
+  if (!requestDevMode(req)) return aircraftLeaseUnlockProgress(missions);
+  return aircraftLeaseUnlockProgressDevOpen(missions);
+}
+
+/**
+ * Temporarily unlock cargo + class ladders (and Dry settles for lease gate)
+ * for a write. Restores only fields the callback did not replace.
+ */
+function withDevProgressionUnlock<T>(
+  req: import('node:http').IncomingMessage,
+  missions: CareerMissionsState,
+  fn: () => T,
+): T {
+  if (!requestDevMode(req)) return fn();
+  const savedCargo = missions.cargoOps;
+  const savedClass = missions.classOps;
+  const cargoGate = unlockAllCareerCargoOps(savedCargo ?? undefined);
+  const have = dryCleanSettlesOk(cargoGate);
+  if (have < LEASE_UNLOCK_CLEAN_DRY_SETTLES) {
+    cargoGate.commodities.supplies.settlesOk +=
+      LEASE_UNLOCK_CLEAN_DRY_SETTLES - have;
+  }
+  const classGate = unlockAllCareerClassOps(savedClass ?? undefined);
+  missions.cargoOps = cargoGate;
+  missions.classOps = classGate;
+  try {
+    return fn();
+  } finally {
+    if (missions.cargoOps === cargoGate) missions.cargoOps = savedCargo;
+    if (missions.classOps === classGate) missions.classOps = savedClass;
+  }
+}
+
+/** @deprecated alias — prefer withDevProgressionUnlock */
+function withDevCargoOpsUnlock<T>(
+  req: import('node:http').IncomingMessage,
+  missions: CareerMissionsState,
+  fn: () => T,
+): T {
+  return withDevProgressionUnlock(req, missions, fn);
+}
+
 function send(res: import('node:http').ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Skyline-Dev-Mode',
   });
   res.end(json);
 }
@@ -1495,10 +1576,9 @@ export function createCareerApiServer(port = 8787) {
             npcBusy,
             npcFlights:
               world.npcFlights?.filter((f) => f.status === 'in_flight').length ?? 0,
-            ...fleetPayload(missions, world),
+            ...fleetPayload(missions, world, req),
             cashflow: summarizeCareerLedger(missions, world.tick),
-            cargoOps: missions.cargoOps ?? null,
-            classOps: missions.classOps ?? null,
+            cargoOps: cargoOpsForRequest(req, missions.cargoOps) ?? null,
             playerFbos: playerFboSnapshot(missions, world),
             companyCrew: companyCrewSnapshot(missions, world),
             groundStaff: groundStaffSnapshot(missions, world),
@@ -1757,7 +1837,7 @@ export function createCareerApiServer(port = 8787) {
             catalog,
             airframePerf,
             fleet: withParkingRates(missions.fleet),
-            leaseUnlock: aircraftLeaseUnlockProgress(missions),
+            leaseUnlock: leaseUnlockForRequest(req, missions),
           };
         });
         send(res, 200, payload);
@@ -1778,26 +1858,28 @@ export function createCareerApiServer(port = 8787) {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             settleAircraftMarketOps(missions, world.tick);
-            const purchased = purchaseAircraftListing(
-              missions,
-              world,
-              body.listingId!,
-              {
-                deliver: body.deliver === true,
-                ...(typeof body.deliverToIcao === 'string'
-                  ? { deliverToIcao: body.deliverToIcao }
-                  : {}),
-              },
-            );
-            return {
-              walletUsd: missions.walletUsd,
-              debitUsd: purchased.debitUsd,
-              deliveryFeeUsd: purchased.deliveryFeeUsd,
-              aircraft: purchased.aircraft,
-              fleet: withParkingRates(missions.fleet),
-              listings: listAircraftMarket(missions, world),
-              companyCredit: companyCreditSnapshot(missions),
-            };
+            return withDevProgressionUnlock(req, missions, () => {
+              const purchased = purchaseAircraftListing(
+                missions,
+                world,
+                body.listingId!,
+                {
+                  deliver: body.deliver === true,
+                  ...(typeof body.deliverToIcao === 'string'
+                    ? { deliverToIcao: body.deliverToIcao }
+                    : {}),
+                },
+              );
+              return {
+                walletUsd: missions.walletUsd,
+                debitUsd: purchased.debitUsd,
+                deliveryFeeUsd: purchased.deliveryFeeUsd,
+                aircraft: purchased.aircraft,
+                fleet: withParkingRates(missions.fleet),
+                listings: listAircraftMarket(missions, world),
+                companyCredit: companyCreditSnapshot(missions),
+              };
+            });
           });
           send(res, 200, result);
         } catch (error) {
@@ -1822,22 +1904,24 @@ export function createCareerApiServer(port = 8787) {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             settleAircraftMarketOps(missions, world.tick);
-            const leased = signAircraftLease(missions, world, body.listingId!, {
-              deliver: body.deliver === true,
-              ...(typeof body.deliverToIcao === 'string'
-                ? { deliverToIcao: body.deliverToIcao }
-                : {}),
+            return withDevProgressionUnlock(req, missions, () => {
+              const leased = signAircraftLease(missions, world, body.listingId!, {
+                deliver: body.deliver === true,
+                ...(typeof body.deliverToIcao === 'string'
+                  ? { deliverToIcao: body.deliverToIcao }
+                  : {}),
+              });
+              return {
+                walletUsd: missions.walletUsd,
+                debitUsd: leased.debitUsd,
+                deliveryFeeUsd: leased.deliveryFeeUsd,
+                aircraft: leased.aircraft,
+                fleet: withParkingRates(missions.fleet),
+                listings: listAircraftMarket(missions, world),
+                companyCredit: companyCreditSnapshot(missions),
+                leaseUnlock: leaseUnlockForRequest(req, missions),
+              };
             });
-            return {
-              walletUsd: missions.walletUsd,
-              debitUsd: leased.debitUsd,
-              deliveryFeeUsd: leased.deliveryFeeUsd,
-              aircraft: leased.aircraft,
-              fleet: withParkingRates(missions.fleet),
-              listings: listAircraftMarket(missions, world),
-              companyCredit: companyCreditSnapshot(missions),
-              leaseUnlock: aircraftLeaseUnlockProgress(missions),
-            };
           });
           send(res, 200, result);
         } catch (error) {
@@ -2470,8 +2554,8 @@ export function createCareerApiServer(port = 8787) {
             reconcilePlayerInbound(w, missions.missions);
             return {
               world: w,
-              cargoOps: missions.cargoOps,
-              classOps: missions.classOps,
+              cargoOps: cargoOpsForRequest(req, missions.cargoOps),
+              classOps: classOpsForRequest(req, missions.classOps),
               missionsState: missions,
             };
           },
@@ -2824,6 +2908,7 @@ export function createCareerApiServer(port = 8787) {
             url.searchParams.get('access'),
           ),
           laneFilter: parseMarketBoardLaneFilter(url.searchParams.get('lane')),
+          crewFilter: parseMarketBoardCrewFilter(url.searchParams.get('crew')),
           // Sticky unlocked-first unless client sends access:desc.
           sorts: requestedSorts,
         };
@@ -3174,26 +3259,28 @@ export function createCareerApiServer(port = 8787) {
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            const bought = buyPortListing(missions, world, {
-              listingId: body.listingId!,
-              kg: Number(body.kg),
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const bought = buyPortListing(missions, world, {
+                listingId: body.listingId!,
+                kg: Number(body.kg),
+              });
+              return {
+                walletUsd: missions.walletUsd,
+                debitUsd: bought.debitUsd,
+                unitPriceUsd: bought.unitPriceUsd,
+                kg: bought.kg,
+                storedKg: bought.storedKg,
+                inboundKg: bought.inboundKg,
+                yardKg: bought.yardKg,
+                transferTicks: bought.transferTicks,
+                readyAtTick: bought.readyAtTick,
+                pickup: bought.pickup,
+                inboundTransfer: bought.inboundTransfer,
+                warehousePile: bought.warehousePile,
+                ports: portSnapshot(world, missions),
+                warehouses: playerWarehouseSnapshot(missions, world),
+              };
             });
-            return {
-              walletUsd: missions.walletUsd,
-              debitUsd: bought.debitUsd,
-              unitPriceUsd: bought.unitPriceUsd,
-              kg: bought.kg,
-              storedKg: bought.storedKg,
-              inboundKg: bought.inboundKg,
-              yardKg: bought.yardKg,
-              transferTicks: bought.transferTicks,
-              readyAtTick: bought.readyAtTick,
-              pickup: bought.pickup,
-              inboundTransfer: bought.inboundTransfer,
-              warehousePile: bought.warehousePile,
-              ports: portSnapshot(world, missions),
-              warehouses: playerWarehouseSnapshot(missions, world),
-            };
           });
           send(res, 200, result);
         } catch (error) {
@@ -3498,29 +3585,31 @@ export function createCareerApiServer(port = 8787) {
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            const accepted = acceptDemandOrder(missions, world, {
-              orderId: body.orderId!,
-              originIcao: body.originIcao!,
-              aircraftId: body.aircraftId!,
-              kg: body.kg != null ? Number(body.kg) : undefined,
-            });
-            return {
-              walletUsd: missions.walletUsd,
-              mission: withMissionClientView(world, missions, accepted.mission),
-              order: accepted.order,
-              kg: accepted.kg,
-              payUsd: accepted.payUsd,
-              warehouses: playerWarehouseSnapshot(missions, world),
-              demand: demandSnapshot(world, {
-                warehouseIcaos: (missions.playerWarehouses?.warehouses ?? []).map(
-                  (w) => w.icao,
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const accepted = acceptDemandOrder(missions, world, {
+                orderId: body.orderId!,
+                originIcao: body.originIcao!,
+                aircraftId: body.aircraftId!,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              });
+              return {
+                walletUsd: missions.walletUsd,
+                mission: withMissionClientView(world, missions, accepted.mission),
+                order: accepted.order,
+                kg: accepted.kg,
+                payUsd: accepted.payUsd,
+                warehouses: playerWarehouseSnapshot(missions, world),
+                demand: demandSnapshot(world, {
+                  warehouseIcaos: (missions.playerWarehouses?.warehouses ?? []).map(
+                    (w) => w.icao,
+                  ),
+                }),
+                fleet: missions.fleet,
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
                 ),
-              }),
-              fleet: missions.fleet,
-              missions: missions.missions.map((m) =>
-                withMissionClientView(world, missions, m),
-              ),
-            };
+              };
+            });
           });
           send(res, 200, result);
         } catch (error) {
@@ -3543,15 +3632,17 @@ export function createCareerApiServer(port = 8787) {
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            const held = holdLotAtFbo(missions, world, {
-              lotId: body.lotId!,
-              cargoKg: body.cargoKg,
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const held = holdLotAtFbo(missions, world, {
+                lotId: body.lotId!,
+                cargoKg: body.cargoKg,
+              });
+              return {
+                hold: held.hold,
+                playerFbos: playerFboSnapshot(missions, world),
+                walletUsd: missions.walletUsd,
+              };
             });
-            return {
-              hold: held.hold,
-              playerFbos: playerFboSnapshot(missions, world),
-              walletUsd: missions.walletUsd,
-            };
           });
           send(res, 200, result);
         } catch (error) {
@@ -4218,8 +4309,8 @@ export function createCareerApiServer(port = 8787) {
               aircraftClassId: aircraft,
               maxCargoKg: cargoLimit.maxCargoKg,
               intoMission: intoMission ?? undefined,
-              cargoOps: missions.cargoOps,
-              classOps: missions.classOps,
+              cargoOps: cargoOpsForRequest(req, missions.cargoOps),
+              classOps: classOpsForRequest(req, missions.classOps),
             });
             const appended = Boolean(intoMission) && mission.lots.length > beforeLots;
             if (intoMission) {
@@ -4297,8 +4388,10 @@ export function createCareerApiServer(port = 8787) {
               return { kind: 'missing' as const };
             }
             if (
-              missions.classOps &&
-              !classOpsIsUnlocked(missions.classOps, flight.aircraftClassId)
+              !classOpsIsUnlocked(
+                classOpsForRequest(req, missions.classOps),
+                flight.aircraftClassId,
+              )
             ) {
               return {
                 kind: 'locked' as const,
@@ -4790,8 +4883,8 @@ export function createCareerApiServer(port = 8787) {
                   lines,
                   aircraftClassId: aircraft,
                   maxCargoKg: operationalMaxCargoKg,
-                  cargoOps: missions.cargoOps,
-              classOps: missions.classOps,
+                  cargoOps: cargoOpsForRequest(req, missions.cargoOps),
+                  classOps: classOpsForRequest(req, missions.classOps),
                 }),
                 aircraftId: playerAircraft.id,
                 airframeTypeId: playerAirframe?.typeId,
@@ -4819,8 +4912,8 @@ export function createCareerApiServer(port = 8787) {
                 maxCargoKg: operationalMaxCargoKg,
                 intoMission: intoMission ?? undefined,
                 airframeTypeId: playerAirframe?.typeId,
-                cargoOps: missions.cargoOps,
-              classOps: missions.classOps,
+                cargoOps: cargoOpsForRequest(req, missions.cargoOps),
+                classOps: classOpsForRequest(req, missions.classOps),
               });
               mission = {
                 ...staged.mission,

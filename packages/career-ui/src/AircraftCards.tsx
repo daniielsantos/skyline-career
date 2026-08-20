@@ -503,7 +503,7 @@ export function MarketListingCard(props: {
               </span>
               <span className="price-sub">
                 {listing.leaseMonthlyUsd != null
-                  ? `${props.formatMoney(listing.leaseMonthlyUsd)} / month`
+                  ? `${props.formatMoney(listing.leaseMonthlyUsd)} / week`
                   : '—'}
               </span>
               <span className="price-term">
@@ -645,17 +645,17 @@ export function ListLeaseAskBody(props: {
   onChange: (next: { monthlyUsd: number; termMonths: number }) => void;
 }) {
   const [monthly, setMonthly] = useState(props.catalogMonthlyUsd);
-  const [term, setTerm] = useState(6);
-  const deposit = Math.round(monthly * 2);
+  const [term, setTerm] = useState(3);
+  const deposit = Math.round(monthly * 4);
   return (
     <>
       <p>
-        Catalog {props.formatMoney(props.catalogMonthlyUsd)}/mo. NPC typically
-        accepts ~70–130% of that and 3–18 month terms. Deposit is two months (
+        Catalog {props.formatMoney(props.catalogMonthlyUsd)}/wk. NPC typically
+        accepts ~70–130% of that and 1–3 month terms. Deposit is four weeks (
         {props.formatMoney(deposit)}).
       </p>
       <p>
-        Monthly ({props.formatMoney(props.minMonthly)}–
+        Weekly ({props.formatMoney(props.minMonthly)}–
         {props.formatMoney(props.maxMonthly)})
       </p>
       <input
@@ -1012,7 +1012,7 @@ export function HangarAircraftCard(props: {
             {acf.lease ? (
               <>
                 <span>
-                  Lease {props.formatMoney(acf.lease.monthlyUsd)}/mo · next due
+                  Lease {props.formatMoney(acf.lease.monthlyUsd)}/wk · next due
                   tick {acf.lease.nextDueTick}
                 </span>
                 {acf.lease.buyoutUsd != null ? (
@@ -1023,7 +1023,7 @@ export function HangarAircraftCard(props: {
             {acf.leaseOut ? (
               <>
                 <span>
-                  Income {props.formatMoney(acf.leaseOut.monthlyUsd)}/mo
+                  Income {props.formatMoney(acf.leaseOut.monthlyUsd)}/wk
                   {acf.leaseOut.lesseeName
                     ? ` · ${acf.leaseOut.lesseeName}`
                     : ''}

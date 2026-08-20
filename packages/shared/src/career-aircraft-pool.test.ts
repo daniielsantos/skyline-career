@@ -5,6 +5,9 @@ import {
   countryScaleFactor,
   countInstancesBySkuGlobally,
   dealerInstancesForMarket,
+  dealerInstancesWorldwide,
+  ensureDealerSkuFloor,
+  ensureAircraftPoolCatalogSync,
   ensureWorldAircraftPool,
 } from './career-aircraft-pool.js';
 import { createSeedEconomyWorld } from './career-economy.js';
@@ -15,6 +18,16 @@ import {
   listAircraftMarket,
   purchaseAircraftListing,
 } from './career-aircraft-market.js';
+import type { FreighterClassId } from './types/career-economy.js';
+
+const CLASS_ORDER: FreighterClassId[] = [
+  'light_ga',
+  'light_turboprop',
+  'light_jet',
+  'medium_piston',
+  'narrow_freighter',
+  'wide_freighter',
+];
 
 describe('aircraft pool', () => {
   it('scales BR at factor 1.0 and caps US at 1.5×', () => {
@@ -49,6 +62,55 @@ describe('aircraft pool', () => {
     const min = Math.min(...counts);
     const max = Math.max(...counts);
     assert.ok(max - min <= 1, `GA global skew min=${min} max=${max}`);
+  });
+
+  it('seeds every enabled SKU at the global per-class quota (wide/narrow)', () => {
+    const world = createSeedEconomyWorld({ seed: 'pool-sku-floor' });
+    ensureWorldAircraftPool(world);
+    const available = new Set(
+      dealerInstancesWorldwide(world).map((i) => i.airframeTypeId),
+    );
+    for (const classId of CLASS_ORDER) {
+      for (const sku of listSkus(classId)) {
+        assert.ok(
+          available.has(sku.typeId),
+          `missing dealer stock for ${classId}/${sku.typeId}`,
+        );
+      }
+    }
+    const wideSkus = listSkus('wide_freighter');
+    assert.ok(wideSkus.some((s) => s.typeId === 'tfdi-md11f-family'));
+    assert.ok(available.has('tfdi-md11f-family'));
+    const wideGlobal = countInstancesBySkuGlobally(world, 'wide_freighter');
+    assert.equal(wideGlobal.size, wideSkus.length);
+    const wideCounts = [...wideGlobal.values()];
+    assert.equal(Math.min(...wideCounts), 3);
+    assert.equal(Math.max(...wideCounts), 3);
+    assert.equal(wideGlobal.get('tfdi-md11f-family'), 3);
+
+    const narrowGlobal = countInstancesBySkuGlobally(world, 'narrow_freighter');
+    const narrowCounts = [...narrowGlobal.values()];
+    assert.equal(Math.min(...narrowCounts), 3);
+    assert.equal(Math.max(...narrowCounts), 3);
+  });
+
+  it('backfills missing SKUs on existing worlds without wipe', () => {
+    const world = createSeedEconomyWorld({ seed: 'pool-backfill' });
+    ensureWorldAircraftPool(world);
+    world.aircraftInstances = (world.aircraftInstances ?? []).filter(
+      (i) => i.airframeTypeId !== 'tfdi-md11f-family',
+    );
+    assert.ok(
+      !(world.aircraftInstances ?? []).some(
+        (i) => i.airframeTypeId === 'tfdi-md11f-family',
+      ),
+    );
+    assert.equal(ensureDealerSkuFloor(world), true);
+    const md11 = (world.aircraftInstances ?? []).filter(
+      (i) => i.airframeTypeId === 'tfdi-md11f-family' && i.status === 'available',
+    );
+    assert.equal(md11.length, 3);
+    assert.equal(ensureAircraftPoolCatalogSync(world), false);
   });
 
   it('purchase removes the dealer instance from the board', () => {

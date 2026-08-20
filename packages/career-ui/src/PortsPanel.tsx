@@ -376,6 +376,11 @@ export function PortsPanel(props: {
   const unit = massUnitLabel(props.weightSystem);
 
   function isCargoOpsCommodityLocked(commodityId: string): boolean {
+    try {
+      if (localStorage.getItem('skyline.devMode') === '1') return false;
+    } catch {
+      /* ignore */
+    }
     const row =
       props.cargoOps?.commodities?.[
         commodityId as keyof NonNullable<CareerCargoOps>['commodities']

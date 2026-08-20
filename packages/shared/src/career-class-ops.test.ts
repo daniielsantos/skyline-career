@@ -18,6 +18,7 @@ import {
   narrowReadyViaMedium,
   normalizeCareerClassOps,
   syncClassOpsFromFleet,
+  unlockAllCareerClassOps,
   wideReady,
 } from './career-class-ops.js';
 
@@ -240,5 +241,17 @@ describe('career-class-ops', () => {
     });
     assert.equal(ops.classes.light_jet.unlocked, true);
     assert.equal(ops.classes.medium_piston.unlocked, true);
+  });
+
+  it('unlockAllCareerClassOps opens Jet through Wide without wiping hours', () => {
+    const ops = emptyCareerClassOps();
+    ops.classes.light_ga.hours = 4;
+    const open = unlockAllCareerClassOps(ops);
+    assert.equal(open.classes.light_jet.unlocked, true);
+    assert.equal(open.classes.medium_piston.unlocked, true);
+    assert.equal(open.classes.narrow_freighter.unlocked, true);
+    assert.equal(open.classes.wide_freighter.unlocked, true);
+    assert.equal(open.classes.light_ga.hours, 4);
+    assert.equal(ops.classes.light_jet.unlocked, false);
   });
 });

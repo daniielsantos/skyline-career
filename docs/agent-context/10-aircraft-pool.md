@@ -14,9 +14,11 @@ Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `c
 
 **Cota igual por modelo (classe)** — slots da classe no mundo (e extras no país) repartidos **round-robin** entre SKUs `enabled`. C172 ≈ Duke em **contagem global**. Sem peso de popularidade.
 
+**Piso / cota global por SKU (travado 2026-08-20)** — todo airframe `enabled` tem pelo menos `CLASS_GLOBAL_MIN_PER_SKU` instâncias no planeta (hoje: leves **1**, medium **2**, narrow/wide **3**). Se a soma dos caps de país for menor, o seed **infla** slots e espalha o overflow pelos países elegíveis. `ensureDealerSkuFloor` backfill em saves antigos sem wipe. Instâncias `sold` contam no piso (compra não respawna sozinha; restock = trade-in).
+
 **Cobertura local (país grande)** — `hubCount >= floor(62×0.95)` **or** factor at POOL cap → **1 de cada** enabled SKU in that class (GA/TP/jet). BR (~60 hubs) qualifies.
 
-**Heavies** — não forçar 16 narrow no BR. Cap escalado pequeno; cota igual **mundial** (cada 737 tem ~o mesmo número no planeta).
+**Heavies** — não forçar 16 narrow no BR. Cap por país continua pequeno; **mundo** garante 1 de cada SKU + cota igual no que sobrar.
 
 **Âncora de classe (fator 1.0), depois `max(round(âncora×fator), cobertura)` nas leves:**
 
@@ -43,10 +45,10 @@ Fonte da verdade do SKU: `packages/shared/src/data/career-player-airframes.json`
 **Novo airframe homologado** (`typeId` novo ou re-`enabled`):
 
 1. Wizard upsert no JSON (`aircraftClassId`, label, roles pack, perf…).
-2. No próximo **load do mundo** ou tick de sync (`ensureAircraftPoolCatalogSync`): detectar SKUs enabled **sem** instância dealer mínima.
+2. No próximo **load do mundo** ou tick de sync (`ensureAircraftPoolCatalogSync` + `ensureDealerSkuFloor`): detectar SKUs enabled **sem** nenhuma instância no mundo.
 3. **Backfill incremental** (não regerar o mundo, não apagar instâncias existentes):
    - País grande (cap classe ≥ skuCount): **+1 instância dealer** desse `typeId` no país (BR, US, …).
-   - Mundo: **+1** (ou +k pela cota igual) distribuído round-robin se faltar slot global daquele SKU vs os irmãos da classe.
+   - Mundo: **piso ≥1** por SKU no maior país elegível da classe; extras seguem cota igual.
    - Matrícula nova (`career-aircraft-registration`), condition/horas roll, `basedIcao` no país (espalhamento regional).
 4. Board passa a mostrar o modelo **sem wipe de save**.
 
@@ -77,7 +79,7 @@ UI: fair / dealer 50% / ask. Ask clamp ~0.5–2.0× fair.
 
 **NPC compra listing (Option B, travado)** — cash = ask do player; **mesma** instância (matrícula/horas) vai para **dealer pool** do país e volta ao Market. **Não** vira frota NPC permanente. **Não** restock +1 extra (cap estável). Chance por ask÷fair (≤0.9 alto … ≥1.2 quase 0). Min **1 dia** no board antes do NPC olhar.
 
-**Lease out** — player escolhe `monthlyUsd` + `termMonths` (listagem 0.6–1.8× catálogo, termo 1–24). NPC só aceita faixa mais estreita (monthly ~0.7–1.3×, termo ~3–18) + lessee ocioso da classe. Delay 1–4 dias. 1 listing lease player por vez. Expire → parked.
+**Lease out** — player escolhe `weeklyUsd` (campo legacy `monthlyUsd`) + `termMonths` 1–3 (listagem 0.6–1.8× catálogo). NPC só aceita faixa ~0.7–1.3× + termo 1–3. Cobrança / renda **semanal**. Depósito **4 semanas**. Delay 1–4 dias. 1 listing lease player por vez. Expire → parked.
 
 **NPC** — compra/lease de **player listing** por preço vs `fairValue`. Dealer stock gerado não some no mesmo loop.
 

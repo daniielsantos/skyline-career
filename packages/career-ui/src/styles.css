@@ -4829,6 +4829,24 @@ tr.lot-locked {
   margin: 0 0 1rem;
 }
 
+.aircraft-market-board {
+  position: relative;
+  min-height: 12rem;
+}
+
+.aircraft-market-board.is-loading .aircraft-card-grid {
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+
+.aircraft-market-loading {
+  position: absolute;
+  left: 50%;
+  top: 4.5rem;
+  z-index: 2;
+  transform: translateX(-50%);
+}
+
 .aircraft-market-search {
   flex: 1 1 11rem;
   min-width: 9rem;

@@ -7,7 +7,7 @@ import { isBushHub } from './career-bush.js';
 import { conditionPctsForListing } from './career-aircraft-maintenance.js';
 import {
   CONDITION_PRICE_MULT,
-  resolveAircraftLeaseMonthlyUsd,
+  resolveAircraftLeaseWeeklyUsd,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
 import { allocateAircraftRegistration } from './career-aircraft-registration.js';
@@ -46,6 +46,19 @@ const CLASS_ANCHOR: Record<FreighterClassId, number> = {
   medium_piston: 3,
   narrow_freighter: 2,
   wide_freighter: 1,
+};
+
+/**
+ * Minimum dealer instances per enabled SKU worldwide (any status counts).
+ * Country caps still drive density for lights; heavies need a real per-model quota.
+ */
+export const CLASS_GLOBAL_MIN_PER_SKU: Record<FreighterClassId, number> = {
+  light_ga: 1,
+  light_turboprop: 1,
+  light_jet: 1,
+  medium_piston: 2,
+  narrow_freighter: 3,
+  wide_freighter: 3,
 };
 
 const LISTING_LIFE_TICKS = TICKS_PER_DAY * 30;
@@ -340,7 +353,7 @@ function priceInstance(
   leaseTermMonths?: number;
 } {
   const msrp = resolveAircraftMsrpUsd({ aircraftClassId: classId, maxCargoKg });
-  const monthly = resolveAircraftLeaseMonthlyUsd({
+  const monthly = resolveAircraftLeaseWeeklyUsd({
     aircraftClassId: classId,
     maxCargoKg,
   });
@@ -351,10 +364,11 @@ function priceInstance(
       : 1;
 
   if (kind === 'lease') {
-    const entryMonths = 2;
-    const termMonths = rng() < 0.55 ? 6 : 12;
+    const entryWeeks = 4;
+    const roll = rng();
+    const termMonths = roll < 0.4 ? 1 : roll < 0.75 ? 2 : 3;
     return {
-      askingUsd: Math.round(monthly * entryMonths),
+      askingUsd: Math.round(monthly * entryWeeks),
       leaseMonthlyUsd: monthly,
       leaseTermMonths: termMonths,
     };
@@ -519,7 +533,10 @@ export function seedWorldAircraftPool(world: CareerEconomyWorld): AircraftInstan
       }))
       .filter((row) => row.remaining > 0);
 
-    const totalSlots = countryCaps.reduce((sum, row) => sum + row.remaining, 0);
+    const sumCaps = countryCaps.reduce((sum, row) => sum + row.remaining, 0);
+    const minPerSku = CLASS_GLOBAL_MIN_PER_SKU[classId] ?? 1;
+    // Inflate when country caps alone cannot meet the per-SKU worldwide quota.
+    const totalSlots = Math.max(sumCaps, skus.length * minPerSku);
     const targets = distributeEqualQuota(totalSlots, skus);
     const assignments: { countryId: string; airframeTypeId: string }[] = [];
 
@@ -552,10 +569,18 @@ export function seedWorldAircraftPool(world: CareerEconomyWorld): AircraftInstan
       }
     }
 
-    const host = countryCaps[0]?.countryId ?? 'BR';
+    const hosts =
+      countryCaps.length > 0
+        ? countryCaps.map((row) => row.countryId)
+        : listSkuFloorHosts(countries, classId, skus.length);
+    let hostIdx = 0;
     for (const [sku, left] of targets) {
       for (let i = 0; i < left; i++) {
-        assignments.push({ countryId: host, airframeTypeId: sku });
+        assignments.push({
+          countryId: hosts[hostIdx % hosts.length]!,
+          airframeTypeId: sku,
+        });
+        hostIdx += 1;
       }
     }
 
@@ -616,6 +641,81 @@ function countAvailableBySku(
   return out;
 }
 
+function listSkuFloorHosts(
+  countries: CountryHubRow[],
+  classId: FreighterClassId,
+  skuCount: number,
+): string[] {
+  const eligible = countries
+    .filter(
+      (row) => countryAircraftClassCap(row.hubCount, classId, skuCount) > 0,
+    )
+    .map((row) => row.countryId);
+  if (eligible.length > 0) return eligible;
+  const fallback = countries[0]?.countryId ?? 'BR';
+  return [fallback];
+}
+
+/**
+ * Every enabled player airframe reaches CLASS_GLOBAL_MIN_PER_SKU instances
+ * worldwide (sold/available both count — buy does not auto-respawn).
+ */
+export function ensureDealerSkuFloor(
+  world: CareerEconomyWorld,
+  state?: Pick<CareerMissionsState, 'fleet' | 'aircraftMarket'>,
+): boolean {
+  ensureWorldAircraftPool(world);
+  const used = collectPoolRegistrations(world);
+  for (const inst of world.aircraftInstances ?? []) {
+    if (inst.registration) used.add(inst.registration);
+  }
+  if (state) {
+    for (const reg of collectUsedAircraftRegistrationsFromState(state)) {
+      used.add(reg);
+    }
+  }
+  const countries = listCountryHubRows(world);
+  const rng = mulberry32(
+    hashSeed(`${world.seed}:acf-pool:sku-floor:${world.tick}`),
+  );
+  const instances = [...(world.aircraftInstances ?? [])];
+  const counts = new Map<string, number>();
+  for (const inst of instances) {
+    counts.set(inst.airframeTypeId, (counts.get(inst.airframeTypeId) ?? 0) + 1);
+  }
+  let added = 0;
+  let hostIdx = 0;
+
+  for (const classId of CLASS_ORDER) {
+    const skus = listCareerPlayerAirframes(classId).map((a) => a.typeId);
+    if (skus.length === 0) continue;
+    const minPerSku = CLASS_GLOBAL_MIN_PER_SKU[classId] ?? 1;
+    const hosts = listSkuFloorHosts(countries, classId, skus.length);
+    for (const sku of skus) {
+      let have = counts.get(sku) ?? 0;
+      while (have < minPerSku) {
+        const inst = spawnDealerInstance({
+          world,
+          countryId: hosts[hostIdx % hosts.length]!,
+          airframeTypeId: sku,
+          aircraftClassId: classId,
+          seq: instances.length + added + 1,
+          usedRegistrations: used,
+          rng,
+        });
+        hostIdx += 1;
+        instances.push(inst);
+        have += 1;
+        counts.set(sku, have);
+        added += 1;
+      }
+    }
+  }
+
+  if (added > 0) world.aircraftInstances = instances;
+  return added > 0;
+}
+
 /** Incremental backfill when homolog adds/enables SKUs (no delete/rebalance). */
 export function ensureAircraftPoolCatalogSync(
   world: CareerEconomyWorld,
@@ -623,49 +723,52 @@ export function ensureAircraftPoolCatalogSync(
 ): boolean {
   ensureWorldAircraftPool(world);
   const hash = hashCareerPlayerAirframeCatalog();
-  if (world.aircraftPoolCatalogHash === hash) return false;
-
-  const used = collectPoolRegistrations(world);
-  if (state) {
-    for (const reg of collectUsedAircraftRegistrationsFromState(state)) {
-      used.add(reg);
-    }
-  }
-  const rng = mulberry32(
-    hashSeed(`${world.seed}:acf-pool:sync:${hash}`),
-  );
   let added = 0;
-  const instances = [...(world.aircraftInstances ?? [])];
-  const countries = listCountryHubRows(world);
 
-  for (const classId of CLASS_ORDER) {
-    const skus = listCareerPlayerAirframes(classId).map((a) => a.typeId);
-    if (skus.length === 0) continue;
-
-    for (const row of countries) {
-      const cap = countryAircraftClassCap(row.hubCount, classId, skus.length);
-      if (cap < skus.length) continue;
-      const have = countAvailableBySku(instances, row.countryId, classId);
-      for (const sku of skus) {
-        if ((have.get(sku) ?? 0) >= 1) continue;
-        const inst = spawnDealerInstance({
-          world,
-          countryId: row.countryId,
-          airframeTypeId: sku,
-          aircraftClassId: classId,
-          seq: instances.length + added + 1,
-          usedRegistrations: used,
-          rng,
-        });
-        instances.push(inst);
-        have.set(sku, 1);
-        added += 1;
+  if (world.aircraftPoolCatalogHash !== hash) {
+    const used = collectPoolRegistrations(world);
+    if (state) {
+      for (const reg of collectUsedAircraftRegistrationsFromState(state)) {
+        used.add(reg);
       }
     }
+    const rng = mulberry32(
+      hashSeed(`${world.seed}:acf-pool:sync:${hash}`),
+    );
+    const instances = [...(world.aircraftInstances ?? [])];
+    const countries = listCountryHubRows(world);
+
+    for (const classId of CLASS_ORDER) {
+      const skus = listCareerPlayerAirframes(classId).map((a) => a.typeId);
+      if (skus.length === 0) continue;
+
+      for (const row of countries) {
+        const cap = countryAircraftClassCap(row.hubCount, classId, skus.length);
+        if (cap < skus.length) continue;
+        const have = countAvailableBySku(instances, row.countryId, classId);
+        for (const sku of skus) {
+          if ((have.get(sku) ?? 0) >= 1) continue;
+          const inst = spawnDealerInstance({
+            world,
+            countryId: row.countryId,
+            airframeTypeId: sku,
+            aircraftClassId: classId,
+            seq: instances.length + added + 1,
+            usedRegistrations: used,
+            rng,
+          });
+          instances.push(inst);
+          have.set(sku, 1);
+          added += 1;
+        }
+      }
+    }
+
+    world.aircraftInstances = instances;
+    world.aircraftPoolCatalogHash = hash;
   }
 
-  world.aircraftInstances = instances;
-  world.aircraftPoolCatalogHash = hash;
+  if (ensureDealerSkuFloor(world, state)) added += 1;
   return added > 0;
 }
 

@@ -8,7 +8,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
 - Lots / Market / NPC / fuel trucks / hub levels / aircraft market / wear / ledger / SQLite store.
-- **Aircraft pool (design locked, 2026-08-19):** cap por país (BR=62 hubs=1.0, teto 1.5×); **cota igual por SKU**; BR/US 1-de-cada nas leves; dealer **50%** vs listar; NPC compra por fair; wipe de save. Roadmap F0–F7: [`10-aircraft-pool.md`](./10-aircraft-pool.md). Market atual ainda é listing sintético 1×SKU/dia.
+- **Crew needed (starter):** global cap `~0.4×regiões` (GA/TP) stays; **piso local** `10` (+4/company, máx 40 no gancho MP) no `homeCountryId` — overflow do cap global enquanto o país-home está abaixo do piso (sem teto duro local); hold **0.5–2 h** abaixo do piso, **3–8 h** acima. Banda jet+ sem piso.
+- **Aircraft pool (design locked, 2026-08-19; cota SKU 2026-08-20):** cap por país (BR=62 hubs=1.0, teto 1.5×); **cota igual por SKU** + mínimo mundial por modelo (leves 1 / medium 2 / narrow+wide **3**); BR/US 1-de-cada nas leves; dealer **50%** vs listar; NPC compra por fair. **Lease:** taxa semanal ↑, cobrança /wk, termo máx **3 mo**, depósito 4 semanas. Roadmap F0–F7: [`10-aircraft-pool.md`](./10-aircraft-pool.md).
 - **Schema v4:** hubs + stock em tabelas (`airports` / `airport_stock`) com `world_id`; tick ainda in-memory; terminal Inventory usa `GET /api/airport?part=stock` (SQL, sem lock); payload completo (lots/NPC) hidrata depois.
 - **Schema v5:** NPC roster, fuel trucks/hauls, Demand board e port listings/inventory/concessions em tabelas (`world_id`); arrays stripped de `economy_json`. Tick ainda in-memory. WH/concessões do player ficam no `company_state`.
 - Partição por país (`homeCountryId` / região `XX-YY` → país `XX`).
@@ -75,7 +76,11 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **FBO spot:** removido (stock wipe on load); FBO = bonded holds only.
 - **Ports:** acesso oceânico só (mar ou rio→mar). Buy → WH/yard → Store/Abandon; preço dinâmico. **Inventory:** 1 descarga/dia de economia (8% do cap) no tick — não ao abrir a aba; listings só do pátio já em estoque. UI: próxima descarga + ETA. **Concession:** CAPEX + lease renovável (1/empresa); gates T3 WH + 25k shipped; buffs P1 (~10% preço, ~15% ETA, +1 listing). **P2:** cap ×1.35 (mesmo % de restock); lease escala com throughput 7d (máx ×1.75) + ×1.2 no P2. Sem desconto extra de compra. UI: chip Operator P1/P2. Ao adicionar porto: `CAREER_PORTS` **e** `PICKUP_HUB_SET`.
 - **Port P3 / specials / feeder (backlog):** ver roadmap *Port endgame backlog*.
-- **Offline fee cap:** catch-up wall-clock cobra no máx. **7** economy-days de hangar/WH/yard/FBO storage/crew+ground salaries; lease ≤1 installment + defer term repossess (`termEndedSoft`); debug time-skip uncapped. Banner em `/api/state`.
+- **Lot pay shrink (2026-08-20):** entrega parcial (player/NPC) agora **pro-rata** `payUsd`/`basePayUsd` com o `quantityKg` restante — evita Load ~0 klb com Pay de lote inteiro no board.
+- **Freight pay retune (2026-08-20):** `quoteFreightLotPay` = arbitragem + haul + **teto total $/kg** (`FREIGHT_TOTAL_CAP_MULT`) × **`freightDistanceCapMult(nm)`** (curto ~0.28 → longo 1.0; Machinery curva própria mais dura) + **tonnage soft** (Machinery soft mais cedo / Wide ×0.32). Haul ≤ **50%** do teto + **URGENT** sobe o teto (×1.1) para gap/tags/scarce/weather ainda moverem pay. Electronics + Machinery no Value-band apertado. **Não** mexeu em `CARGO_FLOW_BALANCE`.
+- **Freight boards (2026-08-20):** Freights split into **Aircraft needed** (sua aeronave · lot pay) e **Crew needed** (avião NPC · pilot fee); filtro API `?crew=aircraft|crew`. Terminal Contracts espelha com chips Aircraft/Crew. Hangar vazio abre em Crew.
+- **Dev Mode → Cargo Ops (2026-08-20):** Settings Dev Mode envia `X-Skyline-Dev-Mode`; API usa `unlockAllCareerCargoOps` só nos gates (state/market/accept/staging/ports/demand/FBO) — **não** grava a ladder no save. Toggle Off restaura o progresso real.
+- **Dev Mode → Class Ops + lease (2026-08-20):** mesmo header libera **todas** as classes e o gate de lease (Airframes buy/lease + board/crew). `unlockAllCareerClassOps` + `aircraftLeaseUnlockProgressDevOpen`; writes usam `withDevProgressionUnlock` (restaura só se o callback não substituiu o objeto).
 
 ## Company tenant (SP → MP)
 

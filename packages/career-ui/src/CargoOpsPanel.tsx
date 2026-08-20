@@ -1,18 +1,11 @@
-import type { CareerCargoOps, CargoOpsCommodityId } from './api';
+import type { CareerCargoOps } from './api';
 import { CommodityIcon } from './CommodityIcon';
 import {
+  CARGO_OPS_COMMODITY_LABELS,
   CARGO_OPS_TIERS,
   cargoOpsUnlockProgress,
   type CargoOpsTierId,
 } from './cargo-ops-unlock';
-
-const LABELS: Record<CargoOpsCommodityId, string> = {
-  general: 'General',
-  supplies: 'Supplies',
-  electronics: 'Electronics',
-  perishables: 'Perishables',
-  machinery: 'Machinery',
-};
 
 function payMultHint(rep: number): string {
   if (rep < 30) return 'pay ×0.85';
@@ -86,7 +79,7 @@ export function CargoOpsPanel(props: {
                       <div className="cargo-ops-commodity-head">
                         <span className="commodity-inline">
                           <CommodityIcon commodityId={id} size={28} />
-                          {LABELS[id]}
+                          {CARGO_OPS_COMMODITY_LABELS[id]}
                           {!row.unlocked ? ' · locked' : ''}
                         </span>
                         <span>

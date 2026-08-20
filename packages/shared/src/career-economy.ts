@@ -1160,18 +1160,28 @@ export {
   CONTRACT_PILOT_OFFER_CHANCE,
   AWAITING_PILOT_MIN_HOURS,
   AWAITING_PILOT_MAX_HOURS,
+  AWAITING_PILOT_SHORT_MIN_HOURS,
+  AWAITING_PILOT_SHORT_MAX_HOURS,
   REPOSITION_AWAITING_MIN_HOURS,
   REPOSITION_AWAITING_MAX_HOURS,
   MAX_OPEN_REPOSITION_OFFERS,
   MAX_OPEN_STARTER_REPOSITION_OFFERS,
   MIN_OPEN_CONTRACT_PILOT_OFFERS,
   MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS,
+  MIN_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
+  STARTER_CREW_OFFERS_PER_EXTRA_COMPANY,
+  MAX_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
   MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION,
   STARTER_CONTRACT_PILOT_CLASSES,
   STARTER_CONTRACT_PILOT_OFFERS_PER_REGION,
   isStarterContractPilotClass,
   countOpenContractPilotOffers,
+  countOpenContractPilotOffersInCountry,
   maxOpenContractPilotOffers,
+  contractPilotOriginCountry,
+  activeContractPilotCountries,
+  starterContractPilotCountryFloor,
+  starterContractPilotCountryNeedsFloor,
   partitionLiftableKgPerDay,
   NPC_LEGS_PER_DAY_EST,
   REPOSITION_PILOT_FEE_MIN_USD,
@@ -2653,10 +2663,338 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
 
 /** Default corridor weight when an international lane has no domestic corridor entry. */
 export const INTERNATIONAL_CORRIDOR_WEIGHT = 2.0;
-/** Pay distance bias for cross-country lots (domestic cross-region is 1.12). */
+/** Pay distance bias for cross-country lots when route nm is unavailable. */
 export const INTERNATIONAL_DISTANCE_BIAS = 1.55;
 /** Extra lot lifetime for long-haul international freights. */
 export const INTERNATIONAL_LIFE_MULT = 1.35;
+
+/**
+ * Freight board pay (2026-08-20+): living arbitrage + haul, with hard total
+ * $/kg caps + tonnage soft-mult so Narrow/Wide cannot print a used airframe
+ * from one XL Value hop. Does not retune CARGO_FLOW_BALANCE / Dry fill.
+ *
+ * pay ≈ qty × min(arb+haul, totalCap) × size × tonnageSoft
+ */
+/**
+ * Freight board pay (2026-08-20+): living arbitrage + haul, with hard total
+ * $/kg caps + tonnage soft-mult so Narrow/Wide cannot print a used airframe
+ * from one XL Value hop. Does not retune CARGO_FLOW_BALANCE / Dry fill.
+ *
+ * pay ≈ qty × min(arb+haul, totalCap) × size × tonnageSoft
+ */
+export const FREIGHT_GAP_SHARE = 0.3;
+
+/** Domestic max arbitrage $/kg as × commodity.basePricePerKg. */
+export const FREIGHT_PAY_CAP_MULT: Readonly<
+  Partial<Record<CommodityId, number>>
+> = {
+  electronics: 0.32,
+  /** Value-band tight — same anti-XL-vs-long feel as electronics. */
+  machinery: 0.36,
+  perishables: 1.15,
+  general: 1.55,
+  supplies: 1.55,
+};
+
+/** Intl bump on the arbitrage ceiling only. */
+export const FREIGHT_PAY_CAP_INTL_MULT = 1.1;
+
+/**
+ * Hard ceiling on (arb + haul) $/kg — stops long-haul haul from reopening
+ * the Value jackpot after the arb cap.
+ */
+export const FREIGHT_TOTAL_CAP_MULT: Readonly<
+  Partial<Record<CommodityId, number>>
+> = {
+  electronics: 0.38,
+  machinery: 0.42,
+  perishables: 1.4,
+  general: 1.9,
+  supplies: 1.9,
+};
+
+export const FREIGHT_TOTAL_CAP_INTL_MULT = 1.12;
+
+/**
+ * Haul may not consume the whole total $/kg ceiling — leave room so
+ * gap / URGENT / scarce / weather still move pay on long Value hauls
+ * (otherwise haul alone pins every lot to the same capped price).
+ */
+export const FREIGHT_HAUL_SHARE_OF_TOTAL_CAP = 0.5;
+
+/** URGENT raises the total $/kg ceiling (tags must still move price). */
+export const FREIGHT_URGENT_TOTAL_CAP_MULT = 1.1;
+
+/** Soft haul — USD per kg per nm (Value rates stay low). */
+export const FREIGHT_HAUL_USD_PER_KG_NM: Readonly<
+  Partial<Record<CommodityId, number>>
+> = {
+  electronics: 0.0018,
+  machinery: 0.0020,
+  perishables: 0.0032,
+  general: 0.0035,
+  supplies: 0.0035,
+};
+
+export const FREIGHT_HAUL_NM_FLOOR = 50;
+/** Default soft cap; Value/Heavy use tighter per-commodity caps below. */
+export const FREIGHT_HAUL_NM_SOFT_CAP = 1_200;
+
+export const FREIGHT_HAUL_NM_SOFT_BY_COMMODITY: Readonly<
+  Partial<Record<CommodityId, number>>
+> = {
+  electronics: 850,
+  machinery: 1_000,
+};
+
+/** Urgency bump — Value/Heavy softer than Dry/Time. */
+export const FREIGHT_URGENT_PAY_MULT: Readonly<
+  Partial<Record<CommodityId, number>>
+> = {
+  electronics: 1.1,
+  machinery: 1.12,
+  perishables: 1.32,
+  general: 1.28,
+  supplies: 1.28,
+};
+
+/**
+ * Above ~Narrow max payload, each extra kg pays less — Wide XL cannot
+ * linear-scale into monopoly cash.
+ */
+export const FREIGHT_TONNAGE_SOFT_KG = 18_000;
+export const FREIGHT_TONNAGE_WIDE_KG = 90_000;
+export const FREIGHT_TONNAGE_WIDE_MULT = 0.45;
+
+/** Machinery: steeper XL soft so mid-haul fat lots cannot match long thin. */
+export const FREIGHT_TONNAGE_BY_COMMODITY: Readonly<
+  Partial<
+    Record<
+      CommodityId,
+      { softKg: number; wideKg: number; wideMult: number }
+    >
+  >
+> = {
+  machinery: { softKg: 15_000, wideKg: 70_000, wideMult: 0.32 },
+};
+
+/**
+ * Total $/kg ceiling scales with distance so a short XL fat lot cannot
+ * match a long mid lot of the same commodity (haul alone is too small
+ * once arb hits the flat cap).
+ */
+export const FREIGHT_DISTANCE_CAP_REF_NM = 2_000;
+/** Short-hop fraction of the commodity total $/kg cap. */
+export const FREIGHT_DISTANCE_CAP_FLOOR = 0.28;
+
+/** Machinery: longer ref + lower floor so ~700–1100 nm stays mid, not "full". */
+export const FREIGHT_DISTANCE_CAP_BY_COMMODITY: Readonly<
+  Partial<
+    Record<
+      CommodityId,
+      { floor: number; refNm: number; power: number; missingNm: number }
+    >
+  >
+> = {
+  machinery: { floor: 0.22, refNm: 2_600, power: 1.05, missingNm: 0.68 },
+};
+
+export function freightDistanceCapMult(
+  distanceNm: number | undefined,
+  commodityId?: CommodityId,
+): number {
+  const by =
+    commodityId != null
+      ? FREIGHT_DISTANCE_CAP_BY_COMMODITY[commodityId]
+      : undefined;
+  const floor = by?.floor ?? FREIGHT_DISTANCE_CAP_FLOOR;
+  const refNm = by?.refNm ?? FREIGHT_DISTANCE_CAP_REF_NM;
+  const power = by?.power ?? 0.85;
+  const missingNm = by?.missingNm ?? 0.72;
+  if (distanceNm == null || !Number.isFinite(distanceNm) || distanceNm <= 0) {
+    return missingNm;
+  }
+  const t = Math.min(1, Math.max(0, distanceNm) / refNm);
+  // Default power <1: slower ramp near zero so ~150–300 nm stays "short".
+  const eased = Math.pow(t, power);
+  return floor + (1 - floor) * eased;
+}
+
+/** Effective nm for haul (floor + diminishing returns past soft cap). */
+export function freightHaulNmEffective(
+  distanceNm: number,
+  commodityId?: CommodityId,
+): number {
+  if (!Number.isFinite(distanceNm) || distanceNm <= 0) {
+    return FREIGHT_HAUL_NM_FLOOR;
+  }
+  const soft =
+    (commodityId
+      ? FREIGHT_HAUL_NM_SOFT_BY_COMMODITY[commodityId]
+      : undefined) ?? FREIGHT_HAUL_NM_SOFT_CAP;
+  const n = Math.max(FREIGHT_HAUL_NM_FLOOR, distanceNm);
+  if (n <= soft) return n;
+  return soft + Math.sqrt(n - soft) * 14;
+}
+
+export function freightHaulUsdPerKg(
+  commodityId: CommodityId,
+  distanceNm: number | undefined,
+): number {
+  const rate = FREIGHT_HAUL_USD_PER_KG_NM[commodityId] ?? 0.0025;
+  return (
+    rate *
+    freightHaulNmEffective(distanceNm ?? FREIGHT_HAUL_NM_FLOOR, commodityId)
+  );
+}
+
+/** 1.0 through Narrow-ish loads; ramps down toward Wide XL. */
+export function freightTonnagePayMult(
+  quantityKg: number,
+  commodityId?: CommodityId,
+): number {
+  const by =
+    commodityId != null
+      ? FREIGHT_TONNAGE_BY_COMMODITY[commodityId]
+      : undefined;
+  const softKg = by?.softKg ?? FREIGHT_TONNAGE_SOFT_KG;
+  const wideKg = by?.wideKg ?? FREIGHT_TONNAGE_WIDE_KG;
+  const wideMult = by?.wideMult ?? FREIGHT_TONNAGE_WIDE_MULT;
+  if (!Number.isFinite(quantityKg) || quantityKg <= softKg) {
+    return 1;
+  }
+  if (quantityKg >= wideKg) return wideMult;
+  const t = (quantityKg - softKg) / (wideKg - softKg);
+  return 1 - (1 - wideMult) * t;
+}
+
+export type FreightLotPayInput = {
+  commodityId: CommodityId;
+  quantityKg: number;
+  originStock: StockPile;
+  destStock: StockPile;
+  distanceNm?: number;
+  international?: boolean;
+  urgent?: boolean;
+  /** Used only when distanceNm is missing (same-region 1 / cross-region 1.12). */
+  regionBias?: number;
+  capacityPayMult?: number;
+  scarcePayMult?: number;
+  weatherPayMult?: number;
+  corridorPayMult?: number;
+  shockPayMult?: number;
+  originLevelPay?: number;
+  bushPay?: number;
+  sizePayMult?: number;
+  minPayGapMult?: number;
+};
+
+export type FreightLotPayQuote = {
+  payUsd: number;
+  payPerKg: number;
+  gapUsdPerKg: number;
+  haulUsdPerKg: number;
+  arbUsdPerKg: number;
+  /** Arbitrage-only ceiling. */
+  capUsdPerKg: number;
+  /** Hard ceiling on arb+haul before size/tonnage. */
+  totalCapUsdPerKg: number;
+  tonnageMult: number;
+  distanceCapMult: number;
+};
+
+/** Pure freight pay quote — unit-tested; used by formLots. */
+export function quoteFreightLotPay(input: FreightLotPayInput): FreightLotPayQuote {
+  const commodity = getCommodity(input.commodityId);
+  const rawGap =
+    localUnitPriceUsd(input.commodityId, input.destStock) -
+    localUnitPriceUsd(input.commodityId, input.originStock);
+  const gapUsdPerKg = Math.max(
+    rawGap,
+    commodity.basePricePerKg * (input.minPayGapMult ?? 0),
+  );
+  const urgentMult = input.urgent
+    ? (FREIGHT_URGENT_PAY_MULT[input.commodityId] ?? 1.28)
+    : 1;
+  const hasNm =
+    input.distanceNm != null &&
+    Number.isFinite(input.distanceNm) &&
+    input.distanceNm > 0;
+  const distanceBias = hasNm
+    ? 1
+    : input.international
+      ? INTERNATIONAL_DISTANCE_BIAS
+      : (input.regionBias ?? 1);
+
+  const arbRaw =
+    gapUsdPerKg *
+    FREIGHT_GAP_SHARE *
+    urgentMult *
+    distanceBias *
+    (input.capacityPayMult ?? 1) *
+    (input.scarcePayMult ?? 1) *
+    (input.weatherPayMult ?? 1) *
+    (input.corridorPayMult ?? 1) *
+    (input.shockPayMult ?? 1) *
+    (input.originLevelPay ?? 1) *
+    (input.bushPay ?? 1);
+
+  const bushCapBoost = Math.max(1, (input.bushPay ?? 1) * 0.95);
+  const distanceCapMult = freightDistanceCapMult(
+    input.distanceNm,
+    input.commodityId,
+  );
+  const urgentCapMult = input.urgent ? FREIGHT_URGENT_TOTAL_CAP_MULT : 1;
+  const capUsdPerKg =
+    commodity.basePricePerKg *
+    (FREIGHT_PAY_CAP_MULT[input.commodityId] ?? 1.2) *
+    (input.international ? FREIGHT_PAY_CAP_INTL_MULT : 1) *
+    bushCapBoost *
+    urgentCapMult *
+    // Arb may clear a bit more than total on short hops; still shrink with nm.
+    Math.max(distanceCapMult, 0.4);
+
+  const totalCapUsdPerKg =
+    commodity.basePricePerKg *
+    (FREIGHT_TOTAL_CAP_MULT[input.commodityId] ?? 1.5) *
+    (input.international ? FREIGHT_TOTAL_CAP_INTL_MULT : 1) *
+    bushCapBoost *
+    urgentCapMult *
+    distanceCapMult;
+
+  const haulRawUsdPerKg = freightHaulUsdPerKg(
+    input.commodityId,
+    input.distanceNm,
+  );
+  const haulUsdPerKg = Math.min(
+    haulRawUsdPerKg,
+    totalCapUsdPerKg * FREIGHT_HAUL_SHARE_OF_TOTAL_CAP,
+  );
+  const arbUsdPerKg = Math.min(arbRaw, capUsdPerKg);
+  const sizePayMult = input.sizePayMult ?? 1;
+  const tonnageMult = freightTonnagePayMult(
+    input.quantityKg,
+    input.commodityId,
+  );
+  const combined = Math.min(arbUsdPerKg + haulUsdPerKg, totalCapUsdPerKg);
+  const payPerKg = combined * sizePayMult * tonnageMult;
+  const payUsd = Math.max(
+    1,
+    Math.round(Math.max(0, input.quantityKg) * payPerKg),
+  );
+  return {
+    payUsd,
+    payPerKg,
+    gapUsdPerKg,
+    haulUsdPerKg,
+    arbUsdPerKg,
+    capUsdPerKg,
+    totalCapUsdPerKg,
+    tonnageMult,
+    distanceCapMult,
+  };
+}
+
 /** Emergency domestic release valve for non-major warehouses pinned near capacity. */
 const DOMESTIC_OVERFLOW_ORIGIN_FILL = 0.9;
 const DOMESTIC_OVERFLOW_DEST_FILL = 0.35;
@@ -12516,8 +12854,8 @@ function expireLots(world: CareerEconomyWorld): void {
 export const IDLE_LOT_ESCALATION_START = 0.25;
 /** Max pay multiplier vs formation base for LTL + perishables. */
 export const IDLE_LOT_PAY_MAX_MULT = 1.4;
-/** Large electronics/machinery — pulse showed p50 doubling with falling fill. */
-export const IDLE_LOT_PAY_MAX_MULT_HEAVY = 1.15;
+/** Large electronics/machinery — keep idle bump mild after pay retune. */
+export const IDLE_LOT_PAY_MAX_MULT_HEAVY = 1.08;
 /** Other large bulk (general/supplies). */
 export const IDLE_LOT_PAY_MAX_MULT_BULK = 1.25;
 /** Life progress at which a lingering lot flips to urgent. */
@@ -12609,6 +12947,45 @@ function availableKg(lot: ShipmentLot): number {
     return 0;
   }
   return Math.max(0, lot.quantityKg - lot.reservedKg);
+}
+
+/**
+ * After cargo leaves the lot (player or NPC delivery): shrink quantity +
+ * reserved and **pro-rate payUsd / basePayUsd** so leftovers keep $/kg.
+ * Without this, partial deliveries left tiny Loads with the full-lot Pay.
+ */
+export function shrinkLotAfterDelivery(
+  lot: ShipmentLot,
+  bookKg: number,
+): void {
+  const delivered = Math.max(0, Math.floor(bookKg));
+  if (delivered <= 0) return;
+  const beforeQty = Math.max(0, lot.quantityKg);
+  const take = Math.min(delivered, beforeQty);
+  lot.reservedKg = Math.max(0, lot.reservedKg - take);
+  lot.quantityKg = Math.max(0, beforeQty - take);
+  if (beforeQty > 0 && take > 0) {
+    if (lot.quantityKg <= 0) {
+      lot.payUsd = 0;
+      if (typeof lot.basePayUsd === 'number') lot.basePayUsd = 0;
+    } else {
+      const frac = lot.quantityKg / beforeQty;
+      lot.payUsd = Math.max(1, Math.round(lot.payUsd * frac));
+      if (typeof lot.basePayUsd === 'number' && Number.isFinite(lot.basePayUsd)) {
+        lot.basePayUsd = Math.max(1, Math.round(lot.basePayUsd * frac));
+      }
+    }
+  }
+  if (lot.quantityKg <= 0) {
+    lot.quantityKg = 0;
+    lot.reservedKg = 0;
+    lot.status = 'delivered';
+  } else if (lot.reservedKg <= 0) {
+    lot.reservedKg = 0;
+    lot.status = 'available';
+  } else {
+    lot.status = 'reserved';
+  }
 }
 
 function fillPct(stock: StockPile): number {
@@ -13245,21 +13622,11 @@ function formLotsFromImbalances(
       (dest.fill < 0.28 && inboundKg < 1_000) ||
       laneSaturation >= 0.5 ||
       (laneWeather === 'poor' && dest.fill < 0.35);
-    const urgencyMult = urgent ? 1.35 : 1;
-    const distanceBias = international
-      ? INTERNATIONAL_DISTANCE_BIAS
-      : origin.ap.region === dest.ap.region
-        ? 1
-        : 1.12;
+    const distanceNm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
+    const regionBias =
+      origin.ap.region === dest.ap.region ? 1 : 1.12;
     const corridorPayMult = 1 + Math.max(0, corridorW - 1) * 0.1;
     // RankedAirport.stock is the live pile reference (same as ensurePile).
-    const rawGap =
-      localUnitPriceUsd(commodity.id, dest.stock) -
-      localUnitPriceUsd(commodity.id, origin.stock);
-    const gap = Math.max(
-      rawGap,
-      commodity.basePricePerKg * (opts.minPayGapMult ?? 0),
-    );
     const capacity = regionCapacity(origin.ap.region);
     const capacityPayMult = 1 + (1 - capacity) * THIN_FLEET_PAY_SLOPE;
     const scarcePayMult =
@@ -13274,25 +13641,27 @@ function formLotsFromImbalances(
       commodity.id,
     );
     const sizePayMult = size === 'xl' ? XL_LOT_PAY_MULT : 1;
-    const payPerKg =
-      Math.min(
-        gap *
-          0.55 *
-          urgencyMult *
-          distanceBias *
-          capacityPayMult *
-          scarcePayMult *
-          weatherPayMult *
-          corridorPayMult *
-          shock.payMult *
-          originLevelPay *
-          bushPay,
-        commodity.basePricePerKg *
-          (international ? 2.1 : 1.8) *
-          Math.max(1, bushPay * 0.95),
-      ) * sizePayMult;
+    const quoted = quoteFreightLotPay({
+      commodityId: commodity.id,
+      quantityKg: qty,
+      originStock: origin.stock,
+      destStock: dest.stock,
+      distanceNm: distanceNm ?? undefined,
+      international,
+      urgent,
+      regionBias,
+      capacityPayMult,
+      scarcePayMult,
+      weatherPayMult,
+      corridorPayMult,
+      shockPayMult: shock.payMult,
+      originLevelPay,
+      bushPay,
+      sizePayMult,
+      minPayGapMult: opts.minPayGapMult,
+    });
+    const payUsd = quoted.payUsd;
     const rng = lotRng(opts.partitionId, commodity.id);
-    const payUsd = Math.round(qty * payPerKg);
     // Lot life in 15-min ticks (legacy hour lives × 4).
     const baseLife = commodity.perishable
       ? 32 + Math.floor(rng() * 16)

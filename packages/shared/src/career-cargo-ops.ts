@@ -335,6 +335,20 @@ export function cargoOpsIsUnlocked(
   return state.unlocked;
 }
 
+/**
+ * Dev / cheat: every cargo commodity unlocked (does not bump rep/cleans).
+ * Returns a fresh normalized copy — safe to use for gates without persisting.
+ */
+export function unlockAllCareerCargoOps(
+  ops?: CareerCargoOps | null,
+): CareerCargoOps {
+  const next = normalizeCareerCargoOps(ops ?? undefined);
+  for (const id of CARGO_OPS_COMMODITY_IDS) {
+    next.commodities[id].unlocked = true;
+  }
+  return next;
+}
+
 /** Pay multiplier from reputation (1.0 at mid rep). */
 export function cargoOpsPayMult(
   ops: CareerCargoOps | undefined,

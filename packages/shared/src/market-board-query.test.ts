@@ -168,6 +168,34 @@ describe('queryMarketBoardPage', () => {
       [400, 200, 900],
     );
   });
+  it('crewFilter splits Crew needed vs Aircraft needed', () => {
+    const mixed = [
+      row({ payUsd: 100, crewNeeded: true, commodityName: 'Crew' }),
+      row({ payUsd: 200, crewNeeded: false, commodityName: 'Own' }),
+      row({ payUsd: 300, commodityName: 'Own2' }),
+    ];
+    const crew = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      crewFilter: 'crew',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      crew.rows.map((r) => r.payUsd),
+      [100],
+    );
+    const aircraft = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      crewFilter: 'aircraft',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      aircraft.rows.map((r) => r.payUsd),
+      [200, 300],
+    );
+  });
+
   it('allows locked-first when access:desc is explicit', () => {
     const mixed = [
       row({ payUsd: 200, commodityId: 'general', cargoLocked: false }),

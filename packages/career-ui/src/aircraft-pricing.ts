@@ -79,13 +79,13 @@ export function estimateFairUsd(
   );
 }
 
-const AIRCRAFT_LEASE_MONTHLY_RATE: Record<FreighterClassId, number> = {
-  light_ga: 0.045,
-  light_turboprop: 0.04,
-  light_jet: 0.038,
-  medium_piston: 0.036,
-  narrow_freighter: 0.035,
-  wide_freighter: 0.032,
+const AIRCRAFT_LEASE_WEEKLY_RATE: Record<FreighterClassId, number> = {
+  light_ga: 0.0165,
+  light_turboprop: 0.015,
+  light_jet: 0.014,
+  medium_piston: 0.0135,
+  narrow_freighter: 0.013,
+  wide_freighter: 0.012,
 };
 
 export function estimateLeaseMonthlyUsd(
@@ -96,7 +96,7 @@ export function estimateLeaseMonthlyUsd(
 ): number {
   return Math.round(
     resolveMsrpUsd(aircraft.aircraftClassId, opts?.maxCargoKg) *
-      AIRCRAFT_LEASE_MONTHLY_RATE[aircraft.aircraftClassId],
+      AIRCRAFT_LEASE_WEEKLY_RATE[aircraft.aircraftClassId],
   );
 }
 
@@ -110,12 +110,12 @@ export function estimateSellBackUsd(
   return Math.round(estimateFairUsd(aircraft, opts) * 0.5);
 }
 
-/** Career clock: 96 ticks/day × 30 days. */
-const TICKS_PER_MONTH = 96 * 30;
+/** Career clock: 96 ticks/day × 7 days. */
+const TICKS_PER_WEEK = 96 * 7;
 
 /**
  * Early-return penalty mirror of quoteLeaseEarlyReturnUsd in shared.
- * Half the remaining months of rent, clamped to 1–3 months.
+ * Half the remaining weeks of rent, clamped to 1–4 weeks.
  */
 export function estimateLeaseEarlyReturnUsd(
   lease: {
@@ -129,14 +129,14 @@ export function estimateLeaseEarlyReturnUsd(
     return { penaltyUsd: 0, remainingMonths: 0 };
   }
   const ticksLeft = lease.termEndsTick - economyTick;
-  const remainingMonths =
-    ticksLeft <= 0 ? 0 : Math.max(1, Math.ceil(ticksLeft / TICKS_PER_MONTH));
-  if (remainingMonths <= 0) {
+  const remainingWeeks =
+    ticksLeft <= 0 ? 0 : Math.max(1, Math.ceil(ticksLeft / TICKS_PER_WEEK));
+  if (remainingWeeks <= 0) {
     return { penaltyUsd: 0, remainingMonths: 0 };
   }
-  const monthsBilled = Math.min(3, Math.max(1, Math.ceil(remainingMonths * 0.5)));
+  const weeksBilled = Math.min(4, Math.max(1, Math.ceil(remainingWeeks * 0.5)));
   return {
-    penaltyUsd: Math.round(lease.monthlyUsd * monthsBilled),
-    remainingMonths,
+    penaltyUsd: Math.round(lease.monthlyUsd * weeksBilled),
+    remainingMonths: Math.max(1, Math.ceil(remainingWeeks / 4)),
   };
 }

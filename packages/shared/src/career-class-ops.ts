@@ -223,6 +223,20 @@ export function classOpsIsUnlocked(
   return normalizeCareerClassOps(ops).classes[classId].unlocked;
 }
 
+/**
+ * Dev / cheat: every freighter class unlocked (does not bump hours/cleans).
+ * Returns a fresh normalized copy — safe for gates without persisting.
+ */
+export function unlockAllCareerClassOps(
+  ops?: CareerClassOps | null,
+): CareerClassOps {
+  const next = normalizeCareerClassOps(ops ?? undefined);
+  for (const id of CLASS_OPS_CLASS_IDS) {
+    next.classes[id].unlocked = true;
+  }
+  return next;
+}
+
 export function assertClassOpsUnlocked(
   ops: CareerClassOps | undefined,
   classId: FreighterClassId,

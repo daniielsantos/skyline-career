@@ -11,6 +11,7 @@ import {
   emptyCareerCargoOps,
   normalizeCareerCargoOps,
   refreshCargoOpsUnlocks,
+  unlockAllCareerCargoOps,
 } from './career-cargo-ops.js';
 import { CAREER_COMMODITIES, getCommodity } from './career-economy.js';
 
@@ -130,7 +131,18 @@ describe('cargoOps', () => {
     assert.match(progress.summary, /peak rep 63\/70/);
   });
 
-  it('hints pay when Value board is open at low Electronics rep', () => {
+  it('unlockAllCareerCargoOps opens Value/Time/Heavy without wiping Dry progress', () => {
+    const ops = emptyCareerCargoOps();
+    ops.commodities.general.settlesOk = 3;
+    const open = unlockAllCareerCargoOps(ops);
+    assert.equal(open.commodities.electronics.unlocked, true);
+    assert.equal(open.commodities.perishables.unlocked, true);
+    assert.equal(open.commodities.machinery.unlocked, true);
+    assert.equal(open.commodities.general.settlesOk, 3);
+    assert.equal(ops.commodities.electronics.unlocked, false);
+  });
+
+  it('reports post-unlock Value progress', () => {
     const ops = emptyCareerCargoOps();
     ops.commodities.electronics.unlocked = true;
     ops.commodities.electronics.rep = 0;

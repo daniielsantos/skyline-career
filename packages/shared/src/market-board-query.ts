@@ -68,9 +68,10 @@ export type MarketBoardSortable = {
 };
 
 export type MarketBoardAccessFilter = 'open' | 'locked';
-
 /** Freights route scope: international lanes vs domestic vs Amazon bush. */
 export type MarketBoardLaneFilter = 'intl' | 'domestic' | 'bush';
+/** Split Freights: crew = fly NPC airframe; aircraft = haul with your plane. */
+export type MarketBoardCrewFilter = 'crew' | 'aircraft';
 
 /**
  * Kg shown in Freights Load column (lot total / formation size).
@@ -189,6 +190,8 @@ export type MarketBoardQueryOpts = {
   accessFilter?: MarketBoardAccessFilter;
   /** International vs domestic route filter. */
   laneFilter?: MarketBoardLaneFilter;
+  /** Crew needed vs own-aircraft freights. */
+  crewFilter?: MarketBoardCrewFilter;
   /** Current economy tick (integer batches). */
   currentTick: number;
   sorts?: MarketBoardSortLevel[];
@@ -389,6 +392,14 @@ export function parseMarketBoardLaneFilter(
   return undefined;
 }
 
+export function parseMarketBoardCrewFilter(
+  raw: string | null | undefined,
+): MarketBoardCrewFilter | undefined {
+  const v = raw?.trim().toLowerCase();
+  if (v === 'crew' || v === 'aircraft') return v;
+  return undefined;
+}
+
 function compareBoardRow<T extends MarketBoardSortable>(
   a: T,
   b: T,
@@ -446,6 +457,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     | 'hangarEmpty'
     | 'accessFilter'
     | 'laneFilter'
+    | 'crewFilter'
     | 'nearMaxNm'
     | 'currentTick'
   >,
@@ -520,10 +532,17 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     if (row.cargoLocked) return false;
     if (row.classLocked) return false;
     if (opts.hangarEmpty) {
-      // Crew on an unlocked class, or last-mile Dry (needs an aircraft to Prepare).
-      const starterJob =
-        row.crewNeeded === true || row.lastMile === true;
-      if (!starterJob) return false;
+      // Crew board: sit unlocked crew holds. Aircraft board: last-mile Dry only
+      // (full freights need a plane). Mixed board: either starter job.
+      if (opts.crewFilter === 'crew') {
+        if (row.crewNeeded !== true) return false;
+      } else if (opts.crewFilter === 'aircraft') {
+        if (row.lastMile !== true) return false;
+      } else {
+        const starterJob =
+          row.crewNeeded === true || row.lastMile === true;
+        if (!starterJob) return false;
+      }
       if (row.estimatedInRange === false) return false;
     } else {
       if (row.estimatedInRange === false) return false;
@@ -563,6 +582,8 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
   if (opts.laneFilter === 'intl' && !row.international) return false;
   if (opts.laneFilter === 'domestic' && row.international) return false;
   if (opts.laneFilter === 'bush' && !row.bush) return false;
+  if (opts.crewFilter === 'crew' && row.crewNeeded !== true) return false;
+  if (opts.crewFilter === 'aircraft' && row.crewNeeded === true) return false;
   return true;
 }
 

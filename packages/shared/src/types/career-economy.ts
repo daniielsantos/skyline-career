@@ -962,8 +962,9 @@ export interface AircraftListing {
   countryId?: string;
   /** Sub-region of `basedIcao` (`BR-N`). */
   region?: string;
-  /** Purchase price, or lease down-payment. */
+  /** Purchase price, or lease deposit (weeks of rent up front). */
   askingUsd: number;
+  /** Weekly lease installment (field name legacy). */
   leaseMonthlyUsd?: number;
   leaseTermMonths?: number;
   condition: AirframeCondition;
@@ -981,8 +982,9 @@ export interface AircraftListing {
 }
 
 export interface AircraftLeaseContract {
+  /** Weekly installment (field name legacy). */
   monthlyUsd: number;
-  /** Economy tick when the next monthly debit is due. */
+  /** Economy tick when the next weekly debit is due. */
   nextDueTick: number;
   /** Economy tick when the lease term ends. */
   termEndsTick: number;
@@ -999,6 +1001,7 @@ export interface AircraftLeaseContract {
 
 /** Income side when an NPC/market leases a player-listed airframe. */
 export interface AircraftLeaseOutContract {
+  /** Weekly installment paid to the owner (field name legacy). */
   monthlyUsd: number;
   nextDueTick: number;
   termEndsTick: number;

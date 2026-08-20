@@ -29,7 +29,7 @@ import {
 import {
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
-  resolveAircraftLeaseMonthlyUsd,
+  resolveAircraftLeaseWeeklyUsd,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
 import { TICKS_PER_DAY } from './career-clock.js';
@@ -81,10 +81,12 @@ import type {
 } from './types/career-economy.js';
 
 export {
+  AIRCRAFT_LEASE_WEEKLY_RATE,
   AIRCRAFT_LEASE_MONTHLY_RATE,
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
   cargoMsrpMultiplier,
+  resolveAircraftLeaseWeeklyUsd,
   resolveAircraftLeaseMonthlyUsd,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
@@ -115,6 +117,7 @@ const CLASS_ORDER: FreighterClassId[] = [
   'wide_freighter',
 ];
 
+const TICKS_PER_WEEK = TICKS_PER_DAY * 7;
 const TICKS_PER_MONTH = TICKS_PER_DAY * 30;
 const LISTING_LIFE_TICKS = TICKS_PER_DAY * 5;
 const PLAYER_LISTING_LIFE_TICKS = TICKS_PER_DAY * 7;
@@ -162,6 +165,20 @@ export function aircraftLeaseUnlockProgress(
     ? `Lease unlocked (${current}/${required} clean Dry freights).`
     : `Lease locked — ${current}/${required} clean Dry freights. Finish Crew needed on time (score ≥70). Buy still requires the aircraft class to be unlocked.`;
   return { current, required, remaining, unlocked, hint };
+}
+
+/** Dev Mode gate copy — lease open without writing Dry settle progress. */
+export function aircraftLeaseUnlockProgressDevOpen(
+  state: Pick<CareerMissionsState, 'cargoOps'>,
+): AircraftLeaseUnlockProgress {
+  const base = aircraftLeaseUnlockProgress(state);
+  if (base.unlocked) return base;
+  return {
+    ...base,
+    unlocked: true,
+    remaining: 0,
+    hint: `Lease unlocked (Dev Mode). Progress ${base.current}/${base.required} clean Dry freights.`,
+  };
 }
 
 function assertAircraftLeaseUnlocked(
@@ -268,15 +285,23 @@ export function aircraftMsrpUsd(
   });
 }
 
-export function aircraftLeaseMonthlyUsd(
+export function aircraftLeaseWeeklyUsd(
   classId: FreighterClassId,
   opts?: { maxCargoKg?: number | null; airframeTypeId?: string | null },
 ): number {
-  return resolveAircraftLeaseMonthlyUsd({
+  return resolveAircraftLeaseWeeklyUsd({
     aircraftClassId: classId,
     maxCargoKg:
       opts?.maxCargoKg ?? maxCargoKgForAirframe(opts?.airframeTypeId),
   });
+}
+
+/** @deprecated Alias — installment is weekly. */
+export function aircraftLeaseMonthlyUsd(
+  classId: FreighterClassId,
+  opts?: { maxCargoKg?: number | null; airframeTypeId?: string | null },
+): number {
+  return aircraftLeaseWeeklyUsd(classId, opts);
 }
 
 export function fairValueUsd(
@@ -314,32 +339,51 @@ export function clampPlayerSaleAskingUsd(
   return Math.min(hi, Math.max(lo, Math.round(askingUsd)));
 }
 
-/** Player may list lease monthly 0.6–1.8× catalog; term 1–24 months. */
-export const PLAYER_LEASE_MONTHLY_MIN_MULT = 0.6;
-export const PLAYER_LEASE_MONTHLY_MAX_MULT = 1.8;
+/** Player may list lease weekly 0.6–1.8× catalog; term 1–3 months. */
+export const PLAYER_LEASE_WEEKLY_MIN_MULT = 0.6;
+export const PLAYER_LEASE_WEEKLY_MAX_MULT = 1.8;
+/** @deprecated Alias for weekly mult. */
+export const PLAYER_LEASE_MONTHLY_MIN_MULT = PLAYER_LEASE_WEEKLY_MIN_MULT;
+/** @deprecated Alias for weekly mult. */
+export const PLAYER_LEASE_MONTHLY_MAX_MULT = PLAYER_LEASE_WEEKLY_MAX_MULT;
 export const PLAYER_LEASE_TERM_MIN_MONTHS = 1;
-export const PLAYER_LEASE_TERM_MAX_MONTHS = 24;
-/** NPC only takes 0.7–1.3× catalog monthly and 3–18 month terms. */
-export const NPC_LEASE_MONTHLY_MIN_MULT = 0.7;
-export const NPC_LEASE_MONTHLY_MAX_MULT = 1.3;
-export const NPC_LEASE_TERM_MIN_MONTHS = 3;
-export const NPC_LEASE_TERM_MAX_MONTHS = 18;
-export const PLAYER_LEASE_DEPOSIT_MONTHS = 2;
+export const PLAYER_LEASE_TERM_MAX_MONTHS = 3;
+/** NPC only takes 0.7–1.3× catalog weekly and 1–3 month terms. */
+export const NPC_LEASE_WEEKLY_MIN_MULT = 0.7;
+export const NPC_LEASE_WEEKLY_MAX_MULT = 1.3;
+/** @deprecated Alias for weekly mult. */
+export const NPC_LEASE_MONTHLY_MIN_MULT = NPC_LEASE_WEEKLY_MIN_MULT;
+/** @deprecated Alias for weekly mult. */
+export const NPC_LEASE_MONTHLY_MAX_MULT = NPC_LEASE_WEEKLY_MAX_MULT;
+export const NPC_LEASE_TERM_MIN_MONTHS = 1;
+export const NPC_LEASE_TERM_MAX_MONTHS = 3;
+/** Up-front deposit = this many weeks of the weekly installment. */
+export const PLAYER_LEASE_DEPOSIT_WEEKS = 4;
+/** @deprecated Use PLAYER_LEASE_DEPOSIT_WEEKS. */
+export const PLAYER_LEASE_DEPOSIT_MONTHS = PLAYER_LEASE_DEPOSIT_WEEKS;
 
+export function clampPlayerLeaseWeeklyUsd(
+  weeklyUsd: number,
+  catalogWeeklyUsd: number,
+): number {
+  const catalog = Math.max(1, Math.round(catalogWeeklyUsd));
+  const lo = Math.max(1, Math.round(catalog * PLAYER_LEASE_WEEKLY_MIN_MULT));
+  const hi = Math.max(lo, Math.round(catalog * PLAYER_LEASE_WEEKLY_MAX_MULT));
+  if (!Number.isFinite(weeklyUsd)) return catalog;
+  return Math.min(hi, Math.max(lo, Math.round(weeklyUsd)));
+}
+
+/** @deprecated Alias — values are weekly. */
 export function clampPlayerLeaseMonthlyUsd(
   monthlyUsd: number,
   catalogMonthlyUsd: number,
 ): number {
-  const catalog = Math.max(1, Math.round(catalogMonthlyUsd));
-  const lo = Math.max(1, Math.round(catalog * PLAYER_LEASE_MONTHLY_MIN_MULT));
-  const hi = Math.max(lo, Math.round(catalog * PLAYER_LEASE_MONTHLY_MAX_MULT));
-  if (!Number.isFinite(monthlyUsd)) return catalog;
-  return Math.min(hi, Math.max(lo, Math.round(monthlyUsd)));
+  return clampPlayerLeaseWeeklyUsd(monthlyUsd, catalogMonthlyUsd);
 }
 
 export function clampPlayerLeaseTermMonths(termMonths: number): number {
   const n = Math.round(termMonths);
-  if (!Number.isFinite(n)) return 6;
+  if (!Number.isFinite(n)) return 3;
   return Math.min(
     PLAYER_LEASE_TERM_MAX_MONTHS,
     Math.max(PLAYER_LEASE_TERM_MIN_MONTHS, n),
@@ -353,7 +397,7 @@ export function npcPlayerLeaseAcceptable(opts: {
 }): boolean {
   const catalog = Math.max(1, opts.catalogMonthlyUsd);
   const ratio = opts.monthlyUsd / catalog;
-  if (ratio < NPC_LEASE_MONTHLY_MIN_MULT || ratio > NPC_LEASE_MONTHLY_MAX_MULT) {
+  if (ratio < NPC_LEASE_WEEKLY_MIN_MULT || ratio > NPC_LEASE_WEEKLY_MAX_MULT) {
     return false;
   }
   const term = Math.round(opts.termMonths);
@@ -513,7 +557,7 @@ function priceListing(
     aircraftClassId: classId,
     maxCargoKg,
   });
-  const monthly = resolveAircraftLeaseMonthlyUsd({
+  const monthly = resolveAircraftLeaseWeeklyUsd({
     aircraftClassId: classId,
     maxCargoKg,
   });
@@ -528,11 +572,12 @@ function priceListing(
       : 1;
 
   if (kind === 'lease') {
-    // Always two months up front; short career terms (not multi-year finance).
-    const entryMonths = 2;
-    const termMonths = rng() < 0.55 ? 6 : 12;
+    // Deposit = 4 weeks; short career terms (1–3 months).
+    const entryWeeks = PLAYER_LEASE_DEPOSIT_WEEKS;
+    const roll = rng();
+    const termMonths = roll < 0.4 ? 1 : roll < 0.75 ? 2 : 3;
     return {
-      askingUsd: Math.round(monthly * entryMonths),
+      askingUsd: Math.round(monthly * entryWeeks),
       leaseMonthlyUsd: monthly,
       leaseTermMonths: termMonths,
     };
@@ -801,7 +846,7 @@ function applyNpcTakeListing(
 
     aircraft.leaseOut = {
       monthlyUsd: listing.leaseMonthlyUsd,
-      nextDueTick: economyTick + TICKS_PER_MONTH,
+      nextDueTick: economyTick + TICKS_PER_WEEK,
       termEndsTick: economyTick + listing.leaseTermMonths * TICKS_PER_MONTH,
       depositUsd: deposit,
       listingId: listing.id,
@@ -867,7 +912,7 @@ function applyNpcDemand(
       });
       const chance = npcPlayerLeaseAcceptChance({
         monthlyUsd: listing.leaseMonthlyUsd ?? catalog,
-        termMonths: listing.leaseTermMonths ?? 6,
+        termMonths: listing.leaseTermMonths ?? 3,
         catalogMonthlyUsd: catalog,
       });
       if (chance <= 0 || rng() > chance) continue;
@@ -892,7 +937,7 @@ function settleLeaseOutIncome(
     if (aircraft.status !== 'leased_out' || !aircraft.leaseOut) continue;
     const lease = aircraft.leaseOut;
     if (typeof lease.startedAtTick !== 'number') {
-      lease.startedAtTick = lease.nextDueTick - TICKS_PER_MONTH;
+      lease.startedAtTick = lease.nextDueTick - TICKS_PER_WEEK;
     }
     if (typeof lease.lastWearTick !== 'number') {
       lease.lastWearTick = lease.startedAtTick;
@@ -914,7 +959,7 @@ function settleLeaseOutIncome(
       earnedUsd += lease.monthlyUsd;
       wearHours += applyLeaseOutWear(aircraft, lease.lastWearTick, lease.nextDueTick);
       lease.lastWearTick = lease.nextDueTick;
-      lease.nextDueTick += TICKS_PER_MONTH;
+      lease.nextDueTick += TICKS_PER_WEEK;
     }
 
     if (economyTick >= lease.termEndsTick) {
@@ -1291,7 +1336,7 @@ function buildAircraftFromListing(
   if (ownership === 'leased' && listing.leaseMonthlyUsd && listing.leaseTermMonths) {
     aircraft.lease = {
       monthlyUsd: listing.leaseMonthlyUsd,
-      nextDueTick: economyTick + TICKS_PER_MONTH,
+      nextDueTick: economyTick + TICKS_PER_WEEK,
       termEndsTick: economyTick + listing.leaseTermMonths * TICKS_PER_MONTH,
       buyoutUsd: Math.round(
         fairValueUsd(listing.aircraftClassId, listing.condition, {
@@ -1842,15 +1887,15 @@ export function listAircraftForLease(
   if (existingPlayerLease) {
     throw new Error('You already have one aircraft listed for lease');
   }
-  const catalogMonthly = aircraftLeaseMonthlyUsd(aircraft.aircraftClassId, {
+  const catalogWeekly = aircraftLeaseWeeklyUsd(aircraft.aircraftClassId, {
     airframeTypeId: aircraft.airframeTypeId,
   });
-  const monthly = clampPlayerLeaseMonthlyUsd(
-    opts?.monthlyUsd ?? catalogMonthly,
-    catalogMonthly,
+  const monthly = clampPlayerLeaseWeeklyUsd(
+    opts?.monthlyUsd ?? catalogWeekly,
+    catalogWeekly,
   );
-  const termMonths = clampPlayerLeaseTermMonths(opts?.termMonths ?? 6);
-  const deposit = Math.max(1, Math.round(monthly * PLAYER_LEASE_DEPOSIT_MONTHS));
+  const termMonths = clampPlayerLeaseTermMonths(opts?.termMonths ?? 3);
+  const deposit = Math.max(1, Math.round(monthly * PLAYER_LEASE_DEPOSIT_WEEKS));
   const listing: AircraftListing = {
     id: `acfl_lease_${aircraft.id}_${economyTick}`,
     kind: 'lease',
@@ -1963,10 +2008,10 @@ export function settleAircraftMarketOps(
       paidUsd += lease.monthlyUsd;
       paidThisAcf += 1;
       installmentsPaid += 1;
-      lease.nextDueTick += TICKS_PER_MONTH;
+      lease.nextDueTick += TICKS_PER_WEEK;
       aircraft.leaseOverdue = false;
     }
-    // More months due but capped — leave overdue so Hangar prompts payment.
+    // More weeks due but capped — leave overdue so Hangar prompts payment.
     if (
       economyTick >= lease.nextDueTick &&
       economyTick < lease.termEndsTick &&
@@ -2060,8 +2105,8 @@ export function buyOutAircraftLease(
   return { state, debitUsd: debit };
 }
 
-/** Months still owed on a player lease (at least 1 while the term is active). */
-export function leaseRemainingMonths(
+/** Weeks still owed on a player lease (at least 1 while the term is active). */
+export function leaseRemainingWeeks(
   aircraft: PlayerAircraft,
   economyTick: number,
 ): number {
@@ -2069,11 +2114,19 @@ export function leaseRemainingMonths(
   if (!lease) return 0;
   const ticksLeft = lease.termEndsTick - economyTick;
   if (ticksLeft <= 0) return 0;
-  return Math.max(1, Math.ceil(ticksLeft / TICKS_PER_MONTH));
+  return Math.max(1, Math.ceil(ticksLeft / TICKS_PER_WEEK));
+}
+
+/** @deprecated Prefer leaseRemainingWeeks. */
+export function leaseRemainingMonths(
+  aircraft: PlayerAircraft,
+  economyTick: number,
+): number {
+  return Math.max(1, Math.ceil(leaseRemainingWeeks(aircraft, economyTick) / 4));
 }
 
 /**
- * Early-return penalty: half the remaining months of rent, clamped to 1–3 months.
+ * Early-return penalty: half the remaining weeks of rent, clamped to 1–4 weeks.
  * Deposit already paid is not refunded.
  */
 export function quoteLeaseEarlyReturnUsd(
@@ -2087,12 +2140,12 @@ export function quoteLeaseEarlyReturnUsd(
   if (aircraft.lease.termEndedSoft === true || economyTick >= aircraft.lease.termEndsTick) {
     return 0;
   }
-  const remaining = leaseRemainingMonths(aircraft, economyTick);
+  const remaining = leaseRemainingWeeks(aircraft, economyTick);
   if (remaining <= 0) {
     throw new Error('Lease term already ended — the lessor will reclaim the airframe');
   }
-  const monthsBilled = Math.min(3, Math.max(1, Math.ceil(remaining * 0.5)));
-  return Math.round(aircraft.lease.monthlyUsd * monthsBilled);
+  const weeksBilled = Math.min(4, Math.max(1, Math.ceil(remaining * 0.5)));
+  return Math.round(aircraft.lease.monthlyUsd * weeksBilled);
 }
 
 /**

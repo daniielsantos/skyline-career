@@ -6,6 +6,32 @@ import type { CareerCargoOps, CargoOpsCommodityId } from './api';
 
 export type CargoOpsTierId = 'dry' | 'value' | 'time' | 'heavy';
 
+/** Keep in sync with packages/shared/src/career-cargo-ops.ts */
+export const CARGO_OPS_COMMODITY_IDS: readonly CargoOpsCommodityId[] = [
+  'general',
+  'supplies',
+  'electronics',
+  'perishables',
+  'machinery',
+];
+
+export const CARGO_OPS_COMMODITY_LABELS: Record<CargoOpsCommodityId, string> = {
+  general: 'General',
+  supplies: 'Supplies',
+  electronics: 'Electronics',
+  perishables: 'Perishables',
+  machinery: 'Machinery',
+};
+
+/** Full freight commodity list for Market filters (not just what's on the board). */
+export const CARGO_OPS_FILTER_OPTIONS: readonly {
+  id: CargoOpsCommodityId;
+  name: string;
+}[] = CARGO_OPS_COMMODITY_IDS.map((id) => ({
+  id,
+  name: CARGO_OPS_COMMODITY_LABELS[id],
+}));
+
 export const CARGO_OPS_TIERS: readonly {
   id: CargoOpsTierId;
   label: string;

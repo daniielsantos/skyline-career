@@ -49,9 +49,21 @@ import {
   MAX_OPEN_STARTER_REPOSITION_OFFERS,
   MIN_OPEN_CONTRACT_PILOT_OFFERS,
   MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS,
+  MIN_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
+  STARTER_CREW_OFFERS_PER_EXTRA_COMPANY,
+  MAX_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
+  AWAITING_PILOT_MIN_HOURS,
+  AWAITING_PILOT_MAX_HOURS,
+  AWAITING_PILOT_SHORT_MIN_HOURS,
+  AWAITING_PILOT_SHORT_MAX_HOURS,
   isStarterContractPilotClass,
   countOpenContractPilotOffers,
+  countOpenContractPilotOffersInCountry,
   maxOpenContractPilotOffers,
+  contractPilotOriginCountry,
+  activeContractPilotCountries,
+  starterContractPilotCountryFloor,
+  starterContractPilotCountryNeedsFloor,
   TICKS_PER_DAY,
   REPOSITION_AWAITING_MAX_HOURS,
   REPOSITION_PILOT_FEE_MIN_USD,
@@ -1213,14 +1225,19 @@ describe('NPC freighter fleet', () => {
 
     const open = countOpenContractPilotOffers(world);
     const cap = maxOpenContractPilotOffers(world);
+    const home = (world.homeCountryId ?? 'BR').trim().toUpperCase();
+    const countryFloor = activeContractPilotCountries(world).includes(home)
+      ? starterContractPilotCountryFloor(1)
+      : 0;
     assert.ok(cap >= MIN_OPEN_CONTRACT_PILOT_OFFERS);
+    // Home-country starter floor may overflow the global starter bucket by ≤ floor.
     assert.ok(
-      open <= cap,
-      `open crew holds ${open} should stay within cap ${cap}`,
+      open <= cap + countryFloor,
+      `open crew holds ${open} should stay within cap ${cap} + country floor ${countryFloor}`,
     );
     assert.ok(
       countOpenContractPilotOffers(world, 'starter') <=
-        maxOpenContractPilotOffers(world, 'starter'),
+        maxOpenContractPilotOffers(world, 'starter') + countryFloor,
     );
     assert.ok(
       countOpenContractPilotOffers(world, 'other') <=
@@ -1241,13 +1258,20 @@ describe('NPC freighter fleet', () => {
     tickEconomyN(world, TICKS_PER_DAY);
 
     const starterCap = maxOpenContractPilotOffers(world, 'starter');
+    const home = (world.homeCountryId ?? 'BR').trim().toUpperCase();
+    const countryFloor = activeContractPilotCountries(world).includes(home)
+      ? starterContractPilotCountryFloor(1)
+      : 0;
     assert.ok(starterCap >= MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS);
     const starterOpen = countOpenContractPilotOffers(world, 'starter');
     assert.ok(
       starterOpen > 0,
       `expected light GA/turboprop crew holds, got ${starterOpen}`,
     );
-    assert.ok(starterOpen <= starterCap);
+    assert.ok(
+      starterOpen <= starterCap + countryFloor,
+      `starter open ${starterOpen} > cap ${starterCap} + floor ${countryFloor}`,
+    );
     const lightGa = world.npcFlights.filter(
       (f) =>
         f.status === 'awaiting_pilot' &&
@@ -1263,6 +1287,367 @@ describe('NPC freighter fleet', () => {
     assert.ok(
       lightGa + turboprop === starterOpen,
       `starter holds should be GA/TP only (ga=${lightGa} tp=${turboprop} open=${starterOpen})`,
+    );
+  });
+
+  it('scales starter country floor with company count', () => {
+    assert.equal(
+      starterContractPilotCountryFloor(1),
+      MIN_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
+    );
+    assert.equal(
+      starterContractPilotCountryFloor(3),
+      MIN_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY +
+        STARTER_CREW_OFFERS_PER_EXTRA_COMPANY * 2,
+    );
+    assert.equal(starterContractPilotCountryFloor(3), 18);
+    assert.equal(
+      starterContractPilotCountryFloor(100),
+      MAX_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
+    );
+  });
+
+  it('country floor opens starter crew at home when the global starter cap is full', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-country-floor' });
+    world.homeCountryId = 'BR';
+    assert.deepEqual(activeContractPilotCountries(world), ['BR']);
+
+    const foreignAp = world.airports.find(
+      (a) => contractPilotOriginCountry(world, a.icao) === 'US',
+    );
+    assert.ok(foreignAp, 'expected a US hub for foreign filler offers');
+    const starterCap = maxOpenContractPilotOffers(world, 'starter');
+    const fillerNpc = world.npcs.find((n) =>
+      isStarterContractPilotClass(n.aircraftClassId),
+    );
+    assert.ok(fillerNpc);
+    for (let i = 0; i < starterCap; i++) {
+      world.npcFlights.push({
+        id: `fill-starter-${i}`,
+        npcId: fillerNpc!.id,
+        lotId: `fill-lot-${i}`,
+        originIcao: foreignAp!.icao,
+        destIcao: foreignAp!.icao,
+        commodityId: 'general',
+        cargoKg: 200,
+        payUsd: 500,
+        aircraftClassId: 'light_ga',
+        departedAtTick: world.tick,
+        arrivesAtTick: world.tick,
+        departedAtMs: world.lastBatchAtMs ?? Date.now(),
+        arrivesAtMs: (world.lastBatchAtMs ?? Date.now()) + 3_600_000,
+        status: 'awaiting_pilot',
+        awaitingPilotUntilMs: (world.lastBatchAtMs ?? Date.now()) + 3_600_000,
+      });
+    }
+    assert.ok(
+      countOpenContractPilotOffers(world, 'starter') >= starterCap,
+      'global starter cap should be saturated with foreign holds',
+    );
+    assert.equal(
+      countOpenContractPilotOffersInCountry(world, 'BR', 'starter'),
+      0,
+    );
+    assert.equal(
+      starterContractPilotCountryNeedsFloor(world, 'SBGR'),
+      true,
+    );
+
+    const npc = world.npcs.find(
+      (n) =>
+        npcCanOfferContractPilot(n) &&
+        isStarterContractPilotClass(n.aircraftClassId),
+    );
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    const lot: ShipmentLot = {
+      id: 'lot-br-floor-test',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      quantityKg: 200,
+      reservedKg: 0,
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 48,
+      payUsd: 400,
+      urgency: 'normal',
+      reason: 'starter floor test',
+      status: 'available',
+    };
+    world.lots.push(lot);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcContractPilotOffer(world, npc!.id, lot.id, {
+      nowMs,
+      rng: () => 0,
+      respectCaps: true,
+    });
+    assert.equal(flight.status, 'awaiting_pilot');
+    assert.equal(contractPilotOriginCountry(world, flight.originIcao), 'BR');
+    assert.ok(
+      countOpenContractPilotOffersInCountry(world, 'BR', 'starter') >= 1,
+    );
+  });
+
+  it('country floor is a soft minimum — home can still open above the floor', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-country-softfloor' });
+    world.homeCountryId = 'BR';
+    const floor = starterContractPilotCountryFloor(1);
+    const npc = world.npcs.find(
+      (n) =>
+        npcCanOfferContractPilot(n) &&
+        isStarterContractPilotClass(n.aircraftClassId),
+    );
+    assert.ok(npc);
+    for (let i = 0; i < floor; i++) {
+      world.npcFlights.push({
+        id: `fill-br-soft-${i}`,
+        npcId: npc!.id,
+        lotId: `fill-br-soft-lot-${i}`,
+        originIcao: 'SBGR',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        cargoKg: 200,
+        payUsd: 400,
+        aircraftClassId: 'light_ga',
+        departedAtTick: world.tick,
+        arrivesAtTick: world.tick,
+        departedAtMs: Date.now(),
+        arrivesAtMs: Date.now() + 3_600_000,
+        status: 'awaiting_pilot',
+        awaitingPilotUntilMs: Date.now() + 3_600_000,
+      });
+    }
+    assert.equal(
+      countOpenContractPilotOffersInCountry(world, 'BR', 'starter'),
+      floor,
+    );
+    assert.equal(starterContractPilotCountryNeedsFloor(world, 'SBGR'), false);
+    assert.ok(
+      countOpenContractPilotOffers(world, 'starter') <
+        maxOpenContractPilotOffers(world, 'starter'),
+      'global starter cap should still have room',
+    );
+    npc!.status = 'idle';
+    npc!.currentFlightId = undefined;
+    npc!.busyUntilMs = undefined;
+    npc!.busyUntilTick = undefined;
+    world.lots.push({
+      id: 'lot-br-softfloor',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      quantityKg: 180,
+      reservedKg: 0,
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 48,
+      payUsd: 350,
+      urgency: 'normal',
+      reason: 'starter soft floor test',
+      status: 'available',
+    });
+    const flight = createNpcContractPilotOffer(world, npc!.id, 'lot-br-softfloor', {
+      rng: () => 0,
+      respectCaps: true,
+    });
+    assert.equal(flight.status, 'awaiting_pilot');
+    assert.ok(
+      countOpenContractPilotOffersInCountry(world, 'BR', 'starter') > floor,
+    );
+  });
+
+  it('uses a short hold below the home-country starter floor and a long hold at the floor', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-short-hold' });
+    tickEconomyN(world, 24);
+    world.homeCountryId = 'BR';
+    // Clear existing BR starter holds so the floor path is deterministic.
+    for (const flight of world.npcFlights) {
+      if (flight.status !== 'awaiting_pilot') continue;
+      if (!isStarterContractPilotClass(flight.aircraftClassId)) continue;
+      if (flight.kind === 'reposition') continue;
+      if (contractPilotOriginCountry(world, flight.originIcao) !== 'BR') {
+        continue;
+      }
+      flight.status = 'in_flight';
+      delete flight.awaitingPilotUntilMs;
+    }
+    assert.equal(
+      countOpenContractPilotOffersInCountry(world, 'BR', 'starter'),
+      0,
+    );
+    const floor = starterContractPilotCountryFloor(1);
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    const starters = world.npcs.filter(
+      (n) =>
+        npcCanOfferContractPilot(n) &&
+        isStarterContractPilotClass(n.aircraftClassId),
+    );
+    assert.ok(starters.length >= 2);
+
+    const park = (npc: (typeof starters)[number]) => {
+      npc.status = 'idle';
+      npc.currentFlightId = undefined;
+      npc.busyUntilMs = undefined;
+      npc.busyUntilTick = undefined;
+    };
+
+    park(starters[0]!);
+    const shortLot = findLiftableLot(
+      world,
+      starters[0]!,
+      heldLots,
+      80,
+      (l) => contractPilotOriginCountry(world, l.originIcao) === 'BR',
+    );
+    assert.ok(shortLot);
+    heldLots.add(shortLot!.id);
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    assert.equal(
+      starterContractPilotCountryNeedsFloor(world, shortLot!.originIcao),
+      true,
+    );
+    const shortFlight = createNpcContractPilotOffer(
+      world,
+      starters[0]!.id,
+      shortLot!.id,
+      { nowMs, rng: () => 0 },
+    );
+    const shortHours =
+      ((shortFlight.awaitingPilotUntilMs ?? nowMs) - nowMs) / 3_600_000;
+    assert.ok(
+      shortHours >= AWAITING_PILOT_SHORT_MIN_HOURS - 1e-9 &&
+        shortHours <= AWAITING_PILOT_SHORT_MAX_HOURS + 1e-9,
+      `expected short hold, got ${shortHours}h`,
+    );
+
+    // Fill home country up to the floor with synthetic BR holds.
+    const brHub =
+      world.airports.find((a) => a.icao === 'SBGR') ??
+      world.airports.find(
+        (a) => contractPilotOriginCountry(world, a.icao) === 'BR',
+      );
+    assert.ok(brHub);
+    let brOpen = countOpenContractPilotOffersInCountry(world, 'BR', 'starter');
+    let fill = 0;
+    while (brOpen < floor) {
+      world.npcFlights.push({
+        id: `fill-br-${fill}`,
+        npcId: starters[0]!.id,
+        lotId: `fill-br-lot-${fill}`,
+        originIcao: brHub!.icao,
+        destIcao: brHub!.icao,
+        commodityId: 'general',
+        cargoKg: 200,
+        payUsd: 500,
+        aircraftClassId: 'light_turboprop',
+        departedAtTick: world.tick,
+        arrivesAtTick: world.tick,
+        departedAtMs: nowMs,
+        arrivesAtMs: nowMs + 3_600_000,
+        status: 'awaiting_pilot',
+        awaitingPilotUntilMs: nowMs + 3_600_000,
+      });
+      fill += 1;
+      brOpen += 1;
+    }
+    assert.equal(
+      starterContractPilotCountryNeedsFloor(world, brHub!.icao),
+      false,
+    );
+
+    park(starters[1]!);
+    const longLot = findLiftableLot(
+      world,
+      starters[1]!,
+      heldLots,
+      80,
+      (l) => contractPilotOriginCountry(world, l.originIcao) === 'BR',
+    );
+    assert.ok(longLot);
+    const longFlight = createNpcContractPilotOffer(
+      world,
+      starters[1]!.id,
+      longLot!.id,
+      { nowMs, rng: () => 0 },
+    );
+    const longHours =
+      ((longFlight.awaitingPilotUntilMs ?? nowMs) - nowMs) / 3_600_000;
+    assert.ok(
+      longHours >= AWAITING_PILOT_MIN_HOURS - 1e-9 &&
+        longHours <= AWAITING_PILOT_MAX_HOURS + 1e-9,
+      `expected long hold, got ${longHours}h`,
+    );
+  });
+
+  it('does not use the country floor bypass for jet+ crew holds', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-crew-other-cap' });
+    tickEconomyN(world, 24);
+    world.homeCountryId = 'BR';
+    const otherCap = maxOpenContractPilotOffers(world, 'other');
+    const brHub =
+      world.airports.find((a) => a.icao === 'SBGR') ??
+      world.airports.find(
+        (a) => contractPilotOriginCountry(world, a.icao) === 'BR',
+      );
+    assert.ok(brHub);
+    const heavyNpc = world.npcs.find(
+      (n) =>
+        npcCanOfferContractPilot(n) &&
+        !isStarterContractPilotClass(n.aircraftClassId),
+    );
+    assert.ok(heavyNpc);
+    for (let i = 0; i < otherCap; i++) {
+      world.npcFlights.push({
+        id: `fill-other-${i}`,
+        npcId: heavyNpc!.id,
+        lotId: `fill-other-lot-${i}`,
+        originIcao: brHub!.icao,
+        destIcao: brHub!.icao,
+        commodityId: 'general',
+        cargoKg: 5_000,
+        payUsd: 5_000,
+        aircraftClassId: 'narrow_freighter',
+        departedAtTick: world.tick,
+        arrivesAtTick: world.tick,
+        departedAtMs: world.lastBatchAtMs ?? Date.now(),
+        arrivesAtMs: (world.lastBatchAtMs ?? Date.now()) + 3_600_000,
+        status: 'awaiting_pilot',
+        awaitingPilotUntilMs: (world.lastBatchAtMs ?? Date.now()) + 3_600_000,
+      });
+    }
+    assert.ok(
+      countOpenContractPilotOffers(world, 'other') >= otherCap,
+    );
+
+    const heldLots = new Set(
+      world.npcFlights
+        .filter(
+          (f) => f.status === 'in_flight' || f.status === 'awaiting_pilot',
+        )
+        .map((f) => f.lotId),
+    );
+    heavyNpc!.status = 'idle';
+    heavyNpc!.currentFlightId = undefined;
+    heavyNpc!.busyUntilMs = undefined;
+    heavyNpc!.busyUntilTick = undefined;
+    const lot = findLiftableLot(world, heavyNpc!, heldLots, 200, (l) =>
+      Boolean(contractPilotOriginCountry(world, l.originIcao) === 'BR'),
+    );
+    assert.ok(lot);
+    assert.throws(() =>
+      createNpcContractPilotOffer(world, heavyNpc!.id, lot!.id, {
+        nowMs: world.lastBatchAtMs ?? Date.now(),
+        rng: () => 0,
+        respectCaps: true,
+      }),
     );
   });
 

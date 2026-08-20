@@ -75,7 +75,7 @@ export function AircraftMarketCountryCombobox(props: {
   const [query, setQuery] = useState(committedLabel);
   const [open, setOpen] = useState(false);
   const [menuBox, setMenuBox] = useState<MenuBox | null>(null);
-  const maxResults = props.maxResults ?? 14;
+  const maxResults = props.maxResults ?? 80;
 
   useEffect(() => {
     if (!open) setQuery(committedLabel);
@@ -85,6 +85,8 @@ export function AircraftMarketCountryCombobox(props: {
     const filtered = props.options.filter((opt) =>
       optionMatches(opt, home, query),
     );
+    // Empty query = browse the full country list; typed filter stays capped.
+    if (!query.trim()) return filtered;
     return filtered.slice(0, maxResults);
   }, [props.options, home, query, maxResults]);
 
@@ -233,8 +235,16 @@ export function AircraftMarketCountryCombobox(props: {
         disabled={props.disabled}
         onChange={(e) => onQueryChange(e.target.value)}
         onFocus={() => {
-          setQuery(committedLabel);
+          // Clear the committed label so the full list opens; closed state
+          // still shows the selection via `value={open ? query : committedLabel}`.
+          setQuery('');
           setOpen(true);
+        }}
+        onClick={() => {
+          if (!open && !props.disabled) {
+            setQuery('');
+            setOpen(true);
+          }
         }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {

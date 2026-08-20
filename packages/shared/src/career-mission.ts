@@ -4,6 +4,7 @@ import {
   getCommodity,
   listMarketLots,
   routeDistanceNm,
+  shrinkLotAfterDelivery,
   type CareerEconomyWorld,
   type MarketLotView,
 } from './career-economy.js';
@@ -1995,21 +1996,6 @@ function computeSettlementPay(
   return { lateTicks, penaltyUsd, payoutUsd, onTime, weatherBonusUsd };
 }
 
-function shrinkDeliveredLot(lot: ShipmentLot, bookKg: number): void {
-  lot.reservedKg = Math.max(0, lot.reservedKg - bookKg);
-  lot.quantityKg = Math.max(0, lot.quantityKg - bookKg);
-  if (lot.quantityKg <= 0) {
-    lot.quantityKg = 0;
-    lot.reservedKg = 0;
-    lot.status = 'delivered';
-  } else if (lot.reservedKg <= 0) {
-    lot.reservedKg = 0;
-    lot.status = 'available';
-  } else {
-    lot.status = 'reserved';
-  }
-}
-
 /**
  * Deliver cargo into the destination terminal, shrink each lot, pay freight (minus late penalty).
  * Accepts dispatched or in_flight (auto-departs if still dispatched).
@@ -2234,7 +2220,7 @@ export function settleMission(
 
       const lot = world.lots.find((l) => l.id === line.shipmentLotId);
       if (lot) {
-        shrinkDeliveredLot(lot, line.cargoKg);
+        shrinkLotAfterDelivery(lot, line.cargoKg);
       }
 
       const isLast = i === working.lots.length - 1;

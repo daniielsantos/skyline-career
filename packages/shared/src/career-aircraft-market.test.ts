@@ -19,7 +19,7 @@ import {
   purchaseAircraftListing,
   quoteAircraftDelivery,
   quoteLeaseEarlyReturnUsd,
-  leaseRemainingMonths,
+  leaseRemainingWeeks,
   resolveAircraftMsrpUsd,
   returnAircraftLeaseEarly,
   sellPlayerAircraft,
@@ -107,13 +107,15 @@ describe('aircraft market', () => {
       );
       assert.ok((lease.leaseMonthlyUsd ?? 0) > 0);
       assert.ok(
-        lease.leaseTermMonths === 6 || lease.leaseTermMonths === 12,
-        'lease terms are short career contracts',
+        lease.leaseTermMonths === 1 ||
+          lease.leaseTermMonths === 2 ||
+          lease.leaseTermMonths === 3,
+        'lease terms are short career contracts (1–3 mo)',
       );
       assert.equal(
         lease.askingUsd,
-        Math.round((lease.leaseMonthlyUsd ?? 0) * 2),
-        'lease deposit is two months',
+        Math.round((lease.leaseMonthlyUsd ?? 0) * 4),
+        'lease deposit is four weeks',
       );
     }
   });
@@ -211,7 +213,7 @@ describe('aircraft market', () => {
     assert.equal(purchased.aircraft.ownership, 'owned');
   });
 
-  it('signs a lease with entry payment and monthly terms', () => {
+  it('signs a lease with entry payment and weekly terms', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-lease' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
       pilotName: 'Lessee',
@@ -251,7 +253,7 @@ describe('aircraft market', () => {
     assert.equal(aircraft.ownership, 'leased');
   });
 
-  it('early-returns a lease with a remaining-month penalty and drops the airframe', () => {
+  it('early-returns a lease with a remaining-week penalty and drops the airframe', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-early-return' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'EarlyReturn',
@@ -266,12 +268,12 @@ describe('aircraft market', () => {
     state.walletUsd = lease!.askingUsd + 200_000;
     seedDryCleanSettlesForTests(state, LEASE_UNLOCK_CLEAN_DRY_SETTLES);
     const { aircraft } = signAircraftLease(state, world, lease!.id);
-    const monthly = aircraft.lease!.monthlyUsd;
-    const remaining = leaseRemainingMonths(aircraft, world.tick);
+    const weekly = aircraft.lease!.monthlyUsd;
+    const remaining = leaseRemainingWeeks(aircraft, world.tick);
     const expected = quoteLeaseEarlyReturnUsd(aircraft, world.tick);
     assert.equal(
       expected,
-      Math.round(monthly * Math.min(3, Math.max(1, Math.ceil(remaining * 0.5)))),
+      Math.round(weekly * Math.min(4, Math.max(1, Math.ceil(remaining * 0.5)))),
     );
     const before = state.walletUsd;
     const result = returnAircraftLeaseEarly(state, aircraft.id, world.tick, world);
@@ -465,11 +467,11 @@ describe('aircraft market', () => {
     const { listing } = listAircraftForLease(state, 'acf_bonanza_2', world.tick);
     assert.equal(listing.source, 'player_lease');
     assert.equal(listing.kind, 'lease');
-    assert.equal(listing.leaseTermMonths, 6);
+    assert.equal(listing.leaseTermMonths, 3);
     assert.ok((listing.leaseMonthlyUsd ?? 0) > 0);
     assert.equal(
       listing.askingUsd,
-      Math.round((listing.leaseMonthlyUsd ?? 0) * 2),
+      Math.round((listing.leaseMonthlyUsd ?? 0) * 4),
     );
     const listed = state.fleet.find((a) => a.id === 'acf_bonanza_2')!;
     assert.equal(listed.status, 'listed');
@@ -482,7 +484,7 @@ describe('aircraft market', () => {
     );
   });
 
-  it('lists a custom monthly and term within catalog bounds', () => {
+  it('lists a custom weekly and term within catalog bounds', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-flex-lease' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'Flex',
@@ -495,30 +497,30 @@ describe('aircraft market', () => {
       status: 'parked',
       ownership: 'owned',
     });
-    const catalogMonthly = aircraftLeaseMonthlyUsd('light_ga', {
+    const catalogWeekly = aircraftLeaseMonthlyUsd('light_ga', {
       airframeTypeId: starter.airframeTypeId,
     });
     const { listing } = listAircraftForLease(state, 'acf_flex', world.tick, {
-      monthlyUsd: Math.round(catalogMonthly * 0.9),
-      termMonths: 9,
+      monthlyUsd: Math.round(catalogWeekly * 0.9),
+      termMonths: 2,
     });
-    assert.equal(listing.leaseTermMonths, 9);
+    assert.equal(listing.leaseTermMonths, 2);
     assert.equal(
       listing.leaseMonthlyUsd,
       clampPlayerLeaseMonthlyUsd(
-        Math.round(catalogMonthly * 0.9),
-        catalogMonthly,
+        Math.round(catalogWeekly * 0.9),
+        catalogWeekly,
       ),
     );
     assert.equal(
       listing.askingUsd,
-      Math.round((listing.leaseMonthlyUsd ?? 0) * 2),
+      Math.round((listing.leaseMonthlyUsd ?? 0) * 4),
     );
     assert.equal(clampPlayerLeaseTermMonths(0), 1);
-    assert.equal(clampPlayerLeaseTermMonths(99), 24);
+    assert.equal(clampPlayerLeaseTermMonths(99), 3);
   });
 
-  it('NPC refuses a player lease outside monthly/term band', () => {
+  it('NPC refuses a player lease outside weekly/term band', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-lease-refuse' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBRF', {
       pilotName: 'Greedy',
@@ -577,7 +579,7 @@ describe('aircraft market', () => {
     state.aircraftMarket = [];
     state.aircraftMarketDay = economyDayIndex(world.tick);
     const { listing } = listAircraftForLease(state, 'acf_bonanza_3', world.tick, {
-      termMonths: 12,
+      termMonths: 3,
     });
     const walletBefore = state.walletUsd;
     // Force demand to run; with only this listing it should take it when takeCount > 0.
@@ -694,7 +696,7 @@ describe('aircraft market', () => {
     });
     state.aircraftMarket = [];
     state.aircraftMarketDay = economyDayIndex(world.tick);
-    listAircraftForLease(state, starter.id, world.tick, { termMonths: 12 });
+    listAircraftForLease(state, starter.id, world.tick, { termMonths: 3 });
 
     let taken = 0;
     for (let d = 0; d < 20 && taken === 0; d++) {

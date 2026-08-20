@@ -16,6 +16,7 @@ import {
   ensureAirportMroInventory,
   getCommodity,
   routeDistanceNm,
+  shrinkLotAfterDelivery,
   SMALL_LOT_MAX_KG,
 } from './career-economy.js';
 import {
@@ -213,6 +214,12 @@ export const AWAITING_PILOT_MIN_HOURS = 3;
 /** Max wall-clock hours an awaiting_pilot offer stays open. */
 export const AWAITING_PILOT_MAX_HOURS = 8;
 /**
+ * Short hold when an active home country is below its starter crew floor —
+ * recycles the slot if nobody accepts.
+ */
+export const AWAITING_PILOT_SHORT_MIN_HOURS = 0.5;
+export const AWAITING_PILOT_SHORT_MAX_HOURS = 2;
+/**
  * Chance a homologated NPC claim becomes a crew-needed offer instead of
  * departing immediately. High so early-game contract pilots see a live board.
  */
@@ -248,6 +255,15 @@ export const MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION = 0.35;
 /** Floor so small maps still show a live crew-needed board. */
 export const MIN_OPEN_CONTRACT_PILOT_OFFERS = 4;
 
+/**
+ * Starter crew floor for the player's home country (SP) / company homes (MP).
+ * Global 0.4×regions still applies elsewhere; this reserves local Fly slots.
+ */
+export const MIN_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY = 10;
+/** Per extra company in that country (MP hook; SP companyCount=1 → floor 10). */
+export const STARTER_CREW_OFFERS_PER_EXTRA_COMPANY = 4;
+export const MAX_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY = 40;
+
 function npcHomeRegionCount(world: CareerEconomyWorld): number {
   return new Set(world.airports.map((ap) => ap.region).filter(Boolean)).size;
 }
@@ -280,6 +296,73 @@ export function countOpenContractPilotOffers(
     const starter = isStarterContractPilotClass(f.aircraftClassId);
     return band === 'starter' ? starter : !starter;
   }).length;
+}
+
+/** ISO country of a lot/flight origin hub (`BR`), or null if unknown. */
+export function contractPilotOriginCountry(
+  world: CareerEconomyWorld,
+  originIcao: string,
+): string | null {
+  const ap = airportByIcao(world, originIcao.trim().toUpperCase());
+  const region = (ap?.region ?? '').trim();
+  if (!region) return null;
+  const id = countryIdFromRegion(region);
+  return /^[A-Z]{2}$/.test(id) && id !== 'XX' ? id : null;
+}
+
+/**
+ * Countries that keep a starter crew floor. SP: `world.homeCountryId` only.
+ * (MP later: company home countries.)
+ */
+export function activeContractPilotCountries(
+  world: Pick<CareerEconomyWorld, 'homeCountryId'>,
+): string[] {
+  const home = (world.homeCountryId ?? '').trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(home) ? [home] : [];
+}
+
+/**
+ * Starter awaiting_pilot floor for one active country.
+ * `companyCount` defaults to 1 (single-player / one company).
+ */
+export function starterContractPilotCountryFloor(companyCount = 1): number {
+  const n = Math.max(1, Math.floor(companyCount));
+  return Math.min(
+    MAX_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
+    MIN_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY +
+      STARTER_CREW_OFFERS_PER_EXTRA_COMPANY * Math.max(0, n - 1),
+  );
+}
+
+/** Open freight crew holds (not ferry) whose origin is in `countryId`. */
+export function countOpenContractPilotOffersInCountry(
+  world: CareerEconomyWorld,
+  countryId: string,
+  band: Exclude<ContractPilotOfferBand, 'all'> = 'starter',
+): number {
+  const want = countryId.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(want)) return 0;
+  return world.npcFlights.filter((f) => {
+    if (f.status !== 'awaiting_pilot' || isNpcRepositionFlight(f)) return false;
+    const starter = isStarterContractPilotClass(f.aircraftClassId);
+    if (band === 'starter' ? !starter : starter) return false;
+    return contractPilotOriginCountry(world, f.originIcao) === want;
+  }).length;
+}
+
+/** True when origin country is active and still under its starter floor. */
+export function starterContractPilotCountryNeedsFloor(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  companyCountInCountry = 1,
+): boolean {
+  const country = contractPilotOriginCountry(world, originIcao);
+  if (!country) return false;
+  if (!activeContractPilotCountries(world).includes(country)) return false;
+  const floor = starterContractPilotCountryFloor(companyCountInCountry);
+  return (
+    countOpenContractPilotOffersInCountry(world, country, 'starter') < floor
+  );
 }
 
 /** Min wall-clock hours a reposition crew offer stays open. */
@@ -1571,7 +1654,17 @@ function isNpcFlightHoldingLot(flight: NpcFlight): boolean {
   return flight.status === 'in_flight' || flight.status === 'awaiting_pilot';
 }
 
-function awaitingPilotHoldHours(rng: () => number): number {
+function awaitingPilotHoldHours(
+  rng: () => number,
+  opts?: { short?: boolean },
+): number {
+  if (opts?.short) {
+    return (
+      AWAITING_PILOT_SHORT_MIN_HOURS +
+      rng() *
+        (AWAITING_PILOT_SHORT_MAX_HOURS - AWAITING_PILOT_SHORT_MIN_HOURS)
+    );
+  }
   return (
     AWAITING_PILOT_MIN_HOURS +
     rng() * (AWAITING_PILOT_MAX_HOURS - AWAITING_PILOT_MIN_HOURS)
@@ -1733,14 +1826,33 @@ function shouldOfferContractPilot(
   world: CareerEconomyWorld,
   npc: NpcFreighter,
   rng: () => number,
-  force?: boolean,
+  opts?: {
+    force?: boolean;
+    originIcao?: string;
+    companyCountInCountry?: number;
+  },
 ): boolean {
+  const force = opts?.force;
   if (force === true) return npcCanOfferContractPilot(npc);
   if (force === false) return false;
   if (!npcCanOfferContractPilot(npc)) return false;
   const band = isStarterContractPilotClass(npc.aircraftClassId)
     ? 'starter'
     : 'other';
+  // Active home country below floor: open even when the global starter cap
+  // is full. Above the floor, fall through to the normal global cap — no
+  // hard country ceiling (crew-needed is unpaid deadhead for the player).
+  if (
+    band === 'starter' &&
+    opts?.originIcao &&
+    starterContractPilotCountryNeedsFloor(
+      world,
+      opts.originIcao,
+      opts.companyCountInCountry ?? 1,
+    )
+  ) {
+    return rng() < CONTRACT_PILOT_OFFER_CHANCE;
+  }
   if (
     countOpenContractPilotOffers(world, band) >=
     maxOpenContractPilotOffers(world, band)
@@ -1846,19 +1958,7 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
     });
 
     if (lot) {
-      const bookKg = flight.cargoKg;
-      lot.reservedKg = Math.max(0, lot.reservedKg - bookKg);
-      lot.quantityKg = Math.max(0, lot.quantityKg - bookKg);
-      if (lot.quantityKg <= 0) {
-        lot.quantityKg = 0;
-        lot.reservedKg = 0;
-        lot.status = 'delivered';
-      } else if (lot.reservedKg <= 0) {
-        lot.reservedKg = 0;
-        lot.status = 'available';
-      } else {
-        lot.status = 'reserved';
-      }
+      shrinkLotAfterDelivery(lot, flight.cargoKg);
     }
   } else if (lot) {
     lot.quantityKg = 0;
@@ -2111,7 +2211,7 @@ function claimLotForNpc(
   lot: ShipmentLot,
   batchNowMs: number,
   rng: () => number,
-  opts?: { forceAwaitingPilot?: boolean },
+  opts?: { forceAwaitingPilot?: boolean; companyCountInCountry?: number },
 ): NpcFlight | undefined {
   const maxCargoKg = npcMaxCargoKg(npc);
   const avail = lotAvailableKg(lot);
@@ -2126,12 +2226,19 @@ function claimLotForNpc(
   if (cargoKg <= 0) return undefined;
 
   const { flightHours } = estimateNpcBlockHours(dist, npc.aircraftClassId);
-  let offerPilot = shouldOfferContractPilot(
-    world,
-    npc,
-    rng,
-    opts?.forceAwaitingPilot,
-  );
+  const companyCountInCountry = opts?.companyCountInCountry ?? 1;
+  const shortHold =
+    isStarterContractPilotClass(npc.aircraftClassId) &&
+    starterContractPilotCountryNeedsFloor(
+      world,
+      lot.originIcao,
+      companyCountInCountry,
+    );
+  let offerPilot = shouldOfferContractPilot(world, npc, rng, {
+    force: opts?.forceAwaitingPilot,
+    originIcao: lot.originIcao,
+    companyCountInCountry,
+  });
   // Don't open a crew hold no homologated airframe can actually fly.
   if (offerPilot && opts?.forceAwaitingPilot !== true) {
     const draft: Pick<
@@ -2174,7 +2281,7 @@ function claimLotForNpc(
   }
 
   if (offerPilot) {
-    const holdHours = awaitingPilotHoldHours(rng);
+    const holdHours = awaitingPilotHoldHours(rng, { short: shortHold });
     const awaitingPilotUntilMs = batchNowMs + hoursToMs(holdHours);
     const pilotFeeUsd = quoteContractPilotFeeUsd(reserved.payUsd);
     const flight: NpcFlight = {
@@ -2269,7 +2376,15 @@ export function createNpcContractPilotOffer(
   world: CareerEconomyWorld,
   npcId: string,
   lotId: string,
-  opts?: { nowMs?: number; rng?: () => number },
+  opts?: {
+    nowMs?: number;
+    rng?: () => number;
+    /** Default true (test helper). */
+    forceAwaitingPilot?: boolean;
+    /** Exercise live caps / country floor (do not force the hold). */
+    respectCaps?: boolean;
+    companyCountInCountry?: number;
+  },
 ): NpcFlight {
   ensureNpcFleet(world);
   const npc = world.npcs.find((n) => n.id === npcId);
@@ -2282,7 +2397,10 @@ export function createNpcContractPilotOffer(
   const nowMs = opts?.nowMs ?? world.lastBatchAtMs ?? Date.now();
   const rng = opts?.rng ?? mulberry32(hashSeed(`${world.seed}:offer:${npcId}:${lotId}`));
   const flight = claimLotForNpc(world, npc, lot, nowMs, rng, {
-    forceAwaitingPilot: true,
+    forceAwaitingPilot: opts?.respectCaps
+      ? undefined
+      : (opts?.forceAwaitingPilot ?? true),
+    companyCountInCountry: opts?.companyCountInCountry,
   });
   if (!flight || flight.status !== 'awaiting_pilot') {
     throw new Error(`Failed to create contract pilot offer for ${npcId} on ${lotId}`);

@@ -150,6 +150,8 @@ export type AircraftListing = {
   label: string;
   registration?: string;
   basedIcao: string;
+  countryId?: string;
+  region?: string;
   askingUsd: number;
   leaseMonthlyUsd?: number;
   leaseTermMonths?: number;
@@ -1576,6 +1578,7 @@ export type AircraftDeliveryQuoteView = {
   distanceNm: number;
   deliveryFeeUsd: number;
   needed: boolean;
+  crossBorder?: boolean;
 };
 
 export type AircraftLeaseUnlock = {
@@ -1586,12 +1589,28 @@ export type AircraftLeaseUnlock = {
   hint: string;
 };
 
-export function fetchAircraftMarket() {
+export type AircraftMarketPoolCountry = {
+  countryId: string;
+  count: number;
+};
+
+export const AIRCRAFT_MARKET_NEAR_NM = 400;
+
+export function fetchAircraftMarket(opts?: { country?: string }) {
+  const country = opts?.country?.trim().toUpperCase();
+  const q =
+    country && (country === 'WORLD' || country.length === 2)
+      ? `?country=${encodeURIComponent(country)}`
+      : '';
   return api<
     ClockSync & {
       walletUsd: number;
       dayIndex: number;
       listings: AircraftListing[];
+      homeCountryId?: string;
+      browseCountryId?: string;
+      acquireEnabled?: boolean;
+      poolCountries?: AircraftMarketPoolCountry[];
       deliveryTargetIcao?: string;
       deliveryQuotes?: Record<string, AircraftDeliveryQuoteView>;
       ferrySoftNmUsed?: number;
@@ -1617,7 +1636,7 @@ export function fetchAircraftMarket() {
       fleet: PlayerAircraft[];
       leaseUnlock?: AircraftLeaseUnlock;
     }
-  >('/api/aircraft-market');
+  >(`/api/aircraft-market${q}`);
 }
 
 export function postAircraftBuy(opts: {
@@ -1661,7 +1680,7 @@ export function postAircraftSell(opts: { aircraftId: string }) {
   return api<{
     walletUsd: number;
     creditUsd: number;
-    listing: AircraftListing;
+    restockId?: string;
     fleet: PlayerAircraft[];
     listings: AircraftListing[];
   }>('/api/aircraft-market/sell', {
@@ -1670,9 +1689,25 @@ export function postAircraftSell(opts: { aircraftId: string }) {
   });
 }
 
+export function postAircraftListSale(opts: {
+  aircraftId: string;
+  askingUsd: number;
+}) {
+  return api<{
+    walletUsd: number;
+    listing: AircraftListing;
+    fleet: PlayerAircraft[];
+    listings: AircraftListing[];
+  }>('/api/aircraft-market/list-sale', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
 export function postAircraftListLease(opts: {
   aircraftId: string;
-  termMonths?: 6 | 12;
+  termMonths?: number;
+  monthlyUsd?: number;
 }) {
   return api<{
     walletUsd: number;

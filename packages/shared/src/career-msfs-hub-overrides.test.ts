@@ -13,7 +13,7 @@ import {
   pruneRuntimeMsfsBushHubOverrides,
 } from './career-msfs-hub-overrides.js';
 import { US_CAREER_HUBS } from './career-us-hubs.js';
-import { resolveAirportCoords } from './career-economy.js';
+import { ensureAirportHubTier, resolveAirportCoords } from './career-economy.js';
 import { SIMBRIEF_DISPATCH_DENY_ICAOS } from './career-simbrief-airports.js';
 import { listCareerHubIcaos } from './career-fleet.js';
 
@@ -168,6 +168,38 @@ describe('MSFS bush hub overrides', () => {
     );
     assert.equal(filtered.SCSN, undefined);
     assert.ok(filtered.SCSE);
+    setRuntimeMsfsBushHubOverrides({});
+  });
+
+  it('ensureAirportHubTier keeps saved MSFS coords on repeat migrate', () => {
+    setRuntimeMsfsBushHubOverrides({});
+    upsertRuntimeMsfsBushHubOverride('ZZ99', {
+      name: 'Grant Airpark Live',
+      lat: 36.2561,
+      lon: -117.9971,
+      source: 'msfs_facility',
+      validatedAt: '2026-08-08',
+    });
+    const terminal = {
+      icao: 'ZZ99',
+      name: 'Grant Airpark Live',
+      lat: 36.2561,
+      lon: -117.9971,
+      region: 'US-CA',
+      hubTier: 'spoke' as const,
+      level: 1,
+      inventory: {},
+      production: {},
+      consumption: {},
+      baseProduction: {},
+      baseConsumption: {},
+    };
+    ensureAirportHubTier(terminal);
+    assert.equal(terminal.lat, 36.2561);
+    assert.equal(terminal.lon, -117.9971);
+    ensureAirportHubTier(terminal);
+    assert.equal(terminal.lat, 36.2561);
+    assert.equal(terminal.lon, -117.9971);
     setRuntimeMsfsBushHubOverrides({});
   });
 });

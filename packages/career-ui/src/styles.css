@@ -3695,9 +3695,15 @@ tr.lot-locked {
   cursor: help;
   max-width: 100%;
   line-height: 1.3;
+  min-height: 0.94rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.lot-meta-empty {
+  visibility: hidden;
+  cursor: default;
 }
 
 .pay .idle-uptick {
@@ -4819,19 +4825,60 @@ tr.lot-locked {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem 0.85rem;
+  gap: 0.5rem 0.65rem;
   margin: 0 0 1rem;
 }
 
 .aircraft-market-search {
-  flex: 1 1 12rem;
-  min-width: 10rem;
-  max-width: 18rem;
+  flex: 1 1 11rem;
+  min-width: 9rem;
+  max-width: 16rem;
+  min-height: 2.15rem;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--line);
   background: var(--surface-2);
   font: inherit;
   color: var(--ink);
+  box-sizing: border-box;
+}
+
+.aircraft-market-country-combobox {
+  flex: 0 1 14rem;
+  min-width: 11rem;
+  max-width: 18rem;
+}
+
+.aircraft-market-country-combobox input {
+  min-height: 2.15rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.aircraft-market-country-menu .ferry-hub-option span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.aircraft-market-country {
+  flex: 0 0 auto;
+  min-width: 6.5rem;
+  min-height: 2.15rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.aircraft-market-toolbar-divider {
+  flex: 0 0 1px;
+  align-self: center;
+  width: 1px;
+  height: 1.45rem;
+  background: var(--line);
 }
 
 .aircraft-class-chips {
@@ -4842,7 +4889,8 @@ tr.lot-locked {
 
 .aircraft-class-chips button {
   margin: 0;
-  padding: 0.28rem 0.65rem;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.65rem;
   border: 1px solid var(--line);
   background: var(--surface-2);
   color: var(--muted);
@@ -4851,11 +4899,17 @@ tr.lot-locked {
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .aircraft-class-chips button:hover {
   color: var(--ink);
   border-color: rgba(20, 32, 51, 0.28);
+}
+
+.aircraft-class-chips button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .aircraft-class-chips button.active {
@@ -5184,6 +5238,12 @@ tr.lot-locked {
 
 .aircraft-card-deliver input {
   margin-top: 0.15rem;
+}
+
+.aircraft-card-import-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .aircraft-card-price-details {
@@ -6824,6 +6884,20 @@ table.contracts-table .col-access .action {
   color: #d6e4f5;
   background: rgba(106, 168, 216, 0.22);
   border-color: rgba(106, 168, 216, 0.55);
+}
+
+/* Keep Freights / terminal Contracts rows even when no Contract/Ferry chip. */
+.freights-board-table .npc-badge-slot,
+table.contracts-table .npc-badge-slot {
+  display: flex;
+  align-items: center;
+  min-height: 1.55rem;
+  margin-top: 0.35rem;
+}
+
+.freights-board-table .npc-badge-slot .npc-badge,
+table.contracts-table .npc-badge-slot .npc-badge {
+  margin-top: 0;
 }
 
 .npc-head {

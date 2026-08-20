@@ -38,11 +38,13 @@ import {
   postSettle,
   postSelectHub,
   fetchAircraftMarket,
+  AIRCRAFT_MARKET_NEAR_NM,
   fetchCashflow,
   fetchNetworkHubs,
   postAircraftBuy,
   postAircraftLease,
   postAircraftSell,
+  postAircraftListSale,
   postAircraftListLease,
   postAircraftUnlist,
   postAircraftMaintenance,
@@ -74,6 +76,7 @@ import {
   type AircraftDeliveryQuoteView,
   type AircraftLeaseUnlock,
   type AircraftListing,
+  type AircraftMarketPoolCountry,
   type AirportLot,
   type AirportMovement,
   type AirportView,
@@ -114,7 +117,7 @@ import {
   pickLivePayloadLb,
   pickStableLiveFuelLb,
 } from './load-verification';
-import { estimateSellBackUsd, estimateLeaseEarlyReturnUsd } from './aircraft-pricing';
+import { estimateFairUsd, estimateLeaseMonthlyUsd, estimateSellBackUsd, estimateLeaseEarlyReturnUsd } from './aircraft-pricing';
 import {
   boardNetSortUsd,
   contractPilotFeePctLabel,
@@ -127,6 +130,11 @@ import { PortsPanel } from './PortsPanel';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { FerryHubCombobox } from './FerryHubCombobox';
+import {
+  AircraftMarketCountryCombobox,
+  type AircraftMarketCountryOption,
+} from './AircraftMarketCountryCombobox';
+import { marketCountryLabel } from './market-country-label';
 import { BushTripMapCard } from './BushTripMapCard';
 import { BrandMark } from './BrandMark';
 import { AirportNamesProvider, IcaoLink } from './IcaoLink';
@@ -140,9 +148,11 @@ import { CrewFlyControls } from './CrewFlyControls';
 import {
   AIRCRAFT_CLASS_FILTERS,
   HangarAircraftCard,
+  ListLeaseAskBody,
+  ListSaleAskBody,
   MarketListingCard,
   aircraftClassLabel,
-  aircraftModelLabel,
+  aircraftListingMatchesQuery,
   type AircraftCatalogEntry,
 } from './AircraftCards';
 import { HangarCashflowPanel } from './CashflowPanel';
@@ -208,6 +218,24 @@ function normalizeStarterHubs(
 }
 
 /** Signup / FBO — network cargo hubs only (no soft-field bush or trip-only). */
+function aircraftMarketFetchOpts(
+  browseRef: string,
+): { country: string } | undefined {
+  const id = browseRef.trim().toUpperCase();
+  if (!id) return undefined;
+  return { country: id };
+}
+
+function syncAircraftBrowseFromApi(
+  browseCountryId: string | undefined,
+  homeCountryId: string | undefined,
+): string {
+  const home = (homeCountryId ?? '').toUpperCase();
+  const browse = (browseCountryId ?? '').toUpperCase();
+  if (!browse || browse === home) return '';
+  return browse;
+}
+
 function networkCargoHubs(hubs: StarterHubOption[]): StarterHubOption[] {
   return hubs.filter((hub) => !hub.bush && !hub.bushTripOnly);
 }
@@ -1619,6 +1647,21 @@ function resolveHubRegion(
   if (!icao) return undefined;
   const id = icao.trim().toUpperCase();
   return hubs.find((h) => h.icao.toUpperCase() === id)?.region;
+}
+
+function haversineNm(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number },
+): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLon = Math.sin(dLon / 2);
+  const h =
+    sinLat * sinLat +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLon * sinLon;
+  return 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 function FuelLogisticsBlock(props: {
@@ -3235,6 +3278,15 @@ export function App() {
     '' | AircraftClass
   >('');
   const [aircraftMarketQuery, setAircraftMarketQuery] = useState('');
+  const [aircraftMarketGeo, setAircraftMarketGeo] = useState<
+    'country' | 'region' | 'near'
+  >('country');
+  const [aircraftHomeCountryId, setAircraftHomeCountryId] = useState('');
+  const [aircraftBrowseCountry, setAircraftBrowseCountry] = useState('');
+  const [aircraftPoolCountries, setAircraftPoolCountries] = useState<
+    AircraftMarketPoolCountry[]
+  >([]);
+  const aircraftBrowseCountryRef = useRef('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [networkHubs, setNetworkHubs] = useState<NetworkHub[]>([]);
   const [networkHubsLoading, setNetworkHubsLoading] = useState(false);
@@ -3389,7 +3441,9 @@ export function App() {
       wantMissions ? fetchMissions() : Promise.resolve(null),
       wantNpc ? fetchNpcFleet() : Promise.resolve(null),
       wantAircraft
-        ? fetchAircraftMarket().catch(() => null)
+        ? fetchAircraftMarket(
+            aircraftMarketFetchOpts(aircraftBrowseCountryRef.current),
+          ).catch(() => null)
         : Promise.resolve(null),
     ]);
     if (wantBush) void refreshBushTrips();
@@ -3465,6 +3519,15 @@ export function App() {
       setAirframePerf(acMarket.airframePerf ?? {});
       setAircraftMarketDay(acMarket.dayIndex);
       setWallet(acMarket.walletUsd);
+      if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
+      if (acMarket.browseCountryId) {
+        aircraftBrowseCountryRef.current = syncAircraftBrowseFromApi(
+          acMarket.browseCountryId,
+          acMarket.homeCountryId,
+        );
+        setAircraftBrowseCountry(aircraftBrowseCountryRef.current);
+      }
+      if (acMarket.poolCountries) setAircraftPoolCountries(acMarket.poolCountries);
       if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
       if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
     }
@@ -5486,13 +5549,24 @@ export function App() {
   }
 
   async function refreshAircraftMarket() {
-    const acMarket = await fetchAircraftMarket();
+    const acMarket = await fetchAircraftMarket(
+      aircraftMarketFetchOpts(aircraftBrowseCountryRef.current),
+    );
     setAircraftListings(acMarket.listings);
     setAircraftDeliveryQuotes(acMarket.deliveryQuotes ?? {});
     setAircraftCatalog(acMarket.catalog);
     setAirframePerf(acMarket.airframePerf ?? {});
     setAircraftMarketDay(acMarket.dayIndex);
     setWallet(acMarket.walletUsd);
+    if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
+    if (acMarket.browseCountryId) {
+      aircraftBrowseCountryRef.current = syncAircraftBrowseFromApi(
+        acMarket.browseCountryId,
+        acMarket.homeCountryId,
+      );
+      setAircraftBrowseCountry(aircraftBrowseCountryRef.current);
+    }
+    if (acMarket.poolCountries) setAircraftPoolCountries(acMarket.poolCountries);
     if (acMarket.fleet) setFleet(acMarket.fleet);
     if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
     return acMarket;
@@ -5550,9 +5624,12 @@ export function App() {
       setAircraftDeliveryQuotes({});
       if (result.leaseUnlock) setLeaseUnlock(result.leaseUnlock);
       setToastKind('ok');
+      const quote = aircraftDeliveryQuotes[listingId];
       const deliveryNote =
         (result.deliveryFeeUsd ?? 0) > 0
-          ? ` (+${formatMoney(result.deliveryFeeUsd!)} delivery)`
+          ? ` (+${formatMoney(result.deliveryFeeUsd!)} ${
+              quote?.crossBorder ? 'import' : 'delivery'
+            })`
           : '';
       setToast(
         `Lease signed · ${result.aircraft.label} · due ${formatMoney(result.debitUsd)}${deliveryNote} · parked at ${result.aircraft.locationIcao}`,
@@ -5573,13 +5650,13 @@ export function App() {
       );
       return;
     }
-    const creditUsd = estimateSellBackUsd(acf, {
-      maxCargoKg: hangarCatalogEntry(acf)?.maxCargoKg,
-    });
+    const catalog = hangarCatalogEntry(acf);
+    const fairUsd = estimateFairUsd(acf, { maxCargoKg: catalog?.maxCargoKg });
+    const creditUsd = estimateSellBackUsd(acf, { maxCargoKg: catalog?.maxCargoKg });
     const ok = await confirm({
-      title: `Sell ${acf.label}?`,
-      body: `Dealer buy-back pays ${formatMoney(creditUsd)} (about 70% of fair value). The airframe is relisted on Airframes for others.`,
-      confirmLabel: 'Sell airframe',
+      title: `Sell ${acf.label} to dealer?`,
+      body: `Instant cash ${formatMoney(creditUsd)} (50% of fair ${formatMoney(fairUsd)}). This tail is gone; another ${acf.label} restocks in this country within 0–2 days.`,
+      confirmLabel: 'Sell to dealer',
     });
     if (!ok) return;
     await run(async () => {
@@ -5588,8 +5665,58 @@ export function App() {
       setWallet(result.walletUsd);
       if (result.listings) setAircraftListings(result.listings);
       setToastKind('ok');
+      setToast(`Dealer paid ${formatMoney(result.creditUsd)}`);
+    });
+  }
+
+  async function onListForSale(aircraftId: string) {
+    const acf = fleet.find((a) => a.id === aircraftId);
+    if (!acf) return;
+    const ownedCount = fleet.filter(
+      (a) => (a.ownership ?? 'owned') === 'owned',
+    ).length;
+    if (ownedCount < 2) {
+      setError(
+        'Keep at least one owned aircraft — buy another before listing this one',
+      );
+      return;
+    }
+    const catalog = hangarCatalogEntry(acf);
+    const fairUsd = estimateFairUsd(acf, { maxCargoKg: catalog?.maxCargoKg });
+    const dealerUsd = estimateSellBackUsd(acf, {
+      maxCargoKg: catalog?.maxCargoKg,
+    });
+    const minAsk = Math.max(500, Math.round(fairUsd * 0.5));
+    const maxAsk = Math.max(minAsk, Math.round(fairUsd * 2));
+    const askRef = { current: fairUsd };
+    const ok = await confirm({
+      title: `List ${acf.label} on Market?`,
+      body: (
+        <ListSaleAskBody
+          fairUsd={fairUsd}
+          dealerUsd={dealerUsd}
+          minAsk={minAsk}
+          maxAsk={maxAsk}
+          formatMoney={formatMoney}
+          onChange={(n) => {
+            askRef.current = n;
+          }}
+        />
+      ),
+      confirmLabel: 'List on Market',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postAircraftListSale({
+        aircraftId,
+        askingUsd: askRef.current,
+      });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setAircraftListings(result.listings);
+      setToastKind('ok');
       setToast(
-        `Sold for ${formatMoney(result.creditUsd)} · listed at ${result.listing.basedIcao}`,
+        `Listed at ${formatMoney(result.listing.askingUsd)} · no cash until sold`,
       );
     });
   }
@@ -5597,19 +5724,45 @@ export function App() {
   async function onListForLease(aircraftId: string) {
     const acf = fleet.find((a) => a.id === aircraftId);
     if (!acf) return;
+    const catalog = hangarCatalogEntry(acf);
+    const catalogMonthly = estimateLeaseMonthlyUsd(acf, {
+      maxCargoKg: catalog?.maxCargoKg,
+    });
+    const minMonthly = Math.max(1, Math.round(catalogMonthly * 0.6));
+    const maxMonthly = Math.max(minMonthly, Math.round(catalogMonthly * 1.8));
+    const leaseRef = { monthlyUsd: catalogMonthly, termMonths: 6 };
     const ok = await confirm({
       title: `List ${acf.label} for lease?`,
-      body: 'Needs two owned aircraft. This airframe leaves dispatch until an NPC leases it or you unlist.',
+      body: (
+        <ListLeaseAskBody
+          catalogMonthlyUsd={catalogMonthly}
+          minMonthly={minMonthly}
+          maxMonthly={maxMonthly}
+          minTerm={1}
+          maxTerm={24}
+          formatMoney={formatMoney}
+          onChange={(next) => {
+            leaseRef.monthlyUsd = next.monthlyUsd;
+            leaseRef.termMonths = next.termMonths;
+          }}
+        />
+      ),
       confirmLabel: 'List for lease',
     });
     if (!ok) return;
     await run(async () => {
-      const result = await postAircraftListLease({ aircraftId, termMonths: 6 });
+      const result = await postAircraftListLease({
+        aircraftId,
+        termMonths: leaseRef.termMonths,
+        monthlyUsd: leaseRef.monthlyUsd,
+      });
       setFleet(result.fleet);
       setWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setToastKind('ok');
-      setToast(`Listed for lease at ${result.listing.basedIcao}`);
+      setToast(
+        `Listed ${formatMoney(result.listing.leaseMonthlyUsd ?? 0)}/mo · ${result.listing.leaseTermMonths} mo · deposit ${formatMoney(result.listing.askingUsd)}`,
+      );
     });
   }
 
@@ -5620,7 +5773,7 @@ export function App() {
       setWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setToastKind('ok');
-      setToast('Lease listing removed');
+      setToast('Listing removed');
     });
   }
 
@@ -7337,18 +7490,79 @@ export function App() {
       fuelBurnKgPerNm: perf?.fuelBurnKgPerNm,
     };
   }
+  const aircraftCountryOptions = useMemo((): AircraftMarketCountryOption[] => {
+    const home = (aircraftHomeCountryId || 'BR').trim().toUpperCase();
+    const pool = aircraftPoolCountries;
+    const worldTotal = pool.reduce((sum, row) => sum + row.count, 0);
+    const byId = new Map(
+      pool.map((row) => [row.countryId.trim().toUpperCase(), row.count]),
+    );
+    const opts: AircraftMarketCountryOption[] = [
+      {
+        countryId: home,
+        count: byId.get(home) ?? 0,
+        isHome: true,
+      },
+      { countryId: 'WORLD', count: worldTotal },
+      ...pool
+        .filter((row) => row.countryId.trim().toUpperCase() !== home)
+        .map((row) => ({
+          countryId: row.countryId.trim().toUpperCase(),
+          count: row.count,
+        }))
+        .sort((a, b) =>
+          marketCountryLabel(a.countryId).localeCompare(
+            marketCountryLabel(b.countryId),
+          ),
+        ),
+    ];
+    return opts;
+  }, [aircraftPoolCountries, aircraftHomeCountryId]);
   const filteredAircraftListings = useMemo(() => {
     const q = aircraftMarketQuery.trim().toLowerCase();
+    const homeRegion = resolveHubRegion(
+      homeHubIcao || pilotIcao,
+      networkHubs,
+    )?.toUpperCase();
+    const originIcao = (pilotIcao || homeHubIcao).trim().toUpperCase();
+    const originHub = networkHubs.find(
+      (h) => h.icao.toUpperCase() === originIcao,
+    );
+    const browsingAway =
+      Boolean(aircraftBrowseCountry) &&
+      aircraftBrowseCountry !== aircraftHomeCountryId;
     return aircraftListings.filter((listing) => {
       if (aircraftMarketClass && listing.aircraftClassId !== aircraftMarketClass) {
         return false;
       }
-      if (!q) return true;
-      const blob =
-        `${listing.label} ${aircraftModelLabel(listing.aircraftClassId)} ${listing.basedIcao} ${listing.kind} ${listing.condition}`.toLowerCase();
-      return blob.includes(q);
+      if (aircraftMarketGeo === 'region' && !browsingAway) {
+        const listingRegion = (
+          listing.region ||
+          resolveHubRegion(listing.basedIcao, networkHubs) ||
+          ''
+        ).toUpperCase();
+        if (!homeRegion || listingRegion !== homeRegion) return false;
+      }
+      if (aircraftMarketGeo === 'near' && originHub) {
+        const dest = networkHubs.find(
+          (h) => h.icao.toUpperCase() === listing.basedIcao.trim().toUpperCase(),
+        );
+        if (!dest) return false;
+        if (haversineNm(originHub, dest) > AIRCRAFT_MARKET_NEAR_NM) return false;
+      }
+      return aircraftListingMatchesQuery(listing, q);
     });
-  }, [aircraftListings, aircraftMarketClass, aircraftMarketQuery]);
+  }, [
+    aircraftListings,
+    aircraftMarketClass,
+    aircraftMarketQuery,
+    aircraftMarketGeo,
+    aircraftBrowseCountry,
+    aircraftHomeCountryId,
+    homeHubIcao,
+    pilotIcao,
+    networkHubs,
+  ]);
   const ownedFleetCount = useMemo(
     () => fleet.filter((a) => (a.ownership ?? 'owned') === 'owned').length,
     [fleet],
@@ -9915,12 +10129,14 @@ export function App() {
                                     </span>
                                   ) : null}
                                 </div>
-                                <NpcTakenBadge
-                                  claim={lot.npcClaim}
-                                  nowMs={displayNowMs}
-                                  weightSystem={weightSystem}
-                                  formatMoney={formatMoney}
-                                />
+                                <div className="npc-badge-slot">
+                                  <NpcTakenBadge
+                                    claim={lot.npcClaim}
+                                    nowMs={displayNowMs}
+                                    weightSystem={weightSystem}
+                                    formatMoney={formatMoney}
+                                  />
+                                </div>
                               </td>
                               <td className="distance col-compact">
                                 {lot.distanceNm !== undefined
@@ -10938,13 +11154,19 @@ export function App() {
                         <small className="lot-meta" title={meta.title}>
                           {meta.text}
                         </small>
-                      ) : null}
-                      <NpcTakenBadge
-                        claim={lot.npcClaim}
-                        nowMs={displayNowMs}
-                        weightSystem={weightSystem}
-                        formatMoney={formatMoney}
-                      />
+                      ) : (
+                        <small className="lot-meta lot-meta-empty" aria-hidden="true">
+                          {'\u00a0'}
+                        </small>
+                      )}
+                      <div className="npc-badge-slot">
+                        <NpcTakenBadge
+                          claim={lot.npcClaim}
+                          nowMs={displayNowMs}
+                          weightSystem={weightSystem}
+                          formatMoney={formatMoney}
+                        />
+                      </div>
                     </td>
                     <td className="distance col-compact">
                       {lot.distanceNm !== undefined
@@ -12329,27 +12551,69 @@ export function App() {
               Refresh board
             </button>
           </div>
-          {aircraftCatalog.length > 0 ? (
-            <p className="aircraft-market-msrp">
-              MSRP guide:{' '}
-              {aircraftCatalog
-                .map((c) => `${c.name} ${formatMoney(c.msrpUsd)}`)
-                .join(' · ')}
-            </p>
-          ) : null}
-          {leaseUnlock && !leaseUnlock.unlocked ? (
-            <p className="banner warn" role="status">
-              {leaseUnlock.hint}
-            </p>
-          ) : null}
           <div className="aircraft-market-toolbar">
             <input
               type="search"
               className="aircraft-market-search"
-              placeholder="Search name or ICAO…"
+              placeholder="Search name, type, tail or ICAO…"
               aria-label="Search aircraft listings"
               value={aircraftMarketQuery}
               onChange={(e) => setAircraftMarketQuery(e.target.value)}
+            />
+            <AircraftMarketCountryCombobox
+              options={aircraftCountryOptions}
+              homeCountryId={aircraftHomeCountryId || 'BR'}
+              value={
+                aircraftBrowseCountry ||
+                aircraftHomeCountryId ||
+                'BR'
+              }
+              disabled={busy}
+              onChange={(countryId) => {
+                const home = (aircraftHomeCountryId || 'BR').trim().toUpperCase();
+                const next = countryId.trim().toUpperCase();
+                if (next === 'WORLD') {
+                  aircraftBrowseCountryRef.current = 'WORLD';
+                  setAircraftBrowseCountry('WORLD');
+                } else if (next === home) {
+                  aircraftBrowseCountryRef.current = '';
+                  setAircraftBrowseCountry('');
+                } else {
+                  aircraftBrowseCountryRef.current = next;
+                  setAircraftBrowseCountry(next);
+                }
+                setAircraftMarketGeo('country');
+                void run(async () => {
+                  await refreshAircraftMarket();
+                });
+              }}
+            />
+            <div
+              className="aircraft-market-toolbar-divider"
+              aria-hidden="true"
+            />
+            <div className="aircraft-class-chips" role="group" aria-label="Scope filter">
+              {(
+                [
+                  ['country', 'All'],
+                  ['region', 'This region'],
+                  ['near', 'Near me'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={aircraftMarketGeo === id ? 'active' : undefined}
+                  disabled={Boolean(aircraftBrowseCountry) && id === 'region'}
+                  onClick={() => setAircraftMarketGeo(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div
+              className="aircraft-market-toolbar-divider"
+              aria-hidden="true"
             />
             <div className="aircraft-class-chips" role="group" aria-label="Aircraft class filter">
               {AIRCRAFT_CLASS_FILTERS.map((chip) => (
@@ -12599,6 +12863,7 @@ export function App() {
                   onBuyout={(id) => void onBuyoutLease(id)}
                   onReturnLease={(id) => void onReturnLease(id)}
                   onListForLease={(id) => void onListForLease(id)}
+                  onListForSale={(id) => void onListForSale(id)}
                   onSell={(id) => void onSellAircraft(id)}
                   onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
                   onEmptyFlight={(id, dest) => onEmptyFlight(id, dest)}

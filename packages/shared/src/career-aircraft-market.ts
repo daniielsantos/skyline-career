@@ -8,6 +8,11 @@ import {
   AIRCRAFT_DELIVERY_MAX_USD,
   AIRCRAFT_DELIVERY_MIN_USD,
   AIRCRAFT_DELIVERY_USD_PER_NM,
+  AIRCRAFT_IMPORT_HANDLING_USD,
+  AIRCRAFT_IMPORT_MAX_USD,
+  AIRCRAFT_IMPORT_MIN_USD,
+  AIRCRAFT_IMPORT_USD_PER_NM,
+  computeFerryFeeUsd,
   FERRY_CLASS_MULT,
   resolvePlayerFuelCapacityKg,
 } from './career-fleet.js';
@@ -43,12 +48,25 @@ import {
 } from './career-player-airframes.js';
 import {
   allocateAircraftRegistration,
-  collectUsedAircraftRegistrations,
   countryIdForHubIcao,
   ensureAircraftRegistrations,
   normalizeAircraftRegistration,
   registrationForListingPurchase,
 } from './career-aircraft-registration.js';
+import {
+  AIRCRAFT_MARKET_BROWSE_WORLD,
+  collectPoolRegistrations,
+  dealerInstancesForMarket,
+  dealerInstancesWorldwide,
+  ensureAircraftPoolCatalogSync,
+  ensureWorldAircraftPool,
+  ingestPlayerAircraftToDealerPool,
+  instanceToListing,
+  markDealerInstanceSold,
+  resolveMarketCountryId,
+  restockDealerAirframe,
+} from './career-aircraft-pool.js';
+import { countryIdFromRegion } from './career-partition.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   AircraftListing,
@@ -271,13 +289,90 @@ export function fairValueUsd(
   );
 }
 
+/** Instant dealer trade-in as a fraction of fair value. */
+export const DEALER_TRADE_IN_FRAC = 0.5;
+export const PLAYER_SALE_ASK_MIN_MULT = 0.5;
+export const PLAYER_SALE_ASK_MAX_MULT = 2;
+
 export function sellBackValueUsd(aircraft: PlayerAircraft): number {
   const condition = aircraft.condition ?? 'good';
   return Math.round(
     fairValueUsd(aircraft.aircraftClassId, condition, {
       airframeTypeId: aircraft.airframeTypeId,
-    }) * 0.7,
+    }) * DEALER_TRADE_IN_FRAC,
   );
+}
+
+export function clampPlayerSaleAskingUsd(
+  askingUsd: number,
+  fairUsd: number,
+): number {
+  const fair = Math.max(500, fairUsd);
+  const lo = Math.max(500, Math.round(fair * PLAYER_SALE_ASK_MIN_MULT));
+  const hi = Math.max(lo, Math.round(fair * PLAYER_SALE_ASK_MAX_MULT));
+  if (!Number.isFinite(askingUsd)) return fair;
+  return Math.min(hi, Math.max(lo, Math.round(askingUsd)));
+}
+
+/** Player may list lease monthly 0.6–1.8× catalog; term 1–24 months. */
+export const PLAYER_LEASE_MONTHLY_MIN_MULT = 0.6;
+export const PLAYER_LEASE_MONTHLY_MAX_MULT = 1.8;
+export const PLAYER_LEASE_TERM_MIN_MONTHS = 1;
+export const PLAYER_LEASE_TERM_MAX_MONTHS = 24;
+/** NPC only takes 0.7–1.3× catalog monthly and 3–18 month terms. */
+export const NPC_LEASE_MONTHLY_MIN_MULT = 0.7;
+export const NPC_LEASE_MONTHLY_MAX_MULT = 1.3;
+export const NPC_LEASE_TERM_MIN_MONTHS = 3;
+export const NPC_LEASE_TERM_MAX_MONTHS = 18;
+export const PLAYER_LEASE_DEPOSIT_MONTHS = 2;
+
+export function clampPlayerLeaseMonthlyUsd(
+  monthlyUsd: number,
+  catalogMonthlyUsd: number,
+): number {
+  const catalog = Math.max(1, Math.round(catalogMonthlyUsd));
+  const lo = Math.max(1, Math.round(catalog * PLAYER_LEASE_MONTHLY_MIN_MULT));
+  const hi = Math.max(lo, Math.round(catalog * PLAYER_LEASE_MONTHLY_MAX_MULT));
+  if (!Number.isFinite(monthlyUsd)) return catalog;
+  return Math.min(hi, Math.max(lo, Math.round(monthlyUsd)));
+}
+
+export function clampPlayerLeaseTermMonths(termMonths: number): number {
+  const n = Math.round(termMonths);
+  if (!Number.isFinite(n)) return 6;
+  return Math.min(
+    PLAYER_LEASE_TERM_MAX_MONTHS,
+    Math.max(PLAYER_LEASE_TERM_MIN_MONTHS, n),
+  );
+}
+
+export function npcPlayerLeaseAcceptable(opts: {
+  monthlyUsd: number;
+  termMonths: number;
+  catalogMonthlyUsd: number;
+}): boolean {
+  const catalog = Math.max(1, opts.catalogMonthlyUsd);
+  const ratio = opts.monthlyUsd / catalog;
+  if (ratio < NPC_LEASE_MONTHLY_MIN_MULT || ratio > NPC_LEASE_MONTHLY_MAX_MULT) {
+    return false;
+  }
+  const term = Math.round(opts.termMonths);
+  return term >= NPC_LEASE_TERM_MIN_MONTHS && term <= NPC_LEASE_TERM_MAX_MONTHS;
+}
+
+/** Cheaper vs catalog → more likely; still 0 outside NPC band. */
+export function npcPlayerLeaseAcceptChance(opts: {
+  monthlyUsd: number;
+  termMonths: number;
+  catalogMonthlyUsd: number;
+}): number {
+  if (!npcPlayerLeaseAcceptable(opts)) return 0;
+  const catalog = Math.max(1, opts.catalogMonthlyUsd);
+  const ratio = opts.monthlyUsd / catalog;
+  if (ratio <= 0.85) return 0.8;
+  if (ratio <= 1.0) return 0.55;
+  if (ratio <= 1.15) return 0.28;
+  return 0.12;
 }
 
 const CLASS_LABEL_SHORT: Record<FreighterClassId, string> = {
@@ -525,7 +620,7 @@ function preservePlayerListings(listings: AircraftListing[]): AircraftListing[] 
   );
 }
 
-/** Score lower = more attractive to abstract NPC demand. */
+/** Score lower = more attractive to abstract NPC demand (leases). */
 function npcDemandScore(listing: AircraftListing): number {
   let score = listing.askingUsd;
   if (listing.aircraftClassId === 'light_ga') score *= 0.55;
@@ -540,6 +635,27 @@ function npcDemandScore(listing: AircraftListing): number {
   if (listingSource(listing) === 'player_lease') score *= 0.8;
   return score;
 }
+
+/** NPC buy chance for player_sale — ask relative to fair value. */
+export function npcPlayerSaleAcceptChance(
+  askingUsd: number,
+  fairUsd: number,
+): number {
+  const fair = Math.max(1, fairUsd);
+  const ratio = askingUsd / fair;
+  if (ratio <= 0.9) return 0.85;
+  if (ratio <= 1.0) return 0.55;
+  if (ratio <= 1.1) return 0.3;
+  if (ratio <= 1.2) return 0.12;
+  return 0.02;
+}
+
+function listingListedAtTick(listing: AircraftListing): number {
+  return Math.max(0, listing.expiresAtTick - PLAYER_LISTING_LIFE_TICKS);
+}
+
+/** Min economy days a player sale must sit before NPC demand considers it. */
+export const PLAYER_SALE_NPC_MIN_DAYS = 1;
 
 function airportRegionOf(world: CareerEconomyWorld, icao: string): string | undefined {
   return world.airports.find((a) => a.icao === icao.toUpperCase())?.region;
@@ -613,6 +729,39 @@ function applyNpcTakeListing(
   rng: () => number,
 ): void {
   const src = listingSource(listing);
+  if (src === 'player_sale') {
+    const aircraft = state.fleet.find((a) => a.id === listing.sellerAircraftId);
+    if (
+      !aircraft ||
+      aircraft.status !== 'listed' ||
+      listing.kind === 'lease'
+    ) {
+      listing.status = 'expired';
+      return;
+    }
+    applyWalletDelta(state, {
+      amountUsd: listing.askingUsd,
+      kind: 'aircraft_sell',
+      atTick: economyTick,
+      aircraftId: aircraft.id,
+      icao: listing.basedIcao || aircraft.locationIcao,
+      note: listing.label,
+    });
+    ensureAircraftConditionPcts(aircraft);
+    const countryId = countryIdForHubIcao(
+      listing.basedIcao || aircraft.locationIcao,
+      world,
+    );
+    ingestPlayerAircraftToDealerPool({
+      world,
+      aircraft,
+      countryId,
+    });
+    state.fleet = state.fleet.filter((a) => a.id !== aircraft.id);
+    state.classOps = syncClassOpsFromFleet(state.classOps, state.fleet);
+    listing.status = 'sold';
+    return;
+  }
   if (src === 'player_lease') {
     const aircraft = state.fleet.find((a) => a.id === listing.sellerAircraftId);
     if (
@@ -643,13 +792,12 @@ function applyNpcTakeListing(
       basedIcao: listing.basedIcao || aircraft.locationIcao,
       rng,
     });
-    if (lessee) {
-      lessee.leasedPlayerAircraftId = aircraft.id;
-      if (!lessee.locationIcao) {
-        lessee.locationIcao = listing.basedIcao || aircraft.locationIcao;
-      }
-      aircraft.locationIcao = lessee.locationIcao;
+    if (!lessee) return;
+    lessee.leasedPlayerAircraftId = aircraft.id;
+    if (!lessee.locationIcao) {
+      lessee.locationIcao = listing.basedIcao || aircraft.locationIcao;
     }
+    aircraft.locationIcao = lessee.locationIcao;
 
     aircraft.leaseOut = {
       monthlyUsd: listing.leaseMonthlyUsd,
@@ -657,15 +805,14 @@ function applyNpcTakeListing(
       termEndsTick: economyTick + listing.leaseTermMonths * TICKS_PER_MONTH,
       depositUsd: deposit,
       listingId: listing.id,
-      lesseeNpcId: lessee?.id,
-      lesseeName: lessee?.name,
+      lesseeNpcId: lessee.id,
+      lesseeName: lessee.name,
       startedAtTick: economyTick,
       lastWearTick: economyTick,
     };
     listing.status = 'sold';
     return;
   }
-  // generated / player_sale — player_sale already paid at sell time.
   listing.status = 'sold';
 }
 
@@ -676,14 +823,59 @@ function applyNpcDemand(
 ): number {
   if (state.aircraftMarketDemandDay === day) return 0;
   const rng = mulberry32(hashSeed(`${world.seed}:acf-demand:d${day}`));
-  const takeCount = Math.floor(rng() * 3); // 0–2
-  const available = (state.aircraftMarket ?? []).filter((l) => l.status === 'available');
-  available.sort((a, b) => npcDemandScore(a) - npcDemandScore(b));
+  const takeBudget = Math.floor(rng() * 3); // 0–2
+  const tick = world.tick;
+  const minSaleAgeTicks = PLAYER_SALE_NPC_MIN_DAYS * TICKS_PER_DAY;
   let taken = 0;
-  for (let i = 0; i < takeCount && i < available.length; i++) {
-    applyNpcTakeListing(state, available[i]!, world.tick, world, rng);
-    taken += 1;
+
+  const saleCandidates = (state.aircraftMarket ?? []).filter((l) => {
+    if (l.status !== 'available' || listingSource(l) !== 'player_sale') {
+      return false;
+    }
+    return tick - listingListedAtTick(l) >= minSaleAgeTicks;
+  });
+  saleCandidates.sort((a, b) => {
+    const fairA = fairValueUsd(a.aircraftClassId, a.condition, {
+      airframeTypeId: a.airframeTypeId,
+    });
+    const fairB = fairValueUsd(b.aircraftClassId, b.condition, {
+      airframeTypeId: b.airframeTypeId,
+    });
+    return a.askingUsd / Math.max(1, fairA) - b.askingUsd / Math.max(1, fairB);
+  });
+  for (const listing of saleCandidates) {
+    if (taken >= takeBudget) break;
+    const fair = fairValueUsd(listing.aircraftClassId, listing.condition, {
+      airframeTypeId: listing.airframeTypeId,
+    });
+    if (rng() > npcPlayerSaleAcceptChance(listing.askingUsd, fair)) continue;
+    applyNpcTakeListing(state, listing, tick, world, rng);
+    if (listing.status === 'sold') taken += 1;
   }
+
+  const leaseBudget = takeBudget - taken;
+  if (leaseBudget > 0) {
+    const leases = (state.aircraftMarket ?? []).filter(
+      (l) =>
+        l.status === 'available' && listingSource(l) === 'player_lease',
+    );
+    leases.sort((a, b) => npcDemandScore(a) - npcDemandScore(b));
+    for (const listing of leases) {
+      if (taken >= takeBudget) break;
+      const catalog = aircraftLeaseMonthlyUsd(listing.aircraftClassId, {
+        airframeTypeId: listing.airframeTypeId,
+      });
+      const chance = npcPlayerLeaseAcceptChance({
+        monthlyUsd: listing.leaseMonthlyUsd ?? catalog,
+        termMonths: listing.leaseTermMonths ?? 6,
+        catalogMonthlyUsd: catalog,
+      });
+      if (chance <= 0 || rng() > chance) continue;
+      applyNpcTakeListing(state, listing, tick, world, rng);
+      if (listing.status === 'sold') taken += 1;
+    }
+  }
+
   state.aircraftMarketDemandDay = day;
   return taken;
 }
@@ -753,10 +945,16 @@ export function ensureAircraftMarket(
 ): CareerMissionsState {
   const day = economyDayIndex(world.tick);
   const tick = world.tick;
-  let listings = Array.isArray(state.aircraftMarket) ? [...state.aircraftMarket] : [];
+  ensureWorldAircraftPool(world);
+  ensureAircraftPoolCatalogSync(world, state);
+
+  let listings = Array.isArray(state.aircraftMarket)
+    ? [...state.aircraftMarket]
+    : [];
 
   // Backfill boards created before concrete player airframes were introduced.
   listings = listings.map((listing) => {
+    if (listingSource(listing) !== 'generated') return listing;
     if (findCareerPlayerAirframe(listing.airframeTypeId)) return listing;
     const seller = listing.sellerAircraftId
       ? state.fleet.find((aircraft) => aircraft.id === listing.sellerAircraftId)
@@ -777,77 +975,247 @@ export function ensureAircraftMarket(
       : listing;
   });
 
-  // Expire stale rows (player listings expire too).
+  // Expire stale player listings.
   listings = listings.map((l) => {
     if (l.status === 'available' && tick >= l.expiresAtTick) {
-      if (listingSource(l) === 'player_lease' && l.sellerAircraftId) {
+      if (isPlayerListing(l) && l.sellerAircraftId) {
         const acf = state.fleet.find((a) => a.id === l.sellerAircraftId);
         if (acf && acf.status === 'listed') {
           acf.status = 'parked';
           acf.listedListingId = undefined;
         }
+        return { ...l, status: 'expired' as const };
       }
-      return { ...l, status: 'expired' as const };
     }
     return l;
   });
 
   const playerKeep = preservePlayerListings(listings);
-  const generatedAvailable = listings.filter(
-    (l) => listingSource(l) === 'generated' && l.status === 'available',
-  );
-  const generatedRows = listings.filter(
-    (listing) => listingSource(listing) === 'generated',
-  );
-  const marketAirframes = listCareerPlayerAirframes();
-  const marketAirframeIds = new Set(marketAirframes.map((airframe) => airframe.typeId));
-  const generatedAirframeIds = new Set(
-    generatedRows.map((listing) => listing.airframeTypeId),
-  );
-  const missingHomologatedAirframe = marketAirframes.some(
-    (airframe) => !generatedAirframeIds.has(airframe.typeId),
-  );
-  // Renamed / disabled / removed SKUs leave stale generated rows until refresh.
-  const staleDisabledAirframe = generatedRows.some(
-    (listing) =>
-      Boolean(listing.airframeTypeId) &&
-      !marketAirframeIds.has(listing.airframeTypeId!),
+  const marketCountryId = resolveMarketCountryId(world, state);
+  const dealerListings = dealerInstancesForMarket(world, marketCountryId, tick).map(
+    (inst) => instanceToListing(world, inst, tick),
   );
 
-  const needRefresh =
-    state.aircraftMarketDay !== day ||
-    (generatedAvailable.length === 0 && playerKeep.length === 0) ||
-    missingHomologatedAirframe ||
-    staleDisabledAirframe;
-
-  if (needRefresh) {
-    const used = collectUsedAircraftRegistrations(state);
-    const generated = generateAircraftMarketListings({
-      world,
-      walletUsd: state.walletUsd,
-      dayIndex: day,
-      economyTick: tick,
-      usedRegistrations: used,
-    });
-    listings = [...generated, ...playerKeep];
-    state.aircraftMarket = listings;
-    state.aircraftMarketDay = day;
-  } else {
-    state.aircraftMarket = listings;
-    state.aircraftMarketDay = day;
-  }
+  state.aircraftMarket = [...dealerListings, ...playerKeep];
+  state.aircraftMarketDay = day;
 
   ensureAircraftRegistrations(state, world);
   applyNpcDemand(state, world, day);
   return state;
 }
 
+/** Radius for the Airframes “Near me” filter. */
+export const AIRCRAFT_MARKET_NEAR_NM = 400;
+
+export const CROSS_BORDER_AIRCRAFT_ACQUIRE =
+  'Cross-border purchase is not available yet — import and ferry come later.';
+
+function applyAcquireRepositionCharges(
+  state: CareerMissionsState,
+  opts: {
+    world: CareerEconomyWorld;
+    listing: AircraftListing;
+    aircraft: PlayerAircraft;
+    crossBorder: boolean;
+    deliverTo: string;
+    deliveryFeeUsd: number;
+    importFeeUsd: number;
+  },
+): void {
+  const { listing, aircraft, deliverTo, deliveryFeeUsd, importFeeUsd } = opts;
+  if (deliveryFeeUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -deliveryFeeUsd,
+      kind: 'aircraft_delivery',
+      atTick: opts.world.tick,
+      aircraftId: aircraft.id,
+      icao: deliverTo,
+      note: `${listing.basedIcao}→${deliverTo}`,
+    });
+  }
+  if (importFeeUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -importFeeUsd,
+      kind: 'aircraft_import',
+      atTick: opts.world.tick,
+      aircraftId: aircraft.id,
+      icao: deliverTo,
+      note: `${listing.basedIcao}→${deliverTo}`,
+    });
+  }
+}
+
+function markListingSold(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  listing: AircraftListing,
+): void {
+  const boardListing = state.aircraftMarket?.find((l) => l.id === listing.id);
+  if (boardListing && boardListing.status === 'available') {
+    boardListing.status = 'sold';
+  }
+  markDealerInstanceSold(world, listing.id);
+}
+
+export function isCrossBorderAircraftListing(
+  world: CareerEconomyWorld,
+  state: Pick<CareerMissionsState, 'homeHubIcao'>,
+  listing: Pick<AircraftListing, 'countryId' | 'basedIcao'>,
+): boolean {
+  const home = resolveMarketCountryId(world, state);
+  const listingCountry = listingCountryId(world, listing);
+  return Boolean(listingCountry && listingCountry !== home);
+}
+
+function stampListingGeo(
+  world: CareerEconomyWorld,
+  listing: AircraftListing,
+): AircraftListing {
+  const icao = listing.basedIcao.trim().toUpperCase();
+  const ap = world.airports.find((a) => a.icao.toUpperCase() === icao);
+  const countryId =
+    listing.countryId?.trim().toUpperCase() ||
+    (ap?.region ? countryIdFromRegion(ap.region) : undefined);
+  const region = listing.region ?? ap?.region;
+  if (listing.countryId === countryId && listing.region === region) {
+    return listing;
+  }
+  return { ...listing, countryId, region };
+}
+
+export function listingCountryId(
+  world: CareerEconomyWorld,
+  listing: Pick<AircraftListing, 'countryId' | 'basedIcao'>,
+): string | undefined {
+  const tagged = listing.countryId?.trim().toUpperCase();
+  if (tagged) return tagged;
+  const icao = listing.basedIcao.trim().toUpperCase();
+  const ap = world.airports.find((a) => a.icao.toUpperCase() === icao);
+  if (ap?.region) return countryIdFromRegion(ap.region);
+  return undefined;
+}
+
+/** Ferry due when returning a lease away from where possession started. */
+export function quoteLeaseReturnRepositionFee(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  aircraft: PlayerAircraft,
+): {
+  feeUsd: number;
+  fromIcao: string;
+  toIcao: string;
+  distanceNm: number;
+  needed: boolean;
+} {
+  const lease = aircraft.lease;
+  if (!lease) {
+    return {
+      feeUsd: 0,
+      fromIcao: aircraft.locationIcao,
+      toIcao: aircraft.locationIcao,
+      distanceNm: 0,
+      needed: false,
+    };
+  }
+  const to = (lease.startIcao ?? aircraft.locationIcao).trim().toUpperCase();
+  const from = aircraft.locationIcao.trim().toUpperCase();
+  if (!from || from === to) {
+    return { feeUsd: 0, fromIcao: from, toIcao: to, distanceNm: 0, needed: false };
+  }
+  assertFerryNotBush(from, to);
+  const distanceNm =
+    hubDistanceNm(from, to) ?? routeDistanceNm(world, from, to);
+  if (distanceNm === undefined) {
+    throw new Error(`No lease return route ${from}→${to}`);
+  }
+  const fee = computeFerryFeeUsd({
+    distanceNm,
+    aircraftClassId: aircraft.aircraftClassId,
+    ferrySoftNmUsed: state.ferrySoftNmUsed,
+  });
+  return {
+    feeUsd: fee.ferryFeeUsd,
+    fromIcao: from,
+    toIcao: to,
+    distanceNm,
+    needed: true,
+  };
+}
+
+function applyLeaseReturnRepositionCharge(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  aircraft: PlayerAircraft,
+  economyTick: number,
+): number {
+  const quote = quoteLeaseReturnRepositionFee(world, state, aircraft);
+  if (!quote.needed || quote.feeUsd <= 0) return 0;
+  applyWalletDelta(state, {
+    amountUsd: -quote.feeUsd,
+    kind: 'ferry',
+    atTick: economyTick,
+    aircraftId: aircraft.id,
+    icao: quote.toIcao,
+    note: `lease return ${quote.fromIcao}→${quote.toIcao}`,
+  });
+  const feeDetail = computeFerryFeeUsd({
+    distanceNm: quote.distanceNm,
+    aircraftClassId: aircraft.aircraftClassId,
+    ferrySoftNmUsed: state.ferrySoftNmUsed,
+  });
+  if (feeDetail.softNmApplied > 0) {
+    state.ferrySoftNmUsed =
+      Math.round(
+        ((state.ferrySoftNmUsed ?? 0) + feeDetail.softNmApplied) * 100,
+      ) / 100;
+  }
+  return quote.feeUsd;
+}
+
+function resolveAvailableMarketListing(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  listingId: string,
+): AircraftListing {
+  const onBoard = state.aircraftMarket?.find(
+    (l) => l.id === listingId && l.status === 'available',
+  );
+  if (onBoard) return onBoard;
+  const inst = (world.aircraftInstances ?? []).find(
+    (row) => row.id === listingId && row.status === 'available',
+  );
+  if (inst) {
+    return instanceToListing(world, inst, world.tick);
+  }
+  throw new Error(`Listing ${listingId} is not available`);
+}
+
+export type ListAircraftMarketOpts = {
+  /** View another country's dealer stock (no player listings). Acquire stays home-only. */
+  browseCountryId?: string;
+};
+
 export function listAircraftMarket(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
+  opts?: ListAircraftMarketOpts,
 ): AircraftListing[] {
   ensureAircraftMarket(state, world);
-  return (state.aircraftMarket ?? []).filter((l) => l.status === 'available');
+  const home = resolveMarketCountryId(world, state);
+  const browse = (opts?.browseCountryId ?? home).trim().toUpperCase();
+  if (browse === AIRCRAFT_MARKET_BROWSE_WORLD) {
+    return dealerInstancesWorldwide(world, world.tick).map((inst) =>
+      instanceToListing(world, inst, world.tick),
+    );
+  }
+  if (browse && browse !== home) {
+    return dealerInstancesForMarket(world, browse, world.tick).map((inst) =>
+      instanceToListing(world, inst, world.tick),
+    );
+  }
+  return (state.aircraftMarket ?? [])
+    .filter((l) => l.status === 'available')
+    .map((l) => stampListingGeo(world, l));
 }
 
 function nextAircraftId(
@@ -951,9 +1319,108 @@ export type AircraftDeliveryQuote = {
   deliverToIcao: string;
   distanceNm: number;
   deliveryFeeUsd: number;
-  /** True when based ≠ deliver target (fee may still be 0 only if same ICAO). */
+  /** True when based ≠ deliver target (fee applies only when deliver/import checked). */
   needed: boolean;
+  /** Cross-border import repositioning (F6). */
+  crossBorder?: boolean;
 };
+
+export function computeAircraftImportFeeUsd(opts: {
+  distanceNm: number;
+  aircraftClassId: FreighterClassId;
+}): number {
+  const distanceNm = Math.max(0, opts.distanceNm);
+  if (distanceNm <= 0) return 0;
+  const raw =
+    distanceNm *
+      AIRCRAFT_IMPORT_USD_PER_NM *
+      FERRY_CLASS_MULT[opts.aircraftClassId] +
+    AIRCRAFT_IMPORT_HANDLING_USD;
+  return Math.min(
+    AIRCRAFT_IMPORT_MAX_USD,
+    Math.max(AIRCRAFT_IMPORT_MIN_USD, Math.round(raw)),
+  );
+}
+
+export function quoteAircraftImportForListing(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  listing: AircraftListing,
+  deliverToIcao?: string,
+): AircraftDeliveryQuote {
+  const to = (
+    deliverToIcao?.trim() ||
+    resolveAircraftDeliveryIcao(state)
+  ).toUpperCase();
+  if (!to) {
+    throw new Error('No import destination — select a starter hub first');
+  }
+  if (!CAREER_HUB_COORDS[to] && !world.airports.some((a) => a.icao === to)) {
+    throw new Error(`Unknown import airport: ${to}`);
+  }
+  const from = listing.basedIcao.trim().toUpperCase();
+  assertFerryNotBush(from, to);
+  if (from === to) {
+    return {
+      listingId: listing.id,
+      basedIcao: from,
+      deliverToIcao: to,
+      distanceNm: 0,
+      deliveryFeeUsd: 0,
+      needed: false,
+      crossBorder: true,
+    };
+  }
+  const distanceNm =
+    hubDistanceNm(from, to) ?? routeDistanceNm(world, from, to);
+  if (distanceNm === undefined) {
+    throw new Error(`No import route ${from}→${to}`);
+  }
+  return {
+    listingId: listing.id,
+    basedIcao: from,
+    deliverToIcao: to,
+    distanceNm,
+    deliveryFeeUsd: computeAircraftImportFeeUsd({
+      distanceNm,
+      aircraftClassId: listing.aircraftClassId,
+    }),
+    needed: true,
+    crossBorder: true,
+  };
+}
+
+function quoteAcquireRepositionForListing(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  listing: AircraftListing,
+  deliverToIcao?: string,
+): AircraftDeliveryQuote {
+  if (isCrossBorderAircraftListing(world, state, listing)) {
+    return quoteAircraftImportForListing(
+      world,
+      state,
+      listing,
+      deliverToIcao,
+    );
+  }
+  return quoteAircraftDeliveryForListing(world, state, listing, deliverToIcao);
+}
+
+/** Domestic delivery or cross-border import quote for buy/lease UI. */
+export function quoteAircraftRepositionForListing(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  listing: AircraftListing,
+  deliverToIcao?: string,
+): AircraftDeliveryQuote {
+  return quoteAcquireRepositionForListing(
+    world,
+    state,
+    listing,
+    deliverToIcao,
+  );
+}
 
 export function computeAircraftDeliveryFeeUsd(opts: {
   distanceNm: number;
@@ -1050,35 +1517,42 @@ export function purchaseAircraftListing(
   deliveryFeeUsd: number;
 } {
   ensureAircraftMarket(state, world);
-  const listing = state.aircraftMarket?.find((l) => l.id === listingId);
-  if (!listing || listing.status !== 'available') {
-    throw new Error(`Listing ${listingId} is not available`);
-  }
+  const listing = resolveAvailableMarketListing(state, world, listingId);
   if (listing.kind === 'lease') {
     throw new Error('Use signLease for lease listings');
   }
   if (listingSource(listing) === 'player_lease') {
     throw new Error('Cannot purchase your own lease listing');
   }
+  if (listingSource(listing) === 'player_sale') {
+    throw new Error('Cannot purchase your own sale listing');
+  }
   if (!state.hubSelected) {
     throw new Error('Select a starter hub before buying aircraft');
   }
   assertClassOpsUnlocked(state.classOps, listing.aircraftClassId);
 
+  const crossBorder = isCrossBorderAircraftListing(world, state, listing);
   let deliveryFeeUsd = 0;
+  let importFeeUsd = 0;
   let deliverTo = listing.basedIcao.trim().toUpperCase();
   if (opts?.deliver) {
-    const dq = quoteAircraftDeliveryForListing(
+    const dq = quoteAcquireRepositionForListing(
       world,
       state,
       listing,
       opts.deliverToIcao,
     );
-    deliveryFeeUsd = dq.deliveryFeeUsd;
     deliverTo = dq.deliverToIcao;
+    if (crossBorder) {
+      importFeeUsd = dq.deliveryFeeUsd;
+    } else {
+      deliveryFeeUsd = dq.deliveryFeeUsd;
+    }
   }
 
-  const debitUsd = listing.askingUsd + deliveryFeeUsd;
+  const repositionFeeUsd = deliveryFeeUsd + importFeeUsd;
+  const debitUsd = listing.askingUsd + repositionFeeUsd;
   if (state.walletUsd < debitUsd) {
     throw new Error(
       `Needs $${debitUsd.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
@@ -1088,7 +1562,11 @@ export function purchaseAircraftListing(
   if (opts?.deliver && deliverTo !== listing.basedIcao.trim().toUpperCase()) {
     aircraft.locationIcao = deliverTo;
   }
-  listing.status = 'sold';
+  const boardListing = state.aircraftMarket?.find((l) => l.id === listing.id);
+  if (boardListing && boardListing.status === 'available') {
+    boardListing.status = 'sold';
+  }
+  markDealerInstanceSold(world, listing.id);
   applyWalletDelta(state, {
     amountUsd: -listing.askingUsd,
     kind: 'aircraft_buy',
@@ -1107,9 +1585,24 @@ export function purchaseAircraftListing(
       note: `${listing.basedIcao}→${deliverTo}`,
     });
   }
+  if (importFeeUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -importFeeUsd,
+      kind: 'aircraft_import',
+      atTick: world.tick,
+      aircraftId: aircraft.id,
+      icao: deliverTo,
+      note: `${listing.basedIcao}→${deliverTo}`,
+    });
+  }
   state.fleet = [...state.fleet, aircraft];
   state.classOps = syncClassOpsFromFleet(state.classOps, state.fleet);
-  return { state, aircraft, debitUsd, deliveryFeeUsd };
+  return {
+    state,
+    aircraft,
+    debitUsd,
+    deliveryFeeUsd: repositionFeeUsd,
+  };
 }
 
 export function signAircraftLease(
@@ -1124,10 +1617,7 @@ export function signAircraftLease(
   deliveryFeeUsd: number;
 } {
   ensureAircraftMarket(state, world);
-  const listing = state.aircraftMarket?.find((l) => l.id === listingId);
-  if (!listing || listing.status !== 'available') {
-    throw new Error(`Listing ${listingId} is not available`);
-  }
+  const listing = resolveAvailableMarketListing(state, world, listingId);
   if (listing.kind !== 'lease') {
     throw new Error('Listing is not a lease');
   }
@@ -1140,20 +1630,27 @@ export function signAircraftLease(
   assertAircraftLeaseUnlocked(state);
   assertClassOpsUnlocked(state.classOps, listing.aircraftClassId);
 
+  const crossBorder = isCrossBorderAircraftListing(world, state, listing);
   let deliveryFeeUsd = 0;
+  let importFeeUsd = 0;
   let deliverTo = listing.basedIcao.trim().toUpperCase();
   if (opts?.deliver) {
-    const dq = quoteAircraftDeliveryForListing(
+    const dq = quoteAcquireRepositionForListing(
       world,
       state,
       listing,
       opts.deliverToIcao,
     );
-    deliveryFeeUsd = dq.deliveryFeeUsd;
     deliverTo = dq.deliverToIcao;
+    if (crossBorder) {
+      importFeeUsd = dq.deliveryFeeUsd;
+    } else {
+      deliveryFeeUsd = dq.deliveryFeeUsd;
+    }
   }
 
-  const debitUsd = listing.askingUsd + deliveryFeeUsd;
+  const repositionFeeUsd = deliveryFeeUsd + importFeeUsd;
+  const debitUsd = listing.askingUsd + repositionFeeUsd;
   if (state.walletUsd < debitUsd) {
     throw new Error(
       `Lease entry $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
@@ -1163,7 +1660,10 @@ export function signAircraftLease(
   if (opts?.deliver && deliverTo !== listing.basedIcao.trim().toUpperCase()) {
     aircraft.locationIcao = deliverTo;
   }
-  listing.status = 'sold';
+  if (aircraft.lease) {
+    aircraft.lease.startIcao = aircraft.locationIcao.trim().toUpperCase();
+  }
+  markListingSold(state, world, listing);
   applyWalletDelta(state, {
     amountUsd: -listing.askingUsd,
     kind: 'aircraft_lease_sign',
@@ -1172,29 +1672,24 @@ export function signAircraftLease(
     icao: listing.basedIcao,
     note: listing.label,
   });
-  if (deliveryFeeUsd > 0) {
-    applyWalletDelta(state, {
-      amountUsd: -deliveryFeeUsd,
-      kind: 'aircraft_delivery',
-      atTick: world.tick,
-      aircraftId: aircraft.id,
-      icao: deliverTo,
-      note: `${listing.basedIcao}→${deliverTo}`,
-    });
-  }
+  applyAcquireRepositionCharges(state, {
+    world,
+    listing,
+    aircraft,
+    crossBorder,
+    deliverTo,
+    deliveryFeeUsd,
+    importFeeUsd,
+  });
   state.fleet = [...state.fleet, aircraft];
   state.classOps = syncClassOpsFromFleet(state.classOps, state.fleet);
-  return { state, aircraft, debitUsd, deliveryFeeUsd };
+  return { state, aircraft, debitUsd, deliveryFeeUsd: repositionFeeUsd };
 }
 
-export function sellPlayerAircraft(
+function assertCanDisposeOwnedAircraft(
   state: CareerMissionsState,
-  aircraftId: string,
-  economyTick: number,
-): { state: CareerMissionsState; creditUsd: number; listing: AircraftListing } {
-  const idx = state.fleet.findIndex((a) => a.id === aircraftId);
-  if (idx < 0) throw new Error(`Unknown aircraft ${aircraftId}`);
-  const aircraft = state.fleet[idx]!;
+  aircraft: PlayerAircraft,
+): void {
   if (aircraft.status === 'assigned') {
     throw new Error('Cannot sell an aircraft assigned to a mission');
   }
@@ -1212,8 +1707,80 @@ export function sellPlayerAircraft(
       'Keep at least one owned aircraft — buy another before selling this one',
     );
   }
+}
+
+/** Instant dealer trade-in at 50% fair. Restocks another unit of the same SKU. */
+export function sellPlayerAircraft(
+  state: CareerMissionsState,
+  aircraftId: string,
+  economyTick: number,
+  world: CareerEconomyWorld,
+): {
+  state: CareerMissionsState;
+  creditUsd: number;
+  restockId?: string;
+} {
+  const idx = state.fleet.findIndex((a) => a.id === aircraftId);
+  if (idx < 0) throw new Error(`Unknown aircraft ${aircraftId}`);
+  const aircraft = state.fleet[idx]!;
+  assertCanDisposeOwnedAircraft(state, aircraft);
   const creditUsd = sellBackValueUsd(aircraft);
-  const askingUsd = Math.round(creditUsd * 1.05);
+  ensureAircraftConditionPcts(aircraft);
+  state.fleet = state.fleet.filter((a) => a.id !== aircraftId);
+  applyWalletDelta(state, {
+    amountUsd: creditUsd,
+    kind: 'aircraft_sell',
+    atTick: economyTick,
+    aircraftId: aircraft.id,
+    icao: aircraft.locationIcao,
+    note: aircraft.label,
+  });
+
+  let restockId: string | undefined;
+  const typeId = aircraft.airframeTypeId;
+  if (typeId && findCareerPlayerAirframe(typeId)) {
+    ensureWorldAircraftPool(world);
+    const countryId = countryIdForHubIcao(aircraft.locationIcao, world);
+    const used = collectPoolRegistrations(world);
+    for (const acf of state.fleet) {
+      const reg = normalizeAircraftRegistration(acf.registration);
+      if (reg) used.add(reg);
+    }
+    const delayDays = Math.floor(
+      mulberry32(hashSeed(`${world.seed}:tradein:${aircraft.id}:${economyTick}`))() *
+        3,
+    );
+    const restock = restockDealerAirframe({
+      world,
+      countryId,
+      airframeTypeId: typeId,
+      aircraftClassId: aircraft.aircraftClassId,
+      preferIcao: aircraft.locationIcao,
+      availableAtTick: economyTick + delayDays * TICKS_PER_DAY,
+      usedRegistrations: used,
+    });
+    restockId = restock.id;
+  }
+  return { state, creditUsd, restockId };
+}
+
+/** List owned airframe on the Market at a player-chosen ask. No cash until sold. */
+export function listAircraftForSale(
+  state: CareerMissionsState,
+  aircraftId: string,
+  economyTick: number,
+  askingUsd: number,
+): { state: CareerMissionsState; listing: AircraftListing } {
+  const aircraft = state.fleet.find((a) => a.id === aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  assertCanDisposeOwnedAircraft(state, aircraft);
+  if (aircraft.status !== 'parked' && aircraft.status !== 'maintenance') {
+    throw new Error('Aircraft must be parked to list for sale');
+  }
+  const fair = fairValueUsd(aircraft.aircraftClassId, aircraft.condition ?? 'good', {
+    airframeTypeId: aircraft.airframeTypeId,
+  });
+  const ask = clampPlayerSaleAskingUsd(askingUsd, fair);
   ensureAircraftConditionPcts(aircraft);
   const listing: AircraftListing = {
     id: `acfl_sale_${aircraft.id}_${economyTick}`,
@@ -1225,7 +1792,7 @@ export function sellPlayerAircraft(
       aircraft.label,
     registration: normalizeAircraftRegistration(aircraft.registration) ?? undefined,
     basedIcao: aircraft.locationIcao,
-    askingUsd: Math.max(500, askingUsd),
+    askingUsd: ask,
     condition: aircraft.condition ?? 'good',
     hoursAirframe: aircraft.hoursAirframe ?? 0,
     hoursEngine: aircraft.hoursEngine ?? 0,
@@ -1236,17 +1803,10 @@ export function sellPlayerAircraft(
     source: 'player_sale',
     sellerAircraftId: aircraft.id,
   };
-  state.fleet = state.fleet.filter((a) => a.id !== aircraftId);
-  applyWalletDelta(state, {
-    amountUsd: creditUsd,
-    kind: 'aircraft_sell',
-    atTick: economyTick,
-    aircraftId: aircraft.id,
-    icao: aircraft.locationIcao,
-    note: aircraft.label,
-  });
+  aircraft.status = 'listed';
+  aircraft.listedListingId = listing.id;
   state.aircraftMarket = [...(state.aircraftMarket ?? []), listing];
-  return { state, creditUsd, listing };
+  return { state, listing };
 }
 
 function ownedParkedCount(state: CareerMissionsState): number {
@@ -1263,7 +1823,7 @@ export function listAircraftForLease(
   state: CareerMissionsState,
   aircraftId: string,
   economyTick: number,
-  opts?: { termMonths?: 6 | 12 },
+  opts?: { termMonths?: number; monthlyUsd?: number },
 ): { state: CareerMissionsState; listing: AircraftListing } {
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
@@ -1282,10 +1842,15 @@ export function listAircraftForLease(
   if (existingPlayerLease) {
     throw new Error('You already have one aircraft listed for lease');
   }
-  const monthly = aircraftLeaseMonthlyUsd(aircraft.aircraftClassId, {
+  const catalogMonthly = aircraftLeaseMonthlyUsd(aircraft.aircraftClassId, {
     airframeTypeId: aircraft.airframeTypeId,
   });
-  const termMonths = opts?.termMonths ?? 6;
+  const monthly = clampPlayerLeaseMonthlyUsd(
+    opts?.monthlyUsd ?? catalogMonthly,
+    catalogMonthly,
+  );
+  const termMonths = clampPlayerLeaseTermMonths(opts?.termMonths ?? 6);
+  const deposit = Math.max(1, Math.round(monthly * PLAYER_LEASE_DEPOSIT_MONTHS));
   const listing: AircraftListing = {
     id: `acfl_lease_${aircraft.id}_${economyTick}`,
     kind: 'lease',
@@ -1296,7 +1861,7 @@ export function listAircraftForLease(
       aircraft.label,
     registration: normalizeAircraftRegistration(aircraft.registration) ?? undefined,
     basedIcao: aircraft.locationIcao,
-    askingUsd: monthly,
+    askingUsd: deposit,
     leaseMonthlyUsd: monthly,
     leaseTermMonths: termMonths,
     condition: aircraft.condition ?? 'good',
@@ -1320,17 +1885,17 @@ export function unlistAircraftForLease(
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
   if (aircraft.status !== 'listed') {
-    throw new Error('Aircraft is not listed for lease');
+    throw new Error('Aircraft is not listed');
   }
   const listing = state.aircraftMarket?.find(
     (l) =>
       l.id === aircraft.listedListingId ||
-      (listingSource(l) === 'player_lease' &&
+      (isPlayerListing(l) &&
         l.sellerAircraftId === aircraftId &&
         l.status === 'available'),
   );
   if (!listing || listing.status !== 'available') {
-    throw new Error('Lease listing is no longer available to unlist');
+    throw new Error('Listing is no longer available to unlist');
   }
   listing.status = 'expired';
   aircraft.status = 'parked';
@@ -1421,6 +1986,22 @@ export function settleAircraftMarketOps(
         termEndedSoft.push(aircraft.id);
         keep.push(aircraft);
         continue;
+      }
+      if (world) {
+        const returnQuote = quoteLeaseReturnRepositionFee(world, state, aircraft);
+        if (
+          returnQuote.needed &&
+          returnQuote.feeUsd > 0 &&
+          state.walletUsd < returnQuote.feeUsd
+        ) {
+          lease.termEndedSoft = true;
+          aircraft.leaseOverdue = true;
+          if (!overdueIds.includes(aircraft.id)) overdueIds.push(aircraft.id);
+          termEndedSoft.push(aircraft.id);
+          keep.push(aircraft);
+          continue;
+        }
+        applyLeaseReturnRepositionCharge(state, world, aircraft, economyTick);
       }
       repossessed.push(aircraft.id);
       continue;
@@ -1523,7 +2104,13 @@ export function returnAircraftLeaseEarly(
   state: CareerMissionsState,
   aircraftId: string,
   economyTick = 0,
-): { state: CareerMissionsState; debitUsd: number; remainingMonths: number } {
+  world?: CareerEconomyWorld,
+): {
+  state: CareerMissionsState;
+  debitUsd: number;
+  returnFerryUsd: number;
+  remainingMonths: number;
+} {
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
   if (aircraft.ownership !== 'leased' || !aircraft.lease) {
@@ -1550,16 +2137,23 @@ export function returnAircraftLeaseEarly(
   const remainingMonths = softEnded
     ? 0
     : leaseRemainingMonths(aircraft, economyTick);
-  const debit = quoteLeaseEarlyReturnUsd(aircraft, economyTick);
-  if (debit > 0 && state.walletUsd < debit) {
+  const penaltyUsd = quoteLeaseEarlyReturnUsd(aircraft, economyTick);
+  const returnQuote =
+    world != null
+      ? quoteLeaseReturnRepositionFee(world, state, aircraft)
+      : { feeUsd: 0, needed: false };
+  const returnFerryUsd =
+    returnQuote.needed && returnQuote.feeUsd > 0 ? returnQuote.feeUsd : 0;
+  const totalDebit = penaltyUsd + returnFerryUsd;
+  if (totalDebit > 0 && state.walletUsd < totalDebit) {
     throw new Error(
-      `Early return $${debit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
+      `Early return $${totalDebit.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
 
-  if (debit > 0) {
+  if (penaltyUsd > 0) {
     applyWalletDelta(state, {
-      amountUsd: -debit,
+      amountUsd: -penaltyUsd,
       kind: 'lease_early_return',
       atTick: economyTick,
       aircraftId: aircraft.id,
@@ -1567,8 +2161,16 @@ export function returnAircraftLeaseEarly(
       note: `${aircraft.label} · ${remainingMonths} mo left`,
     });
   }
+  if (world && returnFerryUsd > 0) {
+    applyLeaseReturnRepositionCharge(state, world, aircraft, economyTick);
+  }
   state.fleet = state.fleet.filter((a) => a.id !== aircraft.id);
-  return { state, debitUsd: debit, remainingMonths };
+  return {
+    state,
+    debitUsd: totalDebit,
+    returnFerryUsd,
+    remainingMonths,
+  };
 }
 
 export function estimateMissionBlockHours(

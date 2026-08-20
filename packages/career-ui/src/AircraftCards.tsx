@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { estimateSellBackUsd } from './aircraft-pricing';
+import { estimateFairUsd, estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 import { IcaoLink } from './IcaoLink';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
@@ -61,6 +61,28 @@ export function aircraftModelLabel(id: AircraftClass): string {
   if (id === 'medium_piston') return 'Douglas DC-6';
   if (id === 'light_ga') return 'Beechcraft Bonanza BE36';
   return 'Boeing 737-800 BCF';
+}
+
+/** Name / type / tail / base ICAO — not the class fallback (all TPs used to match "208"). */
+export function aircraftListingMatchesQuery(
+  listing: Pick<
+    AircraftListing,
+    'label' | 'airframeTypeId' | 'registration' | 'basedIcao'
+  >,
+  rawQuery: string,
+): boolean {
+  const q = rawQuery.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    listing.label,
+    listing.airframeTypeId,
+    listing.registration,
+    listing.basedIcao,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return q.split(/\s+/).every((token) => haystack.includes(token));
 }
 
 /**
@@ -317,6 +339,7 @@ export function MarketListingCard(props: {
     distanceNm: number;
     deliveryFeeUsd: number;
     needed: boolean;
+    crossBorder?: boolean;
   } | null;
   /** When false, Lease is disabled (buy still works unless classUnlocked is false). */
   leaseUnlocked?: boolean;
@@ -340,6 +363,7 @@ export function MarketListingCard(props: {
   const canAfford = props.wallet >= totalDue;
   const classUnlocked = props.classUnlocked !== false;
   const leaseUnlocked = props.leaseUnlocked !== false;
+  const isImport = Boolean(props.delivery?.crossBorder);
   const buyDisabled = props.busy || !canAfford || !classUnlocked;
   const leaseDisabled =
     props.busy || !canAfford || !leaseUnlocked || !classUnlocked;
@@ -452,7 +476,7 @@ export function MarketListingCard(props: {
               onChange={(e) => setDeliver(e.target.checked)}
             />
             <span>
-              Deliver to {props.delivery.deliverToIcao}
+              {isImport ? 'Import to' : 'Deliver to'} {props.delivery.deliverToIcao}
               <span className="muted">
                 {' '}
                 · {props.delivery.distanceNm.toLocaleString()} nm · +
@@ -460,6 +484,11 @@ export function MarketListingCard(props: {
               </span>
             </span>
           </label>
+        ) : null}
+        {isImport && !canDeliver ? (
+          <p className="aircraft-card-import-note muted">
+            Buy here — aircraft stays abroad until you ferry it home.
+          </p>
         ) : null}
       </div>
       <div className="aircraft-card-price">
@@ -486,7 +515,13 @@ export function MarketListingCard(props: {
           ) : (
             <>
               <span className="price-term">
-                {deliveryFee > 0 ? 'purchase + delivery' : 'purchase price'}
+                {deliveryFee > 0
+                  ? isImport
+                    ? 'purchase + import'
+                    : 'purchase + delivery'
+                  : isImport
+                    ? 'purchase abroad'
+                    : 'purchase price'}
               </span>
               <span className="price-sub is-empty" aria-hidden="true">
                 —
@@ -565,6 +600,97 @@ function hangarStatusNote(acf: PlayerAircraft): string | null {
   }
 }
 
+export function ListSaleAskBody(props: {
+  fairUsd: number;
+  dealerUsd: number;
+  minAsk: number;
+  maxAsk: number;
+  formatMoney: (n: number) => string;
+  onChange: (askingUsd: number) => void;
+}) {
+  const [ask, setAsk] = useState(props.fairUsd);
+  return (
+    <>
+      <p>
+        Fair {props.formatMoney(props.fairUsd)} · dealer cash now{' '}
+        {props.formatMoney(props.dealerUsd)}. No payment until someone buys.
+      </p>
+      <p>
+        Asking price ({props.formatMoney(props.minAsk)}–
+        {props.formatMoney(props.maxAsk)})
+      </p>
+      <input
+        type="number"
+        min={props.minAsk}
+        max={props.maxAsk}
+        step={100}
+        value={ask}
+        onChange={(event) => {
+          const n = Number(event.target.value);
+          setAsk(n);
+          if (Number.isFinite(n)) props.onChange(n);
+        }}
+      />
+    </>
+  );
+}
+
+export function ListLeaseAskBody(props: {
+  catalogMonthlyUsd: number;
+  minMonthly: number;
+  maxMonthly: number;
+  minTerm: number;
+  maxTerm: number;
+  formatMoney: (n: number) => string;
+  onChange: (next: { monthlyUsd: number; termMonths: number }) => void;
+}) {
+  const [monthly, setMonthly] = useState(props.catalogMonthlyUsd);
+  const [term, setTerm] = useState(6);
+  const deposit = Math.round(monthly * 2);
+  return (
+    <>
+      <p>
+        Catalog {props.formatMoney(props.catalogMonthlyUsd)}/mo. NPC typically
+        accepts ~70–130% of that and 3–18 month terms. Deposit is two months (
+        {props.formatMoney(deposit)}).
+      </p>
+      <p>
+        Monthly ({props.formatMoney(props.minMonthly)}–
+        {props.formatMoney(props.maxMonthly)})
+      </p>
+      <input
+        type="number"
+        min={props.minMonthly}
+        max={props.maxMonthly}
+        step={50}
+        value={monthly}
+        onChange={(event) => {
+          const n = Number(event.target.value);
+          setMonthly(n);
+          if (Number.isFinite(n)) props.onChange({ monthlyUsd: n, termMonths: term });
+        }}
+      />
+      <p>
+        Term months ({props.minTerm}–{props.maxTerm})
+      </p>
+      <input
+        type="number"
+        min={props.minTerm}
+        max={props.maxTerm}
+        step={1}
+        value={term}
+        onChange={(event) => {
+          const n = Number(event.target.value);
+          setTerm(n);
+          if (Number.isFinite(n)) {
+            props.onChange({ monthlyUsd: monthly, termMonths: n });
+          }
+        }}
+      />
+    </>
+  );
+}
+
 export function HangarAircraftCard(props: {
   aircraft: PlayerAircraft;
   catalog?: AircraftCatalogEntry;
@@ -587,6 +713,7 @@ export function HangarAircraftCard(props: {
   onBuyout: (id: string) => void;
   onReturnLease: (id: string) => void;
   onListForLease: (id: string) => void;
+  onListForSale: (id: string) => void;
   onSell: (id: string) => void;
   onFerry: (
     id: string,
@@ -1125,10 +1252,21 @@ export function HangarAircraftCard(props: {
                     type="button"
                     className="action ghost"
                     disabled={props.busy}
-                    title={`Dealer buy-back ${props.formatMoney(sellBackUsd ?? 0)}`}
+                    title={`List at your price (fair ${props.formatMoney(estimateFairUsd(acf, { maxCargoKg: catalog?.maxCargoKg }))})`}
+                    onClick={() => props.onListForSale(acf.id)}
+                  >
+                    List on Market
+                  </button>
+                ) : null}
+                {canSell ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy}
+                    title={`Dealer pays 50% of fair (${props.formatMoney(sellBackUsd ?? 0)})`}
                     onClick={() => props.onSell(acf.id)}
                   >
-                    Sell · {props.formatMoney(sellBackUsd ?? 0)}
+                    Dealer · {props.formatMoney(sellBackUsd ?? 0)}
                   </button>
                 ) : null}
               </div>

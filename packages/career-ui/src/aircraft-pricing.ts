@@ -64,8 +64,8 @@ function resolveMsrpUsd(
   );
 }
 
-/** Dealer buy-back ≈ 70% of fair value (MSRP × condition × cargo mult). */
-export function estimateSellBackUsd(
+/** Dealer buy-back = 50% of fair value (MSRP × condition × cargo mult). */
+export function estimateFairUsd(
   aircraft: {
     aircraftClassId: FreighterClassId;
     condition?: AirframeCondition | null;
@@ -73,11 +73,41 @@ export function estimateSellBackUsd(
   opts?: { maxCargoKg?: number | null },
 ): number {
   const condition = aircraft.condition ?? 'good';
-  const fair = Math.round(
+  return Math.round(
     resolveMsrpUsd(aircraft.aircraftClassId, opts?.maxCargoKg) *
       CONDITION_PRICE_MULT[condition],
   );
-  return Math.round(fair * 0.7);
+}
+
+const AIRCRAFT_LEASE_MONTHLY_RATE: Record<FreighterClassId, number> = {
+  light_ga: 0.045,
+  light_turboprop: 0.04,
+  light_jet: 0.038,
+  medium_piston: 0.036,
+  narrow_freighter: 0.035,
+  wide_freighter: 0.032,
+};
+
+export function estimateLeaseMonthlyUsd(
+  aircraft: {
+    aircraftClassId: FreighterClassId;
+  },
+  opts?: { maxCargoKg?: number | null },
+): number {
+  return Math.round(
+    resolveMsrpUsd(aircraft.aircraftClassId, opts?.maxCargoKg) *
+      AIRCRAFT_LEASE_MONTHLY_RATE[aircraft.aircraftClassId],
+  );
+}
+
+export function estimateSellBackUsd(
+  aircraft: {
+    aircraftClassId: FreighterClassId;
+    condition?: AirframeCondition | null;
+  },
+  opts?: { maxCargoKg?: number | null },
+): number {
+  return Math.round(estimateFairUsd(aircraft, opts) * 0.5);
 }
 
 /** Career clock: 96 ticks/day × 30 days. */

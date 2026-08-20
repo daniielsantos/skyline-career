@@ -28,6 +28,7 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   lease_early_return: 'Lease early return',
   aircraft_buy: 'Aircraft purchase',
   aircraft_delivery: 'Aircraft delivery',
+  aircraft_import: 'Aircraft import',
   aircraft_lease_sign: 'Lease entry',
   aircraft_sell: 'Aircraft sale',
   aircraft_buyout: 'Lease buyout',

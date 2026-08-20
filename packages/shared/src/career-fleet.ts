@@ -113,6 +113,12 @@ export const AIRCRAFT_DELIVERY_USD_PER_NM = 0.55;
 export const AIRCRAFT_DELIVERY_MIN_USD = 200;
 export const AIRCRAFT_DELIVERY_MAX_USD = 2_500;
 
+/** Cross-border dealer import (F6): repositioning + handling, uncapped like ferry. */
+export const AIRCRAFT_IMPORT_USD_PER_NM = 1.15;
+export const AIRCRAFT_IMPORT_HANDLING_USD = 2_500;
+export const AIRCRAFT_IMPORT_MIN_USD = 1_000;
+export const AIRCRAFT_IMPORT_MAX_USD = 45_000;
+
 export function listCareerHubIcaos(): string[] {
   return Object.keys(CAREER_HUB_COORDS).sort();
 }
@@ -461,6 +467,12 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
               typeof raw.lease.listingId === 'string'
                 ? raw.lease.listingId
                 : undefined,
+            startIcao:
+              typeof raw.lease.startIcao === 'string' &&
+              raw.lease.startIcao.trim().length >= 3
+                ? raw.lease.startIcao.trim().toUpperCase()
+                : undefined,
+            termEndedSoft: raw.lease.termEndedSoft === true ? true : undefined,
           }
         : undefined,
     leaseOverdue: Boolean(raw.leaseOverdue),

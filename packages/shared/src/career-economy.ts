@@ -8006,9 +8006,10 @@ export function ensureAirportHubTier(terminal: AirportTerminal): void {
   if (isBushTripOnlyHub(terminal.icao)) terminal.bushTripOnly = true;
   else if (terminal.bushTripOnly) delete terminal.bushTripOnly;
   // MSFS homologation overrides win over curated catalog / PLN estimates.
-  if (applyMsfsBushHubOverrideToTerminal(terminal)) {
+  const msfsOverride = lookupMsfsBushHubOverride(terminal.icao);
+  if (applyMsfsBushHubOverrideToTerminal(terminal, msfsOverride)) {
     /* lat/lon/name stamped from MSFS override */
-  } else {
+  } else if (!msfsOverride) {
     // Catalog lat/lon/name wins when no MSFS override — bushTripOnly hubs were
     // once seeded from PLN User WPs several NM off the field; also repairs
     // mislabeled ICAOs (e.g. SAVN was Neuquén coords).
@@ -11853,6 +11854,10 @@ export function migrateEconomyWorld(
   const portInventoriesRaw = (base as { portInventories?: unknown }).portInventories;
   const portInboundShipsRaw = (base as { portInboundShips?: unknown }).portInboundShips;
   const portConcessionsRaw = (base as { portConcessions?: unknown }).portConcessions;
+  const aircraftInstancesRaw = (base as { aircraftInstances?: unknown }).aircraftInstances;
+  const aircraftPoolCatalogHashRaw = (base as {
+    aircraftPoolCatalogHash?: unknown;
+  }).aircraftPoolCatalogHash;
   const migrated: CareerEconomyWorld = {
     version: 3,
     seed,
@@ -11903,6 +11908,15 @@ export function migrateEconomyWorld(
         ? { demandOrders: demandRaw as CareerEconomyWorld['demandOrders'] }
         : {};
     })(),
+    ...(Array.isArray(aircraftInstancesRaw)
+      ? {
+          aircraftInstances:
+            aircraftInstancesRaw as CareerEconomyWorld['aircraftInstances'],
+        }
+      : {}),
+    ...(typeof aircraftPoolCatalogHashRaw === 'string'
+      ? { aircraftPoolCatalogHash: aircraftPoolCatalogHashRaw.trim() }
+      : {}),
   };
 
   remapMislabelledClHubs(migrated);
@@ -11973,6 +11987,16 @@ export function ensureEconomyCaughtUp(
     w.demandOrders = migrated.demandOrders;
   } else {
     delete w.demandOrders;
+  }
+  if (migrated.aircraftInstances) {
+    w.aircraftInstances = migrated.aircraftInstances;
+  } else {
+    delete w.aircraftInstances;
+  }
+  if (migrated.aircraftPoolCatalogHash) {
+    w.aircraftPoolCatalogHash = migrated.aircraftPoolCatalogHash;
+  } else {
+    delete w.aircraftPoolCatalogHash;
   }
 
   // Mid-hour continuous ops first (arrivals between batches).

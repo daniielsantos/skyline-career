@@ -42,6 +42,8 @@ import {
   listActivePlayerMissions,
   listAircraftClassCatalog,
   listAircraftMarket,
+  resolveMarketCountryId,
+  dealerPoolCountryCounts,
   listCareerHubIcaos,
   listParkedAt,
   listStarterCareerPlayerAirframes,
@@ -100,7 +102,7 @@ import {
   parseFreighterClassId,
   purchaseAircraftListing,
   purchasePlayerMissionOfpFuel,
-  quoteAircraftDeliveryForListing,
+  quoteAircraftRepositionForListing,
   quotePlayerMissionOfpFuel,
   reconcilePlayerInbound,
   replaceMissionManifest,
@@ -109,6 +111,7 @@ import {
   estimateMissionBlockHours,
   selectStarterHub,
   listAircraftForLease,
+  listAircraftForSale,
   unlistAircraftForLease,
   sellPlayerAircraft,
   settleAircraftMarketOps,
@@ -352,7 +355,7 @@ async function stampMsfsOverridesOnStore(target: CareerStore): Promise<void> {
     await target.saveEconomy(world);
     if (stamped > 0) {
       console.log(
-        `[career] applied MSFS hub overrides to ${stamped} airport(s) in economy`,
+        `[career] updated MSFS homolog coords for ${stamped} airport(s) in economy`,
       );
     }
   }
@@ -1657,9 +1660,20 @@ export function createCareerApiServer(port = 8787) {
 
       // Generated board contains one listing per homologated player airframe.
       if (req.method === 'GET' && path === '/api/aircraft-market') {
+        const browseRaw = url.searchParams.get('country')?.trim().toUpperCase();
         const payload = await withCareerWrite((world, missions) => {
           settleAircraftMarketOps(missions, world.tick, world);
-          const listings = listAircraftMarket(missions, world);
+          const homeCountryId = resolveMarketCountryId(world, missions);
+          const browseCountryId =
+            browseRaw === 'WORLD'
+              ? 'WORLD'
+              : browseRaw && /^[A-Z]{2}$/.test(browseRaw)
+                ? browseRaw
+                : homeCountryId;
+          const listings = listAircraftMarket(missions, world, {
+            browseCountryId,
+          });
+          const acquireEnabled = browseCountryId === homeCountryId;
           const nowMs = Date.now();
           const catalog = listAircraftClassCatalog();
           const catalogByClass = new Map(catalog.map((row) => [row.id, row]));
@@ -1700,11 +1714,15 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: missions.walletUsd,
             dayIndex: economyDayIndex(world.tick),
             listings,
+            homeCountryId,
+            browseCountryId,
+            acquireEnabled,
+            poolCountries: dealerPoolCountryCounts(world, world.tick),
             deliveryTargetIcao: resolveAircraftDeliveryIcao(missions),
             deliveryQuotes: Object.fromEntries(
               listings.map((listing) => {
                 try {
-                  const q = quoteAircraftDeliveryForListing(
+                  const q = quoteAircraftRepositionForListing(
                     world,
                     missions,
                     listing,
@@ -1717,6 +1735,7 @@ export function createCareerApiServer(port = 8787) {
                       distanceNm: Math.round(q.distanceNm),
                       deliveryFeeUsd: q.deliveryFeeUsd,
                       needed: q.needed,
+                      crossBorder: q.crossBorder === true,
                     },
                   ] as const;
                 } catch {
@@ -1841,11 +1860,45 @@ export function createCareerApiServer(port = 8787) {
               missions,
               body.aircraftId!,
               world.tick,
+              world,
             );
             return {
               walletUsd: missions.walletUsd,
               creditUsd: sold.creditUsd,
-              listing: sold.listing,
+              restockId: sold.restockId,
+              fleet: withParkingRates(missions.fleet),
+              listings: listAircraftMarket(missions, world),
+            };
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/list-sale') {
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          askingUsd?: number;
+        };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const listed = listAircraftForSale(
+              missions,
+              body.aircraftId!,
+              world.tick,
+              Number(body.askingUsd),
+            );
+            return {
+              walletUsd: missions.walletUsd,
+              listing: listed.listing,
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
@@ -1863,6 +1916,7 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           aircraftId?: string;
           termMonths?: number;
+          monthlyUsd?: number;
         };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
@@ -1870,12 +1924,14 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           const result = await withCareerWrite((world, missions) => {
-            const term = body.termMonths === 12 ? (12 as const) : (6 as const);
             const listed = listAircraftForLease(
               missions,
               body.aircraftId!,
               world.tick,
-              { termMonths: term },
+              {
+                termMonths: body.termMonths,
+                monthlyUsd: body.monthlyUsd,
+              },
             );
             return {
               walletUsd: missions.walletUsd,
@@ -2025,10 +2081,12 @@ export function createCareerApiServer(port = 8787) {
               missions,
               body.aircraftId!,
               world.tick,
+              world,
             );
             return {
               walletUsd: missions.walletUsd,
               debitUsd: returned.debitUsd,
+              returnFerryUsd: returned.returnFerryUsd,
               remainingMonths: returned.remainingMonths,
               fleet: withParkingRates(missions.fleet, world, missions),
             };

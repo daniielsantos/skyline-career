@@ -421,6 +421,35 @@ export interface CareerEconomyWorld {
   portConcessions?: PortConcessionIndexRow[];
   /** Terminal buy-orders for player warehouse cargo (Demand Board). */
   demandOrders?: DemandOrder[];
+  /** Dealer aircraft pool (finite instances; Market board source). */
+  aircraftInstances?: AircraftInstance[];
+  /** Hash of enabled player-airframe catalog; triggers incremental backfill. */
+  aircraftPoolCatalogHash?: string;
+}
+
+/** Dealer-owned airframe in the world pool (one physical tail number). */
+export type AircraftInstanceStatus = 'available' | 'sold';
+
+export interface AircraftInstance {
+  id: string;
+  airframeTypeId: string;
+  aircraftClassId: FreighterClassId;
+  /** ISO country id (BR, US, …). */
+  countryId: string;
+  basedIcao: string;
+  registration: string;
+  kind: AircraftListingKind;
+  condition: AirframeCondition;
+  hoursAirframe: number;
+  hoursEngine: number;
+  airframeConditionPct?: number;
+  engineConditionPct?: number;
+  /** available = on Market; sold = purchased / removed from dealer stock. */
+  status: AircraftInstanceStatus;
+  /** Economy tick when the instance entered dealer stock. */
+  seededAtTick: number;
+  /** Hidden from Market until this tick (trade-in restock delay). */
+  availableAtTick?: number;
 }
 
 /** Lot size buckets used by flow instrumentation. */
@@ -929,6 +958,10 @@ export interface AircraftListing {
   /** Unique tail number / registration (e.g. PR-SKY, N208AS). */
   registration?: string;
   basedIcao: string;
+  /** Dealer / listing country (`BR`). Used for board browse vs acquire. */
+  countryId?: string;
+  /** Sub-region of `basedIcao` (`BR-N`). */
+  region?: string;
   /** Purchase price, or lease down-payment. */
   askingUsd: number;
   leaseMonthlyUsd?: number;
@@ -955,6 +988,8 @@ export interface AircraftLeaseContract {
   termEndsTick: number;
   buyoutUsd?: number;
   listingId?: string;
+  /** ICAO where possession started — return ferry if elsewhere at term end. */
+  startIcao?: string;
   /**
    * Term ended during a long offline catch-up — airframe kept for player
    * action (return/buyout) instead of silent repossess.
@@ -1440,6 +1475,7 @@ export type CareerLedgerKind =
   | 'lease_early_return'
   | 'aircraft_buy'
   | 'aircraft_delivery'
+  | 'aircraft_import'
   | 'aircraft_lease_sign'
   | 'aircraft_sell'
   | 'aircraft_buyout'

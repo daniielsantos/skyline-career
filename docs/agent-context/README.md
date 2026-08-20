@@ -27,6 +27,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [07-inject-freeze.md](./07-inject-freeze.md) | Inject infinito Writing… / DR400 |
 | [08-economy.md](./08-economy.md) | Economia — ponteiro ao roadmap |
 | [09-homologate.md](./09-homologate.md) | Homologar airframe + hubs |
+| [10-aircraft-pool.md](./10-aircraft-pool.md) | Pool de aviões: regras + roadmap F0–F7 |
 
 ## Manutenção
 

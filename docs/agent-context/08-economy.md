@@ -8,6 +8,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
 - Lots / Market / NPC / fuel trucks / hub levels / aircraft market / wear / ledger / SQLite store.
+- **Aircraft pool (design locked, 2026-08-19):** cap por país (BR=62 hubs=1.0, teto 1.5×); **cota igual por SKU**; BR/US 1-de-cada nas leves; dealer **50%** vs listar; NPC compra por fair; wipe de save. Roadmap F0–F7: [`10-aircraft-pool.md`](./10-aircraft-pool.md). Market atual ainda é listing sintético 1×SKU/dia.
 - **Schema v4:** hubs + stock em tabelas (`airports` / `airport_stock`) com `world_id`; tick ainda in-memory; terminal Inventory usa `GET /api/airport?part=stock` (SQL, sem lock); payload completo (lots/NPC) hidrata depois.
 - **Schema v5:** NPC roster, fuel trucks/hauls, Demand board e port listings/inventory/concessions em tabelas (`world_id`); arrays stripped de `economy_json`. Tick ainda in-memory. WH/concessões do player ficam no `company_state`.
 - Partição por país (`homeCountryId` / região `XX-YY` → país `XX`).

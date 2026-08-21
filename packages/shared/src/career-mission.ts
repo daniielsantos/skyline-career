@@ -381,10 +381,15 @@ export function fuelMatchToleranceLb(
 }
 
 /**
- * EFB station rounding on large freighter sheets is often ~0.1–0.2% off the
- * OFP/mission figure. Floor stays 75 lb for GA / light twins.
+ * EFB station rounding on large freighter sheets is often a few tenths of a
+ * percent off the OFP figure — worse when Cargo Level is a % of capacity, not
+ * exact kg. GA / light twins stay on a 75 lb floor.
  */
 export const DEFAULT_PAYLOAD_TOL_FRACTION = 0.002;
+/** Above this Due, allow a wider band (Cargo Level % / EFB sheet rounding). */
+export const LARGE_PAYLOAD_TOL_PLANNED_LB = 20_000;
+export const LARGE_PAYLOAD_TOL_FRACTION = 0.005;
+export const LARGE_PAYLOAD_TOL_ABS_LB = 200;
 
 export function payloadMatchToleranceLb(
   plannedLb: number | undefined,
@@ -394,7 +399,10 @@ export function payloadMatchToleranceLb(
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) {
     return Math.max(0, absLb);
   }
-  return Math.max(Math.max(0, absLb), Math.abs(plannedLb) * Math.max(0, pct));
+  const large = Math.abs(plannedLb) >= LARGE_PAYLOAD_TOL_PLANNED_LB;
+  const useAbs = large ? Math.max(absLb, LARGE_PAYLOAD_TOL_ABS_LB) : absLb;
+  const usePct = large ? Math.max(pct, LARGE_PAYLOAD_TOL_FRACTION) : pct;
+  return Math.max(Math.max(0, useAbs), Math.abs(plannedLb) * Math.max(0, usePct));
 }
 
 /**

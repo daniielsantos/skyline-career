@@ -20,6 +20,7 @@ import {
   resolveAirportCoords,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
+  sumStationWeights,
   type FuelTankBreakdown,
   type MissionIntent,
   type OfpExpectation,
@@ -399,6 +400,13 @@ export async function runMissionPreflight(
       live.payload.ofpPayloadLb > 0
         ? live.payload.ofpPayloadLb
         : undefined;
+    const pmdgEfbCargoLb =
+      live.payload?.source === 'pmdg-efb' &&
+      typeof live.payload.ofpPayloadLb === 'number' &&
+      Number.isFinite(live.payload.ofpPayloadLb) &&
+      live.payload.ofpPayloadLb > 0
+        ? live.payload.ofpPayloadLb
+        : undefined;
     const a2aPayloadLb =
       live.payload?.source === 'a2a-lvars' &&
       typeof live.payload.total === 'number' &&
@@ -410,10 +418,31 @@ export async function runMissionPreflight(
       ofp.payload?.stationRoles?.crewStations?.filter(
         (idx) => Number.isFinite(idx) && idx > 0,
       ) ?? [];
+    const baggageStationIdxs =
+      ofp.payload?.stationRoles?.baggageStations?.filter(
+        (idx) => Number.isFinite(idx) && idx > 0,
+      ) ?? [];
+    const passengerStationIdxs =
+      ofp.payload?.stationRoles?.passengerStations?.filter(
+        (idx) => Number.isFinite(idx) && idx > 0,
+      ) ?? [];
     const liveCrewLb = crewStationIdxs.reduce((sum, idx) => {
       const lb = live.payload?.stations?.[idx];
       return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
     }, 0);
+    // PMDG BCF etc.: Due is cargo (+ cabin) + crew — galley/service is EFB
+    // fixed weight and must not inflate Sim vs Due (~S10/S11 on 737).
+    const freighterRoleSumLb =
+      !isPaxAndCargoLoadLayout(careerAirframe) &&
+      live.payload?.stations &&
+      (baggageStationIdxs.length > 0 ||
+        passengerStationIdxs.length > 0 ||
+        crewStationIdxs.length > 0)
+        ? (sumStationWeights(live.payload.stations, baggageStationIdxs) ?? 0) +
+          (sumStationWeights(live.payload.stations, passengerStationIdxs) ??
+            0) +
+          (sumStationWeights(live.payload.stations, crewStationIdxs) ?? 0)
+        : undefined;
     // EFB imports often leave S1/S2 at 0 — drop crew floor from Due when empty.
     // When crew is present (MD-11 S1–S3), keep 3 × 170 lb in Due.
     const plannedPayload = plannedPayloadBase
@@ -430,9 +459,14 @@ export async function runMissionPreflight(
       : tfdiEfbCargoLb !== undefined
         ? tfdiEfbCargoLb +
           (plannedPayload?.crewOnStations ? liveCrewLb : 0)
-        : a2aPayloadLb !== undefined
-          ? a2aPayloadLb
-          : (live.payload?.total ?? live.payload?.ofpPayloadLb);
+        : pmdgEfbCargoLb !== undefined
+          ? pmdgEfbCargoLb +
+            (plannedPayload?.crewOnStations ? liveCrewLb : 0)
+          : a2aPayloadLb !== undefined
+            ? a2aPayloadLb
+            : freighterRoleSumLb !== undefined
+              ? freighterRoleSumLb
+              : (live.payload?.total ?? live.payload?.ofpPayloadLb);
     const fuelTolLb = Math.max(
       ofp.tolerances?.fuelAbsLb ?? 50,
       Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
@@ -462,7 +496,10 @@ export async function runMissionPreflight(
     // under-read Accu-Sim / TFDi cargo while the tablet matches Due.
     const payloadOk = plannedPayloadBase?.gaCabin
       ? weights.payload.ok
-      : tfdiEfbCargoLb !== undefined || a2aPayloadLb !== undefined
+      : tfdiEfbCargoLb !== undefined ||
+          pmdgEfbCargoLb !== undefined ||
+          a2aPayloadLb !== undefined ||
+          freighterRoleSumLb !== undefined
         ? weights.payload.ok
         : !payloadFailed && weights.payload.ok;
     const ready = fuelOk && payloadOk;

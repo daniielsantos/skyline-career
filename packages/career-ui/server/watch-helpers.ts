@@ -1981,6 +1981,12 @@ export class CareerWatchSession {
           const preferA2aLvars =
             /a2a-/i.test(current.rolesPackRelPath ?? '') ||
             /a2a-/i.test(current.airframeTypeId ?? '');
+          // PMDG 737 packs: S10/S11 are galley — exclude from Loaded vs Due
+          // (Due is cargo + crew only). Same station map on BCF / BDSF / PAX / BBJ2.
+          const preferPmdgFreighterRoles =
+            /pmdg-738|pmdg-737|pmdg\/737/i.test(
+              current.rolesPackRelPath ?? '',
+            ) || /pmdg-738|pmdg-737/i.test(current.airframeTypeId ?? '');
           const keepFromMax = prevWatchPayload.stationMax
             ? Object.keys(prevWatchPayload.stationMax).map(Number)
             : undefined;
@@ -2054,6 +2060,11 @@ export class CareerWatchSession {
               ? adjustPlannedPayloadForLiveCrewStations({
                   cargoPlacedLb: cargoLb,
                   crewLb: crewFloorLb,
+                  // PMDG 737: crew is S7–S9 (not S1–S3). Without this, cargo on
+                  // S1–S3 looks like “full crew” and Due keeps 3×170 forever.
+                  ...(preferPmdgFreighterRoles
+                    ? { crewStations: [7, 8, 9] }
+                    : {}),
                   liveStations: stationsForCrew,
                 })
               : undefined;
@@ -2076,13 +2087,24 @@ export class CareerWatchSession {
                   return sum + (Number.isFinite(lb) ? lb : 0);
                 }, 0)
               : 0;
+          // PMDG 737: mission Due ignores galley S10/S11 (service). Sum S1–S9.
+          const pmdgRolePayloadLb =
+            preferPmdgFreighterRoles && load.stations
+              ? Object.entries(load.stations).reduce((sum, [key, lb]) => {
+                  const idx = Number(key);
+                  if (!Number.isFinite(idx) || idx < 1 || idx > 9) return sum;
+                  return sum + (Number.isFinite(lb) ? lb : 0);
+                }, 0)
+              : undefined;
           const livePayloadLb =
             load.payloadSource === 'tfdi-efb' &&
             typeof load.tfdiEfbCargoLb === 'number'
               ? load.tfdiEfbCargoLb + liveCrewLb
-              : load.payloadLb !== null
-                ? load.payloadLb
-                : (prevVerification.payload.liveLb ?? undefined);
+              : typeof pmdgRolePayloadLb === 'number'
+                ? pmdgRolePayloadLb
+                : load.payloadLb !== null
+                  ? load.payloadLb
+                  : (prevVerification.payload.liveLb ?? undefined);
           this.lastLiveFuelLb =
             typeof liveFuelLb === 'number' ? liveFuelLb : load.fuelLb;
           this.lastLivePayloadLb =

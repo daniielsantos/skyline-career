@@ -3177,6 +3177,11 @@ export function App() {
     string | null
   >(null);
   const preflightBootstrapErrorRef = useRef<string | null>(null);
+  /**
+   * Watch started before the first Preflight card (SAMPLING) — keep it off until
+   * /api/preflight lands so pollWatch cannot resurrect a stuck session.
+   */
+  const holdWatchOffForPreflightRef = useRef(false);
   /** Prevents a second /api/load-ofp while one is already in flight. */
   const ofpInjectInFlightRef = useRef(false);
   const loadOfpControlRef = useRef<{
@@ -4009,6 +4014,12 @@ export function App() {
         const status = await fetchWatchStatus();
         if (cancelled) return;
         setWatch((prev) => {
+          // First Preflight owns the pipe — ignore a resurrected server Watch
+          // until loadVerification exists (see holdWatchOffForPreflightRef).
+          if (holdWatchOffForPreflightRef.current && status.running) {
+            if (!prev || !prev.running) return prev;
+            return { ...prev, running: false };
+          }
           const justSettled =
             Boolean(prev?.running) &&
             !status.running &&
@@ -4984,6 +4995,9 @@ export function App() {
     if (!activeMission?.id || activeMission.lastPreflightCheck) {
       setPreflightBootstrapError(null);
       preflightBootstrapErrorRef.current = null;
+      if (activeMission?.lastPreflightCheck) {
+        holdWatchOffForPreflightRef.current = false;
+      }
     }
   }, [activeMission?.id, activeMission?.lastPreflightCheck]);
 
@@ -5001,16 +5015,19 @@ export function App() {
       return;
     }
     let cancelled = false;
+    // Drop UI Watch immediately — a hung SAMPLING tick can take seconds to
+    // abort; Preflight must not wait behind "Watch still holds SimBridge".
+    holdWatchOffForPreflightRef.current = true;
+    setWatch(null);
     void (async () => {
       try {
         await postWatchStop({ reset: true });
         if (!cancelled) {
-          setWatch(null);
           setToastKind('warn');
           setToast('Waiting for first Preflight before Watch…');
         }
       } catch {
-        /* soft */
+        /* soft — hold flag still blocks poll/auto-start */
       }
     })();
     return () => {
@@ -5051,6 +5068,7 @@ export function App() {
         Boolean(activeMission?.lastPreflightCheck?.loadVerification)) &&
       !alreadyWatching &&
       !watchAutoPaused &&
+      !holdWatchOffForPreflightRef.current &&
       !settlementBlocks &&
       // Inject owns the SimBridge pipe — do not auto-start Watch until inject
       // leaves waiting/loading (Watch tick is the Loaded vs Due owner afterward).

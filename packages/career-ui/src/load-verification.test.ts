@@ -115,10 +115,11 @@ describe('matchFuelOk', () => {
 
 describe('payloadMatchToleranceLb', () => {
   it('covers EFB station rounding on large freighter sheets', () => {
-    // Sim 64567 vs Due 64659 = 92 lb (~0.14%); flat 75 failed Ready.
+    // Sim 64567 vs Due 64659 = 92 lb; Cargo Level % can miss by ~160–200 lb.
     const tol = payloadMatchToleranceLb(64_659);
-    assert.ok(tol >= 92);
+    assert.ok(tol >= 200);
     assert.equal(Math.abs(64_567 - 64_659) <= tol, true);
+    assert.equal(Math.abs(39_811 - 39_971) <= payloadMatchToleranceLb(39_971), true);
     assert.equal(payloadMatchToleranceLb(1_000), 75);
   });
 });

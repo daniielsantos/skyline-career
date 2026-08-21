@@ -111,7 +111,7 @@ describe('pushCruiseTick', () => {
     assert.equal(cruiseSampleStatus(state, opts).phase, 'collecting');
   });
 
-  it('ignores abrupt fuel-flow spikes without clearing the window', () => {
+  it('ignores abrupt upward fuel-flow spikes without clearing the window', () => {
     let state = createCruiseSampleState();
     const opts = { minStableMs: 60_000 };
     for (let i = 0; i < 5; i += 1) {
@@ -131,6 +131,28 @@ describe('pushCruiseTick', () => {
     assert.ok(
       state.window.every((t) => Math.abs((t.fuelFlowKgPerHour ?? 0) - 58.7) < 0.1),
     );
+  });
+
+  it('restarts the window after a real throttle/speed fuel-flow cut', () => {
+    let state = createCruiseSampleState();
+    const opts = { minStableMs: 180_000 };
+    for (let i = 0; i <= 18; i += 1) {
+      state = pushCruiseTick(
+        state,
+        tick(i * 5_000, { tasKt: 420, fuelFlowKgPerHour: 3200 }),
+        opts,
+      ).state;
+    }
+    assert.equal(cruiseSampleStatus(state, opts).elapsedMs, 90_000);
+    // ~50% flow drop used to freeze elapsed against the old median.
+    state = pushCruiseTick(
+      state,
+      tick(95_000, { tasKt: 360, fuelFlowKgPerHour: 1600 }),
+      opts,
+    ).state;
+    assert.equal(state.window.length, 1);
+    assert.equal(cruiseSampleStatus(state, opts).elapsedMs, 0);
+    assert.equal(state.window[0]!.fuelFlowKgPerHour, 1600);
   });
 });
 

@@ -739,9 +739,12 @@
     "rolesPackRelPath": "profiles/ofp/inibuilds-boeing-b707-gns.json",
     "simbriefIcao": "B703",
     "simbriefAirframeMatch": "Default",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 194,
     "oewKg": 67268,
     "mtowKg": 151318,
-    "maxCargoKg": 33974,
+    "maxCargoKg": 29329,
     "fuelCapacityKg": 72497,
     "maxRangeNm": 800,
     "fuelBurnKgPerNm": 5

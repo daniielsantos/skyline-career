@@ -4216,7 +4216,7 @@ export function createCareerApiServer(port = 8787) {
         const amountUsd =
           typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
             ? Math.round(body.amountUsd * 100) / 100
-            : 100_000;
+            : 1_000_000;
         if (amountUsd === 0) {
           send(res, 400, { error: 'amountUsd must be non-zero' });
           return;

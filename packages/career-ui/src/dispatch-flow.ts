@@ -243,6 +243,8 @@ export function resolveLoadPath(
   preferManualLoad: boolean,
 ): LoadPath {
   if (preferManualLoad) return 'manual';
+  // Prefer server-stamped policy (withMissionLoadPolicy / airframe injectCapable).
+  // Class fallback only when the mission never got a loadMethod.
   const method =
     mission.loadMethod === 'native-simbrief' ||
     mission.loadMethod === 'direct-injection'
@@ -259,6 +261,34 @@ export function resolveLoadPath(
   if (method === 'direct-injection' && injectCapable) return 'inject';
   if (method === 'native-simbrief') return 'efb';
   return 'manual';
+}
+
+/** Copy when Load has no lastPreflightCheck yet (EFB / inject / manual). */
+export function livePreflightWaitHint(input: {
+  bootstrapError?: string | null;
+  simBridgeConnected: boolean;
+  onGround: boolean | null | undefined;
+  watchRunning: boolean;
+  aircraftLabel: string;
+  liveAircraftTitle?: string | null;
+}): string {
+  if (input.bootstrapError?.trim()) {
+    return `Preflight error: ${input.bootstrapError.trim()}`;
+  }
+  if (input.watchRunning) {
+    return 'Watch still holds SimBridge — releasing for the first Preflight…';
+  }
+  if (!input.simBridgeConnected) {
+    return `SimBridge is offline — start the bridge, then load the ${input.aircraftLabel} at the origin.`;
+  }
+  if (input.onGround === false) {
+    return 'MSFS reports airborne — Preflight only runs on the ground.';
+  }
+  const live = input.liveAircraftTitle?.trim();
+  if (live) {
+    return `Reading “${live}”… the Preflight card opens when the first sample lands (usually a few seconds).`;
+  }
+  return `SimBridge is up, but no aircraft title yet — load the ${input.aircraftLabel} at the gate (cold & dark is fine).`;
 }
 
 export function ofpAccepted(mission: Mission): boolean {
@@ -445,9 +475,27 @@ export function dispatchStepStatusLine(input: {
         return 'Enable Skyline inject in Preflight to write fuel & payload — Loaded vs Due updates live.';
       }
       if (input.loadPath === 'efb') {
-        return 'Import the OFP in the aircraft EFB/FMC. Waiting for live preflight…';
+        if (input.mission?.lastPreflightCheck) {
+          return 'EFB import path — fix Loaded vs Due below (re-import weights if needed).';
+        }
+        return livePreflightWaitHint({
+          bootstrapError: null,
+          simBridgeConnected: input.simBridgeConnected,
+          onGround: input.watchOnGround,
+          watchRunning: input.watchRunning,
+          aircraftLabel: 'aircraft',
+        });
       }
-      return 'Set fuel and payload in Mass & Balance / EFB. Waiting for live preflight…';
+      if (input.mission?.lastPreflightCheck) {
+        return 'Manual load path — fix Loaded vs Due below.';
+      }
+      return livePreflightWaitHint({
+        bootstrapError: null,
+        simBridgeConnected: input.simBridgeConnected,
+        onGround: input.watchOnGround,
+        watchRunning: input.watchRunning,
+        aircraftLabel: 'aircraft',
+      });
     case 'ready':
       if (input.watchRunning) {
         return 'Preflight ready · Watch connected — take off in MSFS; departure is detected automatically.';

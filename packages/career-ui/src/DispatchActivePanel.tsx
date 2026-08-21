@@ -4,6 +4,7 @@ import {
   DISPATCH_STEP_LABEL,
   DISPATCH_STEP_ORDER,
   isOfpCargoUnderOnlyFailureUi,
+  livePreflightWaitHint,
   ofpCargoKgFromUnderFinding,
   type DispatchStepId,
   type LoadPath,
@@ -20,6 +21,8 @@ import { IcaoLink } from './IcaoLink';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
   formatPayloadDueLine,
+  fuelMatchToleranceLb,
+  payloadMatchToleranceLb,
   pickFuelTankBreakdown,
   pickLivePayloadLb,
   pickStableLiveFuelLb,
@@ -211,6 +214,15 @@ export function DispatchActivePanel(props: {
     props.preflightBootstrapError &&
       /purchased airframe|does not match/i.test(props.preflightBootstrapError),
   );
+  const watchRunningForMission = Boolean(props.watch?.running);
+  const preflightWaitHint = livePreflightWaitHint({
+    bootstrapError: props.preflightBootstrapError,
+    simBridgeConnected: Boolean(props.simBridge?.connected),
+    onGround: props.simBridge?.onGround,
+    watchRunning: watchRunningForMission,
+    aircraftLabel: assignedAircraft,
+    liveAircraftTitle,
+  });
   const isFerryLeg = flightKind === 'Ferry';
   const isEnRoute = step === 'en_route';
   const routeDistanceNm =
@@ -248,18 +260,6 @@ export function DispatchActivePanel(props: {
 
   const primaryCta = (() => {
     if (step === 'flight_plan') {
-      if (!simbriefUser.trim()) {
-        return (
-          <button
-            type="button"
-            className="accept"
-            disabled={busy}
-            onClick={props.onSelectSettings}
-          >
-            Set SimBrief user
-          </button>
-        );
-      }
       if (ofpCargoUnderOnly) {
         return (
           <>
@@ -282,21 +282,52 @@ export function DispatchActivePanel(props: {
               onClick={() => props.onDispatch(mission)}
               title="Open SimBrief with the current cargo"
             >
-              {mission.status === 'accepted' ? 'Open SimBrief' : 'Re-open SimBrief'}
+              {busy ? (
+                <>
+                  <span className="busy-spinner busy-spinner-sm" aria-hidden="true" />
+                  Opening…
+                </>
+              ) : mission.status === 'accepted' ? (
+                'Open SimBrief'
+              ) : (
+                'Re-open SimBrief'
+              )}
             </button>
           </>
         );
       }
       return (
-        <button
-          type="button"
-          className="accept"
-          disabled={busy}
-          onClick={() => props.onDispatch(mission)}
-          title="Open SimBrief with the current cargo"
-        >
-          {mission.status === 'accepted' ? 'Open SimBrief' : 'Re-open SimBrief'}
-        </button>
+        <>
+          <button
+            type="button"
+            className="accept"
+            disabled={busy}
+            onClick={() => props.onDispatch(mission)}
+            title="Open SimBrief dispatch in your browser"
+          >
+            {busy ? (
+              <>
+                <span className="busy-spinner busy-spinner-sm" aria-hidden="true" />
+                {mission.status === 'accepted' ? 'Opening…' : 'Re-opening…'}
+              </>
+            ) : mission.status === 'accepted' ? (
+              'Open SimBrief'
+            ) : (
+              'Re-open SimBrief'
+            )}
+          </button>
+          {!simbriefUser.trim() ? (
+            <button
+              type="button"
+              className="action ghost"
+              disabled={busy}
+              onClick={props.onSelectSettings}
+              title="Needed for auto-confirm after you generate the OFP"
+            >
+              Set SimBrief user
+            </button>
+          ) : null}
+        </>
       );
     }
     if (step === 'fuel') {
@@ -651,19 +682,32 @@ export function DispatchActivePanel(props: {
         : null}
 
       {step === 'flight_plan' && !mission.lastOfpCheck ? (
-        <div className="dispatch-step-card" aria-live="polite">
-          <strong>
-            {!simbriefUser.trim()
-              ? 'SimBrief username required'
-              : props.ofpAutoStatus === 'checking'
-                ? 'Checking SimBrief for OFP…'
-                : 'Waiting for OFP'}
-          </strong>
-          <p>
-            {!simbriefUser.trim()
-              ? 'Set your username in Settings, then open SimBrief from the primary action.'
-              : 'Generate the OFP in SimBrief. Skyline confirms automatically every 10 seconds while Dispatch is open.'}
-          </p>
+        <div className="dispatch-step-card dispatch-step-card-loading" aria-live="polite">
+          {simbriefUser.trim() &&
+          (props.ofpAutoStatus === 'checking' ||
+            props.ofpAutoStatus === 'waiting') ? (
+            <span className="busy-spinner busy-spinner-sm" aria-hidden="true" />
+          ) : null}
+          <div>
+            <strong>
+              {!simbriefUser.trim()
+                ? 'SimBrief username required'
+                : busy
+                  ? 'Building SimBrief link…'
+                  : props.ofpAutoStatus === 'checking'
+                    ? 'Checking SimBrief for OFP…'
+                    : props.ofpAutoStatus === 'waiting'
+                      ? 'Waiting for OFP'
+                      : 'Waiting for OFP'}
+            </strong>
+            <p>
+              {!simbriefUser.trim()
+                ? 'Set your username in Settings, then open SimBrief from the primary action.'
+                : busy
+                  ? 'Preparing the dispatch URL — SimBrief opens when this finishes.'
+                  : 'Generate the OFP in SimBrief. Skyline confirms automatically every few seconds while Dispatch is open — switch back here after Generate.'}
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -742,14 +786,17 @@ export function DispatchActivePanel(props: {
             ) : null}
           </div>
         ) : (
-          <div className="dispatch-step-card" aria-live="polite">
-            <strong>Checking persisted aircraft fuel…</strong>
-            <p>Comparing the career tank with OFP block fuel.</p>
-            {props.mxFuelBurnAlert ? (
-              <p className="banner warn mx-fuel-burn-alert" role="status">
-                {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
-              </p>
-            ) : null}
+          <div className="dispatch-step-card dispatch-step-card-loading" aria-live="polite">
+            <span className="busy-spinner busy-spinner-sm" aria-hidden="true" />
+            <div>
+              <strong>Checking persisted aircraft fuel…</strong>
+              <p>Comparing the career tank with OFP block fuel.</p>
+              {props.mxFuelBurnAlert ? (
+                <p className="banner warn mx-fuel-burn-alert" role="status">
+                  {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
+                </p>
+              ) : null}
+            </div>
           </div>
         )
       ) : null}
@@ -763,9 +810,29 @@ export function DispatchActivePanel(props: {
           </strong>
           <p>
             {loadPath === 'efb'
-              ? `Use Import SimBrief / Load OFP on the ${assignedAircraft} EFB or FMC. Waiting for live preflight…`
-              : `Set fuel and payload on the ${assignedAircraft} in Mass & Balance / EFB. Waiting for live preflight…`}
+              ? `Use Import SimBrief / Load OFP on the ${assignedAircraft} EFB or FMC.`
+              : `Set fuel and payload on the ${assignedAircraft} in Mass & Balance / EFB.`}
           </p>
+          {!mission.lastPreflightCheck ? (
+            <p
+              className={
+                props.preflightBootstrapError
+                  ? 'dispatch-preflight-wait-error'
+                  : 'dispatch-preflight-wait'
+              }
+            >
+              {!props.preflightBootstrapError ? (
+                <span className="busy-spinner busy-spinner-sm" aria-hidden="true" />
+              ) : null}{' '}
+              {preflightWaitHint}
+            </p>
+          ) : mission.lastPreflightCheck.verdict === 'fail' ||
+            mission.lastPreflightCheck.verdict === 'warn' ? (
+            <p className="dispatch-preflight-wait-hint">
+              Preflight already sampled — Loaded vs Due is below. Re-import
+              weights if the sim still does not match Due.
+            </p>
+          ) : null}
           {props.mxFuelBurnAlert ? (
             <p className="banner warn mx-fuel-burn-alert" role="status">
               {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
@@ -794,17 +861,7 @@ export function DispatchActivePanel(props: {
               </div>
             ) : null}
           </dl>
-          <p>
-            {props.preflightBootstrapError
-              ? props.preflightBootstrapError
-              : !props.simBridge?.connected
-                ? `SimBridge is offline — start the bridge, then load the ${assignedAircraft} at the origin.`
-                : props.simBridge.onGround === false
-                  ? 'MSFS reports airborne — Preflight only runs on the ground.'
-                  : liveAircraftTitle
-                    ? `Reading “${liveAircraftTitle}”… the Preflight card opens when the first sample lands (engines can be off).`
-                    : `SimBridge is up, but no aircraft title yet — load the ${assignedAircraft} at the gate (cold & dark is fine; main menu / world map is not).`}
-          </p>
+          <p>{preflightWaitHint}</p>
           {props.mxFuelBurnAlert ? (
             <p className="banner warn mx-fuel-burn-alert" role="status">
               {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
@@ -879,14 +936,23 @@ export function DispatchActivePanel(props: {
                       baseVerification.cg;
                     // Recompute ok from live numbers so a stale ready flag cannot stick.
                     // Fuel undershoot (taxi burn) is allowed; overshoot stays tight.
-                    const fuelTol = 50;
-                    const payloadTol = 75;
+                    // Match server: abs floor + 3% of Due (not a flat 50 lb).
+                    const fuelTol = fuelMatchToleranceLb(
+                      baseVerification.fuel.plannedLb,
+                    );
+                    const payloadTol = payloadMatchToleranceLb(
+                      baseVerification.payload.plannedLb,
+                    );
+                    const taxiBurnLb =
+                      watchFuel.taxiBurnLb ??
+                      baseVerification.fuel.taxiBurnLb;
                     const fuelOk =
                       baseVerification.fuel.plannedLb === undefined ||
                       matchFuelOk(
                         liveFuelLb,
                         baseVerification.fuel.plannedLb,
                         fuelTol,
+                        taxiBurnLb,
                       );
                     const payloadOk =
                       baseVerification.payload.plannedLb === undefined
@@ -1055,12 +1121,18 @@ export function DispatchActivePanel(props: {
             const fuelNumbersOk =
               !view ||
               view.fuel.plannedLb === undefined ||
-              matchFuelOk(view.fuel.liveLb ?? 0, view.fuel.plannedLb, 50);
+              matchFuelOk(
+                view.fuel.liveLb ?? 0,
+                view.fuel.plannedLb,
+                fuelMatchToleranceLb(view.fuel.plannedLb),
+                view.fuel.taxiBurnLb,
+              );
             const payloadNumbersOk =
               !view ||
               view.payload.plannedLb === undefined ||
               view.payload.liveLb === undefined ||
-              Math.abs(view.payload.liveLb - view.payload.plannedLb) <= 75;
+              Math.abs(view.payload.liveLb - view.payload.plannedLb) <=
+                payloadMatchToleranceLb(view.payload.plannedLb);
             // After wheels-up, fuel/payload no longer gate departure — but the
             // tiles must still show honest Sim vs Due (not fake green ✓).
             const enRoute = step === 'en_route';
@@ -1696,8 +1768,9 @@ export function DispatchActivePanel(props: {
               <button
                 type="button"
                 className="action ghost"
-                disabled={busy || !simbriefUser.trim()}
+                disabled={busy}
                 onClick={() => props.onDispatch(mission)}
+                title="Open SimBrief dispatch in your browser"
               >
                 Re-open SimBrief
               </button>

@@ -126,6 +126,7 @@ import {
 import { useConfirm } from './ConfirmDialog';
 import { ContractPilotPick } from './ContractPilotPick';
 import { FboRerouteDialog } from './FboRerouteDialog';
+import { PilotTravelDialog } from './PilotTravelDialog';
 import { PortsPanel } from './PortsPanel';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
@@ -314,9 +315,7 @@ type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
 type AccessFilter = '' | 'open' | 'locked';
 type LaneFilter = '' | 'intl' | 'domestic' | 'bush';
 
-const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [
-  { key: 'access', direction: 'asc' },
-];
+const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [];
 
 /** Origins within this nm of the pilot / parked aircraft (matches LAST_MILE_MAX_NM). */
 const BOARD_NEAR_MAX_NM = 600;
@@ -353,35 +352,17 @@ function compareAirportLot(
   }
 }
 
-const BOARD_METRIC_SORT_KEYS: ReadonlySet<MarketSortKey> = new Set([
-  'distance',
-  'cargo',
-  'load',
-  'expires',
-  'pay',
-  'net',
-]);
-
 function sortAirportLots(
   lots: readonly AirportLot[],
   sorts: MarketSortLevel[],
   isLocked: (commodityId: string) => boolean,
   hangarEmpty: boolean,
 ): AirportLot[] {
-  const access = sorts.find((level) => level.key === 'access');
-  const rest = sorts.filter((level) => level.key !== 'access');
-  const metricPrimary =
-    sorts[0] != null && BOARD_METRIC_SORT_KEYS.has(sorts[0].key);
-  const levels: MarketSortLevel[] =
-    sorts.length === 0
-      ? DEFAULT_BOARD_SORTS
-      : metricPrimary
-        ? sorts
-        : [access ?? { key: 'access', direction: 'asc' }, ...rest];
+  if (sorts.length === 0) return [...lots];
   return lots
     .map((lot, index) => ({ lot, index }))
     .sort((a, b) => {
-      for (const level of levels) {
+      for (const level of sorts) {
         const comparison = compareAirportLot(
           a.lot,
           b.lot,
@@ -409,7 +390,7 @@ function formatMarketSortParam(sorts: MarketSortLevel[]): string {
   return sorts.map((level) => `${level.key}:${level.direction}`).join(',');
 }
 
-/** Promote a metric column to primary; keep Access as final tiebreak. */
+/** Promote a metric column to primary; third click clears it. */
 function withMetricPrimarySort(
   current: MarketSortLevel[],
   key: MarketSortKey,
@@ -419,20 +400,14 @@ function withMetricPrimarySort(
     key === 'pay' || key === 'net' || key === 'load' ? 'desc' : 'asc';
   const flipped: SortDirection = preferred === 'asc' ? 'desc' : 'asc';
   const existing = current.find((level) => level.key === key);
-  const access =
-    current.find((level) => level.key === 'access') ??
-    ({ key: 'access' as const, direction: 'asc' as const });
-  const others = current.filter(
-    (level) => level.key !== key && level.key !== 'access',
-  );
+  const others = current.filter((level) => level.key !== key);
   if (!existing) {
-    return [{ key, direction: preferred }, access, ...others];
+    return [{ key, direction: preferred }, ...others];
   }
   if (existing.direction === preferred) {
-    return [{ key, direction: flipped }, access, ...others];
+    return [{ key, direction: flipped }, ...others];
   }
-  // Third click clears the metric; fall back to Access (+ any other levels).
-  return others.length > 0 ? [access, ...others] : [access];
+  return others;
 }
 const FLEET_PAGE_SIZE = 10;
 const MAX_STAGING_LOTS = 5;
@@ -2046,15 +2021,85 @@ function loadSimbriefUser(): string {
 }
 
 /** Open SimBrief in the OS browser — never navigate the Skyline window. */
-function openSimBriefDispatchUrl(url: string): void {
+async function openSimBriefDispatchUrl(url: string): Promise<boolean> {
   const href = url.trim();
-  if (!href || !/^https?:\/\//i.test(href)) return;
+  if (!href || !/^https?:\/\//i.test(href)) return false;
   const desktop = window.skylineDesktop;
   if (desktop?.openExternal) {
-    void desktop.openExternal(href);
-    return;
+    try {
+      const result = await desktop.openExternal(href);
+      if (result?.ok) return true;
+      // One retry — first Open after /api/dispatch sometimes races the shell.
+      const retry = await desktop.openExternal(href);
+      if (retry?.ok) return true;
+    } catch {
+      // Fall through to window.open.
+    }
   }
-  window.open(href, '_blank', 'noopener,noreferrer');
+  // Prefer a real http window.open. Avoid "noopener" in features — it makes
+  // the return value null even on success. Electron denies the window but may
+  // still forward http to the OS via setWindowOpenHandler.
+  try {
+    const win = window.open(href, '_blank');
+    if (win) {
+      try {
+        win.opener = null;
+      } catch {
+        /* ignore */
+      }
+      return true;
+    }
+  } catch {
+    /* popup blocked */
+  }
+  const gestureActive =
+    typeof navigator !== 'undefined' &&
+    Boolean(navigator.userActivation?.isActive);
+  if (!gestureActive) return false;
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * First Open must await /api/dispatch (no URL yet). Hold a blank tab under the
+ * click gesture in the browser; desktop relies on IPC after the await.
+ */
+function reserveSimBriefBrowserTab(): Window | null {
+  if (window.skylineDesktop?.openExternal) return null;
+  try {
+    return window.open('about:blank', '_blank');
+  } catch {
+    return null;
+  }
+}
+
+function navigateReservedSimBriefTab(
+  pending: Window | null,
+  href: string,
+): boolean {
+  if (!pending || pending.closed) return false;
+  try {
+    pending.location.href = href;
+    return true;
+  } catch {
+    try {
+      pending.close();
+    } catch {
+      /* ignore */
+    }
+    return false;
+  }
 }
 
 function readLastFboIcao(): string | null {
@@ -3030,6 +3075,7 @@ export function App() {
   /** Local Freights board refresh — not the app-wide `busy` lock. */
   const [marketBoardLoading, setMarketBoardLoading] = useState(false);
   /** Kept in a ref so `refresh` stays stable while board query params change. */
+  /** Last /api/market query that successfully painted the Freights board. */
   const marketFetchOptsRef = useRef({
     originQuery: '',
     destQuery: '',
@@ -3051,10 +3097,19 @@ export function App() {
     nearMaxNm: '' as number | string,
     aircraft: undefined as AircraftClass | undefined,
   });
+  /**
+   * Live filter intent (updated synchronously on edit). Live polls must read
+   * this — not marketFetchOptsRef — or a clear/reselect races the last paint.
+   */
+  const marketBoardIntentRef = useRef(marketFetchOptsRef.current);
+  /** Bumps when Freights filters change so in-flight / poll responses can't clobber. */
+  const marketFetchSeqRef = useRef(0);
   const tabRef = useRef(tab);
   tabRef.current = tab;
-  /** First `/api/state` for this profile has landed (fleet known). */
+  /** First scoped refresh after profile select finished (wallet/missions painted). */
   const careerReadyRef = useRef(false);
+  /** False until the first scoped refresh after profile select finishes. */
+  const [careerReady, setCareerReady] = useState(false);
   /** Avoid double bootstrap refresh (profile select + Strict Mode). */
   const bootProfileKeyRef = useRef<string | null>(null);
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
@@ -3100,6 +3155,10 @@ export function App() {
     setToastState({ id: toastSeqRef.current, text });
   }, []);
   const [simbriefUser, setSimbriefUser] = useState(loadSimbriefUser);
+  /** Last successful /api/dispatch SimBrief URL for the active mission. */
+  const [simbriefLaunchUrl, setSimbriefLaunchUrl] = useState<string | null>(
+    null,
+  );
   const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
   const [devMode, setDevMode] = useState(loadDevMode);
   const [ofpAutoStatus, setOfpAutoStatus] =
@@ -3239,8 +3298,11 @@ export function App() {
   const [companyCredit, setCompanyCredit] =
     useState<CompanyCreditSnapshot | null>(null);
   const [hubOptions, setHubOptions] = useState<StarterHubOption[]>([]);
-  const [ferryDest, setFerryDest] = useState('');
-  const [travelDest, setTravelDest] = useState('');
+  const [ferrySeed, setFerrySeed] = useState<{
+    dest: string;
+    token: number;
+  } | null>(null);
+  const [pilotTravelOpen, setPilotTravelOpen] = useState(false);
   const [pilotName, setPilotName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [pilotIcao, setPilotIcao] = useState('');
@@ -3426,29 +3488,67 @@ export function App() {
     const state = await fetchState();
     if (state.needsProfile) {
       setShowProfileGate(true);
+      setCareerReady(false);
+      careerReadyRef.current = false;
       return;
     }
     const full = scope == null;
     const bootstrapping = !careerReadyRef.current;
+    // First paint after login: only load what the restored tab needs. A full
+    // dump (market + aircraft board + NPC) was blocking Dispatch for ~10s with
+    // $0 wallet and a fake empty flight.
+    const effectiveScope =
+      bootstrapping && full
+        ? liveRefreshScope(tabRef.current, Boolean(airportIcao))
+        : scope;
+    const scopedFull = effectiveScope == null;
     const boardOwnsMarket =
       tabRef.current === 'market' || Boolean(airportIcao);
-    // Board effect issues /api/market with the live filters. Skip the unfiltered
-    // bootstrap copy so we don't fetch twice when fleet hydrates.
     const wantMarket =
-      (full || scope.market === true) &&
+      (scopedFull || effectiveScope?.market === true) &&
       !(bootstrapping && boardOwnsMarket);
-    const wantMissions = full || scope.missions === true;
-    const wantNpc = full || scope.npc === true;
-    const wantAircraft = full || scope.aircraftMarket === true;
+    const marketSeqAtFetch = marketFetchSeqRef.current;
+    const wantMissions = scopedFull || effectiveScope?.missions === true;
+    const wantNpc = scopedFull || effectiveScope?.npc === true;
+    const wantAircraft = scopedFull || effectiveScope?.aircraftMarket === true;
     if (wantAircraft) setAircraftMarketLoading(true);
     try {
-    const wantBush = full || scope.bushTrips === true;
-    const wantAirport = Boolean(airportIcao) && (full || scope?.airport === true);
+    const wantBush = scopedFull || effectiveScope?.bushTrips === true;
+    const wantAirport =
+      Boolean(airportIcao) &&
+      (scopedFull || effectiveScope?.airport === true);
+    // Paint wallet/fleet/pilot from /api/state immediately so the sidebar is
+    // not stuck at $0 / "—" while missions (or other scoped fetches) finish.
+    const clientNow = Date.now();
+    const serverNow = state.serverNowMs ?? clientNow;
+    setServerOffsetMs(serverNow - clientNow);
+    setTick(state.tick);
+    setLastBatchAtMs(state.lastBatchAtMs ?? serverNow);
+    setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
+    setDisplayNowMs(serverNow);
+    setWallet(state.walletUsd);
+    setCargoOps(state.cargoOps ?? null);
+    setClassOps(state.classOps ?? null);
+    if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
+    if (state.offlineFeeSummary) {
+      setOfflineFeeBanner(state.offlineFeeSummary);
+    }
+    setHubSelected(Boolean(state.hubSelected));
+    setFleet(state.fleet ?? []);
+    setHubOptions(normalizeStarterHubs(state.hubs));
+    setPilotName(state.pilotName ?? '');
+    setHomeHubIcao(state.homeHubIcao ?? '');
+    setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
+    if (state.cashflow) setCashflow(state.cashflow);
+    if (state.companyCredit) setCompanyCredit(state.companyCredit);
+    if (state.playerFbos) setPlayerFbos(state.playerFbos);
+    if (state.companyCrew) setCompanyCrew(state.companyCrew);
+
     const [market, missionState, npcState, acMarket] = await Promise.all([
       wantMarket
         ? fetchMarket(
-            marketFetchOptsRef.current.aircraft,
-            marketFetchOptsRef.current,
+            marketBoardIntentRef.current.aircraft,
+            marketBoardIntentRef.current,
           )
         : Promise.resolve(null),
       wantMissions ? fetchMissions() : Promise.resolve(null),
@@ -3460,30 +3560,25 @@ export function App() {
         : Promise.resolve(null),
     ]);
     if (wantBush) void refreshBushTrips();
-    const clientNow = Date.now();
-    const serverNow = state.serverNowMs ?? clientNow;
-    setServerOffsetMs(serverNow - clientNow);
-    setTick(state.tick);
-    setLastBatchAtMs(state.lastBatchAtMs ?? serverNow);
-    setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
-    setDisplayNowMs(serverNow);
-    setWallet(missionState?.walletUsd ?? state.walletUsd);
-    setCargoOps(state.cargoOps ?? null);
-    setClassOps(state.classOps ?? null);
-    if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
-    if (state.offlineFeeSummary) {
-      setOfflineFeeBanner(state.offlineFeeSummary);
+    if (missionState && typeof missionState.walletUsd === 'number') {
+      setWallet(missionState.walletUsd);
     }
     if (market) {
-      setLots(market.lots);
-      setMarketTotalLots(market.totalLots ?? market.lots.length);
-      setMarketPageCount(market.pageCount ?? 1);
-      if (market.page && market.page !== marketFetchOptsRef.current.page) {
-        setMarketPage(market.page);
-        marketFetchOptsRef.current = {
-          ...marketFetchOptsRef.current,
-          page: market.page,
-        };
+      // Drop late polls that raced a filter edit (seq bumped in the board effect).
+      if (marketSeqAtFetch === marketFetchSeqRef.current) {
+        const intent = marketBoardIntentRef.current;
+        setLots(market.lots);
+        setMarketTotalLots(market.totalLots ?? market.lots.length);
+        setMarketPageCount(market.pageCount ?? 1);
+        marketFetchOptsRef.current = intent;
+        if (market.page && market.page !== intent.page) {
+          setMarketPage(market.page);
+          marketFetchOptsRef.current = {
+            ...intent,
+            page: market.page,
+          };
+          marketBoardIntentRef.current = marketFetchOptsRef.current;
+        }
       }
       setMarketEvents(market.events ?? []);
       if (!npcState?.activity.length) {
@@ -3515,16 +3610,6 @@ export function App() {
     if (missionState) {
       setMissions(missionState.missions.slice().reverse());
     }
-    setHubSelected(Boolean(state.hubSelected));
-    setFleet(state.fleet ?? []);
-    setHubOptions(normalizeStarterHubs(state.hubs));
-    setPilotName(state.pilotName ?? '');
-    setHomeHubIcao(state.homeHubIcao ?? '');
-    setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
-    if (state.cashflow) setCashflow(state.cashflow);
-    if (state.companyCredit) setCompanyCredit(state.companyCredit);
-    if (state.playerFbos) setPlayerFbos(state.playerFbos);
-    if (state.companyCrew) setCompanyCrew(state.companyCrew);
     if (acMarket) {
       setAircraftListings(acMarket.listings);
       setAircraftDeliveryQuotes(acMarket.deliveryQuotes ?? {});
@@ -3554,6 +3639,7 @@ export function App() {
       setAirportView(view);
     }
     careerReadyRef.current = true;
+    setCareerReady(true);
     } finally {
       if (wantAircraft) setAircraftMarketLoading(false);
     }
@@ -3651,11 +3737,14 @@ export function App() {
     if (showProfileGate) {
       bootProfileKeyRef.current = null;
       careerReadyRef.current = false;
+      setCareerReady(false);
       return;
     }
     if (!activeCareerProfile) return;
     if (bootProfileKeyRef.current === activeCareerProfile.id) return;
     bootProfileKeyRef.current = activeCareerProfile.id;
+    careerReadyRef.current = false;
+    setCareerReady(false);
     void refreshRef.current().catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       if (!isNeedsProfileMessage(message)) setError(message);
@@ -3730,6 +3819,11 @@ export function App() {
       return;
     }
 
+    // Intent updates immediately; last-fetched stays until paint so a fleet
+    // identity bump mid-debounce still sees "changed" and reschedules.
+    marketBoardIntentRef.current = nextOpts;
+    const fetchSeq = ++marketFetchSeqRef.current;
+
     let cancelled = false;
     const typingIcao =
       prev.originQuery !== nextOpts.originQuery ||
@@ -3742,28 +3836,30 @@ export function App() {
       setMarketBoardLoading(true);
       void fetchMarket(nextOpts.aircraft, nextOpts)
         .then((market) => {
-          if (cancelled) return;
+          if (cancelled || fetchSeq !== marketFetchSeqRef.current) return;
           marketFetchOptsRef.current = nextOpts;
+          marketBoardIntentRef.current = nextOpts;
           setLots(market.lots);
           setMarketTotalLots(market.totalLots ?? market.lots.length);
           setMarketPageCount(market.pageCount ?? 1);
           if (market.page && market.page !== nextOpts.page) {
             setMarketPage(market.page);
-            marketFetchOptsRef.current = {
-              ...nextOpts,
-              page: market.page,
-            };
+            const paged = { ...nextOpts, page: market.page };
+            marketFetchOptsRef.current = paged;
+            marketBoardIntentRef.current = paged;
           }
         })
         .catch((err: unknown) => {
-          if (cancelled) return;
+          if (cancelled || fetchSeq !== marketFetchSeqRef.current) return;
           const message = err instanceof Error ? err.message : String(err);
           if (!isNeedsProfileMessage(message)) setError(message);
         })
         .finally(() => {
-          if (!cancelled) setMarketBoardLoading(false);
+          if (!cancelled && fetchSeq === marketFetchSeqRef.current) {
+            setMarketBoardLoading(false);
+          }
         });
-    }, 250);
+    }, debounceMs);
     return () => {
       cancelled = true;
       clearTimeout(timer);
@@ -3792,6 +3888,7 @@ export function App() {
     homeHubIcao,
     tab,
     airportIcao,
+    careerReady,
   ]);
 
   useEffect(() => {
@@ -3876,13 +3973,18 @@ export function App() {
   }, [serverOffsetMs]);
 
   // Live board: poll only what the open view needs (not the whole career dump).
+  // Freights needs periodic lot refresh (expiry / new freight), but not as often
+  // as Fleet NPC motion — and never while the tab is hidden.
   useEffect(() => {
     if (tab !== 'fleet' && tab !== 'market' && !airportIcao) return;
+    const intervalMs =
+      tab === 'market' || airportIcao ? 30_000 : 15_000;
     const id = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       void refresh(liveRefreshScope(tab, Boolean(airportIcao))).catch(() => {
         /* ignore background refresh errors */
       });
-    }, 15_000);
+    }, intervalMs);
     return () => window.clearInterval(id);
   }, [tab, airportIcao, refresh]);
 
@@ -4375,6 +4477,10 @@ export function App() {
   );
   activeMissionRef.current = activeMission;
 
+  useEffect(() => {
+    setSimbriefLaunchUrl(null);
+  }, [activeMission?.id]);
+
   // Reopen with a pilot in_flight mission → land on Dispatch once (Watch resume
   // also runs off-tab, but settle / progress live here).
   useEffect(() => {
@@ -4560,12 +4666,19 @@ export function App() {
     }
 
     void pollOfp();
+    // 3s while waiting — 10s felt like the app froze after generating in SimBrief.
+    // Also re-check the moment the user returns to Skyline from the browser.
     const id = window.setInterval(() => {
       void pollOfp();
-    }, 10_000);
+    }, 3_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void pollOfp();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [
     activeMission?.id,
@@ -4614,13 +4727,19 @@ export function App() {
         const result = await postFuelQuote(mission.id);
         if (cancelled) return;
         if (result.quote.shortfallKg <= 0) {
-          await postFuelPurchase(mission.id);
+          const purchased = await postFuelPurchase(mission.id);
           if (cancelled) return;
+          setMissions((current) =>
+            current.map((m) =>
+              m.id === purchased.mission.id ? purchased.mission : m,
+            ),
+          );
+          setFleet(purchased.fleet);
+          setWallet(purchased.walletUsd);
           setMissionFuelQuote(null);
           setMissionFuelQuoteStatus('ready');
           setToastKind('ok');
           setToast('Persisted aircraft fuel covers the OFP · continuing automatically');
-          await refresh();
           return;
         }
         setMissionFuelQuote(result);
@@ -4649,7 +4768,6 @@ export function App() {
     activeMission?.lastOfpCheck?.verdict,
     airportIcao,
     missionFuelQuoteRetryToken,
-    refresh,
     tab,
   ]);
 
@@ -4782,6 +4900,9 @@ export function App() {
     // Match deriveDispatchStep: contract-pilot skips fuel purchase, so do not
     // require fuelAuthorizedOfpId (Accept OFP clears it; step can still be load).
     const fuelOk = activeMission ? fuelAuthorizedForOfp(activeMission) : false;
+    // Do not gate on simBridge.connected — the probe can lag/false-negative while
+    // /api/preflight still opens a pipe. Call the API and surface failures on the
+    // Load card instead of spinning "Waiting for live preflight…" forever.
     const eligible =
       tab === 'staging' &&
       !airportIcao &&
@@ -4790,7 +4911,6 @@ export function App() {
       Boolean(username) &&
       Boolean(ofp?.ofpId) &&
       fuelOk &&
-      Boolean(simBridge?.connected) &&
       simBridge?.onGround !== false &&
       !watch?.running &&
       loadOfpAutoStatus !== 'loading' &&
@@ -4833,10 +4953,15 @@ export function App() {
     void refreshLiveLoad();
     const id = window.setInterval(() => {
       void refreshLiveLoad();
-    }, 10_000);
+    }, 5_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshLiveLoad();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [
     activeMission?.id,
@@ -4847,7 +4972,6 @@ export function App() {
     activeMission?.lastOfpCheck?.verdict,
     airportIcao,
     loadOfpAutoStatus,
-    simBridge?.connected,
     simBridge?.onGround,
     simbriefUser,
     staging?.replaceManifest,
@@ -5071,20 +5195,36 @@ export function App() {
 
   async function run(
     action: () => Promise<void>,
-    opts: { refreshAfter?: boolean; lockUi?: boolean } = {},
+    opts: {
+      lockUi?: boolean;
+      /**
+       * Post-unlock client re-read. Default: none — trust mutation response paint.
+       * Pass a CareerRefreshScope or `'full'` only when boards/world slices
+       * change beyond what the action already set.
+       */
+      sync?: CareerRefreshScope | 'full';
+    } = {},
   ) {
     const lockUi = opts.lockUi !== false;
     if (lockUi) setBusy(true);
     setError(null);
+    let failed = false;
     try {
       await action();
-      if (opts.refreshAfter !== false) {
-        await refresh();
-      }
     } catch (err) {
+      failed = true;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      // Unlock before board sync — holding busy through refresh() made every
+      // confirm (buy/lease/contract/travel/…) feel stuck after OK.
       if (lockUi) setBusy(false);
+    }
+    if (!failed && opts.sync) {
+      try {
+        await refresh(opts.sync === 'full' ? undefined : opts.sync);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     }
   }
 
@@ -5231,7 +5371,6 @@ export function App() {
     goToTab(next);
     // Soft refresh in background — don't flash disabled on every nav button.
     void run(() => refresh(liveRefreshScope(next, false)), {
-      refreshAfter: false,
       lockUi: false,
     });
   }
@@ -5248,16 +5387,16 @@ export function App() {
       setAirportIcao(icao);
       setTerminalSection(section);
       writeCareerLocation({ tab, airportIcao: icao });
-    }, { refreshAfter: false, lockUi: false });
+    }, { lockUi: false });
   }
 
   async function onDebugCreditWallet() {
     await run(async () => {
-      const result = await postDebugCreditWallet(100_000);
+      const result = await postDebugCreditWallet(1_000_000);
       setWallet(result.walletUsd);
       setToastKind('ok');
       setToast(`Debug credit +${formatMoney(result.creditedUsd)}`);
-    }, { refreshAfter: false });
+    });
   }
 
   async function onTick(ticks = 1) {
@@ -5366,7 +5505,7 @@ export function App() {
       setToast(
         `Time advanced ${hoursLabel} → ${formatClock(lastTick)} · ${lastLots} lots${leaseNote}${hangarNote}${creditNote}`,
       );
-    });
+    }, { sync: 'full' });
   }
 
   async function onResetWorld() {
@@ -5402,36 +5541,42 @@ export function App() {
         ...marketFetchOptsRef.current,
         page: -1,
       };
-      await refresh();
+      marketBoardIntentRef.current = marketFetchOptsRef.current;
       goToTab('pilot');
-    });
+    }, { sync: 'full' });
+  }
+
+  function clearCareerSessionPaint() {
+    careerReadyRef.current = false;
+    setCareerReady(false);
+    bootProfileKeyRef.current = null;
+    setWallet(0);
+    setMissions([]);
+    setFleet([]);
+    setLots([]);
+    setPilotIcao('');
+    setHomeHubIcao('');
+    setPilotName('');
+    setStaging(null);
+    setActiveBushTrip(null);
+    setBushWatch(null);
+    setFlightDebrief(null);
+    setWatch(null);
   }
 
   async function onSelectCareerProfile(id: string) {
     await run(
       async () => {
         const result = await postCareerProfileSelect(id);
+        clearCareerSessionPaint();
         setCareerProfiles(result.profiles);
         setActiveCareerProfile(
           result.profile ??
             result.profiles.find((p) => p.id === result.activeId) ??
             null,
         );
-        setStaging(null);
-        setActiveBushTrip(null);
-        setBushWatch(null);
-        setFlightDebrief(null);
         setShowProfileGate(false);
-        setToastKind('ok');
-        setToast(
-          `Playing as ${
-            result.profile?.name ??
-            result.profiles.find((p) => p.id === id)?.name ??
-            'profile'
-          }`,
-        );
       },
-      { refreshAfter: false },
     );
   }
 
@@ -5440,17 +5585,11 @@ export function App() {
       async () => {
         const created = await postCareerProfileCreate(name);
         const result = await postCareerProfileSelect(created.profile.id);
+        clearCareerSessionPaint();
         setCareerProfiles(result.profiles);
         setActiveCareerProfile(result.profile ?? created.profile);
-        setStaging(null);
-        setActiveBushTrip(null);
-        setBushWatch(null);
-        setFlightDebrief(null);
         setShowProfileGate(false);
-        setToastKind('ok');
-        setToast(`Playing as ${created.profile.name}`);
       },
-      { refreshAfter: false },
     );
   }
 
@@ -5493,7 +5632,6 @@ export function App() {
         setToastKind('ok');
         setToast('Profile deleted');
       },
-      { refreshAfter: false },
     );
   }
 
@@ -5562,9 +5700,8 @@ export function App() {
       setToast(
         `${result.pilotName} registered at ${result.homeHubIcao} · fly Crew needed offers until you buy your first aircraft`,
       );
-      await refresh();
       goToTab('pilot');
-    });
+    }, { sync: 'full' });
   }
 
   async function refreshAircraftMarket() {
@@ -5690,7 +5827,7 @@ export function App() {
       if (result.listings) setAircraftListings(result.listings);
       setToastKind('ok');
       setToast(`Dealer paid ${formatMoney(result.creditUsd)}`);
-    });
+    }, { sync: { aircraftMarket: true } });
   }
 
   async function onListForSale(aircraftId: string) {
@@ -5828,7 +5965,7 @@ export function App() {
           ? `Inspection paid · ${formatMoney(result.debitUsd)}${mroNote} — repair condition before dispatch`
           : `Inspection cleared · ${formatMoney(result.debitUsd)}${mroNote}`,
       );
-    });
+    }, { sync: { airport: true } });
   }
 
   async function onRepairAircraft(aircraftId: string) {
@@ -5867,7 +6004,7 @@ export function App() {
               ? ` · ${Math.round(result.mro.fromTerminalKg)} kg parts`
               : '';
       setToast(`Repaired · ${formatMoney(result.debitUsd)}${mroNote}`);
-    });
+    }, { sync: { airport: true } });
   }
 
   async function onBuyoutLease(aircraftId: string) {
@@ -5916,7 +6053,7 @@ export function App() {
         setWallet(result.walletUsd);
         setToastKind('ok');
         setToast('Lease returned · term ended');
-      });
+      }, { sync: { aircraftMarket: true } });
       return;
     }
     const ok = await confirm({
@@ -5934,7 +6071,7 @@ export function App() {
       setToast(
         `Lease returned · ${formatMoney(result.debitUsd)} penalty · ${result.remainingMonths} mo left`,
       );
-    });
+    }, { sync: { aircraftMarket: true } });
   }
 
   async function onBuyFbo(icao?: string) {
@@ -6052,8 +6189,7 @@ export function App() {
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
-      await refresh();
-    });
+    }, { sync: { market: true } });
   }
 
   async function onCancelFboHold(holdId: string) {
@@ -6076,8 +6212,7 @@ export function App() {
         const view = await fetchAirportView(airportIcao);
         setAirportView(view);
       }
-      await refresh();
-    });
+    }, { sync: { market: true } });
   }
 
   async function onRerouteFboHold(holdId: string) {
@@ -6104,7 +6239,6 @@ export function App() {
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
-      await refresh();
     });
   }
 
@@ -6126,8 +6260,7 @@ export function App() {
       setToastKind('ok');
       setToast(`Sent to Dispatch · mission ${result.mission.id}`);
       selectTab('staging');
-      await refresh();
-    });
+    }, { sync: { market: true } });
   }
 
   function onSplitFboHold(holdId: string) {
@@ -6157,8 +6290,7 @@ export function App() {
             : '') +
           ` · Send from Accepted list below or Hangar → Crew`,
       );
-      await refresh();
-    });
+    }, { sync: { market: true } });
   }
 
   async function onReturnMissionToFbo(mission: Mission) {
@@ -6184,8 +6316,7 @@ export function App() {
         setAirportView(view);
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
-      await refresh();
-    });
+    }, { sync: { market: true } });
   }
 
   async function onCrewAssignMission(
@@ -6260,7 +6391,7 @@ export function App() {
           setCrewDispatchBusy(false);
         }
       },
-      { refreshAfter: false, lockUi: false },
+      { lockUi: false },
     );
   }
 
@@ -6322,11 +6453,6 @@ export function App() {
       setWallet(result.walletUsd);
       const arrivedAt =
         result.aircraft?.locationIcao?.trim().toUpperCase() ?? dest;
-      if (arrivedAt === finalDest) {
-        setFerryDest('');
-      } else {
-        setFerryDest(finalDest);
-      }
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
       const fuelNote = ' · tanks usually empty after hop';
       setToast(
@@ -6334,7 +6460,6 @@ export function App() {
           ? `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}${fuelNote}`
           : `Ferry leg · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)} · continue toward ${finalDest}${fuelNote}`,
       );
-      await refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
@@ -6355,29 +6480,24 @@ export function App() {
         const others = prev.filter((m) => m.id !== result.mission.id);
         return [...others, result.mission];
       });
-      setFerryDest('');
       setToastKind('ok');
       setToast(
         `Empty flight ${result.mission.originIcao}→${result.mission.destIcao} · open Dispatch`,
       );
       selectTab('staging');
-      await refresh();
-    });
+    }, { sync: { missions: true } });
   }
 
-  async function onPilotTravel(destIcao: string) {
-    if (!destIcao.trim()) return;
+  async function onPilotTravel(destIcao: string): Promise<boolean> {
+    if (!destIcao.trim()) return false;
     const dest = destIcao.trim().toUpperCase();
     let quoteRes: Awaited<ReturnType<typeof postPilotTravel>>;
     try {
-      setBusy(true);
       setError(null);
       quoteRes = await postPilotTravel({ destIcao: dest, quoteOnly: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      return;
-    } finally {
-      setBusy(false);
+      return false;
     }
     const quote = quoteRes.quote;
     const ok = await confirm({
@@ -6386,19 +6506,21 @@ export function App() {
       confirmLabel: 'Travel now',
       cancelLabel: 'Not now',
     });
-    if (!ok) return;
+    if (!ok) return false;
+    let moved = false;
     await run(async () => {
       const result = await postPilotTravel({ destIcao: dest });
       if (result.fleet) setFleet(result.fleet);
       setWallet(result.walletUsd);
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
       else setPilotIcao(dest);
-      setTravelDest('');
       setToastKind('ok');
       setToast(
         `Pilot at ${result.pilotIcao ?? dest} · −${formatMoney(result.walletDebitUsd ?? quote.costUsd)}`,
       );
+      moved = true;
     });
+    return moved;
   }
 
   function openFlightForRoute(
@@ -6547,7 +6669,10 @@ export function App() {
         section:
           airportIcao === lot.originIcao ? terminalSection : 'contracts',
       });
-      setFerryDest(lot.originIcao);
+      setFerrySeed({
+        dest: lot.originIcao.trim().toUpperCase(),
+        token: Date.now(),
+      });
       goToTab('hangar');
       return;
     }
@@ -6858,57 +6983,64 @@ export function App() {
 
   async function onCommitStaging() {
     if (!staging || staging.lines.length === 0) return;
-    await run(async () => {
-      try {
-        const result = await postStagingCommit({
-          aircraft: staging.aircraft,
-          aircraftId: staging.aircraftId,
-          missionId: staging.intoMissionId,
-          openDispatch: false,
-          replace: Boolean(staging.replaceManifest),
-          weightSystem,
-          lines: staging.lines.map((line) => ({
-            lotId: line.lot.id,
-            cargoKg: line.cargoKg,
-          })),
-        });
-        if (result.fleet) setFleet(result.fleet);
-        if (result.mission) {
-          setMissions((prev) => {
-            const idx = prev.findIndex((m) => m.id === result.mission.id);
-            if (idx >= 0) {
-              const next = prev.slice();
-              next[idx] = result.mission;
-              return next;
-            }
-            return [result.mission, ...prev];
+    await run(
+      async () => {
+        try {
+          const result = await postStagingCommit({
+            aircraft: staging.aircraft,
+            aircraftId: staging.aircraftId,
+            missionId: staging.intoMissionId,
+            openDispatch: false,
+            replace: Boolean(staging.replaceManifest),
+            weightSystem,
+            lines: staging.lines.map((line) => ({
+              lotId: line.lot.id,
+              cargoKg: line.cargoKg,
+            })),
           });
-        }
-        if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
-        setStaging(null);
-        setWatchAutoPaused(false);
-        setToastKind('ok');
-        const rem =
-          result.remainingKg !== undefined
-            ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
-            : '';
-        const action = result.replaced
-          ? 'Updated'
-          : result.appended
+          if (result.fleet) setFleet(result.fleet);
+          if (result.mission) {
+            setMissions((prev) => {
+              const idx = prev.findIndex((m) => m.id === result.mission.id);
+              if (idx >= 0) {
+                const next = prev.slice();
+                next[idx] = result.mission;
+                return next;
+              }
+              return [result.mission, ...prev];
+            });
+          }
+          if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+          setStaging(null);
+          setWatchAutoPaused(false);
+          if (result.replaced || result.mission) {
+            setSimbriefLaunchUrl(null);
+          }
+          setToastKind('ok');
+          const rem =
+            result.remainingKg !== undefined
+              ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
+              : '';
+          const action = result.replaced
             ? 'Updated'
-            : 'Created';
-        setToast(
-          `${action} ${result.mission.id} · ${
-            result.lineCount ?? staging.lines.length
-          } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem} · open Dispatch`,
-        );
-        goToTab('staging');
-      } catch (err) {
-        setToastKind('fail');
-        setToast(err instanceof Error ? err.message : String(err));
-        throw err;
-      }
-    });
+            : result.appended
+              ? 'Updated'
+              : 'Created';
+          setToast(
+            `${action} ${result.mission.id} · ${
+              result.lineCount ?? staging.lines.length
+            } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem} · open Dispatch`,
+          );
+          goToTab('staging');
+        } catch (err) {
+          setToastKind('fail');
+          setToast(err instanceof Error ? err.message : String(err));
+          throw err;
+        }
+      },
+      // Paint from commit response; only re-fetch the freight board (lots claimed).
+      { sync: { market: true } },
+    );
   }
 
   async function onAcceptContractPilot(lot: {
@@ -6991,12 +7123,25 @@ export function App() {
         `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition} · open Dispatch`,
       );
       goToTab('staging');
-      await refresh();
-    });
+    }, { sync: { market: true } });
   }
 
   async function onDispatch(mission: Mission) {
-    await run(async () => {
+    const cached = simbriefLaunchUrl?.trim() ?? '';
+    // Re-open must not await /api/dispatch first: that drops the user gesture,
+    // so window.open fallback fails outside this click.
+    if (mission.status === 'dispatched' && cached) {
+      await onOpenSimbriefLaunchUrl();
+      return;
+    }
+
+    // Browser: reserve a tab under this click. Desktop: IPC after await.
+    const pendingTab = reserveSimBriefBrowserTab();
+    setBusy(true);
+    setError(null);
+    setToastKind('ok');
+    setToast('Building SimBrief link…');
+    try {
       const result = await postDispatch({
         missionId: mission.id,
         open: true,
@@ -7007,12 +7152,79 @@ export function App() {
           current.map((m) => (m.id === result.mission.id ? result.mission : m)),
         );
       }
-      if (result.url) openSimBriefDispatchUrl(result.url);
-      setToastKind('ok');
+      const href = typeof result.url === 'string' ? result.url.trim() : '';
+      if (!href) {
+        if (pendingTab && !pendingTab.closed) {
+          try {
+            pendingTab.close();
+          } catch {
+            /* ignore */
+          }
+        }
+        throw new Error(
+          'Dispatch saved, but no SimBrief URL came back — try Re-open SimBrief',
+        );
+      }
+      setSimbriefLaunchUrl(href);
+      let opened = navigateReservedSimBriefTab(pendingTab, href);
+      if (!opened) {
+        opened = await openSimBriefDispatchUrl(href);
+      }
+      if (!opened) {
+        try {
+          await navigator.clipboard.writeText(href);
+        } catch {
+          /* ignore */
+        }
+        setToastKind('warn');
+        setToast(
+          'Dispatch ready · browser did not auto-open — URL copied if clipboard allows; use Re-open SimBrief.',
+        );
+      } else {
+        setToastKind('ok');
+        setToast(
+          `SimBrief opened · ${result.airframeLabel} · ${result.units ?? 'KGS'} · Generate OFP — auto-confirm runs every few seconds`,
+        );
+      }
+      void refresh({ missions: true }).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!isNeedsProfileMessage(message)) setError(message);
+      });
+    } catch (err) {
+      if (pendingTab && !pendingTab.closed) {
+        try {
+          pendingTab.close();
+        } catch {
+          /* ignore */
+        }
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      setToastKind('fail');
+      setToast(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onOpenSimbriefLaunchUrl() {
+    const href = simbriefLaunchUrl?.trim();
+    if (!href) return;
+    const opened = await openSimBriefDispatchUrl(href);
+    if (!opened) {
+      try {
+        await navigator.clipboard.writeText(href);
+      } catch {
+        /* ignore */
+      }
+      setToastKind('warn');
       setToast(
-        `SimBrief opened · ${result.airframeLabel} · ${result.units ?? 'KGS'} · Generate OFP — auto-confirm runs every 10s`,
+        'Browser still did not open — paste the copied SimBrief URL into Chrome/Edge.',
       );
-    });
+      return;
+    }
+    setToastKind('ok');
+    setToast('SimBrief opened in your browser');
   }
 
   async function onRefreshOfpBriefing(mission: Mission) {
@@ -7061,6 +7273,8 @@ export function App() {
         missionId: mission.id,
         simbriefUser: username,
       });
+      // Cargo changed — next Open SimBrief must rebuild the dispatch URL.
+      setSimbriefLaunchUrl(null);
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
@@ -7074,7 +7288,7 @@ export function App() {
       setToast(
         `Accepted OFP cargo · released ${released} to the board · ${payBit} · OFP ${result.check.verdict.toUpperCase()}`,
       );
-    });
+    }, { sync: { market: true } });
   }
 
   async function onCancel(mission: Mission) {
@@ -7130,7 +7344,7 @@ export function App() {
           : `Cancelled · ${result.warning ?? 'no active lot to release'}`,
       );
       goToTab('staging');
-    });
+    }, { sync: { market: true } });
   }
 
   async function onAcceptBushTrip(trip: BushTripBoardRow) {
@@ -7333,7 +7547,6 @@ export function App() {
         }
       }
       },
-      { refreshAfter: false },
     );
     if (userCancelled) {
       setSkylineInjectEnabled(false);
@@ -7365,6 +7578,11 @@ export function App() {
     setMissionFuelQuoteStatus('loading');
     await run(async () => {
       const result = await postFuelPurchase(mission.id);
+      setWallet(result.walletUsd);
+      if (result.fleet) setFleet(result.fleet);
+      setMissions((current) =>
+        current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+      );
       setMissionFuelQuote(null);
       setMissionFuelQuoteStatus('ready');
       setMissionFuelQuoteError(null);
@@ -7375,7 +7593,7 @@ export function App() {
           weightSystem,
         )} · −${formatMoney(result.fuelDebitUsd)} · continuing automatically`,
       );
-    });
+    }, { sync: { airport: true } });
   }
 
   async function onDepart(mission: Mission) {
@@ -7410,6 +7628,10 @@ export function App() {
     }
     await run(async () => {
       const result = await postDepart({ missionId: mission.id, override });
+      setMissions((current) =>
+        current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+      );
+      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
       setToastKind(
         override || result.mission.fuelUplift?.scarcity === 'dry'
           ? 'warn'
@@ -7425,7 +7647,7 @@ export function App() {
           ? `Departed ${result.mission.id} with preflight override · in_flight${fuelNote}`
           : `Departed ${result.mission.id} · in_flight${fuelNote}`,
       );
-    });
+    }, { sync: { airport: true } });
   }
 
   async function onSettle(mission: Mission) {
@@ -7442,6 +7664,9 @@ export function App() {
       if (Array.isArray(result.fleet)) setFleet(result.fleet);
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
       if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      setMissions((current) =>
+        current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+      );
       setWatch((prev) =>
         prev?.missionId === mission.id ? { ...prev, running: false } : prev,
       );
@@ -7459,7 +7684,7 @@ export function App() {
       );
       setStaging(null);
       goToTab('staging');
-    });
+    }, { sync: { missions: true } });
   }
 
   const cargoOptions = CARGO_OPS_FILTER_OPTIONS;
@@ -7766,7 +7991,7 @@ export function App() {
       icao: dest,
       section: terminalSection,
     });
-    setFerryDest(dest);
+    setFerrySeed({ dest, token: Date.now() });
     setHangarPane('aircraft');
     goToTab('hangar');
   }
@@ -7776,9 +8001,13 @@ export function App() {
       if (key === 'access') {
         const existing = current.find((level) => level.key === 'access');
         const rest = current.filter((level) => level.key !== 'access');
-        // Never drop access — only flip unlocked-first ↔ locked-first.
-        const direction = existing?.direction === 'asc' ? 'desc' : 'asc';
-        return [{ key: 'access', direction }, ...rest];
+        if (!existing) {
+          return [{ key: 'access', direction: 'asc' }, ...rest];
+        }
+        if (existing.direction === 'asc') {
+          return [{ key: 'access', direction: 'desc' }, ...rest];
+        }
+        return rest;
       }
       return withMetricPrimarySort(current, key);
     });
@@ -7806,8 +8035,13 @@ export function App() {
       if (key === 'access') {
         const existing = current.find((level) => level.key === 'access');
         const rest = current.filter((level) => level.key !== 'access');
-        const direction = existing?.direction === 'asc' ? 'desc' : 'asc';
-        return [{ key: 'access', direction }, ...rest];
+        if (!existing) {
+          return [{ key: 'access', direction: 'asc' }, ...rest];
+        }
+        if (existing.direction === 'asc') {
+          return [{ key: 'access', direction: 'desc' }, ...rest];
+        }
+        return rest;
       }
       return withMetricPrimarySort(current, key);
     });
@@ -8526,10 +8760,16 @@ export function App() {
         ) : null}
         <div className="sidebar-footer">
           <span className="who">{pilotName || 'Skyline'}</span>
-          <span className="wallet">{formatMoney(wallet)}</span>
+          <span className="wallet">
+            {careerReady ? formatMoney(wallet) : '…'}
+          </span>
           <span className="meta">
-            {pilotIcao ? `Pilot at ${pilotIcao}` : 'Pilot location —'}
-            {homeHubIcao ? ` · home ${homeHubIcao}` : ''}
+            {!careerReady
+              ? 'Loading career…'
+              : pilotIcao
+                ? `Pilot at ${pilotIcao}`
+                : 'Pilot location —'}
+            {careerReady && homeHubIcao ? ` · home ${homeHubIcao}` : ''}
           </span>
           <button
             type="button"
@@ -8597,15 +8837,21 @@ export function App() {
             </p>
           </div>
           <div className="topbar-metrics">
-            {pilotIcao ? (
-              <div className="metric" title="Where you (the pilot) currently are">
+            {careerReady && pilotIcao ? (
+              <button
+                type="button"
+                className="metric pilot-chip"
+                disabled={busy}
+                title="Travel / reposition pilot"
+                onClick={() => setPilotTravelOpen(true)}
+              >
                 <span className="label">Pilot</span>
                 <strong>{pilotIcao}</strong>
-              </div>
+              </button>
             ) : null}
             <div className="metric">
               <span className="label">Wallet</span>
-              <strong>{formatMoney(wallet)}</strong>
+              <strong>{careerReady ? formatMoney(wallet) : '…'}</strong>
             </div>
             <div
               className="metric"
@@ -8657,9 +8903,9 @@ export function App() {
                 className="action ghost"
                 onClick={() => void onDebugCreditWallet()}
                 disabled={busy}
-                title="Temporary test aid — add $100,000 to the wallet"
+                title="Temporary test aid — add $1,000,000 to the wallet"
               >
-                +$100k
+                +$1M
               </button>
               <button
                 type="button"
@@ -10023,7 +10269,7 @@ export function App() {
                                 <button
                                   type="button"
                                   className={`sort-header${contractsSorts.some((l) => l.key === 'access') ? ' is-sorted' : ''}`}
-                                  title="Sort by Cargo Ops access (unlocked first by default). Click again to reverse or clear."
+                                  title="Sort by Cargo Ops access. Click to unlock-first, again for locked-first, again to clear."
                                   onClick={() => toggleContractsSort('access')}
                                 >
                                   Access{' '}
@@ -10804,7 +11050,7 @@ export function App() {
                     <button
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'access') ? ' is-sorted' : ''}`}
-                      title="Sort by Cargo Ops access (unlocked first by default). Click again to reverse or clear."
+                      title="Sort by Cargo Ops access. Click to unlock-first, again for locked-first, again to clear."
                       onClick={() => toggleMarketSort('access')}
                     >
                       Access <span>{sortIndicator('access')}</span>
@@ -11327,7 +11573,17 @@ export function App() {
         </section>
       ) : hubSelected && showStaging ? (
         <section className="panel staging-panel">
-          {activeBushTrip ? (
+          {!careerReady ? (
+            <div className="dispatch-boot-loading" role="status" aria-live="polite">
+              <span className="busy-spinner busy-spinner-lg" aria-hidden="true" />
+              <div>
+                <h2>Loading dispatch…</h2>
+                <p className="muted">
+                  Restoring wallet, fleet, and any active flight for this profile.
+                </p>
+              </div>
+            </div>
+          ) : activeBushTrip ? (
             <>
               <div className="debrief-card">
                 <div className="debrief-card-head">
@@ -11698,12 +11954,22 @@ export function App() {
                     title={
                       staging.replaceManifest
                         ? 'Save the edited manifest and reopen SimBrief'
-                        : 'Accept the staged manifest and open SimBrief'
+                        : 'Accept the staged manifest and open Dispatch'
                     }
                   >
-                    {staging.replaceManifest
-                      ? 'Save & re-dispatch'
-                      : 'Accept & Dispatch'}
+                    {busy ? (
+                      <>
+                        <span
+                          className="busy-spinner busy-spinner-sm"
+                          aria-hidden="true"
+                        />
+                        {staging.replaceManifest ? 'Saving…' : 'Accepting…'}
+                      </>
+                    ) : staging.replaceManifest ? (
+                      'Save & re-dispatch'
+                    ) : (
+                      'Accept & Dispatch'
+                    )}
                   </button>
                 </div>
               </div>
@@ -12001,9 +12267,19 @@ export function App() {
                     disabled={busy || !stagingValid}
                     onClick={() => void onCommitStaging()}
                   >
-                    {staging.replaceManifest
-                      ? 'Save & re-dispatch'
-                      : 'Accept & Dispatch'}
+                    {busy ? (
+                      <>
+                        <span
+                          className="busy-spinner busy-spinner-sm"
+                          aria-hidden="true"
+                        />
+                        {staging.replaceManifest ? 'Saving…' : 'Accepting…'}
+                      </>
+                    ) : staging.replaceManifest ? (
+                      'Save & re-dispatch'
+                    ) : (
+                      'Accept & Dispatch'
+                    )}
                   </button>
                 </div>
               </div>
@@ -12835,8 +13111,8 @@ export function App() {
                     icao: hub.icao,
                     name: hub.name,
                   }))}
-                  ferryDest={ferryDest}
-                  travelDest={travelDest}
+                  preferredFerryDest={ferrySeed?.dest}
+                  ferrySeedToken={ferrySeed?.token}
                   pilotIcao={pilotIcao}
                   ownedCount={ownedFleetCount}
                   hasListed={hasListedAircraft}
@@ -12844,8 +13120,6 @@ export function App() {
                   formatMass={formatTonnes}
                   weightSystem={weightSystem}
                   onOpenAirport={openAirport}
-                  onFerryDestChange={setFerryDest}
-                  onTravelDestChange={setTravelDest}
                   onClearMaintenance={(id) => void onClearMaintenance(id)}
                   onRepair={(id) => void onRepairAircraft(id)}
                   onUnlist={(id) => void onUnlistAircraft(id)}
@@ -12999,7 +13273,27 @@ export function App() {
         loadOfpAutoStatus={loadOfpAutoStatus}
       />
       </div>
-      {confirmDialog}
+      {pilotTravelOpen && pilotIcao ? (
+        <PilotTravelDialog
+          pilotIcao={pilotIcao}
+          hubs={ferryDestinationHubs(hubOptions).map((hub) => ({
+            icao: hub.icao,
+            name: hub.name,
+          }))}
+          fleetShortcuts={fleet
+            .filter(
+              (acf) =>
+                acf.status === 'parked' || acf.status === 'maintenance',
+            )
+            .map((acf) => ({
+              icao: acf.locationIcao,
+              label: acf.label,
+            }))}
+          busy={busy}
+          onCancel={() => setPilotTravelOpen(false)}
+          onTravel={onPilotTravel}
+        />
+      ) : null}
       {rerouteHoldId
         ? (() => {
             const hold = playerFbos?.holds.find((h) => h.id === rerouteHoldId);
@@ -13058,6 +13352,7 @@ export function App() {
             );
           })()
         : null}
+      {confirmDialog}
     </div>
     </AirportNamesProvider>
   );

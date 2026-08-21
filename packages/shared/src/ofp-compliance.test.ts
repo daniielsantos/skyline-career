@@ -10,6 +10,7 @@ import {
   fuelToleranceLb,
   normalizeOfpExpectation,
   ofpFuelToLb,
+  ofpTaxiFuelLb,
   resolveLiveSourcePrefs,
 } from './ofp-compliance.js';
 import type { LiveFuelState, OfpExpectation } from './types/ofp-compliance.js';
@@ -57,6 +58,21 @@ describe('ofpFuelToLb', () => {
     const lb = ofpFuelToLb({ unit: 'kg', total: 1000 });
     assert.ok(lb.total !== undefined);
     assert.ok(Math.abs(lb.total - 2204.6226218) < 0.01);
+  });
+});
+
+describe('ofpTaxiFuelLb', () => {
+  it('reads SimBrief taxi from the load sheet in lb', () => {
+    assert.equal(
+      ofpTaxiFuelLb(
+        makeOfp({ loadSheet: { unit: 'lb', taxiFuel: 800, blockFuel: 29_655 } }),
+      ),
+      800,
+    );
+    const fromKg = ofpTaxiFuelLb(
+      makeOfp({ loadSheet: { unit: 'kg', taxiFuel: 400 } }),
+    );
+    assert.ok(fromKg !== undefined && Math.abs(fromKg - 881.85) < 0.1);
   });
 });
 

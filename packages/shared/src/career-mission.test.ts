@@ -29,6 +29,11 @@ import {
   normalizeMissionIntent,
   normalizeOfpExpectation,
   ofpCargoKg,
+  ofpFreightTowardMissionKg,
+  planPaxAndCargoSimBriefLoad,
+  SIMBRIEF_STANDARD_BAG_PER_PAX_LB,
+  SIMBRIEF_STANDARD_PAX_LB,
+  SIMBRIEF_STANDARD_PAX_WITH_BAG_LB,
   replaceMissionManifest,
   routeDistanceNm,
   settleMission,
@@ -101,6 +106,25 @@ describe('mission load method policy', () => {
     );
   });
 
+  it('keeps B707 GNS on EFB (injectCapable false) with narrow_freighter default', () => {
+    assert.deepEqual(
+      missionLoadPolicy({
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'inibuilds-boeing-b707-gns',
+      }),
+      { loadMethod: 'native-simbrief', injectCapable: false },
+    );
+    assert.equal(
+      careerAllowsDirectInject(
+        missionLoadPolicy({
+          aircraftClassId: 'narrow_freighter',
+          airframeTypeId: 'inibuilds-boeing-b707-gns',
+        }),
+      ),
+      false,
+    );
+  });
+
   it('refuses inject when roles pack is native-simbrief', () => {
     assert.throws(
       () =>
@@ -157,6 +181,12 @@ describe('mission load method policy', () => {
     // Short OFP: flat 150 lb taxi must not keep READY after EFB drain.
     assert.equal(careerFuelMatchOk(29, 187, 50), false); // -158 > tol + 50%*187
     assert.equal(careerFuelMatchOk(120, 187, 50), true); // -67 within tol + capped taxi
+    // B707-class start/taxi: ≥1% of Due (~296 lb) covers ~278 lb burn.
+    assert.equal(careerFuelMatchOk(29_371, 29_649, 50), true);
+    assert.equal(careerFuelMatchOk(29_000, 29_649, 50), false); // ~649 > 50+296
+    // Prefer SimBrief TAXI line (800 lb) when OFP provides it.
+    assert.equal(careerFuelMatchOk(28_900, 29_649, 50, 800), true);
+    assert.equal(careerFuelMatchOk(28_700, 29_649, 50, 800), false);
   });
 });
 
@@ -906,6 +936,48 @@ describe('listViableMarketLots', () => {
   });
 });
 
+describe('planPaxAndCargoSimBriefLoad', () => {
+  it('reserves SimBrief pax+bag (230 lb) per seat before leftover freight', () => {
+    assert.equal(SIMBRIEF_STANDARD_PAX_WITH_BAG_LB, 230);
+    assert.equal(SIMBRIEF_STANDARD_BAG_PER_PAX_LB, 55);
+    const planned = planPaxAndCargoSimBriefLoad({ cargoKg: 20_000, maxPax: 194 });
+    // 20000 kg ≈ 44092 lb → floor(44092/230)=191 seats
+    assert.equal(planned.pax, 191);
+    assert.ok(Math.abs(planned.paxKg + planned.bagKg + planned.cargoKg - 20_000) < 0.02);
+    assert.equal(
+      Math.round(ofpFreightTowardMissionKg(
+        matchingOfp({
+          icao: 'B703',
+          originIcao: 'SBKP',
+          destIcao: 'SBGR',
+          loadSheet: {
+            unit: 'kg',
+            passengerCount: planned.pax,
+            baggage: planned.bagKg + planned.cargoKg,
+            payload: 20_000,
+          },
+        }),
+        { loadLayout: 'pax_and_cargo', maxPaxSeats: 194 },
+      )!),
+      20_000,
+    );
+  });
+
+  it('uses SimBrief standard pax and bag masses', () => {
+    assert.equal(SIMBRIEF_STANDARD_PAX_LB, 175);
+    assert.equal(SIMBRIEF_STANDARD_BAG_PER_PAX_LB, 55);
+  });
+
+  it('fills 194 seats on a ~65 klb mission with freight leftover', () => {
+    const cargoKg = 64_659 / KG_TO_LB;
+    const planned = planPaxAndCargoSimBriefLoad({ cargoKg, maxPax: 194 });
+    assert.equal(planned.pax, 194);
+    const totalLb =
+      planned.pax * SIMBRIEF_STANDARD_PAX_WITH_BAG_LB + planned.cargoKg * KG_TO_LB;
+    assert.ok(Math.abs(totalLb - 64_659) < 1);
+  });
+});
+
 describe('compareMissionIntentToOfp', () => {
   it('passes when OFP matches intent', () => {
     const check = compareMissionIntentToOfp(baseMission(), matchingOfp());
@@ -1057,6 +1129,35 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(isOfpCargoUnderOnlyFailure(check), false);
   });
 
+  it('allows pax_and_cargo cabin seats + baggage totaling mission cargo', () => {
+    const cargoKg = 20_000;
+    const planned = planPaxAndCargoSimBriefLoad({ cargoKg, maxPax: 194 });
+    assert.equal(planned.pax, 191);
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'inibuilds-boeing-b707-gns',
+        cargoKg,
+        pax: 0,
+      }),
+      matchingOfp({
+        icao: 'B703',
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 10_000,
+          passengerCount: planned.pax,
+          baggage: planned.bagKg + planned.cargoKg,
+          payload: cargoKg,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.equal(
+      check.findings.some((f) => f.code === 'INTENT_PAX_MISMATCH'),
+      false,
+    );
+  });
+
   it('fails when freighter OFP has passengers', () => {
     const check = compareMissionIntentToOfp(
       baseMission(),
@@ -1072,6 +1173,25 @@ describe('compareMissionIntentToOfp', () => {
     );
     assert.equal(check.verdict, 'fail');
     assert.ok(check.findings.some((f) => f.code === 'INTENT_PAX_MISMATCH'));
+  });
+
+  it('allows one OFP pilot seat on freighter missions (SimBrief EFB)', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission(),
+      matchingOfp({
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 10_000,
+          passengerCount: 1,
+          baggage: 8_000,
+          payload: 12_000,
+        },
+      }),
+    );
+    assert.equal(
+      check.findings.some((f) => f.code === 'INTENT_PAX_MISMATCH'),
+      false,
+    );
   });
 
   it('accepts Commander C182 OFP on light_ga when mission airframe is Commander', () => {

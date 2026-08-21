@@ -242,13 +242,17 @@ export function pushCruiseTick(
     return { state };
   }
 
-  // Established window: ignore abrupt SimVar fuel-flow spikes (e.g. 58→450 kg/h).
+  // Established window: ignore abrupt *upward* SimVar fuel-flow spikes
+  // (e.g. ghost Eng2 58→450 kg/h). A real throttle/speed cut drops flow and
+  // must fall through to the spread trim — otherwise the counter freezes
+  // forever against the old high-flow median.
   if (state.window.length >= 3) {
     const medFlow = median(state.window.map((t) => t.fuelFlowKgPerHour!));
     const flow = tick.fuelFlowKgPerHour!;
     if (
       medFlow > 0 &&
-      Math.abs(flow - medFlow) / medFlow > resolved.maxFlowOutlier
+      flow > medFlow &&
+      (flow - medFlow) / medFlow > resolved.maxFlowOutlier
     ) {
       return { state };
     }

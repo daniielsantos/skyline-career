@@ -4,8 +4,9 @@
 **Match title:** `Boeing B707 GNS`  
 **ICAO (SimBrief type):** `B703`  
 **Publisher:** `inibuilds`  
-**Stations:** 8  
-**Profile:** `inibuilds/boeing-b707-gns@1.0.0`
+**Stations:** 8 (S3 unused)  
+**Profile:** `inibuilds/boeing-b707-gns@1.0.0`  
+**Load:** EFB `pax_and_cargo` — live max pax from SimBrief `airframe_passengers` (catalog `maxPaxSeats` optional fallback)
 
 ## Fuel tanks
 
@@ -19,12 +20,20 @@
 | `FUEL TANK LEFT TIP QUANTITY` | 439 | LEFT_TIP |
 | `FUEL TANK RIGHT TIP QUANTITY` | 439 | RIGHT_TIP |
 
+## Payload / CG (live)
+
+- **Pure cargo OFP** piles S6–S8 → CG ~4% (out of 16–35).
+- **Full pax** (114 seats) loads **S5** (cabin) → CG ~29% OK.
+- **`pax_and_cargo` dispatch:** SimBrief payload = pax×175 + pax×55 bag + `cargo`. Prefill reserves **230 lb/seat**, remainder as freight.
+- Intent compare treats baggage + (pax × 175 lb) as mission freight.
+- Catálogo `maxCargoKg`: **29 329** ≈ (65 000 − 340 crew) lb CG-limited mix.
+- Roles: crew 1–2 · passenger 4–5 · baggage 6–8 · S3 unused.
+- Note: MSFS Mass & Balance seat grid showed **114/114**; SimBrief Full/`airframe_passengers` is the Dispatch source of truth (catalog `maxPaxSeats` is offline fallback only).
+
 ## Notes
 
-- Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, CENTER, LEFT_AUX, RIGHT_AUX, LEFT_TIP, RIGHT_TIP).
-- AUX/Aft tanks included.
-- Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8.
-- Station maxLoad: placeholder until flight_model.cfg calibrate.
+- Fuel via classic FUEL TANK * from writetest.
+- SimBrief MZFW−OEW overstates balanceable load.
 - Homologated with interactive wizard.
 
 ## Homologated

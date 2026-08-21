@@ -423,8 +423,12 @@ export function plannedStationPayloadLb(opts: {
 /**
  * EFB / SimBrief imports often leave pilot+copilot stations at 0 (crew folded
  * into BEW/ZFW). If live crew stations are empty, drop the crew floor from Due
- * so Loaded vs Due matches cargo-only. When those stations have weight (Skyline
- * inject or EFB set crew), keep the full cargo+crew Due.
+ * so Loaded vs Due matches cargo-only.
+ *
+ * When seats have *some* weight but less than the planned floor (common after
+ * EFB import with a single pilot / pax=1), Due tracks the live crew sum — do
+ * not demand the missing second seat. Near-full crew (Skyline inject) still
+ * uses the planned floor.
  */
 export function adjustPlannedPayloadForLiveCrewStations(opts: {
   cargoPlacedLb: number;
@@ -477,7 +481,11 @@ export function adjustPlannedPayloadForLiveCrewStations(opts: {
     return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
   }, 0);
   const crewOnStations = crewLive >= threshold;
-  const crewLb = crewOnStations ? floorR : 0;
+  let crewLb = 0;
+  if (crewOnStations) {
+    const nearFull = crewLive + threshold >= floorR;
+    crewLb = nearFull ? floorR : roundLb(crewLive);
+  }
 
   return {
     plannedTotalLb: roundLb(cargo + crewLb),

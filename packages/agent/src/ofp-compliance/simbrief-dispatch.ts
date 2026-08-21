@@ -15,7 +15,7 @@ export interface SimBriefDispatchParams {
   type: string;
   orig: string;
   dest: string;
-  /** Passenger count. Pass explicitly (including 0 for freighter) to avoid AUTO load. */
+  /** Passenger count. Freighters use 1 (EFB pilot); pax_and_cargo fills cabin seats. */
   pax?: number;
   /**
    * Freight added, in **thousands** of the selected unit (SimBrief API convention).

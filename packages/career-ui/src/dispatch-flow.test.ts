@@ -10,6 +10,7 @@ import {
   formatLandingFpm,
   formatRunwayTouchdownDebriefLine,
   isOfpCargoUnderOnlyFailureUi,
+  livePreflightWaitHint,
   ofpCargoKgFromUnderFinding,
   resolveLoadPath,
 } from './dispatch-flow.ts';
@@ -164,6 +165,48 @@ describe('resolveLoadPath', () => {
         false,
       ),
       'efb',
+    );
+  });
+
+  it('maps B707 stamp without inject to efb', () => {
+    assert.equal(
+      resolveLoadPath(
+        mission({
+          aircraftClassId: 'narrow_freighter',
+          airframeTypeId: 'inibuilds-boeing-b707-gns',
+          loadMethod: 'native-simbrief',
+          injectCapable: false,
+        }),
+        false,
+      ),
+      'efb',
+    );
+  });
+});
+
+describe('livePreflightWaitHint', () => {
+  it('explains SimBridge offline instead of a blank wait', () => {
+    assert.match(
+      livePreflightWaitHint({
+        simBridgeConnected: false,
+        onGround: true,
+        watchRunning: false,
+        aircraftLabel: 'Boeing B707 GNS',
+      }),
+      /SimBridge is offline/i,
+    );
+  });
+
+  it('surfaces bootstrap errors', () => {
+    assert.match(
+      livePreflightWaitHint({
+        bootstrapError: 'pipe timeout',
+        simBridgeConnected: true,
+        onGround: true,
+        watchRunning: false,
+        aircraftLabel: 'Boeing B707 GNS',
+      }),
+      /Preflight error: pipe timeout/,
     );
   });
 });

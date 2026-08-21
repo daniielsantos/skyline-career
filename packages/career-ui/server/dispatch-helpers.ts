@@ -12,8 +12,10 @@ import {
   findCareerPlayerAirframe,
   formatIntentOfpCheck,
   getAircraftClass,
+  isPaxAndCargoLoadLayout,
   KG_TO_LB,
   ofpCargoKg,
+  planPaxAndCargoSimBriefLoad,
   resolveAirframeFuelBurnKgPerNm,
   resolveConservativeOpsWeights,
   type FreighterClassId,
@@ -29,6 +31,8 @@ import {
   preferSimBriefAirframeMatch,
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
+  isDefaultSimBriefMatch,
+  formatSimBriefAirframeLabel,
 } from '../../agent/src/ofp-compliance/simbrief-airframes.ts';
 import {
   fetchSimBriefLatestOfp,
@@ -213,6 +217,39 @@ export async function resolveClassMaxCargoKg(
     return next;
   };
 
+  // Homologated jet/heavy SKUs with full catalog weights — skip the ~1MB
+  // SimBrief catalog fetch so Open SimBrief stays snappy. light_ga stays
+  // SimBrief-first (BN2 soft maxcargo vs structural mzfw−oew).
+  const catalogFastPath =
+    aircraftClassId === 'narrow_freighter' ||
+    aircraftClassId === 'wide_freighter' ||
+    aircraftClassId === 'medium_piston' ||
+    aircraftClassId === 'light_jet' ||
+    aircraftClassId === 'light_turboprop';
+  if (
+    catalogFastPath &&
+    airframe &&
+    typeof airframe.maxCargoKg === 'number' &&
+    airframe.maxCargoKg > 0 &&
+    typeof airframe.oewKg === 'number' &&
+    airframe.oewKg > 0 &&
+    typeof airframe.mtowKg === 'number' &&
+    airframe.mtowKg > 0 &&
+    typeof airframe.fuelCapacityKg === 'number' &&
+    airframe.fuelCapacityKg > 0
+  ) {
+    return finish({
+      maxCargoKg: Math.floor(airframe.maxCargoKg),
+      source: 'airframe-catalog',
+      airframeLabel: airframe.label,
+      oewKg: airframe.oewKg,
+      mtowKg: airframe.mtowKg,
+      fuelCapacityKg: airframe.fuelCapacityKg,
+      fuelBurnKgPerNm,
+      airframeTypeId: airframe.typeId,
+    });
+  }
+
   try {
     const params = await resolveDispatchSimBriefParams({
       aircraftClassId,
@@ -228,7 +265,7 @@ export async function resolveClassMaxCargoKg(
       source: resolved.source,
       airframeLabel:
         airframe?.label ??
-        (resolved.airframe.comments || resolved.airframe.name),
+        formatSimBriefAirframeLabel(resolved.airframe, aircraft.name),
       oewKg: resolved.airframe.oewKg ?? airframe?.oewKg ?? aircraft.oewKg,
       mtowKg: resolved.airframe.mtowKg ?? airframe?.mtowKg ?? aircraft.mtowKg,
       mzfwKg: resolved.airframe.mzfwKg,
@@ -366,6 +403,8 @@ export async function buildMissionDispatch(
      * so SimBrief is not asked for more freight than inject can load.
      */
     cargoKg?: number;
+    /** Test seam — defaults to global fetch. */
+    fetchImpl?: typeof fetch;
   } = {},
 ): Promise<{
   url: string;
@@ -375,6 +414,8 @@ export async function buildMissionDispatch(
   cargoThousands: number;
   cargoKg: number;
   units: 'KGS' | 'LBS';
+  /** SimBrief cabin seats used for pax_and_cargo prefill (when resolved). */
+  maxPaxSeats?: number;
 }> {
   const params = await resolveDispatchSimBriefParams({
     aircraftClassId: mission.aircraftClassId,
@@ -382,7 +423,36 @@ export async function buildMissionDispatch(
     rolesPackRelPath: mission.rolesPackRelPath,
     liveTitle: opts.liveTitle,
   });
-  const resolved = await resolveSimBriefDispatchType(params);
+  // "Default" match → use ICAO as SimBrief type (B703, etc.) and skip the
+  // multi-MB airframes.json round-trip on Open SimBrief — unless we need
+  // airframe_passengers for pax_and_cargo.
+  const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
+  const needsSimBriefAirframeRow =
+    isPaxAndCargoLoadLayout(careerAirframe) ||
+    !isDefaultSimBriefMatch(params.simbriefAirframeMatch);
+
+  let type: string;
+  let airframeLabel: string;
+  let simBriefPassengers = 0;
+  if (!needsSimBriefAirframeRow) {
+    type = params.simbriefIcao.trim().toUpperCase();
+    airframeLabel = params.titleHint || type;
+  } else {
+    const resolved = await resolveSimBriefDispatchType({
+      simbriefIcao: params.simbriefIcao,
+      simbriefAirframeMatch: params.simbriefAirframeMatch,
+      titleHint: params.titleHint,
+      ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+    });
+    type = isDefaultSimBriefMatch(params.simbriefAirframeMatch)
+      ? params.simbriefIcao.trim().toUpperCase()
+      : resolved.type;
+    airframeLabel = formatSimBriefAirframeLabel(
+      resolved.airframe,
+      params.titleHint,
+    );
+    simBriefPassengers = resolved.airframe.passengers;
+  }
   const units = normalizeDispatchUnits(opts.units);
   // A static_id identifies one dispatch revision, not the mission forever.
   // Reusing it after payload edits lets SimBrief return the previous OFP and
@@ -402,25 +472,52 @@ export async function buildMissionDispatch(
   // Freight — cargo= hits a small maxcargo soft-cap while manualpayload fills
   // the field that matches EFB useful load.
   const usePayloadPrefill = mission.aircraftClassId === 'light_ga';
+  // Navigraph SimBrief EFB (MSFS) refuses IMPORT WEIGHTS with pax=0:
+  // "Expecting at least one passenger (pilot)". Mission intent stays pax=0;
+  // compareMissionIntentToOfp allows +1 via maxExtraPax (or maxPaxSeats).
+  let maxPaxSeatsResolved: number | undefined;
+  let paxAndCargo: ReturnType<typeof planPaxAndCargoSimBriefLoad> | null = null;
+  if (!usePayloadPrefill && isPaxAndCargoLoadLayout(careerAirframe)) {
+    const catalogFallback =
+      typeof careerAirframe?.maxPaxSeats === 'number' && careerAirframe.maxPaxSeats > 0
+        ? careerAirframe.maxPaxSeats
+        : 0;
+    const maxPax =
+      simBriefPassengers > 0
+        ? simBriefPassengers
+        : catalogFallback > 0
+          ? catalogFallback
+          : 1;
+    maxPaxSeatsResolved = maxPax;
+    paxAndCargo = planPaxAndCargoSimBriefLoad({ cargoKg, maxPax });
+  }
+  const dispatchPax = paxAndCargo?.pax ?? 1;
+  const dispatchCargoKg = paxAndCargo?.cargoKg ?? cargoKg;
+  const freightThousands = cargoWeightToThousands(
+    units === 'LBS' ? dispatchCargoKg * KG_TO_LB : dispatchCargoKg,
+  );
   const url = buildDispatchRedirectUrl({
-    type: resolved.type,
+    type,
     orig: canonicalCareerAirportIcao(mission.originIcao),
     dest: canonicalCareerAirportIcao(mission.destIcao),
-    pax: 0,
+    pax: dispatchPax,
     ...(usePayloadPrefill
       ? { manualPayload: cargoThousands }
-      : { cargo: cargoThousands }),
+      : { cargo: freightThousands }),
     units,
     staticId,
   });
   return {
     url,
     staticId,
-    type: resolved.type,
-    airframeLabel: resolved.airframe.comments || resolved.airframe.name,
-    cargoThousands,
+    type,
+    airframeLabel,
+    cargoThousands: usePayloadPrefill ? cargoThousands : freightThousands,
     cargoKg,
     units,
+    ...(maxPaxSeatsResolved !== undefined
+      ? { maxPaxSeats: maxPaxSeatsResolved }
+      : {}),
   };
 }
 
@@ -467,6 +564,7 @@ export async function buildFlyableMissionDispatch(
     units: opts.units,
     liveTitle: opts.liveTitle,
     cargoKg: flyable.cargoKg,
+    ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
   });
   return { built, flyable, cargoLimit };
 }

@@ -33,10 +33,24 @@ export interface CareerPlayerAirframe {
   /** When false, omitted from Aircraft Market. Owned fleet still resolves. Default true. */
   enabled?: boolean;
   /**
-   * When false, Dispatch uses native SimBrief / tablet load even in a
-   * direct-injection class. Default true (follow the economic class).
+   * Load policy override vs the economic class default:
+   * - `false` — force native SimBrief / EFB even in a direct-injection class
+   * - `true` — enable Skyline inject even in an EFB-default class
+   * - omitted — follow CAREER_AIRCRAFT_CLASSES
    */
   injectCapable?: boolean;
+  /**
+   * How freight is staged into SimBrief / EFB:
+   * - omitted / `freighter` — cargo-only (pax≤1 for EFB pilot)
+   * - `pax_and_cargo` — fill cabin seats first (SimBrief 175 lb/pax), remainder as freight
+   *   so Mass & Balance CG stays in envelope on passenger airframes
+   */
+  loadLayout?: 'freighter' | 'pax_and_cargo';
+  /**
+   * Optional catalog fallback for cabin seats when SimBrief airframes.json
+   * is unreachable. Live Dispatch prefers `airframe_passengers` from SimBrief.
+   */
+  maxPaxSeats?: number;
   /** Optional real-airframe weights — prefer over SimBrief proxy for light GA caps. */
   oewKg?: number;
   mtowKg?: number;

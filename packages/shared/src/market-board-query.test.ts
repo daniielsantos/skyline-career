@@ -106,7 +106,7 @@ describe('queryMarketBoardPage', () => {
     row({ payUsd: 300, distanceNm: 200, commodityName: 'C', availableKg: 100, expiresAtTick: 60 }),
   ];
 
-  it('defaults to unlocked-first (stable) and paginates', () => {
+  it('defaults to idle soft-rank (stable) and paginates', () => {
     const page1 = queryMarketBoardPage(rows, {
       currentTick: 0,
       page: 1,
@@ -114,7 +114,7 @@ describe('queryMarketBoardPage', () => {
     });
     assert.equal(page1.total, 3);
     assert.equal(page1.pageCount, 2);
-    // All unlocked → preserve input order within access.
+    // No Access default — equal idle ranks keep input order.
     assert.deepEqual(
       page1.rows.map((r) => r.payUsd),
       [100, 500],
@@ -168,6 +168,7 @@ describe('queryMarketBoardPage', () => {
       [400, 200, 900],
     );
   });
+
   it('crewFilter splits Crew needed vs Aircraft needed', () => {
     const mixed = [
       row({ payUsd: 100, crewNeeded: true, commodityName: 'Crew' }),

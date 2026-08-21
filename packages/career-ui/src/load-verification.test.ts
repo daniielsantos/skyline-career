@@ -4,6 +4,7 @@ import {
   formatPayloadDueLine,
   inferMissingOuterTanks,
   matchFuelOk,
+  payloadMatchToleranceLb,
   pickFuelTankBreakdown,
   stabilizeDisplayedFuel,
 } from './load-verification.js';
@@ -103,6 +104,22 @@ describe('matchFuelOk', () => {
 
   it('still allows taxi burn undershoot', () => {
     assert.equal(matchFuelOk(1700, 1858, 50), true);
+  });
+
+  it('scales taxi slack for heavy-jet start/taxi burn', () => {
+    // Flat 150 + tol 50 was only 200 lb — B707 burned ~278 before wheels-up.
+    assert.equal(matchFuelOk(29_371, 29_649, 50), true);
+    assert.equal(matchFuelOk(29_000, 29_649, 50), false);
+  });
+});
+
+describe('payloadMatchToleranceLb', () => {
+  it('covers EFB station rounding on large freighter sheets', () => {
+    // Sim 64567 vs Due 64659 = 92 lb (~0.14%); flat 75 failed Ready.
+    const tol = payloadMatchToleranceLb(64_659);
+    assert.ok(tol >= 92);
+    assert.equal(Math.abs(64_567 - 64_659) <= tol, true);
+    assert.equal(payloadMatchToleranceLb(1_000), 75);
   });
 });
 

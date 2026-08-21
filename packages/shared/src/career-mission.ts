@@ -254,6 +254,11 @@ export function missionLoadPolicy(mission: {
   if (airframe?.injectCapable === false) {
     return { loadMethod: 'native-simbrief', injectCapable: false };
   }
+  // Homologated SKUs may opt into Skyline inject via airframe.injectCapable
+  // even when the class defaults to EFB-only (narrow/wide freighter).
+  if (airframe?.injectCapable === true) {
+    return { loadMethod: 'direct-injection', injectCapable: true };
+  }
   return {
     loadMethod: aircraft.loadMethod,
     injectCapable: aircraft.injectCapable,
@@ -320,6 +325,12 @@ export function careerLoadWeightMatchOk(
 export const DEFAULT_FUEL_TAXI_BURN_LB = 150;
 
 /**
+ * Heavy jets burn far more than 150 lb before takeoff. Keep at least this
+ * fraction of Due as taxi/APU slack (still capped by FUEL_TAXI_BURN_MAX…).
+ */
+export const FUEL_TAXI_BURN_MIN_FRACTION_OF_PLANNED = 0.01;
+
+/**
  * Taxi slack cannot exceed this fraction of Due — otherwise a short OFP
  * (e.g. 187 lb) stays READY after an EFB drain almost to empty.
  */
@@ -350,10 +361,40 @@ export function fuelTaxiBurnAllowanceLb(
   taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
 ): number {
   if (!Number.isFinite(plannedLb) || plannedLb <= 0) return 0;
-  return Math.min(
+  const scaled = Math.max(
     Math.max(0, taxiBurnLb),
-    plannedLb * FUEL_TAXI_BURN_MAX_FRACTION_OF_PLANNED,
+    plannedLb * FUEL_TAXI_BURN_MIN_FRACTION_OF_PLANNED,
   );
+  return Math.min(scaled, plannedLb * FUEL_TAXI_BURN_MAX_FRACTION_OF_PLANNED);
+}
+
+/** Symmetric |Sim−Due| band used with taxi undershoot (Career OFP defaults). */
+export function fuelMatchToleranceLb(
+  plannedLb: number | undefined,
+  absLb = 50,
+  pct = 0.03,
+): number {
+  if (plannedLb === undefined || !Number.isFinite(plannedLb)) {
+    return Math.max(0, absLb);
+  }
+  return Math.max(Math.max(0, absLb), Math.abs(plannedLb) * Math.max(0, pct));
+}
+
+/**
+ * EFB station rounding on large freighter sheets is often ~0.1–0.2% off the
+ * OFP/mission figure. Floor stays 75 lb for GA / light twins.
+ */
+export const DEFAULT_PAYLOAD_TOL_FRACTION = 0.002;
+
+export function payloadMatchToleranceLb(
+  plannedLb: number | undefined,
+  absLb = 75,
+  pct = DEFAULT_PAYLOAD_TOL_FRACTION,
+): number {
+  if (plannedLb === undefined || !Number.isFinite(plannedLb)) {
+    return Math.max(0, absLb);
+  }
+  return Math.max(Math.max(0, absLb), Math.abs(plannedLb) * Math.max(0, pct));
 }
 
 /**
@@ -2457,7 +2498,7 @@ export interface IntentOfpTolerances {
   cargoUnderAbsKg: number;
   /** Relative under-tolerance vs intent. Default 0.05. */
   cargoUnderPct: number;
-  /** Max allowed OFP passenger count when mission.pax is 0. Default 0. */
+  /** Max allowed OFP passenger count above mission.pax. Default 1 (EFB pilot). */
   maxExtraPax: number;
 }
 
@@ -2466,7 +2507,9 @@ export const DEFAULT_INTENT_OFP_TOLERANCES: IntentOfpTolerances = {
   cargoPct: 0.03,
   cargoUnderAbsKg: 100,
   cargoUnderPct: 0.05,
-  maxExtraPax: 0,
+  // Navigraph SimBrief EFB weight import requires ≥1 pax (counts as pilot)
+  // even on freighters — see dispatch redirect pax=1.
+  maxExtraPax: 1,
 };
 
 export interface IntentOfpCheck {
@@ -2620,6 +2663,85 @@ export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
   return unit === 'kg' ? value : value / KG_TO_LB;
 }
 
+/** SimBrief default passenger mass (lb) — `paxwgt` / Dispatch Redirect `pax`. */
+export const SIMBRIEF_STANDARD_PAX_LB = 175;
+/**
+ * SimBrief default checked-bag mass per passenger (lb) — `bagwgt`.
+ * Dispatch still adds this on top of `cargo=` when `pax` &gt; 0.
+ */
+export const SIMBRIEF_STANDARD_BAG_PER_PAX_LB = 55;
+/** Payload reserved per seat in SimBrief: body + bag (175+55). */
+export const SIMBRIEF_STANDARD_PAX_WITH_BAG_LB =
+  SIMBRIEF_STANDARD_PAX_LB + SIMBRIEF_STANDARD_BAG_PER_PAX_LB;
+
+/**
+ * Split career freight into SimBrief `pax` + `cargo` for `pax_and_cargo` airframes.
+ *
+ * SimBrief payload = (pax × paxwgt) + (pax × bagwgt) + cargo.
+ * We must reserve {@link SIMBRIEF_STANDARD_PAX_WITH_BAG_LB} per seat before the
+ * leftover becomes the `cargo=` freight field — otherwise MZFW fills and OFP
+ * overshoots the mission.
+ */
+export function planPaxAndCargoSimBriefLoad(opts: {
+  cargoKg: number;
+  maxPax: number;
+  /** Default {@link SIMBRIEF_STANDARD_PAX_LB}. */
+  paxWeightLb?: number;
+  /** Default {@link SIMBRIEF_STANDARD_BAG_PER_PAX_LB}. */
+  bagPerPaxLb?: number;
+}): { pax: number; cargoKg: number; paxKg: number; bagKg: number } {
+  const paxLb = opts.paxWeightLb ?? SIMBRIEF_STANDARD_PAX_LB;
+  const bagLb = opts.bagPerPaxLb ?? SIMBRIEF_STANDARD_BAG_PER_PAX_LB;
+  const perSeatLb = paxLb + bagLb;
+  const maxPax = Math.max(0, Math.floor(opts.maxPax));
+  const totalLb = Math.max(0, opts.cargoKg) * KG_TO_LB;
+  let pax = Math.min(maxPax, Math.floor(totalLb / perSeatLb));
+  // Navigraph MSFS EFB import still needs ≥1 passenger (pilot) when any load exists.
+  if (pax < 1 && totalLb > 0 && maxPax >= 1) {
+    pax = 1;
+  }
+  const reservedLb = pax * perSeatLb;
+  const cargoLb = Math.max(0, totalLb - reservedLb);
+  return {
+    pax,
+    paxKg: (pax * paxLb) / KG_TO_LB,
+    bagKg: (pax * bagLb) / KG_TO_LB,
+    cargoKg: cargoLb / KG_TO_LB,
+  };
+}
+
+export function isPaxAndCargoLoadLayout(
+  airframe: { loadLayout?: string; maxPaxSeats?: number } | null | undefined,
+): boolean {
+  return airframe?.loadLayout === 'pax_and_cargo';
+}
+
+/**
+ * Freight the OFP contributes toward mission.cargoKg.
+ * `pax_and_cargo`: prefer SimBrief payload (already pax×paxwgt + bags + cargo);
+ * fallback baggage + pax×175 when payload is missing.
+ */
+export function ofpFreightTowardMissionKg(
+  ofp: OfpExpectation,
+  airframe?: { loadLayout?: string; maxPaxSeats?: number } | null,
+): number | undefined {
+  if (!isPaxAndCargoLoadLayout(airframe)) {
+    return ofpCargoKg(ofp);
+  }
+  const sheet = ofp.loadSheet;
+  const unit = sheet?.unit ?? ofp.fuel.unit ?? 'kg';
+  const payload = sheet?.payload ?? ofp.payload?.total;
+  if (payload !== undefined && Number.isFinite(payload)) {
+    return unit === 'kg' ? payload : payload / KG_TO_LB;
+  }
+  const bag = ofpCargoKg(ofp);
+  const pax = sheet?.passengerCount ?? 0;
+  const paxKg = (pax * SIMBRIEF_STANDARD_PAX_LB) / KG_TO_LB;
+  if (bag === undefined && pax <= 0) return undefined;
+  // Baggage line already includes SimBrief per-pax bagwgt + freight.
+  return (bag ?? 0) + paxKg;
+}
+
 function worstVerdict(findings: ComplianceFinding[]): ComplianceVerdict {
   if (findings.some((f) => f.severity === 'fail')) return 'fail';
   if (findings.some((f) => f.severity === 'warn')) return 'warn';
@@ -2674,25 +2796,34 @@ export function compareMissionIntentToOfp(
     });
   }
 
+  const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
   const ofpPax = ofp.loadSheet?.passengerCount;
+  const maxAllowedOfpPax = isPaxAndCargoLoadLayout(airframe)
+    ? typeof airframe?.maxPaxSeats === 'number' && airframe.maxPaxSeats > 0
+      ? Math.max(airframe.maxPaxSeats, mission.pax + tolerances.maxExtraPax)
+      : // Live max comes from SimBrief at Dispatch; without a catalog cache,
+        // freight-total check is the real gate — do not fail on cabin count alone.
+        Number.POSITIVE_INFINITY
+    : mission.pax + tolerances.maxExtraPax;
   if (ofpPax === undefined) {
     findings.push({
       code: 'INTENT_PAX_MISSING',
       severity: 'warn',
-      message: 'OFP has no passenger count — freighter missions expect pax=0',
+      message:
+        'OFP has no passenger count — freighter missions allow 0–1 (pilot for EFB)',
     });
-  } else if (ofpPax > mission.pax + tolerances.maxExtraPax) {
+  } else if (ofpPax > maxAllowedOfpPax) {
     findings.push({
       code: 'INTENT_PAX_MISMATCH',
       severity: 'fail',
-      message: `OFP pax=${ofpPax} but mission expects pax=${mission.pax}`,
-      expected: mission.pax,
+      message: `OFP pax=${ofpPax} but mission expects pax≤${maxAllowedOfpPax}`,
+      expected: maxAllowedOfpPax,
       actual: ofpPax,
-      delta: ofpPax - mission.pax,
+      delta: ofpPax - maxAllowedOfpPax,
     });
   }
 
-  const ofpCargo = ofpCargoKg(ofp);
+  const ofpCargo = ofpFreightTowardMissionKg(ofp, airframe);
   if (ofpCargo === undefined) {
     findings.push({
       code: 'INTENT_CARGO_MISSING',

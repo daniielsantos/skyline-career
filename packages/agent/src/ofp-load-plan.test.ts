@@ -1337,6 +1337,49 @@ describe('buildOfpLoadPlan', () => {
   });
 });
 
+describe('plannedStationPayloadLb', () => {
+  it('GA soft-cap on passenger seats crushes jet freight Due (~1010 lb)', () => {
+    // B707 pax_and_cargo roles: cabin seats + holds. Soft-cap is for GA only.
+    const crushed = plannedStationPayloadLb({
+      cargoLb: 64_567,
+      stationRoles: {
+        crewStations: [1, 2],
+        passengerStations: [4, 5],
+        baggageStations: [6, 7, 8],
+      },
+    });
+    assert.equal(crushed.gaCabin, true);
+    assert.equal(crushed.cargoPlacedLb, 1010);
+    assert.equal(crushed.plannedTotalLb, 1350);
+
+    // Career Due: treat cabin as freighter capacity (no passenger soft-cap).
+    const freighterStyle = plannedStationPayloadLb({
+      cargoLb: 64_567,
+      stationRoles: {
+        crewStations: [1, 2],
+        passengerStations: [],
+        baggageStations: [4, 5, 6, 7, 8],
+      },
+    });
+    assert.equal(freighterStyle.gaCabin, false);
+    assert.equal(freighterStyle.cargoPlacedLb, 64_567);
+    assert.equal(freighterStyle.plannedTotalLb, 64_907);
+  });
+
+  it('pax_and_cargo Due omits crew floor (EFB sheet already has S1/S2)', () => {
+    const due = plannedStationPayloadLb({
+      cargoLb: 64_659,
+      stationRoles: {
+        crewStations: [],
+        passengerStations: [],
+        baggageStations: [1, 2, 4, 5, 6, 7, 8],
+      },
+    });
+    assert.equal(due.crewLb, 0);
+    assert.equal(due.plannedTotalLb, 64_659);
+  });
+});
+
 describe('adjustPlannedPayloadForLiveCrewStations', () => {
   it('drops crew floor when S1/S2 are empty (EFB cargo-only)', () => {
     const base = plannedStationPayloadLb({
@@ -1367,6 +1410,19 @@ describe('adjustPlannedPayloadForLiveCrewStations', () => {
     assert.equal(adj.crewOnStations, true);
     assert.equal(adj.crewLb, 340);
     assert.equal(adj.plannedTotalLb, 2340);
+  });
+
+  it('tracks partial EFB crew instead of demanding the full floor', () => {
+    // B707 GNS after SimBrief EFB import: one pilot on S1, cargo on aft stations.
+    const adj = adjustPlannedPayloadForLiveCrewStations({
+      cargoPlacedLb: 40_040,
+      crewLb: 340,
+      crewStations: [1, 2],
+      liveStations: { 1: 175, 2: 0, 6: 13_341, 7: 13_341, 8: 13_341 },
+    });
+    assert.equal(adj.crewOnStations, true);
+    assert.equal(adj.crewLb, 175);
+    assert.equal(adj.plannedTotalLb, 40_215);
   });
 
   it('keeps full Due when live stations are unknown', () => {

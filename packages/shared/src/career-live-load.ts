@@ -1,4 +1,4 @@
-import { careerFuelMatchOk, careerLoadWeightMatchOk, careerPreflightReady } from './career-mission.js';
+import { careerFuelMatchOk, careerLoadWeightMatchOk, careerPreflightReady, payloadMatchToleranceLb } from './career-mission.js';
 import {
   DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
@@ -122,7 +122,12 @@ export function resolveLivePayloadLb(opts: {
 
 export type LoadVerificationWeights = {
   ready: boolean;
-  fuel: { plannedLb?: number; liveLb: number; ok: boolean };
+  fuel: {
+    plannedLb?: number;
+    liveLb: number;
+    ok: boolean;
+    taxiBurnLb?: number;
+  };
   payload: { plannedLb?: number; liveLb?: number; ok: boolean };
 };
 
@@ -424,9 +429,13 @@ export function evaluateLoadVerification(opts: {
   livePayloadLb?: number;
   fuelTolLb?: number;
   payloadTolLb?: number;
+  /** Prefer SimBrief OFP taxi fuel when known (else default flat/1% floor). */
+  taxiBurnLb?: number;
 }): LoadVerificationWeights {
   const fuelTol = opts.fuelTolLb ?? DEFAULT_FUEL_TOL_LB;
-  const payloadTol = opts.payloadTolLb ?? DEFAULT_PAYLOAD_TOL_LB;
+  const payloadTol =
+    opts.payloadTolLb ??
+    payloadMatchToleranceLb(opts.plannedPayloadLb);
   const liveFuel =
     typeof opts.liveFuelLb === 'number' && Number.isFinite(opts.liveFuelLb)
       ? opts.liveFuelLb
@@ -440,6 +449,7 @@ export function evaluateLoadVerification(opts: {
     liveFuel,
     opts.plannedFuelLb,
     fuelTol,
+    opts.taxiBurnLb,
   );
   const payloadOk = careerLoadWeightMatchOk(
     livePayload,
@@ -457,6 +467,9 @@ export function evaluateLoadVerification(opts: {
       plannedLb: opts.plannedFuelLb,
       liveLb: liveFuel ?? 0,
       ok: fuelOk,
+      ...(typeof opts.taxiBurnLb === 'number'
+        ? { taxiBurnLb: opts.taxiBurnLb }
+        : {}),
     },
     payload: {
       plannedLb: opts.plannedPayloadLb,

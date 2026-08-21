@@ -26,6 +26,8 @@ export interface OfpLoadSheet {
   blockFuel?: number;
   /** SimBrief "Enroute Burn". */
   enrouteBurn?: number;
+  /** SimBrief planned TAXI fuel (same unit as block). */
+  taxiFuel?: number;
   /** SimBrief "Pass" / passenger count (heads, not weight). */
   passengerCount?: number;
   /** SimBrief "Baggage" weight. */

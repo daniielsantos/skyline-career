@@ -2,8 +2,8 @@
   "source": "simbrief",
   "icao": "B703",
   "ofpId": "inibuilds-boeing-b707-gns",
-  "loadMethod": "direct-injection",
-  "injectCapable": true,
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
   "matchTitles": [
     "Boeing B707 GNS"
   ],
@@ -11,9 +11,11 @@
   "notes": [
     "Boeing B707 GNS — auto roles pack from homologated profile",
     "Profile: inibuilds/boeing-b707-gns@1.0.0",
-    "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Fuel strategy: simconnect-direct"
+    "loadMethod: native-simbrief; injectCapable: false — load via EFB import",
+    "loadLayout: pax_and_cargo — reserve 230 lb/seat (175 paxwgt + 55 bagwgt), remainder as cargo=",
+    "Cabin S5 (+S4) as passengers; holds S6–S8 as baggage; S3 unused",
+    "Fuel strategy: simconnect-direct",
+    "CG-limited payload ~65000 lb (maxCargoKg 29329); maxPaxSeats catalog=194 fallback only"
   ],
   "fuel": {
     "unit": "lb"
@@ -28,15 +30,15 @@
         1,
         2
       ],
-      "baggageStations": [
-        3,
+      "passengerStations": [
         4,
-        5,
+        5
+      ],
+      "baggageStations": [
         6,
         7,
         8
-      ],
-      "passengerStations": []
+      ]
     }
   },
   "liveSources": {
@@ -69,19 +71,19 @@
       "simVarIndex": 3,
       "cfgIndex": 2,
       "name": "Station 3",
-      "role": "baggage"
+      "role": "unused"
     },
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
       "name": "Station 4",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 5,
       "cfgIndex": 4,
       "name": "Station 5",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 6,

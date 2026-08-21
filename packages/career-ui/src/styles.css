@@ -398,6 +398,22 @@ body {
   border: 1px solid var(--line);
 }
 
+.topbar-metrics button.metric {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.topbar-metrics button.metric:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.topbar-metrics button.metric:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .topbar-metrics .metric .label {
   display: block;
   font-size: 0.6rem;
@@ -1214,6 +1230,26 @@ th {
   gap: 1.1rem;
 }
 
+.dispatch-boot-loading {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1.1rem;
+  min-height: 14rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.dispatch-boot-loading h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.dispatch-boot-loading .muted {
+  margin: 0;
+  max-width: 28rem;
+}
+
 .dispatch-stepper {
   list-style: none;
   margin: 0;
@@ -1349,6 +1385,35 @@ th {
   padding: 0.85rem 1rem;
   border: 1px solid var(--line);
   background: var(--surface);
+}
+
+.dispatch-step-card-loading {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.75rem 0.85rem;
+}
+
+.dispatch-preflight-wait {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.dispatch-preflight-wait-error {
+  color: var(--danger, #c44);
+}
+
+.dispatch-preflight-wait-hint {
+  color: var(--muted);
+}
+
+.dispatch-primary-actions .accept,
+.dispatch-primary-actions .action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
 }
 
 .dispatch-step-card strong {
@@ -3346,6 +3411,14 @@ tr.lot-locked {
   gap: 0.65rem;
 }
 
+.cargo-dialog-actions .accept,
+.staging-head-actions .accept {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
 @media (max-width: 860px) {
   .staging-capacity,
   .cargo-capacity {
@@ -4081,6 +4154,10 @@ tr.lot-locked {
   text-align: left;
 }
 
+.pilot-travel-dialog .fbo-icao-switcher {
+  margin: 0 0 0.75rem;
+}
+
 .pilot-chip:disabled {
   cursor: default;
   opacity: 0.7;
@@ -4406,6 +4483,23 @@ tr.lot-locked {
 .hangar-primary {
   width: 100%;
   align-self: stretch;
+}
+
+.hangar-travel {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  border-color: var(--line);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.hangar-travel:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
 }
 
 .hangar-move {
@@ -7160,7 +7254,7 @@ button.linkish {
 .confirm-overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 120;
   display: grid;
   place-items: center;
   padding: 1.25rem;
@@ -8719,6 +8813,27 @@ span.dispatch-route-hub-dest {
 .ports-wh-shelf-tab:disabled:not(.active) {
   opacity: 0.5;
   cursor: default;
+}
+
+.ports-wh-buy-filter {
+  display: block;
+  flex: 0 0 auto;
+  margin: 0 0 0.15rem;
+}
+
+.ports-wh-buy-filter input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.05rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2, var(--surface));
+  font: inherit;
+  color: var(--ink);
+}
+
+.ports-wh-buy-filter input::placeholder {
+  color: var(--muted);
 }
 
 .ports-wh-buy-list {

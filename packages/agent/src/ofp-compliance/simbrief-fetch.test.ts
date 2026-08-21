@@ -22,7 +22,7 @@ describe('mapSimBriefOfpToExpectation', () => {
         aircraft: { icaocode: 'B738' },
         origin: { icao_code: 'SBGR' },
         destination: { icao_code: 'SBGL' },
-        fuel: { plan_ramp: '5236', enroute_burn: '2299' },
+        fuel: { plan_ramp: '5236', enroute_burn: '2299', taxi: '400' },
         weights: {
           oew: '42264',
           pax_count: '156',
@@ -50,6 +50,7 @@ describe('mapSimBriefOfpToExpectation', () => {
 
     assert.equal(ofp.source, 'simbrief');
     assert.equal(ofp.fuel.total, 5236);
+    assert.equal(ofp.loadSheet?.taxiFuel, 400);
     assert.equal(ofp.loadSheet?.passengerCount, 156);
     assert.equal(ofp.loadSheet?.baggage, 3892);
     assert.equal(ofp.loadSheet?.payload, 17336);

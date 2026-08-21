@@ -365,6 +365,7 @@ export function PortsPanel(props: {
   const [selectedBuyHubIcao, setSelectedBuyHubIcao] = useState<string | null>(
     null,
   );
+  const [buyHubQuery, setBuyHubQuery] = useState('');
   const [demandSort, setDemandSort] = useState<DemandSort>({
     key: 'expires',
     direction: 'asc',
@@ -1301,6 +1302,14 @@ export function PortsPanel(props: {
     }
     return map;
   }, [snap?.ports]);
+  const filteredBuyableHubs = useMemo(() => {
+    const q = buyHubQuery.trim().toLowerCase();
+    if (!q) return allBuyableHubs;
+    return allBuyableHubs.filter((icao) => {
+      const name = (portForHub.get(icao)?.name ?? '').toLowerCase();
+      return icao.toLowerCase().includes(q) || name.includes(q);
+    });
+  }, [allBuyableHubs, buyHubQuery, portForHub]);
   const allWarehouseStock = useMemo(() => {
     const whById = new Map(
       (warehouses?.warehouses ?? []).map((w) => [w.id, w]),
@@ -1412,11 +1421,11 @@ export function PortsPanel(props: {
   useEffect(() => {
     if (
       selectedBuyHubIcao &&
-      !allBuyableHubs.includes(selectedBuyHubIcao.trim().toUpperCase())
+      !filteredBuyableHubs.includes(selectedBuyHubIcao.trim().toUpperCase())
     ) {
       setSelectedBuyHubIcao(null);
     }
-  }, [allBuyableHubs, selectedBuyHubIcao]);
+  }, [filteredBuyableHubs, selectedBuyHubIcao]);
 
   function selectStockLot(stockId: string, hubIcao: string) {
     const next = selectedStockId === stockId ? null : stockId;
@@ -2654,8 +2663,28 @@ export function PortsPanel(props: {
                         Every port pickup hub already has a warehouse.
                       </p>
                     ) : (
+                      <>
+                        <label className="ports-wh-buy-filter">
+                          <input
+                            type="search"
+                            value={buyHubQuery}
+                            onChange={(event) =>
+                              setBuyHubQuery(event.target.value)
+                            }
+                            placeholder="Filter ICAO or name…"
+                            disabled={props.busy || loading}
+                            autoComplete="off"
+                            spellCheck={false}
+                            aria-label="Filter available warehouses"
+                          />
+                        </label>
+                        {filteredBuyableHubs.length === 0 ? (
+                          <p className="empty">
+                            No hubs match “{buyHubQuery.trim()}”.
+                          </p>
+                        ) : (
                       <div className="ports-wh-buy-list">
-                        {allBuyableHubs.map((icao) => {
+                        {filteredBuyableHubs.map((icao) => {
                           const buyUsd = buyUsdByIcao[icao];
                           const linked = portForHub.get(icao);
                           const selected =
@@ -2726,6 +2755,8 @@ export function PortsPanel(props: {
                           );
                         })}
                       </div>
+                        )}
+                      </>
                     )}
                     </div>
                   </div>

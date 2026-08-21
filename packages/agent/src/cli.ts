@@ -2199,7 +2199,7 @@ async function main(): Promise<void> {
         type,
         orig: mission.originIcao,
         dest: mission.destIcao,
-        pax: 0,
+        pax: 1,
         ...(usePayloadPrefill
           ? { manualPayload: cargoThousands }
           : { cargo: cargoThousands }),
@@ -2216,7 +2216,7 @@ async function main(): Promise<void> {
       console.log(`static_id=${staticId}`);
       console.log(`Dispatch URL:\n  ${url}`);
       console.log(
-        `Prefill: ${mission.originIcao}→${mission.destIcao}  pax=0  cargo=${mission.cargoKg} kg (${cargoThousands} thousands)`,
+        `Prefill: ${mission.originIcao}→${mission.destIcao}  pax=1 (EFB pilot)  cargo=${mission.cargoKg} kg (${cargoThousands} thousands)`,
       );
       console.log('Fuel planning left to SimBrief AUTO (not sent).');
 

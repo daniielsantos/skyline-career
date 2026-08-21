@@ -696,8 +696,9 @@ export function HangarAircraftCard(props: {
   catalog?: AircraftCatalogEntry;
   busy: boolean;
   hubOptions: FerryHubOption[];
-  ferryDest: string;
-  travelDest: string;
+  /** One-shot prefill when App navigates to Hangar with a target dest. */
+  preferredFerryDest?: string;
+  ferrySeedToken?: number;
   pilotIcao: string;
   ownedCount: number;
   hasListed: boolean;
@@ -705,8 +706,6 @@ export function HangarAircraftCard(props: {
   formatMass: (kg: number) => string;
   weightSystem?: WeightSystem;
   onOpenAirport: (icao: string) => void;
-  onFerryDestChange: (icao: string) => void;
-  onTravelDestChange: (icao: string) => void;
   onClearMaintenance: (id: string) => void;
   onRepair: (id: string) => void;
   onUnlist: (id: string) => void;
@@ -765,9 +764,8 @@ export function HangarAircraftCard(props: {
     props.pilotIcao.trim().toUpperCase() ===
     acf.locationIcao.trim().toUpperCase();
   const pilotLabel = props.pilotIcao.trim().toUpperCase() || '—';
-  const [moveMode, setMoveMode] = useState<'ferry' | 'pilot'>(
-    pilotHere ? 'ferry' : 'pilot',
-  );
+  const [ferryDest, setFerryDest] = useState('');
+  const [appliedFerrySeedToken, setAppliedFerrySeedToken] = useState(0);
   const [ferryPlan, setFerryPlan] = useState<FerryPlanView | null>(null);
   const [ferryPlanError, setFerryPlanError] = useState<string | null>(null);
   const [ferryPlanLoading, setFerryPlanLoading] = useState(false);
@@ -776,14 +774,36 @@ export function HangarAircraftCard(props: {
     null,
   );
   const journeyOriginRef = useRef<string | null>(null);
-  const showMove =
-    acf.status === 'parked' || acf.status === 'maintenance';
+  const showMove = acf.status === 'parked' || acf.status === 'maintenance';
   const showManage =
     canRepair || canList || canSell || canBuyout || canReturnLease;
 
-  const ferryFinal = props.ferryDest.trim().toUpperCase();
+  // Prefill from App navigation (market/board → Hangar) without syncing
+  // every card while the player types a dest on one of them.
   useEffect(() => {
-    if (moveMode !== 'ferry' || acf.status !== 'parked' || !ferryFinal) {
+    const seed = props.preferredFerryDest?.trim().toUpperCase() ?? '';
+    const token = props.ferrySeedToken ?? 0;
+    if (!seed || !token || token === appliedFerrySeedToken) return;
+    const here = acf.locationIcao.trim().toUpperCase();
+    if (here !== seed) setFerryDest(seed);
+    setAppliedFerrySeedToken(token);
+  }, [
+    props.preferredFerryDest,
+    props.ferrySeedToken,
+    appliedFerrySeedToken,
+    acf.locationIcao,
+  ]);
+
+  // Clear dest once this airframe arrives.
+  useEffect(() => {
+    const here = acf.locationIcao.trim().toUpperCase();
+    const dest = ferryDest.trim().toUpperCase();
+    if (dest && here === dest) setFerryDest('');
+  }, [acf.locationIcao, ferryDest]);
+
+  const ferryFinal = ferryDest.trim().toUpperCase();
+  useEffect(() => {
+    if (acf.status !== 'parked' || !ferryFinal) {
       setFerryPlan(null);
       setFerryPlanError(null);
       setFerryPlanLoading(false);
@@ -827,7 +847,7 @@ export function HangarAircraftCard(props: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [acf.id, acf.locationIcao, acf.status, ferryFinal, moveMode]);
+  }, [acf.id, acf.locationIcao, acf.status, ferryFinal]);
 
   const primaryAction =
     acf.status === 'maintenance'
@@ -835,26 +855,24 @@ export function HangarAircraftCard(props: {
           label: 'Inspect',
           title: 'Pay inspection to clear AOG',
           onClick: () => props.onClearMaintenance(acf.id),
+          tone: 'accent' as const,
         }
       : acf.status === 'listed'
         ? {
             label: 'Unlist',
             title: 'Remove from Airframes market',
             onClick: () => props.onUnlist(acf.id),
+            tone: 'accent' as const,
           }
         : acf.status === 'parked' && !pilotHere
           ? {
               label: 'Travel here',
               title: `Travel to ${acf.locationIcao} (pilot reposition)`,
               onClick: () => props.onTravel(acf.locationIcao),
+              tone: 'quiet' as const,
             }
           : null;
 
-  const moveExcludeIcao =
-    moveMode === 'ferry' ? acf.locationIcao : props.pilotIcao;
-  const moveValue = moveMode === 'ferry' ? props.ferryDest : props.travelDest;
-  const moveOnChange =
-    moveMode === 'ferry' ? props.onFerryDestChange : props.onTravelDestChange;
   const ferryBlockedForBush =
     /ferry unavailable|flown mission/i.test(ferryPlanError ?? '');
   const destReady =
@@ -862,16 +880,12 @@ export function HangarAircraftCard(props: {
     ferryFinal !== acf.locationIcao.trim().toUpperCase();
   /** Empty Watch reposition — always offered when a dest is picked. */
   const emptyFlightReady =
-    moveMode === 'ferry' && destReady && acf.status === 'parked';
+    destReady && acf.status === 'parked';
   const ferryReady = Boolean(
-    moveMode === 'ferry' &&
-      destReady &&
+    destReady &&
       !ferryPlanLoading &&
       !ferryPlanError &&
       ferryPlan,
-  );
-  const moveReady = Boolean(
-    moveMode === 'ferry' ? ferryReady || emptyFlightReady : moveValue?.trim(),
   );
   const multiLeg = Boolean(ferryPlan && ferryPlan.legCount > 1);
 
@@ -1042,7 +1056,11 @@ export function HangarAircraftCard(props: {
           {primaryAction ? (
             <button
               type="button"
-              className="accept hangar-primary"
+              className={
+                primaryAction.tone === 'quiet'
+                  ? 'action ghost hangar-primary hangar-travel'
+                  : 'accept hangar-primary'
+              }
               disabled={props.busy}
               title={primaryAction.title}
               onClick={primaryAction.onClick}
@@ -1055,99 +1073,59 @@ export function HangarAircraftCard(props: {
         <div className="hangar-footer-move">
           {showMove ? (
             <div className="hangar-move">
-              <div
-                className="hangar-move-toggle"
-                role="group"
-                aria-label="Move mode"
-              >
-                <button
-                  type="button"
-                  className={moveMode === 'ferry' ? 'is-active' : undefined}
-                  disabled={props.busy || acf.status !== 'parked'}
-                  onClick={() => setMoveMode('ferry')}
-                >
-                  Aircraft
-                </button>
-                <button
-                  type="button"
-                  className={moveMode === 'pilot' ? 'is-active' : undefined}
-                  disabled={props.busy}
-                  onClick={() => setMoveMode('pilot')}
-                >
-                  Pilot
-                </button>
-              </div>
               <div className="hangar-move-row">
                 <label className="staging-aircraft ferry-hub-label">
-                  {moveMode === 'ferry' ? 'Destination' : 'Travel to'}
+                  Destination
                   <FerryHubCombobox
                     hubs={props.hubOptions}
-                    excludeIcao={moveExcludeIcao}
-                    value={moveValue}
+                    excludeIcao={acf.locationIcao}
+                    value={ferryDest}
                     onChange={(icao) => {
-                      if (moveMode === 'ferry') {
-                        journeyOriginRef.current = null;
-                      }
-                      moveOnChange(icao);
+                      journeyOriginRef.current = null;
+                      setFerryDest(icao);
                     }}
-                    disabled={
-                      props.busy ||
-                      (moveMode === 'ferry' && acf.status !== 'parked')
-                    }
+                    disabled={props.busy || acf.status !== 'parked'}
                   />
                 </label>
-                {moveMode === 'ferry' ? (
-                  <>
-                    <button
-                      type="button"
-                      className="ghost hangar-move-go"
-                      disabled={
-                        props.busy || !ferryReady || acf.status !== 'parked'
-                      }
-                      onClick={() => {
-                        setFerryJourneyFinal(ferryFinal);
-                        setFerryJourneyOpen(true);
-                      }}
-                      title={
-                        ferryBlockedForBush
-                          ? ferryPlanError ?? 'Instant ferry unavailable'
-                          : multiLeg
-                            ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
-                            : `Instant ferry ${acf.locationIcao} → ${ferryFinal}`
-                      }
-                    >
-                      {multiLeg && ferryReady
-                        ? `Ferry · ${ferryPlan?.legCount} legs`
-                        : 'Plan ferry'}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost hangar-move-go"
-                      disabled={
-                        props.busy ||
-                        !emptyFlightReady ||
-                        acf.status !== 'parked'
-                      }
-                      onClick={() =>
-                        void props.onEmptyFlight(acf.id, ferryFinal)
-                      }
-                      title={`Empty Watch flight ${acf.locationIcao} → ${ferryFinal} (no contract)`}
-                    >
-                      Plan empty flight
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="ghost hangar-move-go"
-                    disabled={props.busy || !moveReady}
-                    onClick={() => props.onTravel(props.travelDest)}
-                  >
-                    Go
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="ghost hangar-move-go"
+                  disabled={
+                    props.busy || !ferryReady || acf.status !== 'parked'
+                  }
+                  onClick={() => {
+                    setFerryJourneyFinal(ferryFinal);
+                    setFerryJourneyOpen(true);
+                  }}
+                  title={
+                    ferryBlockedForBush
+                      ? ferryPlanError ?? 'Instant ferry unavailable'
+                      : multiLeg
+                        ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
+                        : `Instant ferry ${acf.locationIcao} → ${ferryFinal}`
+                  }
+                >
+                  {multiLeg && ferryReady
+                    ? `Ferry · ${ferryPlan?.legCount} legs`
+                    : 'Plan ferry'}
+                </button>
+                <button
+                  type="button"
+                  className="ghost hangar-move-go"
+                  disabled={
+                    props.busy ||
+                    !emptyFlightReady ||
+                    acf.status !== 'parked'
+                  }
+                  onClick={() =>
+                    void props.onEmptyFlight(acf.id, ferryFinal)
+                  }
+                  title={`Empty Watch flight ${acf.locationIcao} → ${ferryFinal} (no contract)`}
+                >
+                  Plan empty flight
+                </button>
               </div>
-              {moveMode === 'ferry' && ferryFinal ? (
+              {ferryFinal ? (
                 <div className="ferry-plan">
                   {ferryPlanLoading ? (
                     <p className="ferry-plan-meta">Planning route…</p>

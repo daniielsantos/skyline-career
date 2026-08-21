@@ -237,8 +237,22 @@ export function fallbackSimBriefAirframeForDefault(
   return pool[0];
 }
 
-function isDefaultSimBriefMatch(match: string): boolean {
+export function isDefaultSimBriefMatch(match: string): boolean {
   return match.trim().toLowerCase() === 'default';
+}
+
+/** Prefer real airframe name over SimBrief's literal "Default" comment. */
+export function formatSimBriefAirframeLabel(
+  airframe: Pick<SimBriefAirframe, 'comments' | 'name' | 'internalId'>,
+  fallback?: string,
+): string {
+  const comments = airframe.comments?.trim() ?? '';
+  if (comments && !isDefaultSimBriefMatch(comments)) return comments;
+  const name = airframe.name?.trim() ?? '';
+  if (name) return name;
+  const fb = fallback?.trim() ?? '';
+  if (fb) return fb;
+  return airframe.internalId;
 }
 
 function scoreSimBriefAirframes(

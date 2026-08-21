@@ -272,6 +272,48 @@ function isHttpUrl(url) {
   }
 }
 
+/** Open https in the OS browser. Windows uses cmd start — shell.openExternal is flaky. */
+async function openHttpInOsBrowser(url) {
+  if (typeof url !== 'string' || !isHttpUrl(url)) {
+    return { ok: false, reason: 'invalid_url' };
+  }
+  if (process.platform === 'win32') {
+    const safeUrl = url.replace(/"/g, '');
+    try {
+      const { execFile } = await import('node:child_process');
+      await new Promise((resolve, reject) => {
+        execFile(
+          process.env.ComSpec || 'cmd.exe',
+          ['/d', '/s', '/c', `start "" "${safeUrl}"`],
+          { windowsHide: true },
+          (err) => (err ? reject(err) : resolve()),
+        );
+      });
+      return { ok: true, via: 'cmd_start' };
+    } catch (startErr) {
+      const startMsg =
+        startErr instanceof Error ? startErr.message : String(startErr);
+      logLine(`[desktop] cmd start failed: ${startMsg}`);
+      try {
+        await shell.openExternal(url);
+        return { ok: true, via: 'openExternal_fallback' };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logLine(`[desktop] openExternal failed: ${message}`);
+        return { ok: false, reason: `${startMsg}; ${message}` };
+      }
+    }
+  }
+  try {
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logLine(`[desktop] openExternal failed: ${message}`);
+    return { ok: false, reason: message };
+  }
+}
+
 function isAppUrl(url) {
   try {
     return new URL(url).origin === new URL(API_URL).origin;
@@ -283,13 +325,9 @@ function isAppUrl(url) {
 function registerIpc() {
   ipcMain.handle('skyline:get-version', () => app.getVersion());
 
-  ipcMain.handle('skyline:open-external', async (_event, url) => {
-    if (typeof url !== 'string' || !isHttpUrl(url)) {
-      return { ok: false };
-    }
-    await shell.openExternal(url);
-    return { ok: true };
-  });
+  ipcMain.handle('skyline:open-external', async (_event, url) =>
+    openHttpInOsBrowser(url),
+  );
 
   ipcMain.handle('skyline:check-updates', async () => {
     if (!isPackaged()) {
@@ -519,13 +557,14 @@ async function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (isHttpUrl(url)) void shell.openExternal(url);
+    // Same reliable opener as IPC — do not use bare shell.openExternal on Windows.
+    if (isHttpUrl(url)) void openHttpInOsBrowser(url);
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (isAppUrl(url)) return;
     event.preventDefault();
-    if (isHttpUrl(url)) void shell.openExternal(url);
+    if (isHttpUrl(url)) void openHttpInOsBrowser(url);
   });
 
   await mainWindow.loadURL(API_URL);

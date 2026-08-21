@@ -118,6 +118,7 @@ function normalizeLoadSheet(sheet: OfpLoadSheet | undefined): OfpLoadSheet | und
     unit: weightUnit(sheet.unit),
     blockFuel: sheet.blockFuel,
     enrouteBurn: sheet.enrouteBurn,
+    taxiFuel: sheet.taxiFuel,
     passengerCount: sheet.passengerCount,
     baggage: sheet.baggage,
     payload: sheet.payload,
@@ -269,6 +270,19 @@ export function ofpFuelToLb(fuel: OfpFuelPlan): {
     center: fuel.center !== undefined ? toLb(fuel.center, u) : undefined,
     total: fuel.total !== undefined ? toLb(fuel.total, u) : undefined,
   };
+}
+
+/** SimBrief TAXI line from the load sheet, in lb (undefined when OFP omits it). */
+export function ofpTaxiFuelLb(ofp: {
+  fuel: OfpFuelPlan;
+  loadSheet?: { unit?: OfpWeightUnit; taxiFuel?: number };
+}): number | undefined {
+  const taxi = ofp.loadSheet?.taxiFuel;
+  if (typeof taxi !== 'number' || !Number.isFinite(taxi) || taxi < 0) {
+    return undefined;
+  }
+  const unit = ofp.loadSheet?.unit ?? ofp.fuel.unit ?? 'kg';
+  return unit === 'kg' ? taxi * KG_TO_LB : taxi;
 }
 
 export function sumStationWeights(

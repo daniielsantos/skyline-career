@@ -107,6 +107,8 @@ export type WatchLoadVerification = {
     plannedLb?: number;
     liveLb: number;
     ok: boolean;
+    /** SimBrief OFP taxi fuel (lb) used as Loaded vs Due undershoot slack. */
+    taxiBurnLb?: number;
     tanks?: FuelTankBreakdown;
     /** Classic L/R/C capacity (lb) for schematic fill. */
     tankCapacity?: FuelTankBreakdown;
@@ -2090,6 +2092,9 @@ export class CareerWatchSession {
             liveFuelLb,
             plannedPayloadLb,
             livePayloadLb,
+            ...(typeof prevWatchFuel.taxiBurnLb === 'number'
+              ? { taxiBurnLb: prevWatchFuel.taxiBurnLb }
+              : {}),
           });
           const tanks = sample.onGround
             ? (load.fuelTanks ?? prevWatchFuel.tanks)
@@ -2161,6 +2166,9 @@ export class CareerWatchSession {
             ...nextWeights,
             fuel: {
               ...nextWeights.fuel,
+              ...(typeof prevWatchFuel.taxiBurnLb === 'number'
+                ? { taxiBurnLb: prevWatchFuel.taxiBurnLb }
+                : {}),
               ...(tanks ? { tanks } : {}),
               ...(tankCapacity ? { tankCapacity } : {}),
             },

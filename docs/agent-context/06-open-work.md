@@ -17,7 +17,7 @@ Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A live
 - [ ] Watch solo: um pedido `readSimVars` (não 16 stations em série)
 - [ ] Watch no ar: tick de cruise ~5s no TIMEOUT (não ~45s); next tick `force: true`
 - [ ] Cruise burn: sample **antes** do weather ambient (wx TIMEOUT não pula o chip); TAS no flight batch; fallback se combustion flags zeram flow
-- [ ] Cruise sample 180s: VS 400 fpm / TAS 10% / flow 20% / alt 1200 ft — não zerar em bump mínimo; spike BURN (ghost Eng2+) não reseta `Cruise 0s`
+- [ ] Cruise sample 180s: VS 400 fpm / TAS 10% / flow 20% / alt 1200 ft — não zerar em bump mínimo; spike BURN **upward** (ghost Eng2+) não reseta; **corte de velocidade/flow reinicia** a janela (não congela)
 - [ ] Watch: TIMEOUT não fica em loop com pipe “up”; após backoff, sample volta
 - [ ] Reinject no solo após editar EFB: matching profile → fuel/cargo sem freeze em “Reading live aircraft…”
 - [ ] Caravan: leftover do Due divide L/R da fileira (não 192 num assento e 100 no outro)
@@ -228,4 +228,46 @@ centralizados; stations 5/coluna iguais; escala fluido + labels legíveis em til
 Mensagem sugerida:
 
 > Continua Skyline Career. Lê `@docs/agent-context/project-overview.md` e `@docs/agent-context/README.md`. Estamos em desktop 0.3.17; problema atual: …
+
+### UI boot (2026-08-20)
+
+- Após selecionar perfil, o 1º `refresh()` é **scoped** à aba restaurada (`liveRefreshScope`) — Dispatch não espera Market/Airframes (~10s).
+- `careerReady` state: Dispatch mostra “Loading dispatch…”; wallet sidebar/topbar mostra `…` até o boot terminar.
+- `/api/state` pinta wallet/fleet/pilot **antes** do `Promise.all` das fetches scoped.
+
+### B707 GNS payload (2026-08-20)
+
+- Stations 1–8 OK; S3 unused; caps from CG-ok EFB mix (S5–S8 holds).
+- Teto prático ~**65000** lb payload (CG ≈16% FWD); acima disso sai do envelope.
+- Catálogo `maxCargoKg` **→ 29329**.
+- **Inject desligado** (`injectCapable: false`) — load via EFB import.
+- Roles: crew 1–2, passenger 4–5, baggage 6–8 (`pax_and_cargo`).
+- **Dispatch:** `loadLayout: pax_and_cargo` — max pax from SimBrief; reserve **230 lb/seat** (175+55 bagwgt) before `cargo=`.
+- Preflight Due: OFP **payload** (not baggage-only); no GA soft-cap; **no crew floor** on top of EFB sheet (S1/S2 already in station sum).
+- Fuel Ready: taxi slack = max(150 lb, **1% of Due**, **SimBrief OFP taxi**) when present; UI tol = max(50, 3% Due).
+- Payload Ready: tol = max(75 lb, **0.2% of Due**) — EFB station rounding (~92 lb on 64k) no longer fails.
+
+### Next — hybrid payload on larger airframes
+
+- Most **narrow / wide** catalog types are passenger airframes that still lift some freight (`pax_and_cargo`).
+- Map station roles + `maxPaxSeats` / SimBrief live max pax per type (B707 pattern), not pure freighter.
+- EFB path likely for many; inject only where proven.
+
+### Pilot travel (2026-08-21)
+
+- Topbar **Pilot** metric opens `PilotTravelDialog` (hub combobox + fleet ICAO chips).
+- Hangar card: ferry/empty only; keep **Travel here** when pilot away.
+- Confirm of cost must render above travel overlay (close picker on Go; confirm z-index 120).
+
+### Confirm / busy UX (2026-08-21)
+
+- Root cause of “every confirm feels slow”: `run()` held global `busy` through full `refresh()` (market+missions+NPC…), and many actions also `await refresh()` inside the lock (double).
+- Fix: unlock `busy` as soon as the mutation paints; sync boards after. Ferry matches. Travel quote no longer sets global busy.
+
+### Scoped mutation sync (2026-08-21)
+
+- `run({ sync })`: default **no** post-mutation refresh — trust response paint.
+- `sync: 'full'` only for tick / reset world / select hub.
+- Scoped slices: `{ market }` (lots claimed/released), `{ missions }`, `{ aircraftMarket }`, `{ airport }` (parts/Jet-A when terminal open).
+- Ferry: paint-only (no refresh).
 

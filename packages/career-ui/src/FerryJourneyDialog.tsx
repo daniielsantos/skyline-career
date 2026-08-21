@@ -17,7 +17,7 @@ export type FerryJourneyDialogProps = {
 
 /**
  * Multi-leg ferry journey sheet: full route, progress, next-leg cost, fuel note.
- * Parent keeps `ferryDest` as the final ICAO; this dialog drives hop-by-hop clicks.
+ * Card keeps the final dest locally; this dialog drives hop-by-hop clicks.
  */
 export function FerryJourneyDialog(props: FerryJourneyDialogProps) {
   const titleId = useId();

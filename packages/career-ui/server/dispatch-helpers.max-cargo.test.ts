@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
+import { clearSimBriefAirframesCache } from '../../agent/src/ofp-compliance/simbrief-airframes.ts';
 import {
+  buildMissionDispatch,
   clearClassMaxCargoKgCache,
   flyableDispatchCargoKg,
   resolveClassMaxCargoKg,
@@ -8,6 +10,7 @@ import {
 
 afterEach(() => {
   clearClassMaxCargoKgCache();
+  clearSimBriefAirframesCache();
 });
 
 describe('resolveClassMaxCargoKg', () => {
@@ -191,5 +194,60 @@ describe('flyableDispatchCargoKg', () => {
     assert.ok(
       noCrew.operationalMaxCargoKg - withCrew.operationalMaxCargoKg >= 150,
     );
+  });
+});
+
+describe('buildMissionDispatch pax_and_cargo', () => {
+  it('prefills pax from SimBrief airframe_passengers', async () => {
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_b707',
+        status: 'dispatched',
+        originIcao: 'SBKP',
+        destIcao: 'SBGR',
+        commodityId: 'electronics',
+        cargoKg: 29_329,
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'inibuilds-boeing-b707-gns',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      {
+        units: 'KGS',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              B703: {
+                airframes: [
+                  {
+                    airframe_internal_id: 'B703',
+                    airframe_list_type: 'B703',
+                    airframe_icao: 'B703',
+                    airframe_comments: 'Default',
+                    airframe_name: 'B707-320C',
+                    airframe_passengers: 194,
+                    airframe_options: {
+                      wgtunits: 'LBS',
+                      oew: 148300,
+                      mzfw: 230000,
+                      mtow: 333600,
+                      maxfuel: 160000,
+                      maxcargo: 50000,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    assert.equal(built.maxPaxSeats, 194);
+    assert.match(built.url, /[?&]pax=194(?:&|$)/);
+    // Freight leftover after 194×230 lb reserved — not the full mission as cargo=
+    assert.match(built.url, /[?&]cargo=9\./);
   });
 });

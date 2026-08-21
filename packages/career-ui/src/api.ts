@@ -548,6 +548,8 @@ export type Mission = {
         plannedLb?: number;
         liveLb: number;
         ok: boolean;
+        /** SimBrief OFP taxi fuel (lb) used as Loaded vs Due undershoot slack. */
+        taxiBurnLb?: number;
         tanks?: {
           left: number;
           right: number;
@@ -1401,8 +1403,8 @@ export function postTick(n = 1) {
   });
 }
 
-/** Temporary test aid — credits the career wallet (default +$100k). */
-export function postDebugCreditWallet(amountUsd = 100_000) {
+/** Temporary test aid — credits the career wallet (default +$1M). */
+export function postDebugCreditWallet(amountUsd = 1_000_000) {
   return api<{ walletUsd: number; creditedUsd: number }>(
     '/api/debug/credit-wallet',
     {
@@ -2945,6 +2947,7 @@ export type WatchStatus = {
       plannedLb?: number;
       liveLb: number;
       ok: boolean;
+      taxiBurnLb?: number;
       tanks?: {
         left: number;
         right: number;

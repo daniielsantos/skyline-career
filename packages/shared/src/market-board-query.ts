@@ -249,12 +249,10 @@ export function starterBoardFitRank(
   return idle ? 8 : 10;
 }
 
-/** Default Freights sort: unlocked first (no secondary pay sort). */
-export const DEFAULT_MARKET_BOARD_SORTS: readonly MarketBoardSortLevel[] = [
-  { key: 'access', direction: 'asc' },
-];
+/** Default Freights sort: none from the client — server soft-ranks idle/starter. */
+export const DEFAULT_MARKET_BOARD_SORTS: readonly MarketBoardSortLevel[] = [];
 
-/** Board columns the player can click — when leading, honor over access/idle. */
+/** Board columns the player can click — when leading, honor over idle/near. */
 const EXPLICIT_METRIC_SORT_KEYS: ReadonlySet<MarketBoardSortKey> = new Set([
   'distance',
   'cargo',
@@ -266,7 +264,7 @@ const EXPLICIT_METRIC_SORT_KEYS: ReadonlySet<MarketBoardSortKey> = new Set([
 
 /**
  * True when the client put a metric column first (Pay / Net / Load / …).
- * In that case we must not force Access / Idle / Near-focus ahead of it.
+ * In that case we must not force Idle / Near-focus ahead of it.
  */
 export function hasExplicitMetricPrimarySort(
   sorts: readonly MarketBoardSortLevel[] | null | undefined,
@@ -276,35 +274,28 @@ export function hasExplicitMetricPrimarySort(
 }
 
 /**
- * Keep Cargo Ops access as the primary sort unless the client explicitly asks
- * for locked-first (`access:desc`). Prevents pay-only sorts from burying open lots
- * when the player has not clicked a metric column.
+ * Pass-through for requested sorts (Access is optional — only when the player
+ * clicks the column). Empty → DEFAULT_MARKET_BOARD_SORTS.
  */
 export function ensureAccessPrimarySort(
   sorts: readonly MarketBoardSortLevel[] | null | undefined,
 ): MarketBoardSortLevel[] {
-  const levels = sorts?.length ? [...sorts] : [...DEFAULT_MARKET_BOARD_SORTS];
-  const access = levels.find((s) => s.key === 'access');
-  const rest = levels.filter((s) => s.key !== 'access');
-  return [
-    access ?? { key: 'access', direction: 'asc' },
-    ...rest,
-  ];
+  return sorts?.length ? [...sorts] : [...DEFAULT_MARKET_BOARD_SORTS];
 }
 
 /**
- * Starter Freights (empty hangar or GA/TP selected): after Cargo Ops access,
- * surface starter crew holds and last-mile Dry, then nearer hops — not Wide pay.
+ * Starter Freights (empty hangar or GA/TP selected): surface starter crew
+ * holds and last-mile Dry, then nearer hops — not Wide pay.
  */
 export function ensureHangarEmptySorts(
   sorts: readonly MarketBoardSortLevel[] | null | undefined,
 ): MarketBoardSortLevel[] {
-  const levels = ensureAccessPrimarySort(sorts);
+  const levels = sorts?.length ? [...sorts] : [...DEFAULT_MARKET_BOARD_SORTS];
   if (levels.some((s) => s.key === 'starter')) return levels;
-  const access = levels[0] ?? { key: 'access' as const, direction: 'asc' as const };
-  const rest = levels.slice(1).filter((s) => s.key !== 'distance');
+  const rest = levels.filter(
+    (s) => s.key !== 'distance' && s.key !== 'starter',
+  );
   return [
-    access,
     { key: 'starter', direction: 'asc' },
     { key: 'distance', direction: 'asc' },
     ...rest,
@@ -312,8 +303,8 @@ export function ensureHangarEmptySorts(
 }
 
 /**
- * After access / starter, prefer origins closer to the Near-me focus
- * so SBKP crew beats a last-mile 550 nm away.
+ * Prefer origins closer to the Near-me focus so SBKP crew beats a last-mile
+ * 550 nm away.
  */
 export function ensureNearFocusSorts(
   sorts: readonly MarketBoardSortLevel[] | null | undefined,
@@ -333,8 +324,8 @@ export function ensureNearFocusSorts(
 }
 
 /**
- * Non-starter Freights (jet / heavy selected): after Cargo Ops access, surface
- * idle-escalated lots so lingering freight is not buried under fresh Wide pay.
+ * Non-starter Freights (jet / heavy selected): surface idle-escalated lots so
+ * lingering freight is not buried under fresh Wide pay.
  * Starter / empty-hangar boards already fold idle into `starter` rank.
  */
 export function ensureIdleEscalatedSorts(
@@ -589,7 +580,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
 
 /**
  * Filter → multi-sort → paginate a market board.
- * Default sort: unlocked first (stable within access).
+ * Default (no client sorts): idle soft-rank — Access only when explicitly requested.
  */
 export function queryMarketBoardPage<T extends MarketBoardSortable>(
   rows: readonly T[],
@@ -603,7 +594,7 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
 } {
   const filtered = rows.filter((row) => marketBoardRowMatchesFilters(row, opts));
   const requested = opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined;
-  // Player clicked Pay/Net/Load/… first — honor that; do not bury under Access/Idle/Near.
+  // Player clicked Pay/Net/Load/… first — honor that; do not bury under Idle/Near.
   const honorMetricPrimary = hasExplicitMetricPrimarySort(requested);
   const baseSorts = honorMetricPrimary
     ? [...requested!]

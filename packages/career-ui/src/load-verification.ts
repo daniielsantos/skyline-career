@@ -7,6 +7,8 @@ const DEFAULT_FUEL_TOL_LB = 50;
 const DEFAULT_PAYLOAD_TOL_LB = 75;
 /** Sim may sit this far under OFP block after taxi / APU without leaving Ready. */
 const DEFAULT_FUEL_TAXI_BURN_LB = 150;
+/** Heavy jets: at least 1% of Due as taxi/APU slack (mirror shared). */
+const FUEL_TAXI_BURN_MIN_FRACTION = 0.01;
 /** Ceiling for unusable tip/aux floors inject cannot clear — mirror shared. */
 const DEFAULT_FUEL_UNUSABLE_OVERSHOOT_LB = 200;
 /** A gap wider than this is real fuel movement, not a SimConnect flicker. */
@@ -21,13 +23,41 @@ function fuelUnusableOvershootLb(plannedLb: number): number {
   );
 }
 
-/** Mirror of shared fuelTaxiBurnAllowanceLb — cap taxi slack on short OFPs. */
+/** Mirror of shared fuelTaxiBurnAllowanceLb — flat floor + % of Due, cap 50%. */
 function fuelTaxiBurnAllowanceLb(
   plannedLb: number,
   taxiBurnLb: number = DEFAULT_FUEL_TAXI_BURN_LB,
 ): number {
   if (!Number.isFinite(plannedLb) || plannedLb <= 0) return 0;
-  return Math.min(Math.max(0, taxiBurnLb), plannedLb * 0.5);
+  const scaled = Math.max(
+    Math.max(0, taxiBurnLb),
+    plannedLb * FUEL_TAXI_BURN_MIN_FRACTION,
+  );
+  return Math.min(scaled, plannedLb * 0.5);
+}
+
+/** Mirror of shared fuelMatchToleranceLb — |Sim−Due| band before taxi slack. */
+export function fuelMatchToleranceLb(
+  plannedLb: number | undefined,
+  absLb = DEFAULT_FUEL_TOL_LB,
+  pct = 0.03,
+): number {
+  if (plannedLb === undefined || !Number.isFinite(plannedLb)) {
+    return Math.max(0, absLb);
+  }
+  return Math.max(Math.max(0, absLb), Math.abs(plannedLb) * Math.max(0, pct));
+}
+
+/** Mirror of shared payloadMatchToleranceLb — EFB rounding on large sheets. */
+export function payloadMatchToleranceLb(
+  plannedLb: number | undefined,
+  absLb = DEFAULT_PAYLOAD_TOL_LB,
+  pct = 0.002,
+): number {
+  if (plannedLb === undefined || !Number.isFinite(plannedLb)) {
+    return Math.max(0, absLb);
+  }
+  return Math.max(Math.max(0, absLb), Math.abs(plannedLb) * Math.max(0, pct));
 }
 
 function matchOk(
@@ -467,6 +497,8 @@ export type LoadVerificationFuel = {
   plannedLb?: number;
   liveLb: number;
   ok: boolean;
+  /** SimBrief OFP taxi fuel (lb) — undershoot slack for Loaded vs Due. */
+  taxiBurnLb?: number;
   tanks?: LoadFuelTankBreakdown;
   tankCapacity?: LoadFuelTankBreakdown;
 };
@@ -515,13 +547,15 @@ export function evaluateLoadVerification(opts: {
   fuelTankCapacity?: LoadFuelTankBreakdown;
   payloadStations?: Record<number, number>;
   payloadStationMax?: Record<number, number>;
+  taxiBurnLb?: number;
 }): {
   ready: boolean;
   fuel: LoadVerificationFuel;
   payload: LoadVerificationPayload;
 } {
   const fuelTol = opts.fuelTolLb ?? DEFAULT_FUEL_TOL_LB;
-  const payloadTol = opts.payloadTolLb ?? DEFAULT_PAYLOAD_TOL_LB;
+  const payloadTol =
+    opts.payloadTolLb ?? payloadMatchToleranceLb(opts.plannedPayloadLb);
   const liveFuel =
     typeof opts.liveFuelLb === 'number' && Number.isFinite(opts.liveFuelLb)
       ? opts.liveFuelLb
@@ -531,7 +565,12 @@ export function evaluateLoadVerification(opts: {
       ? opts.livePayloadLb
       : undefined;
 
-  const fuelOk = matchFuelOk(liveFuel, opts.plannedFuelLb, fuelTol);
+  const fuelOk = matchFuelOk(
+    liveFuel,
+    opts.plannedFuelLb,
+    fuelTol,
+    opts.taxiBurnLb,
+  );
   const payloadOk = matchOk(livePayload, opts.plannedPayloadLb, payloadTol);
   const ready = fuelOk && payloadOk;
 
@@ -541,6 +580,9 @@ export function evaluateLoadVerification(opts: {
       plannedLb: opts.plannedFuelLb,
       liveLb: liveFuel ?? 0,
       ok: fuelOk,
+      ...(typeof opts.taxiBurnLb === 'number'
+        ? { taxiBurnLb: opts.taxiBurnLb }
+        : {}),
       ...(opts.fuelTanks ? { tanks: opts.fuelTanks } : {}),
       ...(opts.fuelTankCapacity ? { tankCapacity: opts.fuelTankCapacity } : {}),
     },

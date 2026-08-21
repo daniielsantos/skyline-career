@@ -8,10 +8,15 @@ import {
   applyOfpBallastLb,
   evaluateLoadVerification,
   evaluateOriginProximity,
+  findCareerPlayerAirframe,
+  isPaxAndCargoLoadLayout,
   isUsableFuelTankBreakdown,
   normalizeAircraftTitle,
   ofpCargoKg,
+  ofpFreightTowardMissionKg,
   ofpFuelToLb,
+  ofpTaxiFuelLb,
+  payloadMatchToleranceLb,
   resolveAirportCoords,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
@@ -79,6 +84,8 @@ export type PreflightCheckResult = {
       plannedLb?: number;
       liveLb: number;
       ok: boolean;
+      /** SimBrief OFP taxi fuel (lb) used as Loaded vs Due undershoot slack. */
+      taxiBurnLb?: number;
       tanks?: {
         left: number;
         right: number;
@@ -252,7 +259,12 @@ export async function runMissionPreflight(
         finding.severity === 'warn' &&
         ['EMPTY_WEIGHT', 'TOW', 'ZFW'].includes(finding.code),
     ).length;
-    const cargoKg = ofpCargoKg(ofp);
+    const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
+    // pax_and_cargo: Due is full SimBrief payload (pax×paxwgt + bags + freight).
+    // ofpCargoKg with pax>0 returns baggage-only and left Due at ~1k lb.
+    const cargoKg = isPaxAndCargoLoadLayout(careerAirframe)
+      ? ofpFreightTowardMissionKg(ofp, careerAirframe)
+      : ofpCargoKg(ofp);
 
     // CG is advisory in Career preflight (OnAir-style Loaded vs Due).
     // Paint the same envelope inject uses (calibrated-live JSON), not SimVar 0–100.
@@ -341,11 +353,26 @@ export async function runMissionPreflight(
     // ofpPayloadLb (pax+bags only) made Sim look like ~550 while seats showed 1050.
     const cargoLb =
       cargoKg !== undefined ? cargoKg * KG_TO_LB : undefined;
+    // Cabin seats on pax_and_cargo are ballast for career freight — not GA soft-caps.
+    // EFB import writes the full SimBrief payload across stations (incl. S1/S2);
+    // do not add a freighter crew floor on top or Due overshoots by ~2×170.
+    const stationRolesForDue = isPaxAndCargoLoadLayout(careerAirframe)
+      ? {
+          ...ofp.payload?.stationRoles,
+          crewStations: [] as number[],
+          passengerStations: [],
+          baggageStations: [
+            ...(ofp.payload?.stationRoles?.crewStations ?? []),
+            ...(ofp.payload?.stationRoles?.passengerStations ?? []),
+            ...(ofp.payload?.stationRoles?.baggageStations ?? []),
+          ],
+        }
+      : ofp.payload?.stationRoles;
     const plannedPayloadBase =
       cargoLb !== undefined
         ? plannedStationPayloadLb({
             cargoLb,
-            stationRoles: ofp.payload?.stationRoles,
+            stationRoles: stationRolesForDue,
             emptyWeightLb: live.weights?.emptyLb,
             maxGrossWeightLb: live.weights?.maxGrossLb,
             blockFuelLb: plannedFuelLb,
@@ -410,7 +437,13 @@ export async function runMissionPreflight(
       ofp.tolerances?.fuelAbsLb ?? 50,
       Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
     );
-    const payloadTolLb = ofp.tolerances?.payloadAbsLb ?? 75;
+    // Prefer SimBrief TAXI line; else flat 150 / 1% of Due inside careerFuelMatchOk.
+    const taxiBurnLb = ofpTaxiFuelLb(ofp);
+    // Large EFB sheets round stations a few dozen lb off the OFP/mission figure.
+    const payloadTolLb = Math.max(
+      ofp.tolerances?.payloadAbsLb ?? 75,
+      payloadMatchToleranceLb(plannedPayloadLb),
+    );
     // Finding codes can miss freighter baggage-only OFPs; GA soft-cap uses
     // station totals only. evaluateLoadVerification is the shared numeric gate.
     const weights = evaluateLoadVerification({
@@ -420,6 +453,7 @@ export async function runMissionPreflight(
       livePayloadLb,
       fuelTolLb,
       payloadTolLb,
+      ...(taxiBurnLb !== undefined ? { taxiBurnLb } : {}),
     });
     // Loaded vs Due uses block-fuel total only. Per-tank FUEL_LEFT/RIGHT findings
     // are softened to warn (classic L/R can glitch while TOTAL matches).
@@ -472,6 +506,7 @@ export async function runMissionPreflight(
           plannedLb: plannedFuelLb,
           liveLb: liveFuelLb,
           ok: fuelOk,
+          ...(taxiBurnLb !== undefined ? { taxiBurnLb } : {}),
           // Omit classic L/R/C when they glitch to 0 while FUEL TOTAL / mass-balance
           // still shows fuel — READY uses liveLb, not the schematic.
           ...(isUsableFuelTankBreakdown(
@@ -523,9 +558,15 @@ export async function runMissionPreflight(
           ...(plannedPayload && plannedPayloadBase
             ? {
                 cargoLb: plannedPayload.cargoPlacedLb,
-                crewLb: plannedPayload.crewLb,
-                /** Nominal crew floor before EFB empty-station adjust (n × 170). */
-                crewFloorLb: plannedPayloadBase.crewLb,
+                ...(plannedPayload.crewLb > 0
+                  ? {
+                      crewLb: plannedPayload.crewLb,
+                      /** Nominal crew floor before EFB empty-station adjust (n × 170). */
+                      crewFloorLb: plannedPayloadBase.crewLb,
+                    }
+                  : plannedPayloadBase.crewLb > 0
+                    ? { crewFloorLb: plannedPayloadBase.crewLb }
+                    : {}),
               }
             : {}),
           ...(live.payload?.stations

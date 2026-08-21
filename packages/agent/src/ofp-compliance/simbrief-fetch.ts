@@ -353,6 +353,7 @@ export function mapSimBriefOfpToExpectation(
 
   const blockFuel = num(f.plan_ramp);
   const enrouteBurn = num(f.enroute_burn);
+  const taxiFuel = num(f.taxi) ?? num(f.taxi_fuel);
   const passengerCount = num(w.pax_count) ?? num(w.pax_count_actual);
   const payload = num(w.payload);
   const emptyWeight = num(w.oew);
@@ -367,6 +368,7 @@ export function mapSimBriefOfpToExpectation(
     unit,
     blockFuel,
     enrouteBurn,
+    taxiFuel,
     passengerCount,
     baggage,
     payload,

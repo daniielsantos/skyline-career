@@ -8,7 +8,7 @@ declare module 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url' {
 type SkylineDesktopBridge = {
   isDesktop: true;
   getVersion: () => Promise<string>;
-  openExternal: (url: string) => Promise<{ ok: boolean }>;
+  openExternal: (url: string) => Promise<{ ok: boolean; reason?: string; via?: string }>;
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string | null;

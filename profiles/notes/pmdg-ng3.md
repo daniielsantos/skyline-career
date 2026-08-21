@@ -85,6 +85,7 @@ Expect `layoutOk: true`, `nonzeroBytes` > 0, and L/R/C lb close to classic `FUEL
 | Write fuel via classic / LVar / Client Data | **No / out of scope** — user loads via SimBrief/EFB/FMC |
 | CDU control send (`pmdg-cdu`) | **Parked / experimental** — not the product apply path |
 | BCF PAYLOAD validation (`pmdg-payload-bcf`) | **Experimental** — types MAIN/FWD/AFT on CDU; **not** career inject |
+| BCF FUEL validation (`pmdg-fuel-bcf`) | **Experimental** — types TOTAL (display scale) on CDU; **not** career inject |
 | Payload stations | Often yes via `station-writeback` (optional; career may only monitor) |
 | Vendor recipe | `profiles/vendors/pmdg-ng3.json` → `onClassicWriteFail: abort` |
 
@@ -126,23 +127,58 @@ npm run pmdg-payload-bcf -- --zfw 89.3 --dry-run
 npm run pmdg-payload-bcf -- --unique-digits --yes
 ```
 
-**Live note:** `method=event` (TransmitClientEvent) can log success while stations/CDU stay unchanged. Prefer `method=control` (`PMDG_NG3_Control` SetClientData + `parameter=1`). Confirm `EnableDataBroadcast=1` in `737_Options.ini` and that the Host was rebuilt with the `MENU` key.
+**Live note:** `method=event` (TransmitClientEvent) can log success while stations/CDU stay unchanged. Prefer `method=control` (`PMDG_NG3_Control` SetClientData + `parameter=1`). Default `--cdu right` (FO CDU, like GSX) — rebuild/restart Host after pulling FO key resolve. Confirm `EnableDataBroadcast=1` in `737_Options.ini` when verifying SDK fuel.
 
 **INVALID ENTRY / wrong numbers (1000→10020, 200→20):** often repeated digit `0` dropped because `PMDG_NG3_Control` ignores the same EventId until cleared. Host now forces EventId=0 after each key — **rebuild/restart SimBridgeHost** before retesting.
 
-**LSK merge (1234+567→1234567 INVALID, 89 on FWD):** field LSK cleared too fast / next digits started early. Host waits 250ms before EventId=0; script uses longer commit/after-field delays. Validate one field:
+**LSK merge (1234+567→1234567 INVALID, 89 on FWD):** field LSK cleared too fast / next digits started early. Host waits ~150ms before EventId=0; use `--slow` if merge returns. Validate one field:
 
 ```bash
 # Stop SimBridgeHost, npm run build:native, restart Host
-npm run pmdg-payload-bcf -- --unique-digits --only main --yes
+npm run pmdg-payload-bcf -- --unique-digits --only main --empty-first --yes
 # expect MAIN=1234 only
-npm run pmdg-payload-bcf -- --unique-digits --only fwd --no-empty-first --yes
-npm run pmdg-payload-bcf -- --unique-digits --only aft --no-empty-first --yes
+npm run pmdg-payload-bcf -- --unique-digits --only fwd --yes
+npm run pmdg-payload-bcf -- --unique-digits --only aft --yes
 ```
 
 After send, the script dumps `PAYLOAD STATION WEIGHT:1..11`. **Validate by eye:** CDU PAYLOAD shows the numbers; EFB ZFW / LOAD LEVEL moved. If the wrong page got keystrokes, stop and adjust `--payload-page-lsk` / field LSKs — do not wire career inject until this is green.
 
 Do not run alongside GSX boarding automation (both type the CDU).
+
+## BCF CDU FUEL validation script (experimental)
+
+Standalone probe — **does not** touch career inject / `injectCapable`. Same control-area path as payload.
+
+**Assumed LSK map**
+
+| Step | Key |
+|------|-----|
+| Clear scratchpad | `CLR` ×2 |
+| MENU | `MENU` |
+| FS ACTIONS | `R5` |
+| FUEL page | `L1` (`--fuel-page-lsk`) |
+| TOTAL LBS (preferred) | type display (e.g. `16.8`) → **`L1`** (`--total-lsk`) |
+| LEVEL % | **`L2`** — do not use for lb totals (live miss: `16.8` → LEVEL 16.8%) |
+| SET FULL / 2/3 / 1/3 | on-screen L3/L4/L5 — `--preset full\|2/3\|1/3` |
+
+**Commands**
+
+```bash
+# Preferred: TOTAL display scale (25.0 ≈ 25000 lb); L/C/R auto-fill (FO CDU)
+npm run pmdg-fuel-bcf -- --total 16.8 --yes
+# Captain CDU instead:
+npm run pmdg-fuel-bcf -- --total 16.8 --cdu left --yes
+# or from pounds:
+npm run pmdg-fuel-bcf -- --total-lb 16839 --yes
+
+# Preset smoke
+npm run pmdg-fuel-bcf -- --preset full --yes
+
+# Print keystream only
+npm run pmdg-fuel-bcf -- --total 25.0 --dry-run
+```
+
+Default TOTAL LSK is **L1** (L2 = LEVEL %). After send, script dumps classic L/R/C (+ SDK fuel when broadcast is on). Validate CDU **TOTAL LBS** (not LEVEL) vs typed display.
 
 ## Homologation guidance (today)
 

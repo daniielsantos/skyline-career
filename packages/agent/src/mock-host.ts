@@ -301,7 +301,7 @@ async function dispatch(msg: { id?: string; method?: string; params?: Record<str
       const method = typeof params.method === 'string' ? params.method : 'event';
       const release = params.release === false ? false : true;
       console.log(
-        `[mock-host] sendPmdgNg3Control method=${method} eventId=${eventId} key=${String(params.key ?? '')} parameter=0x${parameter.toString(16)} release=${release}`,
+        `[mock-host] sendPmdgNg3Control method=${method} eventId=${eventId} key=${String(params.key ?? '')} cdu=${String(params.cdu ?? 'left')} parameter=0x${parameter.toString(16)} release=${release}`,
       );
       return ok(id, {
         ok: true,
@@ -309,6 +309,7 @@ async function dispatch(msg: { id?: string; method?: string; params?: Record<str
         parameter,
         release,
         method,
+        cdu: typeof params.cdu === 'string' ? params.cdu : 'left',
       });
     }
     default:

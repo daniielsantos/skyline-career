@@ -277,13 +277,20 @@ public sealed class PipeServer : IAsyncDisposable
                     uint eventId;
                     var eventIdNum = GetNumber(request.Params, "eventId");
                     var key = GetString(request.Params, "key");
+                    var cduRaw = GetString(request.Params, "cdu");
+                    if (!PmdgNg3Cdu.TryParseCduSide(cduRaw, out var rightCdu))
+                    {
+                        throw new ArgumentException(
+                            $"Unknown cdu side: {cduRaw} (use left|right|capt|fo)");
+                    }
+
                     if (eventIdNum is not null)
                     {
                         eventId = (uint)eventIdNum.Value;
                     }
                     else if (!string.IsNullOrWhiteSpace(key))
                     {
-                        if (!PmdgNg3Cdu.TryResolveKey(key, out eventId))
+                        if (!PmdgNg3Cdu.TryResolveKey(key, rightCdu, out eventId))
                         {
                             throw new ArgumentException($"Unknown PMDG CDU key: {key}");
                         }
@@ -308,7 +315,8 @@ public sealed class PipeServer : IAsyncDisposable
                         eventId,
                         parameter = usedParameter,
                         release,
-                        method
+                        method,
+                        cdu = rightCdu ? "right" : "left"
                     });
                 }
 

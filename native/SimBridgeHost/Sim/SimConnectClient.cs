@@ -1013,7 +1013,7 @@ public sealed class SimConnectClient : ISimClient
                 .ConfigureAwait(false);
             Console.WriteLine(
                 $"[simconnect] PMDG control EventId={eventId} Parameter=0x{pressParam:X8}");
-            await DelayAsync(250, ct).ConfigureAwait(false);
+            await DelayAsync(150, ct).ConfigureAwait(false);
 
             await WritePmdgControlAsync(0, 0, track: true, ct).ConfigureAwait(false);
             lock (_pmdgControlGate)
@@ -1021,7 +1021,7 @@ public sealed class SimConnectClient : ISimClient
                 _pmdgControlEventId = 0;
             }
 
-            await DelayAsync(120, ct).ConfigureAwait(false);
+            await DelayAsync(80, ct).ConfigureAwait(false);
             return;
         }
 

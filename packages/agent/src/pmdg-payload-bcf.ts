@@ -29,16 +29,16 @@ export const BCF_PAYLOAD_DEFAULTS = {
   fwd: 332,
   aft: 415,
   units: 'lb' as const,
-  /** Inter-key delay (ms). */
-  delayMs: 400,
+  /** Inter-key delay (ms). Tuned for ~5s ZFW path; use --slow if flaky. */
+  delayMs: 200,
   /** Extra pause after page changes (MENU / FS ACTIONS / PAYLOAD). */
-  pageDelayMs: 800,
+  pageDelayMs: 400,
   /** Settle after SET EMPTY before typing (ms). */
-  afterEmptyDelayMs: 2000,
+  afterEmptyDelayMs: 800,
   /** Pause after last digit before field LSK (ms). */
-  commitDelayMs: 1200,
+  commitDelayMs: 500,
   /** Pause after field LSK before CLRs for the next field (ms). */
-  afterFieldDelayMs: 2500,
+  afterFieldDelayMs: 900,
   /** CLR presses before each cargo field (clears INVALID ENTRY + scratchpad). */
   fieldClrCount: 2,
   /** FS ACTIONS → PAYLOAD line (tutorial: FUEL=L1, PAYLOAD≈L2). */
@@ -56,6 +56,17 @@ export const BCF_PAYLOAD_DEFAULTS = {
   zfwLsk: 'R2',
   method: 'control' as const,
   parameter: 1,
+  /** FO CDU (right) — same side GSX types on. */
+  cdu: 'right' as const,
+} as const;
+
+/** Conservative timings (pre-tune). Opt in with --slow. */
+export const BCF_PAYLOAD_SLOW_TIMING = {
+  delayMs: 400,
+  pageDelayMs: 800,
+  afterEmptyDelayMs: 2000,
+  commitDelayMs: 1200,
+  afterFieldDelayMs: 2500,
 } as const;
 
 /** Example ZFW display after a light unique-digits load (~89.3 × 1000 lb). */
@@ -92,6 +103,8 @@ export type BcfPayloadOptions = {
   method: BcfPayloadMethod;
   parameter: number;
   release: boolean;
+  /** Captain left or FO right CDU (GSX uses right). */
+  cdu: 'left' | 'right';
 };
 
 export type CduKeyStep = {
@@ -271,7 +284,7 @@ export function formatBcfPayloadPlan(
       : isZfw
         ? 'PMDG 737-800 BCF — CDU ZFW validation (aircraft fills MAIN/FWD/AFT)'
         : 'PMDG 737-800 BCF — CDU PAYLOAD validation (not career inject)',
-    `  method=${opts.method}  parameter=${opts.parameter}  release=${opts.release}`,
+    `  method=${opts.method}  parameter=${opts.parameter}  release=${opts.release}  cdu=${opts.cdu}`,
     mode === 'smoke-menu'
       ? '  (no payload typing)'
       : isZfw
@@ -290,7 +303,7 @@ export function formatBcfPayloadPlan(
     `  steps (${steps.length}):`,
     ...steps.map((s, i) => `    ${String(i + 1).padStart(3)}. ${s.label}`),
     '',
-    'Before run: BCF loaded, CDU powered, parked, do not touch the CDU.',
+    'Before run: BCF loaded, FO (right) CDU powered if cdu=right, parked, do not touch the CDU.',
     isZfw
       ? 'ZFW uses CDU display scale (89.3 ≈ 89300 lb). After run: MAIN/FWD/AFT should auto-fill.'
       : 'Match --units to PMDG Options (lb vs kg). INVALID ENTRY → more CLR/timing or wrong units.',
@@ -304,7 +317,7 @@ export async function sendBcfPayloadKeySequence(
   steps: CduKeyStep[],
   opts: Pick<
     BcfPayloadOptions,
-    'delayMs' | 'pageDelayMs' | 'method' | 'parameter' | 'release'
+    'delayMs' | 'pageDelayMs' | 'method' | 'parameter' | 'release' | 'cdu'
   >,
 ): Promise<void> {
   let prevKey: string | undefined;
@@ -312,16 +325,17 @@ export async function sendBcfPayloadKeySequence(
     const step = steps[i]!;
     // Extra settle when the same CDU key repeats (especially digit 0).
     if (prevKey !== undefined && prevKey === step.key) {
-      await bridge.delay(Math.max(opts.delayMs, 200));
+      await bridge.delay(Math.max(opts.delayMs, 100));
     }
     const result = await bridge.sendPmdgNg3Control({
       key: step.key,
       release: opts.release,
       method: opts.method,
       parameter: opts.parameter,
+      cdu: opts.cdu,
     });
     console.log(
-      `  [${i + 1}/${steps.length}] ${step.label} → eventId=${result.eventId} method=${result.method ?? opts.method} parameter=0x${Number(result.parameter).toString(16)}`,
+      `  [${i + 1}/${steps.length}] ${step.label} → eventId=${result.eventId} cdu=${result.cdu ?? opts.cdu} method=${result.method ?? opts.method} parameter=0x${Number(result.parameter).toString(16)}`,
     );
     prevKey = step.key;
     if (i + 1 >= steps.length) break;
@@ -375,6 +389,8 @@ export function parseBcfPayloadCliArgs(args: string[]): BcfPayloadOptions & {
     throw new Error(`--method must be event or control (got ${methodRaw})`);
   }
   const method: BcfPayloadMethod = methodRaw;
+
+  const timing = has('--slow') ? BCF_PAYLOAD_SLOW_TIMING : BCF_PAYLOAD_DEFAULTS;
 
   const num = (flag: string, fallback: number): number => {
     const raw = get(flag);
@@ -432,19 +448,14 @@ export function parseBcfPayloadCliArgs(args: string[]): BcfPayloadOptions & {
       uniqueDigits ? 89 : tiny ? 200 : BCF_PAYLOAD_DEFAULTS.aft,
     ),
     units: unitsRaw,
-    delayMs: num('--delay-ms', BCF_PAYLOAD_DEFAULTS.delayMs),
-    pageDelayMs: num('--page-delay-ms', BCF_PAYLOAD_DEFAULTS.pageDelayMs),
-    afterEmptyDelayMs: num(
-      '--after-empty-ms',
-      BCF_PAYLOAD_DEFAULTS.afterEmptyDelayMs,
-    ),
-    commitDelayMs: num('--commit-delay-ms', BCF_PAYLOAD_DEFAULTS.commitDelayMs),
-    afterFieldDelayMs: num(
-      '--after-field-ms',
-      BCF_PAYLOAD_DEFAULTS.afterFieldDelayMs,
-    ),
+    delayMs: num('--delay-ms', timing.delayMs),
+    pageDelayMs: num('--page-delay-ms', timing.pageDelayMs),
+    afterEmptyDelayMs: num('--after-empty-ms', timing.afterEmptyDelayMs),
+    commitDelayMs: num('--commit-delay-ms', timing.commitDelayMs),
+    afterFieldDelayMs: num('--after-field-ms', timing.afterFieldDelayMs),
     fieldClrCount: num('--field-clr', BCF_PAYLOAD_DEFAULTS.fieldClrCount),
-    emptyFirst: !has('--no-empty-first'),
+    // Default off for speed (ZFW/TOTAL path); opt in with --empty-first.
+    emptyFirst: has('--empty-first'),
     ...(onlyField ? { onlyField } : {}),
     ...(zfwDisplay ? { zfwDisplay } : {}),
     payloadPageLsk: (
@@ -462,8 +473,20 @@ export function parseBcfPayloadCliArgs(args: string[]): BcfPayloadOptions & {
       : has('--no-release')
         ? false
         : defaultRelease,
+    cdu: parseCduSide(get('--cdu') ?? BCF_PAYLOAD_DEFAULTS.cdu),
     dryRun: has('--dry-run'),
     yes: has('--yes'),
     smokeMenu: has('--smoke-menu'),
   };
+}
+
+export function parseCduSide(raw: string): 'left' | 'right' {
+  const t = raw.trim().toLowerCase();
+  if (t === 'left' || t === 'l' || t === 'capt' || t === 'captain' || t === '0') {
+    return 'left';
+  }
+  if (t === 'right' || t === 'r' || t === 'fo' || t === '1') {
+    return 'right';
+  }
+  throw new Error(`--cdu must be left|right (got ${raw})`);
 }

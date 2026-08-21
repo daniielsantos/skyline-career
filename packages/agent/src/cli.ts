@@ -18,11 +18,19 @@ import { resolveLiveAircraft } from './resolve-live.js';
 import { runHomologateWizard } from './homologate-wizard.js';
 import { buildSmokeStationTargets } from './smoke-targets.js';
 import {
+  buildBcfFuelKeySequence,
+  dumpClassicFuelLb,
+  formatBcfFuelPlan,
+  parseBcfFuelCliArgs,
+  sendBcfFuelKeySequence,
+} from './pmdg-fuel-bcf.js';
+import {
   buildBcfPayloadKeySequence,
   buildMenuSmokeSequence,
   dumpPayloadStations,
   formatBcfPayloadPlan,
   parseBcfPayloadCliArgs,
+  parseCduSide,
   sendBcfPayloadKeySequence,
 } from './pmdg-payload-bcf.js';
 import { confirm, withPrompts } from './prompt.js';
@@ -108,7 +116,7 @@ const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|draft-ofp-roles|pmdg-cdu|pmdg-payload-bcf|generate-ofp|compare-ofp|monitor-ofp|career|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|draft-ofp-roles|pmdg-cdu|pmdg-payload-bcf|pmdg-fuel-bcf|generate-ofp|compare-ofp|monitor-ofp|career|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -128,7 +136,8 @@ function usage(): never {
   msfs-compat-agent scaffold-ofp-roles [--write] [--out path.json] [--pipe <name>]
   msfs-compat-agent draft-ofp-roles --profile path.json [--write] [--keep-passengers]
   msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
-  msfs-compat-agent pmdg-payload-bcf [--main n] [--fwd n] [--aft n] [--zfw 89.3 | --zfw-lb n] [--units lb|kg] [--tiny] [--unique-digits] [--only main|fwd|aft] [--method control|event] [--smoke-menu] [--no-empty-first] [--dry-run] [--yes] [--delay-ms n] [--commit-delay-ms n] [--after-empty-ms n] [--pipe <name>]
+  msfs-compat-agent pmdg-payload-bcf [--main n] [--fwd n] [--aft n] [--zfw 89.3 | --zfw-lb n] [--units lb|kg] [--cdu right|left] [--tiny] [--unique-digits] [--only main|fwd|aft] [--method control|event] [--smoke-menu] [--empty-first] [--slow] [--dry-run] [--yes] [--delay-ms n] [--commit-delay-ms n] [--after-empty-ms n] [--pipe <name>]
+  msfs-compat-agent pmdg-fuel-bcf [--total 25.0 | --total-lb n | --preset full|2/3|1/3] [--units lb|kg] [--cdu right|left] [--total-lsk L1] [--method control|event] [--smoke-menu] [--slow] [--dry-run] [--yes] [--pipe <name>]
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
@@ -148,7 +157,8 @@ Notes:
   scaffold-ofp-roles: detect known family from live title and print/write roles pack
   draft-ofp-roles: build/merge roles pack from a homologated profiles/examples JSON (no sim)
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
-  pmdg-payload-bcf: BCF CDU PAYLOAD validation — prefer --zfw 89.3 (auto MAIN/FWD/AFT); or MAIN/FWD/AFT LSKs; method=control
+  pmdg-payload-bcf: BCF CDU PAYLOAD validation — prefer --zfw 89.3; default --cdu right (FO, like GSX)
+  pmdg-fuel-bcf: BCF CDU FUEL validation — prefer --total 25.0; default --cdu right (FO, like GSX)
   generate-ofp: Dispatch Redirect with homologated SimBrief variant (pack match / live title); fuel AUTO → fetch by static_id
   compare-ofp / monitor-ofp: fetch latest SimBrief OFP; omit --roles to auto-pick pack from aircraft title
   career: local cargo economy + accept/dispatch missions (SimBrief generate-ofp)
@@ -1269,6 +1279,14 @@ async function main(): Promise<void> {
     const methodRaw = getFlag(rest, '--method') ?? 'event';
     const method = methodRaw === 'control' ? 'control' : 'event';
     const skipFuel = hasFlag(rest, '--no-fuel');
+    const cduRaw = getFlag(rest, '--cdu') ?? 'right';
+    let cdu: 'left' | 'right';
+    try {
+      cdu = parseCduSide(cduRaw);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
 
     if (!key && !typeText && eventRaw === undefined) {
       console.error('pmdg-cdu requires --key, --type, and/or --event');
@@ -1310,7 +1328,7 @@ async function main(): Promise<void> {
       const identity = await bridge.getAircraftIdentity();
       console.log(`Aircraft: ${identity.title}`);
       console.log(
-        `Sending ${steps.length} PMDG CDU key(s) method=${method}${release ? ' (+release)' : ''}…`,
+        `Sending ${steps.length} PMDG CDU key(s) method=${method} cdu=${cdu}${release ? ' (+release)' : ''}…`,
       );
 
       for (let i = 0; i < steps.length; i++) {
@@ -1320,9 +1338,10 @@ async function main(): Promise<void> {
           ...(step.key !== undefined ? { key: step.key } : {}),
           release,
           method,
+          cdu,
         });
         console.log(
-          `  [${i + 1}/${steps.length}] ${step.label} → eventId=${result.eventId} parameter=0x${Number(result.parameter).toString(16)} method=${result.method ?? method}`,
+          `  [${i + 1}/${steps.length}] ${step.label} → eventId=${result.eventId} cdu=${result.cdu ?? cdu} parameter=0x${Number(result.parameter).toString(16)} method=${result.method ?? method}`,
         );
         if (i + 1 < steps.length) {
           await bridge.delay(keyDelayMs);
@@ -1385,6 +1404,7 @@ async function main(): Promise<void> {
       method,
       parameter,
       release,
+      cdu,
     } = parsed;
     const opts = {
       main,
@@ -1409,6 +1429,7 @@ async function main(): Promise<void> {
       method,
       parameter,
       release,
+      cdu,
     };
     const steps = smokeMenu
       ? buildMenuSmokeSequence()
@@ -1443,12 +1464,12 @@ async function main(): Promise<void> {
       const identity = await bridge.getAircraftIdentity();
       console.log(`Aircraft: ${identity.title}`);
       console.log(
-        `Sending keystream method=${method} parameter=${parameter} release=${release}…`,
+        `Sending keystream method=${method} cdu=${cdu} parameter=${parameter} release=${release}…`,
       );
       await sendBcfPayloadKeySequence(bridge, steps, opts);
       if (smokeMenu) {
         console.log(
-          'Smoke done. Did the CDU jump to the MENU page? If no: SDK/control path still dead.',
+          'Smoke done. Did the FO/right CDU jump to MENU (if cdu=right)? If no: rebuild Host + check --cdu.',
         );
         return;
       }
@@ -1479,6 +1500,145 @@ async function main(): Promise<void> {
         zfwDisplay
           ? 'Validate: CDU ZFW matches; MAIN/FWD/AFT populated; LOAD LEVEL moved. Report pass/fail.'
           : 'Validate: CDU PAYLOAD shows MAIN/FWD/AFT; EFB ZFW/LOAD LEVEL updated. Report pass/fail.',
+      );
+    });
+    return;
+  }
+
+  if (command === 'pmdg-fuel-bcf') {
+    let parsed;
+    try {
+      parsed = parseBcfFuelCliArgs(rest);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+
+    const {
+      dryRun,
+      yes,
+      smokeMenu,
+      units,
+      delayMs,
+      pageDelayMs,
+      commitDelayMs,
+      afterFieldDelayMs,
+      fieldClrCount,
+      totalDisplay,
+      preset,
+      fuelPageLsk,
+      totalLsk,
+      presetFullLsk,
+      presetTwoThirdsLsk,
+      presetOneThirdLsk,
+      method,
+      parameter,
+      release,
+      cdu,
+    } = parsed;
+    const opts = {
+      units,
+      delayMs,
+      pageDelayMs,
+      commitDelayMs,
+      afterFieldDelayMs,
+      fieldClrCount,
+      ...(totalDisplay ? { totalDisplay } : {}),
+      ...(preset ? { preset } : {}),
+      fuelPageLsk,
+      totalLsk,
+      presetFullLsk,
+      presetTwoThirdsLsk,
+      presetOneThirdLsk,
+      method,
+      parameter,
+      release,
+      cdu,
+    };
+    const steps = smokeMenu
+      ? buildMenuSmokeSequence()
+      : buildBcfFuelKeySequence(opts);
+    const planMode = smokeMenu
+      ? 'smoke-menu'
+      : preset
+        ? 'preset'
+        : 'total';
+    console.log(formatBcfFuelPlan(opts, steps, planMode));
+
+    if (dryRun) {
+      console.log('\nDry-run only — no keys sent. Drop --dry-run to send.');
+      return;
+    }
+
+    if (!yes) {
+      const ok = await withPrompts((ask) =>
+        confirm(
+          ask,
+          'Send this keystream to the live PMDG CDU? (do not touch the CDU)',
+          true,
+        ),
+      );
+      if (!ok) {
+        console.log('Aborted.');
+        return;
+      }
+    }
+
+    await withBridge(pipeName, async (bridge) => {
+      const identity = await bridge.getAircraftIdentity();
+      console.log(`Aircraft: ${identity.title}`);
+      console.log(
+        `Sending keystream method=${method} cdu=${cdu} parameter=${parameter} release=${release}…`,
+      );
+      await sendBcfFuelKeySequence(bridge, steps, opts);
+      if (smokeMenu) {
+        console.log(
+          'Smoke done. Did the FO/right CDU jump to MENU (if cdu=right)? If no: rebuild Host + check --cdu.',
+        );
+        return;
+      }
+      console.log('Keystream done. Dumping classic fuel mirrors…');
+      try {
+        const fuel = await dumpClassicFuelLb(bridge);
+        console.log(
+          `  L/R/C gal: ${fuel.leftGal.toFixed(1)} / ${fuel.rightGal.toFixed(1)} / ${fuel.centerGal.toFixed(1)}`,
+        );
+        console.log(
+          `  L/R/C lb @ ${fuel.dens.toFixed(2)}: ${fuel.leftLb.toFixed(0)} / ${fuel.rightLb.toFixed(0)} / ${fuel.centerLb.toFixed(0)}  total=${fuel.totalLb.toFixed(0)} lb`,
+        );
+        if (totalDisplay) {
+          const targetLb = Math.round(Number(totalDisplay) * 1000);
+          console.log(
+            `  typed TOTAL display=${totalDisplay} (~${targetLb} ${units}) — compare CDU TOTAL / EFB`,
+          );
+        } else if (preset) {
+          console.log(`  preset SET ${preset.toUpperCase()} — compare CDU TOTAL / LEVEL`);
+        }
+        try {
+          const sdk = await bridge.readPmdgNg3Fuel();
+          if (
+            sdk.available &&
+            sdk.layoutOk &&
+            sdk.leftLb !== undefined &&
+            sdk.rightLb !== undefined &&
+            sdk.centerLb !== undefined
+          ) {
+            console.log(
+              `  SDK L/R/C lb: ${sdk.leftLb.toFixed(0)} / ${sdk.rightLb.toFixed(0)} / ${sdk.centerLb.toFixed(0)}  total=${(sdk.leftLb + sdk.rightLb + sdk.centerLb).toFixed(0)}`,
+            );
+          }
+        } catch {
+          /* optional */
+        }
+      } catch (error) {
+        console.log(
+          `  fuel dump failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      console.log(
+        totalDisplay
+          ? 'Validate: CDU TOTAL ≈ typed display; L/C/R filled; classic/SDK total near target. Report pass/fail.'
+          : 'Validate: CDU TOTAL/LEVEL moved for preset. Report pass/fail.',
       );
     });
     return;

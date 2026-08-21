@@ -3,10 +3,14 @@ namespace SimBridgeHost.Sim.Pmdg;
 /// <summary>
 /// PMDG NG3 CDU / Control helpers. Fuel qty has no direct set event — load is a CDU keystream.
 /// Event IDs = THIRD_PARTY_EVENT_ID_MIN (0x11000) + offset from PMDG_NG3_SDK.h.
+/// Right (FO) CDU keys are left offsets + <see cref="RightCduOffset"/> (NGX/NG3 SDK).
 /// </summary>
 public static class PmdgNg3Cdu
 {
     public const uint ThirdPartyEventIdMin = 0x00011000; // 69632
+
+    /// <summary>SDK: EVT_CDU_R_* = EVT_CDU_L_* + 72.</summary>
+    public const uint RightCduOffset = 72;
 
     public const uint MouseLeftSingle = 0x20000000;
     public const uint MouseLeftRelease = 0x00020000;
@@ -47,7 +51,7 @@ public static class PmdgNg3Cdu
     public const uint EvtCduL_Slash = ThirdPartyEventIdMin + 601;
     public const uint EvtCduL_Clr = ThirdPartyEventIdMin + 602;
 
-    private static readonly Dictionary<string, uint> Keys = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, uint> KeysLeft = new(StringComparer.OrdinalIgnoreCase)
     {
         ["INIT_REF"] = EvtCduL_InitRef,
         ["INIT"] = EvtCduL_InitRef,
@@ -87,7 +91,42 @@ public static class PmdgNg3Cdu
         ["9"] = EvtCduL_9,
     };
 
-    public static bool TryResolveKey(string key, out uint eventId)
+    /// <summary>
+    /// Parse side: left/capt/0 → captain; right/fo/1 → FO (GSX-style).
+    /// </summary>
+    public static bool TryParseCduSide(string? raw, out bool rightCdu)
+    {
+        rightCdu = false;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return true; // default left
+        }
+
+        switch (raw.Trim().ToLowerInvariant())
+        {
+            case "left":
+            case "l":
+            case "capt":
+            case "captain":
+            case "0":
+                rightCdu = false;
+                return true;
+            case "right":
+            case "r":
+            case "fo":
+            case "f/o":
+            case "1":
+                rightCdu = true;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public static bool TryResolveKey(string key, out uint eventId) =>
+        TryResolveKey(key, rightCdu: false, out eventId);
+
+    public static bool TryResolveKey(string key, bool rightCdu, out uint eventId)
     {
         eventId = 0;
         if (string.IsNullOrWhiteSpace(key))
@@ -95,24 +134,35 @@ public static class PmdgNg3Cdu
             return false;
         }
 
-        return Keys.TryGetValue(key.Trim(), out eventId);
+        if (!KeysLeft.TryGetValue(key.Trim(), out var leftId))
+        {
+            return false;
+        }
+
+        eventId = rightCdu ? leftId + RightCduOffset : leftId;
+        return true;
     }
 
-    public static IEnumerable<uint> DigitEvents(string text)
+    public static IEnumerable<uint> DigitEvents(string text, bool rightCdu = false)
     {
         foreach (var ch in text)
         {
             if (ch is >= '0' and <= '9')
             {
-                yield return Keys[ch.ToString()];
+                if (!TryResolveKey(ch.ToString(), rightCdu, out var id))
+                {
+                    throw new ArgumentException($"Unsupported CDU digit: '{ch}'");
+                }
+
+                yield return id;
             }
             else if (ch is '.' or ',')
             {
-                yield return EvtCduL_Dot;
+                yield return rightCdu ? EvtCduL_Dot + RightCduOffset : EvtCduL_Dot;
             }
             else if (ch == '/')
             {
-                yield return EvtCduL_Slash;
+                yield return rightCdu ? EvtCduL_Slash + RightCduOffset : EvtCduL_Slash;
             }
             else if (!char.IsWhiteSpace(ch))
             {

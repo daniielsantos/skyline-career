@@ -280,12 +280,15 @@ export class NamedPipeSimBridge implements SimBridge {
     release?: boolean;
     /** `event` = TransmitClientEvent (default); `control` = PMDG_NG3_Control SetClientData */
     method?: 'event' | 'control';
+    /** Captain (left) or FO (right) CDU — GSX uses right. */
+    cdu?: 'left' | 'right';
   }): Promise<{
     ok: boolean;
     eventId: number;
     parameter: number;
     release?: boolean;
     method?: string;
+    cdu?: string;
   }> {
     await this.ensureOpen();
     return this.client.call('sendPmdgNg3Control', {
@@ -294,6 +297,7 @@ export class NamedPipeSimBridge implements SimBridge {
       ...(opts.parameter !== undefined ? { parameter: opts.parameter } : {}),
       ...(opts.release !== undefined ? { release: opts.release } : {}),
       ...(opts.method !== undefined ? { method: opts.method } : {}),
+      ...(opts.cdu !== undefined ? { cdu: opts.cdu } : {}),
     });
   }
 

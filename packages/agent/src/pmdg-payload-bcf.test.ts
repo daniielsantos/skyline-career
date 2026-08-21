@@ -13,13 +13,14 @@ import {
 
 const baseOpts = {
   ...BCF_PAYLOAD_DEFAULTS,
-  emptyFirst: true,
+  emptyFirst: false,
   release: false,
+  cdu: 'right' as const,
 };
 
 describe('pmdg-payload-bcf', () => {
   it('builds MENU → FS ACTIONS → PAYLOAD → MAIN/FWD/AFT keystream', () => {
-    const steps = buildBcfPayloadKeySequence(baseOpts);
+    const steps = buildBcfPayloadKeySequence({ ...baseOpts, emptyFirst: true });
     const labels = steps.map((s) => s.label);
 
     assert.ok(labels.includes('MENU'));
@@ -40,7 +41,7 @@ describe('pmdg-payload-bcf', () => {
   });
 
   it('builds ZFW keystream with decimal scratchpad → R2', () => {
-    const opts = { ...baseOpts, zfwDisplay: '89.3' };
+    const opts = { ...baseOpts, zfwDisplay: '89.3', emptyFirst: true };
     const steps = buildBcfZfwKeySequence(opts);
     const labels = steps.map((s) => s.label);
     assert.ok(labels.some((l) => l.includes('SET EMPTY')));
@@ -71,6 +72,11 @@ describe('pmdg-payload-bcf', () => {
     assert.equal(parseBcfPayloadCliArgs(['--zfw-lb', '89300']).zfwDisplay, '89.3');
   });
 
+  it('defaults emptyFirst=false; --empty-first opts in', () => {
+    assert.equal(parseBcfPayloadCliArgs([]).emptyFirst, false);
+    assert.equal(parseBcfPayloadCliArgs(['--empty-first']).emptyFirst, true);
+  });
+
   it('skips SET EMPTY when emptyFirst is false', () => {
     const steps = buildBcfPayloadKeySequence({
       ...baseOpts,
@@ -80,7 +86,7 @@ describe('pmdg-payload-bcf', () => {
   });
 
   it('uses R5 for SET EMPTY and afterFieldDelayMs on cargo LSKs', () => {
-    const steps = buildBcfPayloadKeySequence(baseOpts);
+    const steps = buildBcfPayloadKeySequence({ ...baseOpts, emptyFirst: true });
     const empty = steps.find((s) => s.label.includes('SET EMPTY'));
     assert.equal(empty?.key, 'R5');
     assert.equal(empty?.delayAfterMs, BCF_PAYLOAD_DEFAULTS.afterEmptyDelayMs);
@@ -114,12 +120,13 @@ describe('pmdg-payload-bcf', () => {
     );
   });
 
-  it('defaults to method=control parameter=1', () => {
+  it('defaults to method=control parameter=1 and cdu=right', () => {
     const parsed = parseBcfPayloadCliArgs([]);
     assert.equal(parsed.method, 'control');
     assert.equal(parsed.parameter, 1);
     assert.equal(parsed.release, false);
     assert.equal(parsed.fieldClrCount, 2);
+    assert.equal(parsed.cdu, 'right');
   });
 
   it('--tiny uses smaller cargo defaults', () => {
@@ -142,7 +149,7 @@ describe('pmdg-payload-bcf', () => {
       '--method',
       'event',
       '--dry-run',
-      '--no-empty-first',
+      '--empty-first',
       '--smoke-menu',
       '--payload-page-lsk',
       'l3',
@@ -155,9 +162,17 @@ describe('pmdg-payload-bcf', () => {
     assert.equal(parsed.parameter, 0);
     assert.equal(parsed.release, true);
     assert.equal(parsed.dryRun, true);
-    assert.equal(parsed.emptyFirst, false);
+    assert.equal(parsed.emptyFirst, true);
     assert.equal(parsed.smokeMenu, true);
     assert.equal(parsed.payloadPageLsk, 'L3');
+  });
+
+  it('--slow restores conservative timings', () => {
+    const fast = parseBcfPayloadCliArgs([]);
+    const slow = parseBcfPayloadCliArgs(['--slow']);
+    assert.equal(fast.delayMs, 200);
+    assert.equal(slow.delayMs, 400);
+    assert.equal(slow.commitDelayMs, 1200);
   });
 
   it('formatBcfPayloadPlan mentions validation checklist', () => {

@@ -18,6 +18,15 @@ import { resolveLiveAircraft } from './resolve-live.js';
 import { runHomologateWizard } from './homologate-wizard.js';
 import { buildSmokeStationTargets } from './smoke-targets.js';
 import {
+  buildBcfPayloadKeySequence,
+  buildMenuSmokeSequence,
+  dumpPayloadStations,
+  formatBcfPayloadPlan,
+  parseBcfPayloadCliArgs,
+  sendBcfPayloadKeySequence,
+} from './pmdg-payload-bcf.js';
+import { confirm, withPrompts } from './prompt.js';
+import {
   A2A_AEROSTAR_LVAR_CANDIDATES,
   probeLVars,
   watchLVars,
@@ -99,7 +108,7 @@ const repoRoot = resolve(agentDir, '..', '..', '..');
 
 function usage(): never {
   console.log(`Usage:
-  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|draft-ofp-roles|pmdg-cdu|generate-ofp|compare-ofp|monitor-ofp|career|writetest [--pipe <name>]
+  msfs-compat-agent ping|status|live|probe|probe-lvars|probe-pmdg-fuel|probe-payload-stations|scaffold-ofp-roles|draft-ofp-roles|pmdg-cdu|pmdg-payload-bcf|generate-ofp|compare-ofp|monitor-ofp|career|writetest [--pipe <name>]
   msfs-compat-agent fingerprint [--register] [--catalog-url <url>] [--pipe <name>]
   msfs-compat-agent sync-catalog [--catalog-url <url>] [--channel stable]
   msfs-compat-agent resolve [--catalog-url <url>] [--pipe <name>]
@@ -119,6 +128,7 @@ function usage(): never {
   msfs-compat-agent scaffold-ofp-roles [--write] [--out path.json] [--pipe <name>]
   msfs-compat-agent draft-ofp-roles --profile path.json [--write] [--keep-passengers]
   msfs-compat-agent pmdg-cdu [--key NAME] [--type digits] [--event id] [--method event|control] [--no-release] [--pipe <name>]
+  msfs-compat-agent pmdg-payload-bcf [--main n] [--fwd n] [--aft n] [--zfw 89.3 | --zfw-lb n] [--units lb|kg] [--tiny] [--unique-digits] [--only main|fwd|aft] [--method control|event] [--smoke-menu] [--no-empty-first] [--dry-run] [--yes] [--delay-ms n] [--commit-delay-ms n] [--after-empty-ms n] [--pipe <name>]
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
@@ -138,6 +148,7 @@ Notes:
   scaffold-ofp-roles: detect known family from live title and print/write roles pack
   draft-ofp-roles: build/merge roles pack from a homologated profiles/examples JSON (no sim)
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
+  pmdg-payload-bcf: BCF CDU PAYLOAD validation — prefer --zfw 89.3 (auto MAIN/FWD/AFT); or MAIN/FWD/AFT LSKs; method=control
   generate-ofp: Dispatch Redirect with homologated SimBrief variant (pack match / live title); fuel AUTO → fetch by static_id
   compare-ofp / monitor-ofp: fetch latest SimBrief OFP; omit --roles to auto-pick pack from aircraft title
   career: local cargo economy + accept/dispatch missions (SimBrief generate-ofp)
@@ -1335,6 +1346,140 @@ async function main(): Promise<void> {
           );
         }
       }
+    });
+    return;
+  }
+
+  if (command === 'pmdg-payload-bcf') {
+    let parsed;
+    try {
+      parsed = parseBcfPayloadCliArgs(rest);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+
+    const {
+      dryRun,
+      yes,
+      smokeMenu,
+      main,
+      fwd,
+      aft,
+      units,
+      delayMs,
+      pageDelayMs,
+      afterEmptyDelayMs,
+      commitDelayMs,
+      afterFieldDelayMs,
+      fieldClrCount,
+      emptyFirst,
+      onlyField,
+      zfwDisplay,
+      payloadPageLsk,
+      mainLsk,
+      fwdLsk,
+      aftLsk,
+      emptyLsk,
+      zfwLsk,
+      method,
+      parameter,
+      release,
+    } = parsed;
+    const opts = {
+      main,
+      fwd,
+      aft,
+      units,
+      delayMs,
+      pageDelayMs,
+      afterEmptyDelayMs,
+      commitDelayMs,
+      afterFieldDelayMs,
+      fieldClrCount,
+      emptyFirst: smokeMenu ? false : emptyFirst,
+      ...(onlyField ? { onlyField } : {}),
+      ...(zfwDisplay ? { zfwDisplay } : {}),
+      payloadPageLsk,
+      mainLsk,
+      fwdLsk,
+      aftLsk,
+      emptyLsk,
+      zfwLsk,
+      method,
+      parameter,
+      release,
+    };
+    const steps = smokeMenu
+      ? buildMenuSmokeSequence()
+      : buildBcfPayloadKeySequence(opts);
+    const planMode = smokeMenu
+      ? 'smoke-menu'
+      : zfwDisplay
+        ? 'zfw'
+        : 'payload';
+    console.log(formatBcfPayloadPlan(opts, steps, planMode));
+
+    if (dryRun) {
+      console.log('\nDry-run only — no keys sent. Drop --dry-run to send.');
+      return;
+    }
+
+    if (!yes) {
+      const ok = await withPrompts((ask) =>
+        confirm(
+          ask,
+          'Send this keystream to the live PMDG CDU? (do not touch the CDU)',
+          true,
+        ),
+      );
+      if (!ok) {
+        console.log('Aborted.');
+        return;
+      }
+    }
+
+    await withBridge(pipeName, async (bridge) => {
+      const identity = await bridge.getAircraftIdentity();
+      console.log(`Aircraft: ${identity.title}`);
+      console.log(
+        `Sending keystream method=${method} parameter=${parameter} release=${release}…`,
+      );
+      await sendBcfPayloadKeySequence(bridge, steps, opts);
+      if (smokeMenu) {
+        console.log(
+          'Smoke done. Did the CDU jump to the MENU page? If no: SDK/control path still dead.',
+        );
+        return;
+      }
+      console.log('Keystream done. Dumping PAYLOAD STATION WEIGHT:1..11…');
+      try {
+        const stations = await dumpPayloadStations(bridge, 11);
+        let sum = 0;
+        for (const s of stations) {
+          console.log(`  S${s.index}: ${Math.round(s.lb)} lb`);
+          sum += s.lb;
+        }
+        console.log(`  sum S1–S11: ${Math.round(sum)} lb`);
+        if (zfwDisplay) {
+          console.log(
+            `  typed ZFW display=${zfwDisplay} (~${Math.round(Number(zfwDisplay) * 1000)} ${units}) — check MAIN/FWD/AFT auto-fill on CDU`,
+          );
+        } else {
+          console.log(
+            `  typed MAIN+FWD+AFT: ${main + fwd + aft} ${units} (compare CDU page / EFB; stations may redistribute)`,
+          );
+        }
+      } catch (error) {
+        console.log(
+          `  station dump failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      console.log(
+        zfwDisplay
+          ? 'Validate: CDU ZFW matches; MAIN/FWD/AFT populated; LOAD LEVEL moved. Report pass/fail.'
+          : 'Validate: CDU PAYLOAD shows MAIN/FWD/AFT; EFB ZFW/LOAD LEVEL updated. Report pass/fail.',
+      );
     });
     return;
   }

@@ -1005,14 +1005,23 @@ public sealed class SimConnectClient : ISimClient
 
         if (useControl)
         {
-            await SendPmdgControlViaClientDataAsync(eventId, param, ct).ConfigureAwait(false);
-            if (release && param != PmdgNg3Cdu.MouseLeftRelease)
+            // One write per key, then EventId→0 clear only.
+            // Give PMDG time to read the command before clearing — too-fast
+            // clear drops LSKs (1234+567 merge → 1234567 INVALID; 89 lands on FWD).
+            var pressParam = parameter == 0 ? 1u : parameter;
+            await WritePmdgControlAsync(eventId, pressParam, track: true, ct)
+                .ConfigureAwait(false);
+            Console.WriteLine(
+                $"[simconnect] PMDG control EventId={eventId} Parameter=0x{pressParam:X8}");
+            await DelayAsync(250, ct).ConfigureAwait(false);
+
+            await WritePmdgControlAsync(0, 0, track: true, ct).ConfigureAwait(false);
+            lock (_pmdgControlGate)
             {
-                await DelayAsync(50, ct).ConfigureAwait(false);
-                await SendPmdgControlViaClientDataAsync(eventId, PmdgNg3Cdu.MouseLeftRelease, ct)
-                    .ConfigureAwait(false);
+                _pmdgControlEventId = 0;
             }
 
+            await DelayAsync(120, ct).ConfigureAwait(false);
             return;
         }
 
@@ -1048,30 +1057,31 @@ public sealed class SimConnectClient : ISimClient
 
     private async Task SendPmdgControlViaClientDataAsync(uint eventId, uint param, CancellationToken ct)
     {
-        var sim = RequireSim();
+        await WritePmdgControlAsync(eventId, param, track: true, ct).ConfigureAwait(false);
+        Console.WriteLine($"[simconnect] PMDG control set EventId={eventId} Parameter=0x{param:X8}");
+        await DelayAsync(50, ct).ConfigureAwait(false);
+    }
 
+    private Task WritePmdgControlAsync(uint eventId, uint param, bool track, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
         lock (_gate)
         {
+            var sim = RequireSim();
             EnsurePmdgNg3ControlReady(sim);
-        }
-
-        await WaitUntilControlEventIdleAsync(ct).ConfigureAwait(false);
-
-        var control = new PMDGNG3Control
-        {
-            EventId = eventId,
-            Parameter = param
-        };
-
-        lock (_gate)
-        {
-            sim = RequireSim();
-            EnsurePmdgNg3ControlReady(sim);
-            lock (_pmdgControlGate)
+            if (track)
             {
-                _pmdgControlEventId = eventId;
+                lock (_pmdgControlGate)
+                {
+                    _pmdgControlEventId = eventId;
+                }
             }
 
+            var control = new PMDGNG3Control
+            {
+                EventId = eventId,
+                Parameter = param
+            };
             sim.SetClientData(
                 ClientDataIds.PmdgNg3Control,
                 ClientDataDefinitions.PmdgNg3Control,
@@ -1080,21 +1090,12 @@ public sealed class SimConnectClient : ISimClient
                 control);
         }
 
-        Console.WriteLine($"[simconnect] PMDG control set EventId={eventId} Parameter=0x{param:X8}");
-
-        try
-        {
-            await WaitUntilControlEventIdleAsync(ct).ConfigureAwait(false);
-        }
-        catch (SimClientException ex) when (ex.Code == "TIMEOUT")
-        {
-            Console.WriteLine("[simconnect] PMDG control ack wait timed out (Event not cleared yet)");
-        }
+        return Task.CompletedTask;
     }
 
     private async Task WaitUntilControlEventIdleAsync(CancellationToken ct)
     {
-        var deadline = DateTime.UtcNow.AddMilliseconds(1000);
+        var deadline = DateTime.UtcNow.AddMilliseconds(1500);
         while (true)
         {
             ct.ThrowIfCancellationRequested();

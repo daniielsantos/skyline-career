@@ -33,6 +33,7 @@
     "draft-ofp-roles": "node packages/agent/dist/cli.js draft-ofp-roles",
     "probe-payload-stations": "node packages/agent/dist/cli.js probe-payload-stations",
     "pmdg-cdu": "node packages/agent/dist/cli.js pmdg-cdu",
+    "pmdg-payload-bcf": "node packages/agent/dist/cli.js pmdg-payload-bcf",
     "compare-ofp": "node packages/agent/dist/cli.js compare-ofp",
     "generate-ofp": "node packages/agent/dist/cli.js generate-ofp",
     "monitor-ofp": "node packages/agent/dist/cli.js monitor-ofp",

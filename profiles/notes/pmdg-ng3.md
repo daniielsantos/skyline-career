@@ -84,8 +84,65 @@ Expect `layoutOk: true`, `nonzeroBytes` > 0, and L/R/C lb close to classic `FUEL
 | OFP vs live compliance | **Yes** — `compare-ofp` / `monitor-ofp` (fuel L/R/C + total, payload; burn-aware) |
 | Write fuel via classic / LVar / Client Data | **No / out of scope** — user loads via SimBrief/EFB/FMC |
 | CDU control send (`pmdg-cdu`) | **Parked / experimental** — not the product apply path |
+| BCF PAYLOAD validation (`pmdg-payload-bcf`) | **Experimental** — types MAIN/FWD/AFT on CDU; **not** career inject |
 | Payload stations | Often yes via `station-writeback` (optional; career may only monitor) |
 | Vendor recipe | `profiles/vendors/pmdg-ng3.json` → `onClassicWriteFail: abort` |
+
+## BCF CDU PAYLOAD validation script (experimental)
+
+Standalone probe — **does not** touch career inject / `injectCapable`. Use it to see if PMDG accepts a keystream like GSX (CDU events, not SimVar writes).
+
+**Prereqs**
+
+1. Rebuild / restart SimBridge Host after pulling (adds `MENU` key resolve in `PmdgNg3Cdu.cs`).
+2. Load **737-800 BCF**, CDU powered, parked. Do not touch the CDU while the script runs.
+3. Units on the aircraft Options should match `--units` (`lb` default).
+
+**Assumed LSK map** (override with flags if your page differs)
+
+| Step | Key |
+|------|-----|
+| Clear scratchpad | `CLR` ×2 |
+| MENU | `MENU` |
+| FS ACTIONS | `R5` |
+| PAYLOAD page | `L2` (`--payload-page-lsk`) |
+| SET EMPTY (default on) | `R5` (`--empty-lsk`; **not** R2 — R2 is ZFW/TOCG) |
+| SET MAX / SET RANDOM | `R4` / `R6` |
+| ZFW (preferred) | type display (e.g. `89.3`) → `R2` — aircraft fills MAIN/FWD/AFT |
+| MAIN / FWD / AFT (on-screen L1/L2/L3) | SDK keys `L2` / `L3` / `L4` (BCF live: L1 event does not commit) |
+
+**Commands**
+
+```bash
+# Preferred: set ZFW display value (89.3 ≈ 89300 lb); MAIN/FWD/AFT auto-fill
+npm run pmdg-payload-bcf -- --zfw 89.3 --yes
+# or from pounds:
+npm run pmdg-payload-bcf -- --zfw-lb 89300 --yes
+
+# Print keystream only
+npm run pmdg-payload-bcf -- --zfw 89.3 --dry-run
+
+# Legacy three-field path (still works)
+npm run pmdg-payload-bcf -- --unique-digits --yes
+```
+
+**Live note:** `method=event` (TransmitClientEvent) can log success while stations/CDU stay unchanged. Prefer `method=control` (`PMDG_NG3_Control` SetClientData + `parameter=1`). Confirm `EnableDataBroadcast=1` in `737_Options.ini` and that the Host was rebuilt with the `MENU` key.
+
+**INVALID ENTRY / wrong numbers (1000→10020, 200→20):** often repeated digit `0` dropped because `PMDG_NG3_Control` ignores the same EventId until cleared. Host now forces EventId=0 after each key — **rebuild/restart SimBridgeHost** before retesting.
+
+**LSK merge (1234+567→1234567 INVALID, 89 on FWD):** field LSK cleared too fast / next digits started early. Host waits 250ms before EventId=0; script uses longer commit/after-field delays. Validate one field:
+
+```bash
+# Stop SimBridgeHost, npm run build:native, restart Host
+npm run pmdg-payload-bcf -- --unique-digits --only main --yes
+# expect MAIN=1234 only
+npm run pmdg-payload-bcf -- --unique-digits --only fwd --no-empty-first --yes
+npm run pmdg-payload-bcf -- --unique-digits --only aft --no-empty-first --yes
+```
+
+After send, the script dumps `PAYLOAD STATION WEIGHT:1..11`. **Validate by eye:** CDU PAYLOAD shows the numbers; EFB ZFW / LOAD LEVEL moved. If the wrong page got keystrokes, stop and adjust `--payload-page-lsk` / field LSKs — do not wire career inject until this is green.
+
+Do not run alongside GSX boarding automation (both type the CDU).
 
 ## Homologation guidance (today)
 

@@ -26,6 +26,7 @@ public static class PmdgNg3Cdu
     public const uint EvtCduL_R6 = ThirdPartyEventIdMin + 545;
 
     public const uint EvtCduL_InitRef = ThirdPartyEventIdMin + 546;
+    public const uint EvtCduL_Menu = ThirdPartyEventIdMin + 551;
     public const uint EvtCduL_Exec = ThirdPartyEventIdMin + 556;
     public const uint EvtCduL_PrevPage = ThirdPartyEventIdMin + 559;
     public const uint EvtCduL_NextPage = ThirdPartyEventIdMin + 560;
@@ -50,6 +51,7 @@ public static class PmdgNg3Cdu
     {
         ["INIT_REF"] = EvtCduL_InitRef,
         ["INIT"] = EvtCduL_InitRef,
+        ["MENU"] = EvtCduL_Menu,
         ["EXEC"] = EvtCduL_Exec,
         ["PREV"] = EvtCduL_PrevPage,
         ["NEXT"] = EvtCduL_NextPage,

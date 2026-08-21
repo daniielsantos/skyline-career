@@ -56,6 +56,28 @@ export interface SimBridge {
   triggerEvent(request: EventTriggerRequest): Promise<void>;
   snapshot(): Promise<SimSnapshot>;
   delay(ms: number): Promise<void>;
+  /**
+   * Optional: PMDG NG3 CDU key via control area / mapped event.
+   * Required when profile fuel/payload strategy is `pmdg-cdu`.
+   */
+  sendPmdgNg3Control?(opts: {
+    eventId?: number;
+    key?: string;
+    parameter?: number;
+    release?: boolean;
+    method?: 'event' | 'control';
+    cdu?: 'left' | 'right';
+    /** Keep key pressed before release/clear (ms). CLR long-press uses ~3000. */
+    holdMs?: number;
+  }): Promise<{
+    ok: boolean;
+    eventId: number;
+    parameter: number;
+    release?: boolean;
+    method?: string;
+    cdu?: string;
+    holdMs?: number | null;
+  }>;
 }
 
 export interface StrategyContext {

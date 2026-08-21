@@ -942,6 +942,7 @@
     "typeId": "pmdg-738-bcf-family",
     "aircraftClassId": "narrow_freighter",
     "label": "PMDG 737-800 BCF",
+    "injectCapable": true,
     "rolesPackRelPath": "profiles/ofp/pmdg-738-bcf.json",
     "familyRolesPackRelPaths": [
       "profiles/ofp/pmdg-738-bcf.json",

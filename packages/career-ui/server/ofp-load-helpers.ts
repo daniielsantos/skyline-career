@@ -19,6 +19,12 @@ import {
   type MissionIntent,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import {
+  applyPmdgCduFuelOnce,
+  applyPmdgCduPayloadOnce,
+  isPmdgCduFuelProfile,
+  isPmdgCduPayloadProfile,
+} from './pmdg-cdu-inject.ts';
 import { simIpcSessionDied } from '../../agent/src/sim-session-health.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
@@ -1090,10 +1096,24 @@ async function applyMissionOfpLoadExclusive(
       careerFuelMatchOk(beforeFuelLb, built.blockFuelLb, 50, 150, 0) &&
       liveFuelMatchesTarget(beforeLive.tanks, plannedTanks);
     let plannedFuelLb = built.blockFuelLb;
+    const plannedCrewLb =
+      built.crewStations.length > 0
+        ? built.crewStations.reduce((sum, idx) => {
+            const st = resolved.profile.payload.stations.find((s) => s.index === idx);
+            return (
+              sum +
+              (st
+                ? Math.min(FREIGHTER_PILOT_LB, st.maxLoad)
+                : FREIGHTER_PILOT_LB)
+            );
+          }, 0)
+        : 0;
+    /**
+     * Due payload for UI / CDU ZFW. Prefer OFP cargo (requestedCargoLb) — station
+     * distribute may clamp to tiny profile maxLoad (BCF placeholders @ 500 lb).
+     */
     const plannedPayloadLb =
-      built.plan.payload?.total ??
-      sumRecord(built.plan.payload?.stations) ??
-      built.cargoLb + built.crewStations.length * FREIGHTER_PILOT_LB;
+      (built.requestedCargoLb ?? built.cargoLb) + plannedCrewLb;
 
     watchDebugLog('inject', 'plan ready', {
       missionId: mission.id,
@@ -1525,6 +1545,104 @@ async function applyMissionOfpLoadExclusive(
       mxNote && message.startsWith('Injecting OFP fuel')
         ? `${message} · ${mxNote}`
         : message;
+
+    const pmdgCduFuel = isPmdgCduFuelProfile(resolved.profile);
+    const pmdgCduPayload = isPmdgCduPayloadProfile(resolved.profile);
+    /** Absolute ZFW typed on CDU — used for post-inject verify (not station sum). */
+    let pmdgCduZfwTargetLb: number | undefined;
+
+    if (pmdgCduFuel || pmdgCduPayload) {
+      publishLiveProgress(
+        'injecting',
+        pmdgCduFuel && !fuelAlreadyOk
+          ? withMxNote('PMDG CDU fuel TOTAL (FO)…')
+          : 'PMDG CDU payload ZFW (FO)…',
+      );
+
+      if (pmdgCduFuel && !fuelAlreadyOk && built.plan.fuel) {
+        if (beforeLive.enginesRunning) {
+          throw new Error(
+            'Shut down engines before fuel inject — PMDG CDU fuel load requires engines off',
+          );
+        }
+        restoreFuelOnRollback = false;
+        assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'pmdg-cdu fuel');
+        const fuelApply = await applyPmdgCduFuelOnce({
+          engine,
+          fuel: built.plan.fuel,
+        });
+        applyResult = {
+          ...(applyResult ?? {}),
+          fuel: fuelApply ?? applyResult?.fuel,
+        };
+        if (fuelApply && !fuelApply.success) {
+          restoreFuelOnRollback = true;
+        } else {
+          paintFuelUiFromWriteTarget(built.plan.fuel.tanks ?? {});
+          publishLiveProgress(
+            'injecting',
+            `CDU fuel done · ${Math.round(plannedFuelLb)} lb target`,
+          );
+          await delayCancellable(mission.id, 800);
+        }
+      } else if (fuelAlreadyOk || !built.plan.fuel) {
+        const skipTanks =
+          Object.keys(plannedTanks).length > 0 ? plannedTanks : beforeLive.tanks;
+        paintFuelUiFromWriteTarget(skipTanks);
+      }
+
+      const fuelOkCdu =
+        fuelAlreadyOk || !applyResult?.fuel || applyResult.fuel.success;
+      if (fuelOkCdu && pmdgCduPayload) {
+        assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'pmdg-cdu zfw');
+        publishLiveProgress('injecting', 'PMDG CDU ZFW (FO)…');
+        const serviceStations = ofp.payload?.stationRoles?.serviceStations ?? [];
+        const zfwApply = await applyPmdgCduPayloadOnce({
+          engine,
+          bridge,
+          ofp,
+          requestedCargoLb: built.requestedCargoLb ?? built.cargoLb,
+          liveStations: beforeLive.stations,
+          baggageStationIndexes: built.baggageStations,
+          fixedNonCargoStationIndexes: [
+            ...built.crewStations,
+            ...serviceStations,
+          ],
+        });
+        applyResult = {
+          ...(applyResult ?? {}),
+          payload: zfwApply.payload ?? applyResult?.payload,
+          cg: { ok: true, failures: [] },
+        };
+        pmdgCduZfwTargetLb = zfwApply.zfwLb;
+        publishLiveProgress(
+          'injecting',
+          `CDU ZFW ${zfwApply.zfwLb.toFixed(0)} lb (${zfwApply.method})`,
+        );
+        // Let PMDG redistribute MAIN/FWD/AFT before classic station reads.
+        await delayCancellable(mission.id, 2000);
+        try {
+          const liveSt = await readLiveStations(bridge, resolved.profile);
+          workingStations = { ...liveSt };
+          afterLive = {
+            tanks: afterLive.tanks,
+            stations: liveSt,
+          };
+        } catch (err) {
+          if (!simIpcSessionDied(err)) throw err;
+          afterLive = {
+            tanks: afterLive.tanks,
+            stations: { ...workingStations },
+          };
+        }
+      }
+
+      // Fall through to shared live refresh / verify / closeout below.
+      // Skip classic multi-round fuel + CG station loops.
+      if (!applyResult) applyResult = {};
+    }
+
+    if (!pmdgCduFuel && !pmdgCduPayload) {
     publishLiveProgress(
       'injecting',
       fuelAlreadyOk
@@ -2652,17 +2770,21 @@ async function applyMissionOfpLoadExclusive(
       }
     }
 
+    } // end classic multi-round fuel + payload (!pmdgCdu)
+
     afterLive = {
       tanks: await readLiveTanksTrustingWrite(
         bridge,
         resolved.profile,
         fuelUiTanks ?? afterLive.tanks,
       ),
-      stations: await readLiveStationsTrustingWrite(
-        bridge,
-        resolved.profile,
-        workingStations,
-      ),
+      stations: pmdgCduPayload
+        ? await readLiveStations(bridge, resolved.profile)
+        : await readLiveStationsTrustingWrite(
+            bridge,
+            resolved.profile,
+            workingStations,
+          ),
     };
     // Prefer live distribution (tips/nacelles) over the OFP write map when the
     // sim has redistributed; still hold written values if AUX/TIP under-read.
@@ -2676,10 +2798,12 @@ async function applyMissionOfpLoadExclusive(
     // Station SimVars can under-read on Accu-Sim while the tablet LVars hold the load.
     // Prefer a2a-lvars (same reader as Watch/Preflight); only then fall back to
     // classic stations + mass-balance trust for non-Accu-Sim airframes.
-    const plannedPayloadSumLb =
-      built.plan.payload?.total ??
-      sumRecord(built.plan.payload?.stations) ??
-      plannedPayloadLb;
+    // PMDG CDU path: Due = OFP cargo+crew — not the station-capacity-clamped plan.total.
+    const plannedPayloadSumLb = pmdgCduPayload
+      ? plannedPayloadLb
+      : built.plan.payload?.total ??
+        sumRecord(built.plan.payload?.stations) ??
+        plannedPayloadLb;
     const workingSumLb = sumRecord(workingStations);
     const preferA2aVerify =
       ofp.liveSources?.payload?.includes('a2a-lvars') === true ||
@@ -2697,6 +2821,61 @@ async function applyMissionOfpLoadExclusive(
     } catch (err) {
       if (!simIpcSessionDied(err)) throw err;
     }
+
+    // PMDG CDU: prefer ZFW LVar / baggage sum over classic "station write stuck".
+    if (
+      pmdgCduPayload &&
+      applyResult?.payload?.success &&
+      pmdgCduZfwTargetLb !== undefined
+    ) {
+      let liveZfw: number | undefined;
+      try {
+        const z = await bridge.readLVar('ZFW_Lvar');
+        if (Number.isFinite(z) && z >= 20_000 && z <= 200_000) liveZfw = z;
+        else if (Number.isFinite(z) && z >= 50 && z < 500) liveZfw = z * 1000;
+      } catch {
+        /* optional */
+      }
+      const liveCargoLb = built.baggageStations.reduce((sum, idx) => {
+        const v = afterLive.stations[idx];
+        return sum + (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+      }, 0);
+      const requestedCargo = built.requestedCargoLb ?? built.cargoLb;
+      const zfwTol = Math.max(500, pmdgCduZfwTargetLb * 0.01);
+      const cargoTol = Math.max(400, requestedCargo * 0.08);
+      const zfwOk =
+        liveZfw !== undefined &&
+        Math.abs(liveZfw - pmdgCduZfwTargetLb) <= zfwTol;
+      const cargoOk = Math.abs(liveCargoLb - requestedCargo) <= cargoTol;
+      watchDebugLog('inject', 'pmdg-cdu verify', {
+        zfwTarget: Math.round(pmdgCduZfwTargetLb),
+        liveZfw: liveZfw !== undefined ? Math.round(liveZfw) : null,
+        zfwOk,
+        liveCargoLb: Math.round(liveCargoLb),
+        requestedCargo: Math.round(requestedCargo),
+        cargoOk,
+        classicPayloadLb: Math.round(classicPayloadLb),
+      });
+      if (!zfwOk && !cargoOk) {
+        applyResult = {
+          ...applyResult,
+          payload: {
+            success: false,
+            strategyUsed: 'pmdg-cdu',
+            fallbackUsed: false,
+            durationMs: applyResult.payload?.durationMs ?? 0,
+            errorCode: 'PAYLOAD_VERIFY_FAILED',
+            details: {
+              message: `CDU ZFW/cargo not confirmed (ZFW live=${liveZfw?.toFixed(0) ?? '?'} target=${pmdgCduZfwTargetLb.toFixed(0)}; cargo live=${liveCargoLb.toFixed(0)} OFP=${requestedCargo.toFixed(0)})`,
+            },
+          },
+        };
+      } else {
+        // Prefer OFP Due for UI when ZFW/cargo confirm — classic stations can lag.
+        classicPayloadLb = plannedPayloadLb;
+      }
+    }
+
     const stationSumLb = sumRecord(afterLive.stations);
     let a2aPayloadLb: number | undefined;
     let a2aStations: Record<number, number> | undefined;
@@ -2759,8 +2938,11 @@ async function applyMissionOfpLoadExclusive(
       });
     }
 
+    // Classic path only: PMDG CDU never wrote stations — don't treat under-read as ignore.
     const payloadInjectStuck =
-      applySucceeded(applyResult) && resolvedLive.stuck;
+      !pmdgCduPayload &&
+      applySucceeded(applyResult) &&
+      resolvedLive.stuck;
     if (payloadInjectStuck && applyResult) {
       watchDebugLog('inject', 'payload stuck vs plan', {
         livePayloadSumLb: Math.round(livePayloadSumLb),
@@ -2861,14 +3043,27 @@ async function applyMissionOfpLoadExclusive(
     }
 
     if (!applySucceeded(applyResult)) {
-      rolledBack = true;
-      const restore = await engine.applyLoadPlan(
-        rollbackRequest(rollbackPlan, restoreFuelOnRollback),
-      );
-      rollbackOk = applySucceeded({
-        fuel: restore.fuel,
-        payload: restore.payload,
-      });
+      // PMDG CDU never wrote classic stations — rolling them back is useless and
+      // often reports ROLLBACK INCOMPLETE while the CDU load is already set.
+      const skipPayloadRollback =
+        pmdgCduPayload &&
+        (!applyResult?.fuel || applyResult.fuel.success === true);
+      if (skipPayloadRollback && !restoreFuelOnRollback) {
+        rolledBack = false;
+        rollbackOk = null;
+      } else {
+        rolledBack = true;
+        const restore = await engine.applyLoadPlan(
+          rollbackRequest(
+            rollbackPlan,
+            restoreFuelOnRollback,
+          ),
+        );
+        rollbackOk = applySucceeded({
+          fuel: restore.fuel,
+          payload: skipPayloadRollback ? { success: true } : restore.payload,
+        });
+      }
       try {
         afterLive = {
           tanks: await readLiveTanks(bridge, resolved.profile),
@@ -2898,9 +3093,6 @@ async function applyMissionOfpLoadExclusive(
         const failure = applyResult.cg.failures[0];
         const limits = resolved.profile.cg?.constraints;
         const margin = failure?.tolerancePct ?? CG_REBALANCE_MARGIN_MAC;
-        // Report the envelope the gate actually used: live (weight-dependent)
-        // first, profile constraints only as fallback. Printing the static
-        // constraints made rejections read as nonsense ("32.9% outside 19–39%").
         const minMac = lastMinMac ?? limits?.minMac;
         const maxMac = lastMaxMac ?? limits?.maxMac;
         const lo =
@@ -2918,7 +3110,9 @@ async function applyMissionOfpLoadExclusive(
       error = formatPipeError(
         `Apply failed (${parts.join(', ') || 'unknown'})`,
       );
-      if (rollbackOk === false) {
+      if (skipPayloadRollback && !restoreFuelOnRollback) {
+        error += ' — check CDU/EFB load manually (no classic station rollback)';
+      } else if (rollbackOk === false) {
         error += ' — ROLLBACK INCOMPLETE, check aircraft load manually';
       } else {
         error += restoreFuelOnRollback

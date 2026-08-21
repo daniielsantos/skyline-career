@@ -98,6 +98,14 @@
 - **Inject/preflight batch + fill híbrido:** tanks/stations/CG em `readSimVars`.
   Fill equal primeiro em todas as stations; no limite → shift e continua
   o Due. Pack recusa Host stale.
+- **PMDG 738 BCF CDU inject (opt-in):** strategy `pmdg-cdu` (FO TOTAL + ZFW);
+  builders em `packages/shared/src/pmdg-ng3-cdu-keystream.ts`; one-shot em
+  `ofp-load-helpers` (sem rounds/CG). Gates: profile BCF + pack
+  `pmdg-738-bcf.json` + catalog `pmdg-738-bcf-family.injectCapable`. BDSF
+  pack continua EFB; classe `narrow_freighter` intacta.
+  ZFW target = SimBrief `loadSheet.zfw` (`est_zfw`); fallback live−cargo+Due.
+  Início do keystream: **10× CLR** event @ 150ms + settle 350ms (sem hold 3s).
+  Verify PMDG: ZFW/cargo (não “ignored station writes”); sem rollback clássico.
 
 ## O que validar após 0.3.22
 

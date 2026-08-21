@@ -6,6 +6,8 @@ Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A live
 
 ## Validar (manual)
 
+- [ ] **PMDG 738 BCF live inject:** solo, FO CDU ligado, Preflight → Inject;
+  não tocar no CDU; Due fuel ≈ TOTAL; ZFW = SimBrief est_zfw; MAIN/FWD/AFT auto
 - [ ] Watch CG card: após editar EFB, `% MAC` atualiza (não congela no Validate); Loaded vs Due não trava
 - [x] Footer Phase taxi: Accu-Sim COMBUSTION=0 não prende em "On ground"; taxi por GS ≥5 kt (`taxi_out`)
 - [ ] Preflight longe do origin → **NOT AT ORIGIN** + status line; Watch não auto-decola; spawn no hub certo limpa o card sem novo Validate

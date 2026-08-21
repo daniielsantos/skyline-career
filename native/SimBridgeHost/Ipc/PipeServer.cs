@@ -304,8 +304,10 @@ public sealed class PipeServer : IAsyncDisposable
                     // Default release=true for CDU/momentary keys.
                     var release = GetBool(request.Params, "release") ?? true;
                     var method = GetString(request.Params, "method") ?? "event";
+                    var holdMsRaw = GetNumber(request.Params, "holdMs");
+                    var holdMs = holdMsRaw is not null ? (int)holdMsRaw.Value : -1;
 
-                    await _sim.SendPmdgNg3ControlAsync(eventId, parameter, release, method, ct)
+                    await _sim.SendPmdgNg3ControlAsync(eventId, parameter, release, method, holdMs, ct)
                         .ConfigureAwait(false);
                     var usedParameter = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
 
@@ -316,6 +318,7 @@ public sealed class PipeServer : IAsyncDisposable
                         parameter = usedParameter,
                         release,
                         method,
+                        holdMs = holdMs >= 0 ? holdMs : (int?)null,
                         cdu = rightCdu ? "right" : "left"
                     });
                 }

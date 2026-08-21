@@ -85,10 +85,10 @@ describe('pmdg-payload-bcf', () => {
     assert.ok(!steps.some((s) => s.label.includes('SET EMPTY')));
   });
 
-  it('uses R5 for SET EMPTY and afterFieldDelayMs on cargo LSKs', () => {
+  it('uses R4 for SET EMPTY and afterFieldDelayMs on cargo LSKs', () => {
     const steps = buildBcfPayloadKeySequence({ ...baseOpts, emptyFirst: true });
     const empty = steps.find((s) => s.label.includes('SET EMPTY'));
-    assert.equal(empty?.key, 'R5');
+    assert.equal(empty?.key, 'R4');
     assert.equal(empty?.delayAfterMs, BCF_PAYLOAD_DEFAULTS.afterEmptyDelayMs);
     const mainLsk = steps.find((s) => s.label.includes('MAIN CARGO'));
     assert.equal(mainLsk?.delayAfterMs, BCF_PAYLOAD_DEFAULTS.afterFieldDelayMs);

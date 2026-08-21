@@ -5,6 +5,10 @@ import { DefaultGatingEvaluator } from './gating/default-gating-evaluator.js';
 import { StrategyRegistry } from './registry/strategy-registry.js';
 import { HybridSyncFuelStrategy, LvarBridgeFuelStrategy, SimConnectDirectFuelStrategy } from './strategies/fuel/simconnect-fuel-strategy.js';
 import { StationWritebackPayloadStrategy } from './strategies/payload/station-payload-strategy.js';
+import {
+  PmdgCduFuelStrategy,
+  PmdgCduPayloadStrategy,
+} from './strategies/pmdg/pmdg-cdu-strategy.js';
 import type { ProfileEngine, SimBridge } from './types.js';
 import { readBridgeSimVars } from './read-simvars.js';
 
@@ -172,6 +176,8 @@ export function createDefaultProfileRegistry(): StrategyRegistry {
   registry.registerFuel(new SimConnectDirectFuelStrategy());
   registry.registerFuel(new HybridSyncFuelStrategy());
   registry.registerFuel(new LvarBridgeFuelStrategy());
+  registry.registerFuel(new PmdgCduFuelStrategy());
   registry.registerPayload(new StationWritebackPayloadStrategy());
+  registry.registerPayload(new PmdgCduPayloadStrategy());
   return registry;
 }

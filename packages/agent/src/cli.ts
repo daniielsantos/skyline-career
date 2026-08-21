@@ -1405,6 +1405,10 @@ async function main(): Promise<void> {
       parameter,
       release,
       cdu,
+      scratchpadClearHoldMs,
+      scratchpadClearTaps,
+      scratchpadClearTapDelayMs,
+      scratchpadClearSettleMs,
     } = parsed;
     const opts = {
       main,
@@ -1430,6 +1434,10 @@ async function main(): Promise<void> {
       parameter,
       release,
       cdu,
+      scratchpadClearHoldMs: smokeMenu ? 0 : scratchpadClearHoldMs,
+      scratchpadClearTaps: smokeMenu ? 0 : scratchpadClearTaps,
+      scratchpadClearTapDelayMs,
+      scratchpadClearSettleMs,
     };
     const steps = smokeMenu
       ? buildMenuSmokeSequence()
@@ -1535,6 +1543,10 @@ async function main(): Promise<void> {
       parameter,
       release,
       cdu,
+      scratchpadClearHoldMs,
+      scratchpadClearTaps,
+      scratchpadClearTapDelayMs,
+      scratchpadClearSettleMs,
     } = parsed;
     const opts = {
       units,
@@ -1554,6 +1566,10 @@ async function main(): Promise<void> {
       parameter,
       release,
       cdu,
+      scratchpadClearHoldMs: smokeMenu ? 0 : scratchpadClearHoldMs,
+      scratchpadClearTaps: smokeMenu ? 0 : scratchpadClearTaps,
+      scratchpadClearTapDelayMs,
+      scratchpadClearSettleMs,
     };
     const steps = smokeMenu
       ? buildMenuSmokeSequence()

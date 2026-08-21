@@ -282,6 +282,8 @@ export class NamedPipeSimBridge implements SimBridge {
     method?: 'event' | 'control';
     /** Captain (left) or FO (right) CDU — GSX uses right. */
     cdu?: 'left' | 'right';
+    /** Keep key pressed before release/clear (ms). */
+    holdMs?: number;
   }): Promise<{
     ok: boolean;
     eventId: number;
@@ -289,6 +291,7 @@ export class NamedPipeSimBridge implements SimBridge {
     release?: boolean;
     method?: string;
     cdu?: string;
+    holdMs?: number | null;
   }> {
     await this.ensureOpen();
     return this.client.call('sendPmdgNg3Control', {
@@ -298,6 +301,7 @@ export class NamedPipeSimBridge implements SimBridge {
       ...(opts.release !== undefined ? { release: opts.release } : {}),
       ...(opts.method !== undefined ? { method: opts.method } : {}),
       ...(opts.cdu !== undefined ? { cdu: opts.cdu } : {}),
+      ...(opts.holdMs !== undefined ? { holdMs: opts.holdMs } : {}),
     });
   }
 

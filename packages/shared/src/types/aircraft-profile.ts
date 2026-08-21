@@ -11,13 +11,15 @@ export type FuelStrategyName =
   | 'simconnect-direct'
   | 'lvar-bridge'
   | 'hybrid-sync'
-  | 'vendor-specific';
+  | 'vendor-specific'
+  | 'pmdg-cdu';
 
 export type PayloadStrategyName =
   | 'station-writeback'
   | 'simconnect-direct'
   | 'lvar-bridge'
-  | 'vendor-specific';
+  | 'vendor-specific'
+  | 'pmdg-cdu';
 
 export type FlightPhase =
   | 'preflight'

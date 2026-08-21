@@ -35,12 +35,15 @@ public interface ISimClient : IAsyncDisposable
     /// for CDU/momentary keys — matches ConnectionTest FD switch. <c>method=control</c>
     /// uses <c>PMDG_NG3_Control</c> SetClientData. When <paramref name="parameter"/> is 0,
     /// defaults to <see cref="PmdgNg3Cdu.MouseLeftSingle"/>.
+    /// <paramref name="holdMs"/> keeps the key pressed before release/clear (CLR long-press
+    /// clears the whole scratchpad; default 150ms for control, 50ms for event).
     /// </summary>
     Task SendPmdgNg3ControlAsync(
         uint eventId,
         uint parameter = 0,
         bool release = true,
         string method = "event",
+        int holdMs = -1,
         CancellationToken ct = default);
 }
 

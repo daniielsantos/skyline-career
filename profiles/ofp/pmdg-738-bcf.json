@@ -2,8 +2,8 @@
   "source": "simbrief",
   "icao": "B738",
   "ofpId": "pmdg-738-bcf",
-  "loadMethod": "native-simbrief",
-  "injectCapable": false,
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
   "matchTitles": [
     "737-800BCF BW",
     "737-800BCF SSW"
@@ -15,7 +15,7 @@
     "Homologated monitor: pmdg/737-800bcf-bw@1.0.0",
     "SimBrief: PMDG Boeing Converted Freighter — payload is cargo, not pax",
     "Zones 1–4 are main-deck cargo despite PaxZone names in flight_model.cfg",
-    "loadMethod: native-simbrief; injectCapable: false",
+    "loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu)",
     "liveSources: NG3 fuel + PMDG EFB LVars"
   ],
   "fuel": {

@@ -1272,6 +1272,92 @@ describe('buildOfpLoadPlan', () => {
       0,
     );
     assert.equal(crewSpare + baggage, cargoLb);
+    assert.equal(built.requestedCargoLb, cargoLb);
+  });
+
+  it('keeps requestedCargoLb when station maxLoad clamps placed cargo (BCF-style)', () => {
+    const profile = {
+      schemaVersion: '1.0.0' as const,
+      profileId: 'tiny-bcf',
+      profileKey: 'test/tiny-bcf',
+      semver: '1.0.0',
+      displayName: 'tiny',
+      match: { fingerprint: 'x', title: 'test', publisher: 'pmdg' },
+      capabilities: ['simconnect' as const],
+      gating: {
+        requireOnGround: true,
+        requireEnginesOff: false,
+        blockWhenPaused: true,
+        blockWhenSlew: true,
+        minSimRate: 0.9,
+        maxSimRate: 1.1,
+      },
+      fuel: {
+        strategy: 'simconnect-direct' as const,
+        unit: 'gallons' as const,
+        tanks: [
+          {
+            id: 'LEFT_MAIN',
+            name: 'L',
+            capacity: 1000,
+            readVar: 'FUEL TANK LEFT MAIN QUANTITY',
+            readUnit: 'gallons',
+          },
+          {
+            id: 'RIGHT_MAIN',
+            name: 'R',
+            capacity: 1000,
+            readVar: 'FUEL TANK RIGHT MAIN QUANTITY',
+            readUnit: 'gallons',
+          },
+        ],
+        writePlan: [],
+        verify: { timeoutMs: 1000, pollIntervalMs: 100, checks: [] },
+      },
+      payload: {
+        strategy: 'pmdg-cdu' as const,
+        stations: [
+          { index: 1, name: 'Z1', maxLoad: 500 },
+          { index: 2, name: 'Z2', maxLoad: 500 },
+          { index: 7, name: 'PLT', maxLoad: 500 },
+          { index: 8, name: 'CPLT', maxLoad: 500 },
+        ],
+        writePlan: [],
+        verify: { timeoutMs: 1000, pollIntervalMs: 100, checks: [] },
+      },
+    };
+    const roles = {
+      passengerStations: [] as number[],
+      baggageStations: [1, 2],
+      crewStations: [7, 8],
+      serviceStations: [] as number[],
+    };
+    const ofp = normalizeOfpExpectation({
+      source: 'simbrief',
+      fuel: { unit: 'kg', total: 1000 },
+      loadSheet: {
+        unit: 'kg',
+        blockFuel: 1000,
+        baggage: 13_000,
+        payload: 13_000,
+        passengerCount: 0,
+      },
+      payload: {
+        unit: 'kg',
+        total: 13_000,
+        stationRoles: roles,
+      },
+    });
+    const built = buildOfpLoadPlan({
+      ofp,
+      profile,
+      stationRoles: roles,
+      liveStationsLb: {},
+    });
+    const ofpCargoLb = Math.round(13_000 * KG_TO_LB);
+    assert.equal(built.requestedCargoLb, ofpCargoLb);
+    assert.ok(built.cargoLb < ofpCargoLb);
+    assert.ok(built.cargoLb <= 1000);
   });
 
   it('uses cargoKgFallback when OFP has no baggage', async () => {

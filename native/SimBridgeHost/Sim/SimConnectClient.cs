@@ -998,6 +998,7 @@ public sealed class SimConnectClient : ISimClient
         uint parameter = 0,
         bool release = true,
         string method = "event",
+        int holdMs = -1,
         CancellationToken ct = default)
     {
         var param = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
@@ -1008,12 +1009,14 @@ public sealed class SimConnectClient : ISimClient
             // One write per key, then EventId→0 clear only.
             // Give PMDG time to read the command before clearing — too-fast
             // clear drops LSKs (1234+567 merge → 1234567 INVALID; 89 lands on FWD).
+            // holdMs>default: long-press CLR clears the whole scratchpad.
             var pressParam = parameter == 0 ? 1u : parameter;
+            var pressHold = holdMs >= 0 ? holdMs : 150;
             await WritePmdgControlAsync(eventId, pressParam, track: true, ct)
                 .ConfigureAwait(false);
             Console.WriteLine(
-                $"[simconnect] PMDG control EventId={eventId} Parameter=0x{pressParam:X8}");
-            await DelayAsync(150, ct).ConfigureAwait(false);
+                $"[simconnect] PMDG control EventId={eventId} Parameter=0x{pressParam:X8} holdMs={pressHold}");
+            await DelayAsync(pressHold, ct).ConfigureAwait(false);
 
             await WritePmdgControlAsync(0, 0, track: true, ct).ConfigureAwait(false);
             lock (_pmdgControlGate)
@@ -1032,10 +1035,11 @@ public sealed class SimConnectClient : ISimClient
 
         if (release && param != PmdgNg3Cdu.MouseLeftRelease)
         {
-            await DelayAsync(50, ct).ConfigureAwait(false);
+            var pressHold = holdMs >= 0 ? holdMs : 50;
+            await DelayAsync(pressHold, ct).ConfigureAwait(false);
             TransmitPmdgMappedEvent(eventId, PmdgNg3Cdu.MouseLeftRelease);
             Console.WriteLine(
-                $"[simconnect] PMDG TransmitClientEvent #{eventId} Parameter=0x{PmdgNg3Cdu.MouseLeftRelease:X8} (release)");
+                $"[simconnect] PMDG TransmitClientEvent #{eventId} Parameter=0x{PmdgNg3Cdu.MouseLeftRelease:X8} (release holdMs={pressHold})");
         }
     }
 

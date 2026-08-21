@@ -4,7 +4,9 @@ Applies to PMDG 737-600/700/800/900 (NG3 / NGXu) in MSFS, including titles like 
 
 ## Product path (current)
 
-Skyline **reads** PMDG fuel/payload and **compares** to the latest **SimBrief OFP** (`--simbrief-user`). The user loads fuel/payload via SimBrief/EFB/FMC. Skyline does **not** write PMDG fuel.
+Skyline **reads** PMDG fuel/payload and **compares** to the latest **SimBrief OFP**. For most NG3 titles, the user loads via SimBrief/EFB/FMC.
+
+**Exception (opt-in):** PMDG **737-800 BCF** career inject uses FO CDU keystreams (`fuel`/`payload` strategy `pmdg-cdu`) — TOTAL display + ZFW only. Gates: profile `pmdg-737-800bcf-bw`, pack `pmdg-738-bcf.json` (`injectCapable: true`), catalog SKU `pmdg-738-bcf-family`. Class `narrow_freighter` and BDSF pack stay EFB-only. Do **not** touch the FO CDU during Inject.
 
 ```bash
 npm run compare-ofp -- --simbrief-user YOUR_ALIAS --roles profiles/ofp/pmdg-738-ssw-tc.json
@@ -82,11 +84,12 @@ Expect `layoutOk: true`, `nonzeroBytes` > 0, and L/R/C lb close to classic `FUEL
 | Read classic fuel mirrors (qty/cap) | Yes — useful for display / OFP checks |
 | Read SDK fuel qty via Client Data | **Yes** — IPC `readPmdgNg3Fuel` / `probe-pmdg-fuel` |
 | OFP vs live compliance | **Yes** — `compare-ofp` / `monitor-ofp` (fuel L/R/C + total, payload; burn-aware) |
-| Write fuel via classic / LVar / Client Data | **No / out of scope** — user loads via SimBrief/EFB/FMC |
-| CDU control send (`pmdg-cdu`) | **Parked / experimental** — not the product apply path |
-| BCF PAYLOAD validation (`pmdg-payload-bcf`) | **Experimental** — types MAIN/FWD/AFT on CDU; **not** career inject |
-| BCF FUEL validation (`pmdg-fuel-bcf`) | **Experimental** — types TOTAL (display scale) on CDU; **not** career inject |
-| Payload stations | Often yes via `station-writeback` (optional; career may only monitor) |
+| Write fuel via classic / LVar / Client Data | **No** — classic ignored |
+| BCF career inject (`pmdg-cdu`) | **Yes (opt-in)** — FO CDU TOTAL + ZFW; profile/pack/SKU only |
+| CDU control send (`pmdg-cdu` CLI) | Experimental probe — same Host path as inject |
+| BCF PAYLOAD validation (`pmdg-payload-bcf`) | **Experimental** probe — types MAIN/FWD/AFT or ZFW |
+| BCF FUEL validation (`pmdg-fuel-bcf`) | **Experimental** probe — types TOTAL (display scale) |
+| Payload stations | Often yes via `station-writeback` (other aircraft; BCF inject uses CDU ZFW) |
 | Vendor recipe | `profiles/vendors/pmdg-ng3.json` → `onClassicWriteFail: abort` |
 
 ## BCF CDU PAYLOAD validation script (experimental)
@@ -103,13 +106,13 @@ Standalone probe — **does not** touch career inject / `injectCapable`. Use it 
 
 | Step | Key |
 |------|-----|
-| Clear scratchpad | `CLR` ×2 |
+| Clear scratchpad | **10× CLR** as **event** clicks @ ~150ms (+ settle 350ms). Control-area CLR does not delete pad junk. |
 | MENU | `MENU` |
 | FS ACTIONS | `R5` |
 | PAYLOAD page | `L2` (`--payload-page-lsk`) |
-| SET EMPTY (default on) | `R5` (`--empty-lsk`; **not** R2 — R2 is ZFW/TOCG) |
-| SET MAX / SET RANDOM | `R4` / `R6` |
-| ZFW (preferred) | type display (e.g. `89.3`) → `R2` — aircraft fills MAIN/FWD/AFT |
+| SET EMPTY | `R4` (`--empty-lsk`; R3=SET MAX, R5=SET RANDOM) |
+| SET MAX / SET RANDOM | `R3` / `R5` |
+| ZFW (preferred) | type display (e.g. `117.1`) → `R2` — aircraft fills MAIN/FWD/AFT |
 | MAIN / FWD / AFT (on-screen L1/L2/L3) | SDK keys `L2` / `L3` / `L4` (BCF live: L1 event does not commit) |
 
 **Commands**
@@ -186,7 +189,8 @@ Default TOTAL LSK is **L1** (L2 = LEVEL %). After send, script dumps classic L/R
 2. Expect tank discovery: capacity live, writes ignored → wizard stops with this recipe’s abort message **plus** SDK broadcast status (OK vs enable `EnableDataBroadcast`).
 3. Do **not** invent an Accu-Sim recipe with fake `Fuel*Tank` LVars.
 4. Optional: draft a **payload-only** profile later if product needs pax/cargo write without fuel apply.
-5. Fuel for career: user sets OFP fuel in sim; Skyline monitors with `compare-ofp` / `monitor-ofp`.
+5. Fuel for most PMDG titles: user sets OFP fuel in sim; Skyline monitors with `compare-ofp` / `monitor-ofp`.
+6. **BCF career inject live checklist:** BCF on ground, engines off, FO (right) CDU powered, Preflight → Skyline inject On — do not touch that CDU. Expect progress “PMDG CDU fuel TOTAL” then “ZFW”. Target ZFW = SimBrief `est_zfw` / `loadSheet.zfw` (e.g. 109.6); fallback live−cargo+Due if sheet has no zfw.
 
 ## Title tips
 

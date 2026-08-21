@@ -151,7 +151,16 @@ export type BuildOfpLoadPlanInput = {
 export type BuiltOfpLoadPlan = {
   plan: LoadPlanRequest;
   blockFuelLb: number;
+  /**
+   * Cargo actually placed on profile stations (may be << OFP when station
+   * maxLoad is tiny — e.g. BCF placeholder 500 lb/zone).
+   */
   cargoLb: number;
+  /**
+   * OFP cargo after MTOW room clamp, before station-capacity distribute.
+   * CDU ZFW inject must use this (+ crew), not `cargoLb`.
+   */
+  requestedCargoLb: number;
   fuelUnit: 'gallons' | 'pounds' | 'liters' | 'kilograms';
   tankCapacityTotal: number;
   baggageCapacityLb: number;
@@ -1657,13 +1666,16 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
     }
   }
 
+  /** OFP/MTOW cargo target — keep before station maxLoad clamps. */
+  const requestedCargoLb = roundLb(cargoLb);
+
   const payload = distributeCargoAcrossStations(
     cargoLb,
     profile,
     stationRoles ?? ofp.payload?.stationRoles,
     liveStationsLb,
   );
-  // GA soft-caps may place less cargo than the OFP asks for.
+  // GA soft-caps / tiny station maxLoad may place less than OFP asks for.
   cargoLb = payload.cargoPlacedLb;
 
   return {
@@ -1673,6 +1685,7 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
     },
     blockFuelLb,
     cargoLb,
+    requestedCargoLb,
     fuelUnit: fuel.unit,
     tankCapacityTotal: fuel.capacityTotal,
     baggageCapacityLb: payload.baggageCapacityLb,

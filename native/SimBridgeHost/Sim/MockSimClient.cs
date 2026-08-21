@@ -264,12 +264,13 @@ public sealed class MockSimClient : ISimClient
         uint parameter = 0,
         bool release = true,
         string method = "event",
+        int holdMs = -1,
         CancellationToken ct = default)
     {
         EnsureConnected();
         var param = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
         Console.WriteLine(
-            $"[mock] sendPmdgNg3Control method={method} eventId={eventId} parameter={param} release={release}");
+            $"[mock] sendPmdgNg3Control method={method} eventId={eventId} parameter={param} release={release} holdMs={holdMs}");
         return Task.CompletedTask;
     }
 

@@ -6,7 +6,7 @@ Applies to PMDG 737-600/700/800/900 (NG3 / NGXu) in MSFS, including titles like 
 
 Skyline **reads** PMDG fuel/payload and **compares** to the latest **SimBrief OFP**. For most NG3 titles, the user loads via SimBrief/EFB/FMC.
 
-**Exception (opt-in):** PMDG **737-800 BCF** and **737-800 PAX** career inject use FO CDU keystreams (`fuel`/`payload` strategy `pmdg-cdu`) — TOTAL display + ZFW. Gates: BCF profile/pack/SKU `pmdg-738-bcf-family`; PAX profiles + pack `pmdg-738-pax.json` + SKU `pmdg-738-pax-family` (`loadLayout: pax_and_cargo`, 163 seats). **Due = SimBrief `payload`** (route/MTOW may trim). Open SimBrief: seats @ **175+55=230 lb**, `acdata` paxwgt/bagwgt forced (Dual Class default 190 inflates OFP). Galley S10/S11 excluded from Sim vs Due. BDSF pack stays EFB-only. Do **not** touch the FO CDU during Inject.
+**Exception (opt-in):** PMDG **737-800 BCF** and **737-800 PAX** career inject use FO CDU keystreams (`fuel`/`payload` strategy `pmdg-cdu`) — TOTAL display + ZFW. Gates: BCF profile/pack/SKU `pmdg-738-bcf-family`; PAX pack `pmdg-738-pax.json` + SKU `pmdg-738-pax-family` (`loadLayout: pax_and_cargo`, 163 seats). **Due = SimBrief `payload`** (route/MTOW may trim). Open SimBrief: seats @ **175+55=230 lb**, `acdata` paxwgt/bagwgt forced (Dual Class default 190 inflates OFP). Galley S10/S11 excluded from Sim vs Due. **BBJ2 Market SKU disabled** (`pmdg-738-bbj2-family` `enabled: false`) — Dual Class OEW vs live empty ~102.2 klb; pack kept for later. BDSF pack stays EFB-only. Do **not** touch the FO CDU during Inject.
 
 ```bash
 npm run compare-ofp -- --simbrief-user YOUR_ALIAS --roles profiles/ofp/pmdg-738-ssw-tc.json
@@ -85,7 +85,7 @@ Expect `layoutOk: true`, `nonzeroBytes` > 0, and L/R/C lb close to classic `FUEL
 | Read SDK fuel qty via Client Data | **Yes** — IPC `readPmdgNg3Fuel` / `probe-pmdg-fuel` |
 | OFP vs live compliance | **Yes** — `compare-ofp` / `monitor-ofp` (fuel L/R/C + total, payload; burn-aware) |
 | Write fuel via classic / LVar / Client Data | **No** — classic ignored |
-| BCF / PAX career inject (`pmdg-cdu`) | **Yes (opt-in)** — FO CDU TOTAL + ZFW; BCF + PAX SKUs (PAX experimental) |
+| BCF / PAX career inject (`pmdg-cdu`) | **Yes (opt-in)** — FO CDU TOTAL + ZFW; BCF + PAX SKUs. BBJ2 Market off |
 | CDU control send (`pmdg-cdu` CLI) | Experimental probe — same Host path as inject |
 | BCF PAYLOAD validation (`pmdg-payload-bcf`) | **Experimental** probe — types MAIN/FWD/AFT or ZFW |
 | BCF FUEL validation (`pmdg-fuel-bcf`) | **Experimental** probe — types TOTAL (display scale) |

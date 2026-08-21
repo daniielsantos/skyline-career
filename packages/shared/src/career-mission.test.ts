@@ -140,6 +140,13 @@ describe('mission load method policy', () => {
       }),
       { loadMethod: 'direct-injection', injectCapable: true },
     );
+    assert.deepEqual(
+      missionLoadPolicy({
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'pmdg-738-bbj2-family',
+      }),
+      { loadMethod: 'native-simbrief', injectCapable: false },
+    );
     assert.equal(
       careerAllowsDirectInject(
         missionLoadPolicy({

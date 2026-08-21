@@ -175,11 +175,11 @@
     "Homologated via wizard: 737-800 BBJ2 SSW.",
     "ICAO type designator (catalog/SimBrief): B738.",
     "Publisher: pmdg.",
+    "Market SKU disabled (enabled: false) — Dual Class OEW vs live empty ~102.2 klb.",
     "Load method: native-simbrief (no Skyline inject).",
     "Market family: pmdg-738-bbj2-family.",
     "Roles pack: profiles/ofp/pmdg-738-bbj2.json",
     "Fuel/payload write plans intentionally empty — load via PMDG EFB.",
-    "Use compare-ofp + Career Loaded vs Due for validation.",
     "See profiles/notes/pmdg-737-800-bbj2-ssw.md"
   ]
 }

@@ -22,9 +22,10 @@ function readPack(rel: string): {
 }
 
 describe('pmdg BCF/PAX inject gates', () => {
-  it('BCF and PAX packs allow direct inject; BDSF pack does not', () => {
+  it('BCF and PAX packs allow direct inject; BDSF and BBJ2 do not', () => {
     const bcf = readPack('profiles/ofp/pmdg-738-bcf.json');
     const pax = readPack('profiles/ofp/pmdg-738-pax.json');
+    const bbj2 = readPack('profiles/ofp/pmdg-738-bbj2.json');
     const bdsf = readPack('profiles/ofp/pmdg-738-bdsf.json');
     assert.equal(bcf.loadMethod, 'direct-injection');
     assert.equal(bcf.injectCapable, true);
@@ -33,6 +34,12 @@ describe('pmdg BCF/PAX inject gates', () => {
     assert.equal(pax.loadMethod, 'direct-injection');
     assert.equal(pax.injectCapable, true);
     assert.doesNotThrow(() => assertRolesPackAllowsDirectInjection(pax));
+
+    assert.equal(bbj2.injectCapable, false);
+    assert.throws(
+      () => assertRolesPackAllowsDirectInjection(bbj2),
+      /injectCapable|native-simbrief|loadMethod/i,
+    );
 
     assert.equal(bdsf.injectCapable, false);
     assert.throws(
@@ -49,5 +56,10 @@ describe('pmdg BCF/PAX inject gates', () => {
     assert.equal(paxSku!.injectCapable, true);
     assert.equal(paxSku!.loadLayout, 'pax_and_cargo');
     assert.equal(paxSku!.maxPaxSeats, 163);
+
+    const bbj2Sku = findCareerPlayerAirframe('pmdg-738-bbj2-family');
+    assert.ok(bbj2Sku);
+    assert.equal(bbj2Sku!.enabled, false);
+    assert.notEqual(bbj2Sku!.injectCapable, true);
   });
 });

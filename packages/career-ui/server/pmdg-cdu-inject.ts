@@ -14,6 +14,7 @@ import {
   resolvePmdgLiveCargoLb,
   toLb,
   zfwLbToDisplay,
+  floorPmdgCduZfwToEmpty,
   type AircraftProfile,
   type CduKeyStep,
   type FuelTarget,
@@ -246,14 +247,21 @@ export async function resolvePmdgCduZfwTarget(opts: {
   const fixedNonCargoLb = sumStationIndexes(freshStations, fixedIdx);
 
   if (ofpZfw !== undefined && ofpZfw >= 40_000) {
+    const floored = floorPmdgCduZfwToEmpty({
+      ofpZfwLb: ofpZfw,
+      emptyLb,
+      requestedCargoLb: opts.requestedCargoLb,
+    });
     return {
-      zfwLb: Math.round(ofpZfw),
+      zfwLb: floored.zfwLb,
       liveZfwLb,
       liveCargoLb: stationCargoLb,
       stationCargoLb,
       emptyLb,
-      cargoSource: 'simbrief-est-zfw',
-      method: 'ofp-zfw',
+      cargoSource: floored.floored
+        ? 'ofp-zfw-below-empty'
+        : 'simbrief-est-zfw',
+      method: floored.floored ? 'empty-plus-cargo' : 'ofp-zfw',
     };
   }
 

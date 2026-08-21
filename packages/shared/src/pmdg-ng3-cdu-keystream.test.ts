@@ -9,6 +9,7 @@ import {
   buildBcfFuelKeySequence,
   buildBcfZfwKeySequence,
   computePmdgCduZfwTargetLb,
+  floorPmdgCduZfwToEmpty,
   fuelLbToDisplay,
   resolvePmdgLiveCargoLb,
 } from './pmdg-ng3-cdu-keystream.js';
@@ -104,5 +105,23 @@ describe('pmdg-ng3-cdu-keystream (shared)', () => {
     assert.equal(r.source, 'zfw-residual');
     // 110000 - 87400 - 1875 = 20725 (not 22600)
     assert.equal(r.liveCargoLb, 20_725);
+  });
+
+  it('floorPmdgCduZfwToEmpty lifts Dual Class OFP below BBJ2 empty', () => {
+    const r = floorPmdgCduZfwToEmpty({
+      ofpZfwLb: 101_993,
+      emptyLb: 102_200,
+      requestedCargoLb: 8_818,
+    });
+    assert.equal(r.floored, true);
+    assert.equal(r.zfwLb, 111_018);
+    assert.equal(
+      floorPmdgCduZfwToEmpty({
+        ofpZfwLb: 110_000,
+        emptyLb: 102_200,
+        requestedCargoLb: 8_818,
+      }).floored,
+      false,
+    );
   });
 });

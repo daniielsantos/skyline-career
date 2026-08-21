@@ -608,6 +608,35 @@ export function computePmdgCduZfwTargetLb(opts: {
   return zfw;
 }
 
+/**
+ * Dual Class (or any lighter OEW) OFP on a heavier live airframe (BBJ2 VIP)
+ * can publish est_zfw below EMPTY WEIGHT — CDU rejects the entry. Floor to
+ * empty + Due so inject still applies payload.
+ */
+export function floorPmdgCduZfwToEmpty(opts: {
+  ofpZfwLb: number;
+  emptyLb: number;
+  requestedCargoLb: number;
+  /** lb slack — OFP slightly under empty still counts as mismatch */
+  slackLb?: number;
+}): { zfwLb: number; floored: boolean } {
+  const slack = opts.slackLb ?? 50;
+  const empty = opts.emptyLb;
+  const ofp = opts.ofpZfwLb;
+  if (
+    Number.isFinite(empty) &&
+    empty > 1000 &&
+    Number.isFinite(ofp) &&
+    ofp + slack < empty
+  ) {
+    return {
+      zfwLb: Math.round(empty + Math.max(0, opts.requestedCargoLb)),
+      floored: true,
+    };
+  }
+  return { zfwLb: Math.round(ofp), floored: false };
+}
+
 export function formatBcfPayloadPlan(
   opts: BcfPayloadOptions,
   steps: CduKeyStep[],

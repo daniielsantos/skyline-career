@@ -10,11 +10,10 @@
   ],
   "matchTitlePattern": "737-800\\s+BBJ2",
   "notes": [
-    "PMDG 737-800 BBJ2 family (SSW / BW)",
-    "One Skyline Market SKU: pmdg-738-bbj2-family (narrow_freighter)",
+    "PMDG 737-800 BBJ2 family (SSW / BW) — Market SKU disabled (enabled: false)",
+    "Parked: Dual Class OEW (~93k) mismatches live empty ZFW (~102.2 klb); no stable inject path yet",
     "Homologated monitor: pmdg/737-800-bbj2-ssw@1.0.0",
-    "SimBrief: Dual Class proxy; load via PMDG EFB",
-    "loadMethod: native-simbrief; injectCapable: false",
+    "loadMethod: native-simbrief; injectCapable: false — EFB / monitor only until OEW solution",
     "liveSources: NG3 fuel + PMDG EFB LVars"
   ],
   "fuel": {

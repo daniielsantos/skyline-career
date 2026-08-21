@@ -6,13 +6,16 @@
 **Publisher:** `pmdg`  
 **Stations:** 16  
 **Profile:** `pmdg/737-800-bbj2-ssw@1.0.0`  
-**Load method:** native-simbrief  
-**Market family:** `pmdg-738-bbj2-family`  
+**Load method:** native-simbrief (no inject)  
+**Market family:** `pmdg-738-bbj2-family` (**`enabled: false`** — off Market)  
 **Roles pack:** `profiles/ofp/pmdg-738-bbj2.json`
 
 ## Notes
 
-- Load via PMDG EFB / SimBrief Dual Class proxy.
+- Parked: live empty ZFW (~102.2 klb) does not match SimBrief Dual Class OEW (~93k).
+  Dual Class / BCF / hybrid / CDU inject attempts did not yield a stable career path.
+- Homologation + roles pack kept for a future OEW/airframe solution.
+- Load via PMDG EFB only if re-enabled later.
 
 ## Homologated
 

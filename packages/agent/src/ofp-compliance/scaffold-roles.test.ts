@@ -36,6 +36,8 @@ describe('scaffold-roles PMDG 738 BBJ2', () => {
     assert.equal(h?.id, 'pmdg-738-bbj2');
     assert.equal(h?.marketTypeId, 'pmdg-738-bbj2-family');
     assert.equal(h?.familyPackRel, 'pmdg-738-bbj2.json');
+    assert.equal(h?.loadMethod, 'native-simbrief');
+    assert.equal(h?.injectCapable, false);
     assert.equal(matchHeuristic('737-800 BBJ2 BW')?.id, 'pmdg-738-bbj2');
   });
 });

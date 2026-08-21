@@ -171,8 +171,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       { simVarIndex: 11, cfgIndex: 10, name: 'aft_gly', role: 'galley' },
     ],
     notes: [
-      'PMDG 737-800 BBJ2 family (SSW / BW) — VIP layout; same 11-role station map as PAX',
-      'One Skyline Market SKU: pmdg-738-bbj2-family (narrow_freighter)',
+      'PMDG 737-800 BBJ2 family (SSW / BW) — VIP layout; Market SKU disabled pending OEW fix',
+      'One Skyline Market SKU: pmdg-738-bbj2-family (enabled: false)',
       'loadMethod: native-simbrief; injectCapable: false',
       'liveSources: NG3 fuel + PMDG EFB LVars',
     ],

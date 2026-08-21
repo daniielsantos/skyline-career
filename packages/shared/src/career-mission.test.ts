@@ -125,11 +125,18 @@ describe('mission load method policy', () => {
     );
   });
 
-  it('opts PMDG 738 BCF family into inject via airframe.injectCapable', () => {
+  it('opts PMDG 738 BCF and PAX families into inject via airframe.injectCapable', () => {
     assert.deepEqual(
       missionLoadPolicy({
         aircraftClassId: 'narrow_freighter',
         airframeTypeId: 'pmdg-738-bcf-family',
+      }),
+      { loadMethod: 'direct-injection', injectCapable: true },
+    );
+    assert.deepEqual(
+      missionLoadPolicy({
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'pmdg-738-pax-family',
       }),
       { loadMethod: 'direct-injection', injectCapable: true },
     );

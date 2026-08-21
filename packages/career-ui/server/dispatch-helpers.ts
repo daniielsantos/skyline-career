@@ -18,6 +18,8 @@ import {
   planPaxAndCargoSimBriefLoad,
   resolveAirframeFuelBurnKgPerNm,
   resolveConservativeOpsWeights,
+  SIMBRIEF_STANDARD_BAG_PER_PAX_LB,
+  SIMBRIEF_STANDARD_PAX_LB,
   type FreighterClassId,
   type MissionIntent,
 } from '@msfs-compat/shared';
@@ -506,6 +508,16 @@ export async function buildMissionDispatch(
       : { cargo: freightThousands }),
     units,
     staticId,
+    // Dual Class airframes default ~190 lb paxwgt; force Skyline 175+55 so
+    // Payload ≈ mission freight (same math as planPaxAndCargoSimBriefLoad).
+    ...(paxAndCargo
+      ? {
+          acdata: {
+            paxwgt: SIMBRIEF_STANDARD_PAX_LB,
+            bagwgt: SIMBRIEF_STANDARD_BAG_PER_PAX_LB,
+          },
+        }
+      : {}),
   });
   return {
     url,

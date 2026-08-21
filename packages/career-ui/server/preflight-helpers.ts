@@ -261,7 +261,7 @@ export async function runMissionPreflight(
         ['EMPTY_WEIGHT', 'TOW', 'ZFW'].includes(finding.code),
     ).length;
     const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
-    // pax_and_cargo: Due is full SimBrief payload (pax×paxwgt + bags + freight).
+    // pax_and_cargo: Due = SimBrief payload (route/MTOW may trim below mission).
     // ofpCargoKg with pax>0 returns baggage-only and left Due at ~1k lb.
     const cargoKg = isPaxAndCargoLoadLayout(careerAirframe)
       ? ofpFreightTowardMissionKg(ofp, careerAirframe)
@@ -354,16 +354,14 @@ export async function runMissionPreflight(
     // ofpPayloadLb (pax+bags only) made Sim look like ~550 while seats showed 1050.
     const cargoLb =
       cargoKg !== undefined ? cargoKg * KG_TO_LB : undefined;
-    // Cabin seats on pax_and_cargo are ballast for career freight — not GA soft-caps.
-    // EFB import writes the full SimBrief payload across stations (incl. S1/S2);
-    // do not add a freighter crew floor on top or Due overshoots by ~2×170.
+    // Cabin seats on pax_and_cargo are freight ballast — not GA soft-caps.
+    // SimBrief payload already includes cabin (not cockpit crew) — no crew floor.
     const stationRolesForDue = isPaxAndCargoLoadLayout(careerAirframe)
       ? {
           ...ofp.payload?.stationRoles,
           crewStations: [] as number[],
-          passengerStations: [],
+          passengerStations: [] as number[],
           baggageStations: [
-            ...(ofp.payload?.stationRoles?.crewStations ?? []),
             ...(ofp.payload?.stationRoles?.passengerStations ?? []),
             ...(ofp.payload?.stationRoles?.baggageStations ?? []),
           ],
@@ -430,18 +428,20 @@ export async function runMissionPreflight(
       const lb = live.payload?.stations?.[idx];
       return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
     }, 0);
-    // PMDG BCF etc.: Due is cargo (+ cabin) + crew — galley/service is EFB
-    // fixed weight and must not inflate Sim vs Due (~S10/S11 on 737).
+    // PMDG: Sim vs Due ignores galley/service (S10/S11). pax_and_cargo Due is
+    // SimBrief payload (cabin only) — exclude cockpit crew from the live sum.
     const freighterRoleSumLb =
-      !isPaxAndCargoLoadLayout(careerAirframe) &&
       live.payload?.stations &&
       (baggageStationIdxs.length > 0 ||
         passengerStationIdxs.length > 0 ||
-        crewStationIdxs.length > 0)
+        (!isPaxAndCargoLoadLayout(careerAirframe) &&
+          crewStationIdxs.length > 0))
         ? (sumStationWeights(live.payload.stations, baggageStationIdxs) ?? 0) +
           (sumStationWeights(live.payload.stations, passengerStationIdxs) ??
             0) +
-          (sumStationWeights(live.payload.stations, crewStationIdxs) ?? 0)
+          (isPaxAndCargoLoadLayout(careerAirframe)
+            ? 0
+            : (sumStationWeights(live.payload.stations, crewStationIdxs) ?? 0))
         : undefined;
     // EFB imports often leave S1/S2 at 0 — drop crew floor from Due when empty.
     // When crew is present (MD-11 S1–S3), keep 3 × 170 lb in Due.
@@ -456,16 +456,16 @@ export async function runMissionPreflight(
     const plannedPayloadLb = plannedPayload?.plannedTotalLb;
     const livePayloadLb = clearedStations
       ? stationSumLb
-      : tfdiEfbCargoLb !== undefined
-        ? tfdiEfbCargoLb +
-          (plannedPayload?.crewOnStations ? liveCrewLb : 0)
-        : pmdgEfbCargoLb !== undefined
-          ? pmdgEfbCargoLb +
+      : freighterRoleSumLb !== undefined
+        ? freighterRoleSumLb
+        : tfdiEfbCargoLb !== undefined
+          ? tfdiEfbCargoLb +
             (plannedPayload?.crewOnStations ? liveCrewLb : 0)
-          : a2aPayloadLb !== undefined
-            ? a2aPayloadLb
-            : freighterRoleSumLb !== undefined
-              ? freighterRoleSumLb
+          : pmdgEfbCargoLb !== undefined
+            ? pmdgEfbCargoLb +
+              (plannedPayload?.crewOnStations ? liveCrewLb : 0)
+            : a2aPayloadLb !== undefined
+              ? a2aPayloadLb
               : (live.payload?.total ?? live.payload?.ofpPayloadLb);
     const fuelTolLb = Math.max(
       ofp.tolerances?.fuelAbsLb ?? 50,

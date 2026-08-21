@@ -164,6 +164,11 @@ export async function resolvePmdgCduZfwTarget(opts: {
   baggageStationIndexes: number[];
   fixedNonCargoStationIndexes?: number[];
   ofp?: OfpExpectation;
+  /**
+   * Career pax_and_cargo: ignore SimBrief est_zfw when the pilot hand-edited
+   * cargo= without the hybrid seat split (est_zfw embeds inflated payload).
+   */
+  ignoreOfpZfw?: boolean;
 }): Promise<{
   zfwLb: number;
   liveZfwLb: number;
@@ -175,7 +180,12 @@ export async function resolvePmdgCduZfwTarget(opts: {
 }> {
   const liveZfwLb = (await readLiveZfwLb(opts.bridge)) ?? 0;
   const emptyLb = await readEmptyWeightLb(opts.bridge);
-  const ofpZfw = opts.ofp ? resolveOfpZfwLb(opts.ofp) : undefined;
+  const ofpZfw =
+    opts.ignoreOfpZfw === true
+      ? undefined
+      : opts.ofp
+        ? resolveOfpZfwLb(opts.ofp)
+        : undefined;
 
   const fixedIdx = opts.fixedNonCargoStationIndexes ?? [];
   const allIdx = [
@@ -246,6 +256,7 @@ export async function applyPmdgCduPayloadOnce(opts: {
   liveStations?: Record<number, number>;
   baggageStationIndexes: number[];
   fixedNonCargoStationIndexes?: number[];
+  ignoreOfpZfw?: boolean;
 }): Promise<{
   payload?: OperationResult;
   zfwLb: number;

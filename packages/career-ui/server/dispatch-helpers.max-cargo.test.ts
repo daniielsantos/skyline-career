@@ -249,5 +249,9 @@ describe('buildMissionDispatch pax_and_cargo', () => {
     assert.match(built.url, /[?&]pax=194(?:&|$)/);
     // Freight leftover after 194×230 lb reserved — not the full mission as cargo=
     assert.match(built.url, /[?&]cargo=9\./);
+    // Force SimBrief standard 175/55 (Dual Class defaults ~190 and inflates Payload).
+    const acdata = new URL(built.url).searchParams.get('acdata');
+    assert.ok(acdata);
+    assert.deepEqual(JSON.parse(acdata!), { paxwgt: 175, bagwgt: 55 });
   });
 });

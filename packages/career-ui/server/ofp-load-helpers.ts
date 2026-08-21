@@ -6,9 +6,12 @@ import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
   assertRolesPackAllowsDirectInjection,
   careerFuelMatchOk,
+  findCareerPlayerAirframe,
   flightPhaseFromSample,
+  isPaxAndCargoLoadLayout,
   KG_TO_LB,
   normalizeAircraftTitle,
+  ofpFreightTowardMissionKg,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
   liveFuelLbCoherentWithTanks,
@@ -1027,6 +1030,13 @@ async function applyMissionOfpLoadExclusive(
     };
     let clampedFuelTargetKg: number | undefined;
 
+    const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
+    // pax_and_cargo: Due/ZFW cargo = SimBrief payload (may be route-trimmed).
+    // Not ofpCargoKg baggage-only when passengerCount > 0.
+    const paxAndCargoFreightKg = isPaxAndCargoLoadLayout(careerAirframe)
+      ? ofpFreightTowardMissionKg(ofp, careerAirframe)
+      : undefined;
+
     try {
       built = buildOfpLoadPlan({
         ofp,
@@ -1034,6 +1044,9 @@ async function applyMissionOfpLoadExclusive(
         stationRoles,
         liveStationsLb: beforeLive.stations,
         fuelLbPerGal,
+        ...(paxAndCargoFreightKg !== undefined
+          ? { cargoKg: paxAndCargoFreightKg }
+          : {}),
         cargoKgFallback: mission.cargoKg,
         emptyWeightLb: weightLimits.emptyWeightLb,
         maxGrossWeightLb: weightLimits.maxGrossWeightLb,
@@ -1096,8 +1109,9 @@ async function applyMissionOfpLoadExclusive(
       careerFuelMatchOk(beforeFuelLb, built.blockFuelLb, 50, 150, 0) &&
       liveFuelMatchesTarget(beforeLive.tanks, plannedTanks);
     let plannedFuelLb = built.blockFuelLb;
-    const plannedCrewLb =
-      built.crewStations.length > 0
+    const plannedCrewLb = isPaxAndCargoLoadLayout(careerAirframe)
+      ? 0
+      : built.crewStations.length > 0
         ? built.crewStations.reduce((sum, idx) => {
             const st = resolved.profile.payload.stations.find((s) => s.index === idx);
             return (
@@ -1111,6 +1125,7 @@ async function applyMissionOfpLoadExclusive(
     /**
      * Due payload for UI / CDU ZFW. Prefer OFP cargo (requestedCargoLb) — station
      * distribute may clamp to tiny profile maxLoad (BCF placeholders @ 500 lb).
+     * pax_and_cargo: SimBrief payload (no freighter crew floor).
      */
     const plannedPayloadLb =
       (built.requestedCargoLb ?? built.cargoLb) + plannedCrewLb;
@@ -1597,13 +1612,19 @@ async function applyMissionOfpLoadExclusive(
         assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'pmdg-cdu zfw');
         publishLiveProgress('injecting', 'PMDG CDU ZFW (FO)…');
         const serviceStations = ofp.payload?.stationRoles?.serviceStations ?? [];
+        const cabinCargoStations = [
+          ...new Set([
+            ...built.passengerStations,
+            ...built.baggageStations,
+          ]),
+        ];
         const zfwApply = await applyPmdgCduPayloadOnce({
           engine,
           bridge,
           ofp,
           requestedCargoLb: built.requestedCargoLb ?? built.cargoLb,
           liveStations: beforeLive.stations,
-          baggageStationIndexes: built.baggageStations,
+          baggageStationIndexes: cabinCargoStations,
           fixedNonCargoStationIndexes: [
             ...built.crewStations,
             ...serviceStations,

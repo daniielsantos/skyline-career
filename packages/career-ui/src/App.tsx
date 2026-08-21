@@ -3180,8 +3180,12 @@ export function App() {
   /**
    * Watch started before the first Preflight card (SAMPLING) — keep it off until
    * /api/preflight lands so pollWatch cannot resurrect a stuck session.
+   * State (not only a ref) so Preflight eligibility re-renders when we hold.
    */
+  const [holdWatchOffForPreflight, setHoldWatchOffForPreflight] =
+    useState(false);
   const holdWatchOffForPreflightRef = useRef(false);
+  holdWatchOffForPreflightRef.current = holdWatchOffForPreflight;
   /** Prevents a second /api/load-ofp while one is already in flight. */
   const ofpInjectInFlightRef = useRef(false);
   const loadOfpControlRef = useRef<{
@@ -3774,6 +3778,10 @@ export function App() {
       .trim()
       .toUpperCase();
     const useNear = nearMe && !originQuery && Boolean(focusIcao);
+    const crewFilter: '' | 'crew' | 'aircraft' =
+      freightsBoard === 'crew' || freightsBoard === 'aircraft'
+        ? freightsBoard
+        : '';
     const nextOpts = {
       originQuery,
       destQuery: destFilter.trim(),
@@ -3788,10 +3796,7 @@ export function App() {
       minPayUsd: minimumPayUsd,
       access: accessFilter,
       lane: laneFilter,
-      crew:
-        freightsBoard === 'crew' || freightsBoard === 'aircraft'
-          ? freightsBoard
-          : '',
+      crew: crewFilter,
       airframe: boardAcf?.airframeTypeId?.trim() ?? '',
       profitableOnly: Boolean(boardAcf && profitableOnly),
       nearIcao: useNear ? focusIcao : '',
@@ -4923,7 +4928,9 @@ export function App() {
       Boolean(ofp?.ofpId) &&
       fuelOk &&
       simBridge?.onGround !== false &&
-      !watch?.running &&
+      // Hold-off means we already dropped UI Watch; do not wait for a hung
+      // server tick to finish before the first Preflight sample.
+      (!watch?.running || holdWatchOffForPreflight) &&
       loadOfpAutoStatus !== 'loading' &&
       loadOfpAutoStatus !== 'waiting' &&
       !ofpInjectInFlightRef.current &&
@@ -4982,6 +4989,7 @@ export function App() {
     activeMission?.lastOfpCheck?.ofpId,
     activeMission?.lastOfpCheck?.verdict,
     airportIcao,
+    holdWatchOffForPreflight,
     loadOfpAutoStatus,
     simBridge?.onGround,
     simbriefUser,
@@ -4996,7 +5004,7 @@ export function App() {
       setPreflightBootstrapError(null);
       preflightBootstrapErrorRef.current = null;
       if (activeMission?.lastPreflightCheck) {
-        holdWatchOffForPreflightRef.current = false;
+        setHoldWatchOffForPreflight(false);
       }
     }
   }, [activeMission?.id, activeMission?.lastPreflightCheck]);
@@ -5017,7 +5025,7 @@ export function App() {
     let cancelled = false;
     // Drop UI Watch immediately — a hung SAMPLING tick can take seconds to
     // abort; Preflight must not wait behind "Watch still holds SimBridge".
-    holdWatchOffForPreflightRef.current = true;
+    setHoldWatchOffForPreflight(true);
     setWatch(null);
     void (async () => {
       try {
@@ -5068,7 +5076,7 @@ export function App() {
         Boolean(activeMission?.lastPreflightCheck?.loadVerification)) &&
       !alreadyWatching &&
       !watchAutoPaused &&
-      !holdWatchOffForPreflightRef.current &&
+      !holdWatchOffForPreflight &&
       !settlementBlocks &&
       // Inject owns the SimBridge pipe — do not auto-start Watch until inject
       // leaves waiting/loading (Watch tick is the Loaded vs Due owner afterward).
@@ -5101,9 +5109,21 @@ export function App() {
           missionId: activeMission.id,
           intervalSec: 5,
         });
-        // Always apply status — if the effect remounted mid-request, skipping
-        // setWatch left the UI thinking Watch was off while the server ran,
-        // so probe/preflight fought the pipe and postWatchStart looped.
+        // Late responses must not resurrect Watch while Preflight owns the pipe
+        // (or after this effect was cancelled / remounted).
+        const stillNeedsHold =
+          holdWatchOffForPreflightRef.current ||
+          (!isAirborneResume &&
+            !activeMissionRef.current?.lastPreflightCheck?.loadVerification);
+        if (cancelled || stillNeedsHold) {
+          if (status.running) {
+            void postWatchStop({ reset: true }).catch(() => {
+              /* soft */
+            });
+          }
+          if (!cancelled) setWatchAutoStatus('waiting');
+          return;
+        }
         setWatch(status);
         stopped = true;
         if (!cancelled) {
@@ -5144,6 +5164,7 @@ export function App() {
     // (those flip every sample and remounted this effect → Watch start storms).
     Boolean(activeMission?.lastPreflightCheck?.loadVerification),
     airportIcao,
+    holdWatchOffForPreflight,
     loadOfpAutoStatus,
     tab,
     watch?.running,
@@ -8253,7 +8274,9 @@ export function App() {
     loadPath: activeLoadPath,
     simBridgeConnected: Boolean(simBridge?.connected),
     watchRunning: Boolean(
-      watch?.running && watch.missionId === activeMission?.id,
+      watch?.running &&
+        watch.missionId === activeMission?.id &&
+        !holdWatchOffForPreflight,
     ),
     watchAutoStatus,
     watchOnGround:
@@ -12410,7 +12433,8 @@ export function App() {
                 maxCargoKg !== null && Number.isFinite(maxCargoKg)
                   ? maxCargoKg
                   : null
-              }              ofpAutoStatus={ofpAutoStatus}
+              }
+              ofpAutoStatus={ofpAutoStatus}
               missionFuelQuote={missionFuelQuote}
               missionFuelQuoteStatus={missionFuelQuoteStatus}
               missionFuelQuoteError={missionFuelQuoteError}
@@ -12419,7 +12443,11 @@ export function App() {
               loadOfpProgress={loadOfpProgress}
               skylineInjectEnabled={skylineInjectEnabled}
               simBridge={simBridge}
-              watch={watch}
+              watch={
+                holdWatchOffForPreflight && watch
+                  ? { ...watch, running: false }
+                  : watch
+              }
               preflightBootstrapError={preflightBootstrapError}
               mxFuelBurnAlert={activeMissionMxFuelBurn}
               onOpenAirport={openAirport}
@@ -13285,7 +13313,11 @@ export function App() {
         missionStatus={activeMission?.status ?? null}
         activeMissionId={activeMission?.id ?? null}
         simBridge={simBridge}
-        watch={watch}
+        watch={
+          holdWatchOffForPreflight && watch
+            ? { ...watch, running: false }
+            : watch
+        }
         watchAutoStatus={watchAutoStatus}
         watchAutoPaused={watchAutoPaused}
         loadOfpAutoStatus={loadOfpAutoStatus}

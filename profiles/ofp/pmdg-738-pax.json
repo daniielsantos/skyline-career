@@ -2,8 +2,8 @@
   "source": "simbrief",
   "icao": "B738",
   "ofpId": "pmdg-738-pax",
-  "loadMethod": "native-simbrief",
-  "injectCapable": false,
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
   "matchTitles": [
     "737-800 PAX SSW TC",
     "737-800 PAX BW TC",
@@ -13,12 +13,12 @@
     "737-800 PAX BW SC"
   ],
   "matchTitlePattern": "737-800\\s+PAX",
-  "notes": [
+    "notes": [
     "PMDG 737-800 PAX family (SSW/BW · TC/HD/SC) — same station_load layout",
-    "One Skyline Market SKU: pmdg-738-pax-family (narrow_freighter)",
+    "One Skyline Market SKU: pmdg-738-pax-family (narrow_freighter, loadLayout pax_and_cargo, 163 seats)",
     "Homologated monitors: pmdg/737-800-pax-ssw-tc@1.0.0, pmdg/737-800-pax-bw-tc@1.0.0",
-    "SimBrief: PMDG Dual Class; load via PMDG EFB",
-    "loadMethod: native-simbrief; injectCapable: false",
+    "SimBrief: PMDG Dual Class — cabin seats first, remainder as freight",
+    "loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu), experimental vs BCF",
     "liveSources: NG3 fuel + PMDG EFB LVars"
   ],
   "fuel": {

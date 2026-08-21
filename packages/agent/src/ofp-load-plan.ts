@@ -135,6 +135,11 @@ export type BuildOfpLoadPlanInput = {
   liveStationsLb?: Record<number, number>;
   /** Override Jet-A density (lb/gal). Defaults to DEFAULT_JET_A_LB_PER_GAL. */
   fuelLbPerGal?: number;
+  /**
+   * Explicit cargo kg (wins over OFP baggage). Use for `pax_and_cargo` so Due
+   * is full SimBrief payload, not baggage-only when passengerCount &gt; 0.
+   */
+  cargoKg?: number;
   /** Fallback cargo kg when OFP has no baggage/payload (e.g. mission.cargoKg). */
   cargoKgFallback?: number;
   /** Live EMPTY WEIGHT (lb) — enables MTOW cargo clamp. */
@@ -1607,6 +1612,7 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
     stationRoles,
     liveStationsLb,
     fuelLbPerGal,
+    cargoKg: cargoKgOverride,
     cargoKgFallback,
     emptyWeightLb,
     maxGrossWeightLb,
@@ -1630,7 +1636,7 @@ export function buildOfpLoadPlan(input: BuildOfpLoadPlanInput): BuiltOfpLoadPlan
   );
   const blockFuelLb = fuel.placedLb;
 
-  const cargoKg = ofpCargoKg(ofp) ?? cargoKgFallback;
+  const cargoKg = cargoKgOverride ?? ofpCargoKg(ofp) ?? cargoKgFallback;
   if (cargoKg === undefined || !Number.isFinite(cargoKg) || cargoKg < 0) {
     throw new OfpLoadPlanError('NO_CARGO', 'OFP has no cargo/baggage weight to load');
   }

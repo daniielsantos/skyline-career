@@ -276,7 +276,7 @@ export function livePreflightWaitHint(input: {
     return `Preflight error: ${input.bootstrapError.trim()}`;
   }
   if (input.watchRunning) {
-    return 'Stopping Watch so Preflight can sample (PHASE Sampling means the first Watch tick never finished)…';
+    return 'Stopping Watch so Preflight can sample…';
   }
   if (!input.simBridgeConnected) {
     return `SimBridge is offline — start the bridge, then load the ${input.aircraftLabel} at the origin.`;

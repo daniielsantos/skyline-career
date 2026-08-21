@@ -55,6 +55,7 @@ import {
   weatherOpsStatus,
   fuelBurnMultFromAircraft,
   findCareerPlayerAirframe,
+  isPaxAndCargoLoadLayout,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CargoOpsDelta,
@@ -1981,12 +1982,16 @@ export class CareerWatchSession {
           const preferA2aLvars =
             /a2a-/i.test(current.rolesPackRelPath ?? '') ||
             /a2a-/i.test(current.airframeTypeId ?? '');
-          // PMDG 737 packs: S10/S11 are galley — exclude from Loaded vs Due
-          // (Due is cargo + crew only). Same station map on BCF / BDSF / PAX / BBJ2.
+          // PMDG 737 packs: S10/S11 are galley — exclude from Loaded vs Due.
+          // BCF: Due = cabin/holds + crew (S1–S9). PAX pax_and_cargo: Due =
+          // SimBrief payload only (S1–S6) — cockpit crew is not in the sheet.
           const preferPmdgFreighterRoles =
             /pmdg-738|pmdg-737|pmdg\/737/i.test(
               current.rolesPackRelPath ?? '',
             ) || /pmdg-738|pmdg-737/i.test(current.airframeTypeId ?? '');
+          const pmdgPaxAndCargo = isPaxAndCargoLoadLayout(
+            findCareerPlayerAirframe(current.airframeTypeId),
+          );
           const keepFromMax = prevWatchPayload.stationMax
             ? Object.keys(prevWatchPayload.stationMax).map(Number)
             : undefined;
@@ -2059,10 +2064,10 @@ export class CareerWatchSession {
             cargoLb !== undefined && crewFloorLb !== undefined
               ? adjustPlannedPayloadForLiveCrewStations({
                   cargoPlacedLb: cargoLb,
-                  crewLb: crewFloorLb,
+                  crewLb: pmdgPaxAndCargo ? 0 : crewFloorLb,
                   // PMDG 737: crew is S7–S9 (not S1–S3). Without this, cargo on
                   // S1–S3 looks like “full crew” and Due keeps 3×170 forever.
-                  ...(preferPmdgFreighterRoles
+                  ...(preferPmdgFreighterRoles && !pmdgPaxAndCargo
                     ? { crewStations: [7, 8, 9] }
                     : {}),
                   liveStations: stationsForCrew,
@@ -2087,12 +2092,16 @@ export class CareerWatchSession {
                   return sum + (Number.isFinite(lb) ? lb : 0);
                 }, 0)
               : 0;
-          // PMDG 737: mission Due ignores galley S10/S11 (service). Sum S1–S9.
+          // PMDG 737: exclude galley S10/S11. BCF includes crew S7–S9; PAX
+          // pax_and_cargo Due is SimBrief cabin payload → S1–S6 only.
           const pmdgRolePayloadLb =
             preferPmdgFreighterRoles && load.stations
               ? Object.entries(load.stations).reduce((sum, [key, lb]) => {
                   const idx = Number(key);
-                  if (!Number.isFinite(idx) || idx < 1 || idx > 9) return sum;
+                  const maxIdx = pmdgPaxAndCargo ? 6 : 9;
+                  if (!Number.isFinite(idx) || idx < 1 || idx > maxIdx) {
+                    return sum;
+                  }
                   return sum + (Number.isFinite(lb) ? lb : 0);
                 }, 0)
               : undefined;

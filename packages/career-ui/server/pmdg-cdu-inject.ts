@@ -7,11 +7,15 @@
  */
 import type { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
+  bcfZfwInjectOptions,
+  buildBcfZfwKeySequence,
   computePmdgCduZfwTargetLb,
   DEFAULT_JET_A_LB_PER_GAL,
   resolvePmdgLiveCargoLb,
   toLb,
+  zfwLbToDisplay,
   type AircraftProfile,
+  type CduKeyStep,
   type FuelTarget,
   type LoadPlanRequest,
   type OfpExpectation,
@@ -19,6 +23,7 @@ import {
   type OperationResult,
 } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import { watchDebugLog } from './debug-log.ts';
 
 export function isPmdgCduFuelProfile(profile: AircraftProfile): boolean {
   return profile.fuel.strategy === 'pmdg-cdu';
@@ -42,6 +47,48 @@ export async function applyPmdgCduFuelOnce(opts: {
     skipVerify: true,
   } satisfies LoadPlanRequest);
   return result.fuel;
+}
+
+/** Send FO CDU keys (same pacing as runtime pmdg-cdu strategy). */
+async function sendPmdgCduKeystream(
+  bridge: NamedPipeSimBridge,
+  steps: CduKeyStep[],
+  opts: {
+    delayMs: number;
+    pageDelayMs: number;
+    method: 'event' | 'control';
+    parameter: number;
+    release: boolean;
+    cdu: 'left' | 'right';
+  },
+): Promise<void> {
+  if (typeof bridge.sendPmdgNg3Control !== 'function') {
+    throw new Error(
+      'PMDG CDU inject requires bridge.sendPmdgNg3Control (NamedPipe / SimBridgeHost)',
+    );
+  }
+  let prevKey: string | undefined;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i]!;
+    if (prevKey !== undefined && prevKey === step.key) {
+      await bridge.delay(Math.max(opts.delayMs, 100));
+    }
+    await bridge.sendPmdgNg3Control({
+      key: step.key,
+      release: step.release ?? opts.release,
+      method: step.method ?? opts.method,
+      parameter: step.parameter ?? opts.parameter,
+      cdu: opts.cdu,
+      ...(step.holdMs !== undefined ? { holdMs: step.holdMs } : {}),
+    });
+    prevKey = step.key;
+    if (i + 1 >= steps.length) break;
+    const wait =
+      step.delayAfterMs ?? (step.pagePause ? opts.pageDelayMs : opts.delayMs);
+    if (wait > 0) {
+      await bridge.delay(wait);
+    }
+  }
 }
 
 function sumStationIndexes(
@@ -247,6 +294,8 @@ export async function resolvePmdgCduZfwTarget(opts: {
 
 /**
  * Type absolute ZFW on FO CDU (SimBrief est_zfw preferred).
+ * Builds the keystream here (not via runtime dist) so skipScratchpadClear is
+ * honored even when packages/runtime/dist is stale.
  */
 export async function applyPmdgCduPayloadOnce(opts: {
   engine: DefaultProfileEngine;
@@ -257,6 +306,8 @@ export async function applyPmdgCduPayloadOnce(opts: {
   baggageStationIndexes: number[];
   fixedNonCargoStationIndexes?: number[];
   ignoreOfpZfw?: boolean;
+  /** Fuel TOTAL already flushed the scratchpad in this inject session. */
+  skipScratchpadClear?: boolean;
 }): Promise<{
   payload?: OperationResult;
   zfwLb: number;
@@ -279,14 +330,64 @@ export async function applyPmdgCduPayloadOnce(opts: {
     );
   }
 
-  const result = await opts.engine.applyLoadPlan({
-    payload: { total: resolved.zfwLb },
-    cgPolicy: 'none',
-    skipVerify: true,
-  } satisfies LoadPlanRequest);
+  const started = Date.now();
+  const skip = opts.skipScratchpadClear === true;
+  const display = zfwLbToDisplay(resolved.zfwLb);
+  const keyOpts = bcfZfwInjectOptions(display, { skipScratchpadClear: skip });
+  const steps = buildBcfZfwKeySequence(keyOpts);
+  const clrSteps = steps.filter((s) => s.key === 'CLR').length;
+  watchDebugLog('inject', 'pmdg-cdu zfw keystream', {
+    skipScratchpadClear: skip,
+    clrSteps,
+    steps: steps.length,
+    zfwDisplay: display,
+    firstKeys: steps.slice(0, 5).map((s) => s.key),
+  });
+  if (skip && clrSteps > 0) {
+    throw new Error(
+      `PMDG CDU ZFW skipScratchpadClear requested but keystream still has ${clrSteps} CLR step(s)`,
+    );
+  }
+
+  try {
+    await sendPmdgCduKeystream(opts.bridge, steps, keyOpts);
+  } catch (error) {
+    return {
+      payload: {
+        success: false,
+        strategyUsed: 'pmdg-cdu',
+        fallbackUsed: false,
+        durationMs: Date.now() - started,
+        errorCode: 'PAYLOAD_WRITE_FAILED',
+        details: {
+          message: error instanceof Error ? error.message : String(error),
+          skipScratchpadClear: skip,
+          clrSteps,
+        },
+      },
+      zfwLb: resolved.zfwLb,
+      emptyLb: resolved.emptyLb,
+      liveZfwLb: resolved.liveZfwLb,
+      liveCargoLb: resolved.liveCargoLb,
+      method: `${resolved.method}/${resolved.cargoSource}`,
+      corrected: false,
+    };
+  }
 
   return {
-    payload: result.payload,
+    payload: {
+      success: true,
+      strategyUsed: 'pmdg-cdu',
+      fallbackUsed: false,
+      durationMs: Date.now() - started,
+      details: {
+        zfwLb: resolved.zfwLb,
+        display,
+        skipScratchpadClear: skip,
+        clrSteps,
+        steps: steps.length,
+      },
+    },
     zfwLb: resolved.zfwLb,
     emptyLb: resolved.emptyLb,
     liveZfwLb: resolved.liveZfwLb,

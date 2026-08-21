@@ -207,6 +207,11 @@ export interface FuelTarget {
 export interface PayloadTarget {
   total?: number;
   stations?: Record<number, number>;
+  /**
+   * PMDG CDU only: skip the initial scratchpad CLR flush before MENU when fuel
+   * TOTAL already cleared the scratchpad in the same inject session.
+   */
+  skipScratchpadClear?: boolean;
 }
 
 export interface LoadPlanRequest {

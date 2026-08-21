@@ -37,8 +37,13 @@ export const BCF_PAYLOAD_DEFAULTS = {
   scratchpadClearTaps: 10,
   /** Pause after each short CLR so the delete registers before the next key. */
   scratchpadClearTapDelayMs: 150,
-  /** Extra settle after the last CLR before MENU. */
+  /** Settle after the last CLR before MENU (ms). */
   scratchpadClearSettleMs: 350,
+  /**
+   * Skip the initial scratchpad CLR flush before MENU. Career inject sets this
+   * when fuel TOTAL already cleared the scratchpad in the same session.
+   */
+  skipScratchpadClear: false,
 } as const;
 
 export const BCF_PAYLOAD_SLOW_TIMING = {
@@ -86,6 +91,10 @@ export type BcfPayloadOptions = {
   scratchpadClearTapDelayMs: number;
   /** Settle after the last CLR before MENU (ms). */
   scratchpadClearSettleMs: number;
+  /**
+   * Skip the initial scratchpad CLR flush before MENU (fuel already flushed).
+   */
+  skipScratchpadClear?: boolean;
 };
 
 export type CduKeyStep = {
@@ -307,16 +316,16 @@ function pushScratchpadClear(
     return;
   }
 
-  if (holdMs <= 0) {
-    pushClr(steps, 2, reason, tapDelay, settle, true);
-  }
+  // taps=0 and hold=0 → no scratchpad flush (caller opted out).
 }
 
 function pushNavigateToPayload(
   steps: CduKeyStep[],
   opts: BcfPayloadOptions,
 ): void {
-  pushScratchpadClear(steps, opts, 'start');
+  if (!opts.skipScratchpadClear) {
+    pushScratchpadClear(steps, opts, 'start');
+  }
   steps.push({ label: 'MENU', key: 'MENU', pagePause: true });
   steps.push({ label: 'R5 (FS ACTIONS)', key: 'R5', pagePause: true });
   steps.push({
@@ -341,14 +350,19 @@ export function buildBcfZfwKeySequence(opts: BcfPayloadOptions): CduKeyStep[] {
   }
   const steps: CduKeyStep[] = [];
   pushNavigateToPayload(steps, opts);
-  pushClr(
-    steps,
-    opts.fieldClrCount,
-    'before ZFW',
-    opts.scratchpadClearTapDelayMs,
-    undefined,
-    true,
-  );
+  const fieldClr = opts.skipScratchpadClear
+    ? 0
+    : opts.fieldClrCount;
+  if (fieldClr > 0) {
+    pushClr(
+      steps,
+      fieldClr,
+      'before ZFW',
+      opts.scratchpadClearTapDelayMs,
+      undefined,
+      true,
+    );
+  }
   const digs = scratchpadToKeys(zfw);
   for (let i = 0; i < digs.length; i++) {
     const d = digs[i]!;
@@ -489,7 +503,11 @@ export function buildBcfFuelKeySequence(opts: BcfFuelOptions): CduKeyStep[] {
 }
 
 /** Inject helpers: ZFW options from display string. */
-export function bcfZfwInjectOptions(zfwDisplay: string): BcfPayloadOptions {
+export function bcfZfwInjectOptions(
+  zfwDisplay: string,
+  overrides?: { skipScratchpadClear?: boolean },
+): BcfPayloadOptions {
+  const skip = overrides?.skipScratchpadClear === true;
   return {
     ...BCF_PAYLOAD_DEFAULTS,
     main: 0,
@@ -498,6 +516,14 @@ export function bcfZfwInjectOptions(zfwDisplay: string): BcfPayloadOptions {
     emptyFirst: false,
     release: false,
     zfwDisplay: parseZfwDisplay(zfwDisplay),
+    ...(skip
+      ? {
+          skipScratchpadClear: true,
+          scratchpadClearTaps: 0,
+          scratchpadClearHoldMs: 0,
+          fieldClrCount: 0,
+        }
+      : {}),
   };
 }
 

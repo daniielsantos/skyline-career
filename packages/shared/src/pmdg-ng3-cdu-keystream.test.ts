@@ -41,6 +41,20 @@ describe('pmdg-ng3-cdu-keystream (shared)', () => {
     assert.ok(steps.some((s) => s.key === 'R2'));
   });
 
+  it('buildBcfZfwKeySequence can skip initial scratchpad flush after fuel', () => {
+    const opts = bcfZfwInjectOptions('89.3', { skipScratchpadClear: true });
+    const steps = buildBcfZfwKeySequence(opts);
+    assert.equal(opts.skipScratchpadClear, true);
+    assert.equal(opts.scratchpadClearTaps, 0);
+    assert.equal(opts.fieldClrCount, 0);
+    assert.equal(
+      steps.filter((s) => s.key === 'CLR').length,
+      0,
+    );
+    assert.equal(steps[0]?.key, 'MENU');
+    assert.ok(steps.some((s) => s.key === 'R2'));
+  });
+
   it('buildBcfFuelKeySequence flush CLR taps use event method', () => {
     const opts = bcfFuelInjectOptions('16.8');
     const steps = buildBcfFuelKeySequence(opts);

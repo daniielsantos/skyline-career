@@ -248,7 +248,9 @@ export class PmdgCduPayloadStrategy implements PayloadStrategy {
         throw new Error(`PMDG CDU ZFW target looks invalid (${zfwLb} lb)`);
       }
       const display = zfwLbToDisplay(zfwLb);
-      const opts = bcfZfwInjectOptions(display);
+      const opts = bcfZfwInjectOptions(display, {
+        skipScratchpadClear: target.skipScratchpadClear === true,
+      });
       const steps = buildBcfZfwKeySequence(opts);
       await sendKeystreamQuiet(ctx.bridge, steps, opts);
       return {
@@ -256,7 +258,16 @@ export class PmdgCduPayloadStrategy implements PayloadStrategy {
         strategyUsed: this.name,
         fallbackUsed: false,
         durationMs: Date.now() - started,
-        details: { zfwLb, display, emptyLb, payloadLb, steps: steps.length, cdu: opts.cdu },
+        details: {
+          zfwLb,
+          display,
+          emptyLb,
+          payloadLb,
+          steps: steps.length,
+          cdu: opts.cdu,
+          skipScratchpadClear: opts.skipScratchpadClear === true,
+          clrSteps: steps.filter((s) => s.key === 'CLR').length,
+        },
       };
     } catch (error) {
       return {

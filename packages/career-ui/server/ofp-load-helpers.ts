@@ -1566,6 +1566,7 @@ async function applyMissionOfpLoadExclusive(
     /** Absolute ZFW typed on CDU — used for post-inject verify (not station sum). */
     let pmdgCduZfwTargetLb: number | undefined;
 
+    let fuelCduScratchpadCleared = false;
     if (pmdgCduFuel || pmdgCduPayload) {
       publishLiveProgress(
         'injecting',
@@ -1592,7 +1593,8 @@ async function applyMissionOfpLoadExclusive(
         };
         if (fuelApply && !fuelApply.success) {
           restoreFuelOnRollback = true;
-        } else {
+        } else if (fuelApply?.success) {
+          fuelCduScratchpadCleared = true;
           paintFuelUiFromWriteTarget(built.plan.fuel.tanks ?? {});
           publishLiveProgress(
             'injecting',
@@ -1610,7 +1612,12 @@ async function applyMissionOfpLoadExclusive(
         fuelAlreadyOk || !applyResult?.fuel || applyResult.fuel.success;
       if (fuelOkCdu && pmdgCduPayload) {
         assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'pmdg-cdu zfw');
-        publishLiveProgress('injecting', 'PMDG CDU ZFW (FO)…');
+        publishLiveProgress(
+          'injecting',
+          fuelCduScratchpadCleared
+            ? 'PMDG CDU ZFW (FO)… (scratchpad already cleared)'
+            : 'PMDG CDU ZFW (FO)…',
+        );
         const serviceStations = ofp.payload?.stationRoles?.serviceStations ?? [];
         const cabinCargoStations = [
           ...new Set([
@@ -1618,6 +1625,11 @@ async function applyMissionOfpLoadExclusive(
             ...built.baggageStations,
           ]),
         ];
+        watchDebugLog('inject', 'pmdg-cdu zfw opts', {
+          skipScratchpadClear: fuelCduScratchpadCleared,
+          fuelAlreadyOk,
+          fuelSuccess: applyResult?.fuel?.success ?? null,
+        });
         const zfwApply = await applyPmdgCduPayloadOnce({
           engine,
           bridge,
@@ -1629,6 +1641,7 @@ async function applyMissionOfpLoadExclusive(
             ...built.crewStations,
             ...serviceStations,
           ],
+          skipScratchpadClear: fuelCduScratchpadCleared,
         });
         applyResult = {
           ...(applyResult ?? {}),

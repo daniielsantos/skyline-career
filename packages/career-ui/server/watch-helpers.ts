@@ -247,6 +247,7 @@ type WatchCallbacks = {
       persistPortListingId?: string;
       persistPortConcessions?: boolean;
       commandSliceMissionId?: string;
+      commandSliceHoldId?: string;
       commandSliceLotIds?: string[];
       commandSliceIcaos?: string[];
       commandSliceAircraftId?: string;

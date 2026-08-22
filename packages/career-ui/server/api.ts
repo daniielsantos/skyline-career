@@ -741,6 +741,7 @@ type CareerWriteOpts = {
   persistPortListingId?: string;
   persistPortConcessions?: boolean;
   commandSliceMissionId?: string;
+  commandSliceHoldId?: string;
   commandSliceLotIds?: string[];
   commandSliceIcaos?: string[];
   commandSliceAircraftId?: string;
@@ -770,9 +771,15 @@ async function withCareerWrite<T>(
     const portListingId = opts?.persistPortListingId?.trim();
     const persistPortConcessions = opts?.persistPortConcessions === true;
     const sliceId = opts?.commandSliceMissionId?.trim();
+    const holdSliceId = opts?.commandSliceHoldId?.trim();
     const sliceLotIdsOpt = (opts?.commandSliceLotIds ?? [])
       .map((id) => id.trim())
       .filter(Boolean);
+    if (holdSliceId) {
+      const hold = missions.playerFbos?.holds?.find((h) => h.id === holdSliceId);
+      const lotId = hold?.lotId?.trim();
+      if (lotId) sliceLotIdsOpt.push(lotId);
+    }
     const acfId = opts?.commandSliceAircraftId?.trim();
     if (acfId) {
       const acf = missions.fleet.find((a) => a.id === acfId);
@@ -1964,7 +1971,7 @@ export function createCareerApiServer(port = 8787) {
               contractPilotCareer: missions.fleet.length === 0,
               ...fleetPayload(missions, world),
             };
-          });
+          }, { persist: 'blob' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3891,7 +3898,7 @@ export function createCareerApiServer(port = 8787) {
                 walletUsd: missions.walletUsd,
               };
             });
-          });
+          }, { commandSliceLotIds: [body.lotId] });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3915,7 +3922,7 @@ export function createCareerApiServer(port = 8787) {
               playerFbos: playerFboSnapshot(missions, world),
               walletUsd: missions.walletUsd,
             };
-          });
+          }, { commandSliceHoldId: body.holdId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3979,7 +3986,9 @@ export function createCareerApiServer(port = 8787) {
               playerFbos: playerFboSnapshot(missions, world),
               walletUsd: missions.walletUsd,
             };
-          });
+          }, body.quoteOnly
+            ? { persist: 'company' }
+            : { commandSliceHoldId: body.holdId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4040,7 +4049,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
             };
-          });
+          }, { commandSliceHoldId: body.holdId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4085,7 +4094,7 @@ export function createCareerApiServer(port = 8787) {
                 withMissionLoadPolicy(m),
               ),
             };
-          });
+          }, { commandSliceHoldId: body.holdId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4117,7 +4126,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
             };
-          });
+          }, { commandSliceMissionId: body.missionId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4147,7 +4156,7 @@ export function createCareerApiServer(port = 8787) {
               companyCrew: companyCrewSnapshot(missions, world),
               missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4227,6 +4236,10 @@ export function createCareerApiServer(port = 8787) {
               companyCrew: companyCrewSnapshot(missions, world),
               missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
             };
+          }, {
+            commandSliceHoldId: body.holdId,
+            commandSliceMissionId: body.missionId,
+            commandSliceAircraftId: body.aircraftId,
           });
           send(res, 200, result);
         } catch (error) {
@@ -4350,7 +4363,7 @@ export function createCareerApiServer(port = 8787) {
                 groundStaff,
               },
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4477,7 +4490,7 @@ export function createCareerApiServer(port = 8787) {
             note: 'Debug wallet credit',
           });
           return { walletUsd: missions.walletUsd, creditedUsd: amountUsd };
-        });
+        }, { persist: 'company' });
         send(res, 200, payload);
         return;
       }
@@ -5474,7 +5487,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -5498,7 +5511,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -6080,7 +6093,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               fleet: withParkingRates(missions.fleet),
             };
-          });
+          }, { commandSliceMissionId: body.missionId });
           if (purchased.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;

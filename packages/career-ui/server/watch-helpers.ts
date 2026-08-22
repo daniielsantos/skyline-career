@@ -245,6 +245,8 @@ type WatchCallbacks = {
       persist?: 'economy' | 'company';
       commandSliceMissionId?: string;
       commandSliceLotIds?: string[];
+      commandSliceIcaos?: string[];
+      commandSliceAircraftId?: string;
     },
   ) => Promise<T>;
   /**

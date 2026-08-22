@@ -739,6 +739,8 @@ type CareerWriteOpts = {
   persist?: 'economy' | 'company';
   commandSliceMissionId?: string;
   commandSliceLotIds?: string[];
+  commandSliceIcaos?: string[];
+  commandSliceAircraftId?: string;
 };
 
 /**
@@ -758,6 +760,24 @@ async function withCareerWrite<T>(
     const sliceLotIdsOpt = (opts?.commandSliceLotIds ?? [])
       .map((id) => id.trim())
       .filter(Boolean);
+    const acfId = opts?.commandSliceAircraftId?.trim();
+    if (acfId) {
+      const acf = missions.fleet.find((a) => a.id === acfId);
+      const loc = acf?.locationIcao?.trim().toUpperCase();
+      if (loc) {
+        opts = {
+          ...opts,
+          commandSliceIcaos: [...(opts?.commandSliceIcaos ?? []), loc],
+        };
+      }
+    }
+    const sliceIcaosOpt = [
+      ...new Set(
+        (opts?.commandSliceIcaos ?? [])
+          .map((c) => c.trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    ];
     let world: CareerEconomyWorld | undefined;
     let useCommandPersist = false;
     let sliceLotIds: string[] = [...sliceLotIdsOpt];
@@ -807,6 +827,26 @@ async function withCareerWrite<T>(
         sliceIcaos = slice.airports.map((ap) => ap.icao);
         useCommandPersist = true;
       }
+    } else if (
+      skipCatchUp &&
+      sliceIcaosOpt.length > 0 &&
+      !activeStore.peekEconomyWorld()
+    ) {
+      const slice = activeStore.loadCommandWorldSlice({
+        icaos: sliceIcaosOpt,
+        lotIds: sliceLotIdsOpt,
+        missionId: sliceMissionId,
+      });
+      const hasAllHubs =
+        slice &&
+        sliceIcaosOpt.every((icao) =>
+          slice.airports.some((ap) => ap.icao === icao),
+        );
+      if (slice && hasAllHubs) {
+        world = slice;
+        sliceIcaos = sliceIcaosOpt;
+        useCommandPersist = true;
+      }
     }
     if (!world) {
       world = await loadEconomyUnlocked({ skipCatchUp });
@@ -821,6 +861,10 @@ async function withCareerWrite<T>(
       sliceIcaos = [...new Set(sliceIcaos.map((c) => c.trim().toUpperCase()).filter(Boolean))];
       sliceLotIds = [...new Set(sliceLotIds)];
       useCommandPersist = sliceIcaos.length > 0;
+    }
+    if (sliceIcaosOpt.length > 0) {
+      sliceIcaos = [...new Set([...sliceIcaos, ...sliceIcaosOpt])];
+      useCommandPersist = true;
     }
     const housekeeping = persistCompany ? false : opts?.housekeeping !== false;
     if (housekeeping) {
@@ -2130,7 +2174,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2167,7 +2211,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2191,7 +2235,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2221,7 +2265,7 @@ export function createCareerApiServer(port = 8787) {
               mro: mx.mro,
               fleet: withParkingRates(missions.fleet),
             };
-          });
+          }, { commandSliceAircraftId: body.aircraftId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2259,7 +2303,7 @@ export function createCareerApiServer(port = 8787) {
               mro: repaired.mro,
               fleet: withParkingRates(missions.fleet),
             };
-          });
+          }, { commandSliceAircraftId: body.aircraftId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2287,7 +2331,7 @@ export function createCareerApiServer(port = 8787) {
               debitUsd: boughtOut.debitUsd,
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2461,6 +2505,9 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions),
             };
+          }, {
+            commandSliceAircraftId: body.aircraftId,
+            commandSliceIcaos: [body.destIcao],
           });
           send(res, 200, result);
         } catch (error) {
@@ -2493,7 +2540,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions, world),
             };
-          });
+          }, { persist: 'company' });
           const watch = watchSession.getStatus();
           if (watch.missionId && watch.missionId !== result.mission.id) {
             if (watch.running) await watchSession.stop({ reset: true });
@@ -2543,7 +2590,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3319,7 +3366,7 @@ export function createCareerApiServer(port = 8787) {
               playerFbos: playerFboSnapshot(missions, world),
               companyCrew: companyCrewSnapshot(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3347,7 +3394,7 @@ export function createCareerApiServer(port = 8787) {
               companyCrew: companyCrewSnapshot(missions, world),
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3620,7 +3667,7 @@ export function createCareerApiServer(port = 8787) {
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: portSnapshot(world, missions),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3651,7 +3698,7 @@ export function createCareerApiServer(port = 8787) {
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: portSnapshot(world, missions),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4149,7 +4196,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               companyCrew: companyCrewSnapshot(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4211,7 +4258,7 @@ export function createCareerApiServer(port = 8787) {
                 groundStaff,
               },
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {

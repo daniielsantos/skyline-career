@@ -1,6 +1,6 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-08-22. Botões não rodam tick horário. GET também não. Timer 60s + `POST /api/tick` passam `catchUp: true`. Freights/Dispatch: patch SQL. Credit/crew fire: só company. Airframe buy ainda grava o mundo, mas sem catch-up.
+Atualizado 2026-08-22. Botões sem tick. MX/ferry = patch do hub; Hangar list/FBO/WH/crew/travel = company. Buy/lease/sell avião ainda grava o dealer pool.
 
 ## Objetivo
 
@@ -69,7 +69,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 3. ~~**Hot path persist:**~~ settle `catchUp: false`; RAM fria hidrata OD; **RAM quente também** `persistCommandWorldSlice` (só `icaos`/`lotIds`, nunca o array inteiro).
 4. ~~**Fila de jobs:**~~ **não faremos** até um side-effect ser pesado o bastante. Cruise EMA fica no settle.
 5. **MP:** N `company_id` no mesmo `world_id`. Fora de escopo.
-6. **Em curso:** cada rota de botão — company vs patch vs economy. Falta Airframes buy/lease/MX (MX toca stock do hub), FBO/ports, demand accept.
+6. **Em curso:** buy/lease/sell avião ainda grava dealer pool no mundo. Demand/ports listings no mundo. Prepare usa tail assigned no origin.
 
 ## Outros comandos (mesmo molde, depois)
 

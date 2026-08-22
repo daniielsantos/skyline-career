@@ -6754,6 +6754,20 @@ export function App() {
     return { ...draft, lines };
   }
 
+  function fleetTailAtOrigin(icao: string, preferId?: string) {
+    const here = (a: (typeof fleet)[number]) =>
+      a.locationIcao === icao &&
+      (a.status === 'parked' || a.status === 'assigned');
+    if (preferId) {
+      const named = fleet.find((a) => a.id === preferId && here(a));
+      if (named) return named;
+    }
+    return (
+      fleet.find((a) => a.status === 'parked' && a.locationIcao === icao) ??
+      fleet.find((a) => a.status === 'assigned' && a.locationIcao === icao)
+    );
+  }
+
   function enterStaging(lot: MarketLot) {
     if (!hubSelected) {
       setError('Create your pilot profile first (name + home hub)');
@@ -6775,18 +6789,7 @@ export function App() {
       goToTab('staging');
       return;
     }
-    const parkedHere =
-      (boardAircraftId
-        ? fleet.find(
-            (a) =>
-              a.id === boardAircraftId &&
-              a.status === 'parked' &&
-              a.locationIcao === lot.originIcao,
-          )
-        : undefined) ??
-      fleet.find(
-        (a) => a.status === 'parked' && a.locationIcao === lot.originIcao,
-      );
+    const parkedHere = fleetTailAtOrigin(lot.originIcao, boardAircraftId);
     if (!parkedHere) {
       const parked = fleet.find((a) => a.status === 'parked');
       setError(
@@ -6804,6 +6807,23 @@ export function App() {
         token: Date.now(),
       });
       goToTab('hangar');
+      return;
+    }
+    const busyMission = missions.find(
+      (m) =>
+        ['accepted', 'dispatched', 'in_flight'].includes(m.status) &&
+        (m.aircraftId === parkedHere.id ||
+          parkedHere.assignedMissionId === m.id),
+    );
+    if (
+      busyMission &&
+      (busyMission.originIcao !== lot.originIcao ||
+        busyMission.destIcao !== lot.destIcao)
+    ) {
+      setError(
+        `Your ${parkedHere.label} is already on ${busyMission.originIcao}→${busyMission.destIcao}. Finish or cancel it in Dispatch, or ferry another aircraft to ${lot.originIcao}.`,
+      );
+      goToTab('staging');
       return;
     }
     const aircraft = parkedHere.aircraftClassId;

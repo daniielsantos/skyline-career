@@ -736,7 +736,8 @@ type CareerWriteOpts = {
   /** Default false — only the timer / POST /api/tick should pass true. */
   catchUp?: boolean;
   /** Skip saveEconomy when the handler only mutates company/missions. */
-  persist?: 'economy' | 'company';
+  persist?: 'economy' | 'company' | 'blob';
+  persistDemandOrderId?: string;
   commandSliceMissionId?: string;
   commandSliceLotIds?: string[];
   commandSliceIcaos?: string[];
@@ -745,7 +746,8 @@ type CareerWriteOpts = {
 
 /**
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
- * `persist: 'company'` writes missions only. `commandSlice*` patches OD/lots.
+ * `persist: 'company'` writes missions only. `persist: 'blob'` writes dealer
+ * pool JSON without live airport/lot tables. `commandSlice*` patches OD/lots.
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
@@ -756,6 +758,8 @@ async function withCareerWrite<T>(
     const missions = await loadMissions();
     const skipCatchUp = opts?.catchUp !== true;
     const persistCompany = opts?.persist === 'company';
+    const persistBlob = opts?.persist === 'blob';
+    const demandOrderId = opts?.persistDemandOrderId?.trim();
     const sliceId = opts?.commandSliceMissionId?.trim();
     const sliceLotIdsOpt = (opts?.commandSliceLotIds ?? [])
       .map((id) => id.trim())
@@ -866,7 +870,8 @@ async function withCareerWrite<T>(
       sliceIcaos = [...new Set([...sliceIcaos, ...sliceIcaosOpt])];
       useCommandPersist = true;
     }
-    const housekeeping = persistCompany ? false : opts?.housekeeping !== false;
+    const housekeeping =
+      persistCompany || persistBlob ? false : opts?.housekeeping !== false;
     if (housekeeping) {
       settleCrewOpsDue(missions, world, Date.now());
       cancelOrphanPlayerMissions(world, missions);
@@ -879,6 +884,15 @@ async function withCareerWrite<T>(
       if (found) sliceMissionId = found.id;
     }
     if (persistCompany) {
+      if (demandOrderId) {
+        const order = world.demandOrders?.find((o) => o.id === demandOrderId);
+        if (order) await activeStore.persistDemandOrder(order);
+      }
+      await saveMissions(missions);
+      return result;
+    }
+    if (persistBlob) {
+      await activeStore.saveEconomy(world, { liveTables: false });
       await saveMissions(missions);
       return result;
     }
@@ -2068,7 +2082,7 @@ export function createCareerApiServer(port = 8787) {
                 companyCredit: companyCreditSnapshot(missions),
               };
             });
-          });
+          }, { persist: 'blob' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2110,7 +2124,7 @@ export function createCareerApiServer(port = 8787) {
                 leaseUnlock: leaseUnlockForRequest(req, missions),
               };
             });
-          });
+          }, { persist: 'blob' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2141,7 +2155,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          });
+          }, { persist: 'blob' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2362,7 +2376,7 @@ export function createCareerApiServer(port = 8787) {
               remainingMonths: returned.remainingMonths,
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          });
+          }, { persist: 'blob' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3801,6 +3815,9 @@ export function createCareerApiServer(port = 8787) {
                 ),
               };
             });
+          }, {
+            persist: 'company',
+            persistDemandOrderId: body.orderId,
           });
           send(res, 200, result);
         } catch (error) {

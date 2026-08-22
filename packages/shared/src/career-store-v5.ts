@@ -623,6 +623,57 @@ export function replaceDemandOrders(
   }
 }
 
+export function upsertDemandOrder(
+  db: SqliteDb,
+  order: DemandOrder,
+  worldId = LOCAL_WORLD_ID,
+): void {
+  const {
+    id,
+    destIcao,
+    commodityId,
+    wantedKg,
+    remainingKg,
+    maxUnitPriceUsd,
+    arrivedAtTick,
+    expiresAtTick,
+    status,
+    ...rest
+  } = order;
+  const extra = Object.keys(rest).length > 0 ? JSON.stringify(rest) : null;
+  db.prepare(
+    `INSERT INTO demand_orders (
+       world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
+       max_unit_price_usd, arrived_at_tick, expires_at_tick, status, payload_json
+     ) VALUES (
+       @world_id, @id, @dest_icao, @commodity_id, @wanted_kg, @remaining_kg,
+       @max_unit_price_usd, @arrived_at_tick, @expires_at_tick, @status, @payload_json
+     )
+     ON CONFLICT(world_id, id) DO UPDATE SET
+       dest_icao = excluded.dest_icao,
+       commodity_id = excluded.commodity_id,
+       wanted_kg = excluded.wanted_kg,
+       remaining_kg = excluded.remaining_kg,
+       max_unit_price_usd = excluded.max_unit_price_usd,
+       arrived_at_tick = excluded.arrived_at_tick,
+       expires_at_tick = excluded.expires_at_tick,
+       status = excluded.status,
+       payload_json = excluded.payload_json`,
+  ).run({
+    world_id: worldId,
+    id,
+    dest_icao: destIcao,
+    commodity_id: commodityId,
+    wanted_kg: wantedKg,
+    remaining_kg: remainingKg,
+    max_unit_price_usd: maxUnitPriceUsd,
+    arrived_at_tick: arrivedAtTick,
+    expires_at_tick: expiresAtTick,
+    status,
+    payload_json: extra,
+  });
+}
+
 export function readPortListings(
   db: SqliteDb,
   worldId = LOCAL_WORLD_ID,

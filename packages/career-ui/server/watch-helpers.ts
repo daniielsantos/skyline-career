@@ -242,7 +242,8 @@ type WatchCallbacks = {
     opts?: {
       housekeeping?: boolean;
       catchUp?: boolean;
-      persist?: 'economy' | 'company';
+      persist?: 'economy' | 'company' | 'blob';
+      persistDemandOrderId?: string;
       commandSliceMissionId?: string;
       commandSliceLotIds?: string[];
       commandSliceIcaos?: string[];

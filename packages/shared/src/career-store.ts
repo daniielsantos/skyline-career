@@ -79,11 +79,13 @@ import {
   migrateV4toV5IfNeeded,
   persistWorldOpsTables,
   stripEconomyWorldOps,
+  upsertDemandOrder,
 } from './career-store-v5.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
   CareerMissionsState,
+  DemandOrder,
 } from './types/career-economy.js';
 
 export type CareerStoreKind = 'json' | 'sqlite';
@@ -118,7 +120,11 @@ export interface CareerStore {
   readonly kind: CareerStoreKind;
   readonly sqlitePath?: string;
   loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult>;
-  saveEconomy(world: CareerEconomyWorld): Promise<void>;
+  saveEconomy(
+    world: CareerEconomyWorld,
+    opts?: { liveTables?: boolean },
+  ): Promise<void>;
+  persistDemandOrder(order: DemandOrder): Promise<void>;
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).
@@ -368,13 +374,20 @@ class JsonCareerStore implements CareerStore {
     return { world: fresh, advancedTicks: 0, settledFlights: 0, dirty: false };
   }
 
-  async saveEconomy(world: CareerEconomyWorld): Promise<void> {
+  async saveEconomy(
+    world: CareerEconomyWorld,
+    _opts?: { liveTables?: boolean },
+  ): Promise<void> {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
     this.ram = toSave;
     await writeJsonFileAtomic(this.economyPath, toSave);
+  }
+
+  async persistDemandOrder(_order: DemandOrder): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
   }
 
   async loadMissions(): Promise<CareerMissionsState> {
@@ -695,6 +708,11 @@ class SqliteCareerStore implements CareerStore {
     }
   }
 
+  async persistDemandOrder(order: DemandOrder): Promise<void> {
+    upsertDemandOrder(this.db, order);
+    if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
+  }
+
   readAirportInventory(icao: string): AirportInventorySnapshot | null {
     return readAirportInventory(this.db, icao, LOCAL_WORLD_ID);
   }
@@ -818,7 +836,10 @@ class SqliteCareerStore implements CareerStore {
     return { world: caught, advancedTicks, settledFlights, dirty };
   }
 
-  async saveEconomy(world: CareerEconomyWorld): Promise<void> {
+  async saveEconomy(
+    world: CareerEconomyWorld,
+    opts?: { liveTables?: boolean },
+  ): Promise<void> {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
@@ -828,6 +849,21 @@ class SqliteCareerStore implements CareerStore {
     );
     const json = JSON.stringify(blob);
     const now = Date.now();
+    if (opts?.liveTables === false) {
+      runInTransaction(this.db, () => {
+        if (json !== this.lastEconomyBlobJson) {
+          this.db
+            .prepare(
+              `INSERT INTO economy_json (id, json, updated_at_ms) VALUES (1, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
+            )
+            .run(json, now);
+        }
+      });
+      this.ram = toSave;
+      this.lastEconomyBlobJson = json;
+      return;
+    }
     const lotsKey = lotsPersistKey(toSave);
     const inboundKey = inboundPersistKey(toSave);
     const npcKey = npcFlightsPersistKey(toSave);

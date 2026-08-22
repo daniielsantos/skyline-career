@@ -60,8 +60,8 @@ import {
   overlayEconomyMeta,
   persistWorldAirports,
   persistAirportsPatch,
-  persistEconomyMeta,
   readEconomyMeta,
+  airportPersistSignature,
   airportSignaturesFromList,
   readAirportBoard,
   readAirportInventory,
@@ -111,6 +111,7 @@ export type CommandWorldSliceOpts = {
 export type PersistCommandWorldSliceOpts = {
   missionId: string;
   lotIds: string[];
+  icaos: string[];
 };
 
 export interface CareerStore {
@@ -646,22 +647,46 @@ class SqliteCareerStore implements CareerStore {
     world: CareerEconomyWorld,
     opts: PersistCommandWorldSliceOpts,
   ): Promise<void> {
-    const nextIds = new Set((world.lots ?? []).map((lot) => lot.id));
+    const icaoSet = new Set(
+      opts.icaos.map((c) => c.trim().toUpperCase()).filter(Boolean),
+    );
+    const lotIdSet = new Set(opts.lotIds.map((id) => id.trim()).filter(Boolean));
+    const airports = (world.airports ?? []).filter((ap) =>
+      icaoSet.has(String(ap.icao ?? '').trim().toUpperCase()),
+    );
+    const lots = (world.lots ?? []).filter((lot) => lotIdSet.has(lot.id));
+    const remainingLotIds = new Set(lots.map((lot) => lot.id));
+    const inbound = (world.inboundPending ?? []).filter(
+      (row) => row.missionId === opts.missionId,
+    );
     runInTransaction(this.db, () => {
-      persistEconomyMeta(this.db, world);
-      persistAirportsPatch(this.db, world.airports ?? [], []);
-      upsertLotRows(this.db, world.lots ?? [], world.airports);
+      persistAirportsPatch(this.db, airports, []);
+      if (lots.length > 0) upsertLotRows(this.db, lots, airports);
       const del = this.db.prepare(`DELETE FROM lots WHERE id = ?`);
-      for (const id of opts.lotIds) {
-        if (id && !nextIds.has(id)) del.run(id);
+      for (const id of lotIdSet) {
+        if (!remainingLotIds.has(id)) del.run(id);
       }
-      replaceInboundPendingForMission(
-        this.db,
-        opts.missionId,
-        (world.inboundPending ?? []).filter((row) => row.missionId === opts.missionId),
-        world.airports,
-      );
+      replaceInboundPendingForMission(this.db, opts.missionId, inbound, airports);
     });
+    if (this.ram && this.lastAirportSignatures) {
+      for (const ap of airports) {
+        const icao = String(ap.icao ?? '').trim().toUpperCase();
+        if (icao) this.lastAirportSignatures.set(icao, airportPersistSignature(ap));
+      }
+    }
+    if (this.ram && this.lastLotSignatures) {
+      for (const lot of lots) {
+        this.lastLotSignatures.set(lot.id, lotPersistSignature(lot));
+      }
+      for (const id of lotIdSet) {
+        if (!remainingLotIds.has(id)) this.lastLotSignatures.delete(id);
+      }
+      this.lastLotsKey = lotsPersistKey(this.ram);
+    }
+    if (this.ram && this.lastInboundSignatures) {
+      this.lastInboundSignatures = inboundSignatureMap(this.ram);
+      this.lastInboundKey = inboundPersistKey(this.ram);
+    }
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {

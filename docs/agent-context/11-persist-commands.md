@@ -1,8 +1,6 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-08-22. **Fatia 1–4 no código:** patch de hubs; `SettleFlight` idempotente; settle sem catch-up horário; **dois locks** (`world` depois `company`) e **fatia SQL** origin/dest quando a RAM está fria.
-
-Código de hoje: `withCareerWrite` ainda hidrata o planeta no tick e na maior parte das rotas. Watch/API settle passam `commandSliceMissionId`. Tabelas v4/v5 já existem.
+Atualizado 2026-08-22. **Fatia 1–4 no código:** patch de hubs; `SettleFlight` idempotente; settle sem catch-up horário; dois locks; fatia SQL origin/dest. **Sem job queue:** side-effects baratos (cruise EMA) vão no mesmo `saveMissions`. Settle **sempre** persiste patch SQL (RAM quente ou fria), não `saveEconomy` do planeta.
 
 ## Objetivo
 
@@ -40,14 +38,14 @@ Não esperar o tick horário (lots/NPC/Europa) no freio.
 7. `inbound_pending` da missão: delete por `mission_id`.
 8. Demand/port/WH: as mesmas regras de `settleMission` hoje, mas em `company_state` / stock — não via `world.airports.map`.
 
-**Fora do hot path (fila / mesmo processo depois do ack):**
+**Fora do hot path (não precisa de fila):**
 
-- Cruise EMA / `airframePerfOverrides` (já é override pequeno; pode ir no company write **se** for um `UPDATE` de uma linha, não dump).
-- Relógio airborne (após settle a missão já fechou — **não** persistir de novo; já pulado no Watch `228d6c1`).
-- Crew ops due / orphan cancel: **não** no settle; job periódico ou no próximo `company` write que já abra missões.
+- Cruise EMA / `airframePerfOverrides`: no mesmo `saveMissions` do settle (um objeto pequeno). Sem job.
+- Relógio airborne após settle: **não** persistir de novo (Watch `228d6c1`).
+- Crew ops due / orphan cancel: **não** no settle; próximo write de company que já abra missões, ou o timer de 60s.
 - Tick NPC, port discharge, dealer pool, `persistWorldAirports` full rewrite.
 
-**Debrief:** payload do comando (payout, penalty, score). Disco alcança no mesmo `COMMIT` das linhas quentes — **não** fire-and-forget o payout. Fila só para side-effects que o jogador não precisa ver na hora.
+**Debrief:** payload do comando (payout, penalty, score). Disco alcança no mesmo write das linhas quentes — **não** fire-and-forget o payout. Sem fila de jobs até existir um side-effect pesado de verdade.
 
 ## O que `settleMission` faz hoje (para não perder regra)
 
@@ -66,9 +64,9 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 
 1. ~~**Dirty airports:**~~ **feito:** patch por ICAO + skip live/ops/blob. Tick que toca ≥80 hubs ainda faz rewrite completo.
 2. ~~**`SettleFlight` comando:**~~ `executeSettleFlight` idempotente; Watch/API; housekeeping off no settle.
-3. ~~**Hot path persist:**~~ settle `catchUp: false`; lots/inbound incrementais no `saveEconomy` quente; **RAM fria:** fatia origin/dest + patch SQL.
-4. **Fila** só depois: jobs `ApplyCruiseEma`, `CatchUpCrewOps`. Não enfileirar o payout.
-5. **MP:** N `company_id` no mesmo `world_id`. Fora de escopo até 2+3.
+3. ~~**Hot path persist:**~~ settle `catchUp: false`; RAM fria hidrata OD; **RAM quente também** `persistCommandWorldSlice` (só `icaos`/`lotIds`, nunca o array inteiro).
+4. ~~**Fila de jobs:**~~ **não faremos** até um side-effect ser pesado o bastante. Cruise EMA fica no settle.
+5. **MP:** N `company_id` no mesmo `world_id`. Fora de escopo.
 
 ## Outros comandos (mesmo molde, depois)
 

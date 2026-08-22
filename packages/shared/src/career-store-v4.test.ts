@@ -405,11 +405,53 @@ describe('career store v4', () => {
     await cold.persistCommandWorldSlice(slice, {
       missionId: 'slice-mission',
       lotIds: [lot.id],
+      icaos: [origin.icao, dest.icao],
     });
     assert.equal(countAirportsInDb(cold.sqlitePath!), nAirports);
     assert.equal(countLotsInDb(cold.sqlitePath!), nLots - 1);
     assert.equal(readAirportStockKg(cold.sqlitePath!, origin.icao, 'general'), 4321);
     assert.equal(cold.peekEconomyWorld(), null);
     cold.close();
+  });
+
+  it('patches hot RAM settle without rewriting other airport rows', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-v4-hot-slice-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const world = createSeedEconomyWorld({ seed: 'v4-hot-slice' });
+    world.lastBatchAtMs = Date.now();
+    ensureSeedMarketFormed(world);
+    await store.saveEconomy(world);
+    const hot = (await store.loadEconomy({ maxCatchUpTicks: 0 })).world;
+    const nAirports = countAirportsInDb(store.sqlitePath!);
+    const nLots = countLotsInDb(store.sqlitePath!);
+    const lot = hot.lots[0]!;
+    const keep = hot.lots[1]!;
+    const keepQty = keep.quantityKg;
+    const origin =
+      hot.airports.find((ap) => ap.icao === 'SBGR') ?? hot.airports[0]!;
+    const dest = hot.airports.find((ap) => ap.icao !== origin.icao)!;
+    const untouched = hot.airports.find(
+      (ap) => ap.icao !== origin.icao && ap.icao !== dest.icao,
+    );
+    assert.ok(untouched);
+    const untouchedRowid = airportRowid(store.sqlitePath!, untouched.icao);
+    origin.inventory.general = {
+      stockKg: 2222,
+      capacityKg: origin.inventory.general?.capacityKg ?? 50_000,
+    };
+    hot.lots = hot.lots.filter((l) => l.id !== lot.id);
+    await store.persistCommandWorldSlice(hot, {
+      missionId: 'hot-mission',
+      lotIds: [lot.id],
+      icaos: [origin.icao, dest.icao],
+    });
+    assert.equal(countAirportsInDb(store.sqlitePath!), nAirports);
+    assert.equal(airportRowid(store.sqlitePath!, untouched.icao), untouchedRowid);
+    assert.equal(countLotsInDb(store.sqlitePath!), nLots - 1);
+    assert.equal(readAirportStockKg(store.sqlitePath!, origin.icao, 'general'), 2222);
+    const again = await store.loadEconomy({ maxCatchUpTicks: 0 });
+    assert.equal(again.world.lots.find((l) => l.id === keep.id)?.quantityKg, keepQty);
+    assert.equal(again.world.lots.some((l) => l.id === lot.id), false);
+    store.close();
   });
 });

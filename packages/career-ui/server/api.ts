@@ -741,7 +741,7 @@ async function withCareerWrite<T>(
   opts?: {
     housekeeping?: boolean;
     catchUp?: boolean;
-    /** Cold RAM: hydrate origin/dest + mission lots from SQL (no planet catch-up). */
+    /** When set, persist origin/dest + mission lots as a SQL patch (hot or cold RAM). */
     commandSliceMissionId?: string;
   },
 ): Promise<T> {
@@ -751,35 +751,35 @@ async function withCareerWrite<T>(
     const skipCatchUp = opts?.catchUp === false;
     const sliceId = opts?.commandSliceMissionId?.trim();
     let world: CareerEconomyWorld | undefined;
-    let persistSlice = false;
+    let useCommandPersist = false;
     let sliceLotIds: string[] = [];
-    if (skipCatchUp && sliceId && !activeStore.peekEconomyWorld()) {
+    let sliceIcaos: string[] = [];
+    if (skipCatchUp && sliceId) {
       const mission = missions.missions.find((m) => m.id === sliceId);
       if (mission) {
-        const icaos = [
+        sliceIcaos = [
           ...new Set(
             [mission.originIcao, mission.destIcao]
               .map((c) => c.trim().toUpperCase())
               .filter(Boolean),
           ),
         ];
-        const lotIds = mission.lots
+        sliceLotIds = mission.lots
           .map((lot) => lot.shipmentLotId)
           .filter((id): id is string => Boolean(id));
-        sliceLotIds = lotIds;
-        const slice = activeStore.loadCommandWorldSlice({
-          icaos,
-          lotIds,
-          missionId: sliceId,
-        });
-        const hasAllHubs =
-          slice &&
-          icaos.every((icao) =>
-            slice.airports.some((ap) => ap.icao === icao),
-          );
-        if (slice && hasAllHubs) {
-          world = slice;
-          persistSlice = true;
+        useCommandPersist = sliceIcaos.length > 0;
+        if (!activeStore.peekEconomyWorld()) {
+          const slice = activeStore.loadCommandWorldSlice({
+            icaos: sliceIcaos,
+            lotIds: sliceLotIds,
+            missionId: sliceId,
+          });
+          const hasAllHubs =
+            slice &&
+            sliceIcaos.every((icao) =>
+              slice.airports.some((ap) => ap.icao === icao),
+            );
+          if (slice && hasAllHubs) world = slice;
         }
       }
     }
@@ -791,10 +791,11 @@ async function withCareerWrite<T>(
       cancelOrphanPlayerMissions(world, missions);
     }
     const result = await fn(world, missions);
-    if (persistSlice && !activeStore.peekEconomyWorld() && sliceId) {
+    if (useCommandPersist && sliceId) {
       await activeStore.persistCommandWorldSlice(world, {
         missionId: sliceId,
         lotIds: sliceLotIds,
+        icaos: sliceIcaos,
       });
     } else {
       await persistEconomyUnlocked(world);

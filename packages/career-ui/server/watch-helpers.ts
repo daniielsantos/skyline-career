@@ -3125,6 +3125,9 @@ export class CareerWatchSession {
           };
           current = departed.mission;
           return true;
+        }, {
+          housekeeping: false,
+          commandSliceMissionId: this.missionId ?? undefined,
         });
           if (!saved) {
             await this.stop();
@@ -3206,6 +3209,10 @@ export class CareerWatchSession {
               this.missionStatus = next.status;
               current = next;
               return true;
+            },
+            {
+              housekeeping: false,
+              commandSliceMissionId: this.missionId ?? undefined,
             },
           );
           if (reverted) {

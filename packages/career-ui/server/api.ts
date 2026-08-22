@@ -708,9 +708,9 @@ async function persistEconomyUnlocked(world: CareerEconomyWorld): Promise<void> 
   await requireStore().saveEconomy(world);
 }
 
-/** Consistent snapshot of world (+ catch-up) under the career lock. */
+/** GET/health snapshot — no hourly catch-up (timer / POST /api/tick do that). */
 function loadEconomy(): Promise<CareerEconomyWorld> {
-  return withCareerLock(loadEconomyUnlocked);
+  return withCareerLock(() => loadEconomyUnlocked({ skipCatchUp: true }));
 }
 
 /**

@@ -736,7 +736,7 @@ type CareerWriteOpts = {
   /** Default false — only the timer / POST /api/tick should pass true. */
   catchUp?: boolean;
   /** Skip saveEconomy when the handler only mutates company/missions. */
-  persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound';
+  persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound' | 'npcLive';
   persistDemandOrderId?: string;
   persistPortListingId?: string;
   persistPortConcessions?: boolean;
@@ -753,6 +753,7 @@ type CareerWriteOpts = {
  * upserts). `persist: 'blob'` writes dealer pool JSON without live tables.
  * `persist: 'portMarket'` rewrites port listings+inventory only (GET /api/ports seed).
  * `persist: 'demandBoard'` rewrites demand_orders only. `persist: 'inbound'` patches inbound_pending.
+ * `persist: 'npcLive'` writes NPC roster/flights + dirty lots/inbound/airports (not port ops).
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
@@ -767,6 +768,7 @@ async function withCareerWrite<T>(
     const persistPortMarket = opts?.persist === 'portMarket';
     const persistDemandBoard = opts?.persist === 'demandBoard';
     const persistInbound = opts?.persist === 'inbound';
+    const persistNpcLive = opts?.persist === 'npcLive';
     const demandOrderId = opts?.persistDemandOrderId?.trim();
     const portListingId = opts?.persistPortListingId?.trim();
     const persistPortConcessions = opts?.persistPortConcessions === true;
@@ -891,7 +893,8 @@ async function withCareerWrite<T>(
       persistBlob ||
       persistPortMarket ||
       persistDemandBoard ||
-      persistInbound
+      persistInbound ||
+      persistNpcLive
         ? false
         : opts?.housekeeping !== false;
     if (housekeeping) {
@@ -935,6 +938,11 @@ async function withCareerWrite<T>(
     }
     if (persistInbound) {
       await activeStore.persistInboundPending(world);
+      return result;
+    }
+    if (persistNpcLive) {
+      await activeStore.persistNpcLiveWorld(world);
+      await saveMissions(missions);
       return result;
     }
     if (useCommandPersist) {
@@ -4732,7 +4740,7 @@ export function createCareerApiServer(port = 8787) {
               ...result,
               walletUsd: missions.walletUsd,
             };
-          });
+          }, { persist: 'npcLive' });
           let mission = accepted.mission;
           let dispatch:
             | {
@@ -4785,7 +4793,7 @@ export function createCareerApiServer(port = 8787) {
                 if (idx >= 0) missions.missions[idx] = dispatched;
                 else missions.missions.push(dispatched);
                 return dispatched;
-              });
+              }, { commandSliceMissionId: mission.id });
               // UI opens the URL once (Electron IPC / window.open).
               dispatch = {
                 url: built.url,

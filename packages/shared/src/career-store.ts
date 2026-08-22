@@ -83,6 +83,7 @@ import {
   replacePortInventories,
   replacePortListings,
   replaceDemandOrders,
+  replaceNpcs,
   upsertDemandOrder,
   upsertPortListing,
 } from './career-store-v5.js';
@@ -138,6 +139,11 @@ export interface CareerStore {
   persistPortMarketTables(world: CareerEconomyWorld): Promise<void>;
   persistDemandBoardTables(world: CareerEconomyWorld): Promise<void>;
   persistInboundPending(world: CareerEconomyWorld): Promise<void>;
+  /**
+   * Contract-pilot / NPC live: lots, inbound, dirty airports, NPC roster +
+   * flights — not port/demand ops tables.
+   */
+  persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void>;
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).
@@ -420,6 +426,10 @@ class JsonCareerStore implements CareerStore {
   }
 
   async persistInboundPending(_world: CareerEconomyWorld): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
+  }
+
+  async persistNpcLiveWorld(_world: CareerEconomyWorld): Promise<void> {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
@@ -776,6 +786,57 @@ class SqliteCareerStore implements CareerStore {
     );
     this.lastInboundSignatures = inboundSignatureMap(world);
     this.lastInboundKey = inboundPersistKey(world);
+  }
+
+  async persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void> {
+    const toSave = migrateEconomyWorld(world);
+    toSave.lastBatchAtMs = world.lastBatchAtMs;
+    toSave.lastSyncedAtMs = world.lastBatchAtMs;
+    ensureHomeCountryId(toSave);
+    const blob = stripEconomyWorldOps(
+      stripEconomyAirports(stripEconomyHotArrays(toSave)),
+    );
+    const json = JSON.stringify(blob);
+    const now = Date.now();
+    const lotsKey = lotsPersistKey(toSave);
+    const inboundKey = inboundPersistKey(toSave);
+    const prevAirportSignatures = this.lastAirportSignatures;
+    const prevLotSignatures = this.lastLotSignatures;
+    const prevInboundSignatures = this.lastInboundSignatures;
+    runInTransaction(this.db, () => {
+      if (json !== this.lastEconomyBlobJson) {
+        this.db
+          .prepare(
+            `INSERT INTO economy_json (id, json, updated_at_ms) VALUES (1, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
+          )
+          .run(json, now);
+      }
+      if (this.lastLotsKey !== lotsKey) {
+        persistLotsIncremental(
+          this.db,
+          toSave.lots ?? [],
+          toSave.airports,
+          prevLotSignatures,
+        );
+      }
+      if (this.lastInboundKey !== inboundKey) {
+        persistInboundIncremental(
+          this.db,
+          toSave.inboundPending ?? [],
+          toSave.airports,
+          prevInboundSignatures,
+        );
+      }
+      replaceNpcFlights(this.db, toSave.npcFlights ?? [], toSave.airports);
+      replaceNpcs(this.db, toSave.npcs ?? []);
+      persistWorldAirports(this.db, toSave, LOCAL_WORLD_ID, prevAirportSignatures);
+      stampCompanyWorldId(this.db);
+      metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
+      metaSet(this.db, 'economy_tick', String(toSave.tick));
+    });
+    this.ram = toSave;
+    this.rememberPersistedWorld(toSave, json);
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {

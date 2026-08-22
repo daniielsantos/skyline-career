@@ -73,6 +73,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 7. ~~**GET `/api/ports`:**~~ `persist: 'portMarket'`.
 8. ~~**GET Freights / Demand / dealer:**~~ inbound patch, demand_orders table, dealer blob. Warehouse stock abandon = company.
 9. ~~**FBO hold/release + crew/bush/fuel/select-hub:**~~ lot slice via `commandSliceHoldId`; crew assign/bush/debug/ground-staff fire = company; select-hub = blob (`homeCountryId`).
+10. ~~**Contract-pilot accept:**~~ `persist: 'npcLive'` (NPC + flights + dirty lots/inbound/airports; not port/demand rewrite).
 
 ## Outros comandos (mesmo molde, depois)
 

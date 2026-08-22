@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-22: hours MX/resale + settle overlay em `main` (`228d6c1`). Desenho persist/MP: [`11-persist-commands.md`](./11-persist-commands.md) — **próximo código:** `saveEconomy` skip rewrite de airports se stock não mudou; depois `SettleFlight` SQL.
+
 Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). BBJ2 parked. Airport tab / A2A / dual-client IPC inalterados.
 
 **Shipped (uncommitted):** port restock is a daily inbound discharge on the economy tick (not on opening Ports). Listings spawn from yard stock only. Ports UI shows next discharge ETA. Concession P2 enlarges yard cap; renew lease scales with 7-day throughput (no extra buy discount).

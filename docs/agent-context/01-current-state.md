@@ -1,3 +1,7 @@
+# Current state (2026-08-22)
+
+`main` **228d6c1** (não é release desktop): hours AF/ENG mexem MX + resale; hangar reconcilia missão fantasma; orphan cancel no write; cruise sample VS 200; Dispatch **Settling…** no auto-settle; Watch não espera persist de airborne nem 1,5s no próprio tick. Arquitetura persist/MP: `docs/agent-context/11-persist-commands.md`.
+
 # Current state (2026-08-21)
 
 ## Desktop

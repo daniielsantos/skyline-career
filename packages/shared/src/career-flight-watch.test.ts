@@ -490,12 +490,44 @@ describe('evaluateMissionFlightTransition', () => {
     );
   });
 
-  it('inferEnginesRunning does not treat Accu-Sim false combustion alone as off', () => {
+  it('inferEnginesRunning ignores stuck combustion after menu spawn', () => {
     assert.equal(
       inferEnginesRunning({
         snapshotRunning: true,
         n1Pct: [0, 0],
         rpm: [0, 0],
+        combustion: [true, true],
+      }),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        combustion: [true],
+        fuelFlowKgPerHour: 80,
+      }),
+      true,
+    );
+  });
+
+  it('inferEnginesRunning ignores sticky snapshot after menu spawn', () => {
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        n1Pct: [0, 0],
+        rpm: [0, 0],
+        combustion: [false, false],
+      }),
+      false,
+    );
+  });
+
+  it('inferEnginesRunning does not treat Accu-Sim false combustion alone as off', () => {
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        n1Pct: [0, 0],
+        rpm: [2400, 2380],
         combustion: [false, false],
       }),
       true,

@@ -116,9 +116,10 @@ export interface FlightGroundSample {
 
 /**
  * Prefer N1 / RPM / GENERAL ENG COMBUSTION / fuel flow over the snapshot
- * ENG COMBUSTION:1 bit, which stays true after cutoff on several MSFS
- * turboprops (PC-12). Accu-Sim pistons often leave GENERAL ENG COMBUSTION at 0
- * while running — do not treat all-false combustion alone as shutdown.
+ * ENG COMBUSTION:1 bit, which stays true after cutoff / world-menu spawn on
+ * several MSFS turboprops (ATR, PC-12). Accu-Sim pistons often leave
+ * GENERAL ENG COMBUSTION at 0 while running — use RPM or fuel flow, not the
+ * Host snapshot bit.
  */
 export function inferEnginesRunning(input: {
   snapshotRunning: boolean;
@@ -128,9 +129,12 @@ export function inferEnginesRunning(input: {
   /** Live fuel flow (kg/h); strong positive evidence when combustion is stuck 0. */
   fuelFlowKgPerHour?: number;
 }): boolean {
-  // 0 = missing SimVar (batch FLOAT64), not a spooled-down turbine / stopped prop.
-  const n1 = (input.n1Pct ?? []).filter((n) => Number.isFinite(n) && n > 0);
-  const rpm = (input.rpm ?? []).filter((n) => Number.isFinite(n) && n > 0);
+  // Positive N1/RPM = live spool. Raw zeros still count as “sampled dead”
+  // (ATR after world menu). Accu-Sim running uses RPM or fuel flow, not N1.
+  const n1Raw = (input.n1Pct ?? []).filter((n) => Number.isFinite(n));
+  const n1 = n1Raw.filter((n) => n > 0);
+  const rpmRaw = (input.rpm ?? []).filter((n) => Number.isFinite(n));
+  const rpm = rpmRaw.filter((n) => n > 0);
   const comb = input.combustion ?? [];
   const flow =
     typeof input.fuelFlowKgPerHour === 'number' &&
@@ -143,14 +147,24 @@ export function inferEnginesRunning(input: {
 
   if (comb.some((c) => c)) {
     // Sticky combustion after cutoff: low RPM still means shutdown.
-    if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
-    return true;
+    if (rpmRaw.length > 0 && rpmRaw.every((r) => r < ENGINE_RPM_OFF)) return false;
+    if (rpm.some((r) => r >= ENGINE_RPM_OFF)) return true;
+    if (flow !== undefined && flow >= ENGINE_FUEL_FLOW_ON_KG_H) return true;
+    // ATR / PC-12 / world-menu spawn: ENG COMBUSTION stays 1 with N1/RPM/flow
+    // at 0. That is not a running engine (Accu-Sim running has comb=false).
+    return false;
   }
   if (rpm.some((r) => r >= ENGINE_RPM_OFF)) return true;
   if (flow !== undefined && flow >= ENGINE_FUEL_FLOW_ON_KG_H) return true;
 
   if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
-  // GENERAL ENG COMBUSTION all-false alone is inconclusive (Accu-Sim).
+  // Host snapshot is ENG COMBUSTION:1 — same sticky bit after menu spawn.
+  // Accu-Sim with engines actually running should have hit RPM or fuel flow.
+  const sampledDeadN1 =
+    n1Raw.length > 0 && n1Raw.every((n) => n < ENGINE_N1_OFF_PCT);
+  const sampledDeadRpm =
+    rpmRaw.length === 0 || rpmRaw.every((r) => r < ENGINE_RPM_OFF);
+  if (sampledDeadN1 && sampledDeadRpm) return false;
   return input.snapshotRunning;
 }
 

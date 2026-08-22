@@ -12089,31 +12089,6 @@ export function App() {
                   >
                     Back
                   </button>
-                  <button
-                    type="button"
-                    className="accept"
-                    disabled={busy || !stagingValid}
-                    onClick={() => void onCommitStaging()}
-                    title={
-                      staging.replaceManifest
-                        ? 'Save the edited manifest and reopen SimBrief'
-                        : 'Accept the staged manifest and open Dispatch'
-                    }
-                  >
-                    {busy ? (
-                      <>
-                        <span
-                          className="busy-spinner busy-spinner-sm"
-                          aria-hidden="true"
-                        />
-                        {staging.replaceManifest ? 'Saving…' : 'Accepting…'}
-                      </>
-                    ) : staging.replaceManifest ? (
-                      'Save & re-dispatch'
-                    ) : (
-                      'Accept & Dispatch'
-                    )}
-                  </button>
                 </div>
               </div>
 

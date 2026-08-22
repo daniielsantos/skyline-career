@@ -45,7 +45,7 @@ import {
   replaceInboundPendingForMission,
   upsertLotRows,
   readLedgerRowsV3,
-  replaceLedgerV3,
+  persistLedgerIncremental,
   replaceNpcFlights,
   replaceEconomyEvents,
   stripEconomyHotArrays,
@@ -666,6 +666,7 @@ class SqliteCareerStore implements CareerStore {
   private lastEventsKey: string | null = null;
   private lastOpsKey: string | null = null;
   private lastEconomyBlobJson: string | null = null;
+  private lastCompanyPersistKey: string | null = null;
 
   constructor(sqlitePath: string) {
     this.sqlitePath = sqlitePath;
@@ -1088,6 +1089,10 @@ class SqliteCareerStore implements CareerStore {
     const normalized = missionsPayloadForBlob(state);
     const ledger = normalized.ledger ?? [];
     normalized.ledger = ledger;
+    const persistKey = JSON.stringify(normalized);
+    if (persistKey === this.lastCompanyPersistKey) {
+      return;
+    }
     const stub = missionsBlobStub(normalized);
     const json = JSON.stringify(stub);
     const now = Date.now();
@@ -1103,8 +1108,9 @@ class SqliteCareerStore implements CareerStore {
         )
         .run(json, now);
       persistCompanyTables(this.db, normalized);
-      replaceLedgerV3(this.db, ledger);
+      persistLedgerIncremental(this.db, ledger);
     });
+    this.lastCompanyPersistKey = persistKey;
   }
 
   async loadLedger(): Promise<CareerLedgerEntry[]> {
@@ -1130,6 +1136,7 @@ class SqliteCareerStore implements CareerStore {
     this.lastEventsKey = null;
     this.lastOpsKey = null;
     this.lastEconomyBlobJson = null;
+    this.lastCompanyPersistKey = null;
     this.db.close();
   }
 }

@@ -77,6 +77,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 11. ~~**Bush homologate + staging auto-dispatch:**~~ one hub airport patch; staging dispatch = mission slice.
 12. ~~**GET health/NPC + Watch depart:**~~ GETs skip catch-up; Watch auto-depart/false-depart = mission slice.
 13. ~~**Airport GET hydrate + bush Watch:**~~ terminal inventory hydrate skips catch-up; bush depart/settle = company only. Tick / `POST /api/init` still full `saveEconomy`.
+14. ~~**Company persist skip + ledger patch:**~~ identical `saveMissions` no-ops; ledger upsert + delete-not-in (no `DELETE FROM ledger` wipe). Dealer GET blob still calls `saveMissions` but skips SQL when unchanged.
 
 ## Outros comandos (mesmo molde, depois)
 

@@ -1607,17 +1607,34 @@ export function readLedgerRowsV3(db: SqliteDb): CareerLedgerEntry[] {
   );
 }
 
-export function replaceLedgerV3(db: SqliteDb, entries: CareerLedgerEntry[]): void {
-  db.prepare(`DELETE FROM ledger`).run();
-  const ins = db.prepare(
+export function persistLedgerIncremental(db: SqliteDb, entries: CareerLedgerEntry[]): void {
+  const ids = entries.map((e) => e.id).filter(Boolean);
+  if (ids.length === 0) {
+    db.prepare(`DELETE FROM ledger`).run();
+    return;
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`DELETE FROM ledger WHERE id NOT IN (${placeholders})`).run(...ids);
+  const upsert = db.prepare(
     `INSERT INTO ledger (
        id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao, company_id
      ) VALUES (
        @id, @at_tick, @day_index, @amount_usd, @kind, @note, @aircraft_id, @mission_id, @icao, @company_id
-     )`,
+     )
+     ON CONFLICT(id) DO UPDATE SET
+       at_tick = excluded.at_tick,
+       day_index = excluded.day_index,
+       amount_usd = excluded.amount_usd,
+       kind = excluded.kind,
+       note = excluded.note,
+       aircraft_id = excluded.aircraft_id,
+       mission_id = excluded.mission_id,
+       icao = excluded.icao,
+       company_id = excluded.company_id`,
   );
   for (const e of entries) {
-    ins.run({
+    if (!e.id) continue;
+    upsert.run({
       id: e.id,
       at_tick: e.atTick,
       day_index: e.dayIndex,
@@ -1630,6 +1647,11 @@ export function replaceLedgerV3(db: SqliteDb, entries: CareerLedgerEntry[]): voi
       company_id: LOCAL_COMPANY_ID,
     });
   }
+}
+
+/** Full wipe — used by v2→v3 migrate. Live persist uses persistLedgerIncremental. */
+export function replaceLedgerV3(db: SqliteDb, entries: CareerLedgerEntry[]): void {
+  persistLedgerIncremental(db, entries);
 }
 
 /**

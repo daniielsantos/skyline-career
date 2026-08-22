@@ -380,22 +380,25 @@ describe('career store v4', () => {
     const nAirports = countAirportsInDb(store.sqlitePath!);
     const nLots = countLotsInDb(store.sqlitePath!);
     assert.ok(nLots > 1);
-    const origin = world.airports[0]!;
-    const dest = world.airports[1]!;
     const lot = world.lots[0]!;
+    const originIcao = lot.originIcao;
+    const destIcao = lot.destIcao;
     store.close();
 
     const cold = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
     assert.equal(cold.peekEconomyWorld(), null);
     const slice = cold.loadCommandWorldSlice({
-      icaos: [origin.icao, dest.icao],
+      icaos: [originIcao, destIcao],
       lotIds: [lot.id],
       missionId: 'slice-mission',
     });
     assert.ok(slice);
-    assert.equal(slice.airports.length, 2);
+    assert.equal(
+      slice.airports.length,
+      new Set([originIcao, destIcao].map((c) => c.toUpperCase())).size,
+    );
     assert.equal(cold.peekEconomyWorld(), null);
-    const hub = slice.airports.find((ap) => ap.icao === origin.icao);
+    const hub = slice.airports.find((ap) => ap.icao === originIcao);
     assert.ok(hub);
     hub.inventory.general = {
       stockKg: 4321,
@@ -405,11 +408,11 @@ describe('career store v4', () => {
     await cold.persistCommandWorldSlice(slice, {
       missionId: 'slice-mission',
       lotIds: [lot.id],
-      icaos: [origin.icao, dest.icao],
+      icaos: [originIcao, destIcao],
     });
     assert.equal(countAirportsInDb(cold.sqlitePath!), nAirports);
     assert.equal(countLotsInDb(cold.sqlitePath!), nLots - 1);
-    assert.equal(readAirportStockKg(cold.sqlitePath!, origin.icao, 'general'), 4321);
+    assert.equal(readAirportStockKg(cold.sqlitePath!, originIcao, 'general'), 4321);
     assert.equal(cold.peekEconomyWorld(), null);
     cold.close();
   });

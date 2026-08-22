@@ -76,6 +76,16 @@ function readEconomyBlob(sqlitePath: string): Record<string, unknown> {
   }
 }
 
+function countLedgerInDb(sqlitePath: string): number {
+  const db = new DatabaseSync(sqlitePath);
+  try {
+    const row = db.prepare(`SELECT COUNT(*) AS n FROM ledger`).get() as { n: number };
+    return Number(row.n);
+  } finally {
+    db.close();
+  }
+}
+
 function companyLocalExists(sqlitePath: string): boolean {
   const db = new DatabaseSync(sqlitePath);
   try {
@@ -451,10 +461,28 @@ describe('career store', () => {
       },
     ];
     await store.saveMissions(again);
+    await store.saveMissions(again);
     const withPickups = await store.loadMissions();
     assert.equal(withPickups.portPickups?.length, 2);
     assert.equal(withPickups.portPickups?.[0]?.id, 'portpk_1');
     assert.equal(withPickups.portPickups?.[1]?.kg, 500);
+
+    const ledgerBefore = countLedgerInDb(store.sqlitePath!);
+    applyWalletDelta(withPickups, {
+      amountUsd: 50,
+      kind: 'freight_payout',
+      atTick: 48,
+      note: 'ledger-patch',
+    });
+    await store.saveMissions(withPickups);
+    assert.equal(countLedgerInDb(store.sqlitePath!), ledgerBefore + 1);
+    applyWalletDelta(withPickups, {
+      amountUsd: -10,
+      kind: 'hangar_parking',
+      atTick: 48,
+    });
+    await store.saveMissions(withPickups);
+    assert.equal(countLedgerInDb(store.sqlitePath!), ledgerBefore + 2);
 
     store.close();
   });

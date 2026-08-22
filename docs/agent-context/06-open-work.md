@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-22: persist settle = comando SQL (locks + fatia OD, patch também com RAM quente; sem job queue) — [`11-persist-commands.md`](./11-persist-commands.md). Hours/MX + Settling em `228d6c1`.
+Atualizado 2026-08-22: botões sem tick horário; Freights/Dispatch patch SQL; company-only no crédito. [`11-persist-commands.md`](./11-persist-commands.md).
 
 Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). BBJ2 parked. Airport tab / A2A / dual-client IPC inalterados.
 

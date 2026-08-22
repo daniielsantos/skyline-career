@@ -714,46 +714,55 @@ function loadEconomy(): Promise<CareerEconomyWorld> {
 }
 
 /**
- * Load world + missions under one lock (catch-up may persist). Use for reads and
- * quotes so concurrent writers cannot interleave mid-snapshot.
+ * Load world + missions under one lock. Button/GET paths skip hourly catch-up;
+ * the 60s timer and POST /api/tick advance the world.
  */
 async function withCareerRead<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
 ): Promise<T> {
   return withCareerLock(async () => {
-    const world = await loadEconomyUnlocked();
+    const world = await loadEconomyUnlocked({ skipCatchUp: true });
     const missions = await loadMissions();
     const crew = settleCrewOpsDue(missions, world, Date.now());
     if (crew.settled.length > 0) {
-      await persistEconomyUnlocked(world);
       await saveMissions(missions);
     }
     return fn(world, missions);
   });
 }
 
+type CareerWriteOpts = {
+  housekeeping?: boolean;
+  /** Default false — only the timer / POST /api/tick should pass true. */
+  catchUp?: boolean;
+  /** Skip saveEconomy when the handler only mutates company/missions. */
+  persist?: 'economy' | 'company';
+  commandSliceMissionId?: string;
+  commandSliceLotIds?: string[];
+};
+
 /**
- * Load, mutate, and persist economy + missions in one hold so accept/staging/fuel
- * cannot lose to tick NPC bids (and vice versa).
+ * Load, mutate, and persist. Default: no hourly tick, full economy save.
+ * `persist: 'company'` writes missions only. `commandSlice*` patches OD/lots.
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
-  opts?: {
-    housekeeping?: boolean;
-    catchUp?: boolean;
-    /** When set, persist origin/dest + mission lots as a SQL patch (hot or cold RAM). */
-    commandSliceMissionId?: string;
-  },
+  opts?: CareerWriteOpts,
 ): Promise<T> {
   return withCareerLock(async () => {
     const activeStore = requireStore();
     const missions = await loadMissions();
-    const skipCatchUp = opts?.catchUp === false;
+    const skipCatchUp = opts?.catchUp !== true;
+    const persistCompany = opts?.persist === 'company';
     const sliceId = opts?.commandSliceMissionId?.trim();
+    const sliceLotIdsOpt = (opts?.commandSliceLotIds ?? [])
+      .map((id) => id.trim())
+      .filter(Boolean);
     let world: CareerEconomyWorld | undefined;
     let useCommandPersist = false;
-    let sliceLotIds: string[] = [];
+    let sliceLotIds: string[] = [...sliceLotIdsOpt];
     let sliceIcaos: string[] = [];
+    let sliceMissionId = sliceId ?? '';
     if (skipCatchUp && sliceId) {
       const mission = missions.missions.find((m) => m.id === sliceId);
       if (mission) {
@@ -764,9 +773,14 @@ async function withCareerWrite<T>(
               .filter(Boolean),
           ),
         ];
-        sliceLotIds = mission.lots
-          .map((lot) => lot.shipmentLotId)
-          .filter((id): id is string => Boolean(id));
+        sliceLotIds = [
+          ...new Set([
+            ...sliceLotIds,
+            ...mission.lots
+              .map((lot) => lot.shipmentLotId)
+              .filter((id): id is string => Boolean(id)),
+          ]),
+        ];
         useCommandPersist = sliceIcaos.length > 0;
         if (!activeStore.peekEconomyWorld()) {
           const slice = activeStore.loadCommandWorldSlice({
@@ -782,18 +796,51 @@ async function withCareerWrite<T>(
           if (slice && hasAllHubs) world = slice;
         }
       }
+    } else if (skipCatchUp && sliceLotIdsOpt.length > 0 && !activeStore.peekEconomyWorld()) {
+      const slice = activeStore.loadCommandWorldSlice({
+        icaos: [],
+        lotIds: sliceLotIdsOpt,
+        missionId: sliceMissionId,
+      });
+      if (slice && slice.airports.length > 0) {
+        world = slice;
+        sliceIcaos = slice.airports.map((ap) => ap.icao);
+        useCommandPersist = true;
+      }
     }
     if (!world) {
       world = await loadEconomyUnlocked({ skipCatchUp });
     }
-    if (opts?.housekeeping !== false) {
+    if (sliceLotIdsOpt.length > 0 && !useCommandPersist) {
+      for (const id of sliceLotIdsOpt) {
+        const lot = world.lots.find((row) => row.id === id);
+        if (!lot) continue;
+        sliceIcaos.push(lot.originIcao, lot.destIcao);
+        sliceLotIds.push(lot.id);
+      }
+      sliceIcaos = [...new Set(sliceIcaos.map((c) => c.trim().toUpperCase()).filter(Boolean))];
+      sliceLotIds = [...new Set(sliceLotIds)];
+      useCommandPersist = sliceIcaos.length > 0;
+    }
+    const housekeeping = persistCompany ? false : opts?.housekeeping !== false;
+    if (housekeeping) {
       settleCrewOpsDue(missions, world, Date.now());
       cancelOrphanPlayerMissions(world, missions);
     }
     const result = await fn(world, missions);
-    if (useCommandPersist && sliceId) {
+    if (!sliceMissionId && sliceLotIds.length > 0) {
+      const found = missions.missions.find((m) =>
+        m.lots.some((line) => sliceLotIds.includes(line.shipmentLotId)),
+      );
+      if (found) sliceMissionId = found.id;
+    }
+    if (persistCompany) {
+      await saveMissions(missions);
+      return result;
+    }
+    if (useCommandPersist) {
       await activeStore.persistCommandWorldSlice(world, {
-        missionId: sliceId,
+        missionId: sliceMissionId,
         lotIds: sliceLotIds,
         icaos: sliceIcaos,
       });
@@ -1760,7 +1807,7 @@ export function createCareerApiServer(port = 8787) {
               companyCredit: drawn.snapshot,
               ...fleetPayload(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -1785,7 +1832,7 @@ export function createCareerApiServer(port = 8787) {
               companyCredit: repaid.snapshot,
               ...fleetPayload(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4126,7 +4173,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               companyCrew: companyCrewSnapshot(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4302,7 +4349,7 @@ export function createCareerApiServer(port = 8787) {
             companyCrew: companyCrewSnapshot(missions, world),
             walletUsd: missions.walletUsd,
           };
-        });
+        }, { catchUp: true });
         send(res, 200, payload);
         return;
       }
@@ -4423,7 +4470,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               appended,
             };
-          });
+          }, { commandSliceLotIds: [body.lotId] });
           if (result.kind === 'missing_lot') {
             send(res, 404, { error: `Unknown lot ${body.lotId}` });
             return;
@@ -5049,7 +5096,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               fleet: withParkingRates(missions.fleet),
             };
-          });
+          }, { commandSliceLotIds: lines.map((line) => line.lotId) });
 
           let mission = committed.mission;
           // Same rule as accept: a different mission must not inherit prior
@@ -5420,7 +5467,7 @@ export function createCareerApiServer(port = 8787) {
               returnedToMarket,
               foundBefore,
             };
-          });
+          }, { commandSliceMissionId: body.missionId });
           if (result.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;
@@ -5523,7 +5570,7 @@ export function createCareerApiServer(port = 8787) {
             };
             missions.missions[idx] = dispatched;
             return dispatched;
-          });
+          }, { commandSliceMissionId: body.missionId });
 
           send(res, 200, {
             mission,
@@ -5743,7 +5790,7 @@ export function createCareerApiServer(port = 8787) {
               payBeforeUsd: trimmed.payBeforeUsd,
               payAfterUsd: trimmed.payAfterUsd,
             };
-          });
+          }, { commandSliceMissionId: body.missionId });
 
           const after = await confirmMissionOfp(trimmedWrite.mission, {
             username: body.simbriefUser,
@@ -6105,7 +6152,7 @@ export function createCareerApiServer(port = 8787) {
               fuelDebitUsd: departedResult.fuelDebitUsd,
               fleet: withParkingRates(missions.fleet),
             };
-          });
+          }, { commandSliceMissionId: body.missionId });
           if (result.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;
@@ -6755,7 +6802,7 @@ export function createCareerApiServer(port = 8787) {
             void (async () => {
               if (!store) return;
               try {
-                await withCareerWrite(() => undefined);
+                await withCareerWrite(() => undefined, { catchUp: true });
               } catch {
                 /* ignore background catch-up errors */
               }

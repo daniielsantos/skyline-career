@@ -623,9 +623,15 @@ class SqliteCareerStore implements CareerStore {
   loadCommandWorldSlice(opts: CommandWorldSliceOpts): CareerEconomyWorld | null {
     const meta = readEconomyMeta(this.db);
     if (!meta) return null;
-    const airports = readAirportsByIcaos(this.db, opts.icaos);
-    if (airports.length === 0) return null;
     const lots = readLotsByIds(this.db, opts.lotIds);
+    const icaos = [
+      ...new Set([
+        ...opts.icaos.map((c) => c.trim().toUpperCase()).filter(Boolean),
+        ...lots.flatMap((lot) => [lot.originIcao, lot.destIcao]),
+      ]),
+    ];
+    const airports = readAirportsByIcaos(this.db, icaos);
+    if (airports.length === 0) return null;
     const inboundPending = readInboundPendingForMission(this.db, opts.missionId);
     return {
       version: 3,

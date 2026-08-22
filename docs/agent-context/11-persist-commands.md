@@ -1,6 +1,6 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-08-22. **Fatia 1–4 no código:** patch de hubs; `SettleFlight` idempotente; settle sem catch-up horário; dois locks; fatia SQL origin/dest. **Sem job queue:** side-effects baratos (cruise EMA) vão no mesmo `saveMissions`. Settle **sempre** persiste patch SQL (RAM quente ou fria), não `saveEconomy` do planeta.
+Atualizado 2026-08-22. Botões não rodam tick horário. GET também não. Timer 60s + `POST /api/tick` passam `catchUp: true`. Freights/Dispatch: patch SQL. Credit/crew fire: só company. Airframe buy ainda grava o mundo, mas sem catch-up.
 
 ## Objetivo
 
@@ -17,7 +17,9 @@ MP **não** começa neste doc. Sem writes incrementais + lock fino, MP só seria
 
 Hoje os dois estão em `worldLock` + `companyLock`. Acquire **world then company**. `updateOpenMission` só pega `company`. Settle precisa dos dois **só nas linhas que mudam**, não do planeta. RAM quente: usa o mundo em memória. RAM fria: `loadCommandWorldSlice` (SQL origin/dest + lots da missão) e `persistCommandWorldSlice` (patch, sem prune).
 
-Não esperar o tick horário (lots/NPC/Europa) no freio.
+Não esperar o tick horário no clique. O mundo anda no timer (~60s).
+
+`withCareerWrite` default: `catchUp !== true`. `persist: 'company'` = só `saveMissions`. `commandSlice*` = patch origin/dest + lots.
 
 ## Comando `SettleFlight`
 
@@ -67,6 +69,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 3. ~~**Hot path persist:**~~ settle `catchUp: false`; RAM fria hidrata OD; **RAM quente também** `persistCommandWorldSlice` (só `icaos`/`lotIds`, nunca o array inteiro).
 4. ~~**Fila de jobs:**~~ **não faremos** até um side-effect ser pesado o bastante. Cruise EMA fica no settle.
 5. **MP:** N `company_id` no mesmo `world_id`. Fora de escopo.
+6. **Em curso:** cada rota de botão — company vs patch vs economy. Falta Airframes buy/lease/MX (MX toca stock do hub), FBO/ports, demand accept.
 
 ## Outros comandos (mesmo molde, depois)
 

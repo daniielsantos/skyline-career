@@ -242,7 +242,9 @@ type WatchCallbacks = {
     opts?: {
       housekeeping?: boolean;
       catchUp?: boolean;
+      persist?: 'economy' | 'company';
       commandSliceMissionId?: string;
+      commandSliceLotIds?: string[];
     },
   ) => Promise<T>;
   /**

@@ -56,6 +56,7 @@ import {
   pruneDeadLots,
   routeDistanceNm,
   tickEconomyN,
+  tickEconomyNCooperative,
   createEmptyTickPhaseProfile,
   LARGE_LOT_MAX_KG,
   LANE_SATURATION_KG,
@@ -2756,6 +2757,19 @@ describe('tickEconomyN market formation', () => {
     assert.deepEqual(
       (a.npcFlights ?? []).map((f) => [f.npcId, f.lotId, f.status, f.cargoKg]),
       (b.npcFlights ?? []).map((f) => [f.npcId, f.lotId, f.status, f.cargoKg]),
+    );
+  });
+
+  it('cooperative formLots matches a sync tick', async () => {
+    const a = createSeedEconomyWorld({ seed: 'coop-form' });
+    const b = createSeedEconomyWorld({ seed: 'coop-form' });
+    a.lastBatchAtMs = 1;
+    b.lastBatchAtMs = 1;
+    tickEconomyN(a, 1, { fromBatchAtMs: 1 });
+    await tickEconomyNCooperative(b, 1, { fromBatchAtMs: 1 });
+    assert.deepEqual(
+      a.lots.map((l) => [l.commodityId, l.originIcao, l.destIcao, l.quantityKg]),
+      b.lots.map((l) => [l.commodityId, l.originIcao, l.destIcao, l.quantityKg]),
     );
   });
 

@@ -1953,6 +1953,9 @@ async function main(): Promise<void> {
           for (const phase of [
             'npc',
             'formLots',
+            'formLotsBulk',
+            'formLotsLastMile',
+            'formLotsIntl',
             'production',
             'fuel',
             'settle',

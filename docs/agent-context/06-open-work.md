@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-22: `formLots` extraído por país (bulk → last-mile → intl). Replay intacto; sem workers ainda. [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-08-22: botões sem tick horário; Freights/Dispatch patch SQL; company-only no crédito. [`11-persist-commands.md`](./11-persist-commands.md).
 
 Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). BBJ2 parked. Airport tab / A2A / dual-client IPC inalterados.
@@ -56,7 +58,7 @@ Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). 
 7. ~~**América Central completa (seed)**~~ — PA/CR/NI/HN/GT/SV/BZ; ports costeiros; lanes MX/US/CO.
 8. ~~**Caribe (seed, intl-first)**~~ — CU/DO/HT/JM/BS/TT/BB/LC/GD/AG; ring + KMIA/MMUN/CO/VE.
 9. ~~**Dependências caribenhas**~~ — GP/MQ/CW + US-PR (região US); ports + lanes.
-10. **Tick perf (Fase 2c)** — NPC bid: region index + hash noise + prune lots that cannot beat the current best. Claim rng is a per-NPC stream (board size no longer shifts who bids). Last-mile dests cached on airport lookup. Bench (seed `board-cap`, regime): **~2.1s**/tick (was ~2.9s); **npc ~110ms** (was ~870ms); formLots still ~2.0s when countries are below quota. Same seed still replays lots/NPC. No Dry retune.
+10. **Tick perf (formLots jobs + cooperative)** — Bulk buffer + merge por país. `tickEconomyCooperative` / `POST /api/tick` cedem o event loop entre países (`setImmediate`); cadeado de write continua. Testes e `tickEconomyN` (catch-up load) seguem síncronos. Gate: coop 1 tick = sync. Sem Dry.
 11. ~~**Leftovers SX/AW/VI**~~ — SX/AW light countries + US-VI region; ports Philipsburg / Oranjestad / Charlotte Amalie; seed **551**.
 12. ~~**EU-1 Western core**~~ — PT/ES/FR/GB/DE/NL/BE/IT; seed **629**; ports EU; fuel trucks 85; Americas bridge lanes.
 13. ~~**EU-2 Nordics + Alps + IE**~~ — IE/DK/NO/SE/FI/CH/AT; seed **672**; ports **66**; fuel trucks **100**.

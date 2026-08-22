@@ -962,6 +962,7 @@ import {
   recordLotFormationActivity,
   tickHubLevels,
 } from './career-hub-level.js';
+import { mergeLotsByCountryOrder } from './career-form-lots-jobs.js';
 import {
   ensureFuelTruckFleet,
   seedFuelTruckFleet,
@@ -13423,11 +13424,14 @@ type RankedAirport = {
 /**
  * Form shipment lots from surplus→shortage pairs.
  * Domestic passes are per country; cross-country only via internationalLanes.
+ * Yields once per country so the API can drain cooperatively (setImmediate)
+ * without changing formation order.
  */
-function formLotsFromImbalances(
+function* formLotsFromImbalances(
   world: CareerEconomyWorld,
   tickKey: string,
-): PartitionTickResult[] {
+  profile?: TickPhaseProfile,
+): Generator<void, PartitionTickResult[], void> {
   ensureInternationalLanes(world);
   // Warm lane inbound index once for this tick's saturation / soft-fill reads.
   ensureLaneInboundIndex(world);
@@ -13491,6 +13495,19 @@ function formLotsFromImbalances(
   const bumpFormed = (partitionId: string, n = 1) => {
     formedByPartition.set(partitionId, (formedByPartition.get(partitionId) ?? 0) + n);
   };
+
+  const openGaDryByOrigin = new Map<string, number>();
+  const noteOpenGaDryLot = (lot: ShipmentLot): void => {
+    if (lot.status !== 'available' && lot.status !== 'reserved') return;
+    if (lot.quantityKg > GA_LTL_MAX_KG) return;
+    if (!LAST_MILE_DRY_IDS.has(lot.commodityId)) return;
+    const gaKey = `${lot.originIcao.toUpperCase()}|${lot.commodityId}`;
+    openGaDryByOrigin.set(gaKey, (openGaDryByOrigin.get(gaKey) ?? 0) + 1);
+  };
+  for (const existing of world.lots) noteOpenGaDryLot(existing);
+
+  const bulkLotsByCountry = new Map<string, ShipmentLot[]>();
+  let bufferDomesticLots = true;
 
   const batchNowMs = world.lastBatchAtMs ?? Date.now();
   const regionCapacityCache = new Map<string, number>();
@@ -13702,7 +13719,14 @@ function formLotsFromImbalances(
       0,
       origin.stock.capacityKg,
     );
-    world.lots.push(lot);
+    noteOpenGaDryLot(lot);
+    if (bufferDomesticLots && !opts.international) {
+      const buf = bulkLotsByCountry.get(opts.partitionId);
+      if (buf) buf.push(lot);
+      else bulkLotsByCountry.set(opts.partitionId, [lot]);
+    } else {
+      world.lots.push(lot);
+    }
     const odKey = undirectedOdKey(origin.ap.icao, dest.ap.icao);
     activeLaneKgByOd.set(odKey, (activeLaneKgByOd.get(odKey) ?? 0) + qty);
     recordLotFormationActivity(world, origin.ap.icao, dest.ap.icao);
@@ -13897,8 +13921,12 @@ function formLotsFromImbalances(
       };
     });
 
-  // --- Domestic: one pass per country present in the world ---
-  for (const countryId of listWorldCountryIds(world)) {
+  // Domestic bulk is one country at a time (sorted ids). Countries do not share
+  // ODs or board quotas; do not Promise.all this in-process (shared world.lots /
+  // stock). Worker-parallel comes after replay stays identical.
+  const countryIds = listWorldCountryIds(world);
+
+  const runDomesticBulkForCountry = (countryId: string): void => {
     const countryAirports = airportsByCountry.get(countryId) ?? [];
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       if (boardPressureOf(commodity.id, countryId).skipAll) continue;
@@ -14043,16 +14071,20 @@ function formLotsFromImbalances(
         }
       }
     }
-  }
+  };
 
-  const openGaDryByOrigin = new Map<string, number>();
-  for (const lot of world.lots) {
-    if (lot.status !== 'available' && lot.status !== 'reserved') continue;
-    if (lot.quantityKg > GA_LTL_MAX_KG) continue;
-    if (!LAST_MILE_DRY_IDS.has(lot.commodityId)) continue;
-    const key = `${lot.originIcao.toUpperCase()}|${lot.commodityId}`;
-    openGaDryByOrigin.set(key, (openGaDryByOrigin.get(key) ?? 0) + 1);
+  let lotsPhaseAt = performance.now();
+  for (const countryId of countryIds) {
+    runDomesticBulkForCountry(countryId);
+    yield;
   }
+  for (const lot of mergeLotsByCountryOrder(countryIds, bulkLotsByCountry)) {
+    world.lots.push(lot);
+  }
+  bufferDomesticLots = false;
+  addTickPhaseMs(profile, 'formLotsBulk', lotsPhaseAt);
+  lotsPhaseAt = performance.now();
+
   const countOpenGaDryFrom = (
     originIcao: string,
     commodityId: CommodityId,
@@ -14062,7 +14094,9 @@ function formLotsFromImbalances(
 
   // Last-mile Dry: metros stay net sinks in the bulk pass, but still break
   // bulk to nearby spokes so a starter at GRU/JFK has a GA Dry contract.
-  for (const countryId of listWorldCountryIds(world)) {
+  // After every country's bulk (openGaDry sees the full board). Not parallel
+  // with bulk: last-mile reads stock drained in that country's bulk pass.
+  const runLastMileForCountry = (countryId: string): void => {
     const countryAirports = airportsByCountry.get(countryId) ?? [];
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       if (!LAST_MILE_DRY_IDS.has(commodity.id)) continue;
@@ -14171,7 +14205,14 @@ function formLotsFromImbalances(
         }
       }
     }
+  };
+
+  for (const countryId of countryIds) {
+    runLastMileForCountry(countryId);
+    yield;
   }
+  addTickPhaseMs(profile, 'formLotsLastMile', lotsPhaseAt);
+  lotsPhaseAt = performance.now();
 
   // --- International: only curated sparse lanes (both directions) ---
   const byIcaoAll = new Map(world.airports.map((ap) => [ap.icao.toUpperCase(), ap]));
@@ -14218,9 +14259,10 @@ function formLotsFromImbalances(
       }
     }
   }
+  addTickPhaseMs(profile, 'formLotsIntl', lotsPhaseAt);
 
   const results: PartitionTickResult[] = [];
-  for (const countryId of listWorldCountryIds(world)) {
+  for (const countryId of countryIds) {
     results.push({
       countryId,
       ticksAdvanced: 1,
@@ -14237,6 +14279,33 @@ function formLotsFromImbalances(
   return results;
 }
 
+function drainFormLotsSync(
+  world: CareerEconomyWorld,
+  tickKey: string,
+  profile?: TickPhaseProfile,
+): void {
+  const gen = formLotsFromImbalances(world, tickKey, profile);
+  let step = gen.next();
+  while (!step.done) step = gen.next();
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+async function drainFormLotsCooperative(
+  world: CareerEconomyWorld,
+  tickKey: string,
+  profile?: TickPhaseProfile,
+): Promise<void> {
+  const gen = formLotsFromImbalances(world, tickKey, profile);
+  let step = gen.next();
+  while (!step.done) {
+    await yieldToEventLoop();
+    step = gen.next();
+  }
+}
+
 /** Optional per-phase ms accumulator for tick profiling (bench / CLI). */
 export type TickPhaseId =
   | 'ensure'
@@ -14247,6 +14316,9 @@ export type TickPhaseId =
   | 'escalate'
   | 'events'
   | 'formLots'
+  | 'formLotsBulk'
+  | 'formLotsLastMile'
+  | 'formLotsIntl'
   | 'npc'
   | 'hubLevels'
   | 'portRestock'
@@ -14269,6 +14341,9 @@ export function createEmptyTickPhaseProfile(): TickPhaseProfile {
       escalate: 0,
       events: 0,
       formLots: 0,
+      formLotsBulk: 0,
+      formLotsLastMile: 0,
+      formLotsIntl: 0,
       npc: 0,
       hubLevels: 0,
       portRestock: 0,
@@ -14286,16 +14361,24 @@ function addTickPhaseMs(
   profile.ms[phase] += performance.now() - startedAt;
 }
 
-/** Advance the local economy by one hourly batch. Mutates and returns the world. */
-export function tickEconomy(
+export type TickEconomyOpts = {
+  rngSeed?: string;
+  batchNowMs?: number;
+  profile?: TickPhaseProfile;
+};
+
+type TickEconomyRun = {
+  profile: TickPhaseProfile | undefined;
+  tickStartedAt: number;
+  phaseAt: number;
+  batchNowMs: number;
+  tickKey: string;
+};
+
+function tickEconomyPrepare(
   world: CareerEconomyWorld,
-  opts: {
-    rngSeed?: string;
-    batchNowMs?: number;
-    /** When set, accumulates wall ms per phase (does not change sim behavior). */
-    profile?: TickPhaseProfile;
-  } = {},
-): CareerEconomyWorld {
+  opts: TickEconomyOpts,
+): TickEconomyRun {
   const profile = opts.profile;
   const tickStartedAt = performance.now();
   let phaseAt = tickStartedAt;
@@ -14347,8 +14430,6 @@ export function tickEconomy(
   const batchNowMs =
     opts.batchNowMs ??
     (world.lastBatchAtMs ?? Date.now()) + MS_PER_TICK;
-  // Land due flights/hauls before production + lot formation so capacity and
-  // bid pressure see the post-arrival board (also avoids a second settle in NPC tick).
   settleNpcOpsDue(world, batchNowMs);
   settleFuelHaulsDue(world, batchNowMs);
   addTickPhaseMs(profile, 'settle', phaseAt);
@@ -14378,9 +14459,15 @@ export function tickEconomy(
   addTickPhaseMs(profile, 'events', phaseAt);
   phaseAt = performance.now();
 
-  formLotsFromImbalances(world, tickKey);
-  addTickPhaseMs(profile, 'formLots', phaseAt);
-  phaseAt = performance.now();
+  return { profile, tickStartedAt, phaseAt, batchNowMs, tickKey };
+}
+
+function tickEconomyFinish(
+  world: CareerEconomyWorld,
+  ctx: TickEconomyRun,
+): CareerEconomyWorld {
+  const { profile, tickStartedAt, batchNowMs, tickKey } = ctx;
+  let phaseAt = ctx.phaseAt;
 
   tickNpcFreighters(world, mulberry32(hashSeed(`${tickKey}:npc`)), {
     batchNowMs,
@@ -14402,6 +14489,34 @@ export function tickEconomy(
   }
 
   return world;
+}
+
+/** Advance the local economy by one hourly batch. Mutates and returns the world. */
+export function tickEconomy(
+  world: CareerEconomyWorld,
+  opts: TickEconomyOpts = {},
+): CareerEconomyWorld {
+  const ctx = tickEconomyPrepare(world, opts);
+  drainFormLotsSync(world, ctx.tickKey, ctx.profile);
+  addTickPhaseMs(ctx.profile, 'formLots', ctx.phaseAt);
+  ctx.phaseAt = performance.now();
+  return tickEconomyFinish(world, ctx);
+}
+
+/**
+ * Same sim as tickEconomy, but yields to the event loop after each formLots
+ * country. Hold the career write lock for the whole call — do not let another
+ * writer in between yields.
+ */
+export async function tickEconomyCooperative(
+  world: CareerEconomyWorld,
+  opts: TickEconomyOpts = {},
+): Promise<CareerEconomyWorld> {
+  const ctx = tickEconomyPrepare(world, opts);
+  await drainFormLotsCooperative(world, ctx.tickKey, ctx.profile);
+  addTickPhaseMs(ctx.profile, 'formLots', ctx.phaseAt);
+  ctx.phaseAt = performance.now();
+  return tickEconomyFinish(world, ctx);
 }
 
 /**
@@ -14490,7 +14605,49 @@ export function tickEconomyN(
     world.lastBatchAtMs = startBatch + steps * MS_PER_TICK;
     world.lastSyncedAtMs = world.lastBatchAtMs;
   }
-  // Catch-up often lands many turnarounds on the same hour — spread them for the board.
+  ensureNpcFleet(world);
+  ensureFuelTruckFleet(world);
+  return world;
+}
+
+/** Same as tickEconomyN; formLots yields to the event loop between countries. */
+export async function tickEconomyNCooperative(
+  world: CareerEconomyWorld,
+  n: number,
+  opts: {
+    advanceWallClock?: boolean;
+    fromBatchAtMs?: number;
+    profile?: TickPhaseProfile;
+  } = {},
+): Promise<CareerEconomyWorld> {
+  const steps = Math.max(0, Math.floor(n));
+  const advanceWall = opts.advanceWallClock !== false;
+  const explicitStart =
+    typeof opts.fromBatchAtMs === 'number' && Number.isFinite(opts.fromBatchAtMs)
+      ? opts.fromBatchAtMs
+      : undefined;
+
+  let startBatch: number;
+  if (explicitStart !== undefined) {
+    startBatch = explicitStart;
+  } else if (advanceWall && steps > 0) {
+    const endBatch = Date.now();
+    startBatch = endBatch - steps * MS_PER_TICK;
+    const prev = world.lastBatchAtMs ?? endBatch;
+    shiftEconomyWallClock(world, startBatch - prev);
+  } else {
+    startBatch = Date.now() - steps * MS_PER_TICK;
+  }
+
+  for (let i = 0; i < steps; i++) {
+    const batchNowMs = startBatch + (i + 1) * MS_PER_TICK;
+    await tickEconomyCooperative(world, { batchNowMs, profile: opts.profile });
+  }
+
+  if (advanceWall && steps > 0) {
+    world.lastBatchAtMs = startBatch + steps * MS_PER_TICK;
+    world.lastSyncedAtMs = world.lastBatchAtMs;
+  }
   ensureNpcFleet(world);
   ensureFuelTruckFleet(world);
   return world;

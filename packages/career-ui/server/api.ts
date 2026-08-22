@@ -193,7 +193,7 @@ import {
   computeEconomyPulse,
   syncHomeCountryFromHub,
   stockTrend,
-  tickEconomyN,
+  tickEconomyNCooperative,
   withMissionLoadPolicy,
   normalizeMissionIntent,
   missionLoadPolicy,
@@ -4395,8 +4395,8 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'POST' && path === '/api/tick') {
         const body = (await readBody(req)) as { n?: number };
         const n = Math.max(1, Math.min(TICKS_PER_DAY * 7, Math.floor(body.n ?? TICKS_PER_DAY)));
-        const payload = await withCareerWrite((world, missions) => {
-          tickEconomyN(world, n);
+        const payload = await withCareerWrite(async (world, missions) => {
+          await tickEconomyNCooperative(world, n);
           const leaseOps = settleAircraftMarketOps(missions, world.tick, world);
           const hangarOps = settleHangarParkingFees(missions, world, {
             fromTick: world.tick - n,

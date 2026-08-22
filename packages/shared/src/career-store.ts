@@ -40,6 +40,10 @@ import {
   persistInboundIncremental,
   lotPersistSignature,
   inboundPersistSignature,
+  readLotsByIds,
+  readInboundPendingForMission,
+  replaceInboundPendingForMission,
+  upsertLotRows,
   readLedgerRowsV3,
   replaceLedgerV3,
   replaceNpcFlights,
@@ -55,9 +59,13 @@ import {
   migrateV3toV4IfNeeded,
   overlayEconomyMeta,
   persistWorldAirports,
+  persistAirportsPatch,
+  persistEconomyMeta,
+  readEconomyMeta,
   airportSignaturesFromList,
   readAirportBoard,
   readAirportInventory,
+  readAirportsByIcaos,
   stampCompanyWorldId,
   stripEconomyAirports,
   LOCAL_WORLD_ID,
@@ -94,11 +102,32 @@ export type EconomyLoadResult = {
   dirty: boolean;
 };
 
+export type CommandWorldSliceOpts = {
+  icaos: string[];
+  lotIds: string[];
+  missionId: string;
+};
+
+export type PersistCommandWorldSliceOpts = {
+  missionId: string;
+  lotIds: string[];
+};
+
 export interface CareerStore {
   readonly kind: CareerStoreKind;
   readonly sqlitePath?: string;
   loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult>;
   saveEconomy(world: CareerEconomyWorld): Promise<void>;
+  /**
+   * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
+   * JSON store returns null (caller loads the full world).
+   */
+  loadCommandWorldSlice(opts: CommandWorldSliceOpts): CareerEconomyWorld | null;
+  /** Patch those hubs/lots/inbound only — never prune the planet. */
+  persistCommandWorldSlice(
+    world: CareerEconomyWorld,
+    opts: PersistCommandWorldSliceOpts,
+  ): Promise<void>;
   loadMissions(): Promise<CareerMissionsState>;
   saveMissions(state: CareerMissionsState): Promise<void>;
   /** In-process world after last load/save — skip blob parse on hot reads. */
@@ -235,6 +264,17 @@ class JsonCareerStore implements CareerStore {
 
   peekEconomyWorld(): CareerEconomyWorld | null {
     return this.ram;
+  }
+
+  loadCommandWorldSlice(_opts: CommandWorldSliceOpts): CareerEconomyWorld | null {
+    return null;
+  }
+
+  async persistCommandWorldSlice(
+    world: CareerEconomyWorld,
+    _opts: PersistCommandWorldSliceOpts,
+  ): Promise<void> {
+    await this.saveEconomy(world);
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {
@@ -577,6 +617,51 @@ class SqliteCareerStore implements CareerStore {
 
   peekEconomyWorld(): CareerEconomyWorld | null {
     return this.ram;
+  }
+
+  loadCommandWorldSlice(opts: CommandWorldSliceOpts): CareerEconomyWorld | null {
+    const meta = readEconomyMeta(this.db);
+    if (!meta) return null;
+    const airports = readAirportsByIcaos(this.db, opts.icaos);
+    if (airports.length === 0) return null;
+    const lots = readLotsByIds(this.db, opts.lotIds);
+    const inboundPending = readInboundPendingForMission(this.db, opts.missionId);
+    return {
+      version: 3,
+      seed: meta.seed,
+      tick: meta.tick,
+      lastBatchAtMs: meta.lastBatchAtMs,
+      lastSyncedAtMs: meta.lastBatchAtMs,
+      homeCountryId: meta.homeCountryId || undefined,
+      airports,
+      lots,
+      inboundPending,
+      events: [],
+      npcs: [],
+      npcFlights: [],
+    };
+  }
+
+  async persistCommandWorldSlice(
+    world: CareerEconomyWorld,
+    opts: PersistCommandWorldSliceOpts,
+  ): Promise<void> {
+    const nextIds = new Set((world.lots ?? []).map((lot) => lot.id));
+    runInTransaction(this.db, () => {
+      persistEconomyMeta(this.db, world);
+      persistAirportsPatch(this.db, world.airports ?? [], []);
+      upsertLotRows(this.db, world.lots ?? [], world.airports);
+      const del = this.db.prepare(`DELETE FROM lots WHERE id = ?`);
+      for (const id of opts.lotIds) {
+        if (id && !nextIds.has(id)) del.run(id);
+      }
+      replaceInboundPendingForMission(
+        this.db,
+        opts.missionId,
+        (world.inboundPending ?? []).filter((row) => row.missionId === opts.missionId),
+        world.airports,
+      );
+    });
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {

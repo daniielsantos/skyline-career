@@ -369,4 +369,47 @@ describe('career store v4', () => {
     assert.equal(kept?.quantityKg, keepQty);
     store.close();
   });
+
+  it('loads a command slice without filling RAM or pruning the planet', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-v4-slice-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const world = createSeedEconomyWorld({ seed: 'v4-slice' });
+    world.lastBatchAtMs = Date.now();
+    ensureSeedMarketFormed(world);
+    await store.saveEconomy(world);
+    const nAirports = countAirportsInDb(store.sqlitePath!);
+    const nLots = countLotsInDb(store.sqlitePath!);
+    assert.ok(nLots > 1);
+    const origin = world.airports[0]!;
+    const dest = world.airports[1]!;
+    const lot = world.lots[0]!;
+    store.close();
+
+    const cold = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    assert.equal(cold.peekEconomyWorld(), null);
+    const slice = cold.loadCommandWorldSlice({
+      icaos: [origin.icao, dest.icao],
+      lotIds: [lot.id],
+      missionId: 'slice-mission',
+    });
+    assert.ok(slice);
+    assert.equal(slice.airports.length, 2);
+    assert.equal(cold.peekEconomyWorld(), null);
+    const hub = slice.airports.find((ap) => ap.icao === origin.icao);
+    assert.ok(hub);
+    hub.inventory.general = {
+      stockKg: 4321,
+      capacityKg: hub.inventory.general?.capacityKg ?? 50_000,
+    };
+    slice.lots = [];
+    await cold.persistCommandWorldSlice(slice, {
+      missionId: 'slice-mission',
+      lotIds: [lot.id],
+    });
+    assert.equal(countAirportsInDb(cold.sqlitePath!), nAirports);
+    assert.equal(countLotsInDb(cold.sqlitePath!), nLots - 1);
+    assert.equal(readAirportStockKg(cold.sqlitePath!, origin.icao, 'general'), 4321);
+    assert.equal(cold.peekEconomyWorld(), null);
+    cold.close();
+  });
 });

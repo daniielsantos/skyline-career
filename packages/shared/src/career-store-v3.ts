@@ -240,6 +240,43 @@ export function countLotsRows(db: SqliteDb): number {
   return tableCount(db, 'lots');
 }
 
+type LotSqlRow = {
+  id: string;
+  commodity_id: string;
+  origin_icao: string;
+  dest_icao: string;
+  quantity_kg: number;
+  reserved_kg: number;
+  created_at_tick: number;
+  expires_at_tick: number;
+  pay_usd: number;
+  base_pay_usd: number | null;
+  urgency: string;
+  reason: string;
+  status: string;
+};
+
+function lotFromRow(r: LotSqlRow): ShipmentLot {
+  const lot: ShipmentLot = {
+    id: r.id,
+    commodityId: r.commodity_id as CommodityId,
+    originIcao: r.origin_icao,
+    destIcao: r.dest_icao,
+    quantityKg: r.quantity_kg,
+    reservedKg: r.reserved_kg,
+    createdAtTick: r.created_at_tick,
+    expiresAtTick: r.expires_at_tick,
+    payUsd: r.pay_usd,
+    urgency: r.urgency === 'urgent' ? 'urgent' : 'normal',
+    reason: r.reason,
+    status: r.status as ShipmentLotStatus,
+  };
+  if (typeof r.base_pay_usd === 'number' && Number.isFinite(r.base_pay_usd)) {
+    lot.basePayUsd = r.base_pay_usd;
+  }
+  return lot;
+}
+
 export function readLotsRows(db: SqliteDb): ShipmentLot[] {
   const rows = db
     .prepare(
@@ -247,41 +284,22 @@ export function readLotsRows(db: SqliteDb): ShipmentLot[] {
               created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
        FROM lots ORDER BY created_at_tick ASC, id ASC`,
     )
-    .all() as Array<{
-    id: string;
-    commodity_id: string;
-    origin_icao: string;
-    dest_icao: string;
-    quantity_kg: number;
-    reserved_kg: number;
-    created_at_tick: number;
-    expires_at_tick: number;
-    pay_usd: number;
-    base_pay_usd: number | null;
-    urgency: string;
-    reason: string;
-    status: string;
-  }>;
-  return rows.map((r) => {
-    const lot: ShipmentLot = {
-      id: r.id,
-      commodityId: r.commodity_id as CommodityId,
-      originIcao: r.origin_icao,
-      destIcao: r.dest_icao,
-      quantityKg: r.quantity_kg,
-      reservedKg: r.reserved_kg,
-      createdAtTick: r.created_at_tick,
-      expiresAtTick: r.expires_at_tick,
-      payUsd: r.pay_usd,
-      urgency: r.urgency === 'urgent' ? 'urgent' : 'normal',
-      reason: r.reason,
-      status: r.status as ShipmentLotStatus,
-    };
-    if (typeof r.base_pay_usd === 'number' && Number.isFinite(r.base_pay_usd)) {
-      lot.basePayUsd = r.base_pay_usd;
-    }
-    return lot;
-  });
+    .all() as LotSqlRow[];
+  return rows.map(lotFromRow);
+}
+
+export function readLotsByIds(db: SqliteDb, ids: string[]): ShipmentLot[] {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const placeholders = unique.map(() => '?').join(',');
+  const rows = db
+    .prepare(
+      `SELECT id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
+              created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
+       FROM lots WHERE id IN (${placeholders}) ORDER BY created_at_tick ASC, id ASC`,
+    )
+    .all(...unique) as LotSqlRow[];
+  return rows.map(lotFromRow);
 }
 
 /** Upsert by id; delete rows not present in `lots`. Caller wraps in a transaction. */
@@ -346,7 +364,7 @@ export function persistLotsIncremental(
   if (upsert.length > 0) upsertLotRows(db, upsert, airports);
 }
 
-function upsertLotRows(
+export function upsertLotRows(
   db: SqliteDb,
   lots: ShipmentLot[],
   airports?: CareerEconomyWorld['airports'],
@@ -465,6 +483,39 @@ export function economyBlobHasHotArrays(raw: Record<string, unknown>): boolean {
 
 // ─── World live overlays ─────────────────────────────────────────────────────
 
+type InboundSqlRow = {
+  id: string;
+  mission_id: string;
+  origin_icao: string;
+  dest_icao: string;
+  commodity_id: string;
+  cargo_kg: number;
+  expires_at_tick: number;
+  source: string;
+  payload_json: string | null;
+};
+
+function inboundFromRow(r: InboundSqlRow): InboundPending {
+  const base: InboundPending = {
+    id: r.id,
+    missionId: r.mission_id,
+    originIcao: r.origin_icao,
+    destIcao: r.dest_icao,
+    commodityId: r.commodity_id as CommodityId,
+    cargoKg: r.cargo_kg,
+    expiresAtTick: r.expires_at_tick,
+    source: r.source === 'player' ? 'player' : 'player',
+  };
+  if (r.payload_json) {
+    try {
+      return { ...JSON.parse(r.payload_json), ...base } as InboundPending;
+    } catch {
+      /* ignore */
+    }
+  }
+  return base;
+}
+
 export function readInboundPending(db: SqliteDb): InboundPending[] {
   const rows = db
     .prepare(
@@ -472,37 +523,36 @@ export function readInboundPending(db: SqliteDb): InboundPending[] {
               expires_at_tick, source, payload_json
        FROM inbound_pending ORDER BY expires_at_tick ASC, id ASC`,
     )
-    .all() as Array<{
-    id: string;
-    mission_id: string;
-    origin_icao: string;
-    dest_icao: string;
-    commodity_id: string;
-    cargo_kg: number;
-    expires_at_tick: number;
-    source: string;
-    payload_json: string | null;
-  }>;
-  return rows.map((r) => {
-    const base: InboundPending = {
-      id: r.id,
-      missionId: r.mission_id,
-      originIcao: r.origin_icao,
-      destIcao: r.dest_icao,
-      commodityId: r.commodity_id as CommodityId,
-      cargoKg: r.cargo_kg,
-      expiresAtTick: r.expires_at_tick,
-      source: r.source === 'player' ? 'player' : 'player',
-    };
-    if (r.payload_json) {
-      try {
-        return { ...JSON.parse(r.payload_json), ...base } as InboundPending;
-      } catch {
-        /* ignore */
-      }
-    }
-    return base;
-  });
+    .all() as InboundSqlRow[];
+  return rows.map(inboundFromRow);
+}
+
+export function readInboundPendingForMission(
+  db: SqliteDb,
+  missionId: string,
+): InboundPending[] {
+  const id = missionId.trim();
+  if (!id) return [];
+  const rows = db
+    .prepare(
+      `SELECT id, mission_id, origin_icao, dest_icao, commodity_id, cargo_kg,
+              expires_at_tick, source, payload_json
+       FROM inbound_pending WHERE mission_id = ? ORDER BY expires_at_tick ASC, id ASC`,
+    )
+    .all(id) as InboundSqlRow[];
+  return rows.map(inboundFromRow);
+}
+
+export function replaceInboundPendingForMission(
+  db: SqliteDb,
+  missionId: string,
+  rows: InboundPending[],
+  airports?: CareerEconomyWorld['airports'],
+): void {
+  const id = missionId.trim();
+  if (!id) return;
+  db.prepare(`DELETE FROM inbound_pending WHERE mission_id = ?`).run(id);
+  if (rows.length > 0) insertInboundPendingRows(db, rows, airports);
 }
 
 export function replaceInboundPending(

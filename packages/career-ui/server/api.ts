@@ -575,14 +575,19 @@ async function saveMissions(missions: MissionsFile): Promise<void> {
 }
 
 /**
- * One queue for economy + missions so tick/NPC bids cannot clobber accept/staging
- * (and missions OFP updates cannot race cancel). Non-reentrant — use *Unlocked
- * helpers while holding the lock.
+ * World (stock, lots, inbound) then company (missions, wallet, fleet).
+ * Non-reentrant — use *Unlocked helpers while holding. Never take world
+ * while holding company.
  */
-const careerLock = createPromiseLock();
+const worldLock = createPromiseLock();
+const companyLock = createPromiseLock();
+
+function withWorldThenCompany<T>(fn: () => Promise<T> | T): Promise<T> {
+  return worldLock.withLock(() => companyLock.withLock(fn));
+}
 
 function withCareerLock<T>(fn: () => Promise<T> | T): Promise<T> {
-  return careerLock.withLock(fn);
+  return withWorldThenCompany(fn);
 }
 
 /**
@@ -597,7 +602,7 @@ async function updateOpenMission(
     idx: number,
   ) => Promise<boolean> | boolean,
 ): Promise<boolean> {
-  return withCareerLock(async () => {
+  return companyLock.withLock(async () => {
     const missions = await loadMissions();
     const idx = missions.missions.findIndex((m) => m.id === missionId);
     if (idx < 0) return false;
@@ -733,19 +738,67 @@ async function withCareerRead<T>(
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
-  opts?: { housekeeping?: boolean; catchUp?: boolean },
+  opts?: {
+    housekeeping?: boolean;
+    catchUp?: boolean;
+    /** Cold RAM: hydrate origin/dest + mission lots from SQL (no planet catch-up). */
+    commandSliceMissionId?: string;
+  },
 ): Promise<T> {
   return withCareerLock(async () => {
-    const world = await loadEconomyUnlocked({
-      skipCatchUp: opts?.catchUp === false,
-    });
+    const activeStore = requireStore();
     const missions = await loadMissions();
+    const skipCatchUp = opts?.catchUp === false;
+    const sliceId = opts?.commandSliceMissionId?.trim();
+    let world: CareerEconomyWorld | undefined;
+    let persistSlice = false;
+    let sliceLotIds: string[] = [];
+    if (skipCatchUp && sliceId && !activeStore.peekEconomyWorld()) {
+      const mission = missions.missions.find((m) => m.id === sliceId);
+      if (mission) {
+        const icaos = [
+          ...new Set(
+            [mission.originIcao, mission.destIcao]
+              .map((c) => c.trim().toUpperCase())
+              .filter(Boolean),
+          ),
+        ];
+        const lotIds = mission.lots
+          .map((lot) => lot.shipmentLotId)
+          .filter((id): id is string => Boolean(id));
+        sliceLotIds = lotIds;
+        const slice = activeStore.loadCommandWorldSlice({
+          icaos,
+          lotIds,
+          missionId: sliceId,
+        });
+        const hasAllHubs =
+          slice &&
+          icaos.every((icao) =>
+            slice.airports.some((ap) => ap.icao === icao),
+          );
+        if (slice && hasAllHubs) {
+          world = slice;
+          persistSlice = true;
+        }
+      }
+    }
+    if (!world) {
+      world = await loadEconomyUnlocked({ skipCatchUp });
+    }
     if (opts?.housekeeping !== false) {
       settleCrewOpsDue(missions, world, Date.now());
       cancelOrphanPlayerMissions(world, missions);
     }
     const result = await fn(world, missions);
-    await persistEconomyUnlocked(world);
+    if (persistSlice && !activeStore.peekEconomyWorld() && sliceId) {
+      await activeStore.persistCommandWorldSlice(world, {
+        missionId: sliceId,
+        lotIds: sliceLotIds,
+      });
+    } else {
+      await persistEconomyUnlocked(world);
+    }
     await saveMissions(missions);
     return result;
   });
@@ -6193,7 +6246,11 @@ export function createCareerApiServer(port = 8787) {
               settlement: result.settlement,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
             };
-          }, { housekeeping: false, catchUp: false });
+          }, {
+            housekeeping: false,
+            catchUp: false,
+            commandSliceMissionId: body.missionId,
+          });
           if (settled.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;

@@ -1,8 +1,8 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-08-22. **Fatia 1 no código:** `saveEconomy` SQLite faz patch de hubs (não `DELETE` o mapa se 1–79 ICAOs mudaram) e pula lots/NPC/ops/blob se a assinatura não mudou. `lastAirportSignatures` é do último write, não do objeto RAM mutado. Próximo: `SettleFlight` SQL + locks company/world.
+Atualizado 2026-08-22. **Fatia 1–4 no código:** patch de hubs; `SettleFlight` idempotente; settle sem catch-up horário; **dois locks** (`world` depois `company`) e **fatia SQL** origin/dest quando a RAM está fria.
 
-Código de hoje (resto): `withCareerWrite` ainda hidrata o mundo; Watch auto-settle ainda chama `settleMission` no documento. Tabelas v4/v5 já existem.
+Código de hoje: `withCareerWrite` ainda hidrata o planeta no tick e na maior parte das rotas. Watch/API settle passam `commandSliceMissionId`. Tabelas v4/v5 já existem.
 
 ## Objetivo
 
@@ -17,7 +17,7 @@ MP **não** começa neste doc. Sem writes incrementais + lock fino, MP só seria
 | `company` | uma empresa / um save de player hoje | missão, wallet, ledger, frota, WH, cargo-ops |
 | `world` | mapa compartilhado | `airport_stock` do dest, shrink de lot, inbound_pending |
 
-Hoje os dois estão fundidos em `withCareerLock`. Settle precisa dos dois **só nas linhas que mudam**, não do planeta.
+Hoje os dois estão em `worldLock` + `companyLock`. Acquire **world then company**. `updateOpenMission` só pega `company`. Settle precisa dos dois **só nas linhas que mudam**, não do planeta. RAM quente: usa o mundo em memória. RAM fria: `loadCommandWorldSlice` (SQL origin/dest + lots da missão) e `persistCommandWorldSlice` (patch, sem prune).
 
 Não esperar o tick horário (lots/NPC/Europa) no freio.
 
@@ -66,7 +66,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 
 1. ~~**Dirty airports:**~~ **feito:** patch por ICAO + skip live/ops/blob. Tick que toca ≥80 hubs ainda faz rewrite completo.
 2. ~~**`SettleFlight` comando:**~~ `executeSettleFlight` idempotente; Watch/API; housekeeping off no settle.
-3. **Hot path persist (em curso):** settle `catchUp: false` (não roda o tick horário no parking brake). Lots/inbound SQL em patch (não `DELETE` a tabela se <80 linhas mudaram). NPC flights/events só se mudaram.
+3. ~~**Hot path persist:**~~ settle `catchUp: false`; lots/inbound incrementais no `saveEconomy` quente; **RAM fria:** fatia origin/dest + patch SQL.
 4. **Fila** só depois: jobs `ApplyCruiseEma`, `CatchUpCrewOps`. Não enfileirar o payout.
 5. **MP:** N `company_id` no mesmo `world_id`. Fora de escopo até 2+3.
 

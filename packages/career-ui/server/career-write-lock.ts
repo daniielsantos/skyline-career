@@ -1,6 +1,8 @@
 /**
- * Single-queue Promise lock for career economy + missions serialization.
+ * Promise lock for career serialization.
  * Non-reentrant: callers under the lock must use unlocked load/save helpers.
+ *
+ * Acquire **world then company**. Never take world while holding company.
  */
 export type PromiseLock = {
   withLock: <T>(fn: () => Promise<T> | T) => Promise<T>;

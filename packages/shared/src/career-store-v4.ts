@@ -374,6 +374,65 @@ export function readAirportsFromTables(
   return hubs.map((hub) => terminalFromAirportRow(hub, byIcao.get(hub.icao) ?? []));
 }
 
+export function readAirportsByIcaos(
+  db: SqliteDb,
+  icaos: string[],
+  worldId = LOCAL_WORLD_ID,
+): AirportTerminal[] {
+  const unique = [
+    ...new Set(icaos.map((c) => c.trim().toUpperCase()).filter(Boolean)),
+  ];
+  if (unique.length === 0) return [];
+  const placeholders = unique.map(() => '?').join(',');
+  const hubs = db
+    .prepare(
+      `SELECT icao, name, region, hub_tier, bush, bush_trip_only, lat, lon,
+              level, level_xp, level_curve_version, activity_score, last_activity_tick
+       FROM airports WHERE world_id = ? AND icao IN (${placeholders}) ORDER BY icao ASC`,
+    )
+    .all(worldId, ...unique) as Array<{
+    icao: string;
+    name: string;
+    region: string;
+    hub_tier: string;
+    bush: number;
+    bush_trip_only: number;
+    lat: number;
+    lon: number;
+    level: number;
+    level_xp: number;
+    level_curve_version: number;
+    activity_score: number;
+    last_activity_tick: number;
+  }>;
+  if (hubs.length === 0) return [];
+  const stock = db
+    .prepare(
+      `SELECT icao, commodity_id, stock_kg, capacity_kg,
+              base_production_per_tick_kg, base_consumption_per_tick_kg,
+              production_per_tick_kg, consumption_per_tick_kg
+       FROM airport_stock WHERE world_id = ? AND icao IN (${placeholders})
+       ORDER BY icao ASC, commodity_id ASC`,
+    )
+    .all(worldId, ...unique) as Array<{
+    icao: string;
+    commodity_id: string;
+    stock_kg: number;
+    capacity_kg: number;
+    base_production_per_tick_kg: number;
+    base_consumption_per_tick_kg: number;
+    production_per_tick_kg: number;
+    consumption_per_tick_kg: number;
+  }>;
+  const byIcao = new Map<string, typeof stock>();
+  for (const row of stock) {
+    const list = byIcao.get(row.icao);
+    if (list) list.push(row);
+    else byIcao.set(row.icao, [row]);
+  }
+  return hubs.map((hub) => terminalFromAirportRow(hub, byIcao.get(hub.icao) ?? []));
+}
+
 function insertRowBatches(
   db: SqliteDb,
   tableSql: string,

@@ -239,12 +239,16 @@ type WatchCallbacks = {
       world: CareerEconomyWorld,
       missions: CareerMissionsState,
     ) => Promise<T> | T,
-    opts?: { housekeeping?: boolean; catchUp?: boolean },
+    opts?: {
+      housekeeping?: boolean;
+      catchUp?: boolean;
+      commandSliceMissionId?: string;
+    },
   ) => Promise<T>;
   /**
-   * Reload missions under the career lock, then apply. Return false to skip
+   * Reload missions under the company lock, then apply. Return false to skip
    * persist (e.g. mission already cancelled). Missions-only — do not nest
-   * withCareerRead/Write (same non-reentrant lock).
+   * withCareerRead/Write (those hold world then company).
    */
   updateOpenMission: (
     missionId: string,
@@ -3418,7 +3422,11 @@ export class CareerWatchSession {
             };
             return true;
           },
-          { housekeeping: false, catchUp: false },
+          {
+            housekeeping: false,
+            catchUp: false,
+            commandSliceMissionId: this.missionId ?? undefined,
+          },
         );
         if (!saved) {
           this.settling = false;

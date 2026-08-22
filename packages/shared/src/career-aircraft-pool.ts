@@ -717,11 +717,23 @@ export function ensureDealerSkuFloor(
 }
 
 /** Incremental backfill when homolog adds/enables SKUs (no delete/rebalance). */
+function remigratePoolAirframeTypeIds(world: CareerEconomyWorld): boolean {
+  let changed = false;
+  for (const inst of world.aircraftInstances ?? []) {
+    const canonical = findCareerPlayerAirframe(inst.airframeTypeId);
+    if (!canonical || canonical.typeId === inst.airframeTypeId) continue;
+    inst.airframeTypeId = canonical.typeId;
+    changed = true;
+  }
+  return changed;
+}
+
 export function ensureAircraftPoolCatalogSync(
   world: CareerEconomyWorld,
   state?: Pick<CareerMissionsState, 'fleet' | 'aircraftMarket'>,
 ): boolean {
   ensureWorldAircraftPool(world);
+  let changed = remigratePoolAirframeTypeIds(world);
   const hash = hashCareerPlayerAirframeCatalog();
   let added = 0;
 
@@ -769,7 +781,7 @@ export function ensureAircraftPoolCatalogSync(
   }
 
   if (ensureDealerSkuFloor(world, state)) added += 1;
-  return added > 0;
+  return added > 0 || changed;
 }
 
 function collectUsedAircraftRegistrationsFromState(
@@ -861,7 +873,7 @@ export function instanceToListing(
     id: instance.id,
     kind: instance.kind,
     aircraftClassId: instance.aircraftClassId,
-    airframeTypeId: instance.airframeTypeId,
+    airframeTypeId: airframe?.typeId ?? instance.airframeTypeId,
     label: airframe?.label ?? instance.airframeTypeId,
     registration: instance.registration,
     basedIcao: instance.basedIcao,

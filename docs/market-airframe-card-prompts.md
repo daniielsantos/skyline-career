@@ -141,6 +141,38 @@ CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphal
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## C400 Corvalis
+- **typeId:** `microsoft-c400-corvalis`
+- **file:** `c400-corvalis.png`
+
+```
+Stylized cartoon / clean vector illustration of a Cessna 400 Corvalis TT / Columbia 400 (COL4), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: sleek low-wing high-performance single piston composite, retractable tricycle gear down, laminar wing, distinctive Corvalis / Columbia pointed nose and cabin, three-blade prop, sporty modern GA look. Must read as Corvalis C400 at a glance — not a Cirrus SR22 (no Cirrus parachute fairing / different canopy), not a Bonanza (no V-tail or Beech cabin).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphalt GA apron with yellow taxi lines, small gray hangar, soft blue hills. Cool blue wash #6b8cae. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## Cessna 404 Titan
+- **typeId:** `microsoft-404-titan`
+- **file:** `cessna-404-titan.png`
+
+```
+Stylized cartoon / clean vector illustration of a Cessna 404 Titan (C404), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: low-wing twin piston utility twin, two wing-mounted piston engines with props, retractable tricycle gear down, conventional empennage, longer cabin than a Baron, distinctive Cessna Titan nose and cabin window row, utility/commuter twin look. Must read as Cessna 404 Titan at a glance — not a Baron 58, not a Chieftain, not a Caravan.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphalt GA apron with yellow taxi lines, small gray hangar, soft blue hills. Cool blue wash #6b8cae. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ## Cessna 172SP
 - **typeId:** `asobo-c172sp-cargo`
 - **file:** `cessna-172.png`
@@ -681,6 +713,38 @@ Keep the aircraft highly recognizable: low-wing single turboprop, large PC-12 ca
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
 CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e), clean utility ramp, distant tree line. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## ATR 42-600
+- **typeId:** `microsoft-atr-42-600`
+- **file:** `atr-42-600.png`
+
+```
+Stylized cartoon / clean vector illustration of an ATR 42-600 regional turboprop (AT46), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: high-wing twin turboprop regional airliner, two large wing nacelles with six-blade props, short ATR-42 fuselage (shorter than ATR-72), distinctive ATR nose and cockpit eyebrow windows, T-tail, retractable gear down, modern -600 glass look. Must read as ATR 42-600 at a glance — not an ATR 72 (shorter fuselage), not a Dash 8, not a Saab 340.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e), regional utility ramp / short-field asphalt, distant tree line. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## ATR 72-600
+- **typeId:** `microsoft-atr-72-600`
+- **file:** `atr-72-600.png`
+
+```
+Stylized cartoon / clean vector illustration of an ATR 72-600 regional turboprop (AT76), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: high-wing twin turboprop regional airliner, two large wing nacelles with six-blade props, longer ATR-72 fuselage (clearly longer than ATR-42), distinctive ATR nose and cockpit eyebrow windows, T-tail, retractable gear down, modern -600 glass look. Must read as ATR 72-600 at a glance — not an ATR 42 (longer fuselage), not a Dash 8, not a Saab 340.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e), regional utility ramp / short-field asphalt, distant tree line. Soft ground shadow.
 
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```

@@ -102,6 +102,29 @@ describe('titlesMatchForCatalog', () => {
     );
   });
 
+  it('does not alias ATR Stol / Highline onto plain Passenger', () => {
+    assert.equal(
+      titlesMatchForCatalog('ATR 42-600 Stol', 'ATR 42-600 Passenger'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('ATR 42-600 STOL', 'ATR 42-600 Passenger'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('ATR 42-600 Highline 02', 'ATR 42-600 Passenger'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('ATR 42-600 Passenger', 'ATR 42-600 Passenger'),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog('ATR 42-600 Stol', 'ATR 42-600 Stol'),
+      true,
+    );
+  });
+
   it('does not alias Learjet / Saab cargo onto passenger', () => {
     assert.equal(
       titlesMatchForCatalog('LEARJET 35A PASSENGER', 'LEARJET 35A CARGO'),

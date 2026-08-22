@@ -100,6 +100,8 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'blackbox-bn2-islander-specialops-analogue': '/airframes/bn2-islander.png',
   'blackbox-bn2-islander-cargo-tip-tanks': '/airframes/bn2-islander.png',
   'blackbox-bn2-islander-passenger-analogue-tip-tanks': '/airframes/bn2-islander.png',
+  'microsoft-c400-corvalis': '/airframes/c400-corvalis.png',
+  'microsoft-404-titan': '/airframes/cessna-404-titan.png',
   'asobo-c172sp-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-classic-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-g1000-cargo': '/airframes/cessna-172.png',
@@ -152,6 +154,8 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
     '/airframes/c208-caravan.png',
   'microsoft-c408-skycourier-cargo': '/airframes/c408-skycourier.png',
   'microsoft-c408-skycourier-passenger': '/airframes/c408-skycourier.png',
+  'microsoft-atr-42-600': '/airframes/atr-42-600.png',
+  'microsoft-atr-72-600': '/airframes/atr-72-600.png',
   'microsoft-dhc-6-300-twin-otter-wheels': '/airframes/dhc6-twin-otter.png',
   'nextgensim-emb-110p1f-bandeirante': '/airframes/emb-110-bandeirante.png',
   'nextgensim-emb-110-bandeirante': '/airframes/emb-110-bandeirante.png',
@@ -218,7 +222,12 @@ export function airframeCardArtUrl(
 ): string | undefined {
   const id = airframeTypeId?.trim();
   if (!id) return undefined;
-  return AIRFRAME_CARD_ART[id];
+  if (AIRFRAME_CARD_ART[id]) return AIRFRAME_CARD_ART[id];
+  const family = id.replace(
+    /-(highline-\d+|passenger|passengers|freighter|cargo|stol)$/i,
+    '',
+  );
+  return family !== id ? AIRFRAME_CARD_ART[family] : undefined;
 }
 
 function conditionTone(pct: number): 'ok' | 'warn' | 'danger' {

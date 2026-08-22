@@ -1,0 +1,55 @@
+{
+  "source": "simbrief",
+  "icao": "C404",
+  "ofpId": "microsoft-404-titan-cargo",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "404 Titan Cargo",
+    "404 Titan Cargo - Empty"
+  ],
+  "matchTitlePattern": "404\\s+Titan\\s+Cargo",
+  "notes": [
+    "Microsoft 404 Titan Cargo — 4 stations (crew S1–S2, hold S3–S4)",
+    "One Skyline Market SKU: microsoft-404-titan (light_ga) with passengers pack sibling",
+    "Homologated monitor: microsoft/404-titan-cargo@1.0.0",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Cabin/hold mapped as baggage (career cargo / pax=0)",
+    "Fuel: classic LEFT_MAIN / RIGHT_MAIN"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "C404",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

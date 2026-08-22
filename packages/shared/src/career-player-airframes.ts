@@ -277,6 +277,19 @@ const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
   'blackbox-bn2-islander-specialops-analogue':
     'blackbox-bn2-islander-cargo-tip-tanks',
   'microsoft-saab-340-cargo': 'carenado-saab-340-passenger',
+  'microsoft-404-titan-cargo': 'microsoft-404-titan',
+  'microsoft-404-titan-passengers': 'microsoft-404-titan',
+  'microsoft-atr-42-600-highline-01': 'microsoft-atr-42-600',
+  'microsoft-atr-42-600-highline-02': 'microsoft-atr-42-600',
+  'microsoft-atr-42-600-highline-03': 'microsoft-atr-42-600',
+  'microsoft-atr-42-600-passenger': 'microsoft-atr-42-600',
+  'microsoft-atr-42-600-stol': 'microsoft-atr-42-600',
+  'microsoft-atr-72-600-highline-01': 'microsoft-atr-72-600',
+  'microsoft-atr-72-600-highline-02': 'microsoft-atr-72-600',
+  'microsoft-atr-72-600-highline-03': 'microsoft-atr-72-600',
+  'microsoft-atr-72-600-highline-04': 'microsoft-atr-72-600',
+  'microsoft-atr-72-600-passenger': 'microsoft-atr-72-600',
+  'microsoft-atr-72-600-freighter': 'microsoft-atr-72-600',
 };
 
 const BY_ID = new Map(CAREER_PLAYER_AIRFRAMES.map((airframe) => [airframe.typeId, airframe]));

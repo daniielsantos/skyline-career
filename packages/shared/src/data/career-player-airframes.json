@@ -1,5 +1,23 @@
 [
   {
+    "typeId": "microsoft-404-titan",
+    "aircraftClassId": "light_ga",
+    "label": "404 Titan",
+    "rolesPackRelPath": "profiles/ofp/microsoft-404-titan-cargo.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/microsoft-404-titan-cargo.json",
+      "profiles/ofp/microsoft-404-titan-passengers.json"
+    ],
+    "simbriefIcao": "C404",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 2247,
+    "mtowKg": 3810,
+    "maxCargoKg": 1563,
+    "fuelCapacityKg": 947,
+    "maxRangeNm": 800,
+    "fuelBurnKgPerNm": 0.35
+  },
+  {
     "typeId": "blacksquare-baron-58-professional",
     "aircraftClassId": "light_ga",
     "label": "Baron 58 Professional",
@@ -113,6 +131,22 @@
     "cruiseFuelFlowKgPerHour": 86.2,
     "cruiseSpeedKt": 124,
     "fuelBurnKgPerNm": 0.695
+  },
+  {
+    "typeId": "microsoft-c400-corvalis",
+    "aircraftClassId": "light_ga",
+    "label": "C400 Corvalis",
+    "rolesPackRelPath": "profiles/ofp/microsoft-c400-corvalis.json",
+    "simbriefIcao": "SR2T",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 1134,
+    "mtowKg": 1633,
+    "maxCargoKg": 477,
+    "fuelCapacityKg": 288,
+    "maxRangeNm": 1250,
+    "cruiseFuelFlowKgPerHour": 75.3,
+    "cruiseSpeedKt": 235,
+    "fuelBurnKgPerNm": 0.32
   },
   {
     "typeId": "asobo-c172sp-cargo",
@@ -446,6 +480,34 @@
     "cruiseFuelFlowKgPerHour": 112.5,
     "cruiseSpeedKt": 330,
     "fuelBurnKgPerNm": 0.341
+  },
+  {
+    "typeId": "microsoft-atr-42-600",
+    "aircraftClassId": "light_turboprop",
+    "label": "ATR 42-600",
+    "rolesPackRelPath": "profiles/ofp/microsoft-atr-42-600.json",
+    "simbriefIcao": "AT46",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 11550,
+    "mtowKg": 18770,
+    "maxCargoKg": 5000,
+    "fuelCapacityKg": 4601,
+    "maxRangeNm": 800,
+    "fuelBurnKgPerNm": 0.8
+  },
+  {
+    "typeId": "microsoft-atr-72-600",
+    "aircraftClassId": "light_turboprop",
+    "label": "ATR 72-600",
+    "rolesPackRelPath": "profiles/ofp/microsoft-atr-72-600.json",
+    "simbriefIcao": "AT76",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 13000,
+    "mtowKg": 23170,
+    "maxCargoKg": 7500,
+    "fuelCapacityKg": 4601,
+    "maxRangeNm": 800,
+    "fuelBurnKgPerNm": 0.8
   },
   {
     "typeId": "blacksquare-b36tp-bonanza-professional",

@@ -9,6 +9,7 @@ import {
   ensureDealerSkuFloor,
   ensureAircraftPoolCatalogSync,
   ensureWorldAircraftPool,
+  instanceToListing,
 } from './career-aircraft-pool.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { listCareerPlayerAirframes as listSkus } from './career-player-airframes.js';
@@ -111,6 +112,21 @@ describe('aircraft pool', () => {
     );
     assert.equal(md11.length, 3);
     assert.equal(ensureAircraftPoolCatalogSync(world), false);
+  });
+
+  it('remigrates ATR Highline glass ids onto the family Market SKU', () => {
+    const world = createSeedEconomyWorld({ seed: 'pool-atr-alias' });
+    ensureWorldAircraftPool(world);
+    const inst = (world.aircraftInstances ?? []).find(
+      (row) => row.airframeTypeId === 'microsoft-atr-72-600',
+    );
+    assert.ok(inst);
+    inst!.airframeTypeId = 'microsoft-atr-72-600-highline-03';
+    assert.equal(ensureAircraftPoolCatalogSync(world), true);
+    assert.equal(inst!.airframeTypeId, 'microsoft-atr-72-600');
+    const listing = instanceToListing(world, inst!, world.tick);
+    assert.equal(listing.airframeTypeId, 'microsoft-atr-72-600');
+    assert.equal(listing.label, 'ATR 72-600');
   });
 
   it('purchase removes the dealer instance from the board', () => {

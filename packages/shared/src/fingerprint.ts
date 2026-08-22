@@ -317,6 +317,11 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     'summit',
     'amphibian',
     'floats',
+    // ATR / regional STOL kits — "ATR 42-600 Stol" must not alias onto
+    // "ATR 42-600 Passenger" (same tank/station hash).
+    'stol',
+    // Cabin / interior kits (ATR Highline N, etc.).
+    'highline',
     // Black Box BN-2 cabin / tank presets — Passenger Tip Tanks must not
     // alias onto SpecialOps (same tank/station hash, different OFP pack).
     'specialops',

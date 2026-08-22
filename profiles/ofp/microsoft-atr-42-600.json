@@ -1,0 +1,66 @@
+{
+  "source": "simbrief",
+  "icao": "AT46",
+  "ofpId": "microsoft-atr-42-600",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "ATR 42-600 Highline 01",
+    "ATR 42-600 Highline 02",
+    "ATR 42-600 Highline 03",
+    "ATR 42-600 Passenger",
+    "ATR 42-600 Stol"
+  ],
+  "matchTitlePattern": "ATR\\s*42-600",
+  "notes": [
+    "Microsoft ATR 42-600 family (Highline 01–03 · Passenger · Stol) — same 11-station map",
+    "One Skyline Market SKU: microsoft-atr-42-600 (light_turboprop)",
+    "Homologated monitors: microsoft/atr-42-600-highline-01@1.0.0 … highline-03, passenger, stol",
+    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "loadMethod: direct-injection; injectCapable: true",
+    "Fuel: classic LEFT_MAIN / RIGHT_MAIN (AUX deferred)",
+    "liveSources: classic fuel + classic stations"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "AT46",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "baggage" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Station 11", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 50,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 75,
+    "weightAbsLb": 150,
+    "passengerCountAbs": 0,
+    "maxFuelIncreaseLb": 0
+  }
+}

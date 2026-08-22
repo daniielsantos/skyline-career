@@ -109,6 +109,22 @@ describe('career player airframes', () => {
       findCareerPlayerAirframe('blacksquare-caravan-cargo-pod')?.typeId,
       'c208-caravan-cargo',
     );
+    assert.equal(
+      findCareerPlayerAirframe('microsoft-atr-72-600-highline-03')?.typeId,
+      'microsoft-atr-72-600',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('microsoft-atr-72-600-highline-03')?.label,
+      'ATR 72-600',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('microsoft-atr-42-600-stol')?.typeId,
+      'microsoft-atr-42-600',
+    );
+    assert.equal(
+      findCareerPlayerAirframe('microsoft-404-titan-cargo')?.typeId,
+      'microsoft-404-titan',
+    );
   });
 
   it('lists Caravan OFP packs on the shared Market SKU', () => {

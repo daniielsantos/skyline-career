@@ -392,15 +392,99 @@ function insertRowBatches(
   }
 }
 
-export function persistAirportsToTables(
-  db: SqliteDb,
-  airports: AirportTerminal[],
-  worldId = LOCAL_WORLD_ID,
-): void {
-  ensureLocalWorld(db);
-  db.prepare(`DELETE FROM airport_stock WHERE world_id = ?`).run(worldId);
-  db.prepare(`DELETE FROM airports WHERE world_id = ?`).run(worldId);
+/** Hub + stock fields that live in `airports` / `airport_stock` (not RAM-only). */
+export function airportPersistSignature(ap: AirportTerminal): string {
+  const icao = String(ap.icao ?? '')
+    .trim()
+    .toUpperCase();
+  const piles = COMMODITY_IDS.map((id) => {
+    const pile = ap.inventory[id];
+    return [
+      id,
+      sqlNum(pile?.stockKg),
+      sqlNum(pile?.capacityKg),
+      sqlNum(ap.baseProduction?.[id]),
+      sqlNum(ap.baseConsumption?.[id]),
+      sqlNum(ap.production?.[id]),
+      sqlNum(ap.consumption?.[id]),
+    ].join(':');
+  }).join(',');
+  return [
+    icao,
+    ap.name ?? '',
+    ap.region ?? '',
+    ap.hubTier ?? '',
+    ap.bush ? 1 : 0,
+    ap.bushTripOnly ? 1 : 0,
+    sqlNum(ap.lat),
+    sqlNum(ap.lon),
+    sqlNum(ap.level, 1),
+    sqlNum(ap.levelXp),
+    sqlNum(ap.levelCurveVersion),
+    sqlNum(ap.activityScore),
+    sqlNum(ap.lastActivityTick),
+    piles,
+  ].join('|');
+}
 
+export type AirportPersistDiff = {
+  mode: 'full' | 'skip' | 'patch';
+  upsert: AirportTerminal[];
+  removeIcaos: string[];
+};
+
+/** Full rewrite is cheaper than hundreds of per-hub DELETE+INSERT (hourly tick). */
+const AIRPORT_PATCH_FULL_THRESHOLD = 80;
+
+export function airportSignaturesFromList(
+  airports: AirportTerminal[] | undefined,
+): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const [icao, ap] of airportsByIcao(airports ?? [])) {
+    m.set(icao, airportPersistSignature(ap));
+  }
+  return m;
+}
+
+export function diffAirportsForPersist(
+  previous: AirportTerminal[] | undefined,
+  next: AirportTerminal[],
+): AirportPersistDiff {
+  return diffAirportsBySignature(
+    previous && previous.length > 0 ? airportSignaturesFromList(previous) : null,
+    next,
+  );
+}
+
+export function diffAirportsBySignature(
+  previous: Map<string, string> | null | undefined,
+  next: AirportTerminal[],
+): AirportPersistDiff {
+  if (!previous || previous.size === 0) {
+    return { mode: 'full', upsert: next, removeIcaos: [] };
+  }
+  const nextMap = airportsByIcao(next);
+  const upsert: AirportTerminal[] = [];
+  for (const [icao, ap] of nextMap) {
+    if (previous.get(icao) !== airportPersistSignature(ap)) {
+      upsert.push(ap);
+    }
+  }
+  const removeIcaos: string[] = [];
+  for (const icao of previous.keys()) {
+    if (!nextMap.has(icao)) removeIcaos.push(icao);
+  }
+  if (upsert.length === 0 && removeIcaos.length === 0) {
+    return { mode: 'skip', upsert: [], removeIcaos: [] };
+  }
+  const touched = upsert.length + removeIcaos.length;
+  if (touched >= AIRPORT_PATCH_FULL_THRESHOLD) {
+    return { mode: 'full', upsert: next, removeIcaos: [] };
+  }
+  return { mode: 'patch', upsert, removeIcaos };
+}
+
+function airportsByIcao(airports: AirportTerminal[]): Map<string, AirportTerminal> {
   const byIcao = new Map<string, AirportTerminal>();
   for (const ap of airports) {
     const icao = String(ap.icao ?? '')
@@ -409,7 +493,16 @@ export function persistAirportsToTables(
     if (!icao) continue;
     byIcao.set(icao, ap);
   }
+  return byIcao;
+}
 
+function airportTableRows(
+  worldId: string,
+  byIcao: Map<string, AirportTerminal>,
+): {
+  hubRows: Array<Array<string | number>>;
+  stockRows: Array<Array<string | number>>;
+} {
   const hubRows: Array<Array<string | number>> = [];
   const stockRows: Array<Array<string | number>> = [];
   for (const [icao, ap] of byIcao) {
@@ -445,7 +538,15 @@ export function persistAirportsToTables(
       ]);
     }
   }
+  return { hubRows, stockRows };
+}
 
+function insertAirportTableRows(
+  db: SqliteDb,
+  worldId: string,
+  byIcao: Map<string, AirportTerminal>,
+): void {
+  const { hubRows, stockRows } = airportTableRows(worldId, byIcao);
   insertRowBatches(
     db,
     `INSERT INTO airports (
@@ -467,6 +568,42 @@ export function persistAirportsToTables(
     stockRows,
     200,
   );
+}
+
+export function persistAirportsToTables(
+  db: SqliteDb,
+  airports: AirportTerminal[],
+  worldId = LOCAL_WORLD_ID,
+): void {
+  ensureLocalWorld(db);
+  db.prepare(`DELETE FROM airport_stock WHERE world_id = ?`).run(worldId);
+  db.prepare(`DELETE FROM airports WHERE world_id = ?`).run(worldId);
+  insertAirportTableRows(db, worldId, airportsByIcao(airports));
+}
+
+export function persistAirportsPatch(
+  db: SqliteDb,
+  upsert: AirportTerminal[],
+  removeIcaos: string[],
+  worldId = LOCAL_WORLD_ID,
+): void {
+  ensureLocalWorld(db);
+  const delStock = db.prepare(
+    `DELETE FROM airport_stock WHERE world_id = ? AND icao = ?`,
+  );
+  const delHub = db.prepare(`DELETE FROM airports WHERE world_id = ? AND icao = ?`);
+  for (const raw of removeIcaos) {
+    const icao = raw.trim().toUpperCase();
+    if (!icao) continue;
+    delStock.run(worldId, icao);
+    delHub.run(worldId, icao);
+  }
+  const byIcao = airportsByIcao(upsert);
+  for (const icao of byIcao.keys()) {
+    delStock.run(worldId, icao);
+    delHub.run(worldId, icao);
+  }
+  insertAirportTableRows(db, worldId, byIcao);
 }
 
 export function hydrateAirportsFromTables(
@@ -496,8 +633,15 @@ export function persistWorldAirports(
   db: SqliteDb,
   world: CareerEconomyWorld,
   worldId = LOCAL_WORLD_ID,
+  previousSignatures?: Map<string, string> | null,
 ): void {
   persistEconomyMeta(db, world, worldId);
+  const diff = diffAirportsBySignature(previousSignatures, world.airports ?? []);
+  if (diff.mode === 'skip') return;
+  if (diff.mode === 'patch') {
+    persistAirportsPatch(db, diff.upsert, diff.removeIcaos, worldId);
+    return;
+  }
   persistAirportsToTables(db, world.airports ?? [], worldId);
 }
 

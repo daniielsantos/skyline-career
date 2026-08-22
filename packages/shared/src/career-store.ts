@@ -50,6 +50,7 @@ import {
   migrateV3toV4IfNeeded,
   overlayEconomyMeta,
   persistWorldAirports,
+  airportSignaturesFromList,
   readAirportBoard,
   readAirportInventory,
   stampCompanyWorldId,
@@ -487,11 +488,44 @@ function metaSet(db: SqliteDb, key: string, value: string): void {
   ).run(key, value);
 }
 
+function worldLivePersistKey(world: CareerEconomyWorld): string {
+  return JSON.stringify({
+    lots: (world.lots ?? []).map((lot) => [
+      lot.id,
+      lot.quantityKg,
+      lot.reservedKg,
+      lot.status,
+      lot.payUsd,
+      lot.expiresAtTick,
+    ]),
+    inbound: world.inboundPending ?? [],
+    npcFlights: world.npcFlights ?? [],
+    events: world.events ?? [],
+  });
+}
+
+function worldOpsPersistKey(world: CareerEconomyWorld): string {
+  return JSON.stringify({
+    npcs: world.npcs ?? [],
+    fuelTrucks: world.fuelTrucks ?? [],
+    fuelHauls: world.fuelHauls ?? [],
+    demandOrders: world.demandOrders ?? [],
+    portListings: world.portListings ?? [],
+    portInventories: world.portInventories ?? [],
+    portConcessions: world.portConcessions ?? [],
+  });
+}
+
 class SqliteCareerStore implements CareerStore {
   readonly kind = 'sqlite' as const;
   readonly sqlitePath: string;
   private readonly db: SqliteDb;
   private ram: CareerEconomyWorld | null = null;
+  /** Signatures from the last successful airport table write (not in-RAM mutations). */
+  private lastAirportSignatures: Map<string, string> | null = null;
+  private lastLiveKey: string | null = null;
+  private lastOpsKey: string | null = null;
+  private lastEconomyBlobJson: string | null = null;
 
   constructor(sqlitePath: string) {
     this.sqlitePath = sqlitePath;
@@ -594,6 +628,12 @@ class SqliteCareerStore implements CareerStore {
     if (clHubIdentRemapsForPlayer(beforeIcaos, afterIcaos).length > 0) dirty = true;
     await persistClHubIdentRemaps(this, beforeIcaos, afterIcaos);
     this.ram = caught;
+    if (!dirty) {
+      const blob = stripEconomyWorldOps(
+        stripEconomyAirports(stripEconomyHotArrays(caught)),
+      );
+      this.rememberPersistedWorld(caught, JSON.stringify(blob));
+    }
     return { world: caught, advancedTicks, settledFlights, dirty };
   }
 
@@ -607,21 +647,38 @@ class SqliteCareerStore implements CareerStore {
     );
     const json = JSON.stringify(blob);
     const now = Date.now();
+    const liveKey = worldLivePersistKey(toSave);
+    const opsKey = worldOpsPersistKey(toSave);
+    const prevAirportSignatures = this.lastAirportSignatures;
     runInTransaction(this.db, () => {
-      this.db
-        .prepare(
-          `INSERT INTO economy_json (id, json, updated_at_ms) VALUES (1, ?, ?)
-           ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
-        )
-        .run(json, now);
-      persistWorldLiveTables(this.db, toSave);
-      persistWorldAirports(this.db, toSave);
-      persistWorldOpsTables(this.db, toSave);
+      if (json !== this.lastEconomyBlobJson) {
+        this.db
+          .prepare(
+            `INSERT INTO economy_json (id, json, updated_at_ms) VALUES (1, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
+          )
+          .run(json, now);
+      }
+      if (this.lastLiveKey !== liveKey) {
+        persistWorldLiveTables(this.db, toSave);
+      }
+      persistWorldAirports(this.db, toSave, LOCAL_WORLD_ID, prevAirportSignatures);
+      if (this.lastOpsKey !== opsKey) {
+        persistWorldOpsTables(this.db, toSave);
+      }
       stampCompanyWorldId(this.db);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
       metaSet(this.db, 'economy_tick', String(toSave.tick));
     });
     this.ram = toSave;
+    this.rememberPersistedWorld(toSave, json);
+  }
+
+  private rememberPersistedWorld(world: CareerEconomyWorld, blobJson: string): void {
+    this.lastAirportSignatures = airportSignaturesFromList(world.airports);
+    this.lastLiveKey = worldLivePersistKey(world);
+    this.lastOpsKey = worldOpsPersistKey(world);
+    this.lastEconomyBlobJson = blobJson;
   }
 
   async loadMissions(): Promise<CareerMissionsState> {
@@ -692,6 +749,10 @@ class SqliteCareerStore implements CareerStore {
 
   close(): void {
     this.ram = null;
+    this.lastAirportSignatures = null;
+    this.lastLiveKey = null;
+    this.lastOpsKey = null;
+    this.lastEconomyBlobJson = null;
     this.db.close();
   }
 }

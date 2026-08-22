@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-22: hours MX/resale + settle overlay em `main` (`228d6c1`). Desenho persist/MP: [`11-persist-commands.md`](./11-persist-commands.md) — **próximo código:** `saveEconomy` skip rewrite de airports se stock não mudou; depois `SettleFlight` SQL.
+Atualizado 2026-08-22: persist SQLite incremental (airport patch + skip live/ops) — [`11-persist-commands.md`](./11-persist-commands.md). **Próximo:** `SettleFlight` SQL. Hours/MX + Settling em `228d6c1`.
 
 Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). BBJ2 parked. Airport tab / A2A / dual-client IPC inalterados.
 

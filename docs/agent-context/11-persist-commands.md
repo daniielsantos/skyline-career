@@ -1,8 +1,8 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-08-22. **Ainda não implementado.** Código de hoje: `withCareerWrite` carrega `CareerEconomyWorld` + missões, aplica `settleMission`, `saveEconomy` (inclui `DELETE`+rewrite de **todos** os aeroportos) + `saveMissions`. Watch auto-settle espera isso no mesmo tick.
+Atualizado 2026-08-22. **Fatia 1 no código:** `saveEconomy` SQLite faz patch de hubs (não `DELETE` o mapa se 1–79 ICAOs mudaram) e pula lots/NPC/ops/blob se a assinatura não mudou. `lastAirportSignatures` é do último write, não do objeto RAM mutado. Próximo: `SettleFlight` SQL + locks company/world.
 
-Tabelas v4/v5 já existem; o **hot path** ainda trata o save como um documento. Este arquivo é o desenho do recorte — não um rewrite do tick.
+Código de hoje (resto): `withCareerWrite` ainda hidrata o mundo; Watch auto-settle ainda chama `settleMission` no documento. Tabelas v4/v5 já existem.
 
 ## Objetivo
 
@@ -64,7 +64,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 
 ## Fatia de implementação (ordem)
 
-1. **Dirty airports:** `saveEconomy` não chama `persistWorldAirports` se nenhum hub/stock mudou. Ganho imediato no tick e em writes que só mexem NPC blob. Settle ainda hidrata o mundo, mas para de reescrever a Europa no freio.
+1. ~~**Dirty airports:**~~ **feito:** patch por ICAO + skip live/ops/blob. Tick que toca ≥80 hubs ainda faz rewrite completo.
 2. **`SettleFlight` store:** transação SQL: missão + ledger + aircraft + `airport_stock` dest (+ lot). Watch passa a chamar isso em vez de `withCareerWrite` + `settleMission(world inteiro)`.
 3. **Dois locks** quando 2 estiver estável. `withCareerRead` do GET stock já fura o lock — repetir o padrão.
 4. **Fila** só depois: jobs `ApplyCruiseEma`, `CatchUpCrewOps`. Não enfileirar o payout.

@@ -6,7 +6,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { describe, it } from 'node:test';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
-import { persistAirportsToTables, ensureV4Ddl, LOCAL_WORLD_ID } from './career-store-v4.js';
+import {
+  persistAirportsToTables,
+  ensureV4Ddl,
+  LOCAL_WORLD_ID,
+  diffAirportsForPersist,
+} from './career-store-v4.js';
 import { ensureV3Ddl } from './career-store-v3.js';
 import { CAREER_STORE_SCHEMA_VERSION, openCareerStore } from './career-store.js';
 import type { AirportTerminal } from './types/career-economy.js';
@@ -18,6 +23,21 @@ function schemaVersionInDb(sqlitePath: string): string {
       | { value: string }
       | undefined;
     return row?.value ?? '';
+  } finally {
+    db.close();
+  }
+}
+
+function airportRowid(
+  sqlitePath: string,
+  icao: string,
+): number | undefined {
+  const db = new DatabaseSync(sqlitePath);
+  try {
+    const row = db
+      .prepare(`SELECT rowid AS id FROM airports WHERE world_id = 'local' AND icao = ?`)
+      .get(icao) as { id: number } | undefined;
+    return row?.id;
   } finally {
     db.close();
   }
@@ -244,6 +264,61 @@ describe('career store v4', () => {
     assert.equal(Array.isArray(blob.airports) ? blob.airports.length : -1, 0);
     assert.equal(typeof blob.seed === 'string' ? blob.seed : '', 'v3-upgrade');
     assert.ok(store.readAirportBoard('SBGR'));
+    store.close();
+  });
+
+  it('diffs airport persist as skip / patch / full', () => {
+    const hub = (icao: string, stock: number): AirportTerminal =>
+      ({
+        icao,
+        name: icao,
+        region: 'BR-SE',
+        lat: 0,
+        lon: 0,
+        level: 1,
+        inventory: { general: { stockKg: stock, capacityKg: 100 } },
+        production: {},
+        consumption: {},
+      }) as AirportTerminal;
+    const a = hub('SBGR', 1);
+    const b = hub('SBSP', 2);
+    assert.equal(diffAirportsForPersist([a, b], [a, b]).mode, 'skip');
+    const a2 = hub('SBGR', 9);
+    const patch = diffAirportsForPersist([a, b], [a2, b]);
+    assert.equal(patch.mode, 'patch');
+    assert.equal(patch.upsert.length, 1);
+    assert.equal(patch.upsert[0]?.icao, 'SBGR');
+    assert.equal(diffAirportsForPersist(undefined, [a, b]).mode, 'full');
+  });
+
+  it('keeps unchanged airport rowids when one hub stock changes', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-v4-patch-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const world = createSeedEconomyWorld({ seed: 'v4-patch' });
+    world.lastBatchAtMs = Date.now();
+    await store.saveEconomy(world);
+
+    const other = world.airports.find((ap) => ap.icao !== 'SBGR');
+    assert.ok(other);
+    const otherIcao = other.icao;
+    const otherRowid = airportRowid(store.sqlitePath!, otherIcao);
+    const sbgr = world.airports.find((ap) => ap.icao === 'SBGR');
+    assert.ok(sbgr);
+    sbgr.inventory.general = {
+      stockKg: (sbgr.inventory.general?.stockKg ?? 0) + 77,
+      capacityKg: sbgr.inventory.general?.capacityKg ?? 50_000,
+    };
+    await store.saveEconomy(world);
+
+    assert.equal(airportRowid(store.sqlitePath!, otherIcao), otherRowid);
+    assert.equal(
+      readAirportStockKg(store.sqlitePath!, 'SBGR', 'general'),
+      sbgr.inventory.general.stockKg,
+    );
+
+    world.tick += 1;
+    await store.saveEconomy(world);
+    assert.equal(airportRowid(store.sqlitePath!, otherIcao), otherRowid);
     store.close();
   });
 });

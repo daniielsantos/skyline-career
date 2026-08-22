@@ -274,6 +274,7 @@ export async function homologateBushHubBatch(
   },
   writeWorld: (
     fn: (w: CareerEconomyWorld) => Promise<HomologateBushHubResult>,
+    icao: string,
   ) => Promise<HomologateBushHubResult>,
 ): Promise<HomologateBushHubBatchResult> {
   const icaos = (
@@ -291,8 +292,9 @@ export async function homologateBushHubBatch(
         icao,
         pipeName: opts.pipeName,
       });
-      const result = await writeWorld((w) =>
-        homologateBushHub(careerDir, w, resolved),
+      const result = await writeWorld(
+        (w) => homologateBushHub(careerDir, w, resolved),
+        icao,
       );
       results.push({ icao, ok: true, result });
     } catch (error) {

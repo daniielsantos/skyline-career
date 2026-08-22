@@ -5288,7 +5288,7 @@ export function createCareerApiServer(port = 8787) {
                 if (idx >= 0) missions.missions[idx] = dispatched;
                 else missions.missions.push(dispatched);
                 return dispatched;
-              });
+              }, { commandSliceMissionId: mission.id });
               // UI opens the URL once (Electron IPC / window.open).
               dispatch = {
                 url: built.url,
@@ -6825,8 +6825,12 @@ export function createCareerApiServer(port = 8787) {
             source: body.source,
             pipeName: body.pipeName,
           });
-          const result = await withCareerWrite(async (world) =>
-            homologateBushHub(careerRoot, world, resolved),
+          const result = await withCareerWrite(
+            async (world) => homologateBushHub(careerRoot, world, resolved),
+            {
+              housekeeping: false,
+              commandSliceIcaos: [resolved.icao.trim().toUpperCase()],
+            },
           );
           send(res, 200, result);
         } catch (error) {
@@ -6853,7 +6857,11 @@ export function createCareerApiServer(port = 8787) {
               bushOnly: body.bushOnly === true,
               pipeName: body.pipeName,
             },
-            (fn) => withCareerWrite(fn),
+            (fn, icao) =>
+              withCareerWrite(fn, {
+                housekeeping: false,
+                commandSliceIcaos: [icao],
+              }),
           );
           send(res, 200, result);
         } catch (error) {

@@ -46,6 +46,8 @@ import {
   upsertLotRows,
   readLedgerRowsV3,
   persistLedgerIncremental,
+  fleetPersistSignature,
+  missionPersistSignature,
   replaceNpcFlights,
   replaceEconomyEvents,
   stripEconomyHotArrays,
@@ -92,6 +94,8 @@ import type {
   CareerLedgerEntry,
   CareerMissionsState,
   DemandOrder,
+  MissionIntent,
+  PlayerAircraft,
   PortConcessionIndexRow,
   PortListing,
 } from './types/career-economy.js';
@@ -639,6 +643,22 @@ function inboundSignatureMap(world: CareerEconomyWorld): Map<string, string> {
   return m;
 }
 
+function fleetSignatureMap(fleet: PlayerAircraft[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const a of fleet) {
+    if (a.id) m.set(a.id, fleetPersistSignature(a));
+  }
+  return m;
+}
+
+function missionSignatureMap(missions: MissionIntent[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const row of missions) {
+    if (row.id) m.set(row.id, missionPersistSignature(row));
+  }
+  return m;
+}
+
 function worldOpsPersistKey(world: CareerEconomyWorld): string {
   return JSON.stringify({
     npcs: world.npcs ?? [],
@@ -672,6 +692,8 @@ class SqliteCareerStore implements CareerStore {
   private lastMissionsTableKey: string | null = null;
   private lastLedgerPersistKey: string | null = null;
   private lastMissionsStubJson: string | null = null;
+  private lastFleetSignatures: Map<string, string> | null = null;
+  private lastMissionSignatures: Map<string, string> | null = null;
 
   constructor(sqlitePath: string) {
     this.sqlitePath = sqlitePath;
@@ -1132,6 +1154,8 @@ class SqliteCareerStore implements CareerStore {
         companyState: companyStateDirty,
         fleet: fleetDirty,
         missions: missionsDirty,
+        previousFleet: this.lastFleetSignatures,
+        previousMissions: this.lastMissionSignatures,
       });
       if (ledgerDirty) persistLedgerIncremental(this.db, ledger);
     });
@@ -1141,6 +1165,12 @@ class SqliteCareerStore implements CareerStore {
     this.lastMissionsTableKey = missionsKey;
     this.lastLedgerPersistKey = ledgerKey;
     this.lastMissionsStubJson = json;
+    if (fleetDirty) {
+      this.lastFleetSignatures = fleetSignatureMap(normalized.fleet ?? []);
+    }
+    if (missionsDirty) {
+      this.lastMissionSignatures = missionSignatureMap(normalized.missions ?? []);
+    }
   }
 
   async loadLedger(): Promise<CareerLedgerEntry[]> {
@@ -1172,6 +1202,8 @@ class SqliteCareerStore implements CareerStore {
     this.lastMissionsTableKey = null;
     this.lastLedgerPersistKey = null;
     this.lastMissionsStubJson = null;
+    this.lastFleetSignatures = null;
+    this.lastMissionSignatures = null;
     this.db.close();
   }
 }

@@ -484,6 +484,26 @@ describe('career store', () => {
     await store.saveMissions(withPickups);
     assert.equal(countLedgerInDb(store.sqlitePath!), ledgerBefore + 2);
 
+    const sibling = {
+      ...withPickups.fleet[0]!,
+      id: 'ac_test_2',
+      label: 'Second',
+      fuelKg: 400,
+    };
+    withPickups.fleet = [...withPickups.fleet, sibling];
+    await store.saveMissions(withPickups);
+    withPickups.fleet[0]!.fuelKg = 777;
+    await store.saveMissions(withPickups);
+    const twoTails = await store.loadMissions();
+    assert.equal(twoTails.fleet.length, 2);
+    assert.equal(twoTails.fleet.find((a) => a.id === 'ac_test_1')?.fuelKg, 777);
+    assert.equal(twoTails.fleet.find((a) => a.id === 'ac_test_2')?.fuelKg, 400);
+    twoTails.missions[0]!.status = 'dispatched';
+    await store.saveMissions(twoTails);
+    const afterDispatch = await store.loadMissions();
+    assert.equal(afterDispatch.missions[0]?.status, 'dispatched');
+    assert.equal(afterDispatch.fleet.length, 2);
+
     store.close();
   });
 

@@ -1038,6 +1038,47 @@ export function replaceFleetAircraft(
   db.prepare(
     `DELETE FROM fleet_aircraft WHERE company_id = ? AND id NOT IN (${placeholders})`,
   ).run(companyId, ...ids);
+  upsertFleetAircraftRows(db, companyId, fleet);
+}
+
+export function fleetPersistSignature(a: PlayerAircraft): string {
+  return JSON.stringify(a);
+}
+
+export function persistFleetIncremental(
+  db: SqliteDb,
+  companyId: string,
+  fleet: PlayerAircraft[],
+  previous: Map<string, string> | null,
+): void {
+  if (!previous || previous.size === 0) {
+    replaceFleetAircraft(db, companyId, fleet);
+    return;
+  }
+  const nextIds = new Set(fleet.map((a) => a.id).filter(Boolean));
+  const upsert: PlayerAircraft[] = [];
+  for (const a of fleet) {
+    if (!a.id) continue;
+    if (previous.get(a.id) !== fleetPersistSignature(a)) upsert.push(a);
+  }
+  const remove: string[] = [];
+  for (const id of previous.keys()) {
+    if (!nextIds.has(id)) remove.push(id);
+  }
+  if (upsert.length + remove.length >= LIVE_PATCH_FULL_THRESHOLD) {
+    replaceFleetAircraft(db, companyId, fleet);
+    return;
+  }
+  const del = db.prepare(`DELETE FROM fleet_aircraft WHERE company_id = ? AND id = ?`);
+  for (const id of remove) del.run(companyId, id);
+  if (upsert.length > 0) upsertFleetAircraftRows(db, companyId, upsert);
+}
+
+function upsertFleetAircraftRows(
+  db: SqliteDb,
+  companyId: string,
+  fleet: PlayerAircraft[],
+): void {
   const upsert = db.prepare(
     `INSERT INTO fleet_aircraft (
        id, company_id, aircraft_class_id, airframe_type_id, label, location_icao,
@@ -1151,6 +1192,47 @@ export function replaceMissionsTable(
   db.prepare(
     `DELETE FROM missions WHERE company_id = ? AND id NOT IN (${placeholders})`,
   ).run(companyId, ...ids);
+  upsertMissionRows(db, companyId, missions);
+}
+
+export function missionPersistSignature(m: MissionIntent): string {
+  return JSON.stringify(m);
+}
+
+export function persistMissionsIncremental(
+  db: SqliteDb,
+  companyId: string,
+  missions: MissionIntent[],
+  previous: Map<string, string> | null,
+): void {
+  if (!previous || previous.size === 0) {
+    replaceMissionsTable(db, companyId, missions);
+    return;
+  }
+  const nextIds = new Set(missions.map((m) => m.id).filter(Boolean));
+  const upsert: MissionIntent[] = [];
+  for (const m of missions) {
+    if (!m.id) continue;
+    if (previous.get(m.id) !== missionPersistSignature(m)) upsert.push(m);
+  }
+  const remove: string[] = [];
+  for (const id of previous.keys()) {
+    if (!nextIds.has(id)) remove.push(id);
+  }
+  if (upsert.length + remove.length >= LIVE_PATCH_FULL_THRESHOLD) {
+    replaceMissionsTable(db, companyId, missions);
+    return;
+  }
+  const del = db.prepare(`DELETE FROM missions WHERE company_id = ? AND id = ?`);
+  for (const id of remove) del.run(companyId, id);
+  if (upsert.length > 0) upsertMissionRows(db, companyId, upsert);
+}
+
+function upsertMissionRows(
+  db: SqliteDb,
+  companyId: string,
+  missions: MissionIntent[],
+): void {
   const upsert = db.prepare(
     `INSERT INTO missions (
        id, company_id, status, origin_icao, dest_icao, aircraft_id, commodity_id,
@@ -1536,14 +1618,30 @@ export function companyTablesPopulated(db: SqliteDb): boolean {
 export function persistCompanyTables(
   db: SqliteDb,
   state: CareerMissionsState,
-  opts?: { companyState?: boolean; fleet?: boolean; missions?: boolean },
+  opts?: {
+    companyState?: boolean;
+    fleet?: boolean;
+    missions?: boolean;
+    previousFleet?: Map<string, string> | null;
+    previousMissions?: Map<string, string> | null;
+  },
 ): void {
   if (opts?.companyState !== false) upsertCompanyState(db, state);
   if (opts?.fleet !== false) {
-    replaceFleetAircraft(db, LOCAL_COMPANY_ID, state.fleet ?? []);
+    persistFleetIncremental(
+      db,
+      LOCAL_COMPANY_ID,
+      state.fleet ?? [],
+      opts?.previousFleet ?? null,
+    );
   }
   if (opts?.missions !== false) {
-    replaceMissionsTable(db, LOCAL_COMPANY_ID, state.missions ?? []);
+    persistMissionsIncremental(
+      db,
+      LOCAL_COMPANY_ID,
+      state.missions ?? [],
+      opts?.previousMissions ?? null,
+    );
   }
 }
 

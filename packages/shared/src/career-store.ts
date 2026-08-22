@@ -80,6 +80,8 @@ import {
   persistWorldOpsTables,
   stripEconomyWorldOps,
   replacePortConcessions,
+  replacePortInventories,
+  replacePortListings,
   upsertDemandOrder,
   upsertPortListing,
 } from './career-store-v5.js';
@@ -131,6 +133,8 @@ export interface CareerStore {
   persistDemandOrder(order: DemandOrder): Promise<void>;
   persistPortListing(listing: PortListing): Promise<void>;
   persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void>;
+  /** Seed/expire port listings + inventory only — not airports/lots/NPC. */
+  persistPortMarketTables(world: CareerEconomyWorld): Promise<void>;
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).
@@ -401,6 +405,10 @@ class JsonCareerStore implements CareerStore {
   }
 
   async persistPortConcessionIndex(_rows: PortConcessionIndexRow[]): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
+  }
+
+  async persistPortMarketTables(_world: CareerEconomyWorld): Promise<void> {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
@@ -734,6 +742,12 @@ class SqliteCareerStore implements CareerStore {
 
   async persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void> {
     replacePortConcessions(this.db, rows);
+    if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
+  }
+
+  async persistPortMarketTables(world: CareerEconomyWorld): Promise<void> {
+    replacePortListings(this.db, world.portListings ?? []);
+    replacePortInventories(this.db, world.portInventories ?? []);
     if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
   }
 

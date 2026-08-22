@@ -736,7 +736,7 @@ type CareerWriteOpts = {
   /** Default false — only the timer / POST /api/tick should pass true. */
   catchUp?: boolean;
   /** Skip saveEconomy when the handler only mutates company/missions. */
-  persist?: 'economy' | 'company' | 'blob';
+  persist?: 'economy' | 'company' | 'blob' | 'portMarket';
   persistDemandOrderId?: string;
   persistPortListingId?: string;
   persistPortConcessions?: boolean;
@@ -750,7 +750,7 @@ type CareerWriteOpts = {
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
  * `persist: 'company'` writes missions only (plus optional demand/listing/concession
  * upserts). `persist: 'blob'` writes dealer pool JSON without live tables.
- * `commandSlice*` patches OD/lots.
+ * `persist: 'portMarket'` rewrites port listings+inventory only (GET /api/ports seed).
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
@@ -762,6 +762,7 @@ async function withCareerWrite<T>(
     const skipCatchUp = opts?.catchUp !== true;
     const persistCompany = opts?.persist === 'company';
     const persistBlob = opts?.persist === 'blob';
+    const persistPortMarket = opts?.persist === 'portMarket';
     const demandOrderId = opts?.persistDemandOrderId?.trim();
     const portListingId = opts?.persistPortListingId?.trim();
     const persistPortConcessions = opts?.persistPortConcessions === true;
@@ -876,7 +877,9 @@ async function withCareerWrite<T>(
       useCommandPersist = true;
     }
     const housekeeping =
-      persistCompany || persistBlob ? false : opts?.housekeeping !== false;
+      persistCompany || persistBlob || persistPortMarket
+        ? false
+        : opts?.housekeeping !== false;
     if (housekeeping) {
       settleCrewOpsDue(missions, world, Date.now());
       cancelOrphanPlayerMissions(world, missions);
@@ -906,6 +909,10 @@ async function withCareerWrite<T>(
     if (persistBlob) {
       await activeStore.saveEconomy(world, { liveTables: false });
       await saveMissions(missions);
+      return result;
+    }
+    if (persistPortMarket) {
+      await activeStore.persistPortMarketTables(world);
       return result;
     }
     if (useCommandPersist) {
@@ -3448,13 +3455,15 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/ports') {
         try {
-          // Write path: ensurePortListings must persist — migrate used to drop
-          // portListings, and a read-only seed left the UI with IDs the next
-          // buy could not find on a fresh load.
-          const result = await withCareerWrite((world, missions) => ({
-            ...portSnapshot(world, missions),
-            groundStaff: groundStaffSnapshot(missions, world),
-          }));
+          // ensurePortListings may expire/refill; persist those tables only so
+          // buy can find the same listing IDs after reload.
+          const result = await withCareerWrite(
+            (world, missions) => ({
+              ...portSnapshot(world, missions),
+              groundStaff: groundStaffSnapshot(missions, world),
+            }),
+            { persist: 'portMarket' },
+          );
           send(res, 200, result);
         } catch (error) {
           send(res, 500, {

@@ -75,7 +75,8 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 9. ~~**FBO hold/release + crew/bush/fuel/select-hub:**~~ lot slice via `commandSliceHoldId`; crew assign/bush/debug/ground-staff fire = company; select-hub = blob (`homeCountryId`).
 10. ~~**Contract-pilot accept:**~~ `persist: 'npcLive'` (NPC + flights + dirty lots/inbound/airports; not port/demand rewrite).
 11. ~~**Bush homologate + staging auto-dispatch:**~~ one hub airport patch; staging dispatch = mission slice.
-12. ~~**GET health/NPC + Watch depart:**~~ GETs skip catch-up; Watch auto-depart/false-depart = mission slice. Tick / `POST /api/init` still full `saveEconomy`.
+12. ~~**GET health/NPC + Watch depart:**~~ GETs skip catch-up; Watch auto-depart/false-depart = mission slice.
+13. ~~**Airport GET hydrate + bush Watch:**~~ terminal inventory hydrate skips catch-up; bush depart/settle = company only. Tick / `POST /api/init` still full `saveEconomy`.
 
 ## Outros comandos (mesmo molde, depois)
 

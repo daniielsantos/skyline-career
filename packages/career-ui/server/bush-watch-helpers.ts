@@ -72,6 +72,10 @@ type BushWatchCallbacks = {
       world: CareerEconomyWorld,
       missions: CareerMissionsState,
     ) => Promise<T> | T,
+    opts?: {
+      housekeeping?: boolean;
+      persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound' | 'npcLive';
+    },
   ) => Promise<T>;
   /** Stop the freight Watch before opening the bush pipe. */
   stopMarketWatch?: () => Promise<void>;
@@ -400,7 +404,7 @@ export class BushTripWatchSession {
             airborneEndedAtMs: undefined,
             landingFpm: undefined,
           };
-        });
+        }, { persist: 'company', housekeeping: false });
       }
 
       if (event.type === 'settle' && this.opts.autoSettle) {
@@ -422,7 +426,7 @@ export class BushTripWatchSession {
             // Reset watch state for the next leg
             this.watchState = createMissionFlightWatchState();
           }
-        });
+        }, { persist: 'company', housekeeping: false });
         if (done) {
           await this.stop();
           return;

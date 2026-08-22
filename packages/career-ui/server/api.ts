@@ -3273,7 +3273,7 @@ export function createCareerApiServer(port = 8787) {
         const loaded = await withCareerLock(async () => {
           const active = requireStore();
           if (!active.peekEconomyWorld()) {
-            await loadEconomyUnlocked();
+            await loadEconomyUnlocked({ skipCatchUp: true });
           }
           const missions = await loadMissions();
           const cached = active.peekEconomyWorld();

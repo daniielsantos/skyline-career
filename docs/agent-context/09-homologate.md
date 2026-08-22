@@ -31,6 +31,21 @@ node packages/agent/dist/cli.js smoke --profile profiles/drafts\<arquivo>.json
 - Career inject: `clampFuelToCapacity` quando OFP > tanques.
 - `maxCargoKg` com stations ainda em placeholder 500: wizard prefere SimBrief. Catálogo antigo: `npm run airframes:backfill-simbrief-cargo` / `-- --apply`.
 
+## Market SKU (família vs vidro)
+
+Não criar um `typeId` de catálogo por Highline/Passenger/Stol. Um SKU + um (ou poucos) OFP pack(s):
+
+| SKU | Classe | Pack / roles | SimBrief |
+|-----|--------|----------------|----------|
+| `microsoft-atr-72-600` | `light_turboprop` | `profiles/ofp/microsoft-atr-72-600.json` | AT76 |
+| `microsoft-atr-42-600` | `light_turboprop` | `profiles/ofp/microsoft-atr-42-600.json` | AT46 |
+| `microsoft-404-titan` | `light_ga` | cargo + passengers (`familyRolesPackRelPaths`) | (pack) |
+| `microsoft-c400-corvalis` | `light_ga` | `profiles/ofp/microsoft-c400-corvalis.json` | **SR2T** (COL4 não existe no SimBrief) |
+
+Vidros: `profiles/examples/microsoft-atr-*-highline-*.json` etc. + `matchTitles` no pack. Alias de typeId legado → família em `LEGACY_AIRFRAME_ALIASES`.
+
+Prompts de arte de card: `docs/market-airframe-card-prompts.md` (kit da classe, 16:9, PNG em `career-ui/public/airframes/`).
+
 ## Hubs (aeroportos career)
 
 Não é o mesmo que airframe. Seed + facilities MSFS ≤25 nm + ICAO catalog.  

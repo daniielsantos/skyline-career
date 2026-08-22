@@ -24,8 +24,8 @@ Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `c
 
 | Classe | Âncora | BR efetivo (1-de-cada) |
 |--------|--------|-------------------------|
-| GA | 12 | **18** (SKUs atuais) |
-| TP | 6 | **15** |
+| GA | 12 | **~20** (incl. Titan + Corvalis; teste cap pode estar desatualizado em 18) |
+| TP | 6 | **~17** (incl. ATR 42/72) |
 | Light jet | 5 | **9** |
 | Medium | 3 | 3 (2 SKUs + extra na fila) |
 | Narrow | 2 | 2 |
@@ -64,6 +64,8 @@ Fonte da verdade do SKU: `packages/shared/src/data/career-player-airframes.json`
 **Novo SKU dilui cota?** Política travada: **não rebalancear** instâncias já no mundo (sem delete). Só **adicionar** o mínimo (1 por país grande + parcela global se abaixo da cota igual). Opcional depois: extras round-robin só em **novos** slots de cap quando o mapa crescer.
 
 **Versão de catálogo:** hash ordenado de `{typeId, enabled, aircraftClassId}` em `economy_meta` ou world row; se mudou → roda sync uma vez. Desktop: rebuild/restart carrega JSON novo (igual hoje).
+
+**Alias / remigração (2026-08-21):** se o pool ainda tiver typeIds de vidro (ex. `microsoft-atr-72-600-highline-03`), `ensureAircraftPoolCatalogSync` chama `remigratePoolAirframeTypeIds` → SKU de família. `instanceToListing` emite `airframe.typeId` + `label` do catálogo. Sem isso o card mostra silhouette + typeId em UPPERCASE.
 
 **Testes F0+:** homologar GA fictício `enabled` → sync adiciona 1 no BR sem alterar contagem de C172 existente; `enabled: false` → restock off, owned intacto.
 

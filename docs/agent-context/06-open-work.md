@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A liveSource `a2a-lvars` (Preflight/Watch lê tablet). Dual-client IPC de fora.
+Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). BBJ2 parked. Airport tab / A2A / dual-client IPC inalterados.
 
 **Shipped (uncommitted):** port restock is a daily inbound discharge on the economy tick (not on opening Ports). Listings spawn from yard stock only. Ports UI shows next discharge ETA. Concession P2 enlarges yard cap; renew lease scales with 7-day throughput (no extra buy discount).
 
@@ -10,7 +10,9 @@ Atualizado 2026-08-18: Airport tab shipped (MapTiler Hybrid + runways). A2A live
   não tocar no CDU; Due fuel ≈ TOTAL; ZFW = SimBrief est_zfw; MAIN/FWD/AFT auto
 - [ ] **PMDG 738 PAX:** Due = SimBrief payload; Watch Sim = S1–S6 only (sem
   crew S7–S9 / galley); Open SimBrief acdata 175/55; Preflight → Inject (FO CDU)
-- [ ] **PMDG 738 BBJ2:** Market off (`enabled: false`) até solução OEW / airframe
+- [ ] **PMDG 738 BBJ2:** Market off até OEW Dual Class ≈ empty live (~102.2 klb); não reativar sem medir
+- [ ] **ATR 72 Highline no Market:** após restart, cards Highline devem ser “ATR 72-600” + PNG (não typeId cru)
+- [ ] **Novos SKUs no desktop instalado:** precisa rebuild/release — JSON do catálogo não hot-swap no installer antigo
 - [ ] Watch CG card: após editar EFB, `% MAC` atualiza (não congela no Validate); Loaded vs Due não trava
 - [x] Footer Phase taxi: Accu-Sim COMBUSTION=0 não prende em "On ground"; taxi por GS ≥5 kt (`taxi_out`)
 - [ ] Preflight longe do origin → **NOT AT ORIGIN** + status line; Watch não auto-decola; spawn no hub certo limpa o card sem novo Validate
@@ -232,7 +234,17 @@ centralizados; stations 5/coluna iguais; escala fluido + labels legíveis em til
 
 Mensagem sugerida:
 
-> Continua Skyline Career. Lê `@docs/agent-context/project-overview.md` e `@docs/agent-context/README.md`. Estamos em desktop 0.3.17; problema atual: …
+> Continua Skyline Career. Lê `@docs/agent-context/project-overview.md`, `@docs/agent-context/README.md` e `@docs/agent-context/00-constraints.md`. Desktop shipped **0.3.47**; `main` @ **62b8ea9** tem Market ATR/Titan/Corvalis + BBJ2 off. Problema atual: …
+
+### Market homologation (2026-08-21) — feito em `main`
+
+- SKUs: `microsoft-atr-72-600`, `microsoft-atr-42-600`, `microsoft-404-titan`, `microsoft-c400-corvalis`.
+- Família ATR: um pack OFP + `matchTitlePattern`; fingerprint `stol`/`highline`.
+- Titan: um Market SKU, dois packs (cargo/passengers).
+- Corvalis SimBrief **SR2T**.
+- Aliases Highline → família + remigração do dealer pool + arte em `AIRFRAME_CARD_ART`.
+- Prompts: `docs/market-airframe-card-prompts.md`.
+- BBJ2: `1a46e13` — `enabled: false` (OEW).
 
 ### UI boot (2026-08-20)
 

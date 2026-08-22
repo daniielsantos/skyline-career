@@ -22,6 +22,16 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - Escrita AUX clássica → `UNRECOGNIZED_ID` → `ReceiveMessage 0xC00000B0` → Host morto / Watch `PIPE CLOSED`.
 - OFP acima da capacidade dos tanques: career inject deve **clamp** (`clampFuelToCapacity`), não forçar overflow.
 
+## Market / homologação de airframe
+
+- **Um SKU de Market por família** (`career-player-airframes.json`). Vidros Highline/Passenger/Stol/Freighter entram no **mesmo** pack (`matchTitles` / `matchTitlePattern`), não como typeIds separados no catálogo.
+- Fingerprint: tokens `stol` e `highline` são variante — Stol não pode aliasar em Passenger.
+- ATR 42/72 → classe **`light_turboprop`** (par Saab 340). **Não** `medium_piston` (só DC-3/DC-6).
+- Cessna 404 Titan → **`light_ga`**. Um SKU `microsoft-404-titan`; cargo + pax via `familyRolesPackRelPaths`.
+- Corvalis C400: SimBrief ICAO real **COL4** não existe no airframe list → proxy **`SR2T`**.
+- PMDG **738 BBJ2** fica **fora do Market** (`enabled: false`) até OEW bater com SimBrief Dual Class (empty live ~102.2 klb vs OEW ~93k).
+- Arte dos cards: `docs/market-airframe-card-prompts.md` + `AIRFRAME_CARD_ART` em `AircraftCards.tsx`. Um PNG por SKU de Market, não por vidro.
+
 ## Git / release
 
 - Commit só quando o usuário pedir.

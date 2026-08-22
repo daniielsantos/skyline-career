@@ -10,7 +10,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 3. Abra **só** o tópico de sessão necessário (não carregue todos de uma vez)
 4. Transcript antigo (só se precisar de detalhe histórico) — **não** commitar:
    `%USERPROFILE%\.cursor\projects\c-Users-daniel-Documents-msfs-compat-layer\agent-transcripts\`
-   Sessão longa recente: `4ed8b204-f6f8-49c7-8d5a-e577ad7d0d93`
+   Sessão longa recente: `dbbbb643-2609-41b5-a827-560e59cb4138` (ATR/Titan/Corvalis + BBJ2 park; anterior: `4ed8b204-f6f8-49c7-8d5a-e577ad7d0d93`)
 
 ## Índice
 

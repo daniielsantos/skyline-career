@@ -1,4 +1,4 @@
-# Current state (2026-08-16)
+# Current state (2026-08-21)
 
 ## Desktop
 
@@ -36,9 +36,21 @@
 
 ## Branch
 
-`main` — handoff em `docs/agent-context/`.
+`main` @ `62b8ea9` — handoff em `docs/agent-context/`. Desktop **shipped** ainda **0.3.47**; homologação ATR/Titan/Corvalis + BBJ2 park estão em `main` **sem** release nova.
 
-## Local (ainda sem release)
+## Local (ainda sem release) — Market airframes 2026-08-21
+
+- **Homologados no Market** (`career-player-airframes.json`):
+  - `microsoft-atr-72-600` — pack único `profiles/ofp/microsoft-atr-72-600.json` (Highline 01–04 · Passenger · Freighter); classe `light_turboprop`.
+  - `microsoft-atr-42-600` — pack `microsoft-atr-42-600.json` (Highline 01–03 · Passenger · Stol).
+  - `microsoft-404-titan` — um SKU; packs cargo 4 st + passengers 15 via `familyRolesPackRelPaths`.
+  - `microsoft-c400-corvalis` — `light_ga`; SimBrief **`SR2T`** (COL4 ausente).
+- Arte: `packages/career-ui/public/airframes/{atr-42-600,atr-72-600,c400-corvalis,cessna-404-titan}.png` + `AIRFRAME_CARD_ART`.
+- Vidros Highline no pool antigo (`microsoft-atr-72-600-highline-03` etc.) → `LEGACY_AIRFRAME_ALIASES` + `remigratePoolAirframeTypeIds` no catalog sync; listing usa typeId/label canónicos; `airframeCardArtUrl` também corta sufixo highline/stol.
+- Fingerprint: `stol` + `highline` em `fingerprint.ts` (Stol ≠ Passenger).
+- **PMDG 738 BBJ2** (`pmdg-738-bbj2-family`): `enabled: false`, inject off; Dual Class OEW ~93k vs empty live ~102.2 klb. Commit `1a46e13`. Pack/profile kept.
+
+## Local (ainda sem release) — inject / Watch
 
 - **0.3.24 shipped:** equal-first até limite real do envelope; leftover
   split L/R (mesmo arm, Δarm ≤2 ft, LEFT/RIGHT, indexes consecutivos).

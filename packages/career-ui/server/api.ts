@@ -738,6 +738,8 @@ type CareerWriteOpts = {
   /** Skip saveEconomy when the handler only mutates company/missions. */
   persist?: 'economy' | 'company' | 'blob';
   persistDemandOrderId?: string;
+  persistPortListingId?: string;
+  persistPortConcessions?: boolean;
   commandSliceMissionId?: string;
   commandSliceLotIds?: string[];
   commandSliceIcaos?: string[];
@@ -746,8 +748,9 @@ type CareerWriteOpts = {
 
 /**
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
- * `persist: 'company'` writes missions only. `persist: 'blob'` writes dealer
- * pool JSON without live airport/lot tables. `commandSlice*` patches OD/lots.
+ * `persist: 'company'` writes missions only (plus optional demand/listing/concession
+ * upserts). `persist: 'blob'` writes dealer pool JSON without live tables.
+ * `commandSlice*` patches OD/lots.
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
@@ -760,6 +763,8 @@ async function withCareerWrite<T>(
     const persistCompany = opts?.persist === 'company';
     const persistBlob = opts?.persist === 'blob';
     const demandOrderId = opts?.persistDemandOrderId?.trim();
+    const portListingId = opts?.persistPortListingId?.trim();
+    const persistPortConcessions = opts?.persistPortConcessions === true;
     const sliceId = opts?.commandSliceMissionId?.trim();
     const sliceLotIdsOpt = (opts?.commandSliceLotIds ?? [])
       .map((id) => id.trim())
@@ -887,6 +892,13 @@ async function withCareerWrite<T>(
       if (demandOrderId) {
         const order = world.demandOrders?.find((o) => o.id === demandOrderId);
         if (order) await activeStore.persistDemandOrder(order);
+      }
+      if (portListingId) {
+        const listing = world.portListings?.find((l) => l.id === portListingId);
+        if (listing) await activeStore.persistPortListing(listing);
+      }
+      if (persistPortConcessions) {
+        await activeStore.persistPortConcessionIndex(world.portConcessions ?? []);
       }
       await saveMissions(missions);
       return result;
@@ -3486,6 +3498,9 @@ export function createCareerApiServer(port = 8787) {
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
             });
+          }, {
+            persist: 'company',
+            persistPortListingId: body.listingId,
           });
           send(res, 200, result);
         } catch (error) {
@@ -3513,7 +3528,7 @@ export function createCareerApiServer(port = 8787) {
               concession,
               ports: portSnapshot(world, missions),
             };
-          });
+          }, { persist: 'company', persistPortConcessions: true });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3541,7 +3556,7 @@ export function createCareerApiServer(port = 8787) {
               concession,
               ports: portSnapshot(world, missions),
             };
-          });
+          }, { persist: 'company', persistPortConcessions: true });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3568,7 +3583,7 @@ export function createCareerApiServer(port = 8787) {
               concession,
               ports: portSnapshot(world, missions),
             };
-          });
+          }, { persist: 'company', persistPortConcessions: true });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3600,7 +3615,7 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3630,7 +3645,7 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {

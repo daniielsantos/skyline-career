@@ -79,13 +79,17 @@ import {
   migrateV4toV5IfNeeded,
   persistWorldOpsTables,
   stripEconomyWorldOps,
+  replacePortConcessions,
   upsertDemandOrder,
+  upsertPortListing,
 } from './career-store-v5.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
   CareerMissionsState,
   DemandOrder,
+  PortConcessionIndexRow,
+  PortListing,
 } from './types/career-economy.js';
 
 export type CareerStoreKind = 'json' | 'sqlite';
@@ -125,6 +129,8 @@ export interface CareerStore {
     opts?: { liveTables?: boolean },
   ): Promise<void>;
   persistDemandOrder(order: DemandOrder): Promise<void>;
+  persistPortListing(listing: PortListing): Promise<void>;
+  persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void>;
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).
@@ -387,6 +393,14 @@ class JsonCareerStore implements CareerStore {
   }
 
   async persistDemandOrder(_order: DemandOrder): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
+  }
+
+  async persistPortListing(_listing: PortListing): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
+  }
+
+  async persistPortConcessionIndex(_rows: PortConcessionIndexRow[]): Promise<void> {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
@@ -710,6 +724,16 @@ class SqliteCareerStore implements CareerStore {
 
   async persistDemandOrder(order: DemandOrder): Promise<void> {
     upsertDemandOrder(this.db, order);
+    if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
+  }
+
+  async persistPortListing(listing: PortListing): Promise<void> {
+    upsertPortListing(this.db, listing);
+    if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
+  }
+
+  async persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void> {
+    replacePortConcessions(this.db, rows);
     if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
   }
 

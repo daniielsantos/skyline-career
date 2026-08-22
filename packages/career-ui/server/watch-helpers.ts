@@ -244,6 +244,8 @@ type WatchCallbacks = {
       catchUp?: boolean;
       persist?: 'economy' | 'company' | 'blob';
       persistDemandOrderId?: string;
+      persistPortListingId?: string;
+      persistPortConcessions?: boolean;
       commandSliceMissionId?: string;
       commandSliceLotIds?: string[];
       commandSliceIcaos?: string[];

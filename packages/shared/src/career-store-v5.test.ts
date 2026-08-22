@@ -9,7 +9,7 @@ import { emptyMissionsStateV2 } from './career-fleet.js';
 import { CAREER_STORE_SCHEMA_VERSION, openCareerStore } from './career-store.js';
 import { ensureV3Ddl } from './career-store-v3.js';
 import { ensureV4Ddl } from './career-store-v4.js';
-import { ensureV5Ddl, readPortListings, replacePortListings } from './career-store-v5.js';
+import { ensureV5Ddl, readPortListings, replacePortListings, upsertPortListing } from './career-store-v5.js';
 
 function schemaVersionInDb(sqlitePath: string): string {
   const db = new DatabaseSync(sqlitePath);
@@ -236,6 +236,30 @@ describe('career store v5', () => {
     assert.equal(rows.length, 2);
     assert.equal(rows.find((r) => r.id === 'portlot_dup')?.availableKg, 9000);
     assert.equal(rows.find((r) => r.id === 'portlot_other')?.availableKg, 4000);
+  });
+
+  it('upsertPortListing updates one row without wiping siblings', () => {
+    const db = new DatabaseSync(':memory:');
+    ensureV5Ddl(db);
+    const a = {
+      id: 'portlot_a',
+      portId: 'BRSSZ',
+      commodityId: 'general' as const,
+      availableKg: 1000,
+      unitPriceUsd: 1,
+      allocatedHubIcao: 'SBGR',
+      arrivedAtTick: 1,
+      expiresAtTick: 100,
+      status: 'open' as const,
+    };
+    const b = { ...a, id: 'portlot_b', availableKg: 4000 };
+    replacePortListings(db, [a, b]);
+    upsertPortListing(db, { ...a, availableKg: 250, status: 'sold_out' });
+    const rows = readPortListings(db);
+    assert.equal(rows.length, 2);
+    assert.equal(rows.find((r) => r.id === 'portlot_a')?.availableKg, 250);
+    assert.equal(rows.find((r) => r.id === 'portlot_a')?.status, 'sold_out');
+    assert.equal(rows.find((r) => r.id === 'portlot_b')?.availableKg, 4000);
   });
 
   it('upgrades a v4 blob with duplicate port listing ids', async () => {

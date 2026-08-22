@@ -527,6 +527,7 @@ export type Mission = {
     upliftedAtTick: number;
   };
   fuelAuthorizedOfpId?: string;
+  ofpCheckSeq?: number;
   lastOfpCheck?: {
     verdict: 'pass' | 'warn' | 'fail';
     summary: string;

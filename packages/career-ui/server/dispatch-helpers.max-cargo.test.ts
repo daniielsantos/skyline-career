@@ -197,6 +197,63 @@ describe('flyableDispatchCargoKg', () => {
   });
 });
 
+describe('buildMissionDispatch ATR payload prefill', () => {
+  it('sends manualpayload not cargo for ATR 72 HighLine maxcargo cap', async () => {
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_atr72',
+        status: 'dispatched',
+        originIcao: 'SAEZ',
+        destIcao: 'SBGR',
+        commodityId: 'electronics',
+        cargoKg: Math.round(14_500 / 2.20462262185),
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-atr-72-600',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      {
+        units: 'LBS',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              AT76: {
+                airframes: [
+                  {
+                    airframe_internal_id: 'awemeter_hl',
+                    airframe_list_type: 'AT76',
+                    airframe_icao: 'AT76',
+                    airframe_comments:
+                      'Microsoft (MSFS) - ATR 72 - HighLine [credit: Awemeter]',
+                    airframe_name: 'ATR-72-600 Highline',
+                    airframe_passengers: 28,
+                    airframe_options: {
+                      wgtunits: 'LBS',
+                      oew: 29410,
+                      mzfw: 46260,
+                      mtow: 50660,
+                      maxfuel: 11296,
+                      maxcargo: 3739,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    const qs = new URL(built.url).searchParams;
+    assert.equal(qs.get('cargo'), null);
+    assert.ok(qs.get('manualpayload'));
+    const payloadLb = Number(qs.get('manualpayload')) * 1000;
+    assert.ok(Math.abs(payloadLb - 14_500) < 5);
+  });
+});
+
 describe('buildMissionDispatch pax_and_cargo', () => {
   it('prefills pax from SimBrief airframe_passengers', async () => {
     const built = await buildMissionDispatch(

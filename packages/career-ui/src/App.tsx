@@ -113,9 +113,12 @@ import {
   type CareerTab,
 } from './routes';
 import {
+  fuelMatchToleranceLb,
+  matchFuelOk,
+  payloadMatchToleranceLb,
   pickFuelTankBreakdown,
   pickLivePayloadLb,
-  pickStableLiveFuelLb,
+  holdWrittenFuelLb,
 } from './load-verification';
 import { estimateFairUsd, estimateLeaseMonthlyUsd, estimateSellBackUsd, estimateLeaseEarlyReturnUsd } from './aircraft-pricing';
 import {
@@ -3188,6 +3191,10 @@ export function App() {
   holdWatchOffForPreflightRef.current = holdWatchOffForPreflight;
   /** Prevents a second /api/load-ofp while one is already in flight. */
   const ofpInjectInFlightRef = useRef(false);
+  const loadOfpAutoStatusRef = useRef(loadOfpAutoStatus);
+  loadOfpAutoStatusRef.current = loadOfpAutoStatus;
+  /** Ignore Watch fuel samples until the sim finishes settling after inject. */
+  const injectFuelQuietUntilRef = useRef(0);
   const loadOfpControlRef = useRef<{
     stop: () => void;
     abort: AbortController;
@@ -4137,11 +4144,53 @@ export function App() {
             const missionId = status.missionId;
             const verification = status.loadVerification;
             queueMicrotask(() => {
+              const quietWatchFuel =
+                ofpInjectInFlightRef.current ||
+                loadOfpAutoStatusRef.current === 'loading' ||
+                loadOfpAutoStatusRef.current === 'done' ||
+                Date.now() < injectFuelQuietUntilRef.current;
               setMissions((current) =>
                 current.map((mission) => {
                   if (mission.id !== missionId) return mission;
                   const prevCheck = mission.lastPreflightCheck;
                   if (!prevCheck?.loadVerification) return mission;
+                  if (quietWatchFuel) {
+                    const prevFuel = prevCheck.loadVerification.fuel;
+                    const nextFuel = verification.fuel;
+                    const watchCaughtUp =
+                      typeof prevFuel.plannedLb === 'number' &&
+                      matchFuelOk(
+                        nextFuel.liveLb ?? 0,
+                        prevFuel.plannedLb,
+                        fuelMatchToleranceLb(prevFuel.plannedLb),
+                        nextFuel.taxiBurnLb ?? prevFuel.taxiBurnLb,
+                      );
+                    if (!watchCaughtUp) {
+                      const livePayloadLb = pickLivePayloadLb(
+                        verification.payload.liveLb,
+                        prevCheck.loadVerification.payload.liveLb,
+                      );
+                      return {
+                        ...mission,
+                        lastPreflightCheck: {
+                          ...prevCheck,
+                          loadVerification: {
+                            ...prevCheck.loadVerification,
+                            payload: {
+                              ...prevCheck.loadVerification.payload,
+                              ...(livePayloadLb !== undefined
+                                ? { liveLb: livePayloadLb }
+                                : {}),
+                              ...(verification.payload.stations
+                                ? { stations: verification.payload.stations }
+                                : {}),
+                            },
+                          },
+                        },
+                      };
+                    }
+                    injectFuelQuietUntilRef.current = 0;
+                  }
                   if (
                     prevCheck.loadVerification.ready === verification.ready &&
                     Math.abs(
@@ -4628,7 +4677,8 @@ export function App() {
       Boolean(activeMission.staticId) &&
       (!activeMission.lastOfpCheck ||
         activeMission.lastOfpCheck.verdict === 'fail') &&
-      Boolean(username);
+      Boolean(username) &&
+      !busy;
 
     if (!eligible || !activeMission) {
       setOfpAutoStatus('idle');
@@ -4705,6 +4755,7 @@ export function App() {
     simbriefUser,
     staging?.replaceManifest,
     tab,
+    busy,
   ]);
 
   // Compare persisted fleet fuel against confirmed OFP block fuel. A zero-cost
@@ -4821,19 +4872,23 @@ export function App() {
               }
               const livePayload =
                 progress.livePayloadLb ?? verification.payload.liveLb;
-              const stableTanks = pickFuelTankBreakdown(
-                progress.liveTanks,
-                verification.fuel.tanks,
-                progress.liveFuelLb ?? verification.fuel.liveLb,
-              );
-              const liveFuel =
-                pickStableLiveFuelLb({
-                  next: progress.liveFuelLb,
-                  prev: verification.fuel.liveLb,
-                  plannedLb: verification.fuel.plannedLb,
-                  nextTanks: stableTanks ?? progress.liveTanks,
-                  prevTanks: verification.fuel.tanks,
-                }) ?? verification.fuel.liveLb;
+              const heldFuel = holdWrittenFuelLb({
+                liveLb: progress.liveFuelLb ?? verification.fuel.liveLb,
+                writtenLb: verification.fuel.plannedLb,
+                prevLb: verification.fuel.liveLb,
+              });
+              const fuelDumpedDuringPayload =
+                typeof progress.liveFuelLb === 'number' &&
+                typeof heldFuel === 'number' &&
+                Math.abs(progress.liveFuelLb - heldFuel) > 80;
+              const stableTanks = fuelDumpedDuringPayload
+                ? verification.fuel.tanks
+                : pickFuelTankBreakdown(
+                    progress.liveTanks,
+                    verification.fuel.tanks,
+                    heldFuel ?? verification.fuel.liveLb,
+                  );
+              const liveFuel = heldFuel ?? verification.fuel.liveLb;
               return {
                 ...mission,
                 lastPreflightCheck: {
@@ -4897,13 +4952,44 @@ export function App() {
     };
   }, [loadOfpAutoStatus, activeMission?.id]);
 
-  // Done was only to avoid looking like a mid-write cancel. Once Watch is
-  // live, the switch is Off again so the user can unload + reinject.
+  // Writes finished (`done`) before Watch's first honest sample. Stay on
+  // Checking until Sim vs Due matches — flipping Off at Watch-start made
+  // PREFLIGHT FAILED look like inject had already given up.
   useEffect(() => {
-    if (loadOfpAutoStatus === 'done' && watch?.running) {
+    if (loadOfpAutoStatus !== 'done') return;
+    const v = activeMission?.lastPreflightCheck?.loadVerification;
+    if (!v) return;
+    const plannedFuel = v.fuel.plannedLb;
+    const plannedPayload = v.payload.plannedLb;
+    const fuelOk =
+      plannedFuel === undefined ||
+      matchFuelOk(
+        v.fuel.liveLb ?? 0,
+        plannedFuel,
+        fuelMatchToleranceLb(plannedFuel),
+        v.fuel.taxiBurnLb,
+      );
+    const payloadOk =
+      plannedPayload === undefined ||
+      v.payload.liveLb === undefined ||
+      Math.abs(v.payload.liveLb - plannedPayload) <=
+        payloadMatchToleranceLb(plannedPayload);
+    if (!fuelOk || !payloadOk) return;
+    setLoadOfpAutoStatus('idle');
+    setSkylineInjectEnabled(false);
+  }, [
+    activeMission?.lastPreflightCheck?.loadVerification,
+    loadOfpAutoStatus,
+  ]);
+
+  useEffect(() => {
+    if (loadOfpAutoStatus !== 'done') return;
+    const id = window.setTimeout(() => {
       setLoadOfpAutoStatus('idle');
-    }
-  }, [loadOfpAutoStatus, watch?.running]);
+      setSkylineInjectEnabled(false);
+    }, 25_000);
+    return () => window.clearTimeout(id);
+  }, [loadOfpAutoStatus]);
 
   // Continuously refresh Loaded vs Due while staging on the ground.
   // Full /api/preflight opens its own pipe — pause while Watch owns SimBridge
@@ -7453,6 +7539,8 @@ export function App() {
       setSkylineInjectEnabled(false);
       if (loadOfpAutoStatus === 'loading') {
         void onCancelInject();
+      } else if (loadOfpAutoStatus === 'done') {
+        setLoadOfpAutoStatus('idle');
       }
       return;
     }
@@ -7558,19 +7646,32 @@ export function App() {
           throw new Error(result.error ?? 'Fuel and payload load failed');
         }
         succeeded = true;
-        // Keep the switch looking armed until status flips off loading; then
-        // show Done (not Off) so it does not look like a mid-payload cancel.
-        setLoadOfpAutoStatus('done');
+        if (result.mission) {
+          setMissions((current) =>
+            current.map((m) =>
+              m.id === result.mission.id ? result.mission : m,
+            ),
+          );
+        }
+        const injectReady = Boolean(
+          result.mission?.lastPreflightCheck?.loadVerification?.ready,
+        );
+        setLoadOfpAutoStatus(injectReady ? 'idle' : 'done');
         setSkylineInjectEnabled(false);
+        injectFuelQuietUntilRef.current = Date.now() + 12_000;
         setLoadOfpAutoError(null);
-        setLoadOfpProgress(null);
-        setToastKind('ok');
+        if (injectReady) {
+          setLoadOfpProgress(null);
+        }
+        setToastKind(injectReady ? 'ok' : 'ok');
         setToast(
-          `Fuel and payload loaded · cargo ${formatMassExact(result.plan.cargoLb / KG_TO_LB, weightSystem)}` +
+          `Fuel and payload written · cargo ${formatMassExact(result.plan.cargoLb / KG_TO_LB, weightSystem)}` +
             (result.cgRebalanceMoves
               ? ` · CG rebalanced ×${result.cgRebalanceMoves}`
               : '') +
-            ` · live validation active`,
+            (injectReady
+              ? ''
+              : ' · waiting for live sample'),
         );
       } catch (err) {
         if (abort.signal.aborted) {
@@ -7608,6 +7709,7 @@ export function App() {
       });
       setWatch(status);
       setLoadOfpAutoStatus('idle');
+      setSkylineInjectEnabled(false);
     } catch {
       /* auto-start effect retries; leave Done until Watch is up */
     }

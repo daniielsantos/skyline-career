@@ -323,6 +323,21 @@ function normalizeDispatchUnits(
 }
 
 /**
+ * SimBrief Freight (`cargo=`) is a belly maxcargo cap on passenger MSFS
+ * airframes (ATR HighLine/Economy = 3739 lb). Career load belongs in Payload.
+ */
+function simBriefPrefillsPayloadNotFreight(
+  aircraftClassId: string,
+  airframeTypeId?: string,
+): boolean {
+  if (aircraftClassId === 'light_ga') return true;
+  const typeId = findCareerPlayerAirframe(airframeTypeId)?.typeId;
+  return (
+    typeId === 'microsoft-atr-72-600' || typeId === 'microsoft-atr-42-600'
+  );
+}
+
+/**
  * Cargo kg Skyline should hand SimBrief / inject — never above the route
  * fuel+MTOW ops cap (mission booking can still be stale from older accepts).
  *
@@ -473,7 +488,10 @@ export async function buildMissionDispatch(
   // light_ga SimBrief airframes (BN2, Comanche, …) drive load via Payload, not
   // Freight — cargo= hits a small maxcargo soft-cap while manualpayload fills
   // the field that matches EFB useful load.
-  const usePayloadPrefill = mission.aircraftClassId === 'light_ga';
+  const usePayloadPrefill = simBriefPrefillsPayloadNotFreight(
+    mission.aircraftClassId,
+    mission.airframeTypeId,
+  );
   // Navigraph SimBrief EFB (MSFS) refuses IMPORT WEIGHTS with pax=0:
   // "Expecting at least one passenger (pilot)". Mission intent stays pax=0;
   // compareMissionIntentToOfp allows +1 via maxExtraPax (or maxPaxSeats).

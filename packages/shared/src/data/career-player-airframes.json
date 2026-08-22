@@ -501,7 +501,7 @@
     "label": "ATR 72-600",
     "rolesPackRelPath": "profiles/ofp/microsoft-atr-72-600.json",
     "simbriefIcao": "AT76",
-    "simbriefAirframeMatch": "Default",
+    "simbriefAirframeMatch": "Microsoft \\(MSFS\\) - ATR 72 - HighLine",
     "oewKg": 13000,
     "mtowKg": 23170,
     "maxCargoKg": 7500,

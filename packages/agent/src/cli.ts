@@ -94,6 +94,7 @@ import {
   formatIntentOfpCheck,
   formatMissionSummary,
   formatSettlementSummary,
+  findCareerPlayerAirframe,
   getAircraftClass,
   listMarketLots,
   listViableMarketLots,
@@ -2515,7 +2516,12 @@ async function main(): Promise<void> {
 
       const staticId = mission.staticId ?? makeStaticId('career');
       const cargoThousands = cargoWeightToThousands(mission.cargoKg);
-      const usePayloadPrefill = mission.aircraftClassId === 'light_ga';
+      const usePayloadPrefill =
+        mission.aircraftClassId === 'light_ga' ||
+        findCareerPlayerAirframe(mission.airframeTypeId)?.typeId ===
+          'microsoft-atr-72-600' ||
+        findCareerPlayerAirframe(mission.airframeTypeId)?.typeId ===
+          'microsoft-atr-42-600';
       const url = buildDispatchRedirectUrl({
         type,
         orig: mission.originIcao,

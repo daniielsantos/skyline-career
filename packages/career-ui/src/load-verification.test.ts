@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   formatPayloadDueLine,
+  holdWrittenFuelLb,
   inferMissingOuterTanks,
   matchFuelOk,
   payloadMatchToleranceLb,
@@ -121,6 +122,31 @@ describe('payloadMatchToleranceLb', () => {
     assert.equal(Math.abs(64_567 - 64_659) <= tol, true);
     assert.equal(Math.abs(39_811 - 39_971) <= payloadMatchToleranceLb(39_971), true);
     assert.equal(payloadMatchToleranceLb(1_000), 75);
+  });
+});
+
+describe('holdWrittenFuelLb', () => {
+  it('lets tanks fill toward Due, then holds a dump after the fill', () => {
+    assert.equal(
+      holdWrittenFuelLb({ liveLb: 2000, writtenLb: 6151 }),
+      2000,
+    );
+    assert.equal(
+      holdWrittenFuelLb({ liveLb: 4000, writtenLb: 6151, prevLb: 2000 }),
+      4000,
+    );
+    assert.equal(
+      holdWrittenFuelLb({ liveLb: 1049, writtenLb: 6151, prevLb: 6151 }),
+      6151,
+    );
+    assert.equal(
+      holdWrittenFuelLb({ liveLb: 0, writtenLb: 6151, prevLb: 6151 }),
+      6151,
+    );
+    assert.equal(
+      holdWrittenFuelLb({ liveLb: 6100, writtenLb: 6151, prevLb: 6151 }),
+      6100,
+    );
   });
 });
 

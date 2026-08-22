@@ -20,7 +20,8 @@
     "Cabin seats mapped as baggage (career cargo / pax=0)",
     "loadMethod: direct-injection; injectCapable: true",
     "Fuel: classic LEFT_MAIN / RIGHT_MAIN (AUX deferred)",
-    "liveSources: classic fuel + classic stations"
+    "liveSources: classic fuel + classic stations",
+    "SimBrief: Microsoft (MSFS) ATR 72 HighLine (Awemeter) — not Default (Default OEW cuts cargo vs MTOW)"
   ],
   "fuel": {
     "unit": "lb"
@@ -42,7 +43,7 @@
     "payload": ["classic-stations"]
   },
   "simbriefIcao": "AT76",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "Microsoft \\(MSFS\\) - ATR 72 - HighLine",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },

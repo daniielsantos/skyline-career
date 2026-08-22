@@ -496,6 +496,36 @@ export function pickLivePayloadLb(
   return typeof next === 'number' && Number.isFinite(next) ? next : prev;
 }
 
+/**
+ * During inject: show tanks filling toward Due. Only hold the written total
+ * when live *drops* after a completed fill (payload dump / ghost empty).
+ * Never snap Sim up to Due — that looked fake.
+ */
+export function holdWrittenFuelLb(opts: {
+  liveLb?: number;
+  writtenLb?: number;
+  prevLb?: number;
+}): number | undefined {
+  const live = opts.liveLb;
+  const written = opts.writtenLb;
+  const prev = opts.prevLb;
+  const liveOk = typeof live === 'number' && Number.isFinite(live);
+  const writtenOk =
+    typeof written === 'number' && Number.isFinite(written) && written > 0;
+  const prevOk = typeof prev === 'number' && Number.isFinite(prev);
+
+  if (!liveOk) return prevOk ? prev : writtenOk ? written : undefined;
+  if (!prevOk) return live;
+
+  if (live >= prev - 80) return live;
+
+  const filled =
+    writtenOk && prev >= written - Math.max(80, written * 0.05);
+  if (filled && writtenOk) return written;
+  if (live < prev * 0.15) return prev;
+  return live;
+}
+
 export type LoadVerificationFuel = {
   plannedLb?: number;
   liveLb: number;

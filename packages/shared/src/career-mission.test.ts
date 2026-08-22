@@ -19,7 +19,9 @@ import {
   findActivePlayerMission,
   getAircraftClass,
   isActiveMissionStatus,
+  bumpMissionOfpCheckSeq,
   isOfpCargoUnderOnlyFailure,
+  missionOfpCheckSeq,
   KG_TO_LB,
   listActivePlayerMissions,
   listMarketLots,
@@ -1131,6 +1133,14 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(isOfpCargoUnderOnlyFailure(check), true);
   });
 
+  it('bumps ofpCheckSeq so stale confirm can be detected', () => {
+    const mission = baseMission({ cargoKg: 1_800 });
+    assert.equal(missionOfpCheckSeq(mission), 0);
+    assert.equal(bumpMissionOfpCheckSeq(mission), 1);
+    assert.equal(bumpMissionOfpCheckSeq(mission), 2);
+    assert.equal(mission.ofpCheckSeq, 2);
+  });
+
   it('reads freighter load from payload when baggage is a low freight soft-cap', () => {
     const ofp = matchingOfp({
       loadSheet: {
@@ -1142,6 +1152,19 @@ describe('compareMissionIntentToOfp', () => {
       },
     });
     assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 783);
+  });
+
+  it('reads ATR-style load from payload when EFB pax=1 and freight is maxcargo', () => {
+    const ofp = matchingOfp({
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 6000,
+        passengerCount: 1,
+        baggage: 3739,
+        payload: 14_500,
+      },
+    });
+    assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 14_500);
   });
 
   it('does not treat airframe mismatch as cargo-under-only', () => {

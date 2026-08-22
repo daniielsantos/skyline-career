@@ -1,4 +1,4 @@
-# ATR 42-600 Passenger — discovery
+# ATR 42-600 Passenger ï¿½ discovery
 
 **In-sim title (example):** `ATR 42-600 Passenger`  
 **Match title:** `ATR 42-600 Passenger`  
@@ -19,10 +19,10 @@
 - Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).
 - AUX deferred for v1.
 - Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.
-- Station maxLoad: placeholder until flight_model.cfg calibrate.
+- Station maxLoad: 2000 lb (S1â€“S11).
 - Homologated with interactive wizard.
-- Market family: `microsoft-atr-42-600` — pack `profiles/ofp/microsoft-atr-42-600.json`
-  (Highline 01–03 · Passenger · Stol; same stations).
+- Market family: `microsoft-atr-42-600` ï¿½ pack `profiles/ofp/microsoft-atr-42-600.json`
+  (Highline 01ï¿½03 ï¿½ Passenger ï¿½ Stol; same stations).
 
 ## Homologated
 

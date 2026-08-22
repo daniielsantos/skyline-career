@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { preflightBlocksDepart } from './preflight-helpers.ts';
+import { lastPreflightFromInjectLive, preflightBlocksDepart } from './preflight-helpers.ts';
 import type { MissionIntent } from '@msfs-compat/shared';
 
 function missionWithPreflight(
@@ -119,5 +119,41 @@ describe('preflightBlocksDepart', () => {
       ),
       false,
     );
+  });
+});
+
+describe('lastPreflightFromInjectLive', () => {
+  it('marks ready from the inject write snapshot without another sample', () => {
+    const check = lastPreflightFromInjectLive({
+      previous: {
+        verdict: 'fail',
+        summary: 'stale',
+        checkedAtIso: '2026-01-01T00:00:00Z',
+        loadVerification: {
+          ready: false,
+          fuel: { plannedLb: 6100, liveLb: 100, ok: false },
+          payload: {
+            plannedLb: 15_200,
+            liveLb: 200,
+            ok: false,
+            cargoLb: 14_980,
+            crewLb: 220,
+          },
+          aircraft: { onGround: true, enginesRunning: false },
+          weightNoteCount: 0,
+        },
+        findings: [],
+      } as NonNullable<MissionIntent['lastPreflightCheck']>,
+      stations: { 1: 220, 5: 7490, 6: 7490 },
+      tanks: { LEFT_MAIN: 400, RIGHT_MAIN: 400 },
+      liveFuelLb: 6100,
+      livePayloadLb: 15_200,
+      liveTanks: { left: 3050, right: 3050, center: 0 },
+      blockFuelLb: 6100,
+      cargoLb: 14_980,
+    });
+    assert.equal(check.loadVerification?.ready, true);
+    assert.equal(check.loadVerification?.payload.liveLb, 15_200);
+    assert.equal(check.verdict, 'pass');
   });
 });

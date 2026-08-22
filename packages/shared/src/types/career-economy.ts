@@ -757,6 +757,11 @@ export interface MissionIntent {
   fuelUplift?: MissionFuelUplift;
   /** SimBrief OFP whose block-fuel requirement has been funded/accepted. */
   fuelAuthorizedOfpId?: string;
+  /**
+   * Bumped on every lastOfpCheck write (and cargo-trim before reconfirm).
+   * Stale auto-confirm must not overwrite a newer Accept OFP cargo snapshot.
+   */
+  ofpCheckSeq?: number;
   /** Player fleet aircraft that flies this mission. */
   aircraftId?: string;
   /**

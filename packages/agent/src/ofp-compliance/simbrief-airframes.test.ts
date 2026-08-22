@@ -71,6 +71,42 @@ describe('matchSimBriefAirframe', () => {
     assert.equal(hit?.internalId, '746599_dual');
   });
 
+  it('matches Microsoft ATR 72 HighLine without taking Economy', () => {
+    const atr72: SimBriefAirframe[] = [
+      {
+        internalId: 'AT76',
+        icao: 'AT76',
+        listType: 'AT76',
+        comments: 'Default',
+        name: 'ATR 72-600',
+        passengers: 70,
+      },
+      {
+        internalId: 'awemeter_econ',
+        icao: 'AT76',
+        listType: 'AT76',
+        comments: 'Microsoft (MSFS) - ATR 72 - Economy [credit: Awemeter]',
+        name: 'ATR 72-600',
+        passengers: 70,
+      },
+      {
+        internalId: 'awemeter_hl',
+        icao: 'AT76',
+        listType: 'AT76',
+        comments: 'Microsoft (MSFS) - ATR 72 - HighLine [credit: Awemeter]',
+        name: 'ATR 72-600',
+        passengers: 70,
+      },
+    ];
+    assert.equal(
+      matchSimBriefAirframe(
+        atr72,
+        'Microsoft \\(MSFS\\) - ATR 72 - HighLine',
+      )?.internalId,
+      'awemeter_hl',
+    );
+  });
+
   it('disambiguates TFDi PW vs GE from title hint', () => {
     const pw = matchSimBriefAirframe(
       MD1F,

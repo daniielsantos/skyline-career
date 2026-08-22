@@ -2651,9 +2651,9 @@ export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
   const pax = sheet.passengerCount ?? 0;
 
   let value: number | undefined;
-  if (pax <= 0) {
-    // GA payload-primary airframes often leave a low freight/baggage figure
-    // (SimBrief maxcargo) while the real load sits in payload — take the larger.
+  if (pax <= 1) {
+    // EFB needs pax=1 (pilot). Passenger airframes (ATR HighLine, BN2) keep
+    // career freight in Payload; Freight/baggage is a tiny maxcargo cap.
     if (baggage !== undefined && payload !== undefined) {
       value = Math.max(baggage, payload);
     } else {
@@ -2893,6 +2893,22 @@ export function formatIntentOfpCheck(check: IntentOfpCheck): string {
     lines.push(`  [${f.severity}] ${f.code}: ${f.message}`);
   }
   return lines.join('\n');
+}
+
+/** Monotonic OFP-check generation on a mission (0 if never stamped). */
+export function missionOfpCheckSeq(mission: {
+  ofpCheckSeq?: number;
+}): number {
+  const n = mission.ofpCheckSeq;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 0;
+  return Math.max(0, Math.floor(n));
+}
+
+/** Mark that OFP state is mutating so in-flight confirm-ofp must not clobber it. */
+export function bumpMissionOfpCheckSeq(mission: MissionIntent): number {
+  const next = missionOfpCheckSeq(mission) + 1;
+  mission.ofpCheckSeq = next;
+  return next;
 }
 
 /**

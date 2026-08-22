@@ -1123,12 +1123,10 @@ async function applyMissionOfpLoadExclusive(
           }, 0)
         : 0;
     /**
-     * Due payload for UI / CDU ZFW. Prefer OFP cargo (requestedCargoLb) — station
-     * distribute may clamp to tiny profile maxLoad (BCF placeholders @ 500 lb).
-     * pax_and_cargo: SimBrief payload (no freighter crew floor).
+     * Due payload = OFP weight sent to SimBrief (requested cargo / payload).
+     * Crew seed is taken out of that total at inject time — not added on top.
      */
-    const plannedPayloadLb =
-      (built.requestedCargoLb ?? built.cargoLb) + plannedCrewLb;
+    const plannedPayloadLb = built.requestedCargoLb ?? built.cargoLb;
 
     watchDebugLog('inject', 'plan ready', {
       missionId: mission.id,
@@ -1397,7 +1395,7 @@ async function applyMissionOfpLoadExclusive(
     };
 
     let cargoPlacedLb = 0;
-    let cargoTargetLb = built.cargoLb;
+    let cargoTargetLb = Math.max(0, plannedPayloadLb - plannedCrewLb);
     const seatCount = preferSeatFill
       ? Math.max(1, seatStations.length)
       : Math.max(1, baggageStations.length || built.movableStations.length);
@@ -1865,13 +1863,9 @@ async function applyMissionOfpLoadExclusive(
     if (fuelOk) {
       for (let i = 0; i < CG_REBALANCE_MAX_ITERATIONS; i++) {
         assertOfpLoadNotCancelled(mission.id);
-        // Soft-refresh fuel schematic while placing cargo — catches tip/main
-        // transfer that only appears a second or two after the fuel write.
-        if (i > 0 && i % 3 === 0) {
-          await refreshFuelUiFromLive(
-            fuelUiTanks ?? plannedTanks ?? beforeLive.tanks,
-          );
-        }
+        // Do not refresh fuel from live while placing cargo. ATR (and similar)
+        // dump mains on station writes; painting that mid-loop looks like
+        // random fuel updates after payload starts. Restore tanks after cargo.
         const stillPlacing = cargoPlacedLb < cargoTargetLb - 0.5;
         // Hybrid fill: equal across all cargo stations first (Kodiak /
         // Caravan). At a limit → shift and keep Due; leftover then stays
@@ -2806,12 +2800,17 @@ async function applyMissionOfpLoadExclusive(
 
     } // end classic multi-round fuel + payload (!pmdgCdu)
 
+    const writtenFuelTanks = {
+      ...(fuelUiTanks ?? built.plan.fuel?.tanks ?? afterLive.tanks),
+    };
+    let liveTanksAfterPayload = writtenFuelTanks;
+    try {
+      liveTanksAfterPayload = await readLiveTanks(bridge, resolved.profile);
+    } catch {
+      /* payload-style: ghost/failed tank read keeps the write */
+    }
     afterLive = {
-      tanks: await readLiveTanksTrustingWrite(
-        bridge,
-        resolved.profile,
-        fuelUiTanks ?? afterLive.tanks,
-      ),
+      tanks: writtenFuelTanks,
       stations: pmdgCduPayload
         ? await readLiveStations(bridge, resolved.profile)
         : await readLiveStationsTrustingWrite(
@@ -2820,14 +2819,46 @@ async function applyMissionOfpLoadExclusive(
             workingStations,
           ),
     };
-    // Prefer live distribution (tips/nacelles) over the OFP write map when the
-    // sim has redistributed; still hold written values if AUX/TIP under-read.
-    paintFuelUiFromWriteTarget(
-      preferWrittenFuelTanks(
-        afterLive.tanks,
-        fuelUiTanks ?? afterLive.tanks,
-      ),
-    );
+    // Hold the fuel write on the card (same as stations). Do not paint a dump
+    // from SimConnect while cargo was just applied.
+    paintFuelUiFromWriteTarget(writtenFuelTanks);
+
+    // ATR (and similar) can dump mains while payload stations are written.
+    // Re-apply OFP tanks once so the sim matches what the card already shows.
+    {
+      const restoreTanks = built.plan.fuel?.tanks ?? writtenFuelTanks;
+      const liveFuelAfterPayloadLb = tanksToFuelLb(liveTanksAfterPayload);
+      const fuelDroppedAfterPayload =
+        plannedFuelLb > 0 &&
+        liveFuelAfterPayloadLb <
+          plannedFuelLb - Math.max(80, plannedFuelLb * 0.05);
+      if (!restoreFuelOnRollback && restoreTanks && fuelDroppedAfterPayload) {
+        publishLiveProgress(
+          'injecting',
+          'Payload moved fuel — restoring OFP tanks…',
+        );
+        const fuelApply = await applyFuelRound(restoreTanks, {
+          omitFuelTankWrites: idleOuterFuelTankIds(
+            liveTanksAfterPayload,
+            restoreTanks,
+          ),
+        });
+        applyResult = {
+          ...(applyResult ?? {}),
+          fuel: fuelApply.fuel ?? applyResult?.fuel,
+        };
+        paintFuelUiFromWriteTarget(restoreTanks);
+        await delayCancellable(mission.id, PAYLOAD_CG_SETTLE_MS);
+        afterLive = {
+          tanks: restoreTanks,
+          stations: afterLive.stations,
+        };
+        publishLiveProgress(
+          'injecting',
+          `Fuel restored · ${Math.round(lastGoodFuelLb ?? 0)} lb`,
+        );
+      }
+    }
 
     // Station SimVars can under-read on Accu-Sim while the tablet LVars hold the load.
     // Prefer a2a-lvars (same reader as Watch/Preflight); only then fall back to
@@ -3162,8 +3193,8 @@ async function applyMissionOfpLoadExclusive(
       compareVerdict = 'warn';
       compareSummary =
         cgRebalanceMoves > 0
-          ? `Inject applied after ${cgRebalanceMoves} CG shift(s) — Watch will confirm Loaded vs Due`
-          : 'Inject applied — Watch will confirm Loaded vs Due';
+          ? `Inject applied after ${cgRebalanceMoves} CG shift(s)`
+          : 'Inject applied';
       if (softCgWarn && applyResult.cg?.failures[0]) {
         const failure = applyResult.cg.failures[0];
         compareSummary =

@@ -387,7 +387,7 @@ export function plannedStationPayloadLb(opts: {
   maxGrossWeightLb?: number;
   blockFuelLb?: number;
 }): {
-  /** crew floors + placed cargo — compare to live.payload.total */
+  /** OFP / mission payload — compare to live.payload.total */
   plannedTotalLb: number;
   /** cargo after soft-cap / MTOW clamps */
   cargoPlacedLb: number;
@@ -399,7 +399,11 @@ export function plannedStationPayloadLb(opts: {
   const paxN = roles?.passengerStations?.length ?? 0;
   const bagN = roles?.baggageStations?.length ?? 0;
   const gaCabin = paxN > 0;
-  const crewLb = crewN * FREIGHTER_PILOT_LB;
+  // Freighter / career cargo: Due is the OFP payload we sent to SimBrief.
+  // Do not add a Skyline crew floor on top — EFB imports already include the
+  // pilot in that payload (ATR HighLine pax=1), and inject counts crew seed
+  // against the same OFP total.
+  const crewLb = gaCabin ? crewN * FREIGHTER_PILOT_LB : 0;
   let cargoLb = Math.max(0, opts.cargoLb);
 
   if (
@@ -499,6 +503,26 @@ export function adjustPlannedPayloadForLiveCrewStations(opts: {
   if (crewOnStations) {
     const nearFull = crewLive + threshold >= floorR;
     crewLb = nearFull ? floorR : roundLb(crewLive);
+  }
+
+  // ATR HighLine EFB (and similar): SimBrief Payload already includes the
+  // single pax/crew on S1. Adding the crew floor on top of that OFP figure
+  // made Due = Sim + 220 lb after import.
+  const liveSum = Object.values(opts.liveStations).reduce((sum, lb) => {
+    return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
+  }, 0);
+  if (
+    crewOnStations &&
+    crewLb > 0 &&
+    Number.isFinite(liveSum) &&
+    Math.abs(liveSum - cargo) <= 80
+  ) {
+    return {
+      plannedTotalLb: cargoR,
+      cargoPlacedLb: roundLb(Math.max(0, cargo - crewLb)),
+      crewLb,
+      crewOnStations,
+    };
   }
 
   return {

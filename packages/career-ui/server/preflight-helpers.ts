@@ -676,3 +676,158 @@ export function preflightBlocksDepart(mission: MissionIntent): boolean {
   if (typeof ready === 'boolean') return !ready;
   return mission.lastPreflightCheck?.verdict === 'fail';
 }
+
+function sumFinite(values: Iterable<number>): number {
+  let sum = 0;
+  for (const n of values) {
+    if (typeof n === 'number' && Number.isFinite(n)) sum += n;
+  }
+  return sum;
+}
+
+/**
+ * Stamp Loaded vs Due from the inject `after` snapshot — no extra SimConnect
+ * pass. Watch still refreshes later; Ready must not wait on that sample.
+ */
+export function lastPreflightFromInjectLive(opts: {
+  previous?: MissionIntent['lastPreflightCheck'];
+  stations: Record<number, number>;
+  liveFuelLb?: number;
+  livePayloadLb?: number;
+  liveTanks?: { left: number; right: number; center: number };
+  tanks: Record<string, number>;
+  blockFuelLb: number;
+  cargoLb: number;
+  displayCg?: {
+    liveMac?: number;
+    minMac?: number;
+    maxMac?: number;
+  };
+}): NonNullable<MissionIntent['lastPreflightCheck']> {
+  const prevLv = opts.previous?.loadVerification as
+    | (NonNullable<
+        NonNullable<MissionIntent['lastPreflightCheck']>['loadVerification']
+      > & {
+        fuel: {
+          plannedLb?: number;
+          liveLb: number;
+          ok: boolean;
+          taxiBurnLb?: number;
+          tanks?: { left: number; right: number; center: number };
+          tankCapacity?: unknown;
+        };
+        payload: {
+          plannedLb?: number;
+          liveLb?: number;
+          ok: boolean;
+          stations?: Record<number, number>;
+          cargoLb?: number;
+          crewLb?: number;
+          stationMax?: unknown;
+        };
+        cg?: {
+          liveMac?: number;
+          minMac?: number;
+          maxMac?: number;
+          ok?: boolean;
+          severity?: string;
+        };
+      })
+    | undefined;
+  const livePayloadLb = Math.round(
+    typeof opts.livePayloadLb === 'number' && Number.isFinite(opts.livePayloadLb)
+      ? opts.livePayloadLb
+      : sumFinite(Object.values(opts.stations)),
+  );
+  const liveFuelLb = Math.round(
+    typeof opts.liveFuelLb === 'number' && Number.isFinite(opts.liveFuelLb)
+      ? opts.liveFuelLb
+      : sumFinite(Object.values(opts.tanks)),
+  );
+  const plannedFuelLb =
+    typeof prevLv?.fuel.plannedLb === 'number' && prevLv.fuel.plannedLb > 0
+      ? prevLv.fuel.plannedLb
+      : opts.blockFuelLb;
+  const crewLb =
+    typeof prevLv?.payload.crewLb === 'number' ? prevLv.payload.crewLb : 0;
+  const plannedPayloadLb =
+    typeof prevLv?.payload.plannedLb === 'number' && prevLv.payload.plannedLb > 0
+      ? prevLv.payload.plannedLb
+      : opts.cargoLb + crewLb;
+  const taxiBurnLb = prevLv?.fuel.taxiBurnLb;
+  const weights = evaluateLoadVerification({
+    plannedFuelLb,
+    liveFuelLb,
+    plannedPayloadLb,
+    livePayloadLb,
+    taxiBurnLb,
+  });
+  const painted = opts.displayCg;
+  const liveMac = painted?.liveMac ?? prevLv?.cg?.liveMac;
+  const minMac = painted?.minMac ?? prevLv?.cg?.minMac;
+  const maxMac = painted?.maxMac ?? prevLv?.cg?.maxMac;
+  const cgOk =
+    liveMac === undefined ||
+    minMac === undefined ||
+    maxMac === undefined ||
+    (liveMac >= minMac && liveMac <= maxMac);
+  const ready = weights.ready;
+  return {
+    verdict: ready ? 'pass' : 'fail',
+    summary: ready
+      ? 'Inject applied — Loaded vs Due from write snapshot'
+      : 'Inject applied — write snapshot does not yet match Due',
+    checkedAtIso: new Date().toISOString(),
+    phase: opts.previous?.phase ?? 'load',
+    loadVerification: {
+      ready,
+      fuel: {
+        plannedLb: plannedFuelLb,
+        liveLb: liveFuelLb,
+        ok: weights.fuel.ok,
+        ...(taxiBurnLb !== undefined ? { taxiBurnLb } : {}),
+        ...(opts.liveTanks
+          ? { tanks: opts.liveTanks }
+          : prevLv?.fuel.tanks
+            ? { tanks: prevLv.fuel.tanks }
+            : {}),
+        ...(prevLv?.fuel.tankCapacity
+          ? { tankCapacity: prevLv.fuel.tankCapacity }
+          : {}),
+      },
+      payload: {
+        plannedLb: plannedPayloadLb,
+        liveLb: livePayloadLb,
+        ok: weights.payload.ok,
+        stations: { ...opts.stations },
+        ...(typeof prevLv?.payload.cargoLb === 'number'
+          ? { cargoLb: prevLv.payload.cargoLb }
+          : { cargoLb: opts.cargoLb }),
+        ...(crewLb > 0 ? { crewLb } : {}),
+        ...(prevLv?.payload.stationMax
+          ? { stationMax: prevLv.payload.stationMax }
+          : {}),
+      },
+      ...(liveMac !== undefined || minMac !== undefined || maxMac !== undefined
+        ? {
+            cg: {
+              liveMac,
+              minMac,
+              maxMac,
+              ok: cgOk,
+              severity: cgOk ? 'info' : 'warn',
+            },
+          }
+        : prevLv?.cg
+          ? { cg: prevLv.cg }
+          : {}),
+      aircraft: prevLv?.aircraft ?? {
+        onGround: true,
+        enginesRunning: false,
+      },
+      weightNoteCount: prevLv?.weightNoteCount ?? 0,
+    },
+    location: opts.previous?.location,
+    findings: opts.previous?.findings ?? [],
+  } as NonNullable<MissionIntent['lastPreflightCheck']>;
+}

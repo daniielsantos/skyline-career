@@ -25,7 +25,7 @@ import {
   payloadMatchToleranceLb,
   pickFuelTankBreakdown,
   pickLivePayloadLb,
-  pickStableLiveFuelLb,
+  holdWrittenFuelLb,
   stabilizeDisplayedFuel,
   matchFuelOk,
 } from './load-verification';
@@ -180,12 +180,6 @@ export function DispatchActivePanel(props: {
   if (
     stickyInjectStatusRef.current !== 'loading' &&
     props.loadOfpAutoStatus === 'loading'
-  ) {
-    stickyFuelRef.current = {};
-  }
-  if (
-    stickyInjectStatusRef.current === 'loading' &&
-    props.loadOfpAutoStatus !== 'loading'
   ) {
     stickyFuelRef.current = {};
   }
@@ -888,9 +882,14 @@ export function DispatchActivePanel(props: {
       {showPreflight && mission.lastPreflightCheck
         ? (() => {
             const check = mission.lastPreflightCheck;
+            const injectFuelHold =
+              props.loadOfpAutoStatus === 'loading' ||
+              props.loadOfpAutoStatus === 'done';
             const baseVerification = check.loadVerification;
             // Prefer Watch live breakdown when present. Zero liveLb is real
             // (user emptied load) — only keep mission totals when Watch omits liveLb.
+            // During inject/confirm, keep written fuel like payload stations
+            // (ATR dumps mains while cargo is written; Watch would paint the dip).
             const verification =
               baseVerification &&
               props.watch?.running &&
@@ -909,14 +908,22 @@ export function DispatchActivePanel(props: {
                       ok: _watchPayloadOk,
                       ...watchPayloadRest
                     } = watchPayload;
-                    // Watch already filtered flicker on the server. Re-running
-                    // pickStable against the inject sticky latched Sim=Due and
-                    // hid EFB drains after the first inject.
-                    const tanks =
-                      watchFuel.tanks ??
-                      stickyFuelRef.current.tanks ??
-                      baseVerification.fuel.tanks;
-                    const liveFuelLb = watchFuel.liveLb;
+                    const tanks = injectFuelHold
+                      ? (baseVerification.fuel.tanks ??
+                        stickyFuelRef.current.tanks)
+                      : (watchFuel.tanks ??
+                        stickyFuelRef.current.tanks ??
+                        baseVerification.fuel.tanks);
+                    const liveFuelLb = injectFuelHold
+                      ? holdWrittenFuelLb({
+                          liveLb: watchFuel.liveLb,
+                          writtenLb: baseVerification.fuel.plannedLb,
+                          prevLb:
+                            stickyFuelRef.current.liveLb ??
+                            baseVerification.fuel.liveLb,
+                        }) ??
+                        baseVerification.fuel.liveLb
+                      : watchFuel.liveLb;
                     const livePayloadLb = pickLivePayloadLb(
                       watchPayload.liveLb,
                       baseVerification.payload.liveLb,
@@ -995,7 +1002,8 @@ export function DispatchActivePanel(props: {
             const injectProgress = props.loadOfpProgress;
             const verificationWithInject =
               verification &&
-              props.loadOfpAutoStatus === 'loading' &&
+              (props.loadOfpAutoStatus === 'loading' ||
+                props.loadOfpAutoStatus === 'done') &&
               injectProgress &&
               (injectProgress.liveTanks ||
                 injectProgress.liveStations ||
@@ -1006,23 +1014,25 @@ export function DispatchActivePanel(props: {
                       injectProgress.liveFuelLb ?? verification.fuel.liveLb;
                     const { tanks: _vTanks, ...fuelWithoutTanks } =
                       verification.fuel;
-                    const injectTanks = pickFuelTankBreakdown(
-                      injectProgress.liveTanks,
-                      stickyFuelRef.current.tanks ?? verification.fuel.tanks,
-                      rawInjectFuel,
-                    );
                     const injectFuelLb =
-                      pickStableLiveFuelLb({
-                        next: rawInjectFuel,
-                        prev:
+                      holdWrittenFuelLb({
+                        liveLb: rawInjectFuel,
+                        writtenLb: verification.fuel.plannedLb,
+                        prevLb:
                           stickyFuelRef.current.liveLb ??
                           verification.fuel.liveLb,
-                        plannedLb: verification.fuel.plannedLb,
-                        nextTanks: injectTanks ?? injectProgress.liveTanks,
-                        prevTanks:
-                          stickyFuelRef.current.tanks ??
-                          verification.fuel.tanks,
                       }) ?? rawInjectFuel;
+                    const fuelDropped =
+                      typeof rawInjectFuel === 'number' &&
+                      typeof injectFuelLb === 'number' &&
+                      rawInjectFuel < injectFuelLb - 80;
+                    const injectTanks = fuelDropped
+                      ? (stickyFuelRef.current.tanks ?? verification.fuel.tanks)
+                      : pickFuelTankBreakdown(
+                          injectProgress.liveTanks,
+                          stickyFuelRef.current.tanks ?? verification.fuel.tanks,
+                          injectFuelLb,
+                        );
                     if (typeof injectFuelLb === 'number') {
                       stickyFuelRef.current.liveLb = injectFuelLb;
                     }
@@ -1076,7 +1086,8 @@ export function DispatchActivePanel(props: {
             const watchOwnsLoad =
               Boolean(props.watch?.running) &&
               props.watch?.missionId === mission.id &&
-              props.loadOfpAutoStatus !== 'loading';
+              props.loadOfpAutoStatus !== 'loading' &&
+              props.loadOfpAutoStatus !== 'done';
             // Watch is the Loaded vs Due owner after inject. The sticky
             // stabilize gate latched Sim=Due and hid EFB fuel/payload edits.
             const stabilizedFuel = rawView
@@ -1143,6 +1154,8 @@ export function DispatchActivePanel(props: {
             // While Skyline inject is writing, never show PREFLIGHT READY from
             // mid-ramp live numbers — the switch also looked "finished" early.
             const injecting = props.loadOfpAutoStatus === 'loading';
+            const confirming = props.loadOfpAutoStatus === 'done';
+            const injectBusy = injecting || confirming;
             const liveLocation =
               props.watch?.running &&
               props.watch.missionId === mission.id &&
@@ -1152,7 +1165,7 @@ export function DispatchActivePanel(props: {
             const locationOk = liveLocation?.ok !== false;
             const loadReady =
               view != null ? fuelOk && payloadOk : check.verdict !== 'fail';
-            const ready = injecting
+            const ready = injectBusy
               ? false
               : loadReady && locationOk;
             const injectSwitchOn =
@@ -1546,7 +1559,9 @@ export function DispatchActivePanel(props: {
                       <strong>
                         {injecting
                           ? 'INJECTING LOAD'
-                          : ready
+                          : confirming
+                            ? 'CONFIRMING LOAD'
+                            : ready
                             ? 'PREFLIGHT READY'
                             : loadReady && !locationOk
                               ? 'NOT AT ORIGIN'
@@ -1556,6 +1571,8 @@ export function DispatchActivePanel(props: {
                         {injecting
                           ? (props.loadOfpProgress?.message ??
                             'Writing fuel and payload into the sim…')
+                          : confirming
+                            ? 'Writes finished — waiting for a live sample before Ready.'
                           : ready
                             ? 'Fuel and cargo match the confirmed OFP. Take off when Watch is connected.'
                             : loadReady && !locationOk
@@ -1578,6 +1595,8 @@ export function DispatchActivePanel(props: {
                                 : props.loadOfpAutoStatus === 'loading'
                                   ? (props.loadOfpProgress?.message ??
                                     'Writing fuel + payload and balancing CG. Turn off to stop.')
+                                  : confirming
+                                    ? 'Writes finished — waiting for Watch to sample Loaded vs Due.'
                                   : props.watch?.running &&
                                       props.watch.missionId === mission.id &&
                                       !props.simBridge?.connected
@@ -1591,7 +1610,7 @@ export function DispatchActivePanel(props: {
                                 className={`skyline-inject-status${
                                   props.loadOfpAutoStatus === 'failed'
                                     ? ' skyline-inject-status-fail'
-                                    : props.loadOfpAutoStatus === 'loading'
+                                    : injectBusy
                                       ? ' skyline-inject-status-busy'
                                       : ''
                                 }`}
@@ -1609,7 +1628,7 @@ export function DispatchActivePanel(props: {
                                 ? ' skyline-inject-switch-on'
                                 : ''
                             }${
-                              injecting ? ' skyline-inject-switch-busy' : ''
+                              injectBusy ? ' skyline-inject-switch-busy' : ''
                             }`}
                             aria-checked={injectSwitchOn}
                             disabled={
@@ -1625,6 +1644,8 @@ export function DispatchActivePanel(props: {
                               injectSwitchOn
                                 ? injecting
                                   ? 'Turn off to cancel fuel/payload inject'
+                                  : confirming
+                                    ? 'Waiting for live sample — turn off to dismiss'
                                   : 'Skyline inject is on — turn off to leave load as-is'
                                 : 'Turn on to write OFP fuel and payload into the sim'
                             }
@@ -1643,11 +1664,11 @@ export function DispatchActivePanel(props: {
                               <small>
                                 {injecting
                                   ? 'Writing…'
+                                  : confirming
+                                    ? 'Checking…'
                                   : props.loadOfpAutoStatus === 'failed'
                                     ? 'Failed · off'
-                                    : props.loadOfpAutoStatus === 'done'
-                                      ? 'Done'
-                                      : props.skylineInjectEnabled
+                                    : props.skylineInjectEnabled
                                         ? 'On'
                                         : 'Off'}
                               </small>

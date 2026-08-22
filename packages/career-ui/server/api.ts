@@ -203,7 +203,9 @@ import {
   type OfflineFeeSummary,
   fuelBurnMultFromAircraft,
   padOfpBlockFuelKgForMx,
+  bumpMissionOfpCheckSeq,
   isOfpCargoUnderOnlyFailure,
+  missionOfpCheckSeq,
   trimMissionCargoToKg,
   airportByIcao,
   resolveAirportCoords,
@@ -231,7 +233,7 @@ import {
   requestOfpLoadCancel,
 } from './ofp-load-helpers.ts';
 import { beginOfpLoadActive, endOfpLoadActive, isOfpLoadActive } from './ofp-load-state.ts';
-import { preflightBlocksDepart, runMissionPreflight } from './preflight-helpers.ts';
+import { preflightBlocksDepart, runMissionPreflight, lastPreflightFromInjectLive } from './preflight-helpers.ts';
 import {
   CareerWatchSession,
   probeFirstContactPosition,
@@ -495,6 +497,24 @@ type MxFuelBurnFinding = {
   severity: 'warn';
   message: string;
 };
+
+function applyConfirmedOfpCheck(
+  mission: MissionIntent,
+  ofpCheck: NonNullable<MissionIntent['lastOfpCheck']>,
+): void {
+  bumpMissionOfpCheckSeq(mission);
+  mission.lastOfpCheck = {
+    ...ofpCheck,
+    staticId: mission.staticId,
+  };
+  if (
+    mission.contractPilot &&
+    (ofpCheck.verdict === 'pass' || ofpCheck.verdict === 'warn') &&
+    ofpCheck.ofpId
+  ) {
+    mission.fuelAuthorizedOfpId = ofpCheck.ofpId;
+  }
+}
 
 function mxFuelBurnFindingForAircraft(
   aircraft: PlayerAircraft | undefined | null,
@@ -4515,6 +4535,7 @@ export function createCareerApiServer(port = 8787) {
                   staticId: built.staticId,
                   status: 'dispatched',
                   dispatchedAtTick: world.tick,
+                  ofpCheckSeq: missionOfpCheckSeq(next) + 1,
                   lastOfpCheck: undefined,
                   lastPreflightCheck: undefined,
                   injectBallastLb: undefined,
@@ -5008,6 +5029,7 @@ export function createCareerApiServer(port = 8787) {
                   staticId: built.staticId,
                   status: 'dispatched',
                   dispatchedAtTick: world.tick,
+                  ofpCheckSeq: missionOfpCheckSeq(next) + 1,
                   lastOfpCheck: undefined,
                   lastPreflightCheck: undefined,
                   injectBallastLb: undefined,
@@ -5415,6 +5437,7 @@ export function createCareerApiServer(port = 8787) {
               staticId: built.staticId,
               status: 'dispatched',
               dispatchedAtTick: world.tick,
+              ofpCheckSeq: missionOfpCheckSeq(next) + 1,
               lastOfpCheck: undefined,
               lastPreflightCheck: undefined,
               injectBallastLb: undefined,
@@ -5474,6 +5497,9 @@ export function createCareerApiServer(port = 8787) {
         }
 
         try {
+          const seqAtProbe = missionOfpCheckSeq(probeMission);
+          const cargoKgAtProbe = probeMission.cargoKg;
+          const staticIdAtProbe = probeMission.staticId;
           const result = await confirmMissionOfp(probeMission, {
             username: body.simbriefUser,
             userid: body.simbriefUserid,
@@ -5503,23 +5529,23 @@ export function createCareerApiServer(port = 8787) {
             ) {
               return false;
             }
-            mission.lastOfpCheck = {
-              ...ofpCheck,
-              staticId: mission.staticId,
-            };
             if (
-              mission.contractPilot &&
-              (ofpCheck.verdict === 'pass' || ofpCheck.verdict === 'warn') &&
-              ofpCheck.ofpId
+              missionOfpCheckSeq(mission) !== seqAtProbe ||
+              mission.cargoKg !== cargoKgAtProbe ||
+              mission.staticId !== staticIdAtProbe
             ) {
-              mission.fuelAuthorizedOfpId = ofpCheck.ofpId;
+              savedMission = mission;
+              return false;
             }
+            applyConfirmedOfpCheck(mission, ofpCheck);
             savedMission = mission;
             return true;
           });
           if (!wrote || !savedMission) {
             const latest = await loadMissions();
-            const current = latest.missions.find((m) => m.id === body.missionId);
+            const current =
+              savedMission ??
+              latest.missions.find((m) => m.id === body.missionId);
             if (!current) {
               send(res, 404, { error: `Unknown mission ${body.missionId}` });
               return;
@@ -5529,9 +5555,13 @@ export function createCareerApiServer(port = 8787) {
               check: result.check,
               summary: result.summary,
               ofp: result.ofp,
-              warning: isClosedMissionStatus(current.status)
-                ? 'Mission was cancelled or closed before OFP could be saved'
-                : 'Mission status changed before OFP could be saved',
+              ...(savedMission
+                ? {}
+                : {
+                    warning: isClosedMissionStatus(current.status)
+                      ? 'Mission was cancelled or closed before OFP could be saved'
+                      : 'Mission status changed before OFP could be saved',
+                  }),
             });
             return;
           }
@@ -5624,6 +5654,7 @@ export function createCareerApiServer(port = 8787) {
             }
             const trimmed = trimMissionCargoToKg(world, mission, ofpCargoKg);
             Object.assign(mission, trimmed.mission);
+            bumpMissionOfpCheckSeq(mission);
             mission.lastPreflightCheck = undefined;
             mission.injectBallastLb = undefined;
             mission.fuelAuthorizedOfpId = undefined;
@@ -5665,20 +5696,7 @@ export function createCareerApiServer(port = 8787) {
             ) {
               return false;
             }
-            mission.lastOfpCheck = {
-              ...ofpCheck,
-              staticId: mission.staticId,
-            };
-            // Same as confirm OFP: contract-pilot auto-authorizes Jet-A. Accept
-            // OFP clears fuelAuthorizedOfpId before reconfirm — restore it here
-            // so Load/Preflight bootstrap is not stuck waiting forever.
-            if (
-              mission.contractPilot &&
-              (ofpCheck.verdict === 'pass' || ofpCheck.verdict === 'warn') &&
-              ofpCheck.ofpId
-            ) {
-              mission.fuelAuthorizedOfpId = ofpCheck.ofpId;
-            }
+            applyConfirmedOfpCheck(mission, ofpCheck);
             savedMission = mission;
             return true;
           });
@@ -6375,6 +6393,23 @@ export function createCareerApiServer(port = 8787) {
               loadVerification: result.preflight.check.loadVerification,
               findings,
             };
+          }
+          if (!lastPreflightCheck && result.ok) {
+            const progress = getOfpLoadProgress(mission.id);
+            lastPreflightCheck = lastPreflightFromInjectLive({
+              previous: mission.lastPreflightCheck,
+              stations: (progress?.liveStations ?? result.after.stations) as Record<
+                number,
+                number
+              >,
+              tanks: result.after.tanks,
+              liveFuelLb: progress?.liveFuelLb,
+              livePayloadLb: progress?.livePayloadLb,
+              liveTanks: progress?.liveTanks,
+              blockFuelLb: result.plan.blockFuelLb,
+              cargoLb: result.plan.cargoLb,
+              displayCg: result.displayCg,
+            });
           }
           {
             const wrote = await updateOpenMission(body.missionId, (_m, open) => {

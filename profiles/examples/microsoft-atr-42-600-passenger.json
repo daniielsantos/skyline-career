@@ -90,57 +90,57 @@
       {
         "index": 1,
         "name": "Station 1",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 2,
         "name": "Station 2",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 3,
         "name": "Station 3",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 4,
         "name": "Station 4",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 5,
         "name": "Station 5",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 6,
         "name": "Station 6",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 7,
         "name": "Station 7",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 8,
         "name": "Station 8",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 9,
         "name": "Station 9",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 10,
         "name": "Station 10",
-        "maxLoad": 500
+        "maxLoad": 2000
       },
       {
         "index": 11,
         "name": "Station 11",
-        "maxLoad": 500
+        "maxLoad": 2000
       }
     ],
     "writePlan": [
@@ -263,7 +263,7 @@
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.",
-    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Station maxLoad: 2000 lb (S1–S11).",
     "Homologated with interactive wizard.",
     "Market family: microsoft-atr-42-600 (profiles/ofp/microsoft-atr-42-600.json).",
     "See profiles/notes/microsoft-atr-42-600-passenger.md"

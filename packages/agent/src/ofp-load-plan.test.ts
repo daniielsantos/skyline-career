@@ -1449,7 +1449,8 @@ describe('plannedStationPayloadLb', () => {
     });
     assert.equal(freighterStyle.gaCabin, false);
     assert.equal(freighterStyle.cargoPlacedLb, 64_567);
-    assert.equal(freighterStyle.plannedTotalLb, 64_907);
+    assert.equal(freighterStyle.plannedTotalLb, 64_567);
+    assert.equal(freighterStyle.crewLb, 0);
   });
 
   it('pax_and_cargo Due omits crew floor (EFB sheet already has S1/S2)', () => {
@@ -1472,8 +1473,8 @@ describe('adjustPlannedPayloadForLiveCrewStations', () => {
       cargoLb: 2000,
       stationRoles: { crewStations: [1, 2], baggageStations: [12] },
     });
-    assert.equal(base.crewLb, 340);
-    assert.equal(base.plannedTotalLb, 2340);
+    assert.equal(base.crewLb, 0);
+    assert.equal(base.plannedTotalLb, 2000);
 
     const adj = adjustPlannedPayloadForLiveCrewStations({
       cargoPlacedLb: base.cargoPlacedLb,
@@ -1484,6 +1485,19 @@ describe('adjustPlannedPayloadForLiveCrewStations', () => {
     assert.equal(adj.crewOnStations, false);
     assert.equal(adj.crewLb, 0);
     assert.equal(adj.plannedTotalLb, 2000);
+  });
+
+  it('does not double-count crew when OFP payload already includes S1', () => {
+    const adj = adjustPlannedPayloadForLiveCrewStations({
+      cargoPlacedLb: 14_963,
+      crewLb: 340,
+      crewStations: [1, 2],
+      liveStations: { 1: 220, 2: 0, 5: 7372, 6: 7372 },
+    });
+    assert.equal(adj.crewOnStations, true);
+    assert.equal(adj.crewLb, 220);
+    assert.equal(adj.plannedTotalLb, 14_963);
+    assert.equal(adj.cargoPlacedLb, 14_743);
   });
 
   it('keeps crew floor when pilot/copilot stations have weight', () => {

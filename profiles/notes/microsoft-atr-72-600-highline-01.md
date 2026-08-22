@@ -19,7 +19,7 @@
 - Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).
 - AUX deferred for v1.
 - Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.
-- Station maxLoad: placeholder until flight_model.cfg calibrate.
+- Station maxLoad: 2000 lb (S1–S11).
 - Homologated with interactive wizard.
 - Market family: `microsoft-atr-72-600` — pack `profiles/ofp/microsoft-atr-72-600.json`
   (Highline 01–04 · Passenger · Freighter; same stations).

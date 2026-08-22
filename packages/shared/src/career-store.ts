@@ -667,6 +667,11 @@ class SqliteCareerStore implements CareerStore {
   private lastOpsKey: string | null = null;
   private lastEconomyBlobJson: string | null = null;
   private lastCompanyPersistKey: string | null = null;
+  private lastCompanyStateKey: string | null = null;
+  private lastFleetPersistKey: string | null = null;
+  private lastMissionsTableKey: string | null = null;
+  private lastLedgerPersistKey: string | null = null;
+  private lastMissionsStubJson: string | null = null;
 
   constructor(sqlitePath: string) {
     this.sqlitePath = sqlitePath;
@@ -1093,24 +1098,49 @@ class SqliteCareerStore implements CareerStore {
     if (persistKey === this.lastCompanyPersistKey) {
       return;
     }
+    const fleetKey = JSON.stringify(normalized.fleet ?? []);
+    const missionsKey = JSON.stringify(normalized.missions ?? []);
+    const ledgerKey = JSON.stringify(ledger);
+    const companyStateKey = JSON.stringify({
+      ...normalized,
+      fleet: undefined,
+      missions: undefined,
+      ledger: undefined,
+    });
     const stub = missionsBlobStub(normalized);
     const json = JSON.stringify(stub);
+    const stubDirty = json !== this.lastMissionsStubJson;
+    const companyStateDirty = companyStateKey !== this.lastCompanyStateKey;
+    const fleetDirty = fleetKey !== this.lastFleetPersistKey;
+    const missionsDirty = missionsKey !== this.lastMissionsTableKey;
+    const ledgerDirty = ledgerKey !== this.lastLedgerPersistKey;
     const now = Date.now();
     runInTransaction(this.db, () => {
       ensureLocalCompany(this.db, {
         displayName: normalized.pilotName || '',
         homeHubIcao: normalized.homeHubIcao || '',
       });
-      this.db
-        .prepare(
-          `INSERT INTO missions_json (id, json, updated_at_ms) VALUES (1, ?, ?)
-           ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
-        )
-        .run(json, now);
-      persistCompanyTables(this.db, normalized);
-      persistLedgerIncremental(this.db, ledger);
+      if (stubDirty) {
+        this.db
+          .prepare(
+            `INSERT INTO missions_json (id, json, updated_at_ms) VALUES (1, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated_at_ms = excluded.updated_at_ms`,
+          )
+          .run(json, now);
+      }
+      persistCompanyTables(this.db, normalized, {
+        companyState: companyStateDirty,
+        fleet: fleetDirty,
+        missions: missionsDirty,
+      });
+      if (ledgerDirty) persistLedgerIncremental(this.db, ledger);
     });
     this.lastCompanyPersistKey = persistKey;
+    this.lastCompanyStateKey = companyStateKey;
+    this.lastFleetPersistKey = fleetKey;
+    this.lastMissionsTableKey = missionsKey;
+    this.lastLedgerPersistKey = ledgerKey;
+    this.lastMissionsStubJson = json;
   }
 
   async loadLedger(): Promise<CareerLedgerEntry[]> {
@@ -1137,6 +1167,11 @@ class SqliteCareerStore implements CareerStore {
     this.lastOpsKey = null;
     this.lastEconomyBlobJson = null;
     this.lastCompanyPersistKey = null;
+    this.lastCompanyStateKey = null;
+    this.lastFleetPersistKey = null;
+    this.lastMissionsTableKey = null;
+    this.lastLedgerPersistKey = null;
+    this.lastMissionsStubJson = null;
     this.db.close();
   }
 }

@@ -1533,10 +1533,18 @@ export function companyTablesPopulated(db: SqliteDb): boolean {
   return tableCount(db, 'company_state') > 0;
 }
 
-export function persistCompanyTables(db: SqliteDb, state: CareerMissionsState): void {
-  upsertCompanyState(db, state);
-  replaceFleetAircraft(db, LOCAL_COMPANY_ID, state.fleet ?? []);
-  replaceMissionsTable(db, LOCAL_COMPANY_ID, state.missions ?? []);
+export function persistCompanyTables(
+  db: SqliteDb,
+  state: CareerMissionsState,
+  opts?: { companyState?: boolean; fleet?: boolean; missions?: boolean },
+): void {
+  if (opts?.companyState !== false) upsertCompanyState(db, state);
+  if (opts?.fleet !== false) {
+    replaceFleetAircraft(db, LOCAL_COMPANY_ID, state.fleet ?? []);
+  }
+  if (opts?.missions !== false) {
+    replaceMissionsTable(db, LOCAL_COMPANY_ID, state.missions ?? []);
+  }
 }
 
 export function assembleMissionsFromTables(

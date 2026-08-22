@@ -37,6 +37,57 @@ const CONDITION_PRICE_MULT: Record<AirframeCondition, number> = {
   tired: 0.48,
 };
 
+const ECONOMIC_LIFE_HOURS: Record<FreighterClassId, number> = {
+  light_ga: 4_000,
+  light_turboprop: 8_000,
+  light_jet: 10_000,
+  medium_piston: 8_000,
+  narrow_freighter: 12_000,
+  wide_freighter: 20_000,
+};
+
+const HOURS_AF_BLEND = 0.6;
+const HOURS_ENG_BLEND = 0.4;
+const HOURS_MX_AGE_GAIN = 0.6;
+const HOURS_VALUE_HAIRCUT = 0.3;
+
+function finiteHours(n?: number | null): number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function hoursLifeFrac(opts: {
+  aircraftClassId: FreighterClassId;
+  hoursAirframe?: number | null;
+  hoursEngine?: number | null;
+}): number {
+  const life = ECONOMIC_LIFE_HOURS[opts.aircraftClassId];
+  if (!(life > 0)) return 0;
+  const blended =
+    finiteHours(opts.hoursAirframe) * HOURS_AF_BLEND +
+    finiteHours(opts.hoursEngine) * HOURS_ENG_BLEND;
+  return Math.min(1, Math.max(0, blended / life));
+}
+
+export function estimateHoursMxCostMult(aircraft: {
+  aircraftClassId: FreighterClassId;
+  hoursAirframe?: number | null;
+  hoursEngine?: number | null;
+}): number {
+  return (
+    Math.round((1 + HOURS_MX_AGE_GAIN * hoursLifeFrac(aircraft)) * 1000) / 1000
+  );
+}
+
+function hoursValueMult(aircraft: {
+  aircraftClassId: FreighterClassId;
+  hoursAirframe?: number | null;
+  hoursEngine?: number | null;
+}): number {
+  return (
+    Math.round((1 - HOURS_VALUE_HAIRCUT * hoursLifeFrac(aircraft)) * 1000) / 1000
+  );
+}
+
 function cargoMsrpMultiplier(
   aircraftClassId: FreighterClassId,
   maxCargoKg?: number | null,
@@ -64,18 +115,21 @@ function resolveMsrpUsd(
   );
 }
 
-/** Dealer buy-back = 50% of fair value (MSRP × condition × cargo mult). */
+/** Dealer buy-back = 50% of fair value (MSRP × condition × cargo × hours). */
 export function estimateFairUsd(
   aircraft: {
     aircraftClassId: FreighterClassId;
     condition?: AirframeCondition | null;
+    hoursAirframe?: number | null;
+    hoursEngine?: number | null;
   },
   opts?: { maxCargoKg?: number | null },
 ): number {
   const condition = aircraft.condition ?? 'good';
   return Math.round(
     resolveMsrpUsd(aircraft.aircraftClassId, opts?.maxCargoKg) *
-      CONDITION_PRICE_MULT[condition],
+      CONDITION_PRICE_MULT[condition] *
+      hoursValueMult(aircraft),
   );
 }
 
@@ -104,6 +158,8 @@ export function estimateSellBackUsd(
   aircraft: {
     aircraftClassId: FreighterClassId;
     condition?: AirframeCondition | null;
+    hoursAirframe?: number | null;
+    hoursEngine?: number | null;
   },
   opts?: { maxCargoKg?: number | null },
 ): number {

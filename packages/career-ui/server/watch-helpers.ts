@@ -12,6 +12,7 @@ import {
   createWeatherOpsAccumulator,
   cruiseSampleStatus,
   DEFAULT_CRUISE_EMA_ALPHA,
+  DEFAULT_CRUISE_MAX_VS_FPM,
   departMission,
   revertFalseDepartMission,
   distanceNm as greatCircleDistanceNm,
@@ -170,6 +171,8 @@ export type WatchStatusPayload = {
   lastError: string | null;
   /** False when Watch is running but the NDJSON pipe socket dropped. */
   pipeConnected: boolean;
+  /** True while auto-settle is reading SimVars / persisting payout. */
+  settling: boolean;
   settlement: {
     payoutUsd: number;
     penaltyUsd: number;
@@ -1245,6 +1248,7 @@ export class CareerWatchSession {
   private lastEvent: MissionFlightEvent | null = null;
   private lastEventAtIso: string | null = null;
   private lastError: string | null = null;
+  private settling = false;
   private settlement: WatchStatusPayload['settlement'] = null;
   private walletUsd: number | null = null;
   /** Wall clock of last fully successful Watch tick (pipe + sample). */
@@ -1462,6 +1466,7 @@ export class CareerWatchSession {
           Date.now() - this.lastSuccessfulTickAtMs < 12_000
         );
       })(),
+      settling: this.settling,
       settlement: this.settlement,
       walletUsd: this.walletUsd,
       autoDepart: this.opts.autoDepart,
@@ -1528,6 +1533,7 @@ export class CareerWatchSession {
     this.lastLoadSampleAtMs = 0;
     this.consecutivePipeErrors = 0;
     this.pendingSimConnectReset = false;
+    this.settling = false;
     this.settlement = null;
     this.preflightDepartBlockedLogged = false;
     this.originClearedForDepart = false;
@@ -1700,7 +1706,9 @@ export class CareerWatchSession {
     }, ms);
   }
 
-  async stop(opts: { reset?: boolean } = {}): Promise<WatchStatusPayload> {
+  async stop(
+    opts: { reset?: boolean; fromOwnTick?: boolean } = {},
+  ): Promise<WatchStatusPayload> {
     this.running = false;
     if (this.timer) {
       clearTimeout(this.timer);
@@ -1709,19 +1717,23 @@ export class CareerWatchSession {
     // Abort the in-flight tick, then close the pipe so a hung SimVar
     // (10s IPC) cannot freeze reinject. shouldAbort sees running=false.
     // Waiting 25s here left POST /api/load-ofp with no progress message.
-    const tickWaitStarted = Date.now();
-    while (this.tickInFlight && Date.now() - tickWaitStarted < 1_500) {
-      await new Promise((resolve) => setTimeout(resolve, 40));
-    }
-    if (this.tickInFlight) {
-      watchDebugLog('watch', 'stop — closing pipe under in-flight tick', {
-        waitedMs: Date.now() - tickWaitStarted,
-      });
+    // Auto-settle already holds this tick — do not wait 1.5s on ourselves.
+    if (!opts.fromOwnTick) {
+      const tickWaitStarted = Date.now();
+      while (this.tickInFlight && Date.now() - tickWaitStarted < 1_500) {
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      }
+      if (this.tickInFlight) {
+        watchDebugLog('watch', 'stop — closing pipe under in-flight tick', {
+          waitedMs: Date.now() - tickWaitStarted,
+        });
+      }
     }
     // Flush airborne clock before tearing down — app quit must not lose %.
     // Skip persist when hard-resetting (cancel / mission switch) so flicker
-    // stamps are not written onto a closed leg.
-    if (!opts.reset) {
+    // stamps are not written onto a closed leg. After settle the mission is
+    // already persisted — a second lock wait only delays debrief.
+    if (!opts.reset && !this.settlement) {
       await this.persistAirborneClock();
     }
     if (this.bridge) {
@@ -1737,6 +1749,8 @@ export class CareerWatchSession {
     // payout once. Cancel / accept / switch pass reset:true to wipe leftovers.
     if (opts.reset) {
       this.resetSession();
+    } else {
+      this.settling = false;
     }
     return this.getStatus();
   }
@@ -1759,6 +1773,7 @@ export class CareerWatchSession {
     this.lastEvent = null;
     this.lastEventAtIso = null;
     this.lastError = null;
+    this.settling = false;
     this.settlement = null;
     this.walletUsd = null;
     this.lastSuccessfulTickAtMs = 0;
@@ -2760,14 +2775,23 @@ export class CareerWatchSession {
               catalogFlow ?? overrideFlow,
             );
           }
-          const pushed = pushCruiseTick(this.cruiseState, {
+          const cruiseTick = {
             atMs: nowMs,
             onGround: sample.onGround,
             altFt: sample.altitudeFt,
             vsFpm: sample.verticalSpeedFpm,
             tasKt,
             fuelFlowKgPerHour,
-          });
+          };
+          const pushed =
+            this.lastPhase === 'cruise'
+              ? pushCruiseTick(this.cruiseState, cruiseTick)
+              : {
+                  state: {
+                    window: [] as typeof this.cruiseState.window,
+                    committed: this.cruiseState.committed,
+                  },
+                };
           this.cruiseState = pushed.state;
           this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
           if (
@@ -2778,7 +2802,7 @@ export class CareerWatchSession {
             const vsBlock =
               typeof vs === 'number' &&
               Number.isFinite(vs) &&
-              Math.abs(vs) > 400;
+              Math.abs(vs) > DEFAULT_CRUISE_MAX_VS_FPM;
             this.cruiseIdleHint = vsBlock
               ? 'vs'
               : tasKt == null || tasKt < 60
@@ -3241,6 +3265,9 @@ export class CareerWatchSession {
       }
 
       if (event.type === 'settle' && this.opts.autoSettle) {
+        this.settling = true;
+        // Let GET /api/watch/status serve the overlay before SimVar / persist.
+        await new Promise<void>((resolve) => setImmediate(resolve));
         let residualFuelKg: number | undefined;
         try {
           residualFuelKg = await readLiveResidualFuelKg(this.bridge);
@@ -3414,12 +3441,14 @@ export class CareerWatchSession {
           return true;
         });
         if (!saved) {
-          await this.stop();
+          this.settling = false;
+          await this.stop({ fromOwnTick: true });
           return;
         }
-        await this.stop();
+        await this.stop({ fromOwnTick: true });
       }
     } catch (error) {
+      this.settling = false;
       this.lastError = formatIpcError(error);
       this.consecutivePipeErrors += 1;
       watchDebugLog('watch', 'tick error', {

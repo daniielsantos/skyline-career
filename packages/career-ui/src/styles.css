@@ -2717,6 +2717,7 @@ tr.lot-locked {
 }
 
 .dispatch-active {
+  position: relative;
   display: grid;
   gap: 0.75rem;
   /* Cool ops steel — replaces loud orange inside Dispatch only */
@@ -2724,6 +2725,31 @@ tr.lot-locked {
   --dispatch-accent-ink: #061218;
   --accent: var(--dispatch-accent);
   --accent-ink: var(--dispatch-accent-ink);
+}
+
+.dispatch-settle-busy {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.55rem;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  backdrop-filter: blur(4px);
+  animation: confirm-fade-in 140ms ease-out;
+  text-align: center;
+  pointer-events: all;
+}
+
+.dispatch-settle-busy strong {
+  font-size: 1.05rem;
+}
+
+.dispatch-settle-busy span:last-child {
+  font-size: 0.88rem;
+  color: var(--muted);
 }
 
 .dispatch-active .dispatch-step-current .dispatch-step-mark {

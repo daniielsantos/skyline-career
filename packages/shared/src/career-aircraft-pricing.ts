@@ -62,6 +62,53 @@ export const CONDITION_PRICE_MULT: Record<AirframeCondition, number> = {
   tired: 0.48,
 };
 
+/** Hours at which age multipliers reach their cap (not a hard TBO). */
+export const ECONOMIC_LIFE_HOURS: Record<FreighterClassId, number> = {
+  light_ga: 4_000,
+  light_turboprop: 8_000,
+  light_jet: 10_000,
+  medium_piston: 8_000,
+  narrow_freighter: 12_000,
+  wide_freighter: 20_000,
+};
+
+export const HOURS_AF_BLEND = 0.6;
+export const HOURS_ENG_BLEND = 0.4;
+/** Extra workshop cost at full economic life (1 + gain = 1.6×). */
+export const HOURS_MX_AGE_GAIN = 0.6;
+/** Fair-value haircut at full economic life (1 − haircut = 0.7×). */
+export const HOURS_VALUE_HAIRCUT = 0.3;
+
+export type HoursLifeInput = {
+  aircraftClassId: FreighterClassId;
+  hoursAirframe?: number | null;
+  hoursEngine?: number | null;
+};
+
+function finiteHours(n?: number | null): number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** 0 = new, 1 = at/over economic life. */
+export function hoursLifeFrac(opts: HoursLifeInput): number {
+  const life = ECONOMIC_LIFE_HOURS[opts.aircraftClassId];
+  if (!(life > 0)) return 0;
+  const blended =
+    finiteHours(opts.hoursAirframe) * HOURS_AF_BLEND +
+    finiteHours(opts.hoursEngine) * HOURS_ENG_BLEND;
+  return Math.min(1, Math.max(0, blended / life));
+}
+
+export function hoursMxCostMult(opts: HoursLifeInput): number {
+  return Math.round((1 + HOURS_MX_AGE_GAIN * hoursLifeFrac(opts)) * 1000) / 1000;
+}
+
+export function hoursValueMult(opts: HoursLifeInput): number {
+  return (
+    Math.round((1 - HOURS_VALUE_HAIRCUT * hoursLifeFrac(opts)) * 1000) / 1000
+  );
+}
+
 export function cargoMsrpMultiplier(opts: {
   aircraftClassId: FreighterClassId;
   maxCargoKg?: number | null;

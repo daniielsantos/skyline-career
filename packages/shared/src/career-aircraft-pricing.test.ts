@@ -8,6 +8,9 @@ import {
   CARGO_MSRP_MULT_MAX,
   CARGO_MSRP_MULT_MIN,
   cargoMsrpMultiplier,
+  ECONOMIC_LIFE_HOURS,
+  hoursMxCostMult,
+  hoursValueMult,
   resolveAircraftLeaseMonthlyUsd,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
@@ -79,5 +82,43 @@ describe('cargo-scaled aircraft MSRP', () => {
       maxCargoKg: 450,
     });
     assert.ok(leaseFat > leaseBase);
+  });
+});
+
+describe('hours life multipliers', () => {
+  it('is 1× at zero hours and caps at full economic life', () => {
+    const zero = {
+      aircraftClassId: 'light_turboprop' as const,
+      hoursAirframe: 0,
+      hoursEngine: 0,
+    };
+    assert.equal(hoursMxCostMult(zero), 1);
+    assert.equal(hoursValueMult(zero), 1);
+
+    const life = ECONOMIC_LIFE_HOURS.light_turboprop;
+    const full = {
+      aircraftClassId: 'light_turboprop' as const,
+      hoursAirframe: life,
+      hoursEngine: life,
+    };
+    assert.equal(hoursMxCostMult(full), 1.6);
+    assert.equal(hoursValueMult(full), 0.7);
+  });
+
+  it('weights engine hours less than airframe for MX', () => {
+    const classId = 'light_turboprop' as const;
+    const highAf = hoursMxCostMult({
+      aircraftClassId: classId,
+      hoursAirframe: 4_000,
+      hoursEngine: 0,
+    });
+    const highEng = hoursMxCostMult({
+      aircraftClassId: classId,
+      hoursAirframe: 0,
+      hoursEngine: 4_000,
+    });
+    assert.ok(highAf > highEng);
+    assert.ok(highAf > 1);
+    assert.ok(highEng > 1);
   });
 });

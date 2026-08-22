@@ -2992,6 +2992,8 @@ export type WatchStatus = {
   lastError: string | null;
   /** False when Watch is running but the named-pipe socket dropped. */
   pipeConnected?: boolean;
+  /** Auto-settle is sampling residual fuel / writing payout. */
+  settling?: boolean;
   settlement: MissionSettlement | null;
   walletUsd: number | null;
   autoDepart: boolean;

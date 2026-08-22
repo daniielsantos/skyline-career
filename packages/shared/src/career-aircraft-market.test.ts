@@ -30,10 +30,13 @@ import {
   aircraftLeaseUnlockProgress,
   aircraftLeaseMonthlyUsd,
   unlistAircraftForLease,
+  fairValueUsd,
+  sellBackValueUsd,
 } from './career-aircraft-market.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { ensureWorldAircraftPool } from './career-aircraft-pool.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
+import { ECONOMIC_LIFE_HOURS } from './career-aircraft-pricing.js';
 import { economyDayIndex } from './career-weather.js';
 import {
   findCareerPlayerAirframe,
@@ -952,5 +955,34 @@ describe('aircraft market', () => {
         (e) => e.kind === 'ferry' && e.aircraftId === aircraft.id,
       ),
     );
+  });
+
+  it('fair value and dealer sell-back drop with high hours', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'HoursValue',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const acf = state.fleet[0]!;
+    acf.condition = 'good';
+    acf.hoursAirframe = 0;
+    acf.hoursEngine = 0;
+    const freshFair = fairValueUsd(acf.aircraftClassId, 'good', {
+      airframeTypeId: acf.airframeTypeId,
+      hoursAirframe: 0,
+      hoursEngine: 0,
+    });
+    const agedFair = fairValueUsd(acf.aircraftClassId, 'good', {
+      airframeTypeId: acf.airframeTypeId,
+      hoursAirframe: ECONOMIC_LIFE_HOURS.light_ga,
+      hoursEngine: ECONOMIC_LIFE_HOURS.light_ga,
+    });
+    assert.equal(agedFair, Math.round(freshFair * 0.7));
+    acf.hoursAirframe = ECONOMIC_LIFE_HOURS.light_ga;
+    acf.hoursEngine = ECONOMIC_LIFE_HOURS.light_ga;
+    const agedSell = sellBackValueUsd(acf);
+    acf.hoursAirframe = 0;
+    acf.hoursEngine = 0;
+    const freshSell = sellBackValueUsd(acf);
+    assert.equal(agedSell, Math.round(freshSell * 0.7));
   });
 });

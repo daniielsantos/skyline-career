@@ -29,6 +29,7 @@ import {
 import {
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
+  hoursValueMult,
   resolveAircraftLeaseWeeklyUsd,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
@@ -86,6 +87,7 @@ export {
   AIRCRAFT_MSRP_USD,
   CONDITION_PRICE_MULT,
   cargoMsrpMultiplier,
+  hoursValueMult,
   resolveAircraftLeaseWeeklyUsd,
   resolveAircraftLeaseMonthlyUsd,
   resolveAircraftMsrpUsd,
@@ -307,10 +309,21 @@ export function aircraftLeaseMonthlyUsd(
 export function fairValueUsd(
   classId: FreighterClassId,
   condition: AirframeCondition,
-  opts?: { maxCargoKg?: number | null; airframeTypeId?: string | null },
+  opts?: {
+    maxCargoKg?: number | null;
+    airframeTypeId?: string | null;
+    hoursAirframe?: number | null;
+    hoursEngine?: number | null;
+  },
 ): number {
   return Math.round(
-    aircraftMsrpUsd(classId, opts) * CONDITION_PRICE_MULT[condition],
+    aircraftMsrpUsd(classId, opts) *
+      CONDITION_PRICE_MULT[condition] *
+      hoursValueMult({
+        aircraftClassId: classId,
+        hoursAirframe: opts?.hoursAirframe,
+        hoursEngine: opts?.hoursEngine,
+      }),
   );
 }
 
@@ -324,6 +337,8 @@ export function sellBackValueUsd(aircraft: PlayerAircraft): number {
   return Math.round(
     fairValueUsd(aircraft.aircraftClassId, condition, {
       airframeTypeId: aircraft.airframeTypeId,
+      hoursAirframe: aircraft.hoursAirframe,
+      hoursEngine: aircraft.hoursEngine,
     }) * DEALER_TRADE_IN_FRAC,
   );
 }
@@ -552,6 +567,7 @@ function priceListing(
   world: CareerEconomyWorld,
   rng: () => number,
   maxCargoKg?: number,
+  hours?: { hoursAirframe: number; hoursEngine: number },
 ): { askingUsd: number; leaseMonthlyUsd?: number; leaseTermMonths?: number } {
   const msrp = resolveAircraftMsrpUsd({
     aircraftClassId: classId,
@@ -587,9 +603,14 @@ function priceListing(
     return { askingUsd: Math.round(msrp * noise * spokeDiscount) };
   }
   const noise = 0.94 + rng() * 0.1;
+  const ageMult = hoursValueMult({
+    aircraftClassId: classId,
+    hoursAirframe: hours?.hoursAirframe,
+    hoursEngine: hours?.hoursEngine,
+  });
   return {
     askingUsd: Math.round(
-      msrp * CONDITION_PRICE_MULT[condition] * noise * spokeDiscount,
+      msrp * CONDITION_PRICE_MULT[condition] * noise * spokeDiscount * ageMult,
     ),
   };
 }
@@ -625,6 +646,7 @@ export function generateAircraftMarketListings(opts: {
       opts.world,
       rng,
       airframe.maxCargoKg,
+      hours,
     );
     const pcts = conditionPctsForListing(condition, kind, rng);
     const registration = allocateAircraftRegistrationFromMarket({
@@ -882,9 +904,13 @@ function applyNpcDemand(
   saleCandidates.sort((a, b) => {
     const fairA = fairValueUsd(a.aircraftClassId, a.condition, {
       airframeTypeId: a.airframeTypeId,
+      hoursAirframe: a.hoursAirframe,
+      hoursEngine: a.hoursEngine,
     });
     const fairB = fairValueUsd(b.aircraftClassId, b.condition, {
       airframeTypeId: b.airframeTypeId,
+      hoursAirframe: b.hoursAirframe,
+      hoursEngine: b.hoursEngine,
     });
     return a.askingUsd / Math.max(1, fairA) - b.askingUsd / Math.max(1, fairB);
   });
@@ -892,6 +918,8 @@ function applyNpcDemand(
     if (taken >= takeBudget) break;
     const fair = fairValueUsd(listing.aircraftClassId, listing.condition, {
       airframeTypeId: listing.airframeTypeId,
+      hoursAirframe: listing.hoursAirframe,
+      hoursEngine: listing.hoursEngine,
     });
     if (rng() > npcPlayerSaleAcceptChance(listing.askingUsd, fair)) continue;
     applyNpcTakeListing(state, listing, tick, world, rng);
@@ -1341,6 +1369,8 @@ function buildAircraftFromListing(
       buyoutUsd: Math.round(
         fairValueUsd(listing.aircraftClassId, listing.condition, {
           airframeTypeId: listing.airframeTypeId,
+          hoursAirframe: listing.hoursAirframe,
+          hoursEngine: listing.hoursEngine,
         }) * 0.85,
       ),
       listingId: listing.id,
@@ -1824,6 +1854,8 @@ export function listAircraftForSale(
   }
   const fair = fairValueUsd(aircraft.aircraftClassId, aircraft.condition ?? 'good', {
     airframeTypeId: aircraft.airframeTypeId,
+    hoursAirframe: aircraft.hoursAirframe,
+    hoursEngine: aircraft.hoursEngine,
   });
   const ask = clampPlayerSaleAskingUsd(askingUsd, fair);
   ensureAircraftConditionPcts(aircraft);

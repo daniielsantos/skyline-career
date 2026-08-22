@@ -922,6 +922,8 @@ export function findOpenManifestForRoute(
     originIcao: string;
     destIcao: string;
     aircraftClassId: FreighterClassId;
+    /** When set, do not bind a flight already assigned to another tail. */
+    aircraftId?: string;
   },
 ): MissionIntent | undefined {
   const matches = missions
@@ -932,9 +934,45 @@ export function findOpenManifestForRoute(
         !isEmptyLegMission(m) &&
         m.aircraftClassId === opts.aircraftClassId &&
         m.originIcao === opts.originIcao &&
-        m.destIcao === opts.destIcao,
+        m.destIcao === opts.destIcao &&
+        (!opts.aircraftId ||
+          !m.aircraftId ||
+          m.aircraftId === opts.aircraftId),
     );
   return matches.length === 1 ? matches[0] : undefined;
+}
+
+/** Drop leftover accepted/dispatched flights whose hangar tail is no longer assigned. */
+export function cancelOrphanPlayerMissions(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  opts?: { nowMs?: number },
+): MissionIntent[] {
+  const cancelled: MissionIntent[] = [];
+  for (const raw of [...state.missions]) {
+    const mission = normalizeMissionIntent(raw);
+    if (mission.crewOperated) continue;
+    if (mission.status !== 'accepted' && mission.status !== 'dispatched') {
+      continue;
+    }
+    const aircraft = mission.aircraftId
+      ? findPlayerAircraft(state, mission.aircraftId)
+      : undefined;
+    const bound =
+      Boolean(aircraft) &&
+      aircraft!.status === 'assigned' &&
+      (aircraft!.assignedMissionId === mission.id ||
+        !aircraft!.assignedMissionId);
+    if (bound) continue;
+    const next = cancelMission(world, mission, {
+      fleet: state,
+      nowMs: opts?.nowMs,
+    });
+    const idx = state.missions.findIndex((row) => row.id === mission.id);
+    if (idx >= 0) state.missions[idx] = next;
+    cancelled.push(next);
+  }
+  return cancelled;
 }
 
 const ACTIVE_MISSION_STATUSES = new Set(['accepted', 'dispatched', 'in_flight']);

@@ -5,6 +5,7 @@ import {
   applyOfpBallastLb,
   assertRolesPackAllowsDirectInjection,
   cancelMission,
+  cancelOrphanPlayerMissions,
   careerAllowsDirectInject,
   careerLoadWeightMatchOk,
   careerFuelMatchOk,
@@ -14,6 +15,7 @@ import {
   createSeedEconomyWorld,
   departMission,
   revertFalseDepartMission,
+  emptyMissionsStateV2,
   estimateRouteCargoLimit,
   findOpenManifestForRoute,
   findActivePlayerMission,
@@ -39,6 +41,7 @@ import {
   replaceMissionManifest,
   routeDistanceNm,
   settleMission,
+  selectStarterHub,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
   trimMissionCargoToKg,
@@ -746,6 +749,61 @@ describe('acceptMission', () => {
       }),
       undefined,
     );
+  });
+
+  it('findOpenManifestForRoute ignores a flight bound to another tail', () => {
+    const a = baseMission({
+      id: 'msn_atr42',
+      status: 'accepted',
+      originIcao: 'SAEZ',
+      destIcao: 'SGAS',
+      aircraftClassId: 'light_turboprop',
+      aircraftId: 'acf_atr42',
+    });
+    assert.equal(
+      findOpenManifestForRoute([a], {
+        originIcao: 'SAEZ',
+        destIcao: 'SGAS',
+        aircraftClassId: 'light_turboprop',
+        aircraftId: 'acf_atr72',
+      }),
+      undefined,
+    );
+    assert.equal(
+      findOpenManifestForRoute([a], {
+        originIcao: 'SAEZ',
+        destIcao: 'SGAS',
+        aircraftClassId: 'light_turboprop',
+        aircraftId: 'acf_atr42',
+      })?.id,
+      'msn_atr42',
+    );
+  });
+
+  it('cancelOrphanPlayerMissions closes accepted flights on a parked tail', () => {
+    const world = createSeedEconomyWorld({ seed: 'orphan-msn' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SAEZ', {
+      pilotName: 'Orphan Msn',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const acf = state.fleet[0]!;
+    acf.status = 'parked';
+    state.missions = [
+      baseMission({
+        id: 'msn_578_SAEZ_SGAS_675314',
+        status: 'accepted',
+        originIcao: 'SAEZ',
+        destIcao: 'SGAS',
+        aircraftId: acf.id,
+        aircraftClassId: acf.aircraftClassId,
+        lots: [],
+        cargoKg: 0,
+      }),
+    ];
+    const cancelled = cancelOrphanPlayerMissions(world, state);
+    assert.equal(cancelled.length, 1);
+    assert.equal(state.missions[0]!.status, 'cancelled');
+    assert.equal(acf.status, 'parked');
   });
 
   it('isActiveMissionStatus covers accepted/dispatched/in_flight only', () => {

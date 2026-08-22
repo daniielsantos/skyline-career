@@ -6,8 +6,8 @@
 import type { AirframePerfOverride } from './types/career-economy.js';
 
 export const DEFAULT_CRUISE_MIN_STABLE_MS = 180_000; // 3 min
-/** Light turbulence / tiny step-climbs; real climb is still ~800+ fpm. */
-export const DEFAULT_CRUISE_MAX_VS_FPM = 400;
+/** Light turbulence; capture/step-climb on ATR etc. is still 250–400 fpm. */
+export const DEFAULT_CRUISE_MAX_VS_FPM = 200;
 export const DEFAULT_CRUISE_MIN_TAS_KT = 60;
 /** ~17 kt at 167 TAS — was 5% and reset on autopilot wander. */
 export const DEFAULT_CRUISE_TAS_SPREAD = 0.1;

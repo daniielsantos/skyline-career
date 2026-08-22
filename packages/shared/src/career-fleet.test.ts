@@ -295,6 +295,48 @@ describe('career fleet hangar', () => {
     assert.equal(state.fleet[0]!.fuelKg, 138);
   });
 
+  it('normalize parks assigned fleet when the mission is gone', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SAEZ', pilot);
+    const acf = state.fleet[0]!;
+    acf.status = 'assigned';
+    acf.assignedMissionId = 'msn_578_SAEZ_SGAS_6';
+    const migrated = normalizeMissionsState({
+      ...state,
+      missions: [
+        {
+          id: 'msn_578_SAEZ_SGAS_6',
+          originIcao: 'SAEZ',
+          destIcao: 'SGAS',
+          status: 'settled',
+          aircraftId: acf.id,
+        } as never,
+      ],
+    });
+    assert.equal(migrated.fleet[0]!.status, 'parked');
+    assert.equal(migrated.fleet[0]!.assignedMissionId, undefined);
+  });
+
+  it('normalize keeps assignment for an open dispatched mission', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SAEZ', pilot);
+    const acf = state.fleet[0]!;
+    acf.status = 'assigned';
+    acf.assignedMissionId = 'msn_open';
+    const migrated = normalizeMissionsState({
+      ...state,
+      missions: [
+        {
+          id: 'msn_open',
+          originIcao: 'SAEZ',
+          destIcao: 'SGAS',
+          status: 'dispatched',
+          aircraftId: acf.id,
+        } as never,
+      ],
+    });
+    assert.equal(migrated.fleet[0]!.status, 'assigned');
+    assert.equal(migrated.fleet[0]!.assignedMissionId, 'msn_open');
+  });
+
   it('releaseAircraftOnCancel is idempotent for unknown aircraft', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBCF', pilot);
     const released = releaseAircraftOnCancel(state, {

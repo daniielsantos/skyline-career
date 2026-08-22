@@ -2,7 +2,10 @@
  * Skyline aircraft wear + inspection — calibrated to career freights / MSRP.
  */
 
-import { resolveAircraftMsrpUsd } from './career-aircraft-pricing.js';
+import {
+  hoursMxCostMult,
+  resolveAircraftMsrpUsd,
+} from './career-aircraft-pricing.js';
 import { findCareerPlayerAirframe } from './career-player-airframes.js';
 import { applyWalletDelta } from './career-ledger.js';
 import type {
@@ -287,7 +290,13 @@ export function hoursUntilInspection(aircraft: PlayerAircraft): number {
 
 export function inspectionCostUsd(aircraft: PlayerAircraft): number {
   return Math.round(
-    msrpForAircraft(aircraft) * INSPECTION_COST_RATE[aircraft.aircraftClassId],
+    msrpForAircraft(aircraft) *
+      INSPECTION_COST_RATE[aircraft.aircraftClassId] *
+      hoursMxCostMult({
+        aircraftClassId: aircraft.aircraftClassId,
+        hoursAirframe: aircraft.hoursAirframe,
+        hoursEngine: aircraft.hoursEngine,
+      }),
   );
 }
 
@@ -305,7 +314,16 @@ export function repairPointCostUsd(
   const mult = which === 'engine' ? 0.85 : 1;
   return Math.max(
     1,
-    Math.round(msrpForAircraft(aircraft) * rate * mult),
+    Math.round(
+      msrpForAircraft(aircraft) *
+        rate *
+        mult *
+        hoursMxCostMult({
+          aircraftClassId: aircraft.aircraftClassId,
+          hoursAirframe: aircraft.hoursAirframe,
+          hoursEngine: aircraft.hoursEngine,
+        }),
+    ),
   );
 }
 

@@ -7,6 +7,7 @@ import { isBushHub } from './career-bush.js';
 import { conditionPctsForListing } from './career-aircraft-maintenance.js';
 import {
   CONDITION_PRICE_MULT,
+  hoursValueMult,
   resolveAircraftLeaseWeeklyUsd,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
@@ -347,6 +348,7 @@ function priceInstance(
   world: CareerEconomyWorld,
   rng: () => number,
   maxCargoKg?: number,
+  hours?: { hoursAirframe: number; hoursEngine: number },
 ): {
   askingUsd: number;
   leaseMonthlyUsd?: number;
@@ -378,9 +380,14 @@ function priceInstance(
     return { askingUsd: Math.round(msrp * noise * spokeDiscount) };
   }
   const noise = 0.94 + rng() * 0.1;
+  const ageMult = hoursValueMult({
+    aircraftClassId: classId,
+    hoursAirframe: hours?.hoursAirframe,
+    hoursEngine: hours?.hoursEngine,
+  });
   return {
     askingUsd: Math.round(
-      msrp * CONDITION_PRICE_MULT[condition] * noise * spokeDiscount,
+      msrp * CONDITION_PRICE_MULT[condition] * noise * spokeDiscount * ageMult,
     ),
   };
 }
@@ -500,6 +507,7 @@ function pricedFieldsForInstance(
     world,
     rng,
     airframe?.maxCargoKg,
+    { hoursAirframe: instance.hoursAirframe, hoursEngine: instance.hoursEngine },
   );
 }
 

@@ -69,6 +69,13 @@ describe('pushCruiseTick', () => {
         60_000,
     );
   });
+  it('does not collect during a shallow capture climb', () => {
+    let state = createCruiseSampleState();
+    state = pushCruiseTick(state, tick(0, { vsFpm: 300 })).state;
+    assert.equal(state.window.length, 0);
+    assert.equal(cruiseSampleStatus(state).phase, 'idle');
+  });
+
   it('clears the window when VS exceeds the gate', () => {
     let state = createCruiseSampleState();
     const opts = { minStableMs: 60_000 };

@@ -8,7 +8,7 @@ import {
   type CareerEconomyWorld,
 } from './career-economy.js';
 import { assertFerryNotBush, isBushHub, isBushTripOnlyHub } from './career-bush.js';
-import { normalizeActiveBushTrip } from './career-bush-mission.js';
+import { isBushTripActive, normalizeActiveBushTrip } from './career-bush-mission.js';
 import {
   deliverFuelUplift,
   estimateUpliftKg,
@@ -307,7 +307,50 @@ export function normalizeMissionsState(
       : {}),
   };
   ensureAircraftRegistrations(result);
+  reconcileFleetAssignments(result);
   return result;
+}
+
+const OPEN_MISSION_STATUSES = new Set(['accepted', 'dispatched', 'in_flight']);
+
+/** Drop hangar ASSIGNED when the mission/bush trip is gone (cancel/settle/prune). */
+export function reconcileFleetAssignments(state: CareerMissionsState): void {
+  const bush = isBushTripActive(state);
+  for (const aircraft of state.fleet) {
+    if (aircraft.status !== 'assigned' && !aircraft.assignedMissionId) {
+      continue;
+    }
+    if (holdsOpenAssignment(state, aircraft, bush)) continue;
+    aircraft.status =
+      aircraft.status === 'maintenance' ||
+      aircraft.status === 'listed' ||
+      aircraft.status === 'leased_out'
+        ? aircraft.status
+        : 'parked';
+    aircraft.assignedMissionId = undefined;
+  }
+}
+
+function holdsOpenAssignment(
+  state: CareerMissionsState,
+  aircraft: PlayerAircraft,
+  bush: ReturnType<typeof isBushTripActive>,
+): boolean {
+  if (bush && bush.aircraftId === aircraft.id) return true;
+  const mid = aircraft.assignedMissionId?.trim();
+  if (mid?.startsWith('bush:')) {
+    return Boolean(bush && bush.aircraftId === aircraft.id);
+  }
+  const byId = mid
+    ? state.missions.find((m) => m.id === mid)
+    : undefined;
+  const byAircraft = state.missions.find(
+    (m) => m.aircraftId === aircraft.id && OPEN_MISSION_STATUSES.has(m.status),
+  );
+  const mission = byId ?? byAircraft;
+  if (!mission || !OPEN_MISSION_STATUSES.has(mission.status)) return false;
+  if (mission.aircraftId && mission.aircraftId !== aircraft.id) return false;
+  return true;
 }
 
 function normalizeActiveBushTripField(

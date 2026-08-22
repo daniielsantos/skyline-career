@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { estimateFairUsd, estimateSellBackUsd } from './aircraft-pricing';
+import { estimateFairUsd, estimateHoursMxCostMult, estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 import { IcaoLink } from './IcaoLink';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
@@ -334,6 +334,10 @@ function formatAircraftRegistration(
   return compact.length >= 3 ? compact : null;
 }
 
+function hoursMxTooltip(mult: number): string {
+  return `Maintenance cost ×${mult.toFixed(2)} from airframe/engine hours vs class life`;
+}
+
 export function MarketListingCard(props: {
   listing: AircraftListing;
   catalog?: AircraftCatalogEntry;
@@ -360,6 +364,7 @@ export function MarketListingCard(props: {
   onLease: (listingId: string, opts?: { deliver?: boolean }) => void;
 }) {
   const { listing, catalog } = props;
+  const hoursMxMult = estimateHoursMxCostMult(listing);
   const weightSystem = props.weightSystem ?? 'metric';
   const pcts = listingConditionPcts(listing);
   const isYourLease = listing.source === 'player_lease';
@@ -430,7 +435,7 @@ export function MarketListingCard(props: {
               onOpen={props.onOpenAirport}
               disabled={props.busy}
             />
-            <span>
+            <span title={hoursMxTooltip(hoursMxMult)}>
               {Math.round(listing.hoursAirframe)}/
               {Math.round(listing.hoursEngine)} h
             </span>
@@ -573,14 +578,17 @@ export function MarketListingCard(props: {
   );
 }
 
-function hangarWhereLabel(acf: PlayerAircraft): string {
+function hangarWhereLabel(
+  acf: PlayerAircraft,
+  missionRoute?: { originIcao: string; destIcao: string } | null,
+): string {
   switch (acf.status) {
     case 'parked':
       return 'Parked at';
     case 'assigned':
-      return acf.assignedMissionId
-        ? `Mission ${acf.assignedMissionId} ·`
-        : 'Assigned ·';
+      return missionRoute
+        ? `${missionRoute.originIcao} → ${missionRoute.destIcao} ·`
+        : 'On mission ·';
     case 'maintenance':
       return 'AOG at';
     case 'listed':
@@ -731,6 +739,8 @@ export function HangarAircraftCard(props: {
   /** Empty flown reposition (Dispatch/Watch) — recovery from bush/trip-only. */
   onEmptyFlight: (id: string, dest: string) => Promise<void>;
   onTravel: (destIcao: string) => void;
+  /** Open freight route when the airframe is actually assigned. */
+  missionRoute?: { originIcao: string; destIcao: string } | null;
 }) {
   const acf = props.aircraft;
   const catalog = props.catalog;
@@ -748,6 +758,7 @@ export function HangarAircraftCard(props: {
       : null;
   const note = hangarStatusNote(acf);
   const registration = formatAircraftRegistration(acf.registration);
+  const hoursMxMult = estimateHoursMxCostMult(acf);
   const canList =
     (acf.ownership ?? 'owned') === 'owned' &&
     acf.status === 'parked' &&
@@ -947,15 +958,12 @@ export function HangarAircraftCard(props: {
         <div className="hangar-section hangar-section-where">
           <p className="aircraft-card-section-label">Where</p>
           <div className="hangar-where-line">
-            <span className="hangar-where-status">{hangarWhereLabel(acf)}</span>
+            <span className="hangar-where-status">{hangarWhereLabel(acf, props.missionRoute)}</span>
             <IcaoLink
               icao={acf.locationIcao}
               onOpen={props.onOpenAirport}
               disabled={props.busy}
             />
-          </div>
-          <div className="hangar-where-line hangar-where-pilot">
-            Pilot {pilotHere ? 'here' : `at ${pilotLabel}`}
           </div>
         </div>
 
@@ -1004,7 +1012,10 @@ export function HangarAircraftCard(props: {
             </li>
             <li>
               <span>Hours</span>
-              <strong>{Math.round(acf.hoursAirframe ?? 0)} AF</strong>
+              <strong title={hoursMxTooltip(hoursMxMult)}>
+                {Math.round(acf.hoursAirframe ?? 0)}/
+                {Math.round(acf.hoursEngine ?? 0)} h
+              </strong>
             </li>
             <li>
               <span>Inspect</span>

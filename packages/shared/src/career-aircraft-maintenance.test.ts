@@ -14,7 +14,7 @@ import {
   padOfpBlockFuelKgForMx,
   repairAircraftCondition,
 } from './career-aircraft-maintenance.js';
-import { AIRCRAFT_MSRP_USD } from './career-aircraft-pricing.js';
+import { AIRCRAFT_MSRP_USD, ECONOMIC_LIFE_HOURS } from './career-aircraft-pricing.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import {
@@ -77,6 +77,22 @@ describe('aircraft wear + maintenance', () => {
     assert.equal(needsRepair, false);
     assert.equal(acf.status, 'parked');
     assert.equal(acf.hoursSinceInspection, 0);
+  });
+
+  it('inspection cost rises with airframe/engine hours', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
+      pilotName: 'InspectHours',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const acf = state.fleet[0]!;
+    acf.hoursAirframe = 0;
+    acf.hoursEngine = 0;
+    const low = inspectionCostUsd(acf);
+    acf.hoursAirframe = ECONOMIC_LIFE_HOURS.light_ga;
+    acf.hoursEngine = ECONOMIC_LIFE_HOURS.light_ga;
+    const high = inspectionCostUsd(acf);
+    assert.ok(high > low);
+    assert.equal(high, Math.round(low * 1.6));
   });
 
   it('repair restores pct and can clear critical AOG after inspection', () => {

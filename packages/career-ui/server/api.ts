@@ -11,6 +11,7 @@ import {
   returnAircraftLeaseEarly,
   CAREER_COMMODITIES,
   cancelMission,
+  cancelOrphanPlayerMissions,
   cargoOpsIsUnlocked,
   unlockAllCareerCargoOps,
   unlockAllCareerClassOps,
@@ -430,6 +431,18 @@ async function toClientMission(mission: MissionIntent) {
   );
 }
 
+function blockReasonAnotherActiveFlight(
+  missions: Pick<CareerMissionsState, 'fleet'>,
+  mission: MissionIntent,
+): string {
+  const acf = mission.aircraftId
+    ? findPlayerAircraft(missions, mission.aircraftId)
+    : undefined;
+  const route = `${mission.originIcao}→${mission.destIcao}`;
+  const tail = acf?.label ?? 'another aircraft';
+  return `Finish or cancel the ${route} flight on ${tail} before staging another`;
+}
+
 function withParkingRates(
   fleet: PlayerAircraft[],
   world?: Pick<CareerEconomyWorld, 'airports'>,
@@ -721,6 +734,7 @@ async function withCareerWrite<T>(
     const world = await loadEconomyUnlocked();
     const missions = await loadMissions();
     settleCrewOpsDue(missions, world, Date.now());
+    cancelOrphanPlayerMissions(world, missions);
     const result = await fn(world, missions);
     await persistEconomyUnlocked(world);
     await saveMissions(missions);
@@ -4839,6 +4853,7 @@ export function createCareerApiServer(port = 8787) {
                 originIcao: firstLot.originIcao,
                 destIcao: firstLot.destIcao,
                 aircraftClassId: aircraft,
+                aircraftId: playerAircraft.id,
               });
             }
             // Retry after a successful cargo write but failed client/dispatch response:
@@ -4876,7 +4891,7 @@ export function createCareerApiServer(port = 8787) {
             const activeMissions = listActivePlayerMissions(missions.missions);
             if (!intoMission && activeMissions.length > 0) {
               throw new Error(
-                `Finish or cancel active flight ${activeMissions[0]!.id} before staging another`,
+                blockReasonAnotherActiveFlight(missions, activeMissions[0]!),
               );
             }
             if (
@@ -4889,7 +4904,7 @@ export function createCareerApiServer(port = 8787) {
             }
             if (intoMission?.aircraftId && intoMission.aircraftId !== playerAircraft.id) {
               throw new Error(
-                `Mission ${intoMission.id} is assigned to another aircraft`,
+                blockReasonAnotherActiveFlight(missions, intoMission),
               );
             }
             let mission: MissionIntent;

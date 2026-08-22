@@ -4123,6 +4123,7 @@ export function App() {
             prev.sawAirborne === status.sawAirborne &&
             prev.lastError === status.lastError &&
             prev.pipeConnected === status.pipeConnected &&
+            Boolean(prev.settling) === Boolean(status.settling) &&
             prev.lastEvent?.type === status.lastEvent?.type &&
             Boolean(prev.settlement) === Boolean(status.settlement) &&
             prev.flightTime?.met === status.flightTime?.met &&
@@ -4422,12 +4423,18 @@ export function App() {
     }
     const id = window.setInterval(() => {
       void pollWatch();
-    }, watch?.onGround === false ? 5_000 : 3_000);
+    }, watch?.settling ||
+      watch?.lastEvent?.type === 'settle' ||
+      (watch?.onGround === true && inFlight)
+      ? 800
+      : watch?.onGround === false
+        ? 5_000
+        : 3_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [watch?.running, watch?.onGround, refresh]);
+  }, [watch?.running, watch?.onGround, watch?.settling, watch?.lastEvent?.type, refresh]);
 
   // Independent SimBridge probe — does not require Watch to be running.
   // When Watch is already sampling, skip probing entirely (server would only
@@ -5214,12 +5221,6 @@ export function App() {
         stopped = true;
         if (!cancelled) {
           setWatchAutoStatus('idle');
-          setToastKind('ok');
-          setToast(
-            isAirborneResume
-              ? `Watch resumed · MSFS connected · auto-settle near ${activeMission.destIcao}`
-              : `Watch started · MSFS connected · auto-depart/settle near ${activeMission.destIcao}`,
-          );
         }
       } catch {
         if (!cancelled) {
@@ -6652,13 +6653,17 @@ export function App() {
     originIcao: string,
     destIcao: string,
     aircraftClass: AircraftClass,
+    aircraftId?: string,
   ): Mission | undefined {
     const matches = missions.filter(
       (mission) =>
         ['accepted', 'dispatched'].includes(mission.status) &&
         mission.aircraftClassId === aircraftClass &&
         mission.originIcao === originIcao &&
-        mission.destIcao === destIcao,
+        mission.destIcao === destIcao &&
+        (!aircraftId ||
+          !mission.aircraftId ||
+          mission.aircraftId === aircraftId),
     );
     return matches.length === 1 ? matches[0] : undefined;
   }
@@ -6802,7 +6807,7 @@ export function App() {
       return;
     }
     const aircraft = parkedHere.aircraftClassId;
-    const openFlight = openFlightForRoute(lot.originIcao, lot.destIcao, aircraft);
+    const openFlight = openFlightForRoute(lot.originIcao, lot.destIcao, aircraft, parkedHere.id);
     const existingLots = openFlight?.lots?.length ?? 0;
     if (existingLots >= MAX_STAGING_LOTS) {
       setError(`Flight ${openFlight!.id} already has ${MAX_STAGING_LOTS} lots`);
@@ -7017,6 +7022,7 @@ export function App() {
       staging.originIcao,
       staging.destIcao,
       next,
+      selected.id,
     );
     const nextDraft = clampDraftToCapacity({
       ...staging,
@@ -13254,6 +13260,20 @@ export function App() {
                   onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
                   onEmptyFlight={(id, dest) => onEmptyFlight(id, dest)}
                   onTravel={(dest) => void onPilotTravel(dest)}
+                  missionRoute={(() => {
+                    if (acf.status !== 'assigned') return null;
+                    const m = missions.find(
+                      (row) =>
+                        (acf.assignedMissionId &&
+                          row.id === acf.assignedMissionId) ||
+                        row.aircraftId === acf.id,
+                    );
+                    if (!m || !isActiveMissionStatus(m.status)) return null;
+                    return {
+                      originIcao: m.originIcao,
+                      destIcao: m.destIcao,
+                    };
+                  })()}
                 />
               ))}
             </ul>

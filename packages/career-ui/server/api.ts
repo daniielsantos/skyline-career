@@ -179,7 +179,7 @@ import {
   drawCompanyCredit,
   repayCompanyCredit,
   assertCompanyCreditAllowsOps,
-  settleMission,
+  executeSettleFlight,
   signAircraftLease,
   resolveHangarParkingUsdPerDay,
   applyWalletDelta,
@@ -729,12 +729,15 @@ async function withCareerRead<T>(
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
+  opts?: { housekeeping?: boolean },
 ): Promise<T> {
   return withCareerLock(async () => {
     const world = await loadEconomyUnlocked();
     const missions = await loadMissions();
-    settleCrewOpsDue(missions, world, Date.now());
-    cancelOrphanPlayerMissions(world, missions);
+    if (opts?.housekeeping !== false) {
+      settleCrewOpsDue(missions, world, Date.now());
+      cancelOrphanPlayerMissions(world, missions);
+    }
     const result = await fn(world, missions);
     await persistEconomyUnlocked(world);
     await saveMissions(missions);
@@ -6145,9 +6148,10 @@ export function createCareerApiServer(port = 8787) {
             await watchSession.stop();
           }
           const settled = await withCareerWrite((world, missions) => {
-            const idx = missions.missions.findIndex((m) => m.id === body.missionId);
-            if (idx < 0) return { kind: 'missing' as const };
-            const openMission = missions.missions[idx]!;
+            const openMission = missions.missions.find(
+              (m) => m.id === body.missionId,
+            );
+            if (!openMission) return { kind: 'missing' as const };
             const runwayTouch =
               touchdownLat != null && touchdownLon != null
                 ? evaluateRunwayTouchdown(
@@ -6157,8 +6161,8 @@ export function createCareerApiServer(port = 8787) {
                     touchdownHeadingTrueDeg,
                   )
                 : undefined;
-            const result = settleMission(world, openMission, {
-              fleet: missions,
+            const executed = executeSettleFlight(world, missions, {
+              missionId: body.missionId,
               residualFuelKg,
               landingFpm,
               airborneEndedAtMs,
@@ -6170,33 +6174,9 @@ export function createCareerApiServer(port = 8787) {
               runwayTouch,
               nowMs: Date.now(),
             });
-            missions.missions[idx] = result.mission;
-            if (result.walletCreditUsd > 0) {
-              applyWalletDelta(missions, {
-                amountUsd: result.walletCreditUsd,
-                kind: result.mission.demandOrderId
-                  ? 'demand_payout'
-                  : 'freight_payout',
-                atTick: world.tick,
-                missionId: result.mission.id,
-                icao: result.mission.destIcao,
-                note: result.mission.contractPilot
-                  ? `Contract pilot · ${result.mission.originIcao}→${result.mission.destIcao}`
-                  : result.mission.demandOrderId
-                    ? `Demand · ${result.mission.originIcao}→${result.mission.destIcao}`
-                    : `${result.mission.originIcao}→${result.mission.destIcao}`,
-              });
-            }
-            if (result.fuelDebitUsd > 0) {
-              applyWalletDelta(missions, {
-                amountUsd: -result.fuelDebitUsd,
-                kind: 'fuel',
-                atTick: world.tick,
-                missionId: result.mission.id,
-                icao: result.mission.destIcao,
-                note: 'settlement fuel',
-              });
-            }
+            if (executed.kind === 'missing') return { kind: 'missing' as const };
+            if (executed.kind === 'closed') return { kind: 'closed' as const };
+            const result = executed.result;
             return {
               kind: 'ok' as const,
               mission: result.mission,
@@ -6207,9 +6187,13 @@ export function createCareerApiServer(port = 8787) {
               settlement: result.settlement,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
             };
-          });
+          }, { housekeeping: false });
           if (settled.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
+            return;
+          }
+          if (settled.kind === 'closed') {
+            send(res, 409, { error: `Mission ${body.missionId} is already closed` });
             return;
           }
           send(res, 200, {

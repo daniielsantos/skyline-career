@@ -41,6 +41,7 @@ import {
   replaceMissionManifest,
   routeDistanceNm,
   settleMission,
+  executeSettleFlight,
   selectStarterHub,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
@@ -1514,6 +1515,40 @@ describe('settleMission', () => {
         .stockKg;
     assert.ok(destAfter > destBefore);
     assert.equal(result.settlement.destStockAfterKg, destAfter);
+  });
+
+  it('SettleFlight replays a settled mission without a second payout', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-flight-idem' });
+    tickEconomyN(world, 24);
+    const lot = firstBookableLot(world);
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_settle_idem',
+    });
+    const departed = departMission(world, { ...mission, status: 'dispatched' });
+    const company = emptyMissionsStateV2();
+    company.walletUsd = 50_000;
+    company.missions = [departed.mission];
+    const first = executeSettleFlight(world, company, {
+      missionId: departed.mission.id,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(first.kind, 'applied');
+    if (first.kind !== 'applied') return;
+    const walletAfter = company.walletUsd;
+    const dest = world.airports.find((a) => a.icao === mission.destIcao)!;
+    const stockAfter = dest.inventory[mission.commodityId]!.stockKg;
+    const payout = first.result.settlement.payoutUsd;
+    const second = executeSettleFlight(world, company, {
+      missionId: departed.mission.id,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(second.kind, 'replay');
+    assert.equal(company.walletUsd, walletAfter);
+    assert.equal(dest.inventory[mission.commodityId]!.stockKg, stockAfter);
+    assert.equal(second.result.settlement.payoutUsd, payout);
   });
 
   it('reverts a false auto-depart back to dispatched and clears airborne stamps', () => {

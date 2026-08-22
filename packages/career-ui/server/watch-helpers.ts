@@ -51,7 +51,7 @@ import {
   resolveExpectedRouteMs,
   rebaseExpectedRouteMsFromCruise,
   routeDistanceNm,
-  settleMission,
+  executeSettleFlight,
   watchIntervalMsForPhase,
   weatherOpsStatus,
   fuelBurnMultFromAircraft,
@@ -239,6 +239,7 @@ type WatchCallbacks = {
       world: CareerEconomyWorld,
       missions: CareerMissionsState,
     ) => Promise<T> | T,
+    opts?: { housekeeping?: boolean },
   ) => Promise<T>;
   /**
    * Reload missions under the career lock, then apply. Return false to skip
@@ -3343,103 +3344,82 @@ export class CareerWatchSession {
             }
           }
         }
-        const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
-          const openIdx = freshMissions.missions.findIndex(
-            (m) => m.id === this.missionId,
-          );
-          if (openIdx < 0) return false;
-          const openMission = freshMissions.missions[openIdx]!;
-          if (
-            openMission.status !== 'accepted' &&
-            openMission.status !== 'dispatched' &&
-            openMission.status !== 'in_flight'
-          ) {
-            return false;
-          }
-          const weatherOps = finalizeWeatherOpsScore(this.weatherAcc, {
-            expectedRouteMs:
-              openMission.expectedRouteMs ?? this.watchState.expectedRouteMs,
-          });
-          const touch =
-            touchdownLat != null && touchdownLon != null
-              ? evaluateRunwayTouchdown(
-                  openMission.destIcao,
-                  touchdownLat,
-                  touchdownLon,
-                  touchdownHeadingTrueDeg,
-                )
-              : undefined;
-          const result = settleMission(worldFresh, openMission, {
-            fleet: freshMissions,
-            residualFuelKg,
-            landingFpm,
-            airborneEndedAtMs: this.watchState.airborneEndedAtMs,
-            nowMs: Date.now(),
-            flightScore,
-            weatherOps,
-            touchdownLat,
-            touchdownLon,
-            touchdownHeadingTrueDeg,
-            runwayTouch: touch,
-          });
-          freshMissions.missions[openIdx] = result.mission;
-          const cruiseCommit = this.cruiseState.committed;
-          const airframeTypeId = openMission.airframeTypeId?.trim();
-          if (cruiseCommit && airframeTypeId) {
-            const prev =
-              freshMissions.airframePerfOverrides?.[airframeTypeId];
-            const catalogFlow =
-              findCareerPlayerAirframe(airframeTypeId)?.cruiseFuelFlowKgPerHour;
-            const merged = mergeAirframePerfOverride(
-              prev,
-              cruiseCommit,
-              DEFAULT_CRUISE_EMA_ALPHA,
-              { catalogCruiseFuelFlowKgPerHour: catalogFlow },
+        const saved = await this.cb.withCareerWrite(
+          (worldFresh, freshMissions) => {
+            if (!this.missionId) return false;
+            const openMission = freshMissions.missions.find(
+              (m) => m.id === this.missionId,
             );
-            freshMissions.airframePerfOverrides = {
-              ...(freshMissions.airframePerfOverrides ?? {}),
-              [airframeTypeId]: merged,
+            if (!openMission) return false;
+            const weatherOps = finalizeWeatherOpsScore(this.weatherAcc, {
+              expectedRouteMs:
+                openMission.expectedRouteMs ?? this.watchState.expectedRouteMs,
+            });
+            const touch =
+              touchdownLat != null && touchdownLon != null
+                ? evaluateRunwayTouchdown(
+                    openMission.destIcao,
+                    touchdownLat,
+                    touchdownLon,
+                    touchdownHeadingTrueDeg,
+                  )
+                : undefined;
+            const executed = executeSettleFlight(worldFresh, freshMissions, {
+              missionId: this.missionId,
+              residualFuelKg,
+              landingFpm,
+              airborneEndedAtMs: this.watchState.airborneEndedAtMs,
+              nowMs: Date.now(),
+              flightScore,
+              weatherOps,
+              touchdownLat,
+              touchdownLon,
+              touchdownHeadingTrueDeg,
+              runwayTouch: touch,
+            });
+            if (executed.kind === 'missing' || executed.kind === 'closed') {
+              return false;
+            }
+            const result = executed.result;
+            const cruiseCommit = this.cruiseState.committed;
+            const airframeTypeId = openMission.airframeTypeId?.trim();
+            if (cruiseCommit && airframeTypeId) {
+              const prev =
+                freshMissions.airframePerfOverrides?.[airframeTypeId];
+              const catalogFlow =
+                findCareerPlayerAirframe(airframeTypeId)?.cruiseFuelFlowKgPerHour;
+              const merged = mergeAirframePerfOverride(
+                prev,
+                cruiseCommit,
+                DEFAULT_CRUISE_EMA_ALPHA,
+                { catalogCruiseFuelFlowKgPerHour: catalogFlow },
+              );
+              freshMissions.airframePerfOverrides = {
+                ...(freshMissions.airframePerfOverrides ?? {}),
+                [airframeTypeId]: merged,
+              };
+            }
+            this.missionStatus = result.mission.status;
+            this.walletUsd = freshMissions.walletUsd;
+            this.settlement = {
+              payoutUsd: result.settlement.payoutUsd,
+              penaltyUsd: result.settlement.penaltyUsd,
+              lateTicks: result.settlement.lateTicks,
+              onTime: result.settlement.onTime,
+              deliveredKg: result.settlement.deliveredKg,
+              residualFuelKg: result.mission.settledFuelKg ?? null,
+              landingFpm: result.mission.settledLandingFpm ?? null,
+              flightDurationMs: result.mission.settledFlightDurationMs ?? null,
+              flightScore: result.mission.settledFlightScore ?? null,
+              weatherBonusUsd: result.settlement.weatherBonusUsd,
+              weatherOps: result.mission.settledWeatherOps ?? null,
+              runwayTouch: result.mission.settledRunwayTouch ?? null,
+              cargoOpsDeltas: result.cargoOpsDeltas ?? [],
             };
-          }
-          if (result.walletCreditUsd > 0) {
-            applyWalletDelta(freshMissions, {
-              amountUsd: result.walletCreditUsd,
-              kind: 'freight_payout',
-              atTick: worldFresh.tick,
-              missionId: result.mission.id,
-              icao: result.mission.destIcao,
-              note: `${result.mission.originIcao}→${result.mission.destIcao}`,
-            });
-          }
-          if (result.fuelDebitUsd > 0) {
-            applyWalletDelta(freshMissions, {
-              amountUsd: -result.fuelDebitUsd,
-              kind: 'fuel',
-              atTick: worldFresh.tick,
-              missionId: result.mission.id,
-              icao: result.mission.destIcao,
-              note: 'settlement fuel',
-            });
-          }
-          this.missionStatus = result.mission.status;
-          this.walletUsd = freshMissions.walletUsd;
-          this.settlement = {
-            payoutUsd: result.settlement.payoutUsd,
-            penaltyUsd: result.settlement.penaltyUsd,
-            lateTicks: result.settlement.lateTicks,
-            onTime: result.settlement.onTime,
-            deliveredKg: result.settlement.deliveredKg,
-            residualFuelKg: result.mission.settledFuelKg ?? null,
-            landingFpm: result.mission.settledLandingFpm ?? null,
-            flightDurationMs: result.mission.settledFlightDurationMs ?? null,
-            flightScore: result.mission.settledFlightScore ?? null,
-            weatherBonusUsd: result.settlement.weatherBonusUsd,
-            weatherOps: result.mission.settledWeatherOps ?? null,
-            runwayTouch: result.mission.settledRunwayTouch ?? null,
-            cargoOpsDeltas: result.cargoOpsDeltas ?? [],
-          };
-          return true;
-        });
+            return true;
+          },
+          { housekeeping: false },
+        );
         if (!saved) {
           this.settling = false;
           await this.stop({ fromOwnTick: true });

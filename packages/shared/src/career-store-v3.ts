@@ -830,19 +830,40 @@ export function replaceFleetAircraft(
   companyId: string,
   fleet: PlayerAircraft[],
 ): void {
-  db.prepare(`DELETE FROM fleet_aircraft WHERE company_id = ?`).run(companyId);
-  const ins = db.prepare(
+  const ids = fleet.map((a) => a.id).filter(Boolean);
+  if (ids.length === 0) {
+    db.prepare(`DELETE FROM fleet_aircraft WHERE company_id = ?`).run(companyId);
+    return;
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(
+    `DELETE FROM fleet_aircraft WHERE company_id = ? AND id NOT IN (${placeholders})`,
+  ).run(companyId, ...ids);
+  const upsert = db.prepare(
     `INSERT INTO fleet_aircraft (
        id, company_id, aircraft_class_id, airframe_type_id, label, location_icao,
        fuel_kg, fuel_capacity_kg, status, assigned_mission_id, ownership, lease_json, payload_json
      ) VALUES (
        @id, @company_id, @aircraft_class_id, @airframe_type_id, @label, @location_icao,
        @fuel_kg, @fuel_capacity_kg, @status, @assigned_mission_id, @ownership, @lease_json, @payload_json
-     )`,
+     )
+     ON CONFLICT(id) DO UPDATE SET
+       company_id = excluded.company_id,
+       aircraft_class_id = excluded.aircraft_class_id,
+       airframe_type_id = excluded.airframe_type_id,
+       label = excluded.label,
+       location_icao = excluded.location_icao,
+       fuel_kg = excluded.fuel_kg,
+       fuel_capacity_kg = excluded.fuel_capacity_kg,
+       status = excluded.status,
+       assigned_mission_id = excluded.assigned_mission_id,
+       ownership = excluded.ownership,
+       lease_json = excluded.lease_json,
+       payload_json = excluded.payload_json`,
   );
   for (const a of fleet) {
     const { core, payload, leaseJson } = fleetCoreAndPayload(a);
-    ins.run({
+    upsert.run({
       id: sqlVal(core.id),
       company_id: sqlVal(companyId),
       aircraft_class_id: sqlVal(core.aircraftClassId),
@@ -922,8 +943,16 @@ export function replaceMissionsTable(
   companyId: string,
   missions: MissionIntent[],
 ): void {
-  db.prepare(`DELETE FROM missions WHERE company_id = ?`).run(companyId);
-  const ins = db.prepare(
+  const ids = missions.map((m) => m.id).filter(Boolean);
+  if (ids.length === 0) {
+    db.prepare(`DELETE FROM missions WHERE company_id = ?`).run(companyId);
+    return;
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(
+    `DELETE FROM missions WHERE company_id = ? AND id NOT IN (${placeholders})`,
+  ).run(companyId, ...ids);
+  const upsert = db.prepare(
     `INSERT INTO missions (
        id, company_id, status, origin_icao, dest_icao, aircraft_id, commodity_id,
        cargo_kg, pay_usd, accepted_at_tick, deadline_tick, departed_at_tick,
@@ -932,11 +961,27 @@ export function replaceMissionsTable(
        @id, @company_id, @status, @origin_icao, @dest_icao, @aircraft_id, @commodity_id,
        @cargo_kg, @pay_usd, @accepted_at_tick, @deadline_tick, @departed_at_tick,
        @settled_at_tick, @urgency, @reason, @payload_json
-     )`,
+     )
+     ON CONFLICT(id) DO UPDATE SET
+       company_id = excluded.company_id,
+       status = excluded.status,
+       origin_icao = excluded.origin_icao,
+       dest_icao = excluded.dest_icao,
+       aircraft_id = excluded.aircraft_id,
+       commodity_id = excluded.commodity_id,
+       cargo_kg = excluded.cargo_kg,
+       pay_usd = excluded.pay_usd,
+       accepted_at_tick = excluded.accepted_at_tick,
+       deadline_tick = excluded.deadline_tick,
+       departed_at_tick = excluded.departed_at_tick,
+       settled_at_tick = excluded.settled_at_tick,
+       urgency = excluded.urgency,
+       reason = excluded.reason,
+       payload_json = excluded.payload_json`,
   );
   for (const m of missions) {
     const { core, payload } = missionCoreAndPayload(m);
-    ins.run({
+    upsert.run({
       id: sqlVal(core.id),
       company_id: sqlVal(companyId),
       status: sqlVal(core.status),

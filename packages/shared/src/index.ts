@@ -240,6 +240,7 @@ export * from './career-json-io.js';
 export * from './career-partition.js';
 export * from './career-store.js';
 export * from './career-mission.js';
+export * from './career-persist-commands.js';
 export * from './career-cargo-ops.js';
 export * from './career-class-ops.js';
 export * from './career-live-load.js';

@@ -290,7 +290,6 @@ export function upsertLots(
   lots: ShipmentLot[],
   airports?: CareerEconomyWorld['airports'],
 ): void {
-  const countries = icaoCountryMap(airports);
   const ids = lots.map((l) => l.id);
   if (ids.length === 0) {
     db.prepare(`DELETE FROM lots WHERE world_id = ?`).run(LOCAL_WORLD_ID_V3);
@@ -300,7 +299,59 @@ export function upsertLots(
   db.prepare(
     `DELETE FROM lots WHERE world_id = ? AND id NOT IN (${placeholders})`,
   ).run(LOCAL_WORLD_ID_V3, ...ids);
+  upsertLotRows(db, lots, airports);
+}
 
+export function lotPersistSignature(lot: ShipmentLot): string {
+  return [
+    lot.id,
+    lot.quantityKg,
+    lot.reservedKg,
+    lot.status,
+    lot.payUsd,
+    lot.expiresAtTick,
+    lot.commodityId,
+    lot.originIcao,
+    lot.destIcao,
+  ].join('|');
+}
+
+const LIVE_PATCH_FULL_THRESHOLD = 80;
+
+export function persistLotsIncremental(
+  db: SqliteDb,
+  lots: ShipmentLot[],
+  airports: CareerEconomyWorld['airports'] | undefined,
+  previous: Map<string, string> | null,
+): void {
+  if (!previous || previous.size === 0) {
+    upsertLots(db, lots, airports);
+    return;
+  }
+  const nextIds = new Set(lots.map((lot) => lot.id));
+  const upsert: ShipmentLot[] = [];
+  for (const lot of lots) {
+    if (previous.get(lot.id) !== lotPersistSignature(lot)) upsert.push(lot);
+  }
+  const remove: string[] = [];
+  for (const id of previous.keys()) {
+    if (!nextIds.has(id)) remove.push(id);
+  }
+  if (upsert.length + remove.length >= LIVE_PATCH_FULL_THRESHOLD) {
+    upsertLots(db, lots, airports);
+    return;
+  }
+  const del = db.prepare(`DELETE FROM lots WHERE id = ?`);
+  for (const id of remove) del.run(id);
+  if (upsert.length > 0) upsertLotRows(db, upsert, airports);
+}
+
+function upsertLotRows(
+  db: SqliteDb,
+  lots: ShipmentLot[],
+  airports?: CareerEconomyWorld['airports'],
+): void {
+  const countries = icaoCountryMap(airports);
   const upsert = db.prepare(
     `INSERT INTO lots (
        id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
@@ -469,6 +520,104 @@ export function replaceInboundPending(
        @id, @mission_id, @origin_icao, @dest_icao, @commodity_id, @cargo_kg,
        @expires_at_tick, @source, @origin_country_id, @dest_country_id, @payload_json, @world_id
      )`,
+  );
+  for (const row of rows) {
+    const {
+      id,
+      missionId,
+      originIcao,
+      destIcao,
+      commodityId,
+      cargoKg,
+      expiresAtTick,
+      source,
+      ...rest
+    } = row;
+    const extra = Object.keys(rest).length > 0 ? JSON.stringify(rest) : null;
+    ins.run({
+      id,
+      mission_id: missionId,
+      origin_icao: originIcao,
+      dest_icao: destIcao,
+      commodity_id: commodityId,
+      cargo_kg: cargoKg,
+      expires_at_tick: expiresAtTick,
+      source,
+      origin_country_id: countryForIcao(countries, originIcao) || null,
+      dest_country_id: countryForIcao(countries, destIcao) || null,
+      payload_json: extra,
+      world_id: LOCAL_WORLD_ID_V3,
+    });
+  }
+}
+
+export function inboundPersistSignature(row: InboundPending): string {
+  return [
+    row.id,
+    row.missionId,
+    row.originIcao,
+    row.destIcao,
+    row.commodityId,
+    row.cargoKg,
+    row.expiresAtTick,
+    row.source,
+  ].join('|');
+}
+
+export function persistInboundIncremental(
+  db: SqliteDb,
+  rows: InboundPending[],
+  airports: CareerEconomyWorld['airports'] | undefined,
+  previous: Map<string, string> | null,
+): void {
+  if (!previous || previous.size === 0) {
+    replaceInboundPending(db, rows, airports);
+    return;
+  }
+  const nextIds = new Set(rows.map((row) => row.id));
+  const upsert: InboundPending[] = [];
+  for (const row of rows) {
+    if (previous.get(row.id) !== inboundPersistSignature(row)) upsert.push(row);
+  }
+  const remove: string[] = [];
+  for (const id of previous.keys()) {
+    if (!nextIds.has(id)) remove.push(id);
+  }
+  if (upsert.length + remove.length >= LIVE_PATCH_FULL_THRESHOLD) {
+    replaceInboundPending(db, rows, airports);
+    return;
+  }
+  const del = db.prepare(`DELETE FROM inbound_pending WHERE id = ?`);
+  for (const id of remove) del.run(id);
+  if (upsert.length > 0) insertInboundPendingRows(db, upsert, airports);
+}
+
+function insertInboundPendingRows(
+  db: SqliteDb,
+  rows: InboundPending[],
+  airports?: CareerEconomyWorld['airports'],
+): void {
+  const countries = icaoCountryMap(airports);
+  const ins = db.prepare(
+    `INSERT INTO inbound_pending (
+       id, mission_id, origin_icao, dest_icao, commodity_id, cargo_kg,
+       expires_at_tick, source, origin_country_id, dest_country_id, payload_json, world_id
+     ) VALUES (
+       @id, @mission_id, @origin_icao, @dest_icao, @commodity_id, @cargo_kg,
+       @expires_at_tick, @source, @origin_country_id, @dest_country_id, @payload_json, @world_id
+     )
+     ON CONFLICT(id) DO UPDATE SET
+       mission_id = excluded.mission_id,
+       origin_icao = excluded.origin_icao,
+       dest_icao = excluded.dest_icao,
+       commodity_id = excluded.commodity_id,
+       cargo_kg = excluded.cargo_kg,
+       expires_at_tick = excluded.expires_at_tick,
+       source = excluded.source,
+       origin_country_id = excluded.origin_country_id,
+       dest_country_id = excluded.dest_country_id,
+       payload_json = excluded.payload_json,
+       world_id = excluded.world_id`,
   );
   for (const row of rows) {
     const {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, it } from 'node:test';
-import { createSeedEconomyWorld } from './career-economy.js';
+import { createSeedEconomyWorld, ensureSeedMarketFormed } from './career-economy.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
 import {
   persistAirportsToTables,
@@ -38,6 +38,16 @@ function airportRowid(
       .prepare(`SELECT rowid AS id FROM airports WHERE world_id = 'local' AND icao = ?`)
       .get(icao) as { id: number } | undefined;
     return row?.id;
+  } finally {
+    db.close();
+  }
+}
+
+function countLotsInDb(sqlitePath: string): number {
+  const db = new DatabaseSync(sqlitePath);
+  try {
+    const row = db.prepare(`SELECT COUNT(*) AS n FROM lots`).get() as { n: number };
+    return Number(row.n);
   } finally {
     db.close();
   }
@@ -319,6 +329,44 @@ describe('career store v4', () => {
     world.tick += 1;
     await store.saveEconomy(world);
     assert.equal(airportRowid(store.sqlitePath!, otherIcao), otherRowid);
+    store.close();
+  });
+
+  it('skips hourly catch-up when maxCatchUpTicks is 0', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-v4-ncu-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const world = createSeedEconomyWorld({ seed: 'v4-ncu' });
+    world.lastBatchAtMs = Date.now();
+    await store.saveEconomy(world);
+    const loaded = await store.loadEconomy({ maxCatchUpTicks: 0 });
+    const tick = loaded.world.tick;
+    loaded.world.lastBatchAtMs = Date.now() - 12 * 3_600_000;
+    const skipped = await store.loadEconomy({ maxCatchUpTicks: 0 });
+    assert.equal(skipped.advancedTicks, 0);
+    assert.equal(skipped.world.tick, tick);
+    const caught = await store.loadEconomy();
+    assert.ok(caught.advancedTicks > 0);
+    store.close();
+  });
+
+  it('patches a single lot without dropping the rest', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-v4-lot-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const world = createSeedEconomyWorld({ seed: 'v4-lot' });
+    world.lastBatchAtMs = Date.now();
+    ensureSeedMarketFormed(world);
+    await store.saveEconomy(world);
+    const n = countLotsInDb(store.sqlitePath!);
+    assert.ok(n > 1);
+    const keep = world.lots[1]!;
+    const keepQty = keep.quantityKg;
+    const touch = world.lots[0]!;
+    touch.quantityKg = Math.max(0, touch.quantityKg - 10);
+    await store.saveEconomy(world);
+    assert.equal(countLotsInDb(store.sqlitePath!), n);
+    const again = await store.loadEconomy({ maxCatchUpTicks: 0 });
+    const kept = again.world.lots.find((l) => l.id === keep.id);
+    assert.equal(kept?.quantityKg, keepQty);
     store.close();
   });
 });

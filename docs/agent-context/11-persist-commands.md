@@ -65,8 +65,8 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 ## Fatia de implementação (ordem)
 
 1. ~~**Dirty airports:**~~ **feito:** patch por ICAO + skip live/ops/blob. Tick que toca ≥80 hubs ainda faz rewrite completo.
-2. **`SettleFlight` comando (em curso):** `executeSettleFlight` — idempotente (`settled` → replay, sem segundo payout). Watch/API usam isso; `withCareerWrite(..., { housekeeping: false })` no settle. Frota/missões SQL: UPSERT, não DELETE da tabela.
-3. **Dois locks** quando 2 estiver estável. `withCareerRead` do GET stock já fura o lock — repetir o padrão.
+2. ~~**`SettleFlight` comando:**~~ `executeSettleFlight` idempotente; Watch/API; housekeeping off no settle.
+3. **Hot path persist (em curso):** settle `catchUp: false` (não roda o tick horário no parking brake). Lots/inbound SQL em patch (não `DELETE` a tabela se <80 linhas mudaram). NPC flights/events só se mudaram.
 4. **Fila** só depois: jobs `ApplyCruiseEma`, `CatchUpCrewOps`. Não enfileirar o payout.
 5. **MP:** N `company_id` no mesmo `world_id`. Fora de escopo até 2+3.
 

@@ -610,9 +610,13 @@ async function updateOpenMission(
   });
 }
 
-async function loadEconomyUnlocked(): Promise<CareerEconomyWorld> {
+async function loadEconomyUnlocked(opts?: {
+  skipCatchUp?: boolean;
+}): Promise<CareerEconomyWorld> {
   const activeStore = requireStore();
-  const { world: caught, advancedTicks, dirty } = await activeStore.loadEconomy();
+  const { world: caught, advancedTicks, dirty } = await activeStore.loadEconomy(
+    opts?.skipCatchUp ? { maxCatchUpTicks: 0 } : undefined,
+  );
   const missions = await loadMissions();
   let needsSave = dirty;
   // Home partition follows the player's chosen hub (KMIA → US), including legacy saves.
@@ -729,10 +733,12 @@ async function withCareerRead<T>(
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
-  opts?: { housekeeping?: boolean },
+  opts?: { housekeeping?: boolean; catchUp?: boolean },
 ): Promise<T> {
   return withCareerLock(async () => {
-    const world = await loadEconomyUnlocked();
+    const world = await loadEconomyUnlocked({
+      skipCatchUp: opts?.catchUp === false,
+    });
     const missions = await loadMissions();
     if (opts?.housekeeping !== false) {
       settleCrewOpsDue(missions, world, Date.now());
@@ -6187,7 +6193,7 @@ export function createCareerApiServer(port = 8787) {
               settlement: result.settlement,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
             };
-          }, { housekeeping: false });
+          }, { housekeeping: false, catchUp: false });
           if (settled.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;

@@ -239,7 +239,7 @@ type WatchCallbacks = {
       world: CareerEconomyWorld,
       missions: CareerMissionsState,
     ) => Promise<T> | T,
-    opts?: { housekeeping?: boolean },
+    opts?: { housekeeping?: boolean; catchUp?: boolean },
   ) => Promise<T>;
   /**
    * Reload missions under the career lock, then apply. Return false to skip
@@ -3418,7 +3418,7 @@ export class CareerWatchSession {
             };
             return true;
           },
-          { housekeeping: false },
+          { housekeeping: false, catchUp: false },
         );
         if (!saved) {
           this.settling = false;

@@ -736,7 +736,7 @@ type CareerWriteOpts = {
   /** Default false — only the timer / POST /api/tick should pass true. */
   catchUp?: boolean;
   /** Skip saveEconomy when the handler only mutates company/missions. */
-  persist?: 'economy' | 'company' | 'blob' | 'portMarket';
+  persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound';
   persistDemandOrderId?: string;
   persistPortListingId?: string;
   persistPortConcessions?: boolean;
@@ -751,6 +751,7 @@ type CareerWriteOpts = {
  * `persist: 'company'` writes missions only (plus optional demand/listing/concession
  * upserts). `persist: 'blob'` writes dealer pool JSON without live tables.
  * `persist: 'portMarket'` rewrites port listings+inventory only (GET /api/ports seed).
+ * `persist: 'demandBoard'` rewrites demand_orders only. `persist: 'inbound'` patches inbound_pending.
  */
 async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
@@ -763,6 +764,8 @@ async function withCareerWrite<T>(
     const persistCompany = opts?.persist === 'company';
     const persistBlob = opts?.persist === 'blob';
     const persistPortMarket = opts?.persist === 'portMarket';
+    const persistDemandBoard = opts?.persist === 'demandBoard';
+    const persistInbound = opts?.persist === 'inbound';
     const demandOrderId = opts?.persistDemandOrderId?.trim();
     const portListingId = opts?.persistPortListingId?.trim();
     const persistPortConcessions = opts?.persistPortConcessions === true;
@@ -877,7 +880,11 @@ async function withCareerWrite<T>(
       useCommandPersist = true;
     }
     const housekeeping =
-      persistCompany || persistBlob || persistPortMarket
+      persistCompany ||
+      persistBlob ||
+      persistPortMarket ||
+      persistDemandBoard ||
+      persistInbound
         ? false
         : opts?.housekeeping !== false;
     if (housekeeping) {
@@ -913,6 +920,14 @@ async function withCareerWrite<T>(
     }
     if (persistPortMarket) {
       await activeStore.persistPortMarketTables(world);
+      return result;
+    }
+    if (persistDemandBoard) {
+      await activeStore.persistDemandBoardTables(world);
+      return result;
+    }
+    if (persistInbound) {
+      await activeStore.persistInboundPending(world);
       return result;
     }
     if (useCommandPersist) {
@@ -2060,7 +2075,7 @@ export function createCareerApiServer(port = 8787) {
             fleet: withParkingRates(missions.fleet),
             leaseUnlock: leaseUnlockForRequest(req, missions),
           };
-        });
+        }, { persist: 'blob' });
         send(res, 200, payload);
         return;
       }
@@ -2783,6 +2798,7 @@ export function createCareerApiServer(port = 8787) {
               missionsState: missions,
             };
           },
+          { persist: 'inbound' },
         );
         const nowMs = Date.now();
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
@@ -3767,7 +3783,7 @@ export function createCareerApiServer(port = 8787) {
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: portSnapshot(world, missions),
             };
-          });
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3788,7 +3804,7 @@ export function createCareerApiServer(port = 8787) {
               }),
               warehouses,
             };
-          });
+          }, { persist: 'demandBoard' });
           send(res, 200, result);
         } catch (error) {
           send(res, 500, {

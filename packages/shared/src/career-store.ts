@@ -82,6 +82,7 @@ import {
   replacePortConcessions,
   replacePortInventories,
   replacePortListings,
+  replaceDemandOrders,
   upsertDemandOrder,
   upsertPortListing,
 } from './career-store-v5.js';
@@ -135,6 +136,8 @@ export interface CareerStore {
   persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void>;
   /** Seed/expire port listings + inventory only — not airports/lots/NPC. */
   persistPortMarketTables(world: CareerEconomyWorld): Promise<void>;
+  persistDemandBoardTables(world: CareerEconomyWorld): Promise<void>;
+  persistInboundPending(world: CareerEconomyWorld): Promise<void>;
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).
@@ -409,6 +412,14 @@ class JsonCareerStore implements CareerStore {
   }
 
   async persistPortMarketTables(_world: CareerEconomyWorld): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
+  }
+
+  async persistDemandBoardTables(_world: CareerEconomyWorld): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
+  }
+
+  async persistInboundPending(_world: CareerEconomyWorld): Promise<void> {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
@@ -749,6 +760,22 @@ class SqliteCareerStore implements CareerStore {
     replacePortListings(this.db, world.portListings ?? []);
     replacePortInventories(this.db, world.portInventories ?? []);
     if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
+  }
+
+  async persistDemandBoardTables(world: CareerEconomyWorld): Promise<void> {
+    replaceDemandOrders(this.db, world.demandOrders ?? []);
+    if (this.ram) this.lastOpsKey = worldOpsPersistKey(this.ram);
+  }
+
+  async persistInboundPending(world: CareerEconomyWorld): Promise<void> {
+    persistInboundIncremental(
+      this.db,
+      world.inboundPending ?? [],
+      world.airports,
+      this.lastInboundSignatures,
+    );
+    this.lastInboundSignatures = inboundSignatureMap(world);
+    this.lastInboundKey = inboundPersistKey(world);
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {

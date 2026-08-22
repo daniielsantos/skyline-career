@@ -1,12 +1,12 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-08-22. GET `/api/ports` = port listings+inventory tables. Ports buy = listing upsert. Accept/dispatch/cancel = command-slice.
+Atualizado 2026-08-22. SP usa o mesmo molde MP (tabelas/comando; `saveEconomy` só no tick). GET Freights = inbound patch; Demand = demand_orders; dealer GET = blob.
 
 ## Objetivo
 
 Single-player mais rápido no parking brake **e** o mesmo formato de comando que MP vai usar: `company_id` + `world_id`, poucas linhas, idempotente.
 
-MP **não** começa neste doc. Sem writes incrementais + lock fino, MP só serializa a lentidão.
+MP **não** começa neste doc, mas o persist do SP **é** o formato MP: tabelas + comando, não um dump do planeta no clique. Sem isso, MP só serializa a lentidão.
 
 ## Dois cadeados (depois do comando)
 
@@ -70,7 +70,8 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 4. ~~**Fila de jobs:**~~ **não faremos** até um side-effect ser pesado o bastante. Cruise EMA fica no settle.
 5. **MP:** N `company_id` no mesmo `world_id`. Fora de escopo.
 6. ~~**Ports buy / concession:**~~ company + listing upsert / concession index. Deposit/abandon company-only.
-7. ~~**GET `/api/ports`:**~~ `persist: 'portMarket'` (listings + inventory tables only). Accept/dispatch/cancel already use command-slice lots.
+7. ~~**GET `/api/ports`:**~~ `persist: 'portMarket'`.
+8. ~~**GET Freights / Demand / dealer:**~~ inbound patch, demand_orders table, dealer blob. Warehouse stock abandon = company.
 
 ## Outros comandos (mesmo molde, depois)
 

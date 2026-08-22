@@ -242,7 +242,7 @@ type WatchCallbacks = {
     opts?: {
       housekeeping?: boolean;
       catchUp?: boolean;
-      persist?: 'economy' | 'company' | 'blob' | 'portMarket';
+      persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound';
       persistDemandOrderId?: string;
       persistPortListingId?: string;
       persistPortConcessions?: boolean;

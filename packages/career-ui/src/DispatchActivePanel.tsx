@@ -31,6 +31,7 @@ import {
 } from './load-verification';
 import { mxFuelBurnAlertText } from './mx-fuel-burn';
 import { logbookAircraftLabel, logbookFlightKind } from './logbook';
+import { CargoLotCards } from './CargoLotCards';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
   const currentIndex = DISPATCH_STEP_ORDER.indexOf(props.current);
@@ -521,15 +522,11 @@ export function DispatchActivePanel(props: {
             ) : null}
           </div>
           {(mission.lots?.length ?? 0) > 0 ? (
-            <ul className="staging-existing">
-              {mission.lots!.map((line) => (
-                <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                  {props.formatTonnes(line.cargoKg)} {line.commodityId} ·{' '}
-                  {props.formatMoney(line.payUsd)}
-                  {line.urgency === 'urgent' ? ' · urgent' : ''}
-                </li>
-              ))}
-            </ul>
+            <CargoLotCards
+              lots={mission.lots!}
+              formatTonnes={props.formatTonnes}
+              formatMoney={props.formatMoney}
+            />
           ) : (
             <p className="empty">No cargo lots on this flight yet.</p>
           )}
@@ -1521,15 +1518,12 @@ export function DispatchActivePanel(props: {
                       'Empty reposition — no freight on board.'}
                   </p>
                 ) : cargoLots.length > 1 ? (
-                  <ul className="staging-existing dispatch-enroute-block-note">
-                    {cargoLots.map((line) => (
-                      <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                        {props.formatTonnes(line.cargoKg)}{' '}
-                        {line.commodityId.replace(/_/g, ' ')} ·{' '}
-                        {props.formatMoney(line.payUsd)}
-                      </li>
-                    ))}
-                  </ul>
+                  <CargoLotCards
+                    className="dispatch-enroute-block-note"
+                    lots={cargoLots}
+                    formatTonnes={props.formatTonnes}
+                    formatMoney={props.formatMoney}
+                  />
                 ) : null}
               </div>
             );

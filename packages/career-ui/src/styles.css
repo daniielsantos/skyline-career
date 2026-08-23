@@ -3257,6 +3257,68 @@ tr.lot-locked {
   font-size: 0.78rem;
 }
 
+.cargo-lot-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+}
+
+.cargo-lot-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.8rem 0.9rem 0.85rem;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 8px 20px rgba(20, 32, 51, 0.06);
+}
+
+.cargo-lot-card.is-urgent {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.cargo-lot-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.cargo-lot-card-top strong {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+}
+
+.cargo-lot-card-top .tag {
+  flex-shrink: 0;
+}
+
+.cargo-lot-card-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.75rem;
+  margin: 0;
+}
+
+.cargo-lot-card-meta dt {
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cargo-lot-card-meta dd {
+  margin: 0.18rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .staging-existing,
 .staging-lines,
 .staging-candidates {

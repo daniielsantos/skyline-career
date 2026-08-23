@@ -298,6 +298,7 @@ import {
 } from './dispatch-flow';
 import { RunwayTouchdownDiagram } from './RunwayTouchdownDiagram';
 import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
+import { CargoLotCards } from './CargoLotCards';
 import { TerminalAirportPanel } from './TerminalAirportPanel';
 import { WatchStatusFooter } from './WatchStatusFooter';
 import { mxFuelBurnFromAircraft } from './mx-fuel-burn';
@@ -12291,15 +12292,11 @@ export function App() {
               {stagingExisting && (stagingExisting.lots?.length ?? 0) > 0 ? (
                 <div className="staging-section">
                   <h3>Already on this flight</h3>
-                  <ul className="staging-existing">
-                    {stagingExisting.lots!.map((line) => (
-                      <li key={`${line.shipmentLotId}-${line.commodityId}`}>
-                        {formatTonnes(line.cargoKg)} {line.commodityId} ·{' '}
-                        {formatMoney(line.payUsd)}
-                        {line.urgency === 'urgent' ? ' · urgent' : ''}
-                      </li>
-                    ))}
-                  </ul>
+                  <CargoLotCards
+                    lots={stagingExisting.lots!}
+                    formatTonnes={formatTonnes}
+                    formatMoney={formatMoney}
+                  />
                 </div>
               ) : null}
 

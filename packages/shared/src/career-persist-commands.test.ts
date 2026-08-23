@@ -6,6 +6,7 @@ import {
   executeAcceptLot,
   executeAcceptManifest,
   executeBuyAircraft,
+  executeCancelMission,
   executeDepartFlight,
   listAircraftMarket,
   listMarketLots,
@@ -138,6 +139,37 @@ describe('persist commands Accept / Depart / Buy', () => {
     if (second.kind === 'replay') {
       assert.equal(second.debitUsd, 0);
       assert.equal(second.aircraft.registration, first.aircraft.registration);
+    }
+  });
+
+  it('CancelMission replays without releasing the lot twice', () => {
+    const world = createSeedEconomyWorld({ seed: 'cmd-cancel-idem' });
+    tickEconomyN(world, 24);
+    const lot = firstBookableLot(world, 2_000);
+    const company = emptyMissionsStateV2();
+    const accepted = executeAcceptLot(world, company, {
+      lotId: lot.id,
+      cargoKg: 2_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_cancel_idem',
+    });
+    assert.equal(accepted.kind, 'applied');
+    if (accepted.kind !== 'applied') return;
+    const first = executeCancelMission(world, company, {
+      missionId: accepted.mission.id,
+    });
+    assert.equal(first.kind, 'applied');
+    const reservedAfter = world.lots.find((row) => row.id === lot.id)!.reservedKg;
+    const second = executeCancelMission(world, company, {
+      missionId: accepted.mission.id,
+    });
+    assert.equal(second.kind, 'replay');
+    assert.equal(
+      world.lots.find((row) => row.id === lot.id)!.reservedKg,
+      reservedAfter,
+    );
+    if (second.kind === 'replay') {
+      assert.equal(second.mission.status, 'cancelled');
     }
   });
 });

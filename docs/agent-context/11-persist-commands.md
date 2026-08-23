@@ -80,7 +80,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 14. ~~**Company persist skip + ledger patch:**~~ identical `saveMissions` no-ops; ledger upsert + delete-not-in (no `DELETE FROM ledger` wipe). Dealer GET blob still calls `saveMissions` but skips SQL when unchanged.
 15. ~~**Fleet/missions skip:**~~ `saveMissions` só reescreve frota, tabela de missões, `company_state`, stub ou ledger quando aquele slice mudou (ex. parking fee = wallet+ledger, sem `replaceFleet`).
 16. ~~**Fleet/mission row patch:**~~ upsert + delete só das tails/missões dirty (assinatura por id); full rewrite se ≥80 mudanças, como lots.
-17. ~~**Accept / Depart / Buy comandos:**~~ idempotentes; Watch auto-depart usa `executeDepartFlight`. **CancelMission** ainda aberto.
+17. ~~**Accept / Depart / Buy / Cancel comandos:**~~ idempotentes; Watch auto-depart usa `executeDepartFlight`.
 
 ## Outros comandos (mesmo molde)
 
@@ -88,10 +88,10 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 |---------|-----|----------------|
 | ~~`AcceptLot`~~ | lot reserved, missão `accepted`, inbound_pending, tail assign | spawn de lots novos |
 | ~~`DepartFlight`~~ | status `in_flight`, fuel debit, airborne stamps | — |
-| `CancelMission` | status cancel, release tail, lot devolve | — |
+| ~~`CancelMission`~~ | status cancel, release tail, lot devolve | — |
 | ~~`BuyAircraft`~~ | wallet + instance `sold` + fleet row | rebalance pool mundial |
 
-`executeAcceptLot` / `executeAcceptManifest` / `executeDepartFlight` / `executeBuyAircraft` em `career-persist-commands.ts`. Replay: mesmo lot na missão aberta; `in_flight` sem segundo Jet-A; mesmo casco (matrícula) na frota. Buy ainda `persist: 'blob'` (pool no stub). Cancel ainda não.
+`executeAcceptLot` / `executeAcceptManifest` / `executeDepartFlight` / `executeBuyAircraft` / `executeCancelMission` em `career-persist-commands.ts`. Replay: mesmo lot na missão aberta; `in_flight` sem segundo Jet-A; mesmo casco (matrícula) na frota; cancel já `cancelled` não devolve o lote de novo. Buy ainda `persist: 'blob'` (pool no stub). Slice de comando também persiste demand order / NPC live se a missão for Demand ou contract-pilot.
 
 ## Fora
 

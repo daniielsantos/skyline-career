@@ -9,8 +9,10 @@ import {
 } from './career-aircraft-market.js';
 import { applyWalletDelta } from './career-ledger.js';
 import { normalizeAircraftRegistration } from './career-aircraft-registration.js';
+import { releaseCompanyCrewFromMission } from './career-crew.js';
 import {
   acceptMission,
+  cancelMission,
   commitStagedManifest,
   departMission,
   settleMission,
@@ -439,4 +441,43 @@ export function executeBuyAircraft(
     }
     throw error;
   }
+}
+
+export type ExecuteCancelMissionOpts = {
+  missionId: string;
+  nowMs?: number;
+};
+
+export type ExecuteCancelMissionResult =
+  | { kind: 'missing' }
+  | { kind: 'closed' }
+  | { kind: 'replay'; mission: MissionIntent }
+  | { kind: 'applied'; mission: MissionIntent };
+
+/**
+ * CancelMission: release lots/tail once. Replay if already `cancelled`.
+ */
+export function executeCancelMission(
+  world: CareerEconomyWorld,
+  missions: CareerMissionsState,
+  opts: ExecuteCancelMissionOpts,
+): ExecuteCancelMissionResult {
+  const idx = missions.missions.findIndex((row) => row.id === opts.missionId);
+  if (idx < 0) return { kind: 'missing' };
+  const open = missions.missions[idx]!;
+  if (open.status === 'settled' || open.status === 'failed') {
+    return { kind: 'closed' };
+  }
+  if (open.status === 'cancelled') {
+    return { kind: 'replay', mission: open };
+  }
+  const cancelled = cancelMission(world, open, {
+    fleet: missions,
+    nowMs: opts.nowMs,
+  });
+  if (open.crewOperated || open.crewMemberId) {
+    releaseCompanyCrewFromMission(missions, cancelled.id);
+  }
+  missions.missions[idx] = cancelled;
+  return { kind: 'applied', mission: cancelled };
 }

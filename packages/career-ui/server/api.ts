@@ -9,7 +9,6 @@ import {
   buyOutAircraftLease,
   returnAircraftLeaseEarly,
   CAREER_COMMODITIES,
-  cancelMission,
   cancelOrphanPlayerMissions,
   cargoOpsIsUnlocked,
   unlockAllCareerCargoOps,
@@ -171,7 +170,6 @@ import {
   groundStaffSnapshot,
   hireGroundStaffCandidate,
   fireGroundStaffMember,
-  releaseCompanyCrewFromMission,
   drawCompanyCredit,
   repayCompanyCredit,
   assertCompanyCreditAllowsOps,
@@ -180,6 +178,7 @@ import {
   executeAcceptManifest,
   executeDepartFlight,
   executeBuyAircraft,
+  executeCancelMission,
   signAircraftLease,
   resolveHangarParkingUsdPerDay,
   applyWalletDelta,
@@ -951,6 +950,18 @@ async function withCareerWrite<T>(
         lotIds: sliceLotIds,
         icaos: sliceIcaos,
       });
+      const sliceMission = sliceMissionId
+        ? missions.missions.find((row) => row.id === sliceMissionId)
+        : undefined;
+      const demandId =
+        demandOrderId || sliceMission?.demandOrderId?.trim() || '';
+      if (demandId) {
+        const order = world.demandOrders?.find((row) => row.id === demandId);
+        if (order) await activeStore.persistDemandOrder(order);
+      }
+      if (sliceMission?.contractPilot) {
+        await activeStore.persistNpcLiveWorld(world);
+      }
     } else {
       await persistEconomyUnlocked(world);
     }
@@ -5543,9 +5554,8 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           const result = await withCareerWrite((world, missions) => {
-            const idx = missions.missions.findIndex((m) => m.id === body.missionId);
-            if (idx < 0) return { kind: 'missing' as const };
-            const existing = missions.missions[idx]!;
+            const existing = missions.missions.find((m) => m.id === body.missionId);
+            if (!existing) return { kind: 'missing' as const };
             const lines = existing.lots?.length
               ? existing.lots
               : existing.shipmentLotId
@@ -5565,10 +5575,11 @@ export function createCareerApiServer(port = 8787) {
                 reservedBefore += lot.reservedKg;
               }
             }
-            const cancelled = cancelMission(world, existing, { fleet: missions });
-            if (existing.crewOperated || existing.crewMemberId) {
-              releaseCompanyCrewFromMission(missions, cancelled.id);
-            }
+            const executed = executeCancelMission(world, missions, {
+              missionId: body.missionId!,
+            });
+            if (executed.kind === 'missing') return { kind: 'missing' as const };
+            if (executed.kind === 'closed') return { kind: 'closed' as const };
             let reservedAfter = 0;
             let anyReturned = false;
             for (const line of lines) {
@@ -5579,20 +5590,26 @@ export function createCareerApiServer(port = 8787) {
                 anyReturned = true;
               }
             }
-            const releasedKg = Math.max(0, reservedBefore - reservedAfter);
+            const releasedKg =
+              executed.kind === 'applied'
+                ? Math.max(0, reservedBefore - reservedAfter)
+                : 0;
             const returnedToMarket = releasedKg > 0 && anyReturned;
-            missions.missions[idx] = cancelled;
             return {
               kind: 'ok' as const,
-              cancelled,
+              cancelled: executed.mission,
               walletUsd: missions.walletUsd,
               releasedKg,
               returnedToMarket,
               foundBefore,
             };
-          }, { commandSliceMissionId: body.missionId });
+          }, { commandSliceMissionId: body.missionId, housekeeping: false });
           if (result.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
+            return;
+          }
+          if (result.kind === 'closed') {
+            send(res, 409, { error: `Mission ${body.missionId} is already closed` });
             return;
           }
           send(res, 200, {

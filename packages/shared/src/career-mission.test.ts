@@ -35,6 +35,7 @@ import {
   ofpCargoKg,
   ofpFreightTowardMissionKg,
   clampPaxAndCargoDueToHoldsLb,
+  adjustPaxAndCargoDueForEfbPaxLb,
   planPaxAndCargoSimBriefLoad,
   SIMBRIEF_STANDARD_BAG_PER_PAX_LB,
   SIMBRIEF_STANDARD_PAX_LB,
@@ -1112,6 +1113,108 @@ describe('clampPaxAndCargoDueToHoldsLb', () => {
       }),
       ofpPayloadLb,
     );
+  });
+});
+
+describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
+  it('adds iniBuilds 187 lb/pax vs SimBrief 175 for a full A320neo cabin', () => {
+    const ofpPayloadLb = 43_877;
+    const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, {
+      typeId: 'microsoft-a320neo-v2',
+      aircraftClassId: 'narrow_freighter',
+      label: 'A320neo V2',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'A20N',
+      simbriefAirframeMatch: 'Default',
+      loadLayout: 'pax_and_cargo',
+      maxPaxSeats: 180,
+      efbPaxWeightLb: 187,
+    });
+    assert.equal(due, ofpPayloadLb + 180 * (187 - 175));
+    assert.ok(Math.abs(46_187 - due) <= 800);
+    assert.notEqual(
+      adjustPaxAndCargoDueForEfbPaxLb(due, {
+        typeId: 'microsoft-a320neo-v2',
+        aircraftClassId: 'narrow_freighter',
+        label: 'A320neo V2',
+        rolesPackRelPath: 'x',
+        simbriefIcao: 'A20N',
+        simbriefAirframeMatch: 'Default',
+        loadLayout: 'pax_and_cargo',
+        maxPaxSeats: 180,
+        efbPaxWeightLb: 187,
+      }),
+      due,
+      'stacking on painted Due must not be how Watch recomputes',
+    );
+  });
+
+  it('adds Fenix ~196 lb/pax vs SimBrief 175 on a 134-pax OFP', () => {
+    const ofpPayloadLb = 30_768;
+    const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, {
+      typeId: 'fenix-a320',
+      aircraftClassId: 'narrow_freighter',
+      label: 'Fenix A320',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'A320',
+      simbriefAirframeMatch: 'Default',
+      loadLayout: 'pax_and_cargo',
+      maxPaxSeats: 180,
+      efbPaxWeightLb: 196,
+    });
+    assert.equal(due, ofpPayloadLb + 134 * (196 - 175));
+    assert.ok(Math.abs(33_654 - due) <= 800);
+  });
+
+  it('adds Fenix A319 ~200 lb/pax vs SimBrief 175 on a 115-pax OFP', () => {
+    const ofpPayloadLb = 26_372;
+    const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, {
+      typeId: 'fenix-a319',
+      aircraftClassId: 'narrow_freighter',
+      label: 'Fenix A319',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'A319',
+      simbriefAirframeMatch: 'Default',
+      loadLayout: 'pax_and_cargo',
+      maxPaxSeats: 150,
+      efbPaxWeightLb: 200,
+    });
+    assert.equal(due, ofpPayloadLb + 115 * (200 - 175));
+    assert.ok(Math.abs(29_267 - due) <= 800);
+  });
+
+  it('adds iniBuilds A321LR ~188 lb/pax vs SimBrief 175 on a 153-pax OFP', () => {
+    const ofpPayloadLb = 35_164;
+    const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, {
+      typeId: 'microsoft-a321lr',
+      aircraftClassId: 'narrow_freighter',
+      label: 'Microsoft A321LR',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'A21N',
+      simbriefAirframeMatch: 'Default',
+      loadLayout: 'pax_and_cargo',
+      maxPaxSeats: 220,
+      efbPaxWeightLb: 188,
+    });
+    assert.equal(due, ofpPayloadLb + 153 * (188 - 175));
+    assert.ok(Math.abs(37_127 - due) <= 800);
+  });
+
+  it('adds Fenix A321 ~192 lb/pax vs SimBrief 175 on a 153-pax OFP', () => {
+    const ofpPayloadLb = 35_164;
+    const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, {
+      typeId: 'fenix-a321',
+      aircraftClassId: 'narrow_freighter',
+      label: 'Fenix A321',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'A321',
+      simbriefAirframeMatch: 'Default',
+      loadLayout: 'pax_and_cargo',
+      maxPaxSeats: 230,
+      efbPaxWeightLb: 192,
+    });
+    assert.equal(due, ofpPayloadLb + 153 * (192 - 175));
+    assert.ok(Math.abs(37_702 - due) <= 800);
   });
 });
 

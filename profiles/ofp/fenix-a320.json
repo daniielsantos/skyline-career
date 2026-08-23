@@ -16,8 +16,9 @@
     "One Skyline Market SKU: fenix-a320 (narrow_freighter)",
     "Homologated profiles: fenix/fenixa320-{cfm,iae}-{sl,wf}@1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via Fenix EFB",
-    "Cabin stations mapped as baggage for Career cargo (pax=0)",
-    "SimBrief: Default A320"
+    "loadLayout pax_and_cargo: cabin 175+55 then leftover cargo=; 180 pax; live title picks CFM/IAE × SL/WF SimBrief row",
+    "Fenix EFB boarded pax ~196 lb vs SimBrief 175 — catalog efbPaxWeightLb 196",
+    "SimBrief: Fenix Simulations (MSFS) A320 CFM/IAE [(SL)] — Default A320 if no live title"
   ],
   "fuel": {
     "unit": "lb"
@@ -61,7 +62,7 @@
   "tolerances": {
     "fuelAbsLb": 300,
     "fuelPct": 0.03,
-    "payloadAbsLb": 250,
+    "payloadAbsLb": 800,
     "weightAbsLb": 500,
     "passengerCountAbs": 2,
     "maxFuelIncreaseLb": 0

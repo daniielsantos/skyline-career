@@ -2767,6 +2767,44 @@ export function clampPaxAndCargoDueToHoldsLb(
 }
 
 /**
+ * iniBuilds / similar EFBs apply a heavier standard pax than SimBrief 175 lb.
+ */
+export function adjustPaxAndCargoDueForEfbPaxLb(
+  plannedPayloadLb: number,
+  airframe: CareerPlayerAirframe | undefined,
+): number {
+  if (
+    !Number.isFinite(plannedPayloadLb) ||
+    !airframe ||
+    airframe.loadLayout !== 'pax_and_cargo'
+  ) {
+    return plannedPayloadLb;
+  }
+  const efb = airframe.efbPaxWeightLb;
+  const maxPax = airframe.maxPaxSeats;
+  if (
+    typeof efb !== 'number' ||
+    typeof maxPax !== 'number' ||
+    !Number.isFinite(efb) ||
+    !Number.isFinite(maxPax) ||
+    efb <= 0 ||
+    maxPax <= 0
+  ) {
+    return plannedPayloadLb;
+  }
+  const delta = efb - SIMBRIEF_STANDARD_PAX_LB;
+  if (Math.abs(delta) < 0.5) return plannedPayloadLb;
+  const pax = Math.min(
+    maxPax,
+    Math.max(
+      0,
+      Math.round(plannedPayloadLb / SIMBRIEF_STANDARD_PAX_WITH_BAG_LB),
+    ),
+  );
+  return plannedPayloadLb + pax * delta;
+}
+
+/**
  * Split career freight into SimBrief `pax` + `cargo` for `pax_and_cargo` airframes.
  *
  * SimBrief payload = (pax × paxwgt) + (pax × bagwgt) + cargo.

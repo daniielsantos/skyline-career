@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-23: Fenix A321 `pax_and_cargo` (230 pax, SimBrief Fenix CFM/IAE). Medir EFB vs OFP antes de `efbPaxWeightLb`.
+
 Atualizado 2026-08-22: `formLots` extraído por país (bulk → last-mile → intl). Replay intacto; sem workers ainda. [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-08-22: F7 start — dealer pool em tabela `aircraft_instances` (schema v6), matrícula única. Sem N companies.

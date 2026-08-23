@@ -946,7 +946,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Fenix A319 family (CFM/IAE × SL/WF × HD/SD) — same 16-station layout',
-      'Market SKU fenix-a319 (narrow_freighter); SimBrief A319',
+      'Market SKU fenix-a319 (narrow_freighter, pax_and_cargo, 150 seats); SimBrief A319 Fenix CFM/IAE',
       'loadMethod: native-simbrief; injectCapable: false',
     ],
   },
@@ -991,7 +991,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Fenix A320 family (CFM/IAE × SL/WF) — same 16-station layout',
-      'Market SKU fenix-a320 (narrow_freighter); SimBrief A320',
+      'Market SKU fenix-a320 (narrow_freighter, pax_and_cargo, 180 seats); SimBrief A320 Fenix CFM/IAE',
       'loadMethod: native-simbrief; injectCapable: false',
     ],
   },
@@ -1036,7 +1036,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Fenix A321 family (CFM/IAE × SL/WF × TC/SC) — same 16-station layout',
-      'Market SKU fenix-a321 (narrow_freighter); SimBrief A321',
+      'Market SKU fenix-a321 (narrow_freighter, pax_and_cargo, 230 seats); SimBrief A321 Fenix CFM/IAE',
       'loadMethod: native-simbrief; injectCapable: false',
     ],
   },
@@ -1060,7 +1060,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     loadMethod: 'native-simbrief',
     injectCapable: false,
     simbriefIcao: 'A20N',
-    simbriefAirframeMatch: 'Default',
+    simbriefAirframeMatch: 'iniBuilds \\(MSFS\\) - A320neo V2',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
@@ -1073,14 +1073,14 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Microsoft A320neo V2 — 8-station layout',
-      'Market SKU microsoft-a320neo-v2 (narrow_freighter); SimBrief A20N',
+      'Market SKU microsoft-a320neo-v2 (narrow_freighter, pax_and_cargo, 180 seats); SimBrief A20N iniBuilds V2',
       'loadMethod: native-simbrief; injectCapable: false',
     ],
   },
   {
     id: 'microsoft-a321lr',
-    icao: 'A321',
-    titlePattern: /(?:Microsoft\s+)?A321LR\b/i,
+    icao: 'A21N',
+    titlePattern: /(?:Microsoft\s+)?A321LR\b|^A321$/i,
     familyPackRel: 'microsoft-a321lr.json',
     marketTypeId: 'microsoft-a321lr',
     marketLabel: 'Microsoft A321LR',
@@ -1096,8 +1096,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     },
     loadMethod: 'native-simbrief',
     injectCapable: false,
-    simbriefIcao: 'A321',
-    simbriefAirframeMatch: 'Default',
+    simbriefIcao: 'A21N',
+    simbriefAirframeMatch: 'iniBuilds \\(MSFS\\) - A321LR LEAP-1A',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
@@ -1110,7 +1110,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Microsoft A321LR — 8-station layout',
-      'Market SKU microsoft-a321lr (narrow_freighter); SimBrief A321',
+      'Market SKU microsoft-a321lr (narrow_freighter, pax_and_cargo, 220 seats); SimBrief A21N iniBuilds A321LR LEAP-1A',
       'loadMethod: native-simbrief; injectCapable: false',
     ],
   },

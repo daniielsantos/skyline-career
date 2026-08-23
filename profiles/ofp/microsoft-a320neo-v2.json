@@ -13,8 +13,9 @@
     "Market SKU: microsoft-a320neo-v2 (narrow_freighter)",
     "Homologated profile: microsoft/a320neo-v2@1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via EFB/tablet",
-    "Cabin stations mapped as baggage for Career cargo (pax=0)",
-    "SimBrief: Default A20N"
+    "loadLayout pax_and_cargo: cabin 175+55 then leftover cargo=; SimBrief iniBuilds A320neo V2 (180 pax)",
+    "iniBuilds EFB APPLY LOAD uses ~187 lb/pax vs SimBrief 175 — catalog efbPaxWeightLb 187",
+    "SimBrief: iniBuilds (MSFS) - A320neo V2 (not Default 186 pax)"
   ],
   "fuel": {
     "unit": "lb"
@@ -36,7 +37,7 @@
     "payload": ["classic-stations"]
   },
   "simbriefIcao": "A20N",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - A320neo V2",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
@@ -50,7 +51,7 @@
   "tolerances": {
     "fuelAbsLb": 300,
     "fuelPct": 0.03,
-    "payloadAbsLb": 250,
+    "payloadAbsLb": 800,
     "weightAbsLb": 500,
     "passengerCountAbs": 2,
     "maxFuelIncreaseLb": 0

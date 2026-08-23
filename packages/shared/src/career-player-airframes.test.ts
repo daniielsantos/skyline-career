@@ -102,6 +102,51 @@ describe('career player airframes', () => {
     assert.equal(f28?.rolesPackRelPath, 'profiles/ofp/justflight-fokker-f28.json');
   });
 
+  it('stages Microsoft A320neo V2 as pax_and_cargo on the iniBuilds SimBrief row', () => {
+    const neo = findCareerPlayerAirframe('microsoft-a320neo-v2');
+    assert.equal(neo?.loadLayout, 'pax_and_cargo');
+    assert.equal(neo?.maxPaxSeats, 180);
+    assert.equal(neo?.efbPaxWeightLb, 187);
+    assert.equal(
+      neo?.simbriefAirframeMatch,
+      'iniBuilds \\(MSFS\\) - A320neo V2',
+    );
+  });
+
+  it('stages Fenix A320 family as pax_and_cargo', () => {
+    const fenix = findCareerPlayerAirframe('fenix-a320');
+    assert.equal(fenix?.loadLayout, 'pax_and_cargo');
+    assert.equal(fenix?.maxPaxSeats, 180);
+    assert.equal(fenix?.efbPaxWeightLb, 196);
+  });
+
+  it('stages Microsoft A321LR as pax_and_cargo on the iniBuilds SimBrief row', () => {
+    const lr = findCareerPlayerAirframe('microsoft-a321lr');
+    assert.equal(lr?.loadLayout, 'pax_and_cargo');
+    assert.equal(lr?.maxPaxSeats, 220);
+    assert.equal(lr?.efbPaxWeightLb, 188);
+    assert.equal(lr?.simbriefIcao, 'A21N');
+    assert.equal(
+      lr?.simbriefAirframeMatch,
+      'iniBuilds \\(MSFS\\) - A321LR LEAP-1A',
+    );
+  });
+
+  it('stages Fenix A319 family as pax_and_cargo', () => {
+    const a319 = findCareerPlayerAirframe('fenix-a319');
+    assert.equal(a319?.loadLayout, 'pax_and_cargo');
+    assert.equal(a319?.maxPaxSeats, 150);
+    assert.equal(a319?.efbPaxWeightLb, 200);
+  });
+
+  it('stages Fenix A321 family as pax_and_cargo', () => {
+    const a321 = findCareerPlayerAirframe('fenix-a321');
+    assert.equal(a321?.loadLayout, 'pax_and_cargo');
+    assert.equal(a321?.maxPaxSeats, 230);
+    assert.equal(a321?.efbPaxWeightLb, 192);
+    assert.equal(a321?.simbriefIcao, 'A321');
+  });
+
   it('treats omitted enabled as market-eligible', () => {
     assert.equal(isCareerPlayerAirframeEnabled({}), true);
     assert.equal(isCareerPlayerAirframeEnabled({ enabled: true }), true);

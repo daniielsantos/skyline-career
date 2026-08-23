@@ -4,6 +4,7 @@ import {
   airframeMaxCargoKg,
   fallbackSimBriefAirframeForDefault,
   inferSimBriefAirframeMatchFromTitle,
+  liveTitleMatchesMarketSku,
   matchSimBriefAirframe,
   preferSimBriefAirframeMatch,
   resolveSimBriefDispatchType,
@@ -217,8 +218,49 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       'Just Flight \\(MSFS\\) - Fokker F28 Mk.4000',
     );
     assert.equal(
-      inferSimBriefAirframeMatchFromTitle('Just Flight Fokker F28-1000 Air France'),
-      'Just Flight \\(MSFS\\) - Fokker F28 Mk.1000',
+      inferSimBriefAirframeMatchFromTitle('A320neo V2'),
+      'iniBuilds \\(MSFS\\) - A320neo V2',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Microsoft A321LR'),
+      'iniBuilds \\(MSFS\\) - A321LR LEAP-1A',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A321'),
+      'iniBuilds \\(MSFS\\) - A321LR LEAP-1A',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FenixA321 IAE WF TC'),
+      'Fenix Simulations \\(MSFS\\) - A321 IAE$',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FenixA321 CFM SL SC'),
+      'Fenix Simulations \\(MSFS\\) - A321 CFM \\(SL\\)',
+    );
+    assert.equal(liveTitleMatchesMarketSku('A321', 'microsoft-a321lr'), true);
+    assert.equal(
+      liveTitleMatchesMarketSku('FenixA321 IAE WF TC', 'microsoft-a321lr'),
+      false,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('FenixA321 IAE WF TC', 'fenix-a321'),
+      true,
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FenixA320 CFM SL'),
+      'Fenix Simulations \\(MSFS\\) - A320 CFM \\(SL\\)',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FenixA320 IAE WF'),
+      'Fenix Simulations \\(MSFS\\) - A320 IAE$',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FenixA319 CFM SL HD'),
+      'Fenix Simulations \\(MSFS\\) - A319 CFM \\(SL\\)',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FenixA319 IAE WF SD'),
+      'Fenix Simulations \\(MSFS\\) - A319 IAE$',
     );
   });
 });

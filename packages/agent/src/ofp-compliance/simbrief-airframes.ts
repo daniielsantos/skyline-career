@@ -180,6 +180,18 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/\bJust Flight F70\b/i.test(t)) {
     return 'Just Flight \\(MSFS\\) - 70 Passengers';
   }
+  if (/A320neo\s*V2\b/i.test(t)) {
+    return 'iniBuilds \\(MSFS\\) - A320neo V2';
+  }
+  if (/\bA321LR\b/i.test(t) || /^A321$/i.test(t)) {
+    return 'iniBuilds \\(MSFS\\) - A321LR LEAP-1A';
+  }
+  const fenixA320 = inferFenixA320SimBriefMatch(t);
+  if (fenixA320) return fenixA320;
+  const fenixA321 = inferFenixA321SimBriefMatch(t);
+  if (fenixA321) return fenixA321;
+  const fenixA319 = inferFenixA319SimBriefMatch(t);
+  if (fenixA319) return fenixA319;
   return undefined;
 }
 
@@ -199,7 +211,55 @@ export function liveTitleMatchesMarketSku(
   if (id === 'justflight-fokker-f28') {
     return /Just Flight Fokker F28-(?:1000|2000|3000|4000)/i.test(t);
   }
+  if (id === 'microsoft-a320neo-v2') return /A320neo\s*V2\b/i.test(t);
+  if (id === 'microsoft-a321lr') {
+    return /(?:Microsoft\s+)?A321LR\b/i.test(t) || /^A321$/i.test(t);
+  }
+  if (id === 'fenix-a320') return /FenixA320\s+(?:CFM|IAE)\s+(?:SL|WF)\b/i.test(t);
+  if (id === 'fenix-a321') {
+    return /FenixA321\s+(?:CFM|IAE)\s+(?:SL|WF)\s+(?:TC|SC)\b/i.test(t);
+  }
+  if (id === 'fenix-a319') {
+    return /FenixA319\s+(?:CFM|IAE)\s+(?:SL|WF)\s+(?:HD|SD)\b/i.test(t);
+  }
   return false;
+}
+
+function inferFenixCeoSimBriefMatch(
+  title: string,
+  icao: 'A319' | 'A320' | 'A321',
+): string | undefined {
+  const token =
+    icao === 'A319'
+      ? /FenixA319\b/i
+      : icao === 'A321'
+        ? /FenixA321\b/i
+        : /FenixA320\b/i;
+  if (!token.test(title)) return undefined;
+  const iae = /\bIAE\b/i.test(title);
+  const sl = /\bSL\b/i.test(title);
+  const eng = iae ? 'IAE' : 'CFM';
+  if (sl) {
+    return `Fenix Simulations \\(MSFS\\) - ${icao} ${eng} \\(SL\\)`;
+  }
+  if (/\bWF\b/i.test(title) || /\bCFM\b/i.test(title) || iae) {
+    return `Fenix Simulations \\(MSFS\\) - ${icao} ${eng}$`;
+  }
+  return undefined;
+}
+
+/** Fenix A320: WF → CFM/IAE row; SL → CFM/IAE (SL) row. */
+function inferFenixA320SimBriefMatch(title: string): string | undefined {
+  return inferFenixCeoSimBriefMatch(title, 'A320');
+}
+
+function inferFenixA319SimBriefMatch(title: string): string | undefined {
+  return inferFenixCeoSimBriefMatch(title, 'A319');
+}
+
+/** Fenix A321: WF → CFM/IAE row; SL → CFM/IAE (SL) row. TC/SC ignored (like A319 HD/SD). */
+function inferFenixA321SimBriefMatch(title: string): string | undefined {
+  return inferFenixCeoSimBriefMatch(title, 'A321');
 }
 
 /** SimBrief F28 has no Default type — only JF Mk.1000/2000/3000/4000 rows. */

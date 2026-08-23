@@ -62,6 +62,11 @@ export interface CareerPlayerAirframe {
    * bag/cargo often exceeds this; Loaded vs Due clamps OFP cargo to this.
    */
   simconnectCargoHoldMaxLb?: number;
+  /**
+   * iniBuilds A320neo V2 EFB uses ~187 lb/pax on APPLY LOAD vs SimBrief 175.
+   * Loaded vs Due adds (efbPaxWeightLb − 175) × planned pax.
+   */
+  efbPaxWeightLb?: number;
   /** Optional real-airframe weights — prefer over SimBrief proxy for light GA caps. */
   oewKg?: number;
   mtowKg?: number;

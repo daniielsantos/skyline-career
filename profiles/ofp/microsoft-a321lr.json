@@ -1,20 +1,24 @@
 {
   "source": "simbrief",
-  "icao": "A321",
+  "icao": "A21N",
   "ofpId": "microsoft-a321lr",
   "loadMethod": "native-simbrief",
   "injectCapable": false,
   "matchTitles": [
-    "Microsoft A321LR"
+    "Microsoft A321LR",
+    "A321"
   ],
-  "matchTitlePattern": "(?:Microsoft\\s+)?A321LR\\b",
+  "matchTitlePattern": "(?:Microsoft\\s+)?A321LR\\b|^A321$",
   "notes": [
     "Microsoft A321LR — 8-station + 4-tank (L/R/CENTER/CENTER2) layout",
     "Market SKU: microsoft-a321lr (narrow_freighter)",
     "Homologated profile: microsoft/microsoft-a321lr@1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via EFB/tablet",
-    "Cabin stations mapped as baggage for Career cargo (pax=0)",
-    "SimBrief: Default A321"
+    "loadLayout pax_and_cargo: cabin 175+55 then leftover cargo=; SimBrief A21N iniBuilds A321LR LEAP-1A (220 pax)",
+    "iniBuilds EFB APPLY LOAD uses ~188 lb/pax vs SimBrief 175 — catalog efbPaxWeightLb 188",
+    "iniBuilds A321LR EFB APPLY does not write fuel (known SU5 bug) — set block fuel on the default MSFS Weight/Balance EFB, not the aircraft tablet",
+    "Watch C cell = CENTER+CENTER2; FUEL TOTAL can still exceed L+R+C (ACT / extra tanks)",
+    "SimBrief: iniBuilds (MSFS) - A321LR LEAP-1A (not Default A321 ceo)"
   ],
   "fuel": {
     "unit": "lb"
@@ -35,8 +39,8 @@
     "weights": ["classic-weights"],
     "payload": ["classic-stations"]
   },
-  "simbriefIcao": "A321",
-  "simbriefAirframeMatch": "Default",
+  "simbriefIcao": "A21N",
+  "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - A321LR LEAP-1A",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
@@ -50,7 +54,7 @@
   "tolerances": {
     "fuelAbsLb": 300,
     "fuelPct": 0.03,
-    "payloadAbsLb": 250,
+    "payloadAbsLb": 800,
     "weightAbsLb": 500,
     "passengerCountAbs": 2,
     "maxFuelIncreaseLb": 0

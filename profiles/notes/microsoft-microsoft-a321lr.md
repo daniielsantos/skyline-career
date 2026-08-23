@@ -18,9 +18,9 @@
 
 ## Notes
 
-- Load method: native-simbrief (no Skyline inject).
-- Fuel/payload write plans intentionally empty — load via addon EFB/tablet.
-- Use compare-ofp + Career Loaded vs Due for validation.
+- Load method: native-simbrief (no Skyline inject). Payload: aircraft EFB APPLY LOAD.
+- **Fuel:** iniBuilds A321LR EFB APPLY does **not** write FOB (SU5 bug; A320neo V2 is fine). **Confirmed live:** default MSFS Weight and Balance slider updates Watch Sim. Aircraft EFB APPLY is payload-only until iniBuilds fixes it — no Skyline inject. Do not invent AUX writes.
+- Watch Sim fuel follows `FUEL TOTAL QUANTITY WEIGHT` / gross−empty−payload. If that number does not move, the sim mass did not move.
 
 ## Homologated
 

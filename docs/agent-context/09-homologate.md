@@ -46,6 +46,8 @@ Vidros: `profiles/examples/microsoft-atr-*-highline-*.json` etc. + `matchTitles`
 
 Prompts de arte de card: `docs/market-airframe-card-prompts.md` (kit da classe, 16:9, PNG em `career-ui/public/airframes/`).
 
+Jets de passageiro no Market (`loadLayout: pax_and_cargo`): Loaded vs Due vs tablet — **não** é o mesmo que inject writetest. Ver [`12-pax-efb-due.md`](./12-pax-efb-due.md).
+
 ## Hubs (aeroportos career)
 
 Não é o mesmo que airframe. Seed + facilities MSFS ≤25 nm + ICAO catalog.  

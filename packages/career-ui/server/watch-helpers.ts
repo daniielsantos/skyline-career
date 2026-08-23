@@ -58,6 +58,7 @@ import {
   isPaxAndCargoLoadLayout,
   payloadMatchToleranceLb,
   clampPaxAndCargoDueToHoldsLb,
+  adjustPaxAndCargoDueForEfbPaxLb,
   simconnectCabinOvershootLb,
   type CareerEconomyWorld,
   type CareerMissionsState,
@@ -2102,9 +2103,17 @@ export class CareerWatchSession {
                   liveStations: stationsForCrew,
                 })
               : undefined;
-          const plannedPayloadLb = clampPaxAndCargoDueToHoldsLb(
-            adjustedPayload?.plannedTotalLb ??
-              prevVerification.payload.plannedLb,
+          const ofpPayloadLb =
+            pmdgPaxAndCargo &&
+            cargoLb !== undefined &&
+            Number.isFinite(cargoLb)
+              ? cargoLb
+              : (adjustedPayload?.plannedTotalLb ??
+                prevVerification.payload.plannedLb);
+          // Always recompute Due from OFP cargoLb — never from last painted
+          // plannedLb (efbPaxWeightLb is not idempotent if stacked).
+          const plannedPayloadLb = adjustPaxAndCargoDueForEfbPaxLb(
+            clampPaxAndCargoDueToHoldsLb(ofpPayloadLb, airframe),
             airframe,
           );
           const liveCrewLb =

@@ -3420,11 +3420,11 @@ export function PortsPanel(props: {
                         void onUpgradeConcession(
                           port.id,
                           port.concession?.upgrade?.upgradeUsd ??
-                            ((port.concession.level ?? 1) >= 2
+                            ((port.concession?.level ?? 1) >= 2
                               ? 280_000
                               : 220_000),
                           port.concession?.upgrade?.toLevel ??
-                            ((port.concession.level ?? 1) >= 2 ? 3 : 2),
+                            ((port.concession?.level ?? 1) >= 2 ? 3 : 2),
                         )
                       }
                     >

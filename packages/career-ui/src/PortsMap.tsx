@@ -37,10 +37,9 @@ const PORT_ANCHOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32
   <path fill="currentColor" stroke="#fff4e8" stroke-width="0.55" stroke-linejoin="round" d="M5.2 24 2 19.4 8.6 21.6zM26.8 24 30 19.4 23.4 21.6z"/>
 </svg>`;
 
-/** Pickup hub — top-down airplane (airport), not a house. */
-const PICKUP_PLANE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-  <path fill="#fff4e8" d="M16 1.4c1.7 0 2.8 2.4 2.8 6.2v4.2h11.4l1.4 3.6H18.8v5.6h5.6l.9 2.8h-6.5v2.6c0 1.7-1.1 2.8-2.8 2.8s-2.8-1.1-2.8-2.8v-2.6H5.3l.9-2.8h5.6v-5.6H.4l1.4-3.6h11.4V7.6c0-3.8 1.1-6.2 2.8-6.2z"/>
-  <path fill="currentColor" d="M16 2.6c1.2 0 2 2 2 5.4v4.4h10.6l1 2.8H18v6h5.2l.6 2.2H18v2.4c0 1.2-.8 2-2 2s-2-.8-2-2v-2.4H8.2l.6-2.2H14v-6H2.4l1-2.8H14V8c0-3.4.8-5.4 2-5.4z"/>
+/** Pickup hub — side-view jet (airport marker), not a top-down cross. */
+const PICKUP_PLANE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -1 28 26" aria-hidden="true" focusable="false">
+  <path fill="currentColor" stroke="#fff4e8" stroke-width="1.5" stroke-linejoin="round" d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
 </svg>`;
 
 /** Owned warehouse — peaked roof + bay. */
@@ -91,7 +90,7 @@ function hubMarkerElement(highlighted: boolean): HTMLButtonElement {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `ports-map-hub-marker${highlighted ? ' is-selected' : ''}`;
-  const size = highlighted ? 22 : 18;
+  const size = highlighted ? 24 : 20;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
   el.innerHTML = PICKUP_PLANE_SVG;

@@ -4,6 +4,41 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
 } from './ofp-compliance.js';
 
+/**
+ * Live payload for `pax_and_cargo`: OFP payload is cabin + holds, not cockpit crew.
+ * Prefer `payloadStations` (pack passenger + baggage). Else all minus crew
+ * (default S1/S2; Maddog crew is S6/S7).
+ */
+export function paxAndCargoLiveStationSumLb(
+  stations: Record<number, number>,
+  crewStations?: readonly number[] | null,
+  payloadStations?: readonly number[] | null,
+): number {
+  const payloadIdx = (payloadStations ?? []).filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  if (payloadIdx.length > 0) {
+    const want = new Set(payloadIdx);
+    let sum = 0;
+    for (const [key, lb] of Object.entries(stations)) {
+      const idx = Number(key);
+      if (!want.has(idx)) continue;
+      if (Number.isFinite(lb)) sum += lb;
+    }
+    return sum;
+  }
+  const crewIdx =
+    crewStations && crewStations.length > 0 ? crewStations : [1, 2];
+  const crew = new Set(crewIdx.filter((n) => Number.isFinite(n) && n > 0));
+  let sum = 0;
+  for (const [key, lb] of Object.entries(stations)) {
+    const idx = Number(key);
+    if (!Number.isFinite(idx) || crew.has(idx)) continue;
+    if (Number.isFinite(lb)) sum += lb;
+  }
+  return sum;
+}
+
 /** Default Loaded vs Due tolerances (lb). */
 export const DEFAULT_FUEL_TOL_LB = 50;
 export const DEFAULT_PAYLOAD_TOL_LB = 75;

@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-23: Maddog 82 verde (LOAD OFP → trim MZFW → INSTANT LOAD). 83/88 mesmo ritual; MZFW da row Y162 pode mudar.
+
+Atualizado 2026-08-23: Watch pax_and_cargo Sim = soma − `crewStations` (Maddog S6/S7). Maddog EFB vs OFP ainda por medir.
+
 Atualizado 2026-08-23: Fenix A321 `pax_and_cargo` (230 pax, SimBrief Fenix CFM/IAE). Medir EFB vs OFP antes de `efbPaxWeightLb`.
 
 Atualizado 2026-08-22: `formLots` extraído por país (bulk → last-mile → intl). Replay intacto; sem workers ainda. [`08-economy.md`](./08-economy.md).

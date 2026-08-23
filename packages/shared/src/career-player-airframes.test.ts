@@ -147,6 +147,36 @@ describe('career player airframes', () => {
     assert.equal(a321?.simbriefIcao, 'A321');
   });
 
+  it('stages Leonardo Maddog MD-82 as pax_and_cargo on the MSFS Y162 SimBrief row', () => {
+    const md82 = findCareerPlayerAirframe('leonardo-fly-the-maddog-x-md-82-20th');
+    assert.equal(md82?.loadLayout, 'pax_and_cargo');
+    assert.equal(md82?.maxPaxSeats, 162);
+    assert.equal(
+      md82?.simbriefAirframeMatch,
+      'Leonardo Maddog \\(MSFS\\) - Y162 Config',
+    );
+  });
+
+  it('stages Leonardo Maddog MD-83 as pax_and_cargo on the MSFS Y162 SimBrief row', () => {
+    const md83 = findCareerPlayerAirframe('leonardo-fly-the-maddog-x-md-83-20th');
+    assert.equal(md83?.loadLayout, 'pax_and_cargo');
+    assert.equal(md83?.maxPaxSeats, 162);
+    assert.equal(
+      md83?.simbriefAirframeMatch,
+      'Leonardo Maddog \\(MSFS\\) - Y162 Config',
+    );
+  });
+
+  it('stages Leonardo Maddog MD-88 as pax_and_cargo on the MSFS Y162 SimBrief row', () => {
+    const md88 = findCareerPlayerAirframe('leonardo-fly-the-maddog-x-md-88-20th');
+    assert.equal(md88?.loadLayout, 'pax_and_cargo');
+    assert.equal(md88?.maxPaxSeats, 162);
+    assert.equal(
+      md88?.simbriefAirframeMatch,
+      'Leonardo Maddog \\(MSFS\\) - Y162 Config',
+    );
+  });
+
   it('treats omitted enabled as market-eligible', () => {
     assert.equal(isCareerPlayerAirframeEnabled({}), true);
     assert.equal(isCareerPlayerAirframeEnabled({ enabled: true }), true);

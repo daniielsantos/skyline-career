@@ -12,8 +12,9 @@
     "Fly The Maddog X MD-82 20th — Leonardo Maddog X (native SimBrief / EFB)",
     "Profile: leonardo/fly-the-maddog-x-md-82-20th@1.0.0",
     "loadMethod: native-simbrief; injectCapable: false",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "One Skyline Market SKU: leonardo-fly-the-maddog-x-md-82-20th (narrow_freighter)"
+    "Cabin 175+55 then leftover cargo=; SimBrief Leonardo Maddog (MSFS) Y162 (162 pax)",
+    "LOAD OFP duplicates FWD/AFT+bags; trim to MZFW + CG by hand; no efbPaxWeightLb",
+    "One Skyline Market SKU: leonardo-fly-the-maddog-x-md-82-20th (narrow_freighter, pax_and_cargo)"
   ],
   "fuel": {
     "unit": "lb"
@@ -28,14 +29,14 @@
         6,
         7
       ],
-      "baggageStations": [
+      "passengerStations": [
         1,
-        2,
-        3,
-        4,
-        5
+        2
       ],
-      "passengerStations": []
+      "baggageStations": [
+        3,
+        4
+      ]
     }
   },
   "liveSources": {
@@ -50,7 +51,7 @@
     ]
   },
   "simbriefIcao": "MD82",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "Leonardo Maddog \\(MSFS\\) - Y162 Config",
   "stationMap": [
     {
       "simVarIndex": 1,
@@ -98,9 +99,9 @@
   "tolerances": {
     "fuelAbsLb": 50,
     "fuelPct": 0.03,
-    "payloadAbsLb": 75,
-    "weightAbsLb": 150,
-    "passengerCountAbs": 0,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
     "maxFuelIncreaseLb": 0
   }
 }

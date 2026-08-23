@@ -6,6 +6,7 @@ import {
   loadVerificationDrifted,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
+  paxAndCargoLiveStationSumLb,
   resolveLivePayloadLb,
   stationSampleIncomplete,
   stationWeightsDrifted,
@@ -14,6 +15,33 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
   sanitizeFuelDensityLbPerGal,
 } from './ofp-compliance.js';
+
+describe('paxAndCargoLiveStationSumLb', () => {
+  const stations = {
+    1: 14985,
+    2: 14985,
+    3: 6222,
+    4: 10920,
+    5: 2543,
+    6: 200,
+    7: 200,
+  };
+
+  it('defaults to skipping Airbus/JF crew S1/S2', () => {
+    assert.equal(paxAndCargoLiveStationSumLb(stations), 20085);
+  });
+
+  it('skips Maddog crew S6/S7 so cabin S1/S2 count', () => {
+    assert.equal(paxAndCargoLiveStationSumLb(stations, [6, 7]), 49655);
+  });
+
+  it('sums only pack cabin+holds so Maddog S5 config is ignored', () => {
+    assert.equal(
+      paxAndCargoLiveStationSumLb(stations, [6, 7], [1, 2, 3, 4]),
+      47112,
+    );
+  });
+});
 
 describe('resolveLivePayloadLb', () => {
   it('uses mass-balance when stations under-read vs heavy aircraft', () => {

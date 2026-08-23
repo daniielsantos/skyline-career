@@ -186,6 +186,9 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/\bA321LR\b/i.test(t) || /^A321$/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A321LR LEAP-1A';
   }
+  if (/Fly The Maddog X MD-8[238]\s+20th/i.test(t)) {
+    return 'Leonardo Maddog \\(MSFS\\) - Y162 Config';
+  }
   const fenixA320 = inferFenixA320SimBriefMatch(t);
   if (fenixA320) return fenixA320;
   const fenixA321 = inferFenixA321SimBriefMatch(t);
@@ -221,6 +224,15 @@ export function liveTitleMatchesMarketSku(
   }
   if (id === 'fenix-a319') {
     return /FenixA319\s+(?:CFM|IAE)\s+(?:SL|WF)\s+(?:HD|SD)\b/i.test(t);
+  }
+  if (id === 'leonardo-fly-the-maddog-x-md-82-20th') {
+    return /Fly The Maddog X MD-82 20th/i.test(t);
+  }
+  if (id === 'leonardo-fly-the-maddog-x-md-83-20th') {
+    return /Fly The Maddog X MD-83 20th/i.test(t);
+  }
+  if (id === 'leonardo-fly-the-maddog-x-md-88-20th') {
+    return /Fly The Maddog X MD-88 20th/i.test(t);
   }
   return false;
 }

@@ -22,6 +22,8 @@
 ## Notes
 
 - Career load path: Maddog EFB / SimBrief import (same as MD-82 / MD-88).
+- SimBrief: MD83 `Leonardo Maddog (MSFS) - Y162 Config` (162 pax), not Default.
+- Same EFB as MD-82: LOAD OFP duplicates holds; trim to MZFW; CG manual; Watch S1–S4. No `efbPaxWeightLb`.
 - Monitor + validate with compare-ofp + Career Loaded vs Due.
 
 ## Homologated

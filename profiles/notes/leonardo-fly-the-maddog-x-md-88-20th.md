@@ -21,6 +21,8 @@
 ## Notes
 
 - Skyline inject not reliable on this variant — load fuel/payload via Maddog EFB / SimBrief import.
+- SimBrief: MD88 `Leonardo Maddog (MSFS) - Y162 Config` (162 pax), not Default.
+- Same EFB as MD-82: LOAD OFP duplicates holds; trim to MZFW; CG manual; Watch S1–S4. No `efbPaxWeightLb`.
 - Monitor with classic SimVars; validate with compare-ofp + Career Loaded vs Due.
 - Sibling variants: MD-82 / MD-83 (also native-simbrief).
 

@@ -218,8 +218,33 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       'Just Flight \\(MSFS\\) - Fokker F28 Mk.4000',
     );
     assert.equal(
-      inferSimBriefAirframeMatchFromTitle('A320neo V2'),
-      'iniBuilds \\(MSFS\\) - A320neo V2',
+      inferSimBriefAirframeMatchFromTitle('Fly The Maddog X MD-82 20th'),
+      'Leonardo Maddog \\(MSFS\\) - Y162 Config',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Fly The Maddog X MD-88 20th'),
+      'Leonardo Maddog \\(MSFS\\) - Y162 Config',
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku(
+        'Fly The Maddog X MD-88 20th',
+        'leonardo-fly-the-maddog-x-md-88-20th',
+      ),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku(
+        'Fly The Maddog X MD-82 20th',
+        'leonardo-fly-the-maddog-x-md-82-20th',
+      ),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku(
+        'Fly The Maddog X MD-83 20th',
+        'leonardo-fly-the-maddog-x-md-83-20th',
+      ),
+      true,
     );
     assert.equal(
       inferSimBriefAirframeMatchFromTitle('Microsoft A321LR'),

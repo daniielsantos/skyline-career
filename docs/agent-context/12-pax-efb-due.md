@@ -20,6 +20,10 @@ Medir **depois** do Import/APPLY LOAD no EFB, com OFP confirmado.
 
 Watch **recalcula Due a partir de `cargoLb` (OFP)**, nunca do Due pintado — senão `efbPaxWeightLb` empilha a cada tick (43.9k → 46.0k → 48.2k).
 
+Watch **Sim** = soma **passenger + baggage** do pack (não todas as caixas). Airbus/JF: S3+ holds, crew S1/S2 fora. Maddog: S1/S2 cabine, S3/S4 holds, **S5 config fora**, S6/S7 crew fora. CG do Maddog é acerto manual no EFB — Loaded vs Due não valida envelope.
+
+LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mão; INSTANT LOAD. Due = payload OFP; **sem** `efbPaxWeightLb` no teto MZFW (pax EFB 185 come cargo). Família 82/83/88 = mesmo mapa S1–S4.
+
 ## Checklist no ar (novo airframe)
 
 1. `loadLayout: "pax_and_cargo"` + `maxPaxSeats` (fallback; Dispatch prefere `airframe_passengers` da row SimBrief).
@@ -41,5 +45,8 @@ Watch **recalcula Due a partir de `cargoLb` (OFP)**, nunca do Due pintado — se
 | `fenix-a320` | 180 | `efbPaxWeightLb: 196` (134 pax IAE: Sim 33654 vs OFP 30768) |
 | `fenix-a319` | 150 | `efbPaxWeightLb: 200` (115 pax IAE: Sim 29267 vs OFP 26372) |
 | `fenix-a321` | 230 | `efbPaxWeightLb: 192`; 8 vidros CFM/IAE × SL/WF × TC/SC; wizard de variante **apaga** pax no catálogo — repor |
+| `leonardo-fly-the-maddog-x-md-82-20th` | 162 | **Verde:** LOAD OFP + trim MZFW + INSTANT LOAD. Sem `efbPaxWeightLb`. CG manual |
+| `leonardo-fly-the-maddog-x-md-83-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |
+| `leonardo-fly-the-maddog-x-md-88-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |
 
 Accept OFP: cargo da missão = **Payload** SimBrief (`max(Freight, Payload)` / `ofpFreightTowardMissionKg`), não a linha Freight leftover.

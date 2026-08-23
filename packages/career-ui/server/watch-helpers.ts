@@ -42,6 +42,7 @@ import {
   pushFlightScoreSample,
   pushWeatherOpsTick,
   resolveLivePayloadLb,
+  paxAndCargoLiveStationSumLb,
   sanitizeFuelDensityLbPerGal,
   KG_TO_LB,
   normalizeSimPercent,
@@ -104,6 +105,7 @@ import {
   resolveCatalogCgEnvelope,
 } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
+import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
 import { getRepoRoot } from './skyline-paths.ts';
 
 export type WatchLoadVerification = {
@@ -1271,6 +1273,12 @@ export class CareerWatchSession {
   private lastSuccessfulTickAtMs = 0;
   /** Last time we ran the heavy Loaded vs Due SimVar pass. */
   private lastLoadSampleAtMs = 0;
+  /** Cached pack roles for pax_and_cargo Sim sum (crew skip / cabin+hold indexes). */
+  private paxAndCargoCrewCache: {
+    key: string;
+    stations: number[];
+    payloadStations: number[];
+  } | null = null;
   private consecutivePipeErrors = 0;
   private opts: Required<
     Pick<
@@ -2145,17 +2153,56 @@ export class CareerWatchSession {
                   return sum + (Number.isFinite(lb) ? lb : 0);
                 }, 0)
               : undefined;
-          // Just Flight Fokker / B707 pax_and_cargo: Due is SimBrief payload;
-          // S1/S2 are cockpit crew (170 lb) not in the OFP payload line.
+          // pax_and_cargo: Due is SimBrief payload (cabin + holds). Sum pack
+          // passenger+baggage only (Maddog S5 is config, not OFP payload).
+          let paxAndCargoCrewStations: readonly number[] | undefined;
+          let paxAndCargoPayloadStations: readonly number[] | undefined;
+          if (pmdgPaxAndCargo && !preferPmdgFreighterRoles) {
+            const crewKey = `${current.airframeTypeId ?? ''}|${current.rolesPackRelPath ?? ''}`;
+            if (this.paxAndCargoCrewCache?.key === crewKey) {
+              paxAndCargoCrewStations = this.paxAndCargoCrewCache.stations;
+              paxAndCargoPayloadStations =
+                this.paxAndCargoCrewCache.payloadStations;
+            } else if (current.rolesPackRelPath) {
+              try {
+                const roles = await resolveMissionRolesPack({
+                  repoRoot: getRepoRoot(),
+                  rolesPackRelPath: current.rolesPackRelPath,
+                  airframeTypeId: current.airframeTypeId,
+                });
+                const fromPack =
+                  roles.pack.payload?.stationRoles?.crewStations?.filter(
+                    (n) => Number.isFinite(n) && n > 0,
+                  ) ?? [];
+                paxAndCargoCrewStations =
+                  fromPack.length > 0 ? fromPack : [1, 2];
+                const payloadFromPack = [
+                  ...(roles.pack.payload?.stationRoles?.passengerStations ?? []),
+                  ...(roles.pack.payload?.stationRoles?.baggageStations ?? []),
+                ].filter((n) => Number.isFinite(n) && n > 0);
+                paxAndCargoPayloadStations =
+                  payloadFromPack.length > 0 ? payloadFromPack : undefined;
+                this.paxAndCargoCrewCache = {
+                  key: crewKey,
+                  stations: [...paxAndCargoCrewStations],
+                  payloadStations: [...(paxAndCargoPayloadStations ?? [])],
+                };
+              } catch {
+                paxAndCargoCrewStations = [1, 2];
+              }
+            } else {
+              paxAndCargoCrewStations = [1, 2];
+            }
+          }
           const paxAndCargoCabinLb =
             pmdgPaxAndCargo &&
             !preferPmdgFreighterRoles &&
             load.stations
-              ? Object.entries(load.stations).reduce((sum, [key, lb]) => {
-                  const idx = Number(key);
-                  if (!Number.isFinite(idx) || idx <= 2) return sum;
-                  return sum + (Number.isFinite(lb) ? lb : 0);
-                }, 0)
+              ? paxAndCargoLiveStationSumLb(
+                  load.stations,
+                  paxAndCargoCrewStations,
+                  paxAndCargoPayloadStations,
+                )
               : undefined;
           const cabinOvershootLb = simconnectCabinOvershootLb(airframe);
           const rawLivePayloadLb =

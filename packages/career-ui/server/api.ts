@@ -4,7 +4,6 @@ import { access, readdir, stat } from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  acceptMission,
   acceptEmptyFlight,
   assignAircraftToMission,
   buyOutAircraftLease,
@@ -28,10 +27,8 @@ import {
   repairAircraftConditionWithParts,
   hoursUntilInspection,
   inspectionCostUsd,
-  commitStagedManifest,
   continuousEconomyHours,
   createSeedEconomyWorld,
-  departMission,
   emptyMissionsStateV2,
   ensureSeedMarketFormed,
   executeFerry,
@@ -108,7 +105,6 @@ import {
   acceptContractPilotOffer,
   listContractPilotPickAirframes,
   parseFreighterClassId,
-  purchaseAircraftListing,
   purchasePlayerMissionOfpFuel,
   quoteAircraftRepositionForListing,
   quotePlayerMissionOfpFuel,
@@ -180,6 +176,10 @@ import {
   repayCompanyCredit,
   assertCompanyCreditAllowsOps,
   executeSettleFlight,
+  executeAcceptLot,
+  executeAcceptManifest,
+  executeDepartFlight,
+  executeBuyAircraft,
   signAircraftLease,
   resolveHangarParkingUsdPerDay,
   applyWalletDelta,
@@ -2110,17 +2110,16 @@ export function createCareerApiServer(port = 8787) {
             assertCompanyCreditAllowsOps(missions);
             settleAircraftMarketOps(missions, world.tick);
             return withDevProgressionUnlock(req, missions, () => {
-              const purchased = purchaseAircraftListing(
-                missions,
-                world,
-                body.listingId!,
-                {
-                  deliver: body.deliver === true,
-                  ...(typeof body.deliverToIcao === 'string'
-                    ? { deliverToIcao: body.deliverToIcao }
-                    : {}),
-                },
-              );
+              const purchased = executeBuyAircraft(world, missions, {
+                listingId: body.listingId!,
+                deliver: body.deliver === true,
+                ...(typeof body.deliverToIcao === 'string'
+                  ? { deliverToIcao: body.deliverToIcao }
+                  : {}),
+              });
+              if (purchased.kind === 'unavailable') {
+                throw new Error(`Listing ${body.listingId} is not available`);
+              }
               return {
                 walletUsd: missions.walletUsd,
                 debitUsd: purchased.debitUsd,
@@ -2131,7 +2130,7 @@ export function createCareerApiServer(port = 8787) {
                 companyCredit: companyCreditSnapshot(missions),
               };
             });
-          }, { persist: 'blob' });
+          }, { persist: 'blob', housekeeping: false });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4571,31 +4570,28 @@ export function createCareerApiServer(port = 8787) {
               return { kind: 'missing_mission' as const };
             }
 
-            const beforeLots = intoMission?.lots.length ?? 0;
-            const mission = acceptMission(world, {
+            const executed = executeAcceptLot(world, missions, {
               lotId: body.lotId!,
               cargoKg: body.kg,
               aircraftClassId: aircraft,
               maxCargoKg: cargoLimit.maxCargoKg,
-              intoMission: intoMission ?? undefined,
+              intoMissionId: intoMission?.id,
               cargoOps: cargoOpsForRequest(req, missions.cargoOps),
               classOps: classOpsForRequest(req, missions.classOps),
             });
-            const appended = Boolean(intoMission) && mission.lots.length > beforeLots;
-            if (intoMission) {
-              const idx = missions.missions.findIndex((m) => m.id === intoMission!.id);
-              if (idx >= 0) missions.missions[idx] = mission;
-              else missions.missions.push(mission);
-            } else {
-              missions.missions.push(mission);
+            if (executed.kind === 'missing_lot') {
+              return { kind: 'missing_lot' as const };
+            }
+            if (executed.kind === 'missing_mission') {
+              return { kind: 'missing_mission' as const };
             }
             return {
               kind: 'ok' as const,
-              mission,
+              mission: executed.mission,
               walletUsd: missions.walletUsd,
-              appended,
+              appended: executed.appended,
             };
-          }, { commandSliceLotIds: [body.lotId] });
+          }, { commandSliceLotIds: [body.lotId], housekeeping: false });
           if (result.kind === 'missing_lot') {
             send(res, 404, { error: `Unknown lot ${body.lotId}` });
             return;
@@ -5177,15 +5173,18 @@ export function createCareerApiServer(port = 8787) {
                   );
                 }
               }
-              const staged = commitStagedManifest(world, {
+              const staged = executeAcceptManifest(world, missions, {
                 lines,
                 aircraftClassId: aircraft,
                 maxCargoKg: operationalMaxCargoKg,
-                intoMission: intoMission ?? undefined,
+                intoMissionId: intoMission?.id,
                 airframeTypeId: playerAirframe?.typeId,
                 cargoOps: cargoOpsForRequest(req, missions.cargoOps),
                 classOps: classOpsForRequest(req, missions.classOps),
               });
+              if (staged.kind === 'missing_mission') {
+                throw new Error('Unknown mission for staged accept');
+              }
               mission = {
                 ...staged.mission,
                 aircraftId: playerAircraft.id,
@@ -5194,16 +5193,12 @@ export function createCareerApiServer(port = 8787) {
                   playerAirframe?.rolesPackRelPath ??
                   staged.mission.rolesPackRelPath,
               };
-              appended = staged.appended;
+              appended = staged.kind === 'applied' ? staged.appended : false;
               lineCount = staged.lineCount;
-              if (staged.appended && intoMission) {
-                const idx = missions.missions.findIndex((m) => m.id === intoMission!.id);
-                if (idx >= 0) missions.missions[idx] = mission;
-                else missions.missions.push(mission);
-              } else {
-                const idx = missions.missions.findIndex((m) => m.id === mission.id);
-                if (idx >= 0) missions.missions[idx] = mission;
-                else missions.missions.push(mission);
+              const idx = missions.missions.findIndex((m) => m.id === mission.id);
+              if (idx >= 0) missions.missions[idx] = mission;
+              else missions.missions.push(mission);
+              if (staged.kind === 'applied' && !staged.appended) {
                 assignAircraftToMission(
                   missions,
                   playerAircraft.id,
@@ -5221,7 +5216,10 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               fleet: withParkingRates(missions.fleet),
             };
-          }, { commandSliceLotIds: lines.map((line) => line.lotId) });
+          }, {
+            commandSliceLotIds: lines.map((line) => line.lotId),
+            housekeeping: false,
+          });
 
           let mission = committed.mission;
           // Same rule as accept: a different mission must not inherit prior
@@ -6257,29 +6255,29 @@ export function createCareerApiServer(port = 8787) {
                 preflight: existing.lastPreflightCheck ?? null,
               };
             }
-            const departedResult = departMission(world, existing, { fleet: missions });
-            const departed = departedResult.mission;
-            missions.missions[idx] = departed;
-            if (departedResult.fuelDebitUsd > 0) {
-              applyWalletDelta(missions, {
-                amountUsd: -departedResult.fuelDebitUsd,
-                kind: 'fuel',
-                atTick: world.tick,
-                missionId: departed.id,
-                icao: departed.originIcao,
-                note: `${departed.originIcao}→${departed.destIcao}`,
-              });
+            const departedResult = executeDepartFlight(world, missions, {
+              missionId: body.missionId!,
+            });
+            if (departedResult.kind === 'missing') {
+              return { kind: 'missing' as const };
+            }
+            if (departedResult.kind === 'closed') {
+              return { kind: 'closed' as const };
             }
             return {
               kind: 'ok' as const,
-              mission: departed,
+              mission: departedResult.result.mission,
               walletUsd: missions.walletUsd,
-              fuelDebitUsd: departedResult.fuelDebitUsd,
+              fuelDebitUsd: departedResult.result.fuelDebitUsd,
               fleet: withParkingRates(missions.fleet),
             };
-          }, { commandSliceMissionId: body.missionId });
+          }, { commandSliceMissionId: body.missionId, housekeeping: false });
           if (result.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
+            return;
+          }
+          if (result.kind === 'closed') {
+            send(res, 409, { error: `Mission ${body.missionId} is already closed` });
             return;
           }
           if (result.kind === 'preflight_failed') {

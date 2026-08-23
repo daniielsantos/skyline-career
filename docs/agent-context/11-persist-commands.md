@@ -80,17 +80,18 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 14. ~~**Company persist skip + ledger patch:**~~ identical `saveMissions` no-ops; ledger upsert + delete-not-in (no `DELETE FROM ledger` wipe). Dealer GET blob still calls `saveMissions` but skips SQL when unchanged.
 15. ~~**Fleet/missions skip:**~~ `saveMissions` só reescreve frota, tabela de missões, `company_state`, stub ou ledger quando aquele slice mudou (ex. parking fee = wallet+ledger, sem `replaceFleet`).
 16. ~~**Fleet/mission row patch:**~~ upsert + delete só das tails/missões dirty (assinatura por id); full rewrite se ≥80 mudanças, como lots.
+17. ~~**Accept / Depart / Buy comandos:**~~ idempotentes; Watch auto-depart usa `executeDepartFlight`. **CancelMission** ainda aberto.
 
-## Outros comandos (mesmo molde, depois)
+## Outros comandos (mesmo molde)
 
 | Comando | Hot | Não no comando |
 |---------|-----|----------------|
-| `AcceptLot` | lot reserved, missão `accepted`, inbound_pending, tail assign | spawn de lots novos |
-| `DepartFlight` | status `in_flight`, fuel debit, airborne stamps | — |
+| ~~`AcceptLot`~~ | lot reserved, missão `accepted`, inbound_pending, tail assign | spawn de lots novos |
+| ~~`DepartFlight`~~ | status `in_flight`, fuel debit, airborne stamps | — |
 | `CancelMission` | status cancel, release tail, lot devolve | — |
-| `BuyAircraft` | wallet + instance `sold` + fleet row | rebalance pool mundial |
+| ~~`BuyAircraft`~~ | wallet + instance `sold` + fleet row | rebalance pool mundial |
 
-Cada um: idempotência por id de negócio (lot+company, missionId).
+`executeAcceptLot` / `executeAcceptManifest` / `executeDepartFlight` / `executeBuyAircraft` em `career-persist-commands.ts`. Replay: mesmo lot na missão aberta; `in_flight` sem segundo Jet-A; mesmo casco (matrícula) na frota. Buy ainda `persist: 'blob'` (pool no stub). Cancel ainda não.
 
 ## Fora
 

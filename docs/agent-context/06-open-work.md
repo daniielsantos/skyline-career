@@ -2,7 +2,7 @@
 
 Atualizado 2026-08-22: `formLots` extraído por país (bulk → last-mile → intl). Replay intacto; sem workers ainda. [`08-economy.md`](./08-economy.md).
 
-Atualizado 2026-08-22: botões sem tick horário; Freights/Dispatch patch SQL; company-only no crédito. [`11-persist-commands.md`](./11-persist-commands.md).
+Atualizado 2026-08-22: Accept/Depart/Buy = comandos idempotentes (molde SettleFlight). Cancel ainda aberto.
 
 Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). BBJ2 parked. Airport tab / A2A / dual-client IPC inalterados.
 

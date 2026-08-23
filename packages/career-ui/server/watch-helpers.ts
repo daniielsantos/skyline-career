@@ -5,15 +5,13 @@
 import {
   advanceFlightPhase,
   createMissionFlightWatchState,
-  applyWalletDelta,
   createCruiseSampleState,
+  createWeatherOpsAccumulator,
   createFlightScoreAccumulator,
   clearFlightScoreLanding,
-  createWeatherOpsAccumulator,
   cruiseSampleStatus,
   DEFAULT_CRUISE_EMA_ALPHA,
   DEFAULT_CRUISE_MAX_VS_FPM,
-  departMission,
   revertFalseDepartMission,
   distanceNm as greatCircleDistanceNm,
   estimateMissionBlockHours,
@@ -52,6 +50,7 @@ import {
   rebaseExpectedRouteMsFromCruise,
   routeDistanceNm,
   executeSettleFlight,
+  executeDepartFlight,
   watchIntervalMsForPhase,
   weatherOpsStatus,
   fuelBurnMultFromAircraft,
@@ -3098,32 +3097,25 @@ export class CareerWatchSession {
           ) {
             return false;
           }
-          const departed = departMission(worldFresh, openMission, {
-            fleet: freshMissions,
+          const departed = executeDepartFlight(worldFresh, freshMissions, {
+            missionId: openMission.id,
             nowMs: nextState.airborneAtMs ?? nowMs,
             distanceNm,
             expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
           });
-          freshMissions.missions[openIdx] = departed.mission;
-          if (departed.fuelDebitUsd > 0) {
-            applyWalletDelta(freshMissions, {
-              amountUsd: -departed.fuelDebitUsd,
-              kind: 'fuel',
-              atTick: worldFresh.tick,
-              missionId: departed.mission.id,
-              icao: departed.mission.originIcao,
-              note: `${departed.mission.originIcao}→${departed.mission.destIcao}`,
-            });
+          if (departed.kind !== 'applied' && departed.kind !== 'replay') {
+            return false;
           }
-          this.missionStatus = departed.mission.status;
+          freshMissions.missions[openIdx] = departed.result.mission;
+          this.missionStatus = departed.result.mission.status;
           this.walletUsd = freshMissions.walletUsd;
           this.watchState = {
             ...this.watchState,
             sawAirborne: true,
-            airborneAtMs: departed.mission.airborneAtMs,
-            expectedRouteMs: departed.mission.expectedRouteMs,
+            airborneAtMs: departed.result.mission.airborneAtMs,
+            expectedRouteMs: departed.result.mission.expectedRouteMs,
           };
-          current = departed.mission;
+          current = departed.result.mission;
           return true;
         }, {
           housekeeping: false,

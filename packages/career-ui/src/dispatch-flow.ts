@@ -541,3 +541,22 @@ export function dispatchStepStatusLine(input: {
       return '';
   }
 }
+
+/**
+ * After a UI reload, open Dispatch once when the player is already airborne.
+ * Do not consume the one-shot while missions are still hydrating as ground-only
+ * (that used to stick Freights as the home tab mid-cruise).
+ */
+export function airborneResumeShouldOpenDispatch(opts: {
+  alreadyDone: boolean;
+  hubSelected: boolean;
+  tab: string;
+  airportIcao: string | null;
+  playerMissionStatus: string | undefined;
+}): 'wait' | 'mark-done' | 'open-dispatch' {
+  if (!opts.hubSelected || opts.alreadyDone) return 'wait';
+  if (opts.playerMissionStatus !== 'in_flight') return 'wait';
+  if (opts.tab === 'staging' && !opts.airportIcao) return 'mark-done';
+  return 'open-dispatch';
+}
+

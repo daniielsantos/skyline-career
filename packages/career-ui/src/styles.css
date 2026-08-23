@@ -367,6 +367,9 @@ body {
 
 .topbar-title h1 {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   font-family: var(--font-display);
   font-size: clamp(1.7rem, 2.4vw, 2.2rem);
   font-weight: 400;
@@ -374,6 +377,54 @@ body {
   text-transform: uppercase;
   color: var(--ink);
   line-height: 1;
+}
+
+.page-help-trigger {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.page-help-trigger:hover,
+.page-help-trigger:focus-visible {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.page-help-dialog {
+  width: min(100%, 28rem);
+}
+
+.page-help-dialog .confirm-title {
+  font-size: 1.45rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+.page-help-bullets {
+  margin: 0.85rem 0 1.15rem;
+  padding: 0 0 0 1.15rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.page-help-bullets li + li {
+  margin-top: 0.55rem;
+}
+
+.page-help-dialog .confirm-actions {
+  justify-content: flex-end;
 }
 
 .topbar-title .lede {

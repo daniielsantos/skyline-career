@@ -127,6 +127,8 @@ import {
   operatorFreightFromPilotFeeUsd,
 } from './contract-pilot-fee';
 import { useConfirm } from './ConfirmDialog';
+import { PageHelpButton } from './PageHelpButton';
+import { resolvePageHelp } from './page-help';
 import { ContractPilotPick } from './ContractPilotPick';
 import { FboRerouteDialog } from './FboRerouteDialog';
 import { PilotTravelDialog } from './PilotTravelDialog';
@@ -177,39 +179,10 @@ import {
   logbookStatusLabel,
 } from './logbook';
 import { BUSH_TRIPS_BOARD_ENABLED } from './feature-flags';
-
-type CareerRefreshScope = {
-  market?: boolean;
-  missions?: boolean;
-  npc?: boolean;
-  aircraftMarket?: boolean;
-  bushTrips?: boolean;
-  airport?: boolean;
-};
-
-/** Background / tab-switch fetch: only endpoints the open view actually paints. */
-function liveRefreshScope(tab: CareerTab, airportOpen: boolean): CareerRefreshScope {
-  if (airportOpen) {
-    return { npc: true, market: true, airport: true };
-  }
-  switch (tab) {
-    case 'fleet':
-      return { npc: true };
-    case 'market':
-      return {
-        market: true,
-        npc: true,
-        bushTrips: BUSH_TRIPS_BOARD_ENABLED,
-      };
-    case 'aircraft':
-      return { aircraftMarket: true };
-    case 'missions':
-    case 'staging':
-      return { missions: true };
-    default:
-      return {};
-  }
-}
+import {
+  liveRefreshScope,
+  type CareerRefreshScope,
+} from './refresh-scope';
 
 function normalizeStarterHubs(
   hubs: Array<StarterHubOption | string> | null | undefined,
@@ -294,6 +267,7 @@ import {
   formatRunwayTouchdownDebriefLine,
   fuelAuthorizedForOfp,
   resolveLoadPath,
+  airborneResumeShouldOpenDispatch,
   type FlightDebrief,
 } from './dispatch-flow';
 import { RunwayTouchdownDiagram } from './RunwayTouchdownDiagram';
@@ -3539,7 +3513,8 @@ export function App() {
       (scopedFull || effectiveScope?.market === true) &&
       !(bootstrapping && boardOwnsMarket);
     const marketSeqAtFetch = marketFetchSeqRef.current;
-    const wantMissions = scopedFull || effectiveScope?.missions === true;
+    const wantMissions =
+      bootstrapping || scopedFull || effectiveScope?.missions === true;
     const wantNpc = scopedFull || effectiveScope?.npc === true;
     const wantAircraft = scopedFull || effectiveScope?.aircraftMarket === true;
     if (wantAircraft) setAircraftMarketLoading(true);
@@ -4030,6 +4005,25 @@ export function App() {
       setToast(message);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubSelected, showProfileGate, activeCareerProfile?.id]);
+
+  // Sidebar "Active flight" is shell chrome — load missions even if the open
+  // tab never asked for the board (Freights-only bootstrap used to skip it).
+  useEffect(() => {
+    if (showProfileGate || !activeCareerProfile || !hubSelected) return;
+    let cancelled = false;
+    void fetchMissions()
+      .then((missionState) => {
+        if (cancelled) return;
+        setMissions(missionState.missions.slice().reverse());
+        if (typeof missionState.walletUsd === 'number') {
+          setWallet(missionState.walletUsd);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [hubSelected, showProfileGate, activeCareerProfile?.id]);
 
   // Poll MSFS watch session while active. One shot when idle so a mid-flight
@@ -4568,15 +4562,21 @@ export function App() {
     setSimbriefLaunchUrl(null);
   }, [activeMission?.id]);
 
-  // Reopen with a pilot in_flight mission → land on Dispatch once (Watch resume
-  // also runs off-tab, but settle / progress live here).
+  // Reopen with a pilot in_flight mission → land on Dispatch once.
+  // Do not mark the one-shot until we actually see in_flight — a first
+  // missions payload of accepted/dispatched used to skip cruise resume.
   useEffect(() => {
-    if (!hubSelected || airborneResumeNavDoneRef.current) return;
-    if (missions.length === 0) return;
-    airborneResumeNavDoneRef.current = true;
     const airborne = findPlayerDispatchMission(missions);
-    if (airborne?.status !== 'in_flight') return;
-    if (tab === 'staging' && !airportIcao) return;
+    const action = airborneResumeShouldOpenDispatch({
+      alreadyDone: airborneResumeNavDoneRef.current,
+      hubSelected,
+      tab,
+      airportIcao,
+      playerMissionStatus: airborne?.status,
+    });
+    if (action === 'wait') return;
+    airborneResumeNavDoneRef.current = true;
+    if (action === 'mark-done') return;
     setAirportIcao(null);
     setAirportView(null);
     setAirportHydrating(false);
@@ -8628,6 +8628,11 @@ export function App() {
                     : freightsBoard === 'bush' && BUSH_TRIPS_BOARD_ENABLED
                       ? 'Validated bush trip arcs — light GA only, separate from Market freights.'
                       : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
+  const pageHelp = resolvePageHelp({
+    showAirport,
+    showStaging,
+    tab,
+  });
   const parkedIcao =
     fleet.find((a) => a.status === 'parked')?.locationIcao ?? homeHubIcao;
   const signalFocusIcao = pilotIcao || parkedIcao || homeHubIcao;
@@ -8991,7 +8996,10 @@ export function App() {
             >
               Menu
             </button>
-            <h1>{pageTitle}</h1>
+            <h1>
+              {pageTitle}
+              {pageHelp ? <PageHelpButton help={pageHelp} /> : null}
+            </h1>
             <p className="lede">
               {pageLede}
               {showAirport ? (

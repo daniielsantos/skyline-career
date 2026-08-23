@@ -9,6 +9,7 @@ import {
   formatFlightDurationMs,
   formatLandingFpm,
   formatRunwayTouchdownDebriefLine,
+  airborneResumeShouldOpenDispatch,
   isOfpCargoUnderOnlyFailureUi,
   livePreflightWaitHint,
   ofpCargoKgFromUnderFinding,
@@ -450,6 +451,44 @@ describe('isOfpCargoUnderOnlyFailureUi', () => {
         ],
       }),
       false,
+    );
+  });
+});
+
+describe('airborneResumeShouldOpenDispatch', () => {
+  it('waits until an in_flight mission exists so a ground hydrate cannot skip cruise', () => {
+    assert.equal(
+      airborneResumeShouldOpenDispatch({
+        alreadyDone: false,
+        hubSelected: true,
+        tab: 'market',
+        airportIcao: null,
+        playerMissionStatus: 'dispatched',
+      }),
+      'wait',
+    );
+    assert.equal(
+      airborneResumeShouldOpenDispatch({
+        alreadyDone: false,
+        hubSelected: true,
+        tab: 'market',
+        airportIcao: null,
+        playerMissionStatus: 'in_flight',
+      }),
+      'open-dispatch',
+    );
+  });
+
+  it('does not steal Dispatch when already there', () => {
+    assert.equal(
+      airborneResumeShouldOpenDispatch({
+        alreadyDone: false,
+        hubSelected: true,
+        tab: 'staging',
+        airportIcao: null,
+        playerMissionStatus: 'in_flight',
+      }),
+      'mark-done',
     );
   });
 });

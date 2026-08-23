@@ -41,9 +41,9 @@ import {
   portInventorySnapshot,
   portListingSlotCap,
   portOperatorLevel,
+  portOperatorEtaMult,
   portStockPriceFactor,
   recentPortThroughputKg,
-  PORT_OPERATOR_ETA_MULT,
   PORT_OPERATOR_PRICE_MULT,
   syncWorldPortConcessions,
   tickPortConcessions,
@@ -2205,9 +2205,11 @@ export function buyPortListing(
   const inboundKg = wh ? Math.min(qty, Math.max(0, free)) : 0;
   const yardKg = qty - inboundKg;
   const logisticsMult = wh ? logisticsMultForWarehouse(state, wh.id) : 1;
-  const operatorEta = isPortOperator(world, listing.portId, LOCAL_COMPANY_ID)
-    ? PORT_OPERATOR_ETA_MULT
-    : 1;
+  const operatorEta = portOperatorEtaMult(
+    world,
+    listing.portId,
+    LOCAL_COMPANY_ID,
+  );
   const transferTicks =
     inboundKg > 0
       ? warehouseInboundTransferTicks(inboundKg, logisticsMult * operatorEta)

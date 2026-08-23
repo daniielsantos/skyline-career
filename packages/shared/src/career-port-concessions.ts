@@ -60,6 +60,16 @@ export const PORT_P2_UPGRADE_USD = 220_000;
 /** Lifetime kg through this port (operator) to unlock P2. */
 export const PORT_P2_THROUGHPUT_KG = 80_000;
 export const PORT_P2_LEASE_LEVEL_MULT = 1.2;
+
+/** P3: faster restock + listing slot + mild inbound ETA. Same buy discount as P1. */
+export const PORT_P3_RESTOCK_FRAC_PER_DAY = 0.11;
+export const PORT_P3_UPGRADE_USD = 280_000;
+/** Lifetime kg through this port (operator) to unlock P3. */
+export const PORT_P3_THROUGHPUT_KG = 180_000;
+export const PORT_P3_LEASE_LEVEL_MULT = 1.4;
+export const PORT_P3_EXTRA_LISTINGS = 1;
+export const PORT_P3_ETA_MULT = 0.78;
+
 /** Recent 7-day throughput that doubles the variable lease term (capped). */
 export const PORT_LEASE_THROUGHPUT_REF_KG = 80_000;
 export const PORT_LEASE_THROUGHPUT_MAX_MULT = 1.75;
@@ -162,10 +172,35 @@ export function portListingSlotCap(
   world: CareerEconomyWorld,
   portId: string,
 ): number {
+  const op = findActivePortOperator(world, portId);
+  if (!op) return PORT_LISTINGS_BASE;
   return (
     PORT_LISTINGS_BASE +
-    (findActivePortOperator(world, portId) ? PORT_OPERATOR_EXTRA_LISTINGS : 0)
+    PORT_OPERATOR_EXTRA_LISTINGS +
+    (portOperatorLevel(world, portId) >= 3 ? PORT_P3_EXTRA_LISTINGS : 0)
   );
+}
+
+/** Daily inbound discharge as a fraction of yard cap. */
+export function portRestockFracPerDay(
+  world: CareerEconomyWorld,
+  portId: string,
+): number {
+  return portOperatorLevel(world, portId) >= 3
+    ? PORT_P3_RESTOCK_FRAC_PER_DAY
+    : PORT_RESTOCK_FRAC_PER_DAY;
+}
+
+/** Port→WH inbound duration multiplier (1 = default). No extra buy discount. */
+export function portOperatorEtaMult(
+  world: CareerEconomyWorld,
+  portId: string,
+  companyId: string = LOCAL_COMPANY_ID,
+): number {
+  if (!isPortOperator(world, portId, companyId)) return 1;
+  return portOperatorLevel(world, portId) >= 3
+    ? PORT_P3_ETA_MULT
+    : PORT_OPERATOR_ETA_MULT;
 }
 
 export function ensurePortInventories(
@@ -220,7 +255,7 @@ function restockKgForArrival(
   if (cap <= 0) return 0;
   const stock = getPortInventoryStock(world, portId, commodityId);
   const room = Math.max(0, cap - stock);
-  const add = Math.floor(cap * PORT_RESTOCK_FRAC_PER_DAY);
+  const add = Math.floor(cap * portRestockFracPerDay(world, portId));
   return Math.min(room, add);
 }
 
@@ -436,7 +471,13 @@ export function concessionLeaseUsdPerDay(
   conc: PlayerPortConcession,
   tick: number,
 ): number {
-  const levelMult = (conc.level ?? 1) >= 2 ? PORT_P2_LEASE_LEVEL_MULT : 1;
+  const level = conc.level ?? 1;
+  const levelMult =
+    level >= 3
+      ? PORT_P3_LEASE_LEVEL_MULT
+      : level >= 2
+        ? PORT_P2_LEASE_LEVEL_MULT
+        : 1;
   const recent = recentPortThroughputKg(conc, tick);
   const tMult =
     1 +
@@ -676,27 +717,43 @@ export function evaluatePortConcessionUpgrade(
   const fromLevel: PortConcessionLevel =
     conc?.level === 2 || conc?.level === 3 ? conc.level : 1;
   const shippedKg = conc?.lifetimeThroughputKg ?? 0;
+  const toLevel: PortConcessionLevel =
+    fromLevel === 1 ? 2 : fromLevel === 2 ? 3 : 3;
+  const upgradeUsd =
+    fromLevel === 1
+      ? PORT_P2_UPGRADE_USD
+      : fromLevel === 2
+        ? PORT_P3_UPGRADE_USD
+        : 0;
+  const neededKg =
+    fromLevel === 1
+      ? PORT_P2_THROUGHPUT_KG
+      : fromLevel === 2
+        ? PORT_P3_THROUGHPUT_KG
+        : PORT_P3_THROUGHPUT_KG;
   if (!port) reasons.push('Unknown port');
   if (!conc) reasons.push('No active concession on this port');
-  if (conc && fromLevel >= 2) reasons.push('Port yard is already upgraded');
-  if (conc && shippedKg < PORT_P2_THROUGHPUT_KG) {
+  if (conc && fromLevel >= 3) reasons.push('Port is already at P3');
+  if (conc && fromLevel < 3 && shippedKg < neededKg) {
     reasons.push(
-      `Need ${PORT_P2_THROUGHPUT_KG.toLocaleString()} kg throughput at this port (have ${shippedKg.toLocaleString()})`,
+      `Need ${neededKg.toLocaleString()} kg throughput at this port (have ${shippedKg.toLocaleString()})`,
     );
   }
-  if (state.walletUsd < PORT_P2_UPGRADE_USD) {
+  if (upgradeUsd > 0 && state.walletUsd < upgradeUsd) {
     reasons.push(
-      `Need $${PORT_P2_UPGRADE_USD.toLocaleString()} to enlarge the yard`,
+      fromLevel === 1
+        ? `Need $${upgradeUsd.toLocaleString()} to enlarge the yard`
+        : `Need $${upgradeUsd.toLocaleString()} for P3 terminal cadence`,
     );
   }
   return {
     ok: reasons.length === 0,
     reasons,
-    upgradeUsd: PORT_P2_UPGRADE_USD,
-    neededKg: PORT_P2_THROUGHPUT_KG,
+    upgradeUsd,
+    neededKg,
     shippedKg,
     fromLevel,
-    toLevel: 2,
+    toLevel,
   };
 }
 
@@ -724,9 +781,9 @@ export function upgradePortConcession(
     kind: 'port_concession_upgrade',
     atTick: world.tick,
     icao: port.pickupHubs[0],
-    note: `P2 yard · ${port.name}`,
+    note: `P${gate.toLevel} · ${port.name}`,
   });
-  conc.level = 2;
+  conc.level = gate.toLevel;
   syncWorldPortConcessions(world, state);
   return conc;
 }

@@ -13,6 +13,7 @@ import {
   GROUND_STAFF_SOLID_MID_PCT,
   GROUND_STAFF_YARD_HOLD_MULT,
   groundStaffRosterSlotsFree,
+  groundStaffSnapshot,
   hireGroundStaffCandidate,
   logisticsMultForWarehouse,
   normalizeGroundStaffState,
@@ -44,6 +45,7 @@ import {
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { TICKS_PER_DAY } from './career-clock.js';
+import { economyDayIndex } from './career-weather.js';
 import type {
   CareerMissionsState,
   GroundStaffPerkId,
@@ -462,6 +464,50 @@ describe('career ground staff', () => {
     const credited = (liveWh(state).lifetimeShippedKg ?? 0) - beforeShip;
     assert.ok(credited > 1_000);
     assert.equal(credited, Math.max(1_000, Math.floor(1_000 * shipMult)));
+  });
+
+  it('opens a T1 hire desk when the roster is empty', () => {
+    const world = createSeedEconomyWorld({ seed: 'gs-empty-desk' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'GsEmptyDesk',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    const whId = buyWarehouseAtPickupHub(state, world, 'SBGR').warehouse.id;
+    state.groundStaff = {
+      members: [],
+      hirePoolByHub: { SBGR: [] },
+      hirePoolDayByHub: { SBGR: economyDayIndex(world.tick) },
+    };
+    const snap = groundStaffSnapshot(state, world);
+    assert.equal(snap.byWarehouse[whId]?.slotsUsed, 0);
+    assert.equal(snap.byWarehouse[whId]?.slotsUnlocked, 1);
+    assert.equal(snap.byWarehouse[whId]?.slotsFree, 1);
+    assert.ok((snap.hirePoolByHub.SBGR?.length ?? 0) > 0);
+  });
+
+  it('hires a snapshot candidate after the desk pool was dropped', () => {
+    const world = createSeedEconomyWorld({ seed: 'gs-hire-stale-pool' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'GsStalePool',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    const whId = buyWarehouseAtPickupHub(state, world, 'SBGR').warehouse.id;
+    const snap = groundStaffSnapshot(state, world);
+    const cand = snap.hirePoolByHub.SBGR?.[0];
+    assert.ok(cand);
+    state.groundStaff = {
+      members: [],
+      hirePoolByHub: { SBGR: [] },
+      hirePoolDayByHub: { SBGR: economyDayIndex(world.tick) },
+    };
+    const hired = hireGroundStaffCandidate(state, world, {
+      warehouseId: whId,
+      candidateId: cand!.id,
+    });
+    assert.equal(hired.member.displayName, cand!.displayName);
+    assert.equal(hired.member.perkId, cand!.perkId);
   });
 
   it('hire pool can include all five perks over refreshes', () => {

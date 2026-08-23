@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   fetchPorts,
+  fetchWarehouses,
   fetchCargoLimit,
   postDemandAccept,
   postGroundStaffFire,
@@ -43,7 +44,12 @@ import {
   type WeightSystem,
 } from './weight-units';
 
-/** Mirror of shared WAREHOUSE_*_CAPACITY_KG (client must not import shared). */
+/** Mirror of shared groundStaffSlotsForWarehouse (client must not import shared). */
+function warehouseStaffSlotsUnlocked(tier: number): number {
+  if (tier >= 3) return 3;
+  if (tier >= 2) return 2;
+  return 1;
+}
 const WH_T1_CAPACITY_KG = 2_268;
 const WH_T2_CAPACITY_KG = 4_536;
 const WH_T3_CAPACITY_KG = 6_804;
@@ -366,6 +372,7 @@ export function PortsPanel(props: {
     null,
   );
   const [buyHubQuery, setBuyHubQuery] = useState('');
+  const staffDeskRetryKeyRef = useRef<string | null>(null);
   const [demandSort, setDemandSort] = useState<DemandSort>({
     key: 'expires',
     direction: 'asc',
@@ -876,18 +883,30 @@ export function PortsPanel(props: {
     }
   }
 
-  async function onUpgradeConcession(portIdToUpgrade: string, upgradeUsd: number) {
+  async function onUpgradeConcession(
+    portIdToUpgrade: string,
+    upgradeUsd: number,
+    toLevel: number,
+  ) {
     if (props.busy || loading) return;
+    const p3 = toLevel >= 3;
     const ok = await confirm({
-      title: 'Enlarge port yard (P2)?',
-      body: (
+      title: p3 ? 'Unlock P3 terminal cadence?' : 'Enlarge port yard (P2)?',
+      body: p3 ? (
+        <p>
+          Faster daily restock (~11% of cap), +1 listing slot, and a slightly
+          faster inbound for{' '}
+          <strong>{props.formatMoney(upgradeUsd)}</strong>. Same buy discount as
+          P1 — lease floor goes up.
+        </p>
+      ) : (
         <p>
           Bigger factory stock cap (same restock %, more kg per discharge) for{' '}
           <strong>{props.formatMoney(upgradeUsd)}</strong>. Lease scales with
           recent throughput — no extra buy discount.
         </p>
       ),
-      confirmLabel: 'Upgrade yard',
+      confirmLabel: p3 ? 'Unlock P3' : 'Upgrade yard',
       cancelLabel: 'Cancel',
     });
     if (!ok) return;
@@ -902,7 +921,7 @@ export function PortsPanel(props: {
           result.ports.warehouses?.groundStaff ??
           groundStaff,
       );
-      props.onToast?.('ok', 'P2 yard unlocked');
+      props.onToast?.('ok', p3 ? 'P3 terminal unlocked' : 'P2 yard unlocked');
       setConcessionOpen(false);
     } catch (err) {
       props.onToast?.(
@@ -1361,6 +1380,15 @@ export function PortsPanel(props: {
   const staffFocusMeta = staffFocusWarehouse
     ? groundStaff?.byWarehouse[staffFocusWarehouse.id]
     : undefined;
+  const staffSlotsUnlocked = staffFocusWarehouse
+    ? (staffFocusMeta?.slotsUnlocked ??
+      warehouseStaffSlotsUnlocked(staffFocusWarehouse.tier))
+    : 0;
+  const staffSlotsUsed = staffFocusMeta?.slotsUsed ?? 0;
+  const staffSlotsFree = staffFocusWarehouse
+    ? (staffFocusMeta?.slotsFree ??
+      Math.max(0, staffSlotsUnlocked - staffSlotsUsed))
+    : 0;
   const staffHirePool =
     staffFocusWarehouse && groundStaff
       ? (groundStaff.hirePoolByHub[
@@ -1368,6 +1396,30 @@ export function PortsPanel(props: {
         ] ?? [])
       : [];
   const buyUsdByIcao = warehouses?.buyUsdByIcao ?? {};
+
+  useEffect(() => {
+    if (whShelf !== 'staff') return;
+    if (!staffFocusWarehouse) return;
+    if (staffSlotsFree <= 0) return;
+    if (staffHirePool.length > 0) {
+      staffDeskRetryKeyRef.current = null;
+      return;
+    }
+    const key = staffFocusWarehouse.id;
+    if (staffDeskRetryKeyRef.current === key) return;
+    staffDeskRetryKeyRef.current = key;
+    let cancelled = false;
+    void fetchWarehouses()
+      .then((next) => {
+        if (cancelled) return;
+        setWarehouses(next);
+        if (next.groundStaff) setGroundStaff(next.groundStaff);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [whShelf, staffFocusWarehouse, staffSlotsFree, staffHirePool.length]);
 
   const loopStep = useMemo(
     () =>
@@ -2414,7 +2466,7 @@ export function PortsPanel(props: {
                               const slotsUsed = meta?.slotsUsed ?? 0;
                               const slotsUnlocked =
                                 meta?.slotsUnlocked ??
-                                (wh.tier >= 2 ? 2 : 1);
+                                warehouseStaffSlotsUnlocked(wh.tier);
                               return (
                                 <button
                                   key={wh.id}
@@ -2446,13 +2498,7 @@ export function PortsPanel(props: {
                                 <h4 className="crew-section-title">Roster</h4>
                                 <p className="muted crew-section-lede">
                                   {staffFocusWarehouse.icao.toUpperCase()} ·{' '}
-                                  {staffFocusMeta?.slotsUsed ?? 0}/
-                                  {staffFocusMeta?.slotsUnlocked ??
-                                    (staffFocusWarehouse.tier >= 3
-                                      ? 3
-                                      : staffFocusWarehouse.tier >= 2
-                                        ? 2
-                                        : 1)}
+                                  {staffSlotsUsed}/{staffSlotsUnlocked}
                                   {staffFocusMeta?.logisticsActive
                                     ? ` · ${transferDiscountLabel(staffFocusMeta.logisticsMult)}`
                                     : ''}
@@ -2560,11 +2606,9 @@ export function PortsPanel(props: {
                                   {staffHirePool.length} at{' '}
                                   {staffFocusWarehouse.icao.toUpperCase()} ·
                                   refresh each day
-                                  {(staffFocusMeta?.slotsFree ?? 0) <= 0
-                                    ? ' · slot full'
-                                    : ''}
+                                  {(staffSlotsFree <= 0) ? ' · slot full' : ''}
                                 </p>
-                                {(staffFocusMeta?.slotsFree ?? 0) <= 0 &&
+                                {staffSlotsFree <= 0 &&
                                 staffHirePool.length === 0 ? (
                                   <p className="muted">
                                     Slot full — fire or upgrade WH.
@@ -2582,8 +2626,7 @@ export function PortsPanel(props: {
                                         (m) => m.perkId === cand.perkId,
                                       );
                                       const canHire =
-                                        (staffFocusMeta?.slotsFree ?? 0) >
-                                          0 && !dup;
+                                        staffSlotsFree > 0 && !dup;
                                       return (
                                         <li
                                           key={cand.id}
@@ -3330,8 +3373,10 @@ export function PortsPanel(props: {
             {port.concession?.status === 'yours' ? (
               <>
                 <p className="muted">
-                  P{port.concession.level ?? 1} operator: ~10% cheaper buys, ~15%
-                  faster inbound, +1 listing
+                  P{port.concession.level ?? 1} operator: ~10% cheaper buys
+                  {(port.concession.level ?? 1) >= 3
+                    ? ', ~22% faster inbound, +2 listings, faster restock'
+                    : ', ~15% faster inbound, +1 listing'}
                   {(port.concession.level ?? 1) >= 2
                     ? ', enlarged yard cap'
                     : ''}
@@ -3357,7 +3402,7 @@ export function PortsPanel(props: {
                     Close
                   </button>
                   {port.concession.upgrade &&
-                  (port.concession.level ?? 1) < 2 ? (
+                  (port.concession.level ?? 1) < 3 ? (
                     <button
                       type="button"
                       className="action ghost"
@@ -3366,17 +3411,24 @@ export function PortsPanel(props: {
                       }
                       title={
                         port.concession.upgrade.ok
-                          ? 'Enlarge factory cap'
+                          ? (port.concession.level ?? 1) >= 2
+                            ? 'P3 restock cadence'
+                            : 'Enlarge factory cap'
                           : port.concession.upgrade.reasons.join(' · ')
                       }
                       onClick={() =>
                         void onUpgradeConcession(
                           port.id,
-                          port.concession?.upgrade?.upgradeUsd ?? 220_000,
+                          port.concession?.upgrade?.upgradeUsd ??
+                            ((port.concession.level ?? 1) >= 2
+                              ? 280_000
+                              : 220_000),
+                          port.concession?.upgrade?.toLevel ??
+                            ((port.concession.level ?? 1) >= 2 ? 3 : 2),
                         )
                       }
                     >
-                      P2 yard
+                      {(port.concession.level ?? 1) >= 2 ? 'P3 terminal' : 'P2 yard'}
                       {port.concession.upgrade.upgradeUsd
                         ? ` · ${props.formatMoney(port.concession.upgrade.upgradeUsd)}`
                         : ''}

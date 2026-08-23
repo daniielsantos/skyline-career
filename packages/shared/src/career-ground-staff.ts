@@ -637,6 +637,7 @@ function rollCandidate(
   rng: () => number,
   tick: number,
   perkId: GroundStaffPerkId = 'logistics',
+  idKey?: string,
 ): GroundStaffCandidate {
   const first = GS_FIRST_NAMES[Math.floor(rng() * GS_FIRST_NAMES.length)]!;
   const last = GS_LAST_NAMES[Math.floor(rng() * GS_LAST_NAMES.length)]!;
@@ -645,7 +646,8 @@ function rollCandidate(
   const effectMult = effectMultForPerk(perkId, skillPct);
   const salaryUsdPerDay = salaryForGrade(grade, rng);
   const displayName = `${first} ${last}`;
-  const id = nextId(tick, 'gscand');
+  const id =
+    idKey?.trim() || `gscand_${tick}_${Math.floor(rng() * 1e9)}`;
   return {
     id,
     displayName,
@@ -709,8 +711,9 @@ export function refreshGroundStaffHirePool(
     // No free seats across WHs at hub → empty desk (still refresh day stamp).
     const sameDay = hirePoolDayByHub[hub] === day;
     const hasPool = (hirePoolByHub[hub]?.length ?? 0) > 0;
-    if (!opts.force && sameDay && (hasPool || !anyFree)) {
-      if (!anyFree) hirePoolByHub[hub] = [];
+    // Same-day skip only when the desk already has names. An empty stamp (or a
+    // false "full" from a missing WH row) must not block a free T1 slot.
+    if (!opts.force && sameDay && hasPool) {
       continue;
     }
 
@@ -737,7 +740,9 @@ export function refreshGroundStaffHirePool(
         perkChoices[Math.floor(rng() * perkChoices.length)] ??
         perkChoices[i % perkChoices.length] ??
         'logistics';
-      pool.push(rollCandidate(rng, world.tick, perk));
+      pool.push(
+        rollCandidate(rng, world.tick, perk, `gscand_${hub}_${day}_${i}`),
+      );
     }
     hirePoolByHub[hub] = pool;
     hirePoolDayByHub[hub] = day;
@@ -767,19 +772,30 @@ export function hireGroundStaffCandidate(
   if (!wh) throw new Error(`Unknown warehouse ${warehouseId}`);
   const hub = wh.icao.trim().toUpperCase();
 
-  refreshGroundStaffHirePool(state, world, { hubIcao: hub });
-  const roster = ensureGroundStaff(state);
-
   if (groundStaffRosterSlotsFree(state, warehouseId) <= 0) {
     throw new Error(
       `No free ground staff slots at ${hub} — fire someone or upgrade the warehouse`,
     );
   }
 
-  const pool = roster.hirePoolByHub?.[hub] ?? [];
-  const idx = pool.findIndex((c) => c.id === opts.candidateId);
+  const lookup = (): { roster: GroundStaffState; idx: number } => {
+    const roster = ensureGroundStaff(state);
+    const pool = roster.hirePoolByHub?.[hub] ?? [];
+    return {
+      roster,
+      idx: pool.findIndex((c) => c.id === opts.candidateId),
+    };
+  };
+
+  let { roster, idx } = lookup();
+  // GET /api/ports used to roll a desk without persist: 'company'. Reroll is
+  // deterministic per hub+day so a missing RAM/disk pool can still match the UI.
+  if (idx < 0) {
+    refreshGroundStaffHirePool(state, world, { hubIcao: hub, force: true });
+    ({ roster, idx } = lookup());
+  }
   if (idx < 0) throw new Error(`Unknown hire candidate ${opts.candidateId}`);
-  const candidate = pool[idx]!;
+  const candidate = (roster.hirePoolByHub?.[hub] ?? [])[idx]!;
 
   if (warehouseHasGroundPerk(state, warehouseId, candidate.perkId)) {
     throw new Error(
@@ -821,7 +837,9 @@ export function hireGroundStaffCandidate(
   roster.members.push(member);
   roster.hirePoolByHub = {
     ...(roster.hirePoolByHub ?? {}),
-    [hub]: pool.filter((c) => c.id !== candidate.id),
+    [hub]: (roster.hirePoolByHub?.[hub] ?? []).filter(
+      (c) => c.id !== candidate.id,
+    ),
   };
   state.groundStaff = roster;
   return { member, debitUsd: candidate.hireUsd };

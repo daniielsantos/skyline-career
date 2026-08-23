@@ -49,11 +49,13 @@ Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). 
 3. ~~**Port dynamic price + WH lots**~~ — listing price = hub spot × frac + jitter/clamp (frozen at spawn); warehouse deposits keep separate cost lots (±3% merge band).
 
 3b. ~~**Port concession v1**~~ — inventory restock + reactive price; claim/renew lease; operator buffs; 1/company; gates T3+25k shipped.
-3c. **Port P2/P3 + specials market (backlog)** — P2 yard cap shipped; P3 / specials / regional restock share later.
+3c. ~~**Port P2/P3 + specials market**~~ — P2 yard + **P3 cadence** shipped (11% restock, +slot, ETA 0.78, lease ×1.4). Specials / regional share still backlog.
 4. ~~**Company tenant contract (doc)**~~ — roadmap + `08-economy`: company vs world vs pilot; sem schema members ainda.
 4b. ~~**Schema v4 world tables**~~ — `worlds` / `economy_meta` / `airports` / `airport_stock` + `world_id`; terminal SQL; tick in-memory.
 4c. ~~**Schema v5 world ops tables**~~ — `npcs` / `fuel_trucks` / `fuel_hauls` / `demand_orders` / `port_listings` / `port_inventories` / `port_concessions` keyed by `world_id` (`local` in SP); stripped from `economy_json`. Tick still in-memory. Player WH/concessions stay on `company_state`. Next: Postgres / members (not now).
 5. ~~**Ground staff (Ports/WH)**~~ — shipped **0.3.47**: inbound + hire + grades + all 5 perks; WH T1/T2/T3.
+   - **Hire desk false-full (uncommitted):** empty T1 0/1 showed “slot full”. Skip empty same-day pool; UI `slotsFree` from WH tier when meta missing; `GET /api/ports` nests `groundStaff`.
+   - **Hire Unknown candidate (uncommitted):** desk IDs used `Math.random` and GET `/api/ports` did not `saveMissions`; Hire looked up a new pool. IDs now hub+day+slot; persist company on portMarket; Hire rerolls only on miss.
 6. ~~**América do Sul completa (seed)**~~ — UY/PY/PE/BO/EC/CO/VE/GY/SR/GF + BR/AR/CL; ports costeiros; SimBrief allowlist regenerada.
 7. ~~**América Central completa (seed)**~~ — PA/CR/NI/HN/GT/SV/BZ; ports costeiros; lanes MX/US/CO.
 8. ~~**Caribe (seed, intl-first)**~~ — CU/DO/HT/JM/BS/TT/BB/LC/GD/AG; ring + KMIA/MMUN/CO/VE.

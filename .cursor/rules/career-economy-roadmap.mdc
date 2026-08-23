@@ -95,14 +95,15 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` feed listings from yard stock; operator buffs (~10% buy, ~15% inbound ETA, +1 listing slot); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
 - **Port restock cadence:** one inbound discharge per port per economy day (8% of cap, computed on arrival) on `tickEconomy` — not on GET `/api/ports`. Listings spawn from existing yard only. UI shows next discharge ETA.
-- **Port P2:** CAPEX + 80t lifetime throughput at that port; inventory soft cap ×1.35 (restock % unchanged); lease = base × (P2 1.2) × (1 + min(0.75, 7d throughput / 80t)). No extra buy discount. P3 / specials / regional share still backlog.
+- **Port P2:** CAPEX + 80t lifetime throughput at that port; inventory soft cap ×1.35 (restock % unchanged); lease = base × (P2 1.2) × (1 + min(0.75, 7d throughput / 80t)). No extra buy discount.
+- **Port P3:** CAPEX + 180t lifetime throughput; restock **11%/day** (P1/P2 stay 8%); +1 listing slot (operator board = 6); inbound ETA 0.78 vs 0.85; lease level ×1.4. Same ~10% buy discount. No extra cap beyond P2.
 - **Offline fee cap:** wall-clock catch-up caps passive company fees at **7** economy days (hangar, WH/yard/FBO storage, crew + ground staff salaries); soft lease catch-up (≤1 installment when capped, defer term repossess via `lease.termEndedSoft`); debug time-skip uncapped; `/api/state` one-shot `offlineFeeSummary` banner.
 
 ## Port endgame backlog (after map / playtest)
 
 Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always **1** in v1).
 
-- **P2 / P3 CAPEX tree:** P2 shipped (cap ×1.35, escalating lease). P3 still backlog — scale restock rate / listing slots / mild buffs (avoid stacking huge price discounts).
+- **P2 / P3 CAPEX tree:** P2 shipped (cap ×1.35, escalating lease). **P3 shipped** — restock 11%/day, +1 listing, ETA 0.78, lease ×1.4, 180t + $280k. No stacked buy discount.
 - **Escalating lease** with level or lifetime throughput (anti-snowball for operators who hold forever).
 - **Optional specials marketplace** (machinery/electronics only) as acceleration on top of passive restock — not a replacement.
 - Still deferred: NPC port authorities, multi-concession, fee-to-operator wallet, ocean shipping sim.

@@ -750,7 +750,8 @@ type CareerWriteOpts = {
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
  * `persist: 'company'` writes missions only (plus optional demand/listing/concession
  * upserts). `persist: 'blob'` writes economy stub + dealer pool table (not live cargo).
- * `persist: 'portMarket'` rewrites port listings+inventory only (GET /api/ports seed).
+ * `persist: 'portMarket'` rewrites port listings+inventory (GET /api/ports seed)
+ * and company_state (hire-desk pool may roll in that snapshot).
  * `persist: 'demandBoard'` rewrites demand_orders only. `persist: 'inbound'` patches inbound_pending.
  * `persist: 'npcLive'` writes NPC roster/flights + dirty lots/inbound/airports (not port ops).
  */
@@ -930,6 +931,8 @@ async function withCareerWrite<T>(
     }
     if (persistPortMarket) {
       await activeStore.persistPortMarketTables(world);
+      // Hire-desk pool lives on company_state; snapshot may roll it here.
+      await saveMissions(missions);
       return result;
     }
     if (persistDemandBoard) {
@@ -3500,10 +3503,15 @@ export function createCareerApiServer(port = 8787) {
           // ensurePortListings may expire/refill; persist those tables only so
           // buy can find the same listing IDs after reload.
           const result = await withCareerWrite(
-            (world, missions) => ({
-              ...portSnapshot(world, missions),
-              groundStaff: groundStaffSnapshot(missions, world),
-            }),
+            (world, missions) => {
+              const groundStaff = groundStaffSnapshot(missions, world);
+              const ports = portSnapshot(world, missions);
+              return {
+                ...ports,
+                groundStaff,
+                warehouses: { ...ports.warehouses, groundStaff },
+              };
+            },
             { persist: 'portMarket' },
           );
           send(res, 200, result);

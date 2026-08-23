@@ -19,16 +19,26 @@ import {
   PORT_P2_CAP_MULT,
   PORT_P2_THROUGHPUT_KG,
   PORT_P2_UPGRADE_USD,
+  PORT_P3_ETA_MULT,
+  PORT_P3_RESTOCK_FRAC_PER_DAY,
+  PORT_P3_THROUGHPUT_KG,
+  PORT_P3_UPGRADE_USD,
+  PORT_OPERATOR_ETA_MULT,
+  PORT_RESTOCK_FRAC_PER_DAY,
   claimPortConcession,
   concessionLeaseUsdPerDay,
   debitPortInventory,
   ensurePortInventories,
   ensurePortInventoryRestock,
   evaluatePortConcessionClaim,
+  evaluatePortConcessionUpgrade,
+  estimatePortInboundCargo,
   getPortInventoryStock,
   isPortOperator,
   portInventoryCapKg,
   portListingSlotCap,
+  portOperatorEtaMult,
+  portRestockFracPerDay,
   renewPortConcession,
   tickPortConcessions,
   upgradePortConcession,
@@ -266,5 +276,75 @@ describe('port concessions', () => {
     assert.equal(upgraded.level, 2);
     const p2Cap = portInventoryCapKg('general', { world, portId: 'BRSSZ' });
     assert.equal(p2Cap, Math.floor(p1Cap * PORT_P2_CAP_MULT));
+  });
+
+  it('P3 raises restock cadence and listing slots without extra buy discount', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 2_000_000;
+    const conc = claimPortConcession(state, world, { portId: 'BRSSZ' });
+    conc.lifetimeThroughputKg = PORT_P2_THROUGHPUT_KG;
+    upgradePortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(portListingSlotCap(world, 'BRSSZ'), 5);
+    assert.equal(
+      portRestockFracPerDay(world, 'BRSSZ'),
+      PORT_RESTOCK_FRAC_PER_DAY,
+    );
+    const p2Eta = portOperatorEtaMult(world, 'BRSSZ');
+    assert.equal(p2Eta, PORT_OPERATOR_ETA_MULT);
+
+    const row = (world.portInventories ?? []).find(
+      (r) => r.portId === 'BRSSZ' && r.commodityId === 'general',
+    );
+    if (row) row.stockKg = 0;
+    const p2Inbound = estimatePortInboundCargo(world, 'BRSSZ').find(
+      (c) => c.commodityId === 'general',
+    )!.kg;
+
+    const p2Gate = evaluatePortConcessionUpgrade(state, world, 'BRSSZ');
+    assert.equal(p2Gate.ok, false);
+    assert.equal(p2Gate.toLevel, 3);
+    conc.lifetimeThroughputKg = PORT_P3_THROUGHPUT_KG;
+    state.walletUsd = Math.max(state.walletUsd, PORT_P3_UPGRADE_USD + 1);
+    const p3 = upgradePortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(p3.level, 3);
+    assert.equal(portListingSlotCap(world, 'BRSSZ'), 6);
+    assert.equal(
+      portRestockFracPerDay(world, 'BRSSZ'),
+      PORT_P3_RESTOCK_FRAC_PER_DAY,
+    );
+    assert.equal(portOperatorEtaMult(world, 'BRSSZ'), PORT_P3_ETA_MULT);
+    const p3Cap = portInventoryCapKg('general', { world, portId: 'BRSSZ' });
+    assert.equal(
+      p3Cap,
+      Math.floor(
+        portInventoryCapKg('general') * PORT_P2_CAP_MULT,
+      ),
+    );
+    if (row) row.stockKg = 0;
+    const p3Inbound = estimatePortInboundCargo(world, 'BRSSZ').find(
+      (c) => c.commodityId === 'general',
+    )!.kg;
+    assert.ok(p3Inbound > p2Inbound);
+
+    const idleP3Lease = concessionLeaseUsdPerDay(conc, world.tick);
+    assert.ok(
+      idleP3Lease >=
+        PORT_CONCESSION_LEASE_USD_PER_DAY * 1.4 - 0.01,
+    );
+
+    ensurePortListings(world);
+    const listing = listPortListings(world, 'BRSSZ').find(
+      (l) =>
+        l.availableKg >= 400 &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies'),
+    );
+    assert.ok(listing);
+    const bought = buyPortListing(state, world, {
+      listingId: listing!.id,
+      kg: 400,
+    });
+    assert.ok(bought.unitPriceUsd <= listing!.unitPriceUsd * 0.91);
+    assert.ok(bought.unitPriceUsd >= listing!.unitPriceUsd * 0.85);
   });
 });

@@ -172,6 +172,63 @@ export function inferSimBriefAirframeMatchFromTitle(
       return `NextGen Simulations \\(MSFS\\) - ${row.suffix}$`;
     }
   }
+
+  const justFlightF100 = inferJustFlightF100SimBriefMatch(t);
+  if (justFlightF100) return justFlightF100;
+  const justFlightF28 = inferJustFlightF28SimBriefMatch(t);
+  if (justFlightF28) return justFlightF28;
+  if (/\bJust Flight F70\b/i.test(t)) {
+    return 'Just Flight \\(MSFS\\) - 70 Passengers';
+  }
+  return undefined;
+}
+
+/**
+ * True when the spawned MSFS title belongs to this Market SKU, so live-title
+ * SimBrief inference is safe (F100 door configs — not Caravan vs Commander).
+ */
+export function liveTitleMatchesMarketSku(
+  liveTitle: string,
+  airframeTypeId: string,
+): boolean {
+  const t = liveTitle.trim();
+  const id = airframeTypeId.trim();
+  if (!t || !id) return false;
+  if (id === 'justflight-f100') return /\bJust Flight F100\b/i.test(t);
+  if (id === 'justflight-f70') return /\bJust Flight F70\b/i.test(t);
+  if (id === 'justflight-fokker-f28') {
+    return /Just Flight Fokker F28-(?:1000|2000|3000|4000)/i.test(t);
+  }
+  return false;
+}
+
+/** SimBrief F28 has no Default type — only JF Mk.1000/2000/3000/4000 rows. */
+function inferJustFlightF28SimBriefMatch(title: string): string | undefined {
+  const mk = title.match(/Just Flight Fokker F28-(1000|2000|3000|4000)/i);
+  if (!mk) return undefined;
+  return `Just Flight \\(MSFS\\) - Fokker F28 Mk.${mk[1]}`;
+}
+
+/** MSFS uses Airstairs / Cargo Door; SimBrief comments use Stairs / Cargo. */
+function inferJustFlightF100SimBriefMatch(title: string): string | undefined {
+  if (!/\bJust Flight F100\b/i.test(title)) return undefined;
+  const stairs = /integral\s+airstairs|integral\s+stairs/i.test(title);
+  const sliding = /sliding\s+door/i.test(title);
+  const small = /small\s+cargo/i.test(title);
+  const large = /large\s+cargo/i.test(title);
+  const l2 = /\bL2\s+door\b/i.test(title);
+  if (l2 && stairs && small) {
+    return 'Just Flight \\(MSFS\\) - 98 Pax, L2 Door, Integral Stairs, Small Cargo';
+  }
+  if (sliding && large) {
+    return 'Just Flight \\(MSFS\\) - 100 Pax, Sliding Door, Large Cargo';
+  }
+  if (stairs && large) {
+    return 'Just Flight \\(MSFS\\) - 100 Pax, Integral Stairs, Large Cargo';
+  }
+  if (stairs && small) {
+    return 'Just Flight \\(MSFS\\) - 100 Pax, Integral Stairs, Small Cargo';
+  }
   return undefined;
 }
 

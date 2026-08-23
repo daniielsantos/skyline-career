@@ -178,6 +178,49 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       'NextGen Simulations \\(MSFS\\) - EMB-110P$',
     );
   });
+
+  it('maps Just Flight F100 MSFS door/cargo titles onto SimBrief comments', () => {
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'Just Flight F100 | Integral Airstairs | Small Cargo Door | L2 Door | Just Flight',
+      ),
+      'Just Flight \\(MSFS\\) - 98 Pax, L2 Door, Integral Stairs, Small Cargo',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'Just Flight F100 | Integral Airstairs | Large Cargo Door | Just Flight',
+      ),
+      'Just Flight \\(MSFS\\) - 100 Pax, Integral Stairs, Large Cargo',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'Just Flight F100 | Sliding Door | Large Cargo Door | Just Flight',
+      ),
+      'Just Flight \\(MSFS\\) - 100 Pax, Sliding Door, Large Cargo',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'Just Flight F100 | Integral Airstairs | Small Cargo Door | Just Flight',
+      ),
+      'Just Flight \\(MSFS\\) - 100 Pax, Integral Stairs, Small Cargo',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Just Flight F100 | Just Flight'),
+      undefined,
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Just Flight F70 | Just Flight'),
+      'Just Flight \\(MSFS\\) - 70 Passengers',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Just Flight Fokker F28-4000 Air21'),
+      'Just Flight \\(MSFS\\) - Fokker F28 Mk.4000',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Just Flight Fokker F28-1000 Air France'),
+      'Just Flight \\(MSFS\\) - Fokker F28 Mk.1000',
+    );
+  });
 });
 
 describe('preferSimBriefAirframeMatch', () => {

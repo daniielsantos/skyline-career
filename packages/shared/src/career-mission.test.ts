@@ -34,11 +34,13 @@ import {
   normalizeOfpExpectation,
   ofpCargoKg,
   ofpFreightTowardMissionKg,
+  clampPaxAndCargoDueToHoldsLb,
   planPaxAndCargoSimBriefLoad,
   SIMBRIEF_STANDARD_BAG_PER_PAX_LB,
   SIMBRIEF_STANDARD_PAX_LB,
   SIMBRIEF_STANDARD_PAX_WITH_BAG_LB,
   replaceMissionManifest,
+  manifestEditAvailableKg,
   routeDistanceNm,
   settleMission,
   executeSettleFlight,
@@ -1076,6 +1078,43 @@ describe('planPaxAndCargoSimBriefLoad', () => {
   });
 });
 
+describe('clampPaxAndCargoDueToHoldsLb', () => {
+  it('drops SimBrief bag/cargo that will not fit JF F100 holds', () => {
+    const ofpPayloadLb = 100 * 175 + 8_940;
+    assert.equal(ofpPayloadLb, 26_440);
+    const due = clampPaxAndCargoDueToHoldsLb(ofpPayloadLb, {
+      typeId: 'justflight-f100',
+      aircraftClassId: 'narrow_freighter',
+      label: 'F100',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'F100',
+      simbriefAirframeMatch: 'Default',
+      loadLayout: 'pax_and_cargo',
+      maxPaxSeats: 100,
+      simconnectCargoHoldMaxLb: 7_784,
+    });
+    assert.equal(due, 100 * 175 + 7_784);
+  });
+
+  it('leaves F70 Due unchanged when freight fits the holds', () => {
+    const ofpPayloadLb = 70 * 175 + 5_000;
+    assert.equal(
+      clampPaxAndCargoDueToHoldsLb(ofpPayloadLb, {
+        typeId: 'justflight-f70',
+        aircraftClassId: 'narrow_freighter',
+        label: 'F70',
+        rolesPackRelPath: 'x',
+        simbriefIcao: 'F70',
+        simbriefAirframeMatch: 'Default',
+        loadLayout: 'pax_and_cargo',
+        maxPaxSeats: 70,
+        simconnectCargoHoldMaxLb: 5_000,
+      }),
+      ofpPayloadLb,
+    );
+  });
+});
+
 describe('compareMissionIntentToOfp', () => {
   it('passes when OFP matches intent', () => {
     const check = compareMissionIntentToOfp(baseMission(), matchingOfp());
@@ -1224,6 +1263,28 @@ describe('compareMissionIntentToOfp', () => {
       },
     });
     assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 14_500);
+  });
+
+  it('does not accept SimBrief Freight leftover as the whole pax_and_cargo load', () => {
+    const ofp = matchingOfp({
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 12_000,
+        passengerCount: 70,
+        baggage: 5_000,
+        payload: 17_249,
+      },
+    });
+    assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 17_249);
+    assert.equal(
+      Math.round(
+        ofpFreightTowardMissionKg(ofp, {
+          loadLayout: 'pax_and_cargo',
+          maxPaxSeats: 70,
+        })! * KG_TO_LB,
+      ),
+      17_249,
+    );
   });
 
   it('does not treat airframe mismatch as cargo-under-only', () => {
@@ -1994,6 +2055,7 @@ describe('replaceMissionManifest', () => {
     assert.equal(replaced.fuelAuthorizedOfpId, undefined);
     assert.equal(replaced.dispatchedAtTick, undefined);
     assert.equal(lot.reservedKg, 600);
+    assert.equal(lot.quantityKg, 1_500);
     assert.equal(lot.status, 'available');
   });
 
@@ -2022,5 +2084,32 @@ describe('replaceMissionManifest', () => {
       /available|capacity/i,
     );
     assert.equal(lot.reservedKg, 500);
+  });
+});
+
+describe('manifestEditAvailableKg', () => {
+  it('keeps the original lot size after a smaller re-dispatch', () => {
+    assert.equal(
+      manifestEditAvailableKg({
+        bookedKg: 3_742,
+        marketAvailableKg: 0,
+      }),
+      3_742,
+    );
+    assert.equal(
+      manifestEditAvailableKg({
+        bookedKg: 3_742,
+        lotQuantityKg: 10_251,
+        marketAvailableKg: 0,
+      }),
+      10_251,
+    );
+    assert.equal(
+      manifestEditAvailableKg({
+        bookedKg: 3_742,
+        marketAvailableKg: 6_509,
+      }),
+      10_251,
+    );
   });
 });

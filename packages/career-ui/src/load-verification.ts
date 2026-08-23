@@ -57,8 +57,8 @@ export function payloadMatchToleranceLb(
   if (plannedLb === undefined || !Number.isFinite(plannedLb)) {
     return Math.max(0, absLb);
   }
-  const large = Math.abs(plannedLb) >= 20_000;
-  const useAbs = large ? Math.max(absLb, 200) : absLb;
+  const large = Math.abs(plannedLb) >= 4_000;
+  const useAbs = large ? Math.max(absLb, 800) : absLb;
   const usePct = large ? Math.max(pct, 0.005) : pct;
   return Math.max(Math.max(0, useAbs), Math.abs(plannedLb) * Math.max(0, usePct));
 }

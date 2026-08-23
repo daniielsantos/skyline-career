@@ -51,6 +51,7 @@ import {
   listCareerPlayerAirframes,
   resolveAirframeFuelBurnKgPerNm,
   resolveAirframeMaxRangeNm,
+  type CareerPlayerAirframe,
 } from './career-player-airframes.js';
 import type {
   CareerMissionsState,
@@ -381,15 +382,15 @@ export function fuelMatchToleranceLb(
 }
 
 /**
- * EFB station rounding on large freighter sheets is often a few tenths of a
- * percent off the OFP figure — worse when Cargo Level is a % of capacity, not
- * exact kg. GA / light twins stay on a 75 lb floor.
+ * EFB station rounding on jet sheets is often a few hundred lb off the OFP
+ * (Just Flight paxwgt vs SimBrief 175+55). GA / light twins stay on a 75 lb
+ * floor below {@link LARGE_PAYLOAD_TOL_PLANNED_LB}.
  */
 export const DEFAULT_PAYLOAD_TOL_FRACTION = 0.002;
 /** Above this Due, allow a wider band (Cargo Level % / EFB sheet rounding). */
-export const LARGE_PAYLOAD_TOL_PLANNED_LB = 20_000;
+export const LARGE_PAYLOAD_TOL_PLANNED_LB = 4_000;
 export const LARGE_PAYLOAD_TOL_FRACTION = 0.005;
-export const LARGE_PAYLOAD_TOL_ABS_LB = 200;
+export const LARGE_PAYLOAD_TOL_ABS_LB = 800;
 
 export function payloadMatchToleranceLb(
   plannedLb: number | undefined,
@@ -1193,6 +1194,24 @@ export function reserveShipmentLot(
 
   const payUsd = Math.max(1, Math.round((qty / lot.quantityKg) * lot.payUsd));
   return { lot, reservedKg: qty, payUsd };
+}
+
+/**
+ * How much of a market lot the player can still put on an in-edit manifest.
+ * Reserved lots drop off the airport board, so `availableKg` alone collapses
+ * to the last booked slice — restore quantity + currently held kg.
+ */
+export function manifestEditAvailableKg(opts: {
+  bookedKg: number;
+  lotQuantityKg?: number;
+  marketAvailableKg?: number;
+  demandMaxKg?: number;
+}): number {
+  const booked = Math.max(0, Math.floor(opts.bookedKg));
+  const quantity = Math.max(0, Math.floor(opts.lotQuantityKg ?? 0));
+  const fromBoard = Math.max(0, Math.floor(opts.marketAvailableKg ?? 0)) + booked;
+  const demand = Math.max(0, Math.floor(opts.demandMaxKg ?? 0));
+  return Math.max(booked, quantity, fromBoard, demand);
 }
 
 /** Release a prior reservation (cancel before settle — including mid-flight). */
@@ -2679,28 +2698,21 @@ export function applyOfpBallastLb(
   };
 }
 
-/** Prefer SimBrief cargo/baggage; if freighter (pax≈0) fall back to payload. */
+/** Prefer SimBrief payload (cabin+freight) over the Freight/baggage line. */
 export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
   const sheet = ofp.loadSheet;
   if (!sheet) return undefined;
   const unit = sheet.unit ?? ofp.fuel.unit ?? 'kg';
   const baggage = sheet.baggage;
   const payload = sheet.payload ?? ofp.payload?.total;
-  const pax = sheet.passengerCount ?? 0;
 
   let value: number | undefined;
-  if (pax <= 1) {
-    // EFB needs pax=1 (pilot). Passenger airframes (ATR HighLine, BN2) keep
-    // career freight in Payload; Freight/baggage is a tiny maxcargo cap.
-    if (baggage !== undefined && payload !== undefined) {
-      value = Math.max(baggage, payload);
-    } else {
-      value = baggage ?? payload;
-    }
-  } else if (baggage !== undefined) {
-    value = baggage;
+  if (baggage !== undefined && payload !== undefined) {
+    // pax_and_cargo OFPs: Freight= is leftover after seats; career cargo is Payload.
+    // EFB pax=1: Freight may be a tiny maxcargo cap while Payload holds the load.
+    value = Math.max(baggage, payload);
   } else {
-    return undefined;
+    value = baggage ?? payload;
   }
 
   if (value === undefined) return undefined;
@@ -2719,6 +2731,40 @@ export const SIMBRIEF_STANDARD_BAG_PER_PAX_LB = 55;
 /** Payload reserved per seat in SimBrief: body + bag (175+55). */
 export const SIMBRIEF_STANDARD_PAX_WITH_BAG_LB =
   SIMBRIEF_STANDARD_PAX_LB + SIMBRIEF_STANDARD_BAG_PER_PAX_LB;
+
+/**
+ * JF EFB fills cargo holds up to {@link CareerPlayerAirframe.simconnectCargoHoldMaxLb}.
+ * SimBrief bag/cargo can exceed that; Loaded vs Due drops the overflow from Due.
+ */
+export function clampPaxAndCargoDueToHoldsLb(
+  plannedPayloadLb: number,
+  airframe: CareerPlayerAirframe | undefined,
+): number {
+  if (
+    !Number.isFinite(plannedPayloadLb) ||
+    !airframe ||
+    airframe.loadLayout !== 'pax_and_cargo'
+  ) {
+    return plannedPayloadLb;
+  }
+  const holdMax = airframe.simconnectCargoHoldMaxLb;
+  const pax = airframe.maxPaxSeats;
+  if (
+    typeof holdMax !== 'number' ||
+    typeof pax !== 'number' ||
+    !Number.isFinite(holdMax) ||
+    !Number.isFinite(pax) ||
+    holdMax <= 0 ||
+    pax <= 0
+  ) {
+    return plannedPayloadLb;
+  }
+  const bodyLb = pax * SIMBRIEF_STANDARD_PAX_LB;
+  if (plannedPayloadLb <= bodyLb + 1) return plannedPayloadLb;
+  const ofpCargoLb = plannedPayloadLb - bodyLb;
+  if (ofpCargoLb <= holdMax) return plannedPayloadLb;
+  return plannedPayloadLb - (ofpCargoLb - holdMax);
+}
 
 /**
  * Split career freight into SimBrief `pax` + `cargo` for `pax_and_cargo` airframes.

@@ -459,6 +459,28 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(parked.event.type, 'settle');
   });
 
+  it('inferEnginesRunning treats Just Flight residual N1 as off', () => {
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        n1Pct: [22, 21],
+        rpm: [0, 0],
+        combustion: [true, true],
+      }),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        n1Pct: [28, 27],
+        rpm: [0, 0],
+        combustion: [true, true],
+        fuelFlowKgPerHour: 420,
+      }),
+      true,
+    );
+  });
+
   it('inferEnginesRunning treats spooled-down N1 as off', () => {
     assert.equal(
       inferEnginesRunning({ snapshotRunning: true, n1Pct: [4] }),

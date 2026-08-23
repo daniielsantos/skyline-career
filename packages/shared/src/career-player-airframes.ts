@@ -51,9 +51,21 @@ export interface CareerPlayerAirframe {
    * is unreachable. Live Dispatch prefers `airframe_passengers` from SimBrief.
    */
   maxPaxSeats?: number;
+  /**
+   * Physical PAYLOAD STATION occupant slots in the cabin (MSFS 170 lb each).
+   * JF F70 EFB imports 70 pax but SimConnect still fills 80 row stations.
+   * Loaded vs Due subtracts (simconnectCabinSeats − maxPaxSeats) × 170.
+   */
+  simconnectCabinSeats?: number;
+  /**
+   * Combined FWD+AFT hold cap the JF EFB can actually place (lb). SimBrief
+   * bag/cargo often exceeds this; Loaded vs Due clamps OFP cargo to this.
+   */
+  simconnectCargoHoldMaxLb?: number;
   /** Optional real-airframe weights — prefer over SimBrief proxy for light GA caps. */
   oewKg?: number;
   mtowKg?: number;
+  mzfwKg?: number;
   maxCargoKg?: number;
   fuelCapacityKg?: number;
   /**
@@ -74,6 +86,31 @@ export interface CareerPlayerAirframe {
    * Falls back to class fuelBurnKgPerNm when omitted.
    */
   fuelBurnKgPerNm?: number;
+}
+
+/** MSFS PAYLOAD STATION WEIGHT occupant quantum. */
+export const MSFS_STATION_OCCUPANT_LB = 170;
+
+/**
+ * Extra cabin mass SimConnect reports vs SimBrief/EFB pax count (row stations).
+ * JF F70: 80 slots × 170 while OFP/EFB is 70 pax.
+ */
+export function simconnectCabinOvershootLb(
+  airframe: CareerPlayerAirframe | undefined,
+): number {
+  if (!airframe || airframe.loadLayout !== 'pax_and_cargo') return 0;
+  const slots = airframe.simconnectCabinSeats;
+  const pax = airframe.maxPaxSeats;
+  if (
+    typeof slots !== 'number' ||
+    typeof pax !== 'number' ||
+    !Number.isFinite(slots) ||
+    !Number.isFinite(pax) ||
+    slots <= pax
+  ) {
+    return 0;
+  }
+  return Math.round(slots - pax) * MSFS_STATION_OCCUPANT_LB;
 }
 
 /**

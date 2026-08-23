@@ -74,6 +74,19 @@ describe('resolveClassMaxCargoKg', () => {
     assert.equal(limit.source, 'class-fallback');
     assert.equal(limit.maxCargoKg, 450);
   });
+
+  it('keeps F70 catalog payload below F100 (not SimBrief Default mzfw-oew)', async () => {
+    const f70 = await resolveClassMaxCargoKg('narrow_freighter', 'justflight-f70');
+    const f100 = await resolveClassMaxCargoKg(
+      'narrow_freighter',
+      'justflight-f100',
+    );
+    assert.equal(f70.source, 'airframe-catalog');
+    assert.equal(f100.source, 'airframe-catalog');
+    assert.equal(f70.maxCargoKg, 9190);
+    assert.equal(f100.maxCargoKg, 11993);
+    assert.ok(f70.maxCargoKg < f100.maxCargoKg);
+  });
 });
 
 describe('flyableDispatchCargoKg', () => {
@@ -310,5 +323,113 @@ describe('buildMissionDispatch pax_and_cargo', () => {
     const acdata = new URL(built.url).searchParams.get('acdata');
     assert.ok(acdata);
     assert.deepEqual(JSON.parse(acdata!), { paxwgt: 175, bagwgt: 55 });
+  });
+
+  it('prefills Just Flight F100 seats instead of pax=1 freight', async () => {
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_f100',
+        status: 'dispatched',
+        originIcao: 'SBKP',
+        destIcao: 'SBGR',
+        commodityId: 'electronics',
+        cargoKg: 10_000,
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'justflight-f100',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      {
+        units: 'LBS',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              F100: {
+                airframes: [
+                  {
+                    airframe_internal_id: 'F100JF',
+                    airframe_list_type: 'F100',
+                    airframe_icao: 'F100',
+                    airframe_comments:
+                      'Just Flight (MSFS) - 100 Pax, Sliding Door, Large Cargo',
+                    airframe_name: 'F100',
+                    airframe_passengers: 100,
+                    airframe_options: {
+                      wgtunits: 'LBS',
+                      oew: 54000,
+                      mzfw: 81000,
+                      mtow: 98000,
+                      maxfuel: 24000,
+                      maxcargo: 18000,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    assert.equal(built.maxPaxSeats, 100);
+    assert.match(built.url, /[?&]pax=95(?:&|$)/);
+    assert.doesNotMatch(built.url, /[?&]pax=1(?:&|$)/);
+  });
+});
+
+describe('buildMissionDispatch F28', () => {
+  it('uses Just Flight Mk.4000 internal id, not type=F28', async () => {
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_f28',
+        status: 'dispatched',
+        originIcao: 'KMIA',
+        destIcao: 'MMUN',
+        commodityId: 'electronics',
+        cargoKg: 4_000,
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'justflight-fokker-f28',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      {
+        units: 'LBS',
+        liveTitle: 'Just Flight Fokker F28-4000 Air21',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              F28: {
+                airframes: [
+                  {
+                    airframe_internal_id: '624280_mk1000',
+                    airframe_list_type: 'F28',
+                    airframe_icao: 'F28',
+                    airframe_comments: 'Just Flight (MSFS) - Fokker F28 Mk.1000',
+                    airframe_name: 'F28',
+                    airframe_passengers: 65,
+                  },
+                  {
+                    airframe_internal_id: '624280_mk4000',
+                    airframe_list_type: 'F28',
+                    airframe_icao: 'F28',
+                    airframe_comments: 'Just Flight (MSFS) - Fokker F28 Mk.4000',
+                    airframe_name: 'F28',
+                    airframe_passengers: 85,
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    assert.equal(built.type, '624280_mk4000');
+    assert.match(built.url, /[?&]type=624280_mk4000(?:&|$)/);
+    assert.doesNotMatch(built.url, /[?&]type=F28(?:&|$)/);
   });
 });

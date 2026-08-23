@@ -416,8 +416,17 @@ function withMissionClientView(
   const demandEditMaxKg = normalized.demandOrderId
     ? demandMissionEditableMaxKg(missions, world, normalized)
     : undefined;
+  const lots = normalized.lots.map((line) => {
+    const lot = world.lots.find((row) => row.id === line.shipmentLotId);
+    const lotQuantityKg =
+      typeof lot?.quantityKg === 'number' && lot.quantityKg > 0
+        ? Math.floor(lot.quantityKg)
+        : undefined;
+    return lotQuantityKg !== undefined ? { ...line, lotQuantityKg } : line;
+  });
   return {
     ...base,
+    lots,
     ...(airframeLabel ? { airframeLabel } : {}),
     ...(distanceNm !== undefined ? { distanceNm } : {}),
     ...(demandEditMaxKg !== undefined ? { demandEditMaxKg } : {}),

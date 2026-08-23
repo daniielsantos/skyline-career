@@ -1,22 +1,21 @@
 {
   "source": "simbrief",
   "icao": "F100",
-  "ofpId": "justflight-fokker-f70-f100",
+  "ofpId": "justflight-fokker-f100",
   "loadMethod": "native-simbrief",
   "injectCapable": false,
   "matchTitles": [
-    "Just Flight F70",
     "Just Flight F100"
   ],
-  "matchTitlePattern": "Just Flight F(?:70|100)\\b",
+  "matchTitlePattern": "Just Flight F100\\b",
   "notes": [
-    "Just Flight F70 / F100 — same 13-station + L/R/CENTER tank layout",
-    "Two Market SKUs (justflight-f70, justflight-f100) share this OFP pack",
-    "Homologated profiles: justflight/just-flight-f70, justflight/just-flight-f100 @1.0.0",
+    "Just Flight F100 — same 13-station + L/R/CENTER tanks as F70 (separate pack)",
+    "One Market SKU: justflight-f100 (narrow_freighter, loadLayout pax_and_cargo, 100 seats)",
+    "Homologated profile: justflight/just-flight-f100 @1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via addon EFB/tablet",
     "Live titles may include door/airstair options after | — covered by matchTitlePattern",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "SimBrief: F70 or F100 Default per Market SKU"
+    "SimBrief: cabin seats first (175+55 lb), remainder as cargo=; load via Just Flight EFB (not MSFS SimBrief Import Weights — that wrecks CG)",
+    "JF EFB FWD+AFT holds max ~5172+2612 lb — Loaded vs Due clamps SimBrief bag/cargo to simconnectCargoHoldMaxLb 7784"
   ],
   "fuel": {
     "unit": "lb"
@@ -57,8 +56,8 @@
   "tolerances": {
     "fuelAbsLb": 200,
     "fuelPct": 0.03,
-    "payloadAbsLb": 200,
-    "weightAbsLb": 400,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 700,
     "passengerCountAbs": 2,
     "maxFuelIncreaseLb": 0
   }

@@ -782,7 +782,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     id: 'justflight-fokker-f70',
     icao: 'F70',
     titlePattern: /Just Flight F70\b/i,
-    familyPackRel: 'justflight-fokker-f70-f100.json',
+    familyPackRel: 'justflight-fokker-f70.json',
     marketTypeId: 'justflight-f70',
     marketLabel: 'Just Flight F70',
     stationRoles: {
@@ -797,8 +797,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     },
     loadMethod: 'native-simbrief',
     injectCapable: false,
-    simbriefIcao: 'F70',
-    simbriefAirframeMatch: 'Default',
+    simbriefAirframeMatch: 'Just Flight \\(MSFS\\) - 70 Passengers',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
@@ -815,8 +814,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       { simVarIndex: 13, cfgIndex: 12, name: 'Station 13', role: 'baggage' },
     ],
     notes: [
-      'Just Flight F70 — shares OFP pack with F100 (same stations/tanks)',
-      'Market SKU justflight-f70 (narrow_freighter); SimBrief F70',
+      'Just Flight F70 — own OFP pack (same 13-station layout as F100)',
+      'Market SKU justflight-f70 (narrow_freighter, pax_and_cargo, 70 seats); SimBrief F70',
       'loadMethod: native-simbrief; injectCapable: false',
     ],
   },
@@ -824,7 +823,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     id: 'justflight-fokker-f100',
     icao: 'F100',
     titlePattern: /Just Flight F100\b/i,
-    familyPackRel: 'justflight-fokker-f70-f100.json',
+    familyPackRel: 'justflight-fokker-f100.json',
     marketTypeId: 'justflight-f100',
     marketLabel: 'Just Flight F100',
     stationRoles: {
@@ -857,8 +856,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       { simVarIndex: 13, cfgIndex: 12, name: 'Station 13', role: 'baggage' },
     ],
     notes: [
-      'Just Flight F100 — shares OFP pack with F70 (same stations/tanks)',
-      'Market SKU justflight-f100 (narrow_freighter); SimBrief F100',
+      'Just Flight F100 — own OFP pack (same 13-station layout as F70)',
+      'Market SKU justflight-f100 (narrow_freighter, pax_and_cargo, 100 seats); SimBrief F100',
       'loadMethod: native-simbrief; injectCapable: false',
     ],
   },
@@ -901,9 +900,9 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'Just Flight Fokker F28 family (1000–4000) — same 13-station layout',
-      'One Market SKU justflight-fokker-f28 (narrow_freighter)',
+      'One Market SKU justflight-fokker-f28 (narrow_freighter, pax_and_cargo; seats from live Mk)',
       'loadMethod: native-simbrief; injectCapable: false',
-      'SimBrief: Default F28',
+      'SimBrief: Just Flight F28 Mk.1000–4000 (no Default type=F28)',
     ],
   },
   {

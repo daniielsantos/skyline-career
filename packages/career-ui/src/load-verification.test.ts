@@ -118,9 +118,14 @@ describe('payloadMatchToleranceLb', () => {
   it('covers EFB station rounding on large freighter sheets', () => {
     // Sim 64567 vs Due 64659 = 92 lb; Cargo Level % can miss by ~160–200 lb.
     const tol = payloadMatchToleranceLb(64_659);
-    assert.ok(tol >= 200);
+    assert.ok(tol >= 800);
     assert.equal(Math.abs(64_567 - 64_659) <= tol, true);
     assert.equal(Math.abs(39_811 - 39_971) <= payloadMatchToleranceLb(39_971), true);
+    // Just Flight F100 EFB: Sim 22535 vs Due 22000 (~535 lb / paxwgt vs 175+55).
+    assert.equal(Math.abs(22_535 - 22_000) <= payloadMatchToleranceLb(22_000), true);
+    assert.equal(Math.abs(17_646 - 17_079) <= payloadMatchToleranceLb(17_079), true);
+    // Smaller OFP: Sim 9452 vs Due 8830 (~622 lb, crew stations + paxwgt).
+    assert.equal(Math.abs(9_452 - 8_830) <= payloadMatchToleranceLb(8_830), true);
     assert.equal(payloadMatchToleranceLb(1_000), 75);
   });
 });

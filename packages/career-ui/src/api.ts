@@ -438,6 +438,8 @@ export type MissionLotLine = {
   urgency: string;
   reason: string;
   deadlineTick: number;
+  /** Full market lot kg (survives reserved lots dropping off the board). */
+  lotQuantityKg?: number;
 };
 
 export type Mission = {

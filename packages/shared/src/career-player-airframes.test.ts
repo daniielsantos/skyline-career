@@ -12,6 +12,7 @@ import {
   resolveAirframeCruiseFuelFlowKgPerHour,
   resolveAirframeCruiseSpeedKt,
   resolveAirframeMaxRangeNm,
+  simconnectCabinOvershootLb,
 } from './career-player-airframes.js';
 
 describe('career player airframes', () => {
@@ -71,6 +72,34 @@ describe('career player airframes', () => {
       findCareerPlayerAirframe('blacksquare-turbine-duke')?.aircraftClassId,
       'light_turboprop',
     );
+  });
+
+  it('gives Just Flight F70 and F100 separate OFP packs', () => {
+    const f70 = findCareerPlayerAirframe('justflight-f70');
+    const f100 = findCareerPlayerAirframe('justflight-f100');
+    assert.equal(f70?.rolesPackRelPath, 'profiles/ofp/justflight-fokker-f70.json');
+    assert.equal(
+      f100?.rolesPackRelPath,
+      'profiles/ofp/justflight-fokker-f100.json',
+    );
+    assert.notEqual(f70?.rolesPackRelPath, f100?.rolesPackRelPath);
+    assert.equal(f70?.loadLayout, 'pax_and_cargo');
+    assert.equal(f70?.maxPaxSeats, 70);
+    assert.equal(f70?.simconnectCabinSeats, 80);
+    assert.equal(simconnectCabinOvershootLb(f70), 10 * 170);
+    assert.equal(simconnectCabinOvershootLb(f100), 0);
+    assert.equal(f100?.simconnectCargoHoldMaxLb, 7784);
+    assert.equal(f100?.loadLayout, 'pax_and_cargo');
+    assert.equal(f100?.maxPaxSeats, 100);
+    assert.ok((f70?.maxCargoKg ?? 0) < (f100?.maxCargoKg ?? 0));
+    assert.equal(f70?.simbriefAirframeMatch, 'Just Flight \\(MSFS\\) - 70 Passengers');
+  });
+
+  it('stages Just Flight F28 family as pax_and_cargo', () => {
+    const f28 = findCareerPlayerAirframe('justflight-fokker-f28');
+    assert.equal(f28?.loadLayout, 'pax_and_cargo');
+    assert.equal(f28?.maxPaxSeats, 85);
+    assert.equal(f28?.rolesPackRelPath, 'profiles/ofp/justflight-fokker-f28.json');
   });
 
   it('treats omitted enabled as market-eligible', () => {

@@ -319,4 +319,19 @@ describe('resolveDispatchSimBriefParams', () => {
     assert.equal(params.simbriefIcao, 'AEST');
     assert.match(params.titleHint, /Aerostar/i);
   });
+
+  it('picks the Just Flight F100 SimBrief door variant from the live title', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'narrow_freighter',
+      airframeTypeId: 'justflight-f100',
+      rolesPackRelPath: 'profiles/ofp/justflight-fokker-f100.json',
+      liveTitle:
+        'Just Flight F100 | Integral Airstairs | Small Cargo Door | L2 Door | Just Flight',
+    });
+    assert.equal(params.simbriefIcao, 'F100');
+    assert.equal(
+      params.simbriefAirframeMatch,
+      'Just Flight \\(MSFS\\) - 98 Pax, L2 Door, Integral Stairs, Small Cargo',
+    );
+  });
 });

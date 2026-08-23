@@ -1,24 +1,21 @@
 {
   "source": "simbrief",
-  "icao": "F28",
-  "ofpId": "justflight-fokker-f28",
+  "icao": "F70",
+  "ofpId": "justflight-fokker-f70",
   "loadMethod": "native-simbrief",
   "injectCapable": false,
   "matchTitles": [
-    "Just Flight Fokker F28-1000",
-    "Just Flight Fokker F28-2000",
-    "Just Flight Fokker F28-3000",
-    "Just Flight Fokker F28-4000"
+    "Just Flight F70"
   ],
-  "matchTitlePattern": "Just Flight Fokker F28-(?:1000|2000|3000|4000)",
+  "matchTitlePattern": "Just Flight F70\\b",
   "notes": [
-    "Just Flight Fokker F28 family (1000 / 2000 / 3000 / 4000) — same 13-station + tank layout",
-    "One Skyline Market SKU: justflight-fokker-f28 (narrow_freighter)",
-    "Homologated profiles: justflight/just-flight-fokker-f28-{1000,2000,3000,4000}@1.0.0",
+    "Just Flight F70 — same 13-station + L/R/CENTER tanks as F100 (separate pack)",
+    "One Market SKU: justflight-f70 (narrow_freighter, loadLayout pax_and_cargo, 70 seats)",
+    "Homologated profile: justflight/just-flight-f70 @1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via addon EFB/tablet",
-    "Livery suffixes (Air21, Ansett, …) covered by matchTitlePattern",
-    "loadLayout pax_and_cargo: cabin 175+55 then leftover cargo=; SimBrief pax from Mk (65/79/65/85)",
-    "SimBrief: no Default F28 type — Dispatch uses Just Flight Mk.1000/2000/3000/4000 internal ids"
+    "Live titles may include door/airstair options after | — covered by matchTitlePattern",
+    "SimBrief: cabin seats first (175+55 lb), remainder as cargo=; load via Just Flight EFB (not MSFS SimBrief Import Weights — that wrecks CG)",
+    "SimConnect cabin is 80 row stations at 170 lb; EFB/SimBrief count 70 pax — Loaded vs Due subtracts 10×170"
   ],
   "fuel": {
     "unit": "lb"
@@ -39,8 +36,8 @@
     "weights": ["classic-weights"],
     "payload": ["classic-stations"]
   },
-  "simbriefIcao": "F28",
-  "simbriefAirframeMatch": "Default",
+  "simbriefIcao": "F70",
+  "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - 70 Passengers",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
@@ -59,8 +56,8 @@
   "tolerances": {
     "fuelAbsLb": 200,
     "fuelPct": 0.03,
-    "payloadAbsLb": 200,
-    "weightAbsLb": 400,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 700,
     "passengerCountAbs": 2,
     "maxFuelIncreaseLb": 0
   }

@@ -56,6 +56,9 @@ import {
   fuelBurnMultFromAircraft,
   findCareerPlayerAirframe,
   isPaxAndCargoLoadLayout,
+  payloadMatchToleranceLb,
+  clampPaxAndCargoDueToHoldsLb,
+  simconnectCabinOvershootLb,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CargoOpsDelta,
@@ -2016,9 +2019,8 @@ export class CareerWatchSession {
             /pmdg-738|pmdg-737|pmdg\/737/i.test(
               current.rolesPackRelPath ?? '',
             ) || /pmdg-738|pmdg-737/i.test(current.airframeTypeId ?? '');
-          const pmdgPaxAndCargo = isPaxAndCargoLoadLayout(
-            findCareerPlayerAirframe(current.airframeTypeId),
-          );
+          const airframe = findCareerPlayerAirframe(current.airframeTypeId);
+          const pmdgPaxAndCargo = isPaxAndCargoLoadLayout(airframe);
           const keepFromMax = prevWatchPayload.stationMax
             ? Object.keys(prevWatchPayload.stationMax).map(Number)
             : undefined;
@@ -2100,9 +2102,11 @@ export class CareerWatchSession {
                   liveStations: stationsForCrew,
                 })
               : undefined;
-          const plannedPayloadLb =
+          const plannedPayloadLb = clampPaxAndCargoDueToHoldsLb(
             adjustedPayload?.plannedTotalLb ??
-            prevVerification.payload.plannedLb;
+              prevVerification.payload.plannedLb,
+            airframe,
+          );
           const liveCrewLb =
             adjustedPayload?.crewOnStations && stationsForCrew
               ? Object.entries(stationsForCrew).reduce((sum, [key, lb]) => {
@@ -2132,15 +2136,34 @@ export class CareerWatchSession {
                   return sum + (Number.isFinite(lb) ? lb : 0);
                 }, 0)
               : undefined;
-          const livePayloadLb =
+          // Just Flight Fokker / B707 pax_and_cargo: Due is SimBrief payload;
+          // S1/S2 are cockpit crew (170 lb) not in the OFP payload line.
+          const paxAndCargoCabinLb =
+            pmdgPaxAndCargo &&
+            !preferPmdgFreighterRoles &&
+            load.stations
+              ? Object.entries(load.stations).reduce((sum, [key, lb]) => {
+                  const idx = Number(key);
+                  if (!Number.isFinite(idx) || idx <= 2) return sum;
+                  return sum + (Number.isFinite(lb) ? lb : 0);
+                }, 0)
+              : undefined;
+          const cabinOvershootLb = simconnectCabinOvershootLb(airframe);
+          const rawLivePayloadLb =
             load.payloadSource === 'tfdi-efb' &&
             typeof load.tfdiEfbCargoLb === 'number'
               ? load.tfdiEfbCargoLb + liveCrewLb
               : typeof pmdgRolePayloadLb === 'number'
                 ? pmdgRolePayloadLb
-                : load.payloadLb !== null
-                  ? load.payloadLb
-                  : (prevVerification.payload.liveLb ?? undefined);
+                : typeof paxAndCargoCabinLb === 'number'
+                  ? paxAndCargoCabinLb
+                  : load.payloadLb !== null
+                    ? load.payloadLb
+                    : (prevVerification.payload.liveLb ?? undefined);
+          const livePayloadLb =
+            typeof rawLivePayloadLb === 'number' && cabinOvershootLb > 0
+              ? Math.max(0, rawLivePayloadLb - cabinOvershootLb)
+              : rawLivePayloadLb;
           this.lastLiveFuelLb =
             typeof liveFuelLb === 'number' ? liveFuelLb : load.fuelLb;
           this.lastLivePayloadLb =
@@ -2150,6 +2173,7 @@ export class CareerWatchSession {
             liveFuelLb,
             plannedPayloadLb,
             livePayloadLb,
+            payloadTolLb: payloadMatchToleranceLb(plannedPayloadLb),
             ...(typeof prevWatchFuel.taxiBurnLb === 'number'
               ? { taxiBurnLb: prevWatchFuel.taxiBurnLb }
               : {}),

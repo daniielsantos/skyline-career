@@ -142,7 +142,21 @@ export function inferEnginesRunning(input: {
       ? input.fuelFlowKgPerHour
       : undefined;
 
-  if (n1.some((n) => n >= ENGINE_N1_OFF_PCT)) return true;
+  if (n1.some((n) => n >= ENGINE_N1_OFF_PCT)) {
+    const rpmAllDead =
+      rpmRaw.length > 0 && rpmRaw.every((r) => r < ENGINE_RPM_OFF);
+    const flowOff = flow !== undefined && flow < ENGINE_FUEL_FLOW_ON_KG_H;
+    // Just Flight Fokker / sticky N1: ~20% N1 with dead RPM and no burn is off.
+    // Running idle still has fuel flow (or piston RPM).
+    if (
+      rpmAllDead &&
+      (flowOff || (flow === undefined && comb.some((c) => c)))
+    ) {
+      // fall through to combustion / flow gates
+    } else {
+      return true;
+    }
+  }
   if (n1.length > 0 && n1.every((n) => n < ENGINE_N1_OFF_PCT)) return false;
 
   if (comb.some((c) => c)) {

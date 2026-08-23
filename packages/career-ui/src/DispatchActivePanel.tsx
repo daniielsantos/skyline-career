@@ -834,11 +834,6 @@ export function DispatchActivePanel(props: {
               weights if the sim still does not match Due.
             </p>
           ) : null}
-          {props.mxFuelBurnAlert ? (
-            <p className="banner warn mx-fuel-burn-alert" role="status">
-              {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
-            </p>
-          ) : null}
         </div>
       ) : null}
 

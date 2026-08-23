@@ -15,6 +15,7 @@ import {
   isPaxAndCargoLoadLayout,
   KG_TO_LB,
   ofpCargoKg,
+  ofpFreightTowardMissionKg,
   planPaxAndCargoSimBriefLoad,
   resolveAirframeFuelBurnKgPerNm,
   resolveConservativeOpsWeights,
@@ -30,6 +31,7 @@ import {
 } from '../../agent/src/ofp-compliance/simbrief-dispatch.ts';
 import {
   inferSimBriefAirframeMatchFromTitle,
+  liveTitleMatchesMarketSku,
   preferSimBriefAirframeMatch,
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
@@ -147,21 +149,25 @@ export async function resolveDispatchSimBriefParams(opts: {
     }
   }
 
-  // Prefer the purchased airframe label over a mismatched live MSFS title so
-  // SimBrief Default scoring stays on the mission SKU (e.g. Caravan vs Commander).
+  const live = opts.liveTitle?.trim() ?? '';
+  const typeId = opts.airframeTypeId?.trim() ?? '';
+  const inferFromPurchasedLive =
+    Boolean(typeId) && liveTitleMatchesMarketSku(live, typeId);
+  // Family SKUs (F28-1000 vs 4000): score SimBrief comments with the live MSFS
+  // title. Generic catalog label would pick Mk.1000 for every glass.
   const titleHint =
+    (inferFromPurchasedLive ? live : '') ||
     airframe?.label ||
-    opts.liveTitle?.trim() ||
+    live ||
     packTitle ||
     aircraft.name;
-  // With a purchased SKU, SimBrief match comes from the family-resolved roles
-  // pack (live title only applies inside that family). Do not infer from a
-  // mismatched live MSFS title (Commander while planning Caravan).
-  const inferred = opts.airframeTypeId?.trim()
-    ? undefined
-    : inferSimBriefAirframeMatchFromTitle(opts.liveTitle ?? '') ??
-      inferSimBriefAirframeMatchFromTitle(packTitle ?? '') ??
-      inferSimBriefAirframeMatchFromTitle(airframe?.label ?? '');
+  const inferred = inferFromPurchasedLive
+    ? inferSimBriefAirframeMatchFromTitle(live)
+    : typeId
+      ? undefined
+      : inferSimBriefAirframeMatchFromTitle(live) ??
+        inferSimBriefAirframeMatchFromTitle(packTitle ?? '') ??
+        inferSimBriefAirframeMatchFromTitle(airframe?.label ?? '');
 
   return {
     // Catalog ICAO first so a stale class pack cannot force BE36 over AEST.
@@ -246,6 +252,7 @@ export async function resolveClassMaxCargoKg(
       airframeLabel: airframe.label,
       oewKg: airframe.oewKg,
       mtowKg: airframe.mtowKg,
+      mzfwKg: airframe.mzfwKg,
       fuelCapacityKg: airframe.fuelCapacityKg,
       fuelBurnKgPerNm,
       airframeTypeId: airframe.typeId,
@@ -444,15 +451,19 @@ export async function buildMissionDispatch(
   // multi-MB airframes.json round-trip on Open SimBrief — unless we need
   // airframe_passengers for pax_and_cargo.
   const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
+  const icao = params.simbriefIcao.trim().toUpperCase();
+  // F28 has no SimBrief Default type (only JF Mk.xxxx internal IDs). ICAO
+  // type=F28 leaves Aircraft Type = None on Dispatch.
   const needsSimBriefAirframeRow =
     isPaxAndCargoLoadLayout(careerAirframe) ||
-    !isDefaultSimBriefMatch(params.simbriefAirframeMatch);
+    !isDefaultSimBriefMatch(params.simbriefAirframeMatch) ||
+    icao === 'F28';
 
   let type: string;
   let airframeLabel: string;
   let simBriefPassengers = 0;
   if (!needsSimBriefAirframeRow) {
-    type = params.simbriefIcao.trim().toUpperCase();
+    type = icao;
     airframeLabel = params.titleHint || type;
   } else {
     const resolved = await resolveSimBriefDispatchType({
@@ -461,9 +472,12 @@ export async function buildMissionDispatch(
       titleHint: params.titleHint,
       ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
     });
-    type = isDefaultSimBriefMatch(params.simbriefAirframeMatch)
-      ? params.simbriefIcao.trim().toUpperCase()
-      : resolved.type;
+    const resolvedId = resolved.type.trim();
+    type =
+      isDefaultSimBriefMatch(params.simbriefAirframeMatch) &&
+      resolvedId.toUpperCase() === icao
+        ? icao
+        : resolvedId;
     airframeLabel = formatSimBriefAirframeLabel(
       resolved.airframe,
       params.titleHint,
@@ -634,6 +648,7 @@ export async function confirmMissionOfp(
     userid,
     staticId: mission.staticId,
   });
+  const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
   const check = compareMissionIntentToOfp(mission, expectation);
   const briefing = mapSimBriefOfpToBriefing(raw);
   return {
@@ -643,7 +658,9 @@ export async function confirmMissionOfp(
       originIcao: expectation.originIcao,
       destIcao: expectation.destIcao,
       icao: expectation.icao,
-      cargoKg: ofpCargoKg(expectation),
+      cargoKg:
+        ofpFreightTowardMissionKg(expectation, airframe) ??
+        ofpCargoKg(expectation),
       passengerCount: expectation.loadSheet?.passengerCount,
       blockFuel: expectation.loadSheet?.blockFuel,
       blockFuelKg:

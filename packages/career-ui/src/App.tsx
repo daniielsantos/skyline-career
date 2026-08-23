@@ -446,6 +446,20 @@ function lotQuantityKg(lot: MarketLot): number {
   return Math.max(1, lot.availableKg);
 }
 
+/** Reserved lots leave the board; restore original kg for Edit manifest. */
+function manifestEditAvailableKg(opts: {
+  bookedKg: number;
+  lotQuantityKg?: number;
+  marketAvailableKg?: number;
+  demandMaxKg?: number;
+}): number {
+  const booked = Math.max(0, Math.floor(opts.bookedKg));
+  const quantity = Math.max(0, Math.floor(opts.lotQuantityKg ?? 0));
+  const fromBoard = Math.max(0, Math.floor(opts.marketAvailableKg ?? 0)) + booked;
+  const demand = Math.max(0, Math.floor(opts.demandMaxKg ?? 0));
+  return Math.max(booked, quantity, fromBoard, demand);
+}
+
 function proRataPayUsd(lot: MarketLot, cargoKg: number): number {
   return Math.max(1, Math.round((cargoKg / lotQuantityKg(lot)) * lot.payUsd));
 }
@@ -6977,10 +6991,23 @@ export function App() {
         mission.demandEditMaxKg > 0
           ? Math.floor(mission.demandEditMaxKg)
           : undefined;
+      const availableKg = manifestEditAvailableKg({
+        bookedKg: line.cargoKg,
+        lotQuantityKg: line.lotQuantityKg ?? market?.quantityKg,
+        marketAvailableKg: market?.availableKg,
+        demandMaxKg: demandMax,
+      });
+      const fullLotPayUsd =
+        market?.payUsd ??
+        (line.cargoKg > 0 && availableKg > line.cargoKg
+          ? Math.max(1, Math.round((line.payUsd * availableKg) / line.cargoKg))
+          : line.payUsd);
       const lot: MarketLot = market
         ? {
             ...market,
-            availableKg: market.availableKg + line.cargoKg,
+            quantityKg: Math.max(market.quantityKg ?? 0, availableKg),
+            availableKg,
+            payUsd: market.payUsd,
           }
         : {
             id: line.shipmentLotId,
@@ -6990,8 +7017,9 @@ export function App() {
             destName: mission.destIcao,
             commodityId: line.commodityId,
             commodityName: line.commodityId,
-            availableKg: demandMax ?? line.cargoKg,
-            payUsd: line.payUsd,
+            quantityKg: availableKg,
+            availableKg,
+            payUsd: fullLotPayUsd,
             urgency: line.urgency === 'urgent' ? 'urgent' : 'normal',
             reason: line.reason,
             expiresAtTick: line.deadlineTick,

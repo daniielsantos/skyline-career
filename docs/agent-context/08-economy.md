@@ -12,6 +12,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Aircraft pool (design locked, 2026-08-19; cota SKU 2026-08-20):** cap por país (BR=62 hubs=1.0, teto 1.5×); **cota igual por SKU** + mínimo mundial por modelo (leves 1 / medium 2 / narrow+wide **3**); BR/US 1-de-cada nas leves; dealer **50%** vs listar; NPC compra por fair. **Lease:** taxa semanal ↑, cobrança /wk, termo máx **3 mo**, depósito 4 semanas. Roadmap F0–F7: [`10-aircraft-pool.md`](./10-aircraft-pool.md).
 - **Schema v4:** hubs + stock em tabelas (`airports` / `airport_stock`) com `world_id`; tick ainda in-memory; terminal Inventory usa `GET /api/airport?part=stock` (SQL, sem lock); payload completo (lots/NPC) hidrata depois.
 - **Schema v5:** NPC roster, fuel trucks/hauls, Demand board e port listings/inventory/concessions em tabelas (`world_id`); arrays stripped de `economy_json`. Tick ainda in-memory. WH/concessões do player ficam no `company_state`.
+- **Schema v6:** dealer pool (`aircraft_instances`) keyed by `world_id`; unique registration; stripped from `economy_json`. Tick still in-memory.
 - Partição por país (`homeCountryId` / região `XX-YY` → país `XX`).
 - **América do Sul completa** no seed: BR/AR/CL + UY/PY/PE/BO/EC/CO/VE/GY/SR/GF.
 - **América Central completa** no seed: PA/CR/NI/HN/GT/SV/BZ.

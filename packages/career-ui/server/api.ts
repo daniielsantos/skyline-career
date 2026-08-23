@@ -749,7 +749,7 @@ type CareerWriteOpts = {
 /**
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
  * `persist: 'company'` writes missions only (plus optional demand/listing/concession
- * upserts). `persist: 'blob'` writes dealer pool JSON without live tables.
+ * upserts). `persist: 'blob'` writes economy stub + dealer pool table (not live cargo).
  * `persist: 'portMarket'` rewrites port listings+inventory only (GET /api/ports seed).
  * `persist: 'demandBoard'` rewrites demand_orders only. `persist: 'inbound'` patches inbound_pending.
  * `persist: 'npcLive'` writes NPC roster/flights + dirty lots/inbound/airports (not port ops).
@@ -924,6 +924,7 @@ async function withCareerWrite<T>(
     }
     if (persistBlob) {
       await activeStore.saveEconomy(world, { liveTables: false });
+      await activeStore.persistAircraftPool(world);
       await saveMissions(missions);
       return result;
     }

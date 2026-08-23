@@ -1,8 +1,8 @@
 # Aircraft instance pool
 
-Decisões travadas 2026-08-19. **F0–F6 shipped** in `@msfs-compat/shared`. F7 MP not yet. Saves: **wipe** recommended; pool lives on `world.aircraftInstances` in economy blob.
+F0–F6 shipped. **F7 started:** SQLite `aircraft_instances` is SoT (`world_id` + unique `registration`). RAM still ticks the array. Not N companies / SELECT FOR UPDATE yet.
 
-Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `career-partition.ts`, `career-player-airframes.ts`.
+Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `career-partition.ts`, `career-player-airframes.ts`, `career-store-v6.ts`.
 
 ---
 
@@ -153,8 +153,8 @@ Não misturar MP, ferry internacional e lease flexível na primeira fatia. Playt
 
 ### F7 — Multiplayer (depois de SP estável)
 
-- Mesma tabela, server-authoritative, `SELECT FOR UPDATE`, unique `registration`.
-- Buyer humano no lugar (ou além) do NPC.
+- ~~Pool no blob~~ **feito (SP):** tabela `aircraft_instances`, unique `(world_id, registration)`, persist incremental; `persist: 'blob'` também grava o pool.
+- Ainda: server-authoritative `SELECT FOR UPDATE`, buyer humano no lugar (ou além) do NPC, N `company_id`.
 
 ---
 

@@ -89,6 +89,14 @@ import {
   upsertDemandOrder,
   upsertPortListing,
 } from './career-store-v5.js';
+import {
+  aircraftInstanceSignatureMap,
+  ensureV6Ddl,
+  hydrateAircraftPoolFromTables,
+  migrateV5toV6IfNeeded,
+  persistAircraftInstancesIncremental,
+  stripEconomyAircraftPool,
+} from './career-store-v6.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
@@ -103,7 +111,7 @@ import type {
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '5';
+export const CAREER_STORE_SCHEMA_VERSION = '6';
 export { LOCAL_WORLD_ID };
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
 
@@ -148,6 +156,8 @@ export interface CareerStore {
    * flights — not port/demand ops tables.
    */
   persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void>;
+  /** Dealer pool rows only (F7); blob stub no longer holds instances. */
+  persistAircraftPool(world: CareerEconomyWorld): Promise<void>;
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).
@@ -437,6 +447,10 @@ class JsonCareerStore implements CareerStore {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
+  async persistAircraftPool(_world: CareerEconomyWorld): Promise<void> {
+    if (this.ram) await this.saveEconomy(this.ram);
+  }
+
   async loadMissions(): Promise<CareerMissionsState> {
     const existing = await readJsonFile<Record<string, unknown>>(this.missionsPath);
     if (existing && Array.isArray(existing.missions)) {
@@ -558,6 +572,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV3Ddl(db);
   ensureV4Ddl(db);
   ensureV5Ddl(db);
+  ensureV6Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -588,11 +603,26 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verNow = Number.parseInt(afterV4?.value ?? ver.value, 10);
   if (!Number.isFinite(verNow) || verNow < 5) {
-    migrateV4toV5IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV4toV5IfNeeded(db, metaSet, '5');
+  }
+  const afterV5 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV5 = Number.parseInt(afterV5?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV5) || verAfterV5 < 6) {
+    migrateV5toV6IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
   stampCompanyWorldId(db);
+}
+
+function stripEconomyPersistBlob(world: CareerEconomyWorld): Record<string, unknown> {
+  return stripEconomyAircraftPool(
+    stripEconomyWorldOps(
+      stripEconomyAirports(stripEconomyHotArrays(world)),
+    ),
+  );
 }
 
 function metaSet(db: SqliteDb, key: string, value: string): void {
@@ -659,6 +689,18 @@ function missionSignatureMap(missions: MissionIntent[]): Map<string, string> {
   return m;
 }
 
+function aircraftPoolPersistKey(world: CareerEconomyWorld): string {
+  return JSON.stringify(
+    (world.aircraftInstances ?? []).map((inst) => [
+      inst.id,
+      inst.status,
+      inst.registration,
+      inst.basedIcao,
+      inst.availableAtTick ?? 0,
+    ]),
+  );
+}
+
 function worldOpsPersistKey(world: CareerEconomyWorld): string {
   return JSON.stringify({
     npcs: world.npcs ?? [],
@@ -685,6 +727,8 @@ class SqliteCareerStore implements CareerStore {
   private lastNpcFlightsKey: string | null = null;
   private lastEventsKey: string | null = null;
   private lastOpsKey: string | null = null;
+  private lastAircraftPoolKey: string | null = null;
+  private lastAircraftSignatures: Map<string, string> | null = null;
   private lastEconomyBlobJson: string | null = null;
   private lastCompanyPersistKey: string | null = null;
   private lastCompanyStateKey: string | null = null;
@@ -821,9 +865,7 @@ class SqliteCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    const blob = stripEconomyWorldOps(
-      stripEconomyAirports(stripEconomyHotArrays(toSave)),
-    );
+    const blob = stripEconomyPersistBlob(toSave);
     const json = JSON.stringify(blob);
     const now = Date.now();
     const lotsKey = lotsPersistKey(toSave);
@@ -859,12 +901,31 @@ class SqliteCareerStore implements CareerStore {
       replaceNpcFlights(this.db, toSave.npcFlights ?? [], toSave.airports);
       replaceNpcs(this.db, toSave.npcs ?? []);
       persistWorldAirports(this.db, toSave, LOCAL_WORLD_ID, prevAirportSignatures);
+      persistAircraftInstancesIncremental(
+        this.db,
+        toSave.aircraftInstances ?? [],
+        this.lastAircraftSignatures,
+      );
       stampCompanyWorldId(this.db);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
       metaSet(this.db, 'economy_tick', String(toSave.tick));
     });
     this.ram = toSave;
     this.rememberPersistedWorld(toSave, json);
+  }
+
+  async persistAircraftPool(world: CareerEconomyWorld): Promise<void> {
+    const toSave = migrateEconomyWorld(world);
+    runInTransaction(this.db, () => {
+      persistAircraftInstancesIncremental(
+        this.db,
+        toSave.aircraftInstances ?? [],
+        this.lastAircraftSignatures,
+      );
+    });
+    this.ram = toSave;
+    this.lastAircraftSignatures = aircraftInstanceSignatureMap(toSave);
+    this.lastAircraftPoolKey = aircraftPoolPersistKey(toSave);
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {
@@ -938,6 +999,7 @@ class SqliteCareerStore implements CareerStore {
       portListings: existing.portListings,
       portInventories: existing.portInventories,
       portConcessions: existing.portConcessions,
+      aircraftInstances: existing.aircraftInstances,
       airports: existing.airports,
       lots: existing.lots,
       inboundPending: existing.inboundPending,
@@ -947,6 +1009,7 @@ class SqliteCareerStore implements CareerStore {
     hydrateWorldFromTables(this.db, existing as unknown as CareerEconomyWorld);
     hydrateAirportsFromTables(this.db, existing as unknown as CareerEconomyWorld);
     hydrateWorldOpsFromTables(this.db, existing as unknown as CareerEconomyWorld);
+    hydrateAircraftPoolFromTables(this.db, existing as unknown as CareerEconomyWorld);
     overlayEconomyMeta(this.db, existing as unknown as CareerEconomyWorld);
     const tableAirports = countAirportRows(this.db);
     const blobAirports = Array.isArray(existing.airports) ? existing.airports.length : 0;
@@ -958,9 +1021,7 @@ class SqliteCareerStore implements CareerStore {
     if (opts?.maxCatchUpTicks === 0) {
       ensureHomeCountryId(world);
       this.ram = world;
-      const blob = stripEconomyWorldOps(
-        stripEconomyAirports(stripEconomyHotArrays(world)),
-      );
+      const blob = stripEconomyPersistBlob(world);
       this.rememberPersistedWorld(world, JSON.stringify(blob));
       return {
         world,
@@ -982,9 +1043,7 @@ class SqliteCareerStore implements CareerStore {
     await persistClHubIdentRemaps(this, beforeIcaos, afterIcaos);
     this.ram = caught;
     if (!dirty) {
-      const blob = stripEconomyWorldOps(
-        stripEconomyAirports(stripEconomyHotArrays(caught)),
-      );
+      const blob = stripEconomyPersistBlob(caught);
       this.rememberPersistedWorld(caught, JSON.stringify(blob));
     }
     return { world: caught, advancedTicks, settledFlights, dirty };
@@ -998,9 +1057,7 @@ class SqliteCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    const blob = stripEconomyWorldOps(
-      stripEconomyAirports(stripEconomyHotArrays(toSave)),
-    );
+    const blob = stripEconomyPersistBlob(toSave);
     const json = JSON.stringify(blob);
     const now = Date.now();
     if (opts?.liveTables === false) {
@@ -1061,6 +1118,13 @@ class SqliteCareerStore implements CareerStore {
       if (this.lastOpsKey !== opsKey) {
         persistWorldOpsTables(this.db, toSave);
       }
+      if (this.lastAircraftPoolKey !== aircraftPoolPersistKey(toSave)) {
+        persistAircraftInstancesIncremental(
+          this.db,
+          toSave.aircraftInstances ?? [],
+          this.lastAircraftSignatures,
+        );
+      }
       stampCompanyWorldId(this.db);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
       metaSet(this.db, 'economy_tick', String(toSave.tick));
@@ -1078,6 +1142,8 @@ class SqliteCareerStore implements CareerStore {
     this.lastNpcFlightsKey = npcFlightsPersistKey(world);
     this.lastEventsKey = eventsPersistKey(world);
     this.lastOpsKey = worldOpsPersistKey(world);
+    this.lastAircraftPoolKey = aircraftPoolPersistKey(world);
+    this.lastAircraftSignatures = aircraftInstanceSignatureMap(world);
     this.lastEconomyBlobJson = blobJson;
   }
 
@@ -1195,6 +1261,8 @@ class SqliteCareerStore implements CareerStore {
     this.lastNpcFlightsKey = null;
     this.lastEventsKey = null;
     this.lastOpsKey = null;
+    this.lastAircraftPoolKey = null;
+    this.lastAircraftSignatures = null;
     this.lastEconomyBlobJson = null;
     this.lastCompanyPersistKey = null;
     this.lastCompanyStateKey = null;

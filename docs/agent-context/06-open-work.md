@@ -2,7 +2,7 @@
 
 Atualizado 2026-08-22: `formLots` extraído por país (bulk → last-mile → intl). Replay intacto; sem workers ainda. [`08-economy.md`](./08-economy.md).
 
-Atualizado 2026-08-22: Accept/Depart/Buy/Cancel = comandos idempotentes (molde SettleFlight).
+Atualizado 2026-08-22: F7 start — dealer pool em tabela `aircraft_instances` (schema v6), matrícula única. Sem N companies.
 
 Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). BBJ2 parked. Airport tab / A2A / dual-client IPC inalterados.
 
@@ -122,7 +122,7 @@ Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). 
 71. ~~**EU-1 Macaronesia densify**~~ — LPMA / LPPD / GCLP (not LPPS / LPLA / GCTS); seed **1137** / **219** ports / **1140** trucks. Isolated **PT-M** / **PT-A** / **ES-CN**. Island hops LPMA–GCLP, LPPD–GCLP, GCLP–GMMN, LPMA–GMMN, GCLP–GQNO, GCLP–GVAC. Homolog after rebuild.
 72. ~~**Pacific island-neighbor gap**~~ — Nadi **NFFN**–Port Vila **NVVV** / Nouméa **NWWW** (Fiji was AU/NZ-only). Lanes >= **399**.
 73. **Next:** MR GQPP / DRC FZNA / EG FGBT / CV GVNP / FLSK if homolog proves stock. Africa country coverage complete except those densify leftovers.
-74. **Aircraft instance pool** — **F0–F6 shipped**. Next: **F7** MP. Doc: `10-aircraft-pool.md`.
+74. **Aircraft instance pool** — **F0–F6 shipped**. **F7 (tabela):** `aircraft_instances` + unique registration; blob vazio. MP N companies ainda não. Doc: `10-aircraft-pool.md`.
 
 ## Feito (shipped 0.3.47)
 

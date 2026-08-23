@@ -40,6 +40,6 @@ Watch **recalcula Due a partir de `cargoLb` (OFP)**, nunca do Due pintado — se
 | `microsoft-a321lr` | 220 | `efbPaxWeightLb: 188` (153 pax: Sim 37127 vs OFP 35164). **Fuel:** EFB APPLY **não** grava FOB (bug iniBuilds A321LR); usar EFB/slider **padrão do MSFS**. Watch C = CENTER+CENTER2; TOTAL pode ser > L+R+C |
 | `fenix-a320` | 180 | `efbPaxWeightLb: 196` (134 pax IAE: Sim 33654 vs OFP 30768) |
 | `fenix-a319` | 150 | `efbPaxWeightLb: 200` (115 pax IAE: Sim 29267 vs OFP 26372) |
-| `fenix-a321` | 230 | `efbPaxWeightLb: 192` (153 pax IAE: Sim 37702 vs OFP 35164); fuel EFB OK |
+| `fenix-a321` | 230 | `efbPaxWeightLb: 192`; 8 vidros CFM/IAE × SL/WF × TC/SC; wizard de variante **apaga** pax no catálogo — repor |
 
 Accept OFP: cargo da missão = **Payload** SimBrief (`max(Freight, Payload)` / `ofpFreightTowardMissionKg`), não a linha Freight leftover.

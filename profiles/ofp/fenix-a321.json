@@ -5,16 +5,20 @@
   "loadMethod": "native-simbrief",
   "injectCapable": false,
   "matchTitles": [
+    "FenixA321 CFM SL SC",
     "FenixA321 CFM SL TC",
     "FenixA321 CFM WF SC",
+    "FenixA321 CFM WF TC",
     "FenixA321 IAE SL SC",
+    "FenixA321 IAE SL TC",
+    "FenixA321 IAE WF SC",
     "FenixA321 IAE WF TC"
   ],
   "matchTitlePattern": "FenixA321\\s+(?:CFM|IAE)\\s+(?:SL|WF)\\s+(?:TC|SC)\\b",
   "notes": [
     "Fenix A321 family (CFM/IAE × SL/WF × TC/SC) — same 16-station + 6-tank layout",
     "One Skyline Market SKU: fenix-a321 (narrow_freighter)",
-    "Homologated profiles: fenix/fenixa321-{cfm,iae}-{sl,wf}-{tc,sc}@1.0.0",
+    "Homologated profiles: all 8 glasses CFM/IAE × SL/WF × TC/SC; same 16-station pack",
     "loadMethod: native-simbrief; injectCapable: false — load via Fenix EFB",
     "loadLayout pax_and_cargo: cabin 175+55 then leftover cargo=; 230 pax; live title CFM/IAE × SL/WF (TC/SC ignored by SimBrief)",
     "Fenix EFB boarded pax ~192 lb vs SimBrief 175 — catalog efbPaxWeightLb 192",
@@ -29,35 +33,140 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "crewStations": [1, 2],
-      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
       "passengerStations": []
     }
   },
   "liveSources": {
-    "fuel": ["classic", "mass-balance"],
-    "weights": ["classic-weights"],
-    "payload": ["classic-stations"]
+    "fuel": [
+      "classic",
+      "mass-balance"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
   },
   "simbriefIcao": "A321",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
-    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
-    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
-    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
-    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
-    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
-    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
-    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
-    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" },
-    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "baggage" },
-    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "baggage" },
-    { "simVarIndex": 11, "cfgIndex": 10, "name": "Station 11", "role": "baggage" },
-    { "simVarIndex": 12, "cfgIndex": 11, "name": "Station 12", "role": "baggage" },
-    { "simVarIndex": 13, "cfgIndex": 12, "name": "Station 13", "role": "baggage" },
-    { "simVarIndex": 14, "cfgIndex": 13, "name": "Station 14", "role": "baggage" },
-    { "simVarIndex": 15, "cfgIndex": 14, "name": "Station 15", "role": "baggage" },
-    { "simVarIndex": 16, "cfgIndex": 15, "name": "Station 16", "role": "baggage" }
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Station 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Station 2",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Station 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Station 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Station 5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "Station 6",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "Station 7",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "Station 8",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "Station 9",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "Station 10",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 11,
+      "cfgIndex": 10,
+      "name": "Station 11",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 12,
+      "cfgIndex": 11,
+      "name": "Station 12",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 13,
+      "cfgIndex": 12,
+      "name": "Station 13",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 14,
+      "cfgIndex": 13,
+      "name": "Station 14",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 15,
+      "cfgIndex": 14,
+      "name": "Station 15",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 16,
+      "cfgIndex": 15,
+      "name": "Station 16",
+      "role": "baggage"
+    }
   ],
   "tolerances": {
     "fuelAbsLb": 300,

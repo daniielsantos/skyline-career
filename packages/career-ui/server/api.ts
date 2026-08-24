@@ -137,8 +137,12 @@ import {
   playerWarehouseSnapshot,
   quoteWarehouseBuyUsd,
   ensureDemandOrders,
+  expireDemandHolds,
   demandSnapshot,
   acceptDemandOrder,
+  holdDemandOrder,
+  cancelDemandHold,
+  dispatchDemandHold,
   replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
   ensurePortListings,
@@ -666,6 +670,7 @@ async function loadEconomyUnlocked(opts?: {
     tickPortConcessions(missions, caught);
     ensurePortInventoryRestock(caught);
     ensurePortListings(caught);
+    expireDemandHolds(missions, caught);
     ensureDemandOrders(caught);
     const crewDaily = settleCrewDailyOps(missions, caught, {
       fromTick: feeRange.fromTick,
@@ -946,6 +951,7 @@ async function withCareerWrite<T>(
     }
     if (persistDemandBoard) {
       await activeStore.persistDemandBoardTables(world);
+      await saveMissions(missions);
       return result;
     }
     if (persistInbound) {
@@ -3839,6 +3845,7 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/demand') {
         try {
           const result = await withCareerWrite((world, missions) => {
+            expireDemandHolds(missions, world);
             ensureDemandOrders(world);
             const warehouses = playerWarehouseSnapshot(missions, world);
             return {
@@ -3901,6 +3908,133 @@ export function createCareerApiServer(port = 8787) {
           }, {
             persist: 'company',
             persistDemandOrderId: body.orderId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/demand/hold') {
+        const body = (await readBody(req)) as {
+          orderId?: string;
+          originIcao?: string;
+          kg?: number;
+        };
+        if (!body.orderId || !body.originIcao) {
+          send(res, 400, {
+            error: 'orderId and originIcao required',
+          });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const held = holdDemandOrder(missions, world, {
+                orderId: body.orderId!,
+                originIcao: body.originIcao!,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              });
+              const warehouses = playerWarehouseSnapshot(missions, world);
+              return {
+                hold: held.hold,
+                order: held.order,
+                kg: held.kg,
+                warehouses,
+                demand: demandSnapshot(world, {
+                  warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
+                }),
+              };
+            });
+          }, {
+            persist: 'company',
+            persistDemandOrderId: body.orderId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/demand/hold/cancel') {
+        const body = (await readBody(req)) as { holdId?: string };
+        if (!body.holdId) {
+          send(res, 400, { error: 'holdId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const cancelled = cancelDemandHold(missions, world, {
+              holdId: body.holdId!,
+            });
+            const warehouses = playerWarehouseSnapshot(missions, world);
+            return {
+              kg: cancelled.kg,
+              orderId: cancelled.orderId,
+              warehouses,
+              demand: demandSnapshot(world, {
+                warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
+              }),
+            };
+          }, {
+            persist: 'demandBoard',
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/demand/dispatch-hold') {
+        const body = (await readBody(req)) as {
+          holdId?: string;
+          aircraftId?: string;
+        };
+        if (!body.holdId || !body.aircraftId) {
+          send(res, 400, {
+            error: 'holdId and aircraftId required',
+          });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const dispatched = dispatchDemandHold(missions, world, {
+                holdId: body.holdId!,
+                aircraftId: body.aircraftId!,
+              });
+              const warehouses = playerWarehouseSnapshot(missions, world);
+              return {
+                walletUsd: missions.walletUsd,
+                mission: withMissionClientView(world, missions, dispatched.mission),
+                order: dispatched.order,
+                kg: dispatched.kg,
+                payUsd: dispatched.payUsd,
+                warehouses,
+                demand: demandSnapshot(world, {
+                  warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
+                }),
+                fleet: missions.fleet,
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+              };
+            });
+          }, {
+            persist: 'company',
+            persistDemandOrderId: undefined,
+            commandSliceAircraftId: body.aircraftId,
           });
           send(res, 200, result);
         } catch (error) {
@@ -4446,6 +4580,7 @@ export function createCareerApiServer(port = 8787) {
           tickPortConcessions(missions, world);
           ensurePortInventoryRestock(world);
           ensurePortListings(world);
+          expireDemandHolds(missions, world);
           ensureDemandOrders(world);
           const crewDaily = settleCrewDailyOps(missions, world, {
             fromTick: world.tick - n,

@@ -30,6 +30,7 @@ import type {
   PlayerWarehouse,
   PlayerWarehousePile,
   WarehouseInboundTransfer,
+  PlayerDemandHold,
 } from './types/career-economy.js';
 
 export {
@@ -43,9 +44,11 @@ export {
   previewWithdrawCargoCost,
   recordWarehouseShipmentKg,
   warehouseFreeKg,
+  warehouseFreeCommodityKg,
   warehouseInboundFreeKg,
   warehouseInboundPendingKg,
   warehouseUsedKg,
+  warehouseReservedCommodityKg,
   withdrawCargoFromWarehouse,
   WAREHOUSE_CAPACITY_KG,
   WAREHOUSE_LOT_MERGE_REL_BAND,
@@ -677,6 +680,7 @@ export function playerWarehouseSnapshot(
   >;
   stock: PlayerWarehousePile[];
   inboundTransfers: WarehouseInboundTransfer[];
+  demandHolds: PlayerDemandHold[];
   pickupHubs: string[];
   /** CAPEX quote per pickup hub (for Buy UI). */
   buyUsdByIcao: Record<string, number>;
@@ -731,6 +735,7 @@ export function playerWarehouseSnapshot(
     }),
     stock: whs.stock.map((s) => ({ ...s })),
     inboundTransfers: (whs.inboundTransfers ?? []).map((t) => ({ ...t })),
+    demandHolds: (whs.demandHolds ?? []).map((h) => ({ ...h })),
     pickupHubs,
     buyUsdByIcao,
   };

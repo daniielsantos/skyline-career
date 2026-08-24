@@ -13,13 +13,14 @@ import {
   type CareerEconomyWorld,
 } from './career-economy.js';
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
-import { TICKS_PER_HOUR } from './career-clock.js';
+import { TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { demandDeskMultForWarehouse } from './career-ground-staff.js';
 import {
   depositCargoToWarehouse,
   findPlayerWarehouseAtIcao,
+  warehouseFreeCommodityKg,
   withdrawCargoFromWarehouse,
 } from './career-warehouse-stock.js';
 import { isPortPickupHub } from './career-warehouse.js';
@@ -46,6 +47,7 @@ import type {
   CommodityId,
   DemandOrder,
   MissionIntent,
+  PlayerDemandHold,
 } from './types/career-economy.js';
 import demandIntlCountryPairsRaw from './data/demand-intl-country-pairs.json' with { type: 'json' };
 
@@ -94,6 +96,13 @@ export const DEMAND_PRICE_PREMIUM_MAX = 1.15;
  * Stacks on the order's frozen maxUnitPriceUsd (already ~5–15% over spot).
  */
 export const DEMAND_INTL_PAY_MULT = 1.28;
+
+/** Hold TTL by warehouse tier (economy ticks). T1 ~12h, T2 ~18h, T3 ~1d. */
+export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3, number> = {
+  1: TICKS_PER_DAY / 2,
+  2: (TICKS_PER_DAY * 3) / 4,
+  3: TICKS_PER_DAY,
+};
 
 /** Bidirectional country pairs for international Demand (not Market lanes). */
 export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> =
@@ -295,6 +304,404 @@ export function demandEffectiveUnitPriceUsd(
   return money(unit);
 }
 
+export function demandHoldTtlTicks(tier: 1 | 2 | 3): number {
+  return DEMAND_HOLD_TTL_TICKS_BY_TIER[tier] ?? DEMAND_HOLD_TTL_TICKS_BY_TIER[1];
+}
+
+function restoreDemandRemainingKg(
+  world: CareerEconomyWorld,
+  orderId: string,
+  kg: number,
+): void {
+  const add = Math.max(0, Math.floor(kg));
+  if (add <= 0) return;
+  if (!Array.isArray(world.demandOrders)) world.demandOrders = [];
+  const order = world.demandOrders.find((o) => o.id === orderId);
+  if (!order) return;
+  if (order.expiresAtTick <= world.tick) return;
+  order.remainingKg = Math.min(order.wantedKg, order.remainingKg + add);
+  if (order.remainingKg > 0) {
+    order.status = 'open';
+  }
+}
+
+export function listDemandHolds(state: CareerMissionsState): PlayerDemandHold[] {
+  const whs = state.playerWarehouses;
+  if (!whs) return [];
+  if (!Array.isArray(whs.demandHolds)) whs.demandHolds = [];
+  return whs.demandHolds;
+}
+
+/** Drop expired holds and return claimed kg to the Demand Board. */
+export function expireDemandHolds(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+): number {
+  const holds = listDemandHolds(state);
+  if (holds.length === 0) return 0;
+  let released = 0;
+  const kept: PlayerDemandHold[] = [];
+  for (const hold of holds) {
+    if (hold.expiresAtTick > world.tick) {
+      kept.push(hold);
+      continue;
+    }
+    restoreDemandRemainingKg(world, hold.orderId, hold.kg);
+    released += hold.kg;
+  }
+  state.playerWarehouses!.demandHolds = kept;
+  return released;
+}
+
+export function holdDemandOrder(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: {
+    orderId: string;
+    originIcao: string;
+    kg?: number;
+  },
+): { hold: PlayerDemandHold; order: DemandOrder; kg: number } {
+  ensureDemandOrders(world);
+  expireDemandHolds(state, world);
+  const order = (world.demandOrders ?? []).find(
+    (o) => o.id === opts.orderId.trim(),
+  );
+  if (!order || order.status !== 'open' || order.remainingKg <= 0) {
+    throw new Error('Demand order not available');
+  }
+  if (order.expiresAtTick <= world.tick) {
+    order.status = 'expired';
+    throw new Error('Demand order expired');
+  }
+  if (!cargoOpsIsUnlocked(state.cargoOps, order.commodityId)) {
+    const name = getCommodity(order.commodityId).name;
+    throw new Error(
+      `Cargo Ops: ${name} is locked — unlock it in Hangar → Cargo Ops`,
+    );
+  }
+
+  const origin = opts.originIcao.trim().toUpperCase();
+  const dest = order.destIcao.trim().toUpperCase();
+  if (origin === dest) {
+    throw new Error('Warehouse and demand destination must differ');
+  }
+  if (isBushHub(dest) || isBushTripOnlyHub(dest)) {
+    throw new Error(
+      `Demand cannot stage to bush strip ${dest} — SimBrief Dispatch needs a civil hub`,
+    );
+  }
+
+  const wh = findPlayerWarehouseAtIcao(state, origin);
+  if (!wh) {
+    throw new Error(`No warehouse at ${origin}`);
+  }
+
+  const holds = listDemandHolds(state);
+  if (holds.some((h) => h.orderId === order.id)) {
+    throw new Error('This demand order is already held at your warehouse');
+  }
+
+  assertDemandInternationalAccept(world, origin, dest);
+
+  const stockAvail = warehouseFreeCommodityKg(state, origin, order.commodityId);
+  let kg = Math.max(
+    0,
+    Math.floor(opts.kg ?? Math.min(order.remainingKg, stockAvail)),
+  );
+  kg = Math.min(kg, order.remainingKg, stockAvail);
+  if (kg <= 0) {
+    throw new Error(
+      `No ${order.commodityId} available in warehouse at ${origin} for this order`,
+    );
+  }
+
+  const unitPriceUsd = money(
+    order.maxUnitPriceUsd *
+      demandInternationalUnitPriceMult(world, origin, dest) *
+      demandDeskMultForWarehouse(state, wh.id),
+  );
+  const ttl = demandHoldTtlTicks(wh.tier);
+  const hold: PlayerDemandHold = {
+    id: nextId('dhold', world.tick),
+    orderId: order.id,
+    warehouseId: wh.id,
+    originIcao: origin,
+    destIcao: dest,
+    commodityId: order.commodityId,
+    kg,
+    unitPriceUsd,
+    heldAtTick: world.tick,
+    expiresAtTick: Math.min(world.tick + ttl, order.expiresAtTick),
+  };
+  holds.push(hold);
+  state.playerWarehouses!.demandHolds = holds;
+
+  order.remainingKg -= kg;
+  if (order.remainingKg <= 0) {
+    order.remainingKg = 0;
+    order.status = 'filled';
+  }
+
+  return { hold, order: { ...order }, kg };
+}
+
+export function cancelDemandHold(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { holdId: string },
+): { kg: number; orderId: string } {
+  expireDemandHolds(state, world);
+  const holds = listDemandHolds(state);
+  const idx = holds.findIndex((h) => h.id === opts.holdId.trim());
+  if (idx < 0) throw new Error('Demand hold not found');
+  const hold = holds[idx]!;
+  restoreDemandRemainingKg(world, hold.orderId, hold.kg);
+  holds.splice(idx, 1);
+  state.playerWarehouses!.demandHolds = holds;
+  return { kg: hold.kg, orderId: hold.orderId };
+}
+
+export function dispatchDemandHold(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { holdId: string; aircraftId: string },
+): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
+  ensureDemandOrders(world);
+  expireDemandHolds(state, world);
+  const holds = listDemandHolds(state);
+  const idx = holds.findIndex((h) => h.id === opts.holdId.trim());
+  if (idx < 0) throw new Error('Demand hold not found');
+  const hold = holds[idx]!;
+
+  const open = listActivePlayerMissions(state.missions ?? []);
+  if (open.length > 0) {
+    throw new Error(
+      `Finish or cancel ${open[0]!.id} before dispatching a demand hold`,
+    );
+  }
+
+  const aircraft = findPlayerAircraft(state, opts.aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  const airframeTypeId = aircraft.airframeTypeId;
+  if (!airframeTypeId) {
+    throw new Error(`Aircraft ${aircraft.id} has no airframe`);
+  }
+  if (aircraft.status !== 'parked') {
+    throw new Error(`Aircraft ${aircraft.id} is not parked`);
+  }
+  if (aircraft.locationIcao.trim().toUpperCase() !== hold.originIcao) {
+    throw new Error(
+      `Aircraft is at ${aircraft.locationIcao}, not warehouse hub ${hold.originIcao}`,
+    );
+  }
+
+  const dispatchAircraft = {
+    id: aircraft.id,
+    aircraftClassId: aircraft.aircraftClassId,
+    airframeTypeId,
+  };
+  const maxCargoKg = demandRouteMaxCargoKg(
+    world,
+    dispatchAircraft,
+    hold.originIcao,
+    hold.destIcao,
+  );
+  if (hold.kg > maxCargoKg) {
+    throw new Error(
+      `Held ${hold.kg} kg exceeds this airframe's ${maxCargoKg} kg ops cap for ${hold.originIcao}→${hold.destIcao} — release the hold or use a larger aircraft`,
+    );
+  }
+
+  const order = (world.demandOrders ?? []).find((o) => o.id === hold.orderId);
+  const withdrawn = withdrawCargoFromWarehouse(state, {
+    icao: hold.originIcao,
+    commodityId: hold.commodityId,
+    kg: hold.kg,
+  });
+
+  holds.splice(idx, 1);
+  state.playerWarehouses!.demandHolds = holds;
+
+  const kg = hold.kg;
+  const payUsd = money(hold.unitPriceUsd * kg);
+  const deadlineTick = Math.min(
+    order?.expiresAtTick ?? world.tick + TICKS_PER_HOUR * 72,
+    world.tick + TICKS_PER_HOUR * 72,
+  );
+  const mission = createDemandMission(state, world, {
+    origin: hold.originIcao,
+    dest: hold.destIcao,
+    commodityId: hold.commodityId,
+    kg,
+    payUsd,
+    aircraft: dispatchAircraft,
+    orderId: hold.orderId,
+    warehouseId: withdrawn.warehouseId,
+    avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
+    international:
+      demandInternationalUnitPriceMult(world, hold.originIcao, hold.destIcao) >
+      1,
+    originCountryId: demandHubCountryId(world, hold.originIcao) ?? '',
+    destCountryId: demandHubCountryId(world, hold.destIcao) ?? '',
+    deadlineTick,
+  });
+
+  return {
+    mission,
+    order: order ? { ...order } : {
+      id: hold.orderId,
+      destIcao: hold.destIcao,
+      commodityId: hold.commodityId,
+      wantedKg: kg,
+      remainingKg: 0,
+      maxUnitPriceUsd: hold.unitPriceUsd,
+      arrivedAtTick: world.tick,
+      expiresAtTick: deadlineTick,
+      status: 'filled',
+    },
+    kg,
+    payUsd,
+  };
+}
+
+function demandRouteMaxCargoKg(
+  world: CareerEconomyWorld,
+  aircraft: { aircraftClassId: MissionIntent['aircraftClassId']; airframeTypeId: string },
+  origin: string,
+  dest: string,
+): number {
+  if (!CAREER_HUB_COORDS[origin] || !CAREER_HUB_COORDS[dest]) {
+    throw new Error(`Unknown hub route ${origin}→${dest}`);
+  }
+  if (!airportByIcao(world, dest)) {
+    throw new Error(`Unknown destination ${dest}`);
+  }
+  const distanceNm =
+    hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);
+  if (distanceNm === undefined) {
+    throw new Error(`No route distance for ${origin}→${dest}`);
+  }
+  const maxRangeNm = resolveAirframeMaxRangeNm(
+    aircraft.airframeTypeId,
+    aircraft.aircraftClassId,
+  );
+  if (distanceNm > maxRangeNm) {
+    throw new Error(
+      `Leg ${origin}→${dest} is ${Math.round(distanceNm)} nm; max range is ${maxRangeNm} nm`,
+    );
+  }
+  const classDef = getAircraftClass(aircraft.aircraftClassId);
+  const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
+  const structuralMax =
+    (typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
+      ? airframe.maxCargoKg
+      : undefined) ?? classDef.maxCargoKg;
+  const opsWeights = resolveConservativeOpsWeights({
+    oewKg: airframe?.oewKg,
+    mtowKg: airframe?.mtowKg,
+    catalogOewKg: airframe?.oewKg,
+    catalogMtowKg: airframe?.mtowKg,
+  });
+  const routeLimit = estimateRouteCargoLimit(
+    aircraft.aircraftClassId,
+    distanceNm,
+    structuralMax,
+    {
+      oewKg: opsWeights.oewKg,
+      mtowKg: opsWeights.mtowKg,
+      fuelCapacityKg: airframe?.fuelCapacityKg,
+      fuelBurnKgPerNm: airframe?.fuelBurnKgPerNm,
+      airframeTypeId: aircraft.airframeTypeId,
+      crewKg: opsWeights.crewKg,
+    },
+  );
+  if (!routeLimit.fuelFeasible) {
+    throw new Error(
+      `Estimated block fuel ${routeLimit.estimatedBlockFuelKg} kg exceeds ` +
+        `tank capacity ${routeLimit.fuelCapacityKg} kg for ${origin}→${dest}`,
+    );
+  }
+  return routeLimit.operationalMaxCargoKg;
+}
+
+function createDemandMission(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: {
+    origin: string;
+    dest: string;
+    commodityId: CommodityId;
+    kg: number;
+    payUsd: number;
+    aircraft: {
+      id: string;
+      aircraftClassId: MissionIntent['aircraftClassId'];
+      airframeTypeId: string;
+    };
+    orderId: string;
+    warehouseId: string;
+    avgCostUsdPerKg: number;
+    international: boolean;
+    originCountryId: string;
+    destCountryId: string;
+    deadlineTick: number;
+  },
+): MissionIntent {
+  const classDef = getAircraftClass(opts.aircraft.aircraftClassId);
+  const airframe = findCareerPlayerAirframe(opts.aircraft.airframeTypeId);
+  const distanceNm =
+    hubDistanceNm(opts.origin, opts.dest) ??
+    routeDistanceNm(world, opts.origin, opts.dest) ??
+    0;
+  const missionId = `msn_demand_${world.tick}_${opts.origin}_${opts.dest}_${Math.floor(Math.random() * 1e6)}`;
+  const lotId = `demand_${opts.orderId}_${opts.kg}`;
+  const laneLabel = opts.international
+    ? `Intl demand · ${opts.originCountryId}→${opts.destCountryId}`
+    : `Demand delivery · ${opts.origin}→${opts.dest}`;
+  const mission = recomputeMissionTotals({
+    id: missionId,
+    lots: [
+      {
+        shipmentLotId: lotId,
+        commodityId: opts.commodityId,
+        cargoKg: opts.kg,
+        payUsd: opts.payUsd,
+        urgency: 'normal',
+        reason: opts.international
+          ? `Intl demand · ${getCommodity(opts.commodityId).name} → ${opts.dest}`
+          : `Demand · ${getCommodity(opts.commodityId).name} → ${opts.dest}`,
+        deadlineTick: opts.deadlineTick,
+      },
+    ],
+    shipmentLotId: lotId,
+    commodityId: opts.commodityId,
+    originIcao: opts.origin,
+    destIcao: opts.dest,
+    cargoKg: opts.kg,
+    pax: 0,
+    aircraftClassId: opts.aircraft.aircraftClassId,
+    airframeTypeId: opts.aircraft.airframeTypeId,
+    rolesPackRelPath:
+      airframe?.rolesPackRelPath ?? classDef.rolesPackRelPath,
+    deadlineTick: opts.deadlineTick,
+    payUsd: opts.payUsd,
+    urgency: 'normal',
+    reason: laneLabel,
+    status: 'accepted',
+    acceptedAtTick: world.tick,
+    aircraftId: opts.aircraft.id,
+    demandOrderId: opts.orderId,
+    warehouseId: opts.warehouseId,
+    warehouseAvgCostUsdPerKg: opts.avgCostUsdPerKg,
+    distanceNm: Math.round(distanceNm),
+  });
+  assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin);
+  state.missions = [...(state.missions ?? []), mission];
+  syncPlayerInbound(world, mission);
+  return mission;
+}
+
 export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
   if (!Array.isArray(world.demandOrders)) {
     world.demandOrders = [];
@@ -481,6 +888,7 @@ export function acceptDemandOrder(
   },
 ): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
   ensureDemandOrders(world);
+  expireDemandHolds(state, world);
   const order = (world.demandOrders ?? []).find(
     (o) => o.id === opts.orderId.trim(),
   );
@@ -512,6 +920,9 @@ export function acceptDemandOrder(
   const wh = findPlayerWarehouseAtIcao(state, origin);
   if (!wh) {
     throw new Error(`No warehouse at ${origin}`);
+  }
+  if (listDemandHolds(state).some((h) => h.orderId === order.id)) {
+    throw new Error('Dispatch the warehouse hold for this order instead of Fly now');
   }
 
   const open = listActivePlayerMissions(state.missions ?? []);
@@ -591,11 +1002,7 @@ export function acceptDemandOrder(
   }
   const maxCargoKg = routeLimit.operationalMaxCargoKg;
 
-  const stockAvail = (state.playerWarehouses?.stock ?? [])
-    .filter(
-      (s) => s.warehouseId === wh.id && s.commodityId === order.commodityId,
-    )
-    .reduce((s, p) => s + p.kg, 0);
+  const stockAvail = warehouseFreeCommodityKg(state, origin, order.commodityId);
 
   let kg = Math.max(
     0,
@@ -693,11 +1100,7 @@ function warehouseCommodityKg(
 ): number {
   const wh = findPlayerWarehouseAtIcao(state, icao);
   if (!wh) return 0;
-  return (state.playerWarehouses?.stock ?? [])
-    .filter(
-      (s) => s.warehouseId === wh.id && s.commodityId === commodityId && s.kg > 0,
-    )
-    .reduce((s, p) => s + p.kg, 0);
+  return warehouseFreeCommodityKg(state, icao, commodityId);
 }
 
 /**

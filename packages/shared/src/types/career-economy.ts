@@ -1191,11 +1191,28 @@ export interface WarehouseInboundTransfer {
   readyAtTick: number;
 }
 
+/** Demand Board kg pledged at a warehouse without starting a flight. */
+export interface PlayerDemandHold {
+  id: string;
+  orderId: string;
+  warehouseId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: CommodityId;
+  kg: number;
+  /** Frozen USD/kg at hold (intl + demand desk). */
+  unitPriceUsd: number;
+  heldAtTick: number;
+  expiresAtTick: number;
+}
+
 export interface PlayerWarehouseState {
   warehouses: PlayerWarehouse[];
   stock: PlayerWarehousePile[];
   /** Port→WH transfers in flight (slice 1 ground logistics). */
   inboundTransfers?: WarehouseInboundTransfer[];
+  /** Company Demand holds (stock stays in piles; world remainingKg is claimed). */
+  demandHolds?: PlayerDemandHold[];
 }
 
 /** Terminal buy-order on the Demand Board. */

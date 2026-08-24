@@ -36,7 +36,7 @@ export const PAGE_HELP = {
       'Seaport listings sell at factory price into a warehouse at a pickup hub. Overflow sits in the yard — listings do not spawn just because you opened this page.',
       'The yard restocks on a daily inbound discharge. Concession lease grows yard cap; renew cost follows recent throughput.',
       'Buy warehouse space (T1–T3), then Store yard lots into it. Fees apply when you move cargo into the warehouse.',
-      'Demand Board posts when hub terminals run low. Filter by your warehouse so you only see dests you can legally stage (domestic or allowlisted intl). Accept pulls warehouse stock into Dispatch.',
+      'Demand Board posts when terminals run low. Filter by warehouse (domestic or allowlisted intl). Hold pledges stock without flying; Fly now or Dispatch stages the mission.',
       'This is not the Freights board. No warehouse stock means no Demand mission to accept.',
     ],
   },

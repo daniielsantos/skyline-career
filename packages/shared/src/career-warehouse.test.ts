@@ -15,6 +15,7 @@ import {
   upgradeWarehouse,
   upgradeWarehouseToTier2,
   warehouseFreeKg,
+  warehouseFreeCommodityKg,
   warehouseTier2Progress,
   withdrawCargoFromWarehouse,
   WAREHOUSE_T1_CAPACITY_KG,
@@ -25,8 +26,12 @@ import {
 } from './career-warehouse.js';
 import {
   acceptDemandOrder,
+  cancelDemandHold,
   demandSnapshot,
+  dispatchDemandHold,
   ensureDemandOrders,
+  expireDemandHolds,
+  holdDemandOrder,
   listOpenDemandOrders,
   replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
@@ -819,5 +824,176 @@ describe('career warehouse + demand', () => {
       500,
     );
     assert.equal((state.playerWarehouses?.inboundTransfers ?? []).length, 0);
+  });
+
+  it('hold pledges WH kg and claims board remaining without withdrawing stock', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-hold-partial' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'DemandHold',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 800,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    world.demandOrders = [
+      {
+        id: 'demand_hold_sbkp',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 1_000,
+        remainingKg: 1_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
+    const held = holdDemandOrder(state, world, {
+      orderId: 'demand_hold_sbkp',
+      originIcao: 'SBGR',
+      kg: 300,
+    });
+    assert.equal(held.kg, 300);
+    assert.equal(held.hold.orderId, 'demand_hold_sbkp');
+    assert.equal(
+      (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
+      800,
+    );
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 500);
+    const order = world.demandOrders.find((o) => o.id === 'demand_hold_sbkp')!;
+    assert.equal(order.remainingKg, 700);
+    assert.equal(order.status, 'open');
+  });
+
+  it('expired hold restores remainingKg and frees warehouse kg', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-hold-ttl' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'DemandHoldTtl',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    world.demandOrders = [
+      {
+        id: 'demand_hold_ttl',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 400,
+        remainingKg: 400,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
+    const held = holdDemandOrder(state, world, {
+      orderId: 'demand_hold_ttl',
+      originIcao: 'SBGR',
+      kg: 400,
+    });
+    assert.equal(
+      world.demandOrders.find((o) => o.id === 'demand_hold_ttl')!.status,
+      'filled',
+    );
+    world.tick = held.hold.expiresAtTick;
+    const released = expireDemandHolds(state, world);
+    assert.equal(released, 400);
+    assert.equal((state.playerWarehouses?.demandHolds ?? []).length, 0);
+    const restored = world.demandOrders.find((o) => o.id === 'demand_hold_ttl')!;
+    assert.equal(restored.remainingKg, 400);
+    assert.equal(restored.status, 'open');
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 400);
+  });
+
+  it('allows two holds and only one active demand mission', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-two-holds' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'DemandTwoHolds',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 600,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    world.demandOrders = [
+      {
+        id: 'demand_hold_a',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 300,
+        remainingKg: 300,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+      {
+        id: 'demand_hold_b',
+        destIcao: 'SBCT',
+        commodityId: 'general',
+        wantedKg: 300,
+        remainingKg: 300,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
+    holdDemandOrder(state, world, {
+      orderId: 'demand_hold_a',
+      originIcao: 'SBGR',
+      kg: 200,
+    });
+    holdDemandOrder(state, world, {
+      orderId: 'demand_hold_b',
+      originIcao: 'SBGR',
+      kg: 150,
+    });
+    assert.equal((state.playerWarehouses?.demandHolds ?? []).length, 2);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 250);
+
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const holdA = state.playerWarehouses!.demandHolds!.find(
+      (h) => h.orderId === 'demand_hold_a',
+    )!;
+    dispatchDemandHold(state, world, {
+      holdId: holdA.id,
+      aircraftId: aircraft.id,
+    });
+    assert.equal((state.playerWarehouses?.demandHolds ?? []).length, 1);
+    const holdB = state.playerWarehouses!.demandHolds![0]!;
+    assert.throws(
+      () =>
+        dispatchDemandHold(state, world, {
+          holdId: holdB.id,
+          aircraftId: aircraft.id,
+        }),
+      /before dispatching a demand hold/i,
+    );
+
+    cancelDemandHold(state, world, { holdId: holdB.id });
+    assert.equal(
+      world.demandOrders.find((o) => o.id === 'demand_hold_b')!.remainingKg,
+      300,
+    );
   });
 });

@@ -2008,10 +2008,24 @@ export type WarehouseInboundTransferView = {
   readyAtTick: number;
 };
 
+export type PlayerDemandHoldView = {
+  id: string;
+  orderId: string;
+  warehouseId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  kg: number;
+  unitPriceUsd: number;
+  heldAtTick: number;
+  expiresAtTick: number;
+};
+
 export type PlayerWarehouseSnapshot = {
   warehouses: PlayerWarehouseView[];
   stock: PlayerWarehousePileView[];
   inboundTransfers?: WarehouseInboundTransferView[];
+  demandHolds?: PlayerDemandHoldView[];
   pickupHubs: string[];
   buyUsdByIcao?: Record<string, number>;
   groundStaff?: GroundStaffSnapshot;
@@ -2220,6 +2234,55 @@ export function postDemandAccept(opts: {
     fleet: PlayerAircraft[];
     missions: Mission[];
   }>('/api/demand/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postDemandHold(opts: {
+  orderId: string;
+  originIcao: string;
+  kg?: number;
+}) {
+  return api<{
+    hold: PlayerDemandHoldView;
+    order: DemandOrderView;
+    kg: number;
+    warehouses: PlayerWarehouseSnapshot;
+    demand: DemandSnapshot;
+  }>('/api/demand/hold', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postDemandHoldCancel(opts: { holdId: string }) {
+  return api<{
+    kg: number;
+    orderId: string;
+    warehouses: PlayerWarehouseSnapshot;
+    demand: DemandSnapshot;
+  }>('/api/demand/hold/cancel', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postDemandDispatchHold(opts: {
+  holdId: string;
+  aircraftId: string;
+}) {
+  return api<{
+    walletUsd: number;
+    mission: Mission;
+    order: DemandOrderView;
+    kg: number;
+    payUsd: number;
+    warehouses: PlayerWarehouseSnapshot;
+    demand: DemandSnapshot;
+    fleet: PlayerAircraft[];
+    missions: Mission[];
+  }>('/api/demand/dispatch-hold', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { demandOrderReachableFromOrigins } from './demand-accept-preview.ts';
+import { demandOrderReachableFromOrigins, warehouseFreeCommodityKgClient } from './demand-accept-preview.ts';
 
 describe('demandOrderReachableFromOrigins', () => {
   it('keeps US domestic dests from a KMIA warehouse', () => {
@@ -37,5 +37,10 @@ describe('demandOrderReachableFromOrigins', () => {
       }),
       true,
     );
+  });
+
+  it('subtracts reserved hold kg from free warehouse stock', () => {
+    assert.equal(warehouseFreeCommodityKgClient(800, 300), 500);
+    assert.equal(warehouseFreeCommodityKgClient(200, 200), 0);
   });
 });

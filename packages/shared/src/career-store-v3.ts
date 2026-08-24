@@ -1561,6 +1561,9 @@ export function readCompanyStateScalars(
           inboundTransfers: Array.isArray(parsed.inboundTransfers)
             ? parsed.inboundTransfers
             : [],
+          demandHolds: Array.isArray(parsed.demandHolds)
+            ? parsed.demandHolds
+            : [],
         };
       } else {
         out.playerWarehouses = {

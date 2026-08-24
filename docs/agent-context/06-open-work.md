@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-24: Demand warehouse holds — pledge WH kg + claim board remaining without a flight; Dispatch later; TTL by WH tier.
+
 Atualizado 2026-08-23: MM68 (Mina Hércules, GPS) saiu do catálogo — remap MMCU. Demand Board não posta em bush / bushTripOnly (SimBrief OFP). FAA locals US Activities continuam no PLN.
 
 Atualizado 2026-08-23: Demand Board filtra por WH (default My warehouses) — dest só se domestic ou par intl allowlisted a partir daquele hub.
@@ -222,6 +224,7 @@ centralizados; stations 5/coluna iguais; escala fluido + labels legíveis em til
 - **Contracts map:** taller canvas (`min(50vh, 34rem)`).
 - **Market board:** debounce ICAO typing; skip unfiltered bootstrap `/api/market` when the board owns the fetch.
 - **Bush trips board off:** `BUSH_TRIPS_BOARD_ENABLED=false` (shared + UI flag) — aba Freights→Bush trips escondida; Accept API 503; abandon/active ainda ok.
+- **Demand warehouse holds:** pledge WH kg + decrement world `remainingKg` without a flight; Dispatch = today’s Fly now; TTL T1/T2/T3 48/72/96 ticks; cancel/expire restores remaining. Several holds OK; one active Demand mission.
 - **Demand Edit cargo:** reduzir devolve kg à WH + restaura `remainingKg` do pedido; aumentar retira da WH (UI `demandEditMaxKg`).
 - **Ports yard lock:** buy split (free→WH / rest→yard); partial Store; Abandon oversized yard (no refund). T1 WH = **5 klb** (2268 kg); T2/T3 = 10/15 klb.
 - **WH T2 hybrid upgrade:** unlock after `WAREHOUSE_T2_SHIPPED_KG` (10t) Demand Board settle from that WH + CAPEX; capacity 5t→12t.

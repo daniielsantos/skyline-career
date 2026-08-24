@@ -262,3 +262,11 @@ export function previewDemandAcceptPull(opts: {
     limitedBy,
   };
 }
+
+/** Stock that is not pledged to a Demand hold. */
+export function warehouseFreeCommodityKgClient(
+  stockKg: number,
+  reservedKg: number,
+): number {
+  return Math.max(0, Math.floor(stockKg) - Math.max(0, Math.floor(reservedKg)));
+}

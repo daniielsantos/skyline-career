@@ -5,6 +5,7 @@
 import type {
   CareerMissionsState,
   CommodityId,
+  PlayerDemandHold,
   PlayerWarehouse,
   PlayerWarehousePile,
   PlayerWarehouseState,
@@ -109,7 +110,7 @@ function costsWithinMergeBand(a: number, b: number): boolean {
 }
 
 export function emptyPlayerWarehouseState(): PlayerWarehouseState {
-  return { warehouses: [], stock: [], inboundTransfers: [] };
+  return { warehouses: [], stock: [], inboundTransfers: [], demandHolds: [] };
 }
 
 export function normalizePlayerWarehouseState(
@@ -244,7 +245,68 @@ export function normalizePlayerWarehouseState(
       });
     }
   }
-  return { warehouses, stock, inboundTransfers };
+  const demandHolds: PlayerDemandHold[] = [];
+  if (Array.isArray(r.demandHolds)) {
+    for (const row of r.demandHolds) {
+      if (!row || typeof row !== 'object') continue;
+      const h = row as Record<string, unknown>;
+      const id = typeof h.id === 'string' ? h.id.trim() : '';
+      const orderId = typeof h.orderId === 'string' ? h.orderId.trim() : '';
+      const warehouseId =
+        typeof h.warehouseId === 'string' ? h.warehouseId.trim() : '';
+      const originIcao =
+        typeof h.originIcao === 'string'
+          ? h.originIcao.trim().toUpperCase()
+          : '';
+      const destIcao =
+        typeof h.destIcao === 'string' ? h.destIcao.trim().toUpperCase() : '';
+      const commodityId =
+        typeof h.commodityId === 'string'
+          ? (h.commodityId as CommodityId)
+          : null;
+      const kg =
+        typeof h.kg === 'number' && Number.isFinite(h.kg)
+          ? Math.max(0, Math.floor(h.kg))
+          : 0;
+      const unitPriceUsd =
+        typeof h.unitPriceUsd === 'number' && Number.isFinite(h.unitPriceUsd)
+          ? Math.max(0, money(h.unitPriceUsd))
+          : 0;
+      const heldAtTick =
+        typeof h.heldAtTick === 'number' && Number.isFinite(h.heldAtTick)
+          ? Math.max(0, Math.floor(h.heldAtTick))
+          : 0;
+      const expiresAtTick =
+        typeof h.expiresAtTick === 'number' && Number.isFinite(h.expiresAtTick)
+          ? Math.max(0, Math.floor(h.expiresAtTick))
+          : 0;
+      if (
+        !id ||
+        !orderId ||
+        !warehouseId ||
+        !originIcao ||
+        !destIcao ||
+        !commodityId ||
+        kg <= 0 ||
+        !isWarehouseCommodityAllowed(commodityId)
+      ) {
+        continue;
+      }
+      demandHolds.push({
+        id,
+        orderId,
+        warehouseId,
+        originIcao,
+        destIcao,
+        commodityId,
+        kg,
+        unitPriceUsd,
+        heldAtTick,
+        expiresAtTick: Math.max(expiresAtTick, heldAtTick),
+      });
+    }
+  }
+  return { warehouses, stock, inboundTransfers, demandHolds };
 }
 
 export function ensurePlayerWarehouses(
@@ -311,6 +373,34 @@ export function warehouseInboundFreeKg(
     warehouseUsedKg(state, warehouseId) +
     warehouseInboundPendingKg(state, warehouseId);
   return Math.max(0, wh.capacityKg - committed);
+}
+
+export function warehouseReservedCommodityKg(
+  state: CareerMissionsState,
+  warehouseId: string,
+  commodityId: CommodityId,
+): number {
+  const holds = state.playerWarehouses?.demandHolds ?? [];
+  return holds
+    .filter(
+      (h) => h.warehouseId === warehouseId && h.commodityId === commodityId,
+    )
+    .reduce((sum, h) => sum + h.kg, 0);
+}
+
+export function warehouseFreeCommodityKg(
+  state: CareerMissionsState,
+  icao: string,
+  commodityId: CommodityId,
+): number {
+  const wh = findPlayerWarehouseAtIcao(state, icao);
+  if (!wh) return 0;
+  const stock = ensurePlayerWarehouses(state)
+    .stock.filter(
+      (s) => s.warehouseId === wh.id && s.commodityId === commodityId && s.kg > 0,
+    )
+    .reduce((sum, s) => sum + s.kg, 0);
+  return Math.max(0, stock - warehouseReservedCommodityKg(state, wh.id, commodityId));
 }
 
 export function depositCargoToWarehouse(
@@ -470,6 +560,16 @@ export function abandonWarehouseStock(
   if (!wh) throw new Error('Warehouse for stock lot not found');
   const kg = pile.kg;
   const commodityId = pile.commodityId;
+  const reserved = (whs.demandHolds ?? [])
+    .filter(
+      (h) => h.warehouseId === pile.warehouseId && h.commodityId === commodityId,
+    )
+    .reduce((sum, h) => sum + h.kg, 0);
+  if (reserved > 0) {
+    throw new Error(
+      'Release the Demand hold on this commodity before abandoning the lot',
+    );
+  }
   const avgCostUsdPerKg = pile.avgCostUsdPerKg;
   const warehouseId = pile.warehouseId;
   const hubIcao = wh.icao;

@@ -48,7 +48,7 @@ import {
   syncWorldPortConcessions,
   tickPortConcessions,
 } from './career-port-concessions.js';
-import { demandSnapshot, ensureDemandOrders } from './career-demand.js';
+import { demandSnapshot, ensureDemandOrders, expireDemandHolds } from './career-demand.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
@@ -2571,6 +2571,7 @@ export function portSnapshot(
   concessions: NonNullable<CareerMissionsState['playerPortConcessions']>;
 } {
   if (state) {
+    expireDemandHolds(state, world);
     tickPortConcessions(state, world);
     syncWorldPortConcessions(world, state);
   }
@@ -2600,6 +2601,7 @@ export function portSnapshot(
         warehouses: [],
         stock: [],
         inboundTransfers: [],
+        demandHolds: [],
         pickupHubs: [],
         buyUsdByIcao: {},
       };

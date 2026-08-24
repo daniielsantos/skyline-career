@@ -9867,8 +9867,8 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-map-legend .dot.fbo {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.55rem;
+  height: 1.55rem;
 }
 
 .ports-map-legend .dot.port {
@@ -9947,16 +9947,15 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-map-fbo-marker {
-  color: #6ec8ff;
   z-index: 1;
 }
 
-.ports-map-fbo-marker:hover {
-  color: #9adbff;
+.ports-map-fbo-marker img,
+.ports-map-fbo-marker svg {
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.85));
 }
 
 .ports-map-fbo-marker.is-selected {
-  color: #b8e7ff;
   z-index: 3;
 }
 

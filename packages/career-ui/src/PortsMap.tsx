@@ -17,9 +17,21 @@ const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 
 const PORT_ACCENT = '#f0a35a';
 
-/** Generated map pins (transparent PNG). Sources in repo `assets/`. */
+/** Generated map pins. Anchor PNG in `public/ports`; WH is SVG so dock/door read at map scale. */
 const PORT_ANCHOR_SRC = '/ports/anchor.png';
-const WAREHOUSE_SRC = '/ports/warehouse.png';
+/** Chunky 20ft-style container — bold ribs + doors so it still reads at ~48px. */
+const WAREHOUSE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 36" fill="none">
+  <polygon points="15,31 35,20.5 35,8 15,18.5" fill="#1e6a96"/>
+  <polygon points="15,31 19,28.9 19,16.4 15,18.5" fill="#165a82"/>
+  <polygon points="23,26.8 27,24.7 27,12.2 23,16.3" fill="#165a82"/>
+  <polygon points="31,22.6 35,20.5 35,8 31,10.1" fill="#165a82"/>
+  <polygon points="4,33.5 15,31 15,18.5 4,21" fill="#3d9ac8"/>
+  <path d="M9.5 32.25 9.5 19.75" stroke="#fff4e8" stroke-width="1.55" stroke-linecap="round"/>
+  <path d="M6.4 31.7 6.4 21.3M12.6 30.3 12.6 19.9" stroke="#16384c" stroke-width="1.35" stroke-linecap="round"/>
+  <polygon points="4,21 15,18.5 35,8 24,10.5" fill="#8fd0ee"/>
+  <path d="M4 33.5 15 31 35 20.5 35 8 24 10.5 4 21Z" stroke="#fff4e8" stroke-width="2" stroke-linejoin="round"/>
+</svg>`;
+const WAREHOUSE_SRC = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(WAREHOUSE_SVG)}`;
 
 function markerImage(src: string): HTMLImageElement {
   const img = document.createElement('img');
@@ -81,7 +93,7 @@ function fboMarkerElement(highlighted: boolean): HTMLButtonElement {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `ports-map-fbo-marker${highlighted ? ' is-selected' : ''}`;
-  const size = highlighted ? 36 : 32;
+  const size = highlighted ? 56 : 48;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
   el.appendChild(markerImage(WAREHOUSE_SRC));
@@ -282,7 +294,7 @@ export function PortsMap(props: {
           .setLngLat([fbo.lon, fbo.lat])
           .setPopup(
             new Popup({
-              offset: 12,
+              offset: 20,
               closeButton: false,
               className: 'hub-map-popup',
             }).setHTML(

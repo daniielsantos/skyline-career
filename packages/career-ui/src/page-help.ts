@@ -37,7 +37,7 @@ export const PAGE_HELP = {
       'The yard restocks on a daily inbound discharge. Concession lease grows yard cap; renew cost follows recent throughput.',
       'Buy warehouse space (T1–T3), then Store yard lots into it. Fees apply when you move cargo into the warehouse.',
       'Demand Board posts when terminals run low. Filter by warehouse (domestic or allowlisted intl). Hold pledges stock without flying; Fly now or Dispatch stages the mission.',
-      'This is not the Freights board. No warehouse stock means no Demand mission to accept.',
+      'Bridge / Transfer on a warehouse lot flies company stock WH to WH (Hold or Fly now, no payout). Dest overflow goes to that hub yard, not the terminal.',
     ],
   },
   hangar: {

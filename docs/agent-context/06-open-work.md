@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-24: WH air bridge (WH→WH Hold/Fly now, no payout; dest WH + yard overflow). Demand holds unchanged.
+
 Atualizado 2026-08-24: Demand warehouse holds — pledge WH kg + claim board remaining without a flight; Dispatch later; TTL by WH tier.
 
 Atualizado 2026-08-23: MM68 (Mina Hércules, GPS) saiu do catálogo — remap MMCU. Demand Board não posta em bush / bushTripOnly (SimBrief OFP). FAA locals US Activities continuam no PLN.

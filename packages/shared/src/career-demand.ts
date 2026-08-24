@@ -346,7 +346,9 @@ export function expireDemandHolds(
       kept.push(hold);
       continue;
     }
-    restoreDemandRemainingKg(world, hold.orderId, hold.kg);
+    if ((hold.kind ?? 'demand') === 'demand' && hold.orderId) {
+      restoreDemandRemainingKg(world, hold.orderId, hold.kg);
+    }
     released += hold.kg;
   }
   state.playerWarehouses!.demandHolds = kept;
@@ -398,7 +400,7 @@ export function holdDemandOrder(
   }
 
   const holds = listDemandHolds(state);
-  if (holds.some((h) => h.orderId === order.id)) {
+  if (holds.some((h) => (h.kind ?? 'demand') === 'demand' && h.orderId === order.id)) {
     throw new Error('This demand order is already held at your warehouse');
   }
 
@@ -424,6 +426,7 @@ export function holdDemandOrder(
   const ttl = demandHoldTtlTicks(wh.tier);
   const hold: PlayerDemandHold = {
     id: nextId('dhold', world.tick),
+    kind: 'demand',
     orderId: order.id,
     warehouseId: wh.id,
     originIcao: origin,
@@ -456,10 +459,15 @@ export function cancelDemandHold(
   const idx = holds.findIndex((h) => h.id === opts.holdId.trim());
   if (idx < 0) throw new Error('Demand hold not found');
   const hold = holds[idx]!;
-  restoreDemandRemainingKg(world, hold.orderId, hold.kg);
+  if ((hold.kind ?? 'demand') === 'bridge') {
+    throw new Error('Use warehouse bridge cancel for this hold');
+  }
+  const orderId = hold.orderId?.trim();
+  if (!orderId) throw new Error('Demand hold is missing an order');
+  restoreDemandRemainingKg(world, orderId, hold.kg);
   holds.splice(idx, 1);
   state.playerWarehouses!.demandHolds = holds;
-  return { kg: hold.kg, orderId: hold.orderId };
+  return { kg: hold.kg, orderId };
 }
 
 export function dispatchDemandHold(
@@ -473,6 +481,11 @@ export function dispatchDemandHold(
   const idx = holds.findIndex((h) => h.id === opts.holdId.trim());
   if (idx < 0) throw new Error('Demand hold not found');
   const hold = holds[idx]!;
+  if ((hold.kind ?? 'demand') === 'bridge') {
+    throw new Error('Use warehouse bridge dispatch for this hold');
+  }
+  const orderId = hold.orderId?.trim();
+  if (!orderId) throw new Error('Demand hold is missing an order');
 
   const open = listActivePlayerMissions(state.missions ?? []);
   if (open.length > 0) {
@@ -513,7 +526,7 @@ export function dispatchDemandHold(
     );
   }
 
-  const order = (world.demandOrders ?? []).find((o) => o.id === hold.orderId);
+  const order = (world.demandOrders ?? []).find((o) => o.id === orderId);
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: hold.originIcao,
     commodityId: hold.commodityId,
@@ -536,7 +549,7 @@ export function dispatchDemandHold(
     kg,
     payUsd,
     aircraft: dispatchAircraft,
-    orderId: hold.orderId,
+    orderId,
     warehouseId: withdrawn.warehouseId,
     avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
     international:
@@ -550,7 +563,7 @@ export function dispatchDemandHold(
   return {
     mission,
     order: order ? { ...order } : {
-      id: hold.orderId,
+      id: orderId,
       destIcao: hold.destIcao,
       commodityId: hold.commodityId,
       wantedKg: kg,
@@ -565,7 +578,7 @@ export function dispatchDemandHold(
   };
 }
 
-function demandRouteMaxCargoKg(
+export function demandRouteMaxCargoKg(
   world: CareerEconomyWorld,
   aircraft: { aircraftClassId: MissionIntent['aircraftClassId']; airframeTypeId: string },
   origin: string,

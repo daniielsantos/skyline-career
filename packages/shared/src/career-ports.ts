@@ -1879,6 +1879,13 @@ export function getCareerPort(portId: string): CareerPortDef | undefined {
   return PORT_BY_ID.get(portId.trim().toUpperCase());
 }
 
+export function careerPortIdForPickupHub(icao: string): string | undefined {
+  const hub = icao.trim().toUpperCase();
+  return CAREER_PORTS.find((p) =>
+    p.pickupHubs.some((h) => h.trim().toUpperCase() === hub),
+  )?.id;
+}
+
 export function resolvePortPickupHub(
   port: CareerPortDef,
   preferredIcao?: string,

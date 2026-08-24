@@ -230,6 +230,7 @@ export * from './career-fbo.js';
 export * from './career-fbo-perks.js';
 export * from './career-fbo-stock.js';
 export * from './career-warehouse.js';
+export * from './career-warehouse-bridge.js';
 export * from './career-demand.js';
 export * from './career-ports.js';
 export * from './career-port-concessions.js';

@@ -800,6 +800,13 @@ export interface MissionIntent {
    * and fills destination inventory (freight delivery).
    */
   demandOrderId?: string;
+  /**
+   * Company WH→WH air bridge (no payout). Settle deposits dest warehouse;
+   * overflow goes to that hub's port yard. Cancel restores origin WH.
+   */
+  warehouseBridge?: boolean;
+  /** Dest warehouse id for a bridge mission. */
+  destWarehouseId?: string;
   /** Warehouse id cargo was drawn from (restore on cancel). */
   warehouseId?: string;
   /** Avg cost (USD/kg) of reserved warehouse cargo. */
@@ -1194,13 +1201,18 @@ export interface WarehouseInboundTransfer {
 /** Demand Board kg pledged at a warehouse without starting a flight. */
 export interface PlayerDemandHold {
   id: string;
-  orderId: string;
+  /** `demand` claims world remainingKg; `bridge` is company WH→WH only. */
+  kind?: 'demand' | 'bridge';
+  /** Demand Board order id (`demand` holds). */
+  orderId?: string;
   warehouseId: string;
   originIcao: string;
   destIcao: string;
+  /** Dest warehouse id (`bridge` holds). */
+  destWarehouseId?: string;
   commodityId: CommodityId;
   kg: number;
-  /** Frozen USD/kg at hold (intl + demand desk). */
+  /** Frozen USD/kg at hold (intl + demand desk). 0 on bridge. */
   unitPriceUsd: number;
   heldAtTick: number;
   expiresAtTick: number;

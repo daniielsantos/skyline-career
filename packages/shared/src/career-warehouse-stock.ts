@@ -10,6 +10,7 @@ import type {
   PlayerWarehousePile,
   PlayerWarehouseState,
   WarehouseInboundTransfer,
+  PlayerPortPickup,
 } from './types/career-economy.js';
 
 function money(n: number): number {
@@ -251,7 +252,12 @@ export function normalizePlayerWarehouseState(
       if (!row || typeof row !== 'object') continue;
       const h = row as Record<string, unknown>;
       const id = typeof h.id === 'string' ? h.id.trim() : '';
+      const kindRaw = typeof h.kind === 'string' ? h.kind.trim() : '';
+      const kind: 'demand' | 'bridge' =
+        kindRaw === 'bridge' ? 'bridge' : 'demand';
       const orderId = typeof h.orderId === 'string' ? h.orderId.trim() : '';
+      const destWarehouseId =
+        typeof h.destWarehouseId === 'string' ? h.destWarehouseId.trim() : '';
       const warehouseId =
         typeof h.warehouseId === 'string' ? h.warehouseId.trim() : '';
       const originIcao =
@@ -282,7 +288,6 @@ export function normalizePlayerWarehouseState(
           : 0;
       if (
         !id ||
-        !orderId ||
         !warehouseId ||
         !originIcao ||
         !destIcao ||
@@ -292,12 +297,16 @@ export function normalizePlayerWarehouseState(
       ) {
         continue;
       }
+      if (kind === 'demand' && !orderId) continue;
+      if (kind === 'bridge' && !destWarehouseId) continue;
       demandHolds.push({
         id,
-        orderId,
+        kind,
+        ...(orderId ? { orderId } : {}),
         warehouseId,
         originIcao,
         destIcao,
+        ...(destWarehouseId ? { destWarehouseId } : {}),
         commodityId,
         kg,
         unitPriceUsd,
@@ -403,6 +412,24 @@ export function warehouseFreeCommodityKg(
   return Math.max(0, stock - warehouseReservedCommodityKg(state, wh.id, commodityId));
 }
 
+/** Room at dest WH for incoming bridge holds (capacity minus stock, inbound, other bridges). */
+export function warehouseBridgeDestRoomKg(
+  state: CareerMissionsState,
+  destWarehouseId: string,
+  excludeHoldId?: string,
+): number {
+  const inboundFree = warehouseInboundFreeKg(state, destWarehouseId);
+  const pledged = (state.playerWarehouses?.demandHolds ?? [])
+    .filter(
+      (h) =>
+        (h.kind ?? 'demand') === 'bridge' &&
+        h.destWarehouseId === destWarehouseId &&
+        h.id !== excludeHoldId,
+    )
+    .reduce((sum, h) => sum + h.kg, 0);
+  return Math.max(0, inboundFree - pledged);
+}
+
 export function depositCargoToWarehouse(
   state: CareerMissionsState,
   opts: {
@@ -461,6 +488,49 @@ export function depositCargoToWarehouse(
   };
   stock.push(pile);
   return { ...pile };
+}
+
+/** Deposit as much as fits in the WH; leftover becomes a port-yard pickup. */
+export function depositCargoToWarehouseOrYard(
+  state: CareerMissionsState,
+  opts: {
+    icao: string;
+    commodityId: CommodityId;
+    kg: number;
+    avgCostUsdPerKg: number;
+    tick: number;
+    portId: string;
+  },
+): { storedKg: number; yardKg: number } {
+  const kg = Math.max(0, Math.floor(opts.kg));
+  if (kg <= 0) return { storedKg: 0, yardKg: 0 };
+  const wh = findPlayerWarehouseAtIcao(state, opts.icao);
+  const room = wh ? warehouseFreeKg(state, wh.id) : 0;
+  const storedKg = Math.min(kg, room);
+  const yardKg = kg - storedKg;
+  if (storedKg > 0) {
+    depositCargoToWarehouse(state, {
+      icao: opts.icao,
+      commodityId: opts.commodityId,
+      kg: storedKg,
+      avgCostUsdPerKg: opts.avgCostUsdPerKg,
+      tick: opts.tick,
+    });
+  }
+  if (yardKg > 0) {
+    const pickup: PlayerPortPickup = {
+      id: nextId('portpk', opts.tick),
+      portId: opts.portId.trim().toUpperCase(),
+      hubIcao: opts.icao.trim().toUpperCase(),
+      commodityId: opts.commodityId,
+      kg: yardKg,
+      avgCostUsdPerKg: money(opts.avgCostUsdPerKg),
+      purchasedAtTick: opts.tick,
+    };
+    if (!Array.isArray(state.portPickups)) state.portPickups = [];
+    state.portPickups.push(pickup);
+  }
+  return { storedKg, yardKg };
 }
 
 /** Remove kg from warehouse piles at ICAO (FIFO by acquiredAtTick). */

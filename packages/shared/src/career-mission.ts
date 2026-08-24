@@ -20,7 +20,7 @@ import {
 } from './career-fleet.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
 import { hubDistanceNm } from './career-ferry-route.js';
-import { depositCargoToWarehouse, recordWarehouseShipmentKg } from './career-warehouse-stock.js';
+import { depositCargoToWarehouse, depositCargoToWarehouseOrYard, recordWarehouseShipmentKg } from './career-warehouse-stock.js';
 import { whOpsShippedMultForWarehouse } from './career-ground-staff.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
@@ -1729,7 +1729,23 @@ export function cancelMission(
   }
   if (opts.fleet) {
     releaseAircraftOnCancel(opts.fleet, normalized);
-    if (normalized.demandOrderId) {
+    if (normalized.warehouseBridge) {
+      const line = normalized.lots[0];
+      const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
+      if (kg > 0) {
+        try {
+          depositCargoToWarehouse(opts.fleet, {
+            icao: normalized.originIcao,
+            commodityId: line?.commodityId ?? normalized.commodityId,
+            kg,
+            avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
+            tick: normalized.acceptedAtTick ?? world.tick,
+          });
+        } catch {
+          // Warehouse may be gone — cancel still succeeds.
+        }
+      }
+    } else if (normalized.demandOrderId) {
       const line = normalized.lots[0];
       const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
       if (kg > 0) {
@@ -1853,7 +1869,8 @@ export function revertFalseDepartMission(
         line.shipmentLotId.startsWith('deadhead_') ||
         line.shipmentLotId.startsWith('empty_') ||
         line.shipmentLotId.startsWith('portpk_') ||
-        line.shipmentLotId.startsWith('demand_')
+        line.shipmentLotId.startsWith('demand_') ||
+        line.shipmentLotId.startsWith('whbridge_')
       ) {
         continue;
       }
@@ -1904,7 +1921,8 @@ export function departMission(
         line.shipmentLotId.startsWith('deadhead_') ||
         line.shipmentLotId.startsWith('empty_') ||
         line.shipmentLotId.startsWith('portpk_') ||
-        line.shipmentLotId.startsWith('demand_')
+        line.shipmentLotId.startsWith('demand_') ||
+        line.shipmentLotId.startsWith('whbridge_')
       ) {
         continue;
       }
@@ -2227,6 +2245,31 @@ export function settleMission(
         line.shipmentLotId.startsWith('deadhead_') ||
         line.shipmentLotId.startsWith('empty_')
       ) {
+        continue;
+      }
+      // Company WH→WH bridge: deposit dest warehouse (overflow to yard).
+      if (working.warehouseBridge) {
+        if (opts.fleet) {
+          const destPortId =
+            working.portId?.trim().toUpperCase() ||
+            working.destIcao.trim().toUpperCase();
+          depositCargoToWarehouseOrYard(opts.fleet, {
+            icao: working.destIcao,
+            commodityId: line.commodityId,
+            kg: line.cargoKg,
+            avgCostUsdPerKg: working.warehouseAvgCostUsdPerKg ?? 0,
+            tick: settleTick,
+            portId: destPortId,
+          });
+        }
+        settlementLines.push({
+          shipmentLotId: line.shipmentLotId,
+          commodityId: line.commodityId,
+          deliveredKg: line.cargoKg,
+          payUsd: 0,
+          penaltyUsd: 0,
+          payoutUsd: 0,
+        });
         continue;
       }
       // Demand Board: company warehouse cargo — fill dest only (no origin debit).

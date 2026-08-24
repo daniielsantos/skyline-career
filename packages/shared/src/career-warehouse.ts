@@ -36,6 +36,7 @@ import type {
 export {
   abandonWarehouseStock,
   depositCargoToWarehouse,
+  depositCargoToWarehouseOrYard,
   emptyPlayerWarehouseState,
   ensurePlayerWarehouses,
   findPlayerWarehouseAtIcao,
@@ -49,6 +50,7 @@ export {
   warehouseInboundPendingKg,
   warehouseUsedKg,
   warehouseReservedCommodityKg,
+  warehouseBridgeDestRoomKg,
   withdrawCargoFromWarehouse,
   WAREHOUSE_CAPACITY_KG,
   WAREHOUSE_LOT_MERGE_REL_BAND,

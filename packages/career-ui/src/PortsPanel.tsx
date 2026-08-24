@@ -18,6 +18,10 @@ import {
   postWarehouseBuy,
   postWarehouseUpgrade,
   postWarehouseStockAbandon,
+  postWarehouseBridgeHold,
+  postWarehouseBridgeHoldCancel,
+  postWarehouseBridgeAccept,
+  postWarehouseBridgeDispatchHold,
   type CareerCargoOps,
   type DemandOrderView,
   type GroundStaffSnapshot,
@@ -372,6 +376,13 @@ export function PortsPanel(props: {
     null,
   );
   const [dispatchAircraftId, setDispatchAircraftId] = useState('');
+  const [bridgeDraft, setBridgeDraft] = useState<{
+    originIcao: string;
+    commodityId: string;
+  } | null>(null);
+  const [bridgeDest, setBridgeDest] = useState('');
+  const [bridgeMode, setBridgeMode] = useState<'hold' | 'fly'>('hold');
+  const [bridgeAircraftId, setBridgeAircraftId] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
@@ -1313,22 +1324,40 @@ export function PortsPanel(props: {
     if (!dispatchHold || !dispatchAircraftId || props.busy || loading) return;
     setLoading(true);
     try {
-      const result = await postDemandDispatchHold({
-        holdId: dispatchHold.id,
-        aircraftId: dispatchAircraftId,
-      });
-      props.onWallet?.(result.walletUsd);
-      props.onFleet?.(result.fleet);
-      props.onMissions?.(result.missions.slice().reverse());
-      setWarehouses(result.warehouses);
-      setDemand(result.demand.orders);
-      setDispatchHold(null);
-      setDispatchAircraftId('');
-      props.onToast?.(
-        'ok',
-        `Demand ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
-      );
-      props.onStaged?.(result.mission);
+      if (dispatchHold.kind === 'bridge') {
+        const result = await postWarehouseBridgeDispatchHold({
+          holdId: dispatchHold.id,
+          aircraftId: dispatchAircraftId,
+        });
+        props.onWallet?.(result.walletUsd);
+        props.onFleet?.(result.fleet);
+        props.onMissions?.(result.missions.slice().reverse());
+        setWarehouses(result.warehouses);
+        setDispatchHold(null);
+        setDispatchAircraftId('');
+        props.onToast?.(
+          'ok',
+          `Bridge ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · open Dispatch`,
+        );
+        props.onStaged?.(result.mission);
+      } else {
+        const result = await postDemandDispatchHold({
+          holdId: dispatchHold.id,
+          aircraftId: dispatchAircraftId,
+        });
+        props.onWallet?.(result.walletUsd);
+        props.onFleet?.(result.fleet);
+        props.onMissions?.(result.missions.slice().reverse());
+        setWarehouses(result.warehouses);
+        setDemand(result.demand.orders);
+        setDispatchHold(null);
+        setDispatchAircraftId('');
+        props.onToast?.(
+          'ok',
+          `Demand ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
+        );
+        props.onStaged?.(result.mission);
+      }
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -1342,13 +1371,67 @@ export function PortsPanel(props: {
   async function onReleaseDemandHold(hold: PlayerDemandHoldView) {
     setLoading(true);
     try {
-      const result = await postDemandHoldCancel({ holdId: hold.id });
-      setWarehouses(result.warehouses);
-      setDemand(result.demand.orders);
+      if (hold.kind === 'bridge') {
+        const result = await postWarehouseBridgeHoldCancel({ holdId: hold.id });
+        setWarehouses(result.warehouses);
+        props.onToast?.(
+          'ok',
+          `Released ${props.formatTonnes(result.kg)} bridge hold`,
+        );
+      } else {
+        const result = await postDemandHoldCancel({ holdId: hold.id });
+        setWarehouses(result.warehouses);
+        setDemand(result.demand.orders);
+        props.onToast?.(
+          'ok',
+          `Released ${props.formatTonnes(result.kg)} back to the Demand Board`,
+        );
+      }
+    } catch (err) {
       props.onToast?.(
-        'ok',
-        `Released ${props.formatTonnes(result.kg)} back to the Demand Board`,
+        'fail',
+        err instanceof Error ? err.message : String(err),
       );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onConfirmBridge() {
+    if (!bridgeDraft || !bridgeDest || props.busy || loading) return;
+    if (bridgeMode === 'fly' && !bridgeAircraftId) return;
+    setLoading(true);
+    try {
+      if (bridgeMode === 'hold') {
+        const result = await postWarehouseBridgeHold({
+          originIcao: bridgeDraft.originIcao,
+          destIcao: bridgeDest,
+          commodityId: bridgeDraft.commodityId,
+        });
+        setWarehouses(result.warehouses);
+        setBridgeDraft(null);
+        props.onToast?.(
+          'ok',
+          `Held ${props.formatTonnes(result.kg)} bridge ${result.hold.originIcao}→${result.hold.destIcao}`,
+        );
+      } else {
+        const result = await postWarehouseBridgeAccept({
+          originIcao: bridgeDraft.originIcao,
+          destIcao: bridgeDest,
+          commodityId: bridgeDraft.commodityId,
+          aircraftId: bridgeAircraftId,
+        });
+        props.onWallet?.(result.walletUsd);
+        props.onFleet?.(result.fleet);
+        props.onMissions?.(result.missions.slice().reverse());
+        setWarehouses(result.warehouses);
+        setBridgeDraft(null);
+        props.onToast?.(
+          'ok',
+          `Bridge ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · open Dispatch`,
+        );
+        props.onStaged?.(result.mission);
+      }
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -1511,7 +1594,14 @@ export function PortsPanel(props: {
     });
   }, [allWarehouseStock, port?.id, port?.pickupHubs, warehouses?.warehouses, portForHub]);
   const heldOrderIds = useMemo(
-    () => new Set((warehouses?.demandHolds ?? []).map((h) => h.orderId)),
+    () =>
+      new Set(
+        (warehouses?.demandHolds ?? [])
+          .filter(
+            (h) => (h.kind ?? 'demand') !== 'bridge' && Boolean(h.orderId),
+          )
+          .map((h) => h.orderId!),
+      ),
     [warehouses?.demandHolds],
   );
   const holdsAtSelectedPort = useMemo(() => {
@@ -1541,6 +1631,22 @@ export function PortsPanel(props: {
         a.locationIcao.trim().toUpperCase() === hub,
     );
   }, [props.fleet, dispatchHold]);
+  const bridgeDestOptions = useMemo(() => {
+    if (!bridgeDraft) return [];
+    const origin = bridgeDraft.originIcao.trim().toUpperCase();
+    return (warehouses?.warehouses ?? []).filter(
+      (w) => w.icao.trim().toUpperCase() !== origin,
+    );
+  }, [bridgeDraft, warehouses?.warehouses]);
+  const bridgeAircraftOptions = useMemo(() => {
+    if (!bridgeDraft || bridgeMode !== 'fly') return [];
+    const hub = bridgeDraft.originIcao.trim().toUpperCase();
+    return props.fleet.filter(
+      (a) =>
+        a.status === 'parked' &&
+        a.locationIcao.trim().toUpperCase() === hub,
+    );
+  }, [props.fleet, bridgeDraft, bridgeMode]);
   const selectedStock = useMemo(() => {
     if (!selectedStockId) return null;
     return allWarehouseStock.find((s) => s.id === selectedStockId) ?? null;
@@ -2680,6 +2786,45 @@ export function PortsPanel(props: {
                                         >
                                           Abandon
                                         </button>
+                                        {allOwnedWarehouses.length > 1 ? (
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={props.busy || loading}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              const origin = hubIcao;
+                                              setBridgeDraft({
+                                                originIcao: origin,
+                                                commodityId: s.commodityId,
+                                              });
+                                              const dests = (
+                                                warehouses?.warehouses ?? []
+                                              ).filter(
+                                                (w) =>
+                                                  w.icao.trim().toUpperCase() !==
+                                                  origin,
+                                              );
+                                              setBridgeDest(
+                                                dests[0]?.icao.trim().toUpperCase() ??
+                                                  '',
+                                              );
+                                              setBridgeMode('hold');
+                                              const parked = props.fleet.filter(
+                                                (a) =>
+                                                  a.status === 'parked' &&
+                                                  a.locationIcao
+                                                    .trim()
+                                                    .toUpperCase() === origin,
+                                              );
+                                              setBridgeAircraftId(
+                                                parked[0]?.id ?? '',
+                                              );
+                                            }}
+                                          >
+                                            Bridge
+                                          </button>
+                                        ) : null}
                                       </td>
                                     </tr>
                                   );
@@ -2710,6 +2855,7 @@ export function PortsPanel(props: {
                                 {holdsAtSelectedPort.map((h) => (
                                   <tr key={h.id}>
                                     <td>
+                                      {h.kind === 'bridge' ? 'Bridge ' : ''}
                                       {h.originIcao}→{h.destIcao}
                                     </td>
                                     <td>
@@ -3961,6 +4107,28 @@ export function PortsPanel(props: {
         />
       ) : null}
 
+      {bridgeDraft ? (
+        <WarehouseBridgeDialog
+          originIcao={bridgeDraft.originIcao}
+          commodityId={bridgeDraft.commodityId}
+          destIcao={bridgeDest}
+          destOptions={bridgeDestOptions.map((w) => ({
+            icao: w.icao.trim().toUpperCase(),
+            inboundFreeKg: w.inboundFreeKg ?? w.freeKg ?? 0,
+          }))}
+          mode={bridgeMode}
+          aircraftId={bridgeAircraftId}
+          aircraftOptions={bridgeAircraftOptions}
+          busy={Boolean(props.busy || loading)}
+          formatTonnes={props.formatTonnes}
+          onDestChange={setBridgeDest}
+          onModeChange={setBridgeMode}
+          onAircraftChange={setBridgeAircraftId}
+          onCancel={() => setBridgeDraft(null)}
+          onConfirm={() => void onConfirmBridge()}
+        />
+      ) : null}
+
       {confirmDialog}
     </section>
   );
@@ -4515,14 +4683,19 @@ function DemandDispatchHoldDialog(props: {
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <p className="confirm-kicker">Warehouse hold</p>
+        <p className="confirm-kicker">
+          {props.hold.kind === 'bridge' ? 'Warehouse bridge' : 'Warehouse hold'}
+        </p>
         <h2 id={titleId} className="confirm-title">
           Dispatch {props.hold.originIcao}→{props.hold.destIcao}?
         </h2>
         <div className="confirm-body">
           <p>
             {props.formatTonnes(props.hold.kg)} pledged at the warehouse —
-            pick a parked aircraft at {props.hold.originIcao}.
+            pick a parked aircraft at {props.hold.originIcao}
+            {props.hold.kind === 'bridge'
+              ? '. No payout — cargo lands in the dest warehouse.'
+              : '.'}
           </p>
           <div className="demand-accept-section">
             <span className="demand-accept-label">Aircraft</span>
@@ -4569,6 +4742,177 @@ function DemandDispatchHoldDialog(props: {
             onClick={props.onConfirm}
           >
             Fly now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WarehouseBridgeDialog(props: {
+  originIcao: string;
+  commodityId: string;
+  destIcao: string;
+  destOptions: { icao: string; inboundFreeKg: number }[];
+  mode: 'hold' | 'fly';
+  aircraftId: string;
+  aircraftOptions: PlayerAircraft[];
+  busy: boolean;
+  formatTonnes: (kg: number) => string;
+  onDestChange: (icao: string) => void;
+  onModeChange: (mode: 'hold' | 'fly') => void;
+  onAircraftChange: (id: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const titleId = useId();
+  const dest = props.destOptions.find((d) => d.icao === props.destIcao);
+  const canConfirm =
+    Boolean(props.destIcao) &&
+    props.destOptions.length > 0 &&
+    !props.busy &&
+    (props.mode === 'hold' ||
+      (Boolean(props.aircraftId) && props.aircraftOptions.length > 0));
+  return (
+    <div
+      className="confirm-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) props.onCancel();
+      }}
+    >
+      <div
+        className="confirm-dialog demand-accept-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <p className="confirm-kicker">Warehouse transfer</p>
+        <h2 id={titleId} className="confirm-title">
+          Bridge {props.originIcao}→{props.destIcao || '…'}?
+        </h2>
+        <div className="confirm-body">
+          <p>
+            Company cargo only — no Demand Board row and no payout. Hold
+            reserves kg at {props.originIcao}; Fly now withdraws and stages
+            Dispatch.
+          </p>
+          <div className="demand-accept-section">
+            <span className="demand-accept-label">Destination warehouse</span>
+            {props.destOptions.length === 0 ? (
+              <p className="demand-accept-hint">
+                Buy a second warehouse to reposition stock.
+              </p>
+            ) : (
+              <div
+                className="demand-accept-picks"
+                role="listbox"
+                aria-label="Destination warehouse"
+              >
+                {props.destOptions.map((w) => {
+                  const active = w.icao === props.destIcao;
+                  return (
+                    <button
+                      key={w.icao}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      className={`demand-accept-pick${active ? ' is-active' : ''}`}
+                      disabled={props.busy}
+                      onClick={() => props.onDestChange(w.icao)}
+                    >
+                      <strong>{w.icao}</strong>
+                      <span>{props.formatTonnes(w.inboundFreeKg)} free</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          {dest ? (
+            <p className="demand-accept-hint">
+              Dest inbound free {props.formatTonnes(dest.inboundFreeKg)} ·{' '}
+              {props.commodityId}
+            </p>
+          ) : null}
+          <div className="demand-accept-section">
+            <span className="demand-accept-label">When</span>
+            <div className="demand-accept-picks" role="listbox" aria-label="Hold or fly">
+              <button
+                type="button"
+                role="option"
+                aria-selected={props.mode === 'hold'}
+                className={`demand-accept-pick${props.mode === 'hold' ? ' is-active' : ''}`}
+                disabled={props.busy}
+                onClick={() => props.onModeChange('hold')}
+              >
+                <strong>Hold at WH</strong>
+                <span>Reserve kg — fly later</span>
+              </button>
+              <button
+                type="button"
+                role="option"
+                aria-selected={props.mode === 'fly'}
+                className={`demand-accept-pick${props.mode === 'fly' ? ' is-active' : ''}`}
+                disabled={props.busy}
+                onClick={() => props.onModeChange('fly')}
+              >
+                <strong>Fly now</strong>
+                <span>Stage Dispatch</span>
+              </button>
+            </div>
+          </div>
+          {props.mode === 'fly' ? (
+            <div className="demand-accept-section">
+              <span className="demand-accept-label">Aircraft</span>
+              {props.aircraftOptions.length === 0 ? (
+                <p className="demand-accept-hint">
+                  No parked aircraft at {props.originIcao} — ferry one there.
+                </p>
+              ) : (
+                <div
+                  className="demand-accept-picks"
+                  role="listbox"
+                  aria-label="Aircraft"
+                >
+                  {props.aircraftOptions.map((a) => {
+                    const active = a.id === props.aircraftId;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        className={`demand-accept-pick${active ? ' is-active' : ''}`}
+                        disabled={props.busy}
+                        onClick={() => props.onAircraftChange(a.id)}
+                      >
+                        <strong>{a.label ?? a.id}</strong>
+                        <span>{a.locationIcao}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+        <div className="confirm-actions">
+          <button
+            type="button"
+            className="action ghost"
+            disabled={props.busy}
+            onClick={props.onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="accept"
+            disabled={!canConfirm}
+            onClick={props.onConfirm}
+          >
+            {props.mode === 'hold' ? 'Hold' : 'Fly now'}
           </button>
         </div>
       </div>

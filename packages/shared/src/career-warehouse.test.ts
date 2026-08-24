@@ -16,6 +16,7 @@ import {
   upgradeWarehouseToTier2,
   warehouseFreeKg,
   warehouseFreeCommodityKg,
+  warehouseReservedCommodityKg,
   warehouseTier2Progress,
   withdrawCargoFromWarehouse,
   WAREHOUSE_T1_CAPACITY_KG,
@@ -36,6 +37,10 @@ import {
   replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
 } from './career-demand.js';
+import {
+  acceptWarehouseBridge,
+  holdWarehouseBridge,
+} from './career-warehouse-bridge.js';
 import {
   buyPortListing,
   depositPortPickupToWarehouse,
@@ -995,5 +1000,253 @@ describe('career warehouse + demand', () => {
       world.demandOrders.find((o) => o.id === 'demand_hold_b')!.remainingKg,
       300,
     );
+  });
+
+  it('bridge hold does not withdraw stock; expire restores free kg', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-bridge-hold' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'BridgeHold',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    buyWarehouseAtPickupHub(state, world, 'SBCT');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 500,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const held = holdWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      kg: 200,
+    });
+    assert.equal(held.kg, 200);
+    assert.equal(held.hold.kind, 'bridge');
+    assert.equal(held.hold.unitPriceUsd, 0);
+    assert.equal(
+      (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
+      500,
+    );
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 300);
+    world.tick = held.hold.expiresAtTick;
+    const released = expireDemandHolds(state, world);
+    assert.equal(released, 200);
+    assert.equal((state.playerWarehouses?.demandHolds ?? []).length, 0);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 500);
+  });
+
+  it('bridge dispatch settles dest WH with no payout; cancel restores origin only', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-bridge-fly' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'BridgeFly',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    buyWarehouseAtPickupHub(state, world, 'SBCT');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const dest = world.airports.find((a) => a.icao === 'SBCT')!;
+    const destPile = dest.inventory.general ?? {
+      stockKg: 0,
+      capacityKg: 80_000,
+    };
+    dest.inventory.general = destPile;
+    destPile.stockKg = 1_000;
+    const beforeWallet = state.walletUsd;
+    const accepted = acceptWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 150,
+    });
+    assert.equal(accepted.mission.payUsd, 0);
+    assert.equal(accepted.mission.warehouseBridge, true);
+    assert.equal(accepted.mission.demandOrderId, undefined);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 250);
+
+    cancelMission(world, accepted.mission, { fleet: state });
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 400);
+    assert.equal(destPile.stockKg, 1_000);
+    assert.equal(state.walletUsd, beforeWallet);
+
+    aircraft.status = 'parked';
+    aircraft.locationIcao = 'SBGR';
+    aircraft.assignedMissionId = undefined;
+    state.missions = [];
+    const accepted2 = acceptWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 150,
+    });
+    const departed = departMission(world, accepted2.mission, { fleet: state });
+    const settled = settleMission(world, departed.mission, {
+      fleet: state,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(settled.mission.status, 'settled');
+    assert.equal(settled.walletCreditUsd, 0);
+    assert.equal(state.walletUsd, beforeWallet);
+    assert.equal(destPile.stockKg, 1_000);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 250);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBCT', 'general'), 150);
+    const shipped = (state.playerWarehouses?.warehouses ?? []).reduce(
+      (s, w) => s + (w.lifetimeShippedKg ?? 0),
+      0,
+    );
+    assert.equal(shipped, 0);
+  });
+
+  it('bridge overflow goes to dest hub yard', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-bridge-yard' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'BridgeYard',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    buyWarehouseAtPickupHub(state, world, 'SBCT');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 150,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const accepted = acceptWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 150,
+    });
+    depositCargoToWarehouse(state, {
+      icao: 'SBCT',
+      commodityId: 'general',
+      kg: WAREHOUSE_T1_CAPACITY_KG - 40,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const departed = departMission(world, accepted.mission, { fleet: state });
+    settleMission(world, departed.mission, {
+      fleet: state,
+      skipMinAirborneGate: true,
+    });
+    const destWh = (state.playerWarehouses?.warehouses ?? []).find(
+      (w) => w.icao === 'SBCT',
+    )!;
+    const destStock = (state.playerWarehouses?.stock ?? [])
+      .filter((p) => p.warehouseId === destWh.id)
+      .reduce((s, p) => s + p.kg, 0);
+    assert.equal(destStock, WAREHOUSE_T1_CAPACITY_KG);
+    const yard = (state.portPickups ?? []).filter((p) => p.hubIcao === 'SBCT');
+    assert.equal(
+      yard.reduce((s, p) => s + p.kg, 0),
+      110,
+    );
+  });
+
+  it('cannot fly a second cargo mission during an active bridge', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-bridge-one-msn' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'BridgeOne',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    buyWarehouseAtPickupHub(state, world, 'SBCT');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    acceptWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 100,
+    });
+    assert.throws(
+      () =>
+        acceptWarehouseBridge(state, world, {
+          originIcao: 'SBGR',
+          destIcao: 'SBCT',
+          commodityId: 'general',
+          aircraftId: aircraft.id,
+          kg: 50,
+        }),
+      /before starting a warehouse bridge/i,
+    );
+  });
+
+  it('demand hold plus bridge hold reserve the sum of kg', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-bridge-sum' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'BridgeSum',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    buyWarehouseAtPickupHub(state, world, 'SBCT');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 800,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    world.demandOrders = [
+      {
+        id: 'demand_plus_bridge',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 300,
+        remainingKg: 300,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
+    holdDemandOrder(state, world, {
+      orderId: 'demand_plus_bridge',
+      originIcao: 'SBGR',
+      kg: 200,
+    });
+    holdWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      kg: 150,
+    });
+    const originWh = (state.playerWarehouses?.warehouses ?? []).find(
+      (w) => w.icao === 'SBGR',
+    )!;
+    assert.equal(
+      warehouseReservedCommodityKg(state, originWh.id, 'general'),
+      350,
+    );
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 450);
   });
 });

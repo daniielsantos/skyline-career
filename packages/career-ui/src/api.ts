@@ -2010,10 +2010,12 @@ export type WarehouseInboundTransferView = {
 
 export type PlayerDemandHoldView = {
   id: string;
-  orderId: string;
+  kind?: 'demand' | 'bridge';
+  orderId?: string;
   warehouseId: string;
   originIcao: string;
   destIcao: string;
+  destWarehouseId?: string;
   commodityId: string;
   kg: number;
   unitPriceUsd: number;
@@ -2208,6 +2210,69 @@ export function postWarehouseStockAbandon(opts: { stockId: string }) {
     warehouses: PlayerWarehouseSnapshot;
     ports: PortsSnapshot;
   }>('/api/warehouses/stock/abandon', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseBridgeHold(opts: {
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  kg?: number;
+}) {
+  return api<{
+    hold: PlayerDemandHoldView;
+    kg: number;
+    warehouses: PlayerWarehouseSnapshot;
+  }>('/api/warehouses/bridge/hold', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseBridgeHoldCancel(opts: { holdId: string }) {
+  return api<{ kg: number; warehouses: PlayerWarehouseSnapshot }>(
+    '/api/warehouses/bridge/hold/cancel',
+    {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    },
+  );
+}
+
+export function postWarehouseBridgeAccept(opts: {
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  aircraftId: string;
+  kg?: number;
+}) {
+  return api<{
+    walletUsd: number;
+    mission: Mission;
+    kg: number;
+    warehouses: PlayerWarehouseSnapshot;
+    fleet: PlayerAircraft[];
+    missions: Mission[];
+  }>('/api/warehouses/bridge/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseBridgeDispatchHold(opts: {
+  holdId: string;
+  aircraftId: string;
+}) {
+  return api<{
+    walletUsd: number;
+    mission: Mission;
+    kg: number;
+    warehouses: PlayerWarehouseSnapshot;
+    fleet: PlayerAircraft[];
+    missions: Mission[];
+  }>('/api/warehouses/bridge/dispatch-hold', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

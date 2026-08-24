@@ -11891,133 +11891,175 @@ export function App() {
           ) : stagingMode === 'debrief' && flightDebrief ? (
             <>
               <DispatchStepper current="debrief" />
-              <div className="panel-head missions-head">
-                <div className="missions-head-spacer" aria-hidden="true" />
-                <div className="missions-head-center">
+              <section
+                className="debrief-card debrief-sheet"
+                aria-live="polite"
+              >
+                <header className="debrief-hero">
+                  <p className="debrief-kicker">Flight complete</p>
                   <h2>
-                    {flightDebrief.originIcao} → {flightDebrief.destIcao}
+                    {flightDebrief.originIcao}
+                    <span className="debrief-hero-arrow" aria-hidden="true">
+                      →
+                    </span>
+                    {flightDebrief.destIcao}
                   </h2>
-                  <p>
-                    {flightDebrief.onTime
-                      ? 'On time'
-                      : `Late ${(flightDebrief.lateTicks / 4).toFixed(1)}h`}
-                    {' · '}
-                    Net {formatMoney(flightDebrief.netUsd)}
+                  <p className="debrief-hero-meta">
+                    <span
+                      className={
+                        flightDebrief.onTime ? 'debrief-ok' : 'debrief-late'
+                      }
+                    >
+                      {flightDebrief.onTime
+                        ? 'On time'
+                        : `Late ${(flightDebrief.lateTicks / 4).toFixed(1)}h`}
+                    </span>
+                    {flightDebrief.flightDurationMs != null ? (
+                      <>
+                        {' · '}
+                        {formatFlightDurationMs(flightDebrief.flightDurationMs)}{' '}
+                        airborne
+                      </>
+                    ) : null}
                   </p>
-                </div>
-                <div className="missions-head-spacer" aria-hidden="true" />
-              </div>
-              <section className="debrief-card" aria-live="polite">
-                {flightDebrief.runwayTouch ? (
-                  <div className="debrief-runway-block">
-                    <RunwayTouchdownDiagram touch={flightDebrief.runwayTouch} />
-                    {formatRunwayTouchdownDebriefLine(flightDebrief.runwayTouch) ? (
-                      <p
-                        className={
-                          flightDebrief.runwayTouch.onPavement
-                            ? 'debrief-runway-line'
-                            : 'debrief-runway-line debrief-runway-line-off'
-                        }
-                      >
-                        {formatRunwayTouchdownDebriefLine(flightDebrief.runwayTouch)}
+                </header>
+
+                <div className="debrief-layout">
+                  <div className="debrief-col-touch">
+                    {flightDebrief.runwayTouch ? (
+                      <div className="debrief-runway-block">
+                        <RunwayTouchdownDiagram
+                          touch={flightDebrief.runwayTouch}
+                        />
+                        {formatRunwayTouchdownDebriefLine(
+                          flightDebrief.runwayTouch,
+                        ) ? (
+                          <p
+                            className={
+                              flightDebrief.runwayTouch.onPavement
+                                ? 'debrief-runway-line'
+                                : 'debrief-runway-line debrief-runway-line-off'
+                            }
+                          >
+                            {formatRunwayTouchdownDebriefLine(
+                              flightDebrief.runwayTouch,
+                            )}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="muted debrief-no-touch">
+                        No runway sample this leg — landing still scored from
+                        vertical speed when Watch had it.
                       </p>
+                    )}
+                  </div>
+
+                  <div className="debrief-col-stats">
+                    <div className="debrief-hero-money">
+                      <div>
+                        <span className="debrief-hero-money-label">Net</span>
+                        <strong className="debrief-hero-money-net">
+                          {formatMoney(flightDebrief.netUsd)}
+                        </strong>
+                      </div>
+                      {flightDebrief.flightScore ? (
+                        <div className="debrief-hero-score">
+                          <span className="debrief-hero-money-label">Score</span>
+                          <strong
+                            className={
+                              flightDebrief.flightScore.pct >= 90
+                                ? 'debrief-ok'
+                                : flightDebrief.flightScore.pct < 70
+                                  ? 'debrief-late'
+                                  : undefined
+                            }
+                          >
+                            {Math.round(flightDebrief.flightScore.pct)}%
+                          </strong>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <dl className="debrief-metrics">
+                      <div>
+                        <dt>Payout</dt>
+                        <dd>{formatMoney(flightDebrief.payoutUsd)}</dd>
+                      </div>
+                      {flightDebrief.penaltyUsd > 0 ? (
+                        <div>
+                          <dt>Late</dt>
+                          <dd>−{formatMoney(flightDebrief.penaltyUsd)}</dd>
+                        </div>
+                      ) : null}
+                      {flightDebrief.fuelCostUsd > 0 ? (
+                        <div>
+                          <dt>Fuel</dt>
+                          <dd>−{formatMoney(flightDebrief.fuelCostUsd)}</dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt>Landing</dt>
+                        <dd>{formatLandingFpm(flightDebrief.landingFpm)}</dd>
+                      </div>
+                      {flightDebrief.weatherBonusUsd > 0 ? (
+                        <div>
+                          <dt>Weather</dt>
+                          <dd>+{formatMoney(flightDebrief.weatherBonusUsd)}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+
+                    {flightDebrief.flightScore ? (
+                      <div
+                        className="flight-score flight-score-compact"
+                        aria-label="Flight score"
+                      >
+                        <ul className="flight-score-cats">
+                          {flightDebrief.flightScore.categories.map((cat) => (
+                            <li key={cat.id}>
+                              <div className="flight-score-cat-head">
+                                <span>{cat.label}</span>
+                                <span>
+                                  {cat.earned}/{cat.max}
+                                </span>
+                              </div>
+                              <div
+                                className="flight-score-bar"
+                                role="presentation"
+                              >
+                                <div
+                                  className="flight-score-bar-fill"
+                                  style={{
+                                    width: `${
+                                      cat.max > 0
+                                        ? Math.round(
+                                            (100 * cat.earned) / cat.max,
+                                          )
+                                        : 0
+                                    }%`,
+                                  }}
+                                />
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {flightDebrief.cargoOpsDeltas.length > 0 ? (
+                      <div className="cargo-ops-debrief" aria-label="Cargo Ops">
+                        <strong>Cargo Ops</strong>
+                        <p>
+                          {formatCargoOpsDebriefLine(
+                            flightDebrief.cargoOpsDeltas,
+                          )}
+                        </p>
+                      </div>
                     ) : null}
                   </div>
-                ) : null}
+                </div>
 
-                <dl className="debrief-grid debrief-grid-compact">
-                  <div className="debrief-net">
-                    <dt>Net</dt>
-                    <dd>{formatMoney(flightDebrief.netUsd)}</dd>
-                  </div>
-                  <div>
-                    <dt>Payout</dt>
-                    <dd>{formatMoney(flightDebrief.payoutUsd)}</dd>
-                  </div>
-                  {flightDebrief.penaltyUsd > 0 ? (
-                    <div>
-                      <dt>Late</dt>
-                      <dd>−{formatMoney(flightDebrief.penaltyUsd)}</dd>
-                    </div>
-                  ) : null}
-                  {flightDebrief.fuelCostUsd > 0 ? (
-                    <div>
-                      <dt>Fuel</dt>
-                      <dd>−{formatMoney(flightDebrief.fuelCostUsd)}</dd>
-                    </div>
-                  ) : null}
-                  <div>
-                    <dt>Landing</dt>
-                    <dd>{formatLandingFpm(flightDebrief.landingFpm)}</dd>
-                  </div>
-                  <div>
-                    <dt>Air time</dt>
-                    <dd>
-                      {formatFlightDurationMs(flightDebrief.flightDurationMs)}
-                    </dd>
-                  </div>
-                  {flightDebrief.flightScore ? (
-                    <div>
-                      <dt>Score</dt>
-                      <dd
-                        className={
-                          flightDebrief.flightScore.pct >= 90
-                            ? 'debrief-ok'
-                            : flightDebrief.flightScore.pct >= 70
-                              ? undefined
-                              : 'debrief-late'
-                        }
-                      >
-                        {Math.round(flightDebrief.flightScore.pct)}%
-                      </dd>
-                    </div>
-                  ) : null}
-                  {flightDebrief.weatherBonusUsd > 0 ? (
-                    <div>
-                      <dt>Weather</dt>
-                      <dd>+{formatMoney(flightDebrief.weatherBonusUsd)}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-
-                {flightDebrief.flightScore ? (
-                  <div
-                    className="flight-score flight-score-compact"
-                    aria-label="Flight score"
-                  >
-                    <ul className="flight-score-cats">
-                      {flightDebrief.flightScore.categories.map((cat) => (
-                        <li key={cat.id}>
-                          <div className="flight-score-cat-head">
-                            <span>{cat.label}</span>
-                            <span>
-                              {cat.earned}/{cat.max}
-                            </span>
-                          </div>
-                          <div className="flight-score-bar" role="presentation">
-                            <div
-                              className="flight-score-bar-fill"
-                              style={{
-                                width: `${
-                                  cat.max > 0
-                                    ? Math.round((100 * cat.earned) / cat.max)
-                                    : 0
-                                }%`,
-                              }}
-                            />
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {flightDebrief.cargoOpsDeltas.length > 0 ? (
-                  <div className="cargo-ops-debrief" aria-label="Cargo Ops">
-                    <strong>CARGO OPS</strong>
-                    <p>{formatCargoOpsDebriefLine(flightDebrief.cargoOpsDeltas)}</p>
-                  </div>
-                ) : null}
                 <div className="debrief-actions">
                   <button
                     type="button"

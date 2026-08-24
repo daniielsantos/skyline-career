@@ -273,6 +273,7 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   MNRR: 'MNMR',
   MNCE: 'MNMR',
   MPPB: 'MPPA',
+  MM68: 'MMCU',
   MPSA: 'MPSM',
   MRQP: 'MRNS',
   MZCF: 'MZSP',

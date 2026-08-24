@@ -7,6 +7,7 @@ import {
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
   paxAndCargoLiveStationSumLb,
+  pickPaxAndCargoDisplayedLiveLb,
   resolveLivePayloadLb,
   stationSampleIncomplete,
   stationWeightsDrifted,
@@ -39,6 +40,30 @@ describe('paxAndCargoLiveStationSumLb', () => {
     assert.equal(
       paxAndCargoLiveStationSumLb(stations, [6, 7], [1, 2, 3, 4]),
       47112,
+    );
+  });
+});
+
+describe('pickPaxAndCargoDisplayedLiveLb', () => {
+  it('prefers emptied mass-balance over ghost Fenix cabin stations', () => {
+    assert.equal(
+      pickPaxAndCargoDisplayedLiveLb({
+        payloadSource: 'mass-balance',
+        resolvedPayloadLb: 0,
+        cabinStationSumLb: 2591,
+      }),
+      0,
+    );
+  });
+
+  it('uses cabin stations when SimConnect is the payload source', () => {
+    assert.equal(
+      pickPaxAndCargoDisplayedLiveLb({
+        payloadSource: 'stations',
+        resolvedPayloadLb: 2931,
+        cabinStationSumLb: 2591,
+      }),
+      2591,
     );
   });
 });

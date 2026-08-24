@@ -43,6 +43,7 @@ import {
   pushWeatherOpsTick,
   resolveLivePayloadLb,
   paxAndCargoLiveStationSumLb,
+  pickPaxAndCargoDisplayedLiveLb,
   sanitizeFuelDensityLbPerGal,
   KG_TO_LB,
   normalizeSimPercent,
@@ -61,6 +62,7 @@ import {
   clampPaxAndCargoDueToHoldsLb,
   adjustPaxAndCargoDueForEfbPaxLb,
   simconnectCabinOvershootLb,
+  simconnectEmptyPayloadBiasLb,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CargoOpsDelta,
@@ -2205,20 +2207,27 @@ export class CareerWatchSession {
                 )
               : undefined;
           const cabinOvershootLb = simconnectCabinOvershootLb(airframe);
+          const emptyPayloadBiasLb = simconnectEmptyPayloadBiasLb(airframe);
           const rawLivePayloadLb =
             load.payloadSource === 'tfdi-efb' &&
             typeof load.tfdiEfbCargoLb === 'number'
               ? load.tfdiEfbCargoLb + liveCrewLb
               : typeof pmdgRolePayloadLb === 'number'
                 ? pmdgRolePayloadLb
-                : typeof paxAndCargoCabinLb === 'number'
-                  ? paxAndCargoCabinLb
+                : pmdgPaxAndCargo && !preferPmdgFreighterRoles
+                  ? (pickPaxAndCargoDisplayedLiveLb({
+                      payloadSource: load.payloadSource,
+                      resolvedPayloadLb: load.payloadLb,
+                      cabinStationSumLb: paxAndCargoCabinLb,
+                    }) ??
+                    (prevVerification.payload.liveLb ?? undefined))
                   : load.payloadLb !== null
                     ? load.payloadLb
                     : (prevVerification.payload.liveLb ?? undefined);
+          const liveHaircutLb = cabinOvershootLb + emptyPayloadBiasLb;
           const livePayloadLb =
-            typeof rawLivePayloadLb === 'number' && cabinOvershootLb > 0
-              ? Math.max(0, rawLivePayloadLb - cabinOvershootLb)
+            typeof rawLivePayloadLb === 'number' && liveHaircutLb > 0
+              ? Math.max(0, rawLivePayloadLb - liveHaircutLb)
               : rawLivePayloadLb;
           this.lastLiveFuelLb =
             typeof liveFuelLb === 'number' ? liveFuelLb : load.fuelLb;

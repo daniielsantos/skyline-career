@@ -12,6 +12,8 @@ import {
   demandCountryOpenQuotas,
   demandEffectiveUnitPriceUsd,
   demandHubCountryId,
+  demandOrdersGlobalCap,
+  demandWantedKgBand,
   ensureDemandOrders,
   isDemandInternationalCountryPair,
   listOpenDemandOrders,
@@ -209,11 +211,13 @@ describe('demand country quotas', () => {
     }
 
     const quotas = demandCountryOpenQuotas(world);
-    assert.ok((quotas.get('BR') ?? 0) < DEMAND_ORDERS_GLOBAL_CAP);
+    const cap = demandOrdersGlobalCap(world);
+    assert.ok(cap >= DEMAND_ORDERS_GLOBAL_CAP);
+    assert.ok((quotas.get('BR') ?? 0) < cap);
     assert.ok((quotas.get('US') ?? 0) >= 1);
     assert.equal(
       [...quotas.values()].reduce((s, n) => s + n, 0),
-      DEMAND_ORDERS_GLOBAL_CAP,
+      cap,
     );
 
     const orders = ensureDemandOrders(world).filter(
@@ -282,5 +286,12 @@ describe('demand country quotas', () => {
       (byCountry.get('US') ?? 0) > 0 || (byCountry.get('AR') ?? 0) > 0,
       'expected non-BR demand after trim',
     );
+  });
+});
+
+describe('demand wanted kg band', () => {
+  it('allows feeder-jet Demand sizes, not only 4 t general', () => {
+    assert.equal(demandWantedKgBand('supplies').max, 12_000);
+    assert.equal(demandWantedKgBand('electronics').max, 8_000);
   });
 });

@@ -1713,6 +1713,153 @@ th {
   gap: 0.45rem;
 }
 
+.debrief-sheet {
+  gap: 1.15rem;
+  padding: 1.25rem 1.4rem 1.3rem;
+  border-radius: 12px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.debrief-hero h2 {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 2.4vw, 2.05rem);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+
+.debrief-hero-arrow {
+  margin: 0 0.35rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.debrief-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.debrief-hero-meta {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.debrief-layout {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1.2fr) minmax(20rem, 1fr);
+  gap: 1.25rem 1.75rem;
+  align-items: start;
+}
+
+.debrief-col-touch .debrief-runway-svg {
+  border-radius: 8px;
+}
+
+.debrief-no-touch {
+  margin: 0;
+  padding: 1rem 0.2rem;
+}
+
+.debrief-hero-money {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.debrief-hero-money-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.debrief-hero-money-net {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 1.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+}
+
+.debrief-hero-score strong {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.debrief-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.55rem 0.85rem;
+  margin: 0.85rem 0 0;
+}
+
+.debrief-metrics dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.debrief-metrics dd {
+  margin: 0.12rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.98rem;
+  font-weight: 650;
+}
+
+.debrief-sheet .flight-score-compact {
+  margin-top: 0.9rem;
+}
+
+.debrief-sheet .cargo-ops-debrief {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.debrief-sheet .cargo-ops-debrief strong {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.debrief-sheet .cargo-ops-debrief p {
+  margin: 0.3rem 0 0;
+}
+
+.debrief-sheet .debrief-actions {
+  padding-top: 0.15rem;
+}
+
+@media (max-width: 52rem) {
+  .debrief-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .cargo-ops-panel {
   display: grid;
   gap: 0.75rem;
@@ -8692,6 +8839,32 @@ span.dispatch-route-hub-dest {
   min-width: 0;
 }
 
+.ports-demand-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  padding: 0 0 0.45rem;
+}
+
+.ports-demand-origin-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--muted, rgba(255, 255, 255, 0.55));
+}
+
+.ports-demand-origin-filter select {
+  min-width: 12rem;
+  padding: 0.28rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(12, 12, 14, 0.65);
+  color: inherit;
+  font: inherit;
+}
+
 .ports-demand-country-filter {
   display: inline-flex;
   align-items: center;
@@ -9004,6 +9177,29 @@ span.dispatch-route-hub-dest {
   border-color: rgba(240, 163, 90, 0.7);
   box-shadow: 0 0 0 1px rgba(240, 163, 90, 0.35);
   background: rgba(240, 163, 90, 0.08);
+}
+
+.ports-wh-buy-card.is-port-pickup:not(.is-selected) {
+  border-color: rgba(240, 163, 90, 0.4);
+  background: rgba(240, 163, 90, 0.07);
+}
+
+.ports-wh-buy-port-hint {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+}
+
+.ports-wh-port-chip {
+  margin: 0;
+  align-self: flex-start;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f0a35a;
+  background: rgba(240, 163, 90, 0.12);
+  border: 1px solid rgba(240, 163, 90, 0.35);
 }
 
 .ports-wh-buy-head {
@@ -9654,7 +9850,6 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-map-legend .dot.port,
-.ports-map-legend .dot.hub,
 .ports-map-legend .dot.fbo {
   width: 0.95rem;
   height: 0.95rem;
@@ -9663,20 +9858,56 @@ span.dispatch-route-hub-dest {
   transform: none;
 }
 
+.ports-map-legend .dot.hub {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #7a8a9a;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.ports-map-legend .dot.fbo {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 .ports-map-legend .dot.port {
   color: #f0a35a;
 }
 
 .ports-map-legend .dot.port svg,
-.ports-map-legend .dot.hub svg,
-.ports-map-legend .dot.fbo svg {
+.ports-map-legend .dot.fbo svg,
+.ports-map-legend .dot.port img,
+.ports-map-legend .dot.fbo img {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
+}
+
+.ports-map-port-marker svg,
+.ports-map-hub-marker svg,
+.ports-map-fbo-marker svg,
+.ports-map-port-marker img,
+.ports-map-fbo-marker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ports-map-port-marker svg,
+.ports-map-port-marker img {
+  filter:
+    drop-shadow(0 0 6px rgba(240, 163, 90, 0.65));
+}
+
+.ports-map-port-marker.is-selected svg,
+.ports-map-port-marker.is-selected img {
+  filter: drop-shadow(0 0 10px rgba(240, 163, 90, 0.9));
 }
 
 .ports-map-port-marker,
-.ports-map-hub-marker,
 .ports-map-fbo-marker {
   padding: 0;
   appearance: none;
@@ -9687,44 +9918,31 @@ span.dispatch-route-hub-dest {
   box-shadow: none;
 }
 
-.ports-map-port-marker {
-  color: #f0a35a;
-}
-
-.ports-map-port-marker svg,
-.ports-map-hub-marker svg,
-.ports-map-fbo-marker svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.ports-map-port-marker svg {
-  filter:
-    drop-shadow(0 0 6px rgba(240, 163, 90, 0.65));
-}
-
 .ports-map-port-marker.is-selected {
-  color: #ffc089;
   z-index: 2;
 }
 
-.ports-map-port-marker.is-selected svg {
-  filter: drop-shadow(0 0 10px rgba(240, 163, 90, 0.9));
-}
-
 .ports-map-hub-marker {
-  color: #7a8a9a;
-  opacity: 0.95;
+  padding: 0;
+  appearance: none;
+  cursor: pointer;
+  border: 1px solid rgba(12, 12, 14, 0.85);
+  border-radius: 50%;
+  background: #7a8a9a;
+  opacity: 0.9;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .ports-map-hub-marker:hover {
-  color: #c5d0da;
+  background: #a8b8c8;
 }
 
 .ports-map-hub-marker.is-selected {
-  color: #f0a35a;
+  background: #f0a35a;
   opacity: 1;
+  box-shadow:
+    0 0 0 2px #fff4e8,
+    0 0 14px rgba(240, 163, 90, 0.65);
   z-index: 2;
 }
 

@@ -23,6 +23,7 @@ import {
   withdrawCargoFromWarehouse,
 } from './career-warehouse-stock.js';
 import { isPortPickupHub } from './career-warehouse.js';
+import { isBushHub, isBushTripOnlyHub } from './career-bush.js';
 import {
   estimateRouteCargoLimit,
   getAircraftClass,
@@ -46,6 +47,7 @@ import type {
   DemandOrder,
   MissionIntent,
 } from './types/career-economy.js';
+import demandIntlCountryPairsRaw from './data/demand-intl-country-pairs.json' with { type: 'json' };
 
 export const DEMAND_COMMODITIES: readonly CommodityId[] = [
   'general',
@@ -62,10 +64,26 @@ export const DEMAND_ORDERS_PER_HUB = 2;
 
 /**
  * Soft cap of open board rows worldwide (keeps Ports GET snappy).
- * Split across countries present in the world so BR hubs (seeded first)
- * cannot monopolize every slot. With 6 map countries ≈ 32 open each.
+ * Floor 192 (early-map size); scales with countries so a 80-country seed
+ * is not stuck at ~2 rows per country. Split across countries so BR cannot
+ * monopolize every slot.
  */
-export const DEMAND_ORDERS_GLOBAL_CAP = 192;
+export const DEMAND_ORDERS_GLOBAL_CAP_MIN = 192;
+export const DEMAND_ORDERS_GLOBAL_CAP_MAX = 640;
+export const DEMAND_ORDERS_PER_COUNTRY_TARGET = 6;
+/** Minimum floor — live board uses {@link demandOrdersGlobalCap}. */
+export const DEMAND_ORDERS_GLOBAL_CAP = DEMAND_ORDERS_GLOBAL_CAP_MIN;
+
+/** kg band rolled per new Demand row (then clipped to terminal deficit). */
+export function demandWantedKgBand(commodityId: CommodityId): {
+  min: number;
+  max: number;
+} {
+  if (commodityId === 'machinery' || commodityId === 'electronics') {
+    return { min: 400, max: 8_000 };
+  }
+  return { min: 400, max: 12_000 };
+}
 
 /** Premium on local spot for max unit price (rng in range). */
 export const DEMAND_PRICE_PREMIUM_MIN = 1.05;
@@ -77,412 +95,11 @@ export const DEMAND_PRICE_PREMIUM_MAX = 1.15;
  */
 export const DEMAND_INTL_PAY_MULT = 1.28;
 
-/**
- * Bidirectional country pairs allowed for international Demand (not Market lanes).
- * Mirrors lane geography without binding to specific ICAO ODs.
- */
+/** Bidirectional country pairs for international Demand (not Market lanes). */
 export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> =
-  [
-    ['BR', 'US'],
-    ['BR', 'AR'],
-    ['BR', 'CL'],
-    ['BR', 'MX'],
-    ['BR', 'CA'],
-    ['BR', 'UY'],
-    ['BR', 'PY'],
-    ['BR', 'PE'],
-    ['BR', 'BO'],
-    ['BR', 'EC'],
-    ['BR', 'CO'],
-    ['BR', 'VE'],
-    ['BR', 'GY'],
-    ['BR', 'SR'],
-    ['BR', 'GF'],
-    ['AR', 'CL'],
-    ['AR', 'US'],
-    ['AR', 'UY'],
-    ['AR', 'PY'],
-    ['AR', 'BO'],
-    ['CL', 'US'],
-    ['CL', 'PE'],
-    ['US', 'CA'],
-    ['US', 'MX'],
-    ['US', 'PE'],
-    ['US', 'EC'],
-    ['US', 'CO'],
-    ['US', 'VE'],
-    ['PE', 'BO'],
-    ['PE', 'EC'],
-    ['PE', 'CO'],
-    ['EC', 'CO'],
-    ['CO', 'VE'],
-    ['CO', 'MX'],
-    ['VE', 'GY'],
-    ['GY', 'SR'],
-    ['SR', 'GF'],
-    // Central America
-    ['PA', 'CR'],
-    ['PA', 'CO'],
-    ['PA', 'US'],
-    ['PA', 'MX'],
-    ['PA', 'BR'],
-    ['CR', 'NI'],
-    ['CR', 'US'],
-    ['CR', 'MX'],
-    ['NI', 'HN'],
-    ['HN', 'SV'],
-    ['HN', 'GT'],
-    ['SV', 'GT'],
-    ['GT', 'MX'],
-    ['GT', 'BZ'],
-    ['BZ', 'MX'],
-    ['BZ', 'US'],
-    // Caribbean intl-first
-    ['CU', 'US'],
-    ['CU', 'DO'],
-    ['CU', 'BS'],
-    ['DO', 'US'],
-    ['DO', 'HT'],
-    ['DO', 'JM'],
-    ['DO', 'CO'],
-    ['HT', 'US'],
-    ['JM', 'US'],
-    ['JM', 'TT'],
-    ['BS', 'US'],
-    ['BS', 'MX'],
-    ['TT', 'VE'],
-    ['TT', 'BB'],
-    ['TT', 'GD'],
-    ['BB', 'LC'],
-    ['LC', 'AG'],
-    ['LC', 'GD'],
-    ['AG', 'US'],
-    ['GP', 'MQ'],
-    ['GP', 'AG'],
-    ['GP', 'US'],
-    ['MQ', 'BB'],
-    ['MQ', 'US'],
-    ['CW', 'TT'],
-    ['CW', 'VE'],
-    ['CW', 'US'],
-    ['SX', 'AG'],
-    ['SX', 'GP'],
-    ['SX', 'US'],
-    ['AW', 'CW'],
-    ['AW', 'VE'],
-    ['AW', 'US'],
-    ['PT', 'ES'],
-    ['PT', 'BR'],
-    ['ES', 'FR'],
-    ['ES', 'IT'],
-    ['ES', 'US'],
-    ['FR', 'GB'],
-    ['FR', 'DE'],
-    ['FR', 'IT'],
-    ['FR', 'BR'],
-    ['FR', 'US'],
-    ['GB', 'NL'],
-    ['GB', 'DE'],
-    ['GB', 'US'],
-    ['NL', 'DE'],
-    ['NL', 'BE'],
-    ['BE', 'DE'],
-    ['DE', 'IT'],
-    ['IT', 'US'],
-    // MENA-1 Mediterranean face (do not backfill remaining EU-2+ pairs here)
-    ['MA', 'ES'],
-    ['MA', 'PT'],
-    ['MA', 'FR'],
-    ['MA', 'DZ'],
-    ['DZ', 'FR'],
-    ['DZ', 'ES'],
-    ['DZ', 'TN'],
-    ['TN', 'IT'],
-    ['TN', 'FR'],
-    ['TN', 'MT'],
-    ['EG', 'GR'],
-    ['EG', 'TR'],
-    ['EG', 'CY'],
-    ['EG', 'IL'],
-    ['IL', 'CY'],
-    ['IL', 'GR'],
-    // MENA-2 Gulf (do not backfill remaining EU-2+ pairs here)
-    ['SA', 'AE'],
-    ['SA', 'KW'],
-    ['SA', 'EG'],
-    ['AE', 'QA'],
-    ['AE', 'BH'],
-    ['AE', 'OM'],
-    ['AE', 'EG'],
-    ['AE', 'IL'],
-    ['AE', 'TR'],
-    ['AE', 'CY'],
-    ['QA', 'BH'],
-    ['QA', 'TR'],
-    ['BH', 'KW'],
-    // MENA-3 North Gulf (do not backfill remaining EU-2+ pairs here)
-    ['IQ', 'KW'],
-    ['IQ', 'SA'],
-    ['IQ', 'AE'],
-    ['IQ', 'QA'],
-    ['IQ', 'IR'],
-    ['IQ', 'TR'],
-    ['IQ', 'EG'],
-    ['IR', 'AE'],
-    ['IR', 'QA'],
-    ['IR', 'OM'],
-    ['IR', 'TR'],
-    // MENA-4 Levant-east (do not backfill remaining EU-2+ pairs here)
-    ['JO', 'IL'],
-    ['JO', 'SA'],
-    ['JO', 'IQ'],
-    ['JO', 'TR'],
-    ['JO', 'EG'],
-    ['LB', 'IL'],
-    ['LB', 'TR'],
-    ['LB', 'CY'],
-    ['LB', 'EG'],
-    ['SY', 'TR'],
-    ['SY', 'IQ'],
-    ['SY', 'JO'],
-    // MENA-5 Maghreb/Nile gap (do not backfill remaining EU-2+ pairs here)
-    ['LY', 'TN'],
-    ['LY', 'EG'],
-    ['LY', 'MT'],
-    ['LY', 'TR'],
-    ['SD', 'EG'],
-    ['SD', 'SA'],
-    ['SD', 'LY'],
-    // MENA-6 Yemen (do not backfill remaining EU-2+ pairs here)
-    ['YE', 'SA'],
-    ['YE', 'OM'],
-    ['YE', 'AE'],
-    ['YE', 'SD'],
-    // Asia-1 Pakistan (do not backfill remaining EU-2+ pairs here)
-    ['PK', 'AE'],
-    ['PK', 'OM'],
-    ['PK', 'IR'],
-    ['PK', 'SA'],
-    // Asia-2 India west (do not backfill remaining EU-2+ pairs here)
-    ['IN', 'PK'],
-    ['IN', 'AE'],
-    ['IN', 'OM'],
-    ['IN', 'SA'],
-    // Asia-4 Sri Lanka (do not backfill remaining EU-2+ pairs here)
-    ['LK', 'IN'],
-    ['LK', 'AE'],
-    ['LK', 'OM'],
-    ['LK', 'SA'],
-    // Asia-5 Central Asia (do not backfill remaining EU-2+ pairs here)
-    ['KZ', 'UZ'],
-    ['KZ', 'AZ'],
-    ['KZ', 'TM'],
-    ['UZ', 'TM'],
-    ['UZ', 'IR'],
-    ['TM', 'IR'],
-    ['TM', 'AZ'],
-    // Asia-6 Tajikistan / Kyrgyzstan (do not backfill remaining EU-2+ pairs here)
-    ['TJ', 'UZ'],
-    ['TJ', 'KG'],
-    ['TJ', 'KZ'],
-    ['KG', 'KZ'],
-    ['KG', 'UZ'],
-    // Asia-7 Afghanistan (do not backfill remaining EU-2+ pairs here)
-    ['AF', 'PK'],
-    ['AF', 'IR'],
-    ['AF', 'UZ'],
-    ['AF', 'TJ'],
-    // Asia-8 Nepal / Bangladesh (do not backfill remaining EU-2+ pairs here)
-    ['NP', 'IN'],
-    ['BD', 'IN'],
-    ['BD', 'NP'],
-    // Asia-9 Bhutan / Myanmar (do not backfill remaining EU-2+ pairs here)
-    ['BT', 'IN'],
-    ['BT', 'NP'],
-    ['BT', 'BD'],
-    ['MM', 'BD'],
-    ['MM', 'IN'],
-    // Asia-10 Thailand (do not backfill remaining EU-2+ pairs here)
-    ['TH', 'MM'],
-    ['TH', 'BD'],
-    ['TH', 'IN'],
-    // Asia-11 Vietnam / Malaysia / Singapore (do not backfill remaining EU-2+ pairs here)
-    ['VN', 'TH'],
-    ['VN', 'MY'],
-    ['VN', 'SG'],
-    ['MY', 'TH'],
-    ['MY', 'SG'],
-    ['BN', 'MY'],
-    ['BN', 'SG'],
-    ['BN', 'ID'],
-    ['SG', 'TH'],
-    // Asia-12 Indonesia / Philippines (do not backfill remaining EU-2+ pairs here)
-    ['ID', 'SG'],
-    ['ID', 'MY'],
-    ['ID', 'PH'],
-    ['PH', 'SG'],
-    ['PH', 'MY'],
-    ['PH', 'VN'],
-    // Asia-13 China / Japan / Korea (do not backfill remaining EU-2+ pairs here)
-    ['CN', 'JP'],
-    ['CN', 'KR'],
-    ['CN', 'SG'],
-    ['CN', 'VN'],
-    ['JP', 'KR'],
-    ['JP', 'SG'],
-    ['JP', 'PH'],
-    ['KR', 'PH'],
-    ['KR', 'SG'],
-    // Asia-14 Taiwan / Australia / New Zealand (do not backfill remaining EU-2+ pairs here)
-    ['TW', 'CN'],
-    ['TW', 'JP'],
-    ['TW', 'SG'],
-    ['AU', 'SG'],
-    ['AU', 'NZ'],
-    ['AU', 'JP'],
-    ['AU', 'ID'],
-    ['NZ', 'SG'],
-    // Asia-15 Pacific hinge (do not backfill remaining EU-2+ pairs here)
-    ['US', 'JP'],
-    ['US', 'AU'],
-    ['FJ', 'AU'],
-    ['FJ', 'NZ'],
-    ['FJ', 'VU'],
-    ['FJ', 'NC'],
-    ['PG', 'AU'],
-    ['NC', 'AU'],
-    // Asia-16 Guam / Polynesia / Micronesia (do not backfill remaining EU-2+ pairs here)
-    ['US', 'PH'],
-    ['PW', 'PH'],
-    ['PF', 'US'],
-    ['PF', 'NZ'],
-    ['WS', 'NZ'],
-    ['WS', 'TO'],
-    ['TO', 'NZ'],
-    ['TO', 'CK'],
-    ['US', 'WS'],
-    // Asia-17 leftover Pacific (do not backfill remaining EU-2+ pairs here)
-    ['VU', 'AU'],
-    ['VU', 'NC'],
-    ['SB', 'AU'],
-    ['SB', 'PG'],
-    ['CK', 'NZ'],
-    ['CK', 'PF'],
-    ['KI', 'FJ'],
-    ['KI', 'US'],
-    // RU-1 Russia (do not backfill remaining EU-2+ pairs here)
-    ['RU', 'UA'],
-    ['RU', 'BY'],
-    ['RU', 'FI'],
-    ['RU', 'NO'],
-    ['RU', 'PL'],
-    ['RU', 'KZ'],
-    ['RU', 'CN'],
-    ['RU', 'JP'],
-    ['RU', 'GE'],
-    ['RU', 'TR'],
-    // AF-1 Sub-Saharan core (do not backfill remaining EU-2+ pairs here)
-    ['NG', 'GH'],
-    ['NG', 'CI'],
-    ['NG', 'SN'],
-    ['NG', 'CM'],
-    ['NG', 'BR'],
-    ['NG', 'FR'],
-    ['NG', 'MA'],
-    ['NG', 'EG'],
-    ['NG', 'AO'],
-    ['GH', 'CI'],
-    ['SN', 'CI'],
-    ['SN', 'MA'],
-    ['SN', 'FR'],
-    ['CI', 'FR'],
-    ['KE', 'ET'],
-    ['KE', 'TZ'],
-    ['KE', 'SD'],
-    ['KE', 'AE'],
-    ['KE', 'EG'],
-    ['KE', 'ZA'],
-    ['ET', 'SD'],
-    ['ET', 'SA'],
-    ['ET', 'TZ'],
-    ['ZA', 'AO'],
-    ['ZA', 'TZ'],
-    ['ZA', 'GB'],
-    ['ZA', 'AE'],
-    // AF-2 Sub-Saharan densify (do not backfill remaining EU-2+ pairs here)
-    ['UG', 'KE'],
-    ['UG', 'RW'],
-    ['RW', 'KE'],
-    ['RW', 'TZ'],
-    ['MZ', 'ZA'],
-    ['MZ', 'TZ'],
-    ['NA', 'ZA'],
-    ['BW', 'ZA'],
-    ['NG', 'SD'],
-    // AF-3 Sub-Saharan leftovers (do not backfill remaining EU-2+ pairs here)
-    ['ZM', 'ZA'],
-    ['ZM', 'MZ'],
-    ['ZM', 'ZW'],
-    ['ZM', 'CD'],
-    ['ZW', 'ZA'],
-    ['ZW', 'BW'],
-    ['MW', 'MZ'],
-    ['MW', 'TZ'],
-    ['CD', 'AO'],
-    ['CD', 'CM'],
-    ['CD', 'ZA'],
-    // AF-4 Central Africa / Congo basin (do not backfill remaining EU-2+ pairs here)
-    ['CG', 'CD'],
-    ['CG', 'CM'],
-    ['CG', 'GA'],
-    ['GA', 'CM'],
-    ['GA', 'GQ'],
-    ['GQ', 'CM'],
-    ['CF', 'CM'],
-    ['CF', 'CD'],
-    ['TD', 'CM'],
-    ['TD', 'SD'],
-    ['BI', 'RW'],
-    ['CD', 'UG'],
-    // AF-5 West Africa leftovers + island hops (do not backfill remaining EU-2+ pairs here)
-    ['BJ', 'NG'],
-    ['BJ', 'TG'],
-    ['TG', 'GH'],
-    ['LR', 'CI'],
-    ['LR', 'SL'],
-    ['SL', 'GN'],
-    ['GN', 'GW'],
-    ['GW', 'GM'],
-    ['GM', 'SN'],
-    ['CV', 'SN'],
-    ['ST', 'GA'],
-    ['ST', 'GQ'],
-    ['BF', 'GH'],
-    ['BF', 'ML'],
-    ['ML', 'SN'],
-    ['NE', 'NG'],
-    // AF-6 leftovers + Indian Ocean hops (do not backfill remaining EU-2+ pairs here)
-    ['MR', 'SN'],
-    ['MG', 'MU'],
-    ['MU', 'SC'],
-    ['SC', 'KM'],
-    ['KM', 'MG'],
-    ['MG', 'MZ'],
-    ['LS', 'ZA'],
-    ['SZ', 'ZA'],
-    // AF-7 Horn of Africa (do not backfill remaining EU-2+ pairs here)
-    ['SO', 'KE'],
-    ['SO', 'DJ'],
-    ['DJ', 'ET'],
-    ['DJ', 'ER'],
-    ['ER', 'ET'],
-    ['SS', 'UG'],
-    ['SS', 'SD'],
-    ['SS', 'KE'],
-    // Macaronesia island-neighbor hops (do not backfill remaining EU-2+ pairs here)
-    ['ES', 'MR'],
-    ['ES', 'CV'],
-  ];
+  demandIntlCountryPairsRaw as unknown as ReadonlyArray<
+    readonly [string, string]
+  >;
 
 const DEMAND_INTL_PAIR_SET = new Set(
   DEMAND_INTL_COUNTRY_PAIRS.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]),
@@ -521,23 +138,48 @@ function demandAirportCountryId(ap: { region?: string }): string | null {
   return /^[A-Z]{2}$/.test(id) && id !== 'XX' ? id : null;
 }
 
-/**
- * Equal-ish soft quotas per country so seed order (BR first) cannot fill
- * DEMAND_ORDERS_GLOBAL_CAP alone. Remainder goes to sorted countries first.
- */
-export function demandCountryOpenQuotas(
-  world: CareerEconomyWorld,
-  globalCap: number = DEMAND_ORDERS_GLOBAL_CAP,
-): Map<string, number> {
+/** Demand/Dispatch dests — bush trips use PLN, not SimBrief OFP. */
+function isDemandBoardAirport(ap: {
+  icao: string;
+  bush?: boolean;
+  bushTripOnly?: boolean;
+}): boolean {
+  const icao = ap.icao.trim().toUpperCase();
+  if (!icao || !CAREER_HUB_COORDS[icao]) return false;
+  if (ap.bush === true || ap.bushTripOnly === true) return false;
+  if (isBushHub(icao) || isBushTripOnlyHub(icao)) return false;
+  return true;
+}
+
+function demandBoardCountryIds(world: CareerEconomyWorld): string[] {
   const countries = new Set<string>();
   for (const ap of world.airports) {
-    if (ap.bushTripOnly) continue;
+    if (!isDemandBoardAirport(ap)) continue;
     const icao = ap.icao.trim().toUpperCase();
     if (!CAREER_HUB_COORDS[icao]) continue;
     const c = demandAirportCountryId(ap);
     if (c) countries.add(c);
   }
-  const list = [...countries].sort((a, b) => a.localeCompare(b));
+  return [...countries].sort((a, b) => a.localeCompare(b));
+}
+
+export function demandOrdersGlobalCap(world: CareerEconomyWorld): number {
+  const n = Math.max(1, demandBoardCountryIds(world).length);
+  return Math.min(
+    DEMAND_ORDERS_GLOBAL_CAP_MAX,
+    Math.max(DEMAND_ORDERS_GLOBAL_CAP_MIN, n * DEMAND_ORDERS_PER_COUNTRY_TARGET),
+  );
+}
+
+/**
+ * Equal-ish soft quotas per country so seed order (BR first) cannot fill
+ * the live global cap alone. Remainder goes to sorted countries first.
+ */
+export function demandCountryOpenQuotas(
+  world: CareerEconomyWorld,
+  globalCap: number = demandOrdersGlobalCap(world),
+): Map<string, number> {
+  const list = demandBoardCountryIds(world);
   const n = Math.max(1, list.length);
   const base = Math.floor(globalCap / n);
   let rem = globalCap % n;
@@ -659,12 +301,15 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
   }
   const orders = world.demandOrders;
 
-  // Expire past-due open orders
+  // Expire past-due or bush/trip-only dests (SimBrief cannot plan those).
   for (const order of orders) {
-    if (
-      order.status === 'open' &&
-      (order.remainingKg <= 0 || order.expiresAtTick <= world.tick)
-    ) {
+    if (order.status !== 'open') continue;
+    const dest = order.destIcao.trim().toUpperCase();
+    if (isBushHub(dest) || isBushTripOnlyHub(dest)) {
+      order.status = 'expired';
+      continue;
+    }
+    if (order.remainingKg <= 0 || order.expiresAtTick <= world.tick) {
       order.status = order.remainingKg <= 0 ? 'filled' : 'expired';
       if (order.remainingKg <= 0) order.remainingKg = 0;
     }
@@ -678,6 +323,7 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
     o.expiresAtTick > world.tick;
 
   const quotas = demandCountryOpenQuotas(world);
+  const boardCap = demandOrdersGlobalCap(world);
 
   // Existing saves may already hold a BR-only full board. Trim countries that
   // exceed their quota (oldest first) so under-served countries can spawn.
@@ -705,7 +351,7 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
 
   const openGlobal = () => orders.filter(isOpen).length;
 
-  if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) {
+  if (openGlobal() >= boardCap) {
     world.demandOrders = orders.filter(
       (o) =>
         o.status === 'open' ||
@@ -723,8 +369,8 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
   }
 
   const trySpawnAtAirport = (ap: (typeof world.airports)[number]): void => {
-    if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) return;
-    if (ap.bushTripOnly) return;
+    if (openGlobal() >= boardCap) return;
+    if (!isDemandBoardAirport(ap)) return;
     const icao = ap.icao.trim().toUpperCase();
     if (!CAREER_HUB_COORDS[icao]) return;
 
@@ -745,7 +391,7 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
 
     for (const commodityId of DEMAND_COMMODITIES) {
       if (slots <= 0) break;
-      if (openGlobal() >= DEMAND_ORDERS_GLOBAL_CAP) break;
+      if (openGlobal() >= boardCap) break;
       if ((openByCountry.get(country) ?? 0) >= quota) break;
       if (openHere.some((o) => o.commodityId === commodityId)) continue;
 
@@ -760,11 +406,7 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
       );
       if (deficitKg < 200) continue;
 
-      const bandMax =
-        commodityId === 'machinery' || commodityId === 'electronics'
-          ? 2_500
-          : 4_000;
-      const bandMin = 400;
+      const { min: bandMin, max: bandMax } = demandWantedKgBand(commodityId);
       const wantedKg = Math.min(
         deficitKg,
         bandMin + Math.floor(rng() * (bandMax - bandMin)),
@@ -860,6 +502,11 @@ export function acceptDemandOrder(
   const dest = order.destIcao.trim().toUpperCase();
   if (origin === dest) {
     throw new Error('Warehouse and demand destination must differ');
+  }
+  if (isBushHub(dest) || isBushTripOnlyHub(dest)) {
+    throw new Error(
+      `Demand cannot stage to bush strip ${dest} — SimBrief Dispatch needs a civil hub`,
+    );
   }
 
   const wh = findPlayerWarehouseAtIcao(state, origin);

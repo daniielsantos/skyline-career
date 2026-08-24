@@ -1702,9 +1702,6 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'MMCG', b: 'MMCU', weight: 2.4 },
   { a: 'MMCG', b: 'MMHO', weight: 2.0 },
   { a: 'MMCG', b: 'MMMY', weight: 1.8 },
-  { a: 'MM68', b: 'MMCU', weight: 2.3 },
-  { a: 'MM68', b: 'MMMY', weight: 1.9 },
-  { a: 'MM68', b: 'MMGL', weight: 1.6 },
   { a: 'SBBE', b: 'SBGR', weight: 1.6 },
   { a: 'SBBE', b: 'SBRF', weight: 1.4 },
   // Center-West feeders

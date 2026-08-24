@@ -16,42 +16,23 @@ setWorkerUrl(maplibreWorkerUrl);
 const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 
 const PORT_ACCENT = '#f0a35a';
-const HUB_MUTED = '#7a8a9a';
-const FBO_ACCENT = '#6ec8ff';
 
-/** Admiralty ⚓ — shank meets the crown so the arms are not a floating U. */
-const PORT_ANCHOR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" aria-hidden="true" focusable="false">
-  <g fill="none" stroke="#fff4e8" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="16" cy="5.2" r="3.05"/>
-    <path d="M6.2 10.6h19.6"/>
-    <path d="M16 8.2L16 33M5.2 24Q16 42 26.8 24"/>
-  </g>
-  <g fill="none" stroke="currentColor" stroke-width="2.05" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="16" cy="5.2" r="3.05"/>
-    <path d="M6.2 10.6h19.6"/>
-    <path d="M16 8.2L16 33M5.2 24Q16 42 26.8 24"/>
-  </g>
-  <circle cx="16" cy="5.2" r="1.2" fill="currentColor"/>
-  <circle cx="6.2" cy="10.6" r="1.55" fill="currentColor"/>
-  <circle cx="25.8" cy="10.6" r="1.55" fill="currentColor"/>
-  <path fill="currentColor" stroke="#fff4e8" stroke-width="0.55" stroke-linejoin="round" d="M5.2 24 2 19.4 8.6 21.6zM26.8 24 30 19.4 23.4 21.6z"/>
-</svg>`;
+/** Generated map pins (transparent PNG). Sources in repo `assets/`. */
+const PORT_ANCHOR_SRC = '/ports/anchor.png';
+const WAREHOUSE_SRC = '/ports/warehouse.png';
 
-/** Pickup hub — side-view jet (airport marker), not a top-down cross. */
-const PICKUP_PLANE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -1 28 26" aria-hidden="true" focusable="false">
-  <path fill="currentColor" stroke="#fff4e8" stroke-width="1.5" stroke-linejoin="round" d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-</svg>`;
-
-/** Owned warehouse — peaked roof + bay. */
-const WAREHOUSE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-  <path fill="#fff4e8" d="M16 3.2 1.6 15.4h28.8L16 3.2z"/>
-  <rect x="3.6" y="15" width="24.8" height="14.4" rx="1.2" fill="#fff4e8"/>
-  <path fill="currentColor" d="M16 4.6 3.8 15.2h24.4L16 4.6z"/>
-  <rect x="5" y="15.2" width="22" height="13.2" rx="0.6" fill="currentColor"/>
-  <rect x="12.6" y="20.2" width="6.8" height="8.2" rx="0.4" fill="#1a1612" opacity="0.42"/>
-  <rect x="7.2" y="18" width="4.2" height="3.4" rx="0.35" fill="#1a1612" opacity="0.32"/>
-  <rect x="20.6" y="18" width="4.2" height="3.4" rx="0.35" fill="#1a1612" opacity="0.32"/>
-</svg>`;
+function markerImage(src: string): HTMLImageElement {
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = '';
+  img.draggable = false;
+  img.style.width = '100%';
+  img.style.height = '100%';
+  img.style.objectFit = 'contain';
+  img.style.pointerEvents = 'none';
+  img.style.display = 'block';
+  return img;
+}
 
 function portMarkerElement(selected: boolean): HTMLButtonElement {
   const el = document.createElement('button');
@@ -60,7 +41,7 @@ function portMarkerElement(selected: boolean): HTMLButtonElement {
   const size = selected ? 34 : 30;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
-  el.innerHTML = PORT_ANCHOR_SVG;
+  el.appendChild(markerImage(PORT_ANCHOR_SRC));
   return el;
 }
 
@@ -90,10 +71,9 @@ function hubMarkerElement(highlighted: boolean): HTMLButtonElement {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `ports-map-hub-marker${highlighted ? ' is-selected' : ''}`;
-  const size = highlighted ? 24 : 20;
+  const size = highlighted ? 12 : 9;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
-  el.innerHTML = PICKUP_PLANE_SVG;
   return el;
 }
 
@@ -101,10 +81,10 @@ function fboMarkerElement(highlighted: boolean): HTMLButtonElement {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `ports-map-fbo-marker${highlighted ? ' is-selected' : ''}`;
-  const size = highlighted ? 24 : 20;
+  const size = highlighted ? 36 : 32;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
-  el.innerHTML = WAREHOUSE_SVG;
+  el.appendChild(markerImage(WAREHOUSE_SRC));
   return el;
 }
 
@@ -488,27 +468,18 @@ export function PortsMap(props: {
       <div ref={containerRef} className="ports-map-canvas" />
       <ul className="ports-map-legend" aria-label="Map legend">
         <li>
-          <span
-            className="dot port"
-            style={{ color: PORT_ACCENT }}
-            dangerouslySetInnerHTML={{ __html: PORT_ANCHOR_SVG }}
-          />{' '}
+          <span className="dot port">
+            <img src={PORT_ANCHOR_SRC} alt="" />
+          </span>{' '}
           Seaport
         </li>
         <li>
-          <span
-            className="dot hub"
-            style={{ color: HUB_MUTED }}
-            dangerouslySetInnerHTML={{ __html: PICKUP_PLANE_SVG }}
-          />{' '}
-          Pickup hub
+          <span className="dot hub" /> Pickup hub
         </li>
         <li>
-          <span
-            className="dot fbo"
-            style={{ color: FBO_ACCENT }}
-            dangerouslySetInnerHTML={{ __html: WAREHOUSE_SVG }}
-          />{' '}
+          <span className="dot fbo">
+            <img src={WAREHOUSE_SRC} alt="" />
+          </span>{' '}
           Your warehouse
         </li>
       </ul>

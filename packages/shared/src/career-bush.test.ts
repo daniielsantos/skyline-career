@@ -20,6 +20,10 @@ import {
   createSeedEconomyWorld,
   migrateEconomyWorld,
 } from './career-economy.js';
+import {
+  ensureDemandOrders,
+  listOpenDemandOrders,
+} from './career-demand.js';
 import { planFerryRoute, hubDistanceNm } from './career-ferry-route.js';
 import { emptyMissionsStateV2, selectStarterHub, quoteFerry } from './career-fleet.js';
 import { acceptEmptyFlight } from './career-mission.js';
@@ -34,8 +38,8 @@ describe('global soft-field bush hubs', () => {
     assert.equal(BR_CAREER_HUBS.filter((h) => h.bush).length, 2);
     assert.equal(US_CAREER_HUBS.filter((h) => h.bush).length, 3);
     assert.equal(CA_CAREER_HUBS.filter((h) => h.bush).length, 3);
-    assert.equal(MX_CAREER_HUBS.filter((h) => h.bush).length, 2);
-    assert.equal(listBushIcaos().length, 10);
+    assert.equal(MX_CAREER_HUBS.filter((h) => h.bush).length, 1);
+    assert.equal(listBushIcaos().length, 9);
     assert.ok(isBushHub('SNYA'));
     assert.ok(isBushHub('KESW'));
     assert.ok(isBushHub('CYHE'));
@@ -205,5 +209,24 @@ describe('global soft-field bush hubs', () => {
     assert.equal(accepted.mission.emptyFlight, true);
     assert.equal(accepted.mission.originIcao, 'O67');
     assert.equal(accepted.mission.destIcao, dest);
+  });
+
+  it('does not post Demand Board orders to bush dests (SimBrief Dispatch)', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-no-bush' });
+    const mmcg = world.airports.find((a) => a.icao === 'MMCG');
+    assert.ok(mmcg);
+    for (const pile of Object.values(mmcg.inventory)) {
+      pile.stockKg = 0;
+    }
+    ensureDemandOrders(world);
+    const open = listOpenDemandOrders(world);
+    assert.equal(
+      open.some((o) => isBushHub(o.destIcao) || isBushTripOnlyHub(o.destIcao)),
+      false,
+    );
+    assert.equal(
+      open.some((o) => o.destIcao === 'MMCG' || o.destIcao === 'MM68'),
+      false,
+    );
   });
 });

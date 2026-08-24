@@ -17,7 +17,7 @@
     "Homologated profiles: fenix/fenixa319-{cfm,iae}-{sl-hd,wf-sd}@1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via Fenix EFB",
     "loadLayout pax_and_cargo: 150 pax (Fenix SimBrief rows); live title CFM/IAE × SL/WF (HD/SD ignored by SimBrief)",
-    "Fenix EFB boarded pax ~200 lb vs SimBrief 175 — catalog efbPaxWeightLb 200",
+    "EFB empty still leaves S4–S7 (~2642 lb) — catalog simconnectEmptyPayloadBiasLb; no efbPaxWeightLb (bias was that delta)",
     "SimBrief: Fenix Simulations (MSFS) A319 CFM/IAE [(SL)]"
   ],
   "fuel": {

@@ -17,7 +17,7 @@
     "Homologated profiles: fenix/fenixa320-{cfm,iae}-{sl,wf}@1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via Fenix EFB",
     "loadLayout pax_and_cargo: cabin 175+55 then leftover cargo=; 180 pax; live title picks CFM/IAE × SL/WF SimBrief row",
-    "Fenix EFB boarded pax ~196 lb vs SimBrief 175 — catalog efbPaxWeightLb 196",
+    "EFB empty still leaves S4–S7 (~2591 lb) — catalog simconnectEmptyPayloadBiasLb; no efbPaxWeightLb (bias was that delta)",
     "SimBrief: Fenix Simulations (MSFS) A320 CFM/IAE [(SL)] — Default A320 if no live title"
   ],
   "fuel": {

@@ -3,6 +3,8 @@
  * Career UI must not import @msfs-compat/shared.
  */
 
+import demandIntlCountryPairsRaw from '../../shared/src/data/demand-intl-country-pairs.json' with { type: 'json' };
+
 export type DemandWithdrawLot = {
   kg: number;
   avgCostUsdPerKg: number;
@@ -21,19 +23,10 @@ export type DemandAcceptPullPreview = {
 /** Keep in sync with DEMAND_INTL_PAY_MULT in packages/shared career-demand.ts */
 export const DEMAND_INTL_PAY_MULT = 1.28;
 
-/** Keep in sync with DEMAND_INTL_COUNTRY_PAIRS in packages/shared career-demand.ts */
-const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> = [
-  ['BR', 'US'],
-  ['BR', 'AR'],
-  ['BR', 'CL'],
-  ['BR', 'MX'],
-  ['BR', 'CA'],
-  ['AR', 'CL'],
-  ['AR', 'US'],
-  ['CL', 'US'],
-  ['US', 'CA'],
-  ['US', 'MX'],
-];
+const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> =
+  demandIntlCountryPairsRaw as unknown as ReadonlyArray<
+    readonly [string, string]
+  >;
 
 const DEMAND_INTL_PAIR_SET = new Set(
   DEMAND_INTL_COUNTRY_PAIRS.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]),
@@ -162,6 +155,35 @@ export function previewDemandInternationalRoute(opts: {
     originCountryId,
     destCountryId,
   };
+}
+
+export type DemandOriginHub = {
+  icao: string;
+  countryId?: string | null;
+};
+
+/** True if at least one warehouse can legally stage this dest (domestic or allowlisted intl). */
+export function demandOrderReachableFromOrigins(opts: {
+  destIcao: string;
+  destCountryId?: string | null;
+  origins: readonly DemandOriginHub[];
+  pickupHubs: readonly string[];
+}): boolean {
+  const dest = opts.destIcao.trim().toUpperCase();
+  if (!dest || opts.origins.length === 0) return false;
+  for (const origin of opts.origins) {
+    const icao = origin.icao.trim().toUpperCase();
+    if (!icao || icao === dest) continue;
+    const preview = previewDemandInternationalRoute({
+      originIcao: icao,
+      destIcao: dest,
+      originCountryId: origin.countryId,
+      destCountryId: opts.destCountryId,
+      pickupHubs: opts.pickupHubs,
+    });
+    if (preview.allowed) return true;
+  }
+  return false;
 }
 
 /** FIFO weighted-average cost for withdrawing needKg (non-mutating). */

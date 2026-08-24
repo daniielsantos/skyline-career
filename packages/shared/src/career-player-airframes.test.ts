@@ -117,7 +117,8 @@ describe('career player airframes', () => {
     const fenix = findCareerPlayerAirframe('fenix-a320');
     assert.equal(fenix?.loadLayout, 'pax_and_cargo');
     assert.equal(fenix?.maxPaxSeats, 180);
-    assert.equal(fenix?.efbPaxWeightLb, 196);
+    assert.equal(fenix?.efbPaxWeightLb, undefined);
+    assert.equal(fenix?.simconnectEmptyPayloadBiasLb, 2591);
   });
 
   it('stages Microsoft A321LR as pax_and_cargo on the iniBuilds SimBrief row', () => {
@@ -136,14 +137,16 @@ describe('career player airframes', () => {
     const a319 = findCareerPlayerAirframe('fenix-a319');
     assert.equal(a319?.loadLayout, 'pax_and_cargo');
     assert.equal(a319?.maxPaxSeats, 150);
-    assert.equal(a319?.efbPaxWeightLb, 200);
+    assert.equal(a319?.efbPaxWeightLb, undefined);
+    assert.equal(a319?.simconnectEmptyPayloadBiasLb, 2642);
   });
 
   it('stages Fenix A321 family as pax_and_cargo', () => {
     const a321 = findCareerPlayerAirframe('fenix-a321');
     assert.equal(a321?.loadLayout, 'pax_and_cargo');
     assert.equal(a321?.maxPaxSeats, 230);
-    assert.equal(a321?.efbPaxWeightLb, 192);
+    assert.equal(a321?.efbPaxWeightLb, undefined);
+    assert.equal(a321?.simconnectEmptyPayloadBiasLb, 2201);
     assert.equal(a321?.simbriefIcao, 'A321');
   });
 

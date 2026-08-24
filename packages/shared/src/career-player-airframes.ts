@@ -58,6 +58,11 @@ export interface CareerPlayerAirframe {
    */
   simconnectCabinSeats?: number;
   /**
+   * Fenix EFB empty ZFW still leaves this many lb on S3–S16. SimConnect EMPTY
+   * is dry (OEW catalog); EFB BOW is EMPTY + this bias. Subtract from Loaded.
+   */
+  simconnectEmptyPayloadBiasLb?: number;
+  /**
    * Combined FWD+AFT hold cap the JF EFB can actually place (lb). SimBrief
    * bag/cargo often exceeds this; Loaded vs Due clamps OFP cargo to this.
    */
@@ -116,6 +121,17 @@ export function simconnectCabinOvershootLb(
     return 0;
   }
   return Math.round(slots - pax) * MSFS_STATION_OCCUPANT_LB;
+}
+
+export function simconnectEmptyPayloadBiasLb(
+  airframe: CareerPlayerAirframe | undefined,
+): number {
+  if (!airframe || airframe.loadLayout !== 'pax_and_cargo') return 0;
+  const bias = airframe.simconnectEmptyPayloadBiasLb;
+  if (typeof bias !== 'number' || !Number.isFinite(bias) || bias <= 0) {
+    return 0;
+  }
+  return Math.round(bias);
 }
 
 /**

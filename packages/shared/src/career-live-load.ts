@@ -39,6 +39,37 @@ export function paxAndCargoLiveStationSumLb(
   return sum;
 }
 
+/**
+ * Fenix/JF EFB can zero ZFW while PAYLOAD STATION WEIGHT stays loaded.
+ * Watch must not replace that mass-balance read with the cabin station sum.
+ */
+export function pickPaxAndCargoDisplayedLiveLb(opts: {
+  payloadSource: 'stations' | 'mass-balance' | 'tfdi-efb' | 'a2a-lvars' | 'none';
+  resolvedPayloadLb?: number | null;
+  cabinStationSumLb?: number;
+}): number | undefined {
+  if (
+    opts.payloadSource === 'mass-balance' &&
+    typeof opts.resolvedPayloadLb === 'number' &&
+    Number.isFinite(opts.resolvedPayloadLb)
+  ) {
+    return Math.max(0, opts.resolvedPayloadLb);
+  }
+  if (
+    typeof opts.cabinStationSumLb === 'number' &&
+    Number.isFinite(opts.cabinStationSumLb)
+  ) {
+    return opts.cabinStationSumLb;
+  }
+  if (
+    typeof opts.resolvedPayloadLb === 'number' &&
+    Number.isFinite(opts.resolvedPayloadLb)
+  ) {
+    return opts.resolvedPayloadLb;
+  }
+  return undefined;
+}
+
 /** Default Loaded vs Due tolerances (lb). */
 export const DEFAULT_FUEL_TOL_LB = 50;
 export const DEFAULT_PAYLOAD_TOL_LB = 75;

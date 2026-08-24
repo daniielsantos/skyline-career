@@ -535,7 +535,7 @@ export const MX_CAREER_HUBS: readonly MxCareerHubDef[] = [
     lon: -110.3617,
   },
 
-  // ── MX bush soft-fields — OA soft+ICAO is scarce; MMCG gravel + MM68 GRE gps ──
+  // ── MX bush soft-fields — OA soft+ICAO is scarce; MMCG gravel (MM68 GPS ident removed — not in SimBrief)
   {
     icao: 'MMCG',
     name: 'Nuevo Casas Grandes Municipal',
@@ -546,19 +546,9 @@ export const MX_CAREER_HUBS: readonly MxCareerHubDef[] = [
     bush: true,
     ...bushSpoke,
   },
-  {
-    icao: 'MM68',
-    name: 'Mina Hércules',
-    region: 'MX-N',
-    hubTier: 'spoke',
-    lat: 28.0366,
-    lon: -103.771,
-    bush: true,
-    ...bushSpoke,
-  },
 ];
 
-export const MX_CAREER_HUB_COUNT = 47;
+export const MX_CAREER_HUB_COUNT = 46;
 
 /** Auto feeder corridors so every non-bush MX hub has ≥2 partners. */
 export function buildMxFeederCorridors(
@@ -589,7 +579,7 @@ export function assertMxCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<MxCareerRegion, number> = {
-    'MX-N': 16,
+    'MX-N': 15,
     'MX-C': 14,
     'MX-S': 9,
     'MX-Y': 8,

@@ -21,7 +21,7 @@
     "Homologated profiles: all 8 glasses CFM/IAE × SL/WF × TC/SC; same 16-station pack",
     "loadMethod: native-simbrief; injectCapable: false — load via Fenix EFB",
     "loadLayout pax_and_cargo: cabin 175+55 then leftover cargo=; 230 pax; live title CFM/IAE × SL/WF (TC/SC ignored by SimBrief)",
-    "Fenix EFB boarded pax ~192 lb vs SimBrief 175 — catalog efbPaxWeightLb 192",
+    "EFB empty still leaves S4–S6 (~2201 lb) — catalog simconnectEmptyPayloadBiasLb; no efbPaxWeightLb",
     "SimBrief: Fenix Simulations (MSFS) A321 CFM/IAE [(SL)] — Default A321 if no live title"
   ],
   "fuel": {

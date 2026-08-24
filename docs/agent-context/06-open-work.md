@@ -1,10 +1,16 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-23: MM68 (Mina Hércules, GPS) saiu do catálogo — remap MMCU. Demand Board não posta em bush / bushTripOnly (SimBrief OFP). FAA locals US Activities continuam no PLN.
+
+Atualizado 2026-08-23: Demand Board filtra por WH (default My warehouses) — dest só se domestic ou par intl allowlisted a partir daquele hub.
+
+Atualizado 2026-08-23: Demand Board cap escala com países (192–640, ~6/país); wanted até 12 t / 8 t. Pedidos já abertos só mudam no expire/trim.
+
 Atualizado 2026-08-23: Maddog 82 verde (LOAD OFP → trim MZFW → INSTANT LOAD). 83/88 mesmo ritual; MZFW da row Y162 pode mudar.
 
 Atualizado 2026-08-23: Watch pax_and_cargo Sim = soma − `crewStations` (Maddog S6/S7). Maddog EFB vs OFP ainda por medir.
 
-Atualizado 2026-08-23: Fenix A321 `pax_and_cargo` (230 pax, SimBrief Fenix CFM/IAE). Medir EFB vs OFP antes de `efbPaxWeightLb`.
+Atualizado 2026-08-23: Fenix A319/A320/A321 usam `simconnectEmptyPayloadBiasLb` (EFB vazio); **sem** `efbPaxWeightLb` — o 192/196/200 empilhava em cima do bias.
 
 Atualizado 2026-08-22: `formLots` extraído por país (bulk → last-mile → intl). Replay intacto; sem workers ainda. [`08-economy.md`](./08-economy.md).
 

@@ -305,6 +305,7 @@
 - `packages/shared/src/career-simbrief-airports.ts`
 - Data: `data/simbrief-dispatch-airports.json` (regenerate after hub changes)
 - Seed: `assertDispatchHubsAreSimBriefKnown()`
+- **Demand Board** also skips `bush` / `bushTripOnly` dests (PLN strips, not OFP). GPS ident **MM68** retired → remap `MMCU`.
 - Gen: `npm run generate:simbrief-dispatch` (from `packages/shared`) — syncs catalog→JSON; does **not** call SimBrief API. Confirm ICAOs in Dispatch before adding.
 
 ## Homologate / facilities MSFS

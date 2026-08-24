@@ -35,7 +35,12 @@ import {
   portsLoopTargetSection,
   type PortsLoopStep,
 } from './ports-loop-guidance';
-import { previewDemandAcceptPull, previewDemandInternationalRoute, greatCircleDistanceNm } from './demand-accept-preview';
+import {
+  demandOrderReachableFromOrigins,
+  previewDemandAcceptPull,
+  previewDemandInternationalRoute,
+  greatCircleDistanceNm,
+} from './demand-accept-preview';
 import {
   displayToKg,
   KG_TO_LB,
@@ -379,6 +384,8 @@ export function PortsPanel(props: {
   });
   const [demandPage, setDemandPage] = useState(1);
   const [demandCountryFilter, setDemandCountryFilter] = useState('');
+  /** `mine` = any owned WH, ICAO = that hub, empty = whole board. */
+  const [demandOriginFilter, setDemandOriginFilter] = useState('mine');
   const [worldPortsPage, setWorldPortsPage] = useState(1);
 
   const unit = massUnitLabel(props.weightSystem);
@@ -1321,14 +1328,29 @@ export function PortsPanel(props: {
     }
     return map;
   }, [snap?.ports]);
+  const selectedPortPickupSet = useMemo(() => {
+    return new Set(
+      (port?.pickupHubs ?? [])
+        .map((h) => h.trim().toUpperCase())
+        .filter(Boolean),
+    );
+  }, [port?.pickupHubs]);
+
   const filteredBuyableHubs = useMemo(() => {
     const q = buyHubQuery.trim().toLowerCase();
-    if (!q) return allBuyableHubs;
-    return allBuyableHubs.filter((icao) => {
-      const name = (portForHub.get(icao)?.name ?? '').toLowerCase();
-      return icao.toLowerCase().includes(q) || name.includes(q);
+    const matched = !q
+      ? allBuyableHubs
+      : allBuyableHubs.filter((icao) => {
+          const name = (portForHub.get(icao)?.name ?? '').toLowerCase();
+          return icao.toLowerCase().includes(q) || name.includes(q);
+        });
+    return [...matched].sort((a, b) => {
+      const aPort = selectedPortPickupSet.has(a) ? 0 : 1;
+      const bPort = selectedPortPickupSet.has(b) ? 0 : 1;
+      if (aPort !== bPort) return aPort - bPort;
+      return a.localeCompare(b);
     });
-  }, [allBuyableHubs, buyHubQuery, portForHub]);
+  }, [allBuyableHubs, buyHubQuery, portForHub, selectedPortPickupSet]);
   const allWarehouseStock = useMemo(() => {
     const whById = new Map(
       (warehouses?.warehouses ?? []).map((w) => [w.id, w]),
@@ -1349,6 +1371,21 @@ export function PortsPanel(props: {
         return a.acquiredAtTick - b.acquiredAtTick;
       });
   }, [warehouses]);
+  const ownedStockAtSelectedPort = useMemo(() => {
+    const portIdSel = port?.id;
+    if (!portIdSel) return allWarehouseStock;
+    const hubs = new Set(
+      (port?.pickupHubs ?? []).map((h) => h.trim().toUpperCase()).filter(Boolean),
+    );
+    return allWarehouseStock.filter((s) => {
+      const wh = (warehouses?.warehouses ?? []).find(
+        (w) => w.id === s.warehouseId,
+      );
+      const icao = wh?.icao.trim().toUpperCase() ?? '';
+      if (hubs.has(icao)) return true;
+      return portForHub.get(icao)?.id === portIdSel;
+    });
+  }, [allWarehouseStock, port?.id, port?.pickupHubs, warehouses?.warehouses, portForHub]);
   const selectedStock = useMemo(() => {
     if (!selectedStockId) return null;
     return allWarehouseStock.find((s) => s.id === selectedStockId) ?? null;
@@ -1453,11 +1490,11 @@ export function PortsPanel(props: {
   useEffect(() => {
     if (
       selectedStockId &&
-      !allWarehouseStock.some((s) => s.id === selectedStockId)
+      !ownedStockAtSelectedPort.some((s) => s.id === selectedStockId)
     ) {
       setSelectedStockId(null);
     }
-  }, [allWarehouseStock, selectedStockId]);
+  }, [ownedStockAtSelectedPort, selectedStockId]);
 
   useEffect(() => {
     if (
@@ -1511,6 +1548,19 @@ export function PortsPanel(props: {
     }
   }
 
+  const demandOriginHubs = useMemo(() => {
+    const owned = warehouses?.warehouses ?? [];
+    const filter = demandOriginFilter.trim().toUpperCase();
+    const rows =
+      filter && filter !== 'MINE'
+        ? owned.filter((w) => w.icao.trim().toUpperCase() === filter)
+        : owned;
+    return rows.map((w) => ({
+      icao: w.icao.trim().toUpperCase(),
+      countryId: w.countryId ?? null,
+    }));
+  }, [warehouses?.warehouses, demandOriginFilter]);
+
   const sortedDemand = useMemo(() => {
     const seen = new Set<string>();
     const unique: DemandOrderView[] = [];
@@ -1519,21 +1569,52 @@ export function PortsPanel(props: {
       seen.add(order.id);
       unique.push(order);
     }
+    const originMode = demandOriginFilter.trim().toLowerCase();
+    const reachable =
+      originMode === ''
+        ? unique
+        : unique.filter((o) =>
+            demandOrderReachableFromOrigins({
+              destIcao: o.destIcao,
+              destCountryId: o.destCountryId,
+              origins: demandOriginHubs,
+              pickupHubs: warehouses?.pickupHubs ?? [],
+            }),
+          );
     const country = demandCountryFilter.trim().toUpperCase();
     const filtered = country
-      ? unique.filter((o) => demandDestCountryId(o) === country)
-      : unique;
+      ? reachable.filter((o) => demandDestCountryId(o) === country)
+      : reachable;
     return filtered.sort((a, b) => compareDemandOrders(a, b, demandSort));
-  }, [demand, demandSort, demandCountryFilter]);
+  }, [
+    demand,
+    demandSort,
+    demandCountryFilter,
+    demandOriginFilter,
+    demandOriginHubs,
+    warehouses?.pickupHubs,
+  ]);
 
   const demandCountryOptions = useMemo(() => {
+    const originMode = demandOriginFilter.trim().toLowerCase();
+    const pool =
+      originMode === ''
+        ? demand
+        : demand.filter((o) =>
+            demandOrderReachableFromOrigins({
+              destIcao: o.destIcao,
+              destCountryId: o.destCountryId,
+              origins: demandOriginHubs,
+              pickupHubs: warehouses?.pickupHubs ?? [],
+            }),
+          );
     const ids = new Set<string>();
-    for (const o of demand) {
+    for (const o of pool) {
       const id = demandDestCountryId(o);
       if (id) ids.add(id);
     }
     return [...ids].sort((a, b) => a.localeCompare(b));
-  }, [demand]);
+  }, [demand, demandOriginFilter, demandOriginHubs, warehouses?.pickupHubs]);
 
   const demandPageCount = Math.max(
     1,
@@ -1544,7 +1625,7 @@ export function PortsPanel(props: {
     const start = (safeDemandPage - 1) * DEMAND_PAGE_SIZE;
     return sortedDemand.slice(start, start + DEMAND_PAGE_SIZE);
   }, [sortedDemand, safeDemandPage]);
-  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${demandCountryFilter}:${sortedDemand.length}`;
+  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${demandCountryFilter}:${demandOriginFilter}:${sortedDemand.length}`;
 
   useEffect(() => {
     if (demandPage > demandPageCount) setDemandPage(demandPageCount);
@@ -1552,7 +1633,16 @@ export function PortsPanel(props: {
 
   useEffect(() => {
     setDemandPage(1);
-  }, [demandCountryFilter]);
+  }, [demandCountryFilter, demandOriginFilter]);
+
+  useEffect(() => {
+    if (
+      demandCountryFilter &&
+      !demandCountryOptions.includes(demandCountryFilter)
+    ) {
+      setDemandCountryFilter('');
+    }
+  }, [demandCountryFilter, demandCountryOptions]);
 
   const sortedWorldPorts = useMemo(() => {
     return [...(snap?.ports ?? [])].sort((a, b) => {
@@ -1672,7 +1762,7 @@ export function PortsPanel(props: {
               disabled={props.busy || loading}
               onClick={() => setSection('demand')}
             >
-              Demand Board ({demand.length})
+              Demand Board ({sortedDemand.length})
             </button>
           </div>
 
@@ -2338,7 +2428,7 @@ export function PortsPanel(props: {
                             })}
                           </div>
                         )}
-                        {allWarehouseStock.length > 0 ? (
+                        {ownedStockAtSelectedPort.length > 0 ? (
                           <div className="table-wrap ports-warehouse-lots">
                             <table className="data-table">
                               <thead>
@@ -2352,7 +2442,7 @@ export function PortsPanel(props: {
                                 </tr>
                               </thead>
                               <tbody>
-                                {allWarehouseStock.map((s) => {
+                                {ownedStockAtSelectedPort.map((s) => {
                                   const wh = warehouses!.warehouses.find(
                                     (w) => w.id === s.warehouseId,
                                   );
@@ -2444,7 +2534,9 @@ export function PortsPanel(props: {
                           </div>
                         ) : allOwnedWarehouses.length > 0 ? (
                           <p className="empty">
-                            No stock in your warehouses yet.
+                            {allWarehouseStock.length > 0 && port
+                              ? `No stock at ${port.name} — select another port or buy into this pickup.`
+                              : 'No stock in your warehouses yet.'}
                           </p>
                         ) : null}
                       </>
@@ -2721,6 +2813,14 @@ export function PortsPanel(props: {
                             aria-label="Filter available warehouses"
                           />
                         </label>
+                        {port &&
+                        allBuyableHubs.some((icao) =>
+                          selectedPortPickupSet.has(icao),
+                        ) ? (
+                          <p className="muted ports-wh-buy-port-hint">
+                            Pickup hubs for {port.name} are listed first.
+                          </p>
+                        ) : null}
                         {filteredBuyableHubs.length === 0 ? (
                           <p className="empty">
                             No hubs match “{buyHubQuery.trim()}”.
@@ -2732,14 +2832,18 @@ export function PortsPanel(props: {
                           const linked = portForHub.get(icao);
                           const selected =
                             selectedBuyHubIcao?.toUpperCase() === icao;
+                          const atSelectedPort =
+                            selectedPortPickupSet.has(icao);
                           return (
                             <div
                               key={icao}
-                              className={
-                                selected
-                                  ? 'ports-wh-buy-card is-selected'
-                                  : 'ports-wh-buy-card'
-                              }
+                              className={[
+                                'ports-wh-buy-card',
+                                selected ? 'is-selected' : '',
+                                atSelectedPort ? 'is-port-pickup' : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')}
                               role="button"
                               tabIndex={0}
                               aria-pressed={selected}
@@ -2772,6 +2876,11 @@ export function PortsPanel(props: {
                                   {linked?.name ?? 'Pickup hub'}
                                 </span>
                               </div>
+                              {atSelectedPort && port ? (
+                                <p className="ports-wh-port-chip">
+                                  {port.name}
+                                </p>
+                              ) : null}
                               <p className="muted ports-wh-buy-meta">
                                 Capacity {props.formatTonnes(WH_T1_CAPACITY_KG)}{' '}
                                 · Tier 1
@@ -3049,6 +3158,26 @@ export function PortsPanel(props: {
 
           {section === 'demand' ? (
             <div className="ports-demand-board">
+              <div className="ports-demand-filters">
+                <label className="ports-demand-origin-filter">
+                  <span>Warehouse</span>
+                  <select
+                    value={demandOriginFilter}
+                    aria-label="Filter demand by warehouse origin"
+                    disabled={props.busy || loading}
+                    onChange={(e) => setDemandOriginFilter(e.target.value)}
+                  >
+                    <option value="mine">My warehouses</option>
+                    {allOwnedWarehouses.map((w) => (
+                      <option key={w.id} value={w.icao.trim().toUpperCase()}>
+                        {w.icao.trim().toUpperCase()}
+                        {w.countryId ? ` ${w.countryId}` : ''}
+                      </option>
+                    ))}
+                    <option value="">All destinations</option>
+                  </select>
+                </label>
+              </div>
               <div className="table-wrap ports-demand-table-wrap">
                 <table className="data-table ports-demand-table">
                   <thead>
@@ -3149,7 +3278,12 @@ export function PortsPanel(props: {
                           <p className="empty">
                             {demand.length === 0
                               ? 'No open demand — hubs with low stock will post orders.'
-                              : 'No demand in this country — clear the filter or wait for new posts.'}
+                              : demandOriginFilter.trim() !== '' &&
+                                  !demandCountryFilter
+                                ? allOwnedWarehouses.length === 0
+                                  ? 'Buy a warehouse at a pickup hub, or choose All destinations to browse the world board.'
+                                  : 'No demand you can fly from this warehouse — international pairs must be allowlisted, or choose All destinations.'
+                                : 'No demand in this country — clear the filter or wait for new posts.'}
                           </p>
                         </td>
                       </tr>

@@ -92,6 +92,7 @@ node packages/agent/dist/cli.js smoke --profile profiles/examples\<profile>.json
 | Economy / o que já shipou | `.cursor/rules/career-economy-roadmap.mdc` |
 | Novo país/hub | `.cursor/rules/career-map-expansion.mdc` |
 | Sessão recente (Market ATR/Titan, BBJ2, Host…) | `docs/agent-context/01`, `06`, `09`, `10` |
+| Homologação colaborativa (esboço) | `docs/agent-context/13-collaborative-homologation.md` |
 | Constraints operacionais | `docs/agent-context/00-constraints.md` |
 | README humano | `README.md`, `packages/career-ui/README.md`, `packages/desktop/README.md` |
 

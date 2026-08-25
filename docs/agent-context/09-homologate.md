@@ -48,6 +48,8 @@ Prompts de arte de card: `docs/market-airframe-card-prompts.md` (kit da classe, 
 
 Jets de passageiro no Market (`loadLayout: pax_and_cargo`): Loaded vs Due vs tablet — **não** é o mesmo que inject writetest. Ver [`12-pax-efb-due.md`](./12-pax-efb-due.md).
 
+Captura por jogador / fila de review (On Air–like): **não shipado**. Esboço em [`13-collaborative-homologation.md`](./13-collaborative-homologation.md).
+
 ## Hubs (aeroportos career)
 
 Não é o mesmo que airframe. Seed + facilities MSFS ≤25 nm + ICAO catalog.  

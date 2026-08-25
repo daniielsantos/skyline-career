@@ -32,6 +32,7 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - PMDG **738 BBJ2** fica **fora do Market** (`enabled: false`) até OEW bater com SimBrief Dual Class (empty live ~102.2 klb vs OEW ~93k).
 - Arte dos cards: `docs/market-airframe-card-prompts.md` + `AIRFRAME_CARD_ART` em `AircraftCards.tsx`. Um PNG por SKU de Market, não por vidro.
 - Jets `pax_and_cargo`: **não** empilhar todo mismatch em `efbPaxWeightLb`. Três causas — peso/pax EFB, slots SimConnect a mais, hold &lt; bag OFP. Playbook: `docs/agent-context/12-pax-efb-due.md`.
+- Homologação colaborativa: **não** implementar sem pedido. Esboço: `docs/agent-context/13-collaborative-homologation.md`. Formulário ≠ compra Hangar; captura ≠ listar Market.
 
 ## Git / release
 

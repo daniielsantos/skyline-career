@@ -28,6 +28,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [08-economy.md](./08-economy.md) | Economia — ponteiro ao roadmap |
 | [09-homologate.md](./09-homologate.md) | Homologar airframe + hubs |
 | [12-pax-efb-due.md](./12-pax-efb-due.md) | pax_and_cargo: EFB vs SimBrief vs estações (efbPaxWeightLb / cabin seats / holds) |
+| [13-collaborative-homologation.md](./13-collaborative-homologation.md) | Esboço: captura SimVar + review humano (não é o fluxo atual) |
 | [10-aircraft-pool.md](./10-aircraft-pool.md) | Pool de aviões: regras + roadmap F0–F7 |
 | [11-persist-commands.md](./11-persist-commands.md) | Settle/comandos SQL incrementais; pré-req MP |
 

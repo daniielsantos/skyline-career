@@ -183,6 +183,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/A320neo\s*V2\b/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A320neo V2';
   }
+  const inibuildsA350 = inferIniBuildsA350SimBriefMatch(t);
+  if (inibuildsA350) return inibuildsA350;
   if (/\bA321LR\b/i.test(t) || /^A321$/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A321LR LEAP-1A';
   }
@@ -234,7 +236,30 @@ export function liveTitleMatchesMarketSku(
   if (id === 'leonardo-fly-the-maddog-x-md-88-20th') {
     return /Fly The Maddog X MD-88 20th/i.test(t);
   }
+  if (id === 'inibuilds-a350-900-ulr') {
+    return /\bA350-900\s*ULR\b/i.test(t) || /\bA350-900ULR\b/i.test(t);
+  }
+  if (id === 'inibuilds-a350-900-default-cabin') {
+    return /\bA350-900\b/i.test(t) && !/\bULR\b/i.test(t);
+  }
+  if (id === 'inibuilds-a350-1000-default-cabin') {
+    return /\bA350-1000\b/i.test(t);
+  }
   return false;
+}
+
+/** iniBuilds A350 family — ULR before -900 (substring). */
+function inferIniBuildsA350SimBriefMatch(title: string): string | undefined {
+  if (/\bA350-900\s*ULR\b/i.test(title) || /\bA350-900ULR\b/i.test(title)) {
+    return 'iniBuilds \\(MSFS\\) - A350-900ULR';
+  }
+  if (/\bA350-900\b/i.test(title)) {
+    return 'iniBuilds \\(MSFS\\) - A350-900$';
+  }
+  if (/\bA350-1000\b/i.test(title)) {
+    return 'iniBuilds \\(MSFS\\) - A350-1000';
+  }
+  return undefined;
 }
 
 function inferFenixCeoSimBriefMatch(
@@ -318,8 +343,9 @@ export function preferSimBriefAirframeMatch(opts: {
   if (pack && pack !== 'Default') return pack;
   const inferred = opts.inferredFromTitle?.trim();
   if (inferred) return inferred;
-  if (pack) return pack;
   const catalog = opts.catalogMatch?.trim();
+  if (catalog && catalog !== 'Default') return catalog;
+  if (pack) return pack;
   if (catalog) return catalog;
   const classMatch = opts.classMatch?.trim();
   if (classMatch) return classMatch;

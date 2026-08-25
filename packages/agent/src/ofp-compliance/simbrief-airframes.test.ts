@@ -144,6 +144,43 @@ describe('matchSimBriefAirframe', () => {
     );
   });
 
+  it('disambiguates iniBuilds A350-900 from ULR by anchored match', () => {
+    const a359: SimBriefAirframe[] = [
+      {
+        internalId: 'A359',
+        icao: 'A359',
+        listType: 'A359',
+        comments: 'Default',
+        name: 'A350-900',
+        passengers: 325,
+      },
+      {
+        internalId: '347385_1734345124322',
+        icao: 'A359',
+        listType: 'A359',
+        comments: 'iniBuilds (MSFS) - A350-900',
+        name: 'A350-900',
+        passengers: 325,
+      },
+      {
+        internalId: '347385_1749476755253',
+        icao: 'A359',
+        listType: 'A359',
+        comments: 'iniBuilds (MSFS) - A350-900ULR',
+        name: 'A350-900',
+        passengers: 161,
+      },
+    ];
+    assert.equal(
+      matchSimBriefAirframe(a359, 'iniBuilds \\(MSFS\\) - A350-900$')?.internalId,
+      '347385_1734345124322',
+    );
+    assert.equal(
+      matchSimBriefAirframe(a359, 'iniBuilds \\(MSFS\\) - A350-900ULR')?.internalId,
+      '347385_1749476755253',
+    );
+  });
+
   it('disambiguates TFDi PW vs GE from title hint', () => {
     const pw = matchSimBriefAirframe(
       MD1F,
@@ -287,6 +324,30 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       inferSimBriefAirframeMatchFromTitle('FenixA319 IAE WF SD'),
       'Fenix Simulations \\(MSFS\\) - A319 IAE$',
     );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A350-900 (Default Cabin)'),
+      'iniBuilds \\(MSFS\\) - A350-900$',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A350-900 ULR'),
+      'iniBuilds \\(MSFS\\) - A350-900ULR',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A350-1000 Default Cabin'),
+      'iniBuilds \\(MSFS\\) - A350-1000',
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('A350-900 ULR', 'inibuilds-a350-900-ulr'),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('A350-900 (Default Cabin)', 'inibuilds-a350-900-default-cabin'),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('A350-900 ULR', 'inibuilds-a350-900-default-cabin'),
+      false,
+    );
   });
 });
 
@@ -310,6 +371,17 @@ describe('preferSimBriefAirframeMatch', () => {
         catalogMatch: 'Default',
       }),
       'NextGen Simulations \\(MSFS\\) - EMB-110P$',
+    );
+  });
+
+  it('prefers catalog vendor match over shared pack Default', () => {
+    assert.equal(
+      preferSimBriefAirframeMatch({
+        packMatch: 'Default',
+        catalogMatch: 'iniBuilds \\(MSFS\\) - A350-900$',
+        classMatch: 'Default',
+      }),
+      'iniBuilds \\(MSFS\\) - A350-900$',
     );
   });
 });

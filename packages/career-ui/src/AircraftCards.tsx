@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { listAirframeAddons } from './airframe-addons';
 import { estimateFairUsd, estimateHoursMxCostMult, estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 import { IcaoLink } from './IcaoLink';
@@ -424,7 +425,13 @@ export function MarketListingCard(props: {
       />
       <div className="aircraft-card-body">
         <div className="aircraft-card-title">
-          <strong>{listing.label || aircraftModelLabel(listing.aircraftClassId)}</strong>
+          <div className="aircraft-card-title-row">
+            <strong>{listing.label || aircraftModelLabel(listing.aircraftClassId)}</strong>
+            <AirframeAddonInfo
+              airframeTypeId={listing.airframeTypeId}
+              label={listing.label || aircraftModelLabel(listing.aircraftClassId)}
+            />
+          </div>
           {registration ? (
             <div className="aircraft-card-registration">{registration}</div>
           ) : null}
@@ -935,7 +942,13 @@ export function HangarAircraftCard(props: {
       <div className="hangar-card-body">
         <div className="hangar-section hangar-section-title">
           <div className="aircraft-card-title">
-            <strong>{acf.label}</strong>
+            <div className="aircraft-card-title-row">
+              <strong>{acf.label}</strong>
+              <AirframeAddonInfo
+                airframeTypeId={acf.airframeTypeId}
+                label={acf.label}
+              />
+            </div>
             {registration ? (
               <div className="aircraft-card-registration">{registration}</div>
             ) : null}
@@ -1290,5 +1303,75 @@ export function HangarAircraftCard(props: {
         />
       ) : null}
     </li>
+  );
+}
+
+function AirframeAddonInfo(props: {
+  airframeTypeId?: string | null;
+  label: string;
+}) {
+  const addons = listAirframeAddons(props.airframeTypeId);
+  const [open, setOpen] = useState(false);
+  const titleId = useId();
+  if (addons.length === 0) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="aircraft-addon-info"
+        aria-label={`Homologated add-ons for ${props.label}`}
+        title="Which MSFS add-on this is"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        i
+      </button>
+      {open ? (
+        <div
+          className="confirm-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOpen(false);
+          }}
+        >
+          <div
+            className="confirm-dialog aircraft-addon-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+          >
+            <p className="confirm-kicker">MSFS add-on</p>
+            <h2 id={titleId} className="confirm-title">
+              {props.label}
+            </h2>
+            <div className="confirm-body">
+              <p>
+                Skyline Load and Watch are homologated for these store
+                products — not every livery pack with a similar name.
+              </p>
+              <ul className="aircraft-addon-list">
+                {addons.map((row) => (
+                  <li key={`${row.publisher}-${row.product ?? ''}`}>
+                    <strong>{row.publisher}</strong>
+                    {row.product ? <span>{row.product}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="accept"
+                onClick={() => setOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

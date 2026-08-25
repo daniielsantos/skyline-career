@@ -5465,6 +5465,65 @@ tr.lot-locked {
   gap: 0.2rem;
 }
 
+.aircraft-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.aircraft-card-title-row > strong {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.aircraft-addon-info {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.12rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 0.72rem;
+  font-style: italic;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.aircraft-addon-info:hover {
+  border-color: rgba(240, 163, 90, 0.65);
+  color: #f0a35a;
+}
+
+.aircraft-addon-list {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.aircraft-addon-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.aircraft-addon-list span {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
 .aircraft-card-title strong {
   font-family: var(--font-display);
   font-size: 1.25rem;

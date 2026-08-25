@@ -16,6 +16,6 @@ describe('page help copy', () => {
     assert.equal(resolvePageHelp({ showAirport: true, showStaging: false, tab: 'market' }).id, 'airport');
     assert.match(PAGE_HELP.ports.bullets.join(' '), /warehouse/i);
     assert.match(PAGE_HELP.ports.bullets.join(' '), /Demand/i);
-    assert.match(PAGE_HELP.ports.bullets.join(' '), /Bridge/i);
+    assert.match(PAGE_HELP.ports.bullets.join(' '), /pick a hub/i);
   });
 });

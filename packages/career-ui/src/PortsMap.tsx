@@ -16,6 +16,7 @@ setWorkerUrl(maplibreWorkerUrl);
 const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 
 const PORT_ACCENT = '#f0a35a';
+const BRIDGE_ACCENT = '#5ec8c0';
 
 /** Generated map pins. Anchor PNG in `public/ports`; WH is SVG so dock/door read at map scale. */
 const PORT_ANCHOR_SRC = '/ports/anchor.png';
@@ -109,12 +110,21 @@ function hasCoords(lat: unknown, lon: unknown): lat is number {
   );
 }
 
+export type PortsMapBridgeLeg = {
+  originIcao: string;
+  destIcao: string;
+  origin: { lat: number; lon: number };
+  dest: { lat: number; lon: number };
+};
+
 export function PortsMap(props: {
   ports: PortsMapPort[];
   ownedFbos?: PortsMapFbo[];
   selectedPortId?: string | null;
   /** Hub ICAO to emphasize (warehouse / stock selection). */
   highlightedHubIcao?: string | null;
+  /** WH→WH transfer holds (drawn only when present). */
+  bridgeLegs?: PortsMapBridgeLeg[];
   /** Bump to re-run camera focus even when selectedPortId is unchanged. */
   focusToken?: number;
   onSelectPort?: (portId: string) => void;
@@ -165,6 +175,8 @@ export function PortsMap(props: {
       try {
         if (map.getLayer('port-feeder-lines')) map.removeLayer('port-feeder-lines');
         if (map.getSource('port-feeders')) map.removeSource('port-feeders');
+        if (map.getLayer('wh-bridge-lines')) map.removeLayer('wh-bridge-lines');
+        if (map.getSource('wh-bridges')) map.removeSource('wh-bridges');
       } catch {
         /* map may already be torn down */
       }
@@ -405,6 +417,54 @@ export function PortsMap(props: {
       /* keep markers even if lines fail */
     }
 
+    try {
+      const bridgeFeatures = (props.bridgeLegs ?? [])
+        .filter(
+          (leg) =>
+            hasCoords(leg.origin.lat, leg.origin.lon) &&
+            hasCoords(leg.dest.lat, leg.dest.lon),
+        )
+        .map((leg) => ({
+          type: 'Feature' as const,
+          properties: {
+            originIcao: leg.originIcao,
+            destIcao: leg.destIcao,
+          },
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: [
+              [leg.origin.lon, leg.origin.lat],
+              [leg.dest.lon, leg.dest.lat],
+            ] as [number, number][],
+          },
+        }));
+      const bridgeData = {
+        type: 'FeatureCollection' as const,
+        features: bridgeFeatures,
+      };
+      const bridgeSource = map.getSource('wh-bridges') as
+        | { setData: (data: typeof bridgeData) => void }
+        | undefined;
+      if (bridgeSource) {
+        bridgeSource.setData(bridgeData);
+      } else if (bridgeFeatures.length > 0) {
+        map.addSource('wh-bridges', { type: 'geojson', data: bridgeData });
+        map.addLayer({
+          id: 'wh-bridge-lines',
+          type: 'line',
+          source: 'wh-bridges',
+          paint: {
+            'line-color': BRIDGE_ACCENT,
+            'line-width': 2.4,
+            'line-opacity': 0.9,
+            'line-dasharray': [0.4, 1.4],
+          },
+        });
+      }
+    } catch {
+      /* feeders still show if transfer lines fail */
+    }
+
     if (boundCount === 0) return;
     try {
       if (focusLon != null && focusLat != null) {
@@ -471,6 +531,9 @@ export function PortsMap(props: {
     props.selectedPortId,
     props.highlightedHubIcao,
     props.focusToken,
+    (props.bridgeLegs ?? [])
+      .map((l) => `${l.originIcao}-${l.destIcao}`)
+      .join(','),
     // Stabilize: identity of FBO set, not a fresh [] each parent render.
     (props.ownedFbos ?? []).map((f) => f.id).join(','),
   ]);
@@ -494,6 +557,11 @@ export function PortsMap(props: {
           </span>{' '}
           Your warehouse
         </li>
+        {(props.bridgeLegs ?? []).length > 0 ? (
+          <li>
+            <span className="dot bridge-leg" /> Transfer
+          </li>
+        ) : null}
       </ul>
     </div>
   );

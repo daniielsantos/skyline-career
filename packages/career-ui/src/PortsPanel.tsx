@@ -390,6 +390,7 @@ export function PortsPanel(props: {
     'catalog',
   );
   const [whShelf, setWhShelf] = useState<'owned' | 'staff' | 'buy'>('owned');
+  const [whHubScope, setWhHubScope] = useState<'port' | 'all'>('port');
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
   const [selectedOwnedHubIcao, setSelectedOwnedHubIcao] = useState<string | null>(
     null,
@@ -1578,21 +1579,23 @@ export function PortsPanel(props: {
         return a.acquiredAtTick - b.acquiredAtTick;
       });
   }, [warehouses]);
-  const ownedStockAtSelectedPort = useMemo(() => {
-    const portIdSel = port?.id;
-    if (!portIdSel) return allWarehouseStock;
-    const hubs = new Set(
-      (port?.pickupHubs ?? []).map((h) => h.trim().toUpperCase()).filter(Boolean),
-    );
-    return allWarehouseStock.filter((s) => {
-      const wh = (warehouses?.warehouses ?? []).find(
-        (w) => w.id === s.warehouseId,
-      );
-      const icao = wh?.icao.trim().toUpperCase() ?? '';
-      if (hubs.has(icao)) return true;
+  const ownedWarehousesAtPort = useMemo(() => {
+    if (!port) return allOwnedWarehouses;
+    const portIdSel = port.id;
+    return allOwnedWarehouses.filter((w) => {
+      const icao = w.icao.trim().toUpperCase();
+      if (selectedPortPickupSet.has(icao)) return true;
       return portForHub.get(icao)?.id === portIdSel;
     });
-  }, [allWarehouseStock, port?.id, port?.pickupHubs, warehouses?.warehouses, portForHub]);
+  }, [port, allOwnedWarehouses, selectedPortPickupSet, portForHub]);
+  const ownedWarehousesInScope = useMemo(() => {
+    if (whHubScope === 'all' || !port) return allOwnedWarehouses;
+    return ownedWarehousesAtPort;
+  }, [whHubScope, port, allOwnedWarehouses, ownedWarehousesAtPort]);
+  const ownedStockAtSelectedPort = useMemo(() => {
+    const allowed = new Set(ownedWarehousesInScope.map((w) => w.id));
+    return allWarehouseStock.filter((s) => allowed.has(s.warehouseId));
+  }, [allWarehouseStock, ownedWarehousesInScope]);
   const heldOrderIds = useMemo(
     () =>
       new Set(
@@ -1606,22 +1609,85 @@ export function PortsPanel(props: {
   );
   const holdsAtSelectedPort = useMemo(() => {
     const holds = warehouses?.demandHolds ?? [];
-    const portIdSel = port?.id;
-    if (!portIdSel) return holds;
-    const hubs = new Set(
-      (port?.pickupHubs ?? []).map((h) => h.trim().toUpperCase()).filter(Boolean),
+    const allowedIcaos = new Set(
+      ownedWarehousesInScope.map((w) => w.icao.trim().toUpperCase()),
     );
-    return holds.filter((h) => {
-      const icao = h.originIcao.trim().toUpperCase();
-      if (hubs.has(icao)) return true;
-      return portForHub.get(icao)?.id === portIdSel;
-    });
+    if (ownedWarehousesInScope.length === 0) return [];
+    return holds.filter((h) =>
+      allowedIcaos.has(h.originIcao.trim().toUpperCase()),
+    );
+  }, [warehouses?.demandHolds, ownedWarehousesInScope]);
+  const warehouseFocusPorts = useMemo(() => {
+    const focusIcao = selectedOwnedHubIcao?.trim().toUpperCase();
+    if (focusIcao) {
+      const linked = portForHub.get(focusIcao);
+      if (linked) {
+        const match = mapPorts.filter(
+          (p) => p.id.toUpperCase() === linked.id.toUpperCase(),
+        );
+        if (match.length > 0) return match;
+      }
+    }
+    if (!port || whHubScope === 'all') {
+      const ids = new Set<string>();
+      for (const w of warehouses?.warehouses ?? []) {
+        const linked = portForHub.get(w.icao.trim().toUpperCase());
+        if (linked?.id) ids.add(linked.id);
+      }
+      if (ids.size === 0) return mapPorts;
+      return mapPorts.filter((p) => ids.has(p.id));
+    }
+    return mapPorts.filter(
+      (p) => p.id.toUpperCase() === port.id.toUpperCase(),
+    );
   }, [
-    warehouses?.demandHolds,
-    port?.id,
-    port?.pickupHubs,
+    mapPorts,
+    port,
+    whHubScope,
+    warehouses?.warehouses,
     portForHub,
+    selectedOwnedHubIcao,
   ]);
+  const warehouseFocusFbos = useMemo(() => {
+    const allowed = new Set(
+      ownedWarehousesInScope.map((w) => w.icao.trim().toUpperCase()),
+    );
+    return mapWarehouses.filter((f) =>
+      allowed.has(f.icao.trim().toUpperCase()),
+    );
+  }, [mapWarehouses, ownedWarehousesInScope]);
+  const warehouseBridgeLegs = useMemo(() => {
+    const coords = new Map<string, { lat: number; lon: number }>();
+    for (const p of mapPorts) {
+      for (const h of p.pickupHubDetails ?? []) {
+        const icao = h.icao.trim().toUpperCase();
+        if (icao && Number.isFinite(h.lat) && Number.isFinite(h.lon)) {
+          coords.set(icao, { lat: h.lat, lon: h.lon });
+        }
+      }
+    }
+    const scoped = new Set(
+      ownedWarehousesInScope.map((w) => w.icao.trim().toUpperCase()),
+    );
+    const legs: Array<{
+      originIcao: string;
+      destIcao: string;
+      origin: { lat: number; lon: number };
+      dest: { lat: number; lon: number };
+    }> = [];
+    for (const h of warehouses?.demandHolds ?? []) {
+      if ((h.kind ?? 'demand') !== 'bridge') continue;
+      const origin = h.originIcao.trim().toUpperCase();
+      const dest = h.destIcao.trim().toUpperCase();
+      if (origin === dest) continue;
+      if (scoped.size > 0 && !scoped.has(origin) && !scoped.has(dest)) continue;
+      const o = coords.get(origin);
+      const d = coords.get(dest);
+      if (!o || !d) continue;
+      legs.push({ originIcao: origin, destIcao: dest, origin: o, dest: d });
+    }
+    return legs;
+  }, [mapPorts, warehouses?.demandHolds, ownedWarehousesInScope]);
   const dispatchAircraftOptions = useMemo(() => {
     if (!dispatchHold) return [];
     const hub = dispatchHold.originIcao.trim().toUpperCase();
@@ -1664,6 +1730,16 @@ export function PortsPanel(props: {
     if (!highlightedHubIcao) return null;
     return portForHub.get(highlightedHubIcao)?.id ?? null;
   }, [highlightedHubIcao, portForHub]);
+  const focusedOwnedWarehouse = useMemo(() => {
+    const code = highlightedHubIcao;
+    if (code) {
+      const hit = ownedWarehousesInScope.find(
+        (w) => w.icao.trim().toUpperCase() === code,
+      );
+      if (hit) return hit;
+    }
+    return ownedWarehousesInScope[0] ?? null;
+  }, [highlightedHubIcao, ownedWarehousesInScope]);
   const staffFocusWarehouse = useMemo(() => {
     const list = warehouses?.warehouses ?? [];
     if (list.length === 0) return null;
@@ -1736,6 +1812,12 @@ export function PortsPanel(props: {
     }
     return portsLoopCtaLabel(loopStep);
   }, [loopStep, demand.length]);
+  const showPortsLoopBanner =
+    section !== loopTargetSection &&
+    !(
+      section === 'warehouse' &&
+      (loopStep.kind === 'fulfill_demand' || loopStep.kind === 'wait_demand')
+    );
 
   function goToLoopStep() {
     setSection(loopTargetSection);
@@ -1758,15 +1840,18 @@ export function PortsPanel(props: {
   }, [ownedStockAtSelectedPort, selectedStockId]);
 
   useEffect(() => {
-    if (
-      selectedOwnedHubIcao &&
-      !allOwnedWarehouses.some(
-        (w) => w.icao.trim().toUpperCase() === selectedOwnedHubIcao.toUpperCase(),
-      )
-    ) {
-      setSelectedOwnedHubIcao(null);
+    if (whShelf !== 'owned') return;
+    if (ownedWarehousesInScope.length === 0) return;
+    const cur = selectedOwnedHubIcao?.trim().toUpperCase() ?? '';
+    const inScope = ownedWarehousesInScope.some(
+      (w) => w.icao.trim().toUpperCase() === cur,
+    );
+    if (!inScope) {
+      setSelectedOwnedHubIcao(
+        ownedWarehousesInScope[0]!.icao.trim().toUpperCase(),
+      );
     }
-  }, [allOwnedWarehouses, selectedOwnedHubIcao]);
+  }, [whShelf, ownedWarehousesInScope, selectedOwnedHubIcao]);
 
   useEffect(() => {
     if (
@@ -1790,13 +1875,26 @@ export function PortsPanel(props: {
 
   function selectOwnedHub(icao: string) {
     const code = icao.trim().toUpperCase();
-    const next = selectedOwnedHubIcao === code ? null : code;
-    setSelectedOwnedHubIcao(next);
+    setSelectedOwnedHubIcao(code);
     setSelectedStockId(null);
-    if (next) {
-      const linkedPort = portForHub.get(next);
-      if (linkedPort) setPortId(linkedPort.id);
-    }
+    const linkedPort = portForHub.get(code);
+    if (linkedPort) setPortId(linkedPort.id);
+  }
+
+  function openBridgeFromLot(originIcao: string, commodityId: string) {
+    const origin = originIcao.trim().toUpperCase();
+    setBridgeDraft({ originIcao: origin, commodityId });
+    const dests = (warehouses?.warehouses ?? []).filter(
+      (w) => w.icao.trim().toUpperCase() !== origin,
+    );
+    setBridgeDest(dests[0]?.icao.trim().toUpperCase() ?? '');
+    setBridgeMode('hold');
+    const parked = props.fleet.filter(
+      (a) =>
+        a.status === 'parked' &&
+        a.locationIcao.trim().toUpperCase() === origin,
+    );
+    setBridgeAircraftId(parked[0]?.id ?? '');
   }
 
   function selectBuyHub(icao: string) {
@@ -2027,7 +2125,7 @@ export function PortsPanel(props: {
             </button>
           </div>
 
-          {section !== loopTargetSection ? (
+          {showPortsLoopBanner ? (
             <div className="ports-loop-banner" role="status">
               <p className="ports-loop-banner-text">
                 {portsLoopMessage(
@@ -2410,8 +2508,15 @@ export function PortsPanel(props: {
               </h3>
               <div className="ports-main">
                 <PortsMap
-                  ports={mapPorts}
-                  ownedFbos={mapWarehouses}
+                  ports={
+                    whShelf === 'owned' ? warehouseFocusPorts : mapPorts
+                  }
+                  ownedFbos={
+                    whShelf === 'owned' ? warehouseFocusFbos : mapWarehouses
+                  }
+                  bridgeLegs={
+                    whShelf === 'owned' ? warehouseBridgeLegs : undefined
+                  }
                   selectedPortId={
                     (whShelf === 'owned' || whShelf === 'staff') &&
                     highlightPortId
@@ -2433,11 +2538,39 @@ export function PortsPanel(props: {
                     setPortId(id);
                     if (whShelf === 'owned' || whShelf === 'staff') {
                       setSelectedStockId(null);
-                      setSelectedOwnedHubIcao(null);
+                      const picked = (snap.ports ?? []).find(
+                        (p) => p.id.toUpperCase() === id.toUpperCase(),
+                      );
+                      const hubs = new Set(
+                        (picked?.pickupHubs ?? []).map((h) =>
+                          h.trim().toUpperCase(),
+                        ),
+                      );
+                      const hit = allOwnedWarehouses.find((w) =>
+                        hubs.has(w.icao.trim().toUpperCase()),
+                      );
+                      if (hit) {
+                        setSelectedOwnedHubIcao(
+                          hit.icao.trim().toUpperCase(),
+                        );
+                      }
                     }
                     if (whShelf === 'buy') setSelectedBuyHubIcao(null);
                   }}
-                  onSelectHub={(icao) => props.onOpenAirport?.(icao)}
+                  onSelectHub={(icao) => {
+                    const code = icao.trim().toUpperCase();
+                    const owned = allOwnedWarehouses.some(
+                      (w) => w.icao.trim().toUpperCase() === code,
+                    );
+                    if (
+                      (whShelf === 'owned' || whShelf === 'staff') &&
+                      owned
+                    ) {
+                      selectOwnedHub(code);
+                      return;
+                    }
+                    props.onOpenAirport?.(icao);
+                  }}
                 />
 
                 <div className="ports-warehouse-side">
@@ -2446,7 +2579,7 @@ export function PortsPanel(props: {
                       <h3>Warehouses</h3>
                       <p className="muted ports-warehouse-hint">
                         {whShelf === 'owned'
-                          ? 'Your hubs and stock — select to highlight on the map.'
+                          ? 'Pick a hub. Stock lives here. Move it to another warehouse or Dispatch a hold.'
                           : whShelf === 'staff'
                             ? 'Hire per warehouse · Ace→Green grades · salary by grade.'
                             : 'Buyable hubs — select on the map, then buy.'}
@@ -2519,6 +2652,39 @@ export function PortsPanel(props: {
                             : ''}
                         </button>
                       </div>
+                      {whShelf === 'owned' && allOwnedWarehouses.length > 0 ? (
+                        <div
+                          className="ports-wh-scope"
+                          role="group"
+                          aria-label="Warehouse hub scope"
+                        >
+                          <button
+                            type="button"
+                            className={
+                              whHubScope === 'port'
+                                ? 'ports-wh-scope-btn active'
+                                : 'ports-wh-scope-btn'
+                            }
+                            disabled={props.busy || loading || !port}
+                            onClick={() => setWhHubScope('port')}
+                          >
+                            This port
+                            {port ? ` (${ownedWarehousesAtPort.length})` : ''}
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              whHubScope === 'all'
+                                ? 'ports-wh-scope-btn active'
+                                : 'ports-wh-scope-btn'
+                            }
+                            disabled={props.busy || loading}
+                            onClick={() => setWhHubScope('all')}
+                          >
+                            All hubs ({allOwnedWarehouses.length})
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="ports-wh-body">
@@ -2529,9 +2695,55 @@ export function PortsPanel(props: {
                             No warehouses yet — open Available to buy one at a
                             pickup hub.
                           </p>
+                        ) : ownedWarehousesInScope.length === 0 ? (
+                          <p className="empty">
+                            No warehouse at this port — open All hubs, or buy
+                            one on Available.
+                          </p>
                         ) : (
-                          <div className="ports-warehouse-row">
-                            {allOwnedWarehouses.map((wh) => {
+                          <div className="ports-wh-hub-focus">
+                            <div
+                              className="ports-wh-hub-picker"
+                              role="listbox"
+                              aria-label="Your hubs"
+                            >
+                              {ownedWarehousesInScope.map((row) => {
+                                const code = row.icao.trim().toUpperCase();
+                                const active =
+                                  focusedOwnedWarehouse?.id === row.id;
+                                const fillPct = Math.min(
+                                  100,
+                                  Math.round(
+                                    (row.usedKg /
+                                      Math.max(1, row.capacityKg)) *
+                                      100,
+                                  ),
+                                );
+                                return (
+                                  <button
+                                    key={row.id}
+                                    type="button"
+                                    role="option"
+                                    aria-selected={active}
+                                    className={
+                                      active
+                                        ? 'ports-wh-hub-chip is-active'
+                                        : 'ports-wh-hub-chip'
+                                    }
+                                    disabled={props.busy || loading}
+                                    onClick={() => selectOwnedHub(code)}
+                                  >
+                                    <strong>{code}</strong>
+                                    <span>{fillPct}%</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          <div className="ports-wh-hub-grid">
+                            {(focusedOwnedWarehouse
+                              ? [focusedOwnedWarehouse]
+                              : []
+                            ).map((wh) => {
                               const icao = wh.icao.trim().toUpperCase();
                               const linked = portForHub.get(icao);
                               const active = highlightedHubIcao === icao;
@@ -2561,9 +2773,21 @@ export function PortsPanel(props: {
                                     : wh.hubTier === 'spoke'
                                       ? 'Spoke hub'
                                       : null;
+                              const hubStock = allWarehouseStock.filter(
+                                (s) => s.warehouseId === wh.id,
+                              );
+                              const hubHolds = (
+                                warehouses?.demandHolds ?? []
+                              ).filter(
+                                (h) =>
+                                  h.originIcao.trim().toUpperCase() === icao,
+                              );
                               return (
                                 <div
                                   key={wh.id}
+                                  className="ports-wh-hub-column"
+                                >
+                                <div
                                   className={
                                     active
                                       ? 'ports-warehouse-card is-selected is-clickable'
@@ -2685,228 +2909,193 @@ export function PortsPanel(props: {
                                     </p>
                                   )}
                                 </div>
+                                {hubStock.length === 0 ? (
+                                  <p className="empty ports-wh-hub-empty">
+                                    Empty — buy at the port or move stock here.
+                                  </p>
+                                ) : (
+                                  <ul className="ports-wh-lots">
+                                    {hubStock.map((s) => {
+                                      const selected = selectedStockId === s.id;
+                                      const lotLabel = `${props.formatTonnes(s.kg)} ${commodityLabel(
+                                        { commodityId: s.commodityId },
+                                      )}`;
+                                      return (
+                                        <li
+                                          key={s.id}
+                                          className={
+                                            selected
+                                              ? 'ports-wh-lot is-selected'
+                                              : 'ports-wh-lot'
+                                          }
+                                          tabIndex={0}
+                                          aria-selected={selected}
+                                          onClick={() =>
+                                            selectStockLot(s.id, icao)
+                                          }
+                                          onKeyDown={(event) => {
+                                            if (
+                                              event.key === 'Enter' ||
+                                              event.key === ' '
+                                            ) {
+                                              event.preventDefault();
+                                              selectStockLot(s.id, icao);
+                                            }
+                                          }}
+                                        >
+                                          <div className="ports-wh-lot-main">
+                                            <div className="commodity-cell">
+                                              <CommodityIcon
+                                                commodityId={s.commodityId}
+                                                size={28}
+                                              />
+                                              <div>
+                                                <strong>
+                                                  {commodityLabel({
+                                                    commodityId: s.commodityId,
+                                                  })}
+                                                </strong>
+                                                <p className="muted">
+                                                  {props.formatTonnes(s.kg)} ·{' '}
+                                                  {formatUnitPrice(
+                                                    s.avgCostUsdPerKg,
+                                                  )}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="ports-wh-lot-actions">
+                                            {allOwnedWarehouses.length > 1 ? (
+                                              <button
+                                                type="button"
+                                                className="accept"
+                                                disabled={
+                                                  props.busy || loading
+                                                }
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
+                                                  openBridgeFromLot(
+                                                    icao,
+                                                    s.commodityId,
+                                                  );
+                                                }}
+                                              >
+                                                Move
+                                              </button>
+                                            ) : null}
+                                            <button
+                                              type="button"
+                                              className="action ghost"
+                                              disabled={props.busy || loading}
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                void onAbandonWarehouseStock(
+                                                  s.id,
+                                                  lotLabel,
+                                                  icao || 'warehouse',
+                                                );
+                                              }}
+                                            >
+                                              Abandon
+                                            </button>
+                                          </div>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                                {hubHolds.length > 0 ? (
+                                  <ul className="ports-wh-lots ports-wh-holds">
+                                    {hubHolds.map((h) => {
+                                      const isBridge =
+                                        (h.kind ?? 'demand') === 'bridge';
+                                      return (
+                                        <li key={h.id} className="ports-wh-lot">
+                                          <div className="ports-wh-lot-main">
+                                            <div className="commodity-cell">
+                                              <CommodityIcon
+                                                commodityId={h.commodityId}
+                                                size={28}
+                                              />
+                                              <div>
+                                                <div className="ports-wh-hold-line">
+                                                  <span
+                                                    className={
+                                                      isBridge
+                                                        ? 'ports-wh-hold-kind is-transfer'
+                                                        : 'ports-wh-hold-kind is-demand'
+                                                    }
+                                                  >
+                                                    {isBridge
+                                                      ? 'Transfer'
+                                                      : 'Demand'}
+                                                  </span>
+                                                  <span className="ports-wh-hold-dest">
+                                                    → {h.destIcao}
+                                                  </span>
+                                                  <span className="muted">
+                                                    {formatExpiresIn(
+                                                      h.expiresAtTick,
+                                                      props.economyTick,
+                                                    )}
+                                                  </span>
+                                                </div>
+                                                <p className="muted ports-wh-hold-lot">
+                                                  {commodityLabel({
+                                                    commodityId: h.commodityId,
+                                                  })}{' '}
+                                                  · {props.formatTonnes(h.kg)}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="ports-wh-lot-actions">
+                                            <button
+                                              type="button"
+                                              className="accept"
+                                              disabled={props.busy || loading}
+                                              onClick={() => {
+                                                setDispatchHold(h);
+                                                const aircraft =
+                                                  props.fleet.filter(
+                                                    (a) =>
+                                                      a.status === 'parked' &&
+                                                      a.locationIcao
+                                                        .trim()
+                                                        .toUpperCase() ===
+                                                        h.originIcao
+                                                          .trim()
+                                                          .toUpperCase(),
+                                                  );
+                                                setDispatchAircraftId(
+                                                  aircraft[0]?.id ?? '',
+                                                );
+                                              }}
+                                            >
+                                              Dispatch
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="action ghost"
+                                              disabled={props.busy || loading}
+                                              onClick={() =>
+                                                void onReleaseDemandHold(h)
+                                              }
+                                            >
+                                              Release
+                                            </button>
+                                          </div>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                ) : null}
+                                </div>
                               );
                             })}
                           </div>
+                          </div>
                         )}
-                        {ownedStockAtSelectedPort.length > 0 ? (
-                          <div className="table-wrap ports-warehouse-lots">
-                            <table className="data-table">
-                              <thead>
-                                <tr>
-                                  <th>Port</th>
-                                  <th>Hub</th>
-                                  <th>Lot</th>
-                                  <th>Mass</th>
-                                  <th>Cost</th>
-                                  <th />
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {ownedStockAtSelectedPort.map((s) => {
-                                  const wh = warehouses!.warehouses.find(
-                                    (w) => w.id === s.warehouseId,
-                                  );
-                                  const hubIcao =
-                                    wh?.icao.trim().toUpperCase() ?? '';
-                                  const linked = hubIcao
-                                    ? portForHub.get(hubIcao)
-                                    : undefined;
-                                  const selected = selectedStockId === s.id;
-                                  const lotLabel = `${props.formatTonnes(s.kg)} ${commodityLabel(
-                                    { commodityId: s.commodityId },
-                                  )}`;
-                                  return (
-                                    <tr
-                                      key={s.id}
-                                      className={
-                                        selected ? 'is-selected' : undefined
-                                      }
-                                      tabIndex={0}
-                                      aria-selected={selected}
-                                      onClick={() =>
-                                        selectStockLot(s.id, hubIcao)
-                                      }
-                                      onKeyDown={(event) => {
-                                        if (
-                                          event.key === 'Enter' ||
-                                          event.key === ' '
-                                        ) {
-                                          event.preventDefault();
-                                          selectStockLot(s.id, hubIcao);
-                                        }
-                                      }}
-                                    >
-                                      <td>{linked?.name ?? '—'}</td>
-                                      <td>
-                                        <button
-                                          type="button"
-                                          className="linkish"
-                                          disabled={props.busy}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            props.onOpenAirport?.(hubIcao);
-                                          }}
-                                        >
-                                          {hubIcao || '?'}
-                                        </button>
-                                      </td>
-                                      <td>
-                                        <div className="commodity-cell">
-                                          <CommodityIcon
-                                            commodityId={s.commodityId}
-                                            size={28}
-                                          />
-                                          <div>
-                                            <strong>
-                                              {commodityLabel({
-                                                commodityId: s.commodityId,
-                                              })}
-                                            </strong>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      <td>{props.formatTonnes(s.kg)}</td>
-                                      <td>
-                                        {formatUnitPrice(s.avgCostUsdPerKg)}
-                                      </td>
-                                      <td className="actions">
-                                        <button
-                                          type="button"
-                                          className="action ghost"
-                                          disabled={props.busy || loading}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            void onAbandonWarehouseStock(
-                                              s.id,
-                                              lotLabel,
-                                              hubIcao || 'warehouse',
-                                            );
-                                          }}
-                                        >
-                                          Abandon
-                                        </button>
-                                        {allOwnedWarehouses.length > 1 ? (
-                                          <button
-                                            type="button"
-                                            className="action ghost"
-                                            disabled={props.busy || loading}
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              const origin = hubIcao;
-                                              setBridgeDraft({
-                                                originIcao: origin,
-                                                commodityId: s.commodityId,
-                                              });
-                                              const dests = (
-                                                warehouses?.warehouses ?? []
-                                              ).filter(
-                                                (w) =>
-                                                  w.icao.trim().toUpperCase() !==
-                                                  origin,
-                                              );
-                                              setBridgeDest(
-                                                dests[0]?.icao.trim().toUpperCase() ??
-                                                  '',
-                                              );
-                                              setBridgeMode('hold');
-                                              const parked = props.fleet.filter(
-                                                (a) =>
-                                                  a.status === 'parked' &&
-                                                  a.locationIcao
-                                                    .trim()
-                                                    .toUpperCase() === origin,
-                                              );
-                                              setBridgeAircraftId(
-                                                parked[0]?.id ?? '',
-                                              );
-                                            }}
-                                          >
-                                            Bridge
-                                          </button>
-                                        ) : null}
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        ) : allOwnedWarehouses.length > 0 ? (
-                          <p className="empty">
-                            {allWarehouseStock.length > 0 && port
-                              ? `No stock at ${port.name} — select another port or buy into this pickup.`
-                              : 'No stock in your warehouses yet.'}
-                          </p>
-                        ) : null}
-                        {holdsAtSelectedPort.length > 0 ? (
-                          <div className="table-wrap ports-warehouse-lots">
-                            <table className="data-table">
-                              <thead>
-                                <tr>
-                                  <th>Held for</th>
-                                  <th>Lot</th>
-                                  <th>Mass</th>
-                                  <th>Until</th>
-                                  <th />
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {holdsAtSelectedPort.map((h) => (
-                                  <tr key={h.id}>
-                                    <td>
-                                      {h.kind === 'bridge' ? 'Bridge ' : ''}
-                                      {h.originIcao}→{h.destIcao}
-                                    </td>
-                                    <td>
-                                      {commodityLabel({
-                                        commodityId: h.commodityId,
-                                      })}
-                                    </td>
-                                    <td>{props.formatTonnes(h.kg)}</td>
-                                    <td className="muted">
-                                      {formatExpiresIn(
-                                        h.expiresAtTick,
-                                        props.economyTick,
-                                      )}
-                                    </td>
-                                    <td className="actions">
-                                      <button
-                                        type="button"
-                                        className="accept"
-                                        disabled={props.busy || loading}
-                                        onClick={() => {
-                                          setDispatchHold(h);
-                                          const aircraft = props.fleet.filter(
-                                            (a) =>
-                                              a.status === 'parked' &&
-                                              a.locationIcao.trim().toUpperCase() ===
-                                                h.originIcao.trim().toUpperCase(),
-                                          );
-                                          setDispatchAircraftId(
-                                            aircraft[0]?.id ?? '',
-                                          );
-                                        }}
-                                      >
-                                        Dispatch
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="action ghost"
-                                        disabled={props.busy || loading}
-                                        onClick={() =>
-                                          void onReleaseDemandHold(h)
-                                        }
-                                      >
-                                        Release
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ) : null}
                       </>
                     ) : whShelf === 'staff' ? (
                       allOwnedWarehouses.length === 0 ? (
@@ -4787,9 +4976,9 @@ function WarehouseBridgeDialog(props: {
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <p className="confirm-kicker">Warehouse transfer</p>
+        <p className="confirm-kicker">Move stock</p>
         <h2 id={titleId} className="confirm-title">
-          Bridge {props.originIcao}→{props.destIcao || '…'}?
+          {props.originIcao}→{props.destIcao || '…'}?
         </h2>
         <div className="confirm-body">
           <p>

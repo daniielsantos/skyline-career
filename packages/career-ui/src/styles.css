@@ -9300,7 +9300,9 @@ span.dispatch-route-hub-dest {
   gap: 0.4rem;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 0.2rem;
 }
 
 .ports-warehouse-strip h3 {
@@ -9317,6 +9319,124 @@ span.dispatch-route-hub-dest {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+}
+
+.ports-wh-hub-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.ports-wh-hub-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ports-wh-hub-chip {
+  font: inherit;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+}
+
+.ports-wh-hub-chip strong {
+  letter-spacing: 0.04em;
+}
+
+.ports-wh-hub-chip span {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ports-wh-hub-chip:hover:not(:disabled):not(.is-active) {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.ports-wh-hub-chip.is-active {
+  border-color: rgba(240, 163, 90, 0.5);
+  background: rgba(240, 163, 90, 0.12);
+  color: #f3d2ae;
+}
+
+.ports-wh-hub-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ports-wh-hub-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.ports-wh-hub-column .ports-warehouse-card {
+  max-width: none;
+  flex: 0 0 auto;
+}
+
+.ports-wh-hub-empty {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.ports-wh-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.ports-wh-scope-btn {
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.ports-wh-scope-btn:hover:not(:disabled):not(.active) {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.ports-wh-scope-btn.active {
+  border-color: rgba(240, 163, 90, 0.45);
+  color: #f0a35a;
+  background: rgba(240, 163, 90, 0.12);
+}
+
+.ports-wh-hold-kind {
+  display: inline-block;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.32rem;
+  border-radius: 3px;
+}
+
+.ports-wh-hold-kind.is-demand {
+  color: #f0a35a;
+  border: 1px solid rgba(240, 163, 90, 0.35);
+  background: rgba(240, 163, 90, 0.1);
+}
+
+.ports-wh-hold-kind.is-transfer {
+  color: #5ec8c0;
+  border: 1px solid rgba(94, 200, 192, 0.4);
+  background: rgba(94, 200, 192, 0.1);
 }
 
 .ports-warehouse-card {
@@ -9485,8 +9605,83 @@ span.dispatch-route-hub-dest {
 
 .ports-warehouse-lots {
   margin-top: 0.35rem;
-  max-height: 16rem;
-  overflow: auto;
+}
+
+.ports-wh-lots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ports-wh-lot {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.65rem;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.ports-wh-lot.is-selected {
+  border-color: rgba(240, 163, 90, 0.45);
+  background: rgba(240, 163, 90, 0.1);
+}
+
+.ports-wh-lot-main {
+  min-width: 0;
+  flex: 1 1 10rem;
+}
+
+.ports-wh-lot-main .muted {
+  margin: 0.12rem 0 0;
+  font-size: 0.75rem;
+}
+
+.ports-wh-lot-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 5.6rem);
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.ports-wh-lot-actions > button.accept,
+.ports-wh-lot-actions > button.action {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.16rem 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.ports-wh-hold-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.ports-wh-hold-dest {
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.ports-wh-hold-lot {
+  margin: 0.2rem 0 0;
 }
 
 .ports-warehouse-lots .data-table th,
@@ -9521,7 +9716,7 @@ span.dispatch-route-hub-dest {
 
 .ports-main {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 1fr);
   gap: 0.75rem;
   align-items: stretch;
   height: var(--ports-stage-h);
@@ -9864,6 +10059,15 @@ span.dispatch-route-hub-dest {
   border-radius: 50%;
   background: #7a8a9a;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.ports-map-legend .dot.bridge-leg {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  width: 0.85rem;
+  height: 0;
+  border-top: 2px dashed #5ec8c0;
 }
 
 .ports-map-legend .dot.fbo {

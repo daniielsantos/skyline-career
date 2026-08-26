@@ -1211,7 +1211,6 @@ export function DispatchActivePanel(props: {
             // mid-ramp live numbers — the switch also looked "finished" early.
             const injecting = props.loadOfpAutoStatus === 'loading';
             const confirming = props.loadOfpAutoStatus === 'done';
-            const injectFailed = props.loadOfpAutoStatus === 'failed';
             const injectBusy = injecting || confirming;
             const liveLocation =
               props.watch?.running &&
@@ -1225,6 +1224,8 @@ export function DispatchActivePanel(props: {
             const ready = injectBusy
               ? false
               : loadReady && locationOk;
+            const injectFailed =
+              props.loadOfpAutoStatus === 'failed' && !ready;
             const injectSwitchOn =
               props.skylineInjectEnabled || injecting;
             const watchLive =
@@ -1648,7 +1649,7 @@ export function DispatchActivePanel(props: {
                         <div className="skyline-inject-row">
                           {(() => {
                             const injectStatus =
-                              props.loadOfpAutoStatus === 'failed'
+                              injectFailed
                                 ? (props.loadOfpAutoError ??
                                   'Inject failed — turn Skyline inject on to retry.')
                                 : props.loadOfpAutoStatus === 'loading'
@@ -1667,7 +1668,7 @@ export function DispatchActivePanel(props: {
                             return injectStatus ? (
                               <p
                                 className={`skyline-inject-status${
-                                  props.loadOfpAutoStatus === 'failed'
+                                  injectFailed
                                     ? ' skyline-inject-status-fail'
                                     : injectBusy
                                       ? ' skyline-inject-status-busy'
@@ -1725,7 +1726,7 @@ export function DispatchActivePanel(props: {
                                   ? 'Writing…'
                                   : confirming
                                     ? 'Checking…'
-                                  : props.loadOfpAutoStatus === 'failed'
+                                  : injectFailed
                                     ? 'Failed · retry'
                                     : props.skylineInjectEnabled
                                         ? 'On'

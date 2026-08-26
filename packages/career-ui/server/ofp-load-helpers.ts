@@ -3325,7 +3325,6 @@ async function applyMissionOfpLoadExclusive(
           ? ' — restored previous load'
           : ' — restored previous payload (fuel left as-is)';
       }
-      error += ' · debug: profiles/career/watch-debug.log ([cdu]/[inject])';
     } else {
       // Fuel/payload writes already succeeded (UI Sim=Due). compareOnce +
       // runMissionPreflight open another pipe full of CG PERCENT / station

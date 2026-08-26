@@ -454,6 +454,9 @@ export function dispatchStepStatusLine(input: {
         return `Not at origin ${loc.originIcao} — relocate within ${loc.radiusNm} nm before takeoff. Watch will not auto-depart.`;
       }
       if (input.loadPath === 'inject') {
+        if (input.loadOfpAutoStatus === 'done') {
+          return 'Writes finished — waiting for live Loaded vs Due sample…';
+        }
         if (input.loadOfpAutoStatus === 'failed') {
           return (
             input.loadOfpAutoError ??

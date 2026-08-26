@@ -114,6 +114,7 @@ import {
 } from './routes';
 import {
   fuelMatchToleranceLb,
+  loadVerificationNumbersMatch,
   matchFuelOk,
   payloadMatchToleranceLb,
   pickFuelTankBreakdown,
@@ -5199,34 +5200,28 @@ export function App() {
     };
   }, [loadOfpAutoStatus, activeMission?.id]);
 
-  // Writes finished (`done`) or premature `failed` (PMDG ZFW ok but classic
-  // station snapshot lagged) — clear when Loaded vs Due is actually ready.
+  // Writes finished (`done`) or premature `failed` (HTTP verify lagged classic
+  // stations) — clear when Loaded vs Due numbers actually match Preflight.
   useEffect(() => {
     if (loadOfpAutoStatus !== 'done' && loadOfpAutoStatus !== 'failed') return;
-    const v = activeMission?.lastPreflightCheck?.loadVerification;
-    if (!v?.ready) return;
-    const plannedFuel = v.fuel.plannedLb;
-    const plannedPayload = v.payload.plannedLb;
-    const fuelOk =
-      plannedFuel === undefined ||
-      matchFuelOk(
-        v.fuel.liveLb ?? 0,
-        plannedFuel,
-        fuelMatchToleranceLb(plannedFuel),
-        v.fuel.taxiBurnLb,
-      );
-    const payloadOk =
-      plannedPayload === undefined ||
-      v.payload.liveLb === undefined ||
-      Math.abs(v.payload.liveLb - plannedPayload) <=
-        payloadMatchToleranceLb(plannedPayload);
-    if (!fuelOk || !payloadOk) return;
+    const watchV =
+      watch?.running && watch.missionId === activeMission?.id
+        ? watch.loadVerification
+        : undefined;
+    const missionV = activeMission?.lastPreflightCheck?.loadVerification;
+    const v = watchV ?? missionV;
+    if (!loadVerificationNumbersMatch(v)) return;
     setLoadOfpAutoStatus('idle');
     setLoadOfpAutoError(null);
+    setLoadOfpProgress(null);
     setSkylineInjectEnabled(false);
   }, [
+    activeMission?.id,
     activeMission?.lastPreflightCheck?.loadVerification,
     loadOfpAutoStatus,
+    watch?.loadVerification,
+    watch?.missionId,
+    watch?.running,
   ]);
 
   // Do not auto-hide the inject toggle on a timer — user turns it off manually.
@@ -8036,15 +8031,12 @@ export function App() {
         const injectReady = Boolean(
           result.mission?.lastPreflightCheck?.loadVerification?.ready,
         );
-        // Always clear the switch when inject finishes so Failed→retry is one click On.
+        // HTTP inject succeeded — use `done` while waiting for live sample;
+        // reserve `failed` for hard errors (cancel, rollback, verify throw).
         setSkylineInjectEnabled(false);
-        setLoadOfpAutoStatus(injectReady ? 'idle' : 'failed');
+        setLoadOfpAutoStatus(injectReady ? 'idle' : 'done');
         injectFuelQuietUntilRef.current = Date.now() + 12_000;
-        setLoadOfpAutoError(
-          injectReady
-            ? null
-            : 'Inject finished — Loaded vs Due still mismatched (turn inject on to retry) · log: profiles/career/watch-debug.log',
-        );
+        setLoadOfpAutoError(null);
         if (injectReady) {
           setLoadOfpProgress(null);
         }
@@ -8083,9 +8075,7 @@ export function App() {
     if (!succeeded) {
       setSkylineInjectEnabled(false);
       setLoadOfpAutoStatus('failed');
-      setLoadOfpAutoError(
-        `${failureMessage ?? 'Fuel and payload load failed'} · log: profiles/career/watch-debug.log ([cdu]/[inject])`,
-      );
+      setLoadOfpAutoError(failureMessage ?? 'Fuel and payload load failed');
       setLoadOfpProgress(null);
       return;
     }

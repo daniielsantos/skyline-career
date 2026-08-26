@@ -628,3 +628,39 @@ export function evaluateLoadVerification(opts: {
     },
   };
 }
+
+/** Sim vs Due numbers match — same gate as Preflight tiles (ignores stale ready flag). */
+export function loadVerificationNumbersMatch(
+  v:
+    | {
+        fuel: {
+          plannedLb?: number;
+          liveLb?: number;
+          taxiBurnLb?: number;
+        };
+        payload: {
+          plannedLb?: number;
+          liveLb?: number;
+        };
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!v) return false;
+  const plannedFuel = v.fuel.plannedLb;
+  const plannedPayload = v.payload.plannedLb;
+  const fuelOk =
+    plannedFuel === undefined ||
+    matchFuelOk(
+      v.fuel.liveLb ?? 0,
+      plannedFuel,
+      fuelMatchToleranceLb(plannedFuel),
+      v.fuel.taxiBurnLb,
+    );
+  const payloadOk =
+    plannedPayload === undefined ||
+    v.payload.liveLb === undefined ||
+    Math.abs(v.payload.liveLb - plannedPayload) <=
+      payloadMatchToleranceLb(plannedPayload);
+  return fuelOk && payloadOk;
+}

@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-25: **PMDG 777-300ER** homologado como 200ER/LR — `pax_and_cargo` + Skyline CDU inject (`pmdg-777-300er-pax.json`, SimBrief `PMDG (MSFS) - 777,000 MTOW`, 370 seats / hold ~84335 lb). Freighter pack `pmdg-777.json` = **777F only**. Validar inject live FO CDU.
+Atualizado 2026-08-25: Desktop **0.3.48** shipped — PMDG 777-200ER/LR/300ER Skyline CDU inject + pax. Validar inject live FO CDU no 300ER.
 
 Atualizado 2026-08-24: esboço homologação colaborativa em `13-collaborative-homologation.md` (não implementar agora). Cards Market/Hangar têm **i** de add-on (`airframe-addons.ts`).
 

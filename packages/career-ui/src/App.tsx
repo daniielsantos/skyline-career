@@ -3938,6 +3938,18 @@ export function App() {
       return;
     }
 
+    // Drop stale rows when board mode / Near me changes — otherwise Crew can
+    // briefly show a previous world page (often Ferry-heavy) under the new tabs.
+    const boardScopeChanged =
+      prev.crew !== nextOpts.crew ||
+      prev.nearIcao !== nextOpts.nearIcao ||
+      prev.nearMaxNm !== nextOpts.nearMaxNm;
+    if (boardScopeChanged) {
+      setLots([]);
+      setMarketTotalLots(0);
+      setMarketPageCount(1);
+    }
+
     // Intent updates immediately; last-fetched stays until paint so a fleet
     // identity bump mid-debounce still sees "changed" and reschedules.
     marketBoardIntentRef.current = nextOpts;
@@ -5086,11 +5098,12 @@ export function App() {
     };
   }, [loadOfpAutoStatus, activeMission?.id]);
 
-  // Writes finished (`done`) — auto-clear only when Sim vs Due matches.
+  // Writes finished (`done`) or premature `failed` (PMDG ZFW ok but classic
+  // station snapshot lagged) — clear when Loaded vs Due is actually ready.
   useEffect(() => {
-    if (loadOfpAutoStatus !== 'done') return;
+    if (loadOfpAutoStatus !== 'done' && loadOfpAutoStatus !== 'failed') return;
     const v = activeMission?.lastPreflightCheck?.loadVerification;
-    if (!v) return;
+    if (!v?.ready) return;
     const plannedFuel = v.fuel.plannedLb;
     const plannedPayload = v.payload.plannedLb;
     const fuelOk =
@@ -5108,6 +5121,7 @@ export function App() {
         payloadMatchToleranceLb(plannedPayload);
     if (!fuelOk || !payloadOk) return;
     setLoadOfpAutoStatus('idle');
+    setLoadOfpAutoError(null);
     setSkylineInjectEnabled(false);
   }, [
     activeMission?.lastPreflightCheck?.loadVerification,
@@ -9176,7 +9190,7 @@ export function App() {
           <div className="topbar-title">
             <button
               type="button"
-              className="action ghost sidebar-toggle"
+              className="sidebar-toggle"
               aria-label="Open navigation"
               onClick={() => setSidebarOpen(true)}
             >
@@ -11039,7 +11053,7 @@ export function App() {
                 ) : null}
         </section>
       ) : hubSelected && tab === 'market' ? (
-        <section className="panel">
+        <section className="panel freights-panel">
           <div className="settings-choice" role="tablist" aria-label="Freight boards">
             <button
               type="button"
@@ -12339,7 +12353,7 @@ export function App() {
                         : ' · new flight'}
                   </p>
                 </div>
-                <div className="staging-head-actions">
+                <div className="missions-head-center staging-head-aircraft">
                   <label className="staging-aircraft">
                     Aircraft
                     <select
@@ -12372,14 +12386,8 @@ export function App() {
                         ))}
                     </select>
                   </label>
-                  <button
-                    type="button"
-                    className="action ghost"
-                    onClick={exitStaging}
-                    disabled={busy}
-                  >
-                    Back
-                  </button>
+                </div>
+                <div className="missions-head-actions">
                   <button
                     type="button"
                     className="action ghost danger"
@@ -12595,7 +12603,7 @@ export function App() {
                           </div>
                           <button
                             type="button"
-                            className="action ghost danger"
+                            className="action ghost danger compact"
                             disabled={busy || staging.lines.length <= 1}
                             title={
                               staging.lines.length <= 1
@@ -12693,18 +12701,6 @@ export function App() {
                   ) : null}
                 </div>
                 <div className="cargo-dialog-actions">
-                  <button
-                    type="button"
-                    className="action ghost danger"
-                    disabled={busy}
-                    onClick={() => void onCancelStagingFlight()}
-                  >
-                    {stagingBlockingMission
-                      ? 'Cancel flight'
-                      : staging.replaceManifest
-                        ? 'Discard edits'
-                        : 'Discard manifest'}
-                  </button>
                   <button
                     type="button"
                     className="accept"

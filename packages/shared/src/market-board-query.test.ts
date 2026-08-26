@@ -197,6 +197,54 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
+  it('Crew board soft-ranks Contract before Ferry without burying pay clicks', () => {
+    const mixed = [
+      row({
+        payUsd: 9000,
+        crewNeeded: true,
+        crewReposition: true,
+        pilotFeeUsd: 9000,
+        commodityName: 'Ferry',
+      }),
+      row({
+        payUsd: 400,
+        crewNeeded: true,
+        pilotFeeUsd: 400,
+        commodityName: 'Contract',
+        availableKg: 0,
+        quantityKg: 5000,
+      }),
+      row({
+        payUsd: 8000,
+        crewNeeded: true,
+        crewReposition: true,
+        pilotFeeUsd: 8000,
+        commodityName: 'Ferry2',
+      }),
+    ];
+    const soft = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      crewFilter: 'crew',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      soft.rows.map((r) => r.commodityName),
+      ['Contract', 'Ferry', 'Ferry2'],
+    );
+    const byPay = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      crewFilter: 'crew',
+      sorts: [{ key: 'pay', direction: 'desc' }],
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      byPay.rows.map((r) => r.commodityName),
+      ['Ferry', 'Ferry2', 'Contract'],
+    );
+  });
+
   it('allows locked-first when access:desc is explicit', () => {
     const mixed = [
       row({ payUsd: 200, commodityId: 'general', cargoLocked: false }),

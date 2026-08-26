@@ -331,6 +331,34 @@ body {
   display: none;
 }
 
+@media (max-width: 900px) {
+  .sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: flex-start;
+    flex: 0 0 auto;
+    margin: 0 0 0.35rem;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: 0.2rem;
+    background: var(--surface);
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .sidebar-toggle:hover:not(:disabled) {
+    color: var(--ink);
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+    background: var(--surface-2);
+  }
+}
+
 .main-column {
   display: flex;
   flex-direction: column;
@@ -610,12 +638,6 @@ body {
     padding: 0.65rem 1rem;
   }
 
-  .sidebar-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -655,58 +677,106 @@ body {
   font-size: 0.85rem;
 }
 
-.aircraft select,
-.action,
-.accept {
-  font: inherit;
-}
-
 .aircraft select {
+  font: inherit;
   border: 1px solid var(--line);
   background: var(--surface-2);
   color: var(--ink);
   padding: 0.4rem 0.55rem;
 }
 
+/* Primary CTAs — same display/caps language as ghost, filled accent */
 .action,
 .accept {
+  flex: 0 0 auto;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
   border: 1px solid var(--accent);
+  border-radius: 0.2rem;
   background: var(--accent);
   color: var(--accent-ink);
-  padding: 0.45rem 0.8rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
   cursor: pointer;
-  font-weight: 600;
+  transform: none;
+  filter: none;
 }
 
-.action.ghost,
 .accept:disabled,
-.action:disabled {
+.action:not(.ghost):disabled {
   opacity: 0.55;
+  cursor: not-allowed;
 }
 
+/* Secondary / outline actions — Flight Plan Cancel / Edit pattern */
 .action.ghost {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--line);
+  --ghost-tone: var(--ink);
+  flex: 0 0 auto;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--ghost-tone) 50%, var(--line));
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--ghost-tone) 14%, var(--surface));
+  color: var(--ghost-tone);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+.action.ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ghost-tone) 22%, var(--surface));
+  border-color: color-mix(in srgb, var(--ghost-tone) 70%, var(--line));
+  transform: none;
+  filter: none;
+}
+
+.action.ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .action.ghost.danger {
-  color: var(--danger);
-  border-color: rgba(155, 28, 28, 0.4);
-  background: rgba(155, 28, 28, 0.04);
-  opacity: 1;
+  --ghost-tone: var(--danger);
 }
 
-.action.ghost.danger:hover:not(:disabled) {
-  background: rgba(155, 28, 28, 0.1);
-  border-color: rgba(155, 28, 28, 0.55);
+.action.ghost.info {
+  --ghost-tone: var(--info);
 }
 
-.action:hover:not(:disabled),
+.dispatch-active .action.ghost.info {
+  --ghost-tone: var(--dispatch-accent, var(--accent));
+}
+
+.action.ghost.compact,
+.staging-section-head .action.ghost,
+.dispatch-edit-btn.action.ghost {
+  padding: 0.38rem 0.75rem;
+  font-size: 0.88rem;
+}
+
+.action:hover:not(:disabled):not(.ghost),
 .accept:hover:not(:disabled) {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-  transition: transform 160ms ease, filter 160ms ease;
+  filter: brightness(1.08);
+  transform: none;
 }
 
 .banner {
@@ -1015,37 +1085,6 @@ td.net-neg {
   justify-content: flex-end;
   align-items: center;
   min-width: 0;
-}
-
-.missions-head-cancel {
-  flex: 0 0 auto;
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  padding: 0.42rem 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--line));
-  border-radius: 0.2rem;
-  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
-  color: var(--danger);
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.missions-head-cancel:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 22%, var(--surface));
-  border-color: color-mix(in srgb, var(--danger) 70%, var(--line));
-}
-
-.missions-head-cancel:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .missions-head-cancel-enroute {
@@ -1947,11 +1986,10 @@ th {
   gap: 0.85rem;
   align-items: start;
   min-width: 0;
-  min-height: 0;
   padding: 0.75rem;
   border: 1px solid var(--line);
   background: var(--panel);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .crew-person-card.is-hire {
@@ -2030,9 +2068,10 @@ th {
 
 .crew-person-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.25rem 0.45rem;
 }
 
 .crew-person-name {
@@ -2040,6 +2079,21 @@ th {
   font-size: 1.15rem;
   letter-spacing: 0.04em;
   font-weight: 400;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.crew-perk-tag {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .crew-person-perk {
@@ -2049,13 +2103,6 @@ th {
   align-items: baseline;
   gap: 0.35rem 0.45rem;
   font-size: 0.85rem;
-}
-
-.crew-perk-tag {
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--accent);
 }
 
 .crew-person-route {
@@ -2094,6 +2141,24 @@ th {
   flex-wrap: wrap;
   gap: 0.35rem;
   align-items: center;
+}
+
+/* Hire desk / roster cards — accent outline (not a solid block per card) */
+.crew-card-actions .accept {
+  width: 100%;
+  padding: 0.38rem 0.75rem;
+  font-size: 0.88rem;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  filter: none;
+}
+
+.crew-card-actions .accept:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 26%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 78%, var(--line));
+  color: var(--accent);
+  filter: none;
 }
 
 .crew-fly-controls {
@@ -2396,6 +2461,15 @@ tr.lot-locked {
   display: flex;
   align-items: end;
   gap: 0.65rem;
+}
+
+.staging-head-aircraft {
+  justify-items: center;
+  align-self: end;
+}
+
+.staging-head-aircraft .staging-aircraft {
+  justify-items: start;
 }
 
 .staging-aircraft {
@@ -2953,48 +3027,6 @@ tr.lot-locked {
 .dispatch-active .dispatch-step-current .dispatch-step-mark {
   background: color-mix(in srgb, var(--dispatch-accent) 18%, var(--bg-deep));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dispatch-accent) 14%, transparent);
-}
-
-.dispatch-edit-btn {
-  flex: 0 0 auto;
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.38rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--dispatch-accent, var(--accent)) 50%, var(--line));
-  border-radius: 0.2rem;
-  background: color-mix(
-    in srgb,
-    var(--dispatch-accent, var(--accent)) 12%,
-    var(--surface)
-  );
-  color: var(--dispatch-accent, var(--accent));
-  font-family: var(--font-display);
-  font-size: 0.88rem;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.dispatch-edit-btn:hover:not(:disabled) {
-  background: color-mix(
-    in srgb,
-    var(--dispatch-accent, var(--accent)) 20%,
-    var(--surface)
-  );
-  border-color: color-mix(
-    in srgb,
-    var(--dispatch-accent, var(--accent)) 70%,
-    var(--line)
-  );
-}
-
-.dispatch-edit-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 /* EN ROUTE: map dominant + status/load side, single viewport on desktop */
@@ -3729,6 +3761,11 @@ tr.lot-locked {
     width: 100%;
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .staging-head-aircraft {
+    width: 100%;
+    justify-items: stretch;
   }
 
   .staging-ops-head-actions {
@@ -7906,11 +7943,13 @@ button.linkish {
 .confirm-actions .action {
   min-height: 2.35rem;
   padding: 0.55rem 1rem;
-  border-radius: 10px;
-  font-size: 0.92rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.1;
+  border-radius: 0.2rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
   white-space: nowrap;
   transform: none;
 }
@@ -7921,14 +7960,17 @@ button.linkish {
 
 .confirm-actions .action.ghost {
   opacity: 1;
-  background: var(--panel);
-  color: var(--ink);
-  border-color: var(--line);
+  transform: none;
+  filter: none;
+  min-height: 2.35rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
 }
 
 .confirm-actions .action.ghost:hover:not(:disabled) {
-  background: var(--surface-2);
-  border-color: rgba(20, 32, 51, 0.22);
+  transform: none;
+  filter: none;
 }
 
 .confirm-actions .action.danger {
@@ -8017,6 +8059,119 @@ button.linkish {
   transform: translateX(-50%);
 }
 
+/* Freights: denser chrome + table scrolls inside the panel (no page scrollbar). */
+.main-content:has(.freights-panel) {
+  overflow: hidden;
+  padding-top: 0.65rem;
+  padding-bottom: 0.5rem;
+}
+
+.main-content:has(.freights-panel) > .freights-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow: hidden;
+  padding: 0.55rem 0.75rem 0.35rem;
+}
+
+.freights-panel > .settings-choice {
+  flex: 0 0 auto;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.freights-panel .settings-choice-btn {
+  padding: 0.4rem 0.65rem;
+  gap: 0.08rem;
+}
+
+.freights-panel .settings-choice-btn small {
+  font-size: 0.68rem;
+}
+
+.freights-panel > .panel-head {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  gap: 0.45rem 1rem;
+  align-items: center;
+}
+
+.freights-panel > .panel-head .board-aircraft {
+  margin: 0;
+  gap: 0.4rem 0.65rem;
+}
+
+.freights-panel > .banner {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+}
+
+.freights-panel > .table-wrap,
+.freights-panel > .freights-board-table {
+  /* Size to the rows; shrink+scroll only when the panel is too short.
+     flex:1 left a dead gap between the last row and pagination. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.freights-panel .freights-board-table th,
+.freights-panel .freights-board-table td,
+.freights-panel > .table-wrap th,
+.freights-panel > .table-wrap td {
+  padding: 0.42rem 0.45rem;
+}
+
+.freights-panel .freights-board-table .filter-row th {
+  padding-top: 0.1rem;
+  padding-bottom: 0.4rem;
+}
+
+.freights-panel .freights-board-table .pay,
+.freights-panel .freights-board-table td.net {
+  font-size: 0.98rem;
+}
+
+/* Dense board CTAs: accent outline (not a solid orange wall per row) */
+.freights-panel .freights-board-table .col-access .accept,
+.freights-panel .freights-board-table .col-access .action:not(.ghost),
+table.contracts-table .col-access .accept,
+table.contracts-table .col-access .action:not(.ghost),
+td.actions .accept {
+  padding: 0.32rem 0.7rem;
+  font-size: 0.88rem;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  filter: none;
+}
+
+.freights-panel .freights-board-table .col-access .accept:hover:not(:disabled),
+.freights-panel .freights-board-table .col-access .action:not(.ghost):hover:not(:disabled),
+table.contracts-table .col-access .accept:hover:not(:disabled),
+table.contracts-table .col-access .action:not(.ghost):hover:not(:disabled),
+td.actions .accept:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 26%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 78%, var(--line));
+  color: var(--accent);
+  filter: none;
+}
+
+.freights-panel .freights-board-table .col-access .action.ghost,
+td.actions .action.ghost {
+  padding: 0.28rem 0.65rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+}
+
+.freights-panel > .pagination {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.35rem 0;
+}
+
 table {
   color: var(--ink);
 }
@@ -8041,12 +8196,6 @@ textarea {
   background: var(--surface-2) !important;
   color: var(--ink) !important;
   border-color: var(--line) !important;
-}
-
-.action.ghost {
-  color: var(--ink);
-  border-color: var(--line);
-  background: transparent;
 }
 
 .icao-link {
@@ -9035,15 +9184,33 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-ground-staff .crew-person-grid {
-  grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
-  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+  gap: 0.55rem;
 }
 
 .ports-ground-staff .crew-person-card {
   grid-template-columns: 3.75rem minmax(0, 1fr);
   gap: 0.55rem;
-  padding: 0.5rem 0.55rem;
+  padding: 0.55rem 0.6rem 0.65rem;
   align-items: start;
+}
+
+.ports-ground-staff .crew-person-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+}
+
+.ports-ground-staff .crew-person-name {
+  width: 100%;
+  font-size: 0.9rem;
+  line-height: 1.15;
+}
+
+.ports-ground-staff .crew-perk-tag {
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  width: 100%;
 }
 
 .ports-ground-staff .crew-portrait {
@@ -9058,10 +9225,6 @@ span.dispatch-route-hub-dest {
   font-size: 1.05rem;
 }
 
-.ports-ground-staff .crew-person-name {
-  font-size: 0.9rem;
-}
-
 .ports-ground-staff .crew-card-meta,
 .ports-ground-staff .crew-person-perk {
   font-size: 0.78rem;
@@ -9069,7 +9232,12 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-ground-staff .crew-card-actions {
-  margin-top: 0.15rem;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.ports-ground-staff .crew-card-actions .accept {
+  box-sizing: border-box;
 }
 
 .ports-ground-staff-hubs {

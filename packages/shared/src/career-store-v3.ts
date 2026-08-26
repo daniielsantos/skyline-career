@@ -30,6 +30,12 @@ export const LOCAL_WORLD_ID_V3 = 'local';
 
 export type SqliteDb = DatabaseSync;
 
+/**
+ * Stay under SQLite's default SQLITE_MAX_VARIABLE_NUMBER (999).
+ * Large career worlds (1000+ lots) blow up `DELETE … NOT IN (?,?,…)`.
+ */
+export const SQLITE_BIND_SAFE = 900;
+
 /** node:sqlite rejects `undefined` binds — use null. */
 function sqlVal(v: unknown): string | number | bigint | null | Uint8Array {
   if (v === undefined || v === null) return null;
@@ -291,15 +297,21 @@ export function readLotsRows(db: SqliteDb): ShipmentLot[] {
 export function readLotsByIds(db: SqliteDb, ids: string[]): ShipmentLot[] {
   const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   if (unique.length === 0) return [];
-  const placeholders = unique.map(() => '?').join(',');
-  const rows = db
-    .prepare(
-      `SELECT id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-              created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
-       FROM lots WHERE id IN (${placeholders}) ORDER BY created_at_tick ASC, id ASC`,
-    )
-    .all(...unique) as LotSqlRow[];
-  return rows.map(lotFromRow);
+  const out: ShipmentLot[] = [];
+  const chunkSize = SQLITE_BIND_SAFE;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => '?').join(',');
+    const rows = db
+      .prepare(
+        `SELECT id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
+                created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
+         FROM lots WHERE id IN (${placeholders}) ORDER BY created_at_tick ASC, id ASC`,
+      )
+      .all(...chunk) as LotSqlRow[];
+    for (const row of rows) out.push(lotFromRow(row));
+  }
+  return out;
 }
 
 /** Upsert by id; delete rows not present in `lots`. Caller wraps in a transaction. */
@@ -313,10 +325,15 @@ export function upsertLots(
     db.prepare(`DELETE FROM lots WHERE world_id = ?`).run(LOCAL_WORLD_ID_V3);
     return;
   }
-  const placeholders = ids.map(() => '?').join(',');
-  db.prepare(
-    `DELETE FROM lots WHERE world_id = ? AND id NOT IN (${placeholders})`,
-  ).run(LOCAL_WORLD_ID_V3, ...ids);
+  // world_id + keep-ids must fit one bind list; otherwise wipe then rewrite.
+  if (ids.length + 1 > SQLITE_BIND_SAFE) {
+    db.prepare(`DELETE FROM lots WHERE world_id = ?`).run(LOCAL_WORLD_ID_V3);
+  } else {
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(
+      `DELETE FROM lots WHERE world_id = ? AND id NOT IN (${placeholders})`,
+    ).run(LOCAL_WORLD_ID_V3, ...ids);
+  }
   upsertLotRows(db, lots, airports);
 }
 
@@ -1034,10 +1051,14 @@ export function replaceFleetAircraft(
     db.prepare(`DELETE FROM fleet_aircraft WHERE company_id = ?`).run(companyId);
     return;
   }
-  const placeholders = ids.map(() => '?').join(',');
-  db.prepare(
-    `DELETE FROM fleet_aircraft WHERE company_id = ? AND id NOT IN (${placeholders})`,
-  ).run(companyId, ...ids);
+  if (ids.length + 1 > SQLITE_BIND_SAFE) {
+    db.prepare(`DELETE FROM fleet_aircraft WHERE company_id = ?`).run(companyId);
+  } else {
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(
+      `DELETE FROM fleet_aircraft WHERE company_id = ? AND id NOT IN (${placeholders})`,
+    ).run(companyId, ...ids);
+  }
   upsertFleetAircraftRows(db, companyId, fleet);
 }
 
@@ -1188,10 +1209,14 @@ export function replaceMissionsTable(
     db.prepare(`DELETE FROM missions WHERE company_id = ?`).run(companyId);
     return;
   }
-  const placeholders = ids.map(() => '?').join(',');
-  db.prepare(
-    `DELETE FROM missions WHERE company_id = ? AND id NOT IN (${placeholders})`,
-  ).run(companyId, ...ids);
+  if (ids.length + 1 > SQLITE_BIND_SAFE) {
+    db.prepare(`DELETE FROM missions WHERE company_id = ?`).run(companyId);
+  } else {
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(
+      `DELETE FROM missions WHERE company_id = ? AND id NOT IN (${placeholders})`,
+    ).run(companyId, ...ids);
+  }
   upsertMissionRows(db, companyId, missions);
 }
 
@@ -1722,8 +1747,12 @@ export function persistLedgerIncremental(db: SqliteDb, entries: CareerLedgerEntr
     db.prepare(`DELETE FROM ledger`).run();
     return;
   }
-  const placeholders = ids.map(() => '?').join(',');
-  db.prepare(`DELETE FROM ledger WHERE id NOT IN (${placeholders})`).run(...ids);
+  if (ids.length > SQLITE_BIND_SAFE) {
+    db.prepare(`DELETE FROM ledger`).run();
+  } else {
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`DELETE FROM ledger WHERE id NOT IN (${placeholders})`).run(...ids);
+  }
   const upsert = db.prepare(
     `INSERT INTO ledger (
        id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao, company_id

@@ -16,7 +16,9 @@ export type MarketBoardSortKey =
   | 'access'
   | 'starter'
   | 'fromFocus'
-  | 'idle';
+  | 'idle'
+  /** Crew board: Contract (freight) before Ferry (empty reposition). */
+  | 'crewKind';
 
 export type MarketBoardSortDirection = 'asc' | 'desc';
 
@@ -211,6 +213,7 @@ const SORT_KEYS = new Set<MarketBoardSortKey>([
   'starter',
   'fromFocus',
   'idle',
+  'crewKind',
 ]);
 
 const STARTER_CREW_CLASSES = new Set<string>(CLASS_OPS_STARTER_IDS);
@@ -324,6 +327,18 @@ export function ensureNearFocusSorts(
 }
 
 /**
+ * Crew needed Freights: surface Contract (cargo) holds before Ferry
+ * (empty reposition). Long ferry fees otherwise own page 1.
+ */
+export function ensureCrewContractBeforeFerrySorts(
+  sorts: readonly MarketBoardSortLevel[] | null | undefined,
+): MarketBoardSortLevel[] {
+  const levels = sorts?.length ? [...sorts] : [...DEFAULT_MARKET_BOARD_SORTS];
+  if (levels.some((s) => s.key === 'crewKind')) return levels;
+  return [{ key: 'crewKind', direction: 'asc' }, ...levels];
+}
+
+/**
  * Non-starter Freights (jet / heavy selected): surface idle-escalated lots so
  * lingering freight is not buried under fresh Wide pay.
  * Starter / empty-hangar boards already fold idle into `starter` rank.
@@ -428,6 +443,11 @@ function compareBoardRow<T extends MarketBoardSortable>(
     case 'idle':
       return (
         Number(a.idleEscalated !== true) - Number(b.idleEscalated !== true)
+      );
+    case 'crewKind':
+      // Contract (false) before Ferry reposition (true).
+      return (
+        Number(Boolean(a.crewReposition)) - Number(Boolean(b.crewReposition))
       );
   }
 }
@@ -596,11 +616,14 @@ export function queryMarketBoardPage<T extends MarketBoardSortable>(
   const requested = opts.sorts && opts.sorts.length > 0 ? opts.sorts : undefined;
   // Player clicked Pay/Net/Load/… first — honor that; do not bury under Idle/Near.
   const honorMetricPrimary = hasExplicitMetricPrimarySort(requested);
-  const baseSorts = honorMetricPrimary
+  let baseSorts = honorMetricPrimary
     ? [...requested!]
     : opts.hangarEmpty || opts.starterSort
       ? ensureHangarEmptySorts(requested)
       : ensureIdleEscalatedSorts(ensureAccessPrimarySort(requested));
+  if (!honorMetricPrimary && opts.crewFilter === 'crew') {
+    baseSorts = ensureCrewContractBeforeFerrySorts(baseSorts);
+  }
   const sorts =
     !honorMetricPrimary &&
     opts.nearMaxNm !== undefined &&

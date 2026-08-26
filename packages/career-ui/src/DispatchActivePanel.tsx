@@ -409,7 +409,7 @@ export function DispatchActivePanel(props: {
           {['accepted', 'dispatched', 'in_flight'].includes(mission.status) ? (
             <button
               type="button"
-              className={`missions-head-cancel${
+              className={`action ghost danger missions-head-cancel${
                 isEnRoute ? ' missions-head-cancel-enroute' : ''
               }`}
               disabled={busy}
@@ -512,7 +512,7 @@ export function DispatchActivePanel(props: {
             !mission.contractPilot ? (
               <button
                 type="button"
-                className="dispatch-edit-btn"
+                className="action ghost info dispatch-edit-btn"
                 disabled={busy}
                 title="Adjust cargo lots, then regenerate the OFP"
                 onClick={() => props.onEditManifest(mission)}

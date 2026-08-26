@@ -71,10 +71,21 @@ describe('career fuel commodity', () => {
     ensureWorldFuelInventory(migrated);
     const fixed = migrated.airports.find((a) => a.icao === 'KMIA')!;
     assert.ok((fixed.inventory.fuel?.capacityKg ?? 0) >= 400_000);
-    assert.equal(fixed.baseProduction?.fuel, 2_000);
+    assert.equal(fixed.baseProduction?.fuel, 3_500);
     assert.equal(fixed.baseConsumption?.fuel, 750);
-    assert.equal(fixed.production.fuel, 2_000);
+    assert.equal(fixed.production.fuel, 3_500);
     assert.equal(fixed.consumption.fuel, 750);
+  });
+
+  it('bumps legacy hub production (2.0 t/tick) on ensure', () => {
+    const world = createSeedEconomyWorld({ seed: 'fuel-hub-prod-bump' });
+    const mmmx = world.airports.find((a) => a.icao === 'MMMX')!;
+    mmmx.production.fuel = 2_000;
+    mmmx.consumption.fuel = 750;
+    mmmx.baseProduction = { ...mmmx.baseProduction, fuel: 2_000 };
+    ensureWorldFuelInventory(world);
+    assert.equal(mmmx.production.fuel, 3_500);
+    assert.equal(mmmx.baseProduction?.fuel, 3_500);
   });
 
   it('migrates legacy airports without fuel piles', () => {
@@ -116,6 +127,37 @@ describe('career fuel commodity', () => {
     const after = world.airports.find((a) => a.icao === 'SBGR')!.inventory.fuel!.stockKg;
     assert.equal(uplift.deliveredKg, quote.requestedKg);
     assert.equal(after, before - uplift.deliveredKg);
+  });
+
+  it('keeps Jet-A hub reserve — uplift cannot empty a major', () => {
+    const world = createSeedEconomyWorld({ seed: 'fuel-hub-floor' });
+    const ap = world.airports.find((a) => a.icao === 'MMMX')!;
+    const floor = Math.round(ap.inventory.fuel!.capacityKg * 0.25);
+    ap.inventory.fuel!.stockKg = floor + 2_000;
+    const quote = quoteFuelUplift(world, {
+      originIcao: 'MMMX',
+      destIcao: 'MMMY',
+      aircraftClassId: 'wide_freighter',
+      requestedKg: 50_000,
+    });
+    assert.equal(quote.scarcity, 'partial');
+    assert.equal(quote.availableKg, 2_000);
+    deliverFuelUplift(world, quote);
+    assert.equal(ap.inventory.fuel!.stockKg, floor);
+  });
+
+  it('still allows spokes to go dry', () => {
+    const world = createSeedEconomyWorld({ seed: 'fuel-spoke-dry' });
+    const ap = world.airports.find((a) => a.icao === 'SBPS')!;
+    ap.inventory.fuel!.stockKg = 0;
+    const quote = quoteFuelUplift(world, {
+      originIcao: 'SBPS',
+      destIcao: 'SBSV',
+      aircraftClassId: 'light_turboprop',
+      distanceNm: 200,
+    });
+    assert.equal(quote.scarcity, 'dry');
+    assert.equal(quote.availableKg, 0);
   });
 
   it('applies dry surcharge when terminal is empty', () => {

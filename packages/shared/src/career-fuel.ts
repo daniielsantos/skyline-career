@@ -1,11 +1,14 @@
 import {
   ensureAirportFuelInventory,
+  FUEL_HUB_ICAOS,
+  FUEL_HUB_RESERVE_FILL,
   getCommodity,
   localUnitPriceUsd,
   routeDistanceNm,
 } from './career-economy.js';
 import { recordFuelUpliftActivity } from './career-hub-level.js';
 import type {
+  AirportTerminal,
   CareerEconomyWorld,
   FreighterClassId,
   MissionFuelUplift,
@@ -38,6 +41,24 @@ function fuelPile(terminal: { inventory: { fuel?: StockPile } }): StockPile {
     throw new Error('Fuel inventory missing — call ensureAirportFuelInventory first');
   }
   return existing;
+}
+
+/** kg locked at Jet-A hubs so retail/truck offtake cannot empty the terminal. */
+export function fuelHubReserveKg(capacityKg: number): number {
+  return Math.round(Math.max(0, capacityKg) * FUEL_HUB_RESERVE_FILL);
+}
+
+/** Terminal Jet-A available to sell (hubs keep {@link FUEL_HUB_RESERVE_FILL}). */
+export function fuelTerminalSellableKg(
+  terminal: Pick<AirportTerminal, 'icao' | 'inventory'>,
+): number {
+  const stock = terminal.inventory.fuel;
+  if (!stock) return 0;
+  const icao = terminal.icao.trim().toUpperCase();
+  const reserve = FUEL_HUB_ICAOS.has(icao)
+    ? fuelHubReserveKg(stock.capacityKg)
+    : 0;
+  return Math.max(0, Math.floor(stock.stockKg) - reserve);
 }
 
 export function estimateUpliftKg(
@@ -95,7 +116,7 @@ export function quoteFuelUplift(
     distance,
     opts.requestedKg,
   );
-  const availableKg = Math.max(0, Math.floor(stock.stockKg));
+  const availableKg = fuelTerminalSellableKg(ap);
   const costMult =
     typeof opts.costMult === 'number' &&
     Number.isFinite(opts.costMult) &&
@@ -109,7 +130,11 @@ export function quoteFuelUplift(
   let costUsd = fromTerminal * unitPriceUsd;
   let scarcity: MissionFuelUplift['scarcity'] = 'ok';
   if (shortfall > 0) {
-    scarcity = availableKg <= 0 ? 'dry' : 'partial';
+    // Hubs at reserve still have physical stock — peak demand is partial, not dry.
+    const hubAtReserve =
+      FUEL_HUB_ICAOS.has(originIcao) && Math.floor(stock.stockKg) > 0;
+    scarcity =
+      availableKg <= 0 && !hubAtReserve ? 'dry' : 'partial';
     const mult = scarcity === 'dry' ? DRY_SURCHARGE : PARTIAL_SURCHARGE;
     costUsd += shortfall * unitPriceUsd * mult;
   }
@@ -138,7 +163,7 @@ export function deliverFuelUplift(
   const stock = fuelPile(ap);
   const fromTerminalKg = Math.min(
     quote.requestedKg,
-    Math.max(0, Math.floor(stock.stockKg)),
+    fuelTerminalSellableKg(ap),
   );
   stock.stockKg = clamp(stock.stockKg - fromTerminalKg, 0, stock.capacityKg);
   recordFuelUpliftActivity(world, quote.originIcao, fromTerminalKg);

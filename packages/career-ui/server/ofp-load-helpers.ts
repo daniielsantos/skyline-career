@@ -3356,6 +3356,9 @@ async function applyMissionOfpLoadExclusive(
         cgMaxAttempts: CG_REBALANCE_MAX_ITERATIONS,
       });
     } else {
+      // Keep verified live weights on the done stamp — api builds
+      // lastPreflightFromInjectLive from progress; without this it falls back to
+      // classic station sum (PMDG 777 classic lags ZFW → false Failed).
       setOfpLoadProgress(mission.id, {
         phase: 'done',
         message:
@@ -3364,6 +3367,14 @@ async function applyMissionOfpLoadExclusive(
             : 'Load applied.',
         cgAttempt: cgRebalanceMoves || undefined,
         cgMaxAttempts: CG_REBALANCE_MAX_ITERATIONS,
+        liveFuelLb: lastGoodFuelLb,
+        livePayloadLb: livePayloadSumLb,
+        ...(lastGoodSchematicTanks
+          ? { liveTanks: lastGoodSchematicTanks }
+          : {}),
+        liveStations: afterLive.stations,
+        plannedFuelLb,
+        plannedPayloadLb,
       });
     }
 

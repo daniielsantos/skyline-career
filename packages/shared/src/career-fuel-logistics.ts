@@ -54,7 +54,11 @@ const LOAD_UNLOAD_HOURS = 2;
 const MIN_HAUL_KG = 4_000;
 /** Dest fill below this is a dispatch candidate. */
 const DEST_SHORTAGE_FILL = 0.28;
-/** Hub must stay above this fill after dispatch (reserve). */
+/**
+ * Hub must stay above this fill after dispatch (reserve).
+ * Keep in sync with FUEL_HUB_RESERVE_FILL in career-economy.ts
+ * (cannot import — circular: economy ↔ logistics).
+ */
 const HUB_RESERVE_FILL = 0.25;
 /** Hub must start above this fill to dispatch. */
 const HUB_SURPLUS_FILL = 0.4;
@@ -914,7 +918,9 @@ function debitHubFuel(world: CareerEconomyWorld, originIcao: string, kg: number)
   if (!origin || !(kg > 0)) return 0;
   const pile = origin.inventory.fuel;
   if (!pile) return 0;
-  const take = Math.min(kg, Math.max(0, pile.stockKg));
+  const reserveKg = Math.round(pile.capacityKg * HUB_RESERVE_FILL);
+  const sellable = Math.max(0, pile.stockKg - reserveKg);
+  const take = Math.min(kg, sellable);
   pile.stockKg = Math.max(0, pile.stockKg - take);
   return take;
 }

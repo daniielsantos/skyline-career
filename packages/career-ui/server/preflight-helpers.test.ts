@@ -156,4 +156,52 @@ describe('lastPreflightFromInjectLive', () => {
     assert.equal(check.loadVerification?.payload.liveLb, 15_200);
     assert.equal(check.verdict, 'pass');
   });
+
+  it('prefers verified livePayloadLb over inflated classic stations (PMDG ZFW)', () => {
+    const check = lastPreflightFromInjectLive({
+      previous: {
+        verdict: 'fail',
+        summary: 'stale',
+        checkedAtIso: '2026-01-01T00:00:00Z',
+        loadVerification: {
+          ready: false,
+          fuel: { plannedLb: 51_732, liveLb: 7_700, ok: false },
+          payload: {
+            plannedLb: 93_476,
+            liveLb: 30_000,
+            ok: false,
+            cargoLb: 2_010,
+            crewLb: 0,
+          },
+          aircraft: { onGround: true, enginesRunning: false },
+          weightNoteCount: 0,
+        },
+        findings: [],
+      } as NonNullable<MissionIntent['lastPreflightCheck']>,
+      // Classic stations still sum ~95k after CDU ZFW write.
+      stations: {
+        1: 1400,
+        2: 4899,
+        3: 36863,
+        4: 24605,
+        5: 20956,
+        6: 4797,
+        8: 190,
+        9: 190,
+        11: 300,
+        12: 400,
+        13: 600,
+      },
+      tanks: { LEFT_MAIN: 3860.6, RIGHT_MAIN: 3860.6 },
+      liveFuelLb: 51_732,
+      livePayloadLb: 93_476,
+      liveTanks: { left: 25_866, right: 25_866, center: 0 },
+      blockFuelLb: 51_732,
+      cargoLb: 2_010,
+    });
+    assert.equal(check.loadVerification?.ready, true);
+    assert.equal(check.loadVerification?.payload.liveLb, 93_476);
+    assert.equal(check.loadVerification?.payload.ok, true);
+    assert.equal(check.verdict, 'pass');
+  });
 });

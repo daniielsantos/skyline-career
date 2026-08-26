@@ -560,6 +560,37 @@ describe('career store', () => {
     store.close();
   });
 
+  it('saves 1200+ lots without "too many SQL variables"', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-lots-bind-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const { world } = await store.loadEconomy();
+    const origin = world.airports[0]!.icao;
+    const dest = world.airports[1]!.icao;
+    world.lots = Array.from({ length: 1_200 }, (_, i) => ({
+      id: `lot_bind_${i}`,
+      commodityId: 'general' as const,
+      originIcao: origin,
+      destIcao: dest,
+      quantityKg: 1_000,
+      reservedKg: 0,
+      createdAtTick: 1,
+      expiresAtTick: 200,
+      payUsd: 500,
+      urgency: 'normal' as const,
+      reason: 'bind-limit',
+      status: 'available' as const,
+    }));
+    await store.saveEconomy(world);
+    assert.equal(countLotsInDb(store.sqlitePath!), 1_200);
+    const again = await store.loadEconomy();
+    assert.equal(again.world.lots.length, 1_200);
+    // Second save hits delete-not-in / wipe path again.
+    again.world.lots = again.world.lots.slice(0, 1_100);
+    await store.saveEconomy(again.world);
+    assert.equal(countLotsInDb(store.sqlitePath!), 1_100);
+    store.close();
+  });
+
   it('supports json backend via CAREER_STORE=json', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-json-'));
     await mkdir(dir, { recursive: true });

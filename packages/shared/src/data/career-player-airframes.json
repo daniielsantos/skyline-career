@@ -337,20 +337,6 @@
     "fuelBurnKgPerNm": 1.4
   },
   {
-    "typeId": "flightfx-c750-winglets",
-    "aircraftClassId": "light_jet",
-    "label": "C750",
-    "rolesPackRelPath": "profiles/ofp/flightfx-c750-winglets.json",
-    "simbriefIcao": "C750",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 10038,
-    "mtowKg": 16375,
-    "maxCargoKg": 1030,
-    "fuelCapacityKg": 5865,
-    "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 1.4
-  },
-  {
     "typeId": "workingtitle-cessna-citation-cj4",
     "aircraftClassId": "light_jet",
     "label": "Cessna Citation CJ4",
@@ -380,6 +366,20 @@
     "maxRangeNm": 3000,
     "cruiseFuelFlowKgPerHour": 616,
     "cruiseSpeedKt": 440,
+    "fuelBurnKgPerNm": 1.4
+  },
+  {
+    "typeId": "flightfx-c750-winglets",
+    "aircraftClassId": "light_jet",
+    "label": "Cessna Citation X",
+    "rolesPackRelPath": "profiles/ofp/flightfx-c750-winglets.json",
+    "simbriefIcao": "C750",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 10038,
+    "mtowKg": 16375,
+    "maxCargoKg": 1030,
+    "fuelCapacityKg": 5865,
+    "maxRangeNm": 800,
     "fuelBurnKgPerNm": 1.4
   },
   {

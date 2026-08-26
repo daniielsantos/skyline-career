@@ -7715,6 +7715,25 @@ const DEFAULT_CARGO_CONS_BIAS: Readonly<Partial<Record<CommodityId, number>>> = 
   supplies: 0.25,
 };
 
+/**
+ * Untouchable Jet-A fraction at FUEL_HUB_ICAOS terminals.
+ * Trucks already leave this reserve; player/NPC uplift must too — otherwise
+ * majors (MMMX, KMIA, …) can go bone-dry from traffic alone.
+ * Keep in sync with HUB_RESERVE_FILL in career-fuel-logistics.ts.
+ */
+export const FUEL_HUB_RESERVE_FILL = 0.25;
+
+/**
+ * Jet-A kg per 15-min tick at fuel hubs / spokes.
+ * Hub net must cover: (1) local airport burn, (2) NPC/player uplift,
+ * (3) road tankers feeding shortage spokes. 2.0 t/tick was only enough for (1)+(3)
+ * in quiet regions — traffic emptied majors.
+ */
+export const FUEL_HUB_PROD_KG_PER_TICK = 3_500;
+export const FUEL_HUB_CONS_KG_PER_TICK = 750;
+export const FUEL_SPOKE_PROD_KG_PER_TICK = 200;
+export const FUEL_SPOKE_CONS_KG_PER_TICK = 375;
+
 /** Major Jet-A production hubs (BR + US + CA + MX career anchors). */
 export const FUEL_HUB_ICAOS = new Set([
   // BR producers (~1 per 3 hubs at 60 airports)
@@ -8192,11 +8211,16 @@ export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
   const hub = FUEL_HUB_ICAOS.has(icao);
   const cap = hub ? 500_000 : 120_000;
   // kg / 15-min tick (legacy hourly rates ÷ 4)
-  const prod = hub ? 2_000 : 200;
-  const cons = hub ? 750 : 375;
+  const prod = hub ? FUEL_HUB_PROD_KG_PER_TICK : FUEL_SPOKE_PROD_KG_PER_TICK;
+  const cons = hub ? FUEL_HUB_CONS_KG_PER_TICK : FUEL_SPOKE_CONS_KG_PER_TICK;
   const existingCap = terminal.inventory.fuel?.capacityKg ?? 0;
   /** Spoke→hub promotion (e.g. US majors added to FUEL_HUB_ICAOS). */
   const upgradingToHub = hub && existingCap > 0 && existingCap < cap;
+  /** Raise legacy hub rates (pre-3.5 t/tick) without wiping seed rng variation. */
+  const ratesNeedBump =
+    hub &&
+    (terminal.production.fuel ?? 0) > 0 &&
+    (terminal.production.fuel ?? 0) <= 2_000;
 
   if (!terminal.inventory.fuel) {
     terminal.inventory.fuel = pile(Math.round(cap * 0.55), cap);
@@ -8214,10 +8238,14 @@ export function ensureAirportFuelInventory(terminal: AirportTerminal): void {
 
   terminal.baseProduction = { ...terminal.baseProduction, fuel: prod };
   terminal.baseConsumption = { ...terminal.baseConsumption, fuel: cons };
-  if (terminal.production.fuel === undefined || upgradingToHub) {
+  if (terminal.production.fuel === undefined || upgradingToHub || ratesNeedBump) {
     terminal.production = { ...terminal.production, fuel: prod };
   }
-  if (terminal.consumption.fuel === undefined || upgradingToHub) {
+  if (
+    terminal.consumption.fuel === undefined ||
+    upgradingToHub ||
+    ratesNeedBump
+  ) {
     terminal.consumption = { ...terminal.consumption, fuel: cons };
   }
 }
@@ -11789,8 +11817,14 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
         const hub = FUEL_HUB_ICAOS.has(h.icao);
         const cap = Math.round((hub ? 500_000 : 120_000) * capacityBoost);
         // kg / 15-min tick (legacy hourly rates ÷ 4)
-        const prod = Math.round((hub ? 2_000 : 200) * (0.8 + rng() * 0.4));
-        const cons = Math.round((hub ? 750 : 375) * (0.8 + rng() * 0.4));
+        const prod = Math.round(
+          (hub ? FUEL_HUB_PROD_KG_PER_TICK : FUEL_SPOKE_PROD_KG_PER_TICK) *
+            (0.8 + rng() * 0.4),
+        );
+        const cons = Math.round(
+          (hub ? FUEL_HUB_CONS_KG_PER_TICK : FUEL_SPOKE_CONS_KG_PER_TICK) *
+            (0.8 + rng() * 0.4),
+        );
         production[c.id] = prod;
         consumption[c.id] = cons;
         const startFill = 0.45 + rng() * 0.25;
@@ -12742,6 +12776,11 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
         noteWarehouseFlow(world, c.id, prod, cons);
       }
       stock.stockKg = clamp(stock.stockKg + prod - cons, 0, stock.capacityKg);
+      // Heal / hold Jet-A hub strategic reserve (player+NPC cannot empty majors).
+      if (c.id === 'fuel' && FUEL_HUB_ICAOS.has(ap.icao)) {
+        const floor = Math.round(stock.capacityKg * FUEL_HUB_RESERVE_FILL);
+        if (stock.stockKg < floor) stock.stockKg = floor;
+      }
     }
   }
 }

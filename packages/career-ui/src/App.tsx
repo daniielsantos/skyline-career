@@ -143,6 +143,13 @@ import {
 import { marketCountryLabel } from './market-country-label';
 import { BushTripMapCard } from './BushTripMapCard';
 import { BrandMark } from './BrandMark';
+import { SidebarFlightStrip } from './SidebarFlightStrip';
+import {
+  canRestoreStagingDraft,
+  clearPersistedStagingDraft,
+  readPersistedStagingDraft,
+  writePersistedStagingDraft,
+} from './staging-draft-persist';
 import { AirportNamesProvider, IcaoLink } from './IcaoLink';
 import { BusyBlock, BusyChip, TableSkeleton } from './Busy';
 import { CareerProfileManage, ProfileGate, ProfileGateLoading } from './ProfileGate';
@@ -3320,6 +3327,7 @@ export function App() {
   const activeMissionRef = useRef<Mission | undefined>(undefined);
   /** One-shot: reopen mid-flight → Dispatch so settle UI is visible. */
   const airborneResumeNavDoneRef = useRef(false);
+  const stagingRestoreAttemptedRef = useRef<string | null>(null);
   const [maxCargoKg, setMaxCargoKg] = useState<number | null>(null);
   const [structuralMaxCargoKg, setStructuralMaxCargoKg] =
     useState<number | null>(null);
@@ -4150,6 +4158,15 @@ export function App() {
     };
   }, [hubSelected, showProfileGate, activeCareerProfile?.id]);
 
+  useEffect(() => {
+    stagingRestoreAttemptedRef.current = null;
+  }, [activeCareerProfile?.id]);
+
+  useEffect(() => {
+    if (!activeCareerProfile?.id || !staging) return;
+    writePersistedStagingDraft(activeCareerProfile.id, staging);
+  }, [activeCareerProfile?.id, staging]);
+
   // Poll MSFS watch session while active. One shot when idle so a mid-flight
   // reload can still attach; stop interval after settle (no forever /api/watch/status).
   useEffect(() => {
@@ -4681,6 +4698,36 @@ export function App() {
     [missions],
   );
   activeMissionRef.current = activeMission;
+
+  useEffect(() => {
+    if (showProfileGate || !activeCareerProfile?.id || !careerReady || staging) {
+      return;
+    }
+    if (stagingRestoreAttemptedRef.current === activeCareerProfile.id) return;
+    stagingRestoreAttemptedRef.current = activeCareerProfile.id;
+
+    const persisted = readPersistedStagingDraft(activeCareerProfile.id);
+    if (!persisted) return;
+    if (
+      !canRestoreStagingDraft(
+        persisted,
+        missions,
+        activeMission?.id,
+      )
+    ) {
+      clearPersistedStagingDraft(activeCareerProfile.id);
+      return;
+    }
+    setStaging(persisted);
+    setPreferredAircraft(persisted.aircraft as AircraftClass);
+  }, [
+    showProfileGate,
+    activeCareerProfile?.id,
+    careerReady,
+    missions,
+    staging,
+    activeMission?.id,
+  ]);
 
   useEffect(() => {
     setSimbriefLaunchUrl(null);
@@ -5442,6 +5489,9 @@ export function App() {
         (staging.replaceManifest && activeMission.status === 'dispatched'))
     ) {
       return;
+    }
+    if (activeCareerProfile?.id) {
+      clearPersistedStagingDraft(activeCareerProfile.id);
     }
     setStaging(null);
   }, [
@@ -7041,9 +7091,15 @@ export function App() {
   function exitStaging() {
     if (busy) return;
     if (staging?.replaceManifest) {
+      if (activeCareerProfile?.id) {
+        clearPersistedStagingDraft(activeCareerProfile.id);
+      }
       setStaging(null);
       goToTab('staging');
       return;
+    }
+    if (activeCareerProfile?.id) {
+      clearPersistedStagingDraft(activeCareerProfile.id);
     }
     setStaging(null);
     if (airportReturn) {
@@ -7373,6 +7429,9 @@ export function App() {
             });
           }
           if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+          if (activeCareerProfile?.id) {
+            clearPersistedStagingDraft(activeCareerProfile.id);
+          }
           setStaging(null);
           setWatchAutoPaused(false);
           if (result.replaced || result.mission) {
@@ -9089,77 +9148,51 @@ export function App() {
           ) : null}
         </nav>
         {activeMission ? (
-          <div className="sidebar-active-card">
-            <span className="label">Active flight</span>
-            <strong>
-              {activeMission.originIcao}→{activeMission.destIcao}
-            </strong>
-            <p>{activeMission.status.replace(/_/g, ' ')}</p>
-            <button
-              type="button"
-              className="accept"
-              disabled={busy}
-              onClick={() => selectTab('staging')}
-            >
-              Open Dispatch
-            </button>
-          </div>
+          <SidebarFlightStrip
+            kind="active"
+            label="Active flight"
+            originIcao={activeMission.originIcao}
+            destIcao={activeMission.destIcao}
+            detail={activeMission.status.replace(/_/g, ' ')}
+            busy={busy}
+            onOpen={() => selectTab('staging')}
+          />
         ) : activeBushTrip ? (
-          <div className="sidebar-active-card">
-            <span className="label">Active bush trip</span>
-            <strong>
-              {activeBushTrip.fromIcao}→{activeBushTrip.toIcao}
-            </strong>
-            <p>
-              {activeBushTrip.title} · leg {activeBushTrip.legIndex + 1}/
-              {activeBushTrip.legs}
-              {activeBushTrip.legStatus === 'departed'
+          <SidebarFlightStrip
+            kind="bush"
+            label="Bush trip"
+            originIcao={activeBushTrip.fromIcao}
+            destIcao={activeBushTrip.toIcao}
+            detail={`${activeBushTrip.title} · leg ${activeBushTrip.legIndex + 1}/${activeBushTrip.legs}${
+              activeBushTrip.legStatus === 'departed'
                 ? ' · airborne'
                 : activeBushTrip.status === 'in_progress'
                   ? ' · en route'
-                  : ' · ready'}
-            </p>
-            <button
-              type="button"
-              className="accept"
-              disabled={busy}
-              onClick={() => selectTab('staging')}
-            >
-              Open Dispatch
-            </button>
-          </div>
+                  : ' · ready'
+            }`}
+            busy={busy}
+            onOpen={() => selectTab('staging')}
+          />
         ) : staging ? (
-          <div className="sidebar-active-card">
-            <span className="label">Dispatch draft</span>
-            <strong>
-              {staging.originIcao}→{staging.destIcao}
-            </strong>
-            <p>{staging.lines.length} lot(s) staged</p>
-            <button
-              type="button"
-              className="accept"
-              disabled={busy}
-              onClick={() => selectTab('staging')}
-            >
-              Open Dispatch
-            </button>
-          </div>
+          <SidebarFlightStrip
+            kind="draft"
+            label="Dispatch draft"
+            originIcao={staging.originIcao}
+            destIcao={staging.destIcao}
+            detail={`${staging.lines.length} lot(s) staged`}
+            busy={busy}
+            onOpen={() => selectTab('staging')}
+          />
         ) : crewAirborneMission ? (
-          <div className="sidebar-active-card">
-            <span className="label">Crew airborne</span>
-            <strong>
-              {crewAirborneMission.originIcao}→{crewAirborneMission.destIcao}
-            </strong>
-            <p>in flight</p>
-            <button
-              type="button"
-              className="accept"
-              disabled={busy}
-              onClick={() => selectTab('staging')}
-            >
-              Open Dispatch
-            </button>
-          </div>
+          <SidebarFlightStrip
+            kind="crew"
+            label="Crew airborne"
+            originIcao={crewAirborneMission.originIcao}
+            destIcao={crewAirborneMission.destIcao}
+            detail="In flight"
+            busy={busy}
+            onOpen={() => selectTab('staging')}
+          />
         ) : null}
         <div className="sidebar-footer">
           <span className="who">{pilotName || 'Skyline'}</span>

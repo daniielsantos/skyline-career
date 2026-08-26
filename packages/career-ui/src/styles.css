@@ -261,39 +261,148 @@ body {
   opacity: 1;
 }
 
-.sidebar-active-card {
+.sidebar-flight-strip {
+  --strip-accent: var(--accent);
   margin: 0 0.15rem;
-  padding: 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  padding: 0.65rem 0.7rem 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--strip-accent);
+  border-radius: 0.2rem;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--strip-accent) 7%, var(--surface)),
+      var(--surface)
+    );
   display: grid;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  width: calc(100% - 0.3rem);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.sidebar-active-card .label {
-  font-size: 0.65rem;
-  letter-spacing: 0.08em;
+.sidebar-flight-strip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--strip-accent) 40%, var(--line));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--strip-accent) 12%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--strip-accent) 12%, transparent);
+}
+
+.sidebar-flight-strip:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--strip-accent) 65%, var(--ink));
+  outline-offset: 2px;
+}
+
+.sidebar-flight-strip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sidebar-flight-strip--active {
+  --strip-accent: var(--ok);
+}
+
+.sidebar-flight-strip--draft {
+  --strip-accent: var(--accent);
+}
+
+.sidebar-flight-strip--bush {
+  --strip-accent: var(--info);
+}
+
+.sidebar-flight-strip--crew {
+  --strip-accent: color-mix(in srgb, var(--info) 55%, var(--accent));
+}
+
+.sidebar-flight-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.sidebar-flight-strip-badge {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--accent);
-  font-weight: 700;
+  color: var(--strip-accent);
+  line-height: 1.2;
 }
 
-.sidebar-active-card strong {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
-}
-
-.sidebar-active-card p {
-  margin: 0;
-  font-size: 0.82rem;
+.sidebar-flight-strip-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.15rem;
   color: var(--muted);
+  background: color-mix(in srgb, var(--strip-accent) 10%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--strip-accent) 22%, var(--line));
+  flex: 0 0 auto;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
-.sidebar-active-card .accept {
-  width: 100%;
-  margin-top: 0.15rem;
+.sidebar-flight-strip-icon {
+  display: block;
+}
+
+.sidebar-flight-strip:hover:not(:disabled) .sidebar-flight-strip-icon-wrap {
+  color: var(--strip-accent);
+  border-color: color-mix(in srgb, var(--strip-accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--strip-accent) 16%, var(--surface-2));
+}
+
+.sidebar-flight-strip-route {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.sidebar-flight-strip-icao {
+  font-family: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.22rem 0.48rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 0.15rem;
+  line-height: 1.15;
+}
+
+.sidebar-flight-strip-arrow {
+  color: var(--muted);
+  font-size: 0.82rem;
+  flex: 0 0 auto;
+}
+
+.sidebar-flight-strip-detail {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--muted);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .sidebar-footer {

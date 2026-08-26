@@ -14,6 +14,8 @@ export const BCF_PAYLOAD_DEFAULTS = {
   commitDelayMs: 500,
   afterFieldDelayMs: 900,
   fieldClrCount: 2,
+  /** MENU → FS ACTIONS (737 BCF: R5). */
+  fsActionsLsk: 'R5',
   payloadPageLsk: 'L2',
   mainLsk: 'L2',
   fwdLsk: 'L3',
@@ -57,7 +59,7 @@ export const BCF_PAYLOAD_SLOW_TIMING = {
 export const BCF_ZFW_DISPLAY_EXAMPLE = '89.3';
 
 export type BcfPayloadUnits = 'lb' | 'kg';
-export type BcfPayloadMethod = 'event' | 'control';
+export type BcfPayloadMethod = 'event' | 'control' | 'rotor';
 
 export type BcfPayloadOptions = {
   main: number;
@@ -71,8 +73,11 @@ export type BcfPayloadOptions = {
   afterFieldDelayMs: number;
   fieldClrCount: number;
   emptyFirst: boolean;
+  /** CLR taps after SET EMPTY (NG3 default 2 when emptyFirst). */
+  emptyClrCount?: number;
   onlyField?: 'main' | 'fwd' | 'aft';
   zfwDisplay?: string;
+  fsActionsLsk: string;
   payloadPageLsk: string;
   mainLsk: string;
   fwdLsk: string;
@@ -105,7 +110,7 @@ export type CduKeyStep = {
   /** Keep key pressed this long before Host release/clear (CLR long-press). */
   holdMs?: number;
   /** Per-step overrides (CLR long-press uses method=event for a real mouse hold). */
-  method?: 'event' | 'control';
+  method?: 'event' | 'control' | 'rotor';
   parameter?: number;
   release?: boolean;
 };
@@ -117,6 +122,7 @@ export const BCF_FUEL_DEFAULTS = {
   commitDelayMs: 500,
   afterFieldDelayMs: 900,
   fieldClrCount: 2,
+  fsActionsLsk: 'R5',
   fuelPageLsk: 'L1',
   totalLsk: 'L1',
   presetFullLsk: 'L3',
@@ -142,7 +148,7 @@ export const BCF_FUEL_SLOW_TIMING = {
 export const BCF_FUEL_DISPLAY_EXAMPLE = '25.0';
 
 export type BcfFuelUnits = 'lb' | 'kg';
-export type BcfFuelMethod = 'event' | 'control';
+export type BcfFuelMethod = 'event' | 'control' | 'rotor';
 export type BcfFuelPreset = 'full' | '2/3' | '1/3';
 
 export type BcfFuelOptions = {
@@ -154,6 +160,7 @@ export type BcfFuelOptions = {
   fieldClrCount: number;
   totalDisplay?: string;
   preset?: BcfFuelPreset;
+  fsActionsLsk: string;
   fuelPageLsk: string;
   totalLsk: string;
   presetFullLsk: string;
@@ -327,7 +334,11 @@ function pushNavigateToPayload(
     pushScratchpadClear(steps, opts, 'start');
   }
   steps.push({ label: 'MENU', key: 'MENU', pagePause: true });
-  steps.push({ label: 'R5 (FS ACTIONS)', key: 'R5', pagePause: true });
+  steps.push({
+    label: `${opts.fsActionsLsk} (FS ACTIONS)`,
+    key: opts.fsActionsLsk,
+    pagePause: true,
+  });
   steps.push({
     label: `${opts.payloadPageLsk} (PAYLOAD)`,
     key: opts.payloadPageLsk,
@@ -339,7 +350,18 @@ function pushNavigateToPayload(
       key: opts.emptyLsk,
       delayAfterMs: opts.afterEmptyDelayMs,
     });
-    pushClr(steps, 2, 'after empty', opts.scratchpadClearTapDelayMs, undefined, true);
+    const emptyClrs =
+      opts.emptyClrCount !== undefined ? Math.max(0, opts.emptyClrCount) : 2;
+    if (emptyClrs > 0) {
+      pushClr(
+        steps,
+        emptyClrs,
+        'after empty',
+        opts.scratchpadClearTapDelayMs,
+        undefined,
+        true,
+      );
+    }
   }
 }
 
@@ -435,7 +457,11 @@ export function buildMenuSmokeSequence(): CduKeyStep[] {
 function pushNavigateToFuel(steps: CduKeyStep[], opts: BcfFuelOptions): void {
   pushScratchpadClear(steps, opts, 'start');
   steps.push({ label: 'MENU', key: 'MENU', pagePause: true });
-  steps.push({ label: 'R5 (FS ACTIONS)', key: 'R5', pagePause: true });
+  steps.push({
+    label: `${opts.fsActionsLsk} (FS ACTIONS)`,
+    key: opts.fsActionsLsk,
+    pagePause: true,
+  });
   steps.push({
     label: `${opts.fuelPageLsk} (FUEL)`,
     key: opts.fuelPageLsk,

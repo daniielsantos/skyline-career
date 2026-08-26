@@ -1154,6 +1154,7 @@ export function DispatchActivePanel(props: {
             // mid-ramp live numbers — the switch also looked "finished" early.
             const injecting = props.loadOfpAutoStatus === 'loading';
             const confirming = props.loadOfpAutoStatus === 'done';
+            const injectFailed = props.loadOfpAutoStatus === 'failed';
             const injectBusy = injecting || confirming;
             const liveLocation =
               props.watch?.running &&
@@ -1581,7 +1582,12 @@ export function DispatchActivePanel(props: {
                       </small>
                     </div>
                     <div className="preflight-head-actions">
-                      {loadPath === 'inject' ? (
+                      {loadPath === 'inject' ||
+                      mission.injectCapable === true ||
+                      props.loadOfpAutoStatus === 'failed' ||
+                      props.loadOfpAutoStatus === 'loading' ||
+                      props.loadOfpAutoStatus === 'done' ||
+                      props.skylineInjectEnabled ? (
                         <div className="skyline-inject-row">
                           {(() => {
                             const injectStatus =
@@ -1663,7 +1669,7 @@ export function DispatchActivePanel(props: {
                                   : confirming
                                     ? 'Checking…'
                                   : props.loadOfpAutoStatus === 'failed'
-                                    ? 'Failed · off'
+                                    ? 'Failed · retry'
                                     : props.skylineInjectEnabled
                                         ? 'On'
                                         : 'Off'}

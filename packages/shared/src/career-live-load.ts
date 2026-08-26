@@ -3,6 +3,7 @@ import {
   DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
 } from './ofp-compliance.js';
+import type { OfpStationRoleMap } from './types/ofp-compliance.js';
 
 /**
  * Live payload for `pax_and_cargo`: OFP payload is cabin + holds, not cockpit crew.
@@ -37,6 +38,44 @@ export function paxAndCargoLiveStationSumLb(
     if (Number.isFinite(lb)) sum += lb;
   }
   return sum;
+}
+
+/**
+ * Career pax_and_cargo Loaded vs Due: SimBrief payload is ZFW − OEW.
+ * When EFB/CDU ZFW + OFP empty are available, use that residual (PMDG classic
+ * stations remap crew/service and under-read cabin+holds after CDU ZFW inject).
+ * Else sum pack passenger + baggage + service (never cockpit crew).
+ */
+export function careerPaxAndCargoLivePayloadLb(opts: {
+  stations?: Record<number, number>;
+  stationRoles?: OfpStationRoleMap;
+  zfwLb?: number;
+  ofpEmptyLb?: number;
+}): number | undefined {
+  if (
+    typeof opts.zfwLb === 'number' &&
+    Number.isFinite(opts.zfwLb) &&
+    typeof opts.ofpEmptyLb === 'number' &&
+    Number.isFinite(opts.ofpEmptyLb)
+  ) {
+    const fromZfw = opts.zfwLb - opts.ofpEmptyLb;
+    if (fromZfw > 500) {
+      return fromZfw;
+    }
+  }
+  const roles = opts.stationRoles;
+  if (!roles || !opts.stations) return undefined;
+  const payloadStations = [
+    ...(roles.passengerStations ?? []),
+    ...(roles.baggageStations ?? []),
+    ...(roles.serviceStations ?? []),
+  ].filter((n) => Number.isFinite(n) && n > 0);
+  const stationSum = paxAndCargoLiveStationSumLb(
+    opts.stations,
+    roles.crewStations,
+    payloadStations.length > 0 ? payloadStations : undefined,
+  );
+  return stationSum > 0 ? stationSum : undefined;
 }
 
 /**

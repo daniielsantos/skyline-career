@@ -1,16 +1,20 @@
 /**
- * Career inject one-shot for PMDG NG3 CDU strategies (BCF-validated).
+ * Career inject one-shot for PMDG NG3 / 737 CDU strategies (BCF-validated).
  * Kept out of the classic multi-round tank/station CG loop.
+ * PMDG 777 lives in `pmdg-777-cdu-inject.ts` so the two paths do not cross-break.
  *
  * Primary ZFW source: SimBrief `loadSheet.zfw` (est_zfw). Fallback: live ZFW -
  * cargo + Due cargo when the OFP sheet has no zfw.
  */
 import type { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
+  bcfFuelInjectOptions,
   bcfZfwInjectOptions,
+  buildBcfFuelKeySequence,
   buildBcfZfwKeySequence,
   computePmdgCduZfwTargetLb,
   DEFAULT_JET_A_LB_PER_GAL,
+  fuelLbToDisplay,
   resolvePmdgLiveCargoLb,
   toLb,
   zfwLbToDisplay,
@@ -18,7 +22,6 @@ import {
   type AircraftProfile,
   type CduKeyStep,
   type FuelTarget,
-  type LoadPlanRequest,
   type OfpExpectation,
   type OfpWeightUnit,
   type OperationResult,
@@ -39,28 +42,125 @@ export function isPmdgCduInjectProfile(profile: AircraftProfile): boolean {
 }
 
 export async function applyPmdgCduFuelOnce(opts: {
-  engine: DefaultProfileEngine;
+  bridge: NamedPipeSimBridge;
   fuel: FuelTarget;
+  profile: AircraftProfile;
 }): Promise<OperationResult | undefined> {
-  const result = await opts.engine.applyLoadPlan({
-    fuel: opts.fuel,
-    cgPolicy: 'none',
-    skipVerify: true,
-  } satisfies LoadPlanRequest);
-  return result.fuel;
+  const started = Date.now();
+  let dens = DEFAULT_JET_A_LB_PER_GAL;
+  try {
+    const d = await opts.bridge.readSimVar({
+      name: 'FUEL WEIGHT PER GALLON',
+      unit: 'pounds',
+    });
+    if (Number.isFinite(d) && d >= 5 && d <= 8) dens = d;
+  } catch {
+    /* Jet-A default */
+  }
+  const unit = (opts.profile.fuel.unit ?? 'gallons').toLowerCase();
+  const tankSum = Object.values(opts.fuel.tanks ?? {}).reduce(
+    (sum, v) => sum + (typeof v === 'number' && Number.isFinite(v) ? v : 0),
+    0,
+  );
+  const raw =
+    tankSum > 0
+      ? tankSum
+      : typeof opts.fuel.total === 'number' && Number.isFinite(opts.fuel.total)
+        ? opts.fuel.total
+        : 0;
+  const totalLb =
+    unit === 'lb' || unit === 'lbs' || unit === 'pounds'
+      ? raw
+      : unit === 'kg' || unit === 'kgs'
+        ? raw * 2.2046226218
+        : raw * dens;
+  if (totalLb < 1) {
+    return {
+      success: false,
+      strategyUsed: 'pmdg-cdu',
+      fallbackUsed: false,
+      durationMs: Date.now() - started,
+      errorCode: 'FUEL_WRITE_FAILED',
+      details: { message: 'PMDG CDU fuel target is empty (0 lb)' },
+    };
+  }
+
+  const display = fuelLbToDisplay(totalLb);
+  const keyOpts = bcfFuelInjectOptions(display);
+  const steps = buildBcfFuelKeySequence(keyOpts);
+
+  watchDebugLog('inject', 'pmdg-cdu fuel keystream', {
+    airframe: 'ng3',
+    sdk: 'ng3-control',
+    cdu: keyOpts.cdu,
+    fsActionsLsk: keyOpts.fsActionsLsk,
+    totalLsk: keyOpts.totalLsk,
+    method: keyOpts.method,
+    steps: steps.length,
+    totalDisplay: display,
+    totalTargetLb: Math.round(totalLb),
+    plan: steps.map((s, idx) => ({
+      n: idx + 1,
+      key: s.key,
+      label: s.label,
+      method: s.method ?? keyOpts.method,
+    })),
+  });
+
+  try {
+    await sendPmdgCduKeystream(opts.bridge, steps, {
+      delayMs: keyOpts.delayMs,
+      pageDelayMs: keyOpts.pageDelayMs,
+      method: keyOpts.method,
+      parameter: keyOpts.parameter,
+      release: keyOpts.release,
+      cdu: keyOpts.cdu,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      strategyUsed: 'pmdg-cdu',
+      fallbackUsed: false,
+      durationMs: Date.now() - started,
+      errorCode: 'FUEL_WRITE_FAILED',
+      details: {
+        message: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+
+  return {
+    success: true,
+    strategyUsed: 'pmdg-cdu',
+    fallbackUsed: false,
+    durationMs: Date.now() - started,
+    details: {
+      totalLb,
+      display,
+      steps: steps.length,
+      cdu: keyOpts.cdu,
+      airframe: 'ng3',
+    },
+  };
 }
 
-/** Send FO CDU keys (same pacing as runtime pmdg-cdu strategy). */
-async function sendPmdgCduKeystream(
+/** Send FO CDU keys (same pacing as runtime pmdg-cdu strategy). Shared by NG3 + 777 inject. */
+export async function sendPmdgCduKeystream(
   bridge: NamedPipeSimBridge,
   steps: CduKeyStep[],
   opts: {
     delayMs: number;
     pageDelayMs: number;
-    method: 'event' | 'control';
+    method: 'event' | 'control' | 'rotor';
     parameter: number;
     release: boolean;
     cdu: 'left' | 'right';
+    /** SimBridge key resolver: 777 → Pmdg777Cdu (77X ids), ng3 → PmdgNg3Cdu. */
+    cduFamily?: 'ng3' | '777';
+    /**
+     * 777 MSFS: force ROTOR_BRAKE carrier (never NG3 SetClientData / bare #events).
+     */
+    eventOnly?: boolean;
   },
 ): Promise<void> {
   if (typeof bridge.sendPmdgNg3Control !== 'function') {
@@ -74,13 +174,49 @@ async function sendPmdgCduKeystream(
     if (prevKey !== undefined && prevKey === step.key) {
       await bridge.delay(Math.max(opts.delayMs, 100));
     }
-    await bridge.sendPmdgNg3Control({
+    const method = opts.eventOnly ? 'rotor' : (step.method ?? opts.method);
+    const parameter = opts.eventOnly ? 0 : (step.parameter ?? opts.parameter);
+    const release = opts.eventOnly ? false : (step.release ?? opts.release);
+    let eventId: number | undefined;
+    try {
+      const ack = await bridge.sendPmdgNg3Control({
+        key: step.key,
+        release,
+        method,
+        parameter,
+        cdu: opts.cdu,
+        ...(opts.cduFamily ? { cduFamily: opts.cduFamily } : {}),
+        ...(step.holdMs !== undefined ? { holdMs: step.holdMs } : {}),
+      });
+      eventId = ack.eventId;
+    } catch (error) {
+      watchDebugLog('cdu', 'key FAILED', {
+        step: i + 1,
+        total: steps.length,
+        label: step.label,
+        key: step.key,
+        method,
+        parameter,
+        cdu: opts.cdu,
+        cduFamily: opts.cduFamily ?? 'ng3',
+        eventOnly: opts.eventOnly === true,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+    watchDebugLog('cdu', 'key OK', {
+      step: i + 1,
+      total: steps.length,
+      label: step.label,
       key: step.key,
-      release: step.release ?? opts.release,
-      method: step.method ?? opts.method,
-      parameter: step.parameter ?? opts.parameter,
+      method,
+      parameter,
+      release,
+      eventId,
       cdu: opts.cdu,
-      ...(step.holdMs !== undefined ? { holdMs: step.holdMs } : {}),
+      cduFamily: opts.cduFamily ?? 'ng3',
+      eventOnly: opts.eventOnly === true,
+      holdMs: step.holdMs ?? null,
     });
     prevKey = step.key;
     if (i + 1 >= steps.length) break;
@@ -301,7 +437,7 @@ export async function resolvePmdgCduZfwTarget(opts: {
 }
 
 /**
- * Type absolute ZFW on FO CDU (SimBrief est_zfw preferred).
+ * Type absolute ZFW on FO CDU for NG3/737 (SimBrief est_zfw preferred).
  * Builds the keystream here (not via runtime dist) so skipScratchpadClear is
  * honored even when packages/runtime/dist is stale.
  */
@@ -316,6 +452,7 @@ export async function applyPmdgCduPayloadOnce(opts: {
   ignoreOfpZfw?: boolean;
   /** Fuel TOTAL already flushed the scratchpad in this inject session. */
   skipScratchpadClear?: boolean;
+  profile?: AircraftProfile;
 }): Promise<{
   payload?: OperationResult;
   zfwLb: number;
@@ -346,10 +483,27 @@ export async function applyPmdgCduPayloadOnce(opts: {
   const clrSteps = steps.filter((s) => s.key === 'CLR').length;
   watchDebugLog('inject', 'pmdg-cdu zfw keystream', {
     skipScratchpadClear: skip,
+    airframe: 'ng3',
+    sdk: 'ng3-control',
+    cdu: keyOpts.cdu,
+    fsActionsLsk: keyOpts.fsActionsLsk,
+    zfwLsk: keyOpts.zfwLsk,
+    emptyFirst: keyOpts.emptyFirst === true,
+    method: keyOpts.method,
     clrSteps,
     steps: steps.length,
     zfwDisplay: display,
-    firstKeys: steps.slice(0, 5).map((s) => s.key),
+    zfwTargetLb: Math.round(resolved.zfwLb),
+    plan: steps.map((s, idx) => ({
+      n: idx + 1,
+      key: s.key,
+      label: s.label,
+      method: s.method ?? keyOpts.method,
+    })),
+  });
+  watchDebugLog('inject', 'debug log path', {
+    path: 'profiles/career/watch-debug.log',
+    filter: 'Select-String "\\[cdu\\]|\\[inject\\]" profiles/career/watch-debug.log',
   });
   if (skip && clrSteps > 0) {
     throw new Error(

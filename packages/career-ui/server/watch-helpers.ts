@@ -44,8 +44,10 @@ import {
   resolveLivePayloadLb,
   paxAndCargoLiveStationSumLb,
   pickPaxAndCargoDisplayedLiveLb,
+  careerPaxAndCargoLivePayloadLb,
   sanitizeFuelDensityLbPerGal,
   KG_TO_LB,
+  toLb,
   normalizeSimPercent,
   resolveAirportCoords,
   resolveExpectedRouteMs,
@@ -2181,6 +2183,7 @@ export class CareerWatchSession {
                 const payloadFromPack = [
                   ...(roles.pack.payload?.stationRoles?.passengerStations ?? []),
                   ...(roles.pack.payload?.stationRoles?.baggageStations ?? []),
+                  ...(roles.pack.payload?.stationRoles?.serviceStations ?? []),
                 ].filter((n) => Number.isFinite(n) && n > 0);
                 paxAndCargoPayloadStations =
                   payloadFromPack.length > 0 ? payloadFromPack : undefined;
@@ -2206,6 +2209,112 @@ export class CareerWatchSession {
                   paxAndCargoPayloadStations,
                 )
               : undefined;
+          let pmdgZfwLb: number | undefined;
+          if (
+            pmdgPaxAndCargo &&
+            !preferPmdgFreighterRoles &&
+            this.bridge &&
+            typeof this.bridge.readLVar === 'function'
+          ) {
+            try {
+              const z = await this.bridge.readLVar('ZFW_Lvar');
+              if (Number.isFinite(z) && z >= 20_000 && z <= 500_000) {
+                pmdgZfwLb = z;
+              } else if (Number.isFinite(z) && z >= 40 && z < 500) {
+                pmdgZfwLb = z * 1000;
+              }
+            } catch {
+              /* optional — classic stations remain */
+            }
+          }
+          const ofpEmptyLb = (() => {
+            const fromPayload = prevWatchPayload as {
+              ofpEmptyLb?: number;
+              ofpZfwLb?: number;
+            };
+            if (
+              typeof fromPayload.ofpEmptyLb === 'number' &&
+              Number.isFinite(fromPayload.ofpEmptyLb) &&
+              fromPayload.ofpEmptyLb > 50_000
+            ) {
+              return fromPayload.ofpEmptyLb;
+            }
+            // Reconstruct SimBrief OEW once from OFP ZFW − Due when preflight
+            // has not yet stamped ofpEmptyLb (common right after CDU inject).
+            if (
+              typeof fromPayload.ofpZfwLb === 'number' &&
+              Number.isFinite(fromPayload.ofpZfwLb) &&
+              fromPayload.ofpZfwLb > 50_000 &&
+              typeof plannedPayloadLb === 'number' &&
+              plannedPayloadLb > 500
+            ) {
+              const reconstructed = fromPayload.ofpZfwLb - plannedPayloadLb;
+              if (reconstructed > 50_000) return reconstructed;
+            }
+            const sheet = (
+              current.lastOfpCheck as
+                | { loadSheet?: { emptyWeight?: number; unit?: 'lb' | 'kg' } }
+                | undefined
+            )?.loadSheet;
+            if (
+              sheet?.emptyWeight !== undefined &&
+              Number.isFinite(sheet.emptyWeight) &&
+              sheet.emptyWeight > 0
+            ) {
+              return toLb(sheet.emptyWeight, sheet.unit ?? 'lb');
+            }
+            // No stamped OFP empty yet: if live ZFW implies an OEW near the
+            // catalog OEW, treat (ZFW − Due) as SimBrief OEW so Loaded uses
+            // ZFW − OEW instead of remapped classic stations.
+            const catalogOewLb =
+              typeof airframe?.oewKg === 'number' &&
+              Number.isFinite(airframe.oewKg) &&
+              airframe.oewKg > 0
+                ? airframe.oewKg * KG_TO_LB
+                : undefined;
+            if (
+              typeof pmdgZfwLb === 'number' &&
+              typeof plannedPayloadLb === 'number' &&
+              plannedPayloadLb > 500 &&
+              typeof catalogOewLb === 'number'
+            ) {
+              const impliedOew = pmdgZfwLb - plannedPayloadLb;
+              if (
+                impliedOew > 50_000 &&
+                Math.abs(impliedOew - catalogOewLb) <=
+                  Math.max(2_500, catalogOewLb * 0.02)
+              ) {
+                return impliedOew;
+              }
+            }
+            return undefined;
+          })();
+          const paxAndCargoFromZfwLb =
+            pmdgPaxAndCargo &&
+            !preferPmdgFreighterRoles &&
+            load.stations
+              ? careerPaxAndCargoLivePayloadLb({
+                  stations: load.stations,
+                  stationRoles:
+                    (current.lastOfpCheck?.payload?.stationRoles as
+                      | {
+                          crewStations?: number[];
+                          passengerStations?: number[];
+                          baggageStations?: number[];
+                          serviceStations?: number[];
+                        }
+                      | undefined) ?? {
+                      crewStations: paxAndCargoCrewStations
+                        ? [...paxAndCargoCrewStations]
+                        : [1, 2],
+                      passengerStations: paxAndCargoPayloadStations
+                        ? [...paxAndCargoPayloadStations]
+                        : undefined,
+                    },
+                  zfwLb: pmdgZfwLb,
+                  ofpEmptyLb,
+                })
+              : undefined;
           const cabinOvershootLb = simconnectCabinOvershootLb(airframe);
           const emptyPayloadBiasLb = simconnectEmptyPayloadBiasLb(airframe);
           const rawLivePayloadLb =
@@ -2215,7 +2324,8 @@ export class CareerWatchSession {
               : typeof pmdgRolePayloadLb === 'number'
                 ? pmdgRolePayloadLb
                 : pmdgPaxAndCargo && !preferPmdgFreighterRoles
-                  ? (pickPaxAndCargoDisplayedLiveLb({
+                  ? (paxAndCargoFromZfwLb ??
+                    pickPaxAndCargoDisplayedLiveLb({
                       payloadSource: load.payloadSource,
                       resolvedPayloadLb: load.payloadLb,
                       cabinStationSumLb: paxAndCargoCabinLb,
@@ -2283,6 +2393,9 @@ export class CareerWatchSession {
             previousStationSumLb,
             stationSumNow,
             plannedPayloadLb,
+            pmdgZfwLb: pmdgZfwLb ?? null,
+            ofpEmptyLb: ofpEmptyLb ?? null,
+            paxAndCargoFromZfwLb: paxAndCargoFromZfwLb ?? null,
             prevLivePayloadLb: prevVerification.payload.liveLb,
             prevReady: prevVerification.ready,
             nextReady: nextWeights.ready,
@@ -2328,6 +2441,16 @@ export class CareerWatchSession {
                   ? { crewLb: prevWatchPayload.crewLb }
                   : {}),
               ...(crewFloorLb !== undefined ? { crewFloorLb } : {}),
+              ...(ofpEmptyLb !== undefined ? { ofpEmptyLb } : {}),
+              ...((
+                prevWatchPayload as { ofpZfwLb?: number } | undefined
+              )?.ofpZfwLb !== undefined
+                ? {
+                    ofpZfwLb: (
+                      prevWatchPayload as { ofpZfwLb?: number }
+                    ).ofpZfwLb,
+                  }
+                : {}),
               ...(stations ? { stations } : {}),
               ...(stationMax ? { stationMax } : {}),
             },

@@ -210,6 +210,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'tfdi-md11f-family': '/airframes/md-11f.png',
   'pmdg-777f': '/airframes/b777f.png',
   'pmdg-777-200lr': '/airframes/b777-200lr.png',
+  'pmdg-777-200er': '/airframes/b777-200er.png',
   'pmdg-777-200er-rr': '/airframes/b777-200er.png',
   'pmdg-777-300er': '/airframes/b777-300er.png',
   'inibuilds-a350-900-default-cabin': '/airframes/a350-900.png',

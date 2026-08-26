@@ -7,11 +7,7 @@
   "matchTitles": [
     "DC-6A",
     "DC-6B",
-    "DC-6BP",
-    "777F",
-    "777-200LR",
-    "777-200ER RR",
-    "777-300ER"
+    "DC-6BP"
   ],
   "matchTitlePattern": "DC-6(?:BP|[AB])",
   "notes": [

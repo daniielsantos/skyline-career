@@ -108,6 +108,7 @@ import {
   quoteAircraftRepositionForListing,
   quotePlayerMissionOfpFuel,
   reconcilePlayerInbound,
+  reconcileLotReservations,
   replaceMissionManifest,
   resolveAircraftDeliveryIcao,
   routeDistanceNm,
@@ -917,6 +918,7 @@ async function withCareerWrite<T>(
         : opts?.housekeeping !== false;
     if (housekeeping) {
       settleCrewOpsDue(missions, world, Date.now());
+      reconcileLotReservations(world, missions);
       cancelOrphanPlayerMissions(world, missions);
     }
     const result = await fn(world, missions);
@@ -5264,6 +5266,7 @@ export function createCareerApiServer(port = 8787) {
         try {
           const committed = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
+            reconcileLotReservations(world, missions);
             if (!missions.hubSelected || missions.fleet.length === 0) {
               throw new Error(
                 'Buy or lease an aircraft before staging owned freights — or accept a Crew needed offer',
@@ -5895,6 +5898,8 @@ export function createCareerApiServer(port = 8787) {
             const executed = executeCancelMission(world, missions, {
               missionId: body.missionId!,
             });
+            // Free orphan reserved kg left behind by older cancel paths / partial accepts.
+            reconcileLotReservations(world, missions);
             if (executed.kind === 'missing') return { kind: 'missing' as const };
             if (executed.kind === 'closed') return { kind: 'closed' as const };
             let reservedAfter = 0;

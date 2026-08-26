@@ -17,6 +17,11 @@ import type {
   StrategyContext,
   VerificationResult,
 } from '../../types.js';
+import {
+  applyPmdg777RuntimeFuel,
+  applyPmdg777RuntimeZfw,
+  isPmdg777Profile,
+} from './pmdg-777-cdu-apply.js';
 
 async function requirePmdgControl(bridge: SimBridge): Promise<
   NonNullable<SimBridge['sendPmdgNg3Control']>
@@ -35,10 +40,12 @@ async function sendKeystreamQuiet(
   opts: {
     delayMs: number;
     pageDelayMs: number;
-    method: 'event' | 'control';
+    method: 'event' | 'control' | 'rotor';
     parameter: number;
     release: boolean;
     cdu: 'left' | 'right';
+    cduFamily?: 'ng3' | '777';
+    eventOnly?: boolean;
   },
 ): Promise<void> {
   const send = await requirePmdgControl(bridge);
@@ -48,12 +55,16 @@ async function sendKeystreamQuiet(
     if (prevKey !== undefined && prevKey === step.key) {
       await bridge.delay(Math.max(opts.delayMs, 100));
     }
+    const method = opts.eventOnly ? 'rotor' : (step.method ?? opts.method);
+    const parameter = opts.eventOnly ? 0 : (step.parameter ?? opts.parameter);
+    const release = opts.eventOnly ? false : (step.release ?? opts.release);
     await send({
       key: step.key,
-      release: step.release ?? opts.release,
-      method: step.method ?? opts.method,
-      parameter: step.parameter ?? opts.parameter,
+      release,
+      method,
+      parameter,
       cdu: opts.cdu,
+      ...(opts.cduFamily ? { cduFamily: opts.cduFamily } : {}),
       ...(step.holdMs !== undefined ? { holdMs: step.holdMs } : {}),
     });
     prevKey = step.key;
@@ -143,6 +154,15 @@ export class PmdgCduFuelStrategy implements FuelStrategy {
       const totalLb = await resolvePmdgFuelTargetLb(target, ctx.profile, ctx.bridge);
       if (totalLb < 1) {
         throw new Error('PMDG CDU fuel target is empty (0 lb)');
+      }
+      if (isPmdg777Profile(ctx.profile)) {
+        return applyPmdg777RuntimeFuel({
+          bridge: ctx.bridge,
+          totalLb,
+          sendKeystream: sendKeystreamQuiet,
+          started,
+          strategyName: this.name,
+        });
       }
       const display = fuelLbToDisplay(totalLb);
       const opts = bcfFuelInjectOptions(display);
@@ -247,9 +267,22 @@ export class PmdgCduPayloadStrategy implements PayloadStrategy {
       if (zfwLb < 1000) {
         throw new Error(`PMDG CDU ZFW target looks invalid (${zfwLb} lb)`);
       }
+      const skip = target.skipScratchpadClear === true;
+      if (isPmdg777Profile(ctx.profile)) {
+        return applyPmdg777RuntimeZfw({
+          bridge: ctx.bridge,
+          zfwLb,
+          skipScratchpadClear: skip,
+          sendKeystream: sendKeystreamQuiet,
+          started,
+          strategyName: this.name,
+          emptyLb,
+          payloadLb,
+        });
+      }
       const display = zfwLbToDisplay(zfwLb);
       const opts = bcfZfwInjectOptions(display, {
-        skipScratchpadClear: target.skipScratchpadClear === true,
+        skipScratchpadClear: skip,
       });
       const steps = buildBcfZfwKeySequence(opts);
       await sendKeystreamQuiet(ctx.bridge, steps, opts);

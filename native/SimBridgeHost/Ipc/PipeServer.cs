@@ -284,15 +284,23 @@ public sealed class PipeServer : IAsyncDisposable
                             $"Unknown cdu side: {cduRaw} (use left|right|capt|fo)");
                     }
 
+                    var cduFamily = GetString(request.Params, "cduFamily") ?? "ng3";
+                    var use777 = string.Equals(cduFamily, "777", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(cduFamily, "77x", StringComparison.OrdinalIgnoreCase);
+
                     if (eventIdNum is not null)
                     {
                         eventId = (uint)eventIdNum.Value;
                     }
                     else if (!string.IsNullOrWhiteSpace(key))
                     {
-                        if (!PmdgNg3Cdu.TryResolveKey(key, rightCdu, out eventId))
+                        var resolved = use777
+                            ? Pmdg777Cdu.TryResolveKey(key, rightCdu, out eventId)
+                            : PmdgNg3Cdu.TryResolveKey(key, rightCdu, out eventId);
+                        if (!resolved)
                         {
-                            throw new ArgumentException($"Unknown PMDG CDU key: {key}");
+                            throw new ArgumentException(
+                                $"Unknown PMDG CDU key ({cduFamily}): {key}");
                         }
                     }
                     else
@@ -319,7 +327,8 @@ public sealed class PipeServer : IAsyncDisposable
                         release,
                         method,
                         holdMs = holdMs >= 0 ? holdMs : (int?)null,
-                        cdu = rightCdu ? "right" : "left"
+                        cdu = rightCdu ? "right" : "left",
+                        cduFamily = use777 ? "777" : "ng3",
                     });
                 }
 

@@ -65,8 +65,9 @@ export interface SimBridge {
     key?: string;
     parameter?: number;
     release?: boolean;
-    method?: 'event' | 'control';
+    method?: 'event' | 'control' | 'rotor';
     cdu?: 'left' | 'right';
+    cduFamily?: 'ng3' | '777';
     /** Keep key pressed before release/clear (ms). CLR long-press uses ~3000. */
     holdMs?: number;
   }): Promise<{

@@ -1873,6 +1873,109 @@ function findPlayerDispatchMission(missions: Mission[]): Mission | undefined {
   );
 }
 
+function missionLotLines(mission: Mission): Array<{
+  shipmentLotId: string;
+  cargoKg: number;
+}> {
+  if (mission.lots?.length) {
+    return mission.lots.map((line) => ({
+      shipmentLotId: line.shipmentLotId,
+      cargoKg: line.cargoKg,
+    }));
+  }
+  if (mission.shipmentLotId) {
+    return [
+      {
+        shipmentLotId: mission.shipmentLotId,
+        cargoKg: mission.cargoKg,
+      },
+    ];
+  }
+  return [];
+}
+
+/** Open player flight that blocks staging (hidden accepted leg or same-route hold). */
+function findStagingBlockingMission(
+  draft: StagingDraft,
+  missionList: Mission[],
+): Mission | undefined {
+  const lotIds = new Set(draft.lines.map((line) => line.lot.id));
+  for (const mission of missionList) {
+    if (!isActiveMissionStatus(mission.status) || mission.crewOperated) continue;
+    if (missionLotLines(mission).some((line) => lotIds.has(line.shipmentLotId))) {
+      return mission;
+    }
+  }
+  if (draft.intoMissionId) {
+    const bound = missionList.find(
+      (mission) =>
+        mission.id === draft.intoMissionId && isActiveMissionStatus(mission.status),
+    );
+    if (bound) return bound;
+  }
+  const routeMatches = missionList.filter(
+    (mission) =>
+      isActiveMissionStatus(mission.status) &&
+      !mission.crewOperated &&
+      mission.originIcao === draft.originIcao &&
+      mission.destIcao === draft.destIcao &&
+      mission.aircraftClassId === draft.aircraft &&
+      (!draft.aircraftId ||
+        !mission.aircraftId ||
+        mission.aircraftId === draft.aircraftId),
+  );
+  return routeMatches.length === 1 ? routeMatches[0] : undefined;
+}
+
+function bookedKgForStagingLot(
+  lotId: string,
+  missionList: Mission[],
+): number {
+  for (const mission of missionList) {
+    if (!isActiveMissionStatus(mission.status) || mission.crewOperated) continue;
+    for (const line of missionLotLines(mission)) {
+      if (line.shipmentLotId === lotId) {
+        return Math.max(0, Math.floor(line.cargoKg));
+      }
+    }
+  }
+  return 0;
+}
+
+function stagingResolvedLot(
+  draft: StagingDraft,
+  lot: MarketLot,
+  missionList: Mission[],
+  routeLots: MarketLot[],
+  marketLots: MarketLot[],
+): MarketLot {
+  const live =
+    routeLots.find((row) => row.id === lot.id) ??
+    marketLots.find((row) => row.id === lot.id);
+  const base = live ?? lot;
+  const boardAvail = Math.max(0, Math.floor(base.availableKg ?? 0));
+  // New staging must trust the board free slice only. manifestEditAvailableKg
+  // takes max(quantityKg, …) which inflates past reserved kg and lets Accept
+  // request more than lotAvailableKg (e.g. 8900 requested, 900 free).
+  // Edit/replace credits back this flight's booked slice so the slider can keep it.
+  const bookedKg = draft.replaceManifest
+    ? bookedKgForStagingLot(lot.id, missionList)
+    : 0;
+  const availableKg =
+    bookedKg > 0
+      ? manifestEditAvailableKg({
+          bookedKg,
+          lotQuantityKg: base.quantityKg,
+          marketAvailableKg: boardAvail,
+        })
+      : boardAvail;
+  return {
+    ...base,
+    availableKg,
+    quantityKg: Math.max(base.quantityKg ?? 0, availableKg),
+  };
+}
+
 /** Most recent company-crew airborne leg (sidebar status only). */
 function findCrewAirborneMission(missions: Mission[]): Mission | undefined {
   const airborne = missions.filter(
@@ -4974,9 +5077,7 @@ export function App() {
     };
   }, [loadOfpAutoStatus, activeMission?.id]);
 
-  // Writes finished (`done`) before Watch's first honest sample. Stay on
-  // Checking until Sim vs Due matches — flipping Off at Watch-start made
-  // PREFLIGHT FAILED look like inject had already given up.
+  // Writes finished (`done`) — auto-clear only when Sim vs Due matches.
   useEffect(() => {
     if (loadOfpAutoStatus !== 'done') return;
     const v = activeMission?.lastPreflightCheck?.loadVerification;
@@ -5004,14 +5105,7 @@ export function App() {
     loadOfpAutoStatus,
   ]);
 
-  useEffect(() => {
-    if (loadOfpAutoStatus !== 'done') return;
-    const id = window.setTimeout(() => {
-      setLoadOfpAutoStatus('idle');
-      setSkylineInjectEnabled(false);
-    }, 25_000);
-    return () => window.clearTimeout(id);
-  }, [loadOfpAutoStatus]);
+  // Do not auto-hide the inject toggle on a timer — user turns it off manually.
 
   // Continuously refresh Loaded vs Due while staging on the ground.
   // Full /api/preflight opens its own pipe — pause while Watch owns SimBridge
@@ -6717,9 +6811,18 @@ export function App() {
   }
 
   function lineMaxKg(draft: StagingDraft, lot: MarketLot): number {
+    const resolved = stagingResolvedLot(
+      draft,
+      lot,
+      missions,
+      stagingRouteLots,
+      lots,
+    );
     return Math.max(
       0,
-      Math.floor(Math.min(lot.availableKg, stagingRemainingKg(draft, lot.id))),
+      Math.floor(
+        Math.min(resolved.availableKg, stagingRemainingKg(draft, lot.id)),
+      ),
     );
   }
 
@@ -6925,6 +7028,32 @@ export function App() {
       return;
     }
     goToTab('market');
+  }
+
+  async function onCancelStagingFlight() {
+    if (!staging || busy) return;
+    const blocking = findStagingBlockingMission(staging, missions);
+    if (blocking) {
+      await onCancel(blocking);
+      return;
+    }
+    const ok = await confirm({
+      title: staging.replaceManifest ? 'Discard manifest edits?' : 'Discard this manifest?',
+      body: (
+        <>
+          <p>
+            {staging.replaceManifest
+              ? 'Staged changes will be cleared. The accepted flight stays open until you cancel it from Dispatch.'
+              : 'Your staged cargo lines will be cleared. No flight has been accepted yet.'}
+          </p>
+        </>
+      ),
+      confirmLabel: staging.replaceManifest ? 'Discard edits' : 'Discard manifest',
+      cancelLabel: 'Keep editing',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    exitStaging();
   }
 
   async function enterEditManifest(mission: Mission) {
@@ -7163,17 +7292,47 @@ export function App() {
 
   async function onCommitStaging() {
     if (!staging || staging.lines.length === 0) return;
+    // Refresh free kg from the board, then clamp sliders (never send quantityKg as avail).
+    const refreshed: StagingDraft = {
+      ...staging,
+      lines: staging.lines.map((line) => ({
+        ...line,
+        lot: stagingResolvedLot(
+          staging,
+          line.lot,
+          missions,
+          stagingRouteLots,
+          lots,
+        ),
+      })),
+    };
+    const clamped = clampDraftToCapacity(refreshed);
+    if (clamped.lines.some((line) => line.cargoKg <= 0)) {
+      setToastKind('fail');
+      setToast(
+        'One or more lots no longer have free cargo — refresh Freights or lower the slider',
+      );
+      setStaging(clamped);
+      return;
+    }
+    if (
+      clamped.lines.some(
+        (line, i) => line.cargoKg !== staging.lines[i]?.cargoKg,
+      )
+    ) {
+      setStaging(clamped);
+    }
     await run(
       async () => {
         try {
           const result = await postStagingCommit({
-            aircraft: staging.aircraft,
-            aircraftId: staging.aircraftId,
-            missionId: staging.intoMissionId,
+            aircraft: clamped.aircraft,
+            aircraftId: clamped.aircraftId,
+            missionId: clamped.intoMissionId,
             openDispatch: false,
-            replace: Boolean(staging.replaceManifest),
+            replace: Boolean(clamped.replaceManifest),
             weightSystem,
-            lines: staging.lines.map((line) => ({
+            lines: clamped.lines.map((line) => ({
               lotId: line.lot.id,
               cargoKg: line.cargoKg,
             })),
@@ -7208,7 +7367,7 @@ export function App() {
               : 'Created';
           setToast(
             `${action} ${result.mission.id} · ${
-              result.lineCount ?? staging.lines.length
+              result.lineCount ?? clamped.lines.length
             } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem} · open Dispatch`,
           );
           goToTab('staging');
@@ -7596,6 +7755,15 @@ export function App() {
         void onCancelInject();
       } else if (loadOfpAutoStatus === 'done') {
         setLoadOfpAutoStatus('idle');
+        setLoadOfpAutoError(null);
+        setLoadOfpProgress(null);
+      } else if (loadOfpAutoStatus === 'failed') {
+        // Keep status=failed so the Skyline inject switch stays visible for retry
+        // (loadPath can be efb while injectCapable still allows Skyline inject).
+        setLoadOfpAutoError(
+          'Inject failed — turn Skyline inject on to retry.',
+        );
+        setLoadOfpProgress(null);
       }
       return;
     }
@@ -7611,6 +7779,7 @@ export function App() {
       return;
     }
     setSkylineInjectEnabled(true);
+    setLoadOfpAutoError(null);
     void onLoadFuelAndPayload(activeMission);
   }
 
@@ -7711,10 +7880,15 @@ export function App() {
         const injectReady = Boolean(
           result.mission?.lastPreflightCheck?.loadVerification?.ready,
         );
-        setLoadOfpAutoStatus(injectReady ? 'idle' : 'done');
+        // Always clear the switch when inject finishes so Failed→retry is one click On.
         setSkylineInjectEnabled(false);
+        setLoadOfpAutoStatus(injectReady ? 'idle' : 'failed');
         injectFuelQuietUntilRef.current = Date.now() + 12_000;
-        setLoadOfpAutoError(null);
+        setLoadOfpAutoError(
+          injectReady
+            ? null
+            : 'Inject finished — Loaded vs Due still mismatched (turn inject on to retry) · log: profiles/career/watch-debug.log',
+        );
         if (injectReady) {
           setLoadOfpProgress(null);
         }
@@ -7753,7 +7927,9 @@ export function App() {
     if (!succeeded) {
       setSkylineInjectEnabled(false);
       setLoadOfpAutoStatus('failed');
-      setLoadOfpAutoError(failureMessage ?? 'Fuel and payload load failed');
+      setLoadOfpAutoError(
+        `${failureMessage ?? 'Fuel and payload load failed'} · log: profiles/career/watch-debug.log ([cdu]/[inject])`,
+      );
       setLoadOfpProgress(null);
       return;
     }
@@ -7763,10 +7939,8 @@ export function App() {
         intervalSec: 5,
       });
       setWatch(status);
-      setLoadOfpAutoStatus('idle');
-      setSkylineInjectEnabled(false);
     } catch {
-      /* auto-start effect retries; leave Done until Watch is up */
+      /* auto-start effect retries */
     }
   }
 
@@ -8264,6 +8438,9 @@ export function App() {
     staging?.intoMissionId && !staging.replaceManifest
       ? missions.find((m) => m.id === staging.intoMissionId)
       : undefined;
+  const stagingBlockingMission = staging
+    ? findStagingBlockingMission(staging, missions)
+    : undefined;
   const stagingExistingLots = stagingExisting?.lots?.length ?? 0;
   const stagingPayUsd = staging
     ? staging.lines.reduce(
@@ -12194,6 +12371,18 @@ export function App() {
                   >
                     Back
                   </button>
+                  <button
+                    type="button"
+                    className="action ghost danger"
+                    onClick={() => void onCancelStagingFlight()}
+                    disabled={busy}
+                  >
+                    {stagingBlockingMission
+                      ? 'Cancel flight'
+                      : staging.replaceManifest
+                        ? 'Discard edits'
+                        : 'Discard manifest'}
+                  </button>
                 </div>
               </div>
 
@@ -12339,6 +12528,14 @@ export function App() {
                 </p>
               ) : null}
 
+              {stagingBlockingMission ? (
+                <p className="banner warn">
+                  Open flight <code>{stagingBlockingMission.id}</code> still holds
+                  cargo on this route. Cancel it to free the lot or continue on that
+                  flight from Dispatch.
+                </p>
+              ) : null}
+
               {stagingExisting && (stagingExisting.lots?.length ?? 0) > 0 ? (
                 <div className="staging-section">
                   <h3>Already on this flight</h3>
@@ -12360,6 +12557,13 @@ export function App() {
                 </h3>
                 <ul className="staging-lines">
                   {staging.lines.map((line) => {
+                    const resolvedLot = stagingResolvedLot(
+                      staging,
+                      line.lot,
+                      missions,
+                      stagingRouteLots,
+                      lots,
+                    );
                     const maxKg = lineMaxKg(staging, line.lot);
                     const valid = line.cargoKg > 0 && line.cargoKg <= maxKg;
                     const displayMax = Math.max(
@@ -12395,9 +12599,9 @@ export function App() {
                           </button>
                         </div>
                         <p className="staging-line-meta">
-                          Lot {formatTonnes(line.lot.availableKg)} available · max this line{' '}
+                          Lot {formatTonnes(resolvedLot.availableKg)} available · max this line{' '}
                           {formatTonnes(maxKg)} · pay{' '}
-                          {formatMoney(proRataPayUsd(line.lot, line.cargoKg))}
+                          {formatMoney(proRataPayUsd(resolvedLot, line.cargoKg))}
                         </p>
                         <label className="cargo-amount">
                           Load to reserve
@@ -12480,6 +12684,18 @@ export function App() {
                   ) : null}
                 </div>
                 <div className="cargo-dialog-actions">
+                  <button
+                    type="button"
+                    className="action ghost danger"
+                    disabled={busy}
+                    onClick={() => void onCancelStagingFlight()}
+                  >
+                    {stagingBlockingMission
+                      ? 'Cancel flight'
+                      : staging.replaceManifest
+                        ? 'Discard edits'
+                        : 'Discard manifest'}
+                  </button>
                   <button
                     type="button"
                     className="accept"

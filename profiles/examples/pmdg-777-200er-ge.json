@@ -1,16 +1,16 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "pmdg-777-200er-rr",
-  "profileKey": "pmdg/777-200er-rr",
+  "profileId": "pmdg-777-200er-ge",
+  "profileKey": "pmdg/777-200er-ge",
   "semver": "1.0.0",
-  "displayName": "777-200ER RR (MSFS 2024)",
+  "displayName": "777-200ER GE (MSFS 2024)",
   "match": {
-    "fingerprint": "0ec524c06c1370699cd42cffe328b1901e00c66ec0fc222337324349a2f31353",
-    "title": "777-200ER RR",
+    "fingerprint": "fa33a3ab74ec0ede96a16eff7fb065cbf2b8358184d165bd6822c31b27d1c8c3",
+    "title": "777-200ER GE",
     "publisher": "pmdg",
     "icao": "B772",
     "liveTitles": [
-      "777-200ER RR"
+      "777-200ER GE"
     ]
   },
   "capabilities": [
@@ -171,12 +171,12 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: 777-200ER RR.",
+    "Homologated via wizard: 777-200ER GE.",
     "ICAO type designator (catalog/SimBrief): B772.",
     "Load method: direct-injection (PMDG CDU FO TOTAL + ZFW) — experimental; EFB SimBrief fallback.",
     "Roles pack: profiles/ofp/pmdg-777-pax.json",
     "Market SKU: pmdg-777-200er (pax_and_cargo, injectCapable).",
     "Use compare-ofp + Career Loaded vs Due for validation.",
-    "See profiles/notes/pmdg-777-200er-rr.md"
+    "See profiles/notes/pmdg-777-200er-ge.md"
   ]
 }

@@ -989,9 +989,13 @@ public sealed class SimConnectClient : ISimClient
     }
 
     /// <summary>
-    /// Send a PMDG NG3 control. Default path is TransmitClientEvent("#eventId") with
-    /// LEFTSINGLE then LEFTRELEASE (ConnectionTest pattern for momentary switches/CDU).
-    /// Use method=control for SetClientData on PMDG_NG3_Control.
+    /// Send a PMDG control. Paths:
+    /// <list type="bullet">
+    /// <item><c>rotor</c> / <c>rotor_brake</c> — MSFS PMDG 777 CDU/switch standard:
+    ///   <c>(offset*100+1) &gt;K:ROTOR_BRAKE</c> where offset = eventId − 0x11000.</item>
+    /// <item><c>control</c> — SetClientData on <c>PMDG_NG3_Control</c> (737 NG3).</item>
+    /// <item><c>event</c> (default) — TransmitClientEvent <c>#eventId</c> with mouse flags.</item>
+    /// </list>
     /// </summary>
     public async Task SendPmdgNg3ControlAsync(
         uint eventId,
@@ -1002,7 +1006,35 @@ public sealed class SimConnectClient : ISimClient
         CancellationToken ct = default)
     {
         var param = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
+        var useRotor = string.Equals(method, "rotor", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(method, "rotor_brake", StringComparison.OrdinalIgnoreCase);
         var useControl = string.Equals(method, "control", StringComparison.OrdinalIgnoreCase);
+
+        if (useRotor)
+        {
+            // MobiFlight / HubHop carrier: offset*100+1 = left click.
+            // eventId is absolute (THIRD_PARTY_EVENT_ID_MIN + offset).
+            const uint thirdPartyMin = 0x00011000;
+            if (eventId < thirdPartyMin)
+            {
+                throw new SimClientException(
+                    "INVALID",
+                    $"PMDG rotor_brake eventId {eventId} below THIRD_PARTY_EVENT_ID_MIN");
+            }
+
+            var offset = eventId - thirdPartyMin;
+            var rotorParam = offset * 100u + 1u;
+            await TriggerEventAsync("ROTOR_BRAKE", rotorParam, ct).ConfigureAwait(false);
+            Console.WriteLine(
+                $"[simconnect] PMDG ROTOR_BRAKE EventId={eventId} offset={offset} param={rotorParam}");
+            var pressHold = holdMs >= 0 ? holdMs : 50;
+            if (pressHold > 0)
+            {
+                await DelayAsync(pressHold, ct).ConfigureAwait(false);
+            }
+
+            return;
+        }
 
         if (useControl)
         {
@@ -1028,7 +1060,7 @@ public sealed class SimConnectClient : ISimClient
             return;
         }
 
-        // TransmitClientEvent("#NNNNN") — preferred for CDU keys.
+        // TransmitClientEvent("#NNNNN") — preferred for 737 NG3 CDU keys.
         TransmitPmdgMappedEvent(eventId, param);
         Console.WriteLine(
             $"[simconnect] PMDG TransmitClientEvent #{eventId} Parameter=0x{param:X8}");

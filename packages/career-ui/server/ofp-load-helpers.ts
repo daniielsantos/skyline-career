@@ -6,6 +6,7 @@ import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
   assertRolesPackAllowsDirectInjection,
   careerFuelMatchOk,
+  careerPaxAndCargoLivePayloadLb,
   findCareerPlayerAirframe,
   flightPhaseFromSample,
   inferEnginesRunning,
@@ -13,10 +14,12 @@ import {
   KG_TO_LB,
   normalizeAircraftTitle,
   ofpFreightTowardMissionKg,
+  payloadMatchToleranceLb,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
   liveFuelLbCoherentWithTanks,
   resolveLivePayloadLb,
+  toLb,
   type AircraftProfile,
   type FuelTankBreakdown,
   type LoadPlanRequest,
@@ -29,6 +32,11 @@ import {
   isPmdgCduFuelProfile,
   isPmdgCduPayloadProfile,
 } from './pmdg-cdu-inject.ts';
+import {
+  applyPmdg777CduFuelOnce,
+  applyPmdg777CduPayloadOnce,
+  isPmdg777CduProfile,
+} from './pmdg-777-cdu-inject.ts';
 import { simIpcSessionDied } from '../../agent/src/sim-session-health.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
@@ -1642,10 +1650,18 @@ async function applyMissionOfpLoadExclusive(
         }
         restoreFuelOnRollback = false;
         assertOfpLoadWithinBudget(mission.id, injectStartedAtMs, 'pmdg-cdu fuel');
-        const fuelApply = await applyPmdgCduFuelOnce({
-          engine,
-          fuel: built.plan.fuel,
-        });
+        const use777 = isPmdg777CduProfile(resolved.profile);
+        const fuelApply = use777
+          ? await applyPmdg777CduFuelOnce({
+              bridge,
+              fuel: built.plan.fuel,
+              profile: resolved.profile,
+            })
+          : await applyPmdgCduFuelOnce({
+              bridge,
+              fuel: built.plan.fuel,
+              profile: resolved.profile,
+            });
         applyResult = {
           ...(applyResult ?? {}),
           fuel: fuelApply ?? applyResult?.fuel,
@@ -1689,19 +1705,36 @@ async function applyMissionOfpLoadExclusive(
           fuelAlreadyOk,
           fuelSuccess: applyResult?.fuel?.success ?? null,
         });
-        const zfwApply = await applyPmdgCduPayloadOnce({
-          engine,
-          bridge,
-          ofp,
-          requestedCargoLb: built.requestedCargoLb ?? built.cargoLb,
-          liveStations: beforeLive.stations,
-          baggageStationIndexes: cabinCargoStations,
-          fixedNonCargoStationIndexes: [
-            ...built.crewStations,
-            ...serviceStations,
-          ],
-          skipScratchpadClear: fuelCduScratchpadCleared,
-        });
+        const use777 = isPmdg777CduProfile(resolved.profile);
+        const zfwApply = use777
+          ? await applyPmdg777CduPayloadOnce({
+              engine,
+              bridge,
+              ofp,
+              profile: resolved.profile,
+              requestedCargoLb: built.requestedCargoLb ?? built.cargoLb,
+              liveStations: beforeLive.stations,
+              baggageStationIndexes: cabinCargoStations,
+              fixedNonCargoStationIndexes: [
+                ...built.crewStations,
+                ...serviceStations,
+              ],
+              skipScratchpadClear: fuelCduScratchpadCleared,
+            })
+          : await applyPmdgCduPayloadOnce({
+              engine,
+              bridge,
+              ofp,
+              profile: resolved.profile,
+              requestedCargoLb: built.requestedCargoLb ?? built.cargoLb,
+              liveStations: beforeLive.stations,
+              baggageStationIndexes: cabinCargoStations,
+              fixedNonCargoStationIndexes: [
+                ...built.crewStations,
+                ...serviceStations,
+              ],
+              skipScratchpadClear: fuelCduScratchpadCleared,
+            });
         applyResult = {
           ...(applyResult ?? {}),
           payload: zfwApply.payload ?? applyResult?.payload,
@@ -2962,13 +2995,60 @@ async function applyMissionOfpLoadExclusive(
       } catch {
         /* optional */
       }
-      const liveCargoLb = built.baggageStations.reduce((sum, idx) => {
-        const v = afterLive.stations[idx];
-        return sum + (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-      }, 0);
+      if (liveZfw === undefined) {
+        try {
+          const gw = await bridge.readLVar('GW_Lvar');
+          if (Number.isFinite(gw) && gw >= 20_000 && gw <= 600_000) {
+            const fuelGal = await bridge.readSimVar({
+              name: 'FUEL TOTAL QUANTITY',
+              unit: 'gallons',
+            });
+            let dens = fuelLbPerGal;
+            try {
+              const d = await bridge.readSimVar({
+                name: 'FUEL WEIGHT PER GALLON',
+                unit: 'pounds',
+              });
+              if (Number.isFinite(d) && d >= 5 && d <= 8) dens = d;
+            } catch {
+              /* Jet-A default */
+            }
+            const z = gw - fuelGal * dens;
+            if (Number.isFinite(z) && z >= 20_000 && z <= 500_000) liveZfw = z;
+          }
+        } catch {
+          /* optional */
+        }
+      }
+      const liveCargoLb = isPaxAndCargoLoadLayout(
+        findCareerPlayerAirframe(mission.airframeTypeId),
+      )
+        ? (careerPaxAndCargoLivePayloadLb({
+            stations: afterLive.stations,
+            stationRoles: ofp.payload?.stationRoles,
+            zfwLb: liveZfw,
+            ofpEmptyLb:
+              ofp.loadSheet?.emptyWeight !== undefined
+                ? toLb(
+                    ofp.loadSheet.emptyWeight,
+                    ofp.loadSheet.unit ?? ofp.fuel.unit ?? 'lb',
+                  )
+                : undefined,
+          }) ??
+          built.baggageStations.reduce((sum, idx) => {
+            const v = afterLive.stations[idx];
+            return sum + (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+          }, 0))
+        : built.baggageStations.reduce((sum, idx) => {
+            const v = afterLive.stations[idx];
+            return sum + (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+          }, 0);
       const requestedCargo = built.requestedCargoLb ?? built.cargoLb;
       const zfwTol = Math.max(500, pmdgCduZfwTargetLb * 0.01);
-      const cargoTol = Math.max(400, requestedCargo * 0.08);
+      const cargoTol = Math.max(
+        payloadMatchToleranceLb(requestedCargo),
+        requestedCargo * 0.08,
+      );
       const zfwOk =
         liveZfw !== undefined &&
         Math.abs(liveZfw - pmdgCduZfwTargetLb) <= zfwTol;
@@ -2982,7 +3062,7 @@ async function applyMissionOfpLoadExclusive(
         cargoOk,
         classicPayloadLb: Math.round(classicPayloadLb),
       });
-      if (!zfwOk && !cargoOk) {
+      if (!zfwOk || !cargoOk) {
         applyResult = {
           ...applyResult,
           payload: {
@@ -3245,6 +3325,7 @@ async function applyMissionOfpLoadExclusive(
           ? ' — restored previous load'
           : ' — restored previous payload (fuel left as-is)';
       }
+      error += ' · debug: profiles/career/watch-debug.log ([cdu]/[inject])';
     } else {
       // Fuel/payload writes already succeeded (UI Sim=Due). compareOnce +
       // runMissionPreflight open another pipe full of CG PERCENT / station

@@ -270,7 +270,11 @@ public sealed class MockSimClient : ISimClient
         EnsureConnected();
         var param = parameter == 0 ? PmdgNg3Cdu.MouseLeftSingle : parameter;
         Console.WriteLine(
-            $"[mock] sendPmdgNg3Control method={method} eventId={eventId} parameter={param} release={release} holdMs={holdMs}");
+            $"[mock] sendPmdgNg3Control method={method} eventId={eventId} parameter={param} release={release} holdMs={holdMs}" +
+            (string.Equals(method, "rotor", StringComparison.OrdinalIgnoreCase)
+             || string.Equals(method, "rotor_brake", StringComparison.OrdinalIgnoreCase)
+                ? $" rotor={(eventId >= 0x11000u ? (eventId - 0x11000u) * 100u + 1u : 0u)}"
+                : ""));
         return Task.CompletedTask;
     }
 

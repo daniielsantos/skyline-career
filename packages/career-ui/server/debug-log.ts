@@ -16,6 +16,9 @@ function logDir(): string {
 
 export const WATCH_DEBUG_LOG_PATH = join(logDir(), 'watch-debug.log');
 
+/** Same file — inject/CDU lines use scopes `[inject]` and `[cdu]`. */
+export const INJECT_DEBUG_LOG_PATH = WATCH_DEBUG_LOG_PATH;
+
 let chain: Promise<void> = Promise.resolve();
 let ensuredDir = false;
 

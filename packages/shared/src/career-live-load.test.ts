@@ -8,6 +8,7 @@ import {
   pickStableLiveFuelLb,
   paxAndCargoLiveStationSumLb,
   pickPaxAndCargoDisplayedLiveLb,
+  careerPaxAndCargoLivePayloadLb,
   resolveLivePayloadLb,
   stationSampleIncomplete,
   stationWeightsDrifted,
@@ -40,6 +41,61 @@ describe('paxAndCargoLiveStationSumLb', () => {
     assert.equal(
       paxAndCargoLiveStationSumLb(stations, [6, 7], [1, 2, 3, 4]),
       47112,
+    );
+  });
+});
+
+describe('careerPaxAndCargoLivePayloadLb', () => {
+  const roles = {
+    crewStations: [1, 2],
+    passengerStations: [3, 6, 7, 8, 9],
+    baggageStations: [4, 5, 14, 15, 16],
+    serviceStations: [10, 11, 12, 13],
+  };
+  const stations = {
+    1: 3420,
+    2: 7980,
+    3: 39520,
+    4: 7506,
+    5: 6263,
+    6: 1060,
+    7: 3200,
+    8: 190,
+    9: 190,
+    10: 0,
+    11: 300,
+    12: 400,
+    13: 600,
+  };
+
+  it('includes service bays in the career station sum', () => {
+    assert.equal(
+      careerPaxAndCargoLivePayloadLb({ stations, stationRoles: roles }),
+      59229,
+    );
+  });
+
+  it('prefers ZFW − OFP empty over classic station remap (PMDG CDU/EFB)', () => {
+    assert.equal(
+      careerPaxAndCargoLivePayloadLb({
+        stations,
+        stationRoles: roles,
+        zfwLb: 396_495,
+        ofpEmptyLb: 302_980,
+      }),
+      93_515,
+    );
+  });
+
+  it('falls back to station sum when ZFW residual is too small', () => {
+    assert.equal(
+      careerPaxAndCargoLivePayloadLb({
+        stations,
+        stationRoles: roles,
+        zfwLb: 303_000,
+        ofpEmptyLb: 302_980,
+      }),
+      59229,
     );
   });
 });

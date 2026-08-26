@@ -15,6 +15,7 @@ import {
   cancelMission,
   commitStagedManifest,
   departMission,
+  normalizeMissionIntent,
   settleMission,
   type DepartMissionResult,
   type StagedManifestLine,
@@ -65,9 +66,11 @@ function findOpenMissionHoldingLots(
 ): MissionIntent | undefined {
   const ids = lotIds.map((id) => id.trim()).filter(Boolean);
   if (ids.length === 0) return undefined;
-  return missions.missions.find(
-    (row) => isOpenMissionStatus(row.status) && missionHoldsLotIds(row, ids),
-  );
+  return missions.missions
+    .map((row) => normalizeMissionIntent(row))
+    .find(
+      (row) => isOpenMissionStatus(row.status) && missionHoldsLotIds(row, ids),
+    );
 }
 
 function fleetAircraftForListing(

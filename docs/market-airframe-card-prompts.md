@@ -1113,8 +1113,8 @@ CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
-## PMDG 777-200ER RR
-- **typeId:** `pmdg-777-200er-rr`
+## PMDG 777-200ER
+- **typeId:** `pmdg-777-200er`
 - **file:** `b777-200er.png`
 
 ```

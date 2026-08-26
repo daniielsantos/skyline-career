@@ -278,10 +278,12 @@ export class NamedPipeSimBridge implements SimBridge {
     key?: string;
     parameter?: number;
     release?: boolean;
-    /** `event` = TransmitClientEvent (default); `control` = PMDG_NG3_Control SetClientData */
-    method?: 'event' | 'control';
+    /** `event` = TransmitClientEvent; `control` = NG3 SetClientData; `rotor` = 777 ROTOR_BRAKE */
+    method?: 'event' | 'control' | 'rotor';
     /** Captain (left) or FO (right) CDU — GSX uses right. */
     cdu?: 'left' | 'right';
+    /** `ng3` (737) or `777` (77X SDK event IDs). Default ng3. */
+    cduFamily?: 'ng3' | '777';
     /** Keep key pressed before release/clear (ms). */
     holdMs?: number;
   }): Promise<{
@@ -301,6 +303,7 @@ export class NamedPipeSimBridge implements SimBridge {
       ...(opts.release !== undefined ? { release: opts.release } : {}),
       ...(opts.method !== undefined ? { method: opts.method } : {}),
       ...(opts.cdu !== undefined ? { cdu: opts.cdu } : {}),
+      ...(opts.cduFamily !== undefined ? { cduFamily: opts.cduFamily } : {}),
       ...(opts.holdMs !== undefined ? { holdMs: opts.holdMs } : {}),
     });
   }

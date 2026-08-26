@@ -1,11 +1,11 @@
-# 777-200ER RR — discovery
+# 777-200ER PW — discovery
 
-**In-sim title (example):** `777-200ER RR`  
-**Match title:** `777-200ER RR`  
+**In-sim title (example):** `777-200ER PW`  
+**Match title:** `777-200ER PW`  
 **ICAO (SimBrief type):** `B772`  
 **Publisher:** `pmdg`  
 **Stations:** 16  
-**Profile:** `pmdg/777-200er-rr@1.0.0`
+**Profile:** `pmdg/777-200er-pw@1.0.0`
 
 ## Fuel tanks
 
@@ -24,9 +24,9 @@
 
 ## Homologated
 
-- `profiles/examples/pmdg-777-200er-rr.json`
+- `profiles/examples/pmdg-777-200er-pw.json`
 - Family OFP: `profiles/ofp/pmdg-777.json` (shared with 777F / 200LR / 300ER)
-- Market SKU: `pmdg-777-200er` (`wide_freighter`, SimBrief `B772` — RR row)
+- Market SKU: `pmdg-777-200er` (`wide_freighter`, SimBrief `B772` — PW row)
 - **loadLayout:** `pax_and_cargo` — 294 seats; SimBrief hold cap ~85,140 lb; cabin first (175+55 lb/seat)
 - **injectCapable:** `true` — Skyline CDU inject (FO TOTAL + ZFW), same path as PMDG 738 PAX/BCF
-- OFP pack: `profiles/ofp/pmdg-777-pax.json` (777F/LR/300ER stay on `pmdg-777.json`)
+- OFP pack: `profiles/ofp/pmdg-777-pax.json`

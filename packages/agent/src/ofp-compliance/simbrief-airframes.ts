@@ -191,6 +191,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/Fly The Maddog X MD-8[238]\s+20th/i.test(t)) {
     return 'Leonardo Maddog \\(MSFS\\) - Y162 Config';
   }
+  const pmdg772 = inferPmdg777200erSimBriefMatch(t);
+  if (pmdg772) return pmdg772;
   const fenixA320 = inferFenixA320SimBriefMatch(t);
   if (fenixA320) return fenixA320;
   const fenixA321 = inferFenixA321SimBriefMatch(t);
@@ -245,7 +247,24 @@ export function liveTitleMatchesMarketSku(
   if (id === 'inibuilds-a350-1000-default-cabin') {
     return /\bA350-1000\b/i.test(t);
   }
+  if (id === 'pmdg-777-200er') {
+    return /\b777-200ER(?:\s+(?:RR|PW|GE))?\b/i.test(t);
+  }
   return false;
+}
+
+/** PMDG 777-200ER — engine suffix picks the SimBrief B772 row (Default MTOW). */
+function inferPmdg777200erSimBriefMatch(title: string): string | undefined {
+  if (/\b777-200ER\s+GE\b/i.test(title)) {
+    return 'PMDG \\(MSFS\\) - GE90-94B - Default MTOW';
+  }
+  if (/\b777-200ER\s+PW\b/i.test(title)) {
+    return 'PMDG \\(MSFS\\) - PW4092 - Default MTOW';
+  }
+  if (/\b777-200ER(?:\s+RR)?\b/i.test(title)) {
+    return 'PMDG \\(MSFS\\) - Trent 892 - Default MTOW';
+  }
+  return undefined;
 }
 
 /** iniBuilds A350 family — ULR before -900 (substring). */

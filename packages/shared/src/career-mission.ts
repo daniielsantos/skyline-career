@@ -1056,6 +1056,75 @@ export function listActivePlayerMissions(
     .filter((m) => isActiveMissionStatus(m.status));
 }
 
+function activeNpcCargoKgForLot(world: CareerEconomyWorld, lotId: string): number {
+  let total = 0;
+  for (const flight of world.npcFlights ?? []) {
+    if (flight.lotId !== lotId) continue;
+    if (flight.status !== 'in_flight' && flight.status !== 'awaiting_pilot') {
+      continue;
+    }
+    total += Math.max(0, Math.floor(flight.cargoKg));
+  }
+  return total;
+}
+
+function expectedLotReservationKg(
+  world: CareerEconomyWorld,
+  missions: CareerMissionsState,
+  lotId: string,
+): number {
+  let expected = activeNpcCargoKgForLot(world, lotId);
+  for (const hold of missions.playerFbos?.holds ?? []) {
+    if (hold.lotId === lotId) {
+      expected += Math.max(0, Math.floor(hold.cargoKg));
+    }
+  }
+  for (const raw of missions.missions ?? []) {
+    const mission = normalizeMissionIntent(raw);
+    if (!isActiveMissionStatus(mission.status)) continue;
+    for (const line of mission.lots) {
+      if (line.shipmentLotId === lotId) {
+        expected += Math.max(0, Math.floor(line.cargoKg));
+      }
+    }
+  }
+  return expected;
+}
+
+/**
+ * Release lot reservations that no longer match open missions, FBO holds, or
+ * NPC in-flight / awaiting-pilot claims (e.g. after cancel without full release).
+ */
+export function reconcileLotReservations(
+  world: CareerEconomyWorld,
+  missions: CareerMissionsState,
+): { repairedLots: number; releasedKg: number } {
+  let repairedLots = 0;
+  let releasedKg = 0;
+  for (const lot of world.lots) {
+    if (lot.reservedKg <= 0) continue;
+    const expected = expectedLotReservationKg(world, missions, lot.id);
+    if (lot.reservedKg <= expected) continue;
+    const excess = lot.reservedKg - expected;
+    lot.reservedKg = expected;
+    releasedKg += excess;
+    repairedLots += 1;
+    if (lot.quantityKg <= 0) {
+      lot.reservedKg = 0;
+      lot.status = 'delivered';
+      continue;
+    }
+    if (lot.reservedKg <= 0) {
+      lot.status = 'available';
+    } else if (lot.reservedKg >= lot.quantityKg) {
+      lot.status = 'reserved';
+    } else {
+      lot.status = 'reserved';
+    }
+  }
+  return { repairedLots, releasedKg };
+}
+
 /**
  * Accept an empty player reposition (no freight). Flown via Dispatch/Watch.
  * Allowed from bush / trip-only strips — instant ferry stays blocked on soft-field bush.

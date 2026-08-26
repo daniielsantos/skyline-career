@@ -6,6 +6,7 @@
 import {
   KG_TO_LB,
   applyOfpBallastLb,
+  careerPaxAndCargoLivePayloadLb,
   evaluateLoadVerification,
   evaluateOriginProximity,
   findCareerPlayerAirframe,
@@ -21,6 +22,7 @@ import {
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
   sumStationWeights,
+  toLb,
   type FuelTankBreakdown,
   type MissionIntent,
   type OfpExpectation,
@@ -428,8 +430,29 @@ export async function runMissionPreflight(
       const lb = live.payload?.stations?.[idx];
       return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
     }, 0);
-    // PMDG: Sim vs Due ignores galley/service (S10/S11). pax_and_cargo Due is
-    // SimBrief payload (cabin only) — exclude cockpit crew from the live sum.
+    const ofpEmptyLb =
+      ofp.loadSheet?.emptyWeight !== undefined
+        ? toLb(
+            ofp.loadSheet.emptyWeight,
+            ofp.loadSheet.unit ?? ofp.fuel.unit ?? 'lb',
+          )
+        : undefined;
+    const ofpZfwLb =
+      ofp.loadSheet?.zfw !== undefined
+        ? toLb(
+            ofp.loadSheet.zfw,
+            ofp.loadSheet.unit ?? ofp.fuel.unit ?? 'lb',
+          )
+        : undefined;
+    const paxCargoLiveLb =
+      isPaxAndCargoLoadLayout(careerAirframe) && live.payload?.stations
+        ? careerPaxAndCargoLivePayloadLb({
+            stations: live.payload.stations,
+            stationRoles: ofp.payload?.stationRoles,
+            zfwLb: live.weights?.zfwLb,
+            ofpEmptyLb,
+          })
+        : undefined;
     const freighterRoleSumLb =
       live.payload?.stations &&
       (baggageStationIdxs.length > 0 ||
@@ -456,17 +479,19 @@ export async function runMissionPreflight(
     const plannedPayloadLb = plannedPayload?.plannedTotalLb;
     const livePayloadLb = clearedStations
       ? stationSumLb
-      : freighterRoleSumLb !== undefined
-        ? freighterRoleSumLb
-        : tfdiEfbCargoLb !== undefined
-          ? tfdiEfbCargoLb +
+      : paxCargoLiveLb !== undefined
+        ? paxCargoLiveLb
+        : pmdgEfbCargoLb !== undefined
+          ? pmdgEfbCargoLb +
             (plannedPayload?.crewOnStations ? liveCrewLb : 0)
-          : pmdgEfbCargoLb !== undefined
-            ? pmdgEfbCargoLb +
+          : tfdiEfbCargoLb !== undefined
+            ? tfdiEfbCargoLb +
               (plannedPayload?.crewOnStations ? liveCrewLb : 0)
             : a2aPayloadLb !== undefined
               ? a2aPayloadLb
-              : (live.payload?.total ?? live.payload?.ofpPayloadLb);
+              : freighterRoleSumLb !== undefined
+                ? freighterRoleSumLb
+                : (live.payload?.total ?? live.payload?.ofpPayloadLb);
     const fuelTolLb = Math.max(
       ofp.tolerances?.fuelAbsLb ?? 50,
       Math.abs(plannedFuelLb ?? 0) * (ofp.tolerances?.fuelPct ?? 0.03),
@@ -499,6 +524,7 @@ export async function runMissionPreflight(
       : tfdiEfbCargoLb !== undefined ||
           pmdgEfbCargoLb !== undefined ||
           a2aPayloadLb !== undefined ||
+          paxCargoLiveLb !== undefined ||
           freighterRoleSumLb !== undefined
         ? weights.payload.ok
         : !payloadFailed && weights.payload.ok;
@@ -606,6 +632,8 @@ export async function runMissionPreflight(
                     : {}),
               }
             : {}),
+          ...(ofpEmptyLb !== undefined ? { ofpEmptyLb } : {}),
+          ...(ofpZfwLb !== undefined ? { ofpZfwLb } : {}),
           ...(live.payload?.stations
             ? { stations: { ...live.payload.stations } }
             : {}),

@@ -341,9 +341,13 @@ export function applyPmdgEfbPayloadCorrection(
   payload: LivePayloadState,
   weights: LiveWeightState,
   roles: OfpStationRoleMap | undefined,
+  opts: { ofpEmptyLb?: number } = {},
 ): { payload: LivePayloadState; weights: LiveWeightState } {
   const zfw = weights.zfwLb;
-  const empty = weights.emptyLb;
+  const empty =
+    weights.emptyLb !== undefined && Number.isFinite(weights.emptyLb)
+      ? weights.emptyLb
+      : opts.ofpEmptyLb;
   if (zfw === undefined || empty === undefined || weights.source !== 'pmdg-efb-lvars') {
     return { payload, weights };
   }

@@ -348,6 +348,9 @@ const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
   'microsoft-atr-72-600-highline-04': 'microsoft-atr-72-600',
   'microsoft-atr-72-600-passenger': 'microsoft-atr-72-600',
   'microsoft-atr-72-600-freighter': 'microsoft-atr-72-600',
+  'pmdg-777-200er-rr': 'pmdg-777-200er',
+  'pmdg-777-200er-pw': 'pmdg-777-200er',
+  'pmdg-777-200er-ge': 'pmdg-777-200er',
 };
 
 const BY_ID = new Map(CAREER_PLAYER_AIRFRAMES.map((airframe) => [airframe.typeId, airframe]));

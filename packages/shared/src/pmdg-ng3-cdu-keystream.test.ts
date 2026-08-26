@@ -39,6 +39,7 @@ describe('pmdg-ng3-cdu-keystream (shared)', () => {
     assert.equal(flush[0]?.delayAfterMs, 150);
     assert.equal(flush[9]?.delayAfterMs, 350);
     assert.equal(steps[10]?.key, 'MENU');
+    assert.ok(steps.some((s) => s.key === 'R5'));
     assert.ok(steps.some((s) => s.key === 'R2'));
   });
 

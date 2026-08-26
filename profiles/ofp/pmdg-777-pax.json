@@ -1,0 +1,71 @@
+{
+  "source": "simbrief",
+  "icao": "B772",
+  "ofpId": "pmdg-777-pax",
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
+  "matchTitles": [
+    "777-200ER RR",
+    "777-200ER PW",
+    "777-200ER GE"
+  ],
+  "matchTitlePattern": "777-200ER(?:\\s+(?:RR|PW|GE))?\\b",
+  "notes": [
+    "PMDG 777-200ER (RR / PW / GE) — passenger variant used as Career freighter",
+    "Market SKU pmdg-777-200er: loadLayout pax_and_cargo, 294 seats (SimBrief PMDG B772 rows)",
+    "SimBrief Freight cap ~85,140 lb — cabin seats first (175+55 lb), remainder as cargo=",
+    "Homologated profiles: pmdg/777-200er-{rr,pw,ge} @1.0.0",
+    "loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu), experimental vs EFB",
+    "Fallback: PMDG EFB Load Plane from Simbrief when inject fails",
+    "777F / 200LR / 300ER stay on profiles/ofp/pmdg-777.json (freighter stations)",
+    "After EFB SimBrief load, classic cargo stations may inflate — prefer PMDG EFB ZFW LVars"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "passengerStations": [3, 6, 7, 8, 9],
+      "baggageStations": [4, 5, 14, 15, 16],
+      "serviceStations": [10, 11, 12, 13]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["pmdg-efb-lvars", "classic-weights"],
+    "payload": ["pmdg-efb", "classic-stations"]
+  },
+  "simbriefIcao": "B772",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "passenger" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "passenger" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "passenger" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "passenger" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "passenger" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "service" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Station 11", "role": "service" },
+    { "simVarIndex": 12, "cfgIndex": 11, "name": "Station 12", "role": "service" },
+    { "simVarIndex": 13, "cfgIndex": 12, "name": "Station 13", "role": "service" },
+    { "simVarIndex": 14, "cfgIndex": 13, "name": "Station 14", "role": "baggage" },
+    { "simVarIndex": 15, "cfgIndex": 14, "name": "Station 15", "role": "baggage" },
+    { "simVarIndex": 16, "cfgIndex": 15, "name": "Station 16", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 400,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 600,
+    "passengerCountAbs": 4,
+    "maxFuelIncreaseLb": 0
+  }
+}

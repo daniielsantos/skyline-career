@@ -180,6 +180,15 @@ describe('career player airframes', () => {
     );
   });
 
+  it('stages PMDG 777-200ER as pax_and_cargo on the PMDG B772 SimBrief row', () => {
+    const er = findCareerPlayerAirframe('pmdg-777-200er');
+    assert.equal(er?.loadLayout, 'pax_and_cargo');
+    assert.equal(er?.maxPaxSeats, 294);
+    assert.equal(er?.simconnectCargoHoldMaxLb, 85140);
+    assert.equal(er?.injectCapable, true);
+    assert.equal(er?.rolesPackRelPath, 'profiles/ofp/pmdg-777-pax.json');
+  });
+
   it('treats omitted enabled as market-eligible', () => {
     assert.equal(isCareerPlayerAirframeEnabled({}), true);
     assert.equal(isCareerPlayerAirframeEnabled({ enabled: true }), true);

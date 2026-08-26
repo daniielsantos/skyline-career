@@ -348,6 +348,20 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       liveTitleMatchesMarketSku('A350-900 ULR', 'inibuilds-a350-900-default-cabin'),
       false,
     );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('777-200ER GE'),
+      'PMDG \\(MSFS\\) - GE90-94B - Default MTOW',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('777-200ER PW'),
+      'PMDG \\(MSFS\\) - PW4092 - Default MTOW',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('777-200ER RR'),
+      'PMDG \\(MSFS\\) - Trent 892 - Default MTOW',
+    );
+    assert.equal(liveTitleMatchesMarketSku('777-200ER PW', 'pmdg-777-200er'), true);
+    assert.equal(liveTitleMatchesMarketSku('777-200ER GE', 'pmdg-777-200er'), true);
   });
 });
 

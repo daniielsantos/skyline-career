@@ -614,6 +614,8 @@ export async function readLiveLoad(
     roleWeightUnit?: OfpWeightUnit;
     liveSources?: OfpLiveSources;
     previousStationSumLb?: number;
+    /** SimBrief load sheet empty — fallback when EMPTY WEIGHT SimVar is missing. */
+    ofpEmptyLb?: number;
   } = {},
 ): Promise<LiveLoadReading> {
   const prefs = resolveLiveSourcePrefs(opts.liveSources);
@@ -866,7 +868,9 @@ export async function readLiveLoad(
 
   for (const src of prefs.payload) {
     if (src === 'pmdg-efb' && weights.source === 'pmdg-efb-lvars') {
-      const corrected = applyPmdgEfbPayloadCorrection(payload, weights, opts.stationRoles);
+      const corrected = applyPmdgEfbPayloadCorrection(payload, weights, opts.stationRoles, {
+        ofpEmptyLb: opts.ofpEmptyLb,
+      });
       payload = corrected.payload;
       weights = corrected.weights;
       break;

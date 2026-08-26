@@ -6,6 +6,7 @@ import {
   deriveCompliancePhase,
   resolveAveragePassengerWeight,
   sanitizeFuelDensityLbPerGal,
+  toLb,
   type ComplianceBaseline,
   type ComplianceSnapshot,
   type LiveFuelState,
@@ -78,6 +79,13 @@ export async function compareOnce(
     roleWeightUnit,
     liveSources: opts.ofp.liveSources,
     previousStationSumLb: opts.previousStationSumLb,
+    ofpEmptyLb:
+      opts.ofp.loadSheet?.emptyWeight !== undefined
+        ? toLb(
+            opts.ofp.loadSheet.emptyWeight,
+            opts.ofp.loadSheet.unit ?? opts.ofp.fuel.unit ?? 'lb',
+          )
+        : undefined,
   });
   const phase = deriveCompliancePhase(
     { onGround: live.onGround, enginesRunning: live.enginesRunning },

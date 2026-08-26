@@ -41,6 +41,7 @@ import {
   SIMBRIEF_STANDARD_PAX_LB,
   SIMBRIEF_STANDARD_PAX_WITH_BAG_LB,
   replaceMissionManifest,
+  reconcileLotReservations,
   manifestEditAvailableKg,
   routeDistanceNm,
   settleMission,
@@ -808,6 +809,60 @@ describe('acceptMission', () => {
     assert.equal(cancelled.length, 1);
     assert.equal(state.missions[0]!.status, 'cancelled');
     assert.equal(acf.status, 'parked');
+  });
+
+  it('reconcileLotReservations releases orphan reserved kg', () => {
+    const world = createSeedEconomyWorld({ seed: 'reconcile-res' });
+    const state = emptyMissionsStateV2();
+    const lot = pushTestLot(world, {
+      id: 'lot_orphan_res',
+      originIcao: 'KMIA',
+      destIcao: 'KTPA',
+      quantityKg: 28_000,
+      reservedKg: 28_000,
+      status: 'reserved',
+    });
+    const result = reconcileLotReservations(world, state);
+    assert.equal(result.releasedKg, 28_000);
+    assert.equal(result.repairedLots, 1);
+    assert.equal(lot.reservedKg, 0);
+    assert.equal(lot.status, 'available');
+  });
+
+  it('reconcileLotReservations keeps reservations tied to open missions', () => {
+    const world = createSeedEconomyWorld({ seed: 'reconcile-keep' });
+    const state = emptyMissionsStateV2();
+    const lot = pushTestLot(world, {
+      id: 'lot_open_res',
+      originIcao: 'KMIA',
+      destIcao: 'KTPA',
+      quantityKg: 28_000,
+      reservedKg: 28_000,
+      status: 'reserved',
+    });
+    state.missions = [
+      baseMission({
+        id: 'msn_open',
+        status: 'accepted',
+        originIcao: 'KMIA',
+        destIcao: 'KTPA',
+        cargoKg: 28_000,
+        lots: [
+          {
+            shipmentLotId: lot.id,
+            commodityId: 'machinery',
+            cargoKg: 28_000,
+            payUsd: 17_954,
+            urgency: 'urgent',
+            reason: 'test',
+            deadlineTick: world.tick + 48,
+          },
+        ],
+      }),
+    ];
+    const result = reconcileLotReservations(world, state);
+    assert.equal(result.releasedKg, 0);
+    assert.equal(lot.reservedKg, 28_000);
   });
 
   it('isActiveMissionStatus covers accepted/dispatched/in_flight only', () => {

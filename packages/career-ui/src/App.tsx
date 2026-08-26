@@ -144,6 +144,8 @@ import { marketCountryLabel } from './market-country-label';
 import { BushTripMapCard } from './BushTripMapCard';
 import { BrandMark } from './BrandMark';
 import { SidebarFlightStrip } from './SidebarFlightStrip';
+import { StagingLotReason } from './StagingLotReason';
+import { StagingManifestSummary } from './StagingManifestSummary';
 import {
   canRestoreStagingDraft,
   clearPersistedStagingDraft,
@@ -1902,6 +1904,24 @@ function missionLotLines(mission: Mission): Array<{
     ];
   }
   return [];
+}
+
+function stagingManifestEditDirty(
+  draft: StagingDraft,
+  mission: Mission | undefined,
+): boolean {
+  if (!draft.replaceManifest || !mission) return false;
+  const saved = missionLotLines(mission).map((line) => ({
+    lotId: line.shipmentLotId,
+    cargoKg: Math.max(0, Math.floor(line.cargoKg)),
+  }));
+  const staged = draft.lines.map((line) => ({
+    lotId: line.lot.id,
+    cargoKg: Math.max(0, Math.floor(line.cargoKg)),
+  }));
+  if (saved.length !== staged.length) return true;
+  const savedKg = new Map(saved.map((line) => [line.lotId, line.cargoKg]));
+  return staged.some((line) => savedKg.get(line.lotId) !== line.cargoKg);
 }
 
 /** Open player flight that blocks staging (hidden accepted leg or same-route hold). */
@@ -4718,7 +4738,7 @@ export function App() {
       clearPersistedStagingDraft(activeCareerProfile.id);
       return;
     }
-    setStaging(persisted);
+    setStaging(persisted as StagingDraft);
     setPreferredAircraft(persisted.aircraft as AircraftClass);
   }, [
     showProfileGate,
@@ -7109,6 +7129,26 @@ export function App() {
     goToTab('market');
   }
 
+  async function onBackFromManifestEdit() {
+    if (!staging?.replaceManifest || busy) return;
+    const mission = missions.find((m) => m.id === staging.intoMissionId);
+    if (stagingManifestEditDirty(staging, mission)) {
+      const ok = await confirm({
+        title: 'Leave manifest editor?',
+        body: (
+          <p>
+            Unsaved cargo changes will be lost. Your accepted flight stays
+            as-is until you save a new manifest.
+          </p>
+        ),
+        confirmLabel: 'Back to Dispatch',
+        cancelLabel: 'Keep editing',
+      });
+      if (!ok) return;
+    }
+    exitStaging();
+  }
+
   async function onCancelStagingFlight() {
     if (!staging || busy) return;
     const blocking = findStagingBlockingMission(staging, missions);
@@ -8530,6 +8570,12 @@ export function App() {
         0,
       )
     : 0;
+  const stagingContractPayUsd =
+    stagingPayUsd + (stagingExisting?.payUsd ?? 0);
+  const stagingEstNetUsd =
+    estimatedFuelCostUsd !== null
+      ? stagingContractPayUsd - estimatedFuelCostUsd
+      : null;
   const stagingTotalKg = staging ? stagingUsedKg(staging) : 0;
   const stagingFreeKg = staging
     ? Math.max(0, aircraftCapKg(staging.aircraft) - stagingTotalKg)
@@ -8557,6 +8603,10 @@ export function App() {
           lot.availableKg > 0,
       )
     : [];
+  const stagingAssignedLabel = staging
+    ? fleet.find((aircraft) => aircraft.id === staging.aircraftId)?.label ??
+      aircraftClassLabel(staging.aircraft)
+    : '';
 
   const showAirport = airportIcao !== null && airportView !== null;
   const showBack = showAirport || airportReturn !== null;
@@ -12370,24 +12420,60 @@ export function App() {
               <p className="dispatch-step-status" role="status">
                 {dispatchStatusText}
               </p>
-              <div className="panel-head missions-head">
-                <div>
-                  <h2>
-                    {staging.originIcao} → {staging.destIcao}
-                  </h2>
-                  <p>
-                    {staging.originName} → {staging.destName} ·{' '}
-                    {fleet.find((aircraft) => aircraft.id === staging.aircraftId)
-                      ?.label ?? aircraftClassLabel(staging.aircraft)}
-                    {staging.replaceManifest
-                      ? ` · editing ${staging.intoMissionId}`
-                      : stagingExisting
-                        ? ` · adding to ${stagingExisting.id}`
-                        : ' · new flight'}
-                  </p>
+              <div className="staging-manifest-head">
+                <div className="panel-head missions-head">
+                  <div className="missions-head-spacer" aria-hidden="true" />
+                  <div className="missions-head-center">
+                    <h2>
+                      <IcaoLink
+                        icao={staging.originIcao}
+                        onOpen={openAirport}
+                        disabled={busy}
+                      />{' '}
+                      →{' '}
+                      <IcaoLink
+                        icao={staging.destIcao}
+                        onOpen={openAirport}
+                        disabled={busy}
+                      />
+                    </h2>
+                    <p>
+                      {stagingAssignedLabel}
+                      {stagingAssignedLabel !== aircraftClassLabel(staging.aircraft)
+                        ? ` · ${aircraftClassLabel(staging.aircraft)}`
+                        : null}
+                      {staging.replaceManifest
+                        ? ' · editing manifest'
+                        : stagingExisting
+                          ? ' · adding cargo'
+                          : ' · new flight'}
+                    </p>
+                  </div>
+                  <div className="missions-head-actions">
+                    <button
+                      type="button"
+                      className={
+                        staging.replaceManifest
+                          ? 'action ghost info compact'
+                          : 'action ghost danger compact'
+                      }
+                      onClick={() =>
+                        void (staging.replaceManifest
+                          ? onBackFromManifestEdit()
+                          : onCancelStagingFlight())
+                      }
+                      disabled={busy}
+                    >
+                      {stagingBlockingMission
+                        ? 'Cancel flight'
+                        : staging.replaceManifest
+                          ? 'Back to Dispatch'
+                          : 'Discard manifest'}
+                    </button>
+                  </div>
                 </div>
-                <div className="missions-head-center staging-head-aircraft">
-                  <label className="staging-aircraft">
+                <div className="staging-manifest-aircraft">
+                  <label className="staging-aircraft staging-aircraft-centered">
                     Aircraft
                     <select
                       value={staging.aircraftId ?? ''}
@@ -12414,121 +12500,101 @@ export function App() {
                         )
                         .map((aircraft) => (
                           <option key={aircraft.id} value={aircraft.id}>
-                            {aircraft.label} · {aircraftClassLabel(aircraft.aircraftClassId)}
+                            {aircraft.label} ·{' '}
+                            {aircraftClassLabel(aircraft.aircraftClassId)}
                           </option>
                         ))}
                     </select>
                   </label>
                 </div>
-                <div className="missions-head-actions">
-                  <button
-                    type="button"
-                    className="action ghost danger"
-                    onClick={() => void onCancelStagingFlight()}
-                    disabled={busy}
-                  >
-                    {stagingBlockingMission
-                      ? 'Cancel flight'
-                      : staging.replaceManifest
-                        ? 'Discard edits'
-                        : 'Discard manifest'}
-                  </button>
-                </div>
               </div>
 
-              <div className="cargo-capacity staging-capacity">
-                <span>
-                  Operational payload
-                  <strong>{formatTonnes(aircraftCapKg(staging.aircraft))}</strong>
-                  <em>
-                    {structuralMaxCargoKg !== null
-                      ? `structural ${formatTonnes(structuralMaxCargoKg)}`
-                      : 'structural pending'}
-                    {' · MTOW/fuel estimate'}
-                  </em>
-                </span>
-                <span>
-                  Route distance
-                  <strong>
-                    {stagingDistanceNm !== undefined
-                      ? `${Math.round(stagingDistanceNm).toLocaleString()} nm`
-                      : '—'}
-                  </strong>
-                  <em>max {aircraftMaxRangeNm(staging.aircraft).toLocaleString()} nm</em>
-                </span>
-                <span>
-                  Planning fuel
-                  <strong>
-                    {estimatedBlockFuelKg !== null
-                      ? formatTonnes(estimatedBlockFuelKg)
-                      : '—'}
-                  </strong>
-                  <em>
-                    {routeFuelCapacityKg !== null
-                      ? `tank max ${formatTonnes(routeFuelCapacityKg)}`
-                      : airframeLabel ?? 'homologated class'}
-                    {maxCargoSource ? ` · ${maxCargoSource}` : ''}
-                    {mxFuelBurn
-                      ? ` · MX burn +${mxFuelBurn.excessPct}% (cond ${Math.round(mxFuelBurn.conditionPct)}%)`
-                      : ''}
-                  </em>
-                </span>
-                <span>
-                  Manifest total
-                  <strong>{formatTonnes(stagingTotalKg)}</strong>
-                </span>
-                <span>
-                  Remaining
-                  <strong>{formatTonnes(stagingFreeKg)}</strong>
-                </span>
-                <span>
-                  Contract pay
-                  <strong>
-                    {formatMoney(stagingPayUsd + (stagingExisting?.payUsd ?? 0))}
-                  </strong>
-                </span>
-                <span>
-                  Est. net
-                  <strong
-                    className={
-                      estimatedFuelCostUsd !== null
-                        ? stagingPayUsd +
-                            (stagingExisting?.payUsd ?? 0) -
-                            estimatedFuelCostUsd >=
-                          0
-                          ? undefined
-                          : 'staging-est-net-loss'
-                        : undefined
-                    }
-                  >
-                    {estimatedFuelCostUsd !== null
-                      ? formatMoney(
-                          stagingPayUsd +
-                            (stagingExisting?.payUsd ?? 0) -
-                            estimatedFuelCostUsd,
-                        )
-                      : '—'}
-                  </strong>
-                  <em>
-                    {estimatedFuelCostUsd !== null
-                      ? `pay − Jet-A ${formatMoney(estimatedFuelCostUsd)}${
-                          estimatedFuelUnitPriceUsd !== null
-                            ? ` · $${(
-                                weightSystem === 'imperial'
-                                  ? estimatedFuelUnitPriceUsd / KG_TO_LB
-                                  : estimatedFuelUnitPriceUsd
-                              ).toFixed(2)}/${weightSystem === 'imperial' ? 'lb' : 'kg'}`
-                            : ''
-                        }${
-                          estimatedFuelScarcity &&
-                          estimatedFuelScarcity !== 'ok'
-                            ? ` · fuel ${estimatedFuelScarcity}`
-                            : ''
-                        }`
-                      : 'planning fuel × origin Jet-A'}
-                  </em>
-                </span>
-              </div>
+              <StagingManifestSummary
+                formatTonnes={formatTonnes}
+                formatMoney={formatMoney}
+                totalKg={stagingTotalKg}
+                capKg={aircraftCapKg(staging.aircraft)}
+                payUsd={stagingContractPayUsd}
+                estNetUsd={stagingEstNetUsd}
+                estNetLoss={
+                  stagingEstNetUsd !== null && stagingEstNetUsd < 0
+                }
+                distanceNm={stagingDistanceNm}
+                planningDetails={
+                  <>
+                    <span>
+                      Operational payload
+                      <strong>{formatTonnes(aircraftCapKg(staging.aircraft))}</strong>
+                      <em>
+                        {structuralMaxCargoKg !== null
+                          ? `structural ${formatTonnes(structuralMaxCargoKg)}`
+                          : 'structural pending'}
+                        {' · MTOW/fuel estimate'}
+                      </em>
+                    </span>
+                    <span>
+                      Manifest total
+                      <strong>{formatTonnes(stagingTotalKg)}</strong>
+                    </span>
+                    <span>
+                      Remaining
+                      <strong>{formatTonnes(stagingFreeKg)}</strong>
+                    </span>
+                    <span>
+                      Planning fuel
+                      <strong>
+                        {estimatedBlockFuelKg !== null
+                          ? formatTonnes(estimatedBlockFuelKg)
+                          : '—'}
+                      </strong>
+                      <em>
+                        {routeFuelCapacityKg !== null
+                          ? `tank max ${formatTonnes(routeFuelCapacityKg)}`
+                          : airframeLabel ?? 'homologated class'}
+                        {maxCargoSource ? ` · ${maxCargoSource}` : ''}
+                        {mxFuelBurn
+                          ? ` · MX burn +${mxFuelBurn.excessPct}% (cond ${Math.round(mxFuelBurn.conditionPct)}%)`
+                          : ''}
+                      </em>
+                    </span>
+                    <span>
+                      Max range
+                      <strong>
+                        {aircraftMaxRangeNm(staging.aircraft).toLocaleString()} nm
+                      </strong>
+                      <em>
+                        {stagingDistanceNm !== undefined
+                          ? `this route ${Math.round(stagingDistanceNm).toLocaleString()} nm`
+                          : 'route distance pending'}
+                      </em>
+                    </span>
+                    {estimatedFuelCostUsd !== null ? (
+                      <span>
+                        Net estimate
+                        <strong>
+                          {formatMoney(stagingEstNetUsd ?? 0)}
+                        </strong>
+                        <em>
+                          {`pay − Jet-A ${formatMoney(estimatedFuelCostUsd)}${
+                            estimatedFuelUnitPriceUsd !== null
+                              ? ` · $${(
+                                  weightSystem === 'imperial'
+                                    ? estimatedFuelUnitPriceUsd / KG_TO_LB
+                                    : estimatedFuelUnitPriceUsd
+                                ).toFixed(2)}/${weightSystem === 'imperial' ? 'lb' : 'kg'}`
+                              : ''
+                          }${
+                            estimatedFuelScarcity &&
+                            estimatedFuelScarcity !== 'ok'
+                              ? ` · fuel ${estimatedFuelScarcity}`
+                              : ''
+                          }`}
+                        </em>
+                      </span>
+                    ) : null}
+                  </>
+                }
+              />
 
               {!stagingInRange ? (
                 <p className="banner error">
@@ -12625,14 +12691,14 @@ export function App() {
                     );
                     const unit = massUnitLabel(weightSystem);
                     return (
-                      <li key={line.lot.id} className="staging-line">
+                      <li key={line.lot.id} className="staging-line staging-line-compact">
                         <div className="staging-line-head">
-                          <div>
+                          <div className="staging-line-title">
                             <strong>{line.lot.commodityName}</strong>
                             {line.lot.urgency === 'urgent' ? (
                               <span className="tag">Urgent</span>
                             ) : null}
-                            <small>{line.lot.reason}</small>
+                            <StagingLotReason text={line.lot.reason} />
                           </div>
                           <button
                             type="button"
@@ -12649,56 +12715,61 @@ export function App() {
                           </button>
                         </div>
                         <p className="staging-line-meta">
-                          Lot {formatTonnes(resolvedLot.availableKg)} available · max this line{' '}
+                          {formatTonnes(resolvedLot.availableKg)} avail · max{' '}
                           {formatTonnes(maxKg)} · pay{' '}
                           {formatMoney(proRataPayUsd(resolvedLot, line.cargoKg))}
                         </p>
-                        <label className="cargo-amount">
-                          Load to reserve
-                          <div>
+                        <div className="staging-line-controls">
+                          <label className="cargo-amount staging-cargo-amount">
+                            Load
+                            <div>
+                              <input
+                                type="number"
+                                min={1}
+                                max={Math.max(1, displayMax)}
+                                step={weightSystem === 'imperial' ? 10 : 100}
+                                value={displayValue}
+                                onChange={(e) =>
+                                  updateStagingLineKg(
+                                    line.lot.id,
+                                    displayToKg(Number(e.target.value), weightSystem),
+                                  )
+                                }
+                                disabled={busy}
+                              />
+                              <span>{unit}</span>
+                            </div>
                             <input
-                              type="number"
+                              type="range"
                               min={1}
                               max={Math.max(1, displayMax)}
-                              step={weightSystem === 'imperial' ? 10 : 100}
-                              value={displayValue}
+                              step={1}
+                              value={Math.min(displayValue, Math.max(1, displayMax))}
                               onChange={(e) =>
                                 updateStagingLineKg(
                                   line.lot.id,
                                   displayToKg(Number(e.target.value), weightSystem),
                                 )
                               }
-                              disabled={busy}
+                              disabled={busy || displayMax <= 0}
+                              aria-label={`${line.lot.commodityName} load in ${massUnitLong(weightSystem)}`}
                             />
-                            <span>{unit}</span>
+                          </label>
+                          <div className="cargo-presets staging-cargo-presets">
+                            {[0.25, 0.5, 0.75, 1].map((fraction) => (
+                              <button
+                                key={fraction}
+                                type="button"
+                                className="staging-preset-chip"
+                                onClick={() =>
+                                  setStagingLineFraction(line.lot.id, fraction)
+                                }
+                                disabled={busy || maxKg <= 0}
+                              >
+                                {fraction === 1 ? 'Max' : `${fraction * 100}%`}
+                              </button>
+                            ))}
                           </div>
-                          <input
-                            type="range"
-                            min={1}
-                            max={Math.max(1, displayMax)}
-                            step={1}
-                            value={Math.min(displayValue, Math.max(1, displayMax))}
-                            onChange={(e) =>
-                              updateStagingLineKg(
-                                line.lot.id,
-                                displayToKg(Number(e.target.value), weightSystem),
-                              )
-                            }
-                            disabled={busy || displayMax <= 0}
-                            aria-label={`${line.lot.commodityName} load in ${massUnitLong(weightSystem)}`}
-                          />
-                        </label>
-                        <div className="cargo-presets">
-                          {[0.25, 0.5, 0.75, 1].map((fraction) => (
-                            <button
-                              key={fraction}
-                              type="button"
-                              onClick={() => setStagingLineFraction(line.lot.id, fraction)}
-                              disabled={busy || maxKg <= 0}
-                            >
-                              {fraction === 1 ? 'Max' : `${fraction * 100}%`}
-                            </button>
-                          ))}
                         </div>
                         {!valid ? (
                           <p className="cargo-dialog-error">
@@ -12710,51 +12781,6 @@ export function App() {
                     );
                   })}
                 </ul>
-              </div>
-
-              <div className="staging-footer staging-footer-sticky">
-                <div>
-                  <p>
-                    {staging.lines.length} staged · {formatTonnes(stagingTotalKg)} ·{' '}
-                    {formatMoney(stagingPayUsd + (stagingExisting?.payUsd ?? 0))} total
-                  </p>
-                  {!stagingValid ? (
-                    <p className="cargo-dialog-error">
-                      {!stagingInRange
-                        ? 'Route exceeds aircraft range — pick another airframe or shorter hop.'
-                        : !stagingFuelOk
-                          ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
-                          : staging.lines.some((line) => {
-                                const maxKg = lineMaxKg(staging, line.lot);
-                                return line.cargoKg <= 0 || line.cargoKg > maxKg;
-                              })
-                            ? 'Adjust each lot to a valid load before saving.'
-                            : 'Finish the manifest before saving.'}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="cargo-dialog-actions">
-                  <button
-                    type="button"
-                    className="accept"
-                    disabled={busy || !stagingValid}
-                    onClick={() => void onCommitStaging()}
-                  >
-                    {busy ? (
-                      <>
-                        <span
-                          className="busy-spinner busy-spinner-sm"
-                          aria-hidden="true"
-                        />
-                        {staging.replaceManifest ? 'Saving…' : 'Accepting…'}
-                      </>
-                    ) : staging.replaceManifest ? (
-                      'Save & re-dispatch'
-                    ) : (
-                      'Accept & Dispatch'
-                    )}
-                  </button>
-                </div>
               </div>
 
               <div className="staging-section">
@@ -12782,7 +12808,7 @@ export function App() {
                           key={lot.id}
                           className={cargoLocked ? 'lot-locked' : undefined}
                         >
-                          <div>
+                          <div className="staging-candidate-main">
                             <strong>{lot.commodityName}</strong>
                             {lot.urgency === 'urgent' ? (
                               <span className="tag">Urgent</span>
@@ -12799,28 +12825,84 @@ export function App() {
                               {formatTonnes(lot.availableKg)} · {formatMoney(lot.payUsd)}
                             </small>
                           </div>
-                          <button
-                            type="button"
-                            className="accept"
-                            disabled={busy || maxKg <= 0 || cargoLocked}
-                            title={
-                              cargoLocked
-                                ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
-                                : undefined
-                            }
-                            onClick={() => addLotToStaging(lot)}
-                          >
-                            {cargoLocked
-                              ? 'Locked'
-                              : maxKg <= 0
-                                ? 'No room'
-                                : `Add · up to ${formatTonnes(maxKg)}`}
-                          </button>
+                          <div className="staging-candidate-action">
+                            {cargoLocked ? (
+                              <span className="staging-candidate-badge">Locked</span>
+                            ) : maxKg <= 0 ? (
+                              <span className="staging-candidate-badge muted">
+                                No room
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="action ghost compact info"
+                                disabled={busy}
+                                onClick={() => addLotToStaging(lot)}
+                              >
+                                Add · {formatTonnes(maxKg)}
+                              </button>
+                            )}
+                          </div>
                         </li>
                       );
                     })}
                   </ul>
                 )}
+              </div>
+
+              <div className="staging-footer staging-footer-sticky">
+                <div>
+                  <p>
+                    {staging.lines.length} staged · {formatTonnes(stagingTotalKg)} ·{' '}
+                    {formatMoney(stagingContractPayUsd)} total
+                  </p>
+                  {!stagingValid ? (
+                    <p className="cargo-dialog-error">
+                      {!stagingInRange
+                        ? 'Route exceeds aircraft range — pick another airframe or shorter hop.'
+                        : !stagingFuelOk
+                          ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
+                          : staging.lines.some((line) => {
+                                const maxKg = lineMaxKg(staging, line.lot);
+                                return line.cargoKg <= 0 || line.cargoKg > maxKg;
+                              })
+                            ? 'Adjust each lot to a valid load before saving.'
+                            : 'Finish the manifest before saving.'}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="cargo-dialog-actions">
+                  {staging.replaceManifest ? (
+                    <button
+                      type="button"
+                      className="action ghost info"
+                      disabled={busy}
+                      onClick={() => void onBackFromManifestEdit()}
+                    >
+                      Back to Dispatch
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="accept"
+                    disabled={busy || !stagingValid}
+                    onClick={() => void onCommitStaging()}
+                  >
+                    {busy ? (
+                      <>
+                        <span
+                          className="busy-spinner busy-spinner-sm"
+                          aria-hidden="true"
+                        />
+                        {staging.replaceManifest ? 'Saving…' : 'Accepting…'}
+                      </>
+                    ) : staging.replaceManifest ? (
+                      'Save & re-dispatch'
+                    ) : (
+                      'Accept & Dispatch'
+                    )}
+                  </button>
+                </div>
               </div>
             </>
           ) : activeMission ? (

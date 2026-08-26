@@ -63,7 +63,7 @@ describe('pmdg BCF/PAX inject gates', () => {
     assert.notEqual(bbj2Sku!.injectCapable, true);
   });
 
-  it('777-200ER and 777-200LR pax packs allow direct inject', () => {
+  it('777-200ER, 777-200LR, and 777-300ER pax packs allow direct inject', () => {
     const er = readPack('profiles/ofp/pmdg-777-pax.json');
     assert.equal(er.loadMethod, 'direct-injection');
     assert.equal(er.injectCapable, true);
@@ -84,5 +84,18 @@ describe('pmdg BCF/PAX inject gates', () => {
     assert.equal(lrSku!.injectCapable, true);
     assert.equal(lrSku!.loadLayout, 'pax_and_cargo');
     assert.equal(lrSku!.rolesPackRelPath, 'profiles/ofp/pmdg-777-200lr-pax.json');
+
+    const wr = readPack('profiles/ofp/pmdg-777-300er-pax.json');
+    assert.equal(wr.loadMethod, 'direct-injection');
+    assert.equal(wr.injectCapable, true);
+    assert.doesNotThrow(() => assertRolesPackAllowsDirectInjection(wr));
+
+    const wrSku = findCareerPlayerAirframe('pmdg-777-300er');
+    assert.ok(wrSku);
+    assert.equal(wrSku!.injectCapable, true);
+    assert.equal(wrSku!.loadLayout, 'pax_and_cargo');
+    assert.equal(wrSku!.rolesPackRelPath, 'profiles/ofp/pmdg-777-300er-pax.json');
+    assert.equal(wrSku!.maxPaxSeats, 370);
+    assert.equal(wrSku!.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - 777,000 MTOW');
   });
 });

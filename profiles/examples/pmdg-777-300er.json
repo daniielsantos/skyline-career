@@ -25,7 +25,7 @@
     "maxSimRate": 1.1
   },
   "fuel": {
-    "strategy": "simconnect-direct",
+    "strategy": "pmdg-cdu",
     "unit": "gallons",
     "tanks": [
       {
@@ -65,7 +65,7 @@
     }
   },
   "payload": {
-    "strategy": "station-writeback",
+    "strategy": "pmdg-cdu",
     "stations": [
       {
         "index": 1,
@@ -173,8 +173,9 @@
   "notes": [
     "Homologated via wizard: 777-300ER.",
     "ICAO type designator (catalog/SimBrief): B77W.",
-    "Load method: native-simbrief (no Skyline inject).",
-    "Fuel/payload write plans intentionally empty — load via addon EFB/tablet.",
+    "Load method: direct-injection (PMDG CDU FO TOTAL + ZFW) — experimental; EFB SimBrief fallback.",
+    "Roles pack: profiles/ofp/pmdg-777-300er-pax.json",
+    "Market SKU: pmdg-777-300er (pax_and_cargo, injectCapable).",
     "Use compare-ofp + Career Loaded vs Due for validation.",
     "See profiles/notes/pmdg-777-300er.md"
   ]

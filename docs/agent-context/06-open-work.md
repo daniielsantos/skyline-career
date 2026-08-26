@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-25: **PMDG 777-300ER** homologado como 200ER/LR — `pax_and_cargo` + Skyline CDU inject (`pmdg-777-300er-pax.json`, SimBrief `PMDG (MSFS) - 777,000 MTOW`, 370 seats / hold ~84335 lb). Freighter pack `pmdg-777.json` = **777F only**. Validar inject live FO CDU.
+
 Atualizado 2026-08-24: esboço homologação colaborativa em `13-collaborative-homologation.md` (não implementar agora). Cards Market/Hangar têm **i** de add-on (`airframe-addons.ts`).
 
 Atualizado 2026-08-24: Ports Warehouse recorte por hub (This port / All hubs); Demand vs Transfer holds; mapa feeder vs WH-WH.

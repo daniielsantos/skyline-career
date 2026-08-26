@@ -125,6 +125,9 @@
   floor quando `est_zfw` fica abaixo do empty live.
   Início do keystream: **10× CLR** event @ 150ms + settle 350ms (sem hold 3s).
   Verify PMDG: ZFW/cargo (não “ignored station writes”); sem rollback clássico.
+- **PMDG 777 pax CDU inject (77X):** `pmdg-777-cdu-keystream` + Host `Pmdg777Cdu`;
+  packs `pmdg-777-pax` (200ER), `pmdg-777-200lr-pax`, `pmdg-777-300er-pax`;
+  freighter `pmdg-777.json` = 777F only. Prefer Skyline inject over EFB.
 
 ## O que validar após 0.3.22
 

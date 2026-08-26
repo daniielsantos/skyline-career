@@ -5,18 +5,17 @@
   "loadMethod": "native-simbrief",
   "injectCapable": false,
   "matchTitles": [
-    "777F",
-    "777-300ER"
+    "777F"
   ],
-  "matchTitlePattern": "777(?:F|-300ER)\\b",
+  "matchTitlePattern": "777F\\b",
   "notes": [
-    "PMDG 777 freighter/remaining family (777F / 300ER) — same 16-station + L/R/CENTER/CENTER2 layout",
-    "Market SKUs on this pack: pmdg-777f, pmdg-777-300er",
-    "777-200ER → profiles/ofp/pmdg-777-pax.json; 777-200LR → profiles/ofp/pmdg-777-200lr-pax.json",
-    "Homologated profiles: pmdg/777f, pmdg/777-300er @1.0.0",
+    "PMDG 777F freighter — same 16-station + L/R/CENTER/CENTER2 layout",
+    "Market SKU on this pack: pmdg-777f",
+    "777-200ER → pmdg-777-pax.json; 777-200LR → pmdg-777-200lr-pax.json; 777-300ER → pmdg-777-300er-pax.json",
+    "Homologated profile: pmdg/777f @1.0.0",
     "loadMethod: native-simbrief; injectCapable: false — load via PMDG EFB",
     "Cabin/deck stations mapped as baggage for Career cargo (pax=0)",
-    "SimBrief ICAO is per Market SKU (B77F / B77W)"
+    "SimBrief ICAO: B77F"
   ],
   "fuel": {
     "unit": "lb"

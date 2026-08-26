@@ -367,6 +367,11 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       inferSimBriefAirframeMatchFromTitle('777-200LR'),
       'PMDG \\(MSFS\\) - Standard',
     );
+    assert.equal(liveTitleMatchesMarketSku('777-300ER', 'pmdg-777-300er'), true);
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('777-300ER'),
+      'PMDG \\(MSFS\\) - 777,000 MTOW',
+    );
   });
 });
 

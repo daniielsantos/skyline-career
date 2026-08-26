@@ -200,6 +200,17 @@ describe('career player airframes', () => {
     assert.equal(lr?.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - Standard');
   });
 
+  it('stages PMDG 777-300ER as pax_and_cargo with Skyline inject', () => {
+    const wr = findCareerPlayerAirframe('pmdg-777-300er');
+    assert.equal(wr?.loadLayout, 'pax_and_cargo');
+    assert.equal(wr?.maxPaxSeats, 370);
+    assert.equal(wr?.simconnectCargoHoldMaxLb, 84335);
+    assert.equal(wr?.injectCapable, true);
+    assert.equal(wr?.rolesPackRelPath, 'profiles/ofp/pmdg-777-300er-pax.json');
+    assert.equal(wr?.simbriefIcao, 'B77W');
+    assert.equal(wr?.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - 777,000 MTOW');
+  });
+
   it('treats omitted enabled as market-eligible', () => {
     assert.equal(isCareerPlayerAirframeEnabled({}), true);
     assert.equal(isCareerPlayerAirframeEnabled({ enabled: true }), true);

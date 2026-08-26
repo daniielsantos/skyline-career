@@ -15,7 +15,7 @@
     "Homologated profile: pmdg/777-200lr @1.0.0",
     "loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu), experimental vs EFB",
     "Fallback: PMDG EFB Load Plane from Simbrief when inject fails",
-    "777F / 300ER stay on profiles/ofp/pmdg-777.json (freighter stations)",
+    "777F stays on profiles/ofp/pmdg-777.json (freighter stations)",
     "After EFB SimBrief load, classic cargo stations may inflate — prefer PMDG EFB ZFW LVars"
   ],
   "fuel": {

@@ -17,6 +17,7 @@ import {
   formatMacPct,
 } from './LoadSchematic';
 import { DispatchRouteCard } from './DispatchRouteCard';
+import { DispatchFlightSummary } from './DispatchFlightSummary';
 import { IcaoLink } from './IcaoLink';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
@@ -427,78 +428,119 @@ export function DispatchActivePanel(props: {
       </div>
 
       {!isEnRoute ? (
-        <div className="cargo-capacity staging-capacity staging-ops-capacity">
-          {isFerryLeg ? (
-            <span>
-              Load
-              <strong>Empty</strong>
-              <em>ferry / reposition</em>
-            </span>
-          ) : (
-            <span>
-              Cargo
-              <strong>{props.formatTonnes(mission.cargoKg)}</strong>
-              <em>
-                {(mission.lots?.length ?? 1) > 1
-                  ? `${mission.lots!.length} lots`
-                  : '1 lot'}
-              </em>
-            </span>
-          )}
-          <span>
-            {isFerryLeg
-              ? mission.contractPilot
-                ? 'Pilot fee'
-                : 'Payout'
-              : 'Contract'}
-            <strong>{props.formatMoney(mission.payUsd)}</strong>
-          </span>
-          {routeDistanceNm !== undefined ? (
-            <span>
-              Distance
-              <strong>{`${Math.round(routeDistanceNm).toLocaleString()} nm`}</strong>
-            </span>
-          ) : null}
-          <span>
-            Deadline
-            <strong>
-              {props.formatDeadline(mission.deadlineTick, continuousHours)}
-            </strong>
-          </span>
-          {!isFerryLeg ? (
-            <span>
-              Capacity left
-              <strong>
-                {props.formatTonnes(
-                  Math.max(
-                    0,
-                    props.missionMaxCargoKg(mission) - mission.cargoKg,
-                  ),
-                )}
-              </strong>
-              {typeof props.missionOpsCapacityHint === 'number' &&
-              props.missionOpsCapacityHint > 0 ? (
-                <em>
-                  of {props.formatTonnes(props.missionOpsCapacityHint)} ops
-                </em>
-              ) : null}
-            </span>
-          ) : null}
-          {mission.fuelUplift &&
-          (mission.fuelUplift.costUsd > 0 ||
-            mission.fuelUplift.requestedKg > 0.5) ? (
-            <span>
-              Fuel
-              <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
-              <em>
-                {props.formatTonnes(mission.fuelUplift.requestedKg)}
-                {mission.fuelUplift.scarcity !== 'ok'
-                  ? ` · ${mission.fuelUplift.scarcity}`
-                  : ''}
-              </em>
-            </span>
-          ) : null}
-        </div>
+        (() => {
+          const missionMaxKg = props.missionMaxCargoKg(mission);
+          const capacityLeft = Math.max(0, missionMaxKg - mission.cargoKg);
+          const routeLabel =
+            routeDistanceNm !== undefined
+              ? `${Math.round(routeDistanceNm).toLocaleString()} nm`
+              : '—';
+          const deadlineLabel = props.formatDeadline(
+            mission.deadlineTick,
+            props.continuousHours,
+          );
+
+          if (isFerryLeg) {
+            return (
+              <DispatchFlightSummary
+                ariaLabel="Ferry summary"
+                formatTonnes={props.formatTonnes}
+                capacityLabel="Load"
+                totalKg={0}
+                capKg={0}
+                showCapacityBar={false}
+                capacityStaticLabel="Empty"
+                capacityNote="ferry / reposition"
+                highlights={[
+                  {
+                    label: mission.contractPilot ? 'Pilot fee' : 'Payout',
+                    value: props.formatMoney(mission.payUsd),
+                  },
+                  { label: 'Deadline', value: deadlineLabel },
+                  { label: 'Route', value: routeLabel },
+                ]}
+                planningDetails={
+                  mission.fuelUplift &&
+                  (mission.fuelUplift.costUsd > 0 ||
+                    mission.fuelUplift.requestedKg > 0.5) ? (
+                    <span>
+                      Fuel booked
+                      <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
+                      <em>
+                        {props.formatTonnes(mission.fuelUplift.requestedKg)}
+                        {mission.fuelUplift.scarcity !== 'ok'
+                          ? ` · ${mission.fuelUplift.scarcity}`
+                          : ''}
+                      </em>
+                    </span>
+                  ) : (
+                    <span>
+                      Mission
+                      <strong>{flightKind}</strong>
+                      <em>
+                        {mission.reason?.trim() ||
+                          'Empty reposition — no freight on board'}
+                      </em>
+                    </span>
+                  )
+                }
+              />
+            );
+          }
+
+          return (
+            <DispatchFlightSummary
+              ariaLabel="Dispatch summary"
+              formatTonnes={props.formatTonnes}
+              capacityLabel="Payload loaded"
+              totalKg={mission.cargoKg}
+              capKg={missionMaxKg}
+              highlights={[
+                {
+                  label: 'Contract',
+                  value: props.formatMoney(mission.payUsd),
+                },
+                { label: 'Deadline', value: deadlineLabel },
+                { label: 'Route', value: routeLabel },
+              ]}
+              planningDetails={
+                <>
+                  <span>
+                    Capacity left
+                    <strong>{props.formatTonnes(capacityLeft)}</strong>
+                    {typeof props.missionOpsCapacityHint === 'number' &&
+                    props.missionOpsCapacityHint > 0 ? (
+                      <em>
+                        of {props.formatTonnes(props.missionOpsCapacityHint)} ops
+                      </em>
+                    ) : null}
+                  </span>
+                  <span>
+                    Cargo lots
+                    <strong>{mission.lots?.length ?? 1}</strong>
+                    <em>
+                      {(mission.lots?.length ?? 1) > 1 ? 'multi-lot manifest' : 'single lot'}
+                    </em>
+                  </span>
+                  {mission.fuelUplift &&
+                  (mission.fuelUplift.costUsd > 0 ||
+                    mission.fuelUplift.requestedKg > 0.5) ? (
+                    <span>
+                      Fuel booked
+                      <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
+                      <em>
+                        {props.formatTonnes(mission.fuelUplift.requestedKg)}
+                        {mission.fuelUplift.scarcity !== 'ok'
+                          ? ` · ${mission.fuelUplift.scarcity}`
+                          : ''}
+                      </em>
+                    </span>
+                  ) : null}
+                </>
+              }
+            />
+          );
+        })()
       ) : null}
 
       {!isEnRoute &&

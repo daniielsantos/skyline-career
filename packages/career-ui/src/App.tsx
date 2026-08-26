@@ -145,7 +145,7 @@ import { BushTripMapCard } from './BushTripMapCard';
 import { BrandMark } from './BrandMark';
 import { SidebarFlightStrip } from './SidebarFlightStrip';
 import { StagingLotReason } from './StagingLotReason';
-import { StagingManifestSummary } from './StagingManifestSummary';
+import { DispatchFlightSummary } from './DispatchFlightSummary';
 import {
   canRestoreStagingDraft,
   clearPersistedStagingDraft,
@@ -9085,6 +9085,7 @@ export function App() {
           >
             ← Back
           </button>
+
           <button
             type="button"
             className={!showAirport && tab === 'market' ? 'tab active' : 'tab'}
@@ -9193,6 +9194,7 @@ export function App() {
           >
             Logbook
           </button>
+
           {showAirport && terminalSection !== 'fbo' ? (
             <span className="tab active">Terminal</span>
           ) : null}
@@ -12509,17 +12511,38 @@ export function App() {
                 </div>
               </div>
 
-              <StagingManifestSummary
+              <DispatchFlightSummary
+                ariaLabel="Manifest summary"
                 formatTonnes={formatTonnes}
-                formatMoney={formatMoney}
+                capacityLabel="Payload reserved"
                 totalKg={stagingTotalKg}
                 capKg={aircraftCapKg(staging.aircraft)}
-                payUsd={stagingContractPayUsd}
-                estNetUsd={stagingEstNetUsd}
-                estNetLoss={
-                  stagingEstNetUsd !== null && stagingEstNetUsd < 0
-                }
-                distanceNm={stagingDistanceNm}
+                highlights={[
+                  {
+                    label: 'Contract pay',
+                    value: formatMoney(stagingContractPayUsd),
+                  },
+                  {
+                    label: 'Est. net',
+                    value:
+                      stagingEstNetUsd !== null
+                        ? formatMoney(stagingEstNetUsd)
+                        : '—',
+                    strongClassName:
+                      stagingEstNetUsd !== null && stagingEstNetUsd < 0
+                        ? 'staging-est-net-loss'
+                        : stagingEstNetUsd !== null && stagingEstNetUsd >= 0
+                          ? 'staging-est-net-ok'
+                          : undefined,
+                  },
+                  {
+                    label: 'Route',
+                    value:
+                      stagingDistanceNm !== undefined
+                        ? `${Math.round(stagingDistanceNm).toLocaleString()} nm`
+                        : '—',
+                  },
+                ]}
                 planningDetails={
                   <>
                     <span>

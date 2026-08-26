@@ -114,7 +114,7 @@
   {
     "typeId": "blackbox-bn2-islander-cargo-tip-tanks",
     "aircraftClassId": "light_ga",
-    "label": "BN2 Islander - Passenger / Analogue / Tip Tanks",
+    "label": "BN2 Islander",
     "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json",
     "familyRolesPackRelPaths": [
       "profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json",
@@ -199,7 +199,7 @@
   {
     "typeId": "justflight-just-flight-pa28-arrow-iii",
     "aircraftClassId": "light_ga",
-    "label": "Just Flight PA28 Turbo Arrow IV",
+    "label": "Piper PA-28 Turbo Arrow IV",
     "rolesPackRelPath": "profiles/ofp/justflight-just-flight-pa28-arrow-iii.json",
     "simbriefIcao": "C172",
     "simbriefAirframeMatch": "Default",
@@ -215,7 +215,7 @@
   {
     "typeId": "justflight-just-flight-pa28-warrior-ii",
     "aircraftClassId": "light_ga",
-    "label": "Just Flight PA28 Warrior II",
+    "label": "Piper PA-28 Warrior II",
     "rolesPackRelPath": "profiles/ofp/justflight-just-flight-pa28-warrior-ii.json",
     "simbriefIcao": "C172",
     "simbriefAirframeMatch": "Default",
@@ -323,20 +323,6 @@
     "fuelBurnKgPerNm": 0.35
   },
   {
-    "typeId": "workingtitle-cessna-citation-longitude-passengers",
-    "aircraftClassId": "light_jet",
-    "label": "Asobo Cessna Citation Longitude Passengers",
-    "rolesPackRelPath": "profiles/ofp/workingtitle-cessna-citation-longitude-passengers.json",
-    "simbriefIcao": "C700",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 10609,
-    "mtowKg": 18008,
-    "maxCargoKg": 1184,
-    "fuelCapacityKg": 6619,
-    "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 1.4
-  },
-  {
     "typeId": "workingtitle-cessna-citation-cj4",
     "aircraftClassId": "light_jet",
     "label": "Cessna Citation CJ4",
@@ -351,6 +337,20 @@
     "cruiseFuelFlowKgPerHour": 571.5,
     "cruiseSpeedKt": 451,
     "fuelBurnKgPerNm": 1.267
+  },
+  {
+    "typeId": "workingtitle-cessna-citation-longitude-passengers",
+    "aircraftClassId": "light_jet",
+    "label": "Cessna Citation Longitude",
+    "rolesPackRelPath": "profiles/ofp/workingtitle-cessna-citation-longitude-passengers.json",
+    "simbriefIcao": "C700",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 10609,
+    "mtowKg": 18008,
+    "maxCargoKg": 1184,
+    "fuelCapacityKg": 6619,
+    "maxRangeNm": 800,
+    "fuelBurnKgPerNm": 1.4
   },
   {
     "typeId": "skyward-cessna-c680",
@@ -385,7 +385,7 @@
   {
     "typeId": "flightfx-mg-hjet-ha420",
     "aircraftClassId": "light_jet",
-    "label": "FlightFX HondaJet HA420",
+    "label": "HondaJet HA420",
     "rolesPackRelPath": "profiles/ofp/flightfx-mg-hjet-ha420.json",
     "simbriefIcao": "HDJT",
     "simbriefAirframeMatch": "Default",
@@ -401,7 +401,7 @@
   {
     "typeId": "fsreborn-phenom-300e",
     "aircraftClassId": "light_jet",
-    "label": "FSReborn Phenom 300E",
+    "label": "Phenom 300E",
     "rolesPackRelPath": "profiles/ofp/fsreborn-phenom-300e.json",
     "simbriefIcao": "E55P",
     "simbriefAirframeMatch": "Default",
@@ -415,7 +415,7 @@
   {
     "typeId": "flysimware-learjet-35a-cargo",
     "aircraftClassId": "light_jet",
-    "label": "LEARJET 35A",
+    "label": "Learjet 35A",
     "rolesPackRelPath": "profiles/ofp/flysimware-learjet-35a-cargo.json",
     "familyRolesPackRelPaths": [
       "profiles/ofp/flysimware-learjet-35a-cargo.json",
@@ -436,7 +436,7 @@
   {
     "typeId": "workingtitle-microsoft-vision-jet-complete-seating",
     "aircraftClassId": "light_jet",
-    "label": "Microsoft Vision Jet Complete Seating",
+    "label": "Vision Jet Complete Seating",
     "rolesPackRelPath": "profiles/ofp/workingtitle-microsoft-vision-jet-complete-seating.json",
     "simbriefIcao": "SF50",
     "simbriefAirframeMatch": "Default",
@@ -468,7 +468,7 @@
   {
     "typeId": "workingtitle-tbm-930-passengers",
     "aircraftClassId": "light_turboprop",
-    "label": "Asobo TBM 930 Passengers",
+    "label": "TBM 930 Passengers",
     "rolesPackRelPath": "profiles/ofp/workingtitle-tbm-930-passengers.json",
     "simbriefIcao": "TBM9",
     "simbriefAirframeMatch": "Default",
@@ -560,7 +560,7 @@
   {
     "typeId": "c208-caravan-cargo",
     "aircraftClassId": "light_turboprop",
-    "label": "C208B Passengers",
+    "label": "Cessna 208B Passengers",
     "rolesPackRelPath": "profiles/ofp/blacksquare-caravan-cargo-pod.json",
     "familyRolesPackRelPaths": [
       "profiles/ofp/asobo-c208b-cargo.json",
@@ -767,7 +767,7 @@
   {
     "typeId": "microsoft-douglas-dc-3-metal-left",
     "aircraftClassId": "medium_piston",
-    "label": "Douglas DC-3 METAL LEFT",
+    "label": "DC-3 Metal Left",
     "rolesPackRelPath": "profiles/ofp/microsoft-douglas-dc-3-metal-left.json",
     "simbriefIcao": "DC3",
     "simbriefAirframeMatch": "Default",
@@ -781,7 +781,7 @@
   {
     "typeId": "pmdg-dc6",
     "aircraftClassId": "medium_piston",
-    "label": "PMDG DC-6",
+    "label": "Douglas DC-6",
     "rolesPackRelPath": "profiles/ofp/pmdg-dc6.json",
     "simbriefIcao": "DC6",
     "simbriefAirframeMatch": "Default",
@@ -828,7 +828,7 @@
   {
     "typeId": "fenix-a319",
     "aircraftClassId": "narrow_freighter",
-    "label": "Fenix A319",
+    "label": "Airbus A319",
     "rolesPackRelPath": "profiles/ofp/fenix-a319.json",
     "simbriefIcao": "A319",
     "simbriefAirframeMatch": "Default",
@@ -846,7 +846,7 @@
   {
     "typeId": "fenix-a320",
     "aircraftClassId": "narrow_freighter",
-    "label": "Fenix A320",
+    "label": "Airbus A320",
     "rolesPackRelPath": "profiles/ofp/fenix-a320.json",
     "simbriefIcao": "A320",
     "simbriefAirframeMatch": "Default",
@@ -864,7 +864,7 @@
   {
     "typeId": "fenix-a321",
     "aircraftClassId": "narrow_freighter",
-    "label": "Fenix A321",
+    "label": "Airbus A321",
     "rolesPackRelPath": "profiles/ofp/fenix-a321.json",
     "simbriefIcao": "A321",
     "simbriefAirframeMatch": "Default",
@@ -882,7 +882,7 @@
   {
     "typeId": "leonardo-fly-the-maddog-x-md-82-20th",
     "aircraftClassId": "narrow_freighter",
-    "label": "Fly The Maddog X MD-82 20th",
+    "label": "MD-82 20th Anniversary",
     "rolesPackRelPath": "profiles/ofp/leonardo-fly-the-maddog-x-md-82-20th.json",
     "simbriefIcao": "MD82",
     "simbriefAirframeMatch": "Leonardo Maddog \\(MSFS\\) - Y162 Config",
@@ -901,7 +901,7 @@
   {
     "typeId": "leonardo-fly-the-maddog-x-md-83-20th",
     "aircraftClassId": "narrow_freighter",
-    "label": "Fly The Maddog X MD-83 20th",
+    "label": "MD-83 20th Anniversary",
     "rolesPackRelPath": "profiles/ofp/leonardo-fly-the-maddog-x-md-83-20th.json",
     "simbriefIcao": "MD83",
     "simbriefAirframeMatch": "Leonardo Maddog \\(MSFS\\) - Y162 Config",
@@ -919,7 +919,7 @@
   {
     "typeId": "leonardo-fly-the-maddog-x-md-88-20th",
     "aircraftClassId": "narrow_freighter",
-    "label": "Fly The Maddog X MD-88 20th",
+    "label": "MD-88 20th Anniversary",
     "rolesPackRelPath": "profiles/ofp/leonardo-fly-the-maddog-x-md-88-20th.json",
     "simbriefIcao": "MD88",
     "simbriefAirframeMatch": "Leonardo Maddog \\(MSFS\\) - Y162 Config",
@@ -937,7 +937,7 @@
   {
     "typeId": "justflight-f100",
     "aircraftClassId": "narrow_freighter",
-    "label": "Just Flight F100",
+    "label": "Fokker F100",
     "rolesPackRelPath": "profiles/ofp/justflight-fokker-f100.json",
     "simbriefIcao": "F100",
     "simbriefAirframeMatch": "Default",
@@ -955,7 +955,7 @@
   {
     "typeId": "justflight-f70",
     "aircraftClassId": "narrow_freighter",
-    "label": "Just Flight F70",
+    "label": "Fokker F70",
     "rolesPackRelPath": "profiles/ofp/justflight-fokker-f70.json",
     "simbriefIcao": "F70",
     "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - 70 Passengers",
@@ -974,7 +974,7 @@
   {
     "typeId": "justflight-fokker-f28",
     "aircraftClassId": "narrow_freighter",
-    "label": "Just Flight Fokker F28",
+    "label": "Fokker F28",
     "rolesPackRelPath": "profiles/ofp/justflight-fokker-f28.json",
     "simbriefIcao": "F28",
     "simbriefAirframeMatch": "Default",
@@ -988,7 +988,7 @@
   {
     "typeId": "microsoft-a320neo-v2",
     "aircraftClassId": "narrow_freighter",
-    "label": "Microsoft A320neo V2",
+    "label": "A320neo V2",
     "rolesPackRelPath": "profiles/ofp/microsoft-a320neo-v2.json",
     "simbriefIcao": "A20N",
     "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - A320neo V2",
@@ -1006,7 +1006,7 @@
   {
     "typeId": "microsoft-a321lr",
     "aircraftClassId": "narrow_freighter",
-    "label": "Microsoft A321LR",
+    "label": "A321LR",
     "rolesPackRelPath": "profiles/ofp/microsoft-a321lr.json",
     "simbriefIcao": "A21N",
     "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - A321LR LEAP-1A",
@@ -1024,7 +1024,7 @@
   {
     "typeId": "pmdg-738-bbj2-family",
     "aircraftClassId": "narrow_freighter",
-    "label": "PMDG 737-800 BBJ2",
+    "label": "Boeing 737-800 BBJ2",
     "enabled": false,
     "injectCapable": false,
     "rolesPackRelPath": "profiles/ofp/pmdg-738-bbj2.json",
@@ -1042,7 +1042,7 @@
   {
     "typeId": "pmdg-738-bcf-family",
     "aircraftClassId": "narrow_freighter",
-    "label": "PMDG 737-800 BCF",
+    "label": "Boeing 737-800 BCF",
     "injectCapable": true,
     "rolesPackRelPath": "profiles/ofp/pmdg-738-bcf.json",
     "familyRolesPackRelPaths": [
@@ -1063,7 +1063,7 @@
   {
     "typeId": "pmdg-738-pax-family",
     "aircraftClassId": "narrow_freighter",
-    "label": "PMDG 737-800 PAX",
+    "label": "Boeing 737-800 PAX",
     "injectCapable": true,
     "loadLayout": "pax_and_cargo",
     "maxPaxSeats": 163,
@@ -1127,7 +1127,7 @@
   {
     "typeId": "pmdg-777-200er",
     "aircraftClassId": "wide_freighter",
-    "label": "PMDG 777-200ER",
+    "label": "Boeing 777-200ER",
     "injectCapable": true,
     "rolesPackRelPath": "profiles/ofp/pmdg-777-pax.json",
     "simbriefIcao": "B772",
@@ -1146,7 +1146,7 @@
   {
     "typeId": "pmdg-777-200lr",
     "aircraftClassId": "wide_freighter",
-    "label": "PMDG 777-200LR",
+    "label": "Boeing 777-200LR",
     "injectCapable": true,
     "rolesPackRelPath": "profiles/ofp/pmdg-777-200lr-pax.json",
     "simbriefIcao": "B77L",
@@ -1165,7 +1165,7 @@
   {
     "typeId": "pmdg-777-300er",
     "aircraftClassId": "wide_freighter",
-    "label": "PMDG 777-300ER",
+    "label": "Boeing 777-300ER",
     "injectCapable": true,
     "rolesPackRelPath": "profiles/ofp/pmdg-777-300er-pax.json",
     "simbriefIcao": "B77W",
@@ -1184,7 +1184,7 @@
   {
     "typeId": "pmdg-777f",
     "aircraftClassId": "wide_freighter",
-    "label": "PMDG 777F",
+    "label": "Boeing 777F",
     "rolesPackRelPath": "profiles/ofp/pmdg-777.json",
     "simbriefIcao": "B77F",
     "simbriefAirframeMatch": "Default",
@@ -1199,7 +1199,7 @@
   {
     "typeId": "tfdi-md11f-family",
     "aircraftClassId": "wide_freighter",
-    "label": "TFDi MD-11F",
+    "label": "MD-11F",
     "rolesPackRelPath": "profiles/ofp/tfdi-md11f.json",
     "simbriefIcao": "MD1F",
     "simbriefAirframeMatch": "TFDi Design \\(MSFS\\) - MD-11F",
@@ -1215,7 +1215,7 @@
   {
     "typeId": "toliss-toliss-a346-pro-preset-pax",
     "aircraftClassId": "wide_freighter",
-    "label": "ToLiss A346 PRO Preset Pax",
+    "label": "A340-600 PRO Preset Pax",
     "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
     "simbriefIcao": "A346",
     "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",

@@ -173,6 +173,9 @@ export function parseBcfFuelCliArgs(args: string[]): BcfFuelOptions & {
     fieldClrCount: num('--field-clr', BCF_FUEL_DEFAULTS.fieldClrCount),
     ...(totalDisplay ? { totalDisplay } : {}),
     ...(preset ? { preset } : {}),
+    fsActionsLsk: (
+      get('--fs-actions-lsk') ?? BCF_FUEL_DEFAULTS.fsActionsLsk
+    ).toUpperCase(),
     fuelPageLsk: (
       get('--fuel-page-lsk') ?? BCF_FUEL_DEFAULTS.fuelPageLsk
     ).toUpperCase(),

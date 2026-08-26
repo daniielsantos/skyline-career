@@ -63,15 +63,26 @@ describe('pmdg BCF/PAX inject gates', () => {
     assert.notEqual(bbj2Sku!.injectCapable, true);
   });
 
-  it('777-200ER pax pack allows direct inject', () => {
+  it('777-200ER and 777-200LR pax packs allow direct inject', () => {
     const er = readPack('profiles/ofp/pmdg-777-pax.json');
     assert.equal(er.loadMethod, 'direct-injection');
     assert.equal(er.injectCapable, true);
     assert.doesNotThrow(() => assertRolesPackAllowsDirectInjection(er));
 
-    const sku = findCareerPlayerAirframe('pmdg-777-200er');
-    assert.ok(sku);
-    assert.equal(sku!.injectCapable, true);
-    assert.equal(sku!.loadLayout, 'pax_and_cargo');
+    const erSku = findCareerPlayerAirframe('pmdg-777-200er');
+    assert.ok(erSku);
+    assert.equal(erSku!.injectCapable, true);
+    assert.equal(erSku!.loadLayout, 'pax_and_cargo');
+
+    const lr = readPack('profiles/ofp/pmdg-777-200lr-pax.json');
+    assert.equal(lr.loadMethod, 'direct-injection');
+    assert.equal(lr.injectCapable, true);
+    assert.doesNotThrow(() => assertRolesPackAllowsDirectInjection(lr));
+
+    const lrSku = findCareerPlayerAirframe('pmdg-777-200lr');
+    assert.ok(lrSku);
+    assert.equal(lrSku!.injectCapable, true);
+    assert.equal(lrSku!.loadLayout, 'pax_and_cargo');
+    assert.equal(lrSku!.rolesPackRelPath, 'profiles/ofp/pmdg-777-200lr-pax.json');
   });
 });

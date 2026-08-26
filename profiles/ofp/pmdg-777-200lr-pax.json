@@ -1,23 +1,21 @@
 {
   "source": "simbrief",
-  "icao": "B772",
-  "ofpId": "pmdg-777-pax",
+  "icao": "B77L",
+  "ofpId": "pmdg-777-200lr-pax",
   "loadMethod": "direct-injection",
   "injectCapable": true,
   "matchTitles": [
-    "777-200ER RR",
-    "777-200ER PW",
-    "777-200ER GE"
+    "777-200LR"
   ],
-  "matchTitlePattern": "777-200ER(?:\\s+(?:RR|PW|GE))?\\b",
+  "matchTitlePattern": "777-200LR\\b",
   "notes": [
-    "PMDG 777-200ER (RR / PW / GE) — passenger variant used as Career freighter",
-    "Market SKU pmdg-777-200er: loadLayout pax_and_cargo, 294 seats (SimBrief PMDG B772 rows)",
-    "SimBrief Freight cap ~85,140 lb — cabin seats first (175+55 lb), remainder as cargo=",
-    "Homologated profiles: pmdg/777-200er-{rr,pw,ge} @1.0.0",
+    "PMDG 777-200LR — passenger variant used as Career freighter",
+    "Market SKU pmdg-777-200lr: loadLayout pax_and_cargo; SimBrief PMDG (MSFS) - Standard (297 seats, hold ~60,346 lb)",
+    "SimBrief Freight cap ~60,346 lb — cabin seats first (175+55 lb), remainder as cargo=",
+    "Homologated profile: pmdg/777-200lr @1.0.0",
     "loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu), experimental vs EFB",
     "Fallback: PMDG EFB Load Plane from Simbrief when inject fails",
-    "777F / 300ER stay on profiles/ofp/pmdg-777.json (freighter stations); 200LR → pmdg-777-200lr-pax.json",
+    "777F / 300ER stay on profiles/ofp/pmdg-777.json (freighter stations)",
     "After EFB SimBrief load, classic cargo stations may inflate — prefer PMDG EFB ZFW LVars"
   ],
   "fuel": {
@@ -40,8 +38,8 @@
     "weights": ["pmdg-efb-lvars", "classic-weights"],
     "payload": ["pmdg-efb", "classic-stations"]
   },
-  "simbriefIcao": "B772",
-  "simbriefAirframeMatch": "Default",
+  "simbriefIcao": "B77L",
+  "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Standard",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },

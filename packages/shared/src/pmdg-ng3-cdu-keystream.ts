@@ -34,13 +34,14 @@ export const BCF_PAYLOAD_DEFAULTS = {
    * Scratchpad flush before MENU. Default: short CLR taps only (one char each).
    * Long-press hold (~3s) can desync live inject — leave at 0 unless debugging.
    * Tap count + inter-tap delay clear multi-char junk without a hold.
+   * Matches 777 inject: 8 fast taps at every fuel or payload keystream start.
    */
   scratchpadClearHoldMs: 0,
-  scratchpadClearTaps: 10,
+  scratchpadClearTaps: 8,
   /** Pause after each short CLR so the delete registers before the next key. */
-  scratchpadClearTapDelayMs: 150,
+  scratchpadClearTapDelayMs: 70,
   /** Settle after the last CLR before MENU (ms). */
-  scratchpadClearSettleMs: 350,
+  scratchpadClearSettleMs: 250,
   /**
    * Skip the initial scratchpad CLR flush before MENU. Career inject sets this
    * when fuel TOTAL already cleared the scratchpad in the same session.
@@ -133,9 +134,9 @@ export const BCF_FUEL_DEFAULTS = {
   cdu: 'right' as const,
   /** Long-press CLR at start — default off (see payload defaults). */
   scratchpadClearHoldMs: 0,
-  scratchpadClearTaps: 10,
-  scratchpadClearTapDelayMs: 150,
-  scratchpadClearSettleMs: 350,
+  scratchpadClearTaps: 8,
+  scratchpadClearTapDelayMs: 70,
+  scratchpadClearSettleMs: 250,
 } as const;
 
 export const BCF_FUEL_SLOW_TIMING = {

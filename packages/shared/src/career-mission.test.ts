@@ -2246,7 +2246,7 @@ describe('replaceMissionManifest', () => {
 });
 
 describe('manifestEditAvailableKg', () => {
-  it('keeps the original lot size after a smaller re-dispatch', () => {
+  it('credits board free kg plus this flight booked slice, not the whole lot', () => {
     assert.equal(
       manifestEditAvailableKg({
         bookedKg: 3_742,
@@ -2254,13 +2254,15 @@ describe('manifestEditAvailableKg', () => {
       }),
       3_742,
     );
+    // Lot off the board (availableKg 0) must not open the full quantity —
+    // the remainder may still be held by NPC / FBO / ghost reservations.
     assert.equal(
       manifestEditAvailableKg({
         bookedKg: 3_742,
         lotQuantityKg: 10_251,
         marketAvailableKg: 0,
       }),
-      10_251,
+      3_742,
     );
     assert.equal(
       manifestEditAvailableKg({
@@ -2268,6 +2270,14 @@ describe('manifestEditAvailableKg', () => {
         marketAvailableKg: 6_509,
       }),
       10_251,
+    );
+    assert.equal(
+      manifestEditAvailableKg({
+        bookedKg: 16_800,
+        lotQuantityKg: 33_600,
+        marketAvailableKg: 0,
+      }),
+      16_800,
     );
   });
 });

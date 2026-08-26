@@ -362,6 +362,11 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
     );
     assert.equal(liveTitleMatchesMarketSku('777-200ER PW', 'pmdg-777-200er'), true);
     assert.equal(liveTitleMatchesMarketSku('777-200ER GE', 'pmdg-777-200er'), true);
+    assert.equal(liveTitleMatchesMarketSku('777-200LR', 'pmdg-777-200lr'), true);
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('777-200LR'),
+      'PMDG \\(MSFS\\) - Standard',
+    );
   });
 });
 

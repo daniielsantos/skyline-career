@@ -185,6 +185,9 @@ export function parseBcfPayloadCliArgs(args: string[]): BcfPayloadOptions & {
     emptyFirst: has('--empty-first'),
     ...(onlyField ? { onlyField } : {}),
     ...(zfwDisplay ? { zfwDisplay } : {}),
+    fsActionsLsk: (
+      get('--fs-actions-lsk') ?? BCF_PAYLOAD_DEFAULTS.fsActionsLsk
+    ).toUpperCase(),
     payloadPageLsk: (
       get('--payload-page-lsk') ?? BCF_PAYLOAD_DEFAULTS.payloadPageLsk
     ).toUpperCase(),

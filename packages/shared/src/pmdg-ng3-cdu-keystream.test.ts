@@ -25,20 +25,20 @@ describe('pmdg-ng3-cdu-keystream (shared)', () => {
     assert.equal(fuelLbToDisplay(16800), '16.8');
   });
 
-  it('buildBcfZfwKeySequence flushes scratchpad with paced event CLR taps (no hold)', () => {
+  it('buildBcfZfwKeySequence flushes scratchpad with 8 paced event CLR taps (no hold)', () => {
     const opts = bcfZfwInjectOptions('89.3');
     const steps = buildBcfZfwKeySequence(opts);
     assert.equal(opts.scratchpadClearHoldMs, 0);
-    assert.equal(opts.scratchpadClearTaps, 10);
+    assert.equal(opts.scratchpadClearTaps, 8);
     const flush = steps.filter((s) => s.label.includes('flush'));
-    assert.equal(flush.length, 10);
+    assert.equal(flush.length, 8);
     assert.equal(flush[0]?.method, 'event');
     assert.equal(flush[0]?.parameter, 0);
     assert.equal(flush[0]?.release, true);
     assert.equal(flush[0]?.holdMs, 80);
-    assert.equal(flush[0]?.delayAfterMs, 150);
-    assert.equal(flush[9]?.delayAfterMs, 350);
-    assert.equal(steps[10]?.key, 'MENU');
+    assert.equal(flush[0]?.delayAfterMs, 70);
+    assert.equal(flush[7]?.delayAfterMs, 250);
+    assert.equal(steps[8]?.key, 'MENU');
     assert.ok(steps.some((s) => s.key === 'R5'));
     assert.ok(steps.some((s) => s.key === 'R2'));
   });
@@ -61,9 +61,10 @@ describe('pmdg-ng3-cdu-keystream (shared)', () => {
     const opts = bcfFuelInjectOptions('16.8');
     const steps = buildBcfFuelKeySequence(opts);
     const flush = steps.filter((s) => s.label.includes('flush'));
-    assert.ok(flush.length >= 10);
+    assert.equal(flush.length, 8);
     assert.equal(flush[0]?.method, 'event');
     assert.equal(flush[0]?.key, 'CLR');
+    assert.equal(opts.scratchpadClearTapDelayMs, 70);
   });
 
   it('computePmdgCduZfwTargetLb replaces live cargo with OFP cargo', () => {

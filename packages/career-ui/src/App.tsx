@@ -421,7 +421,7 @@ function lotQuantityKg(lot: MarketLot): number {
   return Math.max(1, lot.availableKg);
 }
 
-/** Reserved lots leave the board; restore original kg for Edit manifest. */
+/** Reserved lots leave the board; restore free kg + this flight's booked slice only. */
 function manifestEditAvailableKg(opts: {
   bookedKg: number;
   lotQuantityKg?: number;
@@ -429,10 +429,13 @@ function manifestEditAvailableKg(opts: {
   demandMaxKg?: number;
 }): number {
   const booked = Math.max(0, Math.floor(opts.bookedKg));
-  const quantity = Math.max(0, Math.floor(opts.lotQuantityKg ?? 0));
-  const fromBoard = Math.max(0, Math.floor(opts.marketAvailableKg ?? 0)) + booked;
+  const fromBoard =
+    Math.max(0, Math.floor(opts.marketAvailableKg ?? 0)) + booked;
   const demand = Math.max(0, Math.floor(opts.demandMaxKg ?? 0));
-  return Math.max(booked, quantity, fromBoard, demand);
+  const quantity = Math.max(0, Math.floor(opts.lotQuantityKg ?? 0));
+  const uncapped = Math.max(booked, fromBoard, demand);
+  if (quantity > 0) return Math.min(uncapped, quantity);
+  return uncapped;
 }
 
 function proRataPayUsd(lot: MarketLot, cargoKg: number): number {
@@ -1899,14 +1902,19 @@ function findStagingBlockingMission(
   draft: StagingDraft,
   missionList: Mission[],
 ): Mission | undefined {
+  const editingId =
+    draft.replaceManifest && draft.intoMissionId
+      ? draft.intoMissionId
+      : undefined;
   const lotIds = new Set(draft.lines.map((line) => line.lot.id));
   for (const mission of missionList) {
     if (!isActiveMissionStatus(mission.status) || mission.crewOperated) continue;
+    if (editingId && mission.id === editingId) continue;
     if (missionLotLines(mission).some((line) => lotIds.has(line.shipmentLotId))) {
       return mission;
     }
   }
-  if (draft.intoMissionId) {
+  if (draft.intoMissionId && !draft.replaceManifest) {
     const bound = missionList.find(
       (mission) =>
         mission.id === draft.intoMissionId && isActiveMissionStatus(mission.status),
@@ -1917,6 +1925,7 @@ function findStagingBlockingMission(
     (mission) =>
       isActiveMissionStatus(mission.status) &&
       !mission.crewOperated &&
+      mission.id !== editingId &&
       mission.originIcao === draft.originIcao &&
       mission.destIcao === draft.destIcao &&
       mission.aircraftClassId === draft.aircraft &&

@@ -193,6 +193,9 @@ export function inferSimBriefAirframeMatchFromTitle(
   }
   const pmdg772 = inferPmdg777200erSimBriefMatch(t);
   if (pmdg772) return pmdg772;
+  if (/\b777-200LR\b/i.test(t)) {
+    return 'PMDG \\(MSFS\\) - Standard';
+  }
   const fenixA320 = inferFenixA320SimBriefMatch(t);
   if (fenixA320) return fenixA320;
   const fenixA321 = inferFenixA321SimBriefMatch(t);
@@ -249,6 +252,9 @@ export function liveTitleMatchesMarketSku(
   }
   if (id === 'pmdg-777-200er') {
     return /\b777-200ER(?:\s+(?:RR|PW|GE))?\b/i.test(t);
+  }
+  if (id === 'pmdg-777-200lr') {
+    return /\b777-200LR\b/i.test(t);
   }
   return false;
 }

@@ -1267,8 +1267,9 @@ export function reserveShipmentLot(
 
 /**
  * How much of a market lot the player can still put on an in-edit manifest.
- * Reserved lots drop off the airport board, so `availableKg` alone collapses
- * to the last booked slice — restore quantity + currently held kg.
+ * Reserved lots may drop off the airport board (`availableKg` → 0 / missing).
+ * Credit back only this flight's booked slice — never the full `quantityKg`,
+ * or the slider steals cargo still held by NPC / FBO / ghost reservations.
  */
 export function manifestEditAvailableKg(opts: {
   bookedKg: number;
@@ -1277,10 +1278,14 @@ export function manifestEditAvailableKg(opts: {
   demandMaxKg?: number;
 }): number {
   const booked = Math.max(0, Math.floor(opts.bookedKg));
-  const quantity = Math.max(0, Math.floor(opts.lotQuantityKg ?? 0));
-  const fromBoard = Math.max(0, Math.floor(opts.marketAvailableKg ?? 0)) + booked;
+  const fromBoard =
+    Math.max(0, Math.floor(opts.marketAvailableKg ?? 0)) + booked;
   const demand = Math.max(0, Math.floor(opts.demandMaxKg ?? 0));
-  return Math.max(booked, quantity, fromBoard, demand);
+  // Cap by stamped lot size when known (demand / odd board shapes).
+  const quantity = Math.max(0, Math.floor(opts.lotQuantityKg ?? 0));
+  const uncapped = Math.max(booked, fromBoard, demand);
+  if (quantity > 0) return Math.min(uncapped, quantity);
+  return uncapped;
 }
 
 /** Release a prior reservation (cancel before settle — including mid-flight). */

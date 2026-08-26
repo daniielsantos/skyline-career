@@ -2705,10 +2705,17 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'aircraft query required' });
           return;
         }
-        const airframeTypeId = url.searchParams.get('airframe') ?? undefined;
+        const airframeTypeIdRaw = url.searchParams.get('airframe') ?? undefined;
         const aircraftId = url.searchParams.get('aircraftId')?.trim() || undefined;
         const originIcao = url.searchParams.get('origin')?.trim().toUpperCase();
         const destIcao = url.searchParams.get('dest')?.trim().toUpperCase();
+        let airframeTypeId = airframeTypeIdRaw?.trim() || undefined;
+        if (!airframeTypeId && aircraftId) {
+          airframeTypeId = await withCareerRead((_world, missions) => {
+            const acf = missions.fleet.find((a) => a.id === aircraftId);
+            return acf?.airframeTypeId?.trim() || undefined;
+          });
+        }
         const cargoLimit = await resolveClassMaxCargoKg(
           aircraft,
           airframeTypeId,

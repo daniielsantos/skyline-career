@@ -1813,6 +1813,40 @@ function fallbackMaxCargoKg(aircraft: AircraftClass): number {
   return 18_137;
 }
 
+function resolveMissionStructuralMaxCargoKg(
+  mission: Mission,
+  fleet: PlayerAircraft[],
+  airframePerf: Record<string, { maxCargoKg?: number }>,
+  structuralFromApi: number | null,
+  activeMissionId?: string,
+): number {
+  const acf = mission.aircraftId
+    ? fleet.find((a) => a.id === mission.aircraftId)
+    : undefined;
+  const typeId =
+    mission.airframeTypeId?.trim() || acf?.airframeTypeId?.trim() || '';
+
+  if (
+    activeMissionId === mission.id &&
+    structuralFromApi !== null &&
+    structuralFromApi > 0
+  ) {
+    return structuralFromApi;
+  }
+
+  if (typeId) {
+    const perfKg = airframePerf[typeId]?.maxCargoKg;
+    if (typeof perfKg === 'number' && perfKg > 0) return perfKg;
+  }
+
+  if (acf?.airframeTypeId) {
+    const perfKg = airframePerf[acf.airframeTypeId]?.maxCargoKg;
+    if (typeof perfKg === 'number' && perfKg > 0) return perfKg;
+  }
+
+  return fallbackMaxCargoKg(mission.aircraftClassId as AircraftClass);
+}
+
 function aircraftMaxRangeNm(aircraft: AircraftClass): number {
   if (aircraft === 'wide_freighter') return 6_000;
   if (aircraft === 'medium_piston') return 2_200;
@@ -12942,30 +12976,15 @@ export function App() {
               formatTonnes={formatTonnes}
               formatDeadline={formatDeadline}
               aircraftClassLabel={aircraftClassLabel}
-              missionMaxCargoKg={(mission) => {
-                const typeId =
-                  mission.airframeTypeId?.trim() ||
-                  fleet.find((a) => a.id === mission.aircraftId)?.airframeTypeId
-                    ?.trim() ||
-                  fleet.find(
-                    (a) => a.aircraftClassId === mission.aircraftClassId,
-                  )?.airframeTypeId?.trim();
-                const structural =
-                  typeId && airframePerf[typeId]?.maxCargoKg
-                    ? airframePerf[typeId]!.maxCargoKg
-                    : fallbackMaxCargoKg(
-                        mission.aircraftClassId as AircraftClass,
-                      );
-                // Prefer route MTOW/fuel ops cap when loaded for this Dispatch view.
-                if (
-                  maxCargoKg !== null &&
-                  Number.isFinite(maxCargoKg) &&
-                  maxCargoKg > 0
-                ) {
-                  return Math.min(structural, maxCargoKg);
-                }
-                return structural;
-              }}
+              missionMaxCargoKg={(mission) =>
+                resolveMissionStructuralMaxCargoKg(
+                  mission,
+                  fleet,
+                  airframePerf,
+                  structuralMaxCargoKg,
+                  activeMission?.id,
+                )
+              }
               missionOpsCapacityHint={
                 maxCargoKg !== null && Number.isFinite(maxCargoKg)
                   ? maxCargoKg

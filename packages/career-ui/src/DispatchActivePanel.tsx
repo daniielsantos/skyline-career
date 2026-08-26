@@ -68,9 +68,9 @@ export function DispatchActivePanel(props: {
   formatTonnes: (kg: number) => string;
   formatDeadline: (tick: number, hours: number) => string;
   aircraftClassLabel: (id: string) => string;
-  /** Structural/operational cargo ceiling for this mission (kg). */
+  /** Structural cargo ceiling for this mission (kg) — bar denominator. */
   missionMaxCargoKg: (mission: Mission) => number;
-  /** Route ops payload ceiling when known (kg) — shown under Capacity left. */
+  /** Route ops payload ceiling when known (kg) — MTOW/fuel estimate for this leg. */
   missionOpsCapacityHint?: number | null;
   ofpAutoStatus: 'idle' | 'waiting' | 'checking';
   missionFuelQuote: {
@@ -429,8 +429,20 @@ export function DispatchActivePanel(props: {
 
       {!isEnRoute ? (
         (() => {
-          const missionMaxKg = props.missionMaxCargoKg(mission);
-          const capacityLeft = Math.max(0, missionMaxKg - mission.cargoKg);
+          const structuralMaxKg = props.missionMaxCargoKg(mission);
+          const opsCapKg =
+            typeof props.missionOpsCapacityHint === 'number' &&
+            props.missionOpsCapacityHint > 0
+              ? props.missionOpsCapacityHint
+              : null;
+          const capacityLeftKg = Math.max(0, structuralMaxKg - mission.cargoKg);
+          const routeOpsNote =
+            opsCapKg !== null &&
+            opsCapKg + 1 < structuralMaxKg
+              ? mission.cargoKg > opsCapKg + 1
+                ? `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate — SimBrief may allow more)`
+                : `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate)`
+              : undefined;
           const routeLabel =
             routeDistanceNm !== undefined
               ? `${Math.round(routeDistanceNm).toLocaleString()} nm`
@@ -494,7 +506,8 @@ export function DispatchActivePanel(props: {
               formatTonnes={props.formatTonnes}
               capacityLabel="Payload loaded"
               totalKg={mission.cargoKg}
-              capKg={missionMaxKg}
+              capKg={structuralMaxKg}
+              capacityNote={routeOpsNote}
               highlights={[
                 {
                   label: 'Contract',
@@ -507,14 +520,16 @@ export function DispatchActivePanel(props: {
                 <>
                   <span>
                     Capacity left
-                    <strong>{props.formatTonnes(capacityLeft)}</strong>
-                    {typeof props.missionOpsCapacityHint === 'number' &&
-                    props.missionOpsCapacityHint > 0 ? (
-                      <em>
-                        of {props.formatTonnes(props.missionOpsCapacityHint)} ops
-                      </em>
-                    ) : null}
+                    <strong>{props.formatTonnes(capacityLeftKg)}</strong>
+                    <em>structural</em>
                   </span>
+                  {opsCapKg !== null && opsCapKg + 1 < structuralMaxKg ? (
+                    <span>
+                      Route ops cap
+                      <strong>{props.formatTonnes(opsCapKg)}</strong>
+                      <em>MTOW − fuel estimate for this leg</em>
+                    </span>
+                  ) : null}
                   <span>
                     Cargo lots
                     <strong>{mission.lots?.length ?? 1}</strong>

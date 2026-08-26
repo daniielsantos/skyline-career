@@ -46,19 +46,24 @@ export function DispatchFlightSummary(props: {
           </strong>
         </div>
         {showBar ? (
-          <div
-            className="staging-manifest-capacity-bar"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={props.capKg}
-            aria-valuenow={props.totalKg}
-            aria-label={props.capacityLabel}
-          >
+          <>
             <div
-              className="staging-manifest-capacity-fill"
-              style={{ width: `${fillPct}%` }}
-            />
-          </div>
+              className="staging-manifest-capacity-bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={props.capKg}
+              aria-valuenow={props.totalKg}
+              aria-label={props.capacityLabel}
+            >
+              <div
+                className="staging-manifest-capacity-fill"
+                style={{ width: `${fillPct}%` }}
+              />
+            </div>
+            {props.capacityNote ? (
+              <p className="dispatch-flight-capacity-note">{props.capacityNote}</p>
+            ) : null}
+          </>
         ) : props.capacityNote ? (
           <p className="dispatch-flight-capacity-note">{props.capacityNote}</p>
         ) : null}

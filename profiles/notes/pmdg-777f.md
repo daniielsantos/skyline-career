@@ -18,8 +18,10 @@
 
 ## Notes
 
-- Load method: native-simbrief (no Skyline inject).
-- Fuel/payload write plans intentionally empty — load via addon EFB/tablet.
+- Load method: direct-injection (PMDG CDU FO TOTAL + ZFW) — experimental; EFB SimBrief fallback.
+- **injectCapable:** `true` — Skyline CDU inject, same path as other PMDG 777 variants.
+- SimBrief airframe: **PMDG (MSFS) - 766,800 MTOW** (not Default).
+- **OFP ICAO quirk:** MSFS reports `atc_model`/SimBrief `icaocode` **B77L** on the 777F — Career accepts B77L for `pmdg-777f` missions (Dispatch type stays **B77F**).
 - Use compare-ofp + Career Loaded vs Due for validation.
 
 ## Homologated

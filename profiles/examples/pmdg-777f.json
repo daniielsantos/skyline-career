@@ -25,7 +25,7 @@
     "maxSimRate": 1.1
   },
   "fuel": {
-    "strategy": "simconnect-direct",
+    "strategy": "pmdg-cdu",
     "unit": "gallons",
     "tanks": [
       {
@@ -65,7 +65,7 @@
     }
   },
   "payload": {
-    "strategy": "station-writeback",
+    "strategy": "pmdg-cdu",
     "stations": [
       {
         "index": 1,
@@ -173,8 +173,10 @@
   "notes": [
     "Homologated via wizard: 777F.",
     "ICAO type designator (catalog/SimBrief): B77F.",
-    "Load method: native-simbrief (no Skyline inject).",
-    "Fuel/payload write plans intentionally empty — load via addon EFB/tablet.",
+    "Load method: direct-injection (PMDG CDU FO TOTAL + ZFW) — experimental; EFB SimBrief fallback.",
+    "Roles pack: profiles/ofp/pmdg-777.json",
+    "Market SKU: pmdg-777f (wide_freighter, injectCapable).",
+    "SimBrief airframe: PMDG (MSFS) - 766,800 MTOW",
     "Use compare-ofp + Career Loaded vs Due for validation.",
     "See profiles/notes/pmdg-777f.md"
   ]

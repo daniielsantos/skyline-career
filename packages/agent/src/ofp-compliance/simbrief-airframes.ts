@@ -199,6 +199,9 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/\b777-300ER\b/i.test(t)) {
     return 'PMDG \\(MSFS\\) - 777,000 MTOW';
   }
+  if (/\b777F\b/i.test(t)) {
+    return 'PMDG \\(MSFS\\) - 766,800 MTOW';
+  }
   const fenixA320 = inferFenixA320SimBriefMatch(t);
   if (fenixA320) return fenixA320;
   const fenixA321 = inferFenixA321SimBriefMatch(t);
@@ -261,6 +264,9 @@ export function liveTitleMatchesMarketSku(
   }
   if (id === 'pmdg-777-300er') {
     return /\b777-300ER\b/i.test(t);
+  }
+  if (id === 'pmdg-777f') {
+    return /\b777F\b/i.test(t);
   }
   return false;
 }

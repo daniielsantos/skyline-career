@@ -315,13 +315,13 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     },
     liveSources: {
       fuel: ['classic', 'mass-balance'],
-      weights: ['classic-weights'],
-      payload: ['classic-stations'],
+      weights: ['pmdg-efb-lvars', 'classic-weights'],
+      payload: ['pmdg-efb', 'classic-stations'],
     },
-    loadMethod: 'native-simbrief',
-    injectCapable: false,
+    loadMethod: 'direct-injection',
+    injectCapable: true,
     simbriefIcao: 'B77F',
-    simbriefAirframeMatch: 'Default',
+    simbriefAirframeMatch: 'PMDG \\(MSFS\\) - 766,800 MTOW',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
@@ -342,8 +342,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'PMDG 777F — freighter OFP pack (same stations/tanks layout as pax 777s)',
-      'Market SKU pmdg-777f (wide_freighter); SimBrief B77F',
-      'loadMethod: native-simbrief; injectCapable: false',
+      'Market SKU pmdg-777f (wide_freighter); SimBrief B77F — PMDG 766,800 MTOW',
+      'loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu)',
     ],
   },
   {

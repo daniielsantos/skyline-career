@@ -2,8 +2,8 @@
   "source": "simbrief",
   "icao": "B77F",
   "ofpId": "pmdg-777",
-  "loadMethod": "native-simbrief",
-  "injectCapable": false,
+  "loadMethod": "direct-injection",
+  "injectCapable": true,
   "matchTitles": [
     "777F"
   ],
@@ -13,7 +13,7 @@
     "Market SKU on this pack: pmdg-777f",
     "777-200ER → pmdg-777-pax.json; 777-200LR → pmdg-777-200lr-pax.json; 777-300ER → pmdg-777-300er-pax.json",
     "Homologated profile: pmdg/777f @1.0.0",
-    "loadMethod: native-simbrief; injectCapable: false — load via PMDG EFB",
+    "loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu), experimental vs EFB",
     "Cabin/deck stations mapped as baggage for Career cargo (pax=0)",
     "SimBrief ICAO: B77F"
   ],
@@ -33,11 +33,11 @@
   },
   "liveSources": {
     "fuel": ["classic", "mass-balance"],
-    "weights": ["classic-weights"],
-    "payload": ["classic-stations"]
+    "weights": ["pmdg-efb-lvars", "classic-weights"],
+    "payload": ["pmdg-efb", "classic-stations"]
   },
   "simbriefIcao": "B77F",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "PMDG \\(MSFS\\) - 766,800 MTOW",
   "stationMap": [
     { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
     { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },

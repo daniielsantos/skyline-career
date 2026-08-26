@@ -2719,6 +2719,12 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
   BE36: ['BE36', 'AC11', 'C182', 'C172', 'C152'],
   C152: ['C152', 'C172', 'C182', 'BE36', 'AC11'],
   C172: ['C172', 'C152', 'C182', 'BE36', 'AC11'],
+  /**
+   * PMDG MSFS 777F: title `777F` but SimConnect atc_model / SimBrief OFP
+   * icaocode often print B77L (shared with 777-200LR type designator in sim).
+   * Dispatch still uses SimBrief B77F + PMDG 766,800 MTOW; only OFP ICAO alias.
+   */
+  B77F: ['B77F', 'B77L'],
 };
 
 function normalizeIcao(code: string | undefined): string | undefined {

@@ -211,6 +211,14 @@ describe('career player airframes', () => {
     assert.equal(wr?.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - 777,000 MTOW');
   });
 
+  it('stages PMDG 777F freighter with Skyline inject on PMDG SimBrief row', () => {
+    const f = findCareerPlayerAirframe('pmdg-777f');
+    assert.equal(f?.injectCapable, true);
+    assert.equal(f?.rolesPackRelPath, 'profiles/ofp/pmdg-777.json');
+    assert.equal(f?.simbriefIcao, 'B77F');
+    assert.equal(f?.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - 766,800 MTOW');
+  });
+
   it('treats omitted enabled as market-eligible', () => {
     assert.equal(isCareerPlayerAirframeEnabled({}), true);
     assert.equal(isCareerPlayerAirframeEnabled({ enabled: true }), true);

@@ -1303,6 +1303,29 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
   });
 
+  it('accepts PMDG 777F SimBrief OFP ICAO B77L (MSFS atc_model quirk)', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        aircraftClassId: 'wide_freighter',
+        airframeTypeId: 'pmdg-777f',
+        cargoKg: 103_000,
+        rolesPackRelPath: 'profiles/ofp/pmdg-777.json',
+      }),
+      matchingOfp({
+        icao: 'B77L',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 47_000,
+          passengerCount: 1,
+          baggage: 228_000,
+          payload: 228_320,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
   it('fails on origin/dest edits', () => {
     const check = compareMissionIntentToOfp(
       baseMission(),

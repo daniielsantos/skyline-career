@@ -98,4 +98,17 @@ describe('pmdg BCF/PAX inject gates', () => {
     assert.equal(wrSku!.maxPaxSeats, 370);
     assert.equal(wrSku!.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - 777,000 MTOW');
   });
+
+  it('777F freighter pack allows direct inject', () => {
+    const f = readPack('profiles/ofp/pmdg-777.json');
+    assert.equal(f.loadMethod, 'direct-injection');
+    assert.equal(f.injectCapable, true);
+    assert.doesNotThrow(() => assertRolesPackAllowsDirectInjection(f));
+
+    const fSku = findCareerPlayerAirframe('pmdg-777f');
+    assert.ok(fSku);
+    assert.equal(fSku!.injectCapable, true);
+    assert.equal(fSku!.rolesPackRelPath, 'profiles/ofp/pmdg-777.json');
+    assert.equal(fSku!.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - 766,800 MTOW');
+  });
 });

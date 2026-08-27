@@ -378,7 +378,7 @@ Composition: aircraft large and centered for a wide market card banner. No text,
 ```
 
 ## Citation X (FlightFX v2)
-- **typeIds:** `flightfx-citation-x`, `flightfx-citation-x-winglets`
+- **typeId:** `flightfx-citation-x`
 - **file:** `citation-c750.png`
 
 ```

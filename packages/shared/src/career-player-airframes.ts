@@ -352,7 +352,8 @@ const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
   'pmdg-777-200er-pw': 'pmdg-777-200er',
   'pmdg-777-200er-ge': 'pmdg-777-200er',
   'flightfx-c750': 'flightfx-citation-x',
-  'flightfx-c750-winglets': 'flightfx-citation-x-winglets',
+  'flightfx-c750-winglets': 'flightfx-citation-x',
+  'flightfx-citation-x-winglets': 'flightfx-citation-x',
 };
 
 const BY_ID = new Map(CAREER_PLAYER_AIRFRAMES.map((airframe) => [airframe.typeId, airframe]));

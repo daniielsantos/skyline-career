@@ -722,8 +722,8 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     icao: 'C750',
     titlePattern: /citation x(?: winglets)?/i,
     familyPackRel: 'flightfx-citation-x.json',
-    marketTypeId: 'flightfx-citation-x-winglets',
-    marketLabel: 'FlightFX Citation X',
+    marketTypeId: 'flightfx-citation-x',
+    marketLabel: 'Citation X',
     stationRoles: {
       passengerStations: [],
       baggageStations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
@@ -750,7 +750,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     ],
     notes: [
       'FlightFX Citation X v2 — Citation X + Citation X Winglets share this family pack',
-      'Market SKUs: flightfx-citation-x, flightfx-citation-x-winglets',
+      'One Market SKU flightfx-citation-x',
     ],
   },
   {

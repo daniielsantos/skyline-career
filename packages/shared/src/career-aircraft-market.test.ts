@@ -845,6 +845,37 @@ describe('aircraft market', () => {
     }
   });
 
+  it('includes player lease listings when browsing WORLD', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-world-player-lease' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WorldLease',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    // Need a second owned parked airframe to list for lease.
+    state.fleet.push({
+      ...state.fleet[0]!,
+      id: 'acf_lease_spare',
+      label: 'Spare for lease',
+      status: 'parked',
+      ownership: 'owned',
+      locationIcao: 'SBGR',
+    });
+    ensureAircraftMarket(state, world);
+    const { listing } = listAircraftForLease(
+      state,
+      'acf_lease_spare',
+      world.tick,
+    );
+    assert.equal(listing.source, 'player_lease');
+    const worldwide = listAircraftMarket(state, world, {
+      browseCountryId: 'WORLD',
+    });
+    assert.ok(
+      worldwide.some((l) => l.id === listing.id),
+      'player lease must appear on Worldwide board',
+    );
+  });
+
   it('cross-border lease with import parks at home', () => {
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-import-lease' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {

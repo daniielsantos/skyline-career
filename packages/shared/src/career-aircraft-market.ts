@@ -1264,9 +1264,22 @@ function resolveAvailableMarketListing(
 }
 
 export type ListAircraftMarketOpts = {
-  /** View another country's dealer stock (no player listings). Acquire stays home-only. */
+  /**
+   * View another country's dealer stock (no foreign player board).
+   * WORLD = all dealer pools + your own available sale/lease listings.
+   * Acquire still stays home-only for foreign dealer stock.
+   */
   browseCountryId?: string;
 };
+
+function availablePlayerMarketListings(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+): AircraftListing[] {
+  return (state.aircraftMarket ?? [])
+    .filter((l) => l.status === 'available' && isPlayerListing(l))
+    .map((l) => stampListingGeo(world, l));
+}
 
 export function listAircraftMarket(
   state: CareerMissionsState,
@@ -1277,9 +1290,14 @@ export function listAircraftMarket(
   const home = resolveMarketCountryId(world, state);
   const browse = (opts?.browseCountryId ?? home).trim().toUpperCase();
   if (browse === AIRCRAFT_MARKET_BROWSE_WORLD) {
-    return dealerInstancesWorldwide(world, world.tick).map((inst) =>
+    const dealers = dealerInstancesWorldwide(world, world.tick).map((inst) =>
       instanceToListing(world, inst, world.tick),
     );
+    const mine = availablePlayerMarketListings(state, world);
+    if (mine.length === 0) return dealers;
+    const seen = new Set(dealers.map((l) => l.id));
+    const extra = mine.filter((l) => !seen.has(l.id));
+    return extra.length === 0 ? dealers : [...dealers, ...extra];
   }
   if (browse && browse !== home) {
     return dealerInstancesForMarket(world, browse, world.tick).map((inst) =>

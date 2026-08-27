@@ -86,6 +86,31 @@ export function aircraftListingMatchesQuery(
   return q.split(/\s+/).every((token) => haystack.includes(token));
 }
 
+/** Hangar fleet filter — name, typeId, tail, parking ICAO, class label. */
+export function hangarAircraftMatchesQuery(
+  aircraft: Pick<
+    PlayerAircraft,
+    'label' | 'airframeTypeId' | 'registration' | 'locationIcao' | 'aircraftClassId'
+  >,
+  rawQuery: string,
+  classLabel?: string,
+): boolean {
+  const q = rawQuery.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    aircraft.label,
+    aircraft.airframeTypeId,
+    aircraft.registration,
+    aircraft.locationIcao,
+    aircraft.aircraftClassId,
+    classLabel,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return q.split(/\s+/).every((token) => haystack.includes(token));
+}
+
 /**
  * Card hero art under career-ui/public/airframes/.
  * Keyed by Market typeId (plus common family / pack aliases).
@@ -126,7 +151,6 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'workingtitle-cessna-citation-longitude-passengers':
     '/airframes/citation-longitude.png',
   'flightfx-citation-x': '/airframes/citation-c750.png',
-  'flightfx-citation-x-winglets': '/airframes/citation-c750.png',
   'workingtitle-cessna-citation-cj4': '/airframes/citation-cj4.png',
   'skyward-cessna-c680': '/airframes/citation-sovereign.png',
   'flysimware-learjet-35a-cargo': '/airframes/learjet-35a.png',

@@ -181,21 +181,6 @@
     "fuelBurnKgPerNm": 0.169
   },
   {
-    "typeId": "flightfx-citation-x-winglets",
-    "aircraftClassId": "light_jet",
-    "label": "Citation X Winglets",
-    "rolesPackRelPath": "profiles/ofp/flightfx-citation-x.json",
-    "simbriefIcao": "C750",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 10038,
-    "mtowKg": 16375,
-    "maxCargoKg": 1030,
-    "fuelCapacityKg": 5865,
-    "maxRangeNm": 800,
-    "cruiseSpeedKt": 440,
-    "fuelBurnKgPerNm": 1.4
-  },
-  {
     "typeId": "skyward-da50",
     "aircraftClassId": "light_ga",
     "label": "DA50",

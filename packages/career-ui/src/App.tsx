@@ -169,6 +169,7 @@ import {
   MarketListingCard,
   aircraftClassLabel,
   aircraftListingMatchesQuery,
+  hangarAircraftMatchesQuery,
   type AircraftCatalogEntry,
 } from './AircraftCards';
 import { HangarCashflowPanel } from './CashflowPanel';
@@ -228,9 +229,13 @@ function networkCargoHubs(hubs: StarterHubOption[]): StarterHubOption[] {
   return hubs.filter((hub) => !hub.bush && !hub.bushTripOnly);
 }
 
-/** Hangar ferry destinations — network + trip-only starts; soft-field bush stays out. */
+/**
+ * Hangar ferry, empty flight, and pilot travel destinations.
+ * Network cargo hubs only — trip-only FAA locals (bush-trip PLN strips like
+ * Baker / 1Q2) stay in the world for trips but are not Market/ferry hubs.
+ */
 function ferryDestinationHubs(hubs: StarterHubOption[]): StarterHubOption[] {
-  return hubs.filter((hub) => !hub.bush);
+  return networkCargoHubs(hubs);
 }
 
 function hubTierLabel(tier: StarterHubOption['hubTier']): string {
@@ -3521,6 +3526,7 @@ export function App() {
     '' | AircraftClass
   >('');
   const [aircraftMarketQuery, setAircraftMarketQuery] = useState('');
+  const [hangarQuery, setHangarQuery] = useState('');
   const [aircraftMarketGeo, setAircraftMarketGeo] = useState<
     'country' | 'region' | 'near'
   >('country');
@@ -8335,6 +8341,17 @@ export function App() {
     () => fleet.filter((a) => (a.ownership ?? 'owned') === 'owned').length,
     [fleet],
   );
+  const filteredHangarFleet = useMemo(() => {
+    const q = hangarQuery.trim();
+    if (!q) return fleet;
+    return fleet.filter((acf) =>
+      hangarAircraftMatchesQuery(
+        acf,
+        q,
+        aircraftClassLabel(acf.aircraftClassId),
+      ),
+    );
+  }, [fleet, hangarQuery]);
   const boardEstimateFleet = useMemo(
     () =>
       fleet.filter(
@@ -13685,61 +13702,88 @@ export function App() {
               }
               onReturnToFbo={(m) => void onReturnMissionToFbo(m)}
             />
-          ) : fleet.length === 0 ? (
-            <p className="empty">
-              {!devMode && leaseUnlock && !leaseUnlock.unlocked
-                ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Finish Crew needed on time (score ≥70), or buy a starter class if you can afford it.`
-                : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
-            </p>
           ) : (
-            <ul className="hangar-list">
-              {fleet.map((acf) => (
-                <HangarAircraftCard
-                  key={acf.id}
-                  aircraft={acf}
-                  catalog={hangarCatalogEntry(acf)}
-                  busy={busy}
-                  hubOptions={ferryDestinationHubs(hubOptions).map((hub) => ({
-                    icao: hub.icao,
-                    name: hub.name,
-                  }))}
-                  preferredFerryDest={ferrySeed?.dest}
-                  ferrySeedToken={ferrySeed?.token}
-                  pilotIcao={pilotIcao}
-                  ownedCount={ownedFleetCount}
-                  hasListed={hasListedAircraft}
-                  formatMoney={formatMoney}
-                  formatMass={formatTonnes}
-                  weightSystem={weightSystem}
-                  onOpenAirport={openAirport}
-                  onClearMaintenance={(id) => void onClearMaintenance(id)}
-                  onRepair={(id) => void onRepairAircraft(id)}
-                  onUnlist={(id) => void onUnlistAircraft(id)}
-                  onBuyout={(id) => void onBuyoutLease(id)}
-                  onReturnLease={(id) => void onReturnLease(id)}
-                  onListForLease={(id) => void onListForLease(id)}
-                  onListForSale={(id) => void onListForSale(id)}
-                  onSell={(id) => void onSellAircraft(id)}
-                  onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
-                  onEmptyFlight={(id, dest) => onEmptyFlight(id, dest)}
-                  onTravel={(dest) => void onPilotTravel(dest)}
-                  missionRoute={(() => {
-                    if (acf.status !== 'assigned') return null;
-                    const m = missions.find(
-                      (row) =>
-                        (acf.assignedMissionId &&
-                          row.id === acf.assignedMissionId) ||
-                        row.aircraftId === acf.id,
-                    );
-                    if (!m || !isActiveMissionStatus(m.status)) return null;
-                    return {
-                      originIcao: m.originIcao,
-                      destIcao: m.destIcao,
-                    };
-                  })()}
-                />
-              ))}
-            </ul>
+            <>
+              {fleet.length > 0 ? (
+                <div className="hangar-toolbar">
+                  <input
+                    type="search"
+                    className="hangar-search"
+                    placeholder="Search name, type, tail or ICAO…"
+                    aria-label="Search hangar aircraft"
+                    value={hangarQuery}
+                    onChange={(e) => setHangarQuery(e.target.value)}
+                  />
+                  {hangarQuery.trim() ? (
+                    <p className="hangar-search-meta" role="status">
+                      {filteredHangarFleet.length} of {fleet.length}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {fleet.length === 0 ? (
+                <p className="empty">
+                  {!devMode && leaseUnlock && !leaseUnlock.unlocked
+                    ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Finish Crew needed on time (score ≥70), or buy a starter class if you can afford it.`
+                    : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
+                </p>
+              ) : filteredHangarFleet.length === 0 ? (
+                <p className="empty">
+                  No aircraft match “{hangarQuery.trim()}”.
+                </p>
+              ) : (
+                <ul className="hangar-list">
+                  {filteredHangarFleet.map((acf) => (
+                    <HangarAircraftCard
+                      key={acf.id}
+                      aircraft={acf}
+                      catalog={hangarCatalogEntry(acf)}
+                      busy={busy}
+                      hubOptions={ferryDestinationHubs(hubOptions).map(
+                        (hub) => ({
+                          icao: hub.icao,
+                          name: hub.name,
+                        }),
+                      )}
+                      preferredFerryDest={ferrySeed?.dest}
+                      ferrySeedToken={ferrySeed?.token}
+                      pilotIcao={pilotIcao}
+                      ownedCount={ownedFleetCount}
+                      hasListed={hasListedAircraft}
+                      formatMoney={formatMoney}
+                      formatMass={formatTonnes}
+                      weightSystem={weightSystem}
+                      onOpenAirport={openAirport}
+                      onClearMaintenance={(id) => void onClearMaintenance(id)}
+                      onRepair={(id) => void onRepairAircraft(id)}
+                      onUnlist={(id) => void onUnlistAircraft(id)}
+                      onBuyout={(id) => void onBuyoutLease(id)}
+                      onReturnLease={(id) => void onReturnLease(id)}
+                      onListForLease={(id) => void onListForLease(id)}
+                      onListForSale={(id) => void onListForSale(id)}
+                      onSell={(id) => void onSellAircraft(id)}
+                      onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
+                      onEmptyFlight={(id, dest) => onEmptyFlight(id, dest)}
+                      onTravel={(dest) => void onPilotTravel(dest)}
+                      missionRoute={(() => {
+                        if (acf.status !== 'assigned') return null;
+                        const m = missions.find(
+                          (row) =>
+                            (acf.assignedMissionId &&
+                              row.id === acf.assignedMissionId) ||
+                            row.aircraftId === acf.id,
+                        );
+                        if (!m || !isActiveMissionStatus(m.status)) return null;
+                        return {
+                          originIcao: m.originIcao,
+                          destIcao: m.destIcao,
+                        };
+                      })()}
+                    />
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </section>
       ) : hubSelected && tab === 'fleet' ? (

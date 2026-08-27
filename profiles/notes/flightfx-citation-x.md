@@ -27,3 +27,4 @@
 
 - `profiles/examples/flightfx-citation-x.json`
 - Family OFP: `profiles/ofp/flightfx-citation-x.json` (shared with Citation X Winglets)
+- Market SKU: `flightfx-citation-x` (one listing for both titles)

@@ -11,7 +11,7 @@
   "matchTitlePattern": "Citation X(?: Winglets)?\\b",
   "notes": [
     "FlightFX Citation X family (MSFS 2024 v2) — shared stations/tanks",
-    "Market SKUs: flightfx-citation-x, flightfx-citation-x-winglets",
+    "One Market SKU: flightfx-citation-x (Citation X + Citation X Winglets)",
     "Homologated profiles: flightfx/citation-x@1.0.0, flightfx/citation-x-winglets@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",

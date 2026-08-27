@@ -19,6 +19,8 @@ import {
   ofpFuelToLb,
   ofpTaxiFuelLb,
   payloadMatchToleranceLb,
+  adjustPaxAndCargoDueForEfbPaxLb,
+  clampPaxAndCargoDueToHoldsLb,
   resolveAirportCoords,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
@@ -462,7 +464,19 @@ export async function runMissionPreflight(
           liveStations: live.payload?.stations,
         })
       : undefined;
-    const plannedPayloadLb = plannedPayload?.plannedTotalLb;
+    // Match Watch: hold clamp (Phenom EFB bags stay in SimBrief math only) +
+    // efbPaxWeightLb. Recompute from OFP — never stack on painted Due.
+    const plannedPayloadLbRaw = plannedPayload?.plannedTotalLb;
+    const plannedPayloadLb =
+      plannedPayloadLbRaw !== undefined
+        ? adjustPaxAndCargoDueForEfbPaxLb(
+            clampPaxAndCargoDueToHoldsLb(
+              plannedPayloadLbRaw,
+              careerAirframe,
+            ),
+            careerAirframe,
+          )
+        : undefined;
     const livePayloadLb = clearedStations
       ? stationSumLb
       : paxCargoLiveLb !== undefined

@@ -1169,6 +1169,26 @@ describe('clampPaxAndCargoDueToHoldsLb', () => {
       ofpPayloadLb,
     );
   });
+
+  it('drops Phenom SimBrief bagwgt the EFB never places on stations', () => {
+    // 7×(175+55)+463 hold — EFB stations are 7×175+463; bags are paper-only.
+    const ofpPayloadLb = 7 * (175 + 55) + 463;
+    assert.equal(ofpPayloadLb, 2_073);
+    assert.equal(
+      clampPaxAndCargoDueToHoldsLb(ofpPayloadLb, {
+        typeId: 'fsreborn-phenom-300e',
+        aircraftClassId: 'light_jet',
+        label: 'Phenom 300E',
+        rolesPackRelPath: 'x',
+        simbriefIcao: 'E55P',
+        simbriefAirframeMatch: 'Default',
+        loadLayout: 'pax_and_cargo',
+        maxPaxSeats: 7,
+        simconnectCargoHoldMaxLb: 463,
+      }),
+      7 * 175 + 463,
+    );
+  });
 });
 
 describe('adjustPaxAndCargoDueForEfbPaxLb', () => {

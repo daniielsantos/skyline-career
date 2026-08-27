@@ -95,6 +95,17 @@ describe('career player airframes', () => {
     assert.equal(f70?.simbriefAirframeMatch, 'Just Flight \\(MSFS\\) - 70 Passengers');
   });
 
+  it('stages FSReborn Phenom 300E as pax_and_cargo (belly freight capped)', () => {
+    const phenom = findCareerPlayerAirframe('fsreborn-phenom-300e');
+    assert.equal(phenom?.loadLayout, 'pax_and_cargo');
+    assert.equal(phenom?.maxPaxSeats, 7);
+    assert.equal(phenom?.simconnectCargoHoldMaxLb, 463);
+    assert.equal(
+      phenom?.simbriefAirframeMatch,
+      'FSReborn \\(MSFS\\) - Phenom 300E',
+    );
+  });
+
   it('stages Just Flight F28 family as pax_and_cargo', () => {
     const f28 = findCareerPlayerAirframe('justflight-fokker-f28');
     assert.equal(f28?.loadLayout, 'pax_and_cargo');

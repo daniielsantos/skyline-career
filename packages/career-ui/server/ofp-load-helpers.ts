@@ -5,9 +5,11 @@
 import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
   assertRolesPackAllowsDirectInjection,
+  adjustPaxAndCargoDueForEfbPaxLb,
   careerFuelMatchOk,
   careerFreighterLivePayloadLb,
   careerPaxAndCargoLivePayloadLb,
+  clampPaxAndCargoDueToHoldsLb,
   findCareerPlayerAirframe,
   flightPhaseFromSample,
   inferEnginesRunning,
@@ -20,6 +22,7 @@ import {
   pickStableLiveFuelLb,
   liveFuelLbCoherentWithTanks,
   resolveLivePayloadLb,
+  SIMBRIEF_STANDARD_PAX_LB,
   toLb,
   type AircraftProfile,
   type FuelTankBreakdown,
@@ -1102,10 +1105,19 @@ async function applyMissionOfpLoadExclusive(
 
     const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
     // pax_and_cargo: Due/ZFW cargo = SimBrief payload (may be route-trimmed).
-    // Not ofpCargoKg baggage-only when passengerCount > 0.
-    const paxAndCargoFreightKg = isPaxAndCargoLoadLayout(careerAirframe)
-      ? ofpFreightTowardMissionKg(ofp, careerAirframe)
-      : undefined;
+    // Clamp to hold-capable Due before planning so inject does not chase
+    // SimBrief bagwgt the EFB never places (Phenom 7×55).
+    const paxAndCargoFreightKg = (() => {
+      if (!isPaxAndCargoLoadLayout(careerAirframe)) return undefined;
+      const rawKg = ofpFreightTowardMissionKg(ofp, careerAirframe);
+      if (rawKg === undefined) return undefined;
+      const clampedLb = adjustPaxAndCargoDueForEfbPaxLb(
+        clampPaxAndCargoDueToHoldsLb(rawKg * KG_TO_LB, careerAirframe),
+        careerAirframe,
+      );
+      return clampedLb / KG_TO_LB;
+    })();
+    const paxAndCargoClassic = isPaxAndCargoLoadLayout(careerAirframe);
 
     try {
       built = buildOfpLoadPlan({
@@ -1269,11 +1281,20 @@ async function applyMissionOfpLoadExclusive(
       ...(built.passengerStations ?? []),
     ];
     let baggageStations = [...built.baggageStations];
+    const cabinPassengerStations = [...(built.passengerStations ?? [])];
     const minRetainByIndex: Record<number, number> = {};
     for (const idx of built.crewStations) {
       minRetainByIndex[idx] = FREIGHTER_PILOT_LB;
     }
-    const preferSeatFill = (built.passengerStations?.length ?? 0) > 0;
+    // pax_and_cargo classic: seats stay at SimBrief body weight — do not use the
+    // GA soft-cap path that dumps freight onto pax seats (Phenom 250–300 lb).
+    const preferSeatFill =
+      !paxAndCargoClassic && cabinPassengerStations.length > 0;
+    if (paxAndCargoClassic) {
+      for (const idx of cabinPassengerStations) {
+        minRetainByIndex[idx] = SIMBRIEF_STANDARD_PAX_LB;
+      }
+    }
     const seatSoftMaxByIndex: Record<number, number> = {};
     const seatOccupantSoft = preferSeatFill
       ? SEAT_OCCUPANT_SOFT_MAX_LB
@@ -1301,7 +1322,7 @@ async function applyMissionOfpLoadExclusive(
     let ghostPrunePasses = 0;
     const MAX_GHOST_PRUNE_PASSES = 2;
 
-    // Start from crew floors; pax/baggage empty. Cargo prefers seats, baggage last.
+    // Start from crew floors (+ pax body for pax_and_cargo); baggage empty.
     let workingStations: Record<number, number> = {};
     for (const station of resolved.profile.payload.stations) {
       if (seatStations.includes(station.index) || baggageStations.includes(station.index)) {
@@ -1439,8 +1460,25 @@ async function applyMissionOfpLoadExclusive(
         minMac: extra?.minMac ?? lastMinMac,
         maxMac: extra?.maxMac ?? lastMaxMac,
         liveFuelLb,
-        // Prefer working plan when station SimVars under-read mid-inject.
-        livePayloadLb: Math.max(liveStationSum, workingSum),
+        // Paint the same Loaded vs Due figure as Watch/stamp — not full station
+        // sum (crew+cabin). Mid-inject was Sim 1965 vs Due 1688 (= +crew).
+        livePayloadLb: (() => {
+          const full = Math.max(liveStationSum, workingSum);
+          if (paxAndCargoClassic) {
+            return (
+              careerPaxAndCargoLivePayloadLb({
+                stations: stationsForUi,
+                stationRoles,
+              }) ?? full
+            );
+          }
+          return (
+            careerFreighterLivePayloadLb({
+              stations: stationsForUi,
+              stationRoles,
+            }) ?? full
+          );
+        })(),
         liveTanks,
         ...(schematicTankCapacity
           ? { tankCapacity: schematicTankCapacity }
@@ -1456,7 +1494,14 @@ async function applyMissionOfpLoadExclusive(
     // requestedCargoLb is already freight/payload after MTOW reserved crew
     // (buildOfpLoadPlan). Do not subtract crew again — that left Turbine Duke
     // at ~163 lb bags while Due stayed ~733 lb.
+    // pax_and_cargo: cabin body is already seeded; Due target is hold-clamped.
     let cargoTargetLb = Math.max(0, plannedPayloadLb);
+    if (paxAndCargoClassic) {
+      cargoPlacedLb = cabinPassengerStations.reduce(
+        (sum, idx) => sum + (workingStations[idx] ?? 0),
+        0,
+      );
+    }
     const seatCount = preferSeatFill
       ? Math.max(1, seatStations.length)
       : Math.max(1, baggageStations.length || built.movableStations.length);
@@ -2267,8 +2312,10 @@ async function applyMissionOfpLoadExclusive(
               ...seatSoftMaxByIndex,
               ...baggageSoftMaxByIndex,
             },
-            // Fill forward baggage (S3/S4) before dumping onto crew (S1/S2).
-            deferTargetIndexes: built.crewStations,
+            // Fill forward baggage before dumping onto crew (or cabin pax seats).
+            deferTargetIndexes: paxAndCargoClassic
+              ? [...built.crewStations, ...cabinPassengerStations]
+              : built.crewStations,
           };
           let shifted = shiftCargoForCg(
             workingStations,
@@ -2303,7 +2350,9 @@ async function applyMissionOfpLoadExclusive(
                   ...seatSoftMaxByIndex,
                   ...baggageSoftMaxByIndex,
                 },
-                deferTargetIndexes: built.crewStations,
+                deferTargetIndexes: paxAndCargoClassic
+                  ? [...built.crewStations, ...cabinPassengerStations]
+                  : built.crewStations,
               },
             );
           }
@@ -2636,10 +2685,17 @@ async function applyMissionOfpLoadExclusive(
             },
           );
           cargoTargetLb = clampedTarget;
-          cargoPlacedLb = baggageStations.reduce(
-            (sum, idx) => sum + (workingStations[idx] ?? 0),
-            0,
-          );
+          cargoPlacedLb =
+            baggageStations.reduce(
+              (sum, idx) => sum + (workingStations[idx] ?? 0),
+              0,
+            ) +
+            (paxAndCargoClassic
+              ? cabinPassengerStations.reduce(
+                  (sum, idx) => sum + (workingStations[idx] ?? 0),
+                  0,
+                )
+              : 0);
           const rewriteTotal = Object.values(workingStations).reduce(
             (a, b) => a + b,
             0,
@@ -2715,10 +2771,17 @@ async function applyMissionOfpLoadExclusive(
             });
             break;
           }
-          cargoPlacedLb = baggageStations.reduce(
-            (sum, idx) => sum + (afterLive.stations[idx] ?? 0),
-            0,
-          );
+          cargoPlacedLb =
+            baggageStations.reduce(
+              (sum, idx) => sum + (afterLive.stations[idx] ?? 0),
+              0,
+            ) +
+            (paxAndCargoClassic
+              ? cabinPassengerStations.reduce(
+                  (sum, idx) => sum + (afterLive.stations[idx] ?? 0),
+                  0,
+                )
+              : 0);
           continue;
         }
         if (
@@ -3352,16 +3415,20 @@ async function applyMissionOfpLoadExclusive(
       // classic station sum (PMDG 777 classic lags ZFW → false Failed).
       // GA freighter: stamp bags-only (Due is freight). Full station sum includes
       // crew seed and made confirming see Sim 843 vs Due 503 forever.
+      // pax_and_cargo: stamp cabin+holds (skip crew) — matches Due / Watch.
       const freighterBagsLiveLb =
-        !pmdgCduPayload &&
-        !isPaxAndCargoLoadLayout(
-          findCareerPlayerAirframe(mission.airframeTypeId),
-        )
+        !pmdgCduPayload && !paxAndCargoClassic
           ? (careerFreighterLivePayloadLb({
               stations: afterLive.stations,
               stationRoles,
             }) ?? cargoPlacedLb)
           : undefined;
+      const paxCargoLiveLb = paxAndCargoClassic
+        ? (careerPaxAndCargoLivePayloadLb({
+            stations: afterLive.stations,
+            stationRoles,
+          }) ?? cargoPlacedLb)
+        : undefined;
       setOfpLoadProgress(mission.id, {
         phase: 'done',
         message:
@@ -3371,7 +3438,8 @@ async function applyMissionOfpLoadExclusive(
         cgAttempt: cgRebalanceMoves || undefined,
         cgMaxAttempts: CG_REBALANCE_MAX_ITERATIONS,
         liveFuelLb: lastGoodFuelLb,
-        livePayloadLb: freighterBagsLiveLb ?? livePayloadSumLb,
+        livePayloadLb:
+          paxCargoLiveLb ?? freighterBagsLiveLb ?? livePayloadSumLb,
         ...(lastGoodSchematicTanks
           ? { liveTanks: lastGoodSchematicTanks }
           : {}),

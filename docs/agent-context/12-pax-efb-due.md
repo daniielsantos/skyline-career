@@ -39,6 +39,7 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mã
 
 | SKU | pax_and_cargo | Extra |
 |-----|---------------|--------|
+| `fsreborn-phenom-300e` | 7 | `simconnectCargoHoldMaxLb: 463`; inject seeds 175/seat + holds only (no GA seat dump) |
 | `justflight-f70` | 70 | `simconnectCabinSeats: 80`, `simconnectCargoHoldMaxLb: 5000` (freight coube) |
 | `justflight-f100` | 100 | `simconnectCargoHoldMaxLb: 7784` — **sem** cabin overshoot (100 slots) |
 | `justflight-fokker-f28` | 85 fallback; live Mk 65/79/65/85 | Nenhum extra (82×170 bateu) |

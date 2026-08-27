@@ -10,10 +10,11 @@
   ],
   "matchTitlePattern": "FSReborn Phenom 300E",
   "notes": [
-    "FSReborn Phenom 300E — auto roles pack from homologated profile",
+    "FSReborn Phenom 300E — SimBrief FSReborn (MSFS) row (not Default)",
     "Profile: fsreborn/phenom-300e@1.0.0",
+    "loadLayout pax_and_cargo: SimBrief belly maxcargo ~210 kg; cabin seats carry career freight",
+    "maxPaxSeats 7 = airframe_passengers on FSReborn E55P row",
     "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct"
   ],
   "fuel": {
@@ -25,102 +26,83 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "crewStations": [
-        1,
-        2
-      ],
-      "baggageStations": [
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11
-      ],
-      "passengerStations": []
+      "crewStations": [1, 2],
+      "passengerStations": [3, 4, 5, 6, 7, 8, 9],
+      "baggageStations": [10, 11]
     }
   },
   "liveSources": {
-    "fuel": [
-      "classic"
-    ],
-    "weights": [
-      "classic-weights"
-    ],
-    "payload": [
-      "classic-stations"
-    ]
+    "fuel": ["classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
   },
   "simbriefIcao": "E55P",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "FSReborn \\(MSFS\\) - Phenom 300E",
   "stationMap": [
     {
       "simVarIndex": 1,
       "cfgIndex": 0,
-      "name": "Station 1",
+      "name": "Pilot",
       "role": "crew"
     },
     {
       "simVarIndex": 2,
       "cfgIndex": 1,
-      "name": "Station 2",
+      "name": "Copilot",
       "role": "crew"
     },
     {
       "simVarIndex": 3,
       "cfgIndex": 2,
-      "name": "Station 3",
-      "role": "baggage"
+      "name": "Cabin seat 1",
+      "role": "passenger"
     },
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
-      "name": "Station 4",
-      "role": "baggage"
+      "name": "Cabin seat 2",
+      "role": "passenger"
     },
     {
       "simVarIndex": 5,
       "cfgIndex": 4,
-      "name": "Station 5",
-      "role": "baggage"
+      "name": "Cabin seat 3",
+      "role": "passenger"
     },
     {
       "simVarIndex": 6,
       "cfgIndex": 5,
-      "name": "Station 6",
-      "role": "baggage"
+      "name": "Cabin seat 4",
+      "role": "passenger"
     },
     {
       "simVarIndex": 7,
       "cfgIndex": 6,
-      "name": "Station 7",
-      "role": "baggage"
+      "name": "Cabin seat 5",
+      "role": "passenger"
     },
     {
       "simVarIndex": 8,
       "cfgIndex": 7,
-      "name": "Station 8",
-      "role": "baggage"
+      "name": "Cabin seat 6",
+      "role": "passenger"
     },
     {
       "simVarIndex": 9,
       "cfgIndex": 8,
-      "name": "Station 9",
-      "role": "baggage"
+      "name": "Cabin seat 7",
+      "role": "passenger"
     },
     {
       "simVarIndex": 10,
       "cfgIndex": 9,
-      "name": "Station 10",
+      "name": "Forward baggage",
       "role": "baggage"
     },
     {
       "simVarIndex": 11,
       "cfgIndex": 10,
-      "name": "Station 11",
+      "name": "Aft baggage",
       "role": "baggage"
     }
   ],

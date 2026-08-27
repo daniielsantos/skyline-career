@@ -193,6 +193,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   }
   const pmdg772 = inferPmdg777200erSimBriefMatch(t);
   if (pmdg772) return pmdg772;
+  const tfdiMd11 = inferTfdiMd11fSimBriefMatch(t);
+  if (tfdiMd11) return tfdiMd11;
   if (/\b777-200LR\b/i.test(t)) {
     return 'PMDG \\(MSFS\\) - Standard';
   }
@@ -268,7 +270,28 @@ export function liveTitleMatchesMarketSku(
   if (id === 'pmdg-777f') {
     return /\b777F\b/i.test(t);
   }
+  if (id === 'tfdi-md11f-family') {
+    return /TFDi Design MD-11F/i.test(t);
+  }
   return false;
+}
+
+/** TFDi MD-11F — engine preset picks the SimBrief MD1F row (GE vs PW). */
+function inferTfdiMd11fSimBriefMatch(title: string): string | undefined {
+  if (!/TFDi Design MD-11/i.test(title) && !/\bMD-11F\b/i.test(title)) {
+    return undefined;
+  }
+  const isErf = /\bMD-11\s*ERF\b/i.test(title) || /\bMD-11ERF\b/i.test(title);
+  const isPw = /\bPW\b/i.test(title) || /PW4462/i.test(title);
+  const isGe = /\bGE\b/i.test(title);
+  if (isErf) {
+    if (isPw) return 'TFDi Design \\(MSFS\\) - MD-11ERF PW';
+    if (isGe) return 'TFDi Design \\(MSFS\\) - MD-11ERF GE';
+    return undefined;
+  }
+  if (isPw) return 'TFDi Design \\(MSFS\\) - MD-11F PW';
+  if (isGe) return 'TFDi Design \\(MSFS\\) - MD-11F GE';
+  return undefined;
 }
 
 /** PMDG 777-200ER — engine suffix picks the SimBrief B772 row (Default MTOW). */

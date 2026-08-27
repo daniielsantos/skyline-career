@@ -128,6 +128,7 @@ export interface OfpTolerances {
 export type LiveFuelSource =
   | 'pmdg-ng3'
   | 'classic'
+  | 'fuelsystem'
   | 'mass-balance'
   | 'tfdi-efb'
   | 'a2a-lvars';

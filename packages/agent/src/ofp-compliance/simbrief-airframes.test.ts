@@ -377,6 +377,26 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       inferSimBriefAirframeMatchFromTitle('777F'),
       'PMDG \\(MSFS\\) - 766,800 MTOW',
     );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('TFDi Design MD-11F PW4462'),
+      'TFDi Design \\(MSFS\\) - MD-11F PW',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('TFDi Design MD-11F GE'),
+      'TFDi Design \\(MSFS\\) - MD-11F GE',
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('TFDi Design MD-11F PW4462', 'tfdi-md11f-family'),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('TFDi Design MD-11F GE', 'tfdi-md11f-family'),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('Beechcraft Bonanza G36', 'tfdi-md11f-family'),
+      false,
+    );
   });
 });
 
@@ -439,6 +459,32 @@ describe('resolveSimBriefDispatchType', () => {
     });
     assert.equal(type, '746599_dual');
     assert.match(airframe.comments, /Dual Class/);
+  });
+
+  it('resolves TFDi MD-11F PW from generic family match + live title hint', async () => {
+    const { type, airframe } = await resolveSimBriefDispatchType({
+      simbriefIcao: 'MD1F',
+      simbriefAirframeMatch: 'TFDi Design \\(MSFS\\) - MD-11F',
+      titleHint: 'TFDi Design MD-11F PW4462',
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            MD1F: {
+              airframes: MD1F.map((a) => ({
+                airframe_internal_id: a.internalId,
+                airframe_list_type: a.listType,
+                airframe_icao: a.icao,
+                airframe_comments: a.comments,
+                airframe_name: a.name,
+                airframe_passengers: a.passengers,
+              })),
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+    assert.equal(type, '81536_pw');
+    assert.match(airframe.comments, /MD-11F PW/);
   });
 
   it('falls back from Default when ICAO only has a vendor MSFS airframe', async () => {

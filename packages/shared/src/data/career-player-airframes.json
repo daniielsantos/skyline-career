@@ -1087,6 +1087,8 @@
     "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
     "simbriefIcao": "A346",
     "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 440,
     "oewKg": 185500,
     "mtowKg": 368000,
     "maxCargoKg": 56811,

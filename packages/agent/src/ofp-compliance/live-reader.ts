@@ -69,39 +69,83 @@ export const TFDI_MD11_EFB_LVARS = {
  * Normalize TFDi EFB weight LVars to pounds.
  * Panel shows ×1000 lb; older builds stored kg; some reads already return lb.
  * L:MD11_EFB_PAYLOAD_LOAD is utilization (% of capacity), not a progress bar.
+ *
+ * Heavy freighter payload in kg (~85k) sits in the same numeric band as a
+ * mid load already in lb (~50–90k). Pass zfwLb when known so we can pick the
+ * unit that leaves a sane MD-11 empty (ZFW − payload ≈ 200–290k lb).
  */
 export function interpretTfdiEfbWeightToLb(
   raw: number,
   kind: 'fuel' | 'payload' | 'weight',
+  opts?: { zfwLb?: number },
+): number | undefined {
+  return interpretTfdiEfbWeightLvar(raw, kind, opts);
+}
+
+/**
+ * Interpret raw L:MD11_EFB_PAYLOAD_* values as pounds.
+ * TFDi has shipped these as kilograms, as full pounds, and as the EFB panel
+ * ×1000-lb display number (Fuel 22.3, Payload 50, ZFW 298.6).
+ */
+export function interpretTfdiEfbWeightLvar(
+  raw: number,
+  kind: 'fuel' | 'payload' | 'weight',
+  opts?: { zfwLb?: number },
 ): number | undefined {
   if (!Number.isFinite(raw) || raw <= 0) {
     return undefined;
   }
-  // Panel units (Fuel 22.3, Payload 50, ZFW 298.6).
+  // Panel display units (×1000 lb).
   if (raw < 1000) {
     const lb = raw * 1000;
     return lb >= 500 ? lb : undefined;
   }
   if (kind === 'weight') {
-    // MD-11 ZFW/GW: lb ≥ ~220k; kg typically 100k–200k.
-    if (raw >= 220_000) return raw;
+    // ZFW/GW: lb is typically ≥220k on MD-11; below that treat as kg.
+    if (raw >= 220_000) {
+      return raw;
+    }
     const lb = toLb(raw, 'kg');
     return lb >= 1000 ? lb : undefined;
   }
   if (kind === 'fuel') {
-    // Short-hop block ~10k kg vs ~22k lb — kg band stays ≤20k raw.
+    // Block fuel: ≤20k → kg (short-hop ~10t); else already lb.
     if (raw <= 20_000) {
       const lb = toLb(raw, 'kg');
       return lb >= 500 ? lb : undefined;
     }
     return raw;
   }
-  // Payload: OFP cargo ~23k kg or ~50k lb.
+  // Payload: small/mid kg loads (≤40k raw) always convert.
+  // Ambiguous 40k–120k: freighter kg (~85k → ~187k lb) vs already-lb mid load.
+  const asLb = raw;
+  const fromKg = toLb(raw, 'kg');
   if (raw <= 40_000) {
-    const lb = toLb(raw, 'kg');
-    return lb >= 500 ? lb : undefined;
+    return fromKg >= 500 ? fromKg : undefined;
   }
-  return raw;
+  const zfwLb = opts?.zfwLb;
+  if (
+    typeof zfwLb === 'number' &&
+    Number.isFinite(zfwLb) &&
+    zfwLb >= 220_000 &&
+    raw <= 120_000
+  ) {
+    const emptyAsLb = zfwLb - asLb;
+    const emptyFromKg = zfwLb - fromKg;
+    // MD-11 OEW band (load sheet ~248k; allow GE/PW + config slack).
+    const emptyLo = 200_000;
+    const emptyHi = 290_000;
+    const inBand = (empty: number) => empty >= emptyLo && empty <= emptyHi;
+    const asLbOk = inBand(emptyAsLb);
+    const fromKgOk = inBand(emptyFromKg);
+    if (fromKgOk && !asLbOk) return fromKg;
+    if (asLbOk && !fromKgOk) return asLb;
+    const targetEmpty = 250_000;
+    return Math.abs(emptyFromKg - targetEmpty) <= Math.abs(emptyAsLb - targetEmpty)
+      ? fromKg
+      : asLb;
+  }
+  return asLb;
 }
 
 export interface LiveLoadReading {
@@ -251,8 +295,22 @@ export function fuelFromClassicSnapshot(
 export function fuelFromMassBalance(
   snapshot: SimSnapshot,
   payloadStationsTotalLb: number,
+  opts?: { oewLb?: number },
 ): LiveFuelState | undefined {
-  const emptyLb = snapshot.vars?.['EMPTY WEIGHT'];
+  const simEmptyLb = snapshot.vars?.['EMPTY WEIGHT'];
+  const oewLb = opts?.oewLb;
+  let emptyLb = simEmptyLb;
+  if (
+    typeof oewLb === 'number' &&
+    Number.isFinite(oewLb) &&
+    oewLb > 0 &&
+    (simEmptyLb === undefined ||
+      !Number.isFinite(simEmptyLb) ||
+      Math.abs(simEmptyLb - oewLb) > 500)
+  ) {
+    // SimBrief/EFB OEW when MSFS EMPTY WEIGHT omits cabin equipment (ToLiss A346).
+    emptyLb = oewLb;
+  }
   const grossLb = snapshot.grossWeightLb ?? snapshot.vars?.['TOTAL WEIGHT'];
   if (
     emptyLb === undefined ||
@@ -268,6 +326,36 @@ export function fuelFromMassBalance(
   }
   return {
     source: 'mass-balance',
+    unit: 'lb',
+    left: 0,
+    right: 0,
+    center: 0,
+    total,
+  };
+}
+
+/** Sum FUELSYSTEM TANK QUANTITY:1..N (gallons) — A346 / Aerosoft multi-tank layouts. */
+export function fuelFromFuelSystemSnapshot(
+  snapshot: SimSnapshot,
+  densityLbPerGal: number,
+  tankCount = 8,
+): LiveFuelState | undefined {
+  let totalGal = 0;
+  for (let i = 1; i <= tankCount; i += 1) {
+    const raw = snapshot.vars?.[`FUELSYSTEM TANK QUANTITY:${i}`];
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+      totalGal += raw;
+    }
+  }
+  if (totalGal < 1) {
+    return undefined;
+  }
+  const total = galToLb(totalGal, densityLbPerGal);
+  if (total < 100) {
+    return undefined;
+  }
+  return {
+    source: 'fuelsystem',
     unit: 'lb',
     left: 0,
     right: 0,
@@ -337,47 +425,6 @@ async function readPmdgEfbLvars(
     readLvarWeight(bridge, PMDG_EFB_LVARS.landingWeight),
   ]);
   return { gwLb, zfwLb, lwLb };
-}
-
-/**
- * Interpret raw L:MD11_EFB_PAYLOAD_* values as pounds.
- * TFDi has shipped these as kilograms, as full pounds, and as the EFB panel
- * ×1000-lb display number (Fuel 22.3, Payload 50, ZFW 298.6).
- */
-export function interpretTfdiEfbWeightLvar(
-  raw: number,
-  kind: 'fuel' | 'payload' | 'weight',
-): number | undefined {
-  if (!Number.isFinite(raw) || raw <= 0) {
-    return undefined;
-  }
-  // Panel display units (×1000 lb).
-  if (raw < 1000) {
-    const lb = raw * 1000;
-    return lb >= 500 ? lb : undefined;
-  }
-  if (kind === 'weight') {
-    // ZFW/GW: lb is typically ≥220k on MD-11; below that treat as kg.
-    if (raw >= 220_000) {
-      return raw;
-    }
-    const lb = toLb(raw, 'kg');
-    return lb >= 1000 ? lb : undefined;
-  }
-  if (kind === 'fuel') {
-    // Block fuel: ≤20k → kg (short-hop ~10t); else already lb.
-    if (raw <= 20_000) {
-      const lb = toLb(raw, 'kg');
-      return lb >= 500 ? lb : undefined;
-    }
-    return raw;
-  }
-  // Payload: ≤40k → kg (~23t → ~50k lb); else already lb.
-  if (raw <= 40_000) {
-    const lb = toLb(raw, 'kg');
-    return lb >= 500 ? lb : undefined;
-  }
-  return raw;
 }
 
 export type A2aAccusimLive = {
@@ -562,23 +609,36 @@ export async function readTfdiMd11EfbLvars(
   fuelLb?: number;
 }> {
   // L:MD11_EFB_PAYLOAD_LOAD is utilization (% of capacity), not a progress bar.
-  const readWeight = async (
-    name: string,
-    kind: 'fuel' | 'payload' | 'weight',
-  ): Promise<number | undefined> => {
+  const readRaw = async (name: string): Promise<number | undefined> => {
     try {
       const raw = await bridge.readLVar(name);
-      return interpretTfdiEfbWeightLvar(raw, kind);
+      return typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
     } catch {
       return undefined;
     }
   };
-  const [gwLb, zfwLb, payloadLb, fuelLb] = await Promise.all([
-    readWeight(TFDI_MD11_EFB_LVARS.grossWeight, 'weight'),
-    readWeight(TFDI_MD11_EFB_LVARS.zfw, 'weight'),
-    readWeight(TFDI_MD11_EFB_LVARS.payload, 'payload'),
-    readWeight(TFDI_MD11_EFB_LVARS.fuel, 'fuel'),
+  const [gwRaw, zfwRaw, payloadRaw, fuelRaw] = await Promise.all([
+    readRaw(TFDI_MD11_EFB_LVARS.grossWeight),
+    readRaw(TFDI_MD11_EFB_LVARS.zfw),
+    readRaw(TFDI_MD11_EFB_LVARS.payload),
+    readRaw(TFDI_MD11_EFB_LVARS.fuel),
   ]);
+  const gwLb =
+    gwRaw !== undefined
+      ? interpretTfdiEfbWeightLvar(gwRaw, 'weight')
+      : undefined;
+  const zfwLb =
+    zfwRaw !== undefined
+      ? interpretTfdiEfbWeightLvar(zfwRaw, 'weight')
+      : undefined;
+  const payloadLb =
+    payloadRaw !== undefined
+      ? interpretTfdiEfbWeightLvar(payloadRaw, 'payload', { zfwLb })
+      : undefined;
+  const fuelLb =
+    fuelRaw !== undefined
+      ? interpretTfdiEfbWeightLvar(fuelRaw, 'fuel')
+      : undefined;
   return { gwLb, zfwLb, payloadLb, fuelLb };
 }
 
@@ -649,6 +709,28 @@ export async function readLiveLoad(
     }
   }
 
+  if (wants(prefs.fuel, 'fuelsystem')) {
+    const fuelSystemVars = Array.from(
+      { length: 8 },
+      (_, i) => `FUELSYSTEM TANK QUANTITY:${i + 1}`,
+    );
+    const missingFuel = fuelSystemVars.filter(
+      (name) => snapshot.vars[name] === undefined,
+    );
+    if (missingFuel.length > 0) {
+      const qty = await readSimVarsSoft(
+        bridge,
+        missingFuel.map((name) => ({ name, unit: 'gallons' })),
+      );
+      for (let i = 0; i < missingFuel.length; i += 1) {
+        const raw = qty[i];
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+          snapshot.vars[missingFuel[i]!] = raw;
+        }
+      }
+    }
+  }
+
   // Snapshot struct only carries L/R/C. Hydrate AUX/TIP only when the pack
   // opts into classic+mass-balance (multi-tank freighters like PMDG DC-6) or
   // declares many cargo stations — avoid extra SimConnect traffic on light GA.
@@ -712,6 +794,10 @@ export async function readLiveLoad(
   }
 
   let fuel: LiveFuelState | undefined;
+  const mbOpts =
+    typeof opts.ofpEmptyLb === 'number' && Number.isFinite(opts.ofpEmptyLb)
+      ? { oewLb: opts.ofpEmptyLb }
+      : undefined;
   for (const src of prefs.fuel) {
     if (src === 'pmdg-ng3' && needPmdgNg3) {
       try {
@@ -738,11 +824,18 @@ export async function readLiveLoad(
         // try next preference
       }
     }
+    if (src === 'fuelsystem') {
+      const fs = fuelFromFuelSystemSnapshot(snapshot, density);
+      if (fs) {
+        fuel = fs;
+        break;
+      }
+    }
     if (src === 'classic') {
       fuel = fuelFromClassicSnapshot(snapshot, density);
       // May still upgrade to mass-balance if both are in prefs and classic under-reads.
       if (prefs.fuel.includes('mass-balance')) {
-        const mb = fuelFromMassBalance(snapshot, payload.total);
+        const mb = fuelFromMassBalance(snapshot, payload.total, mbOpts);
         fuel = preferMassBalanceFuel(fuel, mb);
         if (fuel.source === 'mass-balance') {
           break;
@@ -751,7 +844,7 @@ export async function readLiveLoad(
       break;
     }
     if (src === 'mass-balance') {
-      const mb = fuelFromMassBalance(snapshot, payload.total);
+      const mb = fuelFromMassBalance(snapshot, payload.total, mbOpts);
       if (mb) {
         fuel = mb;
         break;

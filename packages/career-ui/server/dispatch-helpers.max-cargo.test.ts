@@ -377,6 +377,62 @@ describe('buildMissionDispatch pax_and_cargo', () => {
     assert.match(built.url, /[?&]pax=95(?:&|$)/);
     assert.doesNotMatch(built.url, /[?&]pax=1(?:&|$)/);
   });
+
+  it('prefills ToLiss A340-600 cabin seats (440 pax) on widebody dispatch', async () => {
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_a346',
+        status: 'dispatched',
+        originIcao: 'SBGR',
+        destIcao: 'EGLL',
+        commodityId: 'electronics',
+        cargoKg: 56_811,
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'wide_freighter',
+        airframeTypeId: 'toliss-toliss-a346-pro-preset-pax',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      {
+        units: 'KGS',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              A346: {
+                airframes: [
+                  {
+                    airframe_internal_id: '38898_1772717739162',
+                    airframe_list_type: 'A346',
+                    airframe_icao: 'A346',
+                    airframe_comments:
+                      'Aerosoft (MSFS) - A340-600 Pro (Standard Gross Weight)',
+                    airframe_name: 'A340-642',
+                    airframe_passengers: 440,
+                    airframe_options: {
+                      wgtunits: 'KGS',
+                      oew: 185500,
+                      mzfw: 245000,
+                      mtow: 368000,
+                      maxfuel: 152024,
+                      maxcargo: 56811,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    assert.equal(built.maxPaxSeats, 440);
+    assert.match(built.url, /[?&]pax=440(?:&|$)/);
+    assert.match(built.url, /[?&]cargo=10\./);
+    const acdata = new URL(built.url).searchParams.get('acdata');
+    assert.ok(acdata);
+    assert.deepEqual(JSON.parse(acdata!), { paxwgt: 175, bagwgt: 55 });
+  });
 });
 
 describe('buildMissionDispatch F28', () => {

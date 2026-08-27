@@ -557,7 +557,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     notes: [
       'Aerosoft / ToLiss A346 PRO (Preset Pax) — flight_model station_load.0..6',
       'liveSources: classic stations; fuel mass-balance then classic (no PMDG/TFDi probe)',
-      'SimBrief: A346 passenger airframe',
+      'SimBrief: A346 passenger airframe (440 seats; pax_and_cargo dispatch)',
       'Package has Pax preset only (no freighter)',
     ],
   },

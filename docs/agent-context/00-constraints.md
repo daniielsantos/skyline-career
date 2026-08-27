@@ -27,7 +27,7 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - **Um SKU de Market por família** (`career-player-airframes.json`). Vidros Highline/Passenger/Stol/Freighter entram no **mesmo** pack (`matchTitles` / `matchTitlePattern`), não como typeIds separados no catálogo.
 - Fingerprint: tokens `stol` e `highline` são variante — Stol não pode aliasar em Passenger.
 - ATR 42/72 → classe **`light_turboprop`** (par Saab 340). **Não** `medium_piston` (só DC-3/DC-6). Preço de regionais sobe via curva de cargo/MSRP/lease em `career-aircraft-pricing.ts` (não reclass).
-- Cessna 404 Titan → **`light_ga`**. Um SKU `microsoft-404-titan`; cargo + pax via `familyRolesPackRelPaths`.
+- Cessna 404 Titan → **`light_ga`**. Um SKU `microsoft-404-titan`; cargo + pax via `familyRolesPackRelPaths`. Preço sobe via curva MSRP/lease (não reclass TP).
 - Corvalis C400: SimBrief ICAO real **COL4** não existe no airframe list → proxy **`SR2T`**.
 - PMDG **738 BBJ2** fica **fora do Market** (`enabled: false`) até OEW bater com SimBrief Dual Class (empty live ~102.2 klb vs OEW ~93k).
 - Arte dos cards: `docs/market-airframe-card-prompts.md` + `AIRFRAME_CARD_ART` em `AircraftCards.tsx`. Um PNG por SKU de Market, não por vidro.

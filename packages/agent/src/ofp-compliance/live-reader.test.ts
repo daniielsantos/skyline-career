@@ -75,6 +75,22 @@ test('interpretTfdiEfbWeightLvar accepts panel ×1000, kg, and lb', () => {
   assert.equal(interpretTfdiEfbWeightLvar(298_611, 'weight'), 298_611);
 });
 
+test('interpretTfdiEfbWeightLvar uses ZFW to disambiguate heavy freighter kg payload', () => {
+  // EFB: Payload 187 ×1000 lb, ZFW 435.6 → LVars often store kg (~84800 / ~197600).
+  const zfwLb = interpretTfdiEfbWeightLvar(197_580, 'weight');
+  assert.ok(zfwLb !== undefined && zfwLb > 430_000);
+  const payloadLb = interpretTfdiEfbWeightLvar(84_824, 'payload', { zfwLb });
+  assert.ok(
+    payloadLb !== undefined && Math.abs(payloadLb - 187_005) < 50,
+    `expected ~187k lb, got ${payloadLb}`,
+  );
+  // Mid load already in lb + matching ZFW keeps lb (empty ≈ 248k).
+  assert.equal(
+    interpretTfdiEfbWeightLvar(50_045, 'payload', { zfwLb: 298_611 }),
+    50_045,
+  );
+});
+
 test('readA2aAccusimLvars maps tablet gallons and Character weights', async () => {
   const values = [
     1332, 4050, 6000, 32, 32, 0, 0, 0, 170, 170, 180, 180, 180, 252, 200,

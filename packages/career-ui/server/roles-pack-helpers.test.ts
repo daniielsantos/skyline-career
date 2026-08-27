@@ -334,4 +334,30 @@ describe('resolveDispatchSimBriefParams', () => {
       'Just Flight \\(MSFS\\) - 98 Pax, L2 Door, Integral Stairs, Small Cargo',
     );
   });
+
+  it('uses TFDi MD-11F PW live title for SimBrief engine disambiguation', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'wide_freighter',
+      airframeTypeId: 'tfdi-md11f-family',
+      rolesPackRelPath: 'profiles/ofp/tfdi-md11f.json',
+      liveTitle: 'TFDi Design MD-11F PW4462',
+    });
+    assert.equal(params.simbriefIcao, 'MD1F');
+    assert.equal(
+      params.simbriefAirframeMatch,
+      'TFDi Design \\(MSFS\\) - MD-11F',
+    );
+    assert.equal(params.titleHint, 'TFDi Design MD-11F PW4462');
+  });
+
+  it('uses TFDi MD-11F GE live title for SimBrief engine disambiguation', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'wide_freighter',
+      airframeTypeId: 'tfdi-md11f-family',
+      rolesPackRelPath: 'profiles/ofp/tfdi-md11f.json',
+      liveTitle: 'TFDi Design MD-11F GE',
+    });
+    assert.equal(params.simbriefIcao, 'MD1F');
+    assert.equal(params.titleHint, 'TFDi Design MD-11F GE');
+  });
 });

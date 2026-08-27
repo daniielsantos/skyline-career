@@ -8,9 +8,9 @@
 import type { AirframeCondition, FreighterClassId } from './types/career-economy.js';
 
 export const AIRCRAFT_MSRP_USD: Record<FreighterClassId, number> = {
-  light_ga: 85_000,
+  light_ga: 140_000,
   light_turboprop: 450_000,
-  light_jet: 750_000,
+  light_jet: 1_050_000,
   medium_piston: 1_200_000,
   narrow_freighter: 1_800_000,
   wide_freighter: 6_500_000,
@@ -41,12 +41,12 @@ export const CARGO_MSRP_CURVE_EXP = 0.65;
  * Baseline weekly lease ≈ MSRP × rate.
  * Charged every economy week; short terms (≤3 mo) so leasing is expensive
  * temporary access — not a cheap ladder skip vs buy.
- * (~1.2–2.2%/wk; light_tp elevated so ATR/Saab lease is not a cheap ladder).
+ * (~1.2–2.2%/wk; light_ga/tp/jet elevated so Titan/ATR/Lear lease is not a cheap ladder).
  */
 export const AIRCRAFT_LEASE_WEEKLY_RATE: Record<FreighterClassId, number> = {
-  light_ga: 0.0165,
+  light_ga: 0.02,
   light_turboprop: 0.022,
-  light_jet: 0.014,
+  light_jet: 0.019,
   medium_piston: 0.0135,
   narrow_freighter: 0.013,
   wide_freighter: 0.012,

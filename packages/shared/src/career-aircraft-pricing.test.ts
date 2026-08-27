@@ -135,6 +135,76 @@ describe('cargo-scaled aircraft MSRP', () => {
         CONDITION_LEASE_WEEKLY_MULT.fair,
     );
   });
+
+  it('prices 404 Titan well above light-GA floor (anti-snowball)', () => {
+    const c172 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_ga',
+      maxCargoKg: 371,
+    });
+    const titan = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_ga',
+      maxCargoKg: 1_563,
+    });
+    assert.ok(titan > c172 * 2);
+    assert.ok(titan >= 300_000, `Titan MSRP ${titan}`);
+
+    const leaseC172 = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'light_ga',
+      maxCargoKg: 371,
+    });
+    const leaseTitan = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'light_ga',
+      maxCargoKg: 1_563,
+    });
+    assert.ok(leaseTitan > leaseC172);
+    assert.ok(leaseTitan >= 6_000, `Titan lease ${leaseTitan}`);
+
+    const tiredAged = Math.round(
+      titan *
+        CONDITION_PRICE_MULT.tired *
+        hoursValueMult({
+          aircraftClassId: 'light_ga',
+          hoursAirframe: ECONOMIC_LIFE_HOURS.light_ga,
+          hoursEngine: ECONOMIC_LIFE_HOURS.light_ga,
+        }),
+    );
+    assert.ok(tiredAged >= 120_000, `Titan tired+aged ${tiredAged}`);
+  });
+
+  it('prices Learjet above light-jet floor (anti-snowball)', () => {
+    const hondaFloor = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_jet',
+      maxCargoKg: 540,
+    });
+    const lear = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_jet',
+      maxCargoKg: 1_423,
+    });
+    assert.ok(lear > hondaFloor);
+    assert.ok(lear >= 950_000, `Lear MSRP ${lear}`);
+
+    const leaseFloor = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'light_jet',
+      maxCargoKg: 540,
+    });
+    const leaseLear = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'light_jet',
+      maxCargoKg: 1_423,
+    });
+    assert.ok(leaseLear > leaseFloor);
+    assert.ok(leaseLear >= 18_000, `Lear lease ${leaseLear}`);
+
+    const tiredAged = Math.round(
+      lear *
+        CONDITION_PRICE_MULT.tired *
+        hoursValueMult({
+          aircraftClassId: 'light_jet',
+          hoursAirframe: ECONOMIC_LIFE_HOURS.light_jet,
+          hoursEngine: ECONOMIC_LIFE_HOURS.light_jet,
+        }),
+    );
+    assert.ok(tiredAged >= 400_000, `Lear tired+aged ${tiredAged}`);
+  });
 });
 
 describe('hours life multipliers', () => {

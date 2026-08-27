@@ -4964,16 +4964,13 @@ export function App() {
           result.check.verdict === 'warn'
         ) {
           stopped = true;
-          setToastKind(result.check.verdict === 'pass' ? 'ok' : 'warn');
-          setToast(
-            `OFP confirmed automatically · ${result.check.verdict.toUpperCase()}`,
-          );
+          // Preflight card updates in place — no toast for a quiet auto-pass.
+          if (result.check.verdict === 'warn') {
+            setToastKind('warn');
+            setToast('OFP confirmed with warnings · check Preflight');
+          }
           setOfpAutoStatus('idle');
         } else {
-          if (!activeMission.lastOfpCheck) {
-            setToastKind('fail');
-            setToast('OFP does not match yet · waiting for the updated plan');
-          }
           setOfpAutoStatus('waiting');
         }
       } catch {
@@ -5059,8 +5056,6 @@ export function App() {
           setWallet(purchased.walletUsd);
           setMissionFuelQuote(null);
           setMissionFuelQuoteStatus('ready');
-          setToastKind('ok');
-          setToast('Persisted aircraft fuel covers the OFP · continuing automatically');
           return;
         }
         setMissionFuelQuote(result);
@@ -5349,25 +5344,13 @@ export function App() {
     ) {
       return;
     }
-    let cancelled = false;
     // Drop UI Watch immediately — a hung SAMPLING tick can take seconds to
     // abort; Preflight must not wait behind "Watch still holds SimBridge".
     setHoldWatchOffForPreflight(true);
     setWatch(null);
-    void (async () => {
-      try {
-        await postWatchStop({ reset: true });
-        if (!cancelled) {
-          setToastKind('warn');
-          setToast('Waiting for first Preflight before Watch…');
-        }
-      } catch {
-        /* soft — hold flag still blocks poll/auto-start */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void postWatchStop({ reset: true }).catch(() => {
+      /* soft — hold flag still blocks poll/auto-start */
+    });
   }, [
     activeMission?.id,
     activeMission?.lastPreflightCheck,
@@ -6620,8 +6603,6 @@ export function App() {
       setPlayerFbos(result.playerFbos);
       setMissions(result.missions.slice().reverse());
       setWallet(result.walletUsd);
-      setToastKind('ok');
-      setToast(`Sent to Dispatch · mission ${result.mission.id}`);
       selectTab('staging');
     }, { sync: { market: true } });
   }
@@ -6792,8 +6773,6 @@ export function App() {
       const result = await postCrewFire({ memberId });
       setCompanyCrew(result.companyCrew);
       setWallet(result.walletUsd);
-      setToastKind('ok');
-      setToast(`Fired ${result.member.displayName}`);
     });
   }
 
@@ -7334,8 +7313,6 @@ export function App() {
     setPreferredAircraft(draft.aircraft);
     setError(null);
     setAirportReturn(null);
-    setToastKind('ok');
-    setToast('Editing manifest — adjust payload, then Save & re-dispatch');
     goToTab('staging');
   }
 
@@ -7512,21 +7489,7 @@ export function App() {
           if (result.replaced || result.mission) {
             setSimbriefLaunchUrl(null);
           }
-          setToastKind('ok');
-          const rem =
-            result.remainingKg !== undefined
-              ? ` · ${formatMassExact(result.remainingKg, weightSystem)} left`
-              : '';
-          const action = result.replaced
-            ? 'Updated'
-            : result.appended
-              ? 'Updated'
-              : 'Created';
-          setToast(
-            `${action} ${result.mission.id} · ${
-              result.lineCount ?? clamped.lines.length
-            } lot(s) · ${formatTonnes(result.mission.cargoKg)}${rem} · open Dispatch`,
-          );
+          // Mission appears on Dispatch — no success toast / mission-id noise.
           goToTab('staging');
         } catch (err) {
           setToastKind('fail');
@@ -7614,9 +7577,10 @@ export function App() {
       const reposition = result.pilotRelocatedFrom
         ? ` · operator covered travel ${result.pilotRelocatedFrom}→${result.pilotIcao ?? result.mission.originIcao}`
         : '';
+      // Fee + split are not obvious on the Dispatch card — keep that money signal.
       setToastKind('ok');
       setToast(
-        `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition} · open Dispatch`,
+        `${isRepo ? 'Ferry' : 'Contract'} accepted · fee ${fee} (${op})${air}${split}${reposition}`,
       );
       goToTab('staging');
     }, { sync: { market: true } });
@@ -7635,8 +7599,6 @@ export function App() {
     const pendingTab = reserveSimBriefBrowserTab();
     setBusy(true);
     setError(null);
-    setToastKind('ok');
-    setToast('Building SimBrief link…');
     try {
       const result = await postDispatch({
         missionId: mission.id,
@@ -7676,12 +7638,8 @@ export function App() {
         setToast(
           'Dispatch ready · browser did not auto-open — URL copied if clipboard allows; use Re-open SimBrief.',
         );
-      } else {
-        setToastKind('ok');
-        setToast(
-          `SimBrief opened · ${result.airframeLabel} · ${result.units ?? 'KGS'} · Generate OFP — auto-confirm runs every few seconds`,
-        );
       }
+      // Happy path: SimBrief tab + Dispatch card are enough — no success toast.
       void refresh({ missions: true }).catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
         if (!isNeedsProfileMessage(message)) setError(message);
@@ -7719,8 +7677,6 @@ export function App() {
       );
       return;
     }
-    setToastKind('ok');
-    setToast('SimBrief opened in your browser');
   }
 
   async function onRefreshOfpBriefing(mission: Mission) {
@@ -7737,10 +7693,12 @@ export function App() {
     );
     const wptCount = result.mission.lastOfpCheck?.briefing?.waypoints?.length ?? 0;
     const diag = result.ofp.navlogDiag;
-    setToastKind(wptCount > 0 ? 'ok' : 'warn');
     if (wptCount > 0) {
-      setToast(`Navlog loaded · ${wptCount} fixes on the route map`);
-    } else if (diag && !diag.present) {
+      // Route map updates in place — no toast.
+      return;
+    }
+    setToastKind('warn');
+    if (diag && !diag.present) {
       setToast(
         'SimBrief OFP has no navlog — re-open SimBrief (Detailed Navlog is now forced), generate again, then Load navlog',
       );
@@ -7749,11 +7707,7 @@ export function App() {
         `Navlog has ${diag.fixCount} fixes but no coordinates — enable Detailed Navlog and regenerate the OFP`,
       );
     } else {
-      setToast(
-        `OFP refreshed without route fixes${
-          diag ? ` (navlog keys: ${diag.topKeys.join(',') || 'none'})` : ''
-        }`,
-      );
+      setToast('OFP refreshed without route fixes — regenerate with Detailed Navlog');
     }
   }
 
@@ -7868,8 +7822,6 @@ export function App() {
       if (Array.isArray(result.fleet)) setFleet(result.fleet);
       setWallet(result.walletUsd);
       await refreshBushTrips();
-      setToastKind('ok');
-      setToast(`Accepted bush trip ${trip.title} · open Dispatch`);
       selectTab('staging');
     });
   }
@@ -8046,16 +7998,12 @@ export function App() {
         if (injectReady) {
           setLoadOfpProgress(null);
         }
-        setToastKind(injectReady ? 'ok' : 'ok');
-        setToast(
-          `Fuel and payload written · cargo ${formatMassExact(result.plan.cargoLb / KG_TO_LB, weightSystem)}` +
-            (result.cgRebalanceMoves
-              ? ` · CG rebalanced ×${result.cgRebalanceMoves}`
-              : '') +
-            (injectReady
-              ? ''
-              : ' · waiting for live sample'),
-        );
+        // Preflight / progress card already reflect inject — toast only when
+        // live sample still needs to catch up.
+        if (!injectReady) {
+          setToastKind('ok');
+          setToast('Fuel and payload written · waiting for live sample');
+        }
       } catch (err) {
         if (abort.signal.aborted) {
           userCancelled = true;

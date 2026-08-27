@@ -1627,7 +1627,7 @@ export function DispatchActivePanel(props: {
                           ? (props.loadOfpProgress?.message ??
                             'Writing fuel and payload into the sim…')
                           : confirming
-                            ? 'Writes finished — waiting for a live sample before Ready.'
+                            ? 'Writes finished — waiting for Loaded vs Due to match (times out if Sim stays short).'
                           : ready
                             ? 'Fuel and cargo match the confirmed OFP. Take off when Watch is connected.'
                             : loadReady && !locationOk

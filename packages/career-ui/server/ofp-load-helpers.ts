@@ -6,6 +6,7 @@ import { DefaultProfileEngine } from '@msfs-compat/runtime';
 import {
   assertRolesPackAllowsDirectInjection,
   careerFuelMatchOk,
+  careerFreighterLivePayloadLb,
   careerPaxAndCargoLivePayloadLb,
   findCareerPlayerAirframe,
   flightPhaseFromSample,
@@ -1178,22 +1179,10 @@ async function applyMissionOfpLoadExclusive(
       careerFuelMatchOk(beforeFuelLb, built.blockFuelLb, 50, 150, 0) &&
       liveFuelMatchesTarget(beforeLive.tanks, plannedTanks);
     let plannedFuelLb = built.blockFuelLb;
-    const plannedCrewLb = isPaxAndCargoLoadLayout(careerAirframe)
-      ? 0
-      : built.crewStations.length > 0
-        ? built.crewStations.reduce((sum, idx) => {
-            const st = resolved.profile.payload.stations.find((s) => s.index === idx);
-            return (
-              sum +
-              (st
-                ? Math.min(FREIGHTER_PILOT_LB, st.maxLoad)
-                : FREIGHTER_PILOT_LB)
-            );
-          }, 0)
-        : 0;
     /**
-     * Due payload = OFP weight sent to SimBrief (requested cargo / payload).
-     * Crew seed is taken out of that total at inject time — not added on top.
+     * Freight/payload target from the OFP (after MTOW clamp that already
+     * reserved crew). Inject seeds crew floors separately — do not subtract
+     * them from this total again.
      */
     const plannedPayloadLb = built.requestedCargoLb ?? built.cargoLb;
 
@@ -1464,7 +1453,10 @@ async function applyMissionOfpLoadExclusive(
     };
 
     let cargoPlacedLb = 0;
-    let cargoTargetLb = Math.max(0, plannedPayloadLb - plannedCrewLb);
+    // requestedCargoLb is already freight/payload after MTOW reserved crew
+    // (buildOfpLoadPlan). Do not subtract crew again — that left Turbine Duke
+    // at ~163 lb bags while Due stayed ~733 lb.
+    let cargoTargetLb = Math.max(0, plannedPayloadLb);
     const seatCount = preferSeatFill
       ? Math.max(1, seatStations.length)
       : Math.max(1, baggageStations.length || built.movableStations.length);
@@ -3358,6 +3350,18 @@ async function applyMissionOfpLoadExclusive(
       // Keep verified live weights on the done stamp — api builds
       // lastPreflightFromInjectLive from progress; without this it falls back to
       // classic station sum (PMDG 777 classic lags ZFW → false Failed).
+      // GA freighter: stamp bags-only (Due is freight). Full station sum includes
+      // crew seed and made confirming see Sim 843 vs Due 503 forever.
+      const freighterBagsLiveLb =
+        !pmdgCduPayload &&
+        !isPaxAndCargoLoadLayout(
+          findCareerPlayerAirframe(mission.airframeTypeId),
+        )
+          ? (careerFreighterLivePayloadLb({
+              stations: afterLive.stations,
+              stationRoles,
+            }) ?? cargoPlacedLb)
+          : undefined;
       setOfpLoadProgress(mission.id, {
         phase: 'done',
         message:
@@ -3367,7 +3371,7 @@ async function applyMissionOfpLoadExclusive(
         cgAttempt: cgRebalanceMoves || undefined,
         cgMaxAttempts: CG_REBALANCE_MAX_ITERATIONS,
         liveFuelLb: lastGoodFuelLb,
-        livePayloadLb: livePayloadSumLb,
+        livePayloadLb: freighterBagsLiveLb ?? livePayloadSumLb,
         ...(lastGoodSchematicTanks
           ? { liveTanks: lastGoodSchematicTanks }
           : {}),

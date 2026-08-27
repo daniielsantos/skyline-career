@@ -2,8 +2,37 @@ import { careerFuelMatchOk, careerLoadWeightMatchOk, careerPreflightReady, paylo
 import {
   DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
+  sumStationWeights,
 } from './ofp-compliance.js';
 import type { OfpStationRoleMap } from './types/ofp-compliance.js';
+
+/**
+ * Classic GA / freighter Loaded vs Due (Duke, Caravan, Twin Otter, ATR HighLine…).
+ *
+ * Contract (separate from Wide/Narrow `pax_and_cargo`):
+ * - Due = OFP freight after MTOW (crew seeded on crewStations, not in Due)
+ * - Live = Σ baggageStations (+ passengerStations used as cargo seats)
+ * - Never include crewStations — otherwise Watch paints Sim = bags+crew vs Due = bags
+ *
+ * Do not use this for `loadLayout: pax_and_cargo` (cabin+holds) or PMDG BCF S1–S9.
+ */
+export function careerFreighterLivePayloadLb(opts: {
+  stations?: Record<number, number>;
+  stationRoles?: OfpStationRoleMap | null;
+}): number | undefined {
+  if (!opts.stations || !opts.stationRoles) return undefined;
+  const bags = (opts.stationRoles.baggageStations ?? []).filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  const pax = (opts.stationRoles.passengerStations ?? []).filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  if (bags.length === 0 && pax.length === 0) return undefined;
+  return (
+    (sumStationWeights(opts.stations, bags) ?? 0) +
+    (sumStationWeights(opts.stations, pax) ?? 0)
+  );
+}
 
 /**
  * Live payload for `pax_and_cargo`: OFP payload is cabin + holds, not cockpit crew.

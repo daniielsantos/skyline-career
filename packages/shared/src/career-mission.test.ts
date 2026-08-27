@@ -1446,6 +1446,39 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 14_500);
   });
 
+  it('uses baggage when EFB pax=1 only adds a standard passenger on top of freight', () => {
+    // Turbine Duke MTOW cut: Payload 909 = Cargo 734 + 175 pax — freight is 734.
+    const ofp = matchingOfp({
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 1_578,
+        passengerCount: 1,
+        baggage: 734,
+        payload: 909,
+      },
+    });
+    assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 734);
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        cargoKg: Math.round(1_100 / KG_TO_LB),
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'blacksquare-turbine-duke',
+      }),
+      matchingOfp({
+        icao: 'B60T',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 1_578,
+          passengerCount: 1,
+          baggage: 734,
+          payload: 909,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'fail');
+    assert.equal(isOfpCargoUnderOnlyFailure(check), true);
+  });
+
   it('does not accept SimBrief Freight leftover as the whole pax_and_cargo load', () => {
     const ofp = matchingOfp({
       loadSheet: {

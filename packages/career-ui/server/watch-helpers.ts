@@ -44,6 +44,7 @@ import {
   resolveLivePayloadLb,
   paxAndCargoLiveStationSumLb,
   pickPaxAndCargoDisplayedLiveLb,
+  careerFreighterLivePayloadLb,
   careerPaxAndCargoLivePayloadLb,
   sanitizeFuelDensityLbPerGal,
   KG_TO_LB,
@@ -1283,6 +1284,16 @@ export class CareerWatchSession {
     stations: number[];
     payloadStations: number[];
   } | null = null;
+  /** Cached pack stationRoles for GA freighter bags-only Live (not on lastOfpCheck). */
+  private freighterRolesCache: {
+    key: string;
+    stationRoles: {
+      crewStations?: number[];
+      passengerStations?: number[];
+      baggageStations?: number[];
+      serviceStations?: number[];
+    };
+  } | null = null;
   private consecutivePipeErrors = 0;
   private opts: Required<
     Pick<
@@ -2317,6 +2328,47 @@ export class CareerWatchSession {
               : undefined;
           const cabinOvershootLb = simconnectCabinOvershootLb(airframe);
           const emptyPayloadBiasLb = simconnectEmptyPayloadBiasLb(airframe);
+          // GA freighter: bags(+cargo seats) only. lastOfpCheck has no
+          // stationRoles — resolve from the roles pack (same as inject).
+          let freighterStationRoles:
+            | {
+                crewStations?: number[];
+                passengerStations?: number[];
+                baggageStations?: number[];
+                serviceStations?: number[];
+              }
+            | undefined;
+          if (!pmdgPaxAndCargo && !preferPmdgFreighterRoles) {
+            const rolesKey = `${current.airframeTypeId ?? ''}|${current.rolesPackRelPath ?? ''}`;
+            if (this.freighterRolesCache?.key === rolesKey) {
+              freighterStationRoles = this.freighterRolesCache.stationRoles;
+            } else if (current.rolesPackRelPath) {
+              try {
+                const roles = await resolveMissionRolesPack({
+                  repoRoot: getRepoRoot(),
+                  rolesPackRelPath: current.rolesPackRelPath,
+                  airframeTypeId: current.airframeTypeId,
+                });
+                const fromPack = roles.pack.payload?.stationRoles;
+                if (fromPack) {
+                  freighterStationRoles = fromPack;
+                  this.freighterRolesCache = {
+                    key: rolesKey,
+                    stationRoles: fromPack,
+                  };
+                }
+              } catch {
+                /* fall through to full station sum */
+              }
+            }
+          }
+          const freighterLiveLb =
+            !pmdgPaxAndCargo && !preferPmdgFreighterRoles
+              ? careerFreighterLivePayloadLb({
+                  stations: load.stations ?? undefined,
+                  stationRoles: freighterStationRoles,
+                })
+              : undefined;
           const rawLivePayloadLb =
             load.payloadSource === 'tfdi-efb' &&
             typeof load.tfdiEfbCargoLb === 'number'
@@ -2331,9 +2383,11 @@ export class CareerWatchSession {
                       cabinStationSumLb: paxAndCargoCabinLb,
                     }) ??
                     (prevVerification.payload.liveLb ?? undefined))
-                  : load.payloadLb !== null
-                    ? load.payloadLb
-                    : (prevVerification.payload.liveLb ?? undefined);
+                  : freighterLiveLb !== undefined
+                    ? freighterLiveLb
+                    : load.payloadLb !== null
+                      ? load.payloadLb
+                      : (prevVerification.payload.liveLb ?? undefined);
           const liveHaircutLb = cabinOvershootLb + emptyPayloadBiasLb;
           const livePayloadLb =
             typeof rawLivePayloadLb === 'number' && liveHaircutLb > 0
@@ -2393,6 +2447,7 @@ export class CareerWatchSession {
             previousStationSumLb,
             stationSumNow,
             plannedPayloadLb,
+            freighterLiveLb: freighterLiveLb ?? null,
             pmdgZfwLb: pmdgZfwLb ?? null,
             ofpEmptyLb: ofpEmptyLb ?? null,
             paxAndCargoFromZfwLb: paxAndCargoFromZfwLb ?? null,

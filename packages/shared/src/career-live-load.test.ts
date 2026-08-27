@@ -8,6 +8,7 @@ import {
   pickStableLiveFuelLb,
   paxAndCargoLiveStationSumLb,
   pickPaxAndCargoDisplayedLiveLb,
+  careerFreighterLivePayloadLb,
   careerPaxAndCargoLivePayloadLb,
   resolveLivePayloadLb,
   stationSampleIncomplete,
@@ -17,6 +18,56 @@ import {
   DEFAULT_JET_A_LB_PER_GAL,
   sanitizeFuelDensityLbPerGal,
 } from './ofp-compliance.js';
+
+describe('careerFreighterLivePayloadLb', () => {
+  const roles = {
+    crewStations: [1, 2],
+    baggageStations: [3, 4, 5, 6, 7, 8, 9, 10],
+  };
+  // Turbine Duke after inject: 2×170 crew + 503 lb bags across holds.
+  const stations = {
+    1: 170,
+    2: 170,
+    3: 50,
+    4: 50,
+    5: 70,
+    6: 70,
+    7: 70,
+    8: 71,
+    9: 61,
+    10: 61,
+  };
+
+  it('sums bags only so crew is not compared to freight Due', () => {
+    assert.equal(
+      careerFreighterLivePayloadLb({ stations, stationRoles: roles }),
+      503,
+    );
+  });
+
+  it('includes passenger seats used as cargo, still skips crew', () => {
+    assert.equal(
+      careerFreighterLivePayloadLb({
+        stations: { ...stations, 11: 200 },
+        stationRoles: {
+          ...roles,
+          passengerStations: [11],
+        },
+      }),
+      703,
+    );
+  });
+
+  it('returns undefined without bag/pax roles (caller falls back)', () => {
+    assert.equal(
+      careerFreighterLivePayloadLb({
+        stations,
+        stationRoles: { crewStations: [1, 2] },
+      }),
+      undefined,
+    );
+  });
+});
 
 describe('paxAndCargoLiveStationSumLb', () => {
   const stations = {

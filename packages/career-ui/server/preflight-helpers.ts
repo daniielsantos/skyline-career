@@ -6,6 +6,7 @@
 import {
   KG_TO_LB,
   applyOfpBallastLb,
+  careerFreighterLivePayloadLb,
   careerPaxAndCargoLivePayloadLb,
   evaluateLoadVerification,
   evaluateOriginProximity,
@@ -21,7 +22,6 @@ import {
   resolveAirportCoords,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
-  sumStationWeights,
   toLb,
   type FuelTankBreakdown,
   type MissionIntent,
@@ -418,14 +418,6 @@ export async function runMissionPreflight(
       ofp.payload?.stationRoles?.crewStations?.filter(
         (idx) => Number.isFinite(idx) && idx > 0,
       ) ?? [];
-    const baggageStationIdxs =
-      ofp.payload?.stationRoles?.baggageStations?.filter(
-        (idx) => Number.isFinite(idx) && idx > 0,
-      ) ?? [];
-    const passengerStationIdxs =
-      ofp.payload?.stationRoles?.passengerStations?.filter(
-        (idx) => Number.isFinite(idx) && idx > 0,
-      ) ?? [];
     const liveCrewLb = crewStationIdxs.reduce((sum, idx) => {
       const lb = live.payload?.stations?.[idx];
       return sum + (typeof lb === 'number' && Number.isFinite(lb) ? lb : 0);
@@ -444,6 +436,7 @@ export async function runMissionPreflight(
             ofp.loadSheet.unit ?? ofp.fuel.unit ?? 'lb',
           )
         : undefined;
+    // Layout branches stay separate: pax_and_cargo ≠ GA freighter bags-only.
     const paxCargoLiveLb =
       isPaxAndCargoLoadLayout(careerAirframe) && live.payload?.stations
         ? careerPaxAndCargoLivePayloadLb({
@@ -453,19 +446,12 @@ export async function runMissionPreflight(
             ofpEmptyLb,
           })
         : undefined;
-    const freighterRoleSumLb =
-      live.payload?.stations &&
-      (baggageStationIdxs.length > 0 ||
-        passengerStationIdxs.length > 0 ||
-        (!isPaxAndCargoLoadLayout(careerAirframe) &&
-          crewStationIdxs.length > 0))
-        ? (sumStationWeights(live.payload.stations, baggageStationIdxs) ?? 0) +
-          (sumStationWeights(live.payload.stations, passengerStationIdxs) ??
-            0) +
-          (isPaxAndCargoLoadLayout(careerAirframe)
-            ? 0
-            : (sumStationWeights(live.payload.stations, crewStationIdxs) ?? 0))
-        : undefined;
+    const freighterRoleSumLb = !isPaxAndCargoLoadLayout(careerAirframe)
+      ? careerFreighterLivePayloadLb({
+          stations: live.payload?.stations,
+          stationRoles: ofp.payload?.stationRoles,
+        })
+      : undefined;
     // EFB imports often leave S1/S2 at 0 — drop crew floor from Due when empty.
     // When crew is present (MD-11 S1–S3), keep 3 × 170 lb in Due.
     const plannedPayload = plannedPayloadBase

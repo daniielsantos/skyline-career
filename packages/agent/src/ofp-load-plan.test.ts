@@ -1453,17 +1453,24 @@ describe('plannedStationPayloadLb', () => {
     assert.equal(freighterStyle.crewLb, 0);
   });
 
-  it('pax_and_cargo Due omits crew floor (EFB sheet already has S1/S2)', () => {
+  it('freighter Due reserves crew under MTOW without adding them to the total', () => {
+    // Turbine Duke: OFP freight 733, empty 4553, fuel 1578, MTOW 7000, 2 crew.
+    // room = 7000 - 4553 - 1578 - 340 - 25 = 504 freight max.
     const due = plannedStationPayloadLb({
-      cargoLb: 64_659,
+      cargoLb: 733,
       stationRoles: {
-        crewStations: [],
+        crewStations: [2, 3],
         passengerStations: [],
-        baggageStations: [1, 2, 4, 5, 6, 7, 8],
+        baggageStations: [1, 4, 5, 6, 7, 8],
       },
+      emptyWeightLb: 4_553,
+      maxGrossWeightLb: 7_000,
+      blockFuelLb: 1_578,
     });
+    assert.equal(due.gaCabin, false);
     assert.equal(due.crewLb, 0);
-    assert.equal(due.plannedTotalLb, 64_659);
+    assert.equal(due.cargoPlacedLb, 504);
+    assert.equal(due.plannedTotalLb, 504);
   });
 });
 

@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-27: Loaded vs Due — **GA freighter** (`careerFreighterLivePayloadLb`: bags only) separado de Wide/Narrow `pax_and_cargo`. Watch resolve roles do pack (não `lastOfpCheck`). Inject stamp pós-write = bags, não soma com crew.
+
 Atualizado 2026-08-25: Desktop **0.3.48** shipped — PMDG 777-200ER/LR/300ER Skyline CDU inject + pax. Validar inject live FO CDU no 300ER.
 
 Atualizado 2026-08-24: esboço homologação colaborativa em `13-collaborative-homologation.md` (não implementar agora). Cards Market/Hangar têm **i** de add-on (`airframe-addons.ts`).

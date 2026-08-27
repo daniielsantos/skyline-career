@@ -399,11 +399,13 @@ export function plannedStationPayloadLb(opts: {
   const paxN = roles?.passengerStations?.length ?? 0;
   const bagN = roles?.baggageStations?.length ?? 0;
   const gaCabin = paxN > 0;
-  // Freighter / career cargo: Due is the OFP payload we sent to SimBrief.
-  // Do not add a Skyline crew floor on top — EFB imports already include the
-  // pilot in that payload (ATR HighLine pax=1), and inject counts crew seed
-  // against the same OFP total.
+  // Freighter / career cargo: Due is the OFP freight we sent to SimBrief.
+  // Do not add a Skyline crew floor on top — inject seeds crew separately and
+  // Loaded vs Due compares baggage(+pax) stations only for freighters.
   const crewLb = gaCabin ? crewN * FREIGHTER_PILOT_LB : 0;
+  // Inject always seeds crewStations @ 170 lb; reserve them under MTOW so Due
+  // matches what can actually be placed (Duke: 733 OFP → ~503 with 2 crew).
+  const crewRoomLb = crewN * FREIGHTER_PILOT_LB;
   let cargoLb = Math.max(0, opts.cargoLb);
 
   if (
@@ -417,7 +419,7 @@ export function plannedStationPayloadLb(opts: {
       opts.maxGrossWeightLb -
       opts.emptyWeightLb -
       opts.blockFuelLb -
-      crewLb -
+      crewRoomLb -
       25;
     if (room >= 0) cargoLb = Math.min(cargoLb, room);
   }

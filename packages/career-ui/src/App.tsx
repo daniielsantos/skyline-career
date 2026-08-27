@@ -5225,6 +5225,21 @@ export function App() {
     watch?.running,
   ]);
 
+  // Confirming forever when Sim payload never reaches Due (MTOW cut without
+  // Accept, Accu-Sim under-read, etc.) — time out to a recoverable failed state.
+  useEffect(() => {
+    if (loadOfpAutoStatus !== 'done') return;
+    const timer = window.setTimeout(() => {
+      if (loadOfpAutoStatusRef.current !== 'done') return;
+      setLoadOfpAutoStatus('failed');
+      setLoadOfpAutoError(
+        'Inject wrote, but Loaded vs Due still does not match. If SimBrief limited cargo, Accept OFP cargo first; otherwise re-check stations and retry inject.',
+      );
+      setLoadOfpProgress(null);
+    }, 20_000);
+    return () => window.clearTimeout(timer);
+  }, [loadOfpAutoStatus]);
+
   // Do not auto-hide the inject toggle on a timer — user turns it off manually.
 
   // Continuously refresh Loaded vs Due while staging on the ground.

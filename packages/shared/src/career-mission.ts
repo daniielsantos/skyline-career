@@ -2687,7 +2687,7 @@ export interface IntentOfpTolerances {
 export const DEFAULT_INTENT_OFP_TOLERANCES: IntentOfpTolerances = {
   cargoAbsKg: 500,
   cargoPct: 0.03,
-  cargoUnderAbsKg: 100,
+  cargoUnderAbsKg: 50,
   cargoUnderPct: 0.05,
   // Navigraph SimBrief EFB weight import requires ≥1 pax (counts as pilot)
   // even on freighters — see dispatch redirect pax=1.
@@ -2821,19 +2821,29 @@ export function applyOfpBallastLb(
   };
 }
 
-/** Prefer SimBrief payload (cabin+freight) over the Freight/baggage line. */
+/** Prefer SimBrief freight for Intent→OFP; fall back to Payload when Freight is a soft-cap. */
 export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
   const sheet = ofp.loadSheet;
   if (!sheet) return undefined;
   const unit = sheet.unit ?? ofp.fuel.unit ?? 'kg';
   const baggage = sheet.baggage;
   const payload = sheet.payload ?? ofp.payload?.total;
+  const pax = sheet.passengerCount ?? 0;
 
   let value: number | undefined;
   if (baggage !== undefined && payload !== undefined) {
-    // pax_and_cargo OFPs: Freight= is leftover after seats; career cargo is Payload.
-    // EFB pax=1: Freight may be a tiny maxcargo cap while Payload holds the load.
-    value = Math.max(baggage, payload);
+    // EFB pilot (pax≈1): Payload = Freight + one standard pax. Career freight is
+    // the baggage line — counting the pilot as cargo hid MTOW cuts (Turbine Duke:
+    // 734 bag / 909 payload vs ~1.1 klb mission → false OFP PASS, no Accept).
+    // ATR HighLine: Freight is a tiny maxcargo while Payload holds the load.
+    if (pax <= 1) {
+      const paxLike = payload - baggage;
+      const oneStandardPax = paxLike >= 100 && paxLike <= 260;
+      value = oneStandardPax ? baggage : Math.max(baggage, payload);
+    } else {
+      // pax_and_cargo OFPs: Freight= is leftover after seats; career cargo is Payload.
+      value = Math.max(baggage, payload);
+    }
   } else {
     value = baggage ?? payload;
   }

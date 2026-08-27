@@ -157,6 +157,50 @@ describe('lastPreflightFromInjectLive', () => {
     assert.equal(check.verdict, 'pass');
   });
 
+  it('GA freighter stamp uses bags-only live vs freight Due (not crew+bags)', () => {
+    // Duke: S2/S3 crew 340 + bags 503 = 843 stations; Due/live compare 503.
+    const check = lastPreflightFromInjectLive({
+      previous: {
+        verdict: 'fail',
+        summary: 'stale',
+        checkedAtIso: '2026-01-01T00:00:00Z',
+        loadVerification: {
+          ready: false,
+          fuel: { plannedLb: 1579, liveLb: 100, ok: false },
+          payload: {
+            plannedLb: 503,
+            liveLb: 843,
+            ok: false,
+            cargoLb: 503,
+            crewLb: 0,
+          },
+          aircraft: { onGround: true, enginesRunning: true },
+          weightNoteCount: 0,
+        },
+        findings: [],
+      } as NonNullable<MissionIntent['lastPreflightCheck']>,
+      stations: {
+        1: 100,
+        2: 170,
+        3: 170,
+        4: 100,
+        5: 100,
+        6: 77,
+        7: 76,
+        8: 50,
+      },
+      tanks: { LEFT_MAIN: 790, RIGHT_MAIN: 790 },
+      liveFuelLb: 1579,
+      livePayloadLb: 503,
+      liveTanks: { left: 790, right: 790, center: 0 },
+      blockFuelLb: 1579,
+      cargoLb: 503,
+    });
+    assert.equal(check.loadVerification?.payload.liveLb, 503);
+    assert.equal(check.loadVerification?.payload.ok, true);
+    assert.equal(check.loadVerification?.ready, true);
+  });
+
   it('prefers verified livePayloadLb over inflated classic stations (PMDG ZFW)', () => {
     const check = lastPreflightFromInjectLive({
       previous: {

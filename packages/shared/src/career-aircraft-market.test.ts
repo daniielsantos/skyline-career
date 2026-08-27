@@ -36,7 +36,7 @@ import {
 import { createSeedEconomyWorld } from './career-economy.js';
 import { ensureWorldAircraftPool } from './career-aircraft-pool.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
-import { ECONOMIC_LIFE_HOURS } from './career-aircraft-pricing.js';
+import { CONDITION_PRICE_MULT, ECONOMIC_LIFE_HOURS } from './career-aircraft-pricing.js';
 import { economyDayIndex } from './career-weather.js';
 import {
   findCareerPlayerAirframe,
@@ -639,7 +639,7 @@ describe('aircraft market', () => {
     const fair = resolveAircraftMsrpUsd({
       aircraftClassId: 'light_ga',
       maxCargoKg: findCareerPlayerAirframe(spare.airframeTypeId)?.maxCargoKg,
-    }) * 0.62;
+    }) * CONDITION_PRICE_MULT.fair;
     const { listing } = listAircraftForSale(
       state,
       'acf_sale_npc',
@@ -1007,13 +1007,13 @@ describe('aircraft market', () => {
       hoursAirframe: ECONOMIC_LIFE_HOURS.light_ga,
       hoursEngine: ECONOMIC_LIFE_HOURS.light_ga,
     });
-    assert.equal(agedFair, Math.round(freshFair * 0.7));
+    assert.equal(agedFair, Math.round(freshFair * 0.8));
     acf.hoursAirframe = ECONOMIC_LIFE_HOURS.light_ga;
     acf.hoursEngine = ECONOMIC_LIFE_HOURS.light_ga;
     const agedSell = sellBackValueUsd(acf);
     acf.hoursAirframe = 0;
     acf.hoursEngine = 0;
     const freshSell = sellBackValueUsd(acf);
-    assert.equal(agedSell, Math.round(freshSell * 0.7));
+    assert.equal(agedSell, Math.round(freshSell * 0.8));
   });
 });

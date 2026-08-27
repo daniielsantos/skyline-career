@@ -6,6 +6,7 @@ import { hubTierOf, type CareerEconomyWorld } from './career-economy.js';
 import { isBushHub } from './career-bush.js';
 import { conditionPctsForListing } from './career-aircraft-maintenance.js';
 import {
+  CONDITION_LEASE_WEEKLY_MULT,
   CONDITION_PRICE_MULT,
   hoursValueMult,
   resolveAircraftLeaseWeeklyUsd,
@@ -369,9 +370,10 @@ function priceInstance(
     const entryWeeks = 4;
     const roll = rng();
     const termMonths = roll < 0.4 ? 1 : roll < 0.75 ? 2 : 3;
+    const weekly = Math.round(monthly * CONDITION_LEASE_WEEKLY_MULT[condition]);
     return {
-      askingUsd: Math.round(monthly * entryWeeks),
-      leaseMonthlyUsd: monthly,
+      askingUsd: Math.round(weekly * entryWeeks),
+      leaseMonthlyUsd: weekly,
       leaseTermMonths: termMonths,
     };
   }

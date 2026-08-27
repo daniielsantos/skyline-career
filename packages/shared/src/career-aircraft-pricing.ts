@@ -9,7 +9,7 @@ import type { AirframeCondition, FreighterClassId } from './types/career-economy
 
 export const AIRCRAFT_MSRP_USD: Record<FreighterClassId, number> = {
   light_ga: 85_000,
-  light_turboprop: 280_000,
+  light_turboprop: 450_000,
   light_jet: 750_000,
   medium_piston: 1_200_000,
   narrow_freighter: 1_800_000,
@@ -27,8 +27,8 @@ export const CLASS_BASELINE_CARGO_KG: Record<FreighterClassId, number> = {
 };
 
 /** Soft clamp so outliers (tiny trainers / fat pods) do not break the ladder. */
-export const CARGO_MSRP_MULT_MIN = 0.8;
-export const CARGO_MSRP_MULT_MAX = 1.6;
+export const CARGO_MSRP_MULT_MIN = 0.72;
+export const CARGO_MSRP_MULT_MAX = 2.8;
 
 /**
  * Sub-linear cargo response — capacity earns more, but not 1:1 with kg
@@ -41,11 +41,11 @@ export const CARGO_MSRP_CURVE_EXP = 0.65;
  * Baseline weekly lease ≈ MSRP × rate.
  * Charged every economy week; short terms (≤3 mo) so leasing is expensive
  * temporary access — not a cheap ladder skip vs buy.
- * (~1.2–1.65%/wk ≈ ~5–6.5%/mo equivalent, above the old monthly table.)
+ * (~1.2–2.2%/wk; light_tp elevated so ATR/Saab lease is not a cheap ladder).
  */
 export const AIRCRAFT_LEASE_WEEKLY_RATE: Record<FreighterClassId, number> = {
   light_ga: 0.0165,
-  light_turboprop: 0.015,
+  light_turboprop: 0.022,
   light_jet: 0.014,
   medium_piston: 0.0135,
   narrow_freighter: 0.013,
@@ -58,8 +58,19 @@ export const AIRCRAFT_LEASE_MONTHLY_RATE = AIRCRAFT_LEASE_WEEKLY_RATE;
 export const CONDITION_PRICE_MULT: Record<AirframeCondition, number> = {
   excellent: 0.92,
   good: 0.78,
-  fair: 0.62,
-  tired: 0.48,
+  fair: 0.68,
+  tired: 0.55,
+};
+
+/**
+ * Mild condition band for dealer lease weekly (buy used still uses
+ * CONDITION_PRICE_MULT). Keeps Excellent ≠ Fair on the lease board.
+ */
+export const CONDITION_LEASE_WEEKLY_MULT: Record<AirframeCondition, number> = {
+  excellent: 1.05,
+  good: 1.0,
+  fair: 0.92,
+  tired: 0.85,
 };
 
 /** Hours at which age multipliers reach their cap (not a hard TBO). */
@@ -76,8 +87,8 @@ export const HOURS_AF_BLEND = 0.6;
 export const HOURS_ENG_BLEND = 0.4;
 /** Extra workshop cost at full economic life (1 + gain = 1.6×). */
 export const HOURS_MX_AGE_GAIN = 0.6;
-/** Fair-value haircut at full economic life (1 − haircut = 0.7×). */
-export const HOURS_VALUE_HAIRCUT = 0.3;
+/** Fair-value haircut at full economic life (1 − haircut = 0.8×). */
+export const HOURS_VALUE_HAIRCUT = 0.2;
 
 export type HoursLifeInput = {
   aircraftClassId: FreighterClassId;

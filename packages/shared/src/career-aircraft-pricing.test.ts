@@ -7,11 +7,14 @@ import {
   AIRCRAFT_MSRP_USD,
   CARGO_MSRP_MULT_MAX,
   CARGO_MSRP_MULT_MIN,
+  CONDITION_LEASE_WEEKLY_MULT,
+  CONDITION_PRICE_MULT,
   cargoMsrpMultiplier,
   ECONOMIC_LIFE_HOURS,
   hoursMxCostMult,
   hoursValueMult,
   resolveAircraftLeaseMonthlyUsd,
+  resolveAircraftLeaseWeeklyUsd,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
 
@@ -83,6 +86,55 @@ describe('cargo-scaled aircraft MSRP', () => {
     });
     assert.ok(leaseFat > leaseBase);
   });
+
+  it('prices ATR regionals well above light-TP floor (anti-snowball)', () => {
+    const kingFloor = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 556,
+    });
+    const atr42 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 5_000,
+    });
+    const atr72 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 7_500,
+    });
+    assert.ok(atr42 > kingFloor * 2);
+    assert.ok(atr72 > atr42);
+    assert.ok(atr72 >= 1_100_000, `ATR72 MSRP ${atr72}`);
+
+    const leaseFloor = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 556,
+    });
+    const lease42 = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 5_000,
+    });
+    const lease72 = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 7_500,
+    });
+    assert.ok(lease42 > leaseFloor);
+    assert.ok(lease72 > lease42);
+    assert.ok(lease72 >= 20_000, `ATR72 lease ${lease72}`);
+
+    const tiredAged = Math.round(
+      atr72 *
+        CONDITION_PRICE_MULT.tired *
+        hoursValueMult({
+          aircraftClassId: 'light_turboprop',
+          hoursAirframe: ECONOMIC_LIFE_HOURS.light_turboprop,
+          hoursEngine: ECONOMIC_LIFE_HOURS.light_turboprop,
+        }),
+    );
+    assert.ok(tiredAged >= 450_000, `ATR72 tired+aged ${tiredAged}`);
+    assert.ok(
+      CONDITION_LEASE_WEEKLY_MULT.excellent >
+        CONDITION_LEASE_WEEKLY_MULT.fair,
+    );
+  });
 });
 
 describe('hours life multipliers', () => {
@@ -102,7 +154,7 @@ describe('hours life multipliers', () => {
       hoursEngine: life,
     };
     assert.equal(hoursMxCostMult(full), 1.6);
-    assert.equal(hoursValueMult(full), 0.7);
+    assert.equal(hoursValueMult(full), 0.8);
   });
 
   it('weights engine hours less than airframe for MX', () => {

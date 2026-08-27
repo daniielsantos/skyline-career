@@ -28,6 +28,7 @@ import {
 } from './career-aircraft-maintenance.js';
 import {
   AIRCRAFT_MSRP_USD,
+  CONDITION_LEASE_WEEKLY_MULT,
   CONDITION_PRICE_MULT,
   hoursValueMult,
   resolveAircraftLeaseWeeklyUsd,
@@ -592,9 +593,10 @@ function priceListing(
     const entryWeeks = PLAYER_LEASE_DEPOSIT_WEEKS;
     const roll = rng();
     const termMonths = roll < 0.4 ? 1 : roll < 0.75 ? 2 : 3;
+    const weekly = Math.round(monthly * CONDITION_LEASE_WEEKLY_MULT[condition]);
     return {
-      askingUsd: Math.round(monthly * entryWeeks),
-      leaseMonthlyUsd: monthly,
+      askingUsd: Math.round(weekly * entryWeeks),
+      leaseMonthlyUsd: weekly,
       leaseTermMonths: termMonths,
     };
   }

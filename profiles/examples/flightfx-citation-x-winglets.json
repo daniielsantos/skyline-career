@@ -1,17 +1,16 @@
 {
   "schemaVersion": "1.0.0",
-  "profileId": "flightfx-c750",
-  "profileKey": "flightfx/c750",
+  "profileId": "flightfx-citation-x-winglets",
+  "profileKey": "flightfx/citation-x-winglets",
   "semver": "1.0.0",
-  "displayName": "C750 (MSFS 2024)",
+  "displayName": "Citation X Winglets (MSFS 2024)",
   "match": {
-    "fingerprint": "34b6e3f7d9ec4ac10b51f245204aa6678fb4c8d3c8e47a62b079372301ef1040",
-    "title": "C750",
+    "fingerprint": "4fdb708e2518bc13b032c57186c0f53a2be9e3f7314cd270a039e9e2e003b280",
+    "title": "Citation X Winglets",
     "publisher": "flightfx",
     "icao": "C750",
     "liveTitles": [
-      "C750",
-      "C750 - Livery 1"
+      "Citation X Winglets"
     ]
   },
   "capabilities": [
@@ -62,7 +61,7 @@
         "op": "simvar_set",
         "var": "FUEL TANK LEFT MAIN QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{LEFT_MAIN} - 0.1"
+        "valueExpr": "{LEFT_MAIN}"
       },
       {
         "op": "simvar_set",
@@ -74,7 +73,7 @@
         "op": "simvar_set",
         "var": "FUEL TANK CENTER QUANTITY",
         "unit": "gallons",
-        "valueExpr": "{CENTER} + 0.2"
+        "valueExpr": "{CENTER}"
       },
       {
         "op": "delay",
@@ -271,17 +270,17 @@
       "maxMac": 35
     },
     "calibration": {
-      "observedMac": 21.81357890367508,
-      "calibratedAtIso": "2026-08-09T14:53:03.672Z",
+      "observedMac": 21.813972294330597,
+      "calibratedAtIso": "2026-08-27T00:38:39.783Z",
       "sweep": {
-        "minObservedMac": 22.925302386283875,
-        "maxObservedMac": 24.90389496088028,
+        "minObservedMac": 22.92555570602417,
+        "maxObservedMac": 24.903832376003265,
         "payloadLb": 200,
         "forwardStation": 1,
         "aftStation": 12,
         "usedStationArms": false,
         "restored": true,
-        "sampledAtIso": "2026-08-09T14:53:12.456Z"
+        "sampledAtIso": "2026-08-27T00:38:48.533Z"
       }
     }
   },
@@ -291,13 +290,13 @@
     ]
   },
   "notes": [
-    "Homologated via wizard: C750.",
+    "Homologated via wizard: Citation X Winglets.",
     "ICAO type designator (catalog/SimBrief): C750.",
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, CENTER).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12.",
     "Station maxLoad: placeholder until flight_model.cfg calibrate.",
     "Homologated with interactive wizard.",
-    "See profiles/notes/flightfx-c750.md"
+    "See profiles/notes/flightfx-citation-x-winglets.md"
   ]
 }

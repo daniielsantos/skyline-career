@@ -377,8 +377,8 @@ CLASS SCENE KIT — light_jet: Cool slate dusk sky with soft blue-gray gradients
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
-## C750 Citation X
-- **typeId:** `flightfx-c750-winglets`
+## Citation X (FlightFX v2)
+- **typeIds:** `flightfx-citation-x`, `flightfx-citation-x-winglets`
 - **file:** `citation-c750.png`
 
 ```

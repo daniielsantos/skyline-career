@@ -1,11 +1,11 @@
-# C750 — discovery
+# Citation X Winglets — discovery
 
-**In-sim title (example):** `C750 - Livery 1`  
-**Match title:** `C750`  
+**In-sim title (example):** `Citation X Winglets`  
+**Match title:** `Citation X Winglets`  
 **ICAO (SimBrief type):** `C750`  
 **Publisher:** `flightfx`  
 **Stations:** 12  
-**Profile:** `flightfx/c750@1.0.0`
+**Profile:** `flightfx/citation-x-winglets@1.0.0`
 
 ## Fuel tanks
 
@@ -25,4 +25,5 @@
 
 ## Homologated
 
-- `profiles/examples/flightfx-c750.json`
+- `profiles/examples/flightfx-citation-x-winglets.json`
+- Family OFP: `profiles/ofp/flightfx-citation-x.json` (shared with Citation X)

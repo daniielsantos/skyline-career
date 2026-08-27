@@ -125,7 +125,8 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   // --- light_jet ---
   'workingtitle-cessna-citation-longitude-passengers':
     '/airframes/citation-longitude.png',
-  'flightfx-c750-winglets': '/airframes/citation-c750.png',
+  'flightfx-citation-x': '/airframes/citation-c750.png',
+  'flightfx-citation-x-winglets': '/airframes/citation-c750.png',
   'workingtitle-cessna-citation-cj4': '/airframes/citation-cj4.png',
   'skyward-cessna-c680': '/airframes/citation-sovereign.png',
   'flysimware-learjet-35a-cargo': '/airframes/learjet-35a.png',

@@ -93,6 +93,7 @@ node packages/agent/dist/cli.js smoke --profile profiles/examples\<profile>.json
 | Novo país/hub | `.cursor/rules/career-map-expansion.mdc` |
 | Sessão recente (Market ATR/Titan, BBJ2, Host…) | `docs/agent-context/01`, `06`, `09`, `10` |
 | Homologação colaborativa (esboço) | `docs/agent-context/13-collaborative-homologation.md` |
+| Produto / B2P vs MP (esboço) | `docs/agent-context/15-business-model.md` |
 | Constraints operacionais | `docs/agent-context/00-constraints.md` |
 | README humano | `README.md`, `packages/career-ui/README.md`, `packages/desktop/README.md` |
 

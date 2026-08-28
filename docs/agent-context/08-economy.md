@@ -96,6 +96,7 @@ Contrato curto — detalhe em **`.cursor/rules/career-economy-roadmap.mdc`** (*C
 - **Pilot ≠ company** — `pilot_name` / `pilot_icao` no `company_state` são atalho SP; não inchá-los; members/roles só quando houver fatia co-op.
 - Norte MP: empresa privada + mundo compartilhado + ranking por company (não rewrite de tick).
 - **Relógio MP (esboço):** [14-mp-world-clock.md](./14-mp-world-clock.md) — tick no server 24/7; client só read + comandos; deprecar catch-up local.
+- **Produto / loja (esboço):** [15-business-model.md](./15-business-model.md) — uma compra, SP+MP, career global; sem DLC de região.
 - Ao tocar persistência: estado do jogador sempre sob `company_id`; facade `CareerStore` permanece.
 
 ## Ground staff (Ports / WH)

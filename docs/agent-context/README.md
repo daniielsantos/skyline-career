@@ -32,6 +32,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [10-aircraft-pool.md](./10-aircraft-pool.md) | Pool de aviões: regras + roadmap F0–F7 |
 | [11-persist-commands.md](./11-persist-commands.md) | Settle/comandos SQL incrementais; pré-req MP |
 | [14-mp-world-clock.md](./14-mp-world-clock.md) | MP: relógio autoritativo, tick server-side, fim do catch-up client |
+| [15-business-model.md](./15-business-model.md) | Produto: B2P único, SP+MP, sem paywall de mapa; extras opcionais |
 
 ## Manutenção
 

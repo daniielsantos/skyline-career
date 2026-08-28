@@ -2206,6 +2206,41 @@ export function PortsPanel(props: {
                 <div className="ports-listings">
                   {port ? (
                     <>
+                      {(() => {
+                        const chips = (port.marketSignals ?? []).filter(
+                          (s) =>
+                            s.balance === 'surplus' || s.balance === 'shortage',
+                        );
+                        if (chips.length === 0) return null;
+                        return (
+                          <div
+                            className="ports-market-signals"
+                            aria-label="Pickup hub market pressure"
+                          >
+                            {chips.map((s) => {
+                              const tight = s.balance === 'shortage';
+                              const label = tight ? 'tight' : 'surplus';
+                              return (
+                                <span
+                                  key={`${s.commodityId}-${s.hubIcao}`}
+                                  className={
+                                    tight
+                                      ? 'tag ports-signal-chip is-tight'
+                                      : 'tag ports-signal-chip is-surplus'
+                                  }
+                                  title={`${s.commodityName} at ${s.hubIcao}: hub warehouse ${s.fillPct}% full`}
+                                >
+                                  {label} {s.commodityName}
+                                  <span className="ports-signal-hub">
+                                    {' '}
+                                    @{s.hubIcao}
+                                  </span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                       {(port.inventory?.length ?? 0) > 0 ? (
                         <details className="ports-stock-details">
                           <summary>Port stock</summary>

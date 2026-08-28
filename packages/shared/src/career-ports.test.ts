@@ -16,6 +16,9 @@ import {
   resolvePortPickupHub,
   settlePortYardHoldFees,
   portSnapshot,
+  portPickupMarketSignals,
+  PORT_HUB_SURPLUS_FILL,
+  PORT_HUB_TIGHT_FILL,
   PORT_YARD_HOLD_USD_PER_KG_DAY,
   PORT_YARD_HOLD_WARN_DAYS,
   stagePortPickupToFbo,
@@ -882,6 +885,37 @@ describe('career ports', () => {
     assert.equal(
       state.portPickups!.reduce((s, p) => s + p.kg, 0),
       2_000,
+    );
+  });
+
+  it('exposes pickup-hub surplus/tight market signals on port snapshot', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-signals' });
+    const sbgr = airportByIcao(world, 'SBGR');
+    assert.ok(sbgr);
+    const pile = sbgr!.inventory.electronics;
+    assert.ok(pile);
+    pile.capacityKg = 100_000;
+    pile.stockKg = 90_000;
+    const mach = sbgr!.inventory.machinery;
+    assert.ok(mach);
+    mach.capacityKg = 100_000;
+    mach.stockKg = 20_000;
+
+    const signals = portPickupMarketSignals(world, ['SBGR', 'SBKP']);
+    const elec = signals.find((s) => s.commodityId === 'electronics');
+    const machinery = signals.find((s) => s.commodityId === 'machinery');
+    assert.equal(elec?.balance, 'surplus');
+    assert.ok((elec?.fillPct ?? 0) >= PORT_HUB_SURPLUS_FILL * 100);
+    assert.equal(machinery?.balance, 'shortage');
+    assert.ok((machinery?.fillPct ?? 100) <= PORT_HUB_TIGHT_FILL * 100);
+
+    const snap = portSnapshot(world, emptyMissionsStateV2());
+    const santos = snap.ports.find((p) => p.id === 'BRSSZ');
+    assert.ok(santos?.marketSignals?.length);
+    assert.ok(
+      santos!.marketSignals.some(
+        (s) => s.commodityId === 'electronics' && s.balance === 'surplus',
+      ),
     );
   });
 

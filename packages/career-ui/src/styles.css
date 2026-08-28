@@ -10419,6 +10419,36 @@ span.dispatch-route-hub-dest {
   font-size: 0.8rem;
 }
 
+.ports-market-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0.65rem 0;
+  padding-bottom: 0.35rem;
+}
+
+.ports-signal-chip {
+  margin-left: 0;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+
+.ports-signal-chip.is-surplus {
+  background: rgba(46, 125, 110, 0.16);
+  color: #1f6b5c;
+}
+
+.ports-signal-chip.is-tight {
+  background: rgba(176, 90, 40, 0.16);
+  color: #8a4a18;
+}
+
+.ports-signal-hub {
+  opacity: 0.75;
+  font-weight: 500;
+}
+
 .ports-stock-details > summary {
   cursor: pointer;
   color: var(--muted, #9aa0a6);

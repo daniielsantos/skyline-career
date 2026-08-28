@@ -1905,6 +1905,14 @@ export type PortsSnapshot = {
       stockKg: number;
       capKg: number;
     }>;
+    /** Pickup-hub surplus / tight (shortage) for Loop B chips. */
+    marketSignals?: Array<{
+      commodityId: string;
+      commodityName: string;
+      balance: 'surplus' | 'shortage' | 'balanced';
+      fillPct: number;
+      hubIcao: string;
+    }>;
     inbound?: {
       arrivesAtTick: number;
       ticksLeft: number;

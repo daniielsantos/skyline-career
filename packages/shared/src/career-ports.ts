@@ -1860,6 +1860,64 @@ const PORT_CARGO: readonly CommodityId[] = [
   'electronics',
 ];
 
+/** Hub fill ≥ this → surplus chip (same band as airport stockBalance). */
+export const PORT_HUB_SURPLUS_FILL = 0.58;
+/** Hub fill ≤ this → tight/shortage chip. */
+export const PORT_HUB_TIGHT_FILL = 0.42;
+
+export type PortMarketSignalBalance = 'surplus' | 'shortage' | 'balanced';
+
+export type PortMarketSignal = {
+  commodityId: CommodityId;
+  commodityName: string;
+  balance: PortMarketSignalBalance;
+  /** 0–100 hub warehouse fill at hubIcao. */
+  fillPct: number;
+  hubIcao: string;
+};
+
+/**
+ * Pickup-hub stock pressure for a port — drives surplus / tight chips (Loop B).
+ * Across multiple hubs, keeps the commodity row with the strongest imbalance.
+ */
+export function portPickupMarketSignals(
+  world: CareerEconomyWorld,
+  pickupHubs: readonly string[],
+): PortMarketSignal[] {
+  const signals: PortMarketSignal[] = [];
+  for (const commodityId of PORT_CARGO) {
+    let best: PortMarketSignal | null = null;
+    let bestScore = -1;
+    for (const raw of pickupHubs) {
+      const hub = raw.trim().toUpperCase();
+      if (!hub) continue;
+      const ap = airportByIcao(world, hub);
+      const pile = ap?.inventory?.[commodityId];
+      if (!pile || !(pile.capacityKg > 0)) continue;
+      const fill = Math.min(1, Math.max(0, pile.stockKg / pile.capacityKg));
+      const balance: PortMarketSignalBalance =
+        fill >= PORT_HUB_SURPLUS_FILL
+          ? 'surplus'
+          : fill <= PORT_HUB_TIGHT_FILL
+            ? 'shortage'
+            : 'balanced';
+      const score = Math.abs(fill - 0.5);
+      if (score > bestScore) {
+        bestScore = score;
+        best = {
+          commodityId,
+          commodityName: getCommodity(commodityId).name,
+          balance,
+          fillPct: Math.round(fill * 1000) / 10,
+          hubIcao: hub,
+        };
+      }
+    }
+    if (best) signals.push(best);
+  }
+  return signals;
+}
+
 function money(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -2531,6 +2589,8 @@ export function portSnapshot(
         stockKg: number;
         capKg: number;
       }>;
+      /** Pickup-hub surplus / tight signals (Loop B UI). */
+      marketSignals: PortMarketSignal[];
       inbound: {
         arrivesAtTick: number;
         ticksLeft: number;
@@ -2678,6 +2738,7 @@ export function portSnapshot(
           ...row,
           commodityName: getCommodity(row.commodityId).name,
         })),
+        marketSignals: portPickupMarketSignals(world, port.pickupHubs),
         inbound:
           inboundTotal > 0
             ? {

@@ -97,6 +97,7 @@ Contrato curto — detalhe em **`.cursor/rules/career-economy-roadmap.mdc`** (*C
 - Norte MP: empresa privada + mundo compartilhado + ranking por company (não rewrite de tick).
 - **Relógio MP (esboço):** [14-mp-world-clock.md](./14-mp-world-clock.md) — tick no server 24/7; client só read + comandos; deprecar catch-up local.
 - **Produto / loja (esboço):** [15-business-model.md](./15-business-model.md) — uma compra, SP+MP, career global; sem DLC de região.
+- **VA / ponte aérea (esboço):** [16-va-logistics.md](./16-va-logistics.md) — WH→WH + Demand; desk F1–F3; tiers 1–3 decididos (C porto→porto caiu).
 - Ao tocar persistência: estado do jogador sempre sob `company_id`; facade `CareerStore` permanece.
 
 ## Ground staff (Ports / WH)

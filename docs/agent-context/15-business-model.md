@@ -86,6 +86,13 @@ O que **não** deve ser o único plano: “MP ou morre o produto”.
 
 Um world denso > muitos shards vazios. Relógio: [14-mp-world-clock.md](./14-mp-world-clock.md).
 
+## VA / desk (ponte para recorrência)
+
+Detalhe: [16-va-logistics.md](./16-va-logistics.md).
+
+- Monetizar **comodidade de desk** (auto-buy → scout → auto-haul) e **seats** VA — não preço de commodity nem lots.
+- Internal haul + Ports/Demand realizam a arbitragem; automação não voa a ponte.
+
 ## Non-goals
 
 - F2P como modelo principal de lançamento

@@ -4075,16 +4075,26 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.equal(world.lastBatchAtMs, threeHoursPlus - 5 * 60 * 1000);
   });
 
-  it('caps catch-up at maxTicks and still snaps lastBatch to wall clock', () => {
+  it('caps catch-up at maxTicks and keeps backlog for the next pulse', () => {
     const world = createSeedEconomyWorld({ seed: 'catch-up-cap' });
     const start = 1_700_000_000_000;
     world.lastBatchAtMs = start;
     world.tick = 0;
     const later = start + 7 * MS_PER_HOUR;
-    const { advancedTicks } = ensureEconomyCaughtUp(world, later, { maxTicks: 1 });
+    const { advancedTicks, wantedTicks, capped } = ensureEconomyCaughtUp(
+      world,
+      later,
+      { maxTicks: 1 },
+    );
     assert.equal(advancedTicks, 1);
+    assert.equal(wantedTicks, 28);
+    assert.equal(capped, true);
     assert.equal(world.tick, 1);
-    assert.equal(world.lastBatchAtMs, later);
+    assert.equal(world.lastBatchAtMs, start + MS_PER_TICK);
+    const again = ensureEconomyCaughtUp(world, later, { maxTicks: 1 });
+    assert.equal(again.advancedTicks, 1);
+    assert.equal(world.tick, 2);
+    assert.equal(world.lastBatchAtMs, start + 2 * MS_PER_TICK);
   });
 
   it('returns 0 when less than one batch elapsed', () => {

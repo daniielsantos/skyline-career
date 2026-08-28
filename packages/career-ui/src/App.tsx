@@ -101,6 +101,7 @@ import {
   type PlayerFboSnapshot,
   type CompanyCrewSnapshot,
   type OfflineFeeSummary,
+  type EconomyCatchUpStatus,
   type RegionPressure,
   type SimBridgeStatus,
   type StarterHubOption,
@@ -3313,6 +3314,8 @@ export function App() {
   const [toastKind, setToastKind] = useState<'ok' | 'warn' | 'fail'>('ok');
   const [offlineFeeBanner, setOfflineFeeBanner] =
     useState<OfflineFeeSummary | null>(null);
+  const [catchUpBanner, setCatchUpBanner] =
+    useState<EconomyCatchUpStatus | null>(null);
   const toast = toastState?.text ?? null;
   const toastSeqRef = useRef(0);
   const setToast = useCallback((text: string | null) => {
@@ -3719,6 +3722,11 @@ export function App() {
     if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
     if (state.offlineFeeSummary) {
       setOfflineFeeBanner(state.offlineFeeSummary);
+    }
+    if (state.catchUp) {
+      setCatchUpBanner(state.catchUp);
+    } else {
+      setCatchUpBanner(null);
     }
     setHubSelected(Boolean(state.hubSelected));
     setFleet(state.fleet ?? []);
@@ -4163,6 +4171,34 @@ export function App() {
       return changed && lines.length > 0 ? { ...current, lines } : current;
     });
   }, [staging?.replaceManifest, staging?.lines]);
+
+  // While economy catch-up is draining, refresh the banner often (timer is ~60s/batch).
+  const economySyncing = catchUpBanner != null;
+  useEffect(() => {
+    if (!economySyncing) return;
+    if (showProfileGate || !activeCareerProfile) return;
+    const id = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void fetchState()
+        .then((state) => {
+          if (state.catchUp) {
+            setCatchUpBanner(state.catchUp);
+          } else {
+            setCatchUpBanner(null);
+          }
+          if (typeof state.tick === 'number') setTick(state.tick);
+          if (typeof state.lastBatchAtMs === 'number') {
+            setLastBatchAtMs(state.lastBatchAtMs);
+          }
+          if (typeof state.serverNowMs === 'number') {
+            setServerOffsetMs(state.serverNowMs - Date.now());
+            setDisplayNowMs(state.serverNowMs);
+          }
+        })
+        .catch(() => undefined);
+    }, 15_000);
+    return () => window.clearInterval(id);
+  }, [economySyncing, showProfileGate, activeCareerProfile?.id]);
 
   // Smooth local clock / ETA / progress between authoritative polls.
   useEffect(() => {
@@ -9464,6 +9500,19 @@ export function App() {
           >
             ×
           </button>
+        </p>
+      ) : null}
+      {catchUpBanner ? (
+        <p className="banner warn" role="status" aria-live="polite">
+          <span>
+            {`Economy syncing · ${catchUpBanner.ticksBehind} batch${
+              catchUpBanner.ticksBehind === 1 ? '' : 'es'
+            } behind (~${
+              catchUpBanner.elapsedHours < 1
+                ? `${Math.max(1, Math.round(catchUpBanner.elapsedHours * 60))}m`
+                : `${catchUpBanner.elapsedHours}h`
+            } away). ~${catchUpBanner.etaMinutes} min left while Career stays open — Freights/NPC refill as batches run.`}
+          </span>
         </p>
       ) : null}
       <DesktopUpdateBanner onOpenSettings={() => selectTab('settings')} />

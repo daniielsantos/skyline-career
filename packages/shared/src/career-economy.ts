@@ -12309,14 +12309,23 @@ export function migrateEconomyWorld(
 }
 
 /**
- * Advance the world by whole hours elapsed since lastBatchAtMs (1:1 batches),
- * and settle continuous NPC ops due at nowMs. Partial hours are preserved.
+ * Advance the world by whole batches elapsed since lastBatchAtMs (15-min ticks),
+ * and settle continuous NPC ops due at nowMs. Partial batches are preserved.
+ * When `maxTicks` caps the run, the wall-clock anchor advances only by the
+ * simulated ticks so a later pulse can drain the remainder (no silent skip).
  */
 export function ensureEconomyCaughtUp(
   world: CareerEconomyWorld | CareerEconomyWorldV1 | Record<string, unknown>,
   nowMs = Date.now(),
   opts: { maxTicks?: number } = {},
-): { advancedTicks: number; settledFlights: number; world: CareerEconomyWorld } {
+): {
+  advancedTicks: number;
+  wantedTicks: number;
+  elapsedMs: number;
+  capped: boolean;
+  settledFlights: number;
+  world: CareerEconomyWorld;
+} {
   const migrated = migrateEconomyWorld(world, { nowMs });
   const w = world as CareerEconomyWorld;
   w.version = 3;
@@ -12388,24 +12397,37 @@ export function ensureEconomyCaughtUp(
   const maxTicks = opts.maxTicks ?? MAX_CATCH_UP_TICKS;
   const wantedTicks = Math.floor(elapsed / MS_PER_TICK);
   const hours = Math.min(maxTicks, wantedTicks);
-  if (wantedTicks > hours) {
+  const capped = wantedTicks > hours;
+  if (capped) {
     console.log(
       `[career] catch-up capped at ${hours}/${wantedTicks} ticks (${(
         (wantedTicks * MS_PER_TICK) /
         hoursToMs(1)
-      ).toFixed(1)}h elapsed)`,
+      ).toFixed(1)}h elapsed; backlog kept for next pulse)`,
     );
   }
   if (hours > 0) {
     tickEconomyN(w, hours, { advanceWallClock: true, fromBatchAtMs: last });
   }
-  // Preserve fractional hour for the next batch boundary.
-  w.lastBatchAtMs = nowMs - (elapsed % MS_PER_TICK);
+  if (capped) {
+    // Drain later: do not snap past the unpaid batches.
+    w.lastBatchAtMs = last + hours * MS_PER_TICK;
+  } else {
+    // Preserve fractional batch for the next boundary.
+    w.lastBatchAtMs = nowMs - (elapsed % MS_PER_TICK);
+  }
   w.lastSyncedAtMs = w.lastBatchAtMs;
 
   settledFlights += settleNpcOpsDue(w, nowMs).settledFlights;
   settledFlights += settleFuelHaulsDue(w, nowMs).settledHauls;
-  return { advancedTicks: hours, settledFlights, world: w };
+  return {
+    advancedTicks: hours,
+    wantedTicks,
+    elapsedMs: elapsed,
+    capped,
+    settledFlights,
+    world: w,
+  };
 }
 
 function baseProdOf(ap: AirportTerminal, commodityId: CommodityId): number {

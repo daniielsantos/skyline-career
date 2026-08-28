@@ -1034,6 +1034,8 @@ export function fetchState() {
       groundStaff?: GroundStaffSnapshot | null;
       leaseUnlock?: AircraftLeaseUnlock;
       offlineFeeSummary?: OfflineFeeSummary | null;
+      /** Present while wall clock is ≥~30 min ahead of last economy batch. */
+      catchUp?: EconomyCatchUpStatus | null;
       starterAircraft?: Array<{
         typeId: string;
         label: string;
@@ -1063,6 +1065,15 @@ export type OfflineFeeSummary = {
     termEndedSoftIds: string[];
     repossessedIds: string[];
   };
+};
+
+export type EconomyCatchUpStatus = {
+  ticksBehind: number;
+  elapsedHours: number;
+  /** Approximate wall minutes left at 1 batch per API catch-up pulse. */
+  etaMinutes: number;
+  pulseMs: number;
+  msPerTick: number;
 };
 
 export type CareerProfileMeta = {

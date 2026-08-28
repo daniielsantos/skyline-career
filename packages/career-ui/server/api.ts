@@ -95,8 +95,10 @@ import {
   regionFuelThin,
   missionRemainingCapacityKg,
   hoursToMs,
+  MS_PER_HOUR,
   MS_PER_TICK,
   msToHours,
+  economyTicksBehind,
   TICKS_PER_DAY,
   listNpcHomeRegions,
   targetNpcFleetSize,
@@ -356,6 +358,11 @@ let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
 /** One-shot banner after long wall-clock catch-up; cleared on /api/state. */
 let pendingOfflineFeeSummary: OfflineFeeSummary | null = null;
+
+/** Catch-up timer interval — keep in sync with listen() setInterval. */
+const CATCH_UP_PULSE_MS = 60_000;
+/** Banner when ≥2 batches owed (~30 min wall) so normal 15-min gaps stay quiet. */
+const CATCH_UP_BANNER_MIN_TICKS = 2;
 
 await ensureCareerProfilesLayout(careerRoot);
 await loadProfileMsfsBushHubOverrides(careerRoot);
@@ -1162,6 +1169,25 @@ function clockPayload(world: CareerEconomyWorld, nowMs = Date.now()) {
   };
 }
 
+/** Progress for catch-up UX while lastBatch lags wall clock. */
+function catchUpPayload(world: CareerEconomyWorld, nowMs: number) {
+  const last =
+    typeof world.lastBatchAtMs === 'number' && Number.isFinite(world.lastBatchAtMs)
+      ? world.lastBatchAtMs
+      : nowMs;
+  const ticksBehind = economyTicksBehind(last, nowMs);
+  if (ticksBehind < CATCH_UP_BANNER_MIN_TICKS) return null;
+  const elapsedMs = Math.max(0, nowMs - last);
+  return {
+    ticksBehind,
+    elapsedHours: Math.round((elapsedMs / MS_PER_HOUR) * 10) / 10,
+    /** ~1 batch per CATCH_UP_PULSE_MS while the API is open. */
+    etaMinutes: ticksBehind,
+    pulseMs: CATCH_UP_PULSE_MS,
+    msPerTick: MS_PER_TICK,
+  };
+}
+
 function clockPayloadFromMeta(
   meta: { tick: number; lastBatchAtMs: number },
   nowMs: number,
@@ -1734,6 +1760,12 @@ export function createCareerApiServer(port = 8787) {
             activeProfileId = id;
             await setActiveCareerProfile(careerRoot, id);
           });
+          // Start draining wall-clock backlog immediately (capped per pulse).
+          try {
+            await withCareerWrite(() => undefined, { catchUp: true });
+          } catch {
+            /* ignore — state banner still shows ticks behind */
+          }
           const file = await readProfilesFile(careerRoot);
           const profile = file.profiles.find((p) => p.id === id) ?? null;
           send(res, 200, {
@@ -1849,6 +1881,7 @@ export function createCareerApiServer(port = 8787) {
           const npcBusy = (world.npcs ?? []).filter((n) => n.status === 'busy').length;
           const offlineFeeSummary = pendingOfflineFeeSummary;
           pendingOfflineFeeSummary = null;
+          const catchUp = catchUpPayload(world, nowMs);
           return {
             needsProfile: false,
             activeProfileId,
@@ -1874,6 +1907,7 @@ export function createCareerApiServer(port = 8787) {
             internationalLaneCount: world.internationalLanes?.length ?? 0,
             store: store!.kind,
             ...(offlineFeeSummary ? { offlineFeeSummary } : {}),
+            ...(catchUp ? { catchUp } : {}),
           };
         });
         send(res, 200, payload);
@@ -7284,7 +7318,7 @@ export function createCareerApiServer(port = 8787) {
                 /* ignore background catch-up errors */
               }
             })();
-          }, 60_000);
+          }, CATCH_UP_PULSE_MS);
           resolveListen();
         });
       });

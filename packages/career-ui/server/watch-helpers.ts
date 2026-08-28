@@ -110,6 +110,7 @@ import {
   pickStationMax,
   pickTankCapacity,
   resolveCatalogCgEnvelope,
+  resolveSchematicCapsFromCatalog,
 } from './schematic-capacity.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 import { resolveMissionRolesPack } from './roles-pack-helpers.ts';
@@ -1309,6 +1310,11 @@ export class CareerWatchSession {
   } | null = null;
   /** Live MSFS title — picks family pack (e.g. 404 Titan Cargo vs Passengers). */
   private lastLiveAircraftTitle: string | null = null;
+  /** Schematic stationMax keyed by live title (family glass switch). */
+  private stationMaxCache: {
+    key: string;
+    stationMax: Record<number, number>;
+  } | null = null;
   private consecutivePipeErrors = 0;
   private opts: Required<
     Pick<
@@ -1612,6 +1618,7 @@ export class CareerWatchSession {
     this.pendingMxDrainKg = 0;
     this.paxAndCargoCrewCache = null;
     this.freighterRolesCache = null;
+    this.stationMaxCache = null;
     this.lastLiveAircraftTitle = null;
 
     const loaded = await this.cb.withCareerRead((world, missions) => {
@@ -1860,6 +1867,7 @@ export class CareerWatchSession {
     this.pendingMxDrainKg = 0;
     this.paxAndCargoCrewCache = null;
     this.freighterRolesCache = null;
+    this.stationMaxCache = null;
     this.lastLiveAircraftTitle = null;
   }
 
@@ -1874,6 +1882,33 @@ export class CareerWatchSession {
       /* keep previous */
     }
     return this.lastLiveAircraftTitle;
+  }
+
+  /** Homologated stationMax for the live glass (not sticky cargo after Passengers switch). */
+  private async refreshStationMaxForLiveTitle(
+    liveTitle: string | null,
+  ): Promise<Record<number, number> | undefined> {
+    const key = liveTitle?.trim() || '';
+    if (this.stationMaxCache?.key === key) {
+      return this.stationMaxCache.stationMax;
+    }
+    if (!key) {
+      this.stationMaxCache = null;
+      return undefined;
+    }
+    try {
+      const caps = await resolveSchematicCapsFromCatalog({
+        repoRoot: getRepoRoot(),
+        title: key,
+      });
+      if (caps.stationMax && Object.keys(caps.stationMax).length > 0) {
+        this.stationMaxCache = { key, stationMax: caps.stationMax };
+        return caps.stationMax;
+      }
+    } catch {
+      /* keep previous cache */
+    }
+    return this.stationMaxCache?.stationMax;
   }
 
   /** Write Watch airborne clock onto the open mission save (survives app quit). */
@@ -2079,9 +2114,15 @@ export class CareerWatchSession {
             ) || /pmdg-738|pmdg-737/i.test(current.airframeTypeId ?? '');
           const airframe = findCareerPlayerAirframe(current.airframeTypeId);
           const pmdgPaxAndCargo = isPaxAndCargoLoadLayout(airframe);
-          const keepFromMax = prevWatchPayload.stationMax
-            ? Object.keys(prevWatchPayload.stationMax).map(Number)
-            : undefined;
+          const liveTitleForSchematic = await this.refreshLiveAircraftTitle();
+          const freshStationMax = await this.refreshStationMaxForLiveTitle(
+            liveTitleForSchematic,
+          );
+          const keepFromMax = freshStationMax
+            ? Object.keys(freshStationMax).map(Number)
+            : prevWatchPayload.stationMax
+              ? Object.keys(prevWatchPayload.stationMax).map(Number)
+              : undefined;
           const keepFromStations = prevWatchPayload.stations
             ? Object.keys(prevWatchPayload.stations).map(Number)
             : undefined;
@@ -2472,7 +2513,7 @@ export class CareerWatchSession {
             ? prevWatchPayload.stations
             : (load.stations ?? prevWatchPayload.stations);
           const stationMax = pickStationMax(
-            undefined,
+            freshStationMax,
             prevWatchPayload.stationMax,
           );
           const stationSumNow = load.stations
@@ -2666,7 +2707,7 @@ export class CareerWatchSession {
                   prevLv.fuel.tankCapacity,
                 );
                 const mergedStationMax = pickStationMax(
-                  undefined,
+                  freshStationMax,
                   prevLv.payload.stationMax,
                 );
                 const { tanks: _prevTanks, ...prevFuelRest } =

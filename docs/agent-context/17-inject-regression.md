@@ -276,3 +276,6 @@ Career **inject freighters** (GA / TP / light jet, não `pax_and_cargo`) enviam 
 
 Header usa `logbookAircraftLabel` → precisa de `airframeLabel` (enrich `withMissionClientView`) ou `airframeTypeId`. Paths que devolviam missão crua (inject OFP, FBO/crew, Lab POST, settle/depart/cancel…) apagavam o label e caíam na classe. Corrigido: enrich nas respostas + fallback typeId no client.
 
+### UI: schematic Cargo grudado após trocar para Passengers (404)
+
+Watch fazia `pickStationMax(undefined, prev)` — `stationMax` do glass Cargo (S1–S4) ficava sticky. Inject/Due podiam estar corretos no Passengers (Sim ~1893) enquanto o schematic só pintava 4 boxes. Corrigido: refresh `stationMax` via título vivo + schematic une estações com peso.

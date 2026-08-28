@@ -346,11 +346,18 @@ export function PayloadStationSchematic(props: {
         .map(Number)
         .filter((index) => Number.isFinite(index) && (maxMap[index] ?? 0) > 0)
     : [];
-  const indexes = new Set<number>(
-    maxKeys.length > 0
-      ? maxKeys
-      : Object.keys(stations).map(Number),
-  );
+  // Prefer homologated stationMax, but always include live stations with weight
+  // (family glass switch can leave a sticky cargo max while passengers hold load).
+  const indexes = new Set<number>([
+    ...maxKeys,
+    ...Object.keys(stations)
+      .map(Number)
+      .filter(
+        (index) =>
+          Number.isFinite(index) &&
+          (maxKeys.length === 0 || (stations[index] ?? 0) > 0.5),
+      ),
+  ]);
   const entries = [...indexes]
     .filter((index) => Number.isFinite(index))
     .map((index) => ({

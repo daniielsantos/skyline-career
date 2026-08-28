@@ -330,17 +330,21 @@ function normalizeDispatchUnits(
 }
 
 /**
- * SimBrief Freight (`cargo=`) is a belly maxcargo cap on passenger MSFS
- * airframes (ATR HighLine/Economy = 3739 lb). Career load belongs in Payload.
+ * SimBrief Freight (`cargo=`) is the Optional Entries **Freight** field — often a
+ * belly soft-cap (ATR HighLine ≈3739 lb; EMB-110 Freight Full ≈3500 lb). Career
+ * inject load belongs in **Payload** (`manualpayload=`, total useful load ≈4740 lb
+ * on Bandeirante). `pax_and_cargo` jets keep `cargo=` for SimBrief leftover freight.
  */
 function simBriefPrefillsPayloadNotFreight(
   aircraftClassId: string,
   airframeTypeId?: string,
 ): boolean {
-  if (aircraftClassId === 'light_ga') return true;
-  const typeId = findCareerPlayerAirframe(airframeTypeId)?.typeId;
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  if (isPaxAndCargoLoadLayout(airframe)) return false;
   return (
-    typeId === 'microsoft-atr-72-600' || typeId === 'microsoft-atr-42-600'
+    aircraftClassId === 'light_ga' ||
+    aircraftClassId === 'light_turboprop' ||
+    aircraftClassId === 'light_jet'
   );
 }
 

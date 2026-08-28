@@ -3,6 +3,11 @@
  * Docs: https://forum.navigraph.com/t/dispatch-redirect-guide/5299
  *
  * No API key required. Fuel stays AUTO (omit minfob / manual fuel fields).
+ *
+ * **Freight vs Payload:** `cargo=` maps to Optional Entries **Freight** (often a
+ * small belly maxcargo). `manualpayload=` maps to **Payload** (total useful load,
+ * mzfw−oew). Career inject freighters (GA/TP/light jet) use manualpayload so
+ * mission weight is not capped below structural payload.
  */
 
 import { spawn } from 'node:child_process';

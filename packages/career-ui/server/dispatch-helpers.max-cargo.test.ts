@@ -265,6 +265,33 @@ describe('buildMissionDispatch ATR payload prefill', () => {
     const payloadLb = Number(qs.get('manualpayload')) * 1000;
     assert.ok(Math.abs(payloadLb - 14_500) < 5);
   });
+
+  it('sends manualpayload not cargo for Bandeirante (Freight cap < Payload)', async () => {
+    const cargoLb = 4_740;
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_e110',
+        status: 'dispatched',
+        originIcao: 'SBSP',
+        destIcao: 'SBRJ',
+        commodityId: 'electronics',
+        cargoKg: Math.round(cargoLb / 2.20462262185),
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'nextgensim-emb-110p1f-bandeirante',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      { units: 'LBS' },
+    );
+    const qs = new URL(built.url).searchParams;
+    assert.equal(qs.get('cargo'), null);
+    assert.ok(qs.get('manualpayload'));
+    const payloadLb = Number(qs.get('manualpayload')) * 1000;
+    assert.ok(Math.abs(payloadLb - cargoLb) < 5);
+  });
 });
 
 describe('buildMissionDispatch pax_and_cargo', () => {

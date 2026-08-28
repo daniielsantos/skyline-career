@@ -6,6 +6,102 @@ import {
 } from './ofp-compliance.js';
 import type { OfpStationRoleMap } from './types/ofp-compliance.js';
 
+/** Classic Watch/inject batch reads PAYLOAD STATION WEIGHT:1..N (Host cap). */
+export const CLASSIC_PAYLOAD_STATION_BATCH_MAX = 16;
+
+function finitePayloadLb(raw: unknown): number | undefined {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
+  return raw;
+}
+
+/** SDK `PAYLOAD STATION COUNT` (1-based stations; can exceed batch cap). */
+export function parsePayloadStationCount(
+  raw: number | undefined | null,
+): number | undefined {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
+  const n = Math.floor(raw);
+  if (n < 1) return undefined;
+  return n;
+}
+
+export type PayloadStationBatchSample = {
+  stations: Record<number, number>;
+  stationSum: number;
+  stationsRead: number;
+  /** Stations attempted in this batch (min of SDK count and batch cap). */
+  stationLoopMax: number;
+  payloadStationCount?: number;
+};
+
+/**
+ * Parse classic station weights from a fixed Host batch (stations 1..batchMax).
+ * When COUNT is known, only sums 1..min(COUNT, batchMax).
+ */
+export function samplePayloadStationsFromValues(
+  values: readonly unknown[],
+  opts: {
+    stationValuesStart: number;
+    batchMax?: number;
+    payloadStationCountRaw?: number;
+  },
+): PayloadStationBatchSample {
+  const batchMax = opts.batchMax ?? CLASSIC_PAYLOAD_STATION_BATCH_MAX;
+  const sdkCount = parsePayloadStationCount(opts.payloadStationCountRaw);
+  const stationLoopMax = Math.min(batchMax, sdkCount ?? batchMax);
+  const stations: Record<number, number> = {};
+  let stationSum = 0;
+  let stationsRead = 0;
+  for (let index = 1; index <= stationLoopMax; index += 1) {
+    const w = finitePayloadLb(values[opts.stationValuesStart + index - 1]);
+    if (w !== undefined && w >= 0) {
+      stations[index] = w;
+      stationSum += w;
+      stationsRead += 1;
+    }
+  }
+  return {
+    stations,
+    stationSum,
+    stationsRead,
+    stationLoopMax,
+    ...(sdkCount !== undefined ? { payloadStationCount: sdkCount } : {}),
+  };
+}
+
+/**
+ * True when a classic station IPC pass looks truncated (timeout mid-loop),
+ * not when the user emptied cargo. Uses SDK COUNT when available.
+ */
+export function isClassicStationBatchIncomplete(opts: {
+  aborted?: boolean;
+  payloadStationCount?: number;
+  stationLoopMax: number;
+  stationsRead: number;
+  previousStationSumLb?: number;
+}): boolean {
+  if (opts.aborted) return true;
+  const hadLoad =
+    typeof opts.previousStationSumLb === 'number' &&
+    opts.previousStationSumLb > 200;
+  if (!hadLoad || opts.stationsRead === 0) return false;
+
+  const expected =
+    typeof opts.payloadStationCount === 'number' && opts.payloadStationCount > 0
+      ? Math.min(opts.payloadStationCount, opts.stationLoopMax)
+      : undefined;
+  if (expected !== undefined && opts.stationsRead < expected) return true;
+
+  // Legacy fallback only when SDK COUNT is missing (IPC timeout mid-loop).
+  if (
+    expected === undefined &&
+    opts.stationsRead > 0 &&
+    opts.stationsRead < 8
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Classic GA / freighter Loaded vs Due (Duke, Caravan, Twin Otter, ATR HighLine…).
  *

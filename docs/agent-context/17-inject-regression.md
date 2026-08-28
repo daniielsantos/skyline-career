@@ -1,0 +1,258 @@
+# Inject regression pack (GA / TP / light jet)
+
+Pacote mínimo para **não quebrar um airframe ao consertar outro** quando o diff mexe em código compartilhado:
+
+- `packages/career-ui/server/watch-helpers.ts`
+- `packages/career-ui/server/ofp-load-helpers.ts`
+- `packages/shared/src/career-live-load.ts`
+- `packages/career-ui/src/load-verification.ts`
+- Host SimConnect / `readSimVars` batch
+
+Perfis são isolados (`profiles/examples/*.json`); o risco real é **policy compartilhada** (soma de estações, mass-balance, Due vs Sim).
+
+Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./12-pax-efb-due.md).
+
+---
+
+## Leitura de payload (Sim) — como funciona
+
+**Não existe um SimVar único confiável de “payload total”** no fluxo clássico. O Watch lê num batch:
+
+- `PAYLOAD STATION WEIGHT:1` … `:16`
+- `PAYLOAD STATION COUNT` — limita a soma a 1..COUNT (batch cap 16)
+- `EMPTY WEIGHT`, `TOTAL WEIGHT`, fuel (tanques + `FUEL TOTAL QUANTITY WEIGHT`)
+
+Implementação: `sampleLiveLoadLb()` em `watch-helpers.ts` → policy em `resolveLivePayloadLb()` (`career-live-load.ts`).
+
+### Camadas (ordem conceitual)
+
+| Camada | O que é | Quando manda |
+|--------|---------|--------------|
+| **Soma bruta 1–16** | Σ todas as estações lidas | Base; UI schematic por station |
+| **`resolveLivePayloadLb`** | Escolhe **stations** vs **mass-balance** | Stations ~zero mas avião pesado → MB; stations infladas vs gross → MB; senão stations |
+| **Mass-balance** | `TOTAL WEIGHT − EMPTY WEIGHT − fuel` | Accu-Sim / tablet que não atualiza `PAYLOAD STATION WEIGHT`; PMDG ghost stations |
+| **Vendor** | TFDi EFB Lvars, A2A Accu-Sim Lvars | Perfil/pack pede `preferTfdiEfb` / `preferA2aLvars` |
+| **Due vs Sim (roles)** | Não é a soma crua 1–16 | Freighter: só `baggageStations` (+ seats-as-cargo). `pax_and_cargo`: cabine+holds (ou ZFW−OEW) |
+
+Para **Preflight Loaded vs Due**:
+
+- **Freighter / cargo clássico** (`careerFreighterLivePayloadLb`): Sim = bags (+ passenger stations usadas como cargo). **Crew stations ficam fora** — Due = freight OFP, não bags+crew.
+- **`pax_and_cargo`** (`careerPaxAndCargoLivePayloadLb`): Sim = cabine+holds; opcional residual `ZFW − OFP empty` quando EFB injetou ZFW (PMDG/Fenix).
+
+Tolérance READY: fuel ±50 lb; payload ±75 lb (ou % do Due) — `evaluateLoadVerification`.
+
+### Está sólido?
+
+| Faixa | Status |
+|-------|--------|
+| **Inject direct + freighter + classic stations** (C172, Caravan, Kodiak, ATR, Bandeirante, BN2, Learjet cargo…) | **Sólido** — path principal; regressões Caravan/Kodiak/Bonanza pós-0.3.24 |
+| **Mass-balance fallback** | **Sólido com regras** — cobre under-read Accu-Sim e ghost stations; testes em `career-live-load.test.ts` |
+| **Watch no solo + edição EFB após inject** | **Sólido** — stations que andaram mandam; não gruda READY no snapshot do inject |
+| **`pax_and_cargo` + EFB nativo** (Phenom inject, CJ4/Longitude WT, PMDG pax…) | **Médio** — Due/Sim depende de roles + às veis ZFW; ver [`12-pax-efb-due.md`](./12-pax-efb-due.md) |
+| **Wide/narrow airline** (Fenix/Maddog/PMDG monitor) | **Fora deste pack** — track A / quirks por família |
+
+**Regra:** mudou `resolveLivePayloadLb`, `careerFreighterLivePayloadLb`, ou o loop de stations no Watch → rodar **P0** abaixo.
+
+---
+
+## Lista canônica — âncoras de regressão
+
+Não é o Market inteiro (`career-player-airframes.json` tem dezenas de SKUs). São **âncoras** que cobrem layouts e code paths diferentes.
+
+Legenda **tier**:
+
+- **P0** — obrigatório antes de merge em código compartilhado de inject/read
+- **P1** — smoke spot-check se o diff tocar fuel/tanks/stations da família
+- **P2** — amostragem periódica / release GA+TP
+
+### light_ga
+
+| Tier | typeId | Por quê | Profile exemplo | Pack OFP |
+|------|--------|---------|-----------------|----------|
+| P0 | `asobo-c172sp-cargo` | 6 stations, family merge Classic/G1000/IFD | `asobo-c172sp-g1000-cargo.json` | `asobo-c172sp-cargo.json` |
+| P0 | `blacksquare-bonanza-professional` | Black Square inject, envelope equal-first | `blacksquare-bonanza-professional.json` | idem |
+| P1 | `blackbox-bn2-islander-cargo-tip-tanks` | Tip tanks (fuel schematic + payload) | `blackbox-bn2-islander-cargo-analogue-tip-tanks.json` | `blackbox-bn2-islander-cargo-tip-tanks.json` |
+| P1 | `microsoft-c400-corvalis` | SimBrief **SR2T** (não Default) | `microsoft-c400-corvalis.json` | idem |
+| P1 | `microsoft-404-titan` | Family cargo 4st + pax 15st | `microsoft-404-titan-passengers.json` | cargo + passengers packs |
+| P2 | `a2a-piper-pa-24-250-comanche` | Accu-Sim Lvars (`preferA2aLvars`) | `a2a-piper-pa-24-250-comanche.json` | idem |
+| P2 | `asobo-robin-dr400` | Delay inject 400 ms histórico | `asobo-robin-dr400.json` | idem |
+
+### light_turboprop
+
+| Tier | typeId | Por quê | Profile exemplo | Pack OFP |
+|------|--------|---------|-----------------|----------|
+| P0 | `c208-caravan-cargo` | Multi-station + BS/Asobo family; flicker S7–S11 | `blacksquare-caravan-professional-gear.json` | `blacksquare-caravan-cargo-pod.json` (+ family paths) |
+| P0 | `sws-kodiak-100-commuter-cargopod-tundra-wheels` | 11 variant packs, combi/cargo | `sws-kodiak-100-cargo.json` | family under SKU |
+| P0 | `microsoft-atr-72-600` | 11 stations, Highline merge, crew S1–S2 | `microsoft-atr-72-600-highline-03.json` | `microsoft-atr-72-600.json` |
+| P0 | `nextgensim-emb-110p1f-bandeirante` | TP freighter recente, family E110 | `nextgensim-emb-110p1f-bandeirante.json` | idem |
+| P1 | `microsoft-dhc-6-300-twin-otter-wheels` | AUX tanks — não inventar vars | `microsoft-dhc-6-300-twin-otter-wheels.json` | idem |
+| P1 | `microsoft-c408-skycourier-cargo` | Step 400 lb / maxLoad 500 zones | `asobo-c208b-cargo.json` → C408 profile | `microsoft-c408-skycourier-cargo.json` |
+| P1 | `microsoft-atr-42-600` | Stol vs Highline fingerprint | `microsoft-atr-42-600-stol.json` | `microsoft-atr-42-600.json` |
+| P2 | `workingtitle-tbm-930-passengers` | Single-engine jet-fuel TP | `workingtitle-tbm-930-passengers.json` | idem |
+| P2 | `microsoft-pc-12-ngx-passengers` | VIP/cargo family | `microsoft-pc-12-ngx-vip.json` | family paths |
+
+### light_jet
+
+| Tier | typeId | Por quê | Profile exemplo | Pack OFP |
+|------|--------|---------|-----------------|----------|
+| P0 | `flysimware-learjet-35a-cargo` | Tip tank fuel flicker + cargo inject | `flysimware-learjet-35a-cargo.json` | idem |
+| P0 | `fsreborn-phenom-300e` | **`pax_and_cargo`** + inject (cabin seats = freight) | `fsreborn-phenom-300e.json` | idem |
+| P1 | `workingtitle-cessna-citation-cj4` | WT light jet, classic stations | `workingtitle-cessna-citation-cj4.json` | idem |
+| P1 | `microsoft-pc-24-cargo` | Cargo jet family VIP/cargo | `microsoft-pc-24-cargo.json` | idem |
+| P2 | `flightfx-citation-x` | Fuel strategy / range variants | `flightfx-citation-x.json` | idem |
+| P2 | `skyward-cessna-c680` | Third-party light jet | `skyward-cessna-c680.json` | idem |
+
+**Fora do pack (proposital):** narrow/wide (PMDG/Fenix/Maddog), `pmdg-738-bbj2-family` (`enabled: false`).
+
+---
+
+## Checklist por airframe (homologação + regressão)
+
+Use para **promover profile novo** ou **revalidar âncora P0** após diff compartilhado.
+
+### A — CLI / perfil (`direct-injection`)
+
+```powershell
+npm run build
+npm run build:native
+npm run host:simconnect   # MSFS, no avião, solo, engines off se o pack exige
+
+node packages/agent/dist/cli.js writetest
+node packages/agent/dist/cli.js draft-profile --calibrate
+node packages/agent/dist/cli.js smoke --profile profiles/examples\<profile>.json
+```
+
+| # | Gate | Pass |
+|---|------|------|
+| A1 | `writetest` | Tanques + stations writable; sem `UNRECOGNIZED_ID` |
+| A2 | `draft-profile --calibrate` | Fuel offset / verify dentro do envelope |
+| A3 | `smoke` | Write + read back; payload/fuel dentro da tol do profile |
+
+### B — Career Preflight (Due vs Sim)
+
+MSFS no avião, missão staging, OFP aceito.
+
+| # | Gate | Pass |
+|---|------|------|
+| B1 | **Inject auto** (se `injectCapable`) | Fuel + payload → READY sem hang |
+| B2 | **Loaded vs Due fuel** | Sim ≈ Due (±50 lb ou taxi slack) |
+| B3 | **Loaded vs Due payload** | Sim ≈ Due (±75 lb ou % Due) |
+| B4 | **Station schematic** | Pesos por station batem com inject (não truncar mid-16) |
+| B5 | **EFB edit pós-inject** | Esvaziar/adicionar cargo no tablet → Sim atualiza; READY reflete |
+| B6 | **CG card** | Envelope visível no 1º open (advisory) |
+
+### C — Watch / EN ROUTE (solo)
+
+| # | Gate | Pass |
+|---|------|------|
+| C1 | Tick no solo | Payload/fuel drift ≥15 lb persiste |
+| C2 | IPC timeout | Não zera stations parciais como unload real |
+| C3 | Post-inject | Não gruda READY se user mudou carga no EFB |
+
+### D — Família / Market
+
+| # | Gate | Pass |
+|---|------|------|
+| D1 | `matchTitles` | Título MSFS resolve profile certo |
+| D2 | Roles pack | `stationRoles` alinhado ao profile |
+| D3 | Catálogo | `career-player-airframes.json` upsert OK; `maxCargoKg` vs stations reais |
+
+---
+
+## Matriz rápida — o que testar em cada âncora P0
+
+| Âncora | A (smoke) | B3 payload | B5 EFB | C2 watch | Nota |
+|--------|-----------|------------|--------|----------|------|
+| C172 G1000 cargo | ✓ | classic freighter sum | opcional | ✓ | Family 6 st |
+| Bonanza BS | ✓ | ✓ | ✓ | ✓ | equal-first |
+| Caravan BS Gear | ✓ | ✓ | ✓ | ✓ | multi-st, no flicker S7–S11 |
+| Kodiak cargo | ✓ | ✓ | ✓ | ✓ | pick one variant |
+| ATR 72 HL03 | ✓ | crew excluído do Sim | MS EFB se pax | ✓ | 11 st |
+| Bandeirante P1F | ✓ | ✓ | ✓ | ✓ | family E110 |
+| Learjet 35A cargo | ✓ | ✓ | ✓ | tip fuel | tip schematic |
+| Phenom 300E | ✓ | **pax_and_cargo** | ✓ | ✓ | cabin+hold Due |
+
+---
+
+## Quando rodar o quê
+
+| Mudança | Pack mínimo |
+|---------|-------------|
+| `resolveLivePayloadLb` / freighter / pax_and_cargo helpers | **Todos P0** (GA+TP+jet) |
+| `sampleLiveLoadLb` / `LOAD_SAMPLE_VARS` | **Todos P0** + Learjet (tips) |
+| Inject write plan / equal-first / station step | Airframe tocado + **Caravan + Kodiak + C408** |
+| Fuel tanks / density / outer tank sticky | **Learjet + BN2 + Twin Otter** |
+| Só profile isolado (`profiles/examples/foo.json`) | **Smoke + Preflight só foo** |
+| Só UI Career (sem server/shared load) | Smoke opcional |
+
+---
+
+## Comandos úteis
+
+```powershell
+# Smoke um profile
+node packages/agent/dist/cli.js smoke --profile profiles/examples/blacksquare-caravan-professional-gear.json
+
+# Compare OFP (track monitor / native-simbrief)
+npm run compare-ofp -- --simbrief-user YOUR_ALIAS
+```
+
+Notas por airframe: `profiles/notes/*.md` — criar ao promover (`09-homologate.md`).
+
+---
+
+## freighter vs `pax_and_cargo` — quando usar
+
+São **duas camadas** — não confundir:
+
+| Camada | Onde vive | O que decide |
+|--------|-----------|--------------|
+| **`loadLayout`** (catálogo) | `career-player-airframes.json` | Como o **Dispatch monta o OFP** (pax×175+bags vs freight puro) e ajustes Due (`efbPaxWeightLb`, hold cap…) |
+| **`stationRoles`** (pack OFP) | `profiles/ofp/*.json` | Como o **Watch soma Sim** (`careerFreighterLivePayloadLb` vs `careerPaxAndCargoLivePayloadLb`) |
+
+Watch escolhe freighter vs pax_and_cargo pelo catálogo (`loadLayout === 'pax_and_cargo'`), **não** pelo nome “Passengers” do vidro.
+
+### Use **`freighter`** (omitido = freighter) quando
+
+- Variante **cargo / combi / cargomaster** sem missão de pax simulada (C172 Cargo, Caravan pod, Kodiak cargo, ATR Freighter, BN2 cargo, Learjet cargo, BCF…).
+- Inject **direct** e o OFP pode ser **freight-only** (`pax=0` ou só piloto) sem estourar MZFW/CG.
+- Cabine vira **slots de carga** no pack (`passengerStations: []`, assentos mapeados em `baggageStations`).
+- Due = **freight da missão** (+ crew fora do Due); Sim = Σ stations de carga (crew excluído).
+
+**Hoje:** quase todo `light_ga` + `light_turboprop` inject está aqui — **correto** para Career cargo.
+
+### Use **`pax_and_cargo`** quando
+
+- Fuseleiro **passageiro** (cabine + holds) e o freight da missão deve **ocupar assentos primeiro** (175+55 lb/assento) para CG/envelope no SimBrief/EFB.
+- EFB/tablet do addon é a fonte de verdade (Fenix, iniBuilds, JF, Maddog, Phenom com cabine real…).
+- Precisa de campos extra no catálogo: `maxPaxSeats`, às veis `efbPaxWeightLb`, `simconnectCabinSeats`, `simconnectCargoHoldMaxLb`, `simconnectEmptyPayloadBiasLb`.
+- Due = **payload OFP inteiro** (pax+bags+cargo); Sim = cabine+holds (ou ZFW−OEW).
+
+**Hoje:** narrow/wide airline + Phenom + alguns jets — ~18 SKUs com flag explícita.
+
+### O que **não** fazer na revalidação
+
+- Não marcar **todos** os aviões como `pax_and_cargo` só porque têm assentos no modelo 3D.
+- Caravan **Passengers** com Career freight em S7–S11 continua **freighter layout** + seats-as-baggage no pack — funciona e é mais simples.
+- Migrar GA/TP para `pax_and_cargo` **só** se SimBrief MZFW/CG falhar ou Due≠Sim após inject; senão aumenta complexidade (pax fake no OFP) sem ganho.
+
+### SimBrief: Freight vs Payload (cap de carga)
+
+SimBrief Dispatch tem **dois campos** na UI:
+
+| Campo API | UI SimBrief | Significado típico |
+|-----------|-------------|-------------------|
+| `cargo=` | **Freight [LBS]** | Compartimento freight / maxcargo “soft” (EMB-110 Full ≈ **3 500 lb**) |
+| `manualpayload=` | **Payload [LBS]** | Carga útil total mzfw−oew (EMB-110 Full ≈ **4 740 lb**) |
+
+Career **inject freighters** (GA / TP / light jet, não `pax_and_cargo`) enviam **`manualpayload=`** no Open SimBrief — mesmo motivo do BN2/ATR. O catálogo `maxCargoKg` (Bandeirante **2150 kg ≈ 4740 lb**) alinha com **Payload**, não com Freight.
+
+`loadLayout: freighter` continua correto; o bug era só qual campo SimBrief recebia.
+
+### Checklist para “bater o martelo” por SKU
+
+1. Aceitar OFP freight-only no inject → **freighter**.
+2. MZFW/CG estoura ou EFB exige pax≥1 com freight na cabine → **`pax_and_cargo` + `maxPaxSeats`**.
+3. Preflight: medir Sim vs Due; gravar no máximo **um** bias (`12-pax-efb-due.md`).
+4. Alinhar `stationRoles` ao layout escolhido (crew sempre fora do Sim freighter).
+

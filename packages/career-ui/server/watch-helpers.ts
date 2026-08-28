@@ -42,6 +42,8 @@ import {
   pushFlightScoreSample,
   pushWeatherOpsTick,
   resolveLivePayloadLb,
+  samplePayloadStationsFromValues,
+  isClassicStationBatchIncomplete,
   paxAndCargoLiveStationSumLb,
   pickPaxAndCargoDisplayedLiveLb,
   careerFreighterLivePayloadLb,
@@ -629,6 +631,7 @@ const LOAD_SAMPLE_VARS = [
   { name: 'FUEL TOTAL QUANTITY', unit: 'gallons' },
   { name: 'EMPTY WEIGHT', unit: 'pounds' },
   { name: 'TOTAL WEIGHT', unit: 'pounds' },
+  { name: 'PAYLOAD STATION COUNT', unit: 'number' },
   { name: 'PAYLOAD STATION WEIGHT:1', unit: 'pounds' },
   { name: 'PAYLOAD STATION WEIGHT:2', unit: 'pounds' },
   { name: 'PAYLOAD STATION WEIGHT:3', unit: 'pounds' },
@@ -646,6 +649,14 @@ const LOAD_SAMPLE_VARS = [
   { name: 'PAYLOAD STATION WEIGHT:15', unit: 'pounds' },
   { name: 'PAYLOAD STATION WEIGHT:16', unit: 'pounds' },
 ] as const;
+
+/** Indices into {@link LOAD_SAMPLE_VARS} batch results. */
+const LOAD_SAMPLE_IDX = {
+  emptyWeight: 12,
+  grossWeight: 13,
+  payloadStationCount: 14,
+  payloadStation1: 15,
+} as const;
 
 const LOAD_CAPACITY_VARS = [
   { name: 'FUEL TANK LEFT MAIN CAPACITY', unit: 'gallons' },
@@ -709,6 +720,8 @@ export async function sampleLiveLoadLb(
   fuelTanks?: FuelTankBreakdown;
   fuelTankCapacity?: FuelTankBreakdown;
   stations?: Record<number, number>;
+  /** SDK PAYLOAD STATION COUNT when the batch returned a valid value. */
+  payloadStationCount?: number | null;
   /** TFDi EFB cargo-only payload (excludes crew stations). */
   tfdiEfbCargoLb?: number | null;
   /** Truncated station loop (TIMEOUT mid-16). Caller must keep previous map. */
@@ -813,8 +826,8 @@ export async function sampleLiveLoadLb(
   let massBalanceLb: number | undefined;
   let emptyWeightLb: number | undefined;
   let grossWeightLb: number | undefined;
-  const empty = finiteNum(v[12]);
-  const gross = finiteNum(v[13]);
+  const empty = finiteNum(v[LOAD_SAMPLE_IDX.emptyWeight]);
+  const gross = finiteNum(v[LOAD_SAMPLE_IDX.grossWeight]);
   if (empty !== undefined && empty > 0) emptyWeightLb = empty;
   if (gross !== undefined && gross > 0) grossWeightLb = gross;
   if (
@@ -829,17 +842,15 @@ export async function sampleLiveLoadLb(
     );
   }
 
-  const stations: Record<number, number> = {};
-  let stationSum = 0;
-  let stationsRead = 0;
-  for (let index = 1; index <= 16; index += 1) {
-    const w = finiteNum(v[13 + index]);
-    if (w !== undefined && w >= 0) {
-      stations[index] = w;
-      stationSum += w;
-      stationsRead += 1;
-    }
-  }
+  const payloadStationCountRaw = finiteNum(v[LOAD_SAMPLE_IDX.payloadStationCount]);
+  const stationBatch = samplePayloadStationsFromValues(v, {
+    stationValuesStart: LOAD_SAMPLE_IDX.payloadStation1,
+    payloadStationCountRaw,
+  });
+  const stations = stationBatch.stations;
+  const stationSum = stationBatch.stationSum;
+  const stationsRead = stationBatch.stationsRead;
+  const payloadStationCount = stationBatch.payloadStationCount ?? null;
 
   let fuelTankCapacity: FuelTankBreakdown | undefined;
   let capacitySessionDied = false;
@@ -856,12 +867,13 @@ export async function sampleLiveLoadLb(
       }
     }
   }
-  const stationsIncomplete =
-    aborted() ||
-    (typeof previousStationSumLb === 'number' &&
-      previousStationSumLb > 200 &&
-      stationsRead > 0 &&
-      stationsRead < 8);
+  const stationsIncomplete = isClassicStationBatchIncomplete({
+    aborted: aborted(),
+    payloadStationCount: stationBatch.payloadStationCount,
+    stationLoopMax: stationBatch.stationLoopMax,
+    stationsRead,
+    previousStationSumLb,
+  });
   const mbCollapsed =
     typeof massBalanceLb === 'number' &&
     (stationsIncomplete
@@ -1018,6 +1030,7 @@ export async function sampleLiveLoadLb(
     ...(usableTanks ? { fuelTanks: usableTanks } : {}),
     ...(fuelTankCapacity ? { fuelTankCapacity } : {}),
     ...(stationsOut ? { stations: stationsOut } : {}),
+    ...(payloadStationCount !== null ? { payloadStationCount } : {}),
     ...(stationsIncomplete && !vendorLivePayload
       ? { stationsIncomplete: true }
       : {}),

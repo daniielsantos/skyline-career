@@ -11,6 +11,9 @@ import {
   careerFreighterLivePayloadLb,
   careerPaxAndCargoLivePayloadLb,
   resolveLivePayloadLb,
+  parsePayloadStationCount,
+  samplePayloadStationsFromValues,
+  isClassicStationBatchIncomplete,
   stationSampleIncomplete,
   stationWeightsDrifted,
 } from './career-live-load.js';
@@ -606,5 +609,72 @@ describe('loadVerificationDrifted', () => {
       livePayloadLb: 0,
     });
     assert.equal(loadVerificationDrifted(a, b), true);
+  });
+});
+
+describe('payload station count batch', () => {
+  it('parsePayloadStationCount rejects invalid values', () => {
+    assert.equal(parsePayloadStationCount(undefined), undefined);
+    assert.equal(parsePayloadStationCount(0), undefined);
+    assert.equal(parsePayloadStationCount(11.9), 11);
+  });
+
+  it('samplePayloadStationsFromValues respects SDK count', () => {
+    const values = [
+      100, 200, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    ];
+    const r = samplePayloadStationsFromValues(values, {
+      stationValuesStart: 0,
+      payloadStationCountRaw: 6,
+    });
+    assert.equal(r.stationLoopMax, 6);
+    assert.equal(r.stationsRead, 6);
+    assert.equal(r.stationSum, 300);
+    assert.equal(r.payloadStationCount, 6);
+    assert.equal(Object.keys(r.stations).length, 6);
+    assert.equal(r.stations[1], 100);
+    assert.equal(r.stations[3], 0);
+    assert.equal(r.stations[7], undefined);
+  });
+
+  it('isClassicStationBatchIncomplete uses count when prior load was heavy', () => {
+    assert.equal(
+      isClassicStationBatchIncomplete({
+        payloadStationCount: 11,
+        stationLoopMax: 11,
+        stationsRead: 3,
+        previousStationSumLb: 2500,
+      }),
+      true,
+    );
+    assert.equal(
+      isClassicStationBatchIncomplete({
+        payloadStationCount: 11,
+        stationLoopMax: 11,
+        stationsRead: 11,
+        previousStationSumLb: 2500,
+      }),
+      false,
+    );
+    assert.equal(
+      isClassicStationBatchIncomplete({
+        payloadStationCount: 6,
+        stationLoopMax: 6,
+        stationsRead: 6,
+        previousStationSumLb: 2500,
+      }),
+      false,
+    );
+  });
+
+  it('isClassicStationBatchIncomplete keeps legacy <8 heuristic without count', () => {
+    assert.equal(
+      isClassicStationBatchIncomplete({
+        stationLoopMax: 16,
+        stationsRead: 5,
+        previousStationSumLb: 900,
+      }),
+      true,
+    );
   });
 });

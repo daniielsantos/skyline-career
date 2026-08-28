@@ -371,6 +371,16 @@ export function DispatchActivePanel(props: {
       ) : null}
       <DispatchStepper current={step} />
 
+      {mission.payloadLab ? (
+        <div className="payload-lab-banner" role="status">
+          <strong>Payload Lab</strong>
+          <span>
+            Temporary inject harness — Cancel flight when done (no settle /
+            payout).
+          </span>
+        </div>
+      ) : null}
+
       <div className="panel-head missions-head">
         <div className="missions-head-spacer" aria-hidden="true" />
         <div className="missions-head-center">

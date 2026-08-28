@@ -5,6 +5,10 @@ import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   acceptEmptyFlight,
+  startPayloadLabMission,
+  findPayloadLabMission,
+  listCareerPlayerAirframes,
+  isCareerPlayerAirframeEnabled,
   assignAircraftToMission,
   buyOutAircraftLease,
   returnAircraftLeaseEarly,
@@ -2687,6 +2691,135 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/dev/payload-lab') {
+        const options = listCareerPlayerAirframes()
+          .filter((row) => isCareerPlayerAirframeEnabled(row))
+          .map((row) => ({
+            typeId: row.typeId,
+            label: row.label,
+            aircraftClassId: row.aircraftClassId,
+            maxCargoKg: row.maxCargoKg ?? null,
+            loadLayout: row.loadLayout ?? 'freighter',
+            injectCapable: row.injectCapable !== false,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+        const lab = await withCareerRead((_world, missions) =>
+          findPayloadLabMission(missions.missions ?? []),
+        );
+        send(res, 200, {
+          options,
+          mission: lab
+            ? {
+                id: lab.id,
+                status: lab.status,
+                airframeTypeId: lab.airframeTypeId,
+                originIcao: lab.originIcao,
+                destIcao: lab.destIcao,
+                cargoKg: lab.cargoKg,
+                reason: lab.reason,
+              }
+            : null,
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/dev/payload-lab') {
+        const body = (await readBody(req)) as {
+          airframeTypeId?: string;
+          cargoKg?: number;
+          originIcao?: string;
+          destIcao?: string;
+        };
+        if (!body.airframeTypeId?.trim()) {
+          send(res, 400, { error: 'airframeTypeId required' });
+          return;
+        }
+        if (
+          typeof body.cargoKg !== 'number' ||
+          !Number.isFinite(body.cargoKg)
+        ) {
+          send(res, 400, { error: 'cargoKg required' });
+          return;
+        }
+        const originIcao = (body.originIcao ?? 'SBGR').trim().toUpperCase();
+        const destIcao = (body.destIcao ?? 'SBSP').trim().toUpperCase();
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const started = startPayloadLabMission(world, missions, {
+              airframeTypeId: body.airframeTypeId!.trim(),
+              cargoKg: body.cargoKg!,
+              originIcao,
+              destIcao,
+            });
+            return {
+              mission: withMissionClientView(world, missions, started.mission),
+              airframeLabel: started.airframeLabel,
+              replacedLabIds: started.replacedLabIds,
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+            };
+          }, { persist: 'company' });
+          const watch = watchSession.getStatus();
+          if (watch.missionId && watch.missionId !== result.mission.id) {
+            if (watch.running) await watchSession.stop({ reset: true });
+            else watchSession.resetSession();
+          }
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'DELETE' && path === '/api/dev/payload-lab') {
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const lab = findPayloadLabMission(missions.missions ?? []);
+            if (!lab) {
+              return {
+                cancelled: null as null,
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+              };
+            }
+            const executed = executeCancelMission(world, missions, {
+              missionId: lab.id,
+            });
+            if (executed.kind !== 'applied') {
+              throw new Error(`Could not cancel lab flight (${executed.kind})`);
+            }
+            return {
+              cancelled: withMissionClientView(
+                world,
+                missions,
+                executed.mission,
+              ),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+            };
+          }, { persist: 'company' });
+          const watch = watchSession.getStatus();
+          if (
+            result.cancelled &&
+            watch.missionId === result.cancelled.id
+          ) {
+            if (watch.running) await watchSession.stop({ reset: true });
+            else watchSession.resetSession();
+          }
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/pilot/travel') {
         const body = (await readBody(req)) as {
           destIcao?: string;
@@ -4421,10 +4554,12 @@ export function createCareerApiServer(port = 8787) {
               maxCargoKg,
             });
             return {
-              mission: withMissionLoadPolicy(released.mission),
+              mission: withMissionClientView(world, missions, released.mission),
               playerFbos: playerFboSnapshot(missions, world),
               walletUsd: missions.walletUsd,
-              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
             };
           }, { commandSliceHoldId: body.holdId });
           send(res, 200, result);
@@ -4460,7 +4595,9 @@ export function createCareerApiServer(port = 8787) {
               })),
             });
             return {
-              missions: split.missions.map((m) => withMissionLoadPolicy(m)),
+              missions: split.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
               hold: split.hold,
               allocatedKg: split.allocatedKg,
               remainingKg: split.remainingKg,
@@ -4468,7 +4605,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet, world, missions),
               walletUsd: missions.walletUsd,
               allMissions: missions.missions.map((m) =>
-                withMissionLoadPolicy(m),
+                withMissionClientView(world, missions, m),
               ),
             };
           }, { commandSliceHoldId: body.holdId });
@@ -4495,13 +4632,15 @@ export function createCareerApiServer(port = 8787) {
               body.missionId!.trim(),
             );
             return {
-              mission: withMissionLoadPolicy(returned.mission),
+              mission: withMissionClientView(world, missions, returned.mission),
               hold: returned.hold,
               merged: returned.merged,
               playerFbos: playerFboSnapshot(missions, world),
               fleet: withParkingRates(missions.fleet, world, missions),
               walletUsd: missions.walletUsd,
-              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
             };
           }, { commandSliceMissionId: body.missionId });
           send(res, 200, result);
@@ -4529,9 +4668,11 @@ export function createCareerApiServer(port = 8787) {
               crewMemberId: body.crewMemberId!.trim(),
             });
             return {
-              mission: withMissionLoadPolicy(mission),
+              mission: withMissionClientView(world, missions, mission),
               companyCrew: companyCrewSnapshot(missions, world),
-              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
             };
           }, { persist: 'company' });
           send(res, 200, result);
@@ -4602,7 +4743,7 @@ export function createCareerApiServer(port = 8787) {
               nowMs: Date.now(),
             });
             return {
-              mission: withMissionLoadPolicy(dispatched.mission),
+              mission: withMissionClientView(world, missions, dispatched.mission),
               crewFeeUsd: dispatched.crewFeeUsd,
               returnFeeUsd: dispatched.returnFeeUsd,
               totalRoundTripFeeUsd: dispatched.totalRoundTripFeeUsd,
@@ -4611,7 +4752,9 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet, world, missions),
               playerFbos: playerFboSnapshot(missions, world),
               companyCrew: companyCrewSnapshot(missions, world),
-              missions: missions.missions.map((m) => withMissionLoadPolicy(m)),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
             };
           }, {
             commandSliceHoldId: body.holdId,
@@ -4984,7 +5127,7 @@ export function createCareerApiServer(port = 8787) {
             }
           }
           send(res, 200, {
-            mission: result.mission,
+            mission: await toClientMission(result.mission),
             walletUsd: result.walletUsd,
             maxCargoKg: cargoLimit.maxCargoKg,
             maxCargoSource: cargoLimit.source,
@@ -5976,7 +6119,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, {
-            mission: result.cancelled,
+            mission: await toClientMission(result.cancelled),
             walletUsd: result.walletUsd,
             releasedKg: result.releasedKg,
             returnedToMarket: result.returnedToMarket,
@@ -6485,7 +6628,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, {
-            mission: purchased.mission,
+            mission: await toClientMission(purchased.mission),
             quote: purchased.quote,
             fuelDebitUsd: purchased.fuelDebitUsd,
             walletUsd: purchased.walletUsd,
@@ -6670,7 +6813,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, {
-            mission: result.mission,
+            mission: await toClientMission(result.mission),
             walletUsd: result.walletUsd,
             fuelDebitUsd: result.fuelDebitUsd,
             fleet: result.fleet,
@@ -6811,7 +6954,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, {
-            mission: settled.mission,
+            mission: await toClientMission(settled.mission),
             walletUsd: settled.walletUsd,
             fuelDebitUsd: settled.fuelDebitUsd,
             fleet: settled.fleet,
@@ -7069,13 +7212,13 @@ export function createCareerApiServer(port = 8787) {
               );
             send(res, unavailable ? 503 : 400, {
               error: result.error ?? 'OFP load failed',
-              mission: savedMission,
+              mission: await toClientMission(savedMission),
               ...result,
             });
             return;
           }
           send(res, 200, {
-            mission: savedMission,
+            mission: await toClientMission(savedMission),
             ...result,
           });
         } catch (error) {

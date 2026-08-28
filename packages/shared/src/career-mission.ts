@@ -48,6 +48,7 @@ import { TICKS_PER_HOUR } from './career-clock.js';
 import { assertBushLightGa, isOfflineNetworkHub } from './career-bush.js';
 import {
   findCareerPlayerAirframe,
+  isCareerPlayerAirframeEnabled,
   listCareerPlayerAirframes,
   resolveAirframeFuelBurnKgPerNm,
   resolveAirframeMaxRangeNm,
@@ -1219,6 +1220,138 @@ export function acceptEmptyFlight(
 }
 
 /**
+ * Dev Payload Lab: temporary Dispatch flight without hangar / Market lot.
+ * Reuses Preflight + inject + Watch. Cancel when finished (no settle / payout).
+ */
+export function startPayloadLabMission(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  opts: {
+    airframeTypeId: string;
+    cargoKg: number;
+    originIcao: string;
+    destIcao: string;
+    missionId?: string;
+    nowMs?: number;
+  },
+): { mission: MissionIntent; airframeLabel: string; replacedLabIds: string[] } {
+  const typeId = opts.airframeTypeId?.trim();
+  if (!typeId) throw new Error('airframeTypeId required');
+  const airframe = findCareerPlayerAirframe(typeId);
+  if (!airframe || !isCareerPlayerAirframeEnabled(airframe)) {
+    throw new Error(`Unknown or disabled airframe ${typeId}`);
+  }
+
+  const origin = opts.originIcao.trim().toUpperCase();
+  const dest = opts.destIcao.trim().toUpperCase();
+  if (!/^[A-Z0-9]{3,4}$/.test(origin)) {
+    throw new Error(`Invalid origin ICAO: ${origin}`);
+  }
+  if (!/^[A-Z0-9]{3,4}$/.test(dest)) {
+    throw new Error(`Invalid destination ICAO: ${dest}`);
+  }
+  if (origin === dest) {
+    throw new Error('Origin and destination must differ');
+  }
+
+  const cargoKg = Math.max(0, Math.floor(opts.cargoKg));
+  if (cargoKg < 1) {
+    throw new Error('cargoKg must be at least 1');
+  }
+  const structuralMax =
+    typeof airframe.maxCargoKg === 'number' && airframe.maxCargoKg > 0
+      ? Math.floor(airframe.maxCargoKg)
+      : getAircraftClass(airframe.aircraftClassId).maxCargoKg;
+  if (cargoKg > structuralMax) {
+    throw new Error(
+      `cargoKg ${cargoKg} exceeds ${airframe.label} max ${structuralMax} kg`,
+    );
+  }
+
+  const replacedLabIds: string[] = [];
+  const nowMs = opts.nowMs ?? Date.now();
+  for (const raw of [...(state.missions ?? [])]) {
+    const m = normalizeMissionIntent(raw);
+    if (!m.payloadLab) continue;
+    if (!isActiveMissionStatus(m.status)) continue;
+    const cancelled = cancelMission(world, m, { fleet: state, nowMs });
+    const idx = state.missions.findIndex((row) => row.id === m.id);
+    if (idx >= 0) state.missions[idx] = cancelled;
+    replacedLabIds.push(m.id);
+  }
+
+  const blocking = listActivePlayerMissions(state.missions ?? []).find(
+    (m) => m.crewOperated !== true && !m.payloadLab,
+  );
+  if (blocking) {
+    throw new Error(
+      `Finish or cancel ${blocking.id} on Dispatch before starting Payload Lab`,
+    );
+  }
+
+  const distanceNm =
+    hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);
+  const classDef = getAircraftClass(airframe.aircraftClassId);
+  const missionId =
+    opts.missionId?.trim() ||
+    `msn_lab_${world.tick}_${typeId}_${Math.floor(Math.random() * 1e6)}`;
+  const shipmentLotId = `lab_${missionId}`;
+
+  const mission = recomputeMissionTotals({
+    id: missionId,
+    lots: [
+      {
+        shipmentLotId,
+        commodityId: 'general',
+        cargoKg,
+        payUsd: 0,
+        urgency: 'normal',
+        reason: `Payload Lab · ${airframe.label}`,
+        deadlineTick: world.tick + TICKS_PER_HOUR * 72,
+      },
+    ],
+    shipmentLotId,
+    commodityId: 'general',
+    originIcao: origin,
+    destIcao: dest,
+    cargoKg,
+    pax: 0,
+    aircraftClassId: airframe.aircraftClassId,
+    airframeTypeId: airframe.typeId,
+    rolesPackRelPath: airframe.rolesPackRelPath ?? classDef.rolesPackRelPath,
+    deadlineTick: world.tick + TICKS_PER_HOUR * 72,
+    payUsd: 0,
+    urgency: 'normal',
+    reason: `Payload Lab · ${airframe.label}`,
+    status: 'accepted',
+    acceptedAtTick: world.tick,
+    contractPilot: true,
+    payloadLab: true,
+    contractPilotFeeUsd: 0,
+    ...(typeof distanceNm === 'number' ? { distanceNm } : {}),
+  });
+
+  state.missions = [...(state.missions ?? []), mission];
+  syncPlayerInbound(world, mission);
+
+  return {
+    mission,
+    airframeLabel: airframe.label,
+    replacedLabIds,
+  };
+}
+
+export function findPayloadLabMission(
+  missions: readonly MissionIntent[],
+): MissionIntent | undefined {
+  const active = listActivePlayerMissions(missions).filter((m) => m.payloadLab);
+  if (active.length === 0) return undefined;
+  return active.reduce((best, mission) =>
+    (mission.acceptedAtTick ?? 0) >= (best.acceptedAtTick ?? 0) ? mission : best,
+  );
+}
+
+/**
  * Prefer the most recently accepted active mission when recovering UI state.
  * With the single-active gate there should be at most one.
  */
@@ -1795,6 +1928,7 @@ export function cancelMission(
     if (
       normalized.contractPilot &&
       !normalized.contractPilotReposition &&
+      !normalized.payloadLab &&
       returnContractSliceToOpenOffer(world, normalized, line, nowMs)
     ) {
       continue;
@@ -2204,6 +2338,11 @@ export function settleMission(
   opts: SettleMissionOpts = {},
 ): SettleMissionResult {
   let working = normalizeMissionIntent(mission);
+  if (working.payloadLab) {
+    throw new Error(
+      'Payload Lab flights cannot settle — cancel the lab flight when done',
+    );
+  }
   if (
     working.status !== 'dispatched' &&
     working.status !== 'in_flight' &&

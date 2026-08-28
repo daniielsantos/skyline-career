@@ -487,6 +487,8 @@ export type Mission = {
   crewDeadhead?: boolean;
   /** Player empty reposition (no freight) — Hangar → Plan empty flight. */
   emptyFlight?: boolean;
+  /** Dev Payload Lab flight (no hangar / no payout). */
+  payloadLab?: boolean;
   /** Demand Board mission (warehouse → terminal). */
   demandOrderId?: string;
   warehouseId?: string;
@@ -2596,6 +2598,54 @@ export function postEmptyFlight(opts: {
     method: 'POST',
     body: JSON.stringify(opts),
   });
+}
+
+export type PayloadLabAirframeOption = {
+  typeId: string;
+  label: string;
+  aircraftClassId: string;
+  maxCargoKg: number | null;
+  loadLayout: string;
+  injectCapable: boolean;
+};
+
+export function fetchPayloadLab() {
+  return api<{
+    options: PayloadLabAirframeOption[];
+    mission: {
+      id: string;
+      status: string;
+      airframeTypeId?: string;
+      originIcao: string;
+      destIcao: string;
+      cargoKg: number;
+      reason: string;
+    } | null;
+  }>('/api/dev/payload-lab');
+}
+
+export function postPayloadLab(opts: {
+  airframeTypeId: string;
+  cargoKg: number;
+  originIcao?: string;
+  destIcao?: string;
+}) {
+  return api<{
+    mission: Mission;
+    airframeLabel: string;
+    replacedLabIds: string[];
+    missions: Mission[];
+  }>('/api/dev/payload-lab', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function deletePayloadLab() {
+  return api<{
+    cancelled: Mission | null;
+    missions: Mission[];
+  }>('/api/dev/payload-lab', { method: 'DELETE' });
 }
 
 export type FerryPlanLeg = {

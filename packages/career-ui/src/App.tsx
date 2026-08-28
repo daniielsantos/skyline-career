@@ -288,6 +288,7 @@ import {
 } from './dispatch-flow';
 import { RunwayTouchdownDiagram } from './RunwayTouchdownDiagram';
 import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
+import { PayloadLabPanel } from './PayloadLabPanel';
 import { CargoLotCards } from './CargoLotCards';
 import { TerminalAirportPanel } from './TerminalAirportPanel';
 import { WatchStatusFooter } from './WatchStatusFooter';
@@ -8933,6 +8934,8 @@ export function App() {
                   ? 'Ports'
                   : tab === 'missions'
                   ? 'Logbook'
+                  : tab === 'lab'
+                    ? 'Payload Lab'
                   : tab === 'settings'
                     ? 'Settings'
                     : 'Freights';
@@ -9234,6 +9237,17 @@ export function App() {
           >
             Logbook
           </button>
+          {devMode ? (
+            <button
+              type="button"
+              className={!showAirport && tab === 'lab' ? 'tab active' : 'tab'}
+              onClick={() => selectTab('lab')}
+              disabled={busy}
+              title="Payload Lab — inject Due vs Sim without buy/ferry"
+            >
+              Lab
+            </button>
+          ) : null}
 
           {showAirport && terminalSection !== 'fbo' ? (
             <span className="tab active">Terminal</span>
@@ -13073,6 +13087,22 @@ export function App() {
             </div>
           )}
         </section>
+      ) : hubSelected && tab === 'lab' && devMode ? (
+        <PayloadLabPanel
+          busy={busy}
+          homeHubIcao={homeHubIcao}
+          activeLabMission={
+            missions.find(
+              (m) =>
+                m.payloadLab &&
+                (m.status === 'accepted' ||
+                  m.status === 'dispatched' ||
+                  m.status === 'in_flight'),
+            ) ?? null
+          }
+          onOpenDispatch={() => selectTab('staging')}
+          onMissionsUpdated={(next) => setMissions(next)}
+        />
       ) : hubSelected && tab === 'settings' ? (
         <section className="panel settings-panel">
           <div className="settings-grid">

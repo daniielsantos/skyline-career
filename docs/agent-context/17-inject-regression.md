@@ -37,6 +37,7 @@ Implementação: `sampleLiveLoadLb()` em `watch-helpers.ts` → policy em `resol
 Para **Preflight Loaded vs Due**:
 
 - **Freighter / cargo clássico** (`careerFreighterLivePayloadLb`): Sim = bags (+ passenger stations usadas como cargo). **Crew stations ficam fora** — Due = freight OFP, não bags+crew.
+- **Family packs + `liveTitle`:** Watch e inject devem passar o título MSFS em `resolveMissionRolesPack`. Sem isso o Due pode vir do pack Passengers (S3–S15) enquanto o Sim soma só o pack Cargo default (S3–S4 ≈ 300 lb no 404 Titan).
 - **`pax_and_cargo`** (`careerPaxAndCargoLivePayloadLb`): Sim = cabine+holds; opcional residual `ZFW − OFP empty` quando EFB injetou ZFW (PMDG/Fenix).
 
 Tolérance READY: fuel ±50 lb; payload ±75 lb (ou % do Due) — `evaluateLoadVerification`.
@@ -73,7 +74,7 @@ Legenda **tier**:
 | P0 | `blacksquare-bonanza-professional` | Black Square inject, envelope equal-first | `blacksquare-bonanza-professional.json` | idem |
 | P1 | `blackbox-bn2-islander-cargo-tip-tanks` | Tip tanks (fuel schematic + payload) | `blackbox-bn2-islander-cargo-analogue-tip-tanks.json` | `blackbox-bn2-islander-cargo-tip-tanks.json` |
 | P1 | `microsoft-c400-corvalis` | SimBrief **SR2T** (não Default) | `microsoft-c400-corvalis.json` | idem |
-| P1 | `microsoft-404-titan` | Family cargo 4st + pax 15st | `microsoft-404-titan-passengers.json` | cargo + passengers packs |
+| P1 | `microsoft-404-titan` | Family cargo 4st + pax 15st; **Cargo** bags S3–S4 maxLoad **1750** each (Due can reach catalog cargo); **Passengers** S3–S15 | `microsoft-404-titan-passengers.json` | cargo + passengers packs |
 | P2 | `a2a-piper-pa-24-250-comanche` | Accu-Sim Lvars (`preferA2aLvars`) | `a2a-piper-pa-24-250-comanche.json` | idem |
 | P2 | `asobo-robin-dr400` | Delay inject 400 ms histórico | `asobo-robin-dr400.json` | idem |
 
@@ -201,6 +202,21 @@ Notas por airframe: `profiles/notes/*.md` — criar ao promover (`09-homologate.
 
 ---
 
+## Payload Lab (dev)
+
+Settings → **Developer → On** → sidebar **Lab** (`/lab`).
+
+Cria missão sintética (`payloadLab` + `contractPilot`) **sem** comprar / ferry / settle:
+
+1. Escolhe SKU + payload kg + OD  
+2. **Start lab → Dispatch**  
+3. No Dispatch: Open SimBrief → Accept OFP → inject → Due vs Sim (UI real)  
+4. **Cancel flight** quando terminar  
+
+API: `GET|POST|DELETE /api/dev/payload-lab`. Requer nenhum outro Dispatch player ativo.
+
+---
+
 ## freighter vs `pax_and_cargo` — quando usar
 
 São **duas camadas** — não confundir:
@@ -255,4 +271,8 @@ Career **inject freighters** (GA / TP / light jet, não `pax_and_cargo`) enviam 
 2. MZFW/CG estoura ou EFB exige pax≥1 com freight na cabine → **`pax_and_cargo` + `maxPaxSeats`**.
 3. Preflight: medir Sim vs Due; gravar no máximo **um** bias (`12-pax-efb-due.md`).
 4. Alinhar `stationRoles` ao layout escolhido (crew sempre fora do Sim freighter).
+
+### UI: label “Light GA” no Dispatch
+
+Header usa `logbookAircraftLabel` → precisa de `airframeLabel` (enrich `withMissionClientView`) ou `airframeTypeId`. Paths que devolviam missão crua (inject OFP, FBO/crew, Lab POST, settle/depart/cancel…) apagavam o label e caíam na classe. Corrigido: enrich nas respostas + fallback typeId no client.
 

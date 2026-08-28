@@ -775,6 +775,11 @@ export interface MissionIntent {
    */
   contractPilot?: boolean;
   /**
+   * Dev-only Payload Lab flight (inject / Due vs Sim harness). No hangar, no
+   * Market lot, no payout — cancel when done. Skips fuel purchase like contractPilot.
+   */
+  payloadLab?: boolean;
+  /**
    * Contract-pilot empty reposition (NPC deadhead home). Skips Cargo Ops Dry
    * settles — not a freight haul.
    */

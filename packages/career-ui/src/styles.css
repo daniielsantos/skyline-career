@@ -11062,3 +11062,103 @@ table.fbo-holds-table tbody tr.is-selected td {
 table.fbo-holds-table tbody tr.is-selected:hover td {
   background: color-mix(in srgb, var(--accent, #6ea8fe) 16%, transparent);
 }
+
+.payload-lab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.payload-lab-form,
+.payload-lab-active {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.payload-lab-od {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.payload-lab-filters {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 560px) {
+  .payload-lab-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+.payload-lab-steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  line-height: 1.45;
+}
+
+.payload-lab-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  align-items: baseline;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(240, 163, 90, 0.45);
+  background: rgba(240, 163, 90, 0.1);
+  font-size: 0.9rem;
+}
+
+.payload-lab-banner strong {
+  color: #f0a35a;
+}
+
+.payload-lab-layout-chip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  align-items: baseline;
+  margin: 0.45rem 0 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.payload-lab-layout-chip strong {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.payload-lab-layout-freighter {
+  border-color: rgba(110, 168, 254, 0.4);
+}
+
+.payload-lab-layout-freighter > span:first-of-type {
+  color: #6ea8fe;
+  font-weight: 600;
+}
+
+.payload-lab-layout-pax_and_cargo {
+  border-color: rgba(180, 140, 255, 0.45);
+}
+
+.payload-lab-layout-pax_and_cargo > span:first-of-type {
+  color: #b48cff;
+  font-weight: 600;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

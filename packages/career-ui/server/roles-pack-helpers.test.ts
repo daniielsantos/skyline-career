@@ -9,6 +9,36 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..', '..');
 
 describe('resolveMissionRolesPack', () => {
+  it('resolves 404 Titan Passengers pack from live title (not cargo default)', async () => {
+    const roles = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/microsoft-404-titan-cargo.json',
+      airframeTypeId: 'microsoft-404-titan',
+      liveTitle: '404 Titan Passengers',
+    });
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /microsoft-404-titan-passengers\.json$/,
+    );
+    assert.deepEqual(roles.pack.payload?.stationRoles?.baggageStations, [
+      3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    ]);
+  });
+
+  it('keeps 404 Titan Cargo pack for cargo live title', async () => {
+    const roles = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/microsoft-404-titan-cargo.json',
+      airframeTypeId: 'microsoft-404-titan',
+      liveTitle: '404 Titan Cargo',
+    });
+    assert.match(
+      roles.path.replace(/\\/g, '/'),
+      /microsoft-404-titan-cargo\.json$/,
+    );
+    assert.deepEqual(roles.pack.payload?.stationRoles?.baggageStations, [3, 4]);
+  });
+
   it('resolves the Asobo C208B pack from the live title', async () => {
     const roles = await resolveMissionRolesPack({
       repoRoot,

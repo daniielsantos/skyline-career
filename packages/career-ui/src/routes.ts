@@ -10,6 +10,7 @@ export type CareerTab =
   | 'pilot'
   | 'map'
   | 'ports'
+  | 'lab'
   | 'settings';
 
 export type CareerLocation = {
@@ -28,6 +29,7 @@ const TAB_PATH: Record<CareerTab, string> = {
   map: '/network',
   ports: '/ports',
   missions: '/logbook',
+  lab: '/lab',
   settings: '/settings',
 };
 
@@ -51,6 +53,7 @@ const PATH_TAB: Record<string, CareerTab> = {
   '/ports': 'ports',
   '/logbook': 'missions',
   '/missions': 'missions',
+  '/lab': 'lab',
   '/settings': 'settings',
 };
 

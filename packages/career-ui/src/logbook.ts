@@ -27,8 +27,11 @@ export function logbookStatusLabel(status: string): string {
 }
 
 /**
- * Hangar / combo airframe name. Never SimBrief ICAO — C172/BE36/C208 are
+ * Hangar / catalog airframe name. Never SimBrief ICAO — C172/BE36/C208 are
  * shared by several addons, including ones not homologated on that OFP type.
+ *
+ * Prefer API `airframeLabel` (withMissionClientView). Some write paths used to
+ * return raw missions and wipe the label — fall back to typeId before class.
  */
 export function logbookAircraftLabel(
   mission: Mission,
@@ -40,8 +43,55 @@ export function logbookAircraftLabel(
   if (catalog) return catalog;
   const fleet = opts?.fleetLabel?.trim();
   if (fleet) return fleet;
+  const fromType = labelFromAirframeTypeId(mission.airframeTypeId);
+  if (fromType) return fromType;
   return aircraftClassLabel(mission.aircraftClassId);
 }
+
+/** Browser-safe last resort when API omitted airframeLabel. */
+export function labelFromAirframeTypeId(
+  airframeTypeId: string | null | undefined,
+): string | null {
+  const raw = airframeTypeId?.trim();
+  if (!raw) return null;
+  const parts = raw.split('-').filter(Boolean);
+  if (parts.length === 0) return null;
+  const head = parts[0]!.toLowerCase();
+  if (TYPE_ID_PUBLISHER_PREFIXES.has(head)) parts.shift();
+  if (parts.length === 0) return null;
+  return parts
+    .map((part) => {
+      if (/^\d/.test(part) || /[a-z]+\d|\d+[a-z]/i.test(part)) {
+        return part.toUpperCase();
+      }
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(' ');
+}
+
+const TYPE_ID_PUBLISHER_PREFIXES = new Set([
+  'microsoft',
+  'asobo',
+  'blacksquare',
+  'blackbox',
+  'blackbird',
+  'workingtitle',
+  'justflight',
+  'inibuilds',
+  'flysimware',
+  'flightfx',
+  'fsreborn',
+  'nextgensim',
+  'leonardo',
+  'carenado',
+  'fenix',
+  'pmdg',
+  'toliss',
+  'tfdi',
+  'skyward',
+  'a2a',
+  'sws',
+]);
 
 export function logbookDistanceNm(mission: Mission): number | null {
   const fromApi = mission.distanceNm;

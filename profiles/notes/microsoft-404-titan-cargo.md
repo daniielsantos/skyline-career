@@ -19,7 +19,7 @@
 - Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).
 - AUX deferred for v1.
 - Payload stations from writetest: 1, 2, 3, 4.
-- Station maxLoad: placeholder until flight_model.cfg calibrate.
+- Station maxLoad: S1–S2 crew placeholder **500**; hold **S3–S4 = 1750** each (Σ bags ≈ catalog `maxCargoKg` 1563 ≈ 3446 lb). Wizard 500 was artificial; CFG in `.fsarchive` not calibrated; verify inject if SimConnect clamps.
 - Homologated with interactive wizard.
 - Market family: `microsoft-404-titan` — pack
   `profiles/ofp/microsoft-404-titan-cargo.json` (4 stations); sibling passengers pack (15).

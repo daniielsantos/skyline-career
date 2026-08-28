@@ -86,6 +86,18 @@ describe('logbookAircraftLabel', () => {
     );
     assert.equal(logbookAircraftLabel(mission()), 'Light jet');
   });
+
+  it('falls back to airframeTypeId before class', () => {
+    assert.equal(
+      logbookAircraftLabel(
+        mission({
+          aircraftClassId: 'light_ga',
+          airframeTypeId: 'microsoft-404-titan',
+        }),
+      ),
+      '404 Titan',
+    );
+  });
 });
 
 describe('logbookDistanceNm', () => {

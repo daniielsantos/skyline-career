@@ -1307,6 +1307,8 @@ export class CareerWatchSession {
       serviceStations?: number[];
     };
   } | null = null;
+  /** Live MSFS title — picks family pack (e.g. 404 Titan Cargo vs Passengers). */
+  private lastLiveAircraftTitle: string | null = null;
   private consecutivePipeErrors = 0;
   private opts: Required<
     Pick<
@@ -1608,6 +1610,9 @@ export class CareerWatchSession {
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
     this.pendingMxDrainKg = 0;
+    this.paxAndCargoCrewCache = null;
+    this.freighterRolesCache = null;
+    this.lastLiveAircraftTitle = null;
 
     const loaded = await this.cb.withCareerRead((world, missions) => {
       const mission = missions.missions.find((m) => m.id === opts.missionId);
@@ -1853,6 +1858,22 @@ export class CareerWatchSession {
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
     this.pendingMxDrainKg = 0;
+    this.paxAndCargoCrewCache = null;
+    this.freighterRolesCache = null;
+    this.lastLiveAircraftTitle = null;
+  }
+
+  /** Prefer live MSFS title so family packs (404 Cargo vs Passengers) resolve correctly. */
+  private async refreshLiveAircraftTitle(): Promise<string | null> {
+    if (!this.bridge) return this.lastLiveAircraftTitle;
+    try {
+      const identity = await this.bridge.getAircraftIdentity();
+      const title = identity.title?.trim() || null;
+      if (title) this.lastLiveAircraftTitle = title;
+    } catch {
+      /* keep previous */
+    }
+    return this.lastLiveAircraftTitle;
   }
 
   /** Write Watch airborne clock onto the open mission save (survives app quit). */
@@ -2193,7 +2214,8 @@ export class CareerWatchSession {
           let paxAndCargoCrewStations: readonly number[] | undefined;
           let paxAndCargoPayloadStations: readonly number[] | undefined;
           if (pmdgPaxAndCargo && !preferPmdgFreighterRoles) {
-            const crewKey = `${current.airframeTypeId ?? ''}|${current.rolesPackRelPath ?? ''}`;
+            const liveTitle = await this.refreshLiveAircraftTitle();
+            const crewKey = `${current.airframeTypeId ?? ''}|${current.rolesPackRelPath ?? ''}|${liveTitle ?? ''}`;
             if (this.paxAndCargoCrewCache?.key === crewKey) {
               paxAndCargoCrewStations = this.paxAndCargoCrewCache.stations;
               paxAndCargoPayloadStations =
@@ -2204,6 +2226,7 @@ export class CareerWatchSession {
                   repoRoot: getRepoRoot(),
                   rolesPackRelPath: current.rolesPackRelPath,
                   airframeTypeId: current.airframeTypeId,
+                  liveTitle,
                 });
                 const fromPack =
                   roles.pack.payload?.stationRoles?.crewStations?.filter(
@@ -2359,7 +2382,8 @@ export class CareerWatchSession {
               }
             | undefined;
           if (!pmdgPaxAndCargo && !preferPmdgFreighterRoles) {
-            const rolesKey = `${current.airframeTypeId ?? ''}|${current.rolesPackRelPath ?? ''}`;
+            const liveTitle = await this.refreshLiveAircraftTitle();
+            const rolesKey = `${current.airframeTypeId ?? ''}|${current.rolesPackRelPath ?? ''}|${liveTitle ?? ''}`;
             if (this.freighterRolesCache?.key === rolesKey) {
               freighterStationRoles = this.freighterRolesCache.stationRoles;
             } else if (current.rolesPackRelPath) {
@@ -2368,6 +2392,7 @@ export class CareerWatchSession {
                   repoRoot: getRepoRoot(),
                   rolesPackRelPath: current.rolesPackRelPath,
                   airframeTypeId: current.airframeTypeId,
+                  liveTitle,
                 });
                 const fromPack = roles.pack.payload?.stationRoles;
                 if (fromPack) {

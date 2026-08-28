@@ -90,121 +90,121 @@
       {
         "index": 1,
         "name": "PILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 10.023
       },
       {
         "index": 2,
         "name": "COPILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 10.023
       },
       {
         "index": 3,
         "name": "NGSE110V2 PASSENGER 1 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 6.07
       },
       {
         "index": 4,
         "name": "NGSE110V2 PASSENGER 1 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 6.07
       },
       {
         "index": 5,
         "name": "NGSE110V2 PASSENGER 1 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 6.07
       },
       {
         "index": 6,
         "name": "NGSE110V2 PASSENGER 2 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 3.553
       },
       {
         "index": 7,
         "name": "NGSE110V2 PASSENGER 2 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 3.553
       },
       {
         "index": 8,
         "name": "NGSE110V2 PASSENGER 2 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 3.553
       },
       {
         "index": 9,
         "name": "NGSE110V2 PASSENGER 3 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 1.086
       },
       {
         "index": 10,
         "name": "NGSE110V2 PASSENGER 3 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 1.086
       },
       {
         "index": 11,
         "name": "NGSE110V2 PASSENGER 3 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 1.086
       },
       {
         "index": 12,
         "name": "NGSE110V2 PASSENGER 4 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -1.352
       },
       {
         "index": 13,
         "name": "NGSE110V2 PASSENGER 4 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -1.352
       },
       {
         "index": 14,
         "name": "NGSE110V2 PASSENGER 4 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -1.352
       },
       {
         "index": 15,
         "name": "NGSE110V2 PASSENGER 5 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -3.789
       },
       {
         "index": 16,
         "name": "NGSE110V2 PASSENGER 5 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -3.789
       },
       {
         "index": 17,
         "name": "NGSE110V2 PASSENGER 5 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -3.789
       },
       {
         "index": 18,
         "name": "NGSE110V2 PASSENGER 6 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -6.247
       },
       {
         "index": 19,
         "name": "NGSE110V2 PASSENGER 6 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -6.247
       },
       {
         "index": 20,
         "name": "NGSE110V2 PASSENGER 6 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -6.247
       }
     ],

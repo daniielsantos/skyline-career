@@ -19,7 +19,7 @@
 - Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).
 - AUX deferred for v1.
 - Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.
-- Station maxLoad: placeholder until cfg or clamp.
+- Station maxLoad: 750 lb per station (SimBrief/in-sim headroom; cfg has no per-station cap).
 - Homologated with interactive wizard.
 
 ## Homologated

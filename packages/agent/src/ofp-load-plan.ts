@@ -379,6 +379,40 @@ export function seatSoftMaxLb(
  * Live UI should compare against `live.payload.total` (all stations), not ofpPayloadLb
  * (pax+bags only — that was showing Sim 550 while the tablet showed 1050).
  */
+/** Sum of structural maxLoad on mapped baggage stations (freighter inject cap). */
+export function freighterBaggageHardCapacityLb(
+  profile: AircraftProfile,
+  stationRoles?: OfpStationRoleMap,
+): number {
+  const baggageStations = (stationRoles?.baggageStations ?? []).filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  return baggageStations.reduce((sum, idx) => {
+    const station = profile.payload.stations.find((s) => s.index === idx);
+    return sum + (station?.maxLoad ?? 0);
+  }, 0);
+}
+
+/** Preflight Due helper when only homologated stationMax is available (no live profile). */
+export function freighterBaggageCapacityFromStationMax(
+  stationMax: Record<number, number> | undefined,
+  stationRoles?: OfpStationRoleMap,
+): number | undefined {
+  if (!stationMax) return undefined;
+  const baggageStations = (stationRoles?.baggageStations ?? []).filter(
+    (n) => Number.isFinite(n) && n > 0,
+  );
+  if (baggageStations.length === 0) return undefined;
+  let sum = 0;
+  for (const idx of baggageStations) {
+    const cap = stationMax[idx];
+    if (typeof cap === 'number' && Number.isFinite(cap) && cap > 0) {
+      sum += cap;
+    }
+  }
+  return sum > 0 ? sum : undefined;
+}
+
 export function plannedStationPayloadLb(opts: {
   cargoLb: number;
   stationRoles?: OfpStationRoleMap;
@@ -386,6 +420,8 @@ export function plannedStationPayloadLb(opts: {
   emptyWeightLb?: number;
   maxGrossWeightLb?: number;
   blockFuelLb?: number;
+  /** Freighter: clamp Due to injectable baggage capacity (station maxLoad sum). */
+  baggageCapacityLb?: number;
 }): {
   /** OFP / mission payload — compare to live.payload.total */
   plannedTotalLb: number;
@@ -430,6 +466,12 @@ export function plannedStationPayloadLb(opts: {
       paxN * SEAT_OCCUPANT_SOFT_MAX_LB;
     const bagRoom = bagN * GA_BAGGAGE_SOFT_MAX_LB;
     cargoLb = Math.min(cargoLb, seatCargoRoom + bagRoom);
+  } else if (
+    typeof opts.baggageCapacityLb === 'number' &&
+    Number.isFinite(opts.baggageCapacityLb) &&
+    opts.baggageCapacityLb >= 0
+  ) {
+    cargoLb = Math.min(cargoLb, opts.baggageCapacityLb);
   }
 
   return {
@@ -625,10 +667,10 @@ export function distributeCargoAcrossStations(
     const cap = seatSoftMax[idx] ?? seatOccupantSoft;
     return sum + Math.max(0, cap - (stations[idx] ?? 0));
   }, 0);
-  const baggageHardCapacityLb = baggageStations.reduce((sum, idx) => {
-    const station = profile.payload.stations.find((s) => s.index === idx);
-    return sum + (station?.maxLoad ?? 0);
-  }, 0);
+  const baggageHardCapacityLb = freighterBaggageHardCapacityLb(
+    profile,
+    stationRoles,
+  );
   const baggageSoftMax = Object.fromEntries(
     baggageStations.map((idx) => {
       const hard =

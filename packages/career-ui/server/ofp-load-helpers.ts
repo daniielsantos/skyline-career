@@ -1196,7 +1196,7 @@ async function applyMissionOfpLoadExclusive(
      * reserved crew). Inject seeds crew floors separately — do not subtract
      * them from this total again.
      */
-    const plannedPayloadLb = built.requestedCargoLb ?? built.cargoLb;
+    const plannedPayloadLb = built.cargoLb;
 
     watchDebugLog('inject', 'plan ready', {
       missionId: mission.id,

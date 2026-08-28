@@ -1472,6 +1472,20 @@ describe('plannedStationPayloadLb', () => {
     assert.equal(due.cargoPlacedLb, 504);
     assert.equal(due.plannedTotalLb, 504);
   });
+
+  it('freighter Due clamps to baggage station capacity (Bandeirante 5×750)', () => {
+    const due = plannedStationPayloadLb({
+      cargoLb: 4000,
+      stationRoles: {
+        crewStations: [1, 2],
+        baggageStations: [3, 4, 5, 6, 7],
+      },
+      baggageCapacityLb: 3750,
+    });
+    assert.equal(due.gaCabin, false);
+    assert.equal(due.cargoPlacedLb, 3750);
+    assert.equal(due.plannedTotalLb, 3750);
+  });
 });
 
 describe('adjustPlannedPayloadForLiveCrewStations', () => {

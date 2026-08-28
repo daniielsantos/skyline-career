@@ -90,121 +90,121 @@
       {
         "index": 1,
         "name": "PILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 12.491
       },
       {
         "index": 2,
         "name": "COPILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 12.491
       },
       {
         "index": 3,
         "name": "NGSE110V2 PASSENGER 1 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 7.862
       },
       {
         "index": 4,
         "name": "NGSE110V2 PASSENGER 1 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 7.862
       },
       {
         "index": 5,
         "name": "NGSE110V2 PASSENGER 1 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 7.862
       },
       {
         "index": 6,
         "name": "NGSE110V2 PASSENGER 2 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 5.32
       },
       {
         "index": 7,
         "name": "NGSE110V2 PASSENGER 2 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 5.32
       },
       {
         "index": 8,
         "name": "NGSE110V2 PASSENGER 2 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 5.32
       },
       {
         "index": 9,
         "name": "NGSE110V2 PASSENGER 3 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 2.777
       },
       {
         "index": 10,
         "name": "NGSE110V2 PASSENGER 3 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 2.777
       },
       {
         "index": 11,
         "name": "NGSE110V2 PASSENGER 3 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 2.777
       },
       {
         "index": 12,
         "name": "NGSE110V2 PASSENGER 4 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 0.234
       },
       {
         "index": 13,
         "name": "NGSE110V2 PASSENGER 4 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 0.234
       },
       {
         "index": 14,
         "name": "NGSE110V2 PASSENGER 4 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 0.234
       },
       {
         "index": 15,
         "name": "NGSE110V2 PASSENGER 5 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -2.308
       },
       {
         "index": 16,
         "name": "NGSE110V2 PASSENGER 5 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -2.308
       },
       {
         "index": 17,
         "name": "NGSE110V2 PASSENGER 5 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -2.308
       },
       {
         "index": 18,
         "name": "NGSE110V2 PASSENGER 6 L",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -4.851
       },
       {
         "index": 19,
         "name": "NGSE110V2 PASSENGER 6 R A",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -4.851
       },
       {
         "index": 20,
         "name": "NGSE110V2 PASSENGER 6 R B",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -4.851
       }
     ],
@@ -383,7 +383,7 @@
     "Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.",
-    "Station maxLoad: placeholder until cfg or clamp.",
+    "Station maxLoad: 750 lb per station (SimBrief/in-sim headroom; cfg has no per-station cap).",
     "Homologated with interactive wizard.",
     "See profiles/notes/nextgensim-emb-110p2-bandeirante.md"
   ]

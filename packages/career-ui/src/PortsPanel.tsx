@@ -2161,33 +2161,30 @@ export function PortsPanel(props: {
               ) : null}
               {port ? (
                 <h3 className="ports-selected-name ports-stage-title">
-                  {port.name}
-                  <button
-                    type="button"
+                  <span className="ports-selected-name-text">{port.name}</span>
+                  <span
                     className={
                       port.concession?.status === 'yours'
-                        ? 'tag ports-operator-badge ports-concession-chip'
+                        ? 'tag ports-operator-badge ports-concession-status'
                         : port.concession?.status === 'held'
-                          ? 'tag ports-concession-chip'
-                          : 'tag muted ports-concession-chip'
+                          ? 'tag ports-concession-status'
+                          : 'tag muted ports-concession-status'
                     }
-                    title="Port concession (endgame)"
-                    disabled={props.busy}
-                    onClick={() => setConcessionOpen(true)}
+                    title="Port concession status"
                   >
                     {port.concession?.status === 'yours'
                       ? `Operator P${port.concession.level ?? 1}`
                       : port.concession?.status === 'held'
                         ? 'Held'
                         : 'Vacant'}
-                  </button>
+                  </span>
                   <button
                     type="button"
                     className="action ghost ports-concession-open"
                     disabled={props.busy}
                     onClick={() => setConcessionOpen(true)}
                   >
-                    Concession…
+                    Concession
                   </button>
                 </h3>
               ) : (

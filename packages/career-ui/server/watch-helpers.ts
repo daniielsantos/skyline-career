@@ -2125,7 +2125,14 @@ export class CareerWatchSession {
                     : {}),
                   liveStations: stationsForCrew,
                 })
-              : undefined;
+              : cargoLb !== undefined
+                ? {
+                    plannedTotalLb: cargoLb,
+                    cargoPlacedLb: cargoLb,
+                    crewLb: 0,
+                    crewOnStations: false,
+                  }
+                : undefined;
           const ofpPayloadLb =
             pmdgPaxAndCargo &&
             cargoLb !== undefined &&
@@ -2490,9 +2497,10 @@ export class CareerWatchSession {
             payload: {
               ...nextWeights.payload,
               ...(cargoLb !== undefined ? { cargoLb } : {}),
-              ...(adjustedPayload
+              ...(adjustedPayload && adjustedPayload.crewLb > 0
                 ? { crewLb: adjustedPayload.crewLb }
-                : prevWatchPayload.crewLb !== undefined
+                : prevWatchPayload.crewLb !== undefined &&
+                    prevWatchPayload.crewLb > 0
                   ? { crewLb: prevWatchPayload.crewLb }
                   : {}),
               ...(crewFloorLb !== undefined ? { crewFloorLb } : {}),

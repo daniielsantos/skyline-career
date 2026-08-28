@@ -811,6 +811,26 @@ describe('acceptMission', () => {
     assert.equal(acf.status, 'parked');
   });
 
+  it('cancelOrphanPlayerMissions keeps contract-pilot flights without a hangar tail', () => {
+    const world = createSeedEconomyWorld({ seed: 'orphan-cp' });
+    const state = emptyMissionsStateV2();
+    state.missions = [
+      baseMission({
+        id: 'msn_cp_1_EGLL_EGCC_508063',
+        status: 'accepted',
+        originIcao: 'EGLL',
+        destIcao: 'EGCC',
+        aircraftClassId: 'light_turboprop',
+        contractPilot: true,
+        lots: [],
+        cargoKg: 1200,
+      }),
+    ];
+    const cancelled = cancelOrphanPlayerMissions(world, state);
+    assert.equal(cancelled.length, 0);
+    assert.equal(state.missions[0]!.status, 'accepted');
+  });
+
   it('reconcileLotReservations releases orphan reserved kg', () => {
     const world = createSeedEconomyWorld({ seed: 'reconcile-res' });
     const state = emptyMissionsStateV2();

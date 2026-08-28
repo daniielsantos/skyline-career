@@ -9515,6 +9515,22 @@ span.dispatch-route-hub-dest {
   color: var(--accent, #f0a500);
 }
 
+.ports-selected-name.ports-stage-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+}
+
+.ports-selected-name-text {
+  min-width: 0;
+}
+
+.ports-concession-status {
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
 .ports-stage-title.is-muted {
   color: var(--muted);
   font-weight: 500;
@@ -10373,12 +10389,10 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-operator-badge {
-  margin-left: 0.55rem;
   vertical-align: middle;
 }
 
 .ports-concession-chip {
-  margin-left: 0.55rem;
   vertical-align: middle;
   cursor: pointer;
   border: none;
@@ -10391,10 +10405,11 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-concession-open {
-  margin-left: 0.45rem;
-  vertical-align: middle;
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 0.78rem;
-  padding: 0.15rem 0.45rem;
+  padding: 0.2rem 0.55rem;
+  margin-left: 0.15rem;
 }
 
 .ports-stock-details {

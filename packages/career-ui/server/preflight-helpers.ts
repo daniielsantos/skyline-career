@@ -35,6 +35,7 @@ import { compareOnce, formatComplianceSummary } from '../../agent/src/ofp-compli
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 import {
   adjustPlannedPayloadForLiveCrewStations,
+  freighterBaggageCapacityFromStationMax,
   plannedStationPayloadLb,
 } from '../../agent/src/ofp-load-plan.ts';
 import { readLiveCgState } from '../../agent/src/live-cg.ts';
@@ -271,6 +272,12 @@ export async function runMissionPreflight(
       ? ofpFreightTowardMissionKg(ofp, careerAirframe)
       : ofpCargoKg(ofp);
 
+    const catalogCaps = await resolveSchematicCapsFromCatalog({
+      repoRoot,
+      title: liveTitle || identity.title,
+      icao: identity.icao,
+    });
+
     // CG is advisory in Career preflight (OnAir-style Loaded vs Due).
     // Paint the same envelope inject uses (calibrated-live JSON), not SimVar 0–100.
     const painted = await resolveCatalogCgEnvelope({
@@ -371,6 +378,12 @@ export async function runMissionPreflight(
           ],
         }
       : ofp.payload?.stationRoles;
+    const baggageCapacityLb = !isPaxAndCargoLoadLayout(careerAirframe)
+      ? freighterBaggageCapacityFromStationMax(
+          catalogCaps.stationMax,
+          stationRolesForDue,
+        )
+      : undefined;
     const plannedPayloadBase =
       cargoLb !== undefined
         ? plannedStationPayloadLb({
@@ -379,6 +392,7 @@ export async function runMissionPreflight(
             emptyWeightLb: live.weights?.emptyLb,
             maxGrossWeightLb: live.weights?.maxGrossLb,
             blockFuelLb: plannedFuelLb,
+            ...(baggageCapacityLb !== undefined ? { baggageCapacityLb } : {}),
           })
         : undefined;
     const stationSumLb = live.payload?.stations
@@ -534,11 +548,7 @@ export async function runMissionPreflight(
       careerVerdict = 'fail';
     }
 
-    const catalogCaps = await resolveSchematicCapsFromCatalog({
-      repoRoot,
-      title: liveTitle || identity.title,
-      icao: identity.icao,
-    });
+    const catalogCapsForSchematic = catalogCaps;
     let liveTankCapacity: FuelTankBreakdown | undefined;
     try {
       liveTankCapacity = await readClassicFuelTankCapacityLb(bridge);
@@ -547,9 +557,9 @@ export async function runMissionPreflight(
     }
     const tankCapacity = pickTankCapacity(
       liveTankCapacity,
-      catalogCaps.tankCapacity,
+      catalogCapsForSchematic.tankCapacity,
     );
-    const stationMax = pickStationMax(catalogCaps.stationMax, undefined);
+    const stationMax = pickStationMax(catalogCapsForSchematic.stationMax, undefined);
 
     const check: PreflightCheckResult = {
       verdict: careerVerdict,

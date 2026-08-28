@@ -191,4 +191,14 @@ describe('formatPayloadDueLine', () => {
       'Due 2840 lb',
     );
   });
+
+  it('shows cargo only when crew floor is zero (freighter Due)', () => {
+    assert.equal(
+      formatPayloadDueLine(
+        { plannedLb: 2804, cargoLb: 2804, crewLb: 0 },
+        fmt,
+      ),
+      'Due 2804 lb · 2804 lb cargo',
+    );
+  });
 });

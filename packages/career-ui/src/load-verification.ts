@@ -563,8 +563,11 @@ export function formatPayloadDueLine(
     typeof payload.crewLb === 'number' && Number.isFinite(payload.crewLb)
       ? payload.crewLb
       : undefined;
-  if (cargo !== undefined && crew !== undefined) {
+  if (cargo !== undefined && crew !== undefined && crew > 0) {
     return `Due ${due} · ${formatLb(cargo)} cargo + ${formatLb(crew)} crew`;
+  }
+  if (cargo !== undefined) {
+    return `Due ${due} · ${formatLb(cargo)} cargo`;
   }
   return `Due ${due}`;
 }

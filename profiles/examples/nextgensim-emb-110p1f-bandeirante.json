@@ -90,43 +90,43 @@
       {
         "index": 1,
         "name": "PILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 12.491
       },
       {
         "index": 2,
         "name": "COPILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 12.491
       },
       {
         "index": 3,
         "name": "CARGO CABIN 1",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 5.249
       },
       {
         "index": 4,
         "name": "CARGO CABIN 2",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 1.969
       },
       {
         "index": 5,
         "name": "CARGO CABIN 3",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -1.312
       },
       {
         "index": 6,
         "name": "CARGO CABIN 4",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -4.593
       },
       {
         "index": 7,
         "name": "CARGO CABIN 5",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": -7.874
       }
     ],
@@ -227,7 +227,7 @@
     "Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.",
-    "Station maxLoad: placeholder until cfg or clamp.",
+    "Station maxLoad: 750 lb per station (SimBrief/in-sim headroom; cfg has no per-station cap).",
     "Homologated with interactive wizard.",
     "See profiles/notes/nextgensim-emb-110p1f-bandeirante.md"
   ]

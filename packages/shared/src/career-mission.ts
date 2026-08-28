@@ -956,9 +956,9 @@ export function cancelOrphanPlayerMissions(
     if (mission.status !== 'accepted' && mission.status !== 'dispatched') {
       continue;
     }
-    const aircraft = mission.aircraftId
-      ? findPlayerAircraft(state, mission.aircraftId)
-      : undefined;
+    // Contract-pilot (and other tail-less) flights have no hangar assignment.
+    if (!mission.aircraftId?.trim()) continue;
+    const aircraft = findPlayerAircraft(state, mission.aircraftId);
     const bound =
       Boolean(aircraft) &&
       aircraft!.status === 'assigned' &&

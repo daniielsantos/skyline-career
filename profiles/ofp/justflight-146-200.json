@@ -14,7 +14,8 @@
     "Homologated: justflight/just-flight-146-200-air-cal@1.0.0",
     "Family: QC/QT freighter uses justflight-146-200-freighter.json (16 stations)",
     "loadMethod: native-simbrief; injectCapable: false",
-    "SimBrief airframe: Just Flight (MSFS) - BAe 146-200"
+    "SimBrief airframe: Just Flight (MSFS) - BAe 146-200",
+    "EFB: cabin S3–S10 (170 lb/pax zones), FWD/AFT S11–S12; S13+ sticky/ghost omitted from Live vs Due."
   ],
   "fuel": {
     "unit": "lb"
@@ -29,7 +30,7 @@
         1,
         2
       ],
-      "baggageStations": [
+      "passengerStations": [
         3,
         4,
         5,
@@ -37,17 +38,12 @@
         7,
         8,
         9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18
+        10
       ],
-      "passengerStations": []
+      "baggageStations": [
+        11,
+        12
+      ]
     }
   },
   "liveSources": {
@@ -81,49 +77,49 @@
       "simVarIndex": 3,
       "cfgIndex": 2,
       "name": "Station 3",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
       "name": "Station 4",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 5,
       "cfgIndex": 4,
       "name": "Station 5",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 6,
       "cfgIndex": 5,
       "name": "Station 6",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 7,
       "cfgIndex": 6,
       "name": "Station 7",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 8,
       "cfgIndex": 7,
       "name": "Station 8",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 9,
       "cfgIndex": 8,
       "name": "Station 9",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 10,
       "cfgIndex": 9,
       "name": "Station 10",
-      "role": "baggage"
+      "role": "passenger"
     },
     {
       "simVarIndex": 11,
@@ -141,37 +137,37 @@
       "simVarIndex": 13,
       "cfgIndex": 12,
       "name": "Station 13",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 14,
       "cfgIndex": 13,
       "name": "Station 14",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 15,
       "cfgIndex": 14,
       "name": "Station 15",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 16,
       "cfgIndex": 15,
       "name": "Station 16",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 17,
       "cfgIndex": 16,
       "name": "Station 17",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 18,
       "cfgIndex": 17,
       "name": "Station 18",
-      "role": "baggage"
+      "role": "service"
     }
   ],
   "tolerances": {

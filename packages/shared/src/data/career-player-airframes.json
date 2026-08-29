@@ -1080,7 +1080,8 @@
     "maxRangeNm": 1600,
     "cruiseSpeedKt": 390,
     "fuelBurnKgPerNm": 3.6,
-    "mzfwKg": 31071
+    "mzfwKg": 31071,
+    "efbPaxWeightLb": 170
   },
   {
     "typeId": "justflight-146-200",
@@ -1103,7 +1104,8 @@
     "maxRangeNm": 1600,
     "cruiseSpeedKt": 390,
     "fuelBurnKgPerNm": 3.7,
-    "mzfwKg": 34745
+    "mzfwKg": 34745,
+    "efbPaxWeightLb": 170
   },
   {
     "typeId": "justflight-146-300",
@@ -1126,7 +1128,8 @@
     "maxRangeNm": 1600,
     "cruiseSpeedKt": 390,
     "fuelBurnKgPerNm": 3.8,
-    "mzfwKg": 36514
+    "mzfwKg": 36514,
+    "efbPaxWeightLb": 170
   },
   {
     "typeId": "leonardo-fly-the-maddog-x-md-82-20th",

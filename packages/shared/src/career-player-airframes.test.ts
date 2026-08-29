@@ -117,6 +117,8 @@ describe('career player airframes', () => {
     assert.equal(s100?.maxPaxSeats, 80);
     assert.equal(s200?.maxPaxSeats, 112);
     assert.equal(s300?.maxPaxSeats, 128);
+    assert.equal(s100?.efbPaxWeightLb, 170);
+    assert.equal(s300?.efbPaxWeightLb, 170);
     assert.deepEqual(
       [...careerPlayerAirframePackPaths(s100!)].sort(),
       [

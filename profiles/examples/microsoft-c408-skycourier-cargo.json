@@ -100,17 +100,17 @@
       {
         "index": 3,
         "name": "Cargo 3",
-        "maxLoad": 1500
+        "maxLoad": 2500
       },
       {
         "index": 4,
-        "name": "Cargo 4",
-        "maxLoad": 1500
+        "name": "Cargo 4 (dead)",
+        "maxLoad": 0
       },
       {
         "index": 5,
-        "name": "Cargo 5",
-        "maxLoad": 1500
+        "name": "Cargo 5 (dead)",
+        "maxLoad": 0
       }
     ],
     "writePlan": [
@@ -198,7 +198,7 @@
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
     "AUX deferred for v1.",
     "Payload stations from writetest: 1, 2, 3, 4, 5 (Empty livery).",
-    "S3–S5 are cargo holds (CG sweep 15.9–20.2% MAC). maxLoad 1500 so career cargo fits; 500 placeholder capped the board at 680 kg.",
+    "S1–S2 crew; cargo inject uses S3 only — S4/S5 maxLoad 0 (SimConnect writes do not stick). S3 maxLoad 2500; live clamp often ~800 lb (pre-fill probe).",
     "Homologated with interactive wizard.",
     "See profiles/notes/microsoft-c408-skycourier-cargo.md"
   ]

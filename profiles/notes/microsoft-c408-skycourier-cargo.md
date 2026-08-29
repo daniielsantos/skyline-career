@@ -4,7 +4,7 @@
 **Match title:** `C408 SkyCourier Cargo - Empty`  
 **ICAO (SimBrief type):** `C408`  
 **Publisher:** `microsoft`  
-**Stations:** 5  
+**Stations:** 5 (cargo write: **S3 only**)  
 **Profile:** `microsoft/c408-skycourier-cargo@1.0.0`
 
 **Not supported:** `C408 SkyCourier Cargo - Loaded` — that livery only exposes S1–S2 crew. Spawn **Empty** for inject.
@@ -21,7 +21,10 @@
 - Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).
 - AUX deferred for v1.
 - Payload stations from writetest: 1, 2, 3, 4, 5 (use **Cargo - Empty** livery — Loaded only exposed crew).
-- S1–S2 crew; S3–S5 cargo holds. CG sweep 15.9–20.2% MAC with 200 lb (index is longitudinal on this variant).
+- S1–S2 crew; **S3** is the only sticky cargo hold. **S4/S5** accept profile indexes but SimConnect writes do not stick → `baggageStations: [3]`, `maxLoad` 0 on S4/S5.
+- S3 `maxLoad` 2500; live often clamps ~800 lb — inject pre-fill probe measures ceiling and clamps Due.
+- Catalog SKU `maxCargoKg` **1055** (~2325 lb) matches Passenger S5 hold; Cargo Empty still probe/Accept-cuts when S3 clamps lower.
+- Inject: pre-fill baggage writability + clamp probe; mid-fill ghost prune remains as safety net. Log: `baggage writability probe` / `dead stations pruned` in `profiles/career/watch-debug.log`.
 - Homologated with interactive wizard.
 
 ## Homologated

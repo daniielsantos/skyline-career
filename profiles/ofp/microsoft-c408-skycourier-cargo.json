@@ -13,7 +13,8 @@
     "Do not match Cargo - Loaded: that livery only exposes S1–S2 crew.",
     "Profile: microsoft/c408-skycourier-cargo@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
-    "S1–S2 crew; S3–S5 cargo holds. SimBrief: Carenado C408.",
+    "S1–S2 crew; cargo write sticks on S3 only — S4/S5 are dead SimConnect holds (kept in profile at maxLoad 0).",
+    "SimBrief: Carenado C408.",
     "Fuel strategy: simconnect-direct"
   ],
   "fuel": {
@@ -30,9 +31,7 @@
         2
       ],
       "baggageStations": [
-        3,
-        4,
-        5
+        3
       ],
       "passengerStations": []
     }
@@ -72,14 +71,14 @@
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
-      "name": "Cargo 4",
-      "role": "baggage"
+      "name": "Cargo 4 (dead)",
+      "role": "unused"
     },
     {
       "simVarIndex": 5,
       "cfgIndex": 4,
-      "name": "Cargo 5",
-      "role": "baggage"
+      "name": "Cargo 5 (dead)",
+      "role": "unused"
     }
   ],
   "tolerances": {

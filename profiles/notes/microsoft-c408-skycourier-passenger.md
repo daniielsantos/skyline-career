@@ -26,6 +26,7 @@
   - **Cargo** tab → **S5** wing-box hold (~2325 lb), CG ~17% MAC
   - **S6 / S7** are unused. SimConnect writes there pull CG to −10% MAC.
 - Career cargo (pax=0) injects **S5 only**; S3/S4 stay empty.
+- SKU `maxCargoKg` **1055** (~2325 lb) — Passenger hold; Cargo Empty relies on probe/Accept when S3 clamps lower.
 
 ## Homologated
 

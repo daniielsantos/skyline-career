@@ -671,19 +671,8 @@ export function DispatchActivePanel(props: {
                       SimBrief limited payload for this leg — leftover returns to
                       the board and{' '}
                       {mission.contractPilot ? 'pilot fee' : 'pay'} is reduced.
+                      Use Accept OFP cargo below.
                     </p>
-                    <button
-                      type="button"
-                      className="accept"
-                      disabled={busy}
-                      onClick={() => props.onAcceptOfpCargo?.(mission)}
-                      title="Trim mission cargo and pay to match the SimBrief OFP"
-                    >
-                      Accept OFP cargo
-                      {ofpAcceptCargoKg
-                        ? ` (${formatMassExact(ofpAcceptCargoKg, weightSystem)})`
-                        : ''}
-                    </button>
                   </div>
                 ) : null}
                 {briefingItems.length > 0 ? (

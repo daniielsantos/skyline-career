@@ -9,22 +9,26 @@
 
 ## Fuel tanks
 
-| Var | Capacity | Id |
-|-----|----------|----|
-| `FUEL TANK CENTER QUANTITY` | 181 | CENTER (forward fuselage) |
-| `FUEL TANK CENTER2 QUANTITY` | 197 | CENTER2 (aft fuselage) |
+| Id | SimVar | Cap (gal) | EFB label |
+|----|--------|-----------|-----------|
+| CENTER | `FUEL TANK CENTER QUANTITY` | 181 | Center |
+| CENTER2 | `FUEL TANK CENTER2 QUANTITY` | 197 | Center AFT |
+| LEFT_MAIN | `FUEL TANK LEFT MAIN QUANTITY` | 37 | Left outer |
+| RIGHT_MAIN | `FUEL TANK RIGHT MAIN QUANTITY` | 37 | Right outer |
 
-Total written by Skyline: **378 US gal** ≈ **2,268 lb** / **1,029 kg** Jet-A.
+Total: **452 US gal** ≈ **3,028 lb** / **1,374 kg** Jet-A.
 
-AOM also lists optional wing tanks (37 gal/side). Do **not** map them to classic
-`LEFT_AUX`/`RIGHT_AUX` without a live writetest — writing unregistered tank
-SimVars triggered SimConnect `UNRECOGNIZED_ID` and killed the Host
-(`ReceiveMessage error: 0xC00000B0`). Re-homologate wing tanks with the correct
-vars before enabling long-range inject.
+Same wings as `FUELSYSTEM TANK QUANTITY:3` / `:4` (cap 37). **Do not** map them to
+`LEFT_AUX` / `RIGHT_AUX` — those read 0 and ignore writes. (Older attempts to
+write unregistered AUX vars killed the Host; AUX is the wrong slot here.)
+
+Wing mains often stick ~13 gal (~89 lb) unusable floor. Inject uses
+`redistributeAroundResidualFloors` so Due stays on OFP block fuel (floor kept
+on wings, same qty pulled from fuselage). Payload writes can re-raise the floor
+— post-payload fuel restore re-applies the plan.
 
 ## Notes
 
-- Fuel via classic FUEL TANK * (CENTER, CENTER2 only for now).
 - Payload stations from writetest: 1–11.
 - Station maxLoad: placeholder until flight_model.cfg calibrate.
 - Homologated with interactive wizard.

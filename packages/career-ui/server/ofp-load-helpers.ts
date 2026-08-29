@@ -3116,16 +3116,21 @@ async function applyMissionOfpLoadExclusive(
     // from SimConnect while cargo was just applied.
     paintFuelUiFromWriteTarget(writtenFuelTanks);
 
-    // ATR (and similar) can dump mains while payload stations are written.
-    // Re-apply OFP tanks once so the sim matches what the card already shows.
+    // ATR can dump mains while payload stations are written; Twin Otter can
+    // re-raise wing MAIN floors. Re-apply OFP tanks (with residual redistribute)
+    // when live total drifts either way from Due.
     {
-      const restoreTanks = built.plan.fuel?.tanks ?? writtenFuelTanks;
+      const baseRestore = built.plan.fuel?.tanks ?? writtenFuelTanks;
       const liveFuelAfterPayloadLb = tanksToFuelLb(liveTanksAfterPayload);
-      const fuelDroppedAfterPayload =
+      const fuelDriftTol = Math.max(80, plannedFuelLb * 0.05);
+      const fuelDriftedAfterPayload =
         plannedFuelLb > 0 &&
-        liveFuelAfterPayloadLb <
-          plannedFuelLb - Math.max(80, plannedFuelLb * 0.05);
-      if (!restoreFuelOnRollback && restoreTanks && fuelDroppedAfterPayload) {
+        Math.abs(liveFuelAfterPayloadLb - plannedFuelLb) > fuelDriftTol;
+      if (!restoreFuelOnRollback && baseRestore && fuelDriftedAfterPayload) {
+        const restoreTanks = redistributeAroundResidualFloors(
+          baseRestore,
+          liveTanksAfterPayload,
+        ).tanks;
         publishLiveProgress(
           'injecting',
           'Payload moved fuel — restoring OFP tanks…',
@@ -3146,6 +3151,11 @@ async function applyMissionOfpLoadExclusive(
           tanks: restoreTanks,
           stations: afterLive.stations,
         };
+        watchDebugLog('inject', 'fuel restored after payload drift', {
+          plannedFuelLb: Math.round(plannedFuelLb),
+          liveFuelAfterPayloadLb: Math.round(liveFuelAfterPayloadLb),
+          restoreTotalLb: Math.round(tanksToFuelLb(restoreTanks)),
+        });
         publishLiveProgress(
           'injecting',
           `Fuel restored · ${Math.round(lastGoodFuelLb ?? 0)} lb`,

@@ -4,28 +4,33 @@
 **Profile:** `profiles/examples/microsoft-dhc-6-300-twin-otter-wheels.json`  
 **Notes:** `profiles/notes/microsoft-dhc-6-300-twin-otter-wheels.md`
 
-## Tanques no sim (writetest)
+## Tanques no sim (writetest 2026-08-29)
 
-| Id | SimVar | Cap (gal) |
-|----|--------|-----------|
-| CENTER | `FUEL TANK CENTER QUANTITY` | 181 |
-| CENTER2 | `FUEL TANK CENTER2 QUANTITY` | 197 |
-| **Total** | | **378 gal** ≈ 2268 lb / 1029 kg Jet-A |
+| Id | SimVar | Cap (gal) | EFB |
+|----|--------|-----------|-----|
+| CENTER | `FUEL TANK CENTER QUANTITY` | 181 | Center |
+| CENTER2 | `FUEL TANK CENTER2 QUANTITY` | 197 | Center AFT |
+| **LEFT_MAIN** | `FUEL TANK LEFT MAIN QUANTITY` | **37** | **Left outer** |
+| **RIGHT_MAIN** | `FUEL TANK RIGHT MAIN QUANTITY` | **37** | **Right outer** |
+| LEFT_AUX / RIGHT_AUX | classic AUX | — | qty 0, write ignored |
+| FUELSYSTEM :3 / :4 | mirrors wing mains | 37 | same outers |
 
-AOM lista wing tanks +37/+37 gal — **ainda não homologados**.
+**Total** 452 gal ≈ 3028 lb / 1374 kg Jet-A.
 
 ## Bugs já corrigidos
 
 1. **Densidade errada (~6.0)** → OFP ~2641 lb virava ~440 gal.  
    Fix: `resolveFuelDensityLbPerGal` / `sanitizeFuelDensityLbPerGal` (Jet-A 6.7 para tanques grandes).
 
-2. **Tentativa LEFT_AUX/RIGHT_AUX** → Host crash (`UNRECOGNIZED_ID` → `0xC00000B0`).  
-   Revertido em `d0316cc`. **Não reintroduzir** sem writetest das vars certas.
+2. **Mapear asas como LEFT_AUX/RIGHT_AUX** → errado (AUX morto) e no passado Host crash.  
+   Asas = **LEFT_MAIN / RIGHT_MAIN** (confirmado probe+writetest).
 
 3. **OFP > capacidade** → `FUEL_OVER_CAPACITY`.  
-   Career inject: `clampFuelToCapacity: true` em `buildOfpLoadPlan` / `distributeFuelAcrossTanks`; Due reescrito via `applyTargetBlockFuelKg`; UI “OFP over tanks — loading max …”. Soft-fail retry em `ofp-load-helpers.ts`.
+   Career inject: `clampFuelToCapacity: true`; Due reescrito; UI “OFP over tanks…”.
 
-4. **Hangar capacity:** `normalizePlayerAircraft` usa catalog `fuelCapacityKg` (Twin Otter ~1029 kg após revert AUX).
+4. **Hangar capacity:** `fuelCapacityKg` **1374** (452 gal) após asas no perfil.
+
+5. **Pós-payload Sim fuel sobe (~+89 lb L/R):** outers com floor ~13 gal; inject só CENTER* deixava L/R fora do plano. Perfil inclui mains + residual redistribute + restore pós-payload se live driftar do Due.
 
 ## Sintoma UI clássico
 
@@ -36,6 +41,8 @@ AOM lista wing tanks +37/+37 gal — **ainda não homologados**.
   (+50 tol). Capada a 50% do Due (`fuelTaxiBurnAllowanceLb`) — senão EFB drain
   deixava READY.
 
-## Próximo passo opcional (não urgente)
+## Runtime fuel probe?
 
-Homologar wing tanks com **SimVars corretas** (não classic AUX) + writetest live, se quiser pernas longas sem clamp.
+**Não** no estilo payload dead-stations. Writetest na homologação + tanques no perfil
+bastam; probe write de todos os slots classic no inject é lento e já matou Host com
+vars erradas. Residual floors usam `redistributeAroundResidualFloors` (já no inject).

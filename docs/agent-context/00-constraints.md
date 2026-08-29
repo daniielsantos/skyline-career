@@ -18,8 +18,9 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 
 ## Twin Otter / fuel
 
-- **Não** mapear wing tanks como `LEFT_AUX` / `RIGHT_AUX` sem writetest live.
-- Escrita AUX clássica → `UNRECOGNIZED_ID` → `ReceiveMessage 0xC00000B0` → Host morto / Watch `PIPE CLOSED`.
+- Wing outers = **LEFT_MAIN / RIGHT_MAIN** (37 gal), not `LEFT_AUX` / `RIGHT_AUX` (qty 0).
+- Do **not** invent classic AUX writes on this airframe — wrong slot; older Host crashes were from bad vars.
+- Detail: `docs/agent-context/02-twin-otter-fuel.md`.
 - OFP acima da capacidade dos tanques: career inject deve **clamp** (`clampFuelToCapacity`), não forçar overflow.
 
 ## Market / homologação de airframe

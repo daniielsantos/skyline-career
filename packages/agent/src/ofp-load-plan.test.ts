@@ -82,24 +82,29 @@ describe('distributeFuelAcrossTanks', () => {
     );
   });
 
-  it('clamps Twin Otter OFP fuel to fuselage capacity when requested', async () => {
+  it('clamps Twin Otter OFP fuel to fuselage+wing capacity when requested', async () => {
     const raw = await readFile(
       join(repoRoot, 'profiles', 'examples', 'microsoft-dhc-6-300-twin-otter-wheels.json'),
       'utf8',
     );
     const profile = JSON.parse(raw) as AircraftProfile;
     const density = resolveFuelDensityLbPerGal(profile, 6.0);
-    const overLb = 2641;
+    const capacityGal = 452; // 181+197 fuselage + 37+37 wing MAIN
+    const overLb = Math.round(capacityGal * density) + 400;
     const { tanks, capacityTotal, clamped, placedLb, requestedLb } =
       distributeFuelAcrossTanks(overLb, profile, density, {
         clampToCapacity: true,
       });
     assert.equal(clamped, true);
     assert.equal(requestedLb, overLb);
-    assert.equal(capacityTotal, 378);
-    const placedGal = (tanks.CENTER ?? 0) + (tanks.CENTER2 ?? 0);
-    assert.ok(Math.abs(placedGal - 378) < 0.2);
-    assert.ok(Math.abs(placedLb - 378 * density) < 2);
+    assert.equal(capacityTotal, capacityGal);
+    const placedGal =
+      (tanks.CENTER ?? 0) +
+      (tanks.CENTER2 ?? 0) +
+      (tanks.LEFT_MAIN ?? 0) +
+      (tanks.RIGHT_MAIN ?? 0);
+    assert.ok(Math.abs(placedGal - capacityGal) < 0.2);
+    assert.ok(Math.abs(placedLb - capacityGal * density) < 2);
   });
 
   it('uses Jet-A density for Twin Otter even when live reports avgas 6.0', async () => {
@@ -109,17 +114,21 @@ describe('distributeFuelAcrossTanks', () => {
     );
     const profile = JSON.parse(raw) as AircraftProfile;
     assert.equal(resolveFuelDensityLbPerGal(profile, 6.0), DEFAULT_JET_A_LB_PER_GAL);
-    // Fuselage tanks only (378 gal) — wing tanks need a verified SimVar map.
-    const blockLb = 378 * DEFAULT_JET_A_LB_PER_GAL;
+    const capacityGal = 452;
+    const blockLb = capacityGal * DEFAULT_JET_A_LB_PER_GAL;
     const { tanks, capacityTotal } = distributeFuelAcrossTanks(
       blockLb,
       profile,
       resolveFuelDensityLbPerGal(profile, 6.0),
     );
-    assert.equal(capacityTotal, 378);
-    const placed = (tanks.CENTER ?? 0) + (tanks.CENTER2 ?? 0);
+    assert.equal(capacityTotal, capacityGal);
+    const placed =
+      (tanks.CENTER ?? 0) +
+      (tanks.CENTER2 ?? 0) +
+      (tanks.LEFT_MAIN ?? 0) +
+      (tanks.RIGHT_MAIN ?? 0);
     assert.ok(placed <= capacityTotal + 0.05);
-    assert.ok(Math.abs(placed - 378) < 0.2);
+    assert.ok(Math.abs(placed - capacityGal) < 0.2);
   });
 });
 
@@ -1651,5 +1660,33 @@ describe('redistributeAroundResidualFloors', () => {
     assert.equal(tanks.RIGHT_AUX, 11.9);
     assert.ok(tanks.LEFT_MAIN! < planned.LEFT_MAIN);
     assert.ok(tanks.RIGHT_MAIN! < planned.RIGHT_MAIN);
+  });
+
+  it('keeps Twin Otter wing MAIN floors and drains fuselage instead', () => {
+    const planned = {
+      CENTER: 200,
+      CENTER2: 50,
+      LEFT_MAIN: 0,
+      RIGHT_MAIN: 0,
+    };
+    const live = {
+      CENTER: 200,
+      CENTER2: 50,
+      LEFT_MAIN: 13.3,
+      RIGHT_MAIN: 13.3,
+    };
+    const { tanks, added, reduced } = redistributeAroundResidualFloors(
+      planned,
+      live,
+    );
+    assert.ok(added > 26);
+    assert.ok(reduced > 26);
+    assert.equal(tanks.LEFT_MAIN, 13.3);
+    assert.equal(tanks.RIGHT_MAIN, 13.3);
+    const plannedTotal = 250;
+    const nextTotal =
+      tanks.CENTER! + tanks.CENTER2! + tanks.LEFT_MAIN! + tanks.RIGHT_MAIN!;
+    assert.ok(Math.abs(nextTotal - plannedTotal) < 0.15);
+    assert.ok(tanks.CENTER! + tanks.CENTER2! < planned.CENTER + planned.CENTER2);
   });
 });

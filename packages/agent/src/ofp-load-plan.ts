@@ -1552,14 +1552,16 @@ function sumTankQty(tanks: Record<string, number>): number {
 }
 
 /**
- * Keep OFP total fuel: accept unusable AUX/TIP floors, then pull the same
- * quantity out of the mains so Loaded vs Due still matches block fuel.
+ * Keep OFP total fuel: accept unusable floors on tanks planned empty (wing
+ * mains on Twin Otter, AUX/TIP on King Air), then pull the same quantity out of
+ * tanks that carried OFP fuel — never undo the floors by draining them first.
  */
 export function redistributeAroundResidualFloors(
   planned: Record<string, number>,
   live: Record<string, number>,
   opts?: { maxFloor?: number },
 ): { tanks: Record<string, number>; added: number; reduced: number } {
+  const originalPlanned = { ...planned };
   const targetTotal = sumTankQty(planned);
   const absorbed = absorbFuelResidualFloors(planned, live, opts);
   if (absorbed.added <= 0.05) {
@@ -1572,26 +1574,31 @@ export function redistributeAroundResidualFloors(
     return { tanks, added: absorbed.added, reduced: 0 };
   }
 
+  /** Prefer draining tanks that had OFP fuel so residual floors stay put. */
+  const canDrain = (id: string): boolean =>
+    (Number.isFinite(originalPlanned[id]) ? originalPlanned[id]! : 0) > 0.5;
+
   for (const [leftId, rightId] of RESIDUAL_DRAIN_PAIRS) {
     if (excess <= 0.05) break;
+    if (!canDrain(leftId) && !canDrain(rightId)) continue;
     const left = Number.isFinite(tanks[leftId]) ? tanks[leftId]! : 0;
     const right = Number.isFinite(tanks[rightId]) ? tanks[rightId]! : 0;
     if (left <= 0 && right <= 0 && !(leftId in tanks) && !(rightId in tanks)) {
       continue;
     }
-    const pair = left + right;
+    const drainLeft = canDrain(leftId) ? left : 0;
+    const drainRight = canDrain(rightId) ? right : 0;
+    const pair = drainLeft + drainRight;
     if (pair <= 0.05) continue;
     const take = Math.min(excess, pair);
-    const half = take / 2;
-    let nextLeft = Math.max(0, left - half);
-    let nextRight = Math.max(0, right - half);
-    // Absorb rounding / odd leftovers on the fuller side.
+    let nextLeft = canDrain(leftId) ? Math.max(0, left - take / 2) : left;
+    let nextRight = canDrain(rightId) ? Math.max(0, right - take / 2) : right;
     let leftover = take - (left - nextLeft + (right - nextRight));
-    if (leftover > 0.01 && nextLeft >= leftover) {
+    if (leftover > 0.01 && canDrain(leftId) && nextLeft >= leftover) {
       nextLeft -= leftover;
       leftover = 0;
     }
-    if (leftover > 0.01 && nextRight >= leftover) {
+    if (leftover > 0.01 && canDrain(rightId) && nextRight >= leftover) {
       nextRight -= leftover;
       leftover = 0;
     }
@@ -1602,10 +1609,10 @@ export function redistributeAroundResidualFloors(
     reduced += removed;
   }
 
-  // Unpaired CENTER / other mains last.
   if (excess > 0.05) {
     for (const id of Object.keys(tanks)) {
       if (excess <= 0.05) break;
+      if (!canDrain(id)) continue;
       if (/aux|tip/i.test(id)) continue;
       const cur = tanks[id]!;
       if (!(cur > 0.05)) continue;

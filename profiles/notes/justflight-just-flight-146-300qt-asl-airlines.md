@@ -24,6 +24,7 @@
 - Use compare-ofp + Career Loaded vs Due for validation.
 
 - Market SKU: justflight-146-300 (QT freighter family; SimBrief B463; pack profiles/ofp/justflight-146-300-freighter.json)
+- EFB Side+FWD+AFT ↔ SimConnect **S3–S12** (= OFP cargo). S13+ sticky/ghost — fora do Live vs Due.
 
 ## Homologated
 

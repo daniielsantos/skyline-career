@@ -44,6 +44,7 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mã
 | `fsreborn-phenom-300e` | 7 | `simconnectCargoHoldMaxLb: 463`; inject seeds 175/seat + holds only (no GA seat dump) |
 | `justflight-f70` | 70 | `simconnectCabinSeats: 80`, `simconnectCargoHoldMaxLb: 5000` (freight coube) |
 | `justflight-f100` | 100 | `simconnectCargoHoldMaxLb: 7784` — **sem** cabin overshoot (100 slots) |
+| `justflight-146-300` (QT pack) | freighter glass | Live = **S3–S12** only (EFB Side+FWD+AFT). S13+ ghost — omit from roles |
 | `justflight-fokker-f28` | 85 fallback; live Mk 65/79/65/85 | Nenhum extra (82×170 bateu) |
 | `microsoft-a320neo-v2` | 180 | `efbPaxWeightLb: 187` (zonas S3–S7, não fileiras 170) |
 | `microsoft-a321lr` | 220 | `efbPaxWeightLb: 188` (153 pax: Sim 37127 vs OFP 35164). **Fuel:** EFB APPLY **não** grava FOB (bug iniBuilds A321LR); usar EFB/slider **padrão do MSFS**. Watch C = CENTER+CENTER2; TOTAL pode ser > L+R+C |

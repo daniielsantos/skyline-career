@@ -14,7 +14,8 @@
     "Market SKU: justflight-146-200 (family pack)",
     "Homologated: 200QT Ansett + 200QC RAF CMk3 @1.0.0",
     "loadMethod: native-simbrief; injectCapable: false",
-    "SimBrief airframe: Just Flight (MSFS) - BAe 146-200 QC/QT"
+    "SimBrief airframe: Just Flight (MSFS) - BAe 146-200 QC/QT",
+    "EFB Side+FWD+AFT map to S3–S12; S13+ sticky/ghost — omit from Live vs Due (not serviceStations; those are summed)."
   ],
   "fuel": {
     "unit": "lb"
@@ -29,6 +30,7 @@
         1,
         2
       ],
+      "passengerStations": [],
       "baggageStations": [
         3,
         4,
@@ -39,13 +41,8 @@
         9,
         10,
         11,
-        12,
-        13,
-        14,
-        15,
-        16
-      ],
-      "passengerStations": []
+        12
+      ]
     }
   },
   "liveSources": {
@@ -139,25 +136,25 @@
       "simVarIndex": 13,
       "cfgIndex": 12,
       "name": "Station 13",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 14,
       "cfgIndex": 13,
       "name": "Station 14",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 15,
       "cfgIndex": 14,
       "name": "Station 15",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 16,
       "cfgIndex": 15,
       "name": "Station 16",
-      "role": "baggage"
+      "role": "service"
     }
   ],
   "tolerances": {

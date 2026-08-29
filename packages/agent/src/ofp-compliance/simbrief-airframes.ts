@@ -177,6 +177,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (justFlightF100) return justFlightF100;
   const justFlightF28 = inferJustFlightF28SimBriefMatch(t);
   if (justFlightF28) return justFlightF28;
+  const justFlight146 = inferJustFlight146SimBriefMatch(t);
+  if (justFlight146) return justFlight146;
   if (/\bJust Flight F70\b/i.test(t)) {
     return 'Just Flight \\(MSFS\\) - 70 Passengers';
   }
@@ -448,6 +450,35 @@ function inferJustFlightF28SimBriefMatch(title: string): string | undefined {
   const mk = title.match(/Just Flight Fokker F28-(1000|2000|3000|4000)/i);
   if (!mk) return undefined;
   return `Just Flight \\(MSFS\\) - Fokker F28 Mk.${mk[1]}`;
+}
+
+/**
+ * Just Flight BAe 146 (MSFS) — passenger vs Statesman CC2 vs QC/QT freighter.
+ * Longest tokens first so 300QT does not collapse to 300.
+ */
+function inferJustFlight146SimBriefMatch(title: string): string | undefined {
+  if (!/\b(?:Just Flight\s+)?146[- ]?(?:100|200|300)/i.test(title)) {
+    return undefined;
+  }
+  if (/146-?100.*Statesman|\bCC2\b/i.test(title)) {
+    return 'Just Flight \\(MSFS\\) - BAe 146-100 CC2';
+  }
+  if (/146-?200(?:QC|QT)|\b146-?200\b.*\b(?:QC|QT)\b/i.test(title)) {
+    return 'Just Flight \\(MSFS\\) - BAe 146-200 QC/QT';
+  }
+  if (/146-?300QT|\b146-?300\b.*\bQT\b/i.test(title)) {
+    return 'Just Flight \\(MSFS\\) - BAe 146-300 QT';
+  }
+  if (/146-?100\b/i.test(title)) {
+    return 'Just Flight \\(MSFS\\) - BAe 146-100';
+  }
+  if (/146-?200\b/i.test(title)) {
+    return 'Just Flight \\(MSFS\\) - BAe 146-200';
+  }
+  if (/146-?300\b/i.test(title)) {
+    return 'Just Flight \\(MSFS\\) - BAe 146-300';
+  }
+  return undefined;
 }
 
 /** MSFS uses Airstairs / Cargo Door; SimBrief comments use Stairs / Cargo. */

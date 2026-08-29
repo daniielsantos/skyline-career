@@ -540,9 +540,18 @@ export async function buildMissionDispatch(
   // Navigraph SimBrief EFB (MSFS) refuses IMPORT WEIGHTS with pax=0:
   // "Expecting at least one passenger (pilot)". Mission intent stays pax=0;
   // compareMissionIntentToOfp allows +1 via maxExtraPax (or maxPaxSeats).
+  // Exception: SimBrief freighter rows (QT/QC, airframe_passengers=0) — do NOT
+  // fall back to catalog maxPaxSeats or almost all mission mass becomes "pax"
+  // and Freight collapses to a tiny leftover (~160 lb).
   let maxPaxSeatsResolved: number | undefined;
   let paxAndCargo: ReturnType<typeof planPaxAndCargoSimBriefLoad> | null = null;
-  if (!usePayloadPrefill && isPaxAndCargoLoadLayout(careerAirframe)) {
+  const pureFreighterSimBrief =
+    needsSimBriefAirframeLookup && simBriefPassengers === 0;
+  if (
+    !usePayloadPrefill &&
+    isPaxAndCargoLoadLayout(careerAirframe) &&
+    !pureFreighterSimBrief
+  ) {
     const catalogFallback =
       typeof careerAirframe?.maxPaxSeats === 'number' && careerAirframe.maxPaxSeats > 0
         ? careerAirframe.maxPaxSeats
@@ -556,7 +565,7 @@ export async function buildMissionDispatch(
     maxPaxSeatsResolved = maxPax;
     paxAndCargo = planPaxAndCargoSimBriefLoad({ cargoKg, maxPax });
   }
-  const dispatchPax = paxAndCargo?.pax ?? 1;
+  const dispatchPax = paxAndCargo?.pax ?? (pureFreighterSimBrief ? 0 : 1);
   const dispatchCargoKg = paxAndCargo?.cargoKg ?? cargoKg;
   const freightThousands = cargoWeightToThousands(
     units === 'LBS' ? dispatchCargoKg * KG_TO_LB : dispatchCargoKg,

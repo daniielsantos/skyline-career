@@ -484,6 +484,84 @@ describe('buildMissionDispatch pax_and_cargo', () => {
     assert.ok(acdata);
     assert.deepEqual(JSON.parse(acdata!), { paxwgt: 175, bagwgt: 55 });
   });
+
+  it('puts full mission freight on BAe 146-300 QT (0-seat SimBrief row)', async () => {
+    const cargoKg = 8_000;
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_b463_qt',
+        status: 'dispatched',
+        originIcao: 'SBCT',
+        destIcao: 'SBGR',
+        commodityId: 'electronics',
+        cargoKg,
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'narrow_freighter',
+        airframeTypeId: 'justflight-146-300',
+        rolesPackRelPath: 'profiles/ofp/justflight-146-300-freighter.json',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      {
+        units: 'LBS',
+        liveTitle: 'Just Flight 146-300QT ASL Airlines',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              B463: {
+                airframes: [
+                  {
+                    airframe_internal_id: '3_146300',
+                    airframe_list_type: 'B463',
+                    airframe_icao: 'B463',
+                    airframe_comments: 'Just Flight (MSFS) - BAe 146-300',
+                    airframe_name: 'BAe 146-300',
+                    airframe_passengers: 128,
+                    airframe_options: {
+                      wgtunits: 'LBS',
+                      oew: 57340,
+                      mzfw: 80500,
+                      mtow: 99500,
+                      maxfuel: 22840,
+                      maxcargo: 5124,
+                    },
+                  },
+                  {
+                    airframe_internal_id: '3_146300qt',
+                    airframe_list_type: 'B463',
+                    airframe_icao: 'B463',
+                    airframe_comments: 'Just Flight (MSFS) - BAe 146-300 QT',
+                    airframe_name: 'BAe 146-300 QT',
+                    airframe_passengers: 0,
+                    airframe_options: {
+                      wgtunits: 'LBS',
+                      oew: 57210,
+                      mzfw: 80500,
+                      mtow: 99500,
+                      maxfuel: 22840,
+                      maxcargo: 23874,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    assert.equal(built.maxPaxSeats, undefined);
+    assert.match(built.url, /[?&]pax=0(?:&|$)/);
+    assert.match(built.url, /[?&]type=3_146300qt(?:&|$)/);
+    // Full mission as Freight — not ~160 lb leftover after fake cabin fill.
+    const freightLb =
+      Number(new URL(built.url).searchParams.get('cargo')) * 1000;
+    assert.ok(
+      Math.abs(freightLb - cargoKg * 2.20462262185) < 50,
+      `expected ~${Math.round(cargoKg * 2.20462262185)} lb freight, got ${freightLb}`,
+    );
+  });
 });
 
 describe('buildMissionDispatch F28', () => {

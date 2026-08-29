@@ -352,6 +352,30 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       'Just Flight \\(MSFS\\) - 70 Passengers',
     );
     assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Just Flight 146-300QT ASL Airlines'),
+      'Just Flight \\(MSFS\\) - BAe 146-300 QT',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'Just Flight 146-200QT Ansett Australia Cargo',
+      ),
+      'Just Flight \\(MSFS\\) - BAe 146-200 QC/QT',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Just Flight 146-200QC RAF CMk3'),
+      'Just Flight \\(MSFS\\) - BAe 146-200 QC/QT',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'Just Flight 146-100 RAF ZE701 Statesman New',
+      ),
+      'Just Flight \\(MSFS\\) - BAe 146-100 CC2',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Just Flight 146-300 Aer Lingus'),
+      'Just Flight \\(MSFS\\) - BAe 146-300',
+    );
+    assert.equal(
       inferSimBriefAirframeMatchFromTitle('Just Flight Fokker F28-4000 Air21'),
       'Just Flight \\(MSFS\\) - Fokker F28 Mk.4000',
     );

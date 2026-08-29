@@ -384,23 +384,16 @@ export async function runMissionPreflight(
           stationRolesForDue,
         )
       : undefined;
-    // Freighter Due = OFP/mission freight (baggageCapacity soft-cap only).
-    // Do NOT re-clamp with EMPTY×MTOW here: after inject, live EMPTY often
-    // folds in station payload and shrinks Due below Sim/Cargo (Baron 58TC:
-    // Sim≈1478 / Due 1264 while the Cargo card stayed at ~1.5 klb). MTOW room
-    // belongs in inject planning (`buildOfpLoadPlan`), not Loaded vs Due.
+    // Freighter + pax_and_cargo Due = OFP/mission payload. Do NOT re-clamp with
+    // live EMPTY×MTOW — after inject, EMPTY often folds in station/cabin mass and
+    // shrinks Due below Sim (Baron freighter; same risk on Phenom/CJ4).
+    // Freighter hard cap: baggageCapacity. pax_and_cargo: hold/EFB clamps below.
+    // MTOW room belongs to SimBrief + Accept, not Loaded vs Due.
     const plannedPayloadBase =
       cargoLb !== undefined
         ? plannedStationPayloadLb({
             cargoLb,
             stationRoles: stationRolesForDue,
-            ...(isPaxAndCargoLoadLayout(careerAirframe)
-              ? {
-                  emptyWeightLb: live.weights?.emptyLb,
-                  maxGrossWeightLb: live.weights?.maxGrossLb,
-                  blockFuelLb: plannedFuelLb,
-                }
-              : {}),
             ...(baggageCapacityLb !== undefined ? { baggageCapacityLb } : {}),
           })
         : undefined;

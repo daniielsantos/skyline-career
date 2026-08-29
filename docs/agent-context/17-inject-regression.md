@@ -37,7 +37,7 @@ Implementação: `sampleLiveLoadLb()` em `watch-helpers.ts` → policy em `resol
 Para **Preflight Loaded vs Due**:
 
 - **Freighter / cargo clássico** (`careerFreighterLivePayloadLb`): Sim = bags (+ passenger stations usadas como cargo). **Crew stations ficam fora** — Due = freight OFP, não bags+crew.
-- **Freighter Due:** **não** re-clampa MTOW/EMPTY no Preflight (só `baggageCapacity`). O clamp MTOW fica no inject. Re-clamar com EMPTY live pós-inject encolhia Due abaixo do Sim (Baron 58TC: Sim≈Cargo ~1.5 klb, Due 1264). `ofpCargoKg`: `oneStandardPax` só com `pax===1`, nunca `pax===0`.
+- **Due + inject (freighter e `pax_and_cargo`):** **não** re-clampa MTOW/EMPTY live. Due = payload OFP/missão. Inject coloca esse alvo; hard caps = `maxLoad` das stations (freighter) ou hold/EFB (`clampPaxAndCargoDueToHoldsLb` / `efbPaxWeightLb`). MTOW fica no SimBrief + Accept (e route ops no Dispatch). EMPTY live pós-inject / troca de vidro encolhia alvo (Baron 1264 vs ~1.5 klb). `ofpCargoKg`: `oneStandardPax` só com `pax===1`, nunca `pax===0`.
 - **Schematic sticky após zerar:** se Sim payload ≈ 0 e o sample de stations falha/omite, zerar as keys do último mapa (`schematicStationsForLivePayload`) — senão S1–S8 ficam no snapshot do inject com “Sim 0 lb”.
 - **Family packs + `liveTitle`:** Watch e inject devem passar o título MSFS em `resolveMissionRolesPack`. Sem isso o Due pode vir do pack Passengers (S3–S15) enquanto o Sim soma só o pack Cargo default (S3–S4 ≈ 300 lb no 404 Titan).
 - **`pax_and_cargo`** (`careerPaxAndCargoLivePayloadLb`): Sim = cabine+holds; opcional residual `ZFW − OFP empty` quando EFB injetou ZFW (PMDG/Fenix).
@@ -237,7 +237,7 @@ Watch escolhe freighter vs pax_and_cargo pelo catálogo (`loadLayout === 'pax_an
 - Variante **cargo / combi / cargomaster** sem missão de pax simulada (C172 Cargo, Caravan pod, Kodiak cargo, ATR Freighter, BN2 cargo, Learjet cargo, BCF…).
 - Inject **direct** e o OFP pode ser **freight-only** (`pax=0` ou só piloto) sem estourar MZFW/CG.
 - Cabine vira **slots de carga** no pack (`passengerStations: []`, assentos mapeados em `baggageStations`).
-- Due = **freight da missão** (+ crew fora do Due); Sim = Σ stations de carga (crew excluído).
+- Due = **freight da missão** (+ crew fora do Due); Sim = Σ stations de carga (crew excluído). Sem re-clamp EMPTY×MTOW live.
 
 **Hoje:** quase todo `light_ga` + `light_turboprop` inject está aqui — **correto** para Career cargo.
 
@@ -246,7 +246,7 @@ Watch escolhe freighter vs pax_and_cargo pelo catálogo (`loadLayout === 'pax_an
 - Fuseleiro **passageiro** (cabine + holds) e o freight da missão deve **ocupar assentos primeiro** (175+55 lb/assento) para CG/envelope no SimBrief/EFB.
 - EFB/tablet do addon é a fonte de verdade (Fenix, iniBuilds, JF, Maddog, Phenom com cabine real…).
 - Precisa de campos extra no catálogo: `maxPaxSeats`, às veis `efbPaxWeightLb`, `simconnectCabinSeats`, `simconnectCargoHoldMaxLb`, `simconnectEmptyPayloadBiasLb`.
-- Due = **payload OFP inteiro** (pax+bags+cargo); Sim = cabine+holds (ou ZFW−OEW).
+- Due = **payload OFP inteiro** (pax+bags+cargo); Sim = cabine+holds (ou ZFW−OEW). Sem re-clamp EMPTY×MTOW live (hold/EFB caps só).
 
 **Hoje:** narrow/wide airline + Phenom + alguns jets — ~18 SKUs com flag explícita.
 

@@ -106,9 +106,12 @@ export function isClassicStationBatchIncomplete(opts: {
  * Classic GA / freighter Loaded vs Due (Duke, Caravan, Twin Otter, ATR HighLine…).
  *
  * Contract (separate from Wide/Narrow `pax_and_cargo`):
- * - Due = OFP freight after MTOW (crew seeded on crewStations, not in Due)
+ * - Due = OFP freight (crew seeded on crewStations, not in Due)
  * - Live = Σ baggageStations (+ passengerStations used as cargo seats)
  * - Never include crewStations — otherwise Watch paints Sim = bags+crew vs Due = bags
+ *
+ * Career freighter inject does not re-clamp with live EMPTY×MTOW; station maxLoad
+ * is the hard cap. SimBrief + Accept own route MTOW.
  *
  * Do not use this for `loadLayout: pax_and_cargo` (cabin+holds) or PMDG BCF S1–S9.
  */

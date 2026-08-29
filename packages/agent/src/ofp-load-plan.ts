@@ -142,9 +142,9 @@ export type BuildOfpLoadPlanInput = {
   cargoKg?: number;
   /** Fallback cargo kg when OFP has no baggage/payload (e.g. mission.cargoKg). */
   cargoKgFallback?: number;
-  /** Live EMPTY WEIGHT (lb) — enables MTOW cargo clamp. */
+  /** Optional MTOW cargo clamp (CLI/tooling). Career inject omits these. */
   emptyWeightLb?: number;
-  /** Live MAX GROSS WEIGHT (lb) — enables MTOW cargo clamp. */
+  /** Optional MTOW cargo clamp (CLI/tooling). Career inject omits these. */
   maxGrossWeightLb?: number;
   /**
    * Career inject: when OFP block fuel exceeds profile tanks, fill to capacity
@@ -162,7 +162,8 @@ export type BuiltOfpLoadPlan = {
    */
   cargoLb: number;
   /**
-   * OFP cargo after MTOW room clamp, before station-capacity distribute.
+   * OFP cargo after optional MTOW room clamp, before station-capacity distribute.
+   * Career freighter inject omits live EMPTY×MTOW — then this equals OFP freight.
    * CDU ZFW inject must use this (+ crew), not `cargoLb`.
    */
   requestedCargoLb: number;

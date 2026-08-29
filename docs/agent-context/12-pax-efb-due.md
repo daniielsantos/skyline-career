@@ -4,6 +4,8 @@ Jets de passageiro no Career: freight vai na **cabine + leftover cargo**, não `
 
 SimBrief Dispatch usa **175+55 lb/assento** (`paxwgt`/`bagwgt`). O Due do Preflight **não** é o klb do contrato no topo (isso é freight da missão). Due = payload OFP (pax+bags+cargo), depois os ajustes abaixo.
 
+**Não** re-clampa Due/inject com EMPTY×MTOW live — mesmo contrato do freighter. Hard caps = hold/EFB (`simconnectCargoHoldMaxLb`, `efbPaxWeightLb`). MTOW fica no SimBrief + Accept.
+
 **Não** usar Import Weights do MSFS SimBrief EFB em JF / iniBuilds — estraga CG. Load no **tablet do addon**.
 
 ## Três mismatches (não misturar)

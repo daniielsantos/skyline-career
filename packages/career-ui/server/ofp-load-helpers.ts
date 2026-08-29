@@ -1097,18 +1097,20 @@ async function applyMissionOfpLoadExclusive(
       resolved.profile,
       planningLive.fuelLbPerGal,
     );
-    const weightLimits = {
-      emptyWeightLb: planningLive.emptyWeightLb,
-      maxGrossWeightLb: planningLive.maxGrossWeightLb,
-    };
+    const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
+    const paxAndCargoClassic = isPaxAndCargoLoadLayout(careerAirframe);
+    // Career inject (freighter + pax_and_cargo): do not re-derive MTOW room from
+    // live EMPTY/MTOW. SimBrief + Accept already trimmed; live EMPTY often
+    // includes leftover station/cabin mass and under-clamps inject vs Due
+    // (Baron 58P; same risk on Phenom/CJ4). Hard caps: station maxLoad
+    // (freighter) and hold/EFB clamps (pax_and_cargo freight override below).
     let clampedFuelTargetKg: number | undefined;
 
-    const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
     // pax_and_cargo: Due/ZFW cargo = SimBrief payload (may be route-trimmed).
     // Clamp to hold-capable Due before planning so inject does not chase
     // SimBrief bagwgt the EFB never places (Phenom 7×55).
     const paxAndCargoFreightKg = (() => {
-      if (!isPaxAndCargoLoadLayout(careerAirframe)) return undefined;
+      if (!paxAndCargoClassic) return undefined;
       const rawKg = ofpFreightTowardMissionKg(ofp, careerAirframe);
       if (rawKg === undefined) return undefined;
       const clampedLb = adjustPaxAndCargoDueForEfbPaxLb(
@@ -1117,7 +1119,6 @@ async function applyMissionOfpLoadExclusive(
       );
       return clampedLb / KG_TO_LB;
     })();
-    const paxAndCargoClassic = isPaxAndCargoLoadLayout(careerAirframe);
 
     try {
       built = buildOfpLoadPlan({
@@ -1130,8 +1131,6 @@ async function applyMissionOfpLoadExclusive(
           ? { cargoKg: paxAndCargoFreightKg }
           : {}),
         cargoKgFallback: mission.cargoKg,
-        emptyWeightLb: weightLimits.emptyWeightLb,
-        maxGrossWeightLb: weightLimits.maxGrossWeightLb,
         // Career: fill to tank max instead of aborting when SimBrief plans past capacity
         // (e.g. Twin Otter fuselage-only profile on a 500+ NM leg).
         clampFuelToCapacity: true,
@@ -1192,9 +1191,9 @@ async function applyMissionOfpLoadExclusive(
       liveFuelMatchesTarget(beforeLive.tanks, plannedTanks);
     let plannedFuelLb = built.blockFuelLb;
     /**
-     * Freight/payload target from the OFP (after MTOW clamp that already
-     * reserved crew). Inject seeds crew floors separately — do not subtract
-     * them from this total again.
+     * Freight/payload target from the OFP (hold/EFB-clamped for pax_and_cargo).
+     * Career inject omits live EMPTY×MTOW for freighter and pax_and_cargo.
+     * Inject seeds crew floors separately — do not subtract them from this total.
      */
     const plannedPayloadLb = built.cargoLb;
 
@@ -1491,9 +1490,9 @@ async function applyMissionOfpLoadExclusive(
     };
 
     let cargoPlacedLb = 0;
-    // requestedCargoLb is already freight/payload after MTOW reserved crew
-    // (buildOfpLoadPlan). Do not subtract crew again — that left Turbine Duke
-    // at ~163 lb bags while Due stayed ~733 lb.
+    // requestedCargoLb is OFP/mission freight (freighter: no live MTOW peel).
+    // Do not subtract crew again — that left Turbine Duke at ~163 lb bags
+    // while Due stayed ~733 lb.
     // pax_and_cargo: cabin body is already seeded; Due target is hold-clamped.
     let cargoTargetLb = Math.max(0, plannedPayloadLb);
     if (paxAndCargoClassic) {

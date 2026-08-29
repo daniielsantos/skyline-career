@@ -1421,6 +1421,34 @@ describe('buildOfpLoadPlan', () => {
     assert.equal(built.cargoLb, 715);
     assert.ok(built.cargoLb < 992);
   });
+
+  it('without live EMPTY×MTOW keeps full freighter OFP cargo (career inject path)', async () => {
+    // Career freighter inject omits empty/maxGross — SimBrief/Accept trimmed;
+    // station maxLoad is the only hard cap.
+    const profile = await loadCaravanProfile();
+    const ofp = normalizeOfpExpectation({
+      source: 'simbrief',
+      icao: 'C208',
+      fuel: { unit: 'lb', total: 175 },
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 175,
+        baggage: 992,
+        passengerCount: 0,
+      },
+      payload: {
+        unit: 'lb',
+        stationRoles: CARAVAN_ROLES,
+      },
+    });
+    const built = buildOfpLoadPlan({
+      ofp,
+      profile,
+      stationRoles: CARAVAN_ROLES,
+    });
+    assert.equal(built.requestedCargoLb, 992);
+    assert.equal(built.cargoLb, 992);
+  });
 });
 
 describe('plannedStationPayloadLb', () => {

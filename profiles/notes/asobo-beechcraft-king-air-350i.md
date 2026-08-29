@@ -21,7 +21,7 @@
 - Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX).
 - AUX/Aft tanks included.
 - Payload stations from writetest: 1, 2, 3.
-- Station maxLoad: placeholder until flight_model.cfg calibrate.
+- Station maxLoad: S1/S2 **750** (crew + CG ballast), S3 **2500** (was placeholder 500 — blocked Accept/Due at 500 lb). Confirm with inject that SimConnect holds ~2.3–2.5 klb on S3; if the sim clamps lower, set maxLoad to the probed value.
 - Homologated with interactive wizard.
 
 ## Homologated

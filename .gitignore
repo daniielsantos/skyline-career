@@ -22,6 +22,9 @@ profiles/career/saves/
 profiles/career/skyline.sqlite*
 artifacts/
 
+# Local cloc binary (https://github.com/AlDanial/cloc)
+cloc*.exe
+
 # OurAirports download cache (generate:runways)
 packages/shared/.cache/
 

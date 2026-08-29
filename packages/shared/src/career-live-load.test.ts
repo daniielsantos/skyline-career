@@ -49,6 +49,28 @@ describe('careerFreighterLivePayloadLb', () => {
     );
   });
 
+  it('counts crew-seat mass above the seeded floor as freight (CG forward shift)', () => {
+    // Bonanza: inject parked 250 lb ballast on S1/S2; bags 802 → Sim must be 1052.
+    assert.equal(
+      careerFreighterLivePayloadLb({
+        stations: {
+          1: 295,
+          2: 295,
+          3: 401,
+          4: 401,
+          5: 0,
+          6: 0,
+          7: 0,
+        },
+        stationRoles: {
+          crewStations: [1, 2],
+          baggageStations: [3, 4, 5, 6, 7],
+        },
+      }),
+      1_052,
+    );
+  });
+
   it('includes passenger seats used as cargo, still skips crew', () => {
     assert.equal(
       careerFreighterLivePayloadLb({

@@ -66,7 +66,7 @@
   {
     "typeId": "blacksquare-bonanza-professional",
     "aircraftClassId": "light_ga",
-    "label": "Beechcraft Bonanza BE36",
+    "label": "Bonanza A36/A36TC Professional",
     "rolesPackRelPath": "profiles/ofp/blacksquare-bonanza-professional.json",
     "simbriefIcao": "BE36",
     "simbriefAirframeMatch": "Default",
@@ -500,7 +500,7 @@
   {
     "typeId": "blacksquare-b36tp-bonanza-professional",
     "aircraftClassId": "light_turboprop",
-    "label": "Beechcraft Bonanza B36TP",
+    "label": "Bonanza B36TP Professional",
     "rolesPackRelPath": "profiles/ofp/blacksquare-b36tp-bonanza-professional.json",
     "simbriefIcao": "B36T",
     "simbriefAirframeMatch": "Default",

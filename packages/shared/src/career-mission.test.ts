@@ -1343,6 +1343,50 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
   });
 
+  it('rejects Bonanza B36T OFP when mission catalog is piston BE36 (separate SKU)', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        aircraftClassId: 'light_ga',
+        airframeTypeId: 'blacksquare-bonanza-professional',
+        cargoKg: 660,
+        rolesPackRelPath: 'profiles/ofp/blacksquare-a36-bonanza-professional.json',
+      }),
+      matchingOfp({
+        icao: 'B36T',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 633,
+          passengerCount: 1,
+          baggage: 927,
+          payload: 1102,
+        },
+      }),
+    );
+    assert.ok(check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
+  it('accepts Bonanza BT36 OFP ICAO when mission catalog is BE36 (A36TC glass)', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        aircraftClassId: 'light_ga',
+        airframeTypeId: 'blacksquare-bonanza-professional',
+        cargoKg: 660,
+        rolesPackRelPath: 'profiles/ofp/blacksquare-bonanza-professional.json',
+      }),
+      matchingOfp({
+        icao: 'BT36',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 500,
+          passengerCount: 1,
+          baggage: 800,
+          payload: 970,
+        },
+      }),
+    );
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
   it('accepts PMDG 777F SimBrief OFP ICAO B77L (MSFS atc_model quirk)', () => {
     const check = compareMissionIntentToOfp(
       baseMission({

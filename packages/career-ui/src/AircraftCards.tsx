@@ -60,7 +60,7 @@ export function aircraftModelLabel(id: AircraftClass): string {
   if (id === 'light_turboprop') return 'Cessna 208 Caravan Cargo';
   if (id === 'light_jet') return 'Learjet 35A';
   if (id === 'medium_piston') return 'Douglas DC-6';
-  if (id === 'light_ga') return 'Beechcraft Bonanza BE36';
+  if (id === 'light_ga') return 'Bonanza A36/A36TC Professional';
   return 'Boeing 737-800 BCF';
 }
 

@@ -72,14 +72,14 @@ CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphal
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
-## Beechcraft Bonanza BE36
+## Bonanza A36/A36TC Professional
 - **typeId:** `blacksquare-bonanza-professional`
 - **file:** `bonanza-be36.png`
 
 ```
-Stylized cartoon / clean vector illustration of a Beechcraft Bonanza A36 / BE36 (BE36), three-quarter side view parked facing left.
+Stylized cartoon / clean vector illustration of a Beechcraft Bonanza A36 / A36TC (BE36 / BT36), three-quarter side view parked facing left.
 
-Keep the aircraft highly recognizable: low-wing single piston, distinctive Bonanza V-tail OR conventional-tail A36 (prefer conventional-tail A36/BE36 straight empennage), retractable tricycle gear down, tall greenhouse cabin, short nose cowling, classic Bonanza silhouette. Must read as a Bonanza BE36 at a glance — not a Baron, not a Cessna.
+Keep the aircraft highly recognizable: low-wing single piston, distinctive Bonanza V-tail OR conventional-tail A36 (prefer conventional-tail A36/BE36 straight empennage), retractable tricycle gear down, tall greenhouse cabin, short nose cowling, classic Bonanza silhouette. Must read as a Bonanza A36/A36TC at a glance — not a Baron, not a Cessna, not the B36TP turboprop.
 
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 
@@ -541,7 +541,7 @@ CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e), ut
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
-## Beechcraft Bonanza B36TP
+## Bonanza B36TP Professional
 - **typeId:** `blacksquare-b36tp-bonanza-professional`
 - **file:** `bonanza-b36tp.png`
 

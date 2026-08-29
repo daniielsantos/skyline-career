@@ -1170,6 +1170,7 @@ async function applyMissionOfpLoadExclusive(
       envelopeSource === 'cfg' ||
       envelopeSource === 'manual' ||
       envelopeSource === 'simvar' ||
+      envelopeSource === 'calibrated-live' ||
       envelopeSource === 'live-sweep'
         ? 'strict'
         : 'soft';

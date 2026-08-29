@@ -1,4 +1,5 @@
 import { careerFuelMatchOk, careerLoadWeightMatchOk, careerPreflightReady, payloadMatchToleranceLb } from './career-mission.js';
+import { MSFS_STATION_OCCUPANT_LB } from './career-player-airframes.js';
 import {
   DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
@@ -106,9 +107,11 @@ export function isClassicStationBatchIncomplete(opts: {
  * Classic GA / freighter Loaded vs Due (Duke, Caravan, Twin Otter, ATR HighLine…).
  *
  * Contract (separate from Wide/Narrow `pax_and_cargo`):
- * - Due = OFP freight (crew seeded on crewStations, not in Due)
+ * - Due = OFP freight (crew seeded on crewStations at {@link MSFS_STATION_OCCUPANT_LB}, not in Due)
  * - Live = Σ baggageStations (+ passengerStations used as cargo seats)
- * - Never include crewStations — otherwise Watch paints Sim = bags+crew vs Due = bags
+ *   + mass on crewStations **above** the seeded floor (CG forward-shift ballast)
+ * - Do not count the full crew station weight — that would paint Sim = bags+crew
+ *   vs Due = bags. Only the excess is freight that inject parked on S1/S2.
  *
  * Career freighter inject does not re-clamp with live EMPTY×MTOW; station maxLoad
  * is the hard cap. SimBrief + Accept own route MTOW.
@@ -127,10 +130,21 @@ export function careerFreighterLivePayloadLb(opts: {
     (n) => Number.isFinite(n) && n > 0,
   );
   if (bags.length === 0 && pax.length === 0) return undefined;
-  return (
+  let sum =
     (sumStationWeights(opts.stations, bags) ?? 0) +
-    (sumStationWeights(opts.stations, pax) ?? 0)
+    (sumStationWeights(opts.stations, pax) ?? 0);
+  // Bonanza / nose-light freighters: inject shifts freight onto crew seats for
+  // CG. That mass is still Due cargo — count only lb above the seeded floor.
+  const crew = (opts.stationRoles.crewStations ?? []).filter(
+    (n) => Number.isFinite(n) && n > 0,
   );
+  for (const idx of crew) {
+    const lb = opts.stations[idx];
+    if (typeof lb === 'number' && Number.isFinite(lb) && lb > MSFS_STATION_OCCUPANT_LB) {
+      sum += lb - MSFS_STATION_OCCUPANT_LB;
+    }
+  }
+  return sum;
 }
 
 /**

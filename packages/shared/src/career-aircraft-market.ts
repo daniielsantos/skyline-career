@@ -436,7 +436,7 @@ export function npcPlayerLeaseAcceptChance(opts: {
 }
 
 const CLASS_LABEL_SHORT: Record<FreighterClassId, string> = {
-  light_ga: 'Beechcraft Bonanza BE36',
+  light_ga: 'Bonanza A36/A36TC Professional',
   light_turboprop: 'Cessna 208 Caravan Cargo',
   light_jet: 'Learjet 35A',
   medium_piston: 'Douglas DC-6',

@@ -217,6 +217,40 @@ export function inferSimBriefAirframeMatchFromTitle(
  * True when the spawned MSFS title belongs to this Market SKU, so live-title
  * SimBrief inference is safe (F100 door configs — not Caravan vs Commander).
  */
+/**
+ * Black Square Bonanza SimBrief ICAO from Market SKU + live glass.
+ * Piston SKU (`blacksquare-bonanza-professional`): A36→BE36, A36TC→BT36 only.
+ * Live B36TP on that SKU is ignored (separate Market SKU) — preflight rejects.
+ * TP SKU (`blacksquare-b36tp-bonanza-professional`): always B36T.
+ */
+export function resolveBonanzaSimBriefIcao(opts: {
+  airframeTypeId?: string | null;
+  liveTitle?: string | null;
+  catalogIcao?: string | null;
+}): string | undefined {
+  const id = opts.airframeTypeId?.trim() ?? '';
+  const live = opts.liveTitle?.trim() ?? '';
+  const catalog = opts.catalogIcao?.trim().toUpperCase() || undefined;
+  const isPistonSku = id === 'blacksquare-bonanza-professional';
+  const isTpSku = id === 'blacksquare-b36tp-bonanza-professional';
+  if (!isPistonSku && !isTpSku) return undefined;
+
+  if (isTpSku) {
+    if (/Black Square B36TP Bonanza/i.test(live) || /\bB36TP\b/i.test(live)) {
+      return 'B36T';
+    }
+    return catalog || 'B36T';
+  }
+
+  if (/Black Square A36TC Bonanza/i.test(live) || /\bA36TC\b/i.test(live)) {
+    return 'BT36';
+  }
+  if (/Black Square A36 Bonanza/i.test(live)) {
+    return 'BE36';
+  }
+  return catalog || 'BE36';
+}
+
 export function liveTitleMatchesMarketSku(
   liveTitle: string,
   airframeTypeId: string,
@@ -224,6 +258,12 @@ export function liveTitleMatchesMarketSku(
   const t = liveTitle.trim();
   const id = airframeTypeId.trim();
   if (!t || !id) return false;
+  if (id === 'blacksquare-bonanza-professional') {
+    return /Black Square A36(?:TC)? Bonanza Professional/i.test(t);
+  }
+  if (id === 'blacksquare-b36tp-bonanza-professional') {
+    return /Black Square B36TP Bonanza Professional/i.test(t);
+  }
   if (id === 'justflight-f100') return /\bJust Flight F100\b/i.test(t);
   if (id === 'justflight-f70') return /\bJust Flight F70\b/i.test(t);
   if (id === 'justflight-fokker-f28') {

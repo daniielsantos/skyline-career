@@ -12,9 +12,9 @@
   "notes": [
     "Black Square Bonanza Professional piston family (A36 / A36TC)",
     "Same 7-station layout; fuel capacities differ per variant profile",
-    "B36TP is a separate light_turboprop Market SKU",
+    "SimBrief ICAO: A36 → BE36, A36TC → BT36 (dispatch picks from live title)",
+    "B36TP is a separate light_turboprop Market SKU (B36T)",
     "liveSources: classic fuel tanks + classic stations/weights",
-    "SimBrief: Default BE36",
     "Homologated profile: blacksquare/a36-bonanza-professional@1.0.0",
     "Title: Black Square A36 Bonanza Professional",
     "Homologated profile: blacksquare/a36tc-bonanza-professional@1.0.0",

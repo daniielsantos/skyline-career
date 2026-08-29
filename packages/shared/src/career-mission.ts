@@ -208,7 +208,7 @@ export const CAREER_AIRCRAFT_CLASSES: readonly AircraftClass[] = [
   },
   {
     id: 'light_ga',
-    name: 'Light GA (BE36 Bonanza Professional)',
+    name: 'Light GA (Bonanza A36/A36TC Professional)',
     /**
      * Fallback structural payload for piston BE36 family (A36 / A36TC).
      * B36TP is light_turboprop with its own Market SKU.
@@ -2855,7 +2855,12 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
    */
   AC11: ['AC11', 'C182', 'BE36', 'C172', 'C152'],
   C182: ['C182', 'AC11', 'BE36', 'C172', 'C152'],
-  BE36: ['BE36', 'AC11', 'C182', 'C172', 'C152'],
+  /**
+   * Black Square Bonanza piston SKU: A36 (BE36) and A36TC (BT36) share one Market
+   * typeId. B36TP (B36T) is a separate light_turboprop SKU — do not alias here.
+   */
+  BE36: ['BE36', 'BT36', 'AC11', 'C182', 'C172', 'C152'],
+  BT36: ['BT36', 'BE36'],
   C152: ['C152', 'C172', 'C182', 'BE36', 'AC11'],
   C172: ['C172', 'C152', 'C182', 'BE36', 'AC11'],
   /**

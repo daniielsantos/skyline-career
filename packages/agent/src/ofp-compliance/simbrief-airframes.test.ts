@@ -7,6 +7,7 @@ import {
   liveTitleMatchesMarketSku,
   matchSimBriefAirframe,
   preferSimBriefAirframeMatch,
+  resolveBonanzaSimBriefIcao,
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
   type SimBriefAirframe,
@@ -194,6 +195,57 @@ describe('matchSimBriefAirframe', () => {
       'TFDi Design MD-11F GE',
     );
     assert.equal(ge?.internalId, '81536_ge');
+  });
+});
+
+describe('resolveBonanzaSimBriefIcao', () => {
+  it('maps A36 / A36TC on the piston Market SKU; ignores live B36TP', () => {
+    assert.equal(
+      resolveBonanzaSimBriefIcao({
+        airframeTypeId: 'blacksquare-bonanza-professional',
+        liveTitle: 'Black Square A36 Bonanza Professional',
+        catalogIcao: 'BE36',
+      }),
+      'BE36',
+    );
+    assert.equal(
+      resolveBonanzaSimBriefIcao({
+        airframeTypeId: 'blacksquare-bonanza-professional',
+        liveTitle: 'Black Square A36TC Bonanza Professional',
+        catalogIcao: 'BE36',
+      }),
+      'BT36',
+    );
+    assert.equal(
+      resolveBonanzaSimBriefIcao({
+        airframeTypeId: 'blacksquare-bonanza-professional',
+        liveTitle: 'Black Square B36TP Bonanza Professional',
+        catalogIcao: 'BE36',
+      }),
+      'BE36',
+    );
+  });
+
+  it('maps B36TP Market SKU to B36T', () => {
+    assert.equal(
+      resolveBonanzaSimBriefIcao({
+        airframeTypeId: 'blacksquare-b36tp-bonanza-professional',
+        liveTitle: 'Black Square B36TP Bonanza Professional',
+        catalogIcao: 'B36T',
+      }),
+      'B36T',
+    );
+  });
+
+  it('ignores non-Bonanza Market SKUs', () => {
+    assert.equal(
+      resolveBonanzaSimBriefIcao({
+        airframeTypeId: 'c208-caravan-cargo',
+        liveTitle: 'Black Square B36TP Bonanza Professional',
+        catalogIcao: 'C208',
+      }),
+      undefined,
+    );
   });
 });
 

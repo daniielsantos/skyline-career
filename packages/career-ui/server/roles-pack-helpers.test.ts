@@ -390,4 +390,34 @@ describe('resolveDispatchSimBriefParams', () => {
     assert.equal(params.simbriefIcao, 'MD1F');
     assert.equal(params.titleHint, 'TFDi Design MD-11F GE');
   });
+
+  it('Bonanza piston SKU: A36TC live title opens SimBrief BT36 not BE36', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_ga',
+      airframeTypeId: 'blacksquare-bonanza-professional',
+      rolesPackRelPath: 'profiles/ofp/blacksquare-bonanza-professional.json',
+      liveTitle: 'Black Square A36TC Bonanza Professional',
+    });
+    assert.equal(params.simbriefIcao, 'BT36');
+  });
+
+  it('Bonanza piston SKU: live B36TP keeps catalog BE36 (separate Market SKU)', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_ga',
+      airframeTypeId: 'blacksquare-bonanza-professional',
+      rolesPackRelPath: 'profiles/ofp/blacksquare-bonanza-professional.json',
+      liveTitle: 'Black Square B36TP Bonanza Professional',
+    });
+    assert.equal(params.simbriefIcao, 'BE36');
+  });
+
+  it('Bonanza B36TP SKU keeps SimBrief B36T', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_turboprop',
+      airframeTypeId: 'blacksquare-b36tp-bonanza-professional',
+      rolesPackRelPath: 'profiles/ofp/blacksquare-b36tp-bonanza-professional.json',
+      liveTitle: 'Black Square B36TP Bonanza Professional',
+    });
+    assert.equal(params.simbriefIcao, 'B36T');
+  });
 });

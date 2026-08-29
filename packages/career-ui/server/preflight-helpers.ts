@@ -21,6 +21,7 @@ import {
   payloadMatchToleranceLb,
   adjustPaxAndCargoDueForEfbPaxLb,
   clampPaxAndCargoDueToHoldsLb,
+  missionLoadPolicy,
   resolveAirportCoords,
   softenCareerPreflightVerdict,
   softenCgFindingSeverity,
@@ -378,12 +379,19 @@ export async function runMissionPreflight(
           ],
         }
       : ofp.payload?.stationRoles;
-    const baggageCapacityLb = !isPaxAndCargoLoadLayout(careerAirframe)
-      ? freighterBaggageCapacityFromStationMax(
-          catalogCaps.stationMax,
-          stationRolesForDue,
-        )
-      : undefined;
+    const loadPolicy = missionLoadPolicy(mission);
+    const baggageCapacityLb =
+      // native-simbrief / non-inject: EFB writes real OFP mass. Also skip when
+      // freighterBaggageCapacityFromStationMax returns undefined (discovery
+      // maxLoad 500×N placeholders — TFDi MD-11F Due crushed to 5k).
+      loadPolicy.injectCapable &&
+      loadPolicy.loadMethod === 'direct-injection' &&
+      !isPaxAndCargoLoadLayout(careerAirframe)
+        ? freighterBaggageCapacityFromStationMax(
+            catalogCaps.stationMax,
+            stationRolesForDue,
+          )
+        : undefined;
     // Freighter + pax_and_cargo Due = OFP/mission payload. Do NOT re-clamp with
     // live EMPTY×MTOW — after inject, EMPTY often folds in station/cabin mass and
     // shrinks Due below Sim (Baron freighter; same risk on Phenom/CJ4).

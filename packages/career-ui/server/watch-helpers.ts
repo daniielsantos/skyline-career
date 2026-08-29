@@ -69,6 +69,7 @@ import {
   fuelBurnMultFromAircraft,
   findCareerPlayerAirframe,
   isPaxAndCargoLoadLayout,
+  missionLoadPolicy,
   payloadMatchToleranceLb,
   clampPaxAndCargoDueToHoldsLb,
   adjustPaxAndCargoDueForEfbPaxLb,
@@ -2251,11 +2252,31 @@ export class CareerWatchSession {
             typeof liveFuelLb === 'number' &&
             Math.abs(rawFuelLb - liveFuelLb) > 1;
           const stationsForCrew = load.stations ?? prevWatchPayload.stations;
-          const cargoLb =
+          const loadPolicy = missionLoadPolicy(current);
+          const missionFreightLb =
+            typeof current.cargoKg === 'number' &&
+            Number.isFinite(current.cargoKg) &&
+            current.cargoKg > 0
+              ? current.cargoKg * KG_TO_LB
+              : undefined;
+          const stickyCargoLb =
             typeof prevWatchPayload.cargoLb === 'number' &&
             Number.isFinite(prevWatchPayload.cargoLb)
               ? prevWatchPayload.cargoLb
               : undefined;
+          // Heal Due crushed by discovery maxLoad 500×N (MD-11F → 5k) while
+          // EFB/mission freight is ~198 klb. Use class/SKU policy — do not trust
+          // a stale mission.injectCapable stamp alone.
+          const efbFreighter =
+            !loadPolicy.injectCapable ||
+            loadPolicy.loadMethod === 'native-simbrief';
+          const cargoLb =
+            efbFreighter &&
+            missionFreightLb !== undefined &&
+            (stickyCargoLb === undefined ||
+              stickyCargoLb < missionFreightLb * 0.15)
+              ? missionFreightLb
+              : stickyCargoLb;
           const crewFloorLb =
             typeof prevWatchPayload.crewFloorLb === 'number' &&
             Number.isFinite(prevWatchPayload.crewFloorLb)

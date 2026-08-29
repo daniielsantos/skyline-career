@@ -10,7 +10,7 @@ Pacote mínimo para **não quebrar um airframe ao consertar outro** quando o dif
 
 Perfis são isolados (`profiles/examples/*.json`); o risco real é **policy compartilhada** (soma de estações, mass-balance, Due vs Sim).
 
-Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./12-pax-efb-due.md).
+Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./12-pax-efb-due.md) (MD-11F: Due ≠ station maxLoad 500×N).
 
 ---
 

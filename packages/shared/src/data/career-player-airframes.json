@@ -1364,6 +1364,7 @@
     "rolesPackRelPath": "profiles/ofp/tfdi-md11f.json",
     "simbriefIcao": "MD1F",
     "simbriefAirframeMatch": "TFDi Design \\(MSFS\\) - MD-11F",
+    "injectCapable": false,
     "oewKg": 112748,
     "mtowKg": 286000,
     "maxCargoKg": 90000,

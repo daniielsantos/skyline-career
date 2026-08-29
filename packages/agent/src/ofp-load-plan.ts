@@ -404,14 +404,20 @@ export function freighterBaggageCapacityFromStationMax(
     (n) => Number.isFinite(n) && n > 0,
   );
   if (baggageStations.length === 0) return undefined;
-  let sum = 0;
+  const caps: number[] = [];
   for (const idx of baggageStations) {
     const cap = stationMax[idx];
     if (typeof cap === 'number' && Number.isFinite(cap) && cap > 0) {
-      sum += cap;
+      caps.push(cap);
     }
   }
-  return sum > 0 ? sum : undefined;
+  if (caps.length === 0) return undefined;
+  // Discovery drafts stamp maxLoad 500 on every station (TFDi MD-11F → 10×500=5k
+  // Due while EFB Sim is ~198 klb). That is not a real hold rating — skip clamp.
+  if (caps.length >= 4 && caps.every((c) => c === 500)) {
+    return undefined;
+  }
+  return caps.reduce((sum, c) => sum + c, 0);
 }
 
 export function plannedStationPayloadLb(opts: {

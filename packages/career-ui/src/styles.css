@@ -1626,6 +1626,12 @@ th {
   color: var(--muted);
 }
 
+.preflight-efb-units-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .dispatch-primary-actions .accept,
 .dispatch-primary-actions .action {
   display: inline-flex;

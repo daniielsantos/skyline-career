@@ -14,6 +14,7 @@ export const PAGE_HELP = {
       'Freights (or a contract) become a flight here. Edit cargo if you need to change lots — then generate a new OFP.',
       'Open SimBrief, accept the OFP, and Skyline sets Fuel and Payload Due from that plan — not from the klb on the contract tile.',
       'Load the aircraft in the addon EFB (or Inject when the airframe allows). Preflight is green when Sim matches Due.',
+      'Keep the aircraft EFB in LB (not kg) for Import / Apply — metric mode often mismatches Skyline Loaded vs Due.',
       'Cabin jets (Maddog, Fenix, JF): LOAD OFP / Import can overfill holds. Trim cargo to MZFW, Instant Load, then balance CG yourself.',
     ],
   },

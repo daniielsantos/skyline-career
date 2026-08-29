@@ -8,6 +8,14 @@ SimBrief Dispatch usa **175+55 lb/assento** (`paxwgt`/`bagwgt`). O Due do Prefli
 
 **Não** usar Import Weights do MSFS SimBrief EFB em JF / iniBuilds — estraga CG. Load no **tablet do addon**.
 
+## Unidades EFB (kg vs lb) — afeta o Sim, não o Due
+
+Skyline lê `PAYLOAD STATION WEIGHT` / fuel **sempre como pounds** (SDK). O Due vem do OFP já convertido para lb. O toggle **metric/imperial do Career UI** só muda o texto na tela.
+
+O toggle **kg/lb do EFB do addon** (iniBuilds A330, Asobo/Microsoft glass, etc.) **pode mudar o que o APPLY grava no sim**. Se o tablet estiver em kg e o OFP/números forem tratados como lb (ou o contrário), o Preflight vê Sim≠Due mesmo com airframe/row corretos.
+
+**Ritual:** antes do Import/APPLY no tablet, pôr unidades em **LB** quando o OFP Skyline/SimBrief estiver em LBS (caso típico). UI Dispatch: card “Import OFP in the aircraft EFB” + reminder no Preflight fail. Depois do APPLY, conferir ZFW/payload no EFB vs load sheet. Se Sim ≈ valor_em_kg×2.2 ou ≈ valor_em_lb/2.2, é unidade — não `efbPaxWeightLb` / ghost / OEW.
+
 ## Quatro mismatches (não misturar)
 
 Medir **depois** do Import/APPLY LOAD no EFB, com OFP confirmado.
@@ -35,7 +43,7 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mã
 1. `loadLayout: "pax_and_cargo"` + `maxPaxSeats` (fallback; Dispatch prefere `airframe_passengers` da row SimBrief).
 2. Open SimBrief: `type=` tem de ser ICAO **ou** internal id. F28 **não tem** Default — só Mk.1000/2000/3000/4000. Neo V2: `iniBuilds (MSFS) - A320neo V2` (180 pax), não Default 186.
 3. Título live → `inferSimBriefAirframeMatchFromTitle` + `liveTitleMatchesMarketSku` (família F28/F100 doors).
-4. Import no EFB. Anotar: pax EFB, FWD/AFT, Payload OFP, Sim estações, Due.
+4. EFB em **LB** (ver secção unidades). Import no tablet. Anotar: pax EFB, FWD/AFT, Payload OFP, Sim estações, Due.
 5. Só então gravar **um** dos três campos (ou nenhum, se |Sim−Due| ≤ ~800 lb em folha grande).
 6. Rebuild `@msfs-compat/shared` — catálogo JSON não hot-swap no desktop antigo.
 
@@ -61,4 +69,4 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mã
 | `leonardo-fly-the-maddog-x-md-83-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |
 | `leonardo-fly-the-maddog-x-md-88-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |
 
-Accept OFP: cargo da missão = **Payload** SimBrief (`max(Freight, Payload)` / `ofpFreightTowardMissionKg`), não a linha Freight leftover.
+**TFDi MD-11F:** pack `injectCapable: false` / native-simbrief. Homologation profiles still have discovery `maxLoad: 500` on every station → 10 holds × 500 = **5 000 lb**. Preflight used to clamp freighter Due to that sum while EFB Sim ≈ OFP Payload (~198 klb). Fix: `freighterBaggageCapacityFromStationMax` **ignores** uniform 500×N placeholders; also skip station-max Due clamp when `missionLoadPolicy` is native-simbrief; Watch heals sticky Due ≪ mission freight. Desktop instalado precisa **rebuild/restart Host** — fix não hot-swap.

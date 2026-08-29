@@ -38,6 +38,7 @@ import {
   distributeCargoAcrossStations,
   distributeFuelAcrossTanks,
   orderStationsLongitudinal,
+  freighterBaggageCapacityFromStationMax,
   plannedStationPayloadLb,
   seatSoftMaxLb,
   shiftCargoForCg,
@@ -1522,6 +1523,25 @@ describe('plannedStationPayloadLb', () => {
     assert.equal(due.gaCabin, false);
     assert.equal(due.cargoPlacedLb, 3750);
     assert.equal(due.plannedTotalLb, 3750);
+  });
+
+  it('ignores discovery placeholder maxLoad 500×N (MD-11F Due must not be 5k)', () => {
+    const stationMax: Record<number, number> = {};
+    for (let i = 1; i <= 15; i++) stationMax[i] = 500;
+    const cap = freighterBaggageCapacityFromStationMax(stationMax, {
+      crewStations: [1, 2, 3],
+      baggageStations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+    });
+    assert.equal(cap, undefined);
+    const due = plannedStationPayloadLb({
+      cargoLb: 198_471,
+      stationRoles: {
+        crewStations: [1, 2, 3],
+        baggageStations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      },
+      ...(cap !== undefined ? { baggageCapacityLb: cap } : {}),
+    });
+    assert.equal(due.cargoPlacedLb, 198_471);
   });
 });
 

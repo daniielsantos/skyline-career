@@ -882,6 +882,13 @@ export function DispatchActivePanel(props: {
               ? `Use Import SimBrief / Load OFP on the ${assignedAircraft} EFB or FMC.`
               : `Set fuel and payload on the ${assignedAircraft} in Mass & Balance / EFB.`}
           </p>
+          {loadPath === 'efb' ? (
+            <p className="dispatch-preflight-wait-hint">
+              Set the aircraft EFB weight units to <strong>LB</strong> before
+              Import / Apply — kg mode often writes the wrong mass into the
+              sim and Preflight will fail Loaded vs Due.
+            </p>
+          ) : null}
           {!mission.lastPreflightCheck ? (
             <p
               className={
@@ -1655,6 +1662,16 @@ export function DispatchActivePanel(props: {
                                 : 'Relocate to the mission origin before takeoff — Watch will not auto-depart.'
                             : 'Fix the mismatched aircraft load before departure.'}
                       </small>
+                      {!enRoute &&
+                      !ready &&
+                      !injecting &&
+                      !confirming &&
+                      loadPath === 'efb' ? (
+                        <p className="dispatch-preflight-wait-hint preflight-efb-units-hint">
+                          Reminder: aircraft EFB units should be <strong>LB</strong>{' '}
+                          (not kg) when Import / Apply-ing the OFP.
+                        </p>
+                      ) : null}
                     </div>
                     <div className="preflight-head-actions">
                       {loadPath === 'inject' ||

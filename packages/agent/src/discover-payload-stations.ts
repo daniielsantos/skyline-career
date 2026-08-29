@@ -27,8 +27,8 @@ export const STATION_SOFT_REPROBE_LB = 150;
 /** Crew ballast headroom when raising bag maxLoads from a cargo ceiling. */
 export const HOMOLOGATE_CREW_MAX_LOAD_FLOOR_LB = 750;
 
-/** Host / Watch can read beyond the classic first batch of 16. */
-export const PAYLOAD_STATION_DISCOVERY_MAX = 32;
+/** Host / Watch can read beyond the classic first batch of 16 (Saab 340 ≈37). */
+export const PAYLOAD_STATION_DISCOVERY_MAX = 48;
 
 export type StationMaxLoadSource = 'clamp' | 'cfg' | 'cargo-split' | 'placeholder';
 

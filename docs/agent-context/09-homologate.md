@@ -30,7 +30,7 @@ node packages/agent/dist/cli.js smoke --profile profiles/drafts\<arquivo>.json
 - Capacidade do hangar (`fuelCapacityKg`) deve bater com tanques homologados.
 - Career inject: `clampFuelToCapacity` quando OFP > tanques.
 - **`maxLoad` placeholder 500:** inject Due = Σ maxLoad. Wizard cascade: cfg (`station_load` >500) → **split SimBrief/useful-load** nas bag stations (S1/S2 ≥750). Sem probe de clamp live (MSFS quase sempre aceita qualquer peso). Market `maxCargoKg` via SimBrief **não** substitui maxLoad no inject (YS-11: 6×500 capava o avião).
-- Stations **>16** (EMB-110 pax / Saab): Watch overflow batch; wizard avisa no discovery.
+- Stations **>16** (EMB-110 pax / Saab): Watch overflow batch; wizard avisa no discovery. Discovery/fingerprint/probe CLI cap = **48** (`PAYLOAD_STATION_DISCOVERY_MAX`; Saab COUNT≈37). Saab **Passenger**: S1–2 crew, S3–36 as `baggageStations` maxLoad 500 (não soft-max 300), S37 excluded; **`cg.policy: none`** (braços ruins + ballast estourava Due). Vidro **Cargo** continua freighter 6-station.
 - Soft re-probe: holds que grudam e esvaziam (C408) saem do draft antes do promote.
 - Force-include AUX com write falho: **não** (Host risk); remap para MAIN sticky.
 - `maxCargoKg` com stations ainda em placeholder 500: wizard prefere SimBrief. Catálogo antigo: `npm run airframes:backfill-simbrief-cargo` / `-- --apply`.

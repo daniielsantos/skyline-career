@@ -2,7 +2,7 @@
   "schemaVersion": "1.0.0",
   "profileId": "carenado-saab-340-passenger",
   "profileKey": "carenado/saab-340-passenger",
-  "semver": "1.0.0",
+  "semver": "1.1.0",
   "displayName": "Saab 340 Passenger (MSFS 2024)",
   "match": {
     "fingerprint": "14a165489e2f85082e75ec7e3fa81af5e0e340105e21a0db7bff92b760411205",
@@ -89,102 +89,182 @@
     "stations": [
       {
         "index": 1,
-        "name": "Station 1",
+        "name": "Crew 1",
         "maxLoad": 500
       },
       {
         "index": 2,
-        "name": "Station 2",
+        "name": "Crew 2",
         "maxLoad": 500
       },
       {
         "index": 3,
-        "name": "Station 3",
+        "name": "Seat 3",
         "maxLoad": 500
       },
       {
         "index": 4,
-        "name": "Station 4",
+        "name": "Seat 4",
         "maxLoad": 500
       },
       {
         "index": 5,
-        "name": "Station 5",
+        "name": "Seat 5",
         "maxLoad": 500
       },
       {
         "index": 6,
-        "name": "Station 6",
+        "name": "Seat 6",
         "maxLoad": 500
       },
       {
         "index": 7,
-        "name": "Station 7",
+        "name": "Seat 7",
         "maxLoad": 500
       },
       {
         "index": 8,
-        "name": "Station 8",
+        "name": "Seat 8",
         "maxLoad": 500
       },
       {
         "index": 9,
-        "name": "Station 9",
+        "name": "Seat 9",
         "maxLoad": 500
       },
       {
         "index": 10,
-        "name": "Station 10",
+        "name": "Seat 10",
         "maxLoad": 500
       },
       {
         "index": 11,
-        "name": "Station 11",
+        "name": "Seat 11",
         "maxLoad": 500
       },
       {
         "index": 12,
-        "name": "Station 12",
+        "name": "Seat 12",
         "maxLoad": 500
       },
       {
         "index": 13,
-        "name": "Station 13",
+        "name": "Seat 13",
         "maxLoad": 500
       },
       {
         "index": 14,
-        "name": "Station 14",
+        "name": "Seat 14",
         "maxLoad": 500
       },
       {
         "index": 15,
-        "name": "Station 15",
+        "name": "Seat 15",
         "maxLoad": 500
       },
       {
         "index": 16,
-        "name": "Station 16",
+        "name": "Seat 16",
         "maxLoad": 500
       },
       {
         "index": 17,
-        "name": "Station 17",
+        "name": "Seat 17",
         "maxLoad": 500
       },
       {
         "index": 18,
-        "name": "Station 18",
+        "name": "Seat 18",
         "maxLoad": 500
       },
       {
         "index": 19,
-        "name": "Station 19",
+        "name": "Seat 19",
         "maxLoad": 500
       },
       {
         "index": 20,
-        "name": "Station 20",
+        "name": "Seat 20",
+        "maxLoad": 500
+      },
+      {
+        "index": 21,
+        "name": "Seat 21",
+        "maxLoad": 500
+      },
+      {
+        "index": 22,
+        "name": "Seat 22",
+        "maxLoad": 500
+      },
+      {
+        "index": 23,
+        "name": "Seat 23",
+        "maxLoad": 500
+      },
+      {
+        "index": 24,
+        "name": "Seat 24",
+        "maxLoad": 500
+      },
+      {
+        "index": 25,
+        "name": "Seat 25",
+        "maxLoad": 500
+      },
+      {
+        "index": 26,
+        "name": "Seat 26",
+        "maxLoad": 500
+      },
+      {
+        "index": 27,
+        "name": "Seat 27",
+        "maxLoad": 500
+      },
+      {
+        "index": 28,
+        "name": "Seat 28",
+        "maxLoad": 500
+      },
+      {
+        "index": 29,
+        "name": "Seat 29",
+        "maxLoad": 500
+      },
+      {
+        "index": 30,
+        "name": "Seat 30",
+        "maxLoad": 500
+      },
+      {
+        "index": 31,
+        "name": "Seat 31",
+        "maxLoad": 500
+      },
+      {
+        "index": 32,
+        "name": "Seat 32",
+        "maxLoad": 500
+      },
+      {
+        "index": 33,
+        "name": "Seat 33",
+        "maxLoad": 500
+      },
+      {
+        "index": 34,
+        "name": "Seat 34",
+        "maxLoad": 500
+      },
+      {
+        "index": 35,
+        "name": "Seat 35",
+        "maxLoad": 500
+      },
+      {
+        "index": 36,
+        "name": "Seat 36",
         "maxLoad": 500
       }
     ],
@@ -310,6 +390,102 @@
         "valueExpr": "{station_20}"
       },
       {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:21",
+        "unit": "pounds",
+        "valueExpr": "{station_21}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:22",
+        "unit": "pounds",
+        "valueExpr": "{station_22}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:23",
+        "unit": "pounds",
+        "valueExpr": "{station_23}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:24",
+        "unit": "pounds",
+        "valueExpr": "{station_24}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:25",
+        "unit": "pounds",
+        "valueExpr": "{station_25}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:26",
+        "unit": "pounds",
+        "valueExpr": "{station_26}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:27",
+        "unit": "pounds",
+        "valueExpr": "{station_27}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:28",
+        "unit": "pounds",
+        "valueExpr": "{station_28}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:29",
+        "unit": "pounds",
+        "valueExpr": "{station_29}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:30",
+        "unit": "pounds",
+        "valueExpr": "{station_30}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:31",
+        "unit": "pounds",
+        "valueExpr": "{station_31}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:32",
+        "unit": "pounds",
+        "valueExpr": "{station_32}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:33",
+        "unit": "pounds",
+        "valueExpr": "{station_33}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:34",
+        "unit": "pounds",
+        "valueExpr": "{station_34}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:35",
+        "unit": "pounds",
+        "valueExpr": "{station_35}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:36",
+        "unit": "pounds",
+        "valueExpr": "{station_36}"
+      },
+      {
         "op": "delay",
         "ms": 400
       }
@@ -331,6 +507,7 @@
     "readVar": "CG PERCENT",
     "readUnit": "Percent over 100",
     "envelopeSource": "simvar",
+    "policy": "none",
     "toleranceMac": 0.5,
     "constraints": {
       "minMac": 0,
@@ -344,7 +521,7 @@
         "maxObservedMac": 27.136844396591187,
         "payloadLb": 200,
         "forwardStation": 1,
-        "aftStation": 20,
+        "aftStation": 36,
         "usedStationArms": false,
         "restored": true,
         "sampledAtIso": "2026-08-04T02:12:04.327Z"
@@ -361,9 +538,10 @@
     "ICAO type designator (catalog/SimBrief): SF34.",
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
     "AUX deferred for v1.",
-    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.",
-    "Station maxLoad: placeholder until cfg or clamp.",
-    "Homologated with interactive wizard.",
+    "Payload: S1–S2 crew, S3–S36 cabin seats (EFB seats map). S37 sticky 300 lb excluded (not Empty/Cargo).",
+    "Cabin S3–S36 maxLoad 500; pack maps them as baggageStations so freighter equal-fill is not capped by GA seat soft-max 300.",
+    "cg.policy none — broken station arms / heavy cabin freight; no CG ballast over Due.",
+    "Shared Market SKU with Cargo glass (freighter 6-station pack) — keep catalog freighter loadLayout.",
     "See profiles/notes/carenado-saab-340-passenger.md"
   ]
 }

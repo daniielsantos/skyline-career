@@ -1192,16 +1192,22 @@ async function applyMissionOfpLoadExclusive(
       bridge,
     });
 
-    // Strict CG only when envelope provenance is authoritative.
+    // Strict CG only when envelope provenance is authoritative — unless the
+    // profile pins policy (e.g. broken station arms → none: Due-only, no ballast).
     const envelopeSource = resolved.profile.cg?.envelopeSource;
     const cgPolicy =
-      envelopeSource === 'cfg' ||
+      resolved.profile.cg?.policy ??
+      (envelopeSource === 'cfg' ||
       envelopeSource === 'manual' ||
       envelopeSource === 'simvar' ||
       envelopeSource === 'calibrated-live' ||
       envelopeSource === 'live-sweep'
         ? 'strict'
-        : 'soft';
+        : 'soft');
+    /** Extra mass above OFP Due — only when CG is enforced strictly. */
+    const allowCgBallast = cgPolicy === 'strict';
+    /** Drive fill/shift from live MAC (soft may shift; none = equal-fill only). */
+    const useCgGuidance = cgPolicy !== 'none';
 
     const plannedTanks = built.plan.fuel?.tanks ?? {};
     // Skip fuel only when weight already matches Due tightly. Do NOT apply the
@@ -2111,12 +2117,13 @@ async function applyMissionOfpLoadExclusive(
           liveMac !== undefined &&
           minMac !== undefined &&
           maxMac !== undefined;
-        const lo = haveEnvelope ? minMac! + CG_REBALANCE_MARGIN_MAC : undefined;
-        const hi = haveEnvelope ? maxMac! - CG_REBALANCE_MARGIN_MAC : undefined;
+        const guideCg = useCgGuidance && haveEnvelope;
+        const lo = guideCg ? minMac! + CG_REBALANCE_MARGIN_MAC : undefined;
+        const hi = guideCg ? maxMac! - CG_REBALANCE_MARGIN_MAC : undefined;
         const inEnvelope =
-          haveEnvelope && liveMac! >= lo! && liveMac! <= hi!;
+          guideCg && liveMac! >= lo! && liveMac! <= hi!;
 
-        const fillAction = haveEnvelope
+        const fillAction = guideCg
           ? resolveCgFillAction({
               liveMac: liveMac!,
               lo: lo!,
@@ -2135,7 +2142,7 @@ async function applyMissionOfpLoadExclusive(
                 ? 'forward'
                 : 'equal';
           perSeatLb = CG_BALANCE_STEP_LB;
-        } else if (haveEnvelope) {
+        } else if (guideCg) {
           bias = resolveCgCounterweightBias({
             liveMac: liveMac!,
             lo: lo!,
@@ -2161,21 +2168,35 @@ async function applyMissionOfpLoadExclusive(
         lastLiveMac = liveMac;
         prevLiveMac = liveMac;
 
-        if (!stillPlacing && (!haveEnvelope || inEnvelope)) {
+        if (
+          !stillPlacing &&
+          (cgPolicy === 'none' || !haveEnvelope || inEnvelope)
+        ) {
+          if (
+            cgPolicy === 'none' &&
+            haveEnvelope &&
+            liveMac !== undefined &&
+            (liveMac < minMac! + CG_REBALANCE_MARGIN_MAC ||
+              liveMac > maxMac! - CG_REBALANCE_MARGIN_MAC)
+          ) {
+            softCgWarn = true;
+          }
           applyResult = {
             ...applyResult,
             cg: { ok: true, failures: [] },
           };
           publishLiveProgress(
             'balancing',
-            liveMac !== undefined
-              ? `CG in envelope (${liveMac.toFixed(1)}% MAC)`
-              : 'Payload complete',
+            cgPolicy === 'none'
+              ? `Payload complete (CG advisory${liveMac !== undefined ? ` · ${liveMac.toFixed(1)}% MAC` : ''})`
+              : liveMac !== undefined
+                ? `CG in envelope (${liveMac.toFixed(1)}% MAC)`
+                : 'Payload complete',
             { cgAttempt: i, liveMac },
           );
           watchDebugLog('inject', 'balance done', {
             round: i,
-            reason: 'cargo+cg ok',
+            reason: cgPolicy === 'none' ? 'cargo ok · cg ignored' : 'cargo+cg ok',
             cargoPlacedLb: Math.round(cargoPlacedLb),
             cargoTargetLb: Math.round(cargoTargetLb),
             liveMac,
@@ -2462,10 +2483,12 @@ async function applyMissionOfpLoadExclusive(
           // Ferry / empty cabin: cargo target is met (often 0) and crew seats sit
           // at their floor, so there is nothing left to shift. Add the minimum
           // ballast that walks CG back into the envelope instead of rolling back.
+          // Never when cg.policy soft/none — ballast pushes Sim above OFP Due.
           if (
             shifted.movedLb <= 0 &&
             !stillPlacing &&
             !preferSeatFill &&
+            allowCgBallast &&
             ballastPlacedLb < CG_BALLAST_MAX_LB &&
             built.movableStations.length > 0
           ) {

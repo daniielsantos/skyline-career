@@ -14,6 +14,7 @@ import { calibrateProfile } from './calibrate-profile.js';
 import { CatalogClient } from './catalog-client.js';
 import { ProfileCache } from './profile-cache.js';
 import { sampleAircraftStructure } from './sample-structure.js';
+import { PAYLOAD_STATION_DISCOVERY_MAX } from './discover-payload-stations.js';
 import { resolveLiveAircraft } from './resolve-live.js';
 import { runHomologateWizard } from './homologate-wizard.js';
 import { buildSmokeStationTargets } from './smoke-targets.js';
@@ -154,7 +155,7 @@ Notes:
   career-payload: SimBrief maxcargo / OEW / MTOW / fuel → career-player-airframes.json (Freights ceiling)
   probe-lvars: read/watch/write Accu-Sim LVars (restart start:local after native rebuild)
   probe-pmdg-fuel: read PMDG_NG3_Data Client Data fuel qty (requires EnableDataBroadcast=1)
-  probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N (homologate pax/cargo roles)
+  probe-payload-stations: dump PAYLOAD STATION WEIGHT:1..N from SDK COUNT (capped at discovery max)
   scaffold-ofp-roles: detect known family from live title and print/write roles pack
   draft-ofp-roles: build/merge roles pack from a homologated profiles/examples JSON (no sim)
   pmdg-cdu: experimental/parked — not the fuel apply path (use SimBrief/EFB; Skyline monitors OFP vs live)
@@ -1125,22 +1126,56 @@ async function main(): Promise<void> {
     await withBridge(pipeName, async (bridge) => {
       const identity = await bridge.getAircraftIdentity();
       console.log(`Aircraft: ${identity.title}`);
-      console.log('Reading PAYLOAD STATION WEIGHT:1..20 (+ empty/gross)…');
 
-      const snapshot = await bridge.snapshot();
+      let sdkCount: number | undefined;
+      try {
+        const raw = await bridge.readSimVar({
+          name: 'PAYLOAD STATION COUNT',
+          unit: 'number',
+        });
+        if (Number.isFinite(raw) && raw > 0) {
+          sdkCount = Math.round(raw);
+        }
+      } catch {
+        /* fall through */
+      }
+      const limit = Math.max(
+        1,
+        Math.min(
+          PAYLOAD_STATION_DISCOVERY_MAX,
+          sdkCount && sdkCount > 0 ? sdkCount : 16,
+        ),
+      );
+      console.log(
+        `Reading PAYLOAD STATION WEIGHT:1..${limit}` +
+          (sdkCount != null ? ` (COUNT=${sdkCount}` : ' (COUNT unknown') +
+          (sdkCount != null && sdkCount > PAYLOAD_STATION_DISCOVERY_MAX
+            ? `; capped at discovery max ${PAYLOAD_STATION_DISCOVERY_MAX})`
+            : ')') +
+          '…',
+      );
+
+      const weightVars = Array.from({ length: limit }, (_, i) => ({
+        name: `PAYLOAD STATION WEIGHT:${i + 1}`,
+        unit: 'pounds' as const,
+      }));
+      const metaVars = [
+        { name: 'EMPTY WEIGHT', unit: 'pounds' as const },
+        { name: 'TOTAL WEIGHT', unit: 'pounds' as const },
+      ];
+      const values = await bridge.readSimVars([...metaVars, ...weightVars]);
+      const empty = values[0];
+      const gross = values[1];
       const stations: Array<{ index: number; lb: number }> = [];
       let total = 0;
-      for (let i = 1; i <= 20; i++) {
-        const key = `PAYLOAD STATION WEIGHT:${i}`;
-        const lb = snapshot.vars?.[key];
-        if (lb !== undefined && Number.isFinite(lb)) {
-          stations.push({ index: i, lb });
+      for (let i = 0; i < limit; i++) {
+        const lb = values[2 + i];
+        if (typeof lb === 'number' && Number.isFinite(lb)) {
+          stations.push({ index: i + 1, lb });
           total += lb;
         }
       }
 
-      const empty = snapshot.vars?.['EMPTY WEIGHT'];
-      const gross = snapshot.grossWeightLb ?? snapshot.vars?.['TOTAL WEIGHT'];
       console.log(
         `empty=${empty?.toFixed(0) ?? '?'} lb  gross(classic)=${gross?.toFixed(0) ?? '?'} lb  payloadSum=${total.toFixed(1)} lb`,
       );
@@ -1163,9 +1198,14 @@ async function main(): Promise<void> {
         );
       }
 
-      console.log('Stations (host snapshot currently defines :1..14; higher may be missing):');
+      console.log(`Stations (1..${limit}):`);
       for (const s of stations) {
         console.log(`  ${String(s.index).padStart(2)}: ${s.lb.toFixed(1).padStart(10)} lb`);
+      }
+      if (sdkCount != null && sdkCount > PAYLOAD_STATION_DISCOVERY_MAX) {
+        console.log(
+          `  (COUNT ${sdkCount} exceeds discovery max ${PAYLOAD_STATION_DISCOVERY_MAX} — S${PAYLOAD_STATION_DISCOVERY_MAX + 1}+ not listed)`,
+        );
       }
     });
     return;

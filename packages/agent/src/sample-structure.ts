@@ -1,5 +1,6 @@
 import type { AircraftStructure } from '@msfs-compat/shared';
 import type { NamedPipeSimBridge } from './named-pipe-sim-bridge.js';
+import { PAYLOAD_STATION_DISCOVERY_MAX } from './discover-payload-stations.js';
 
 /**
  * Classic named tanks for fingerprinting when FUELSYSTEM capacities are empty.
@@ -72,7 +73,7 @@ export async function sampleAircraftStructure(bridge: NamedPipeSimBridge): Promi
     stationCount = Math.max(
       1,
       Math.min(
-          32,
+          PAYLOAD_STATION_DISCOVERY_MAX,
           Math.round(
             await bridge.readSimVar({
               name: 'PAYLOAD STATION COUNT',

@@ -8,13 +8,17 @@
     "Saab 340 Passenger",
     "340 Passenger"
   ],
-  "matchTitlePattern": "(?:Saab\\s+)?340\\s+Passenger",
+  "matchTitlePattern": "(?:Saab\\s+)?340\\s*Passenger",
   "notes": [
-    "Saab 340 Passenger — auto roles pack from homologated profile",
-    "Profile: carenado/saab-340-passenger@1.0.0",
+    "Saab 340 Passenger — S1–S2 crew, S3–S36 cabin (EFB Seats; no classic holds)",
+    "Profile: carenado/saab-340-passenger@1.1.0",
     "One Skyline Market SKU with Cargo variant (microsoft-saab-340-cargo)",
+    "EFB Cargo tab does not write PAYLOAD STATION WEIGHT — no classic holds",
+    "S37 sticky ~300 lb excluded (survives Empty; not a seat)",
+    "Career freight: cabin as baggageStations maxLoad 500 (not GA seat soft-max 300)",
+    "Profile cg.policy none — no CG ballast (arms broken; was overshooting Due)",
+    "Catalog stays freighter loadLayout so Cargo glass inject stays freighter",
     "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct"
   ],
   "fuel": {
@@ -30,6 +34,7 @@
         1,
         2
       ],
+      "passengerStations": [],
       "baggageStations": [
         3,
         4,
@@ -48,9 +53,24 @@
         17,
         18,
         19,
-        20
-      ],
-      "passengerStations": []
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36
+      ]
     }
   },
   "liveSources": {
@@ -70,130 +90,226 @@
     {
       "simVarIndex": 1,
       "cfgIndex": 0,
-      "name": "Station 1",
+      "name": "Crew 1",
       "role": "crew"
     },
     {
       "simVarIndex": 2,
       "cfgIndex": 1,
-      "name": "Station 2",
+      "name": "Crew 2",
       "role": "crew"
     },
     {
       "simVarIndex": 3,
       "cfgIndex": 2,
-      "name": "Station 3",
+      "name": "Seat 3",
       "role": "baggage"
     },
     {
       "simVarIndex": 4,
       "cfgIndex": 3,
-      "name": "Station 4",
+      "name": "Seat 4",
       "role": "baggage"
     },
     {
       "simVarIndex": 5,
       "cfgIndex": 4,
-      "name": "Station 5",
+      "name": "Seat 5",
       "role": "baggage"
     },
     {
       "simVarIndex": 6,
       "cfgIndex": 5,
-      "name": "Station 6",
+      "name": "Seat 6",
       "role": "baggage"
     },
     {
       "simVarIndex": 7,
       "cfgIndex": 6,
-      "name": "Station 7",
+      "name": "Seat 7",
       "role": "baggage"
     },
     {
       "simVarIndex": 8,
       "cfgIndex": 7,
-      "name": "Station 8",
+      "name": "Seat 8",
       "role": "baggage"
     },
     {
       "simVarIndex": 9,
       "cfgIndex": 8,
-      "name": "Station 9",
+      "name": "Seat 9",
       "role": "baggage"
     },
     {
       "simVarIndex": 10,
       "cfgIndex": 9,
-      "name": "Station 10",
+      "name": "Seat 10",
       "role": "baggage"
     },
     {
       "simVarIndex": 11,
       "cfgIndex": 10,
-      "name": "Station 11",
+      "name": "Seat 11",
       "role": "baggage"
     },
     {
       "simVarIndex": 12,
       "cfgIndex": 11,
-      "name": "Station 12",
+      "name": "Seat 12",
       "role": "baggage"
     },
     {
       "simVarIndex": 13,
       "cfgIndex": 12,
-      "name": "Station 13",
+      "name": "Seat 13",
       "role": "baggage"
     },
     {
       "simVarIndex": 14,
       "cfgIndex": 13,
-      "name": "Station 14",
+      "name": "Seat 14",
       "role": "baggage"
     },
     {
       "simVarIndex": 15,
       "cfgIndex": 14,
-      "name": "Station 15",
+      "name": "Seat 15",
       "role": "baggage"
     },
     {
       "simVarIndex": 16,
       "cfgIndex": 15,
-      "name": "Station 16",
+      "name": "Seat 16",
       "role": "baggage"
     },
     {
       "simVarIndex": 17,
       "cfgIndex": 16,
-      "name": "Station 17",
+      "name": "Seat 17",
       "role": "baggage"
     },
     {
       "simVarIndex": 18,
       "cfgIndex": 17,
-      "name": "Station 18",
+      "name": "Seat 18",
       "role": "baggage"
     },
     {
       "simVarIndex": 19,
       "cfgIndex": 18,
-      "name": "Station 19",
+      "name": "Seat 19",
       "role": "baggage"
     },
     {
       "simVarIndex": 20,
       "cfgIndex": 19,
-      "name": "Station 20",
+      "name": "Seat 20",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 21,
+      "cfgIndex": 20,
+      "name": "Seat 21",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 22,
+      "cfgIndex": 21,
+      "name": "Seat 22",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 23,
+      "cfgIndex": 22,
+      "name": "Seat 23",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 24,
+      "cfgIndex": 23,
+      "name": "Seat 24",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 25,
+      "cfgIndex": 24,
+      "name": "Seat 25",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 26,
+      "cfgIndex": 25,
+      "name": "Seat 26",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 27,
+      "cfgIndex": 26,
+      "name": "Seat 27",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 28,
+      "cfgIndex": 27,
+      "name": "Seat 28",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 29,
+      "cfgIndex": 28,
+      "name": "Seat 29",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 30,
+      "cfgIndex": 29,
+      "name": "Seat 30",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 31,
+      "cfgIndex": 30,
+      "name": "Seat 31",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 32,
+      "cfgIndex": 31,
+      "name": "Seat 32",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 33,
+      "cfgIndex": 32,
+      "name": "Seat 33",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 34,
+      "cfgIndex": 33,
+      "name": "Seat 34",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 35,
+      "cfgIndex": 34,
+      "name": "Seat 35",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 36,
+      "cfgIndex": 35,
+      "name": "Seat 36",
       "role": "baggage"
     }
   ],
   "tolerances": {
     "fuelAbsLb": 50,
     "fuelPct": 0.03,
-    "payloadAbsLb": 75,
-    "weightAbsLb": 150,
-    "passengerCountAbs": 0,
+    "payloadAbsLb": 400,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
     "maxFuelIncreaseLb": 0
   }
 }

@@ -147,6 +147,14 @@ export interface CgSection {
   readUnit?: string;
   /** Provenance of the operational envelope stored in constraints. */
   envelopeSource?: 'cfg' | 'manual' | 'simvar' | 'live-sweep' | 'calibrated-live';
+  /**
+   * Inject CG behavior. When unset, inject derives from envelopeSource
+   * (authoritative sources → strict).
+   * - strict: rebalance + ballast; out of envelope can fail apply
+   * - soft: may shift mass; no ballast over Due; CG is advisory
+   * - none: equal-fill to Due only; skip CG rebalance/ballast; advisory
+   */
+  policy?: 'strict' | 'soft' | 'none';
   /** Read/settling tolerance in percentage points of MAC. */
   toleranceMac?: number;
   constraints?: {

@@ -29,6 +29,10 @@ node packages/agent/dist/cli.js smoke --profile profiles/drafts\<arquivo>.json
 - Densidade: Jet-A ~6.7 vs avgas ~6.0 — OFP em lb / tanque em gal.
 - Capacidade do hangar (`fuelCapacityKg`) deve bater com tanques homologados.
 - Career inject: `clampFuelToCapacity` quando OFP > tanques.
+- **`maxLoad` placeholder 500:** inject Due = Σ maxLoad. Wizard cascade: cfg (`station_load` >500) → **split SimBrief/useful-load** nas bag stations (S1/S2 ≥750). Sem probe de clamp live (MSFS quase sempre aceita qualquer peso). Market `maxCargoKg` via SimBrief **não** substitui maxLoad no inject (YS-11: 6×500 capava o avião).
+- Stations **>16** (EMB-110 pax / Saab): Watch overflow batch; wizard avisa no discovery.
+- Soft re-probe: holds que grudam e esvaziam (C408) saem do draft antes do promote.
+- Force-include AUX com write falho: **não** (Host risk); remap para MAIN sticky.
 - `maxCargoKg` com stations ainda em placeholder 500: wizard prefere SimBrief. Catálogo antigo: `npm run airframes:backfill-simbrief-cargo` / `-- --apply`.
 
 ## Market SKU (família vs vidro)

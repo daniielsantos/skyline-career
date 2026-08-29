@@ -1,0 +1,258 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "inibuilds-ys-11",
+  "profileKey": "inibuilds/ys-11",
+  "semver": "1.0.0",
+  "displayName": "YS-11 (MSFS 2024)",
+  "match": {
+    "fingerprint": "1ab244ef385d9df3b0ffb54fd8357cb4c1085a93c5b57c4c73f04732b664570f",
+    "title": "YS-11",
+    "publisher": "inibuilds",
+    "icao": "YS11",
+    "liveTitles": [
+      "YS-11"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 230,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 359,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 700,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT AUX QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 700,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 1.5"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 1.5"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX} + 6.2"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT AUX QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX} + 6.2"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK LEFT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{LEFT_AUX}"
+        },
+        {
+          "var": "FUEL TANK RIGHT AUX QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 2,
+          "valueExpr": "{RIGHT_AUX}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 750
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 750
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 4197
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 4197
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 4197
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 4197
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 20,
+      "maxMac": 36
+    },
+    "calibration": {
+      "observedMac": 22.537001967430115,
+      "calibratedAtIso": "2026-08-29T16:51:02.491Z",
+      "sweep": {
+        "minObservedMac": 22.71324247121811,
+        "maxObservedMac": 25.355148315429688,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 6,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-08-29T16:51:09.894Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: YS-11.",
+    "ICAO type designator (catalog/SimBrief): YS11.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX).",
+    "AUX/Aft tanks included.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6.",
+    "Station maxLoad: placeholder S1,S2,S3,S4,S5,S6=500",
+    "Fuel residual floors (writetest): LEFT_AUX ~6.2 gal, RIGHT_AUX ~6.2 gal — inject redistributeAroundResidualFloors keeps OFP total.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/inibuilds-ys-11.md"
+  ]
+}

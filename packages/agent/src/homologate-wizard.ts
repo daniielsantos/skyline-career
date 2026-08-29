@@ -7,6 +7,8 @@ import {
   getAircraftClass,
   normalizeAircraftTitle,
   inferPublisher,
+  KG_TO_LB,
+  findCareerPlayerAirframe,
 } from '@msfs-compat/shared';
 import { buildSmokeStationTargets } from './smoke-targets.js';
 import { calibrateProfile } from './calibrate-profile.js';
@@ -32,6 +34,10 @@ import {
 import {
   discoverWritablePayloadStations,
   liveStationIndexes as stickyStationIndexes,
+  reprobeStickyPayloadStations,
+  resolveHomologateStationMaxLoads,
+  PAYLOAD_STATION_DISCOVERY_MAX,
+  STATION_MAX_LOAD_PLACEHOLDER_LB,
 } from './discover-payload-stations.js';
 import {
   ensureAuxTanks,
@@ -604,7 +610,13 @@ function readStationWeights(snap: {
 }): PayloadWeightSummary {
   const countRaw = snap.vars?.['PAYLOAD STATION COUNT'];
   const countHint = Math.round(typeof countRaw === 'number' ? countRaw : Number(countRaw) || 0);
-  const limit = Math.max(0, Math.min(16, countHint > 0 ? countHint : 14));
+  const limit = Math.max(
+    0,
+    Math.min(
+      PAYLOAD_STATION_DISCOVERY_MAX,
+      countHint > 0 ? countHint : 14,
+    ),
+  );
   const stations: StationWeight[] = [];
   for (let i = 1; i <= limit; i++) {
     const raw = snap.vars?.[`PAYLOAD STATION WEIGHT:${i}`];
@@ -1136,6 +1148,14 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         console.log(`  · ${p.id.padEnd(10)} inactive${p.note ? ` (${p.note})` : ''}`);
       }
     }
+    const fuelResidualFloors: string[] = [];
+    for (const p of fuelProbes) {
+      if (!p.live || p.after === null || p.target === null) continue;
+      const residual = Math.abs(p.after - p.target);
+      if (residual > writeTolerance(p.target)) {
+        fuelResidualFloors.push(`${p.id} ~${residual.toFixed(1)} gal`);
+      }
+    }
     const partialTanks = fuelProbes.filter((p) => p.hasCapacity && !p.writable && p.changed);
     console.log(
       liveTanks.length > 0
@@ -1153,7 +1173,7 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       writeGapMs: 50,
       settleMs: 400,
     });
-    const liveStationIndexes = stickyStationIndexes(stationProbes);
+    let liveStationIndexes = stickyStationIndexes(stationProbes);
     for (const p of stationProbes) {
       if (p.live) {
         console.log(`  ✓ Station ${String(p.index).padStart(2)}  writable (restored)`);
@@ -1171,9 +1191,48 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
     }
     console.log(
       liveStationIndexes.length > 0
-        ? `  → Sticky stations for draft: ${liveStationIndexes.join(', ')}`
+        ? `  → Sticky stations after writetest: ${liveStationIndexes.join(', ')}`
         : '  → No payload stations retained weight after writetest.',
     );
+
+    if (liveStationIndexes.length > 0) {
+      console.log('  Soft re-probe (batch mid-weight — drop sticky-then-empty holds)...');
+      const reprobed = await reprobeStickyPayloadStations(bridge, liveStationIndexes, {
+        settleMs: 700,
+        writeGapMs: 50,
+      });
+      if (reprobed.dropped.length > 0) {
+        console.log(
+          `  → Dropped flaky S${reprobed.dropped.join(',S')} (sticky then empty)`,
+        );
+      }
+      liveStationIndexes = reprobed.sticky;
+      console.log(
+        liveStationIndexes.length > 0
+          ? `  → Sticky stations for draft: ${liveStationIndexes.join(', ')}`
+          : '  → No stations survived soft re-probe.',
+      );
+    }
+
+    const sdkStationCount = payloadLive.count;
+    if (
+      sdkStationCount > 16 ||
+      liveStationIndexes.some((idx) => idx > 16)
+    ) {
+      console.log('');
+      console.log(
+        `  WARNING: Stations beyond 16 (COUNT=${sdkStationCount || 'n/a'}; sticky max S${Math.max(0, ...liveStationIndexes, 0)}).`,
+      );
+      console.log(
+        '    Career Watch uses an overflow Host batch for S17+ — validate Preflight schematic after inject.',
+      );
+    }
+
+    let maxLoadNote =
+      'Station maxLoad: pending cfg / cargo-ceiling split after calibrate.';
+    // No live clamp probe — MSFS usually accepts any station weight (same reason
+    // Career inject dropped per-station clamp probing). Ceilings come from cfg
+    // (station_load >500) or SimBrief/useful-load split after calibrate.
 
     let fsWriteOk = false;
     try {
@@ -1490,7 +1549,11 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
       !includeAux &&
       ((leftAuxCap !== null && leftAuxCap >= 5) || (rightAuxCap !== null && rightAuxCap >= 5))
     ) {
-      const addAux = await confirm(ask, 'AUX capacity ≥5 but write probe failed earlier. Force-include AUX', false);
+      const addAux = await confirm(
+        ask,
+        'AUX capacity ≥5 but write probe FAILED. Force-include anyway? (Host risk — Twin Otter wrong-slot history; prefer sticky MAIN ids)',
+        false,
+      );
       if (addAux) {
         profile = await ensureAuxTanks(profile, {
           left: leftAuxCap && leftAuxCap >= 5 ? leftAuxCap : Math.max(leftAuxQty ?? 0, 15),
@@ -1511,6 +1574,134 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         matchIcao,
       );
     profile = JSON.parse(await readFile(drafted.path, 'utf8')) as AircraftProfile;
+
+    // After cfg calibrate: if bags still on 500, split SimBrief / catalog / useful-load.
+    {
+      const heuristicRoles = {
+        crewStations: [1, 2].filter((i) =>
+          profile.payload.stations.some((s) => s.index === i),
+        ),
+        baggageStations: profile.payload.stations
+          .map((s) => s.index)
+          .filter((i) => i > 2),
+        passengerStations: [] as number[],
+      };
+      if (
+        heuristicRoles.baggageStations.length === 0 &&
+        profile.payload.stations.length > 0
+      ) {
+        heuristicRoles.baggageStations = profile.payload.stations
+          .map((s) => s.index)
+          .filter((i) => !heuristicRoles.crewStations.includes(i));
+      }
+      if (
+        stationCargoCeilingIsPlaceholder(
+          profile.payload.stations,
+          heuristicRoles,
+        )
+      ) {
+        let cargoCeilingLb: number | undefined;
+        let ceilingSrc = 'useful-load';
+        try {
+          const resolved = await resolveSimBriefMaxCargoKg({
+            simbriefIcao: matchIcao,
+            simbriefAirframeMatch: 'Default',
+            titleHint: matchTitle,
+          });
+          cargoCeilingLb = Math.round(resolved.maxCargoKg * KG_TO_LB);
+          ceilingSrc = `simbrief ${resolved.source}`;
+        } catch (err) {
+          console.log(
+            `  SimBrief cargo ceiling unavailable: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+        if (cargoCeilingLb == null || cargoCeilingLb <= STATION_MAX_LOAD_PLACEHOLDER_LB) {
+          const row = findCareerPlayerAirframe(profile.profileId);
+          if (
+            row &&
+            typeof row.maxCargoKg === 'number' &&
+            row.maxCargoKg > 0
+          ) {
+            cargoCeilingLb = Math.round(row.maxCargoKg * KG_TO_LB);
+            ceilingSrc = `catalog ${row.typeId}`;
+          }
+        }
+        if (cargoCeilingLb == null || cargoCeilingLb <= STATION_MAX_LOAD_PLACEHOLDER_LB) {
+          const empty =
+            typeof emptyWeightLb === 'number' && Number.isFinite(emptyWeightLb)
+              ? emptyWeightLb
+              : snapshot.vars?.['EMPTY WEIGHT'];
+          const mtow =
+            typeof mtowLb === 'number' && Number.isFinite(mtowLb)
+              ? mtowLb
+              : snapshot.vars?.['MAX GROSS WEIGHT'];
+          if (
+            typeof empty === 'number' &&
+            typeof mtow === 'number' &&
+            mtow > empty
+          ) {
+            const useful = mtow - empty;
+            cargoCeilingLb = Math.round(useful * 0.7);
+            ceilingSrc = '0.7×(MTOW−EMPTY)';
+          }
+        }
+        if (cargoCeilingLb != null && cargoCeilingLb > STATION_MAX_LOAD_PLACEHOLDER_LB) {
+          const cfgMaxByIndex: Record<number, number> = {};
+          for (const st of profile.payload.stations) {
+            if (
+              typeof st.maxLoad === 'number' &&
+              st.maxLoad > STATION_MAX_LOAD_PLACEHOLDER_LB
+            ) {
+              cfgMaxByIndex[st.index] = st.maxLoad;
+            }
+          }
+          const split = resolveHomologateStationMaxLoads({
+            stickyIndexes: liveStationIndexes,
+            cfgMaxByIndex,
+            cargoCeilingLb,
+            crewIndexes: heuristicRoles.crewStations,
+          });
+          let changed = false;
+          for (const st of profile.payload.stations) {
+            const next = split.maxLoads[st.index];
+            if (
+              typeof next === 'number' &&
+              Number.isFinite(next) &&
+              next !== st.maxLoad
+            ) {
+              st.maxLoad = next;
+              changed = true;
+            }
+          }
+          if (changed) {
+            await writeFile(
+              drafted.path,
+              `${JSON.stringify(profile, null, 2)}\n`,
+              'utf8',
+            );
+            maxLoadNote = `Station maxLoad: ${split.summary} (${ceilingSrc})`;
+            console.log(`  → Raised station maxLoads from cargo ceiling (${ceilingSrc}).`);
+            console.log(`    ${split.summary}`);
+          }
+        } else {
+          console.log(
+            '  WARNING: bags still at 500 lb placeholder — inject Due will cap below aircraft useful load. Set maxLoad manually or fix SimBrief/catalog ceiling.',
+          );
+          maxLoadNote =
+            'Station maxLoad: placeholder 500 (cargo ceiling unresolved — inject will under-fill)';
+        }
+      } else {
+        const raised = profile.payload.stations
+          .filter((s) => (s.maxLoad ?? 0) > STATION_MAX_LOAD_PLACEHOLDER_LB)
+          .map((s) => `S${s.index}=${s.maxLoad}`);
+        if (raised.length > 0) {
+          maxLoadNote = `Station maxLoad: ${raised.join(',')} (cfg)`;
+        }
+      }
+    }
+
     printKv([
       ['draft', drafted.path],
       ['profileKey', profile.profileKey],
@@ -1520,6 +1711,10 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
         profile.fuel.tanks
           .map((t) => `${t.id} ${formatGalLbs(t.capacity, lbPerGal)}`)
           .join(', '),
+      ],
+      [
+        'station maxLoad',
+        profile.payload.stations.map((s) => `S${s.index}=${s.maxLoad}`).join(' '),
       ],
       ['stations', profile.payload.stations.length],
       ['CG envelope', `${profile.cg?.constraints?.minMac}..${profile.cg?.constraints?.maxMac}`],
@@ -1605,7 +1800,17 @@ export async function runHomologateWizard(options: HomologateWizardOptions): Pro
           : 'Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).',
       includeAux ? 'AUX/Aft tanks included.' : 'AUX deferred for v1.',
       `Payload stations from writetest: ${liveStationIndexes.join(', ')}.`,
-      'Station maxLoad: placeholder until flight_model.cfg calibrate.',
+      maxLoadNote,
+      ...(sdkStationCount > 16 || liveStationIndexes.some((i) => i > 16)
+        ? [
+            `Stations >16 (COUNT=${sdkStationCount}): Watch overflow batch required for Preflight S17+.`,
+          ]
+        : []),
+      ...(fuelResidualFloors.length > 0
+        ? [
+            `Fuel residual floors (writetest): ${fuelResidualFloors.join(', ')} — inject redistributeAroundResidualFloors keeps OFP total.`,
+          ]
+        : []),
       'Homologated with interactive wizard.',
     ];
 

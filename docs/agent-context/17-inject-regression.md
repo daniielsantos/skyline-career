@@ -137,7 +137,7 @@ node packages/agent/dist/cli.js smoke --profile profiles/examples\<profile>.json
 
 | # | Gate | Pass |
 |---|------|------|
-| A1 | `writetest` | Tanques + stations writable; sem `UNRECOGNIZED_ID` |
+| A1 | `writetest` / wizard discovery | Tanques + stations writable; soft re-probe; sem `UNRECOGNIZED_ID`; COUNT>16 avisado |
 | A2 | `draft-profile --calibrate` | Fuel offset / verify dentro do envelope |
 | A3 | `smoke` | Write + read back; payload/fuel dentro da tol do profile |
 

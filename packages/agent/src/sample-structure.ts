@@ -72,14 +72,14 @@ export async function sampleAircraftStructure(bridge: NamedPipeSimBridge): Promi
     stationCount = Math.max(
       1,
       Math.min(
-        16,
-        Math.round(
-          await bridge.readSimVar({
-            name: 'PAYLOAD STATION COUNT',
-            unit: 'number',
-          }),
+          32,
+          Math.round(
+            await bridge.readSimVar({
+              name: 'PAYLOAD STATION COUNT',
+              unit: 'number',
+            }),
+          ),
         ),
-      ),
     );
   } catch {
     stationCount = 8;

@@ -25,9 +25,9 @@ export interface DraftOptions {
    */
   liveStationIndexes?: number[];
   /**
-   * Optional structural maxLoad (lb) keyed by station index.
-   * Homologate wizard no longer live-probes clamps (usually uncapped in MSFS);
-   * missing indexes keep placeholder 500 until flight_model.cfg calibrate.
+   * Optional structural maxLoad (lb) keyed by station index from homologate
+   * cascade (clamp / cfg / SimBrief-or-useful-load split). Missing indexes keep
+   * placeholder 500.
    */
   liveStationMaxLoads?: Record<number, number>;
   /**
@@ -292,7 +292,7 @@ export async function draftProfileFromLive(
       stationCount = Math.max(
         1,
         Math.min(
-          16,
+          32,
           Math.round(
             await bridge.readSimVar({
               name: 'PAYLOAD STATION COUNT',

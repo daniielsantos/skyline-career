@@ -6,8 +6,11 @@ import {
   isStationWriteAccepted,
   liveStationIndexes,
   probeStationMaxLoads,
+  reprobeStickyPayloadStations,
+  resolveHomologateStationMaxLoads,
   stationWriteTolerance,
   STATION_CLAMP_PROBE_LB,
+  STATION_MAX_LOAD_PLACEHOLDER_LB,
 } from './discover-payload-stations.js';
 
 type StationState = Record<number, number>;
@@ -142,5 +145,68 @@ describe('probeStationMaxLoads', () => {
       }),
       170,
     );
+  });
+});
+
+describe('reprobeStickyPayloadStations', () => {
+  it('drops indexes that ignore the mid-weight batch write', async () => {
+    const bridge = stubStationBridge({
+      count: 5,
+      ghosts: [4, 5],
+      initial: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    });
+    const { sticky, dropped } = await reprobeStickyPayloadStations(
+      bridge,
+      [1, 2, 3, 4, 5],
+      { settleMs: 0, writeGapMs: 0 },
+    );
+    assert.deepEqual(sticky, [1, 2, 3]);
+    assert.deepEqual(dropped, [4, 5]);
+  });
+});
+
+describe('resolveHomologateStationMaxLoads', () => {
+  it('prefers clamp then cfg then cargo split', () => {
+    const r = resolveHomologateStationMaxLoads({
+      stickyIndexes: [1, 2, 3, 4, 5, 6],
+      clampByIndex: { 3: 900 },
+      cfgMaxByIndex: { 4: 1200 },
+      cargoCeilingLb: 8000,
+      crewIndexes: [1, 2],
+    });
+    assert.equal(r.maxLoads[3], 900);
+    assert.equal(r.sourceByIndex[3], 'clamp');
+    assert.equal(r.maxLoads[4], 1200);
+    assert.equal(r.sourceByIndex[4], 'cfg');
+    // bags 5,6 split 8000/2 (3 and 4 already set — wait, needSplit is 1,2,5,6)
+    // bagIndexes among needSplit excluding crew = 5,6 → 4000 each
+    assert.equal(r.maxLoads[5], 4000);
+    assert.equal(r.maxLoads[6], 4000);
+    assert.equal(r.sourceByIndex[5], 'cargo-split');
+    assert.ok((r.maxLoads[1] ?? 0) >= 750);
+    assert.ok((r.maxLoads[2] ?? 0) >= 750);
+  });
+
+  it('YS-11 style: six placeholders + SimBrief ceiling raises bags', () => {
+    const r = resolveHomologateStationMaxLoads({
+      stickyIndexes: [1, 2, 3, 4, 5, 6],
+      cargoCeilingLb: 7400,
+      crewIndexes: [1, 2],
+    });
+    assert.equal(r.maxLoads[3], 1850);
+    assert.equal(r.maxLoads[4], 1850);
+    assert.equal(r.maxLoads[5], 1850);
+    assert.equal(r.maxLoads[6], 1850);
+    assert.equal(r.maxLoads[1], 750);
+    assert.equal(r.maxLoads[2], 750);
+    assert.ok(!Object.values(r.maxLoads).every((v) => v === STATION_MAX_LOAD_PLACEHOLDER_LB));
+  });
+
+  it('keeps placeholder when no ceiling', () => {
+    const r = resolveHomologateStationMaxLoads({
+      stickyIndexes: [1, 2, 3],
+    });
+    assert.equal(r.maxLoads[3], STATION_MAX_LOAD_PLACEHOLDER_LB);
+    assert.equal(r.sourceByIndex[3], 'placeholder');
   });
 });

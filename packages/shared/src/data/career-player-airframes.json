@@ -64,22 +64,6 @@
     "fuelBurnKgPerNm": 0.35
   },
   {
-    "typeId": "blacksquare-bonanza-professional",
-    "aircraftClassId": "light_ga",
-    "label": "Bonanza A36/A36TC Professional",
-    "rolesPackRelPath": "profiles/ofp/blacksquare-bonanza-professional.json",
-    "simbriefIcao": "BE36",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 973,
-    "mtowKg": 1656,
-    "maxCargoKg": 660,
-    "fuelCapacityKg": 299,
-    "maxRangeNm": 915,
-    "cruiseFuelFlowKgPerHour": 45.4,
-    "cruiseSpeedKt": 174,
-    "fuelBurnKgPerNm": 0.261
-  },
-  {
     "typeId": "asobo-beechcraft-bonanza",
     "aircraftClassId": "light_ga",
     "label": "Beechcraft Bonanza G36",
@@ -94,22 +78,6 @@
     "cruiseFuelFlowKgPerHour": 45.4,
     "cruiseSpeedKt": 176,
     "fuelBurnKgPerNm": 0.258
-  },
-  {
-    "typeId": "blacksquare-b60-duke",
-    "aircraftClassId": "light_ga",
-    "label": "Duke B60 / Grand Duke",
-    "rolesPackRelPath": "profiles/ofp/blacksquare-b60-duke.json",
-    "simbriefIcao": "BE60",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 1990,
-    "mtowKg": 3062,
-    "maxCargoKg": 1072,
-    "fuelCapacityKg": 563,
-    "maxRangeNm": 1100,
-    "cruiseFuelFlowKgPerHour": 120,
-    "cruiseSpeedKt": 230,
-    "fuelBurnKgPerNm": 0.522
   },
   {
     "typeId": "blackbox-bn2-islander-cargo-tip-tanks",
@@ -131,6 +99,22 @@
     "cruiseFuelFlowKgPerHour": 86.2,
     "cruiseSpeedKt": 124,
     "fuelBurnKgPerNm": 0.695
+  },
+  {
+    "typeId": "blacksquare-bonanza-professional",
+    "aircraftClassId": "light_ga",
+    "label": "Bonanza A36/A36TC Professional",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-bonanza-professional.json",
+    "simbriefIcao": "BE36",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 973,
+    "mtowKg": 1656,
+    "maxCargoKg": 660,
+    "fuelCapacityKg": 299,
+    "maxRangeNm": 915,
+    "cruiseFuelFlowKgPerHour": 45.4,
+    "cruiseSpeedKt": 174,
+    "fuelBurnKgPerNm": 0.261
   },
   {
     "typeId": "microsoft-c400-corvalis",
@@ -195,6 +179,22 @@
     "cruiseFuelFlowKgPerHour": 31.3,
     "cruiseSpeedKt": 165,
     "fuelBurnKgPerNm": 0.19
+  },
+  {
+    "typeId": "blacksquare-b60-duke",
+    "aircraftClassId": "light_ga",
+    "label": "Duke B60 / Grand Duke",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-b60-duke.json",
+    "simbriefIcao": "BE60",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 1990,
+    "mtowKg": 3062,
+    "maxCargoKg": 1072,
+    "fuelCapacityKg": 563,
+    "maxRangeNm": 1100,
+    "cruiseFuelFlowKgPerHour": 120,
+    "cruiseSpeedKt": 230,
+    "fuelBurnKgPerNm": 0.522
   },
   {
     "typeId": "a2a-piper-aerostar-600",
@@ -498,22 +498,6 @@
     "fuelBurnKgPerNm": 0.8
   },
   {
-    "typeId": "blacksquare-b36tp-bonanza-professional",
-    "aircraftClassId": "light_turboprop",
-    "label": "Bonanza B36TP Professional",
-    "rolesPackRelPath": "profiles/ofp/blacksquare-b36tp-bonanza-professional.json",
-    "simbriefIcao": "B36T",
-    "simbriefAirframeMatch": "Default",
-    "oewKg": 1068,
-    "mtowKg": 1837,
-    "maxCargoKg": 769,
-    "fuelCapacityKg": 377,
-    "maxRangeNm": 982,
-    "cruiseFuelFlowKgPerHour": 79.4,
-    "cruiseSpeedKt": 250,
-    "fuelBurnKgPerNm": 0.318
-  },
-  {
     "typeId": "asobo-beechcraft-king-air-350i",
     "aircraftClassId": "light_turboprop",
     "label": "Beechcraft King Air 350i",
@@ -544,6 +528,22 @@
     "cruiseFuelFlowKgPerHour": 181.4,
     "cruiseSpeedKt": 290,
     "fuelBurnKgPerNm": 0.626
+  },
+  {
+    "typeId": "blacksquare-b36tp-bonanza-professional",
+    "aircraftClassId": "light_turboprop",
+    "label": "Bonanza B36TP Professional",
+    "rolesPackRelPath": "profiles/ofp/blacksquare-b36tp-bonanza-professional.json",
+    "simbriefIcao": "B36T",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 1068,
+    "mtowKg": 1837,
+    "maxCargoKg": 769,
+    "fuelCapacityKg": 377,
+    "maxRangeNm": 982,
+    "cruiseFuelFlowKgPerHour": 79.4,
+    "cruiseSpeedKt": 250,
+    "fuelBurnKgPerNm": 0.318
   },
   {
     "typeId": "microsoft-c408-skycourier-cargo",
@@ -767,6 +767,20 @@
     "cruiseFuelFlowKgPerHour": 112.5,
     "cruiseSpeedKt": 330,
     "fuelBurnKgPerNm": 0.341
+  },
+  {
+    "typeId": "inibuilds-ys-11",
+    "aircraftClassId": "light_turboprop",
+    "label": "YS-11",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-ys-11.json",
+    "simbriefIcao": "YS11",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 14883,
+    "mtowKg": 24499,
+    "maxCargoKg": 7615,
+    "fuelCapacityKg": 6045,
+    "maxRangeNm": 800,
+    "fuelBurnKgPerNm": 0.8
   },
   {
     "typeId": "microsoft-douglas-dc-3-metal-left",

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { fuelFlowKgPerHourFromTotalWeightDelta } from './watch-helpers.ts';
+import {
+  fuelFlowKgPerHourFromTotalWeightDelta,
+  sumFlightFuelFlowKgPerHour,
+} from './watch-helpers.ts';
 
 describe('fuelFlowKgPerHourFromTotalWeightDelta', () => {
   it('derives burn from FUEL TOTAL drop across a Watch tick', () => {
@@ -31,5 +34,33 @@ describe('fuelFlowKgPerHourFromTotalWeightDelta', () => {
       }),
       undefined,
     );
+  });
+});
+
+describe('sumFlightFuelFlowKgPerHour', () => {
+  it('ignores sticky ~1 GPH with engines off (BN2)', () => {
+    assert.equal(
+      sumFlightFuelFlowKgPerHour({
+        numberOfEngines: 2,
+        combustion: [false, false],
+        pph: [0, 0],
+        recip: [0, 0],
+        gph: [1, 1],
+        general: [undefined, undefined],
+      }),
+      undefined,
+    );
+  });
+
+  it('accepts real GPH idle when PPH is missing', () => {
+    const kg = sumFlightFuelFlowKgPerHour({
+      numberOfEngines: 2,
+      combustion: [false, false],
+      pph: [0, 0],
+      recip: [0, 0],
+      gph: [8, 8],
+      general: [undefined, undefined],
+    });
+    assert.ok(kg != null && kg > 40);
   });
 });

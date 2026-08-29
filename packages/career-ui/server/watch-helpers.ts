@@ -348,10 +348,14 @@ function pickEngineFlowLbPerHour(
 ): number | undefined {
   for (const candidate of candidates) {
     const raw = candidate.raw;
+    // GPH often sticks at ~1.0 with engines off (BN2 tip-tank GA). That is
+    // ~6.7 lb/h per side — enough to fake “running” via kg/h conversion.
+    // Real idle/cruise GPH is well above 2.
+    const minRaw = candidate.asGph ? 2 : 0.3;
     if (
       typeof raw !== 'number' ||
       !Number.isFinite(raw) ||
-      !(raw > (candidate.asGph ? 0.05 : 0.3))
+      !(raw > minRaw)
     ) {
       continue;
     }
@@ -361,7 +365,8 @@ function pickEngineFlowLbPerHour(
   return undefined;
 }
 
-function sumFlightFuelFlowKgPerHour(opts: {
+/** @internal Exported for unit tests — flight-sample fuel flow aggregation. */
+export function sumFlightFuelFlowKgPerHour(opts: {
   numberOfEngines?: number;
   combustion: boolean[];
   pph: Array<number | undefined>;
@@ -556,12 +561,23 @@ export async function sampleLiveFlight(
     gph: [flowGph1, flowGph2],
     general: [flowGeneral1, undefined],
   });
+  // Engines-running gate: ignore GPH. Sticky ~1 GPH on GA twins with cutoff
+  // still crossed ENGINE_FUEL_FLOW_ON_KG_H after lb→kg conversion; probe only
+  // reads PPH and was already correct. Cruise burn keeps GPH above.
+  const enginesFuelFlowKgPerHour = sumFlightFuelFlowKgPerHour({
+    numberOfEngines,
+    combustion: combustionFlags,
+    pph: [flowPph1, flowPph2],
+    recip: [flowRecip1, flowRecip2],
+    gph: [undefined, undefined],
+    general: [flowGeneral1, undefined],
+  });
   const enginesRunning = inferEnginesRunning({
     snapshotRunning: snap.enginesRunning,
     n1Pct,
     rpm,
     combustion,
-    fuelFlowKgPerHour,
+    fuelFlowKgPerHour: enginesFuelFlowKgPerHour,
   });
 
   return {

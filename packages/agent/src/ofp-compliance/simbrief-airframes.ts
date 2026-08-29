@@ -242,10 +242,14 @@ export function resolveBonanzaSimBriefIcao(opts: {
     return catalog || 'B36T';
   }
 
-  if (/Black Square A36TC Bonanza/i.test(live) || /\bA36TC\b/i.test(live)) {
+  // A36TC before A36 — titles are "…A36TC Bonanza…", not "…A36 Bonanza…".
+  if (
+    /Black Square A36\s*TC Bonanza/i.test(live) ||
+    /\bA36\s*TC\b/i.test(live)
+  ) {
     return 'BT36';
   }
-  if (/Black Square A36 Bonanza/i.test(live)) {
+  if (/Black Square A36 Bonanza/i.test(live) || /\bA36\b/i.test(live)) {
     return 'BE36';
   }
   return catalog || 'BE36';

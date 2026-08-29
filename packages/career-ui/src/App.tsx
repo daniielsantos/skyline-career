@@ -7639,15 +7639,9 @@ export function App() {
   }
 
   async function onDispatch(mission: Mission) {
-    const cached = simbriefLaunchUrl?.trim() ?? '';
-    // Re-open must not await /api/dispatch first: that drops the user gesture,
-    // so window.open fallback fails outside this click.
-    if (mission.status === 'dispatched' && cached) {
-      await onOpenSimbriefLaunchUrl();
-      return;
-    }
-
-    // Browser: reserve a tab under this click. Desktop: IPC after await.
+    // Always rebuild the SimBrief URL (Bonanza A36 vs A36TC → BE36 vs BT36).
+    // Re-using a cached href kept the wrong type after switching glass.
+    // Browser: reserve a tab under this click so await does not drop the gesture.
     const pendingTab = reserveSimBriefBrowserTab();
     setBusy(true);
     setError(null);
@@ -7656,6 +7650,7 @@ export function App() {
         missionId: mission.id,
         open: true,
         weightSystem,
+        liveTitle: simBridgeRef.current?.aircraftTitle ?? null,
       });
       if (result.mission) {
         setMissions((current) =>

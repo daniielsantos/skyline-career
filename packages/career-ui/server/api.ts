@@ -6144,6 +6144,8 @@ export function createCareerApiServer(port = 8787) {
           open?: boolean;
           weightSystem?: 'metric' | 'imperial';
           units?: 'KGS' | 'LBS';
+          /** UI SimBridge title — preferred over last probe for family ICAO. */
+          liveTitle?: string | null;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
@@ -6180,12 +6182,14 @@ export function createCareerApiServer(port = 8787) {
         }
 
         try {
+          const liveTitle =
+            body.liveTitle?.trim() || getLastProbeAircraftTitle();
           const { built, flyable, cargoLimit } = await buildFlyableMissionDispatch(
             prep.mission,
             prep.dispatchDistanceNm,
             {
               units: body.units ?? body.weightSystem,
-              liveTitle: getLastProbeAircraftTitle(),
+              liveTitle,
             },
           );
           const mission = await withCareerWrite((world, missions) => {

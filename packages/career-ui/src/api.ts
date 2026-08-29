@@ -2976,6 +2976,8 @@ export function postDispatch(opts: {
   missionId: string;
   open?: boolean;
   weightSystem?: 'metric' | 'imperial';
+  /** Live MSFS title — picks Bonanza BE36 vs BT36 (and other family glass). */
+  liveTitle?: string | null;
 }) {
   return api<{
     mission: Mission;

@@ -219,6 +219,14 @@ describe('resolveBonanzaSimBriefIcao', () => {
     assert.equal(
       resolveBonanzaSimBriefIcao({
         airframeTypeId: 'blacksquare-bonanza-professional',
+        liveTitle: 'Black Square A36TC Bonanza Professional N5172C',
+        catalogIcao: 'BE36',
+      }),
+      'BT36',
+    );
+    assert.equal(
+      resolveBonanzaSimBriefIcao({
+        airframeTypeId: 'blacksquare-bonanza-professional',
         liveTitle: 'Black Square B36TP Bonanza Professional',
         catalogIcao: 'BE36',
       }),

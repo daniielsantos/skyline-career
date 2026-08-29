@@ -115,11 +115,74 @@ export interface FlightGroundSample {
 }
 
 /**
+ * Light SimVar batch shared by Watch probe, SimBridge status, and Preflight
+ * live-reader — same thresholds via {@link inferEnginesRunning}.
+ */
+export const ENGINE_RUNNING_PROBE_SIMVARS = [
+  { name: 'TURB ENG N1:1', unit: 'percent' },
+  { name: 'TURB ENG N1:2', unit: 'percent' },
+  { name: 'GENERAL ENG RPM:1', unit: 'rpm' },
+  { name: 'GENERAL ENG RPM:2', unit: 'rpm' },
+  { name: 'GENERAL ENG COMBUSTION:1', unit: 'bool' },
+  { name: 'GENERAL ENG COMBUSTION:2', unit: 'bool' },
+  { name: 'ENG FUEL FLOW PPH:1', unit: 'pounds per hour' },
+  { name: 'ENG FUEL FLOW PPH:2', unit: 'pounds per hour' },
+] as const;
+
+function finiteProbeSample(n: unknown): number | undefined {
+  return typeof n === 'number' && Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Map an {@link ENGINE_RUNNING_PROBE_SIMVARS} result array into
+ * {@link inferEnginesRunning}. Values may be sparse/undefined when a read fails.
+ */
+export function inferEnginesRunningFromProbeBatch(
+  values: readonly unknown[],
+  snapshotRunning: boolean,
+): boolean {
+  const n1Eng1 = finiteProbeSample(values[0]);
+  const n1Eng2 = finiteProbeSample(values[1]);
+  const rpmEng1 = finiteProbeSample(values[2]);
+  const rpmEng2 = finiteProbeSample(values[3]);
+  const combEng1 = finiteProbeSample(values[4]);
+  const combEng2 = finiteProbeSample(values[5]);
+  const pph1 = finiteProbeSample(values[6]);
+  const pph2 = finiteProbeSample(values[7]);
+  const n1Pct = [n1Eng1, n1Eng2].filter(
+    (n): n is number => typeof n === 'number',
+  );
+  const rpm = [rpmEng1, rpmEng2].filter(
+    (n): n is number => typeof n === 'number',
+  );
+  const combustion = [combEng1, combEng2]
+    .filter((n): n is number => typeof n === 'number')
+    .map((n) => n > 0.5);
+  const pph = [pph1, pph2].filter(
+    (n): n is number => typeof n === 'number' && n > 0.3,
+  );
+  const fuelFlowKgPerHour =
+    pph.length > 0
+      ? Math.round(pph.reduce((s, n) => s + n, 0) * 0.45359237 * 10) / 10
+      : undefined;
+  return inferEnginesRunning({
+    snapshotRunning,
+    n1Pct,
+    rpm,
+    combustion,
+    fuelFlowKgPerHour,
+  });
+}
+
+/**
  * Prefer N1 / RPM / GENERAL ENG COMBUSTION / fuel flow over the snapshot
  * ENG COMBUSTION:1 bit, which stays true after cutoff / world-menu spawn on
  * several MSFS turboprops (ATR, PC-12). Accu-Sim pistons often leave
  * GENERAL ENG COMBUSTION at 0 while running — use RPM or fuel flow, not the
  * Host snapshot bit.
+ *
+ * Without positive spool/flow evidence, returns false — never trusts the Host
+ * sticky bit alone (empty samples after a failed read included).
  */
 export function inferEnginesRunning(input: {
   snapshotRunning: boolean;
@@ -143,19 +206,11 @@ export function inferEnginesRunning(input: {
       : undefined;
 
   if (n1.some((n) => n >= ENGINE_N1_OFF_PCT)) {
-    const rpmAllDead =
-      rpmRaw.length > 0 && rpmRaw.every((r) => r < ENGINE_RPM_OFF);
-    const flowOff = flow !== undefined && flow < ENGINE_FUEL_FLOW_ON_KG_H;
-    // Just Flight Fokker / sticky N1: ~20% N1 with dead RPM and no burn is off.
-    // Running idle still has fuel flow (or piston RPM).
-    if (
-      rpmAllDead &&
-      (flowOff || (flow === undefined && comb.some((c) => c)))
-    ) {
-      // fall through to combustion / flow gates
-    } else {
-      return true;
-    }
+    // N1 alone sticks after cutoff / world menu — only trust spool when RPM or
+    // fuel flow corroborates (turboprop idle still burns; residual N1 does not).
+    if (rpm.some((r) => r >= ENGINE_RPM_OFF)) return true;
+    if (flow !== undefined && flow >= ENGINE_FUEL_FLOW_ON_KG_H) return true;
+    // fall through to combustion / flow gates
   }
   if (n1.length > 0 && n1.every((n) => n < ENGINE_N1_OFF_PCT)) return false;
 
@@ -174,12 +229,10 @@ export function inferEnginesRunning(input: {
   if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
   // Host snapshot is ENG COMBUSTION:1 — same sticky bit after menu spawn.
   // Accu-Sim with engines actually running should have hit RPM or fuel flow.
-  const sampledDeadN1 =
-    n1Raw.length > 0 && n1Raw.every((n) => n < ENGINE_N1_OFF_PCT);
-  const sampledDeadRpm =
-    rpmRaw.length === 0 || rpmRaw.every((r) => r < ENGINE_RPM_OFF);
-  if (sampledDeadN1 && sampledDeadRpm) return false;
-  return input.snapshotRunning;
+  // Empty samples (read failed / not probed) → false; do not revive sticky Host.
+  // `snapshotRunning` kept for call-site compatibility; never trusted alone.
+  void input.snapshotRunning;
+  return false;
 }
 
 /**

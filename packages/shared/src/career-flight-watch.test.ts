@@ -8,6 +8,7 @@ import {
   evaluateMissionFlightTransition,
   flightPhaseFromSample,
   inferEnginesRunning,
+  inferEnginesRunningFromProbeBatch,
   isNearAirport,
   mergeAirborneClockOntoMission,
   parseBlockTimeToMs,
@@ -472,6 +473,15 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(
       inferEnginesRunning({
         snapshotRunning: true,
+        n1Pct: [55, 54],
+        rpm: [0, 0],
+        combustion: [false, false],
+      }),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
         n1Pct: [28, 27],
         rpm: [0, 0],
         combustion: [true, true],
@@ -486,8 +496,17 @@ describe('evaluateMissionFlightTransition', () => {
       inferEnginesRunning({ snapshotRunning: true, n1Pct: [4] }),
       false,
     );
+    // N1 alone (no RPM/flow) is not enough — sticky residual spool.
     assert.equal(
       inferEnginesRunning({ snapshotRunning: false, n1Pct: [55] }),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: false,
+        n1Pct: [55],
+        fuelFlowKgPerHour: 80,
+      }),
       true,
     );
     assert.equal(
@@ -541,6 +560,43 @@ describe('evaluateMissionFlightTransition', () => {
         combustion: [false, false],
       }),
       false,
+    );
+  });
+
+  it('inferEnginesRunning treats empty samples as off despite sticky Host', () => {
+    assert.equal(
+      inferEnginesRunning({ snapshotRunning: true }),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: true,
+        n1Pct: [],
+        rpm: [],
+        combustion: [],
+      }),
+      false,
+    );
+  });
+
+  it('inferEnginesRunningFromProbeBatch maps sticky Host + dead spool to off', () => {
+    assert.equal(
+      inferEnginesRunningFromProbeBatch(
+        [0, 0, 0, 0, 1, 1, 0, 0],
+        true,
+      ),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunningFromProbeBatch([], true),
+      false,
+    );
+    assert.equal(
+      inferEnginesRunningFromProbeBatch(
+        [55, 54, 0, 0, 1, 1, 900, 880],
+        false,
+      ),
+      true,
     );
   });
 

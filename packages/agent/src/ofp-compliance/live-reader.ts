@@ -1,8 +1,10 @@
 import {
   DEFAULT_AVGAS_LB_PER_GAL,
   DEFAULT_JET_A_LB_PER_GAL,
+  ENGINE_RUNNING_PROBE_SIMVARS,
   applyPmdgEfbPayloadCorrection,
   enrichPayloadWithRoles,
+  inferEnginesRunningFromProbeBatch,
   resolveLivePayloadLb,
   resolveLiveSourcePrefs,
   toLb,
@@ -997,12 +999,28 @@ export async function readLiveLoad(
     }
   }
 
+  let enginesRunning = snapshot.enginesRunning;
+  try {
+    const engineProbe = await readSimVarsSoft(bridge, [
+      ...ENGINE_RUNNING_PROBE_SIMVARS,
+    ]);
+    enginesRunning = inferEnginesRunningFromProbeBatch(
+      engineProbe,
+      snapshot.enginesRunning,
+    );
+  } catch {
+    enginesRunning = inferEnginesRunningFromProbeBatch(
+      [],
+      snapshot.enginesRunning,
+    );
+  }
+
   return {
     fuel,
     payload,
     weights,
     onGround: snapshot.onGround,
-    enginesRunning: snapshot.enginesRunning,
+    enginesRunning,
     pmdgEfb,
     tfdiEfb,
     a2a,

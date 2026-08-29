@@ -1430,10 +1430,13 @@ export function DispatchActivePanel(props: {
                   watchSample?.onGround ??
                   props.simBridge?.onGround ??
                   view.aircraft.onGround;
+                // Never fall back to lastPreflightCheck.aircraft.enginesRunning —
+                // that was the Host ENG COMBUSTION sticky bit. Watch → probe only;
+                // unknown live sample → off (same policy as inferEnginesRunning).
                 const liveEngines =
                   watchSample?.enginesRunning ??
                   props.simBridge?.enginesRunning ??
-                  view.aircraft.enginesRunning;
+                  false;
                 const loc =
                   props.watch?.running &&
                   props.watch.missionId === mission.id &&

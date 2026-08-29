@@ -12,7 +12,8 @@ import {
   clampPaxAndCargoDueToHoldsLb,
   findCareerPlayerAirframe,
   flightPhaseFromSample,
-  inferEnginesRunning,
+  ENGINE_RUNNING_PROBE_SIMVARS,
+  inferEnginesRunningFromProbeBatch,
   isPaxAndCargoLoadLayout,
   KG_TO_LB,
   normalizeAircraftTitle,
@@ -408,59 +409,17 @@ function phaseFromFlags(
   );
 }
 
-function finiteProbeNum(n: unknown): number | undefined {
-  return typeof n === 'number' && Number.isFinite(n) ? n : undefined;
-}
-
 /** Host ENG COMBUSTION:1 sticks true on JF Fokker / ATR after cutoff. */
 async function inferProbeEnginesRunning(
   bridge: NamedPipeSimBridge,
   snapshotRunning: boolean,
 ): Promise<boolean> {
   try {
-    const v = await bridge.readSimVars([
-      { name: 'TURB ENG N1:1', unit: 'percent' },
-      { name: 'TURB ENG N1:2', unit: 'percent' },
-      { name: 'GENERAL ENG RPM:1', unit: 'rpm' },
-      { name: 'GENERAL ENG RPM:2', unit: 'rpm' },
-      { name: 'GENERAL ENG COMBUSTION:1', unit: 'bool' },
-      { name: 'GENERAL ENG COMBUSTION:2', unit: 'bool' },
-      { name: 'ENG FUEL FLOW PPH:1', unit: 'pounds per hour' },
-      { name: 'ENG FUEL FLOW PPH:2', unit: 'pounds per hour' },
-    ]);
-    const n1Eng1 = finiteProbeNum(v[0]);
-    const n1Eng2 = finiteProbeNum(v[1]);
-    const rpmEng1 = finiteProbeNum(v[2]);
-    const rpmEng2 = finiteProbeNum(v[3]);
-    const combEng1 = finiteProbeNum(v[4]);
-    const combEng2 = finiteProbeNum(v[5]);
-    const pph1 = finiteProbeNum(v[6]);
-    const pph2 = finiteProbeNum(v[7]);
-    const n1Pct = [n1Eng1, n1Eng2].filter(
-      (n): n is number => typeof n === 'number',
-    );
-    const rpm = [rpmEng1, rpmEng2].filter(
-      (n): n is number => typeof n === 'number',
-    );
-    const combustion = [combEng1, combEng2]
-      .filter((n): n is number => typeof n === 'number')
-      .map((n) => n > 0.5);
-    const pph = [pph1, pph2].filter(
-      (n): n is number => typeof n === 'number' && n > 0.3,
-    );
-    const fuelFlowKgPerHour =
-      pph.length > 0
-        ? Math.round(pph.reduce((s, n) => s + n, 0) * 0.45359237 * 10) / 10
-        : undefined;
-    return inferEnginesRunning({
-      snapshotRunning,
-      n1Pct,
-      rpm,
-      combustion,
-      fuelFlowKgPerHour,
-    });
+    const v = await bridge.readSimVars([...ENGINE_RUNNING_PROBE_SIMVARS]);
+    return inferEnginesRunningFromProbeBatch(v, snapshotRunning);
   } catch {
-    return snapshotRunning;
+    // No spool/flow evidence — do not revive Host sticky bit.
+    return inferEnginesRunningFromProbeBatch([], snapshotRunning);
   }
 }
 
@@ -1083,11 +1042,15 @@ async function applyMissionOfpLoadExclusive(
       await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
       planningLive = await readPlanningLive();
     }
+    const enginesRunning = await inferProbeEnginesRunning(
+      bridge,
+      snap.enginesRunning,
+    );
     beforeLive = {
       tanks: planningLive.tanks,
       stations: planningLive.stations,
       onGround: snap.onGround,
-      enginesRunning: snap.enginesRunning,
+      enginesRunning,
     };
 
     // Same density as buildOfpLoadPlan — raw MSFS FUEL WEIGHT PER GALLON often

@@ -19,7 +19,7 @@
 - Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).
 - AUX deferred for v1.
 - Payload stations from writetest: 1, 2, 3, 4, 5, 6.
-- Station maxLoad: placeholder until cfg or clamp.
+- Station maxLoad: S1/S2 crew **750**; S3–S6 bags **2000** each (Σ 8000 lb ≥ Market `maxCargoKg` 3514). Was placeholder 500 → inject Due capped at 2000 lb.
 - Homologated with interactive wizard.
 
 ## Homologated
